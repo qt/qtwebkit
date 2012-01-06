@@ -1,0 +1,94 @@
+# -------------------------------------------------------------------
+# QtWebKit defaults for qmake. These rules are parsed before the
+# actual project file.
+#
+# See 'Tools/qmake/README' for an overview of the build system
+# -------------------------------------------------------------------
+
+load(functions)
+
+# FIXME: In this case we probably want to exit early so that we
+# don't load all of the custom build tweaks needlessly.
+pro_file = $$_PRO_FILE_ # Checking the variable directly does not work
+isEmpty(pro_file): CONFIG += recursive_include
+
+# We default to release builds
+!build_pass {
+    CONFIG += release
+    CONFIG -= debug
+}
+
+# Resolve root directories for source and build
+ROOT_WEBKIT_DIR = $$replace(IN_PWD, /Tools/qmake/mkspecs/features,)
+WEBKIT_SUBDIR = $$replace(_PRO_FILE_PWD_, $${ROOT_WEBKIT_DIR},)
+ROOT_BUILD_DIR = $$replace(OUT_PWD, $$WEBKIT_SUBDIR,)
+
+# We want the QtWebKit API forwarding includes to live in the root build dir,
+# except when we are running the config.tests in Tools/qmake.
+pro_file_name = $$basename(_PRO_FILE_)
+!equals(pro_file_name, configure.pro): QMAKE_SYNCQT_OUTDIR = $$ROOT_BUILD_DIR
+
+load(default_pre) # Load Qt's defaults after we've resolved the build directory
+
+equals(OUT_PWD, $${ROOT_BUILD_DIR}) {
+    !recursive_include:CONFIG += root_project_file
+    BUILD_ROOT_RELATIVE_TO_OUT_PWD = .
+} else {
+    subdir_parts = $$replace(OUT_PWD, ^$${ROOT_BUILD_DIR}$${QMAKE_DIR_SEP},)
+    subdir_parts = $$split(subdir_parts, $${QMAKE_DIR_SEP})
+    for(subdir, subdir_parts) {
+        BUILD_ROOT_RELATIVE_TO_OUT_PWD += ..
+    }
+    BUILD_ROOT_RELATIVE_TO_OUT_PWD = $$join(BUILD_ROOT_RELATIVE_TO_OUT_PWD, $${QMAKE_DIR_SEP})
+}
+
+# Make sure QMAKEPATH is set for recursive targets
+win32-msvc*: QMAKE_QMAKE = \(set QMAKEPATH=$$(QMAKEPATH)\) && $$QMAKE_QMAKE
+else: QMAKE_QMAKE = QMAKEPATH=$$(QMAKEPATH) $$QMAKE_QMAKE
+
+# Default location of generated sources
+GENERATED_SOURCES_DESTDIR = generated
+
+QUOTE = ""
+DOUBLE_ESCAPED_QUOTE = ""
+ESCAPE = ""
+win32-msvc* {
+    ESCAPE = "^"
+} else:win32-g++*:isEmpty(QMAKE_SH) {
+    # MinGW's make will run makefile commands using sh, even if make
+    # was run from the Windows shell, if it finds sh in the path.
+    ESCAPE = "^"
+} else {
+    QUOTE = "\'"
+    DOUBLE_ESCAPED_QUOTE = "\\\'"
+}
+
+MAKEFILE_NOOP_COMMAND = @echo -n
+win32-msvc*: MAKEFILE_NOOP_COMMAND = @echo >NUL
+
+# Set up a default python version
+scratchbox: PYTHON = python2.6
+else: PYTHON = python
+
+!haveQt(4, 8):!haveQt(5):!recursive_include: error("Building WebKit with Qt versions older than 4.8 is not supported.")
+
+!haveQt(5):!no_webkit2 {
+    root_project_file {
+        message("Building WebKit2 with Qt versions older than 5.0 is not supported. Disabling WebKit2.")
+        message("Read http://www.mail-archive.com/webkit-qt@lists.webkit.org/msg01674.html for more information.")
+    }
+    CONFIG += no_webkit2
+}
+
+haveQt(5): {
+    isEmpty(QT.widgets.name)|isEmpty(QT.printsupport.name) {
+        root_project_file: error("Building WebKit against Qt 5.0 requires the QtWidgets and QtPrintSupport modules.")
+    }
+}
+
+QT.webkit.modulefile = $${ROOT_WEBKIT_DIR}/Tools/qmake/mkspecs/modules/qt_webkit.pri
+include($$QT.webkit.modulefile)
+VERSION = $${QT.webkit.VERSION}
+
+# Set some defaults for specific platforms
+CONFIG += include_webinspector
