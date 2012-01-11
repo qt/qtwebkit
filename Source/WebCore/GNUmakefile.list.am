@@ -1674,6 +1674,8 @@ webcore_sources += \
 	Source/WebCore/dom/TreeDepthLimit.h \
 	Source/WebCore/dom/TreeScope.cpp \
 	Source/WebCore/dom/TreeScope.h \
+	Source/WebCore/dom/TreeScopeAdopter.cpp \
+	Source/WebCore/dom/TreeScopeAdopter.h \
 	Source/WebCore/dom/TreeWalker.cpp \
 	Source/WebCore/dom/TreeWalker.h \
 	Source/WebCore/dom/UIEvent.cpp \
@@ -2325,6 +2327,8 @@ webcore_sources += \
 	Source/WebCore/inspector/ConsoleMessage.h \
 	Source/WebCore/inspector/ContentSearchUtils.cpp \
 	Source/WebCore/inspector/ContentSearchUtils.h \
+	Source/WebCore/inspector/DOMEditor.cpp \
+	Source/WebCore/inspector/DOMEditor.h \
 	Source/WebCore/inspector/DOMNodeHighlighter.cpp \
 	Source/WebCore/inspector/DOMNodeHighlighter.h \
 	Source/WebCore/inspector/DOMWrapperVisitor.h \
@@ -2646,6 +2650,8 @@ webcore_sources += \
 	Source/WebCore/page/DOMTimer.h \
 	Source/WebCore/page/DOMWindow.cpp \
 	Source/WebCore/page/DOMWindow.h \
+	Source/WebCore/page/DOMWindowProperty.cpp \
+	Source/WebCore/page/DOMWindowProperty.h \
 	Source/WebCore/page/DragActions.h \
 	Source/WebCore/page/DragClient.h \
 	Source/WebCore/page/DragController.cpp \
@@ -2664,6 +2670,8 @@ webcore_sources += \
 	Source/WebCore/page/Frame.h \
 	Source/WebCore/page/FrameActionScheduler.cpp \
 	Source/WebCore/page/FrameActionScheduler.h \
+	Source/WebCore/page/FrameDestructionObserver.cpp \
+	Source/WebCore/page/FrameDestructionObserver.h \
 	Source/WebCore/page/FrameTree.cpp \
 	Source/WebCore/page/FrameTree.h \
 	Source/WebCore/page/FrameView.cpp \
@@ -2954,6 +2962,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/GraphicsContext.h \
 	Source/WebCore/platform/graphics/GraphicsLayer.h \
 	Source/WebCore/platform/graphics/GraphicsLayer.cpp \
+	Source/WebCore/platform/graphics/GraphicsLayerClient.h \
 	Source/WebCore/platform/graphics/GraphicsTypes.cpp \
 	Source/WebCore/platform/graphics/GraphicsTypes.h \
 	Source/WebCore/platform/graphics/GraphicsTypes3D.h \
@@ -3745,6 +3754,8 @@ webcore_sources += \
 	Source/WebCore/storage/AbstractDatabase.h \
 	Source/WebCore/storage/ChangeVersionWrapper.cpp \
 	Source/WebCore/storage/ChangeVersionWrapper.h \
+	Source/WebCore/storage/DOMWindowSQLDatabase.cpp \
+	Source/WebCore/storage/DOMWindowSQLDatabase.h \
 	Source/WebCore/storage/DatabaseAuthorizer.cpp \
 	Source/WebCore/storage/DatabaseAuthorizer.h \
 	Source/WebCore/storage/DatabaseCallback.h \
@@ -4591,6 +4602,7 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSSQLTransactionSyncCallback.h
 
 dom_binding_idls += \
+	$(WebCore)/storage/DOMWindowSQLDatabase.idl \
 	$(WebCore)/storage/Database.idl \
 	$(WebCore)/storage/DatabaseCallback.idl \
 	$(WebCore)/storage/DatabaseSync.idl \
@@ -5451,12 +5463,16 @@ webcore_built_sources += \
 webcore_sources += \
 	Source/ThirdParty/ANGLE/include/GLSLANG/ShaderLang.h \
 	Source/ThirdParty/ANGLE/src/compiler/BaseTypes.h \
+	Source/ThirdParty/ANGLE/src/compiler/BuiltInFunctionEmulator.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/BuiltInFunctionEmulator.h \
 	Source/ThirdParty/ANGLE/src/compiler/CodeGenGLSL.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/Common.h \
 	Source/ThirdParty/ANGLE/src/compiler/Compiler.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/ConstantUnion.h \
 	Source/ThirdParty/ANGLE/src/compiler/debug.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/debug.h \
+	Source/ThirdParty/ANGLE/src/compiler/DetectRecursion.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/DetectRecursion.h \
 	Source/ThirdParty/ANGLE/src/compiler/ExtensionBehavior.h \
 	Source/ThirdParty/ANGLE/src/compiler/ForLoopUnroll.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/ForLoopUnroll.h \
@@ -5498,6 +5514,7 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/cpp.c \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/cpp.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/cppstruct.c \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/length_limits.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/memory.c \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/memory.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/parser.h \
@@ -5631,7 +5648,7 @@ webcore_sources += \
 endif  # END ENABLE_REQUEST_ANIMATION_FRAME
 
 # ---
-# Compile with accelerated compositing support
+# Accelerated compositing support
 # ---
 if USE_ACCELERATED_COMPOSITING
 if USE_CLUTTER
@@ -5646,6 +5663,7 @@ if USE_TEXTURE_MAPPER_CAIRO
 webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
@@ -5661,6 +5679,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/opengl/TextureMapperGL.h \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \

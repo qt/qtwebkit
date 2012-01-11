@@ -123,16 +123,6 @@ Element::~Element()
     removeShadowRoot();
     if (m_attributeMap)
         m_attributeMap->detachFromElement();
-
-    if (hasRareData()) {
-        ElementRareData* elementRareData = rareData();
-        if (elementRareData->hasCachedHTMLCollections()) {
-            for (unsigned type = 0; type < NumNodeCollectionTypes; ++type) {
-                if (HTMLCollection* collection = elementRareData->cachedHTMLCollection(static_cast<CollectionType>(FirstNodeCollectionType + type)))
-                    collection->detachFromNode();
-            }
-        }
-    }
 }
 
 inline ElementRareData* Element::rareData() const
@@ -674,7 +664,7 @@ void Element::attributeChanged(Attribute* attr, bool)
 
 void Element::updateAfterAttributeChanged(Attribute* attr)
 {
-    invalidateNodeListsCacheAfterAttributeChanged();
+    invalidateNodeListsCacheAfterAttributeChanged(attr->name());
 
     if (!AXObjectCache::accessibilityEnabled())
         return;
@@ -708,9 +698,12 @@ void Element::recalcStyleIfNeededAfterAttributeChanged(Attribute* attr)
 {
     if (needsStyleRecalc())
         return;
-
-    if (document()->attached() && document()->styleSelector()->hasSelectorForAttribute(attr->name().localName()))
-        setNeedsStyleRecalc();
+    if (!document()->attached())
+        return;
+    CSSStyleSelector* styleSelector = document()->styleSelectorIfExists();
+    if (styleSelector && !styleSelector->hasSelectorForAttribute(attr->name().localName()))
+        return;
+    setNeedsStyleRecalc();
 }
 
 void Element::idAttributeChanged(Attribute* attr)
@@ -1221,7 +1214,7 @@ void Element::removeShadowRoot()
             oldRoot->detach();
 
         oldRoot->setShadowHost(0);
-        oldRoot->setTreeScopeRecursively(document());
+        document()->adoptIfNeeded(oldRoot.get());
         if (oldRoot->inDocument())
             oldRoot->removedFromDocument();
         else

@@ -91,14 +91,11 @@ PassRefPtr<HTMLFormElement> HTMLFormElement::create(const QualifiedName& tagName
 
 HTMLFormElement::~HTMLFormElement()
 {
-    if (m_elementsCollection)
-        m_elementsCollection->detachFromNode();
-
     if (!shouldAutocomplete())
         document()->unregisterForPageCacheSuspensionCallbacks(this);
 
     for (unsigned i = 0; i < m_associatedElements.size(); ++i)
-        m_associatedElements[i]->formDestroyed();
+        m_associatedElements[i]->formWillBeDestroyed();
     for (unsigned i = 0; i < m_imageElements.size(); ++i)
         m_imageElements[i]->m_form = 0;
 }
@@ -459,18 +456,11 @@ unsigned HTMLFormElement::formElementIndex(FormAssociatedElement* associatedElem
 
 void HTMLFormElement::registerFormElement(FormAssociatedElement* e)
 {
-    if (e->isFormControlElement()) {
-        HTMLFormControlElement* element = static_cast<HTMLFormControlElement*>(e);
-        document()->checkedRadioButtons().removeButton(element);
-        m_checkedRadioButtons.addButton(element);
-    }
     m_associatedElements.insert(formElementIndex(e), e);
 }
 
 void HTMLFormElement::removeFormElement(FormAssociatedElement* e)
 {
-    if (e->isFormControlElement())
-        m_checkedRadioButtons.removeButton(static_cast<HTMLFormControlElement*>(e));
     unsigned index;
     for (index = 0; index < m_associatedElements.size(); ++index) {
         if (m_associatedElements[index] == e)
@@ -501,11 +491,11 @@ void HTMLFormElement::removeImgElement(HTMLImageElement* e)
     removeFromVector(m_imageElements, e);
 }
 
-PassRefPtr<HTMLCollection> HTMLFormElement::elements()
+HTMLCollection* HTMLFormElement::elements()
 {
     if (!m_elementsCollection)
         m_elementsCollection = HTMLFormCollection::create(this);
-    return m_elementsCollection;
+    return m_elementsCollection.get();
 }
 
 String HTMLFormElement::name() const

@@ -1,3 +1,569 @@
+2012-01-10  Mark Rowe  <mrowe@apple.com>
+
+        <rdar://problem/10673792> jsc should install directly in to versioned Resources subfolder
+
+        This ensures that jsc ends up in a consistent location whether built in to the same DSTROOT
+        as JavaScriptCore.framework or in to a different one.
+
+        Rubber-stamped by Dan Bernstein.
+
+        * Configurations/JSC.xcconfig: Update INSTALL_PATH.
+
+2012-01-10  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG inlining block linking compares BlockIndex against bytecode index
+        https://bugs.webkit.org/show_bug.cgi?id=76018
+        <rdar://problem/10671979>
+
+        Reviewed by Gavin Barraclough.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseCodeBlock):
+
+2012-01-10  Filip Pizlo  <fpizlo@apple.com>
+
+        CodeBlock.h declares too many things
+        https://bugs.webkit.org/show_bug.cgi?id=76001
+
+        Rubber stamped by Gavin Barraclough.
+        
+        Removed all non-CodeBlock type declarations from CodeBlock.h, and put them
+        into separate header files. Also removed all non-CodeBlock method implementations
+        from CodeBlock.cpp and put them into corresponding cpp files.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * assembler/RepatchBuffer.h:
+        * bytecode/CallLinkInfo.cpp: Added.
+        (JSC::CallLinkInfo::unlink):
+        * bytecode/CallLinkInfo.h: Added.
+        (JSC::CallLinkInfo::callTypeFor):
+        (JSC::CallLinkInfo::CallLinkInfo):
+        (JSC::CallLinkInfo::~CallLinkInfo):
+        (JSC::CallLinkInfo::isLinked):
+        (JSC::CallLinkInfo::seenOnce):
+        (JSC::CallLinkInfo::setSeen):
+        (JSC::getCallLinkInfoReturnLocation):
+        (JSC::getCallLinkInfoBytecodeIndex):
+        * bytecode/CallReturnOffsetToBytecodeOffset.h: Added.
+        (JSC::CallReturnOffsetToBytecodeOffset::CallReturnOffsetToBytecodeOffset):
+        (JSC::getCallReturnOffset):
+        * bytecode/CodeBlock.cpp:
+        * bytecode/CodeBlock.h:
+        * bytecode/CodeType.h: Added.
+        * bytecode/ExpressionRangeInfo.h: Added.
+        * bytecode/GlobalResolveInfo.h: Added.
+        (JSC::GlobalResolveInfo::GlobalResolveInfo):
+        * bytecode/HandlerInfo.h: Added.
+        * bytecode/LineInfo.h: Added.
+        * bytecode/MethodCallLinkInfo.cpp: Added.
+        (JSC::MethodCallLinkInfo::reset):
+        * bytecode/MethodCallLinkInfo.h: Added.
+        (JSC::MethodCallLinkInfo::MethodCallLinkInfo):
+        (JSC::MethodCallLinkInfo::seenOnce):
+        (JSC::MethodCallLinkInfo::setSeen):
+        (JSC::getMethodCallLinkInfoReturnLocation):
+        (JSC::getMethodCallLinkInfoBytecodeIndex):
+        * bytecode/StructureStubInfo.h:
+        (JSC::getStructureStubInfoReturnLocation):
+        (JSC::getStructureStubInfoBytecodeIndex):
+
+2012-01-10  Anders Carlsson  <andersca@apple.com>
+
+        Hang opening movie that requires authentication
+        https://bugs.webkit.org/show_bug.cgi?id=75989
+        <rdar://problem/9601915>
+
+        Reviewed by Sam Weinig.
+
+        * wtf/Functional.h:
+        Add function wrapper for a function that takes three parameters.
+
+2012-01-10  Filip Pizlo  <fpizlo@apple.com>
+
+        CodeBlock::m_numParameters should be encapsulated
+        https://bugs.webkit.org/show_bug.cgi?id=75985
+        <rdar://problem/10671020>
+
+        Reviewed by Oliver Hunt.
+        
+        Encapsulated CodeBlock::m_numParameters and hooked argument profile creation
+        into it.  This appears to be performance neutral.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        (JSC::CodeBlock::setNumParameters):
+        (JSC::CodeBlock::addParameter):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::numParameters):
+        (JSC::CodeBlock::addressOfNumParameters):
+        (JSC::CodeBlock::offsetOfNumParameters):
+        (JSC::CodeBlock::numberOfArgumentValueProfiles):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        (JSC::BytecodeGenerator::addParameter):
+        (JSC::BytecodeGenerator::emitReturn):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::AbstractState):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::ByteCodeParser):
+        (JSC::DFG::ByteCodeParser::InlineStackEntry::InlineStackEntry):
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::predictArgumentTypes):
+        * dfg/DFGJITCompiler.cpp:
+        (JSC::DFG::JITCompiler::compileFunction):
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::checkArgumentTypes):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::SpeculativeJIT):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::slideRegisterWindowForCall):
+        (JSC::Interpreter::dumpRegisters):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::prepareForRepeatCall):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompile):
+        * jit/JITStubs.cpp:
+        (JSC::arityCheckFor):
+        (JSC::lazyLinkFor):
+        * runtime/Executable.cpp:
+        (JSC::FunctionExecutable::compileForCallInternal):
+        (JSC::FunctionExecutable::compileForConstructInternal):
+
+2012-01-10  Gavin Barraclough  <barraclough@apple.com>
+
+        Build fix following https://bugs.webkit.org/show_bug.cgi?id=75935
+
+        Fix 32-bit builds.
+
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::getOwnPropertyNames):
+        (JSC::JSArray::setLength):
+
+2012-01-10  Gavin Barraclough  <barraclough@apple.com>
+
+        Windows build fix.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-01-10  Gavin Barraclough  <barraclough@apple.com>
+
+        Do not allow Array length to be set if it is non-configurable
+        https://bugs.webkit.org/show_bug.cgi?id=75935
+
+        Reviewed by Sam Weinig.
+
+        Do not allow Array length to be set if it is non-configurable, and if the new
+        length is less than the old length then intervening properties should removed
+        in reverse order. Removal of properties should cease if an intervening indexed
+        property being removed is non-configurable.
+
+        * JavaScriptCore.exp:
+            - Removed export for setLength.
+        * runtime/ArrayPrototype.cpp:
+        (JSC::arrayProtoFuncConcat):
+            - JSArray::setLength now takes an ExecState*
+        (JSC::arrayProtoFuncSlice):
+            - JSArray::setLength now takes an ExecState*
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::defineOwnProperty):
+            - JSArray::setLength now takes an ExecState*
+        (JSC::JSArray::put):
+            - JSArray::setLength now takes an ExecState*
+        (JSC::compareKeysForQSort):
+            - Keys extracted from the map can be stored as unsigneds.
+        (JSC::JSArray::getOwnPropertyNames):
+            - Keys extracted from the map can be stored as unsigneds.
+        (JSC::JSArray::setLength):
+            - Check lengthIsReadOnly(), rather than copying the entire map to iterate
+              over to determine which keys to remove, instead just copy the keys from
+              the map to a Vector. When inSparseMode sort the keys in the Vector so
+              that we can remove properties in reverse order.
+        * runtime/JSArray.h:
+            - JSArray::setLength now takes an ExecState*
+
+2012-01-10  Gavin Barraclough  <barraclough@apple.com>
+
+        Use SameValue to compare property descriptor values
+        https://bugs.webkit.org/show_bug.cgi?id=75975
+
+        Reviewed by Sam Weinig.
+
+        Rather than strictEqual.
+
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::defineOwnNumericProperty):
+            - Missing configurablePresent() check.
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::defineOwnProperty):
+            - call sameValue.
+        * runtime/PropertyDescriptor.cpp:
+        (JSC::sameValue):
+            - Moved from JSArray.cpp, fix NaN comparison.
+        (JSC::PropertyDescriptor::equalTo):
+            - call sameValue.
+        * runtime/PropertyDescriptor.h:
+            - Added declaration for sameValue.
+2012-01-09  Gavin Barraclough  <barraclough@apple.com>
+
+        Error handling : in ISO8601 timezone
+        https://bugs.webkit.org/show_bug.cgi?id=75919
+
+        Reviewed by Sam Weinig.
+
+        * wtf/DateMath.cpp:
+        (WTF::parseDateFromNullTerminatedCharacters):
+            - need to increment the string position.
+
+2012-01-09  Mark Rowe  <mrowe@apple.com>
+
+        JavaScriptCore executable targets shouldn't explicitly depend on the JavaScriptCore framework target
+        <http://webkit.org/b/75907> / <rdar://problem/10659862>
+
+        We'd like for it to be possible to build jsc without building JavaScriptCore.framework and the explicit
+        dependencies prevent this.
+
+        Reviewed by Dan Bernstein.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+
+2012-01-09  Adam Treat  <atreat@rim.com>
+
+        Log is a little to verbose for blackberry port
+        https://bugs.webkit.org/show_bug.cgi?id=75728
+
+        The BlackBerry::Platform::Log* functions take care of the call to vfprintf
+        which is resulting in unintentional noise in our logs.  Add a conditional
+        directive to fix.
+
+        Change to using BlackBerry::Platform::logStreamV which does not insert
+        threading info and newlines unlike BlackBerry::Platform::log.
+
+        Finally, add log locking and unlocking which the BlackBerry platform
+        uses to ensure that N threads do not trample on each other's logs.
+
+        Reviewed by Rob Buis.
+
+        * wtf/Assertions.cpp:
+        (WTFLogLocker::WTFReportAssertionFailure):
+        (WTFLogLocker::WTFReportAssertionFailureWithMessage):
+        (WTFLogLocker::WTFReportArgumentAssertionFailure):
+        (WTFLogLocker::WTFReportFatalError):
+        (WTFLogLocker::WTFReportError):
+        (WTFLogLocker::WTFLog):
+        (WTFLogLocker::WTFLogVerbose):
+
+2012-01-09  Gavin Barraclough  <barraclough@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=75789
+        defineOwnProperty not implemented for Array objects
+
+        Reviewed by Sam Weinig.
+
+        Implements support for getter/setter & non-default attribute properties on arrays,
+        by forcing them into a dictionary-like 'SparseMode'. This fixes ~300 test-262
+        test failures.
+
+        * JavaScriptCore.exp:
+            - Updated exports.
+        * dfg/DFGOperations.cpp:
+            - JSArray::pop now requires an exec state.
+        * runtime/ArrayPrototype.cpp:
+        (JSC::arrayProtoFuncPop):
+            - JSArray::pop now requires an exec state.
+        * runtime/JSArray.cpp:
+        (JSC::SparseArrayValueMap::add):
+            - Add a potentially empty entry into the map.
+        (JSC::SparseArrayValueMap::put):
+            - Changed to call setter.
+        (JSC::SparseArrayEntry::get):
+            - calls getters.
+        (JSC::SparseArrayEntry::getNonSparseMode):
+            - does not call getters.
+        (JSC::JSArray::enterSparseMode):
+            - Convert into 'SparseMode' - removes the vectors, don't allow it to be recreated.
+        (JSC::JSArray::putDescriptor):
+            - Create a numeric property based on a descriptor.
+        (JSC::sameValue):
+            - See ES5.1 9.12.
+        (JSC::reject):
+            - Helper for the [[DefineOwnProperty]] algorithm.
+        (JSC::JSArray::defineOwnNumericProperty):
+            - Define an indexed property on an array object.
+        (JSC::JSArray::setLengthWritable):
+            - Marks the length read-only, enters SparseMode as necessary.
+        (JSC::JSArray::defineOwnProperty):
+            - Defines either an indexed property or 'length' on an array object.
+        (JSC::JSArray::getOwnPropertySlotByIndex):
+            - Updated to correctly handle accessor descriptors & attributes.
+        (JSC::JSArray::getOwnPropertyDescriptor):
+            - Updated to correctly handle accessor descriptors & attributes.
+        (JSC::JSArray::put):
+            - Pass strict mode flag to setLength.
+        (JSC::JSArray::putByIndex):
+            - putByIndexBeyondVectorLength requires an ExecState* rather than a JSGloablData&.
+        (JSC::JSArray::putByIndexBeyondVectorLength):
+            - Pass exec to SparseArrayValueMap::put.
+        (JSC::JSArray::deletePropertyByIndex):
+            - Do not allow deletion of non-configurable properties.
+        (JSC::compareKeysForQSort):
+            - used in implementation of getOwnPropertyNames.
+        (JSC::JSArray::getOwnPropertyNames):
+            - Properties in the sparse map should be iterated in order.
+        (JSC::JSArray::setLength):
+            - Updated to take a 'shouldThrow' flag, return a result indicating error.
+        (JSC::JSArray::pop):
+            - pop should throw an error if length is not writable, even if the array is empty.
+        (JSC::JSArray::push):
+            - putByIndexBeyondVectorLength requires an ExecState* rather than a JSGloablData&.
+        (JSC::JSArray::sort):
+            - Changed 'get' to 'getNonSparseMode' (can't be getters to call).
+        (JSC::JSArray::compactForSorting):
+            - Changed 'get' to 'getNonSparseMode' (can't be getters to call).
+        * runtime/JSArray.h:
+        (JSC::SparseArrayValueMap::lengthIsReadOnly):
+            - Check if the length is read only.
+        (JSC::SparseArrayValueMap::setLengthIsReadOnly):
+            - Mark the length as read only.
+        (JSC::SparseArrayValueMap::find):
+            - Moved into header.
+        (JSC::JSArray::isLengthWritable):
+            - Wraps SparseArrayValueMap::lengthIsReadOnly.
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::defineOwnProperty):
+            - Should be returning the result of putDescriptor.
+        * runtime/PropertyDescriptor.cpp:
+        (JSC::PropertyDescriptor::attributesOverridingCurrent):
+            - Added attributesOverridingCurrent - this should probably be merged with attributesWithOverride.
+        * runtime/PropertyDescriptor.h:
+            - Added attributesOverridingCurrent.
+
+2012-01-09  Pavel Heimlich  <tropikhajma@gmail.com>
+
+        There is no support for fastcall in Solaris Studio.
+        Fixes build on Solaris.
+        https://bugs.webkit.org/show_bug.cgi?id=75736
+
+        Reviewed by Gavin Barraclough.
+
+        * jit/JITStubs.h:
+
+2012-01-09  Pavel Heimlich  <tropikhajma@gmail.com>
+
+        Fix build failure on Solaris
+        https://bugs.webkit.org/show_bug.cgi?id=75733
+
+        Reviewed by Gavin Barraclough.
+
+        * wtf/ByteArray.h:
+
+2012-01-01  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Clean up some cruft from WTF's CMakeLists.txt
+        https://bugs.webkit.org/show_bug.cgi?id=75420
+
+        Reviewed by Daniel Bates.
+
+        * wtf/CMakeLists.txt: Remove the unused WTF_PORT_FLAGS variable; add
+        all needed paths to WTF_INCLUDE_DIRECTORIES in a single place.
+
+2012-01-08  Xianzhu Wang  <wangxianzhu@chromium.org>
+
+        Fix compilation error about ListHashSetReverseIterator
+        https://bugs.webkit.org/show_bug.cgi?id=75372
+
+        Reviewed by Darin Adler.
+
+        There is a typo in class ListHashSetReverseIterator:
+        typedef ListHashSetConstIterator<ValueArg, inlineCapacity, HashArg> const_reverse_iterator;
+        Should be
+        typedef ListHashSetConstReverseIterator<ValueArg, inlineCapacity, HashArg> const_reverse_iterator;
+
+        * wtf/ListHashSet.h:
+
+2012-01-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        WinCE build fix after r104415.
+
+        * jit/JITExceptions.cpp:
+        * jit/JITExceptions.h:
+
+2012-01-08  Filip Pizlo  <fpizlo@apple.com>
+
+        The JIT's protocol for exception handling should be available to other parts of the system
+        https://bugs.webkit.org/show_bug.cgi?id=75808
+        <rdar://problem/10661025>
+
+        Reviewed by Oliver Hunt.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * jit/JITExceptions.cpp: Added.
+        (JSC::genericThrow):
+        (JSC::jitThrow):
+        * jit/JITExceptions.h: Added.
+        * jit/JITStubs.cpp:
+        * runtime/JSGlobalData.h:
+
+2012-01-06  Hajime Morrita  <morrita@chromium.org>
+
+        https://bugs.webkit.org/show_bug.cgi?id=75296
+        JSString should not have JS_EXPORTCLASS annotation
+
+        Reviewed by Kevin Ollivier.
+
+        * runtime/JSString.h: Removed JS_EXPORTCLASS annotation.
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+        Added missing symbols which were hidden by JS_EXPORTCLASS.
+
+2012-01-06  Michael Saboff  <msaboff@apple.com>
+
+        JSArray::pop() should compare SparseArrayValueMap::find() to SparseArrayValueMap::notFound()
+        https://bugs.webkit.org/show_bug.cgi?id=75757
+
+        Reviewed by Gavin Barraclough.
+
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::pop): Changed map->end() to map->notFound().
+
+2012-01-06  Filip Pizlo  <fpizlo@apple.com>
+
+        JIT stub slow paths that would be identical to that of an interpreter should be factored out
+        https://bugs.webkit.org/show_bug.cgi?id=75743
+        <rdar://problem/10657024>
+
+        Reviewed by Geoff Garen.
+
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * runtime/CommonSlowPaths.h: Added.
+        (JSC::CommonSlowPaths::opInstanceOfSlow):
+        (JSC::CommonSlowPaths::opIn):
+        (JSC::CommonSlowPaths::opResolve):
+        (JSC::CommonSlowPaths::opResolveSkip):
+        (JSC::CommonSlowPaths::opResolveWithBase):
+        (JSC::CommonSlowPaths::opResolveWithThis):
+
+2012-01-06  Sam Weinig  <sam@webkit.org>
+
+        Fix windows build.
+
+        * wtf/TypeTraits.cpp:
+
+2012-01-05  Michael Saboff  <msaboff@apple.com>
+
+        Default HashTraits for Opcode don't work for Opcode = 0
+        https://bugs.webkit.org/show_bug.cgi?id=75595
+
+        Reviewed by Oliver Hunt.
+
+        Removed the populating of the m_opcodeIDTable table in the
+        case where the OpcodeID and Opcode are the same (m_enabled is false).
+        Instead we just cast the one type to the other.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::initialize):
+        (JSC::Interpreter::isOpcode):
+        * interpreter/Interpreter.h:
+        (JSC::Interpreter::getOpcodeID):
+
+2012-01-06  Sam Weinig  <sam@webkit.org>
+
+        Add a DecayArray type trait as a first step towards merging OwnPtr and OwnArrayPtr
+        https://bugs.webkit.org/show_bug.cgi?id=75737
+
+        Reviewed by Anders Carlsson.
+
+        * wtf/TypeTraits.cpp:
+        * wtf/TypeTraits.h:
+        Added a DecayArray trait, that can convert T[] and T[3] -> T*. DecayArray
+        is composed of some helpers which are also exposed, Conditional<>, which
+        can provide one type or another based on a boolean predicate, IsArray<>
+        which can deduce array types, and RemoveExtent<>, which removes the extent
+        from an array type. 
+
+2012-01-06  Oliver Hunt  <oliver@apple.com>
+
+        GetByteArrayLength is incorrect
+        https://bugs.webkit.org/show_bug.cgi?id=75735
+
+        Reviewed by Filip Pizlo.
+
+        Load the byte array length from the correct location.
+        This stops an existing test from hanging.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-01-06  Filip Pizlo  <fpizlo@apple.com>
+
+        Fix build.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+
+2012-01-06  Oliver Hunt  <oliver@apple.com>
+
+        DFG no longer optimises CanvasPixelArray
+        https://bugs.webkit.org/show_bug.cgi?id=75729
+
+        Reviewed by Gavin Barraclough.
+
+        Rename ByteArray (in its ClassInfo) to Uint8ClampedArray to match
+        the future name when we switch over to the new typed-array based
+        ImageData specification.
+
+        * runtime/JSByteArray.cpp:
+
+2012-01-06  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Use HashMap<OwnPtr> for SourceProviderCache items
+        https://bugs.webkit.org/show_bug.cgi?id=75346
+
+        Reviewed by Daniel Bates.
+
+        * parser/Parser.cpp:
+        * parser/SourceProviderCache.cpp:
+        (JSC::SourceProviderCache::clear):
+        (JSC::SourceProviderCache::add):
+        * parser/SourceProviderCache.h:
+
+2012-01-06  Sam Weinig  <sam@webkit.org>
+
+        Remove unused OwnFastMallocPtr class.
+        https://bugs.webkit.org/show_bug.cgi?id=75722
+
+        Reviewed by Geoffrey Garen.
+
+        * GNUmakefile.list.am:
+        * JavaScriptCore.gypi:
+        * JavaScriptCore.vcproj/WTF/WTF.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/OwnFastMallocPtr.h: Removed.
+        * wtf/text/StringImpl.h:
+        * wtf/wtf.pro:
+
+2012-01-06  Benjamin Poulain  <bpoulain@webkit.org>
+
+        [Mac] Sort the resources of JavaScriptCore.xcodeproj and remove duplicates
+        https://bugs.webkit.org/show_bug.cgi?id=75631
+
+        Reviewed by Andreas Kling.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+
 2012-01-06  Eric Seidel  <eric@webkit.org> and Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
 
         Make the new WTF module build on Gtk

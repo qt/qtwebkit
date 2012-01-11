@@ -574,6 +574,7 @@ SOURCES += \
     dom/TouchList.cpp \
     dom/Traversal.cpp \
     dom/TreeScope.cpp \
+    dom/TreeScopeAdopter.cpp \
     dom/TreeWalker.cpp \
     dom/UIEvent.cpp \
     dom/UIEventWithKeyState.cpp \
@@ -848,6 +849,7 @@ SOURCES += \
     html/shadow/TextControlInnerElements.cpp \
     inspector/ConsoleMessage.cpp \
     inspector/ContentSearchUtils.cpp \
+    inspector/DOMEditor.cpp \
     inspector/DOMNodeHighlighter.cpp \
     inspector/IdentifiersFactory.cpp \
     inspector/InjectedScript.cpp \
@@ -967,12 +969,14 @@ SOURCES += \
     page/DOMSelection.cpp \
     page/DOMTimer.cpp \
     page/DOMWindow.cpp \
+    page/DOMWindowProperty.cpp \
     page/DragController.cpp \
     page/EventHandler.cpp \
     page/EventSource.cpp \
     page/FocusController.cpp \
     page/Frame.cpp \
     page/FrameActionScheduler.cpp \
+    page/FrameDestructionObserver.cpp \
     page/FrameTree.cpp \
     page/FrameView.cpp \
     page/Geolocation.cpp \
@@ -1168,6 +1172,7 @@ SOURCES += \
     rendering/BidiRun.cpp \
     rendering/CounterNode.cpp \
     rendering/EllipsisBox.cpp \
+    rendering/FilterEffectRenderer.cpp \
     rendering/FixedTableLayout.cpp \
     rendering/HitTestingTransformState.cpp \
     rendering/HitTestResult.cpp \
@@ -1274,6 +1279,7 @@ SOURCES += \
     rendering/style/StyleTransformData.cpp \
     rendering/style/StyleVisualData.cpp \
     storage/AbstractDatabase.cpp \
+    storage/DOMWindowSQLDatabase.cpp \
     storage/Database.cpp \
     storage/DatabaseAuthorizer.cpp \
     storage/DatabaseSync.cpp \
@@ -1671,6 +1677,7 @@ HEADERS += \
     dom/Traversal.h \
     dom/TreeDepthLimit.h \
     dom/TreeScope.h \
+    dom/TreeScopeAdopter.h \
     dom/TreeWalker.h \
     dom/UIEvent.h \
     dom/UIEventWithKeyState.h \
@@ -1902,6 +1909,7 @@ HEADERS += \
     html/track/WebVTTTokenizer.h \
     inspector/ConsoleMessage.h \
     inspector/ContentSearchUtils.h \
+    inspector/DOMEditor.h \
     inspector/DOMNodeHighlighter.h \
     inspector/DOMWrapperVisitor.h \
     inspector/IdentifiersFactory.h \
@@ -2282,6 +2290,7 @@ HEADERS += \
     rendering/break_lines.h \
     rendering/CounterNode.h \
     rendering/EllipsisBox.h \
+    rendering/FilterEffectRenderer.h \
     rendering/FixedTableLayout.h \
     rendering/HitTestingTransformState.h \
     rendering/HitTestResult.h \
@@ -2465,6 +2474,7 @@ HEADERS += \
     rendering/svg/SVGTextRunRenderingContext.h \
     storage/AbstractDatabase.h \
     storage/ChangeVersionWrapper.h \
+    storage/DOMWindowSQLDatabase.h \
     storage/DatabaseAuthorizer.h \
     storage/Database.h \
     storage/DatabaseCallback.h \
@@ -3733,9 +3743,11 @@ contains(DEFINES, ENABLE_WEBGL=1) {
 
         ANGLE_HEADERS += \
             $$ANGLE_DIR/src/compiler/BaseTypes.h \
+            $$ANGLE_DIR/src/compiler/BuiltInFunctionEmulator.h \
             $$ANGLE_DIR/src/compiler/Common.h \
             $$ANGLE_DIR/src/compiler/ConstantUnion.h \
             $$ANGLE_DIR/src/compiler/debug.h \
+            $$ANGLE_DIR/src/compiler/DetectRecursion.h \
             $$ANGLE_DIR/src/compiler/ExtensionBehavior.h \
             $$ANGLE_DIR/src/compiler/ForLoopUnroll.h \
             $$ANGLE_DIR/src/compiler/glslang.h \
@@ -3753,6 +3765,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
             $$ANGLE_DIR/src/compiler/preprocessor/atom.h \
             $$ANGLE_DIR/src/compiler/preprocessor/compile.h \
             $$ANGLE_DIR/src/compiler/preprocessor/cpp.h \
+            $$ANGLE_DIR/src/compiler/preprocessor/length_limits.h \
             $$ANGLE_DIR/src/compiler/preprocessor/memory.h \
             $$ANGLE_DIR/src/compiler/preprocessor/parser.h \
             $$ANGLE_DIR/src/compiler/preprocessor/preprocess.h \
@@ -3784,9 +3797,11 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         HEADERS += $$ANGLE_HEADERS
 
         ANGLE_SOURCES += \
+            $$ANGLE_DIR/src/compiler/BuiltInFunctionEmulator.cpp \
             $$ANGLE_DIR/src/compiler/CodeGenGLSL.cpp \
             $$ANGLE_DIR/src/compiler/Compiler.cpp \
             $$ANGLE_DIR/src/compiler/debug.cpp \
+            $$ANGLE_DIR/src/compiler/DetectRecursion.cpp \
             $$ANGLE_DIR/src/compiler/ForLoopUnroll.cpp \
             $$ANGLE_DIR/src/compiler/glslang_lex.cpp \
             $$ANGLE_DIR/src/compiler/glslang_tab.cpp \
@@ -3898,6 +3913,7 @@ contains(CONFIG, texmap) {
 
     SOURCES += \
         platform/graphics/qt/TextureMapperQt.cpp \
+        platform/graphics/texmap/TextureMapper.cpp \
         platform/graphics/texmap/TextureMapperNode.cpp \
         platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
 

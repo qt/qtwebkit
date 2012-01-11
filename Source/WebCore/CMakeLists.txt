@@ -610,6 +610,7 @@ SET(WebCore_SOURCES
     dom/TransformSourceLibxslt.cpp
     dom/Traversal.cpp
     dom/TreeScope.cpp
+    dom/TreeScopeAdopter.cpp
     dom/TreeWalker.cpp
     dom/UIEvent.cpp
     dom/UIEventWithKeyState.cpp
@@ -869,6 +870,7 @@ SET(WebCore_SOURCES
 
     inspector/ConsoleMessage.cpp
     inspector/ContentSearchUtils.cpp
+    inspector/DOMEditor.cpp
     inspector/DOMNodeHighlighter.cpp
     inspector/IdentifiersFactory.cpp
     inspector/InjectedScript.cpp
@@ -989,12 +991,14 @@ SET(WebCore_SOURCES
     page/DOMSelection.cpp
     page/DOMTimer.cpp
     page/DOMWindow.cpp
+    page/DOMWindowProperty.cpp
     page/DragController.cpp
     page/EventHandler.cpp
     page/EventSource.cpp
     page/FocusController.cpp
     page/Frame.cpp
     page/FrameActionScheduler.cpp
+    page/FrameDestructionObserver.cpp
     page/FrameTree.cpp
     page/FrameView.cpp
     page/Geolocation.cpp
@@ -1345,6 +1349,7 @@ SET(WebCore_SOURCES
 
     storage/AbstractDatabase.cpp
     storage/ChangeVersionWrapper.cpp
+    storage/DOMWindowSQLDatabase.cpp
     storage/Database.cpp
     storage/DatabaseAuthorizer.cpp
     storage/DatabaseSync.cpp
@@ -1464,6 +1469,7 @@ ENDIF ()
 
 IF (ENABLE_SQL_DATABASE)
     LIST(APPEND WebCore_IDL_FILES
+        storage/DOMWindowSQLDatabase.idl
         storage/Database.idl
         storage/DatabaseCallback.idl
         storage/DatabaseSync.idl
@@ -2327,7 +2333,10 @@ ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WEBCORE_DIR}/css/CSSParser.cpp tokeniz
 # Replace ";" with "space" in order to recognize feature definition in css files.
 SET(FEATURE_DEFINES_WITH_SPACE_SEPARATOR "")
 FOREACH(_feature ${FEATURE_DEFINES})
-    SET(FEATURE_DEFINES_WITH_SPACE_SEPARATOR "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR} ${_feature}")
+    # filter out color input since we have our own solution
+    IF (NOT CMAKE_SYSTEM_NAME MATCHES "QNX" OR NOT _feature MATCHES "ENABLE_INPUT_COLOR")
+        SET(FEATURE_DEFINES_WITH_SPACE_SEPARATOR "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR} ${_feature}")
+    ENDIF()
 ENDFOREACH()
 
 

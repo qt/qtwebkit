@@ -298,6 +298,13 @@ IntRect PageClientImpl::windowToScreen(const IntRect& rect)
     return enclosingIntRect(tempRect);
 }
 
+#if ENABLE(GESTURE_EVENTS)
+void PageClientImpl::doneWithGestureEvent(const WebGestureEvent&, bool wasEventHandled)
+{
+    notImplemented();
+}
+#endif
+
 void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool eventWasHandled)
 {
     [m_wkView _doneWithKeyEvent:event.nativeEvent() eventWasHandled:eventWasHandled];

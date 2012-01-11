@@ -1770,7 +1770,7 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
     # between 32-bit and 64-bit architectures. The options are also
     # used on Chromium build.
     determineArchitecture();
-    if ($architecture ne "x86_64") {
+    if ($architecture ne "x86_64" && !isARM()) {
         $ENV{'CXXFLAGS'} = "-march=pentium4 -msse2 -mfpmath=sse";
     }
 
@@ -2111,6 +2111,10 @@ sub buildQMakeProject($@)
             File::Path::rmtree($dir);
             File::Path::mkpath($dir);
             chdir $dir or die "Failed to cd into " . $dir . "\n";
+
+            # After removing WebKitBuild directory, we have to call qtFeatureDefaults()
+            # to run config tests and generate the removed Tools/qmake/.qmake.cache again.
+            qtFeatureDefaults(\@buildArgs);
         #}
     }
 
@@ -2266,7 +2270,7 @@ sub buildChromium($@)
     } elsif (isCygwin() || isWindows()) {
         # Windows build - builds the root visual studio solution.
         $result = buildChromiumVisualStudioProject("Source/WebKit/chromium/WebKit.sln", $clean);
-    } elsif (isLinux() || isChromiumAndroid() || isChromiumMacMake) {
+    } elsif (isLinux() || isChromiumAndroid() || isChromiumMacMake()) {
         # Linux build - build using make.
         $result = buildChromiumMakefile("all", $clean, @options);
     } else {

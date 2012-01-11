@@ -201,7 +201,6 @@ sub ShouldSkipTypeInImplementation
 
     return 1 if $typeInfo->signature->extendedAttributes->{"CustomArgumentHandling"}
              or $typeInfo->signature->extendedAttributes->{"CustomGetter"}
-             or $typeInfo->signature->extendedAttributes->{"NeedsUserGestureCheck"}
              or $typeInfo->signature->extendedAttributes->{"CPPCustom"};
 
     # FIXME: We don't generate bindings for SVG related interfaces yet
@@ -669,7 +668,7 @@ sub GenerateImplementation
 
         push(@implContent, "$implClassNameWithNamespace* ${className}::impl() const\n");
         push(@implContent, "{\n");
-        push(@implContent, "    return m_impl ? m_impl->impl.get() : 0;\n");
+        push(@implContent, "    return m_impl ? WTF::getPtr(m_impl->impl) : 0;\n");
         push(@implContent, "}\n\n");
 
         # Destructor
@@ -849,7 +848,16 @@ sub GenerateImplementation
 
             my @functionContent = ();
             push(@parameterNames, "ec") if $raisesExceptions;
-            my $content = "impl()->" . $codeGenerator->WK_lcfirst($functionName) . "(" . join(", ", @parameterNames) . ")"; 
+
+            my $content;
+            if ($function->signature->extendedAttributes->{"ImplementedBy"}) {
+                my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
+                $implIncludes{"${implementedBy}.h"} = 1;
+                unshift(@parameterNames, "impl()");
+                $content = "${implementedBy}::" . $codeGenerator->WK_lcfirst($functionName) . "(" . join(", ", @parameterNames) . ")";
+            } else {
+                $content = "impl()->" . $codeGenerator->WK_lcfirst($functionName) . "(" . join(", ", @parameterNames) . ")";
+            }
 
             if ($returnType eq "void") {
                 # Special case 'void' return type.

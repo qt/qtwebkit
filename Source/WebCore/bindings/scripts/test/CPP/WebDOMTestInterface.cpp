@@ -26,8 +26,10 @@
 
 #include "KURL.h"
 #include "TestInterface.h"
+#include "TestObj.h"
 #include "TestSupplemental.h"
 #include "WebDOMString.h"
+#include "WebDOMTestObj.h"
 #include "WebExceptionHandler.h"
 #include "wtf/text/AtomicString.h"
 #include <wtf/GetPtr.h>
@@ -69,7 +71,7 @@ WebDOMTestInterface& WebDOMTestInterface::operator=(const WebDOMTestInterface& c
 
 WebCore::TestInterface* WebDOMTestInterface::impl() const
 {
-    return m_impl ? m_impl->impl.get() : 0;
+    return m_impl ? WTF::getPtr(m_impl->impl) : 0;
 }
 
 WebDOMTestInterface::~WebDOMTestInterface()
@@ -79,33 +81,60 @@ WebDOMTestInterface::~WebDOMTestInterface()
 }
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
-WebDOMString WebDOMTestInterface::str1() const
+WebDOMString WebDOMTestInterface::supplementalStr1() const
 {
     if (!impl())
         return WebDOMString();
 
-    return static_cast<const WTF::String&>(TestSupplemental::str1(impl()));
+    return static_cast<const WTF::String&>(TestSupplemental::supplementalStr1(impl()));
 }
 
 #endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
-WebDOMString WebDOMTestInterface::str2() const
+WebDOMString WebDOMTestInterface::supplementalStr2() const
 {
     if (!impl())
         return WebDOMString();
 
-    return static_cast<const WTF::String&>(TestSupplemental::str2(impl()));
+    return static_cast<const WTF::String&>(TestSupplemental::supplementalStr2(impl()));
 }
 
-void WebDOMTestInterface::setStr2(const WebDOMString& newStr2)
+void WebDOMTestInterface::setSupplementalStr2(const WebDOMString& newSupplementalStr2)
 {
     if (!impl())
         return;
 
-    TestSupplemental::setStr2(impl(), newStr2);
+    TestSupplemental::setSupplementalStr2(impl(), newSupplementalStr2);
 }
 
 #endif
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+void WebDOMTestInterface::supplementalMethod1()
+{
+    if (!impl())
+        return;
+
+    TestSupplemental::supplementalMethod1(impl());
+}
+
+#endif
+
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+WebDOMTestObj WebDOMTestInterface::supplementalMethod2(const WebDOMString& strArg, const WebDOMTestObj& objArg)
+{
+    if (!impl())
+        return WebDOMTestObj();
+
+    WebCore::ExceptionCode ec = 0;
+    WebDOMTestObj result = toWebKit(WTF::getPtr(TestSupplemental::supplementalMethod2(impl(), strArg, toWebCore(objArg), ec)));
+    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
+    return result;
+}
+
+#endif
+
 WebCore::TestInterface* toWebCore(const WebDOMTestInterface& wrapper)
 {
     return wrapper.impl();

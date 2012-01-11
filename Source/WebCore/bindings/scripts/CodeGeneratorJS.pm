@@ -522,7 +522,7 @@ sub GenerateGetOwnPropertyDescriptorBody
         if ($interfaceName eq "DOMWindow") {
             push(@implContent, "    if (!thisObject->allowsAccessFrom(exec))\n");
         } else {
-            push(@implContent, "    if (!allowsAccessFromFrame(exec, thisObject->impl()->frame()))\n");
+            push(@implContent, "    if (!allowAccessToFrame(exec, thisObject->impl()->frame()))\n");
         }
         push(@implContent, "        return false;\n");
     }
@@ -1752,15 +1752,15 @@ sub GenerateImplementation
                     } else {
                         push(@implContent, "    return castedThis->$implGetterFunctionName(exec);\n");
                     }
-                } elsif ($attribute->signature->extendedAttributes->{"CheckNodeSecurity"}) {
+                } elsif ($attribute->signature->extendedAttributes->{"allowAccessToNode"}) {
                     $implIncludes{"JSDOMBinding.h"} = 1;
                     push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
-                    push(@implContent, "    return checkNodeSecurity(exec, impl->$implGetterFunctionName()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
+                    push(@implContent, "    return allowAccessToNode(exec, impl->$implGetterFunctionName()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
                 } elsif ($attribute->signature->extendedAttributes->{"CheckFrameSecurity"}) {
                     $implIncludes{"Document.h"} = 1;
                     $implIncludes{"JSDOMBinding.h"} = 1;
                     push(@implContent, "    $implClassName* impl = static_cast<$implClassName*>(castedThis->impl());\n");
-                    push(@implContent, "    return checkNodeSecurity(exec, impl->contentDocument()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
+                    push(@implContent, "    return allowAccessToNode(exec, impl->contentDocument()) ? " . NativeToJSValue($attribute->signature, 0, $implClassName, "impl->$implGetterFunctionName()", "castedThis") . " : jsUndefined();\n");
                 } elsif ($type eq "EventListener") {
                     $implIncludes{"EventListener.h"} = 1;
                     push(@implContent, "    UNUSED_PARAM(exec);\n");
@@ -1928,7 +1928,7 @@ sub GenerateImplementation
                             if ($interfaceName eq "DOMWindow") {
                                 push(@implContent, "    if (!static_cast<$className*>(thisObject)->allowsAccessFrom(exec))\n");
                             } else {
-                                push(@implContent, "    if (!allowsAccessFromFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
+                                push(@implContent, "    if (!allowAccessToFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
                             }
                             push(@implContent, "        return;\n");
                         }
@@ -2056,7 +2056,7 @@ sub GenerateImplementation
                     if ($interfaceName eq "DOMWindow") {
                         push(@implContent, "    if (!static_cast<$className*>(thisObject)->allowsAccessFrom(exec))\n");
                     } else {
-                        push(@implContent, "    if (!allowsAccessFromFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
+                        push(@implContent, "    if (!allowAccessToFrame(exec, static_cast<$className*>(thisObject)->impl()->frame()))\n");
                     }
                     push(@implContent, "        return;\n");
                 }
@@ -2170,7 +2170,7 @@ sub GenerateImplementation
                 }
 
                 if ($function->signature->extendedAttributes->{"SVGCheckSecurityDocument"} and !$function->isStatic) {
-                    push(@implContent, "    if (!checkNodeSecurity(exec, impl->getSVGDocument(" . (@{$function->raisesExceptions} ? "ec" : "") .")))\n");
+                    push(@implContent, "    if (!allowAccessToNode(exec, impl->getSVGDocument(" . (@{$function->raisesExceptions} ? "ec" : "") .")))\n");
                     push(@implContent, "        return JSValue::encode(jsUndefined());\n");
                     $implIncludes{"JSDOMBinding.h"} = 1;
                 }
@@ -2181,8 +2181,8 @@ sub GenerateImplementation
                     push(@implContent, GenerateEventListenerCall($className, "remove"));
                 } else {
                     my $numParameters = @{$function->parameters};
-                    my ($functionString, $paramIndex) = GenerateParametersCheck(\@implContent, $function, $dataNode, $numParameters, $implClassName, $functionImplementationName, $svgPropertyType, $svgPropertyOrListPropertyType, $svgListPropertyType);
-                    GenerateImplementationFunctionCall($function, $functionString, $paramIndex, "    ", $svgPropertyType, $implClassName);
+                    my ($functionString, $dummy) = GenerateParametersCheck(\@implContent, $function, $dataNode, $numParameters, $implClassName, $functionImplementationName, $svgPropertyType, $svgPropertyOrListPropertyType, $svgListPropertyType);
+                    GenerateImplementationFunctionCall($function, $functionString, "    ", $svgPropertyType, $implClassName);
                 }
             }
 
@@ -2419,19 +2419,23 @@ sub GenerateParametersCheck
     my $svgPropertyOrListPropertyType = shift;
     my $svgListPropertyType = shift;
 
-    my $paramIndex = 0;
     my $argsIndex = 0;
     my $hasOptionalArguments = 0;
 
-    my $functionBase = "";
+    my @arguments;
+    my $functionName;
     if ($function->isStatic) {
-        $functionBase = "${implClassName}::";
+        $functionName = "${implClassName}::${functionImplementationName}";
+    } elsif ($function->signature->extendedAttributes->{"ImplementedBy"}) {
+        my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
+        AddToImplIncludes("${implementedBy}.h");
+        unshift(@arguments, "impl");
+        $functionName = "${implementedBy}::${functionImplementationName}";
     } elsif ($svgPropertyOrListPropertyType and !$svgListPropertyType) {
-        $functionBase = "podImpl.";
+        $functionName = "podImpl.${functionImplementationName}";
     } else {
-        $functionBase = "impl->";
+        $functionName = "impl->${functionImplementationName}";
     }
-    my $functionString = "$functionBase$functionImplementationName(";
 
     if ($function->signature->extendedAttributes->{"CustomArgumentHandling"} and !$function->isStatic) {
         push(@$outputArray, "    RefPtr<ScriptArguments> scriptArguments(createScriptArguments(exec, $numParameters));\n");
@@ -2444,12 +2448,7 @@ sub GenerateParametersCheck
     my $callWith = $function->signature->extendedAttributes->{"CallWith"};
     if ($callWith and !$function->signature->extendedAttributes->{"Constructor"}) {
         my $callWithArg = "COMPILE_ASSERT(false)";
-        if ($callWith eq "DynamicFrame") {
-            push(@$outputArray, "    Frame* dynamicFrame = toDynamicFrame(exec);\n");
-            push(@$outputArray, "    if (!dynamicFrame)\n");
-            push(@$outputArray, "        return JSValue::encode(jsUndefined());\n");
-            $callWithArg = "dynamicFrame";
-        } elsif ($callWith eq "ScriptState") {
+        if ($callWith eq "ScriptState") {
             $callWithArg = "exec";
         } elsif ($callWith eq "ScriptExecutionContext") {
             push(@$outputArray, "    ScriptExecutionContext* scriptContext = static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject())->scriptExecutionContext();\n");
@@ -2457,9 +2456,7 @@ sub GenerateParametersCheck
             push(@$outputArray, "        return JSValue::encode(jsUndefined());\n");
             $callWithArg = "scriptContext"; 
         }
-        $functionString .= ", " if $paramIndex;
-        $functionString .= $callWithArg;
-        $paramIndex++;
+        push @arguments, $callWithArg;
     }
 
     $implIncludes{"ExceptionCode.h"} = 1;
@@ -2478,7 +2475,16 @@ sub GenerateParametersCheck
                 $hasOptionalArguments = 1;
             }
             push(@$outputArray, "    if (argsCount <= $argsIndex) {\n");
-            GenerateImplementationFunctionCall($function, $functionString, $paramIndex, "    " x 2, $svgPropertyType, $implClassName);
+
+            my @optionalCallbackArguments = @arguments;
+            if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
+                push @optionalCallbackArguments, "scriptArguments, callStack";
+            }
+            if (@{$function->raisesExceptions}) {
+                push @optionalCallbackArguments, "ec";
+            }
+            my $functionString = "$functionName(" . join(", ", @optionalCallbackArguments) . ")";
+            GenerateImplementationFunctionCall($function, $functionString, "    " x 2, $svgPropertyType, $implClassName);
             push(@$outputArray, "    }\n\n");
         }
 
@@ -2559,27 +2565,23 @@ sub GenerateParametersCheck
             }
         }
 
-        $functionString .= ", " if $paramIndex;
-
         if ($argType eq "NodeFilter") {
-            $functionString .= "$name.get()";
+            push @arguments, "$name.get()";
         } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($argType) and not $implClassName =~ /List$/) {
-            $functionString .= "$name->propertyReference()";
+            push @arguments, "$name->propertyReference()";
         } else {
-            $functionString .= $name;
+            push @arguments, $name;
         }
         $argsIndex++;
-        $paramIndex++;
     }
 
-    if ($function->signature->extendedAttributes->{"NeedsUserGestureCheck"}) {
-        $functionString .= ", " if $paramIndex;
-        $functionString .= "ScriptController::processingUserGesture()";
-        $paramIndex++;
-        $implIncludes{"ScriptController.h"} = 1;
+    if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
+        push @arguments, "scriptArguments, callStack";
     }
-
-    return ($functionString, $paramIndex);
+    if (@{$function->raisesExceptions}) {
+        push @arguments, "ec";
+    }
+    return ("$functionName(" . join(", ", @arguments) . ")", scalar @arguments);
 }
 
 sub GenerateCallbackHeader
@@ -2744,22 +2746,9 @@ sub GenerateImplementationFunctionCall()
 {
     my $function = shift;
     my $functionString = shift;
-    my $paramIndex = shift;
     my $indent = shift;
     my $svgPropertyType = shift;
     my $implClassName = shift;
-
-    if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
-        $functionString .= ", " if $paramIndex;
-        $paramIndex += 2;
-        $functionString .= "scriptArguments, callStack";
-    }
-
-    if (@{$function->raisesExceptions}) {
-        $functionString .= ", " if $paramIndex;
-        $functionString .= "ec";
-    }
-    $functionString .= ")";
 
     if ($function->signature->type eq "void") {
         push(@implContent, $indent . "$functionString;\n");

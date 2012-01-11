@@ -217,12 +217,13 @@ private:
     bool m_drawn;
 };
 
+// https://bugs.webkit.org/show_bug.cgi?id=75783
 TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
 {
     GraphicsContext3D::Attributes attrs;
     RefPtr<GraphicsContext3D> context = GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(new BlendStateTrackerContext()), attrs, 0, GraphicsContext3D::RenderDirectlyToHostWindow, GraphicsContext3DPrivate::ForUseOnThisThread);
     m_hostImpl->initializeLayerRenderer(context);
-    m_hostImpl->setViewport(IntSize(10, 10));
+    m_hostImpl->setViewportSize(IntSize(10, 10));
 
     RefPtr<CCLayerImpl> root = CCLayerImpl::create(0);
     root->setAnchorPoint(FloatPoint(0, 0));
@@ -263,7 +264,7 @@ TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
     layer2->setOpacity(1);
     layer2->setExpectation(false, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
+    EXPECT_FALSE(layer1->drawn());
     EXPECT_TRUE(layer2->drawn());
 
     // Parent layer with translucent content, drawn with blending.
@@ -272,7 +273,7 @@ TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
     layer1->setExpectation(true, false);
     layer2->setExpectation(false, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
+    EXPECT_FALSE(layer1->drawn());
     EXPECT_TRUE(layer2->drawn());
 
     // Parent layer with translucent opacity and opaque content. Since it has a
@@ -284,6 +285,29 @@ TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
     layer1->setOpacity(0.5);
     layer1->setExpectation(false, true);
     layer2->setExpectation(false, false);
+    m_hostImpl->drawLayers();
+    EXPECT_FALSE(layer1->drawn());
+    EXPECT_TRUE(layer2->drawn());
+
+    // Draw again, but with child non-opaque, to make sure
+    // layer1 not culled.
+    layer1->setOpaque(true);
+    layer1->setOpacity(1);
+    layer1->setExpectation(false, false);
+    layer2->setOpaque(true);
+    layer2->setOpacity(0.5);
+    layer2->setExpectation(true, false);
+    m_hostImpl->drawLayers();
+    EXPECT_TRUE(layer1->drawn());
+    EXPECT_TRUE(layer2->drawn());
+
+    // A second way of making the child non-opaque.
+    layer1->setOpaque(true);
+    layer1->setOpacity(1);
+    layer1->setExpectation(false, false);
+    layer2->setOpaque(false);
+    layer2->setOpacity(1);
+    layer2->setExpectation(true, false);
     m_hostImpl->drawLayers();
     EXPECT_TRUE(layer1->drawn());
     EXPECT_TRUE(layer2->drawn());
@@ -321,7 +345,7 @@ TEST_F(CCLayerTreeHostImplTest, reshapeNotCalledUntilDraw)
     ReshapeTrackerContext* reshapeTracker = new ReshapeTrackerContext();
     RefPtr<GraphicsContext3D> context = GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(reshapeTracker), attrs, 0, GraphicsContext3D::RenderDirectlyToHostWindow, GraphicsContext3DPrivate::ForUseOnThisThread);
     m_hostImpl->initializeLayerRenderer(context);
-    m_hostImpl->setViewport(IntSize(10, 10));
+    m_hostImpl->setViewportSize(IntSize(10, 10));
 
     RefPtr<CCLayerImpl> root = adoptRef(new FakeDrawableCCLayerImpl(1));
     root->setAnchorPoint(FloatPoint(0, 0));
@@ -371,7 +395,7 @@ TEST_F(CCLayerTreeHostImplTest, partialSwapReceivesDamageRect)
     settings.partialSwapEnabled = true;
     OwnPtr<CCLayerTreeHostImpl> layerTreeHostImpl = CCLayerTreeHostImpl::create(settings, this);
     layerTreeHostImpl->initializeLayerRenderer(context);
-    layerTreeHostImpl->setViewport(IntSize(500, 500));
+    layerTreeHostImpl->setViewportSize(IntSize(500, 500));
 
     RefPtr<CCLayerImpl> root = adoptRef(new FakeDrawableCCLayerImpl(1));
     RefPtr<CCLayerImpl> child = adoptRef(new FakeDrawableCCLayerImpl(2));
@@ -412,7 +436,7 @@ TEST_F(CCLayerTreeHostImplTest, partialSwapReceivesDamageRect)
     // Make sure that partial swap is constrained to the viewport dimensions
     // expected damage rect: IntRect(IntPoint::zero(), IntSize(500, 500));
     // expected swap rect: flipped damage rect, but also clamped to viewport
-    layerTreeHostImpl->setViewport(IntSize(10, 10));
+    layerTreeHostImpl->setViewportSize(IntSize(10, 10));
     root->setOpacity(0.7); // this will damage everything
     layerTreeHostImpl->drawLayers();
     layerTreeHostImpl->swapBuffers();

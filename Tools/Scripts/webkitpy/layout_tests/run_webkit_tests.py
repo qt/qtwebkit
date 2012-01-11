@@ -172,6 +172,7 @@ def parse_args(args=None):
         optparse.make_option("--platform", help="Override port/platform being tested (i.e. chromium-mac)"),
         optparse.make_option('--qt', action='store_const', const='qt', dest="platform", help='Alias for --platform=qt'),
         optparse.make_option('--gtk', action='store_const', const='gtk', dest="platform", help='Alias for --platform=gtk'),
+        optparse.make_option('--efl', action='store_const', const='efl', dest="platform", help='Alias for --platform=efl'),
     ]
 
     print_options = printing.print_options()
@@ -264,12 +265,12 @@ def parse_args(args=None):
         optparse.make_option("--build-directory",
             help="Path to the directory under which build files are kept (should not include configuration)"),
         optparse.make_option("--new-baseline", action="store_true",
-            default=False, help="Save all generated results as new baselines "
-                 "into the platform directory, overwriting whatever's "
+            default=False, help="Save generated results as new baselines "
+                 "into the *platform* directory, overwriting whatever's "
                  "already there."),
         optparse.make_option("--reset-results", action="store_true",
-            default=False, help="Reset any existing baselines to the "
-                 "generated results"),
+            default=False, help="Reset expectations to the "
+                 "generated results in their existing location."),
         optparse.make_option("--no-new-test-results", action="store_false",
             dest="new_test_results", default=True,
             help="Don't create new baselines when no expected results exist"),

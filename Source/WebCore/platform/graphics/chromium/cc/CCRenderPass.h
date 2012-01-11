@@ -46,6 +46,8 @@ public:
     void appendQuadsForLayer(CCLayerImpl*);
     void appendQuadsForRenderSurfaceLayer(CCLayerImpl*);
 
+    void optimizeQuads();
+
     const CCQuadList& quadList() const { return m_quadList; }
     CCRenderSurface* targetSurface() const { return m_targetSurface; }
 
@@ -60,6 +62,8 @@ private:
     Vector<OwnPtr<CCSharedQuadState> > m_sharedQuadStateList;
     FloatRect m_surfaceDamageRect;
 };
+
+typedef Vector<OwnPtr<CCRenderPass> > CCRenderPassList;
 
 }
 

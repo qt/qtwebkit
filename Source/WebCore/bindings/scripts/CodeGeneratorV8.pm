@@ -291,8 +291,6 @@ sub GenerateHeader
         }
     }
 
-    my $hasLegacyParent = $dataNode->extendedAttributes->{"LegacyParent"};
-
     # - Add default header template
     push(@headerContent, GenerateHeaderContentHeader($dataNode));
 
@@ -883,10 +881,10 @@ END
     }
 
     # Generate security checks if necessary
-    if ($attribute->signature->extendedAttributes->{"CheckNodeSecurity"}) {
-        push(@implContentDecls, "    if (!V8BindingSecurity::checkNodeSecurity(V8BindingState::Only(), imp->$attrName()))\n    return v8::Handle<v8::Value>();\n\n");
+    if ($attribute->signature->extendedAttributes->{"allowAccessToNode"}) {
+        push(@implContentDecls, "    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->$attrName()))\n    return v8::Handle<v8::Value>();\n\n");
     } elsif ($attribute->signature->extendedAttributes->{"CheckFrameSecurity"}) {
-        push(@implContentDecls, "    if (!V8BindingSecurity::checkNodeSecurity(V8BindingState::Only(), imp->contentDocument()))\n    return v8::Handle<v8::Value>();\n\n");
+        push(@implContentDecls, "    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->contentDocument()))\n    return v8::Handle<v8::Value>();\n\n");
     }
 
     my $useExceptions = 1 if @{$attribute->getterExceptions};
@@ -1434,7 +1432,7 @@ END
     }
     if ($function->signature->extendedAttributes->{"SVGCheckSecurityDocument"}) {
         push(@implContentDecls, <<END);
-    if (!V8BindingSecurity::checkNodeSecurity(V8BindingState::Only(), imp->getSVGDocument(ec)))
+    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->getSVGDocument(ec)))
         return v8::Handle<v8::Value>();
 END
     }
@@ -2211,7 +2209,6 @@ sub GenerateImplementation
     my $visibleInterfaceName = GetVisibleInterfaceName($interfaceName);
     my $className = "V8$interfaceName";
     my $implClassName = $interfaceName;
-    my $hasLegacyParent = $dataNode->extendedAttributes->{"LegacyParent"};
 
     # - Add default header template
     push(@implFixedHeader, GenerateImplementationContentHeader($dataNode));
@@ -3185,23 +3182,26 @@ sub GenerateFunctionCallString()
         $name = $function->signature->extendedAttributes->{"ImplementationFunction"};
     }
 
-    my $functionString = "imp->${name}(";
-    if ($function->isStatic) {
-        $functionString = "${implClassName}::${name}(";
-    }
-
     my $index = 0;
     my $hasScriptState = 0;
+
+    my @arguments;
+    my $functionName;
+    if ($function->isStatic) {
+        $functionName = "${implClassName}::${name}";
+    } elsif ($function->signature->extendedAttributes->{"ImplementedBy"}) {
+        my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
+        AddToImplIncludes("${implementedBy}.h");
+        unshift(@arguments, "imp");
+        $functionName = "${implementedBy}::${name}";
+    } else {
+        $functionName = "imp->${name}";
+    }
 
     my $callWith = $function->signature->extendedAttributes->{"CallWith"};
     if ($callWith) {
         my $callWithArg = "COMPILE_ASSERT(false)";
-        if ($callWith eq "DynamicFrame") {
-            $result .= $indent . "Frame* enteredFrame = V8Proxy::retrieveFrameForEnteredContext();\n";
-            $result .= $indent . "if (!enteredFrame)\n";
-            $result .= $indent . "    return v8::Undefined();\n";
-            $callWithArg = "enteredFrame";
-        } elsif ($callWith eq "ScriptState") {
+        if ($callWith eq "ScriptState") {
             $result .= $indent . "EmptyScriptState state;\n";
             $callWithArg = "&state";
             $hasScriptState = 1;
@@ -3211,8 +3211,7 @@ sub GenerateFunctionCallString()
             $result .= $indent . "    return v8::Undefined();\n";
             $callWithArg = "scriptContext";
         }
-        $functionString .= ", " if $index;
-        $functionString .= $callWithArg;
+        push @arguments, $callWithArg;
         $index++;
         $numberOfParameters++
     }
@@ -3221,45 +3220,34 @@ sub GenerateFunctionCallString()
         if ($index eq $numberOfParameters) {
             last;
         }
-        $functionString .= ", " if $index;
         my $paramName = $parameter->name;
         my $paramType = $parameter->type;
 
         if ($parameter->type eq "NodeFilter" || $parameter->type eq "XPathNSResolver") {
-            $functionString .= "$paramName.get()";
+            push @arguments, "$paramName.get()";
         } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($parameter->type) and not $implClassName =~ /List$/) {
-            $functionString .= "$paramName->propertyReference()";
+            push @arguments, "$paramName->propertyReference()";
             $result .= $indent . "if (!$paramName) {\n";
             $result .= $indent . "    V8Proxy::setDOMException(WebCore::TYPE_MISMATCH_ERR);\n";
             $result .= $indent . "    return v8::Handle<v8::Value>();\n";
             $result .= $indent . "}\n";
         } elsif ($parameter->type eq "SVGMatrix" and $implClassName eq "SVGTransformList") {
-            $functionString .= "$paramName.get()";
+            push @arguments, "$paramName.get()";
         } else {
-            $functionString .= $paramName;
+            push @arguments, $paramName;
         }
         $index++;
     }
 
     if ($function->signature->extendedAttributes->{"CustomArgumentHandling"}) {
-        $functionString .= ", " if $index;
-        $functionString .= "scriptArguments, callStack";
-        $index += 2;
-    }
-
-    if ($function->signature->extendedAttributes->{"NeedsUserGestureCheck"}) {
-        $functionString .= ", " if $index;
-        $functionString .= "ScriptController::processingUserGesture()";
-        $index++;
-        AddToImplIncludes("ScriptController.h");
+        push @arguments, "scriptArguments, callStack";
     }
 
     if (@{$function->raisesExceptions}) {
-        $functionString .= ", " if $index;
-        $functionString .= "ec";
-        $index++;
+        push @arguments, "ec";
     }
-    $functionString .= ")";
+
+    my $functionString = "$functionName(" . join(", ", @arguments) . ")";
 
     my $return = "result";
     my $returnIsRef = IsRefPtrType($returnType);
@@ -3429,6 +3417,7 @@ sub GetNativeTypeForCallbacks
 {
     my $type = shift;
     return "const String&" if $type eq "DOMString";
+    return "SerializedScriptValue*" if $type eq "SerializedScriptValue";
 
     # Callbacks use raw pointers, so pass isParameter = 1
     return GetNativeType($type, 1);

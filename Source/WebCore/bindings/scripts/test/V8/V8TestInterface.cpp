@@ -32,7 +32,11 @@
 #include "V8DOMWrapper.h"
 #include "V8IsolatedContext.h"
 #include "V8Proxy.h"
+#include "V8TestObj.h"
 #include "V8TestSupplemental.h"
+#include <wtf/GetPtr.h>
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 #include <wtf/UnusedParam.h>
 
 namespace WebCore {
@@ -45,35 +49,74 @@ template <typename T> void V8_USE(T) { }
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
 
-static v8::Handle<v8::Value> str1AttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+static v8::Handle<v8::Value> supplementalStr1AttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestInterface.str1._get");
+    INC_STATS("DOM.TestInterface.supplementalStr1._get");
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
-    return v8String(TestSupplemental::str1(imp));
+    return v8String(TestSupplemental::supplementalStr1(imp));
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
 
-static v8::Handle<v8::Value> str2AttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+static v8::Handle<v8::Value> supplementalStr2AttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestInterface.str2._get");
+    INC_STATS("DOM.TestInterface.supplementalStr2._get");
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
-    return v8String(TestSupplemental::str2(imp));
+    return v8String(TestSupplemental::supplementalStr2(imp));
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
 
-static void str2AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+static void supplementalStr2AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestInterface.str2._set");
+    INC_STATS("DOM.TestInterface.supplementalStr2._set");
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK_VOID(V8Parameter<>, v, value);
-    TestSupplemental::setStr2(imp, v);
+    TestSupplemental::setSupplementalStr2(imp, v);
     return;
+}
+
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+
+static v8::Handle<v8::Value> supplementalMethod1Callback(const v8::Arguments& args)
+{
+    INC_STATS("DOM.TestInterface.supplementalMethod1");
+    TestInterface* imp = V8TestInterface::toNative(args.Holder());
+    TestSupplemental::supplementalMethod1(imp);
+    return v8::Handle<v8::Value>();
+}
+
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+
+static v8::Handle<v8::Value> supplementalMethod2Callback(const v8::Arguments& args)
+{
+    INC_STATS("DOM.TestInterface.supplementalMethod2");
+    if (args.Length() < 2)
+        return throwError("Not enough arguments", V8Proxy::TypeError);
+    TestInterface* imp = V8TestInterface::toNative(args.Holder());
+    ExceptionCode ec = 0;
+    {
+    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, strArg, MAYBE_MISSING_PARAMETER(args, 0, MissingIsUndefined));
+    EXCEPTION_BLOCK(TestObj*, objArg, V8TestObj::HasInstance(MAYBE_MISSING_PARAMETER(args, 1, MissingIsUndefined)) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(MAYBE_MISSING_PARAMETER(args, 1, MissingIsUndefined))) : 0);
+    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
+    if (!scriptContext)
+        return v8::Undefined();
+    RefPtr<TestObj> result = TestSupplemental::supplementalMethod2(imp, scriptContext, strArg, objArg, ec);
+    if (UNLIKELY(ec))
+        goto fail;
+    return toV8(result.release());
+    }
+    fail:
+    V8Proxy::setDOMException(ec);
+    return v8::Handle<v8::Value>();
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -82,17 +125,23 @@ static void str2AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> valu
 
 static const BatchedAttribute TestInterfaceAttrs[] = {
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    // Attribute 'str1' (Type: 'readonly attribute' ExtAttr: 'Conditional ImplementedBy')
-    {"str1", TestInterfaceInternal::str1AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'supplementalStr1' (Type: 'readonly attribute' ExtAttr: 'Conditional ImplementedBy')
+    {"supplementalStr1", TestInterfaceInternal::supplementalStr1AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    // Attribute 'str2' (Type: 'attribute' ExtAttr: 'Conditional ImplementedBy')
-    {"str2", TestInterfaceInternal::str2AttrGetter, TestInterfaceInternal::str2AttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'supplementalStr2' (Type: 'attribute' ExtAttr: 'Conditional ImplementedBy')
+    {"supplementalStr2", TestInterfaceInternal::supplementalStr2AttrGetter, TestInterfaceInternal::supplementalStr2AttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 #if ENABLE(Condition11) || ENABLE(Condition12)
-    // Attribute 'str3' (Type: 'attribute' ExtAttr: 'CustomSetter CustomGetter Conditional ImplementedBy')
-    {"str3", V8TestSupplemental::str3AccessorGetter, V8TestSupplemental::str3AccessorSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'supplementalStr3' (Type: 'attribute' ExtAttr: 'CustomSetter CustomGetter Conditional ImplementedBy')
+    {"supplementalStr3", V8TestSupplemental::supplementalStr3AccessorGetter, V8TestSupplemental::supplementalStr3AccessorSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
+};
+
+static const BatchedCallback TestInterfaceCallbacks[] = {
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    {"supplementalMethod1", TestInterfaceInternal::supplementalMethod1Callback},
+#endif
 };
 
 v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& args)
@@ -135,10 +184,22 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceTemplate(v8:
     v8::Local<v8::Signature> defaultSignature;
     defaultSignature = configureTemplate(desc, "TestInterface", v8::Persistent<v8::FunctionTemplate>(), V8TestInterface::internalFieldCount,
         TestInterfaceAttrs, WTF_ARRAY_LENGTH(TestInterfaceAttrs),
-        0, 0);
+        TestInterfaceCallbacks, WTF_ARRAY_LENGTH(TestInterfaceCallbacks));
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
     desc->SetCallHandler(V8TestInterface::constructorCallback);
+    v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
+    v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
+    UNUSED_PARAM(instance); // In some cases, it will not be used.
+    UNUSED_PARAM(proto); // In some cases, it will not be used.
     
+
+    // Custom Signature 'supplementalMethod2'
+    const int supplementalMethod2Argc = 2;
+    v8::Handle<v8::FunctionTemplate> supplementalMethod2Argv[supplementalMethod2Argc] = { v8::Handle<v8::FunctionTemplate>(), V8TestObj::GetRawTemplate() };
+    v8::Handle<v8::Signature> supplementalMethod2Signature = v8::Signature::New(desc, supplementalMethod2Argc, supplementalMethod2Argv);
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    proto->Set(v8::String::New("supplementalMethod2"), v8::FunctionTemplate::New(TestInterfaceInternal::supplementalMethod2Callback, v8::Handle<v8::Value>(), supplementalMethod2Signature));
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
 
     // Custom toString template
     desc->Set(getToStringName(), getToStringTemplate());

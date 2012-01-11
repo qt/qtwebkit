@@ -435,13 +435,14 @@ void LayerRendererChromium::drawDebugBorderQuad(const CCDebugBorderDrawQuad* qua
     ASSERT(program && program->initialized());
     GLC(context(), context()->useProgram(program->program()));
 
-    TransformationMatrix renderMatrix = quad->layerTransform();
     const IntRect& layerRect = quad->quadRect();
+    TransformationMatrix renderMatrix = quad->quadTransform();
+    renderMatrix.translate(0.5 * layerRect.width() + layerRect.x(), 0.5 * layerRect.height() + layerRect.y());
     renderMatrix.scaleNonUniform(layerRect.width(), layerRect.height());
     LayerRendererChromium::toGLMatrix(&glMatrix[0], projectionMatrix() * renderMatrix);
     GLC(context(), context()->uniformMatrix4fv(program->vertexShader().matrixLocation(), false, &glMatrix[0], 1));
 
-    GLC(context(), context()->uniform4f(program->fragmentShader().colorLocation(), quad->color().red() / 255.0, quad->color().green() / 255.0, quad->color().blue() / 255.0, 1));
+    GLC(context(), context()->uniform4f(program->fragmentShader().colorLocation(), quad->color().red() / 255.0, quad->color().green() / 255.0, quad->color().blue() / 255.0, quad->color().alpha() / 255.0));
 
     GLC(context(), context()->lineWidth(quad->width()));
 
@@ -679,11 +680,9 @@ void LayerRendererChromium::finishDrawingFrame()
 
     size_t contentsMemoryUseBytes = m_contentsTextureAllocator->currentMemoryUseBytes();
     size_t reclaimLimit = TextureManager::reclaimLimitBytes(viewportSize());
-    if (reclaimLimit > contentsMemoryUseBytes)
-        m_renderSurfaceTextureManager->setPreferredMemoryLimitBytes(reclaimLimit - contentsMemoryUseBytes);
-    else
-        m_renderSurfaceTextureManager->setPreferredMemoryLimitBytes(0);
-
+    size_t preferredLimit = reclaimLimit > contentsMemoryUseBytes ? reclaimLimit - contentsMemoryUseBytes : 0;
+    m_renderSurfaceTextureManager->setPreferredMemoryLimitBytes(preferredLimit);
+    m_renderSurfaceTextureManager->reduceMemoryToLimit(preferredLimit);
     m_renderSurfaceTextureManager->deleteEvictedTextures(m_renderSurfaceTextureAllocator.get());
 
     if (settings().compositeOffscreen)

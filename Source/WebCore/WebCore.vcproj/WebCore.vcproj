@@ -25186,6 +25186,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\page\DOMWindowProperty.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\DOMWindowProperty.h"
+				>
+			</File>
+			<File
 				RelativePath="..\page\DragActions.h"
 				>
 			</File>
@@ -25252,14 +25260,22 @@
 			<File
 				RelativePath="..\page\Frame.h"
 				>
-				<File
-					RelativePath="..\page\FrameActionScheduler.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\page\FrameActionScheduler.h"
-					>
-				</File>
+			</File>
+			<File
+				RelativePath="..\page\FrameActionScheduler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\FrameActionScheduler.h"
+				>
+			</File>
+			<File
+				RelativePath="..\page\FrameDestructionObserver.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\FrameDestructionObserver.h"
+				>
 			</File>
 			<File
 				RelativePath="..\page\FrameTree.cpp"
@@ -51774,6 +51790,62 @@
 				>
 			</File>
 			<File
+				RelativePath="..\dom\TreeScopeAdopter.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\TreeScopeAdopter.h"
+				>
+			</File>
+			<File
 				RelativePath="..\dom\TreeWalker.cpp"
 				>
 				<FileConfiguration
@@ -70454,6 +70526,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\storage\DOMWindowSQLDatabase.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\storage\DOMWindowSQLDatabase.h"
+				>
+			</File>
+			<File
 				RelativePath="..\storage\Database.cpp"
 				>
 			</File>
@@ -71055,6 +71135,14 @@
 			</File>
 			<File
 				RelativePath="..\inspector\ContentSearchUtils.h"
+				>
+			</File>
+			<File
+				RelativePath="..\inspector\DOMEditor.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\inspector\DOMEditor.h"
 				>
 			</File>
 			<File

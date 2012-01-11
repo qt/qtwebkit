@@ -368,11 +368,12 @@ bool RenderLayerCompositor::updateBacking(RenderLayer* layer, CompositingChangeR
             layer->ensureBacking();
 
 #if PLATFORM(MAC) && USE(CA)
-            if (m_renderView->document()->settings()->acceleratedDrawingEnabled())
+            Settings* settings = m_renderView->document()->settings();
+            if (settings && settings->acceleratedDrawingEnabled())
                 layer->backing()->graphicsLayer()->setAcceleratesDrawing(true);
             else if (layer->renderer()->isCanvas()) {
                 HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(layer->renderer()->node());
-                if (canvas->renderingContext() && canvas->renderingContext()->isAccelerated())
+                if (canvas->shouldAccelerate(canvas->size()))
                     layer->backing()->graphicsLayer()->setAcceleratesDrawing(true);
             }
 #endif
@@ -1331,6 +1332,7 @@ bool RenderLayerCompositor::requiresCompositingLayer(const RenderLayer* layer) c
              || clipsCompositingDescendants(layer)
              || requiresCompositingForAnimation(renderer)
              || requiresCompositingForFullScreen(renderer)
+             || requiresCompositingForFilters(renderer)
              || requiresCompositingForPosition(renderer, layer);
 }
 
@@ -1510,6 +1512,19 @@ bool RenderLayerCompositor::requiresCompositingForFullScreen(RenderObject* rende
 {
 #if ENABLE(FULLSCREEN_API)
     return renderer->isRenderFullScreen() && m_renderView->document()->isAnimatingFullScreen();
+#else
+    UNUSED_PARAM(renderer);
+    return false;
+#endif
+}
+
+bool RenderLayerCompositor::requiresCompositingForFilters(RenderObject* renderer) const
+{
+#if ENABLE(CSS_FILTERS)
+    if (!(m_compositingTriggers & ChromeClient::FilterTrigger))
+        return false;
+
+    return renderer->hasFilter();
 #else
     UNUSED_PARAM(renderer);
     return false;

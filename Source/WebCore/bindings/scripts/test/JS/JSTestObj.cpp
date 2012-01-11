@@ -21,24 +21,37 @@
 #include "config.h"
 #include "JSTestObj.h"
 
+#include "Document.h"
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
 #include "IDBBindingUtilities.h"
 #include "IDBKey.h"
 #include "JSDOMBinding.h"
 #include "JSDOMStringList.h"
+#include "JSDocument.h"
 #include "JSEventListener.h"
 #include "JSOptionsObject.h"
+#include "JSSVGDocument.h"
+#include "JSSVGPoint.h"
 #include "JSTestCallback.h"
 #include "JSTestObj.h"
+#include "JSa.h"
+#include "JSb.h"
+#include "JSbool.h"
+#include "JSc.h"
+#include "JSd.h"
+#include "JSe.h"
+#include "JSint.h"
 #include "JSlog.h"
 #include "KURL.h"
+#include "SVGDocument.h"
+#include "SVGStaticPropertyTearOff.h"
 #include "ScriptArguments.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
-#include "ScriptController.h"
 #include "SerializedScriptValue.h"
 #include "TestObj.h"
+#include "bool.h"
 #include <runtime/Error.h>
 #include <runtime/JSString.h>
 #include <wtf/GetPtr.h>
@@ -115,6 +128,10 @@ static const HashTableValue JSTestObjTableValues[] =
 #endif
     { "cachedAttribute1", DontDelete | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjCachedAttribute1), (intptr_t)0, NoIntrinsic },
     { "cachedAttribute2", DontDelete | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjCachedAttribute2), (intptr_t)0, NoIntrinsic },
+    { "contentDocument", DontDelete | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjContentDocument), (intptr_t)0, NoIntrinsic },
+    { "mutablePoint", DontDelete, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjMutablePoint), (intptr_t)setJSTestObjMutablePoint, NoIntrinsic },
+    { "immutablePoint", DontDelete, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjImmutablePoint), (intptr_t)setJSTestObjImmutablePoint, NoIntrinsic },
+    { "strictFloat", DontDelete, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjStrictFloat), (intptr_t)setJSTestObjStrictFloat, NoIntrinsic },
     { "description", DontDelete | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjDescription), (intptr_t)0, NoIntrinsic },
     { "id", DontDelete, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjId), (intptr_t)setJSTestObjId, NoIntrinsic },
     { "hash", DontDelete | ReadOnly, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestObjHash), (intptr_t)0, NoIntrinsic },
@@ -122,7 +139,7 @@ static const HashTableValue JSTestObjTableValues[] =
     { 0, 0, 0, 0, NoIntrinsic }
 };
 
-static const HashTable JSTestObjTable = { 135, 127, JSTestObjTableValues, 0 };
+static const HashTable JSTestObjTable = { 136, 127, JSTestObjTableValues, 0 };
 /* Hash table for constructor */
 
 static const HashTableValue JSTestObjConstructorTableValues[] =
@@ -242,11 +259,6 @@ static const HashTableValue JSTestObjPrototypeTableValues[] =
     { "customArgsAndException", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionCustomArgsAndException), (intptr_t)1, NoIntrinsic },
     { "addEventListener", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionAddEventListener), (intptr_t)3, NoIntrinsic },
     { "removeEventListener", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionRemoveEventListener), (intptr_t)3, NoIntrinsic },
-    { "withDynamicFrame", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithDynamicFrame), (intptr_t)0, NoIntrinsic },
-    { "withDynamicFrameAndArg", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithDynamicFrameAndArg), (intptr_t)1, NoIntrinsic },
-    { "withDynamicFrameAndOptionalArg", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithDynamicFrameAndOptionalArg), (intptr_t)2, NoIntrinsic },
-    { "withDynamicFrameAndUserGesture", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithDynamicFrameAndUserGesture), (intptr_t)1, NoIntrinsic },
-    { "withDynamicFrameAndUserGestureASAD", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithDynamicFrameAndUserGestureASAD), (intptr_t)2, NoIntrinsic },
     { "withScriptStateVoid", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithScriptStateVoid), (intptr_t)0, NoIntrinsic },
     { "withScriptStateObj", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithScriptStateObj), (intptr_t)0, NoIntrinsic },
     { "withScriptStateVoidException", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionWithScriptStateVoidException), (intptr_t)0, NoIntrinsic },
@@ -268,10 +280,20 @@ static const HashTableValue JSTestObjPrototypeTableValues[] =
     { "conditionalMethod3", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionConditionalMethod3), (intptr_t)0, NoIntrinsic },
 #endif
     { "overloadedMethod", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionOverloadedMethod), (intptr_t)2, NoIntrinsic },
+    { "getSVGDocument", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionGetSVGDocument), (intptr_t)0, NoIntrinsic },
+    { "convert1", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionConvert1), (intptr_t)1, NoIntrinsic },
+    { "convert2", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionConvert2), (intptr_t)1, NoIntrinsic },
+    { "convert3", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionConvert3), (intptr_t)1, NoIntrinsic },
+    { "convert4", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionConvert4), (intptr_t)1, NoIntrinsic },
+    { "convert5", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionConvert5), (intptr_t)1, NoIntrinsic },
+    { "mutablePointFunction", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionMutablePointFunction), (intptr_t)0, NoIntrinsic },
+    { "immutablePointFunction", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionImmutablePointFunction), (intptr_t)0, NoIntrinsic },
+    { "orange", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionOrange), (intptr_t)0, NoIntrinsic },
+    { "strictFunction", DontDelete | JSC::Function, (intptr_t)static_cast<NativeFunction>(jsTestObjPrototypeFunctionStrictFunction), (intptr_t)3, NoIntrinsic },
     { 0, 0, 0, 0, NoIntrinsic }
 };
 
-static const HashTable JSTestObjPrototypeTable = { 137, 127, JSTestObjPrototypeTableValues, 0 };
+static const HashTable JSTestObjPrototypeTable = { 138, 127, JSTestObjPrototypeTableValues, 0 };
 const ClassInfo JSTestObjPrototype::s_info = { "TestObjPrototype", &Base::s_info, &JSTestObjPrototypeTable, 0, CREATE_METHOD_TABLE(JSTestObjPrototype) };
 
 JSObject* JSTestObjPrototype::self(ExecState* exec, JSGlobalObject* globalObject)
@@ -708,6 +730,44 @@ JSValue jsTestObjCachedAttribute2(ExecState* exec, JSValue slotBase, const Ident
 }
 
 
+JSValue jsTestObjContentDocument(ExecState* exec, JSValue slotBase, const Identifier&)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(slotBase));
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    return allowAccessToNode(exec, impl->contentDocument()) ? toJS(exec, castedThis->globalObject(), WTF::getPtr(impl->contentDocument())) : jsUndefined();
+}
+
+
+JSValue jsTestObjMutablePoint(ExecState* exec, JSValue slotBase, const Identifier&)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(slotBase));
+    UNUSED_PARAM(exec);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    JSValue result = toJS(exec, castedThis->globalObject(), WTF::getPtr(SVGStaticPropertyTearOff<TestObj, FloatPoint>::create(impl, impl->mutablePoint(), &TestObj::updateMutablePoint)));
+    return result;
+}
+
+
+JSValue jsTestObjImmutablePoint(ExecState* exec, JSValue slotBase, const Identifier&)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(slotBase));
+    UNUSED_PARAM(exec);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    JSValue result = toJS(exec, castedThis->globalObject(), WTF::getPtr(SVGPropertyTearOff<FloatPoint>::create(impl->immutablePoint())));
+    return result;
+}
+
+
+JSValue jsTestObjStrictFloat(ExecState* exec, JSValue slotBase, const Identifier&)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(slotBase));
+    UNUSED_PARAM(exec);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    JSValue result = jsNumber(impl->strictFloat());
+    return result;
+}
+
+
 JSValue jsTestObjDescription(ExecState* exec, JSValue slotBase, const Identifier&)
 {
     JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(slotBase));
@@ -1014,6 +1074,30 @@ void setJSTestObjConditionalAttr6Constructor(ExecState* exec, JSObject* thisObje
 
 #endif
 
+void setJSTestObjMutablePoint(ExecState* exec, JSObject* thisObject, JSValue value)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(thisObject);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    impl->setMutablePoint(toSVGPoint(value));
+}
+
+
+void setJSTestObjImmutablePoint(ExecState* exec, JSObject* thisObject, JSValue value)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(thisObject);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    impl->setImmutablePoint(toSVGPoint(value));
+}
+
+
+void setJSTestObjStrictFloat(ExecState* exec, JSObject* thisObject, JSValue value)
+{
+    JSTestObj* castedThis = static_cast<JSTestObj*>(thisObject);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    impl->setStrictFloat(value.toFloat(exec));
+}
+
+
 void setJSTestObjId(ExecState* exec, JSObject* thisObject, JSValue value)
 {
     JSTestObj* castedThis = static_cast<JSTestObj*>(thisObject);
@@ -1306,121 +1390,6 @@ EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionRemoveEventListener(ExecS
     if (!listener.isObject())
         return JSValue::encode(jsUndefined());
     impl->removeEventListener(ustringToAtomicString(exec->argument(0).toString(exec)), JSEventListener::create(asObject(listener), castedThis, false, currentWorld(exec)).get(), exec->argument(2).toBoolean(exec));
-    return JSValue::encode(jsUndefined());
-}
-
-EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionWithDynamicFrame(ExecState* exec)
-{
-    JSValue thisValue = exec->hostThisValue();
-    if (!thisValue.inherits(&JSTestObj::s_info))
-        return throwVMTypeError(exec);
-    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
-    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
-    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
-    Frame* dynamicFrame = toDynamicFrame(exec);
-    if (!dynamicFrame)
-        return JSValue::encode(jsUndefined());
-    impl->withDynamicFrame(dynamicFrame);
-    return JSValue::encode(jsUndefined());
-}
-
-EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionWithDynamicFrameAndArg(ExecState* exec)
-{
-    JSValue thisValue = exec->hostThisValue();
-    if (!thisValue.inherits(&JSTestObj::s_info))
-        return throwVMTypeError(exec);
-    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
-    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
-    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
-    if (exec->argumentCount() < 1)
-        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    Frame* dynamicFrame = toDynamicFrame(exec);
-    if (!dynamicFrame)
-        return JSValue::encode(jsUndefined());
-    int intArg(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toInt32(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-    impl->withDynamicFrameAndArg(dynamicFrame, intArg);
-    return JSValue::encode(jsUndefined());
-}
-
-EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionWithDynamicFrameAndOptionalArg(ExecState* exec)
-{
-    JSValue thisValue = exec->hostThisValue();
-    if (!thisValue.inherits(&JSTestObj::s_info))
-        return throwVMTypeError(exec);
-    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
-    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
-    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
-    if (exec->argumentCount() < 1)
-        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    Frame* dynamicFrame = toDynamicFrame(exec);
-    if (!dynamicFrame)
-        return JSValue::encode(jsUndefined());
-    int intArg(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toInt32(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-
-    size_t argsCount = exec->argumentCount();
-    if (argsCount <= 1) {
-        impl->withDynamicFrameAndOptionalArg(dynamicFrame, intArg);
-        return JSValue::encode(jsUndefined());
-    }
-
-    int optionalArg(MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined).toInt32(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-    impl->withDynamicFrameAndOptionalArg(dynamicFrame, intArg, optionalArg);
-    return JSValue::encode(jsUndefined());
-}
-
-EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionWithDynamicFrameAndUserGesture(ExecState* exec)
-{
-    JSValue thisValue = exec->hostThisValue();
-    if (!thisValue.inherits(&JSTestObj::s_info))
-        return throwVMTypeError(exec);
-    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
-    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
-    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
-    if (exec->argumentCount() < 1)
-        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    Frame* dynamicFrame = toDynamicFrame(exec);
-    if (!dynamicFrame)
-        return JSValue::encode(jsUndefined());
-    int intArg(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toInt32(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-    impl->withDynamicFrameAndUserGesture(dynamicFrame, intArg, ScriptController::processingUserGesture());
-    return JSValue::encode(jsUndefined());
-}
-
-EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionWithDynamicFrameAndUserGestureASAD(ExecState* exec)
-{
-    JSValue thisValue = exec->hostThisValue();
-    if (!thisValue.inherits(&JSTestObj::s_info))
-        return throwVMTypeError(exec);
-    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
-    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
-    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
-    if (exec->argumentCount() < 1)
-        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    Frame* dynamicFrame = toDynamicFrame(exec);
-    if (!dynamicFrame)
-        return JSValue::encode(jsUndefined());
-    int intArg(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toInt32(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-
-    size_t argsCount = exec->argumentCount();
-    if (argsCount <= 1) {
-        impl->withDynamicFrameAndUserGestureASAD(dynamicFrame, intArg);
-        return JSValue::encode(jsUndefined());
-    }
-
-    int optionalArg(MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined).toInt32(exec));
-    if (exec->hadException())
-        return JSValue::encode(jsUndefined());
-    impl->withDynamicFrameAndUserGestureASAD(dynamicFrame, intArg, optionalArg, ScriptController::processingUserGesture());
     return JSValue::encode(jsUndefined());
 }
 
@@ -1906,6 +1875,174 @@ EncodedJSValue JSC_HOST_CALL jsTestObjConstructorFunctionOverloadedMethod1(ExecS
 }
 
 #endif
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionGetSVGDocument(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    ExceptionCode ec = 0;
+    if (!allowAccessToNode(exec, impl->getSVGDocument(ec)))
+        return JSValue::encode(jsUndefined());
+
+    JSC::JSValue result = toJS(exec, castedThis->globalObject(), WTF::getPtr(impl->getSVGDocument(ec)));
+    setDOMException(exec, ec);
+    return JSValue::encode(result);
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionConvert1(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    if (exec->argumentCount() < 1)
+        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
+    a* (toa(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    impl->convert1();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionConvert2(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    if (exec->argumentCount() < 1)
+        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
+    b* (tob(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    impl->convert2();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionConvert3(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    if (exec->argumentCount() < 1)
+        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
+    c* (toc(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    impl->convert3();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionConvert4(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    if (exec->argumentCount() < 1)
+        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
+    d* (tod(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    impl->convert4();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionConvert5(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    if (exec->argumentCount() < 1)
+        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
+    e* (toe(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    impl->convert5();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionMutablePointFunction(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+
+    JSC::JSValue result = toJS(exec, castedThis->globalObject(), WTF::getPtr(SVGPropertyTearOff<FloatPoint>::create(impl->mutablePointFunction())));
+    return JSValue::encode(result);
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionImmutablePointFunction(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+
+    JSC::JSValue result = toJS(exec, castedThis->globalObject(), WTF::getPtr(SVGPropertyTearOff<FloatPoint>::create(impl->immutablePointFunction())));
+    return JSValue::encode(result);
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionOrange(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    impl->banana();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL jsTestObjPrototypeFunctionStrictFunction(ExecState* exec)
+{
+    JSValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&JSTestObj::s_info))
+        return throwVMTypeError(exec);
+    JSTestObj* castedThis = static_cast<JSTestObj*>(asObject(thisValue));
+    ASSERT_GC_OBJECT_INHERITS(castedThis, &JSTestObj::s_info);
+    TestObj* impl = static_cast<TestObj*>(castedThis->impl());
+    if (exec->argumentCount() < 3)
+        return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
+    ExceptionCode ec = 0;
+    const String& str(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toString(exec)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    float a(MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined).toFloat(exec));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    if (exec->argumentCount() > 2 && !exec->argument(2).isUndefinedOrNull() && !exec->argument(2).inherits(&JSint::s_info))
+        return throwVMTypeError(exec);
+    int* b(toint(MAYBE_MISSING_PARAMETER(exec, 2, MissingIsUndefined)));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+
+    JSC::JSValue result = toJS(exec, castedThis->globalObject(), WTF::getPtr(impl->strictFunction(str, a, b, ec)));
+    setDOMException(exec, ec);
+    return JSValue::encode(result);
+}
 
 void JSTestObj::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {

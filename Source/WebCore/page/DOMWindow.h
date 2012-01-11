@@ -28,6 +28,7 @@
 #define DOMWindow_h
 
 #include "EventTarget.h"
+#include "FrameDestructionObserver.h"
 #include "KURL.h"
 
 namespace WebCore {
@@ -40,6 +41,7 @@ namespace WebCore {
     class DOMApplicationCache;
     class DOMSelection;
     class DOMURL;
+    class DOMWindowProperty;
     class Database;
     class DatabaseCallback;
     class Document;
@@ -80,7 +82,7 @@ namespace WebCore {
 
     enum SetLocationLocking { LockHistoryBasedOnGestureState, LockHistoryAndBackForwardList };
 
-    class DOMWindow : public RefCounted<DOMWindow>, public EventTarget {
+    class DOMWindow : public RefCounted<DOMWindow>, public EventTarget, public FrameDestructionObserver {
     public:
         static PassRefPtr<DOMWindow> create(Frame* frame) { return adoptRef(new DOMWindow(frame)); }
         virtual ~DOMWindow();
@@ -90,8 +92,10 @@ namespace WebCore {
 
         virtual DOMWindow* toDOMWindow();
 
-        Frame* frame() const { return m_frame; }
-        void disconnectFrame();
+        virtual void frameDestroyed() OVERRIDE;
+
+        void registerProperty(DOMWindowProperty*);
+        void unregisterProperty(DOMWindowProperty*);
 
         void clear();
 
@@ -351,10 +355,6 @@ namespace WebCore {
         DOMURL* webkitURL() const;
 #endif
 
-#if ENABLE(SQL_DATABASE)
-        PassRefPtr<Database> openDatabase(const String& name, const String& version, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback> creationCallback, ExceptionCode&);
-#endif
-
 #if ENABLE(DEVICE_ORIENTATION)
         DEFINE_ATTRIBUTE_EVENT_LISTENER(devicemotion);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(deviceorientation);
@@ -414,14 +414,14 @@ namespace WebCore {
         Performance* performance() const;
 #endif
 
-    private:
-        DOMWindow(Frame*);
-
         // FIXME: When this DOMWindow is no longer the active DOMWindow (i.e.,
         // when its document is no longer the document that is displayed in its
         // frame), we would like to zero out m_frame to avoid being confused
         // by the document that is currently active in m_frame.
         bool isCurrentlyDisplayedInFrame() const;
+
+    private:
+        explicit DOMWindow(Frame*);
 
         virtual void refEventTarget() { ref(); }
         virtual void derefEventTarget() { deref(); }
@@ -437,7 +437,9 @@ namespace WebCore {
         KURL m_url;
 
         bool m_shouldPrintWhenFinishedLoading;
-        Frame* m_frame;
+
+        HashSet<DOMWindowProperty*> m_properties;
+
         mutable RefPtr<Screen> m_screen;
         mutable RefPtr<DOMSelection> m_selection;
         mutable RefPtr<History> m_history;

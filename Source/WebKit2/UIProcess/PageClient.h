@@ -52,6 +52,9 @@ class NativeWebKeyboardEvent;
 #if ENABLE(TOUCH_EVENTS)
 class NativeWebTouchEvent;
 #endif
+#if ENABLE(GESTURE_EVENTS)
+class WebGestureEvent;
+#endif
 class WebContextMenuProxy;
 class WebEditCommandProxy;
 class WebPopupMenuProxy;
@@ -106,6 +109,7 @@ public:
     virtual void focusEditableArea(const WebCore::IntRect&, const WebCore::IntRect&) = 0;
     virtual void didReceiveMessageFromNavigatorQtObject(const String&) = 0;
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
+    virtual void updateTextInputState() = 0;
 #endif
 
 #if PLATFORM(QT) || PLATFORM(GTK)
@@ -141,6 +145,9 @@ public:
     virtual WebCore::IntRect windowToScreen(const WebCore::IntRect&) = 0;
     
     virtual void doneWithKeyEvent(const NativeWebKeyboardEvent&, bool wasEventHandled) = 0;
+#if ENABLE(GESTURE_EVENTS)
+    virtual void doneWithGestureEvent(const WebGestureEvent&, bool wasEventHandled) = 0;
+#endif
 #if ENABLE(TOUCH_EVENTS)
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled) = 0;
 #endif

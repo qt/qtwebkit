@@ -376,7 +376,7 @@ void MediaControlRootElementChromium::updateTextTrackDisplay()
         if (!cue->track() || cue->track()->mode() != TextTrack::SHOWING)
             continue;
 
-        String cueText = cue->getCueAsSource();
+        String cueText = cue->text();
         if (!cueText.isEmpty()) {
             if (!nothingToDisplay)
                 m_textTrackDisplay->appendChild(document()->createElement(HTMLNames::brTag, false), ASSERT_NO_EXCEPTION);
@@ -396,6 +396,14 @@ const AtomicString& MediaControlRootElementChromium::shadowPseudoId() const
 {
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls"));
     return id;
+}
+
+void MediaControlRootElementChromium::bufferingProgressed()
+{
+    // We only need to update buffering progress when paused, during normal
+    // playback playbackProgressed() will take care of it.
+    if (m_mediaController->paused())
+        m_timeline->setPosition(m_mediaController->currentTime());
 }
 
 }

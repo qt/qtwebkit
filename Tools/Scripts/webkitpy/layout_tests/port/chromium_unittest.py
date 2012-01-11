@@ -98,7 +98,7 @@ class ChromiumDriverTest(unittest.TestCase):
             raise IOError
         self.driver._proc.stdout.readline = mock_readline
 
-        self.driver._port.test_to_uri = lambda test: 'mocktesturi'
+        self.driver.test_to_uri = lambda test: 'mocktesturi'
         driver_output = self.driver.run_test(DriverInput(test_name='some/test.html', timeout=1, image_hash=None, is_reftest=False))
         self.assertEqual(self.driver._port.driver_name(), driver_output.crashed_process_name)
 
@@ -162,28 +162,16 @@ class ChromiumPortTest(port_testcase.PortTestCase):
         self.assertEquals(set(port.all_test_configurations()), set([
             TestConfiguration('leopard', 'x86', 'debug', 'cpu'),
             TestConfiguration('leopard', 'x86', 'debug', 'gpu'),
-            TestConfiguration('leopard', 'x86', 'debug', 'cpu-cg'),
-            TestConfiguration('leopard', 'x86', 'debug', 'gpu-cg'),
             TestConfiguration('leopard', 'x86', 'release', 'cpu'),
             TestConfiguration('leopard', 'x86', 'release', 'gpu'),
-            TestConfiguration('leopard', 'x86', 'release', 'cpu-cg'),
-            TestConfiguration('leopard', 'x86', 'release', 'gpu-cg'),
             TestConfiguration('snowleopard', 'x86', 'debug', 'cpu'),
             TestConfiguration('snowleopard', 'x86', 'debug', 'gpu'),
-            TestConfiguration('snowleopard', 'x86', 'debug', 'cpu-cg'),
-            TestConfiguration('snowleopard', 'x86', 'debug', 'gpu-cg'),
             TestConfiguration('snowleopard', 'x86', 'release', 'cpu'),
             TestConfiguration('snowleopard', 'x86', 'release', 'gpu'),
-            TestConfiguration('snowleopard', 'x86', 'release', 'cpu-cg'),
-            TestConfiguration('snowleopard', 'x86', 'release', 'gpu-cg'),
             TestConfiguration('lion', 'x86', 'debug', 'cpu'),
             TestConfiguration('lion', 'x86', 'debug', 'gpu'),
-            TestConfiguration('lion', 'x86', 'debug', 'cpu-cg'),
-            TestConfiguration('lion', 'x86', 'debug', 'gpu-cg'),
             TestConfiguration('lion', 'x86', 'release', 'cpu'),
             TestConfiguration('lion', 'x86', 'release', 'gpu'),
-            TestConfiguration('lion', 'x86', 'release', 'cpu-cg'),
-            TestConfiguration('lion', 'x86', 'release', 'gpu-cg'),
             TestConfiguration('xp', 'x86', 'debug', 'cpu'),
             TestConfiguration('xp', 'x86', 'debug', 'gpu'),
             TestConfiguration('xp', 'x86', 'release', 'cpu'),

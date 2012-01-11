@@ -68,6 +68,7 @@
 #import <WebKit/WebDatabaseManagerPrivate.h>
 #import <WebKit/WebDocumentPrivate.h>
 #import <WebKit/WebDeviceOrientationProviderMock.h>
+#import <WebKit/WebDynamicScrollBarsView.h>
 #import <WebKit/WebEditingDelegate.h>
 #import <WebKit/WebFrameView.h>
 #import <WebKit/WebHistory.h>
@@ -439,6 +440,68 @@ static void adjustFonts()
     activateTestingFonts();
 }
 
+@interface DRTMockScroller : NSScroller
+@end
+
+@implementation DRTMockScroller
+
+- (NSRect)rectForPart:(NSScrollerPart)partCode
+{
+    switch (partCode) {
+    case NSScrollerKnob: {
+        NSRect frameRect = [self frame];
+        NSRect bounds = [self bounds];
+        BOOL isHorizontal = frameRect.size.width > frameRect.size.height;
+        CGFloat trackLength = isHorizontal ? bounds.size.width : bounds.size.height;
+        CGFloat minKnobSize = isHorizontal ? bounds.size.height : bounds.size.width;
+        CGFloat knobLength = max(minKnobSize, static_cast<CGFloat>(round(trackLength * [self knobProportion])));
+        CGFloat knobPosition = static_cast<CGFloat>((round([self doubleValue] * (trackLength - knobLength))));
+        
+        if (isHorizontal)
+            return NSMakeRect(bounds.origin.x + knobPosition, bounds.origin.y, knobLength, bounds.size.height);
+
+        return NSMakeRect(bounds.origin.x, bounds.origin.y +  + knobPosition, bounds.size.width, knobLength);
+    }
+    }
+    
+    return [super rectForPart:partCode];
+}
+
+- (void)drawKnob
+{
+    if (![self isEnabled])
+        return;
+
+    NSRect knobRect = [self rectForPart:NSScrollerKnob];
+    
+    static NSColor *knobColor = [[NSColor colorWithDeviceRed:0x80 / 255.0 green:0x80 / 255.0 blue:0x80 / 255.0 alpha:1] retain];
+    [knobColor set];
+
+    NSRectFill(knobRect);
+}
+
+- (void)drawRect:(NSRect)dirtyRect
+{
+    static NSColor *trackColor = [[NSColor colorWithDeviceRed:0xC0 / 255.0 green:0xC0 / 255.0 blue:0xC0 / 255.0 alpha:1] retain];
+    static NSColor *disabledTrackColor = [[NSColor colorWithDeviceRed:0xE0 / 255.0 green:0xE0 / 255.0 blue:0xE0 / 255.0 alpha:1] retain];
+
+    if ([self isEnabled])
+        [trackColor set];
+    else
+        [disabledTrackColor set];
+
+    NSRectFill(dirtyRect);
+    
+    [self drawKnob];
+}
+
+@end
+
+static void registerMockScrollbars()
+{
+    [WebDynamicScrollBarsView setCustomScrollerClass:[DRTMockScroller class]];
+}
+
 WebView *createWebViewAndOffscreenWindow()
 {
     NSRect rect = NSMakeRect(0, 0, LayoutTestController::maxViewWidth, LayoutTestController::maxViewHeight);
@@ -555,6 +618,7 @@ static void resetDefaultsToConsistentValues()
     [preferences setXSSAuditorEnabled:NO];
     [preferences setExperimentalNotificationsEnabled:NO];
     [preferences setPlugInsEnabled:YES];
+    [preferences setTextAreasAreResizable:YES];
 
     [preferences setPrivateBrowsingEnabled:NO];
     [preferences setAuthorAndUserStylesEnabled:YES];
@@ -643,7 +707,6 @@ static void crashHandler(int sig)
     char *signalName = strsignal(sig);
     write(STDERR_FILENO, signalName, strlen(signalName));
     write(STDERR_FILENO, "\n", 1);
-    restoreMainDisplayColorProfile(0);
     exit(128 + sig);
 }
 
@@ -752,9 +815,8 @@ static void prepareConsistentTestingEnvironment()
 
     setDefaultsToConsistentValuesForTesting();
     adjustFonts();
+    registerMockScrollbars();
     
-    if (dumpPixels)
-        setupMainDisplayColorProfile();
     allocateGlobalControllers();
     
     makeLargeMallocFailSilently();
@@ -822,9 +884,6 @@ void dumpRenderTree(int argc, const char *argv[])
         CFRelease(disallowedURLs);
         disallowedURLs = 0;
     }
-
-    if (dumpPixels)
-        restoreMainDisplayColorProfile(0);
 }
 
 int main(int argc, const char *argv[])

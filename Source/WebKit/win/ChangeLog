@@ -1,3 +1,17 @@
+2012-01-07  Andreas Kling  <awesomekling@apple.com>
+
+        Windows build fix.
+
+        * DOMHTMLClasses.cpp:
+        (DOMHTMLDocument::forms):
+        (DOMHTMLSelectElement::options):
+
+2012-01-06  Jessie Berlin  <jberlin@apple.com>
+
+        Windows build fix.
+
+        * Interfaces/IWebViewPrivate.idl:
+
 2012-01-05  Adam Roben  <aroben@apple.com>
 
         Add WebKitTestRunnerLauncher to WebKit.sln.

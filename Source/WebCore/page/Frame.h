@@ -63,7 +63,7 @@ typedef struct HBITMAP__* HBITMAP;
 namespace WebCore {
 
     class Document;
-    class Frame;
+    class FrameDestructionObserver;
     class FrameView;
     class HTMLTableCellElement;
     class RegularExpression;
@@ -73,18 +73,6 @@ namespace WebCore {
 #if !USE(TILED_BACKING_STORE)
     class TiledBackingStoreClient { };
 #endif
-
-    class FrameDestructionObserver {
-    public:
-        explicit FrameDestructionObserver(Frame*);
-        virtual void frameDestroyed();
-        Frame* frame() const { return m_frame; }
-
-    protected:
-        virtual ~FrameDestructionObserver();
-
-        Frame* m_frame;
-    };
 
     class Frame : public RefCounted<Frame>, public TiledBackingStoreClient {
     public:
@@ -145,7 +133,6 @@ namespace WebCore {
         DOMWindow* domWindow() const;
         DOMWindow* existingDOMWindow() { return m_domWindow.get(); }
         void setDOMWindow(DOMWindow*);
-        void clearFormerDOMWindow(DOMWindow*);
         void clearDOMWindow();
 
         static Frame* frameForWidget(const Widget*);
@@ -224,7 +211,6 @@ namespace WebCore {
         mutable NavigationScheduler m_navigationScheduler;
 
         mutable RefPtr<DOMWindow> m_domWindow;
-        HashSet<DOMWindow*> m_liveFormerWindows;
 
         HTMLFrameOwnerElement* m_ownerElement;
         RefPtr<FrameView> m_view;

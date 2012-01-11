@@ -34,9 +34,11 @@ SET(JavaScriptCore_SOURCES
     API/JSWeakObjectMapRefPrivate.cpp
     API/OpaqueJSString.cpp
 
+    bytecode/CallLinkInfo.cpp
     bytecode/CodeBlock.cpp
     bytecode/DFGExitProfile.cpp
     bytecode/JumpTable.cpp
+    bytecode/MethodCallLinkInfo.cpp
     bytecode/Opcode.cpp
     bytecode/PredictedType.cpp
     bytecode/SamplingTool.cpp
@@ -92,6 +94,7 @@ SET(JavaScriptCore_SOURCES
     jit/JITCall32_64.cpp
     jit/JITCall.cpp
     jit/JIT.cpp
+    jit/JITExceptions.cpp
     jit/JITOpcodes32_64.cpp
     jit/JITOpcodes.cpp
     jit/JITPropertyAccess32_64.cpp

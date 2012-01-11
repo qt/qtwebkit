@@ -107,7 +107,7 @@ public:
     int sourceFrameNumber() const { return m_sourceFrameNumber; }
     void setSourceFrameNumber(int frameNumber) { m_sourceFrameNumber = frameNumber; }
 
-    void setViewport(const IntSize& viewportSize);
+    void setViewportSize(const IntSize&);
     const IntSize& viewportSize() const { return m_viewportSize; }
 
     void setPageScaleFactorAndLimits(float pageScale, float minPageScale, float maxPageScale);
@@ -133,7 +133,8 @@ private:
     void adjustScrollsForPageScaleChange(float);
     void updateMaxScrollPosition();
     void trackDamageForAllSurfaces(CCLayerImpl* rootDrawLayer, const CCLayerList& renderSurfaceLayerList);
-    void calculateRenderPasses(Vector<OwnPtr<CCRenderPass> >&);
+    void calculateRenderPasses(CCRenderPassList&);
+    void optimizeRenderPasses(CCRenderPassList&);
 
     OwnPtr<LayerRendererChromium> m_layerRenderer;
     RefPtr<CCLayerImpl> m_rootLayerImpl;

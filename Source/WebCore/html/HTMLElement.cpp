@@ -237,6 +237,7 @@ void HTMLElement::parseMappedAttribute(Attribute* attr)
         setItemRef(attr->value());
     } else if (attr->name() == itemtypeAttr) {
         setItemType(attr->value());
+        itemTypeAttributeChanged();
 #endif
     }
 // standard events
@@ -642,7 +643,7 @@ static Element* contextElementForInsertion(const String& where, Element* element
 {
     if (equalIgnoringCase(where, "beforeBegin") || equalIgnoringCase(where, "afterEnd")) {
         ContainerNode* parent = element->parentNode();
-        if (parent && parent->isDocumentNode()) {
+        if (parent && !parent->isElementNode()) {
             ec = NO_MODIFICATION_ALLOWED_ERR;
             return 0;
         }
@@ -824,7 +825,7 @@ void HTMLElement::setTabIndex(int value)
     setAttribute(tabindexAttr, String::number(value));
 }
 
-PassRefPtr<HTMLCollection> HTMLElement::children()
+HTMLCollection* HTMLElement::children()
 {
     return ensureCachedHTMLCollection(NodeChildren);
 }

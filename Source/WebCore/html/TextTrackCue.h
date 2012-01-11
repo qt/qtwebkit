@@ -59,19 +59,39 @@ public:
     TextTrack* track() const;
     void setTrack(PassRefPtr<TextTrack>);
 
-    String id() const;
-    double startTime() const;
-    double endTime() const;
-    bool pauseOnExit() const;
-    
-    String direction() const;
-    bool snapToLines() const { return m_snapToLines; }
-    int linePosition() const { return m_linePosition; }
-    int textPosition() const { return m_textPosition; }
-    int size() const { return m_cueSize; }
-    String alignment() const;
+    const String& id() const { return m_id; }
+    void setId(const String&);
 
-    String getCueAsSource();
+    double startTime() const { return m_startTime; }
+    void setStartTime(double);
+
+    double endTime() const { return m_endTime; }
+    void setEndTime(double);
+
+    bool pauseOnExit() const { return m_pauseOnExit; }
+    void setPauseOnExit(bool);
+
+    const String& direction() const;
+    void setDirection(const String&, ExceptionCode&);
+
+    bool snapToLines() const { return m_snapToLines; }
+    void setSnapToLines(bool);
+
+    int linePosition() const { return m_linePosition; }
+    void setLinePosition(int, ExceptionCode&);
+
+    int textPosition() const { return m_textPosition; }
+    void setTextPosition(int, ExceptionCode&);
+
+    int size() const { return m_cueSize; }
+    void setSize(int, ExceptionCode&);
+
+    const String& alignment() const;
+    void setAlignment(const String&, ExceptionCode&);
+
+    const String& text() const { return m_content; }
+    void setText(const String&);
+
     PassRefPtr<DocumentFragment> getCueAsHTML();
     void setCueHTML(PassRefPtr<DocumentFragment>);
 
@@ -96,6 +116,8 @@ private:
     TextTrackCue(ScriptExecutionContext*, const String& id, double start, double end, const String& content, const String& settings, bool pauseOnExit);
 
     void parseSettings(const String&);
+    void cueWillChange();
+    void cueDidChange();
     
     virtual void refEventTarget() { ref(); }
     virtual void derefEventTarget() { deref(); }

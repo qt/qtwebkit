@@ -1,3 +1,313 @@
+2012-01-10  Daniel Cheng  <dcheng@chromium.org>
+
+        [chromium] Unreviewed, roll Chromium DEPS to r117121.
+
+        * DEPS:
+
+2012-01-10  Nat Duca  <nduca@chromium.org>
+
+        [chromium] Reuse old timebase when activating CCDelayBasedTimeSource
+        https://bugs.webkit.org/show_bug.cgi?id=75938
+
+        Reviewed by James Robinson.
+
+        * tests/CCDelayBasedTimeSourceTest.cpp:
+        (WebKitTests::TEST):
+
+2012-01-10  Tony Chang  <tony@chromium.org>
+
+        [chromium] Unreviewed, roll Chromium DEPS to r117109.
+
+        * DEPS:
+
+2012-01-10  Bill Budge  <bbudge@chromium.org>
+
+        Allow plugins to add rotate items to browser's context menu. Adds a new
+        WebPluginAction struct, with rotate types.
+        https://bugs.webkit.org/show_bug.cgi?id=75645
+
+        Reviewed by Darin Fisher.
+
+        * WebKit.gyp:
+        * public/WebContextMenuData.h:
+        * public/WebPlugin.h:
+        (WebKit::WebPlugin::canRotateView):
+        (WebKit::WebPlugin::rotateView):
+        * public/WebPluginAction.h: Added.
+        (WebKit::WebPluginAction::WebPluginAction):
+        * public/WebView.h:
+        * src/ContextMenuClientImpl.cpp:
+        (WebKit::ContextMenuClientImpl::getCustomMenuFromDefaultItems):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::performMediaPlayerAction):
+        (WebKit::WebViewImpl::performPluginAction):
+        * src/WebViewImpl.h:
+
+2012-01-10  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Create iterators for the RenderSurface-Layer tree
+        https://bugs.webkit.org/show_bug.cgi?id=74203
+
+        Reviewed by James Robinson.
+
+        * WebKit.gypi:
+        * tests/CCLayerIteratorTest.cpp: Added.
+
+2012-01-10  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove old WebMimeRegistry.h forwarding header
+        https://bugs.webkit.org/show_bug.cgi?id=75979
+
+        Reviewed by Ryosuke Niwa.
+
+        This isn't needed any more.
+
+        * WebKit.gyp:
+        * public/platform/WebMimeRegistry.h: Removed.
+        * src/FrameLoaderClientImpl.cpp:
+        * src/PlatformSupport.cpp:
+        * src/WebMediaPlayerClientImpl.cpp:
+
+2012-01-10  Adrienne Walker  <enne@google.com>
+
+        [chromium] Draw debug tile borders on composited layers
+        https://bugs.webkit.org/show_bug.cgi?id=75680
+
+        Reviewed by James Robinson.
+
+        As debug borders are not a CCSetting and are instead grabbed directly
+        from each graphics layer, modify the NonCompositedContentHost to say
+        that its graphics layer has debug borders if the page settings demand
+        it.
+
+        * src/NonCompositedContentHost.cpp:
+        (WebKit::NonCompositedContentHost::NonCompositedContentHost):
+        (WebKit::NonCompositedContentHost::setShowDebugBorders):
+        (WebKit::NonCompositedContentHost::showDebugBorders):
+        * src/NonCompositedContentHost.h:
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::setIsAcceleratedCompositingActive):
+
+2012-01-10  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Fix compilation with ENABLE_WEB_AUDIO=0
+        https://bugs.webkit.org/show_bug.cgi?id=75957
+
+        Reviewed by Tony Gentilcore.
+
+        Revision 104502 broke Chromium compilation for platforms which disable
+        the Web Audio API. All references to m_audioSourceProvider should be
+        guarded with the ENABLE(WEB_AUDIO) conditional.
+
+        * src/WebMediaPlayerClientImpl.cpp:
+        (WebKit::WebMediaPlayerClientImpl::load):
+        (WebKit::WebMediaPlayerClientImpl::loadInternal):
+
+2012-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Roll Chromium DEPS from 116979 to 117006.
+
+        * DEPS:
+
+2012-01-09  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r104507.
+        http://trac.webkit.org/changeset/104507
+        https://bugs.webkit.org/show_bug.cgi?id=75936
+
+        Broke webkit_unit_tests (Requested by dimich on #webkit).
+
+        * WebKit.gypi:
+        * tests/CCLayerIteratorTest.cpp: Removed.
+
+2012-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Touch WebView.h in an attempt to clobber Chromium bots on build.webkit.org.
+
+        * public/WebView.h:
+
+2012-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Roll Chromium DEPS from 116459 to 116979.
+
+        * DEPS:
+
+2012-01-09  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Create iterators for the RenderSurface-Layer tree
+        https://bugs.webkit.org/show_bug.cgi?id=74203
+
+        Reviewed by James Robinson.
+
+        * WebKit.gypi:
+        * tests/CCLayerIteratorTest.cpp: Added.
+
+2012-01-09  W. James MacLean  <wjmaclean@chromium.org>
+
+        [Chromium] REGRESSION(r104368): Broke CCLayerTreeHostImplTest.blendingOffWhenDrawingOpaqueLayers
+        https://bugs.webkit.org/show_bug.cgi?id=75783
+
+        Updated unit test to reflect desired behaviour now that tile/quad culling
+        is implemented.
+
+        Reviewed by James Robinson.
+
+        * tests/CCLayerTreeHostImplTest.cpp:
+        (WebKit::TEST_F):
+
+2012-01-09  Chris Rogers  <crogers@google.com>
+
+        Fix potential issue in WebMediaPlayerClientImpl
+        https://bugs.webkit.org/show_bug.cgi?id=75899
+
+        Reviewed by Kenneth Russell.
+
+        * src/WebMediaPlayerClientImpl.cpp:
+        (WebKit::WebMediaPlayerClientImpl::load):
+        (WebKit::WebMediaPlayerClientImpl::loadInternal):
+        (WebKit::WebMediaPlayerClientImpl::AudioSourceProviderImpl::wrap):
+
+2012-01-09  Justin Novosad  <junov@chromium.org>
+
+        [Chromium] remove all references to the legacy accelerated 2d Canvas
+        implementation
+        https://bugs.webkit.org/show_bug.cgi?id=75108
+
+        Purging an old settings flag that is no longer referenced
+
+        Reviewed by Darin Fisher.
+
+        * public/WebSettings.h:
+        * src/WebSettingsImpl.cpp:
+        * src/WebSettingsImpl.h:
+
+2012-01-09  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: Make WebIDBDatabase::close() idempotent
+        https://bugs.webkit.org/show_bug.cgi?id=75751
+
+        Allow Chromium's back-end to safely trigger the cleanup that occurs
+        when a database connection is closed, without tracking whether or not
+        the connection was previous closed by script.
+
+        Reviewed by Tony Chang.
+
+        * src/WebIDBDatabaseImpl.cpp:
+        (WebKit::WebIDBDatabaseImpl::close):
+
+2012-01-09  Xianzhu Wang  <wangxianzhu@chromium.org>
+
+        Avoid unnecessary TextureManager::reduceMemoryToLimit().
+        https://bugs.webkit.org/show_bug.cgi?id=75632
+
+        Main part of the change is in Source/WebCore.
+
+        Reviewed by James Robinson.
+
+        Tests: webkit_unit_tests --gtest_filter=TextureManagerTest.*:CCLayerTreeHostTestSetViewportSize.*
+
+        * WebKit.gypi:
+        * src/WebLayerTreeView.cpp:
+        (WebKit::WebLayerTreeView::setViewportSize):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::updateLayerTreeViewport):
+        * tests/CCLayerTreeHostImplTest.cpp:
+        (WebKit::TEST_F):
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::MockLayerTreeHost::create):
+        (WTF::CCLayerTreeHostTestOpacityChange::beginTest):
+        (WTF::CCLayerTreeHostTestSetViewportSize::CCLayerTreeHostTestSetViewportSize):
+        (WTF::CCLayerTreeHostTestSetViewportSize::beginTest):
+        (WTF::CCLayerTreeHostTestSetViewportSize::afterTest):
+        (WTF::TEST_F):
+        * tests/TextureManagerTest.cpp: Added.
+        (WTF::FakeTextureAllocator::createTexture):
+        (WTF::FakeTextureAllocator::deleteTexture):
+        (WTF::texturesMemorySize):
+        (WTF::createTextureManager):
+        (WTF::requestTexture):
+        (WTF::TEST):
+
+2012-01-09  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r104418.
+        http://trac.webkit.org/changeset/104418
+        https://bugs.webkit.org/show_bug.cgi?id=75855
+
+        we still need to build against CG on Mac sometimes (Requested
+        by epoger on #webkit).
+
+        * WebKit.gyp:
+        * WebKit.gypi:
+
+2012-01-08  David Levin  <levin@chromium.org>
+
+        [chromium] iframes in an autoresized window get sized incorrectly.
+        https://bugs.webkit.org/show_bug.cgi?id=75806
+
+        Reviewed by Adam Barth.
+
+        TEST: fast/autoresize/autoresize-with-iframe.html
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::createFrameView): Only do autoresizing
+        for the main frame not child frames.
+
+2012-01-08  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Remove use_skia option from GYP
+        https://bugs.webkit.org/show_bug.cgi?id=75811
+
+        Reviewed by Ryosuke Niwa.
+
+        The CG configuration of Chromium Mac is no longer supported.
+
+        * WebKit.gyp:
+        * WebKit.gypi:
+
+2012-01-07  Dmitry Lomov  <dslomov@google.com>
+
+        Unreviewed: disabled CCLayerTreeHostImplTest.blendingOffWhenDrawingOpaqueLayers
+        and filed https://bugs.webkit.org/show_bug.cgi?id=75783.
+
+        * tests/CCLayerTreeHostImplTest.cpp:
+        (WebKit::TEST_F):
+
+2012-01-06  W. James MacLean  <wjmaclean@chromium.org>
+
+        [Chromium] Cull occluded tiles in tiled layers
+        https://bugs.webkit.org/show_bug.cgi?id=70533
+
+        Reviewed by James Robinson.
+
+        * WebKit.gypi:
+        * tests/CCQuadCullerTest.cpp: Added.
+        (WebCore::TestDrawQuad::TestDrawQuad):
+        (WebCore::TestDrawQuad::create):
+        (WebCore::setQuads):
+        (WebCore::TEST):
+
+2012-01-06  Greg Billock  <gbillock@google.com>
+
+        [Web Intents] Flagged-off WebCore implementation of navigator.startActivity
+        https://bugs.webkit.org/show_bug.cgi?id=73051
+
+        Reviewed by Adam Barth.
+
+        * features.gypi:
+
+2012-01-06  Tom Sepez  <tsepez@chromium.org>
+
+        Pass Content-security-policy directive to worker threads.
+        https://bugs.webkit.org/show_bug.cgi?id=73242
+
+        Reviewed by David Levin.
+
+        * src/WebSharedWorkerImpl.cpp:
+        (WebKit::WebSharedWorkerImpl::startWorkerContext):
+        * src/WebWorkerClientImpl.cpp:
+        (WebKit::WebWorkerClientImpl::startWorkerContext):
+
 2012-01-05  Jochen Eisinger  <jochen@chromium.org>
 
         Check whether a WebView exists before accessing it in StorageAreaProxy. This is not necessarily the case, e.g. for detached iframes.

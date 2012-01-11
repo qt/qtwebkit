@@ -34,6 +34,7 @@
 
 #include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
+#include "DOMTokenList.h"
 #include "EventNames.h"
 #include "FloatConversion.h"
 #include "Frame.h"
@@ -185,6 +186,9 @@ void MediaControlPanelElement::setPosition(const LayoutPoint& position)
     style->setProperty(CSSPropertyTop, top, CSSPrimitiveValue::CSS_PX);
     style->setProperty(CSSPropertyMarginLeft, 0.0, CSSPrimitiveValue::CSS_PX);
     style->setProperty(CSSPropertyMarginTop, 0.0, CSSPrimitiveValue::CSS_PX);
+
+    ExceptionCode ignored;
+    classList()->add("dragged", ignored);
 }
 
 void MediaControlPanelElement::resetPosition()
@@ -195,6 +199,9 @@ void MediaControlPanelElement::resetPosition()
     style->removeProperty(CSSPropertyTop);
     style->removeProperty(CSSPropertyMarginLeft);
     style->removeProperty(CSSPropertyMarginTop);
+
+    ExceptionCode ignored;
+    classList()->remove("dragged", ignored);
 }
 
 void MediaControlPanelElement::makeOpaque()
@@ -229,12 +236,12 @@ void MediaControlPanelElement::defaultEventHandler(Event* event)
 
     if (event->isMouseEvent()) {
         LayoutPoint location = static_cast<MouseEvent*>(event)->absoluteLocation();
-        if (event->type() == eventNames().mousedownEvent) {
+        if (event->type() == eventNames().mousedownEvent && event->target() == this) {
             startDrag(location);
             event->setDefaultHandled();
-        } else if (event->type() == eventNames().mousemoveEvent)
+        } else if (event->type() == eventNames().mousemoveEvent && m_isBeingDragged)
             continueDrag(location);
-        else if (event->type() == eventNames().mouseupEvent) {
+        else if (event->type() == eventNames().mouseupEvent && m_isBeingDragged) {
             continueDrag(location);
             endDrag();
             event->setDefaultHandled();

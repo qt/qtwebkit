@@ -89,13 +89,12 @@ class MockDRTPortTest(port_testcase.PortTestCase):
 
 class MockDRTTest(unittest.TestCase):
     def input_line(self, port, test_name, checksum=None):
-        url = port.test_to_uri(test_name)
-        # FIXME: we shouldn't have to work around platform-specific issues
-        # here.
-        if url.startswith('file:////'):
-            url = url[len('file:////') - 1:]
-        if url.startswith('file:///'):
-            url = url[len('file:///') - 1:]
+        url = port.create_driver(0).test_to_uri(test_name)
+        if url.startswith('file://'):
+            if sys.platform == 'win32':
+                url = url[len('file:///'):]
+            else:
+                url = url[len('file://'):]
 
         if checksum:
             return url + "'" + checksum + '\n'
@@ -215,13 +214,13 @@ class MockChromiumDRTTest(MockDRTTest):
         return mock_drt.MockChromiumDRT(options, args, host, stdin, stdout, stderr)
 
     def input_line(self, port, test_name, checksum=None):
-        url = port.test_to_uri(test_name)
+        url = port.create_driver(0).test_to_uri(test_name)
         if checksum:
             return url + ' 6000 ' + checksum + '\n'
         return url + ' 6000\n'
 
     def expected_output(self, port, test_name, pixel_tests, text_output, expected_checksum):
-        url = port.test_to_uri(test_name)
+        url = port.create_driver(0).test_to_uri(test_name)
         if pixel_tests and expected_checksum:
             return ['#URL:%s\n' % url,
                     '#MD5:%s\n' % expected_checksum,
@@ -236,9 +235,10 @@ class MockChromiumDRTTest(MockDRTTest):
 
     def test_pixeltest__fails(self):
         host = MockHost()
+        url = '#URL:file://%s/failures/expected/checksum.html' % host.port_factory.get('test').layout_tests_dir()
         self.assertTest('failures/expected/checksum.html', pixel_tests=True,
             expected_checksum='wrong-checksum',
-            drt_output=['#URL:file:///test.checkout/LayoutTests/failures/expected/checksum.html\n',
+            drt_output=[url + '\n',
                         '#MD5:checksum-checksum\n',
                         'checksum-txt',
                         '\n',
@@ -248,7 +248,7 @@ class MockChromiumDRTTest(MockDRTTest):
             {'/tmp/png_result0.png': 'checksum\x8a-pngtEXtchecksum\x00checksum-checksum'})
 
     def test_chromium_parse_options(self):
-        options, args = mock_drt.parse_options(['--platform', 'chromium-cg-mac',
+        options, args = mock_drt.parse_options(['--platform', 'chromium-mac',
             '--pixel-tests=/tmp/png_result0.png'])
         self.assertTrue(options.chromium)
         self.assertTrue(options.pixel_tests)

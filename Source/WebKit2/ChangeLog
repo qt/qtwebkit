@@ -1,3 +1,630 @@
+2012-01-10  Mark Rowe  <mrowe@apple.com>
+
+        REGRESSION (r104377): All pages print blank on Snow Leopard
+        <http://webkit.org/b/75879> / <rdar://problem/10674335>
+
+        We need to explicitly load PDFKit.framework before using PDFDocument and friends.
+        On SnowLeopard the framework is not necessarily loaded by anything else before we
+        print, which would lead to us failing to allocate the PDFDocument that we use for
+        drawing the content from the web process.
+
+        Reviewed by Dan Bernstein.
+
+        * UIProcess/API/mac/WKPrintingView.mm:
+        (pdfKitFrameworkPath): Construct the path to the PDFKit framework.
+        (classFromPDFKit): Ensure that the PDFKit framework is loaded, and then retrieve the
+        given class from it.
+        (pdfAnnotationLinkClass): ASSERT that we found the class.
+        (pdfDocumentClass): Ditto.
+
+2012-01-10  Chris Marrin  <cmarrin@apple.com>
+
+        Wrapped allowedCompositingTriggers in ACCELERATED_COMPOSITING ifdef to make non-accelerated builds work
+
+        Unreviewed.
+
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+
+2012-01-10  Viatcheslav Ostapenko  <ostapenko.viatcheslav@nokia.com>
+
+        [Qt][WK2]REGRESSION(r102435): It made tst_QQuickWebView::show() crash
+        https://bugs.webkit.org/show_bug.cgi?id=74176
+
+        Reviewed by Noam Rosenthal.
+
+        Check texture mapper exists already in ensureRootLayer to avoid recrecation.
+        Check if root layer was deleted already in purgeGLResources.
+        Added multipleWebViewWindows and multipleWebViews API tests.
+
+        * UIProcess/API/qt/tests/qquickwebview/tst_qquickwebview.cpp:
+        (tst_QQuickWebView::multipleWebViewWindows):
+        (tst_QQuickWebView::multipleWebViews):
+        * UIProcess/qt/LayerTreeHostProxyQt.cpp:
+        (WebKit::LayerTreeHostProxy::ensureRootLayer):
+        (WebKit::LayerTreeHostProxy::purgeGLResources):
+
+2012-01-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Snow Leopard build fix.
+
+        * UIProcess/API/mac/PageClientImpl.h:
+        * UIProcess/API/mac/PageClientImpl.mm:
+
+2012-01-10  Anders Carlsson  <andersca@apple.com>
+
+        Hang opening movie that requires authentication
+        https://bugs.webkit.org/show_bug.cgi?id=75989
+
+        Reviewed by Sam Weinig.
+
+        Change the way the keychain calls are processed to avoid deadlocks:
+
+        1. When a keychain call is made, the web process sends an asynchronous request message to the UI process,
+           avoiding the need to bounce calls to the main thread (since CoreIPC only allows sending
+           synchronous messages from the main thread). Incidentally, this fixes <rdar://problem/9428041>.
+        2. The Web Process now waits on the calling thread, (for a condition variable to be signalled) for a reply message.
+        3. The UI process handles the incoming message request message on the connection work queue and uses
+           dispatch_async to a global dispatch queue where the keychain call is made.
+           We use a global queue to prevent the connection work queue from blocking on the call.
+        4. The UI process then sends an asynchronous reply message back to the web process. This message is sent from
+           the global dispatch queue.
+        5. The Web Process handles the reply message on the connection queue, adds the reply to a map and signals
+           the condition variable that the web process is waiting on and the thread that made the keychain call
+           can resume execution.
+
+        * Shared/mac/SecItemRequestData.cpp:
+        (WebKit::SecItemRequestData::SecItemRequestData):
+        (WebKit::SecItemRequestData::encode):
+        (WebKit::SecItemRequestData::decode):
+        * Shared/mac/SecItemRequestData.h:
+        (WebKit::SecItemRequestData::type):
+        Add a type to SecItemRequestData and encode/decode it.
+
+        * Shared/mac/SecItemResponseData.h:
+        (WebKit::SecItemResponseData::resultObject):
+        Make this return a reference so we can call leakRef() on it.
+
+        * Shared/mac/SecKeychainItemRequestData.cpp:
+        (WebKit::SecKeychainItemRequestData::SecKeychainItemRequestData):
+        (WebKit::SecKeychainItemRequestData::~SecKeychainItemRequestData):
+        (WebKit::SecKeychainItemRequestData::attributeList):
+        (WebKit::SecKeychainItemRequestData::encode):
+        (WebKit::SecKeychainItemRequestData::decode):
+        * Shared/mac/SecKeychainItemRequestData.h:
+        (WebKit::SecKeychainItemRequestData::type):
+        Add a type, and put the OwnPtr and OwnArrayPtr in a RefCounted struct so we can
+        correctly copy this object.
+
+        * UIProcess/WebConnectionToWebProcess.cpp:
+        (WebKit::WebConnectionToWebProcess::WebConnectionToWebProcess):
+        Don't open the connection here, the WebProcessProxy object needs to add itself as a queue client before opening.
+    
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::disconnect):
+        Remove the WebProcessProxy object from the list of connection queue clients.
+
+        (WebKit::WebProcessProxy::didReceiveMessageOnConnectionWorkQueue):
+        Call didReceiveWebProcessProxyMessageOnConnectionWorkQueue.
+
+        (WebKit::WebProcessProxy::didFinishLaunching):
+        Add the WebProcessProxy as a queue client and open the connection.
+
+        * UIProcess/WebProcessProxy.h:
+        WebProcessProxy should inherit from CoreIPC::Connection::QueueClient. Replace all individual keychain
+        handler functions with two generic functions, secItemRequest and secKeychainItemRequest.
+    
+        * UIProcess/WebProcessProxy.messages.in:
+        Replace individual keychain messages with SecItemRequest and SecKeychainItemRequest messages.
+
+        * UIProcess/mac/WebProcessProxyMac.mm:
+        (WebKit::handleSecItemRequest):
+        Call the right SecItem function depending on the request type and send back the result.
+
+        (WebKit::WebProcessProxy::secItemRequest):
+        Dispatch handleSecItemRequest on a global dispatch queue.
+
+        (WebKit::handleSecKeychainItemRequest):
+        Call the right SecKeychainItem function depending on the request type and send back the result.
+        
+        (WebKit::WebProcessProxy::secKeychainItemRequest):
+        Dispatch handleSecKeychainItemRequest on a global dispatch queue.
+        
+        * WebKit2.xcodeproj/project.pbxproj:
+        Update for added/removed files.
+
+        * WebProcess/WebProcess.h:
+        Add secItemResponse and secKeychainItemResponse message handlers.
+
+        * WebProcess/WebProcess.messages.in:
+        Add SecItemResponse and SecKeychainItemResponse messages.
+
+        * WebProcess/mac/CoreIPCClientRunLoop.h:
+        * WebProcess/mac/CoreIPCClientRunLoop.mm:
+        This is no longer needed.
+
+        * WebProcess/mac/KeychainItemShimMethods.h:
+        * WebProcess/mac/KeychainItemShimMethods.mm:
+        (WebKit::managedAttributeLists):
+        Make this an atomically initialized static.
+
+        (WebKit::managedAttributeListsMutex):
+        Add an atomically initialized mutex.
+
+        (WebKit::allocateAttributeListContents):
+        Use the managedAttributeListsMutex to make this function callable from any thread.
+
+        (WebKit::managedKeychainItemContents):
+        Make this an atomically initialized static.
+        
+        (WebKit::managedKeychainItemContentsMutex):
+        Add an atomically initialized mutex.
+
+        (WebKit::allocateKeychainItemContentData):
+        Use the managedAttributeListsMutex to make this function callable from any thread.
+
+        (WebKit::webFreeAttributeListContent):
+        Use locking so this can be called from any thread.
+
+        (WebKit::webFreeKeychainItemContent):
+        Ditto.
+
+        (WebKit::responseMap):
+        Add responseMap thread-safe singleton for holding incoming responses.
+
+        (WebKit::generateSecKeychainItemRequestID):
+        Return a unique item request id, using OSAtomicIncrement64Barrier for atomicity.
+
+        (WebKit::didReceiveSecKeychainItemResponse):
+        Pass the response over the response map.
+
+        (WebKit::sendSeqKeychainItemRequest):
+        Send a request message and wait for a response using ResponseMap::waitForResponse.
+
+        (WebKit::webSecKeychainItemCopyContent):
+        Send a request using sendSeqKeychainItemRequest.
+
+        (WebKit::webSecKeychainItemCreateFromContent):
+        Ditto.
+
+        (WebKit::webSecKeychainItemModifyContent):
+        Ditto.
+
+        * WebProcess/mac/KeychainShimResponseMap.h:
+        New thread-safe helper class that stores a map of responses and lets client wait for a response
+        with a given ID.
+
+        (KeychainShimResponseMap::waitForResponse):
+        Wait until the response is available in the hash map, then return it.
+
+        (KeychainShimResponseMap::didReceiveResponse):
+        Add the response to the hash map and signal the condition variable.
+
+        * WebProcess/mac/SecItemShimMethods.h:
+        * WebProcess/mac/SecItemShimMethods.mm:
+        (WebKit::responseMap):
+        Add responseMap thread-safe singleton for holding incoming responses.
+
+        (WebKit::generateSecItemRequestID):
+        Return a unique item request id, using OSAtomicIncrement64Barrier for atomicity.
+
+        (WebKit::didReceiveSecItemResponse):
+        Pass the response over the response map.
+
+        (WebKit::sendSeqItemRequest):
+        Send a request message and wait for a response using ResponseMap::waitForResponse.
+
+        (WebKit::webSecItemCopyMatching):
+        Send a request using sendSeqItemRequest.
+
+        (WebKit::webSecItemAdd):
+        Ditto.
+
+        (WebKit::webSecItemUpdate):
+        Ditto.
+
+        (WebKit::webSecItemDelete):
+        Ditto.
+
+        * WebProcess/mac/WebProcessMac.mm:
+        (WebKit::WebProcess::secItemResponse):
+        Call didReceiveSecItemResponse.
+
+        (WebKit::WebProcess::secKeychainItemResponse):
+        Call didReceiveSecKeychainItemResponse.
+
+2012-01-10  Anders Carlsson  <andersca@apple.com>
+
+        DispatchOnConnectionQueue messages should have a Connection parameter
+        https://bugs.webkit.org/show_bug.cgi?id=75986
+
+        Reviewed by Adam Roben.
+
+        Message handlers for messages with the DispatchOnConnectionQueue should have a CoreIPC::Connection
+        parameter, making it easier to send messages back over that connection.
+
+        * Platform/CoreIPC/HandleMessage.h:
+        (CoreIPC::callMemberFunction):
+        (CoreIPC::handleMessageOnConnectionQueue):
+        * Scripts/webkit2/messages.py:
+        (async_case_statement):
+        (generate_message_handler):
+        * Scripts/webkit2/messages_unittest.py:
+        * WebProcess/WebPage/EventDispatcher.cpp:
+        (WebKit::EventDispatcher::wheelEvent):
+        (WebKit::EventDispatcher::gestureEvent):
+        * WebProcess/WebPage/EventDispatcher.h:
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::pluginProcessCrashed):
+        * WebProcess/WebProcess.h:
+
+2012-01-10  Chris Marrin  <cmarrin@apple.com>
+
+        Turn off the FilterTrigger in WebKit and WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=75914
+
+        Reviewed by Simon Fraser.
+
+        Implement allowedCompositingTriggers to turn on all compositing triggers except FilterTrigger.
+
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+        (WebKit::WebChromeClient::allowedCompositingTriggers):
+
+2012-01-10  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Unreviewed potential Mac WK2 build fix.
+
+        * UIProcess/PageClient.h: forward declare WebGestureEvent.
+
+2012-01-10  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Unreviewed, rolling out an accidental commit r104569.
+
+        * Shared/EditorState.cpp:
+        (WebKit::EditorState::encode):
+        (WebKit::EditorState::decode):
+        * Shared/EditorState.h:
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebView::inputMethodQuery):
+        * WebProcess/WebCoreSupport/WebEditorClient.cpp:
+        (WebKit::WebEditorClient::respondToChangedSelection):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::editorState):
+
+2012-01-10  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Unreviewed potential Mac WK2 build fix.
+
+        * UIProcess/API/mac/PageClientImpl.h:
+        * UIProcess/API/mac/PageClientImpl.mm:
+        (WebKit::PageClientImpl::doneWithGestureEvent):
+
+2012-01-10  Rafael Brandao  <rafael.lobo@openbossa.org>
+
+        [Qt][WK2] Add font-related API tests for QWebPreferences
+        https://bugs.webkit.org/show_bug.cgi?id=75739
+
+        Reviewed by Zoltan Herczeg.
+
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_preferences.qml:
+        * UIProcess/API/qt/tests/qmltests/common/font-preferences.html: Added.
+
+2012-01-10  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix failing WK2 layout tests after r104557
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didReceiveEvent): Add missing break to not
+        handle mouseDown as gesture event.
+
+2012-01-10  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Unreviewed buildfix.
+
+        * UIProcess/WebPageProxy.h:
+
+2012-01-10  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Implement the input panel request/close handling
+
+        Reviewed by Simon Hausmann.
+
+        With the current patch we only request the input panel as a
+        response to a user tap. Close requests, on the other hand,
+        is always respected.
+
+        As multiple show/hide requests can happen while processing
+        the tap gesture, input panel visibility changes are postponed
+        until the tap gesture ends.
+
+        The input panel will become visible if the WebCore editor is
+        in canEdit mode and thus work for content-editable, meaning
+        that it won't close the input panel if you click on a link
+        (eg. editCommand) while in content-editable mode.
+
+        * UIProcess/PageClient.h:
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::handleGestureEvent):
+        (WebKit::WebPageProxy::editorStateChanged):
+        (WebKit::WebPageProxy::didReceiveEvent):
+
+            Add a new doneWithGestureEvent method to the PageClient
+            as well as add a updateTextInputState similar to that of mac.
+
+        * UIProcess/WebPageProxy.h:
+        * UIProcess/qt/QtPageClient.cpp:
+        (QtPageClient::updateTextInputState):
+        (QtPageClient::doneWithGestureEvent):
+
+            Propagate the new events to the Qt EventHandler.
+
+        * UIProcess/qt/QtPageClient.h:
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        * UIProcess/qt/QtWebPageEventHandler.h:
+        (QtWebPageEventHandler::QtWebPageEventHandler):
+        (QtWebPageEventHandler::handleSingleTapEvent):
+        (setInputPanelVisible):
+        (QtWebPageEventHandler::updateTextInputState):
+        (QtWebPageEventHandler::doneWithGestureEvent):
+
+            Handle postponing of the input method visibility change
+            and the actual showing/hiding.
+
+2012-01-10  Eunmi Lee  <eunmi15.lee@samsung.com>
+
+        [EFL][WK2] Remove codes to move and resize the clip.
+        https://bugs.webkit.org/show_bug.cgi?id=75428
+
+        Reviewed by Andreas Kling.
+
+        Remove codes to move and resize the clip because clip is not used now.
+        We have to show whole area of evas_object_image so we don't have to
+        clip any area.
+        In the WebKit1 Efl, the clip is used to clip the area to show during
+        weak zoom, so we can use codes to manipulate the clip when we want to
+        implement weak zoom for WebKit2 Efl.
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_ewk_view_smart_calculate):
+
+2012-01-09  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt][WK2] Pinch zoom should affect the page size
+        https://bugs.webkit.org/show_bug.cgi?id=74601
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The current implementation uses the scale property of the QQuickWebPage
+        to scale the page in response to pinch gestures.
+        However for layout and anchoring to work correctly in QML, pinching needs
+        to change the page size.
+        This patch applies the pinch scale to the page size and to the transformation
+        matrix of the drawing area.
+        Thus the page item's coordinate system is no longer a direct representation
+        of the WebCore::Page coordinate system and it is no longer suitable as
+        an inertial frame of reference for input events. The event propagation had
+        to be moved to the QQuickWebView and the positions translated to content
+        coordinates when NativeWebEvents are created.
+        Re-landing with fixed event delivery for the test infrastructure.
+
+        * Shared/NativeWebMouseEvent.h:
+        * Shared/NativeWebTouchEvent.h:
+        * Shared/NativeWebWheelEvent.h:
+        * Shared/qt/NativeWebMouseEventQt.cpp:
+        (WebKit::NativeWebMouseEvent::NativeWebMouseEvent):
+        * Shared/qt/NativeWebTouchEventQt.cpp:
+        (WebKit::NativeWebTouchEvent::NativeWebTouchEvent):
+        * Shared/qt/NativeWebWheelEventQt.cpp:
+        (WebKit::NativeWebWheelEvent::NativeWebWheelEvent):
+        * Shared/qt/WebEventFactoryQt.cpp:
+        (WebKit::WebEventFactory::createWebMouseEvent):
+        (WebKit::WebEventFactory::createWebWheelEvent):
+        (WebKit::WebEventFactory::createWebTouchEvent):
+        * Shared/qt/WebEventFactoryQt.h:
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPage::geometryChanged):
+        (QQuickWebPagePrivate::QQuickWebPagePrivate):
+        (QQuickWebPagePrivate::paintToCurrentGLContext):
+        (QQuickWebPage::usesTraditionalDesktopBehaviour):
+        (QQuickWebPage::setUsesTraditionalDesktopBehaviour):
+        (QQuickWebPage::eventHandler):
+        (QQuickWebPage::setContentSize):
+        (QQuickWebPage::contentSize):
+        (QQuickWebPage::setContentScale):
+        (QQuickWebPage::contentScale):
+        (QQuickWebPage::transformFromItem):
+        (QQuickWebPage::transformToItem):
+        (QQuickWebPagePrivate::updateSize):
+        * UIProcess/API/qt/qquickwebpage_p.h:
+        * UIProcess/API/qt/qquickwebpage_p_p.h:
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::enableMouseEvents):
+        (QQuickWebViewPrivate::disableMouseEvents):
+        (QQuickWebViewPrivate::loadDidCommit):
+        (QQuickWebViewPrivate::didFinishFirstNonEmptyLayout):
+        (QQuickWebViewPrivate::didChangeContentsSize):
+        (QQuickWebViewPrivate::didChangeViewportProperties):
+        (QQuickWebViewPrivate::pageDidRequestScroll):
+        (QQuickWebViewPrivate::updateVisibleContentRectAndScale):
+        (QQuickWebViewPrivate::PostTransitionState::apply):
+        (QQuickWebViewPrivate::setUseTraditionalDesktopBehaviour):
+        (QQuickWebViewExperimental::setUseTraditionalDesktopBehaviour):
+        (QQuickWebViewExperimental::useTraditionalDesktopBehaviour):
+        (QQuickWebView::mapToWebContent):
+        (QQuickWebView::mapRectToWebContent):
+        (QQuickWebView::mapFromWebContent):
+        (QQuickWebView::mapRectFromWebContent):
+        (QQuickWebView::geometryChanged):
+        (QQuickWebView::keyPressEvent):
+        (QQuickWebView::keyReleaseEvent):
+        (QQuickWebView::inputMethodEvent):
+        (QQuickWebView::focusInEvent):
+        (QQuickWebView::focusOutEvent):
+        (QQuickWebView::touchEvent):
+        (QQuickWebView::mousePressEvent):
+        (QQuickWebView::mouseMoveEvent):
+        (QQuickWebView::mouseReleaseEvent):
+        (QQuickWebView::mouseDoubleClickEvent):
+        (QQuickWebView::wheelEvent):
+        (QQuickWebView::hoverEnterEvent):
+        (QQuickWebView::hoverMoveEvent):
+        (QQuickWebView::hoverLeaveEvent):
+        (QQuickWebView::dragMoveEvent):
+        (QQuickWebView::dragEnterEvent):
+        (QQuickWebView::dragLeaveEvent):
+        (QQuickWebView::dropEvent):
+        (QQuickWebView::event):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        * UIProcess/API/qt/qwebviewportinfo.cpp:
+        (QWebViewportInfo::contentsSize):
+        * UIProcess/API/qt/tests/qquickwebview/tst_qquickwebview.cpp:
+        (tst_QQuickWebView::scrollRequest):
+        * UIProcess/qt/QtPinchGestureRecognizer.cpp:
+        (WebKit::QtPinchGestureRecognizer::recognize):
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::QtViewportInteractionEngine):
+        (WebKit::QtViewportInteractionEngine::setItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::animateItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::event):
+        (WebKit::QtViewportInteractionEngine::wheelEvent):
+        (WebKit::QtViewportInteractionEngine::pagePositionRequest):
+        (WebKit::QtViewportInteractionEngine::computePosRangeForItemAtScale):
+        (WebKit::QtViewportInteractionEngine::ensureContentWithinViewportBoundary):
+        (WebKit::QtViewportInteractionEngine::applyConstraints):
+        (WebKit::QtViewportInteractionEngine::currentCSSScale):
+        (WebKit::QtViewportInteractionEngine::panGestureStarted):
+        (WebKit::QtViewportInteractionEngine::panGestureRequestUpdate):
+        (WebKit::QtViewportInteractionEngine::panGestureEnded):
+        (WebKit::QtViewportInteractionEngine::pinchGestureStarted):
+        (WebKit::QtViewportInteractionEngine::pinchGestureRequestUpdate):
+        (WebKit::QtViewportInteractionEngine::scaleContent):
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (QtWebPageEventHandler::handleEvent):
+        (QtWebPageEventHandler::handleMouseMoveEvent):
+        (QtWebPageEventHandler::handleMousePressEvent):
+        (QtWebPageEventHandler::handleMouseReleaseEvent):
+        (QtWebPageEventHandler::handleWheelEvent):
+        (QtWebPageEventHandler::handleHoverLeaveEvent):
+        (QtWebPageEventHandler::handleHoverMoveEvent):
+        (QtWebPageEventHandler::handleDragEnterEvent):
+        (QtWebPageEventHandler::handleDragMoveEvent):
+        (QtWebPageEventHandler::handleDropEvent):
+        (QtWebPageEventHandler::handleSingleTapEvent):
+        (QtWebPageEventHandler::handleDoubleTapEvent):
+        (QtWebPageEventHandler::touchEvent):
+        * UIProcess/qt/QtWebPageEventHandler.h:
+
+2012-01-09  Eunmi Lee  <eunmi15.lee@samsung.com>
+
+        [EFL][WK2] Set color_set function to the clipped smart class.
+        https://bugs.webkit.org/show_bug.cgi?id=75286
+
+        Reviewed by Andreas Kling.
+
+        Set _ewk_view_smart_color_set() function to the clipped smart class's color_set,
+        so application can set webpage's background color using evas_object_color_set() API.
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_ewk_view_smart_color_set):
+        (ewk_view_smart_class_init):
+
+2012-01-08  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r103859): WKViews leak
+        https://bugs.webkit.org/show_bug.cgi?id=75805
+
+        The flags changed event monitor added in r103859 was retaining the WKView (as it references
+        self in the handler block), causing it to leak.
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView dealloc]): Moved call to remove the flags changed event monitor from here...
+        (-[WKView viewDidMoveToWindow]): ...to here. Moved call to add the flags changed event
+        monitor to here from...
+        (-[WKView initWithFrame:contextRef:pageGroupRef:]): ...here.
+
+2012-01-06  Mark Rowe  <mrowe@apple.com>
+
+        REGRESSION (WebKit2): Save as PDF no longer generates links to URLs
+        <http://webkit.org/b/65076> / <rdar://problem/9606246>
+
+        WebKit2 printing works by having the web process render the page content to a PDF. The PDF
+        data is then shipped to the UI process which will render it in to the printing graphics context.
+        Links were being lost because the API used to do the rendering of the PDF in to the printing
+        graphics context, CGContextDrawPDFPage, did not preserve the links that were present in the
+        PDF content received from the web process.
+
+        To fix this we switch to using PDFKit for drawing the PDF in to the printing graphics context.
+        PDFKit provides the ability for us to iterate over the links in the PDF content ourselves and
+        add links in to the printing graphics context.
+
+        Reviewed by Alexey Proskuryakov.
+
+        * UIProcess/API/mac/WKPrintingView.h:
+        * UIProcess/API/mac/WKPrintingView.mm:
+        (pdfAnnotationLinkClass): Look up the PDFAnnotationLink class from PDFKit as WebKit2 loads PDFKit lazily.
+        (pdfDocumentClass): Ditto.
+        (-[WKPrintingView _drawPDFDocument:page:atPoint:]): Switch to using the PDFKit equivalents of several types.
+        Iterate over the annotations present in the PDFPage, calling CGPDFContextSetURLForRect for each PDFAnnotationLink
+        that we find.
+        (-[WKPrintingView _drawPreview:]): Create an NSData to feed to PDFDocument.
+        (-[WKPrintingView drawRect:]): Ditto.
+        * WebKit2Prefix.h: Add the usual workaround to make Objective-C exceptions compile when C++ exception handling is disabled.
+
+2012-01-06  Viatcheslav Ostapenko  <ostapenko.viatcheslav@nokia.com>
+
+        [Qt] [WK2] Minibrowser leaks memory ~6-7Mb per reload
+        https://bugs.webkit.org/show_bug.cgi?id=75746
+
+        Reset WebGraphicsLayer::m_layerTreeTileClient of all dependent 
+        layers from ~LayerTreeHostQt(). This replaces r103760 which
+        causes leaks of GraphicsLayerTextureMapper objects on UI side. 
+
+        Reviewed by Noam Rosenthal.
+
+        * WebProcess/WebCoreSupport/WebGraphicsLayer.cpp:
+        (WebCore::WebGraphicsLayer::syncCompositingStateForThisLayerOnly):
+        (WebCore::WebGraphicsLayer::setLayerTreeTileClient):
+        * WebProcess/WebCoreSupport/WebGraphicsLayer.h:
+        * WebProcess/WebPage/qt/LayerTreeHostQt.cpp:
+        (WebKit::LayerTreeHostQt::~LayerTreeHostQt):
+
+2012-01-06  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] Thread verifier assertions when printing
+        https://bugs.webkit.org/show_bug.cgi?id=75738
+
+        Reviewed by Sam Weinig.
+
+        * UIProcess/API/mac/WKPrintingView.mm:
+        (-[WKPrintingView dealloc]): Dealloc in main thread, so that WebFrameProxy doesn't get
+        deref'ed from a secondary one.
+        (-[WKPrintingView _adjustPrintingMarginsForHeaderAndFooter]): This method calls out to client,
+        which only expects that on main thread.
+        (-[WKPrintingView knowsPageRange:]): Call _adjustPrintingMarginsForHeaderAndFooter on main
+        thread.
+
+2012-01-06  Alexey Proskuryakov  <ap@apple.com>
+
+        Need to allow SCNetworkReachability service in sandbox profile
+        https://bugs.webkit.org/show_bug.cgi?id=75724
+        <rdar://problem/10652415>
+
+        Reviewed by Mark Rowe.
+
+        * WebProcess/com.apple.WebProcess.sb:
+
+2012-01-06  Benjamin Poulain  <bpoulain@apple.com>
+
+        [Mac] Sort the resources of WebKit2.xcodeproj
+        https://bugs.webkit.org/show_bug.cgi?id=75636
+
+        Reviewed by Andreas Kling.
+
+        * WebKit2.xcodeproj/project.pbxproj:
+
 2012-01-06  Rafael Brandao  <rafael.lobo@openbossa.org>
 
         [Qt][WK2] QQuickWebView breaks when an empty url is loaded

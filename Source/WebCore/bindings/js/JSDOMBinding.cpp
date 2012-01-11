@@ -216,12 +216,12 @@ DOMWindow* firstDOMWindow(ExecState* exec)
     return asJSDOMWindow(exec->dynamicGlobalObject())->impl();
 }
 
-bool checkNodeSecurity(ExecState* exec, Node* node)
+bool allowAccessToNode(ExecState* exec, Node* node)
 {
-    return node && allowsAccessFromFrame(exec, node->document()->frame());
+    return node && allowAccessToFrame(exec, node->document()->frame());
 }
 
-bool allowsAccessFromFrame(ExecState* exec, Frame* frame)
+bool allowAccessToFrame(ExecState* exec, Frame* frame)
 {
     if (!frame)
         return false;
@@ -229,7 +229,7 @@ bool allowsAccessFromFrame(ExecState* exec, Frame* frame)
     return window && window->allowsAccessFrom(exec);
 }
 
-bool allowsAccessFromFrame(ExecState* exec, Frame* frame, String& message)
+bool allowAccessToFrame(ExecState* exec, Frame* frame, String& message)
 {
     if (!frame)
         return false;
@@ -242,12 +242,6 @@ void printErrorMessageForFrame(Frame* frame, const String& message)
     if (!frame)
         return;
     frame->domWindow()->printErrorMessage(message);
-}
-
-// FIXME: We should remove or at least deprecate this function. Callers can use firstDOMWindow directly.
-Frame* toDynamicFrame(ExecState* exec)
-{
-    return firstDOMWindow(exec)->frame();
 }
 
 JSValue objectToStringFunctionGetter(ExecState* exec, JSValue, const Identifier& propertyName)

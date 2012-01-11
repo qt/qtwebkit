@@ -41,6 +41,10 @@ Rectangle {
         webView.load(address)
     }
 
+    function reload() {
+        webView.reload()
+    }
+
     function focusAddressBar() {
         addressLine.forceActiveFocus()
         addressLine.selectAll()
@@ -151,11 +155,9 @@ Rectangle {
                     onReleased: { parent.color = "#efefef" }
                     onClicked: {
                         if (webView.loading) {
-                            console.log("stop loading")
                             webView.stop()
                         } else {
-                            console.log("reloading")
-                            webView.reload()
+                            reload()
                         }
                     }
                 }
@@ -177,6 +179,33 @@ Rectangle {
                     anchors.fill: parent
                     onClicked: {
                        viewportInfoItem.visible = !viewportInfoItem.visible
+                    }
+                }
+            }
+
+            Rectangle {
+                id: touchEventsButton
+                height: parent.height
+                width: height
+                color: "#efefef"
+                radius: 6
+
+                Image {
+                    anchors.centerIn: parent
+                    opacity: options.touchMockingEnabled ? 0.6 : 0.1
+                    source: "../icons/touch.png"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        if (options.touchMockingEnabled) {
+                            console.log("Touch Mocking Disabled")
+                        } else {
+                            console.log("Touch Mocking Enabled")
+                        }
+
+                        options.touchMockingEnabled = !options.touchMockingEnabled
                     }
                 }
             }
@@ -234,13 +263,6 @@ Rectangle {
                     console.log("going to: ", addressLine.text)
                     webView.load(utils.urlFromUserInput(addressLine.text))
                 }
-
-                Keys.onPressed: {
-                    if (((event.modifiers & Qt.ControlModifier) && event.key == Qt.Key_L) || event.key == Qt.key_F6) {
-                        focusAddressBar()
-                        event.accepted = true
-                    }
-                }
             }
         }
     }
@@ -278,12 +300,5 @@ Rectangle {
         }
         visible: false
         viewportInfo : webView.experimental.viewportInfo
-    }
-
-    Keys.onPressed: {
-        if (((event.modifiers & Qt.ControlModifier) && event.key == Qt.Key_L) || event.key == Qt.key_F6) {
-            focusAddressBar()
-            event.accepted = true
-        }
     }
 }

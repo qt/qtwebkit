@@ -169,7 +169,6 @@ public:
 
     PassRefPtr<InspectorObject> resolveNode(Node*, const String& objectGroup);
     bool handleMousePress();
-    bool searchingForNodeInPage() const;
     void mouseDidMoveOverElement(const HitTestResult&, unsigned modifierFlags);
     void inspect(Node*);
     void focusNode();

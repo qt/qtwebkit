@@ -400,6 +400,10 @@ private:
     bool userIsInterestedInThisLanguage(const String&) const;
     bool userIsInterestedInThisTrack(HTMLTrackElement*) const;
     HTMLTrackElement* showingTrackWithSameKind(HTMLTrackElement*) const;
+
+    bool ignoreTrackDisplayUpdateRequests() const { return m_ignoreTrackDisplayUpdate > 0; }
+    void beginIgnoringTrackDisplayUpdateRequests() { ++m_ignoreTrackDisplayUpdate; }
+    void endIgnoringTrackDisplayUpdateRequests() { ASSERT(m_ignoreTrackDisplayUpdate); --m_ignoreTrackDisplayUpdate; }
 #endif
 
     // These "internal" functions do not check user gesture restrictions.
@@ -456,6 +460,11 @@ private:
     bool hasCurrentSrc() const { return !m_currentSrc.isEmpty(); }
     bool isLiveStream() const { return movieLoadType() == MediaPlayer::LiveStream; }
     bool isAutoplaying() const { return m_autoplaying; }
+
+#if PLATFORM(MAC)
+    void updateDisableSleep();
+    bool shouldDisableSleep() const;
+#endif
 
     Timer<HTMLMediaElement> m_loadTimer;
     Timer<HTMLMediaElement> m_asyncEventTimer;
@@ -566,6 +575,7 @@ private:
     Vector<RefPtr<TextTrack> > m_textTracksWhenResourceSelectionBegan;
     CueIntervalTree m_cueTree;
     CueList m_currentlyActiveCues;
+    int m_ignoreTrackDisplayUpdate;
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -599,7 +609,7 @@ template <>
 struct ValueToString<TextTrackCue*> {
     static String string(TextTrackCue* const& cue)
     {
-        return String::format("%p id=%s interval=%f-->%f cue=%s)", cue, cue->id().utf8().data(), cue->startTime(), cue->endTime(), cue->getCueAsSource().utf8().data());
+        return String::format("%p id=%s interval=%f-->%f cue=%s)", cue, cue->id().utf8().data(), cue->startTime(), cue->endTime(), cue->text().utf8().data());
     }
 };
 #endif

@@ -162,16 +162,30 @@ void PropertyDescriptor::setGetter(JSValue getter)
     m_attributes &= ~ReadOnly;
 }
 
+// See ES5.1 9.12
+bool sameValue(ExecState* exec, JSValue a, JSValue b)
+{
+    if (!a.isNumber())
+        return JSValue::strictEqual(exec, a, b);
+    if (!b.isNumber())
+        return false;
+    double x = a.asNumber();
+    double y = b.asNumber();
+    if (isnan(x))
+        return isnan(y);
+    return bitwise_cast<uint64_t>(x) == bitwise_cast<uint64_t>(y);
+}
+
 bool PropertyDescriptor::equalTo(ExecState* exec, const PropertyDescriptor& other) const
 {
     if (!other.m_value == m_value ||
         !other.m_getter == m_getter ||
         !other.m_setter == m_setter)
         return false;
-    return (!m_value || JSValue::strictEqual(exec, other.m_value, m_value)) && 
-           (!m_getter || JSValue::strictEqual(exec, other.m_getter, m_getter)) && 
-           (!m_setter || JSValue::strictEqual(exec, other.m_setter, m_setter)) &&
-           attributesEqual(other);
+    return (!m_value || sameValue(exec, other.m_value, m_value))
+        && (!m_getter || JSValue::strictEqual(exec, other.m_getter, m_getter))
+        && (!m_setter || JSValue::strictEqual(exec, other.m_setter, m_setter))
+        && attributesEqual(other);
 }
 
 bool PropertyDescriptor::attributesEqual(const PropertyDescriptor& other) const
@@ -199,6 +213,20 @@ unsigned PropertyDescriptor::attributesWithOverride(const PropertyDescriptor& ot
     if (sharedSeen & EnumerablePresent && mismatch & DontEnum)
         newAttributes ^= DontEnum;
     return newAttributes;
+}
+
+unsigned PropertyDescriptor::attributesOverridingCurrent(const PropertyDescriptor& current) const
+{
+    unsigned overrideMask = 0;
+    if (writablePresent())
+        overrideMask |= ReadOnly;
+    if (enumerablePresent())
+        overrideMask |= DontEnum;
+    if (configurablePresent())
+        overrideMask |= DontDelete;
+    if (isAccessorDescriptor())
+        overrideMask |= (Getter | Setter);
+    return (m_attributes & overrideMask) | (current.m_attributes & ~overrideMask);
 }
 
 }

@@ -380,7 +380,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncConcat(ExecState* exec)
         curArg = (exec->argument(i));
         ++i;
     }
-    arr->setLength(n);
+    arr->setLength(exec, n);
     return JSValue::encode(arr);
 }
 
@@ -389,7 +389,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncPop(ExecState* exec)
     JSValue thisValue = exec->hostThisValue();
 
     if (isJSArray(thisValue))
-        return JSValue::encode(asArray(thisValue)->pop());
+        return JSValue::encode(asArray(thisValue)->pop(exec));
 
     JSObject* thisObj = thisValue.toObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
@@ -523,7 +523,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSlice(ExecState* exec)
         if (v)
             resObj->methodTable()->putByIndex(resObj, exec, n, v);
     }
-    resObj->setLength(n);
+    resObj->setLength(exec, n);
     return JSValue::encode(result);
 }
 

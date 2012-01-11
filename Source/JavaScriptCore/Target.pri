@@ -49,9 +49,11 @@ SOURCES += \
     assembler/ARMv7Assembler.cpp \
     assembler/MacroAssemblerARM.cpp \
     assembler/MacroAssemblerSH4.cpp \
+    bytecode/CallLinkInfo.cpp \
     bytecode/CodeBlock.cpp \
     bytecode/DFGExitProfile.cpp \
     bytecode/JumpTable.cpp \
+    bytecode/MethodCallLinkInfo.cpp \
     bytecode/Opcode.cpp \
     bytecode/PredictedType.cpp \
     bytecode/SamplingTool.cpp \
@@ -104,6 +106,7 @@ SOURCES += \
     jit/JITCall.cpp \
     jit/JITCall32_64.cpp \
     jit/JIT.cpp \
+    jit/JITExceptions.cpp \
     jit/JITOpcodes.cpp \
     jit/JITOpcodes32_64.cpp \
     jit/JITPropertyAccess.cpp \

@@ -73,6 +73,11 @@ struct WebPageGroupData;
 struct WebPreferencesStore;
 struct WebProcessCreationParameters;
 
+#if PLATFORM(MAC)
+class SecItemResponseData;
+class SecKeychainItemResponseData;
+#endif
+
 class WebProcess : public ChildProcess, private CoreIPC::Connection::QueueClient {
 public:
     static WebProcess& shared();
@@ -182,7 +187,7 @@ private:
 #endif
     
 #if ENABLE(PLUGIN_PROCESS)
-    void pluginProcessCrashed(const String& pluginPath);
+    void pluginProcessCrashed(CoreIPC::Connection*, const String& pluginPath);
 #endif
 
     void startMemorySampler(const SandboxExtension::Handle&, const String&, const double);
@@ -198,6 +203,11 @@ private:
     
     void getWebCoreStatistics(uint64_t callbackID);
     void garbageCollectJavaScriptObjects();
+
+#if PLATFORM(MAC)
+    void secItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecItemResponseData&);
+    void secKeychainItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecKeychainItemResponseData&);
+#endif
 
     // ChildProcess
     virtual bool shouldTerminate();

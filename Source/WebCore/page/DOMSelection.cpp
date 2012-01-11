@@ -54,18 +54,8 @@ static Node* selectionShadowAncestor(Frame* frame)
 }
 
 DOMSelection::DOMSelection(Frame* frame)
-    : m_frame(frame)
+    : DOMWindowProperty(frame)
 {
-}
-
-Frame* DOMSelection::frame() const
-{
-    return m_frame;
-}
-
-void DOMSelection::disconnectFrame()
-{
-    m_frame = 0;
 }
 
 const VisibleSelection& DOMSelection::visibleSelection() const
@@ -419,7 +409,7 @@ void DOMSelection::addRange(Range* r)
         }
     } else {
         // We don't support discontiguous selection. We don't do anything if r and range don't intersect.
-        if (r->compareBoundaryPoints(Range::END_TO_START, range.get(), ec) < 1) {
+        if (r->compareBoundaryPoints(Range::END_TO_START, range.get(), ec) < 1 && !ec) {
             if (r->compareBoundaryPoints(Range::END_TO_END, range.get(), ec) == -1)
                 // The original range contains r.
                 selection->setSelection(VisibleSelection(range.get()));

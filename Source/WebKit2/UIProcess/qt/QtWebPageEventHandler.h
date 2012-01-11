@@ -52,6 +52,8 @@ public:
 
     void didFindZoomableArea(const WebCore::IntPoint& target, const WebCore::IntRect& area);
     void focusEditableArea(const WebCore::IntRect& caret, const WebCore::IntRect& area);
+    void updateTextInputState();
+    void doneWithGestureEvent(const WebGestureEvent& event, bool wasEventHandled);
     void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled);
     void resetGestureRecognizers();
 
@@ -88,10 +90,11 @@ private:
     void touchEvent(QTouchEvent*);
     void inputMethodEvent(QInputMethodEvent*);
 
-    QPoint m_lastClick;
+    QPointF m_lastClick;
     QBasicTimer m_clickTimer;
     Qt::MouseButton m_previousClickButton;
     int m_clickCount;
+    bool m_postponeTextInputStateChanged;
 };
 
 #endif /* QtWebPageEventHandler_h */

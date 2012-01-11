@@ -79,57 +79,59 @@
      WHILE = 295,
      SAMPLER2D = 296,
      SAMPLERCUBE = 297,
-     IDENTIFIER = 298,
-     TYPE_NAME = 299,
-     FLOATCONSTANT = 300,
-     INTCONSTANT = 301,
-     BOOLCONSTANT = 302,
-     FIELD_SELECTION = 303,
-     LEFT_OP = 304,
-     RIGHT_OP = 305,
-     INC_OP = 306,
-     DEC_OP = 307,
-     LE_OP = 308,
-     GE_OP = 309,
-     EQ_OP = 310,
-     NE_OP = 311,
-     AND_OP = 312,
-     OR_OP = 313,
-     XOR_OP = 314,
-     MUL_ASSIGN = 315,
-     DIV_ASSIGN = 316,
-     ADD_ASSIGN = 317,
-     MOD_ASSIGN = 318,
-     LEFT_ASSIGN = 319,
-     RIGHT_ASSIGN = 320,
-     AND_ASSIGN = 321,
-     XOR_ASSIGN = 322,
-     OR_ASSIGN = 323,
-     SUB_ASSIGN = 324,
-     LEFT_PAREN = 325,
-     RIGHT_PAREN = 326,
-     LEFT_BRACKET = 327,
-     RIGHT_BRACKET = 328,
-     LEFT_BRACE = 329,
-     RIGHT_BRACE = 330,
-     DOT = 331,
-     COMMA = 332,
-     COLON = 333,
-     EQUAL = 334,
-     SEMICOLON = 335,
-     BANG = 336,
-     DASH = 337,
-     TILDE = 338,
-     PLUS = 339,
-     STAR = 340,
-     SLASH = 341,
-     PERCENT = 342,
-     LEFT_ANGLE = 343,
-     RIGHT_ANGLE = 344,
-     VERTICAL_BAR = 345,
-     CARET = 346,
-     AMPERSAND = 347,
-     QUESTION = 348
+     SAMPLER_EXTERNAL_OES = 298,
+     SAMPLER2DRECT = 299,
+     IDENTIFIER = 300,
+     TYPE_NAME = 301,
+     FLOATCONSTANT = 302,
+     INTCONSTANT = 303,
+     BOOLCONSTANT = 304,
+     FIELD_SELECTION = 305,
+     LEFT_OP = 306,
+     RIGHT_OP = 307,
+     INC_OP = 308,
+     DEC_OP = 309,
+     LE_OP = 310,
+     GE_OP = 311,
+     EQ_OP = 312,
+     NE_OP = 313,
+     AND_OP = 314,
+     OR_OP = 315,
+     XOR_OP = 316,
+     MUL_ASSIGN = 317,
+     DIV_ASSIGN = 318,
+     ADD_ASSIGN = 319,
+     MOD_ASSIGN = 320,
+     LEFT_ASSIGN = 321,
+     RIGHT_ASSIGN = 322,
+     AND_ASSIGN = 323,
+     XOR_ASSIGN = 324,
+     OR_ASSIGN = 325,
+     SUB_ASSIGN = 326,
+     LEFT_PAREN = 327,
+     RIGHT_PAREN = 328,
+     LEFT_BRACKET = 329,
+     RIGHT_BRACKET = 330,
+     LEFT_BRACE = 331,
+     RIGHT_BRACE = 332,
+     DOT = 333,
+     COMMA = 334,
+     COLON = 335,
+     EQUAL = 336,
+     SEMICOLON = 337,
+     BANG = 338,
+     DASH = 339,
+     TILDE = 340,
+     PLUS = 341,
+     STAR = 342,
+     SLASH = 343,
+     PERCENT = 344,
+     LEFT_ANGLE = 345,
+     RIGHT_ANGLE = 346,
+     VERTICAL_BAR = 347,
+     CARET = 348,
+     AMPERSAND = 349,
+     QUESTION = 350
    };
 #endif
 /* Tokens.  */
@@ -173,57 +175,59 @@
 #define WHILE 295
 #define SAMPLER2D 296
 #define SAMPLERCUBE 297
-#define IDENTIFIER 298
-#define TYPE_NAME 299
-#define FLOATCONSTANT 300
-#define INTCONSTANT 301
-#define BOOLCONSTANT 302
-#define FIELD_SELECTION 303
-#define LEFT_OP 304
-#define RIGHT_OP 305
-#define INC_OP 306
-#define DEC_OP 307
-#define LE_OP 308
-#define GE_OP 309
-#define EQ_OP 310
-#define NE_OP 311
-#define AND_OP 312
-#define OR_OP 313
-#define XOR_OP 314
-#define MUL_ASSIGN 315
-#define DIV_ASSIGN 316
-#define ADD_ASSIGN 317
-#define MOD_ASSIGN 318
-#define LEFT_ASSIGN 319
-#define RIGHT_ASSIGN 320
-#define AND_ASSIGN 321
-#define XOR_ASSIGN 322
-#define OR_ASSIGN 323
-#define SUB_ASSIGN 324
-#define LEFT_PAREN 325
-#define RIGHT_PAREN 326
-#define LEFT_BRACKET 327
-#define RIGHT_BRACKET 328
-#define LEFT_BRACE 329
-#define RIGHT_BRACE 330
-#define DOT 331
-#define COMMA 332
-#define COLON 333
-#define EQUAL 334
-#define SEMICOLON 335
-#define BANG 336
-#define DASH 337
-#define TILDE 338
-#define PLUS 339
-#define STAR 340
-#define SLASH 341
-#define PERCENT 342
-#define LEFT_ANGLE 343
-#define RIGHT_ANGLE 344
-#define VERTICAL_BAR 345
-#define CARET 346
-#define AMPERSAND 347
-#define QUESTION 348
+#define SAMPLER_EXTERNAL_OES 298
+#define SAMPLER2DRECT 299
+#define IDENTIFIER 300
+#define TYPE_NAME 301
+#define FLOATCONSTANT 302
+#define INTCONSTANT 303
+#define BOOLCONSTANT 304
+#define FIELD_SELECTION 305
+#define LEFT_OP 306
+#define RIGHT_OP 307
+#define INC_OP 308
+#define DEC_OP 309
+#define LE_OP 310
+#define GE_OP 311
+#define EQ_OP 312
+#define NE_OP 313
+#define AND_OP 314
+#define OR_OP 315
+#define XOR_OP 316
+#define MUL_ASSIGN 317
+#define DIV_ASSIGN 318
+#define ADD_ASSIGN 319
+#define MOD_ASSIGN 320
+#define LEFT_ASSIGN 321
+#define RIGHT_ASSIGN 322
+#define AND_ASSIGN 323
+#define XOR_ASSIGN 324
+#define OR_ASSIGN 325
+#define SUB_ASSIGN 326
+#define LEFT_PAREN 327
+#define RIGHT_PAREN 328
+#define LEFT_BRACKET 329
+#define RIGHT_BRACKET 330
+#define LEFT_BRACE 331
+#define RIGHT_BRACE 332
+#define DOT 333
+#define COMMA 334
+#define COLON 335
+#define EQUAL 336
+#define SEMICOLON 337
+#define BANG 338
+#define DASH 339
+#define TILDE 340
+#define PLUS 341
+#define STAR 342
+#define SLASH 343
+#define PERCENT 344
+#define LEFT_ANGLE 345
+#define RIGHT_ANGLE 346
+#define VERTICAL_BAR 347
+#define CARET 348
+#define AMPERSAND 349
+#define QUESTION 350
 
 
 

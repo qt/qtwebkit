@@ -28,20 +28,23 @@
 
 #if WEBKIT_VERSION_MAX_ALLOWED >= WEBKIT_VERSION_LATEST
 
+@class DOMTestObj;
 @class NSString;
 
 @interface DOMTestInterface : DOMObject
 #if ENABLE(Condition11) || ENABLE(Condition12)
-- (NSString *)str1;
+- (NSString *)supplementalStr1;
 #endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
-- (NSString *)str2;
-- (void)setStr2:(NSString *)newStr2;
+- (NSString *)supplementalStr2;
+- (void)setSupplementalStr2:(NSString *)newSupplementalStr2;
 #endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
-- (NSString *)str3;
-- (void)setStr3:(NSString *)newStr3;
+- (NSString *)supplementalStr3;
+- (void)setSupplementalStr3:(NSString *)newSupplementalStr3;
 #endif
+- (void)supplementalMethod1;
+- (DOMTestObj *)supplementalMethod2:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 @end
 
 #endif

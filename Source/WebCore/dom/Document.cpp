@@ -498,6 +498,10 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 
     static int docID = 0;
     m_docID = docID++;
+    
+#ifndef NDEBUG
+    m_updatingStyleSelector = false;
+#endif
 }
 
 static void histogramMutationEventUsage(const unsigned short& listenerTypes)
@@ -567,14 +571,6 @@ Document::~Document()
 
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
-
-    for (unsigned i = 0; i < NumUnnamedDocumentCachedTypes; ++i) {
-        if (m_collections[i])
-            m_collections[i]->detachFromNode();
-    }
-
-    if (m_allCollection)
-        m_allCollection->detachFromNode();
 }
 
 void Document::removedLastRef()
@@ -712,9 +708,9 @@ void Document::setDocType(PassRefPtr<DocumentType> docType)
     ASSERT(!m_docType || !docType);
     m_docType = docType;
     if (m_docType)
-        m_docType->setTreeScopeRecursively(this);
+        this->adoptIfNeeded(m_docType.get());
     // Doctype affects the interpretation of the stylesheets.
-    m_styleSelector.clear();
+    clearStyleSelector();
 }
 
 DOMImplementation* Document::implementation()
@@ -728,14 +724,12 @@ void Document::childrenChanged(bool changedByParser, Node* beforeChange, Node* a
 {
     TreeScope::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
     
-    // Invalidate the document element we have cached in case it was replaced.
-    m_documentElement = 0;
-}
-
-void Document::cacheDocumentElement() const
-{
-    ASSERT(!m_documentElement);
-    m_documentElement = firstElementChild(this);
+    Element* newDocumentElement = firstElementChild(this);
+    if (newDocumentElement == m_documentElement)
+        return;
+    m_documentElement = newDocumentElement;
+    // The root style used for media query matching depends on the document element.
+    clearStyleSelector();
 }
 
 PassRefPtr<Element> Document::createElement(const AtomicString& name, ExceptionCode& ec)
@@ -949,7 +943,7 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionCode& ec)
             source->parentNode()->removeChild(source.get(), ec);
     }
 
-    source->setTreeScopeRecursively(this);
+    this->adoptIfNeeded(source.get());
 
     return source;
 }
@@ -1807,6 +1801,12 @@ void Document::createStyleSelector()
     m_styleSelector = adoptPtr(new CSSStyleSelector(this, m_styleSheets.get(), m_mappedElementSheet.get(), pageUserSheet(), pageGroupUserSheets(), m_userSheets.get(),
                                                     !inQuirksMode(), matchAuthorAndUserStyles));
     combineCSSFeatureFlags();
+}
+    
+inline void Document::clearStyleSelector()
+{
+    ASSERT(!m_updatingStyleSelector);
+    m_styleSelector.clear();
 }
 
 void Document::attach()
@@ -3171,22 +3171,29 @@ bool Document::testAddedStylesheetRequiresStyleRecalc(CSSStyleSheet* stylesheet)
         return true;
     HashSet<AtomicStringImpl*>::iterator end = idScopes.end();
     for (HashSet<AtomicStringImpl*>::iterator it = idScopes.begin(); it != end; ++it) {
-        if (hasElementWithId(*it))
+        AtomicStringImpl* id = *it;
+        Element* idElement = getElementById(id);
+        if (!idElement)
+            continue;
+        if (containsMultipleElementsWithId(id))
             return true;
+        idElement->setNeedsStyleRecalc();
     }
     end = classScopes.end();
     for (HashSet<AtomicStringImpl*>::iterator it = classScopes.begin(); it != end; ++it) {
         // FIXME: getElementsByClassName is not optimal for this. We should handle all classes in a single pass.
-        if (getElementsByClassName(*it)->length())
-            return true;
+        RefPtr<NodeList> classElements = getElementsByClassName(*it);
+        unsigned elementCount = classElements->length();
+        for (unsigned i = 0; i < elementCount; ++i)
+            classElements->item(i)->setNeedsStyleRecalc();
     }
     return false;
 }
     
-void Document::analyzeStylesheetChange(StyleSelectorUpdateFlag updateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleSelectorReset, bool& requiresStyleRecalc)
+void Document::analyzeStylesheetChange(StyleSelectorUpdateFlag updateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleSelectorReset, bool& requiresFullStyleRecalc)
 {
     requiresStyleSelectorReset = true;
-    requiresStyleRecalc = true;
+    requiresFullStyleRecalc = true;
     
     // Stylesheets of <style> elements that @import stylesheets are active but loading. We need to trigger a full recalc when such loads are done.
     bool hasActiveLoadingStylesheet = false;
@@ -3225,11 +3232,13 @@ void Document::analyzeStylesheetChange(StyleSelectorUpdateFlag updateFlag, const
         if (testAddedStylesheetRequiresStyleRecalc(static_cast<CSSStyleSheet*>(newStylesheets[i].get())))
             return;
     }
-    requiresStyleRecalc = false;
+    requiresFullStyleRecalc = false;
 }
 
 bool Document::updateActiveStylesheets(StyleSelectorUpdateFlag updateFlag)
 {
+    ASSERT(!m_updatingStyleSelector);
+
     if (m_inStyleRecalc) {
         // SVG <use> element may manage to invalidate style selector in the middle of a style recalc.
         // https://bugs.webkit.org/show_bug.cgi?id=54344
@@ -3245,13 +3254,22 @@ bool Document::updateActiveStylesheets(StyleSelectorUpdateFlag updateFlag)
     collectActiveStylesheets(newStylesheets);
 
     bool requiresStyleSelectorReset;
-    bool requiresStyleRecalc;
-    analyzeStylesheetChange(updateFlag, newStylesheets, requiresStyleSelectorReset, requiresStyleRecalc);
+    bool requiresFullStyleRecalc;
+    analyzeStylesheetChange(updateFlag, newStylesheets, requiresStyleSelectorReset, requiresFullStyleRecalc);
 
     if (requiresStyleSelectorReset)
-        m_styleSelector.clear();
+        clearStyleSelector();
     else {
-        m_styleSelector->appendAuthorStylesheets(m_styleSheets->length(), newStylesheets);
+#ifndef NDEBUG
+        m_updatingStyleSelector = true;
+#endif
+        // Detach the style selector temporarily so it can't get deleted during appendAuthorStylesheets
+        OwnPtr<CSSStyleSelector> detachedStyleSelector = m_styleSelector.release();
+        detachedStyleSelector->appendAuthorStylesheets(m_styleSheets->length(), newStylesheets);
+        m_styleSelector = detachedStyleSelector.release();
+#ifndef NDEBUG
+        m_updatingStyleSelector = false;
+#endif
         resetCSSFeatureFlags();
     }
     m_styleSheets->swap(newStylesheets);
@@ -3259,7 +3277,7 @@ bool Document::updateActiveStylesheets(StyleSelectorUpdateFlag updateFlag)
     m_didCalculateStyleSelector = true;
     m_hasDirtyStyleSelector = false;
     
-    return requiresStyleRecalc;
+    return requiresFullStyleRecalc;
 }
 
 void Document::setHoverNode(PassRefPtr<Node> newHoverNode)
@@ -4176,7 +4194,7 @@ KURL Document::openSearchDescriptionURL()
     if (!head())
         return KURL();
 
-    RefPtr<HTMLCollection> children = head()->children();
+    HTMLCollection* children = head()->children();
     for (Node* child = children->firstItem(); child; child = children->nextItem()) {
         if (!child->hasTagName(linkTag))
             continue;
@@ -4301,81 +4319,81 @@ bool Document::hasSVGRootNode() const
 }
 #endif
 
-const RefPtr<HTMLCollection>& Document::cachedCollection(CollectionType type)
+HTMLCollection* Document::cachedCollection(CollectionType type)
 {
     ASSERT(static_cast<unsigned>(type) < NumUnnamedDocumentCachedTypes);
     if (!m_collections[type])
         m_collections[type] = HTMLCollection::create(this, type);
-    return m_collections[type];
+    return m_collections[type].get();
 }
 
-PassRefPtr<HTMLCollection> Document::images()
+HTMLCollection* Document::images()
 {
     return cachedCollection(DocImages);
 }
 
-PassRefPtr<HTMLCollection> Document::applets()
+HTMLCollection* Document::applets()
 {
     return cachedCollection(DocApplets);
 }
 
-PassRefPtr<HTMLCollection> Document::embeds()
+HTMLCollection* Document::embeds()
 {
     return cachedCollection(DocEmbeds);
 }
 
-PassRefPtr<HTMLCollection> Document::plugins()
+HTMLCollection* Document::plugins()
 {
     // This is an alias for embeds() required for the JS DOM bindings.
     return cachedCollection(DocEmbeds);
 }
 
-PassRefPtr<HTMLCollection> Document::objects()
+HTMLCollection* Document::objects()
 {
     return cachedCollection(DocObjects);
 }
 
-PassRefPtr<HTMLCollection> Document::scripts()
+HTMLCollection* Document::scripts()
 {
     return cachedCollection(DocScripts);
 }
 
-PassRefPtr<HTMLCollection> Document::links()
+HTMLCollection* Document::links()
 {
     return cachedCollection(DocLinks);
 }
 
-PassRefPtr<HTMLCollection> Document::forms()
+HTMLCollection* Document::forms()
 {
     return cachedCollection(DocForms);
 }
 
-PassRefPtr<HTMLCollection> Document::anchors()
+HTMLCollection* Document::anchors()
 {
     return cachedCollection(DocAnchors);
 }
 
-PassRefPtr<HTMLAllCollection> Document::all()
+HTMLAllCollection* Document::all()
 {
     if (!m_allCollection)
         m_allCollection = HTMLAllCollection::create(this);
-    return m_allCollection;
+    return m_allCollection.get();
 }
 
-PassRefPtr<HTMLCollection> Document::windowNamedItems(const AtomicString& name)
+HTMLCollection* Document::windowNamedItems(const AtomicString& name)
 {
-    RefPtr<HTMLNameCollection>& collection = m_windowNamedItemCollections.add(name.impl(), 0).first->second;
+    OwnPtr<HTMLNameCollection>& collection = m_windowNamedItemCollections.add(name.impl(), nullptr).first->second;
     if (!collection)
         collection = HTMLNameCollection::create(this, WindowNamedItems, name);
-    return collection;
+    return collection.get();
 }
 
-PassRefPtr<HTMLCollection> Document::documentNamedItems(const AtomicString& name)
+HTMLCollection* Document::documentNamedItems(const AtomicString& name)
 {
-    RefPtr<HTMLNameCollection>& collection = m_documentNamedItemCollections.add(name.impl(), 0).first->second;
+    OwnPtr<HTMLNameCollection>& collection = m_documentNamedItemCollections.add(name.impl(), nullptr).first->second;
     if (!collection)
         collection = HTMLNameCollection::create(this, DocumentNamedItems, name);
-    return collection;
+    return collection.get();
 }
 
 void Document::finishedParsing()

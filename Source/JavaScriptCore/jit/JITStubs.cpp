@@ -33,6 +33,7 @@
 #if ENABLE(JIT)
 #include "JITStubs.h"
 
+#include "CommonSlowPaths.h"
 #include "Arguments.h"
 #include "CallFrame.h"
 #include "CodeBlock.h"
@@ -43,6 +44,7 @@
 #include "Heap.h"
 #include "InlineASM.h"
 #include "JIT.h"
+#include "JITExceptions.h"
 #include "JSActivation.h"
 #include "JSArray.h"
 #include "JSByteArray.h"
@@ -1031,26 +1033,6 @@ static NEVER_INLINE void returnToThrowTrampoline(JSGlobalData* globalData, Retur
             return; \
         } \
     } while (0)
-
-struct ExceptionHandler {
-    void* catchRoutine;
-    CallFrame* callFrame;
-};
-
-static ExceptionHandler jitThrow(JSGlobalData* globalData, CallFrame* callFrame, JSValue exceptionValue, ReturnAddressPtr faultLocation)
-{
-    ASSERT(exceptionValue);
-
-    unsigned vPCIndex = callFrame->codeBlock()->bytecodeOffset(faultLocation);
-    globalData->exception = JSValue();
-    HandlerInfo* handler = globalData->interpreter->throwException(callFrame, exceptionValue, vPCIndex); // This may update callFrame & exceptionValue!
-    globalData->exception = exceptionValue;
-
-    void* catchRoutine = handler ? handler->nativeCode.executableAddress() : FunctionPtr(ctiOpThrowNotCaught).value();
-    ASSERT(catchRoutine);
-    ExceptionHandler exceptionHandler = { catchRoutine, callFrame };
-    return exceptionHandler;
-}
 
 // Helper function for JIT stubs that may throw an exception in the middle of
 // processing a function call. This function rolls back the register file to
@@ -2088,29 +2070,10 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_instanceof)
     JSValue value = stackFrame.args[0].jsValue();
     JSValue baseVal = stackFrame.args[1].jsValue();
     JSValue proto = stackFrame.args[2].jsValue();
-
-    // At least one of these checks must have failed to get to the slow case.
-    ASSERT(!value.isCell() || !baseVal.isCell() || !proto.isCell()
-           || !value.isObject() || !baseVal.isObject() || !proto.isObject() 
-           || !asObject(baseVal)->structure()->typeInfo().implementsDefaultHasInstance());
-
-
-    // ECMA-262 15.3.5.3:
-    // Throw an exception either if baseVal is not an object, or if it does not implement 'HasInstance' (i.e. is a function).
-    TypeInfo typeInfo(UnspecifiedType);
-    if (!baseVal.isObject() || !(typeInfo = asObject(baseVal)->structure()->typeInfo()).implementsHasInstance()) {
-        stackFrame.globalData->exception = createInvalidParamError(stackFrame.callFrame, "instanceof", baseVal);
-        VM_THROW_EXCEPTION();
-    }
-    ASSERT(typeInfo.type() != UnspecifiedType);
-
-    if (!typeInfo.overridesHasInstance() && !value.isObject())
-        return JSValue::encode(jsBoolean(false));
-
-    JSValue result = jsBoolean(asObject(baseVal)->methodTable()->hasInstance(asObject(baseVal), callFrame, value, proto));
+    
+    bool result = CommonSlowPaths::opInstanceOfSlow(callFrame, value, baseVal, proto);
     CHECK_FOR_EXCEPTION_AT_END();
-
-    return JSValue::encode(result);
+    return JSValue::encode(jsBoolean(result));
 }
 
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_del_by_id)
@@ -2209,13 +2172,13 @@ inline CallFrame* arityCheckFor(CallFrame* callFrame, RegisterFile* registerFile
     int argumentCountIncludingThis = callFrame->argumentCountIncludingThis();
 
     // This ensures enough space for the worst case scenario of zero arguments passed by the caller.
-    if (!registerFile->grow(callFrame->registers() + newCodeBlock->m_numParameters + newCodeBlock->m_numCalleeRegisters))
+    if (!registerFile->grow(callFrame->registers() + newCodeBlock->numParameters() + newCodeBlock->m_numCalleeRegisters))
         return 0;
 
-    ASSERT(argumentCountIncludingThis < newCodeBlock->m_numParameters);
+    ASSERT(argumentCountIncludingThis < newCodeBlock->numParameters());
 
     // Too few arguments -- copy call frame and arguments, then fill in missing arguments with undefined.
-    size_t delta = newCodeBlock->m_numParameters - argumentCountIncludingThis;
+    size_t delta = newCodeBlock->numParameters() - argumentCountIncludingThis;
     Register* src = callFrame->registers();
     Register* dst = callFrame->registers() + delta;
 
@@ -2276,7 +2239,7 @@ inline void* lazyLinkFor(CallFrame* callFrame, CodeSpecializationKind kind)
         if (error)
             return 0;
         codeBlock = &functionExecutable->generatedBytecodeFor(kind);
-        if (callFrame->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->m_numParameters)
+        if (callFrame->argumentCountIncludingThis() < static_cast<size_t>(codeBlock->numParameters())
             || callLinkInfo->callType == CallLinkInfo::CallVarargs)
             codePtr = functionExecutable->generatedJITCodeWithArityCheckFor(kind);
         else
@@ -2424,25 +2387,10 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve)
     STUB_INIT_STACK_FRAME(stackFrame);
 
     CallFrame* callFrame = stackFrame.callFrame;
-    ScopeChainNode* scopeChain = callFrame->scopeChain();
 
-    ScopeChainIterator iter = scopeChain->begin();
-    ScopeChainIterator end = scopeChain->end();
-    ASSERT(iter != end);
-
-    Identifier& ident = stackFrame.args[0].identifier();
-    do {
-        JSObject* o = iter->get();
-        PropertySlot slot(o);
-        if (o->getPropertySlot(callFrame, ident, slot)) {
-            JSValue result = slot.getValue(callFrame, ident);
-            CHECK_FOR_EXCEPTION_AT_END();
-            return JSValue::encode(result);
-        }
-    } while (++iter != end);
-
-    stackFrame.globalData->exception = createUndefinedVariableError(callFrame, ident);
-    VM_THROW_EXCEPTION();
+    JSValue result = CommonSlowPaths::opResolve(callFrame, stackFrame.args[0].identifier());
+    CHECK_FOR_EXCEPTION_AT_END();
+    return JSValue::encode(result);
 }
 
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_construct_NotJSConstruct)
@@ -2784,38 +2732,9 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_skip)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
 
-    CallFrame* callFrame = stackFrame.callFrame;
-    ScopeChainNode* scopeChain = callFrame->scopeChain();
-
-    int skip = stackFrame.args[1].int32();
-
-    ScopeChainIterator iter = scopeChain->begin();
-    ScopeChainIterator end = scopeChain->end();
-    ASSERT(iter != end);
-    CodeBlock* codeBlock = callFrame->codeBlock();
-    bool checkTopLevel = codeBlock->codeType() == FunctionCode && codeBlock->needsFullScopeChain();
-    ASSERT(skip || !checkTopLevel);
-    if (checkTopLevel && skip--) {
-        if (callFrame->uncheckedR(codeBlock->activationRegister()).jsValue())
-            ++iter;
-    }
-    while (skip--) {
-        ++iter;
-        ASSERT(iter != end);
-    }
-    Identifier& ident = stackFrame.args[0].identifier();
-    do {
-        JSObject* o = iter->get();
-        PropertySlot slot(o);
-        if (o->getPropertySlot(callFrame, ident, slot)) {
-            JSValue result = slot.getValue(callFrame, ident);
-            CHECK_FOR_EXCEPTION_AT_END();
-            return JSValue::encode(result);
-        }
-    } while (++iter != end);
-
-    stackFrame.globalData->exception = createUndefinedVariableError(callFrame, ident);
-    VM_THROW_EXCEPTION();
+    JSValue result = CommonSlowPaths::opResolveSkip(stackFrame.callFrame, stackFrame.args[0].identifier(), stackFrame.args[1].int32());
+    CHECK_FOR_EXCEPTION_AT_END();
+    return JSValue::encode(result);
 }
 
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_global)
@@ -3143,33 +3062,9 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_with_base)
     STUB_INIT_STACK_FRAME(stackFrame);
 
     CallFrame* callFrame = stackFrame.callFrame;
-    ScopeChainNode* scopeChain = callFrame->scopeChain();
-
-    ScopeChainIterator iter = scopeChain->begin();
-    ScopeChainIterator end = scopeChain->end();
-
-    // FIXME: add scopeDepthIsZero optimization
-
-    ASSERT(iter != end);
-
-    Identifier& ident = stackFrame.args[0].identifier();
-    JSObject* base;
-    do {
-        base = iter->get();
-        PropertySlot slot(base);
-        if (base->getPropertySlot(callFrame, ident, slot)) {
-            JSValue result = slot.getValue(callFrame, ident);
-            CHECK_FOR_EXCEPTION_AT_END();
-
-            callFrame->registers()[stackFrame.args[1].int32()] = JSValue(base);
-            return JSValue::encode(result);
-        }
-        ++iter;
-    } while (iter != end);
-
-    stackFrame.globalData->exception = createUndefinedVariableError(callFrame, ident);
-    VM_THROW_EXCEPTION_AT_END();
-    return JSValue::encode(JSValue());
+    JSValue result = CommonSlowPaths::opResolveWithBase(callFrame, stackFrame.args[0].identifier(), callFrame->registers()[stackFrame.args[1].int32()]);
+    CHECK_FOR_EXCEPTION_AT_END();
+    return JSValue::encode(result);
 }
 
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_with_this)
@@ -3177,41 +3072,9 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_with_this)
     STUB_INIT_STACK_FRAME(stackFrame);
 
     CallFrame* callFrame = stackFrame.callFrame;
-    ScopeChainNode* scopeChain = callFrame->scopeChain();
-
-    ScopeChainIterator iter = scopeChain->begin();
-    ScopeChainIterator end = scopeChain->end();
-
-    // FIXME: add scopeDepthIsZero optimization
-
-    ASSERT(iter != end);
-
-    Identifier& ident = stackFrame.args[0].identifier();
-    JSObject* base;
-    do {
-        base = iter->get();
-        ++iter;
-        PropertySlot slot(base);
-        if (base->getPropertySlot(callFrame, ident, slot)) {
-            JSValue result = slot.getValue(callFrame, ident);
-            CHECK_FOR_EXCEPTION_AT_END();
-
-            // All entries on the scope chain should be EnvironmentRecords (activations etc),
-            // other then 'with' object, which are directly referenced from the scope chain,
-            // and the global object. If we hit either an EnvironmentRecord or a global
-            // object at the end of the scope chain, this is undefined. If we hit a non-
-            // EnvironmentRecord within the scope chain, pass the base as the this value.
-            if (iter == end || base->structure()->typeInfo().isEnvironmentRecord())
-                callFrame->registers()[stackFrame.args[1].int32()] = jsUndefined();
-            else
-                callFrame->registers()[stackFrame.args[1].int32()] = JSValue(base);
-            return JSValue::encode(result);
-        }
-    } while (iter != end);
-
-    stackFrame.globalData->exception = createUndefinedVariableError(callFrame, ident);
-    VM_THROW_EXCEPTION_AT_END();
-    return JSValue::encode(JSValue());
+    JSValue result = CommonSlowPaths::opResolveWithThis(callFrame, stackFrame.args[0].identifier(), callFrame->registers()[stackFrame.args[1].int32()]);
+    CHECK_FOR_EXCEPTION_AT_END();
+    return JSValue::encode(result);
 }
 
 DEFINE_STUB_FUNCTION(JSObject*, op_new_func_exp)
