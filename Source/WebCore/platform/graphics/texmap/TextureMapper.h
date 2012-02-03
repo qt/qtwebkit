@@ -71,6 +71,7 @@ public:
     // For performance reasons, BitmapTexture might modify the bits directly (swizzle).
     // Thus, this method is only recommended for buffer update, such as used by WebKit2.
     virtual void updateContents(PixelFormat, const IntRect&, void* bits) = 0;
+    virtual void updateRawContents(const IntRect&, const void* bits) { }
     virtual PlatformGraphicsContext* beginPaintMedia()
     {
         return beginPaint(IntRect(0, 0, size().width(), size().height()));
@@ -126,7 +127,7 @@ public:
     virtual void beginPainting() { }
     virtual void endPainting() { }
 
-    virtual void releaseTextureToPool(BitmapTexture* surface);
+    // A surface is released implicitly when dereferenced.
     virtual PassRefPtr<BitmapTexture> acquireTextureFromPool(const IntSize&);
 
 

@@ -34,7 +34,9 @@ class CCDebugBorderDrawQuad;
 class CCRenderSurfaceDrawQuad;
 class CCSolidColorDrawQuad;
 class CCTileDrawQuad;
-class CCCustomLayerDrawQuad;
+class CCCanvasDrawQuad;
+class CCVideoDrawQuad;
+class CCPluginDrawQuad;
 
 // CCDrawQuad is a bag of data used for drawing a quad. Because different
 // materials need different bits of per-quad data to render, classes that derive
@@ -49,10 +51,15 @@ public:
     const IntRect& layerRect() const { return m_sharedQuadState->layerRect(); }
     const IntRect& clipRect() const { return m_sharedQuadState->clipRect(); }
     float opacity() const { return m_sharedQuadState->opacity(); }
-    // For the purposes of culling, are the contents of this quad opaque?
-    bool drawsOpaque() const { return m_sharedQuadState->isOpaque() && m_quadOpaque && opacity() == 1; }
-    bool needsBlending() const { return !m_sharedQuadState->isOpaque() || m_needsBlending || opacity() != 1; }
+    // For the purposes of culling, what part of the contents of this quad are opaque?
+    IntRect opaqueRect() const;
+    bool needsBlending() const { return m_needsBlending || opaqueRect() != m_quadRect; }
     bool isLayerAxisAlignedIntRect() const { return m_sharedQuadState->isLayerAxisAlignedIntRect(); }
+
+    // Allows changing the rect that gets drawn to make it smaller. Parameter passed
+    // in will be clipped to quadRect().
+    void setQuadVisibleRect(const IntRect&);
+    const IntRect& quadVisibleRect() const { return m_quadVisibleRect; }
 
     enum Material {
         Invalid,
@@ -60,9 +67,9 @@ public:
         RenderSurface,
         SolidColor,
         TiledContent,
-
-        // FIXME: remove this and add proper material types for all layer types
-        CustomLayer,
+        CanvasContent,
+        VideoContent,
+        PluginContent,
     };
 
     Material material() const { return m_material; }
@@ -71,7 +78,9 @@ public:
     const CCRenderSurfaceDrawQuad* toRenderSurfaceDrawQuad() const;
     const CCSolidColorDrawQuad* toSolidColorDrawQuad() const;
     const CCTileDrawQuad* toTileDrawQuad() const;
-    const CCCustomLayerDrawQuad* toCustomLayerDrawQuad() const;
+    const CCCanvasDrawQuad* toCanvasDrawQuad() const;
+    const CCVideoDrawQuad* toVideoDrawQuad() const;
+    const CCPluginDrawQuad* toPluginDrawQuad() const;
 
 protected:
     CCDrawQuad(const CCSharedQuadState*, Material, const IntRect&);
@@ -80,12 +89,17 @@ protected:
 
     Material m_material;
     IntRect m_quadRect;
+    IntRect m_quadVisibleRect;
 
     // By default, the shared quad state determines whether or not this quad is
     // opaque or needs blending. Derived classes can override with these
     // variables.
     bool m_quadOpaque;
     bool m_needsBlending;
+
+    // Be default, this rect is empty. It is used when the shared quad state and above
+    // variables determine that the quad is not fully opaque but may be partially opaque.
+    IntRect m_opaqueRect;
 };
 
 }

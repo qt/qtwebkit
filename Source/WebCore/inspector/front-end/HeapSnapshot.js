@@ -571,6 +571,16 @@ WebInspector.HeapSnapshotNode.prototype = {
         return this.name.substr(0, 9) === "DOMWindow";
     },
 
+    get isNativeRoot()
+    {
+        return this.name === "(Native objects)";
+    },
+
+    get isDetachedDOMTree()
+    {
+        return this.className === "Detached DOM tree";
+    },
+
     get isRoot()
     {
         return this.nodeIndex === this._snapshot._rootNodeIndex;
@@ -710,7 +720,10 @@ WebInspector.HeapSnapshot.prototype = {
         this._edgeInvisibleType = this._edgeTypes.length;
         this._edgeTypes.push("invisible");
 
-        this._nodeFlags = { canBeQueried: 1 };
+        this._nodeFlags = { // bit flags
+            canBeQueried: 1,
+            detachedDOMTreeNode: 2,
+        };
 
         this._markInvisibleEdges();
     },
@@ -909,8 +922,12 @@ WebInspector.HeapSnapshot.prototype = {
                 continue;
             if (node.type !== "native" && node.selfSize === 0)
                 continue;
-            var nameMatters = node.type === "object" || node.type === "native";
             var className = node.className;
+            if (className === "Document DOM tree")
+                continue;
+            if (className === "Detached DOM tree")
+                continue;
+            var nameMatters = node.type === "object" || node.type === "native";
             if (!aggregates.hasOwnProperty(className))
                 aggregates[className] = { count: 0, self: 0, maxRet: 0, type: node.type, name: nameMatters ? node.name : null, idxs: [] };
             var clss = aggregates[className];
@@ -1033,30 +1050,70 @@ WebInspector.HeapSnapshot.prototype = {
         return a < b ? -1 : (a > b ? 1 : 0);
     },
 
-    _calculateFlags: function()
+    _markDetachedDOMTreeNodes: function()
     {
-        var flag = this._nodeFlags.canBeQueried;
-        this._flags = new Array(this.nodeCount);
+        var flag = this._nodeFlags.detachedDOMTreeNode;
+        var nativeRoot;
+        for (var iter = this.rootNode.edges; iter.hasNext(); iter.next()) {
+            var node = iter.edge.node;
+            if (node.isNativeRoot) {
+                nativeRoot = node;
+                break;
+            }
+        }
+
+        if (!nativeRoot)
+            return;
+
+        for (var iter = nativeRoot.edges; iter.hasNext(); iter.next()) {
+            var node = iter.edge.node;
+            if (node.isDetachedDOMTree) {
+                for (var edgesIter = node.edges; edgesIter.hasNext(); edgesIter.next())
+                    this._flags[edgesIter.edge.node.nodeIndex] |= flag;
+            }
+        }
+    },
+
+    _markQueriableHeapObjects: function()
+    {
         // Allow runtime properties query for objects accessible from DOMWindow objects
         // via regular properties, and for DOM wrappers. Trying to access random objects
         // can cause a crash due to insonsistent state of internal properties of wrappers.
+        var flag = this._nodeFlags.canBeQueried;
+
         var list = [];
         for (var iter = this.rootNode.edges; iter.hasNext(); iter.next()) {
             if (iter.edge.node.isDOMWindow)
                 list.push(iter.edge.node);
         }
+
         while (list.length) {
-            var node = list.shift();
-            if (node.canBeQueried) continue;
-            this._flags[node.nodeIndex] = flag;
+            var node = list.pop();
+            if (this._flags[node.nodeIndex] & flag)
+                continue;
+            this._flags[node.nodeIndex] |= flag;
             for (var iter = node.edges; iter.hasNext(); iter.next()) {
                 var edge = iter.edge;
-                if (!edge.isHidden && !edge.isInvisible &&
-                    edge.name && (!edge.isInternal || edge.name === "native") &&
-                    !edge.node.canBeQueried)
-                    list.push(edge.node);
+                var node = edge.node;
+                if (this._flags[node.nodeIndex])
+                    continue;
+                if (edge.isHidden || edge.isInvisible)
+                    continue;
+                var name = edge.name;
+                if (!name)
+                    continue;
+                if (edge.isInternal && name !== "native")
+                    continue;
+                list.push(node);
             }
         }
+    },
+
+    _calculateFlags: function()
+    {
+        this._flags = new Array(this.nodeCount);
+        this._markDetachedDOMTreeNodes();
+        this._markQueriableHeapObjects();
     },
 
     baseSnapshotHasNode: function(baseSnapshotId, className, nodeId)
@@ -1089,6 +1146,12 @@ WebInspector.HeapSnapshot.prototype = {
     createEdgesProvider: function(nodeIndex, filter)
     {
         return new WebInspector.HeapSnapshotEdgesProvider(this, nodeIndex, this._parseFilter(filter));
+    },
+
+    createRetainingEdgesProvider: function(nodeIndex, filter)
+    {
+        var node = new WebInspector.HeapSnapshotNode(this, nodeIndex);
+        return new WebInspector.HeapSnapshotEdgesProvider(this, nodeIndex, this._parseFilter(filter), node.retainers);
     },
 
     createNodesProvider: function(filter)
@@ -1244,17 +1307,18 @@ WebInspector.HeapSnapshotFilteredOrderedIterator.prototype.createComparator = fu
     return {fieldName1:fieldNames[0], ascending1:fieldNames[1], fieldName2:fieldNames[2], ascending2:fieldNames[3]};
 }
 
-WebInspector.HeapSnapshotEdgesProvider = function(snapshot, nodeIndex, filter)
+WebInspector.HeapSnapshotEdgesProvider = function(snapshot, nodeIndex, filter, iter)
 {
     this.snapshot = snapshot;
     var node = new WebInspector.HeapSnapshotNode(snapshot, nodeIndex);
-    WebInspector.HeapSnapshotFilteredOrderedIterator.call(this, new WebInspector.HeapSnapshotEdgeIterator(new WebInspector.HeapSnapshotEdge(snapshot, node.rawEdges)), filter);
+    var edgesIter = iter || new WebInspector.HeapSnapshotEdgeIterator(new WebInspector.HeapSnapshotEdge(snapshot, node.rawEdges));
+    WebInspector.HeapSnapshotFilteredOrderedIterator.call(this, edgesIter, filter);
 }
 
 WebInspector.HeapSnapshotEdgesProvider.prototype = {
     _serialize: function(edge)
     {
-        return {name: edge.name, node: WebInspector.HeapSnapshotNodesProvider.prototype._serialize(edge.node), nodeIndex: edge.nodeIndex, type: edge.type};
+        return {name: edge.name, propertyAccessor: edge.toString(), node: WebInspector.HeapSnapshotNodesProvider.prototype._serialize(edge.node), nodeIndex: edge.nodeIndex, type: edge.type};
     },
 
     sort: function(comparator, leftBound, rightBound, count)

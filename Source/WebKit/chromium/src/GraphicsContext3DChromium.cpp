@@ -46,9 +46,10 @@
 #include "ImageBuffer.h"
 #include "ImageData.h"
 #include "WebKit.h"
-#include "platform/WebKitPlatformSupport.h"
+#include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "platform/WebGraphicsContext3D.h"
+#include "platform/WebKitPlatformSupport.h"
 
 #include <stdio.h>
 #include <wtf/FastMalloc.h>
@@ -151,14 +152,17 @@ PassRefPtr<GraphicsContext3D> createGraphicsContext(GraphicsContext3D::Attribute
     webAttributes.noExtensions = attrs.noExtensions;
     webAttributes.shareResources = attrs.shareResources;
     webAttributes.forUseOnAnotherThread = threadUsage == GraphicsContext3DPrivate::ForUseOnAnotherThread;
-    OwnPtr<WebKit::WebGraphicsContext3D> webContext = adoptPtr(WebKit::webKitPlatformSupport()->createGraphicsContext3D());
-    if (!webContext)
-        return 0;
 
     Chrome* chrome = static_cast<Chrome*>(hostWindow);
     WebKit::WebViewImpl* webViewImpl = chrome ? static_cast<WebKit::WebViewImpl*>(chrome->client()->webView()) : 0;
-
-    if (!webContext->initialize(webAttributes, webViewImpl, renderDirectlyToHostWindow))
+    OwnPtr<WebKit::WebGraphicsContext3D> webContext;
+    if (!webViewImpl || !webViewImpl->client()) {
+        if (renderDirectlyToHostWindow)
+            return 0;
+        webContext = adoptPtr(WebKit::webKitPlatformSupport()->createOffscreenGraphicsContext3D(webAttributes));
+    } else
+        webContext = adoptPtr(webViewImpl->client()->createGraphicsContext3D(webAttributes, renderDirectlyToHostWindow));
+    if (!webContext)
         return 0;
 
     return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), attrs, hostWindow, renderStyle, threadUsage);
@@ -210,7 +214,7 @@ GrContext* GraphicsContext3DPrivate::grContext()
     // Limit the number of textures we hold in the bitmap->texture cache.
     static const int maxTextureCacheCount = 512;
     // Limit the bytes allocated toward textures in the bitmap->texture cache.
-    static const size_t maxTextureCacheBytes = 50 * 1024 * 1024;
+    static const size_t maxTextureCacheBytes = 96 * 1024 * 1024;
 
     if (!m_grContext) {
         SkAutoTUnref<GrGLInterface> interface(m_impl->createGrGLInterface());
@@ -1032,6 +1036,7 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes, HostWindow*,
 GraphicsContext3D::~GraphicsContext3D()
 {
     m_private->setContextLostCallback(nullptr);
+    m_private->setErrorMessageCallback(nullptr);
     m_private->setSwapBuffersCompleteCallbackCHROMIUM(nullptr);
 }
 
@@ -1268,6 +1273,7 @@ DELEGATE_TO_INTERNAL_1(synthesizeGLError, GC3Denum)
 DELEGATE_TO_INTERNAL_R(getExtensions, Extensions3D*)
 
 DELEGATE_TO_INTERNAL_1(setContextLostCallback, PassOwnPtr<GraphicsContext3D::ContextLostCallback>)
+DELEGATE_TO_INTERNAL_1(setErrorMessageCallback, PassOwnPtr<GraphicsContext3D::ErrorMessageCallback>)
 
 class GraphicsContextLostCallbackAdapter : public WebKit::WebGraphicsContext3D::WebGraphicsContextLostCallback {
 public:
@@ -1294,6 +1300,33 @@ void GraphicsContext3DPrivate::setContextLostCallback(PassOwnPtr<GraphicsContext
 {
     m_contextLostCallbackAdapter = GraphicsContextLostCallbackAdapter::create(cb);
     m_impl->setContextLostCallback(m_contextLostCallbackAdapter.get());
+}
+
+class GraphicsErrorMessageCallbackAdapter : public WebKit::WebGraphicsContext3D::WebGraphicsErrorMessageCallback {
+public:
+    virtual void onErrorMessage(const WebKit::WebString&, WebKit::WGC3Dint);
+    static PassOwnPtr<GraphicsErrorMessageCallbackAdapter> create(PassOwnPtr<GraphicsContext3D::ErrorMessageCallback>);
+    virtual ~GraphicsErrorMessageCallbackAdapter() { }
+private:
+    GraphicsErrorMessageCallbackAdapter(PassOwnPtr<GraphicsContext3D::ErrorMessageCallback> cb) : m_errorMessageCallback(cb) { }
+    OwnPtr<GraphicsContext3D::ErrorMessageCallback> m_errorMessageCallback;
+};
+
+void GraphicsErrorMessageCallbackAdapter::onErrorMessage(const WebKit::WebString& message, WebKit::WGC3Dint id)
+{
+    if (m_errorMessageCallback)
+        m_errorMessageCallback->onErrorMessage(message, id);
+}
+
+PassOwnPtr<GraphicsErrorMessageCallbackAdapter> GraphicsErrorMessageCallbackAdapter::create(PassOwnPtr<GraphicsContext3D::ErrorMessageCallback> cb)
+{
+    return adoptPtr(cb.get() ? new GraphicsErrorMessageCallbackAdapter(cb) : 0);
+}
+
+void GraphicsContext3DPrivate::setErrorMessageCallback(PassOwnPtr<GraphicsContext3D::ErrorMessageCallback> cb)
+{
+    m_errorMessageCallbackAdapter = GraphicsErrorMessageCallbackAdapter::create(cb);
+    m_impl->setErrorMessageCallback(m_errorMessageCallbackAdapter.get());
 }
 
 bool GraphicsContext3D::isGLES2Compliant() const

@@ -54,7 +54,7 @@ module window {
         attribute [Replaceable] Navigator navigator;
         attribute [Replaceable] Navigator clientInformation;
         readonly attribute Crypto crypto;
-        attribute [DoNotCheckDomainSecurity, JSCCustom, V8CustomSetter, V8DisallowShadowing, CPPCustom] Location location;
+        attribute [DoNotCheckDomainSecurity, JSCCustom, V8CustomSetter, V8Unforgeable, CPPCustom] Location location;
 
         attribute [Replaceable, CustomGetter, V8CustomSetter] Event event;
 
@@ -129,12 +129,12 @@ module window {
 
         // Self referential attributes
         attribute [Replaceable, DoNotCheckDomainSecurityOnGet] DOMWindow self;
-        readonly attribute [DoNotCheckDomainSecurity, V8DisallowShadowing] DOMWindow window;
+        readonly attribute [DoNotCheckDomainSecurity, V8Unforgeable] DOMWindow window;
         attribute [Replaceable, DoNotCheckDomainSecurityOnGet] DOMWindow frames;
 
         attribute [Replaceable, DoNotCheckDomainSecurityOnGet, V8CustomSetter] DOMWindow opener;
         attribute [Replaceable, DoNotCheckDomainSecurityOnGet] DOMWindow parent;
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet, V8DisallowShadowing, V8ReadOnly] DOMWindow top;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGet, V8Unforgeable, V8ReadOnly] DOMWindow top;
 
         // DOM Level 2 AbstractView Interface
         readonly attribute Document document;
@@ -171,20 +171,6 @@ module window {
 
 #if defined(ENABLE_NOTIFICATIONS) && ENABLE_NOTIFICATIONS
         readonly attribute [EnabledAtRuntime] NotificationCenter webkitNotifications;
-#endif
-#if defined(ENABLE_INDEXED_DATABASE) && ENABLE_INDEXED_DATABASE
-        readonly attribute IDBFactory webkitIndexedDB;
-
-        attribute IDBCursorConstructor webkitIDBCursor;
-        attribute IDBDatabaseConstructor webkitIDBDatabase;
-        attribute IDBDatabaseErrorConstructor webkitIDBDatabaseError;
-        attribute IDBDatabaseExceptionConstructor webkitIDBDatabaseException;
-        attribute IDBFactoryConstructor webkitIDBFactory;
-        attribute IDBIndexConstructor webkitIDBIndex;
-        attribute IDBKeyRangeConstructor webkitIDBKeyRange;
-        attribute IDBObjectStoreConstructor webkitIDBObjectStore;
-        attribute IDBRequestConstructor webkitIDBRequest;
-        attribute IDBTransactionConstructor webkitIDBTransaction;
 #endif
 #if defined(ENABLE_FILE_SYSTEM) && ENABLE_FILE_SYSTEM
         const unsigned short TEMPORARY = 0;
@@ -242,9 +228,9 @@ module window {
 #endif
 
         // Base64
-        DOMString atob(in [ConvertNullToNullString,Optional=CallWithDefaultValue] DOMString string)
+        DOMString atob(in [TreatNullAs=EmptyString,Optional=CallWithDefaultValue] DOMString string)
             raises(DOMException);
-        DOMString btoa(in [ConvertNullToNullString,Optional=CallWithDefaultValue] DOMString string)
+        DOMString btoa(in [TreatNullAs=EmptyString,Optional=CallWithDefaultValue] DOMString string)
             raises(DOMException);
 
         // Events
@@ -412,6 +398,7 @@ module window {
         attribute EntityConstructor Entity;
         attribute EntityReferenceConstructor EntityReference;
         attribute ProcessingInstructionConstructor ProcessingInstruction;
+        attribute [Conditional=SHADOW_DOM, EnabledAtRuntime=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
 
         attribute HTMLDocumentConstructor HTMLDocument;
 
@@ -441,7 +428,6 @@ module window {
         attribute HTMLIFrameElementConstructor HTMLIFrameElement;
         attribute HTMLImageElementConstructor HTMLImageElement;
         attribute HTMLInputElementConstructor HTMLInputElement;
-        attribute HTMLIsIndexElementConstructor HTMLIsIndexElement;
         attribute HTMLKeygenElementConstructor HTMLKeygenElement;
         attribute HTMLLIElementConstructor HTMLLIElement;
         attribute HTMLLabelElementConstructor HTMLLabelElement;
@@ -509,6 +495,7 @@ module window {
         attribute ArrayBufferConstructor ArrayBuffer; // Usable with new operator
         attribute Int8ArrayConstructor Int8Array; // Usable with new operator
         attribute Uint8ArrayConstructor Uint8Array; // Usable with new operator
+        attribute Uint8ClampedArrayConstructor Uint8ClampedArray; // Usable with new operator
         attribute Int16ArrayConstructor Int16Array; // Usable with new operator
         attribute Uint16ArrayConstructor Uint16Array; // Usable with new operator
         attribute Int32ArrayConstructor Int32Array; // Usable with new operator
@@ -551,6 +538,7 @@ module window {
 
         attribute WebKitCSSKeyframeRuleConstructor WebKitCSSKeyframeRule;
         attribute WebKitCSSKeyframesRuleConstructor WebKitCSSKeyframesRule;
+        attribute WebKitCSSRegionRuleConstructor WebKitCSSRegionRule;
 
         attribute WebKitCSSMatrixConstructor WebKitCSSMatrix; // Usable with the new operator
 
@@ -602,8 +590,6 @@ module window {
         attribute [EnabledAtRuntime=webkitVideoTrack] TextTrackListConstructor TextTrackList;
         attribute [EnabledAtRuntime=webkitVideoTrack] TrackEventConstructor TrackEvent;
 #endif
-
-        attribute [Conditional=WEB_INTENTS] IntentConstructor Intent; // Usable with the new operator
 
         attribute DOMPluginConstructor Plugin;
         attribute DOMPluginArrayConstructor PluginArray;

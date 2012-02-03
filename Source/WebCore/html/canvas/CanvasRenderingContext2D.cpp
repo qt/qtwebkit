@@ -219,6 +219,7 @@ CanvasRenderingContext2D::State::State(const State& other)
     , m_globalComposite(other.m_globalComposite)
     , m_transform(other.m_transform)
     , m_invertibleCTM(other.m_invertibleCTM)
+    , m_lineDashOffset(other.m_lineDashOffset)
     , m_textAlign(other.m_textAlign)
     , m_textBaseline(other.m_textBaseline)
     , m_unparsedFont(other.m_unparsedFont)
@@ -314,7 +315,7 @@ void CanvasRenderingContext2D::setAllAttributesToDefault()
     if (!context)
         return;
 
-    context->setLegacyShadow(FloatSize(), 0, Color::transparent, ColorSpaceDeviceRGB);
+    applyShadow();
     context->setAlpha(1);
     context->setCompositeOperation(CompositeSourceOver);
 }
@@ -1149,7 +1150,7 @@ void CanvasRenderingContext2D::setShadow(float width, float height, float blur, 
     if (!c)
         return;
 
-    c->setLegacyShadow(FloatSize(width, -height), state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    applyShadow();
 }
 
 void CanvasRenderingContext2D::setShadow(float width, float height, float blur, const String& color, float alpha)
@@ -1167,7 +1168,7 @@ void CanvasRenderingContext2D::setShadow(float width, float height, float blur, 
     if (!c)
         return;
 
-    c->setLegacyShadow(FloatSize(width, -height), state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    applyShadow();
 }
 
 void CanvasRenderingContext2D::setShadow(float width, float height, float blur, float grayLevel, float alpha)
@@ -1180,7 +1181,7 @@ void CanvasRenderingContext2D::setShadow(float width, float height, float blur, 
     if (!c)
         return;
 
-    c->setLegacyShadow(FloatSize(width, -height), state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    applyShadow();
 }
 
 void CanvasRenderingContext2D::setShadow(float width, float height, float blur, float r, float g, float b, float a)
@@ -1193,7 +1194,7 @@ void CanvasRenderingContext2D::setShadow(float width, float height, float blur, 
     if (!c)
         return;
 
-    c->setLegacyShadow(FloatSize(width, -height), state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    applyShadow();
 }
 
 void CanvasRenderingContext2D::setShadow(float width, float height, float blur, float c, float m, float y, float k, float a)
@@ -1213,7 +1214,7 @@ void CanvasRenderingContext2D::setShadow(float width, float height, float blur, 
     CGContextSetShadowWithColor(dc->platformContext(), adjustedShadowSize(width, -height), blur, shadowColor);
     CGColorRelease(shadowColor);
 #else
-    dc->setLegacyShadow(FloatSize(width, -height), blur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    applyShadow();
 #endif
 }
 
@@ -1231,9 +1232,17 @@ void CanvasRenderingContext2D::applyShadow()
     if (!c)
         return;
 
-    float width = state().m_shadowOffset.width();
-    float height = state().m_shadowOffset.height();
-    c->setLegacyShadow(FloatSize(width, -height), state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    if (shouldDrawShadows()) {
+        float width = state().m_shadowOffset.width();
+        float height = state().m_shadowOffset.height();
+        c->setLegacyShadow(FloatSize(width, -height), state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+    } else
+        c->setLegacyShadow(FloatSize(), 0, Color::transparent, ColorSpaceDeviceRGB);
+}
+
+bool CanvasRenderingContext2D::shouldDrawShadows() const
+{
+    return alphaChannel(state().m_shadowColor) && (state().m_shadowBlur || !state().m_shadowOffset.isZero());
 }
 
 static LayoutSize size(HTMLImageElement* image)
@@ -1986,7 +1995,7 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     String declarationText("font: ");
     declarationText += newFont;
     parser.parseDeclaration(tempDecl.get(), declarationText);
-    if (!tempDecl->length())
+    if (tempDecl->isEmpty())
         return;
 
     // The parse succeeded.

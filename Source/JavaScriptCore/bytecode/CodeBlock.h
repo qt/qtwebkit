@@ -94,7 +94,7 @@ namespace JSC {
         Heap* m_heap;
 
     public:
-        virtual ~CodeBlock();
+        JS_EXPORT_PRIVATE virtual ~CodeBlock();
         
         int numParameters() const { return m_numParameters; }
         void setNumParameters(int newValue);
@@ -388,7 +388,22 @@ namespace JSC {
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
         virtual void jettison() = 0;
         virtual CodeBlock* replacement() = 0;
-        virtual bool canCompileWithDFG() = 0;
+
+        enum CompileWithDFGState {
+            CompileWithDFGFalse,
+            CompileWithDFGTrue,
+            CompileWithDFGUnset
+        };
+
+        virtual bool canCompileWithDFGInternal() = 0;
+        bool canCompileWithDFG()
+        {
+            bool result = canCompileWithDFGInternal();
+            m_canCompileWithDFGState = result ? CompileWithDFGTrue : CompileWithDFGFalse;
+            return result;
+        }
+        CompileWithDFGState canCompileWithDFGState() { return m_canCompileWithDFGState; }
+
         bool hasOptimizedReplacement()
         {
             ASSERT(getJITType() == JITCode::BaselineJIT);
@@ -521,6 +536,11 @@ namespace JSC {
         {
             ValueProfile* result = WTF::genericBinarySearch<ValueProfile, int, getValueProfileBytecodeOffset>(m_valueProfiles, m_valueProfiles.size(), bytecodeOffset);
             ASSERT(result->m_bytecodeOffset != -1);
+            ASSERT(!hasInstructions()
+                   || instructions()[bytecodeOffset + opcodeLength(
+                           m_globalData->interpreter->getOpcodeID(
+                               instructions()[
+                                   bytecodeOffset].u.opcode)) - 1].u.profile == result);
             return result;
         }
         
@@ -664,10 +684,22 @@ namespace JSC {
             return m_rareData && !!m_rareData->m_codeOrigins.size();
         }
         
-        CodeOrigin codeOriginForReturn(ReturnAddressPtr returnAddress)
+        bool codeOriginForReturn(ReturnAddressPtr returnAddress, CodeOrigin& codeOrigin)
         {
-            ASSERT(hasCodeOrigins());
-            return binarySearch<CodeOriginAtCallReturnOffset, unsigned, getCallReturnOffsetForCodeOrigin>(codeOrigins().begin(), codeOrigins().size(), getJITCode().offsetOf(returnAddress.value()))->codeOrigin;
+            if (!hasCodeOrigins())
+                return false;
+            unsigned offset = getJITCode().offsetOf(returnAddress.value());
+            CodeOriginAtCallReturnOffset* entry = binarySearch<CodeOriginAtCallReturnOffset, unsigned, getCallReturnOffsetForCodeOrigin>(codeOrigins().begin(), codeOrigins().size(), offset, WTF::KeyMustNotBePresentInArray);
+            if (entry->callReturnOffset != offset)
+                return false;
+            codeOrigin = entry->codeOrigin;
+            return true;
+        }
+        
+        CodeOrigin codeOrigin(unsigned index)
+        {
+            ASSERT(m_rareData);
+            return m_rareData->m_codeOrigins[index].codeOrigin;
         }
         
         bool addFrequentExitSite(const DFG::FrequentExitSite& site)
@@ -686,11 +718,14 @@ namespace JSC {
         Identifier& identifier(int index) { return m_identifiers[index]; }
 
         size_t numberOfConstantRegisters() const { return m_constantRegisters.size(); }
-        void addConstant(JSValue v)
+        unsigned addConstant(JSValue v)
         {
+            unsigned result = m_constantRegisters.size();
             m_constantRegisters.append(WriteBarrier<Unknown>());
             m_constantRegisters.last().set(m_globalObject->globalData(), m_ownerExecutable.get(), v);
+            return result;
         }
+        unsigned addOrFindConstant(JSValue);
         WriteBarrier<Unknown>& constantRegister(int index) { return m_constantRegisters[index - FirstConstantRegisterIndex]; }
         ALWAYS_INLINE bool isConstantRegisterIndex(int index) const { return index >= FirstConstantRegisterIndex; }
         ALWAYS_INLINE JSValue getConstant(int index) const { return m_constantRegisters[index - FirstConstantRegisterIndex].get(); }
@@ -780,7 +815,7 @@ namespace JSC {
         // Functions for controlling when tiered compilation kicks in. This
         // controls both when the optimizing compiler is invoked and when OSR
         // entry happens. Two triggers exist: the loop trigger and the return
-        // trigger. In either case, when an addition to m_executeCounter
+        // trigger. In either case, when an addition to m_jitExecuteCounter
         // causes it to become non-negative, the optimizing compiler is
         // invoked. This includes a fast check to see if this CodeBlock has
         // already been optimized (i.e. replacement() returns a CodeBlock
@@ -821,14 +856,14 @@ namespace JSC {
             return Options::executionCounterValueForOptimizeAfterLongWarmUp << reoptimizationRetryCounter();
         }
         
-        int32_t* addressOfExecuteCounter()
+        int32_t* addressOfJITExecuteCounter()
         {
-            return &m_executeCounter;
+            return &m_jitExecuteCounter;
         }
         
-        static ptrdiff_t offsetOfExecuteCounter() { return OBJECT_OFFSETOF(CodeBlock, m_executeCounter); }
+        static ptrdiff_t offsetOfJITExecuteCounter() { return OBJECT_OFFSETOF(CodeBlock, m_jitExecuteCounter); }
 
-        int32_t executeCounter() const { return m_executeCounter; }
+        int32_t jitExecuteCounter() const { return m_jitExecuteCounter; }
         
         unsigned optimizationDelayCounter() const { return m_optimizationDelayCounter; }
         
@@ -837,7 +872,7 @@ namespace JSC {
         // expensive than executing baseline code.
         void optimizeNextInvocation()
         {
-            m_executeCounter = Options::executionCounterValueForOptimizeNextInvocation;
+            m_jitExecuteCounter = Options::executionCounterValueForOptimizeNextInvocation;
         }
         
         // Call this to prevent optimization from happening again. Note that
@@ -847,7 +882,7 @@ namespace JSC {
         // the future as well.
         void dontOptimizeAnytimeSoon()
         {
-            m_executeCounter = Options::executionCounterValueForDontOptimizeAnytimeSoon;
+            m_jitExecuteCounter = Options::executionCounterValueForDontOptimizeAnytimeSoon;
         }
         
         // Call this to reinitialize the counter to its starting state,
@@ -858,14 +893,14 @@ namespace JSC {
         // counter that this corresponds to is also available directly.
         void optimizeAfterWarmUp()
         {
-            m_executeCounter = counterValueForOptimizeAfterWarmUp();
+            m_jitExecuteCounter = counterValueForOptimizeAfterWarmUp();
         }
         
         // Call this to force an optimization trigger to fire only after
         // a lot of warm-up.
         void optimizeAfterLongWarmUp()
         {
-            m_executeCounter = counterValueForOptimizeAfterLongWarmUp();
+            m_jitExecuteCounter = counterValueForOptimizeAfterLongWarmUp();
         }
         
         // Call this to cause an optimization trigger to fire soon, but
@@ -888,7 +923,7 @@ namespace JSC {
         // in the baseline code.
         void optimizeSoon()
         {
-            m_executeCounter = Options::executionCounterValueForOptimizeSoon << reoptimizationRetryCounter();
+            m_jitExecuteCounter = Options::executionCounterValueForOptimizeSoon << reoptimizationRetryCounter();
         }
         
         // The speculative JIT tracks its success rate, so that we can
@@ -989,6 +1024,7 @@ namespace JSC {
         void printBinaryOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
         void printConditionalJump(ExecState*, const Vector<Instruction>::const_iterator&, Vector<Instruction>::const_iterator&, int location, const char* op) const;
         void printGetByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
+        void printCallOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
         void printPutByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
 #endif
         void visitStructures(SlotVisitor&, Instruction* vPC) const;
@@ -1129,7 +1165,7 @@ namespace JSC {
 
         OwnPtr<CodeBlock> m_alternative;
         
-        int32_t m_executeCounter;
+        int32_t m_jitExecuteCounter;
         uint32_t m_speculativeSuccessCounter;
         uint32_t m_speculativeFailCounter;
         uint8_t m_optimizationDelayCounter;
@@ -1169,6 +1205,9 @@ namespace JSC {
         friend void WTF::deleteOwnedPtr<RareData>(RareData*);
 #endif
         OwnPtr<RareData> m_rareData;
+#if ENABLE(JIT)
+        CompileWithDFGState m_canCompileWithDFGState;
+#endif
     };
 
     // Program code is not marked by any function, so we make the global object
@@ -1208,7 +1247,7 @@ namespace JSC {
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
         virtual CodeBlock* replacement();
-        virtual bool canCompileWithDFG();
+        virtual bool canCompileWithDFGInternal();
 #endif
     };
 
@@ -1242,7 +1281,7 @@ namespace JSC {
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
         virtual CodeBlock* replacement();
-        virtual bool canCompileWithDFG();
+        virtual bool canCompileWithDFGInternal();
 #endif
 
     private:
@@ -1279,7 +1318,7 @@ namespace JSC {
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
         virtual CodeBlock* replacement();
-        virtual bool canCompileWithDFG();
+        virtual bool canCompileWithDFGInternal();
 #endif
     };
 

@@ -373,7 +373,7 @@ void LayoutTestController::setSmartInsertDeleteEnabled(bool flag)
 
 static gboolean waitToDumpWatchdogFired(void*)
 {
-    waitToDumpWatchdog = 0;
+    setWaitToDumpWatchdog(0);
     gLayoutTestController->waitToDumpWatchdogTimerFired();
     return FALSE;
 }
@@ -383,8 +383,8 @@ void LayoutTestController::setWaitToDump(bool waitUntilDone)
     static const int timeoutSeconds = 30;
 
     m_waitToDump = waitUntilDone;
-    if (m_waitToDump && !waitToDumpWatchdog)
-        waitToDumpWatchdog = g_timeout_add_seconds(timeoutSeconds, waitToDumpWatchdogFired, 0);
+    if (m_waitToDump && shouldSetWaitToDumpWatchdog())
+        setWaitToDumpWatchdog(g_timeout_add_seconds(timeoutSeconds, waitToDumpWatchdogFired, 0));
 }
 
 int LayoutTestController::windowCount()
@@ -521,6 +521,12 @@ int LayoutTestController::numberOfPendingGeolocationPermissionRequests()
 }
 
 void LayoutTestController::addMockSpeechInputResult(JSStringRef result, double confidence, JSStringRef language)
+{
+    // FIXME: Implement for speech input layout tests.
+    // See https://bugs.webkit.org/show_bug.cgi?id=39485.
+}
+
+void LayoutTestController::setMockSpeechInputDumpRect(bool flag)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.

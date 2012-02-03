@@ -299,37 +299,140 @@ class BuildBotTest(unittest.TestCase):
         files = buildbot._parse_twisted_directory_listing(self._example_directory_listing)
         self.assertEqual(self._expected_files, files)
 
-    # Revision, is_green
-    # Ordered from newest (highest number) to oldest.
-    fake_builder1 = [
-        [2, False],
-        [1, True],
-    ]
-    fake_builder2 = [
-        [2, False],
-        [1, True],
-    ]
-    fake_builders = [
-        fake_builder1,
-        fake_builder2,
-    ]
-    def _build_from_fake(self, fake_builder, index):
-        if index >= len(fake_builder):
-            return None
-        fake_build = fake_builder[index]
-        build = Build(
-            builder=fake_builder,
-            build_number=index,
-            revision=fake_build[0],
-            is_green=fake_build[1],
-        )
-        def mock_previous_build():
-            return self._build_from_fake(fake_builder, index + 1)
-        build.previous_build = mock_previous_build
-        return build
+    _fake_builder_page = '''
+    <body>
+    <div class="content">
+    <h1>Some Builder</h1>
+    <p>(<a href="../waterfall?show=Some Builder">view in waterfall</a>)</p>
+    <div class="column">
+    <h2>Recent Builds:</h2>
+    <table class="info">
+      <tr>
+        <th>Time</th>
+        <th>Revision</th>
+        <th>Result</th>    <th>Build #</th>
+        <th>Info</th>
+      </tr>
+      <tr class="alt">
+        <td>Jan 10 15:49</td>
+        <td><span class="revision" title="Revision 104643"><a href="http://trac.webkit.org/changeset/104643">104643</a></span></td>
+        <td class="success">failure</td>    <td><a href=".../37604">#37604</a></td>
+        <td class="left">Build successful</td>
+      </tr>
+      <tr class="">
+        <td>Jan 10 15:32</td>
+        <td><span class="revision" title="Revision 104636"><a href="http://trac.webkit.org/changeset/104636">104636</a></span></td>
+        <td class="success">failure</td>    <td><a href=".../37603">#37603</a></td>
+        <td class="left">Build successful</td>
+      </tr>
+      <tr class="alt">
+        <td>Jan 10 15:18</td>
+        <td><span class="revision" title="Revision 104635"><a href="http://trac.webkit.org/changeset/104635">104635</a></span></td>
+        <td class="success">success</td>    <td><a href=".../37602">#37602</a></td>
+        <td class="left">Build successful</td>
+      </tr>
+      <tr class="">
+        <td>Jan 10 14:51</td>
+        <td><span class="revision" title="Revision 104633"><a href="http://trac.webkit.org/changeset/104633">104633</a></span></td>
+        <td class="failure">failure</td>    <td><a href=".../37601">#37601</a></td>
+        <td class="left">Failed compile-webkit</td>
+      </tr>
+    </table>
+    </body>'''
+    _fake_builder_page_without_success = '''
+    <body>
+    <table>
+      <tr class="alt">
+        <td>Jan 10 15:49</td>
+        <td><span class="revision" title="Revision 104643"><a href="http://trac.webkit.org/changeset/104643">104643</a></span></td>
+        <td class="success">failure</td>
+      </tr>
+      <tr class="">
+        <td>Jan 10 15:32</td>
+        <td><span class="revision" title="Revision 104636"><a href="http://trac.webkit.org/changeset/104636">104636</a></span></td>
+        <td class="success">failure</td>
+      </tr>
+      <tr class="alt">
+        <td>Jan 10 15:18</td>
+        <td><span class="revision" title="Revision 104635"><a href="http://trac.webkit.org/changeset/104635">104635</a></span></td>
+        <td class="success">failure</td>
+      </tr>
+      <tr class="">
+          <td>Jan 10 11:58</td>
+          <td><span class="revision" title="Revision ??"><a href="http://trac.webkit.org/changeset/%3F%3F">??</a></span></td>
+          <td class="retry">retry</td>
+        </tr>
+      <tr class="">
+        <td>Jan 10 14:51</td>
+        <td><span class="revision" title="Revision 104633"><a href="http://trac.webkit.org/changeset/104633">104633</a></span></td>
+        <td class="failure">failure</td>
+      </tr>
+    </table>
+    </body>'''
 
-    def _fake_builds_at_index(self, index):
-        return [self._build_from_fake(builder, index) for builder in self.fake_builders]
+    def test_revisions_for_builder(self):
+        buildbot = BuildBot()
+        buildbot._fetch_builder_page = lambda builder: builder.page
+        builder_with_success = Builder('Some builder', None)
+        builder_with_success.page = self._fake_builder_page
+        self.assertEqual(buildbot._revisions_for_builder(builder_with_success), [(104643, False), (104636, False), (104635, True), (104633, False)])
+
+        builder_without_success = Builder('Some builder', None)
+        builder_without_success.page = self._fake_builder_page_without_success
+        self.assertEqual(buildbot._revisions_for_builder(builder_without_success), [(104643, False), (104636, False), (104635, False), (104633, False)])
+
+    def test_find_green_revision(self):
+        buildbot = BuildBot()
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (3, True)],
+            'Builder 2': [(1, True), (3, False)],
+            'Builder 3': [(1, True), (3, True)],
+        }), 1)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, False), (3, True)],
+            'Builder 2': [(1, True), (3, True)],
+            'Builder 3': [(1, True), (3, True)],
+        }), 3)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (2, True)],
+            'Builder 2': [(1, False), (2, True), (3, True)],
+            'Builder 3': [(1, True), (3, True)],
+        }), None)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (2, True)],
+            'Builder 2': [(1, True), (2, True), (3, True)],
+            'Builder 3': [(1, True), (3, True)],
+        }), 2)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, False), (2, True)],
+            'Builder 2': [(1, True), (3, True)],
+            'Builder 3': [(1, True), (3, True)],
+        }), None)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (3, True)],
+            'Builder 2': [(1, False), (2, True), (3, True), (4, True)],
+            'Builder 3': [(2, True), (4, True)],
+        }), 3)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (3, True)],
+            'Builder 2': [(1, False), (2, True), (3, True), (4, False)],
+            'Builder 3': [(2, True), (4, True)],
+        }), None)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (3, True)],
+            'Builder 2': [(1, False), (2, True), (3, True), (4, False)],
+            'Builder 3': [(2, True), (3, True), (4, True)],
+        }), 3)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (2, True)],
+            'Builder 2': [],
+            'Builder 3': [(1, True), (2, True)],
+        }), None)
+        self.assertEqual(buildbot._find_green_revision({
+            'Builder 1': [(1, True), (3, False), (5, True), (10, True), (12, False)],
+            'Builder 2': [(1, True), (3, False), (7, True), (9, True), (12, False)],
+            'Builder 3': [(1, True), (3, True), (7, True), (11, False), (12, True)],
+        }), 7)
 
     def test_last_green_revision(self):
         buildbot = BuildBot()
@@ -337,8 +440,24 @@ class BuildBotTest(unittest.TestCase):
         def mock_builds_from_builders():
             return self._fake_builds_at_index(0)
 
+        # Revision, is_green
+        # Ordered from newest (highest number) to oldest.
+        fake_builder1 = Builder("Fake Builder 1", None)
+        fake_builder1.revisions = [(1, True), (3, False), (5, True), (10, True), (12, False)]
+        fake_builder2 = Builder("Fake Builder 2", None)
+        fake_builder2.revisions = [(1, True), (3, False), (7, True), (9, True), (12, False)]
+        some_builder = Builder("Some Builder", None)
+        some_builder.revisions = [(1, True), (3, True), (7, True), (11, False), (12, True)]
+
+        buildbot.builders = lambda: [fake_builder1, fake_builder2, some_builder]
+        buildbot._revisions_for_builder = lambda builder: builder.revisions
         buildbot._latest_builds_from_builders = mock_builds_from_builders
-        self.assertEqual(buildbot.last_green_revision(), 1)
+        self.assertEqual(buildbot.last_green_revision(''),
+            "The last known green revision is 7\nFake Builder 1: 10\nFake Builder 2: 9\nSome Builder: 12\n")
+
+        some_builder.revisions = [(1, False), (3, False)]
+        self.assertEqual(buildbot.last_green_revision(''),
+            "Fake Builder 1: 10\nFake Builder 2: 9\nSome Builder has had no green revision in the last 2 runs\n")
 
     def _fetch_build(self, build_number):
         if build_number == 5:

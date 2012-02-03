@@ -42,9 +42,15 @@ from webkitpy.layout_tests.port import port_testcase
 
 from webkitpy import layout_tests
 from webkitpy.layout_tests import run_webkit_tests
+from webkitpy.layout_tests.controllers import manager
 from webkitpy.layout_tests.controllers.manager import interpret_test_failures,  Manager, natural_sort_key, test_key, TestRunInterruptedException, TestShard
+from webkitpy.layout_tests.models import result_summary
+from webkitpy.layout_tests.models import test_expectations
 from webkitpy.layout_tests.models import test_failures
+from webkitpy.layout_tests.models import test_results
 from webkitpy.layout_tests.models.result_summary import ResultSummary
+from webkitpy.layout_tests.models.test_expectations import TestExpectations
+from webkitpy.layout_tests.models.test_results import TestResult
 from webkitpy.layout_tests.views import printing
 from webkitpy.tool.mocktool import MockOptions
 from webkitpy.common.system.executive_mock import MockExecutive
@@ -69,13 +75,13 @@ class ShardingTests(unittest.TestCase):
         "dom/html/level2/html/HTMLAnchorElement06.html",
     ]
 
-    def get_shards(self, num_workers, fully_parallel, test_list=None):
+    def get_shards(self, num_workers, fully_parallel, test_list=None, max_locked_shards=None):
         test_list = test_list or self.test_list
         host = MockHost()
         port = host.port_factory.get(port_name='test')
         port._filesystem = MockFileSystem()
-        # FIXME: This should use MockOptions() instead of Mock()
-        self.manager = ManagerWrapper(port=port, options=Mock(), printer=Mock())
+        options = MockOptions(max_locked_shards=max_locked_shards)
+        self.manager = ManagerWrapper(port=port, options=options, printer=Mock())
         return self.manager._shard_tests(test_list, num_workers, fully_parallel)
 
     def test_shard_by_dir(self):
@@ -142,6 +148,24 @@ class ShardingTests(unittest.TestCase):
              test_list=['http/tests/webcoket/tests/unicode.htm'])
         self.assertEquals(len(locked), 1)
         self.assertEquals(len(unlocked), 0)
+
+    def test_multiple_locked_shards(self):
+        locked, unlocked = self.get_shards(num_workers=4, fully_parallel=False, max_locked_shards=2)
+        self.assertEqual(locked,
+            [TestShard('locked_shard_1',
+                       ['http/tests/security/view-source-no-refresh.html',
+                        'http/tests/websocket/tests/unicode.htm',
+                        'http/tests/websocket/tests/websocket-protocol-ignored.html']),
+             TestShard('locked_shard_2',
+                        ['http/tests/xmlhttprequest/supported-xml-content-types.html'])])
+
+        locked, unlocked = self.get_shards(num_workers=4, fully_parallel=False)
+        self.assertEquals(locked,
+            [TestShard('locked_shard_1',
+                       ['http/tests/security/view-source-no-refresh.html',
+                        'http/tests/websocket/tests/unicode.htm',
+                        'http/tests/websocket/tests/websocket-protocol-ignored.html',
+                        'http/tests/xmlhttprequest/supported-xml-content-types.html'])])
 
 
 class ManagerTest(unittest.TestCase):
@@ -226,6 +250,22 @@ class ManagerTest(unittest.TestCase):
         manager._options.exit_after_n_crashes_or_timeouts = None
         manager._options.exit_after_n_failures = 10
         exception = self.assertRaises(TestRunInterruptedException, manager._interrupt_if_at_failure_limits, result_summary)
+
+    def test_update_summary_with_result(self):
+        host = MockHost()
+        port = host.port_factory.get('test-win-xp')
+        test = 'failures/expected/reftest.html'
+        expectations = TestExpectations(port, tests=[test],
+             expectations='WONTFIX : failures/expected/reftest.html = IMAGE',
+             test_config=port.test_configuration())
+        # Reftests expected to be image mismatch should be respected when pixel_tests=False.
+        manager = Manager(port=port, options=MockOptions(pixel_tests=False, exit_after_n_failures=None, exit_after_n_crashes_or_timeouts=None), printer=Mock())
+        manager._expectations = expectations
+        result_summary = ResultSummary(expectations=expectations, test_files=[test])
+        result = TestResult(test_name=test, failures=[test_failures.FailureReftestMismatchDidNotOccur()])
+        manager._update_summary_with_result(result_summary, result)
+        self.assertEquals(1, result_summary.expected)
+        self.assertEquals(0, result_summary.unexpected)
 
     def test_needs_servers(self):
         def get_manager_with_tests(test_names):
@@ -334,6 +374,56 @@ class ResultSummaryTest(unittest.TestCase):
         self.assertTrue(test_dict['is_mismatch_reftest'])
         self.assertEqual(test_dict['ref_file'], 'foo/common.html')
 
+    def get_result(self, test_name, result_type=test_expectations.PASS, run_time=0):
+        failures = []
+        if result_type == test_expectations.TIMEOUT:
+            failures = [test_failures.FailureTimeout()]
+        elif result_type == test_expectations.CRASH:
+            failures = [test_failures.FailureCrash()]
+        return test_results.TestResult(test_name, failures=failures, test_run_time=run_time)
+
+    def get_result_summary(self, port, test_names, expectations_str):
+        expectations = test_expectations.TestExpectations(port, test_names, expectations_str, port.test_configuration(), is_lint_mode=False)
+        return test_names, result_summary.ResultSummary(expectations, test_names), expectations
+
+    # FIXME: Use this to test more of summarize_results. This was moved from printing_unittest.py.
+    def get_unexpected_results(self, port, expected, passing, flaky):
+        tests = ['passes/text.html', 'failures/expected/timeout.html', 'failures/expected/crash.html']
+        expectations = ''
+        paths, rs, exp = self.get_result_summary(port, tests, expectations)
+        if expected:
+            rs.add(self.get_result('passes/text.html', test_expectations.PASS), expected)
+            rs.add(self.get_result('failures/expected/timeout.html', test_expectations.TIMEOUT), expected)
+            rs.add(self.get_result('failures/expected/crash.html', test_expectations.CRASH), expected)
+        elif passing:
+            rs.add(self.get_result('passes/text.html'), expected)
+            rs.add(self.get_result('failures/expected/timeout.html'), expected)
+            rs.add(self.get_result('failures/expected/crash.html'), expected)
+        else:
+            rs.add(self.get_result('passes/text.html', test_expectations.TIMEOUT), expected)
+            rs.add(self.get_result('failures/expected/timeout.html', test_expectations.CRASH), expected)
+            rs.add(self.get_result('failures/expected/crash.html', test_expectations.TIMEOUT), expected)
+        retry = rs
+        if flaky:
+            paths, retry, exp = self.get_result_summary(port, tests, expectations)
+            retry.add(self.get_result('passes/text.html'), True)
+            retry.add(self.get_result('failures/expected/timeout.html'), True)
+            retry.add(self.get_result('failures/expected/crash.html'), True)
+        unexpected_results = manager.summarize_results(port, exp, rs, retry, test_timings={}, only_unexpected=True, interrupted=False)
+        return unexpected_results
+
+    def test_no_svn_revision(self):
+        host = MockHost()
+        port = host.port_factory.get('test')
+        results = self.get_unexpected_results(port, expected=False, passing=False, flaky=False)
+        self.assertTrue('revision' not in results)
+
+    def test_svn_revision(self):
+        host = MockHost()
+        port = host.port_factory.get('test')
+        port._options.builder_name = 'dummy builder'
+        results = self.get_unexpected_results(port, expected=False, passing=False, flaky=False)
+        self.assertTrue('revision' in results)
 
 if __name__ == '__main__':
     port_testcase.main()

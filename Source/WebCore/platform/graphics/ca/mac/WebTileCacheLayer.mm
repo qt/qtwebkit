@@ -52,14 +52,54 @@ using namespace WebCore;
     _tileCache->tileCacheLayerBoundsChanged();
 }
 
+- (void)setNeedsDisplay
+{
+    _tileCache->setNeedsDisplay();
+}
+
 - (void)setNeedsDisplayInRect:(CGRect)rect
 {
     _tileCache->setNeedsDisplayInRect(enclosingIntRect(rect));
 }
 
+- (void)setAcceleratesDrawing:(BOOL)acceleratesDrawing
+{
+    _tileCache->setAcceleratesDrawing(acceleratesDrawing);
+}
+
+- (BOOL)acceleratesDrawing
+{
+    return _tileCache->acceleratesDrawing();
+}
+
 - (CALayer *)tileContainerLayer
 {
     return _tileCache->tileContainerLayer();
+}
+
+- (void)visibleRectChanged
+{
+    _tileCache->visibleRectChanged();
+}
+
+- (CGColorRef)borderColor
+{
+    return _tileCache->tileDebugBorderColor();
+}
+
+- (void)setBorderColor:(CGColorRef)borderColor
+{
+    _tileCache->setTileDebugBorderColor(borderColor);
+}
+
+- (CGFloat)borderWidth
+{
+    return _tileCache->tileDebugBorderWidth();
+}
+
+- (void)setBorderWidth:(CGFloat)borderWidth
+{
+    _tileCache->setTileDebugBorderWidth(borderWidth);
 }
 
 @end

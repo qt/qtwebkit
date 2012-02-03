@@ -48,6 +48,7 @@ class CCLayerTreeHostImpl;
 class CCTextureUpdater;
 class GraphicsContext3D;
 class LayerPainterChromium;
+class Region;
 class TextureAllocator;
 class TextureManager;
 
@@ -76,7 +77,8 @@ struct CCSettings {
             , showPlatformLayerTree(false)
             , refreshRate(0)
             , perTilePainting(false)
-            , partialSwapEnabled(false) { }
+            , partialSwapEnabled(false)
+            , partialTextureUpdates(true) { }
 
     bool acceleratePainting;
     bool compositeOffscreen;
@@ -85,6 +87,7 @@ struct CCSettings {
     double refreshRate;
     bool perTilePainting;
     bool partialSwapEnabled;
+    bool partialTextureUpdates;
 };
 
 // Provides information on an Impl's rendering capabilities back to the CCLayerTreeHost
@@ -192,19 +195,24 @@ public:
     void startRateLimiter(GraphicsContext3D*);
     void stopRateLimiter(GraphicsContext3D*);
 
+    void deleteTextureAfterCommit(PassOwnPtr<ManagedTexture>);
+
 protected:
     CCLayerTreeHost(CCLayerTreeHostClient*, const CCSettings&);
     bool initialize();
 
 private:
     typedef Vector<RefPtr<LayerChromium> > LayerList;
+    typedef Vector<OwnPtr<ManagedTexture> > TextureList;
 
     enum PaintType { PaintVisible, PaintIdle };
-    static void paintContentsIfDirty(LayerChromium*, PaintType);
+    static void paintContentsIfDirty(LayerChromium*, PaintType, const Region& occludedScreenSpace);
     void paintLayerContents(const LayerList&, PaintType);
     void paintMaskAndReplicaForRenderSurface(LayerChromium*, PaintType);
 
     void updateLayers(LayerChromium*);
+    // Pre-reserve textures for any layer marked "always reserve textures"
+    void reserveTextures();
     void clearPendingUpdate();
 
     int m_compositorIdentifier;
@@ -233,6 +241,8 @@ private:
     float m_pageScale;
     float m_minPageScale, m_maxPageScale;
     bool m_triggerIdlePaints;
+
+    TextureList m_deleteTextureAfterCommitList;
 };
 
 }

@@ -81,7 +81,7 @@ WebInspector.ScriptsNavigator.prototype = {
      */
     get defaultFocusedElement()
     {
-        return this._navigatorScriptsTreeElement
+        return this._navigatorScriptsTreeElement;
     },
 
     /**
@@ -128,7 +128,7 @@ WebInspector.ScriptsNavigator.prototype = {
         this._tabbedPane.selectTab(uiSourceCode.isContentScript ? WebInspector.ScriptsNavigator.ContentScriptsTab : WebInspector.ScriptsNavigator.ScriptsTab);
 
         var scriptTreeElement = this._scriptTreeElementsByUISourceCode.get(uiSourceCode);
-        scriptTreeElement.revealAndSelect();
+        scriptTreeElement.revealAndSelect(true);
     },
 
     /**
@@ -146,16 +146,21 @@ WebInspector.ScriptsNavigator.prototype = {
      */
     replaceUISourceCodes: function(oldUISourceCodeList, uiSourceCodeList)
     {
+        var added = false;
         var selected = false;
         for (var i = 0; i < oldUISourceCodeList.length; ++i) {
             var uiSourceCode = oldUISourceCodeList[i];
-            var treeElement = this._scriptTreeElementsByUISourceCode.get(uiSourceCode);
-            if (treeElement) {
-                if (this._lastSelectedUISourceCode && this._lastSelectedUISourceCode === uiSourceCode)
-                    selected = true;
-                this.removeUISourceCode(uiSourceCode);
-            }
+            if (!this._scriptTreeElementsByUISourceCode.get(uiSourceCode))
+                continue;
+            added = true;
+
+            if (this._lastSelectedUISourceCode === uiSourceCode)
+                selected = true;
+            this._removeUISourceCode(uiSourceCode);
         }
+        
+        if (!added)
+            return;
             
         for (var i = 0; i < uiSourceCodeList.length; ++i)
             this.addUISourceCode(uiSourceCodeList[i]);
@@ -170,13 +175,13 @@ WebInspector.ScriptsNavigator.prototype = {
     scriptSelected: function(uiSourceCode)
     {
         this._lastSelectedUISourceCode = uiSourceCode;
-        this.dispatchEventToListeners(WebInspector.ScriptsPanel.FileSelector.Events.ScriptSelected, uiSourceCode);
+        this.dispatchEventToListeners(WebInspector.ScriptsPanel.FileSelector.Events.FileSelected, uiSourceCode);
     },
     
     /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      */
-    removeUISourceCode: function(uiSourceCode)
+    _removeUISourceCode: function(uiSourceCode)
     {
         var treeElement = this._scriptTreeElementsByUISourceCode.get(uiSourceCode);
         while (treeElement) {
@@ -210,6 +215,7 @@ WebInspector.ScriptsNavigator.prototype = {
         this._navigatorContentScriptsTree.stopSearch();
         this._navigatorContentScriptsTree.removeChildren();
         this._folderTreeElements = {};
+        this._scriptTreeElementsByUISourceCode.clear();
     },
 
     /**

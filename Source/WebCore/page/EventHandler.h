@@ -127,7 +127,8 @@ public:
 #if ENABLE(DRAG_SUPPORT)
     bool updateDragAndDrop(const PlatformMouseEvent&, Clipboard*);
     void cancelDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    void performDragAndDrop(const PlatformMouseEvent&, Clipboard*);
+    bool performDragAndDrop(const PlatformMouseEvent&, Clipboard*);
+    void updateDragStateAfterEditDragIfNeeded(Element* rootEditableElement);
 #endif
 
     void scheduleHoverStateUpdate();
@@ -148,7 +149,8 @@ public:
     bool tabsToLinks(KeyboardEvent*) const;
     bool tabsToAllFormControls(KeyboardEvent*) const;
 
-    bool mouseMoved(const PlatformMouseEvent&, bool onlyUpdateScrollbars = false);
+    bool mouseMoved(const PlatformMouseEvent&);
+    bool passMouseMovedEventToScrollbars(const PlatformMouseEvent&);
 
     void lostMouseCapture();
 
@@ -199,6 +201,8 @@ public:
     void mouseMoved(NSEvent *);
     bool keyEvent(NSEvent *);
     bool wheelEvent(NSEvent *);
+
+    void passMouseMovedEventToScrollbars(NSEvent *);
 
     void sendFakeEventsAfterWidgetTracking(NSEvent *initiatingEvent);
 

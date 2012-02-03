@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Zeno Albisser <zeno@webkit.org>
+ * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,15 +39,19 @@ class WebProcess;
 class QtNetworkAccessManager : public QNetworkAccessManager {
     Q_OBJECT
 public:
-    QtNetworkAccessManager(QObject* parent);
     QtNetworkAccessManager(WebProcess*);
     void registerApplicationScheme(const WebPage*, const QString& scheme);
 
 protected:
     virtual QNetworkReply* createRequest(Operation, const QNetworkRequest&, QIODevice* outgoingData = 0) OVERRIDE;
-    static WebPage* obtainOriginatingWebPage(const QNetworkRequest&);
+
+private Q_SLOTS:
+    void onAuthenticationRequired(QNetworkReply *, QAuthenticator *);
+    void onSslErrors(QNetworkReply*, const QList<QSslError>&);
 
 private:
+    WebPage* obtainOriginatingWebPage(const QNetworkRequest&);
+
     QMultiHash<const WebPage*, QString> m_applicationSchemes;
     WebProcess* m_webProcess;
 

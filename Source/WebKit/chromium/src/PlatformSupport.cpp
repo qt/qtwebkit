@@ -1092,28 +1092,20 @@ bool PlatformSupport::screenIsMonochrome(Widget* widget)
     return client->screenInfo().isMonochrome;
 }
 
-IntRect PlatformSupport::screenRect(Widget* widget)
+IntRect PlatformSupport::screenRect(FrameView* frameView)
 {
-    WebWidgetClient* client = toWebWidgetClient(widget);
+    WebWidgetClient* client = toWebWidgetClient(frameView);
     if (!client)
         return IntRect();
     return client->screenInfo().rect;
 }
 
-IntRect PlatformSupport::screenAvailableRect(Widget* widget)
+IntRect PlatformSupport::screenAvailableRect(FrameView* frameView)
 {
-    WebWidgetClient* client = toWebWidgetClient(widget);
+    WebWidgetClient* client = toWebWidgetClient(frameView);
     if (!client)
         return IntRect();
     return client->screenInfo().availableRect;
-}
-
-double PlatformSupport::screenRefreshRate(Widget* widget)
-{
-    WebWidgetClient* client = toWebWidgetClient(widget);
-    if (!client)
-        return 0;
-    return client->screenInfo().refreshRate;
 }
 
 bool PlatformSupport::popupsAllowed(NPP npp)

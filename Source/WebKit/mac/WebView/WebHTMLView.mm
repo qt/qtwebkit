@@ -108,6 +108,7 @@
 #import <WebCore/Range.h>
 #import <WebCore/RenderWidget.h>
 #import <WebCore/RenderView.h>
+#import <WebCore/RunLoop.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/SharedBuffer.h>
 #import <WebCore/SimpleFontData.h>
@@ -521,6 +522,8 @@ struct WebHTMLViewInterpretKeyEventsParameters {
 
     SEL selectorForDoCommandBySelector;
 
+    NSTrackingArea *trackingAreaForNonKeyWindow;
+
 #ifndef NDEBUG
     BOOL enumeratingSubviews;
 #endif
@@ -548,6 +551,7 @@ static NSCellStateValue kit(TriState state)
 {
     JSC::initializeThreading();
     WTF::initializeMainThreadToProcessMainThread();
+    WebCore::RunLoop::initializeMainRunLoop();
     WebCoreObjCFinalizeOnMainThread(self);
     
     if (!oldSetCursorForMouseLocationIMP) {
@@ -584,6 +588,7 @@ static NSCellStateValue kit(TriState state)
     [completionController release];
     [dataSource release];
     [highlighters release];
+    [trackingAreaForNonKeyWindow release];
     if (promisedDragTIFFDataSource)
         promisedDragTIFFDataSource->removeClient(promisedDataClient());
 
@@ -609,6 +614,7 @@ static NSCellStateValue kit(TriState state)
     [completionController release];
     [dataSource release];
     [highlighters release];
+    [trackingAreaForNonKeyWindow release];
     if (promisedDragTIFFDataSource)
         promisedDragTIFFDataSource->removeClient(promisedDataClient());
 
@@ -619,6 +625,7 @@ static NSCellStateValue kit(TriState state)
     completionController = nil;
     dataSource = nil;
     highlighters = nil;
+    trackingAreaForNonKeyWindow = nil;
     promisedDragTIFFDataSource = 0;
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1545,6 +1552,24 @@ static NSURL* uniqueURLWithRelativePart(NSString *relativePart)
     return [[_private->toolTip copy] autorelease];
 }
 
+static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
+{
+    switch ([event type]) {
+        case NSLeftMouseDown:
+        case NSLeftMouseUp:
+        case NSLeftMouseDragged:
+        case NSRightMouseDown:
+        case NSRightMouseUp:
+        case NSRightMouseDragged:
+        case NSOtherMouseDown:
+        case NSOtherMouseUp:
+        case NSOtherMouseDragged:
+            return true;
+        default:
+            return false;
+    }
+}
+
 - (void)_updateMouseoverWithEvent:(NSEvent *)event
 {
     if (_private->closed)
@@ -1586,8 +1611,17 @@ static NSURL* uniqueURLWithRelativePart(NSString *relativePart)
     lastHitView = view;
 
     if (view) {
-        if (Frame* coreFrame = core([view _frame]))
-            coreFrame->eventHandler()->mouseMoved(event);
+        if (Frame* coreFrame = core([view _frame])) {
+            // We need to do a full, normal hit test during this mouse event if the page is active or if a mouse
+            // button is currently pressed. It is possible that neither of those things will be true on Lion and
+            // newer when legacy scrollbars are enabled, because then WebKit receives mouse events all the time. 
+            // If it is one of those cases where the page is not active and the mouse is not pressed, then we can
+            // fire a much more restricted and efficient scrollbars-only version of the event.
+            if ([[self window] isKeyWindow] || mouseEventIsPartOfClickOrDrag(event))
+                coreFrame->eventHandler()->mouseMoved(event);
+            else
+                coreFrame->eventHandler()->passMouseMovedEventToScrollbars(event);
+        }
 
         [view release];
     }
@@ -2243,6 +2277,7 @@ static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension
                              returnTypes:[[self class] _insertablePasteboardTypes]];
     JSC::initializeThreading();
     WTF::initializeMainThreadToProcessMainThread();
+    WebCore::RunLoop::initializeMainRunLoop();
     WebCoreObjCFinalizeOnMainThread(self);
 }
 
@@ -2800,6 +2835,12 @@ WEBCORE_COMMAND(yankAndSelect)
         return;
 #endif
 
+#if !defined(BUILDING_ON_SNOW_LEOPARD)
+    // Legacy scrollbars require tracking the mouse at all times.
+    if (WKRecommendedScrollerStyle() == NSScrollerStyleLegacy)
+        return;
+#endif
+
     [[self _webView] _mouseDidMoveOverElement:nil modifierFlags:0];
     [self _removeMouseMovedObserverUnconditionally];
 }
@@ -3333,6 +3374,14 @@ static void setMenuTargets(NSMenu* menu)
         return;
     }
 
+#if !defined(BUILDING_ON_SNOW_LEOPARD)
+    if (_private->trackingAreaForNonKeyWindow) {
+        [self removeTrackingArea:_private->trackingAreaForNonKeyWindow];
+        [_private->trackingAreaForNonKeyWindow release];
+        _private->trackingAreaForNonKeyWindow = nil;
+    }
+#endif
+
     NSWindow *keyWindow = [notification object];
 
     if (keyWindow == [self window]) {
@@ -3357,6 +3406,19 @@ static void setMenuTargets(NSMenu* menu)
         [self _updateSecureInputState];
         [_private->completionController endRevertingChange:NO moveLeft:NO];
     }
+
+#if !defined(BUILDING_ON_SNOW_LEOPARD)
+    if (WKRecommendedScrollerStyle() == NSScrollerStyleLegacy) {
+        // Legacy style scrollbars have design details that rely on tracking the mouse all the time.
+        // It's easiest to do this with a tracking area, which we will remove when the window is key
+        // again.
+        _private->trackingAreaForNonKeyWindow = [[NSTrackingArea alloc] initWithRect:[self bounds]
+                                                    options:NSTrackingMouseMoved | NSTrackingMouseEnteredAndExited | NSTrackingInVisibleRect | NSTrackingActiveAlways
+                                                    owner:self
+                                                    userInfo:nil];
+        [self addTrackingArea:_private->trackingAreaForNonKeyWindow];
+    }
+#endif
 }
 
 - (void)windowWillOrderOnScreen:(NSNotification *)notification
@@ -4506,29 +4568,6 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
 
     [shadow release];
 
-#if 0
-
-NSObliquenessAttributeName        /* float; skew to be applied to glyphs, default 0: no skew */
-    // font-style, but that is just an on-off switch
-
-NSExpansionAttributeName          /* float; log of expansion factor to be applied to glyphs, default 0: no expansion */
-    // font-stretch?
-
-NSKernAttributeName               /* float, amount to modify default kerning, if 0, kerning off */
-    // letter-spacing? probably not good enough
-
-NSUnderlineColorAttributeName     /* NSColor, default nil: same as foreground color */
-NSStrikethroughColorAttributeName /* NSColor, default nil: same as foreground color */
-    // text-decoration-color?
-
-NSLigatureAttributeName           /* int, default 1: default ligatures, 0: no ligatures, 2: all ligatures */
-NSBaselineOffsetAttributeName     /* float, in points; offset from baseline, default 0 */
-NSStrokeWidthAttributeName        /* float, in percent of font point size, default 0: no stroke; positive for stroke alone, negative for stroke and fill (a typical value for outlined text would be 3.0) */
-NSStrokeColorAttributeName        /* NSColor, default nil: same as foreground color */
-    // need extensions?
-
-#endif
-    
     NSDictionary *a = [sender convertAttributes:oa];
     NSDictionary *b = [sender convertAttributes:ob];
 
@@ -4543,6 +4582,8 @@ NSStrokeColorAttributeName        /* NSColor, default nil: same as foreground co
     ca = [a objectForKey:NSForegroundColorAttributeName];
     cb = [b objectForKey:NSForegroundColorAttributeName];
     if (ca == cb) {
+        if (!ca)
+            ca = [NSColor blackColor];
         [style setColor:[self _colorAsString:ca]];
     }
 
@@ -5005,10 +5046,6 @@ static BOOL writingDirectionKeyBindingsEnabled()
     ASSERT(font != nil);
 
     [[NSFontManager sharedFontManager] setSelectedFont:font isMultiple:multipleFonts];
-
-    // FIXME: we don't keep track of selected attributes, or set them on the font panel. This
-    // appears to have no effect on the UI. E.g., underlined text in Mail or TextEdit is
-    // not reflected in the font panel. Maybe someday this will change.
 }
 
 - (BOOL)_canSmartCopyOrDelete
@@ -5460,6 +5497,9 @@ static CGPoint coreGraphicsScreenPointForAppKitScreenPoint(NSPoint point)
 #elif (defined(BUILDING_ON_SNOW_LEOPARD) || defined(BUILDING_ON_LION))
     // Do geometry flipping here, which flips all the compositing layers so they are top-down.
     [viewLayer setGeometryFlipped:YES];
+#else
+    if (WKExecutableWasLinkedOnOrBeforeLion())
+        [viewLayer setGeometryFlipped:YES];
 #endif
 }
 

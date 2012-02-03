@@ -31,7 +31,7 @@
 #include <assembler/LinkBuffer.h>
 #include <assembler/MacroAssembler.h>
 #include <bytecode/CodeBlock.h>
-#include <dfg/DFGAssemblyHelpers.h>
+#include <dfg/DFGCCallHelpers.h>
 #include <dfg/DFGFPRInfo.h>
 #include <dfg/DFGGPRInfo.h>
 #include <dfg/DFGGraph.h>
@@ -70,37 +70,76 @@ struct CallLinkRecord {
     FunctionPtr m_function;
 };
 
+class CallBeginToken {
+public:
+    CallBeginToken()
+#if !ASSERT_DISABLED
+        : m_codeOriginIndex(UINT_MAX)
+#endif
+    {
+    }
+    
+    explicit CallBeginToken(unsigned codeOriginIndex)
+#if !ASSERT_DISABLED
+        : m_codeOriginIndex(codeOriginIndex)
+#endif
+    {
+        UNUSED_PARAM(codeOriginIndex);
+    }
+    
+    void assertCodeOriginIndex(unsigned codeOriginIndex) const
+    {
+        ASSERT_UNUSED(codeOriginIndex, codeOriginIndex < UINT_MAX);
+        ASSERT_UNUSED(codeOriginIndex, codeOriginIndex == m_codeOriginIndex);
+    }
+    
+    void assertNoCodeOriginIndex() const
+    {
+        ASSERT(m_codeOriginIndex == UINT_MAX);
+    }
+private:
+#if !ASSERT_DISABLED
+    unsigned m_codeOriginIndex;
+#endif
+};
+
 // === CallExceptionRecord ===
 //
 // A record of a call out from JIT code that might throw an exception.
 // Calls that might throw an exception also record the Jump taken on exception
 // (unset if not present) and code origin used to recover handler/source info.
 struct CallExceptionRecord {
-    CallExceptionRecord(MacroAssembler::Call call, CodeOrigin codeOrigin)
+    CallExceptionRecord(MacroAssembler::Call call, CodeOrigin codeOrigin, CallBeginToken token)
         : m_call(call)
         , m_codeOrigin(codeOrigin)
+        , m_token(token)
     {
     }
 
-    CallExceptionRecord(MacroAssembler::Call call, MacroAssembler::Jump exceptionCheck, CodeOrigin codeOrigin)
+    CallExceptionRecord(MacroAssembler::Call call, MacroAssembler::Jump exceptionCheck, CodeOrigin codeOrigin, CallBeginToken token)
         : m_call(call)
         , m_exceptionCheck(exceptionCheck)
         , m_codeOrigin(codeOrigin)
+        , m_token(token)
     {
     }
 
     MacroAssembler::Call m_call;
     MacroAssembler::Jump m_exceptionCheck;
     CodeOrigin m_codeOrigin;
+    CallBeginToken m_token;
 };
 
 struct PropertyAccessRecord {
+    enum RegisterMode { RegistersFlushed, RegistersInUse };
+    
 #if USE(JSVALUE64)
-    PropertyAccessRecord(MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR)
+    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
 #elif USE(JSVALUE32_64)
-    PropertyAccessRecord(MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR)
+    PropertyAccessRecord(CodeOrigin codeOrigin, MacroAssembler::DataLabelPtr deltaCheckImmToCall, MacroAssembler::Call functionCall, MacroAssembler::Jump deltaCallToStructCheck, MacroAssembler::DataLabelCompact deltaCallToTagLoadOrStore, MacroAssembler::DataLabelCompact deltaCallToPayloadLoadOrStore, MacroAssembler::Label deltaCallToSlowCase, MacroAssembler::Label deltaCallToDone, int8_t baseGPR, int8_t valueTagGPR, int8_t valueGPR, int8_t scratchGPR, RegisterMode registerMode = RegistersInUse)
 #endif
-        : m_deltaCheckImmToCall(deltaCheckImmToCall)
+        : m_codeOrigin(codeOrigin)
+        , m_deltaCheckImmToCall(deltaCheckImmToCall)
         , m_functionCall(functionCall)
         , m_deltaCallToStructCheck(deltaCallToStructCheck)
 #if USE(JSVALUE64)
@@ -117,9 +156,11 @@ struct PropertyAccessRecord {
 #endif
         , m_valueGPR(valueGPR)
         , m_scratchGPR(scratchGPR)
+        , m_registerMode(registerMode)
     {
     }
 
+    CodeOrigin m_codeOrigin;
     MacroAssembler::DataLabelPtr m_deltaCheckImmToCall;
     MacroAssembler::Call m_functionCall;
     MacroAssembler::Jump m_deltaCallToStructCheck;
@@ -137,6 +178,7 @@ struct PropertyAccessRecord {
 #endif
     int8_t m_valueGPR;
     int8_t m_scratchGPR;
+    RegisterMode m_registerMode;
 };
 
 // === JITCompiler ===
@@ -147,11 +189,12 @@ struct PropertyAccessRecord {
 // relationship). The JITCompiler holds references to information required during
 // compilation, and also records information used in linking (e.g. a list of all
 // call to be linked).
-class JITCompiler : public AssemblyHelpers {
+class JITCompiler : public CCallHelpers {
 public:
     JITCompiler(JSGlobalData* globalData, Graph& dfg, CodeBlock* codeBlock)
-        : AssemblyHelpers(globalData, codeBlock)
+        : CCallHelpers(globalData, codeBlock)
         , m_graph(dfg)
+        , m_currentCodeOriginIndex(0)
     {
     }
 
@@ -160,11 +203,32 @@ public:
 
     // Accessors for properties.
     Graph& graph() { return m_graph; }
+    
+    // Just get a token for beginning a call.
+    CallBeginToken nextCallBeginToken(CodeOrigin codeOrigin)
+    {
+        if (!codeOrigin.inlineCallFrame)
+            return CallBeginToken();
+        return CallBeginToken(m_currentCodeOriginIndex++);
+    }
+    
+    // Get a token for beginning a call, and set the current code origin index in
+    // the call frame.
+    CallBeginToken beginCall(CodeOrigin codeOrigin)
+    {
+        unsigned codeOriginIndex;
+        if (!codeOrigin.inlineCallFrame)
+            codeOriginIndex = UINT_MAX;
+        else
+            codeOriginIndex = m_currentCodeOriginIndex++;
+        store32(TrustedImm32(codeOriginIndex), tagFor(static_cast<VirtualRegister>(RegisterFile::ArgumentCount)));
+        return CallBeginToken(codeOriginIndex);
+    }
 
     // Notify the JIT of a call that does not require linking.
-    void notifyCall(Call functionCall, CodeOrigin codeOrigin)
+    void notifyCall(Call functionCall, CodeOrigin codeOrigin, CallBeginToken token)
     {
-        m_exceptionChecks.append(CallExceptionRecord(functionCall, codeOrigin));
+        m_exceptionChecks.append(CallExceptionRecord(functionCall, codeOrigin, token));
     }
 
     // Add a call out from JIT code, without an exception check.
@@ -176,25 +240,18 @@ public:
     }
 
     // Add a call out from JIT code, with an exception check.
-    Call addExceptionCheck(Call functionCall, CodeOrigin codeOrigin)
+    void addExceptionCheck(Call functionCall, CodeOrigin codeOrigin, CallBeginToken token)
     {
         move(TrustedImm32(m_exceptionChecks.size()), GPRInfo::nonPreservedNonReturnGPR);
-#if USE(JSVALUE64)
-        Jump exceptionCheck = branchTestPtr(NonZero, AbsoluteAddress(&globalData()->exception));
-#elif USE(JSVALUE32_64)
-        Jump exceptionCheck = branch32(NotEqual, AbsoluteAddress(reinterpret_cast<char*>(&globalData()->exception) + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), TrustedImm32(JSValue::EmptyValueTag));
-#endif
-        m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin));
-        return functionCall;
+        m_exceptionChecks.append(CallExceptionRecord(functionCall, emitExceptionCheck(), codeOrigin, token));
     }
     
     // Add a call out from JIT code, with a fast exception check that tests if the return value is zero.
-    Call addFastExceptionCheck(Call functionCall, CodeOrigin codeOrigin)
+    void addFastExceptionCheck(Call functionCall, CodeOrigin codeOrigin, CallBeginToken token)
     {
         move(TrustedImm32(m_exceptionChecks.size()), GPRInfo::nonPreservedNonReturnGPR);
         Jump exceptionCheck = branchTestPtr(Zero, GPRInfo::returnValueGPR);
-        m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin));
-        return functionCall;
+        m_exceptionChecks.append(CallExceptionRecord(functionCall, exceptionCheck, codeOrigin, token));
     }
     
     // Helper methods to check nodes for constants.
@@ -325,6 +382,7 @@ private:
     
     Vector<PropertyAccessRecord, 4> m_propertyAccesses;
     Vector<JSCallRecord, 4> m_jsCalls;
+    unsigned m_currentCodeOriginIndex;
 };
 
 } } // namespace JSC::DFG

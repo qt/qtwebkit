@@ -229,6 +229,7 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     macro(PutByVal, NodeMustGenerate | NodeClobbersWorld) \
     macro(PutByValAlias, NodeMustGenerate | NodeClobbersWorld) \
     macro(GetById, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
+    macro(GetByIdFlush, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(PutById, NodeMustGenerate | NodeClobbersWorld) \
     macro(PutByIdDirect, NodeMustGenerate | NodeClobbersWorld) \
     macro(CheckStructure, NodeMustGenerate) \
@@ -244,6 +245,7 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     macro(GetInt16ArrayLength, NodeResultInt32) \
     macro(GetInt32ArrayLength, NodeResultInt32) \
     macro(GetUint8ArrayLength, NodeResultInt32) \
+    macro(GetUint8ClampedArrayLength, NodeResultInt32) \
     macro(GetUint16ArrayLength, NodeResultInt32) \
     macro(GetUint32ArrayLength, NodeResultInt32) \
     macro(GetFloat32ArrayLength, NodeResultInt32) \
@@ -502,6 +504,7 @@ struct Node {
     {
         switch (op) {
         case GetById:
+        case GetByIdFlush:
         case PutById:
         case PutByIdDirect:
         case Resolve:
@@ -718,6 +721,7 @@ struct Node {
     {
         switch (op) {
         case GetById:
+        case GetByIdFlush:
         case GetByVal:
         case Call:
         case Construct:
@@ -959,6 +963,11 @@ struct Node {
     bool shouldSpeculateUint8Array()
     {
         return isUint8ArrayPrediction(prediction());
+    }
+
+    bool shouldSpeculateUint8ClampedArray()
+    {
+        return isUint8ClampedArrayPrediction(prediction());
     }
     
     bool shouldSpeculateUint16Array()

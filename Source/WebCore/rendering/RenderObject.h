@@ -343,6 +343,7 @@ public:
 #endif
 
     virtual bool isRenderFlowThread() const { return false; }
+    bool canHaveRegionStyle() const { return isRenderBlock() && !isAnonymous() && !isRenderFlowThread(); }
 
     bool isRoot() const { return document()->documentElement() == m_node; }
     bool isBody() const;
@@ -673,7 +674,7 @@ public:
     virtual LayoutUnit minPreferredLogicalWidth() const { return 0; }
     virtual LayoutUnit maxPreferredLogicalWidth() const { return 0; }
 
-    RenderStyle* style() const;
+    RenderStyle* style() const { return m_style.get(); }
     RenderStyle* firstLineStyle() const { return document()->usesFirstLineRules() ? firstLineStyleSlowCase() : style(); }
     RenderStyle* style(bool firstLine) const { return firstLine ? firstLineStyle() : style(); }
 
@@ -1104,11 +1105,6 @@ inline bool RenderObject::preservesNewline() const
 #endif
         
     return style()->preserveNewline();
-}
-
-inline RenderStyle* RenderObject::style() const
-{
-    return m_style.get();
 }
 
 inline void makeMatrixRenderable(TransformationMatrix& matrix, bool has3DRendering)

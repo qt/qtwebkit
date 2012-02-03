@@ -116,12 +116,36 @@ public:
         UOther
     };
 
-    static bool isUnitTypeLength(int type) { return (type > CSSPrimitiveValue::CSS_PERCENTAGE && type < CSSPrimitiveValue::CSS_DEG) ||
-                                                    type == CSSPrimitiveValue::CSS_REMS; }
+    bool isAngle() const
+    {
+        return m_primitiveUnitType == CSS_DEG
+               || m_primitiveUnitType == CSS_RAD
+               || m_primitiveUnitType == CSS_GRAD
+               || m_primitiveUnitType == CSS_TURN;
+    }
+    bool isAttr() const { return m_primitiveUnitType == CSS_ATTR; }
+    bool isCounter() const { return m_primitiveUnitType == CSS_COUNTER; }
+    bool isFontIndependentLength() const { return m_primitiveUnitType >= CSS_PX && m_primitiveUnitType <= CSS_PC; }
+    bool isFontRelativeLength() const
+    {
+        return m_primitiveUnitType == CSS_EMS || m_primitiveUnitType == CSS_EXS || m_primitiveUnitType == CSS_REMS;
+    }
+    bool isIdent() const { return m_primitiveUnitType == CSS_IDENT; }
+    bool isLength() const
+    {
+        return (m_primitiveUnitType >= CSS_EMS && m_primitiveUnitType <= CSS_PC)
+               || m_primitiveUnitType == CSS_REMS;
+    }
+    bool isNumber() const { return m_primitiveUnitType == CSS_NUMBER; }
+    bool isPercentage() const { return m_primitiveUnitType == CSS_PERCENTAGE; }
+    bool isPx() const { return m_primitiveUnitType == CSS_PX; }
+    bool isRect() const { return m_primitiveUnitType == CSS_RECT; }
+    bool isRGBColor() const { return m_primitiveUnitType == CSS_RGBCOLOR; }
+    bool isShape() const { return m_primitiveUnitType == CSS_SHAPE; }
+    bool isString() const { return m_primitiveUnitType == CSS_STRING; }
+    bool isTime() const { return m_primitiveUnitType == CSS_S || m_primitiveUnitType == CSS_MS; }
+    bool isURI() const { return m_primitiveUnitType == CSS_URI; }
 
-    bool isLength() const { return isUnitTypeLength(m_primitiveUnitType); }
-    bool isPercentage() const { return m_primitiveUnitType == CSSPrimitiveValue::CSS_PERCENTAGE; }
-    bool isNumber() const { return m_primitiveUnitType == CSSPrimitiveValue::CSS_NUMBER; }
 
     static PassRefPtr<CSSPrimitiveValue> createIdentifier(int identifier) { return adoptRef(new CSSPrimitiveValue(identifier)); }
     static PassRefPtr<CSSPrimitiveValue> createColor(unsigned rgbValue) { return adoptRef(new CSSPrimitiveValue(rgbValue)); }
@@ -150,6 +174,23 @@ public:
 
     unsigned short primitiveType() const { return m_primitiveUnitType; }
 
+    double computeDegrees();
+
+    enum TimeUnit { Seconds, Milliseconds };
+    template <typename T, TimeUnit timeUnit> T computeTime()
+    {
+        if (timeUnit == Seconds && m_primitiveUnitType == CSS_S)
+            return getValue<T>();
+        if (timeUnit == Seconds && m_primitiveUnitType == CSS_MS)
+            return getValue<T>() / 1000;
+        if (timeUnit == Milliseconds && m_primitiveUnitType == CSS_MS)
+            return getValue<T>();
+        if (timeUnit == Milliseconds && m_primitiveUnitType == CSS_S)
+            return getValue<T>() * 1000;
+        ASSERT_NOT_REACHED();
+        return 0;
+    }
+
     /*
      * computes a length in pixels out of the given CSSValue. Need the RenderStyle to get
      * the fontinfo in case val is defined in em or ex.
@@ -160,7 +201,10 @@ public:
      * this is screen/printer dependent, so we probably need a config option for this,
      * and some tool to calibrate.
      */
-    template<typename T> T computeLength(RenderStyle* currStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false);
+    template<typename T> T computeLength(RenderStyle* currStyle, RenderStyle* rootStyle, float multiplier = 1.0f, bool computingFontSize = false);
+
+    // Converts to a Length, mapping various unit types appropriately.
+    template<int> Length convertToLength(RenderStyle* currStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false);
 
     // use with care!!!
     void setPrimitiveType(unsigned short type) { m_primitiveUnitType = type; }
@@ -260,7 +304,7 @@ private:
 
     bool getDoubleValueInternal(UnitTypes targetUnitType, double* result) const;
 
-    double computeLengthDouble(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier, bool computingFontSize);
+    double computeLengthDouble(RenderStyle* currentStyle, RenderStyle* rootStyle, float multiplier, bool computingFontSize);
 
     union {
         int ident;

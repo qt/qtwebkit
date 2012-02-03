@@ -219,7 +219,11 @@ void ScrollView::setClipsRepaints(bool clipsRepaints)
 
 void ScrollView::setDelegatesScrolling(bool delegatesScrolling)
 {
+    if (m_delegatesScrolling == delegatesScrolling)
+        return;
+
     m_delegatesScrolling = delegatesScrolling;
+    delegatesScrollingDidChange();
 }
 
 #if !PLATFORM(GTK)
@@ -828,9 +832,9 @@ Scrollbar* ScrollView::scrollbarAtPoint(const IntPoint& windowPoint)
         return 0;
 
     IntPoint viewPoint = convertFromContainingWindow(windowPoint);
-    if (m_horizontalScrollbar && m_horizontalScrollbar->frameRect().contains(viewPoint))
+    if (m_horizontalScrollbar && m_horizontalScrollbar->shouldParticipateInHitTesting() && m_horizontalScrollbar->frameRect().contains(viewPoint))
         return m_horizontalScrollbar.get();
-    if (m_verticalScrollbar && m_verticalScrollbar->frameRect().contains(viewPoint))
+    if (m_verticalScrollbar && m_verticalScrollbar->shouldParticipateInHitTesting() && m_verticalScrollbar->frameRect().contains(viewPoint))
         return m_verticalScrollbar.get();
     return 0;
 }
@@ -991,6 +995,7 @@ void ScrollView::scrollbarStyleChanged(int, bool forceUpdate)
 
     contentsResized();
     updateScrollbars(scrollOffset());
+    positionScrollbarLayers();
 }
 
 void ScrollView::updateScrollCorner()
@@ -1075,7 +1080,7 @@ void ScrollView::paint(GraphicsContext* context, const IntRect& rect)
         paintContents(context, documentDirtyRect);
     }
 
-#if USE(ACCELERATED_COMPOSITING) && PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
     if (!layerForOverhangAreas())
         calculateAndPaintOverhangAreas(context, rect);
 #else

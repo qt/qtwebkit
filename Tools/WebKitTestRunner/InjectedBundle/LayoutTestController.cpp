@@ -350,7 +350,8 @@ void LayoutTestController::setCanOpenWindows(bool)
 
 void LayoutTestController::setXSSAuditorEnabled(bool enabled)
 {
-    WKBundleOverrideXSSAuditorEnabledForTestRunner(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), true);
+    WKRetainPtr<WKStringRef> key(AdoptWK, WKStringCreateWithUTF8CString("WebKitXSSAuditorEnabled"));
+    WKBundleOverrideBoolPreferenceForTestRunner(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), key.get(), enabled);
 }
 
 void LayoutTestController::setAllowUniversalAccessFromFileURLs(bool enabled)
@@ -368,6 +369,11 @@ void LayoutTestController::setFrameFlatteningEnabled(bool enabled)
     WKBundleSetFrameFlatteningEnabled(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
 }
 
+void LayoutTestController::setGeolocationPermission(bool enabled)
+{
+    WKBundleSetGeolocationPermission(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
+}
+
 void LayoutTestController::setJavaScriptCanAccessClipboard(bool enabled)
 {
      WKBundleSetJavaScriptCanAccessClipboard(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
@@ -376,6 +382,11 @@ void LayoutTestController::setJavaScriptCanAccessClipboard(bool enabled)
 void LayoutTestController::setPrivateBrowsingEnabled(bool enabled)
 {
      WKBundleSetPrivateBrowsingEnabled(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
+}
+
+void LayoutTestController::setPopupBlockingEnabled(bool enabled)
+{
+     WKBundleSetPopupBlockingEnabled(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
 }
 
 void LayoutTestController::setAuthorAndUserStylesEnabled(bool enabled)
@@ -601,6 +612,11 @@ void LayoutTestController::callFocusWebViewCallback()
 void LayoutTestController::callSetBackingScaleFactorCallback()
 {
     callLayoutTestControllerCallback(SetBackingScaleFactorCallbackID);
+}
+
+void LayoutTestController::overridePreference(JSStringRef preference, bool value)
+{
+    WKBundleOverrideBoolPreferenceForTestRunner(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), toWK(preference).get(), value);
 }
 
 } // namespace WTR

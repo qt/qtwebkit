@@ -52,16 +52,18 @@
 #include "TrackingTextureAllocator.h"
 #include "TreeSynchronizer.h"
 #include "WebGLLayerChromium.h"
-#include "cc/CCCustomLayerDrawQuad.h"
+#include "cc/CCCanvasDrawQuad.h"
 #include "cc/CCDamageTracker.h"
 #include "cc/CCDebugBorderDrawQuad.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerTreeHostCommon.h"
+#include "cc/CCPluginDrawQuad.h"
 #include "cc/CCProxy.h"
 #include "cc/CCRenderPass.h"
 #include "cc/CCRenderSurfaceDrawQuad.h"
 #include "cc/CCSolidColorDrawQuad.h"
 #include "cc/CCTileDrawQuad.h"
+#include "cc/CCVideoDrawQuad.h"
 #if USE(SKIA)
 #include "Extensions3D.h"
 #include "GrContext.h"
@@ -161,10 +163,6 @@ private:
 
 PassOwnPtr<LayerRendererChromium> LayerRendererChromium::create(CCLayerTreeHostImpl* owner, PassRefPtr<GraphicsContext3D> context)
 {
-#if USE(SKIA)
-    if (owner->settings().acceleratePainting && !contextSupportsAcceleratedPainting(context.get()))
-        return nullptr;
-#endif
     OwnPtr<LayerRendererChromium> layerRenderer(adoptPtr(new LayerRendererChromium(owner, context)));
     if (!layerRenderer->initialize())
         return nullptr;
@@ -189,8 +187,10 @@ bool LayerRendererChromium::initialize()
     if (!m_context->makeContextCurrent())
         return false;
 
-    if (settings().acceleratePainting)
+#if USE(SKIA)
+    if (settings().acceleratePainting && contextSupportsAcceleratedPainting(m_context.get()))
         m_capabilities.usingAcceleratedPainting = true;
+#endif
 
     WebCore::Extensions3D* extensions = m_context->getExtensions();
     m_capabilities.contextHasCachedFrontBuffer = extensions->supports("GL_CHROMIUM_front_buffer_cached");
@@ -422,8 +422,14 @@ void LayerRendererChromium::drawQuad(const CCDrawQuad* quad, const FloatRect& su
     case CCDrawQuad::TiledContent:
         drawTileQuad(quad->toTileDrawQuad());
         break;
-    case CCDrawQuad::CustomLayer:
-        drawCustomLayerQuad(quad->toCustomLayerDrawQuad());
+    case CCDrawQuad::CanvasContent:
+        drawCanvasQuad(quad->toCanvasDrawQuad());
+        break;
+    case CCDrawQuad::VideoContent:
+        drawVideoQuad(quad->toVideoDrawQuad());
+        break;
+    case CCDrawQuad::PluginContent:
+        drawPluginQuad(quad->toPluginDrawQuad());
         break;
     }
 }
@@ -536,7 +542,7 @@ static void findTileProgramUniforms(LayerRendererChromium* layerRenderer, const 
 
 void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
 {
-    const IntRect& tileRect = quad->quadRect();
+    const IntRect& tileRect = quad->quadVisibleRect();
 
     FloatRect clampRect(tileRect);
     // Clamp texture coordinates to avoid sampling outside the layer
@@ -552,7 +558,8 @@ void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
     clampRect.inflateY(-clampY);
     FloatSize clampOffset = clampRect.minXMinYCorner() - FloatRect(tileRect).minXMinYCorner();
 
-    FloatPoint textureOffset = quad->textureOffset() + clampOffset;
+    FloatPoint textureOffset = quad->textureOffset() + clampOffset +
+                               IntPoint(quad->quadVisibleRect().location() - quad->quadRect().location());
 
     // Map clamping rectangle to unit square.
     float vertexTexTranslateX = -clampRect.x() / clampRect.width();
@@ -615,13 +622,14 @@ void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
         CCLayerQuad::Edge topEdge(topLeft, topRight);
         CCLayerQuad::Edge rightEdge(topRight, bottomRight);
 
-        if (quad->topEdgeAA())
+        // Only apply anti-aliasing to edges not clipped during culling.
+        if (quad->topEdgeAA() && quad->quadVisibleRect().y() == quad->quadRect().y())
             topEdge = deviceLayerEdges.top();
-        if (quad->leftEdgeAA())
+        if (quad->leftEdgeAA() && quad->quadVisibleRect().x() == quad->quadRect().x())
             leftEdge = deviceLayerEdges.left();
-        if (quad->rightEdgeAA())
+        if (quad->rightEdgeAA() && quad->quadVisibleRect().maxX() == quad->quadRect().maxX())
             rightEdge = deviceLayerEdges.right();
-        if (quad->bottomEdgeAA())
+        if (quad->bottomEdgeAA() && quad->quadVisibleRect().maxY() == quad->quadRect().maxY())
             bottomEdge = deviceLayerEdges.bottom();
 
         float sign = FloatQuad(tileRect).isCounterclockwise() ? -1 : 1;
@@ -659,7 +667,38 @@ void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
     drawTexturedQuad(quad->quadTransform(), tileRect.width(), tileRect.height(), quad->opacity(), localQuad, uniforms.matrixLocation, uniforms.alphaLocation, uniforms.pointLocation);
 }
 
-void LayerRendererChromium::drawCustomLayerQuad(const CCCustomLayerDrawQuad* quad)
+void LayerRendererChromium::drawCanvasQuad(const CCCanvasDrawQuad* quad)
+{
+    ASSERT(CCProxy::isImplThread());
+    const CCCanvasLayerImpl::Program* program = canvasLayerProgram();
+    ASSERT(program && program->initialized());
+    GLC(context(), context()->activeTexture(GraphicsContext3D::TEXTURE0));
+    GLC(context(), context()->bindTexture(GraphicsContext3D::TEXTURE_2D, quad->textureId()));
+    GLC(context(), context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR));
+    GLC(context(), context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR));
+
+    if (quad->hasAlpha() && !quad->premultipliedAlpha())
+        GLC(context(), context()->blendFunc(GraphicsContext3D::SRC_ALPHA, GraphicsContext3D::ONE_MINUS_SRC_ALPHA));
+
+    const IntSize& bounds = quad->quadRect().size();
+
+    GLC(context(), context()->useProgram(program->program()));
+    GLC(context(), context()->uniform1i(program->fragmentShader().samplerLocation(), 0));
+    drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), sharedGeometryQuad(),
+                                    program->vertexShader().matrixLocation(),
+                                    program->fragmentShader().alphaLocation(),
+                                    -1);
+
+    GLC(m_context.get(), m_context->blendFunc(GraphicsContext3D::ONE, GraphicsContext3D::ONE_MINUS_SRC_ALPHA));
+}
+
+void LayerRendererChromium::drawVideoQuad(const CCVideoDrawQuad* quad)
+{
+    CCLayerImpl* layer = quad->layer();
+    layer->draw(this);
+}
+
+void LayerRendererChromium::drawPluginQuad(const CCPluginDrawQuad* quad)
 {
     CCLayerImpl* layer = quad->layer();
     layer->draw(this);

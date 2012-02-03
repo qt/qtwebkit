@@ -27,10 +27,9 @@
 #define WebKitURIResponsePrivate_h
 
 #include "WebKitURIResponse.h"
-#include <libsoup/soup.h>
+#include <WebCore/ResourceResponse.h>
 
-WebKitURIResponse* webkitURIResponseCreateForSoupMessage(SoupMessage*);
-SoupMessage* webkitURIResponseGetSoupMessage(WebKitURIResponse*);
-void webkitURIResponseSetContentLength(WebKitURIResponse*, guint64 contentLength);
+WebKitURIResponse* webkitURIResponseCreateForResourceResponse(const WebCore::ResourceResponse&);
+const WebCore::ResourceResponse& webkitURIResponseGetResourceResponse(WebKitURIResponse*);
 
 #endif // WebKitURIResponsePrivate_h

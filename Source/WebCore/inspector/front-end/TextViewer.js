@@ -86,6 +86,7 @@ WebInspector.TextViewer.prototype = {
         if (this._mainPanel.readOnly === readOnly)
             return;
         this._mainPanel.readOnly = readOnly;
+        WebInspector.markBeingEdited(this.element, !readOnly);
     },
 
     get readOnly()
@@ -330,6 +331,18 @@ WebInspector.TextViewer.prototype = {
             return false;
 
         return this._delegate.cancelEditing();
+    },
+
+    wasShown: function()
+    {
+        if (!this.readOnly)
+            WebInspector.markBeingEdited(this.element, true);
+    },
+
+    willHide: function()
+    {
+        if (!this.readOnly)
+            WebInspector.markBeingEdited(this.element, false);
     }
 }
 
@@ -930,7 +943,7 @@ WebInspector.TextEditorMainPanel.prototype = {
         var selection = window.getSelection();
         if (selection.rangeCount) {
             var commonAncestorContainer = selection.getRangeAt(0).commonAncestorContainer;
-            if (this._container === commonAncestorContainer || this._container.isAncestor(commonAncestorContainer))
+            if (this._container.isSelfOrAncestor(commonAncestorContainer))
                 return;
         }
 
@@ -1652,7 +1665,7 @@ WebInspector.TextEditorMainPanel.prototype = {
         if (!lineRow)
             return;
 
-        if (lineRow.decorationsElement && (lineRow.decorationsElement === target || lineRow.decorationsElement.isAncestor(target))) {
+        if (lineRow.decorationsElement && lineRow.decorationsElement.isSelfOrAncestor(target)) {
             if (this._syncDecorationsForLineListener)
                 this._syncDecorationsForLineListener(lineRow.lineNumber);
             return;

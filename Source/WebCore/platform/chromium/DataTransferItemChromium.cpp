@@ -38,6 +38,8 @@
 #include "ClipboardChromium.h"
 #include "ClipboardMimeTypes.h"
 #include "ClipboardUtilitiesChromium.h"
+#include "DataTransferItemListChromium.h"
+#include "File.h"
 #include "PlatformSupport.h"
 #include "SharedBuffer.h"
 #include "StringCallback.h"
@@ -47,7 +49,7 @@ namespace WebCore {
 PassRefPtr<DataTransferItemChromium> DataTransferItemChromium::createFromPasteboard(PassRefPtr<Clipboard> owner, ScriptExecutionContext* context, const String& type)
 {
     if (type == mimeTypeTextPlain || type == mimeTypeTextHTML)
-        return adoptRef(new DataTransferItemChromium(owner, context, PasteboardSource, DataTransferItem::kindString, type, ""));
+        return adoptRef(new DataTransferItemChromium(owner, context, PasteboardSource, DataTransferItem::kindString, type, String()));
     return adoptRef(new DataTransferItemChromium(owner, context, PasteboardSource, DataTransferItem::kindFile, type, ""));
 }
 
@@ -56,29 +58,42 @@ PassRefPtr<DataTransferItemChromium> DataTransferItemChromium::create(PassRefPtr
                                                                       const String& data,
                                                                       const String& type)
 {
-    return adoptRef(new DataTransferItemChromium(owner, context, InternalSource, DataTransferItem::kindString, type, data));
+    return adoptRef(new DataTransferItemChromium(owner, context, DataTransferItemChromium::InternalSource, kindString, type, data));
 }
 
-PassRefPtr<DataTransferItem> DataTransferItem::create(PassRefPtr<Clipboard> owner,
-                                                      ScriptExecutionContext* context,
-                                                      const String& data,
-                                                      const String& type)
+PassRefPtr<DataTransferItemChromium> DataTransferItemChromium::create(PassRefPtr<Clipboard> owner,
+                                                                      ScriptExecutionContext* context,
+                                                                      PassRefPtr<File> file)
 {
-    return DataTransferItemChromium::create(owner, context, data, type);
+    return adoptRef(new DataTransferItemChromium(owner, context, DataTransferItemChromium::InternalSource, file));
 }
 
 DataTransferItemChromium::DataTransferItemChromium(PassRefPtr<Clipboard> owner, ScriptExecutionContext* context, DataSource source, const String& kind, const String& type, const String& data)
-    : DataTransferItem(owner, kind, type)
-    , m_context(context)
+    : m_context(context)
+    , m_owner(owner)
+    , m_kind(kind)
+    , m_type(type)
     , m_source(source)
     , m_data(data)
 {
 }
 
-void DataTransferItemChromium::getAsString(PassRefPtr<StringCallback> callback)
+DataTransferItemChromium::DataTransferItemChromium(PassRefPtr<Clipboard> owner, ScriptExecutionContext* context, DataSource source, PassRefPtr<File> file)
+    : m_context(context)
+    , m_owner(owner)
+    , m_kind(kindFile)
+    , m_type(file.get() ? file->type() : String())
+    , m_source(source)
+    , m_file(file)
 {
-    if ((owner()->policy() != ClipboardReadable && owner()->policy() != ClipboardWritable)
-        || kind() != kindString)
+}
+
+void DataTransferItemChromium::getAsString(PassRefPtr<StringCallback> callback) const
+{
+    if (kind() != kindString)
+        return;
+
+    if (clipboardChromium()->storageHasUpdated())
         return;
 
     if (m_source == InternalSource) {
@@ -87,8 +102,6 @@ void DataTransferItemChromium::getAsString(PassRefPtr<StringCallback> callback)
     }
 
     ASSERT(m_source == PasteboardSource);
-    if (static_cast<ClipboardChromium*>(owner())->platformClipboardChanged())
-        return;
 
     // This is ugly but there's no real alternative.
     if (type() == mimeTypeTextPlain) {
@@ -106,13 +119,13 @@ void DataTransferItemChromium::getAsString(PassRefPtr<StringCallback> callback)
     ASSERT_NOT_REACHED();
 }
 
-PassRefPtr<Blob> DataTransferItemChromium::getAsFile()
+PassRefPtr<Blob> DataTransferItemChromium::getAsFile() const
 {
-    if (m_source == InternalSource)
+    if (kind() != kindFile || clipboardChromium()->storageHasUpdated())
         return 0;
 
-    if (static_cast<ClipboardChromium*>(owner())->platformClipboardChanged())
-        return 0;
+    if (m_source == InternalSource)
+        return m_file;
 
     ASSERT(m_source == PasteboardSource);
     if (type() == mimeTypeImagePng) {
@@ -134,6 +147,11 @@ PassRefPtr<Blob> DataTransferItemChromium::getAsFile()
         return Blob::create(blobData.release(), data->size());
     }
     return 0;
+}
+
+ClipboardChromium* DataTransferItemChromium::clipboardChromium() const
+{
+    return static_cast<ClipboardChromium*>(m_owner.get());
 }
 
 } // namespace WebCore

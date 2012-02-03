@@ -64,6 +64,7 @@ struct WebPageCreationParameters {
     WebCore::IntSize fixedLayoutSize;
 
     WebCore::Page::Pagination::Mode paginationMode;
+    bool paginationBehavesLikeColumns;
     double pageLength;
     double gapBetweenPages;
 
@@ -76,6 +77,8 @@ struct WebPageCreationParameters {
     bool canRunModal;
 
     float deviceScaleFactor;
+    
+    float mediaVolume;
 
 #if PLATFORM(MAC)
     bool isSmartInsertDeleteEnabled;

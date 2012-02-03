@@ -52,9 +52,6 @@
 
 namespace WebKit {
 class WebGeolocationClientMock;
-class WebSpeechInputController;
-class WebSpeechInputControllerMock;
-class WebSpeechInputListener;
 }
 
 namespace webkit_support {
@@ -380,6 +377,7 @@ public:
 
     // Speech input related functions.
     void addMockSpeechInputResult(const CppArgumentList&, CppVariant*);
+    void setMockSpeechInputDumpRect(const CppArgumentList&, CppVariant*);
     void startSpeechInput(const CppArgumentList&, CppVariant*);
 
     void layerTreeAsText(const CppArgumentList& args, CppVariant* result);
@@ -430,11 +428,18 @@ public:
     void enableFixedLayoutMode(const CppArgumentList&, CppVariant*);
     void setFixedLayoutSize(const CppArgumentList&, CppVariant*);
 
+#if ENABLE(POINTER_LOCK)
+    void didLosePointerLock(const CppArgumentList&, CppVariant*);
+    void setPointerLockWillFailSynchronously(const CppArgumentList&, CppVariant*);
+    void setPointerLockWillFailAsynchronously(const CppArgumentList&, CppVariant*);
+#endif
+
+    void workerThreadCount(CppVariant*);
+
 public:
     // The following methods are not exposed to JavaScript.
     void setWorkQueueFrozen(bool frozen) { m_workQueue.setFrozen(frozen); }
 
-    WebKit::WebSpeechInputController* speechInputController(WebKit::WebSpeechInputListener*);
     bool shouldDumpAsAudio() const { return m_dumpAsAudio; } 
     void setShouldDumpAsAudio(bool dumpAsAudio) { m_dumpAsAudio = dumpAsAudio; } 
     bool shouldDumpAsText() { return m_dumpAsText; }
@@ -690,8 +695,6 @@ private:
     CppVariant m_interceptPostMessage;
 
     WebKit::WebURL m_userStyleSheetLocation;
-
-    OwnPtr<WebKit::WebSpeechInputControllerMock> m_speechInputControllerMock;
 
     // WAV audio data is stored here.
     WebKit::WebArrayBufferView m_audioData;

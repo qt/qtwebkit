@@ -55,6 +55,7 @@ PassOwnPtr<TiledCoreAnimationDrawingArea> TiledCoreAnimationDrawingArea::create(
 
 TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea(WebPage* webPage, const WebPageCreationParameters& parameters)
     : DrawingArea(DrawingAreaTypeTiledCoreAnimation, webPage)
+    , m_layerTreeStateIsFrozen(false)
     , m_layerFlushScheduler(this)
 {
     Page* page = webPage->corePage();
@@ -103,33 +104,57 @@ void TiledCoreAnimationDrawingArea::scroll(const IntRect& scrollRect, const IntS
 
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(GraphicsLayer* graphicsLayer)
 {
-    if (!graphicsLayer) {
-        m_rootLayer.get().sublayers = nil;
+    CALayer *rootCompositingLayer = graphicsLayer ? graphicsLayer->platformLayer() : nil;
+
+    if (m_layerTreeStateIsFrozen) {
+        m_pendingRootCompositingLayer = rootCompositingLayer;
         return;
     }
 
-    m_rootLayer.get().sublayers = [NSArray arrayWithObject:graphicsLayer->platformLayer()];
+    setRootCompositingLayer(rootCompositingLayer);
+}
+
+void TiledCoreAnimationDrawingArea::setLayerTreeStateIsFrozen(bool layerTreeStateIsFrozen)
+{
+    if (m_layerTreeStateIsFrozen == layerTreeStateIsFrozen)
+        return;
+
+    m_layerTreeStateIsFrozen = layerTreeStateIsFrozen;
+    if (m_layerTreeStateIsFrozen)
+        m_layerFlushScheduler.suspend();
+    else
+        m_layerFlushScheduler.resume();
+}
+
+bool TiledCoreAnimationDrawingArea::layerTreeStateIsFrozen() const
+{
+    return m_layerTreeStateIsFrozen;
 }
 
 void TiledCoreAnimationDrawingArea::scheduleCompositingLayerSync()
 {
     m_layerFlushScheduler.schedule();
-    // FIXME: Implement
 }
 
 bool TiledCoreAnimationDrawingArea::flushLayers()
 {
+    ASSERT(!m_layerTreeStateIsFrozen);
+
     // This gets called outside of the normal event loop so wrap in an autorelease pool
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
     m_webPage->layoutIfNeeded();
+
+    if (m_pendingRootCompositingLayer) {
+        setRootCompositingLayer(m_pendingRootCompositingLayer.get());
+        m_pendingRootCompositingLayer = nullptr;
+    }
 
     bool returnValue = m_webPage->corePage()->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 
     [pool drain];
     return returnValue;
 }
-
 
 void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
 {
@@ -147,6 +172,21 @@ void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
     [CATransaction synchronize];
 
     m_webPage->send(Messages::DrawingAreaProxy::DidUpdateGeometry());
+}
+
+void TiledCoreAnimationDrawingArea::setRootCompositingLayer(CALayer *layer)
+{
+    ASSERT(!m_layerTreeStateIsFrozen);
+
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+
+    if (!layer)
+        m_rootLayer.get().sublayers = nil;
+    else
+        m_rootLayer.get().sublayers = [NSArray arrayWithObject:layer];
+
+    [CATransaction commit];
 }
 
 } // namespace WebKit

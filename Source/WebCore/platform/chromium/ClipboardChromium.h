@@ -38,22 +38,23 @@ namespace WebCore {
 
     class CachedImage;
     class ChromiumDataObject;
+    class DataTransferItem;
+    class DataTransferItemListChromium;
     class Frame;
     class IntPoint;
 
     class ClipboardChromium : public Clipboard, public CachedImageClient {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        ~ClipboardChromium() {}
+        ~ClipboardChromium();
 
         static PassRefPtr<ClipboardChromium> create(
             ClipboardType, PassRefPtr<ChromiumDataObject>, ClipboardAccessPolicy, Frame*);
 
-        // Returns the file name (not including the extension). This removes any
-        // invalid file system characters as well as making sure the
-        // path + extension is not bigger than allowed by the file system.
-        // This may change the file extension in dataObject.
-        static String validateFileName(const String& title, ChromiumDataObject* dataObject);
+        // Validates a filename (without the extension) and the extension. This removes any invalid
+        // file system characters as well as making sure the path + extension is not bigger than
+        // allowed by the file system.
+        static void validateFilename(String& name, String& extension);
 
         virtual void clearData(const String& type);
         void clearAllData();
@@ -83,6 +84,10 @@ namespace WebCore {
 
 #if ENABLE(DATA_TRANSFER_ITEMS)
         virtual PassRefPtr<DataTransferItemList> items();
+
+        // Internal routines to keep the list returned by items() (i.e. m_itemList) synchronized with the content of the clipboard data.
+        void mayUpdateItems(Vector<RefPtr<DataTransferItem> >& items);
+        bool storageHasUpdated() const;
 #endif
 
     private:
@@ -93,7 +98,12 @@ namespace WebCore {
         RefPtr<ChromiumDataObject> m_dataObject;
         Frame* m_frame;
 
+#if ENABLE(DATA_TRANSFER_ITEMS)
+        RefPtr<DataTransferItemListChromium> m_itemList;
+#endif
+
         uint64_t m_originalSequenceNumber;
+        bool m_dragStorageUpdated;
     };
 
 } // namespace WebCore

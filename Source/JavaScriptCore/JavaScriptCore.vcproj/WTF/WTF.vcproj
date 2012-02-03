@@ -693,6 +693,10 @@
 			>
 		</File>
 		<File
+			RelativePath="..\..\wtf\CheckedBoolean.h"
+			>
+		</File>
+		<File
 			RelativePath="..\..\wtf\Compiler.h"
 			>
 		</File>
@@ -946,6 +950,14 @@
 		</File>
 		<File
 			RelativePath="..\..\wtf\NullPtr.h"
+			>
+		</File>
+		<File
+			RelativePath="..\..\wtf\NumberOfCores.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\..\wtf\NumberOfCores.h"
 			>
 		</File>
 		<File

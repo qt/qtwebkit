@@ -33,12 +33,7 @@
 
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
-
-#ifdef __OBJC__
-@class NSMenuItem;
-#else
-class NSMenuItem;
-#endif
+OBJC_CLASS NSMenuItem;
 #elif PLATFORM(WIN)
 typedef struct tagMENUITEMINFOW MENUITEMINFO;
 #elif PLATFORM(GTK)
@@ -64,7 +59,7 @@ namespace WebCore {
         ContextMenuItemTagOpenImageInNewWindow,
         ContextMenuItemTagDownloadImageToDisk,
         ContextMenuItemTagCopyImageToClipboard,
-#if PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
         ContextMenuItemTagCopyImageUrlToClipboard,
 #endif
         ContextMenuItemTagOpenFrameInNewWindow,

@@ -59,16 +59,21 @@ public:
     ManagedTexture* managedTexture() { return m_texture->texture(); }
 
     bool isDirty() const { return !m_dirtyRect.isEmpty(); }
-    void clearDirty() { m_dirtyRect = IntRect(); }
+    void copyAndClearDirty()
+    {
+        m_updateRect = m_dirtyRect;
+        m_dirtyRect = IntRect();
+    }
 
     IntRect m_dirtyRect;
     IntRect m_updateRect;
+    IntRect m_opaqueRect;
 private:
     OwnPtr<LayerTextureUpdater::Texture> m_texture;
 };
 
-TiledLayerChromium::TiledLayerChromium(CCLayerDelegate* delegate)
-    : LayerChromium(delegate)
+TiledLayerChromium::TiledLayerChromium()
+    : LayerChromium()
     , m_textureFormat(GraphicsContext3D::INVALID_ENUM)
     , m_skipsDraw(false)
     , m_skipsIdlePaint(false)
@@ -150,13 +155,13 @@ void TiledLayerChromium::setBorderTexelOption(CCLayerTilingData::BorderTexelOpti
 
 bool TiledLayerChromium::drawsContent() const
 {
-    if (!LayerChromium::drawsContent() || !m_delegate)
+    if (!LayerChromium::drawsContent())
         return false;
 
     if (m_tilingOption == NeverTile && m_tiler->numTiles() > 1)
         return false;
 
-    return !m_skipsDraw;
+    return true;
 }
 
 bool TiledLayerChromium::needsContentsScale() const
@@ -173,9 +178,6 @@ void TiledLayerChromium::setLayerTreeHost(CCLayerTreeHost* host)
 {
     if (host == layerTreeHost())
         return;
-
-    if (layerTreeHost())
-        cleanupResources();
 
     LayerChromium::setLayerTreeHost(host);
 
@@ -236,7 +238,11 @@ void TiledLayerChromium::updateCompositorResources(GraphicsContext3D*, CCTexture
         }
     }
 
+    // The updateRect should be in layer space. So we have to convert the paintRect from content space to layer space.
     m_updateRect = FloatRect(m_paintRect);
+    float widthScale = bounds().width() / static_cast<float>(contentBounds().width());
+    float heightScale = bounds().height() / static_cast<float>(contentBounds().height());
+    m_updateRect.scale(widthScale, heightScale);
 }
 
 void TiledLayerChromium::setTilingOption(TilingOption tilingOption)
@@ -268,7 +274,7 @@ void TiledLayerChromium::pushPropertiesTo(CCLayerImpl* layer)
         if (tile->isDirty())
             continue;
 
-        tiledLayer->syncTextureId(i, j, tile->managedTexture()->textureId());
+        tiledLayer->pushTileProperties(i, j, tile->managedTexture()->textureId(), tile->m_opaqueRect);
     }
 }
 
@@ -366,7 +372,9 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
     }
 
     // Create tiles as needed, expanding a dirty rect to contain all
-    // the dirty regions currently being drawn.
+    // the dirty regions currently being drawn. All dirty tiles that are to be painted
+    // get their m_updateRect set to m_dirtyRect and m_dirtyRect cleared. This way if
+    // invalidateRect is invoked during prepareToUpdate we don't lose the request.
     IntRect dirtyLayerRect;
     for (int j = top; j <= bottom; ++j) {
         for (int i = left; i <= right; ++i) {
@@ -374,19 +382,28 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
             if (!tile)
                 tile = createTile(i, j);
 
+            // Do post commit deletion of current texture when partial texture
+            // updates are not used.
+            if (tile->isDirty() && layerTreeHost() && !layerTreeHost()->settings().partialTextureUpdates)
+                layerTreeHost()->deleteTextureAfterCommit(tile->managedTexture()->steal());
+
             if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat))
                 tile->m_dirtyRect = m_tiler->tileRect(tile);
 
             if (!tile->managedTexture()->reserve(m_tiler->tileSize(), m_textureFormat)) {
                 m_skipsIdlePaint = true;
                 if (!idle) {
-                    m_skipsDraw = true;
+                    // If the background covers the viewport, always draw this
+                    // layer so that checkerboarded tiles will still draw.
+                    if (!backgroundCoversViewport())
+                        m_skipsDraw = true;
                     cleanupResources();
                 }
                 return;
             }
 
             dirtyLayerRect.unite(tile->m_dirtyRect);
+            tile->copyAndClearDirty();
         }
     }
 
@@ -405,7 +422,8 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
     // However, we can't free the memory backing the GraphicsContext until the paint finishes,
     // so we grab a local reference here to hold the updater alive until the paint completes.
     RefPtr<LayerTextureUpdater> protector(textureUpdater());
-    textureUpdater()->prepareToUpdate(m_paintRect, m_tiler->tileSize(), m_tiler->hasBorderTexels(), contentsScale());
+    IntRect paintedOpaqueRect;
+    textureUpdater()->prepareToUpdate(m_paintRect, m_tiler->tileSize(), m_tiler->hasBorderTexels(), contentsScale(), &paintedOpaqueRect);
     for (int j = top; j <= bottom; ++j) {
         for (int i = left; i <= right; ++i) {
             UpdatableTile* tile = tileAt(i, j);
@@ -414,18 +432,26 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
             if (!tile)
                 CRASH();
 
-            if (!tile->isDirty())
+            IntRect tileRect = m_tiler->tileBounds(i, j);
+
+            // Save what was painted opaque in the tile. If everything painted in the tile was opaque, and the area is a subset of an
+            // already opaque area, keep the old area.
+            IntRect tilePaintedRect = intersection(tileRect, m_paintRect);
+            IntRect tilePaintedOpaqueRect = intersection(tileRect, paintedOpaqueRect);
+            if (tilePaintedOpaqueRect != tilePaintedRect || !tile->m_opaqueRect.contains(tilePaintedOpaqueRect))
+                tile->m_opaqueRect = tilePaintedOpaqueRect;
+
+            // Use m_updateRect as copyAndClearDirty above moved the existing dirty rect to m_updateRect.
+            const IntRect& dirtyRect = tile->m_updateRect;
+            if (dirtyRect.isEmpty())
                 continue;
 
+            // sourceRect starts as a full-sized tile with border texels included.
             IntRect sourceRect = m_tiler->tileRect(tile);
-            sourceRect.intersect(tile->m_dirtyRect);
+            sourceRect.intersect(dirtyRect);
             // Paint rect not guaranteed to line up on tile boundaries, so
             // make sure that sourceRect doesn't extend outside of it.
             sourceRect.intersect(m_paintRect);
-
-            // updateCompositorResources() uses m_updateRect to determine
-            // the tiles to update so we can clear the dirty rectangle here.
-            tile->clearDirty();
 
             tile->m_updateRect = sourceRect;
             if (sourceRect.isEmpty())
@@ -436,6 +462,60 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
     }
 }
 
+void TiledLayerChromium::reserveTextures()
+{
+    updateBounds();
+
+    const IntRect& layerRect = visibleLayerRect();
+    if (layerRect.isEmpty() || !m_tiler->numTiles())
+        return;
+
+    int left, top, right, bottom;
+    m_tiler->layerRectToTileIndices(layerRect, left, top, right, bottom);
+
+    for (int j = top; j <= bottom; ++j) {
+        for (int i = left; i <= right; ++i) {
+            UpdatableTile* tile = tileAt(i, j);
+            if (!tile)
+                tile = createTile(i, j);
+
+            if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat))
+                tile->m_dirtyRect = m_tiler->tileRect(tile);
+
+            if (!tile->managedTexture()->reserve(m_tiler->tileSize(), m_textureFormat))
+                return;
+        }
+    }
+}
+
+void TiledLayerChromium::addSelfToOccludedScreenSpace(Region& occludedScreenSpace)
+{
+    if (m_skipsDraw || drawOpacity() != 1 || !isPaintedAxisAlignedInScreen())
+        return;
+
+    if (opaque()) {
+        LayerChromium::addSelfToOccludedScreenSpace(occludedScreenSpace);
+        return;
+    }
+
+    IntRect visibleRect = visibleLayerRect();
+    TransformationMatrix contentTransform = contentToScreenSpaceTransform();
+
+    // FIXME: Create/Use a FloatRegion for the occludedScreenSpace, instead of a Region based on ints, to avoid this step and get better accuracy between layers in target space.
+    Region tileRegion;
+    int left, top, right, bottom;
+    m_tiler->layerRectToTileIndices(visibleLayerRect(), left, top, right, bottom);
+    for (int j = top; j <= bottom; ++j) {
+        for (int i = left; i <= right; ++i) {
+            UpdatableTile* tile = tileAt(i, j);
+            if (tile) {
+                IntRect visibleTileOpaqueRect = intersection(visibleRect, tile->m_opaqueRect);
+                FloatRect screenRect = contentTransform.mapRect(FloatRect(visibleTileOpaqueRect));
+                occludedScreenSpace.unite(enclosedIntRect(screenRect));
+            }
+        }
+    }
+}
 
 void TiledLayerChromium::prepareToUpdate(const IntRect& layerRect)
 {

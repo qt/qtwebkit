@@ -103,30 +103,30 @@ void FloatRect::unite(const FloatRect& other)
         return;
     }
 
-    float l = min(x(), other.x());
-    float t = min(y(), other.y());
-    float r = max(maxX(), other.maxX());
-    float b = max(maxY(), other.maxY());
+    uniteEvenIfEmpty(other);
+}
 
-    setLocationAndSizeFromEdges(l, t, r, b);
+void FloatRect::uniteEvenIfEmpty(const FloatRect& other)
+{
+    float minX = min(x(), other.x());
+    float minY = min(y(), other.y());
+    float maxX = max(this->maxX(), other.maxX());
+    float maxY = max(this->maxY(), other.maxY());
+
+    setLocationAndSizeFromEdges(minX, minY, maxX, maxY);
 }
 
 void FloatRect::uniteIfNonZero(const FloatRect& other)
 {
     // Handle empty special cases first.
-    if (!other.width() && !other.height())
+    if (other.isZero())
         return;
-    if (!width() && !height()) {
+    if (isZero()) {
         *this = other;
         return;
     }
 
-    float left = min(x(), other.x());
-    float top = min(y(), other.y());
-    float right = max(maxX(), other.maxX());
-    float bottom = max(maxY(), other.maxY());
-
-    setLocationAndSizeFromEdges(left, top, right, bottom);
+    uniteEvenIfEmpty(other);
 }
 
 void FloatRect::scale(float sx, float sy)
@@ -216,6 +216,19 @@ IntRect enclosingIntRect(const FloatRect& rect)
     
     return IntRect(clampToInteger(left), clampToInteger(top), 
                    clampToInteger(width), clampToInteger(height));
+}
+
+IntRect enclosedIntRect(const FloatRect& rect)
+{
+    int x = clampToInteger(ceilf(rect.x()));
+    int y = clampToInteger(ceilf(rect.y()));
+    float maxX = clampToInteger(floorf(rect.maxX()));
+    float maxY = clampToInteger(floorf(rect.maxY()));
+    // A rect of width 0 should not become a rect of width -1 due to ceil/floor.
+    int width = max(clampToInteger(maxX - x), 0);
+    int height = max(clampToInteger(maxY - y), 0);
+
+    return IntRect(x, y, width, height);
 }
 
 FloatRect mapRect(const FloatRect& r, const FloatRect& srcRect, const FloatRect& destRect)

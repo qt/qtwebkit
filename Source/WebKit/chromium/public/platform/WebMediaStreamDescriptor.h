@@ -42,14 +42,31 @@ class WebString;
 class WebMediaStreamDescriptor {
 public:
     WebMediaStreamDescriptor() { }
+    WebMediaStreamDescriptor(const WebMediaStreamDescriptor& other) { assign(other); }
     ~WebMediaStreamDescriptor() { reset(); }
 
+    WebMediaStreamDescriptor& operator=(const WebMediaStreamDescriptor& other)
+    {
+        assign(other);
+        return *this;
+    }
+
+    WEBKIT_EXPORT void assign(const WebMediaStreamDescriptor&);
+
+    // DEPRECATED
     WEBKIT_EXPORT void initialize(const WebString& label, const WebVector<WebMediaStreamSource>&);
+
+    WEBKIT_EXPORT void initialize(const WebString& label, const WebVector<WebMediaStreamSource>& audioSources, const WebVector<WebMediaStreamSource>& videoSources);
     WEBKIT_EXPORT void reset();
     bool isNull() const { return m_private.isNull(); }
 
     WEBKIT_EXPORT WebString label() const;
+
+    // DEPRECATED
     WEBKIT_EXPORT void sources(WebVector<WebMediaStreamSource>&) const;
+
+    WEBKIT_EXPORT void audioSources(WebVector<WebMediaStreamSource>&) const;
+    WEBKIT_EXPORT void videoSources(WebVector<WebMediaStreamSource>&) const;
 
 #if WEBKIT_IMPLEMENTATION
     WebMediaStreamDescriptor(const WTF::PassRefPtr<WebCore::MediaStreamDescriptor>&);

@@ -77,6 +77,7 @@ public:
     virtual void setJavaScriptCanAccessClipboard(bool);
     virtual void setXSSAuditorEnabled(bool);
     virtual void setDNSPrefetchingEnabled(bool);
+    virtual void setFixedElementsLayoutRelativeToFrame(bool);
     virtual void setLocalStorageEnabled(bool);
     virtual void setEditableLinkBehaviorNeverLive();
     virtual void setFrameFlatteningEnabled(bool);
@@ -106,11 +107,13 @@ public:
     virtual void setAcceleratedCompositingForCanvasEnabled(bool);
     virtual void setAcceleratedCompositingForAnimationEnabled(bool);
     virtual void setAccelerated2dCanvasEnabled(bool);
+    virtual void setDeferred2dCanvasEnabled(bool);
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool);
     virtual void setMinimumAccelerated2dCanvasSize(int);
     virtual void setAcceleratedFiltersEnabled(bool);
     virtual void setMemoryInfoEnabled(bool);
     virtual void setHyperlinkAuditingEnabled(bool);
+    virtual void setLayoutFallbackWidth(int);
     virtual void setAsynchronousSpellCheckingEnabled(bool);
     virtual void setUnifiedTextCheckerEnabled(bool);
     virtual void setCaretBrowsingEnabled(bool);

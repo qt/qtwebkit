@@ -25,7 +25,6 @@
 #include "APICast.h"
 #include "AXObjectCache.h"
 #include "AccessibilityObject.h"
-#include "AccessibilityObjectWrapperAtk.h"
 #include "AnimationController.h"
 #include "DOMWrapperWorld.h"
 #include "Document.h"
@@ -60,6 +59,7 @@
 #include "SecurityPolicy.h"
 #include "Settings.h"
 #include "TextIterator.h"
+#include "WebKitAccessibleWrapperAtk.h"
 #include "WebKitDOMRangePrivate.h"
 #include "WorkerThread.h"
 #include "webkitglobalsprivate.h"
@@ -484,7 +484,7 @@ AtkObject* DumpRenderTreeSupportGtk::getFocusedAccessibleElement(WebKitWebFrame*
     if (!wrapper)
         return 0;
 
-    return webkit_accessible_get_focused_element(WEBKIT_ACCESSIBLE(wrapper));
+    return webkitAccessibleGetFocusedElement(WEBKIT_ACCESSIBLE(wrapper));
 #else
     return 0;
 #endif
@@ -761,7 +761,7 @@ static void modifyAccessibilityValue(AtkObject* axObject, bool increment)
     if (!axObject || !WEBKIT_IS_ACCESSIBLE(axObject))
         return;
 
-    AccessibilityObject* coreObject = webkit_accessible_get_accessibility_object(WEBKIT_ACCESSIBLE(axObject));
+    AccessibilityObject* coreObject = webkitAccessibleGetAccessibilityObject(WEBKIT_ACCESSIBLE(axObject));
     if (!coreObject)
         return;
 
@@ -786,7 +786,7 @@ CString DumpRenderTreeSupportGtk::accessibilityHelpText(AtkObject* axObject)
     if (!axObject || !WEBKIT_IS_ACCESSIBLE(axObject))
         return CString();
 
-    AccessibilityObject* coreObject = webkit_accessible_get_accessibility_object(WEBKIT_ACCESSIBLE(axObject));
+    AccessibilityObject* coreObject = webkitAccessibleGetAccessibilityObject(WEBKIT_ACCESSIBLE(axObject));
     if (!coreObject)
         return CString();
 

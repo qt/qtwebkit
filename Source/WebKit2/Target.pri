@@ -12,7 +12,7 @@ load(features)
 include(WebKit2.pri)
 
 WEBKIT += wtf javascriptcore webcore
-QT += declarative
+QT += declarative quick widgets
 
 CONFIG += staticlib
 
@@ -31,7 +31,6 @@ HEADERS += \
     Platform/Logging.h \
     Platform/Module.h \
     Platform/PlatformProcessIdentifier.h \
-    Platform/RunLoop.h \
     Platform/SharedMemory.h \
     Platform/WorkQueue.h \
     PluginProcess/PluginControllerProxy.h \
@@ -348,6 +347,7 @@ HEADERS += \
     WebProcess/WebPage/DrawingAreaImpl.h \
     WebProcess/WebPage/EventDispatcher.h \
     WebProcess/WebPage/FindController.h \
+    WebProcess/WebPage/TapHighlightController.h \
     WebProcess/WebPage/PageOverlay.h \
     WebProcess/WebPage/WebContextMenu.h \
     WebProcess/WebPage/WebFrame.h \
@@ -373,10 +373,8 @@ SOURCES += \
     Platform/CoreIPC/DataReference.cpp \
     Platform/Logging.cpp \
     Platform/Module.cpp \
-    Platform/RunLoop.cpp \
     Platform/WorkQueue.cpp \
     Platform/qt/ModuleQt.cpp \
-    Platform/qt/RunLoopQt.cpp \
     PluginProcess/PluginControllerProxy.cpp \
     PluginProcess/PluginProcess.cpp \
     PluginProcess/WebProcessConnection.cpp \
@@ -510,6 +508,7 @@ SOURCES += \
     UIProcess/API/qt/qquickwebview.cpp \
     UIProcess/API/qt/qwebiconimageprovider.cpp \
     UIProcess/API/qt/qquicknetworkreply.cpp \
+    UIProcess/API/qt/qquicknetworkrequest.cpp \
     UIProcess/API/qt/qquickurlschemedelegate.cpp \
     UIProcess/API/qt/qwebpreferences.cpp \
     UIProcess/API/qt/qwebviewportinfo.cpp \
@@ -701,6 +700,7 @@ SOURCES += \
     WebProcess/WebPage/EncoderAdapter.cpp \
     WebProcess/WebPage/EventDispatcher.cpp \
     WebProcess/WebPage/FindController.cpp \
+    WebProcess/WebPage/TapHighlightController.cpp \
     WebProcess/WebPage/LayerTreeHost.cpp \
     WebProcess/WebPage/PageOverlay.cpp \
     WebProcess/WebPage/TiledBackingStoreRemoteTile.cpp \

@@ -595,6 +595,7 @@ void RenderLayerCompositor::addToOverlapMap(OverlapMap& overlapMap, RenderLayer*
     }
 
     LayoutRect clipRect = layer->backgroundClipRect(rootRenderLayer(), 0, true).rect(); // FIXME: Incorrect for CSS regions.
+    clipRect.scale(pageScaleFactor());
     clipRect.intersect(layerBounds);
     overlapMap.add(layer, clipRect);
 }
@@ -963,11 +964,10 @@ void RenderLayerCompositor::frameViewDidChangeSize()
         FrameView* frameView = m_renderView->frameView();
         m_clipLayer->setSize(frameView->visibleContentRect(false /* exclude scrollbars */).size());
 
-        LayoutPoint scrollPosition = frameView->scrollPosition();
-        m_scrollLayer->setPosition(FloatPoint(-scrollPosition.x(), -scrollPosition.y()));
+        frameViewDidScroll();
         updateOverflowControlsLayers();
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
         if (m_layerForOverhangAreas)
             m_layerForOverhangAreas->setSize(frameView->frameRect().size());
 #endif
@@ -979,8 +979,14 @@ void RenderLayerCompositor::frameViewDidChangeSize()
     }
 }
 
-void RenderLayerCompositor::frameViewDidScroll(const LayoutPoint& scrollPosition)
+void RenderLayerCompositor::frameViewDidScroll()
 {
+    FrameView* frameView = m_renderView->frameView();
+    LayoutPoint scrollPosition = frameView->scrollPosition();
+
+    if (RenderLayerBacking* backing = rootRenderLayer()->backing())
+        backing->graphicsLayer()->visibleRectChanged();
+
     if (m_scrollLayer)
         m_scrollLayer->setPosition(FloatPoint(-scrollPosition.x(), -scrollPosition.y()));
 }
@@ -1505,7 +1511,7 @@ bool RenderLayerCompositor::requiresCompositingForAnimation(RenderObject* render
 
 bool RenderLayerCompositor::requiresCompositingWhenDescendantsAreCompositing(RenderObject* renderer) const
 {
-    return renderer->hasTransform() || renderer->isTransparent() || renderer->hasMask() || renderer->hasReflection();
+    return renderer->hasTransform() || renderer->isTransparent() || renderer->hasMask() || renderer->hasReflection() || renderer->hasFilter();
 }
     
 bool RenderLayerCompositor::requiresCompositingForFullScreen(RenderObject* renderer) const
@@ -1582,6 +1588,10 @@ bool RenderLayerCompositor::needsContentsCompositingLayer(const RenderLayer* lay
 
 bool RenderLayerCompositor::requiresScrollLayer(RootLayerAttachment attachment) const
 {
+    // This applies when the application UI handles scrolling, in which case RenderLayerCompositor doesn't need to manage it.
+    if (m_renderView->frameView()->delegatesScrolling())
+        return false;
+
     // We need to handle our own scrolling if we're:
     return !m_renderView->frameView()->platformWidget() // viewless (i.e. non-Mac, or Mac in WebKit2)
         || attachment == RootLayerAttachedViaEnclosingFrame; // a composited frame on Mac
@@ -1623,6 +1633,22 @@ void RenderLayerCompositor::paintContents(const GraphicsLayer* graphicsLayer, Gr
     }
 }
 
+bool RenderLayerCompositor::showDebugBorders(const GraphicsLayer* layer) const
+{
+    if (layer == m_layerForHorizontalScrollbar || layer == m_layerForVerticalScrollbar || layer == m_layerForScrollCorner)
+        return m_showDebugBorders;
+
+    return false;
+}
+
+bool RenderLayerCompositor::showRepaintCounter(const GraphicsLayer* layer) const
+{
+    if (layer == m_layerForHorizontalScrollbar || layer == m_layerForVerticalScrollbar || layer == m_layerForScrollCorner)
+        return m_showDebugBorders;
+
+    return false;
+}
+
 float RenderLayerCompositor::deviceScaleFactor() const
 {
     Frame* frame = m_renderView->frameView()->frame();
@@ -1656,10 +1682,18 @@ bool RenderLayerCompositor::keepLayersPixelAligned() const
     return true;
 }
 
-static bool shouldCompositeOverflowControls(ScrollView* view)
+static bool shouldCompositeOverflowControls(FrameView* view)
 {
     if (view->platformWidget())
         return false;
+
+#if ENABLE(THREADED_SCROLLING)
+    if (Page* page = view->frame()->page()) {
+        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+            return scrollingCoordinator->coordinatesScrollingForFrameView(view);
+    }
+#endif
+
 #if !PLATFORM(CHROMIUM)
     if (!view->hasOverlayScrollbars())
         return false;
@@ -1669,33 +1703,47 @@ static bool shouldCompositeOverflowControls(ScrollView* view)
 
 bool RenderLayerCompositor::requiresHorizontalScrollbarLayer() const
 {
-    ScrollView* view = m_renderView->frameView();
+    FrameView* view = m_renderView->frameView();
     return shouldCompositeOverflowControls(view) && view->horizontalScrollbar();
 }
 
 bool RenderLayerCompositor::requiresVerticalScrollbarLayer() const
 {
-    ScrollView* view = m_renderView->frameView();
+    FrameView* view = m_renderView->frameView();
     return shouldCompositeOverflowControls(view) && view->verticalScrollbar();
 }
 
 bool RenderLayerCompositor::requiresScrollCornerLayer() const
 {
-    ScrollView* view = m_renderView->frameView();
+    FrameView* view = m_renderView->frameView();
     return shouldCompositeOverflowControls(view) && view->isScrollCornerVisible();
 }
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
 bool RenderLayerCompositor::requiresOverhangAreasLayer() const
 {
-    // Only if this is a top level frame (not iframe).
-    return !m_renderView->document()->ownerElement();
+    // We don't want a layer if this is a subframe.
+    if (m_renderView->document()->ownerElement())
+        return false;
+
+    // We do want a layer if we have a scrolling coordinator.
+#if ENABLE(THREADED_SCROLLING)
+    if (scrollingCoordinator())
+        return true;
+#endif
+
+    // Chromium always wants a layer.
+#if PLATFORM(CHROMIUM)
+    return true;
+#endif
+
+    return false;
 }
 #endif
 
 void RenderLayerCompositor::updateOverflowControlsLayers()
 {
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     if (requiresOverhangAreasLayer()) {
         if (!m_layerForOverhangAreas) {
             m_layerForOverhangAreas = GraphicsLayer::create(this);
@@ -1704,7 +1752,10 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
 #endif
             m_layerForOverhangAreas->setDrawsContent(false);
             m_layerForOverhangAreas->setSize(m_renderView->frameView()->frameRect().size());
-            m_overflowControlsHostLayer->addChild(m_layerForOverhangAreas.get());
+
+            // We want the overhang areas layer to be positioned below the frame contents,
+            // so insert it below the clip layer.
+            m_overflowControlsHostLayer->addChildBelow(m_layerForOverhangAreas.get(), m_clipLayer.get());
         }
     } else if (m_layerForOverhangAreas) {
         m_layerForOverhangAreas->removeFromParent();
@@ -1821,7 +1872,7 @@ void RenderLayerCompositor::ensureRootLayer()
             m_scrollLayer->addChild(m_rootContentLayer.get());
 
             frameViewDidChangeSize();
-            frameViewDidScroll(m_renderView->frameView()->scrollPosition());
+            frameViewDidScroll();
 
 #if ENABLE(THREADED_SCROLLING)
             if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
@@ -1850,7 +1901,7 @@ void RenderLayerCompositor::destroyRootLayer()
 
     detachRootLayer();
 
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     if (m_layerForOverhangAreas) {
         m_layerForOverhangAreas->removeFromParent();
         m_layerForOverhangAreas = nullptr;

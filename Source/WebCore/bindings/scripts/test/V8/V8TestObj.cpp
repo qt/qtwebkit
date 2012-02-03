@@ -330,22 +330,6 @@ static void reflectedURLAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8:
     return;
 }
 
-static v8::Handle<v8::Value> reflectedNonEmptyURLAttrAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
-{
-    INC_STATS("DOM.TestObj.reflectedNonEmptyURLAttr._get");
-    TestObj* imp = V8TestObj::toNative(info.Holder());
-    return v8String(imp->getNonEmptyURLAttribute(WebCore::HTMLNames::reflectednonemptyurlattrAttr));
-}
-
-static void reflectedNonEmptyURLAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
-{
-    INC_STATS("DOM.TestObj.reflectedNonEmptyURLAttr._set");
-    TestObj* imp = V8TestObj::toNative(info.Holder());
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK_VOID(V8Parameter<WithNullCheck>, v, value);
-    imp->setAttribute(WebCore::HTMLNames::reflectednonemptyurlattrAttr, v);
-    return;
-}
-
 static v8::Handle<v8::Value> reflectedStringAttrAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
     INC_STATS("DOM.TestObj.reflectedStringAttr._get");
@@ -407,22 +391,6 @@ static void reflectedCustomURLAttrAttrSetter(v8::Local<v8::String> name, v8::Loc
     TestObj* imp = V8TestObj::toNative(info.Holder());
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK_VOID(V8Parameter<WithNullCheck>, v, value);
     imp->setAttribute(WebCore::HTMLNames::customContentURLAttrAttr, v);
-    return;
-}
-
-static v8::Handle<v8::Value> reflectedCustomNonEmptyURLAttrAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
-{
-    INC_STATS("DOM.TestObj.reflectedCustomNonEmptyURLAttr._get");
-    TestObj* imp = V8TestObj::toNative(info.Holder());
-    return v8String(imp->getNonEmptyURLAttribute(WebCore::HTMLNames::customContentNonEmptyURLAttrAttr));
-}
-
-static void reflectedCustomNonEmptyURLAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
-{
-    INC_STATS("DOM.TestObj.reflectedCustomNonEmptyURLAttr._set");
-    TestObj* imp = V8TestObj::toNative(info.Holder());
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK_VOID(V8Parameter<WithNullCheck>, v, value);
-    imp->setAttribute(WebCore::HTMLNames::customContentNonEmptyURLAttrAttr, v);
     return;
 }
 
@@ -509,6 +477,118 @@ static void stringAttrWithSetterExceptionAttrSetter(v8::Local<v8::String> name, 
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK_VOID(V8Parameter<>, v, value);
     ExceptionCode ec = 0;
     imp->setStringAttrWithSetterException(v, ec);
+    if (UNLIKELY(ec))
+        V8Proxy::setDOMException(ec);
+    return;
+}
+
+static v8::Handle<v8::Value> withScriptStateAttributeAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptStateAttribute._get");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    ScriptState* state = ScriptState::current();
+    if (!state)
+        return v8::Undefined();
+    return v8::Integer::New(imp->withScriptStateAttribute(state));
+}
+
+static void withScriptStateAttributeAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptStateAttribute._set");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    int v = toInt32(value);
+    ScriptState* state = ScriptState::current();
+    if (!state)
+        return;
+    imp->setWithScriptStateAttribute(state, v);
+    if (state.hadException())
+        throwError(state.exception());
+    return;
+}
+
+static v8::Handle<v8::Value> withScriptExecutionContextAttributeAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptExecutionContextAttribute._get");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
+    if (!scriptContext)
+        return v8::Undefined();
+    return toV8(imp->withScriptExecutionContextAttribute(scriptContext));
+}
+
+static void withScriptExecutionContextAttributeAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptExecutionContextAttribute._set");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    TestObj* v = V8TestObj::HasInstance(value) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(value)) : 0;
+    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
+    if (!scriptContext)
+        return;
+    imp->setWithScriptExecutionContextAttribute(scriptContext, WTF::getPtr(v));
+    return;
+}
+
+static v8::Handle<v8::Value> withScriptStateAttributeRaisesAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptStateAttributeRaises._get");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    ExceptionCode ec = 0;
+    ScriptState* state = ScriptState::current();
+    if (!state)
+        return v8::Undefined();
+    RefPtr<TestObj> v = imp->withScriptStateAttributeRaises(state, ec);
+    if (UNLIKELY(ec)) {
+        V8Proxy::setDOMException(ec);
+        return v8::Handle<v8::Value>();
+    }
+    if (state.hadException())
+        return throwError(state.exception());
+    return toV8(v.release());
+}
+
+static void withScriptStateAttributeRaisesAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptStateAttributeRaises._set");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    TestObj* v = V8TestObj::HasInstance(value) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(value)) : 0;
+    ExceptionCode ec = 0;
+    ScriptState* state = ScriptState::current();
+    if (!state)
+        return;
+    imp->setWithScriptStateAttributeRaises(state, WTF::getPtr(v), ec);
+    if (UNLIKELY(ec))
+        V8Proxy::setDOMException(ec);
+    if (state.hadException())
+        throwError(state.exception());
+    return;
+}
+
+static v8::Handle<v8::Value> withScriptExecutionContextAttributeRaisesAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptExecutionContextAttributeRaises._get");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    ExceptionCode ec = 0;
+    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
+    if (!scriptContext)
+        return v8::Undefined();
+    RefPtr<TestObj> v = imp->withScriptExecutionContextAttributeRaises(scriptContext, ec);
+    if (UNLIKELY(ec)) {
+        V8Proxy::setDOMException(ec);
+        return v8::Handle<v8::Value>();
+    }
+    return toV8(v.release());
+}
+
+static void withScriptExecutionContextAttributeRaisesAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestObj.withScriptExecutionContextAttributeRaises._set");
+    TestObj* imp = V8TestObj::toNative(info.Holder());
+    TestObj* v = V8TestObj::HasInstance(value) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(value)) : 0;
+    ExceptionCode ec = 0;
+    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
+    if (!scriptContext)
+        return;
+    imp->setWithScriptExecutionContextAttributeRaises(scriptContext, WTF::getPtr(v), ec);
     if (UNLIKELY(ec))
         V8Proxy::setDOMException(ec);
     return;
@@ -1500,8 +1580,6 @@ static const BatchedAttribute TestObjAttrs[] = {
     {"reflectedBooleanAttr", TestObjInternal::reflectedBooleanAttrAttrGetter, TestObjInternal::reflectedBooleanAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'reflectedURLAttr' (Type: 'attribute' ExtAttr: 'URL Reflect')
     {"reflectedURLAttr", TestObjInternal::reflectedURLAttrAttrGetter, TestObjInternal::reflectedURLAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'reflectedNonEmptyURLAttr' (Type: 'attribute' ExtAttr: 'URL NonEmpty Reflect')
-    {"reflectedNonEmptyURLAttr", TestObjInternal::reflectedNonEmptyURLAttrAttrGetter, TestObjInternal::reflectedNonEmptyURLAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'reflectedStringAttr' (Type: 'attribute' ExtAttr: 'Reflect')
     {"reflectedStringAttr", TestObjInternal::reflectedStringAttrAttrGetter, TestObjInternal::reflectedStringAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'reflectedCustomIntegralAttr' (Type: 'attribute' ExtAttr: 'Reflect')
@@ -1510,8 +1588,6 @@ static const BatchedAttribute TestObjAttrs[] = {
     {"reflectedCustomBooleanAttr", TestObjInternal::reflectedCustomBooleanAttrAttrGetter, TestObjInternal::reflectedCustomBooleanAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'reflectedCustomURLAttr' (Type: 'attribute' ExtAttr: 'URL Reflect')
     {"reflectedCustomURLAttr", TestObjInternal::reflectedCustomURLAttrAttrGetter, TestObjInternal::reflectedCustomURLAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'reflectedCustomNonEmptyURLAttr' (Type: 'attribute' ExtAttr: 'URL NonEmpty Reflect')
-    {"reflectedCustomNonEmptyURLAttr", TestObjInternal::reflectedCustomNonEmptyURLAttrAttrGetter, TestObjInternal::reflectedCustomNonEmptyURLAttrAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'attrWithGetterException' (Type: 'attribute' ExtAttr: '')
     {"attrWithGetterException", TestObjInternal::attrWithGetterExceptionAttrGetter, TestObjInternal::attrWithGetterExceptionAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'attrWithSetterException' (Type: 'attribute' ExtAttr: '')
@@ -1522,6 +1598,14 @@ static const BatchedAttribute TestObjAttrs[] = {
     {"stringAttrWithSetterException", TestObjInternal::stringAttrWithSetterExceptionAttrGetter, TestObjInternal::stringAttrWithSetterExceptionAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'customAttr' (Type: 'attribute' ExtAttr: 'Custom')
     {"customAttr", V8TestObj::customAttrAccessorGetter, V8TestObj::customAttrAccessorSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'withScriptStateAttribute' (Type: 'attribute' ExtAttr: 'CallWith')
+    {"withScriptStateAttribute", TestObjInternal::withScriptStateAttributeAttrGetter, TestObjInternal::withScriptStateAttributeAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'withScriptExecutionContextAttribute' (Type: 'attribute' ExtAttr: 'CallWith')
+    {"withScriptExecutionContextAttribute", TestObjInternal::withScriptExecutionContextAttributeAttrGetter, TestObjInternal::withScriptExecutionContextAttributeAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'withScriptStateAttributeRaises' (Type: 'attribute' ExtAttr: 'CallWith')
+    {"withScriptStateAttributeRaises", TestObjInternal::withScriptStateAttributeRaisesAttrGetter, TestObjInternal::withScriptStateAttributeRaisesAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'withScriptExecutionContextAttributeRaises' (Type: 'attribute' ExtAttr: 'CallWith')
+    {"withScriptExecutionContextAttributeRaises", TestObjInternal::withScriptExecutionContextAttributeRaisesAttrGetter, TestObjInternal::withScriptExecutionContextAttributeRaisesAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'scriptStringAttr' (Type: 'readonly attribute' ExtAttr: 'ConvertScriptString')
     {"scriptStringAttr", TestObjInternal::scriptStringAttrAttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #if ENABLE(Condition1)
@@ -1556,7 +1640,7 @@ static const BatchedAttribute TestObjAttrs[] = {
     {"floatArray", TestObjInternal::floatArrayAttrGetter, TestObjInternal::floatArrayAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'doubleArray' (Type: 'attribute' ExtAttr: '')
     {"doubleArray", TestObjInternal::doubleArrayAttrGetter, TestObjInternal::doubleArrayAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'contentDocument' (Type: 'readonly attribute' ExtAttr: 'CheckFrameSecurity')
+    // Attribute 'contentDocument' (Type: 'readonly attribute' ExtAttr: 'CheckAccessToNode')
     {"contentDocument", TestObjInternal::contentDocumentAttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'mutablePoint' (Type: 'attribute' ExtAttr: '')
     {"mutablePoint", TestObjInternal::mutablePointAttrGetter, TestObjInternal::mutablePointAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},

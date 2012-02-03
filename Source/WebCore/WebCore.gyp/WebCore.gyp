@@ -30,6 +30,7 @@
 
 {
   'includes': [
+    '../../WebKit/chromium/WinPrecompile.gypi',
     # FIXME: Sense whether upstream or downstream build, and
     # include the right features.gypi
     '../../WebKit/chromium/features.gypi',
@@ -52,6 +53,7 @@
       '../..',
       '../Modules/gamepad',
       '../Modules/intents',
+      '../Modules/indexeddb',
       '../accessibility',
       '../accessibility/chromium',
       '../bindings',
@@ -376,6 +378,8 @@
             '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendDispatcher.h',
             '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorFrontend.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorFrontend.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorTypeBuilder.cpp',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorTypeBuilder.h',
             '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendStub.js',
           ],
           'variables': {
@@ -387,7 +391,6 @@
             '<@(_inputs)',
             '--output_h_dir', '<(SHARED_INTERMEDIATE_DIR)/webkit',
             '--output_cpp_dir', '<(SHARED_INTERMEDIATE_DIR)/webcore',
-            '--defines', '<(feature_defines) LANGUAGE_JAVASCRIPT',
           ],
           'message': 'Generating Inspector protocol sources from Inspector.json',
         },
@@ -909,23 +912,6 @@
           ],
         },
         {
-          'action_name': 'tokenizer',
-          'inputs': [
-            '../css/maketokenizer',
-            '../css/tokenizer.flex',
-          ],
-          'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/tokenizer.cpp',
-          ],
-          'action': [
-            'python',
-            'scripts/action_maketokenizer.py',
-            '<@(_outputs)',
-            '--',
-            '<@(_inputs)'
-          ],
-        },
-        {
           'action_name': 'derived_sources_all_in_one',
           'inputs': [
             'scripts/action_derivedsourcesallinone.py',
@@ -1127,6 +1113,7 @@
         # Additional .cpp files from the webcore_inspector_sources list.
         '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorFrontend.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendDispatcher.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorTypeBuilder.cpp',
       ],
       'conditions': [
         ['inside_chromium_build==1 and OS=="win" and component=="shared_library"', {
@@ -1147,9 +1134,6 @@
           ],
         }],
         ['OS=="win"', {
-          'dependencies': [
-            '<(chromium_src_dir)/build/win/system.gyp:cygwin'
-          ],
           'defines': [
             'WEBCORE_NAVIGATOR_PLATFORM="Win32"',
             '__PRETTY_FUNCTION__=__FUNCTION__',
@@ -1352,12 +1336,6 @@
           },
         }],
         ['OS=="win"', {
-          'dependencies': [
-            '<(chromium_src_dir)/build/win/system.gyp:cygwin'
-          ],
-          'export_dependent_settings': [
-            '<(chromium_src_dir)/build/win/system.gyp:cygwin'
-          ],
           'direct_dependent_settings': {
             'defines': [
               # Match Safari and Mozilla on Windows.
@@ -1374,6 +1352,7 @@
           'direct_dependent_settings': {
             'include_dirs': [
               '<(chromium_src_dir)/third_party/ffmpeg/patched-ffmpeg',
+              '<(chromium_src_dir)/third_party/ffmpeg',
             ],
           },
           'dependencies': [
@@ -1493,7 +1472,7 @@
             ['include', 'platform/graphics/harfbuzz/FontHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/SimpleFontDataSkia\\.cpp$'],
+            ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
           ],
         }, { # use_x11==0
           'sources/': [
@@ -1660,6 +1639,7 @@
             ['exclude', 'platform/graphics/mac/FontMac\\.mm$'],
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
+            ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
             ['exclude', 'platform/chromium/DragImageChromiumMac\\.cpp$'],
           ],
         }],
@@ -1691,6 +1671,7 @@
             # platform/graphics/chromium, included by regex above, instead.
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
+            ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
 
             # SystemInfo.cpp is useful and we don't want to copy it.
             ['include', 'platform/win/SystemInfo\\.cpp$'],
@@ -1707,7 +1688,7 @@
             ['include', 'platform/graphics/harfbuzz/FontHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/SimpleFontDataSkia\\.cpp$'],
+            ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
           ],
         }, { # OS!="android"
           'sources/': [
@@ -2030,6 +2011,8 @@
         '<@(webcore_test_support_files)',
         '<(SHARED_INTERMEDIATE_DIR)/webcore/bindings/V8Internals.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings/V8Internals.h',
+        '<(SHARED_INTERMEDIATE_DIR)/webcore/bindings/V8InternalSettings.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings/V8InternalSettings.h',
       ],
       'sources/': [
         ['exclude', 'testing/js'],

@@ -102,6 +102,11 @@ def interpret_test_failures(port, test_name, failures):
     return test_dict
 
 
+def use_trac_links_in_results_html(port_obj):
+    # We only use trac links on the buildbots.
+    # Use existence of builder_name as a proxy for knowing we're on a bot.
+    return port_obj.get_option("builder_name")
+
 # FIXME: This should be on the Manager class (since that's the only caller)
 # or split off from Manager onto another helper class, but should not be a free function.
 # Most likely this should be made into its own class, and this super-long function
@@ -228,7 +233,10 @@ def summarize_results(port_obj, expectations, result_summary, retry_summary, tes
     results['has_wdiff'] = port_obj.wdiff_available()
     results['has_pretty_patch'] = port_obj.pretty_patch_available()
     try:
-        results['revision'] = port_obj.host.scm().head_svn_revision()
+        # We only use the svn revision for using trac links in the results.html file,
+        # Don't do this by default since it takes >100ms.
+        if use_trac_links_in_results_html(port_obj):
+            results['revision'] = port_obj.host.scm().head_svn_revision()
     except Exception, e:
         _log.warn("Failed to determine svn revision for checkout (cwd: %s, webkit_base: %s), leaving 'revision' key blank in full_results.json.\n%s" % (port_obj._filesystem.getcwd(), port_obj.path_from_webkit_base(), e))
         # Handle cases where we're running outside of version control.
@@ -346,32 +354,6 @@ class Manager(object):
         if path.startswith(self.LAYOUT_TESTS_DIRECTORY + self._filesystem.sep):
             return path[len(self.LAYOUT_TESTS_DIRECTORY + self._filesystem.sep):]
         return path
-
-    def lint(self):
-        lint_failed = False
-        for test_configuration in self._port.all_test_configurations():
-            try:
-                self.lint_expectations(test_configuration)
-            except test_expectations.ParseError:
-                lint_failed = True
-                self._printer.write("")
-
-        if lint_failed:
-            _log.error("Lint failed.")
-            return -1
-
-        _log.info("Lint succeeded.")
-        return 0
-
-    def lint_expectations(self, config):
-        port = self._port
-        test_expectations.TestExpectations(
-            port,
-            None,
-            port.test_expectations(),
-            config,
-            self._options.lint_test_files,
-            port.test_expectations_overrides())
 
     def _is_http_test(self, test):
         return self.HTTP_SUBDIR in test or self.WEBSOCKET_SUBDIR in test
@@ -668,11 +650,17 @@ class Manager(object):
         # Put a ceiling on the number of locked shards, so that we
         # don't hammer the servers too badly.
 
-        # FIXME: For now, limit to one shard. After testing to make sure we
+        # FIXME: For now, limit to one shard or set it
+        # with the --max-locked-shards. After testing to make sure we
         # can handle multiple shards, we should probably do something like
         # limit this to no more than a quarter of all workers, e.g.:
         # return max(math.ceil(num_workers / 4.0), 1)
-        return 1
+        if self._options.max_locked_shards:
+            num_of_locked_shards = self._options.max_locked_shards
+        else:
+            num_of_locked_shards = 1
+
+        return num_of_locked_shards
 
     def _resize_shards(self, old_shards, max_new_shards, shard_name_prefix):
         """Takes a list of shards and redistributes the tests into no more
@@ -1018,7 +1006,7 @@ class Manager(object):
         if result.type == test_expectations.SKIP:
             result_summary.add(result, expected=True)
         else:
-            expected = self._expectations.matches_an_expected_result(result.test_name, result.type, self._options.pixel_tests)
+            expected = self._expectations.matches_an_expected_result(result.test_name, result.type, self._options.pixel_tests or test_failures.is_reftest_failure(result.failures))
             result_summary.add(result, expected)
             exp_str = self._expectations.get_expectations_string(result.test_name)
             got_str = self._expectations.expectation_to_string(result.type)

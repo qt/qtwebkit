@@ -356,6 +356,7 @@ static WebCacheModel cacheModelForMainBundle(void)
         [NSNumber numberWithBool:NO],   WebKitDOMPasteAllowedPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitUsesPageCachePreferenceKey,
         [NSNumber numberWithInt:cacheModelForMainBundle()], WebKitCacheModelPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitPageCacheSupportsPluginsPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitDeveloperExtrasEnabledPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitAuthorAndUserStylesEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitApplicationChromeModeEnabledPreferenceKey,
@@ -366,6 +367,8 @@ static WebCacheModel cacheModelForMainBundle(void)
         [NSNumber numberWithBool:NO],   WebKitJavaScriptCanAccessClipboardPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitXSSAuditorEnabledPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitAcceleratedCompositingEnabledPreferenceKey,
+        // CSS Shaders also need WebGL enabled (which is disabled by default), so we can keep it enabled for now.
+        [NSNumber numberWithBool:YES], WebKitCSSCustomFilterEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitAcceleratedDrawingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitCanvasUsesAcceleratedDrawingPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShowDebugBordersPreferenceKey,
@@ -1320,6 +1323,16 @@ static NSString *classIBCreatorID = nil;
 - (void)setAcceleratedCompositingEnabled:(BOOL)enabled
 {
     [self _setBoolValue:enabled forKey:WebKitAcceleratedCompositingEnabledPreferenceKey];
+}
+
+- (BOOL)cssCustomFilterEnabled
+{
+    return [self _boolValueForKey:WebKitCSSCustomFilterEnabledPreferenceKey];
+}
+
+- (void)setCSSCustomFilterEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitCSSCustomFilterEnabledPreferenceKey];
 }
 
 - (BOOL)showDebugBorders

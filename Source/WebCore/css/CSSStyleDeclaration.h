@@ -21,6 +21,7 @@
 #ifndef CSSStyleDeclaration_h
 #define CSSStyleDeclaration_h
 
+#include "CSSPropertyNames.h"
 #include "CSSRule.h"
 #include <wtf/Forward.h>
 
@@ -30,6 +31,7 @@ class CSSMutableStyleDeclaration;
 class CSSProperty;
 class CSSStyleSheet;
 class CSSValue;
+class StyledElement;
 
 typedef int ExceptionCode;
 
@@ -40,70 +42,61 @@ public:
 
     static bool isPropertyName(const String&);
 
-    CSSRule* parentRule() const { return m_parentRule; }
-    void clearParentRule() { m_parentRule = 0; }
+    CSSRule* parentRule() const { return m_isInlineStyleDeclaration ? 0 : m_parent.rule; }
+    void clearParentRule() { ASSERT(!m_isInlineStyleDeclaration); m_parent.rule = 0; }
+
+    StyledElement* parentElement() const { ASSERT(m_isInlineStyleDeclaration); return m_parent.element; }
+    void clearParentElement() { ASSERT(m_isInlineStyleDeclaration); m_parent.element = 0; }
 
     CSSStyleSheet* parentStyleSheet() const;
 
     virtual String cssText() const = 0;
     virtual void setCssText(const String&, ExceptionCode&) = 0;
-
-    unsigned length() const { return virtualLength(); }
-    virtual unsigned virtualLength() const = 0;
-    bool isEmpty() const { return !length(); }
+    virtual unsigned length() const = 0;
     virtual String item(unsigned index) const = 0;
+    virtual PassRefPtr<CSSValue> getPropertyCSSValue(const String& propertyName) = 0;
+    virtual String getPropertyValue(const String& propertyName) = 0;
+    virtual String getPropertyPriority(const String& propertyName) = 0;
+    virtual String getPropertyShorthand(const String& propertyName) = 0;
+    virtual bool isPropertyImplicit(const String& propertyName) = 0;
+    virtual void setProperty(const String& propertyName, const String& value, const String& priority, ExceptionCode&) = 0;
+    virtual String removeProperty(const String& propertyName, ExceptionCode&) = 0;
 
-    PassRefPtr<CSSValue> getPropertyCSSValue(const String& propertyName);
-    String getPropertyValue(const String& propertyName);
-    String getPropertyPriority(const String& propertyName);
-    String getPropertyShorthand(const String& propertyName);
-    bool isPropertyImplicit(const String& propertyName);
-
-    virtual PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const = 0;
-    virtual String getPropertyValue(int propertyID) const = 0;
-    virtual bool getPropertyPriority(int propertyID) const = 0;
-    virtual int getPropertyShorthand(int propertyID) const = 0;
-    virtual bool isPropertyImplicit(int propertyID) const = 0;
-
-    void setProperty(const String& propertyName, const String& value, const String& priority, ExceptionCode&);
-    String removeProperty(const String& propertyName, ExceptionCode&);
-    virtual void setProperty(int propertyId, const String& value, bool important, ExceptionCode&) = 0;
-    virtual String removeProperty(int propertyID, ExceptionCode&) = 0;
+    // CSSPropertyID versions of the CSSOM functions to support bindings and editing.
+    // Use the non-virtual methods in the concrete subclasses when possible.
+    virtual PassRefPtr<CSSValue> getPropertyCSSValueInternal(CSSPropertyID) = 0;
+    virtual String getPropertyValueInternal(CSSPropertyID) = 0;
+    virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&) = 0;
 
     virtual PassRefPtr<CSSMutableStyleDeclaration> copy() const = 0;
     virtual PassRefPtr<CSSMutableStyleDeclaration> makeMutable() = 0;
 
-    void diff(CSSMutableStyleDeclaration*) const;
-
-    PassRefPtr<CSSMutableStyleDeclaration> copyPropertiesInSet(const int* set, unsigned length) const;
+    virtual bool cssPropertyMatches(const CSSProperty*) const = 0;
 
 #ifndef NDEBUG
     void showStyle();
 #endif
 
-    bool isElementStyleDeclaration() const { return m_isElementStyleDeclaration; }
     bool isInlineStyleDeclaration() const { return m_isInlineStyleDeclaration; }
 
 protected:
     CSSStyleDeclaration(CSSRule* parentRule = 0);
-
-    virtual bool cssPropertyMatches(const CSSProperty*) const;
+    CSSStyleDeclaration(StyledElement* parentElement);
 
     // The bits in this section are only used by specific subclasses but kept here
     // to maximize struct packing.
 
     // CSSMutableStyleDeclaration bits:
     bool m_strictParsing : 1;
-#ifndef NDEBUG
-    unsigned m_iteratorCount : 4;
-#endif
-
-    // CSSElementStyleDeclaration bits:
-    bool m_isElementStyleDeclaration : 1;
     bool m_isInlineStyleDeclaration : 1;
 
 private:
-    CSSRule* m_parentRule;
+    union Parent {
+        Parent(CSSRule* rule) : rule(rule) { }
+        Parent(StyledElement* element) : element(element) { }
+        CSSRule* rule;
+        StyledElement* element;
+    } m_parent;
 };
 
 } // namespace WebCore

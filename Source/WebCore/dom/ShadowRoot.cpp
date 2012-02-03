@@ -26,19 +26,21 @@
 
 #include "config.h"
 #include "ShadowRoot.h"
-#include "Element.h"
 
+#include "ContentInclusionSelector.h"
 #include "Document.h"
+#include "Element.h"
+#include "HTMLContentElement.h"
 #include "NodeRareData.h"
-#include "ShadowContentElement.h"
-#include "ShadowInclusionSelector.h"
 #include "Text.h"
 
 namespace WebCore {
 
 ShadowRoot::ShadowRoot(Document* document)
-    : TreeScope(document, CreateShadowRoot)
+    : DocumentFragment(document, CreateShadowRoot)
+    , TreeScope(this)
     , m_applyAuthorSheets(false)
+    , m_needsRecalculateContent(false)
 {
     ASSERT(document);
     
@@ -51,6 +53,23 @@ ShadowRoot::ShadowRoot(Document* document)
 
 ShadowRoot::~ShadowRoot()
 {
+    // We must call clearRareData() here since a ShadowRoot class inherits TreeScope
+    // as well as Node. See a comment on TreeScope.h for the reason.
+    if (hasRareData())
+        clearRareData();
+}
+
+PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ExceptionCode& ec)
+{
+    if (!element || element->shadowRoot()) {
+        ec = HIERARCHY_REQUEST_ERR;
+        return 0;
+    }
+    RefPtr<ShadowRoot> shadowRoot = create(element->document());
+    element->setShadowRoot(shadowRoot, ec);
+    if (ec)
+        return 0;
+    return shadowRoot.release();
 }
 
 String ShadowRoot::nodeName() const
@@ -86,8 +105,8 @@ bool ShadowRoot::childTypeAllowed(NodeType type) const
 
 void ShadowRoot::recalcShadowTreeStyle(StyleChange change)
 {
-    if (hasContentElement())
-        reattach();
+    if (needsReattachHostChildrenAndShadow())
+        reattachHostChildrenAndShadow();
     else {
         for (Node* n = firstChild(); n; n = n->nextSibling()) {
             if (n->isElementNode())
@@ -97,11 +116,19 @@ void ShadowRoot::recalcShadowTreeStyle(StyleChange change)
         }
     }
 
+    clearNeedsReattachHostChildrenAndShadow();
     clearNeedsStyleRecalc();
     clearChildNeedsStyleRecalc();
 }
 
-ShadowContentElement* ShadowRoot::includerFor(Node* node) const
+void ShadowRoot::setNeedsReattachHostChildrenAndShadow()
+{
+    m_needsRecalculateContent = true;
+    if (shadowHost())
+        shadowHost()->setNeedsStyleRecalc();
+}
+
+HTMLContentElement* ShadowRoot::includerFor(Node* node) const
 {
     if (!m_inclusions)
         return 0;
@@ -150,20 +177,39 @@ void ShadowRoot::attach()
     // ensureInclusions(), and here we just ensure that
     // it is in clean state.
     ASSERT(!m_inclusions || !m_inclusions->hasCandidates());
-    TreeScope::attach();
+    DocumentFragment::attach();
     if (m_inclusions)
         m_inclusions->didSelect();
 }
 
-ShadowInclusionSelector* ShadowRoot::inclusions() const
+void ShadowRoot::reattachHostChildrenAndShadow()
+{
+    Node* hostNode = host();
+    if (!hostNode)
+        return;
+
+    for (Node* child = hostNode->firstChild(); child; child = child->nextSibling()) {
+        if (child->attached())
+            child->detach();
+    }
+
+    reattach();
+
+    for (Node* child = hostNode->firstChild(); child; child = child->nextSibling()) {
+        if (!child->attached())
+            child->attach();
+    }
+}
+
+ContentInclusionSelector* ShadowRoot::inclusions() const
 {
     return m_inclusions.get();
 }
 
-ShadowInclusionSelector* ShadowRoot::ensureInclusions()
+ContentInclusionSelector* ShadowRoot::ensureInclusions()
 {
     if (!m_inclusions)
-        m_inclusions = adoptPtr(new ShadowInclusionSelector());
+        m_inclusions = adoptPtr(new ContentInclusionSelector());
     m_inclusions->willSelectOver(this);
     return m_inclusions.get();
 }

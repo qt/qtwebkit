@@ -47,37 +47,26 @@
 #include "AccessibilityObjectWrapper.h"
 #endif
 
+#if PLATFORM(MAC)
+
 typedef struct _NSRange NSRange;
 
-#ifdef __OBJC__
-@class NSArray;
-@class NSAttributedString;
-@class NSData;
-@class NSMutableAttributedString;
-@class NSString;
-@class NSValue;
-@class NSView;
-@class WebAccessibilityObjectWrapper;
-#else
-class NSArray;
-class NSAttributedString;
-class NSData;
-class NSMutableAttributedString;
-class NSString;
-class NSValue;
-class NSView;
-#if PLATFORM(GTK)
+OBJC_CLASS NSArray;
+OBJC_CLASS NSAttributedString;
+OBJC_CLASS NSData;
+OBJC_CLASS NSMutableAttributedString;
+OBJC_CLASS NSString;
+OBJC_CLASS NSValue;
+OBJC_CLASS NSView;
+OBJC_CLASS WebAccessibilityObjectWrapper;
+
+typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
+
+#elif PLATFORM(GTK)
 typedef struct _AtkObject AtkObject;
 typedef struct _AtkObject AccessibilityObjectWrapper;
-#elif PLATFORM(MAC)
-class WebAccessibilityObjectWrapper;
 #else
 class AccessibilityObjectWrapper;
-#endif
-#endif
-
-#if PLATFORM(MAC)
-typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
 #endif
 
 namespace WebCore {
@@ -95,6 +84,7 @@ class Node;
 class Page;
 class RenderObject;
 class RenderListItem;
+class ScrollableArea;
 class VisibleSelection;
 class Widget;
 
@@ -574,6 +564,8 @@ public:
     virtual AccessibilityObject* activeDescendant() const { return 0; }    
     virtual void handleActiveDescendantChanged() { }
     virtual void handleAriaExpandedChanged() { }
+    bool isDescendantOfObject(const AccessibilityObject*) const;
+    bool isAncestorOfObject(const AccessibilityObject*) const;
     
     static AccessibilityRole ariaRoleToWebCoreRole(const String&);
     const AtomicString& getAttribute(const QualifiedName&) const;
@@ -653,7 +645,14 @@ public:
     
     // CSS3 Speech properties.
     virtual ESpeak speakProperty() const { return SpeakNormal; }
-    
+
+    // Make this object visible by scrolling as many nested scrollable views as needed.
+    virtual void scrollToMakeVisible() const;
+    // Same, but if the whole object can't be made visible, try for this subrect, in local coordinates.
+    virtual void scrollToMakeVisibleWithSubFocus(const IntRect&) const;
+    // Scroll this object to a given point in global coordinates of the top-level window.
+    virtual void scrollToGlobalPoint(const IntPoint&) const;
+
 #if HAVE(ACCESSIBILITY)
 #if PLATFORM(GTK)
     AccessibilityObjectWrapper* wrapper() const;
@@ -687,6 +686,10 @@ protected:
     mutable bool m_haveChildren;
     AccessibilityRole m_role;
     
+    // If this object itself scrolls, return its ScrollableArea.
+    virtual ScrollableArea* getScrollableAreaIfScrollable() const { return 0; }
+    virtual void scrollTo(const IntPoint&) const { }
+
     virtual bool isDetached() const { return true; }
     static bool isAccessibilityObjectSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);

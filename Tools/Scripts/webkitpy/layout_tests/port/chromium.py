@@ -58,8 +58,6 @@ _log = logging.getLogger(__name__)
 class ChromiumPort(Port):
     """Abstract base class for Chromium implementations of the Port class."""
 
-    port_name = "chromium"
-
     ALL_SYSTEMS = (
         ('leopard', 'x86'),
         ('snowleopard', 'x86'),
@@ -85,11 +83,19 @@ class ChromiumPort(Port):
         'linux': ['lucid'],
     }
 
-    def __init__(self, host, **kwargs):
-        Port.__init__(self, host, **kwargs)
+    @classmethod
+    def _chromium_base_dir(cls, filesystem):
+        module_path = filesystem.path_to_module(cls.__module__)
+        offset = module_path.find('third_party')
+        if offset == -1:
+            return filesystem.join(module_path[0:module_path.find('Tools')], 'Source', 'WebKit', 'chromium')
+        else:
+            return module_path[0:offset]
+
+    def __init__(self, host, port_name, **kwargs):
+        Port.__init__(self, host, port_name, **kwargs)
         # All sub-classes override this, but we need an initial value for testing.
-        self._version = 'xp'
-        self._chromium_base_dir = None
+        self._chromium_base_dir_path = None
 
     def _check_file_exists(self, path_to_file, file_description,
                            override_step=None, logging=True):
@@ -220,14 +226,9 @@ class ChromiumPort(Port):
     def path_from_chromium_base(self, *comps):
         """Returns the full path to path made by joining the top of the
         Chromium source tree and the list of path components in |*comps|."""
-        if not self._chromium_base_dir:
-            chromium_module_path = self._filesystem.path_to_module(self.__module__)
-            offset = chromium_module_path.find('third_party')
-            if offset == -1:
-                self._chromium_base_dir = self._filesystem.join(chromium_module_path[0:chromium_module_path.find('Tools')], 'Source', 'WebKit', 'chromium')
-            else:
-                self._chromium_base_dir = chromium_module_path[0:offset]
-        return self._filesystem.join(self._chromium_base_dir, *comps)
+        if self._chromium_base_dir_path is None:
+            self._chromium_base_dir_path = self._chromium_base_dir(self._filesystem)
+        return self._filesystem.join(self._chromium_base_dir_path, *comps)
 
     def path_to_test_expectations_file(self):
         return self.path_from_webkit_base('LayoutTests', 'platform', 'chromium', 'test_expectations.txt')
@@ -390,8 +391,8 @@ class ChromiumPort(Port):
 
 # FIXME: This should inherit from WebKitDriver now that Chromium has a DumpRenderTree process like the rest of WebKit.
 class ChromiumDriver(Driver):
-    def __init__(self, port, worker_number, pixel_tests):
-        Driver.__init__(self, port, worker_number, pixel_tests)
+    def __init__(self, port, worker_number, pixel_tests, no_timeout=False):
+        Driver.__init__(self, port, worker_number, pixel_tests, no_timeout)
         self._proc = None
         self._image_path = None
         if self._pixel_tests:
@@ -405,6 +406,8 @@ class ChromiumDriver(Driver):
         # FIXME: This is not None shouldn't be necessary, unless --js-flags="''" changes behavior somehow?
         if self._port.get_option('js_flags') is not None:
             cmd.append('--js-flags="' + self._port.get_option('js_flags') + '"')
+        if self._no_timeout:
+            cmd.append("--no-timeout")
 
         # FIXME: We should be able to build this list using only an array of
         # option names, the options (optparse.Values) object, and the orignal
@@ -600,7 +603,8 @@ class ChromiumDriver(Driver):
         if self._proc.stderr:
             self._proc.stderr.close()
         time_out_ms = self._port.get_option('time_out_ms')
-        if time_out_ms:
+        if time_out_ms and not self._no_timeout:
+            # FIXME: Port object shouldn't be dependent on layout test manager.
             kill_timeout_seconds = 3.0 * int(time_out_ms) / Manager.DEFAULT_TEST_TIMEOUT_MS
         else:
             kill_timeout_seconds = 3.0

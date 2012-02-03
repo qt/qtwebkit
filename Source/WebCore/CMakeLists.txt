@@ -129,6 +129,7 @@ SET(WebCore_IDL_FILES
     css/WebKitCSSKeyframeRule.idl
     css/WebKitCSSKeyframesRule.idl
     css/WebKitCSSMatrix.idl
+    css/WebKitCSSRegionRule.idl
     css/WebKitCSSTransformValue.idl
 
     dom/Attr.idl
@@ -179,6 +180,7 @@ SET(WebCore_IDL_FILES
     dom/ProgressEvent.idl
     dom/RangeException.idl
     dom/Range.idl
+    dom/ShadowRoot.idl
     dom/TextEvent.idl
     dom/Text.idl
     dom/TouchEvent.idl
@@ -235,7 +237,6 @@ SET(WebCore_IDL_FILES
     html/HTMLIFrameElement.idl
     html/HTMLImageElement.idl
     html/HTMLInputElement.idl
-    html/HTMLIsIndexElement.idl
     html/HTMLKeygenElement.idl
     html/HTMLLabelElement.idl
     html/HTMLLegendElement.idl
@@ -303,6 +304,9 @@ SET(WebCore_IDL_FILES
     html/canvas/Uint16Array.idl
     html/canvas/Uint32Array.idl
     html/canvas/Uint8Array.idl
+    html/canvas/Uint8ClampedArray.idl
+
+    html/shadow/HTMLContentElement.idl
 
     html/track/TextTrackList.idl
     html/track/TrackEvent.idl
@@ -425,14 +429,14 @@ SET(WebCore_SOURCES
     bindings/generic/RuntimeEnabledFeatures.cpp
 
     css/CSSAspectRatioValue.cpp
-    css/CSSBorderImageValue.cpp
+    css/CSSBorderImage.cpp
     css/CSSBorderImageSliceValue.cpp
+    css/CSSCalculationValue.cpp
     css/CSSCanvasValue.cpp
     css/CSSCharsetRule.cpp
     css/CSSComputedStyleDeclaration.cpp
     css/CSSCrossfadeValue.cpp
     css/CSSCursorImageValue.cpp
-    css/CSSElementStyleDeclaration.cpp
     css/CSSFlexValue.cpp
     css/CSSFontFace.cpp
     css/CSSFontFaceRule.cpp
@@ -541,6 +545,7 @@ SET(WebCore_SOURCES
     dom/DynamicNodeList.cpp
     dom/EditingText.cpp
     dom/Element.cpp
+    dom/ElementAttributeData.cpp
     dom/EntityReference.cpp
     dom/ErrorEvent.cpp
     dom/Event.cpp
@@ -553,6 +558,7 @@ SET(WebCore_SOURCES
     dom/EventTarget.cpp
     dom/ExceptionBase.cpp
     dom/ExceptionCodePlaceholder.cpp
+    dom/GenericEventQueue.cpp
     dom/IconURL.cpp
     dom/KeyboardEvent.cpp
     dom/MessageChannel.cpp
@@ -593,8 +599,6 @@ SET(WebCore_SOURCES
     dom/ScriptRunner.cpp
     dom/SecurityContext.cpp
     dom/SelectorQuery.cpp
-    dom/ShadowContentElement.cpp
-    dom/ShadowInclusionSelector.cpp
     dom/ShadowRoot.cpp
     dom/SpaceSplitString.cpp
     dom/StaticHashSetNodeList.cpp
@@ -754,7 +758,6 @@ SET(WebCore_SOURCES
     html/HTMLImageElement.cpp
     html/HTMLImageLoader.cpp
     html/HTMLInputElement.cpp
-    html/HTMLIsIndexElement.cpp
     html/HTMLKeygenElement.cpp
     html/HTMLLIElement.cpp
     html/HTMLLabelElement.cpp
@@ -860,7 +863,10 @@ SET(WebCore_SOURCES
     html/parser/TextViewSourceParser.cpp
     html/parser/XSSAuditor.cpp
 
+    html/shadow/ContentSelectorQuery.cpp
+    html/shadow/ContentInclusionSelector.cpp
     html/shadow/DetailsMarkerControl.cpp
+    html/shadow/HTMLContentElement.cpp
     html/shadow/MediaControls.cpp
     html/shadow/MediaControlRootElement.cpp
     html/shadow/MeterShadowElement.cpp
@@ -894,6 +900,7 @@ SET(WebCore_SOURCES
     inspector/InspectorFileSystemAgent.cpp
     inspector/InspectorFrontendClientLocal.cpp
     inspector/InspectorFrontendHost.cpp
+    inspector/InspectorIndexedDBAgent.cpp
     inspector/InspectorInstrumentation.cpp
     inspector/InspectorMemoryAgent.cpp
     inspector/InspectorProfilerAgent.cpp
@@ -1038,6 +1045,7 @@ SET(WebCore_SOURCES
     page/animation/KeyframeAnimation.cpp
 
     platform/Arena.cpp
+    platform/CalculationValue.cpp
     platform/Clock.cpp
     platform/ContextMenu.cpp
     platform/ContextMenuItem.cpp
@@ -1120,6 +1128,7 @@ SET(WebCore_SOURCES
     platform/graphics/WidthIterator.cpp
 
     platform/graphics/filters/CustomFilterMesh.cpp
+    platform/graphics/filters/CustomFilterProgram.cpp
     platform/graphics/filters/CustomFilterShader.cpp
     platform/graphics/filters/DistantLightSource.cpp
     platform/graphics/filters/FEBlend.cpp
@@ -1494,7 +1503,6 @@ IF (ENABLE_DATA_TRANSFER_ITEMS)
     )
     LIST(APPEND WebCore_SOURCES
         dom/DataTransferItem.cpp
-        dom/DataTransferItemList.cpp
         dom/StringCallback.cpp
     )
 ENDIF ()
@@ -1681,6 +1689,7 @@ IF (ENABLE_SVG)
         rendering/svg/SVGTextLayoutEngineSpacing.cpp
         rendering/svg/SVGTextRunRenderingContext.cpp
         rendering/svg/SVGTextMetrics.cpp
+        rendering/svg/SVGTextMetricsBuilder.cpp
         rendering/svg/SVGTextQuery.cpp
         svg/ColorDistance.cpp
         svg/SVGAElement.cpp
@@ -2119,14 +2128,10 @@ ENDIF ()
 
 IF (ENABLE_WEBGL)
     LIST(APPEND WebCore_INCLUDE_DIRECTORIES
-        ${OPENGL_INCLUDE_DIR}
         ${THIRDPARTY_DIR}/ANGLE/src
         ${THIRDPARTY_DIR}/ANGLE/include
         ${THIRDPARTY_DIR}/ANGLE/include/GLSLANG
         ${WEBCORE_DIR}/platform/graphics/gpu
-    )
-    LIST(APPEND WebCore_LIBRARIES
-        ${OPENGL_gl_LIBRARY}
     )
     LIST(APPEND WebCore_SOURCES
         ${DERIVED_SOURCES_WEBCORE_DIR}/glslang.cpp
@@ -2171,6 +2176,8 @@ IF (ENABLE_WEBGL)
         html/canvas/WebGLCompressedTextures.cpp
         html/canvas/WebGLContextAttributes.cpp
         html/canvas/WebGLContextEvent.cpp
+        html/canvas/WebGLContextGroup.cpp
+        html/canvas/WebGLContextObject.cpp
         html/canvas/WebGLDebugRendererInfo.cpp
         html/canvas/WebGLDebugShaders.cpp
         html/canvas/WebGLFramebuffer.cpp
@@ -2181,6 +2188,7 @@ IF (ENABLE_WEBGL)
         html/canvas/WebGLRenderbuffer.cpp
         html/canvas/WebGLRenderingContext.cpp
         html/canvas/WebGLShader.cpp
+        html/canvas/WebGLSharedObject.cpp
         html/canvas/WebGLTexture.cpp
         html/canvas/WebGLUniformLocation.cpp
         html/canvas/WebGLVertexArrayObjectOES.cpp
@@ -2270,12 +2278,12 @@ ADD_CUSTOM_COMMAND(
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorProtocolVersion.h)
 
 ADD_CUSTOM_COMMAND(
-    OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendDispatcher.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendDispatcher.h ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorFrontend.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorFrontend.h
+    OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendDispatcher.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendDispatcher.h ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorFrontend.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorFrontend.h ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorTypeBuilder.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorTypeBuilder.h
     MAIN_DEPENDENCY inspector/Inspector.json
     DEPENDS ${WEBCORE_DIR}/inspector/CodeGeneratorInspector.py
-    COMMAND ${PYTHON_EXECUTABLE} ${WEBCORE_DIR}/inspector/CodeGeneratorInspector.py ${WEBCORE_DIR}/inspector/Inspector.json --output_h_dir "${DERIVED_SOURCES_WEBCORE_DIR}" --output_cpp_dir "${DERIVED_SOURCES_WEBCORE_DIR}" --defines "${FEATURE_DEFINES_JAVASCRIPT}"
+    COMMAND ${PYTHON_EXECUTABLE} ${WEBCORE_DIR}/inspector/CodeGeneratorInspector.py ${WEBCORE_DIR}/inspector/Inspector.json --output_h_dir "${DERIVED_SOURCES_WEBCORE_DIR}" --output_cpp_dir "${DERIVED_SOURCES_WEBCORE_DIR}"
     VERBATIM)
-LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendDispatcher.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorFrontend.cpp)
+LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendDispatcher.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorFrontend.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorTypeBuilder.cpp)
 
 
 # Generate InjectedScriptSource.h
@@ -2317,17 +2325,6 @@ ADD_CUSTOM_COMMAND(
     COMMAND ${PYTHON_EXECUTABLE} ${WEBCORE_DIR}/html/parser/create-html-entity-table -o ${DERIVED_SOURCES_WEBCORE_DIR}/HTMLEntityTable.cpp ${WEBCORE_DIR}/html/parser/HTMLEntityNames.in
     VERBATIM)
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/HTMLEntityTable.cpp)
-
-
-# Generate tokenizer
-FILE(TO_NATIVE_PATH ${PERL_EXECUTABLE} PERL_EXECUTABLE_NATIVE_PATH)
-ADD_CUSTOM_COMMAND(
-    OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/tokenizer.cpp
-    MAIN_DEPENDENCY ${WEBCORE_DIR}/css/maketokenizer
-    DEPENDS ${WEBCORE_DIR}/css/tokenizer.flex
-    COMMAND ${FLEX_EXECUTABLE} -t ${WEBCORE_DIR}/css/tokenizer.flex | ${PERL_EXECUTABLE_NATIVE_PATH} ${WEBCORE_DIR}/css/maketokenizer > ${DERIVED_SOURCES_WEBCORE_DIR}/tokenizer.cpp
-    VERBATIM)
-ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WEBCORE_DIR}/css/CSSParser.cpp tokenizer.cpp)
 
 
 # Replace ";" with "space" in order to recognize feature definition in css files.

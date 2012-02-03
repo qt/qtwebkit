@@ -45,6 +45,7 @@ NonCompositedContentHost::NonCompositedContentHost(PassOwnPtr<WebCore::LayerPain
 #endif
     m_graphicsLayer->setDrawsContent(true);
     m_graphicsLayer->platformLayer()->setIsNonCompositedContent(true);
+    m_graphicsLayer->platformLayer()->setBackgroundCoversViewport(true);
     m_graphicsLayer->platformLayer()->setOpaque(true);
 }
 
@@ -77,6 +78,20 @@ void NonCompositedContentHost::setScrollLayer(WebCore::GraphicsLayer* layer)
     ASSERT(scrollLayer());
 }
 
+static void reserveScrollbarLayers(WebCore::LayerChromium* layer, WebCore::LayerChromium* clipLayer)
+{
+    // Scrollbars and corners are known to be attached outside the root clip
+    // rect, so skip the clipLayer subtree.
+    if (layer == clipLayer)
+        return;
+
+    for (size_t i = 0; i < layer->children().size(); ++i)
+        reserveScrollbarLayers(layer->children()[i].get(), clipLayer);
+
+    if (layer->drawsContent())
+        layer->setAlwaysReserveTextures(true);
+}
+
 void NonCompositedContentHost::setViewport(const WebCore::IntSize& viewportSize, const WebCore::IntSize& contentsSize, const WebCore::IntPoint& scrollPosition, float pageScale, int layerAdjustX)
 {
     if (!scrollLayer())
@@ -105,6 +120,12 @@ void NonCompositedContentHost::setViewport(const WebCore::IntSize& viewportSize,
 
     if (m_graphicsLayer->pageScaleFactor() != pageScale)
         m_graphicsLayer->deviceOrPageScaleFactorChanged();
+
+    WebCore::LayerChromium* clipLayer = scrollLayer()->parent();
+    WebCore::LayerChromium* rootLayer = clipLayer;
+    while (rootLayer->parent())
+        rootLayer = rootLayer->parent();
+    reserveScrollbarLayers(rootLayer, clipLayer);
 }
 
 WebCore::LayerChromium* NonCompositedContentHost::scrollLayer()
@@ -150,12 +171,12 @@ void NonCompositedContentHost::setShowDebugBorders(bool showDebugBorders)
     m_graphicsLayer->updateDebugIndicators();
 }
 
-bool NonCompositedContentHost::showDebugBorders() const
+bool NonCompositedContentHost::showDebugBorders(const WebCore::GraphicsLayer*) const
 {
     return m_showDebugBorders;
 }
 
-bool NonCompositedContentHost::showRepaintCounter() const
+bool NonCompositedContentHost::showRepaintCounter(const WebCore::GraphicsLayer*) const
 {
     return false;
 }

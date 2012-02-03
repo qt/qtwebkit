@@ -84,24 +84,31 @@ JSValue PropertyDescriptor::setter() const
     return m_setter;
 }
 
+JSObject* PropertyDescriptor::getterObject() const
+{
+    ASSERT(isAccessorDescriptor() && getterPresent());
+    return m_getter.isObject() ? asObject(m_getter) : 0;
+}
+
+JSObject* PropertyDescriptor::setterObject() const
+{
+    ASSERT(isAccessorDescriptor() && setterPresent());
+    return m_setter.isObject() ? asObject(m_setter) : 0;
+}
+
 void PropertyDescriptor::setDescriptor(JSValue value, unsigned attributes)
 {
     ASSERT(value);
+    ASSERT(value.isGetterSetter() == !!(attributes & Accessor));
+
     m_attributes = attributes;
     if (value.isGetterSetter()) {
+        m_attributes &= ~ReadOnly; // FIXME: we should be able to ASSERT this!
+
         GetterSetter* accessor = asGetterSetter(value);
-
-        m_getter = accessor->getter();
-        if (m_getter)
-            m_attributes |= Getter;
-
-        m_setter = accessor->setter();
-        if (m_setter)
-            m_attributes |= Setter;
-
-        ASSERT(m_getter || m_setter);
+        m_getter = accessor->getter() ? accessor->getter() : jsUndefined();
+        m_setter = accessor->setter() ? accessor->setter() : jsUndefined();
         m_seenAttributes = EnumerablePresent | ConfigurablePresent;
-        m_attributes &= ~ReadOnly;
     } else {
         m_value = value;
         m_seenAttributes = EnumerablePresent | ConfigurablePresent | WritablePresent;
@@ -110,14 +117,12 @@ void PropertyDescriptor::setDescriptor(JSValue value, unsigned attributes)
 
 void PropertyDescriptor::setAccessorDescriptor(GetterSetter* accessor, unsigned attributes)
 {
-    ASSERT(attributes & (Getter | Setter));
-    ASSERT(accessor->getter() || accessor->setter());
-    ASSERT(!accessor->getter() == !(attributes & Getter));
-    ASSERT(!accessor->setter() == !(attributes & Setter));
+    ASSERT(attributes & Accessor);
+    attributes &= ~ReadOnly; // FIXME: we should be able to ASSERT this!
+
     m_attributes = attributes;
-    m_getter = accessor->getter();
-    m_setter = accessor->setter();
-    m_attributes &= ~ReadOnly;
+    m_getter = accessor->getter() ? accessor->getter() : jsUndefined();
+    m_setter = accessor->setter() ? accessor->setter() : jsUndefined();
     m_seenAttributes = EnumerablePresent | ConfigurablePresent;
 }
 
@@ -151,14 +156,14 @@ void PropertyDescriptor::setConfigurable(bool configurable)
 void PropertyDescriptor::setSetter(JSValue setter)
 {
     m_setter = setter;
-    m_attributes |= Setter;
+    m_attributes |= Accessor;
     m_attributes &= ~ReadOnly;
 }
 
 void PropertyDescriptor::setGetter(JSValue getter)
 {
     m_getter = getter;
-    m_attributes |= Getter;
+    m_attributes |= Accessor;
     m_attributes &= ~ReadOnly;
 }
 
@@ -217,6 +222,7 @@ unsigned PropertyDescriptor::attributesWithOverride(const PropertyDescriptor& ot
 
 unsigned PropertyDescriptor::attributesOverridingCurrent(const PropertyDescriptor& current) const
 {
+    unsigned currentAttributes = current.m_attributes;
     unsigned overrideMask = 0;
     if (writablePresent())
         overrideMask |= ReadOnly;
@@ -225,8 +231,8 @@ unsigned PropertyDescriptor::attributesOverridingCurrent(const PropertyDescripto
     if (configurablePresent())
         overrideMask |= DontDelete;
     if (isAccessorDescriptor())
-        overrideMask |= (Getter | Setter);
-    return (m_attributes & overrideMask) | (current.m_attributes & ~overrideMask);
+        overrideMask |= Accessor;
+    return (m_attributes & overrideMask) | (currentAttributes & ~overrideMask);
 }
 
 }

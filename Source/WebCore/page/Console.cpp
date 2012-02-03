@@ -128,12 +128,14 @@ static void printMessageSourceAndLevelPrefix(MessageSource source, MessageLevel 
     printf("%s %s:", sourceString, levelString);
 }
 
-void Console::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL)
+void addMessage(MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptCallStack>);
+
+void Console::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, PassRefPtr<ScriptCallStack> callStack)
 {
-    addMessage(source, type, level, message, lineNumber, sourceURL, 0);
+    addMessage(source, type, level, message, String(), 0, callStack);
 }
 
-void Console::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
+void Console::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     Page* page = this->page();
     if (!page)
@@ -144,7 +146,7 @@ void Console::addMessage(MessageSource source, MessageType type, MessageLevel le
     if (callStack)
         InspectorInstrumentation::addMessageToConsole(page, source, type, level, message, 0, callStack);
     else
-        InspectorInstrumentation::addMessageToConsole(page, source, type, level, message, lineNumber, sourceURL);
+        InspectorInstrumentation::addMessageToConsole(page, source, type, level, message, sourceURL, lineNumber);
 
     if (!Console::shouldPrintExceptions())
         return;
@@ -328,7 +330,7 @@ void Console::groupCollapsed(PassRefPtr<ScriptArguments> arguments, PassRefPtr<S
 
 void Console::groupEnd()
 {
-    InspectorInstrumentation::addMessageToConsole(page(), ConsoleAPIMessageSource, EndGroupMessageType, LogMessageLevel, String(), 0, String());
+    InspectorInstrumentation::addMessageToConsole(page(), ConsoleAPIMessageSource, EndGroupMessageType, LogMessageLevel, String(), String(), 0);
 }
 
 void Console::warn(PassRefPtr<ScriptArguments> arguments, PassRefPtr<ScriptCallStack> callStack)

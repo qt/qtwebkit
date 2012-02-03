@@ -69,6 +69,64 @@ private:
     QString m_defaultValue;
 };
 
+class AuthenticationDialogContextObject : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString hostname READ hostname CONSTANT)
+    Q_PROPERTY(QString realm READ realm CONSTANT)
+    Q_PROPERTY(QString prefilledUsername READ prefilledUsername CONSTANT)
+
+public:
+    AuthenticationDialogContextObject(const QString& hostname, const QString& realm, const QString& prefilledUsername)
+        : QObject()
+        , m_hostname(hostname)
+        , m_realm(realm)
+        , m_prefilledUsername(prefilledUsername)
+    {
+    }
+
+    QString hostname() const { return m_hostname; }
+    QString realm() const { return m_realm; }
+    QString prefilledUsername() const { return m_prefilledUsername; }
+
+public slots:
+    void accept(const QString& username, const QString& password) { emit accepted(username, password); }
+    void reject() { emit rejected(); }
+
+signals:
+    void accepted(const QString& username, const QString& password);
+    void rejected();
+
+private:
+    QString m_hostname;
+    QString m_realm;
+    QString m_prefilledUsername;
+};
+
+class CertificateVerificationDialogContextObject : public QObject {
+    Q_OBJECT
+    Q_PROPERTY(QString hostname READ hostname CONSTANT)
+
+public:
+    CertificateVerificationDialogContextObject(const QString& hostname)
+        : QObject()
+        , m_hostname(hostname)
+    {
+    }
+
+    QString hostname() const { return m_hostname; }
+
+public slots:
+    void accept() { emit accepted(); }
+    void reject() { emit rejected(); }
+
+signals:
+    void accepted();
+    void rejected();
+
+private:
+    QString m_hostname;
+};
+
 bool QtDialogRunner::initForAlert(QDeclarativeComponent* component, QQuickItem* dialogParent, const QString& message)
 {
     DialogContextObject* contextObject = new DialogContextObject(message);
@@ -100,6 +158,32 @@ bool QtDialogRunner::initForPrompt(QDeclarativeComponent* component, QQuickItem*
     connect(contextObject, SIGNAL(accepted(QString)), SLOT(onAccepted(QString)));
     connect(contextObject, SIGNAL(accepted(QString)), SLOT(quit()));
     connect(contextObject, SIGNAL(rejected()), SLOT(quit()));
+    return true;
+}
+
+bool QtDialogRunner::initForAuthentication(QDeclarativeComponent* component, QQuickItem* dialogParent, const QString& hostname, const QString& realm, const QString& prefilledUsername)
+{
+    AuthenticationDialogContextObject* contextObject = new AuthenticationDialogContextObject(hostname, realm, prefilledUsername);
+    if (!createDialog(component, dialogParent, contextObject))
+        return false;
+
+    connect(contextObject, SIGNAL(accepted(QString, QString)), SLOT(onAuthenticationAccepted(QString, QString)));
+    connect(contextObject, SIGNAL(accepted(QString, QString)), SLOT(quit()));
+    connect(contextObject, SIGNAL(rejected()), SLOT(quit()));
+
+    return true;
+}
+
+bool QtDialogRunner::initForCertificateVerification(QDeclarativeComponent* component, QQuickItem* dialogParent, const QString& hostname)
+{
+    CertificateVerificationDialogContextObject* contextObject = new CertificateVerificationDialogContextObject(hostname);
+    if (!createDialog(component, dialogParent, contextObject))
+        return false;
+
+    connect(contextObject, SIGNAL(accepted()), SLOT(onAccepted()));
+    connect(contextObject, SIGNAL(accepted()), SLOT(quit()));
+    connect(contextObject, SIGNAL(rejected()), SLOT(quit()));
+
     return true;
 }
 

@@ -35,4 +35,6 @@ namespace WebCore {
 }
 
 - (CALayer *)tileContainerLayer;
+- (void)visibleRectChanged;
+
 @end

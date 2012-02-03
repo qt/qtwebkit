@@ -60,7 +60,6 @@ public:
     bool isValueList() const { return m_classType >= ValueListClass; }
 
     bool isAspectRatioValue() const { return m_classType == AspectRatioClass; }
-    bool isBorderImageValue() const { return m_classType == BorderImageClass; }
     bool isBorderImageSliceValue() const { return m_classType == BorderImageSliceClass; }
     bool isCursorImageValue() const { return m_classType == CursorImageClass; }
     bool isFontFamilyValue() const { return m_classType == FontFamilyClass; }
@@ -77,6 +76,7 @@ public:
     bool isWebKitCSSTransformValue() const { return m_classType == WebKitCSSTransformClass; }
     bool isCSSLineBoxContainValue() const { return m_classType == LineBoxContainClass; }
     bool isFlexValue() const { return m_classType == FlexClass; }
+    bool isCalculationValue() const {return m_classType == CalculationClass; }
 #if ENABLE(CSS_FILTERS)
     bool isWebKitCSSFilterValue() const { return m_classType == WebKitCSSFilterClass; }
 #if ENABLE(CSS_SHADERS)
@@ -113,7 +113,6 @@ protected:
 
         // Other class types.
         AspectRatioClass,
-        BorderImageClass,
         BorderImageSliceClass,
         FontFeatureClass,
         FontClass,
@@ -128,6 +127,7 @@ protected:
         UnicodeRangeClass,
         LineBoxContainClass,
         FlexClass,
+        CalculationClass,
 #if ENABLE(CSS_FILTERS) && ENABLE(CSS_SHADERS)
         WebKitCSSShaderClass,
 #endif

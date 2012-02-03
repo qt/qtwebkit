@@ -26,6 +26,7 @@
 #ifndef Internals_h
 #define Internals_h
 
+#include "FrameDestructionObserver.h"
 #include "PlatformString.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -36,14 +37,17 @@ namespace WebCore {
 class ClientRect;
 class Document;
 class Element;
+class InternalSettings;
 class Node;
 class Range;
+class ShadowRoot;
 
 typedef int ExceptionCode;
 
-class Internals : public RefCounted<Internals> {
+class Internals : public RefCounted<Internals>,
+                  public FrameDestructionObserver {
 public:
-    static PassRefPtr<Internals> create();
+    static PassRefPtr<Internals> create(Document*);
     virtual ~Internals();
 
     void reset(Document*);
@@ -52,43 +56,30 @@ public:
 
     bool isPreloaded(Document*, const String& url);
 
-    Node* ensureShadowRoot(Element* host, ExceptionCode&);
-    Node* shadowRoot(Element* host, ExceptionCode&);
+    size_t numberOfScopedHTMLStyleChildren(const Element*, ExceptionCode&) const;
+
+#if ENABLE(SHADOW_DOM)
+    typedef ShadowRoot ShadowRootIfShadowDOMEnabledOrNode;
+#else
+    typedef Node ShadowRootIfShadowDOMEnabledOrNode;
+#endif
+    ShadowRootIfShadowDOMEnabledOrNode* ensureShadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* shadowRoot(Element* host, ExceptionCode&);
     void removeShadowRoot(Element* host, ExceptionCode&);
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
-    PassRefPtr<Element> createShadowContentElement(Document*, ExceptionCode&);
+    PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
     Element* getElementByIdInShadowRoot(Node* shadowRoot, const String& id, ExceptionCode&);
+    bool isValidContentSelect(Element* contentElement, ExceptionCode&);
 
 #if ENABLE(INPUT_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);
-#endif
-
-#if ENABLE(INSPECTOR)
-    void setInspectorResourcesDataSizeLimits(Document*, int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
-#else
-    void setInspectorResourcesDataSizeLimits(Document*, int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&) { }
 #endif
 
     PassRefPtr<ClientRect> boundingBox(Element*, ExceptionCode&);
 
     unsigned markerCountForNode(Node*, const String&, ExceptionCode&);
     PassRefPtr<Range> markerRangeForNode(Node*, const String&, unsigned, ExceptionCode&);
-
-    void setForceCompositingMode(Document*, bool enabled, ExceptionCode&);
-    void setEnableCompositingForFixedPosition(Document*, bool enabled, ExceptionCode&);
-    void setEnableCompositingForScrollableFrames(Document*, bool enabled, ExceptionCode&);
-    void setAcceleratedDrawingEnabled(Document*, bool enabled, ExceptionCode&);
-    void setAcceleratedFiltersEnabled(Document*, bool enabled, ExceptionCode&);
-
-    void setEnableScrollAnimator(Document*, bool enabled, ExceptionCode&);
-    void setZoomAnimatorTransform(Document*, float scale, float tx, float ty, ExceptionCode&);
-    void setZoomParameters(Document*, float scale, float x, float y, ExceptionCode&);
-
-    void setMockScrollbarsEnabled(Document*, bool enabled, ExceptionCode&);
-
-    void setPasswordEchoEnabled(Document*, bool enabled, ExceptionCode&);
-    void setPasswordEchoDurationInSeconds(Document*, double durationInSeconds, ExceptionCode&);
 
     void setScrollViewPosition(Document*, long x, long y, ExceptionCode&);
 
@@ -104,28 +95,24 @@ public:
     PassRefPtr<Range> rangeFromLocationAndLength(Element* scope, int rangeLocation, int rangeLength, ExceptionCode&);
     unsigned locationFromRange(Element* scope, const Range*, ExceptionCode&);
     unsigned lengthFromRange(Element* scope, const Range*, ExceptionCode&);
-    void setShouldLayoutFixedElementsRelativeToFrame(Document*, bool, ExceptionCode&);
-
-    void setUnifiedTextCheckingEnabled(Document*, bool, ExceptionCode&);
-    bool unifiedTextCheckingEnabled(Document*, ExceptionCode&);
 
     int lastSpellCheckRequestSequence(Document*, ExceptionCode&);
     int lastSpellCheckProcessedSequence(Document*, ExceptionCode&);
     
-    float pageScaleFactor(Document*,  ExceptionCode&);
-    void setPageScaleFactor(Document*, float scaleFactor, int x, int y, ExceptionCode&);
+    Vector<String> userPreferredLanguages() const;
+    void setUserPreferredLanguages(const Vector<String>&);
 
-    void setPerTileDrawingEnabled(Document*, bool enabled, ExceptionCode&);
+    void setShouldDisplayTrackKind(Document*, const String& kind, bool, ExceptionCode&);
+    bool shouldDisplayTrackKind(Document*, const String& kind, ExceptionCode&);
 
     static const char* internalsId;
 
-private:
-    Internals();
+    InternalSettings* settings() const { return m_settings.get(); }
 
-    double passwordEchoDurationInSecondsBackup;
-    bool passwordEchoEnabledBackup : 1;
-    bool passwordEchoDurationInSecondsBackedUp : 1;
-    bool passwordEchoEnabledBackedUp : 1;
+private:
+    explicit Internals(Document*);
+
+    RefPtr<InternalSettings> m_settings;
 };
 
 } // namespace WebCore

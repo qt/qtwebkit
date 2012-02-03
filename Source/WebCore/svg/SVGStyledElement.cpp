@@ -379,7 +379,7 @@ void SVGStyledElement::buildPendingResourcesIfNeeded()
 
     SVGDocumentExtensions* extensions = document->accessSVGExtensions();
     String resourceId = getIdAttribute();
-    if (!extensions->hasPendingResources(resourceId))
+    if (!extensions->hasPendingResource(resourceId))
         return;
 
     OwnPtr<SVGDocumentExtensions::SVGPendingElements> clients(extensions->removePendingResource(resourceId));
@@ -422,7 +422,7 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
 
     QualifiedName attributeName(nullAtom, name, nullAtom);
     Attribute* attr = attributeMap()->getAttributeItem(attributeName);
-    if (!attr || !attr->isMappedAttribute() || !attr->style())
+    if (!attr || !attr->isMappedAttribute() || !attr->mappedAttributeDeclaration())
         return 0;
 
     Attribute* cssSVGAttr = attr;
@@ -432,12 +432,12 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
     // before returning so that any modifications to the CSSValue will not affect other attributes.
     MappedAttributeEntry entry;
     mapToEntry(attributeName, entry);
-    if (getMappedAttributeDecl(entry, cssSVGAttr) == cssSVGAttr->decl()) {
-        cssSVGAttr->setDecl(0);
+    if (getMappedAttributeDecl(entry, cssSVGAttr) == cssSVGAttr->mappedAttributeDeclaration()) {
+        cssSVGAttr->setMappedAttributeDeclaration(0);
         int propId = SVGStyledElement::cssPropertyIdForSVGAttributeName(cssSVGAttr->name());
         addCSSProperty(cssSVGAttr, propId, cssSVGAttr->value());
     }
-    return cssSVGAttr->style()->getPropertyCSSValue(name);
+    return cssSVGAttr->decl()->getPropertyCSSValue(cssPropertyID(name));
 }
 
 bool SVGStyledElement::instanceUpdatesBlocked() const
@@ -463,7 +463,7 @@ void SVGStyledElement::setHasPendingResources()
 
 void SVGStyledElement::clearHasPendingResourcesIfPossible()
 {
-    if (!document()->accessSVGExtensions()->isElementInPendingResources(this))
+    if (!document()->accessSVGExtensions()->isElementPendingResources(this))
         ensureRareSVGData()->setHasPendingResources(false);
 }
 

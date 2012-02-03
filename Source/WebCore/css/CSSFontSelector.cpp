@@ -86,7 +86,7 @@ bool CSSFontSelector::isEmpty() const
 void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
 {
     // Obtain the font-family property and the src property.  Both must be defined.
-    const CSSMutableStyleDeclaration* style = fontFaceRule->style();
+    const CSSMutableStyleDeclaration* style = fontFaceRule->declaration();
     RefPtr<CSSValue> fontFamily = style->getPropertyCSSValue(CSSPropertyFontFamily);
     RefPtr<CSSValue> src = style->getPropertyCSSValue(CSSPropertySrc);
     RefPtr<CSSValue> unicodeRange = style->getPropertyCSSValue(CSSPropertyUnicodeRange);
@@ -285,9 +285,9 @@ void CSSFontSelector::addFontFaceRule(const CSSFontFaceRule* fontFaceRule)
     for (int i = 0; i < familyLength; i++) {
         CSSPrimitiveValue* item = static_cast<CSSPrimitiveValue*>(familyList->itemWithoutBoundsCheck(i));
         String familyName;
-        if (item->primitiveType() == CSSPrimitiveValue::CSS_STRING)
+        if (item->isString())
             familyName = static_cast<FontFamilyValue*>(item)->familyName();
-        else if (item->primitiveType() == CSSPrimitiveValue::CSS_IDENT) {
+        else if (item->isIdent()) {
             // We need to use the raw text for all the generic family types, since @font-face is a way of actually
             // defining what font to use for those types.
             String familyName;
@@ -615,6 +615,8 @@ void CSSFontSelector::beginLoadTimerFired(Timer<WebCore::CSSFontSelector>*)
         // Balances incrementRequestCount() in beginLoadingFontSoon().
         cachedResourceLoader->decrementRequestCount(fontsToBeginLoading[i].get());
     }
+    // Ensure that if the request count reaches zero, the frame loader will know about it.
+    cachedResourceLoader->loadDone();
 }
 
 }

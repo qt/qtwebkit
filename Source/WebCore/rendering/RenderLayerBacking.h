@@ -133,8 +133,8 @@ public:
     virtual float pageScaleFactor() const;
     virtual void didCommitChangesForLayer(const GraphicsLayer*) const;
 
-    virtual bool showDebugBorders() const;
-    virtual bool showRepaintCounter() const;
+    virtual bool showDebugBorders(const GraphicsLayer*) const;
+    virtual bool showRepaintCounter(const GraphicsLayer*) const;
 
     LayoutRect contentsBox() const;
     
@@ -197,7 +197,8 @@ private:
     Color rendererBackgroundColor() const;
     void updateBackgroundColor();
 
-    bool hasVisibleNonCompositingDescendants() const;
+    bool containsNonEmptyRenderers() const;
+    bool hasVisibleNonCompositingDescendantLayers() const;
     
     void paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect, PaintBehavior, GraphicsLayerPaintingPhase, RenderObject* paintingRoot);
 

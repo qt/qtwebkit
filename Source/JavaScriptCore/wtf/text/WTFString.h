@@ -62,9 +62,9 @@ struct StringHash;
 
 // Declarations of string operations
 
-WTF_EXPORT_PRIVATE int charactersToIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
+int charactersToIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_PRIVATE int charactersToIntStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
-WTF_EXPORT_PRIVATE unsigned charactersToUIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
+unsigned charactersToUIntStrict(const LChar*, size_t, bool* ok = 0, int base = 10);
 WTF_EXPORT_PRIVATE unsigned charactersToUIntStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 int64_t charactersToInt64Strict(const LChar*, size_t, bool* ok = 0, int base = 10);
 int64_t charactersToInt64Strict(const UChar*, size_t, bool* ok = 0, int base = 10);
@@ -74,7 +74,7 @@ intptr_t charactersToIntPtrStrict(const LChar*, size_t, bool* ok = 0, int base =
 intptr_t charactersToIntPtrStrict(const UChar*, size_t, bool* ok = 0, int base = 10);
 
 int charactersToInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
-int charactersToInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
+WTF_EXPORT_PRIVATE int charactersToInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
 unsigned charactersToUInt(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
 unsigned charactersToUInt(const UChar*, size_t, bool* ok = 0); // ignores trailing garbage
 int64_t charactersToInt64(const LChar*, size_t, bool* ok = 0); // ignores trailing garbage
@@ -87,7 +87,7 @@ intptr_t charactersToIntPtr(const UChar*, size_t, bool* ok = 0); // ignores trai
 WTF_EXPORT_PRIVATE double charactersToDouble(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 WTF_EXPORT_PRIVATE double charactersToDouble(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 float charactersToFloat(const LChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
-float charactersToFloat(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
+WTF_EXPORT_PRIVATE float charactersToFloat(const UChar*, size_t, bool* ok = 0, bool* didReadNumber = 0);
 
 enum FloatConversionFlags {
     ShouldRoundSignificantFigures = 1 << 0,
@@ -187,7 +187,7 @@ public:
         return m_impl->characters()[index];
     }
 
-    WTF_EXPORT_PRIVATE static String number(short);
+    static String number(short);
     WTF_EXPORT_PRIVATE static String number(unsigned short);
     WTF_EXPORT_PRIVATE static String number(int);
     WTF_EXPORT_PRIVATE static String number(unsigned);
@@ -301,8 +301,8 @@ public:
     WTF_EXPORT_PRIVATE int toIntStrict(bool* ok = 0, int base = 10) const;
     WTF_EXPORT_PRIVATE unsigned toUIntStrict(bool* ok = 0, int base = 10) const;
     WTF_EXPORT_PRIVATE int64_t toInt64Strict(bool* ok = 0, int base = 10) const;
-    WTF_EXPORT_PRIVATE uint64_t toUInt64Strict(bool* ok = 0, int base = 10) const;
-    WTF_EXPORT_PRIVATE intptr_t toIntPtrStrict(bool* ok = 0, int base = 10) const;
+    uint64_t toUInt64Strict(bool* ok = 0, int base = 10) const;
+    intptr_t toIntPtrStrict(bool* ok = 0, int base = 10) const;
 
     WTF_EXPORT_PRIVATE int toInt(bool* ok = 0) const;
     WTF_EXPORT_PRIVATE unsigned toUInt(bool* ok = 0) const;

@@ -389,7 +389,8 @@ void TestController::initialize(int argc, const char* argv[])
         0, // didChangeBackForwardList
         0, // shouldGoToBackForwardListItem
         0, // didRunInsecureContentForFrame
-        0  // didDetectXSSForFrame
+        0, // didDetectXSSForFrame 
+        0  // didNewFirstVisuallyNonEmptyLayout 
     };
     WKPageSetPageLoaderClient(m_mainWebView->page(), &pageLoaderClient);
 }
@@ -415,6 +416,7 @@ bool TestController::resetStateToConsistentValues()
 
     // Reset preferences
     WKPreferencesRef preferences = WKPageGroupGetPreferences(m_pageGroup.get());
+    WKPreferencesResetTestRunnerOverrides(preferences);
     WKPreferencesSetOfflineWebApplicationCacheEnabled(preferences, true);
     WKPreferencesSetFontSmoothingLevel(preferences, kWKFontSmoothingLevelNoSubpixelAntiAliasing);
     WKPreferencesSetXSSAuditorEnabled(preferences, false);
@@ -426,6 +428,13 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetFileAccessFromFileURLsAllowed(preferences, true);
 #if ENABLE(FULLSCREEN_API)
     WKPreferencesSetFullScreenEnabled(preferences, true);
+#endif
+    WKPreferencesSetPageCacheEnabled(preferences, false);
+
+// [Qt][WK2]REGRESSION(r104881):It broke hundreds of tests
+// FIXME: https://bugs.webkit.org/show_bug.cgi?id=76247
+#if !PLATFORM(QT)
+    WKPreferencesSetMockScrollbarsEnabled(preferences, true);
 #endif
 
 #if !PLATFORM(QT)

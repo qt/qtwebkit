@@ -187,7 +187,7 @@ public:
     // Update the geometry of the layers used for clipping and scrolling in frames.
     void frameViewDidChangeLocation(const LayoutPoint& contentsOffset);
     void frameViewDidChangeSize();
-    void frameViewDidScroll(const LayoutPoint& = LayoutPoint());
+    void frameViewDidScroll();
 
     String layerTreeAsText(bool showDebugInfo = false);
 
@@ -207,7 +207,7 @@ public:
     GraphicsLayer* layerForHorizontalScrollbar() const { return m_layerForHorizontalScrollbar.get(); }
     GraphicsLayer* layerForVerticalScrollbar() const { return m_layerForVerticalScrollbar.get(); }
     GraphicsLayer* layerForScrollCorner() const { return m_layerForScrollCorner.get(); }
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     GraphicsLayer* layerForOverhangAreas() const { return m_layerForOverhangAreas.get(); }
 #endif
 
@@ -217,10 +217,8 @@ private:
     virtual void notifySyncRequired(const GraphicsLayer*) { scheduleLayerFlush(); }
     virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const LayoutRect&);
 
-    // These calls return false always. They are saying that the layers associated with this client
-    // (the clipLayer and scrollLayer) should never show debugging info.
-    virtual bool showDebugBorders() const { return false; }
-    virtual bool showRepaintCounter() const { return false; }
+    virtual bool showDebugBorders(const GraphicsLayer*) const;
+    virtual bool showRepaintCounter(const GraphicsLayer*) const;
     
     // Whether the given RL needs a compositing layer.
     bool needsToBeComposited(const RenderLayer*) const;
@@ -293,7 +291,7 @@ private:
     bool requiresHorizontalScrollbarLayer() const;
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     bool requiresOverhangAreasLayer() const;
 #endif
 
@@ -339,7 +337,7 @@ private:
     OwnPtr<GraphicsLayer> m_layerForHorizontalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForVerticalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
+#if ENABLE(RUBBER_BANDING)
     OwnPtr<GraphicsLayer> m_layerForOverhangAreas;
 #endif
 #if PROFILE_LAYER_REBUILD

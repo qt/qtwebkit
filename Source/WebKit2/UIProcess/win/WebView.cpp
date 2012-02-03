@@ -32,11 +32,7 @@
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebMouseEvent.h"
 #include "NativeWebWheelEvent.h"
-#include "RunLoop.h"
 #include "WKAPICast.h"
-#if USE(CG)
-#include "WKCACFViewWindow.h"
-#endif
 #include "WebContext.h"
 #include "WebContextMenuProxyWin.h"
 #include "WebEditCommandProxy.h"
@@ -48,18 +44,23 @@
 #include <WebCore/Cursor.h>
 #include <WebCore/DragSession.h>
 #include <WebCore/Editor.h>
+#include <WebCore/FileSystem.h>
 #include <WebCore/FloatRect.h>
-#if USE(CG)
-#include <WebCore/GraphicsContextCG.h>
-#endif
+#include <WebCore/HWndDC.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/NotImplemented.h>
 #include <WebCore/Region.h>
+#include <WebCore/RunLoop.h>
 #include <WebCore/SoftLinking.h>
 #include <WebCore/WebCoreInstanceHandle.h>
 #include <WebCore/WindowMessageBroadcaster.h>
 #include <WebCore/WindowsTouch.h>
 #include <wtf/text/WTFString.h>
+
+#if USE(CG)
+#include "WKCACFViewWindow.h"
+#include <WebCore/GraphicsContextCG.h>
+#endif
 
 #if ENABLE(FULLSCREEN_API)
 #include "WebFullScreenManagerProxy.h"
@@ -959,9 +960,8 @@ void WebView::scrollView(const IntRect& scrollRect, const IntSize& scrollOffset)
 void WebView::flashBackingStoreUpdates(const Vector<IntRect>& updateRects)
 {
     static HBRUSH brush = createBrush(WebPageProxy::backingStoreUpdatesFlashColor().rgb()).leakPtr();
-    HDC dc = ::GetDC(m_window);
+    HWndDC dc(m_window);
     flashRects(dc, updateRects.data(), updateRects.size(), brush);
-    ::ReleaseDC(m_window, dc);
 }
 
 WebCore::IntSize WebView::viewSize()
@@ -1708,6 +1708,18 @@ HRESULT STDMETHODCALLTYPE WebView::DragLeave()
     return S_OK;
 }
 
+static bool maybeCreateSandboxExtensionFromDragData(const DragData& dragData, SandboxExtension::Handle& sandboxExtensionHandle)
+{
+    if (!dragData.containsFiles())
+        return false;
+
+    // Unlike on Mac, we allow multiple files and directories, since on Windows
+    // we have actions for those (open the first file, open a Windows Explorer window).
+
+    SandboxExtension::createHandle("\\", SandboxExtension::ReadOnly, sandboxExtensionHandle);
+    return true;
+}
+
 HRESULT STDMETHODCALLTYPE WebView::Drop(IDataObject* pDataObject, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect)
 {
     if (m_dropTargetHelper)
@@ -1720,6 +1732,9 @@ HRESULT STDMETHODCALLTYPE WebView::Drop(IDataObject* pDataObject, DWORD grfKeySt
     DragData data(pDataObject, IntPoint(localpt.x, localpt.y), IntPoint(pt.x, pt.y), keyStateToDragOperation(grfKeyState));
 
     SandboxExtension::Handle sandboxExtensionHandle;
+    bool createdExtension = maybeCreateSandboxExtensionFromDragData(data, sandboxExtensionHandle);
+    if (createdExtension)
+        m_page->process()->willAcquireUniversalFileReadSandboxExtension();
     m_page->performDrag(&data, String(), sandboxExtensionHandle);
     return S_OK;
 }

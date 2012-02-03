@@ -53,7 +53,9 @@ public:
     virtual void didRelaunchProcess();
     virtual PassOwnPtr<DrawingAreaProxy> createDrawingAreaProxy();
     virtual void handleDownloadRequest(DownloadProxy*);
-    virtual void handleApplicationSchemeRequest(PassRefPtr<QtNetworkRequestData>);
+    virtual void handleApplicationSchemeRequest(PassRefPtr<QtRefCountedNetworkRequestData>);
+    virtual void handleAuthenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password);
+    virtual void handleCertificateVerificationRequest(const String& hostname, bool& ignoreErrors);
 
     virtual void displayView();
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
@@ -92,7 +94,6 @@ public:
     virtual void findStringInCustomRepresentation(const String&, WebKit::FindOptions, unsigned maxMatchCount) { }
     virtual void countStringMatchesInCustomRepresentation(const String&, WebKit::FindOptions, unsigned maxMatchCount) { }
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&);
-    virtual void focusEditableArea(const WebCore::IntRect&, const WebCore::IntRect&);
     virtual void updateTextInputState();
     virtual void doneWithGestureEvent(const WebGestureEvent&, bool wasEventHandled);
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled);

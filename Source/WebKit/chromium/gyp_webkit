@@ -102,11 +102,12 @@ if __name__ == '__main__':
   if sys.platform not in ('darwin',):
     args.append('--no-circular-check')
 
-  # On linux, we want gyp to output a makefile (default is scons).
-  if (sys.platform.startswith('linux') or
+  generators = os.environ.get('GYP_GENERATORS', '')
+  if 'ninja' in generators:
+    args.extend([ '--toplevel-dir=../../..' ])
+  elif (sys.platform.startswith('linux') or
       'WEBKIT_ANDROID_BUILD' in os.environ or
-      (sys.platform == 'darwin' and
-          os.environ.get('GYP_GENERATORS', '').find('make') != -1)):
+      (sys.platform == 'darwin' and 'make' in generators)):
     args.extend(['-fmake',
                  '--suffix=.chromium',
                  '--toplevel-dir=../../..',
@@ -119,7 +120,6 @@ if __name__ == '__main__':
                '-Dinside_chromium_build=0',
                '-Dv8_use_snapshot=false',
                '-Dmsvs_use_common_release=0',
-               '-Dbuild_webkit_exes_from_webkit_gyp=1',
 
                # WebKit doesn't use the chromium style checker.
                '-Dmake_clang_dir=Source/WebKit/chromium/third_party/llvm-build/Release+Asserts',
@@ -129,7 +129,7 @@ if __name__ == '__main__':
                '--depth=./',
 
                # gyp file to execute.
-               'WebKit.gyp'])
+               'All.gyp'])
 
   print 'Updating webkit projects from gyp files...'
   sys.stdout.flush()

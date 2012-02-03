@@ -27,6 +27,7 @@ WebKitCacheModel
 webkit_web_context_get_default
 webkit_web_context_get_cache_model
 webkit_web_context_set_cache_model
+webkit_web_context_download_uri
 
 <SUBSECTION Standard>
 WebKitWebContextClass
@@ -47,6 +48,7 @@ webkit_web_context_get_type
 <TITLE>WebKitWebView</TITLE>
 WebKitWebView
 WebKitLoadEvent
+WebKitPolicyDecisionType
 webkit_web_view_new
 webkit_web_view_new_with_context
 webkit_web_view_get_context
@@ -202,6 +204,8 @@ webkit_settings_get_enable_caret_browsing
 webkit_settings_set_enable_caret_browsing
 webkit_settings_get_enable_fullscreen
 webkit_settings_set_enable_fullscreen
+webkit_settings_get_print_backgrounds
+webkit_settings_set_print_backgrounds
 
 <SUBSECTION Standard>
 WebKitSettingsClass
@@ -285,15 +289,87 @@ webkit_window_properties_get_type
 </SECTION>
 
 <SECTION>
+<FILE>WebKitDownload</FILE>
+WebKitDownload
+webkit_download_get_destination
+webkit_download_set_destination
+webkit_download_get_response
+webkit_download_cancel
+webkit_download_get_estimated_progress
+webkit_download_get_elapsed_time
+
+<SUBSECTION Standard>
+WebKitDownloadClass
+WEBKIT_TYPE_DOWNLOAD
+WEBKIT_DOWNLOAD
+WEBKIT_IS_DOWNLOAD
+WEBKIT_DOWNLOAD_CLASS
+WEBKIT_IS_DOWNLOAD_CLASS
+WEBKIT_DOWNLOAD_GET_CLASS
+
+<SUBSECTION Private>
+WebKitDownloadPrivate
+webkit_download_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitPolicyDecision</FILE>
+WebKitPolicyDecision
+webkit_policy_decision_download
+webkit_policy_decision_ignore
+webkit_policy_decision_use
+
+<SUBSECTION Standard>
+WebKitPolicyDecisionClass
+WEBKIT_TYPE_POLICY_DECISION
+WEBKIT_POLICY_DECISION
+WEBKIT_IS_POLICY_DECISION
+WEBKIT_POLICY_DECISION_CLASS
+WEBKIT_IS_POLICY_DECISION_CLASS
+WEBKIT_POLICY_DECISION_GET_CLASS
+
+<SUBSECTION Private>
+WebKitPolicyDecisionPrivate
+webkit_policy_decision_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitNavigationPolicyDecision</FILE>
+WebKitNavigationPolicyDecision
+WebKitNavigationType
+webkit_navigation_policy_decision_get_frame_name
+webkit_navigation_policy_decision_get_modifiers
+webkit_navigation_policy_decision_get_mouse_button
+webkit_navigation_policy_decision_get_navigation_type
+webkit_navigation_policy_decision_get_request
+
+<SUBSECTION Standard>
+WebKitNavigationPolicyDecisionClass
+WEBKIT_TYPE_NAVIGATION_POLICY_DECISION
+WEBKIT_NAVIGATION_POLICY_DECISION
+WEBKIT_IS_NAVIGATION_POLICY_DECISION
+WEBKIT_NAVIGATION_POLICY_DECISION_CLASS
+WEBKIT_IS_NAVIGATION_POLICY_DECISION_CLASS
+WEBKIT_NAVIGATION_POLICY_DECISION_GET_CLASS
+
+<SUBSECTION Private>
+WebKitNavigationPolicyDecisionPrivate
+webkit_navigation_policy_decision_get_type
+</SECTION>
+
+<SECTION>
 <FILE>WebKitError</FILE>
 WEBKIT_NETWORK_ERROR
 WEBKIT_PLUGIN_ERROR
 WEBKIT_POLICY_ERROR
+WEBKIT_DOWNLOAD_ERROR
 WebKitNetworkError
 WebKitPluginError
 WebKitPolicyError
+WebKitDownloadError
 webkit_network_error_quark
 webkit_plugin_error_quark
 webkit_policy_error_quark
+webkit_download_error_quark
 </SECTION>
 

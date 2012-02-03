@@ -212,7 +212,7 @@ bool Clipboard::hasDropZoneType(const String& keyword)
 {
     if (keyword.startsWith("file:"))
         return hasFileOfType(keyword.substring(5));
-                             
+
     if (keyword.startsWith("string:"))
         return hasStringOfType(keyword.substring(7));
 

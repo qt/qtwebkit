@@ -31,27 +31,7 @@
 
 namespace WebCore {
 
-class CSSMutableStyleDeclarationConstIterator {
-public:
-    CSSMutableStyleDeclarationConstIterator(const CSSMutableStyleDeclaration* decl, CSSProperty* current);
-    CSSMutableStyleDeclarationConstIterator(const CSSMutableStyleDeclarationConstIterator& o);
-    ~CSSMutableStyleDeclarationConstIterator();
-
-    const CSSProperty& operator*() const { return *m_current; }
-    const CSSProperty* operator->() const { return m_current; }
-
-    bool operator!=(const CSSMutableStyleDeclarationConstIterator& o) { ASSERT(m_decl == o.m_decl); return m_current != o.m_current; }
-    bool operator==(const CSSMutableStyleDeclarationConstIterator& o) { ASSERT(m_decl == o.m_decl); return m_current == o.m_current; }
-
-    CSSMutableStyleDeclarationConstIterator& operator=(const CSSMutableStyleDeclarationConstIterator& o);
-
-    CSSMutableStyleDeclarationConstIterator& operator++();
-    CSSMutableStyleDeclarationConstIterator& operator--();
-
-private:
-    const CSSMutableStyleDeclaration* m_decl;
-    CSSProperty* m_current;
-};
+class StyledElement;
 
 class CSSMutableStyleDeclaration : public CSSStyleDeclaration {
 public:
@@ -73,39 +53,30 @@ public:
     {
         return adoptRef(new CSSMutableStyleDeclaration(0, properties));
     }
+    static PassRefPtr<CSSMutableStyleDeclaration> createInline(StyledElement* element)
+    { 
+        return adoptRef(new CSSMutableStyleDeclaration(element));
+    }
 
-    // Used by StyledElement::copyNonAttributeProperties().
-    void copyPropertiesFrom(const CSSMutableStyleDeclaration&);
+    unsigned propertyCount() const { return m_properties.size(); }
+    bool isEmpty() const { return m_properties.isEmpty(); }
+    const CSSProperty& propertyAt(unsigned index) const { return m_properties[index]; }
 
-    typedef CSSMutableStyleDeclarationConstIterator const_iterator;
-
-    const_iterator begin() { return const_iterator(this, m_properties.begin()); }
-    const_iterator end() { return const_iterator(this, m_properties.end()); }
-
-    virtual String cssText() const;
-    virtual void setCssText(const String&, ExceptionCode&);
-
-    virtual unsigned virtualLength() const;
-    unsigned length() const { return m_properties.size(); }
-
-    virtual String item(unsigned index) const;
-
-    virtual PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
-    virtual String getPropertyValue(int propertyID) const;
-    virtual bool getPropertyPriority(int propertyID) const;
-    virtual int getPropertyShorthand(int propertyID) const;
-    virtual bool isPropertyImplicit(int propertyID) const;
-
-    virtual void setProperty(int propertyId, const String& value, bool important, ExceptionCode&);
-    virtual String removeProperty(int propertyID, ExceptionCode&);
+    PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
+    String getPropertyValue(int propertyID) const;
+    bool propertyIsImportant(int propertyID) const;
+    int getPropertyShorthand(int propertyID) const;
+    bool isPropertyImplicit(int propertyID) const;
 
     virtual PassRefPtr<CSSMutableStyleDeclaration> copy() const;
 
     bool setProperty(int propertyID, int value, bool important = false) { return setProperty(propertyID, value, important, true); }
     bool setProperty(int propertyId, double value, CSSPrimitiveValue::UnitTypes unit, bool important = false) { return setProperty(propertyId, value, unit, important, true); }
     bool setProperty(int propertyID, const String& value, bool important = false) { return setProperty(propertyID, value, important, true); }
-
+    void setProperty(const CSSProperty&, CSSProperty* slot = 0);
+    
     void removeProperty(int propertyID) { removeProperty(propertyID, true, false); }
+    String removeProperty(int propertyID, bool notifyChanged, bool returnText);
 
     // The following parses an entire new style declaration.
     void parseDeclaration(const String& styleDeclaration);
@@ -127,18 +98,39 @@ public:
 
     void addSubresourceStyleURLs(ListHashSet<KURL>&);
 
-protected:
-    CSSMutableStyleDeclaration(CSSRule* parentRule);
-    CSSMutableStyleDeclaration();
+    // Used by StyledElement::copyNonAttributeProperties().
+    void copyPropertiesFrom(const CSSMutableStyleDeclaration&);
 
-    void setPropertyInternal(const CSSProperty&, CSSProperty* slot = 0);
-    String removeProperty(int propertyID, bool notifyChanged, bool returnText);
+    void removeEquivalentProperties(const CSSStyleDeclaration*);
+
+    PassRefPtr<CSSMutableStyleDeclaration> copyPropertiesInSet(const int* set, unsigned length) const;
+
+    String asText() const;
 
 private:
+    CSSMutableStyleDeclaration();
+    CSSMutableStyleDeclaration(CSSRule* parentRule);
     CSSMutableStyleDeclaration(CSSRule* parentRule, const Vector<CSSProperty>&);
     CSSMutableStyleDeclaration(CSSRule* parentRule, const CSSProperty* const *, int numProperties);
+    CSSMutableStyleDeclaration(StyledElement*);
 
     virtual PassRefPtr<CSSMutableStyleDeclaration> makeMutable();
+
+    // CSSOM functions. Don't make these public.
+    virtual unsigned length() const;
+    virtual String item(unsigned index) const;
+    virtual PassRefPtr<CSSValue> getPropertyCSSValue(const String& propertyName);
+    virtual String getPropertyValue(const String& propertyName);
+    virtual String getPropertyPriority(const String& propertyName);
+    virtual String getPropertyShorthand(const String& propertyName);
+    virtual bool isPropertyImplicit(const String& propertyName);
+    virtual void setProperty(const String& propertyName, const String& value, const String& priority, ExceptionCode&);
+    virtual String removeProperty(const String& propertyName, ExceptionCode&);
+    virtual String cssText() const;
+    virtual void setCssText(const String&, ExceptionCode&);
+    virtual PassRefPtr<CSSValue> getPropertyCSSValueInternal(CSSPropertyID);
+    virtual String getPropertyValueInternal(CSSPropertyID);
+    virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&);
 
     void setNeedsStyleRecalc();
 
@@ -160,61 +152,13 @@ private:
     bool removeShorthandProperty(int propertyID, bool notifyChanged);
     bool removePropertiesInSet(const int* set, unsigned length, bool notifyChanged);
 
-    Vector<CSSProperty>::const_iterator findPropertyWithId(int propertyId) const;
-    Vector<CSSProperty>::iterator findPropertyWithId(int propertyId);
+    virtual bool cssPropertyMatches(const CSSProperty*) const;
+
+    const CSSProperty* findPropertyWithId(int propertyId) const;
+    CSSProperty* findPropertyWithId(int propertyId);
 
     Vector<CSSProperty, 4> m_properties;
-
-    friend class CSSMutableStyleDeclarationConstIterator;
 };
-
-inline CSSMutableStyleDeclarationConstIterator::CSSMutableStyleDeclarationConstIterator(const CSSMutableStyleDeclaration* decl, CSSProperty* current)
-: m_decl(decl)
-, m_current(current)
-{
-#ifndef NDEBUG
-    const_cast<CSSMutableStyleDeclaration*>(m_decl)->m_iteratorCount++;
-#endif
-}
-
-inline CSSMutableStyleDeclarationConstIterator::CSSMutableStyleDeclarationConstIterator(const CSSMutableStyleDeclarationConstIterator& o)
-: m_decl(o.m_decl)
-, m_current(o.m_current)
-{
-#ifndef NDEBUG
-    const_cast<CSSMutableStyleDeclaration*>(m_decl)->m_iteratorCount++;
-#endif
-}
-
-inline CSSMutableStyleDeclarationConstIterator::~CSSMutableStyleDeclarationConstIterator()
-{
-#ifndef NDEBUG
-    const_cast<CSSMutableStyleDeclaration*>(m_decl)->m_iteratorCount--;
-#endif
-}
-
-inline CSSMutableStyleDeclarationConstIterator& CSSMutableStyleDeclarationConstIterator::operator=(const CSSMutableStyleDeclarationConstIterator& o)
-{
-    m_decl = o.m_decl;
-    m_current = o.m_current;
-#ifndef NDEBUG
-    const_cast<CSSMutableStyleDeclaration*>(m_decl)->m_iteratorCount++;
-#endif
-    return *this;
-}
-
-inline CSSMutableStyleDeclarationConstIterator& CSSMutableStyleDeclarationConstIterator::operator++()
-{
-    ASSERT(m_current != const_cast<CSSMutableStyleDeclaration*>(m_decl)->m_properties.end());
-    ++m_current;
-    return *this;
-}
-
-inline CSSMutableStyleDeclarationConstIterator& CSSMutableStyleDeclarationConstIterator::operator--()
-{
-    --m_current;
-    return *this;
-}
 
 } // namespace WebCore
 

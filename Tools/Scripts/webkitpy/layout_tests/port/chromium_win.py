@@ -31,7 +31,6 @@
 
 import os
 import logging
-import sys
 
 import chromium
 
@@ -39,23 +38,9 @@ import chromium
 _log = logging.getLogger(__name__)
 
 
-def os_version(windows_version=None):
-    if not windows_version:
-        if hasattr(sys, 'getwindowsversion'):
-            windows_version = tuple(sys.getwindowsversion()[:2])
-        else:
-            # Make up something for testing.
-            windows_version = (5, 1)
-
-    version_strings = {
-        (6, 1): 'win7',
-        (6, 0): 'vista',
-        (5, 1): 'xp',
-    }
-    return version_strings[windows_version]
-
-
 class ChromiumWinPort(chromium.ChromiumPort):
+    port_name = 'chromium-win'
+
     # FIXME: Figure out how to unify this with base.TestConfiguration.all_systems()?
     SUPPORTED_VERSIONS = ('xp', 'vista', 'win7')
 
@@ -84,18 +69,24 @@ class ChromiumWinPort(chromium.ChromiumPort):
         ],
     }
 
-    def __init__(self, host, port_name=None, windows_version=None, **kwargs):
+    @classmethod
+    def determine_full_port_name(cls, host, options, port_name):
+        if port_name.endswith('-win'):
+            assert host.platform.is_win()
+            if host.platform.os_version in ('7sp0', '7sp1', 'future'):
+                version = 'win7'
+            else:
+                version = host.platform.os_version
+            port_name = port_name + '-' + version
+        return port_name
+
+    def __init__(self, host, port_name, **kwargs):
+        chromium.ChromiumPort.__init__(self, host, port_name, **kwargs)
+
         # We're a little generic here because this code is reused by the
         # 'google-chrome' port as well as the 'mock-' and 'dryrun-' ports.
-        port_name = port_name or 'chromium-win'
-        chromium.ChromiumPort.__init__(self, host, port_name=port_name, **kwargs)
-        if port_name.endswith('-win'):
-            self._version = os_version(windows_version)
-            self._name = port_name + '-' + self._version
-        else:
-            self._version = port_name[port_name.index('-win-') + len('-win-'):]
-            assert self._version in self.SUPPORTED_VERSIONS, "%s is not in %s" % (self._version, self.SUPPORTED_VERSIONS)
-
+        self._version = port_name[port_name.index('-win-') + len('-win-'):]
+        assert self._version in self.SUPPORTED_VERSIONS, "%s is not in %s" % (self._version, self.SUPPORTED_VERSIONS)
 
     def setup_environ_for_server(self, server_name=None):
         env = chromium.ChromiumPort.setup_environ_for_server(self, server_name)

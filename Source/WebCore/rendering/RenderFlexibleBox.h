@@ -46,6 +46,8 @@ public:
 
     virtual void layoutBlock(bool relayoutChildren, int pageLogicalHeight = 0, BlockLayoutPass = NormalLayoutPass);
 
+    bool isHorizontalFlow() const;
+
 private:
     class TreeOrderIterator;
     class FlexOrderIterator;
@@ -53,7 +55,6 @@ private:
 
     bool hasOrthogonalFlow(RenderBox* child) const;
     bool isColumnFlow() const;
-    bool isHorizontalFlow() const;
     bool isLeftToRightFlow() const;
     Length crossAxisLength() const;
     Length mainAxisLengthForChild(RenderBox* child) const;
@@ -77,6 +78,7 @@ private:
     LayoutUnit flowAwareMarginBeforeForChild(RenderBox* child) const;
     LayoutUnit flowAwareMarginAfterForChild(RenderBox* child) const;
     LayoutUnit crossAxisMarginExtentForChild(RenderBox* child) const;
+    LayoutUnit crossAxisScrollbarExtent() const;
     LayoutPoint flowAwareLocationForChild(RenderBox* child) const;
     // FIXME: Supporting layout deltas.
     void setFlowAwareLocationForChild(RenderBox* child, const LayoutPoint&);

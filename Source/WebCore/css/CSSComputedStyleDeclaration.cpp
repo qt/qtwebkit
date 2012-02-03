@@ -26,9 +26,10 @@
 
 #include "AnimationController.h"
 #include "CSSAspectRatioValue.h"
-#include "CSSBorderImageValue.h"
+#include "CSSBorderImage.h"
 #include "CSSLineBoxContainValue.h"
 #include "CSSMutableStyleDeclaration.h"
+#include "CSSParser.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPrimitiveValueMappings.h"
 #include "CSSProperty.h"
@@ -42,7 +43,9 @@
 #include "CounterContent.h"
 #include "CursorList.h"
 #if ENABLE(CSS_SHADERS)
+#include "CustomFilterNumberParameter.h"
 #include "CustomFilterOperation.h"
+#include "CustomFilterParameter.h"
 #endif
 #include "Document.h"
 #include "ExceptionCode.h"
@@ -56,6 +59,7 @@
 #include "RenderStyle.h"
 #include "ShadowValue.h"
 #if ENABLE(CSS_FILTERS)
+#include "StyleCustomFilterProgram.h"
 #include "WebKitCSSFilterValue.h"
 #endif
 #include "WebKitCSSTransformValue.h"
@@ -217,12 +221,14 @@ static const int computedProperties[] = {
 #endif
     CSSPropertyWebkitFlexOrder,
     CSSPropertyWebkitFlexPack,
+    CSSPropertyWebkitFlexAlign,
     CSSPropertyWebkitFlexItemAlign,
     CSSPropertyWebkitFlexDirection,
     CSSPropertyWebkitFlexFlow,
     CSSPropertyWebkitFlexWrap,
     CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
+    CSSPropertyWebkitFontVariantLigatures,
 #if ENABLE(CSS_GRID_LAYOUT)
     CSSPropertyWebkitGridColumns,
     CSSPropertyWebkitGridRows,
@@ -496,7 +502,7 @@ static PassRefPtr<CSSValue> valueForNinePieceImage(const NinePieceImage& image, 
     // Create the repeat rules.
     RefPtr<CSSValue> repeat = valueForNinePieceImageRepeat(image, cssValuePool);
 
-    return CSSBorderImageValue::create(imageValue.release(), imageSlices.release(), borderSlices.release(), outset.release(), repeat);
+    return createBorderImageValue(imageValue, imageSlices, borderSlices, outset, repeat);
 }
 
 inline static PassRefPtr<CSSPrimitiveValue> zoomAdjustedPixelValue(int value, const RenderStyle* style, CSSValuePool* cssValuePool)
@@ -710,6 +716,30 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
     return list.release();
 }
 
+#if ENABLE(CSS_SHADERS)
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForCustomFilterNumberParameter(const CustomFilterNumberParameter* numberParameter) const
+{
+    RefPtr<CSSValueList> numberParameterValue = CSSValueList::createSpaceSeparated();
+    CSSValuePool* cssValuePool = m_node->document()->cssValuePool().get();
+    for (unsigned i = 0; i < numberParameter->size(); ++i)
+        numberParameterValue->append(cssValuePool->createValue(numberParameter->valueAt(i), CSSPrimitiveValue::CSS_NUMBER));
+    return numberParameterValue.release();
+}
+
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForCustomFilterParameter(const CustomFilterParameter* parameter) const
+{
+    // FIXME: Add here computed style for the other types: boolean, transform, matrix, texture.
+    ASSERT(parameter);
+    switch (parameter->parameterType()) {
+    case CustomFilterParameter::NUMBER:
+        return valueForCustomFilterNumberParameter(static_cast<const CustomFilterNumberParameter*>(parameter));
+    }
+    
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+#endif // ENABLE(CSS_SHADERS)
+
 #if ENABLE(CSS_FILTERS)
 PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(RenderStyle* style) const
 {
@@ -801,13 +831,16 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(RenderStyle* st
             
             // The output should be verbose, even if the values are the default ones.
             
+            ASSERT(customOperation->program());
+            StyleCustomFilterProgram* program = static_cast<StyleCustomFilterProgram*>(customOperation->program());
+            
             RefPtr<CSSValueList> shadersList = CSSValueList::createSpaceSeparated();
-            if (customOperation->vertexShader())
-                shadersList->append(customOperation->vertexShader()->cssValue());
+            if (program->vertexShader())
+                shadersList->append(program->vertexShader()->cssValue());
             else
                 shadersList->append(cssValuePool->createIdentifierValue(CSSValueNone));
-            if (customOperation->fragmentShader())
-                shadersList->append(customOperation->fragmentShader()->cssValue());
+            if (program->fragmentShader())
+                shadersList->append(program->fragmentShader()->cssValue());
             else
                 shadersList->append(cssValuePool->createIdentifierValue(CSSValueNone));
             filterValue->append(shadersList.release());
@@ -824,6 +857,20 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(RenderStyle* st
             
             filterValue->append(meshParameters.release());
             
+            const CustomFilterParameterList& parameters = customOperation->parameters();
+            size_t parametersSize = parameters.size();
+            if (!parametersSize)
+                break;
+            RefPtr<CSSValueList> parametersCSSValue = CSSValueList::createCommaSeparated();
+            for (size_t i = 0; i < parametersSize; ++i) {
+                const CustomFilterParameter* parameter = parameters.at(i).get();
+                RefPtr<CSSValueList> parameterCSSNameAndValue = CSSValueList::createSpaceSeparated();
+                parameterCSSNameAndValue->append(cssValuePool->createValue(parameter->name(), CSSPrimitiveValue::CSS_STRING));
+                parameterCSSNameAndValue->append(valueForCustomFilterParameter(parameter));
+                parametersCSSValue->append(parameterCSSNameAndValue.release());
+            }
+            
+            filterValue->append(parametersCSSValue.release());
             break;
         }
 #endif
@@ -1521,7 +1568,11 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return cssValuePool->createValue(style->flexOrder(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyWebkitFlexPack:
             return cssValuePool->createValue(style->flexPack());
+        case CSSPropertyWebkitFlexAlign:
+            return cssValuePool->createValue(style->flexAlign());
         case CSSPropertyWebkitFlexItemAlign:
+            // FIXME: If flex-item-align:auto, then we should return the parent's flex-align.
+            // http://webkit.org/b/76326
             return cssValuePool->createValue(style->flexItemAlign());
         case CSSPropertyWebkitFlexDirection:
             return cssValuePool->createValue(style->flexDirection());
@@ -1871,6 +1922,23 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return cssValuePool->createValue(style->fontDescription().kerning());
         case CSSPropertyWebkitFontSmoothing:
             return cssValuePool->createValue(style->fontDescription().fontSmoothing());
+        case CSSPropertyWebkitFontVariantLigatures: {
+            FontDescription::LigaturesState commonLigaturesState = style->fontDescription().commonLigaturesState();
+            FontDescription::LigaturesState discretionaryLigaturesState = style->fontDescription().discretionaryLigaturesState();
+            FontDescription::LigaturesState historicalLigaturesState = style->fontDescription().historicalLigaturesState();
+            if (commonLigaturesState == FontDescription::NormalLigaturesState && discretionaryLigaturesState == FontDescription::NormalLigaturesState
+                && historicalLigaturesState == FontDescription::NormalLigaturesState)
+                return cssValuePool->createIdentifierValue(CSSValueNormal);
+
+            RefPtr<CSSValueList> valueList = CSSValueList::createSpaceSeparated();
+            if (commonLigaturesState != FontDescription::NormalLigaturesState)
+                valueList->append(cssValuePool->createIdentifierValue(commonLigaturesState == FontDescription::DisabledLigaturesState ? CSSValueNoCommonLigatures : CSSValueCommonLigatures));
+            if (discretionaryLigaturesState != FontDescription::NormalLigaturesState)
+                valueList->append(cssValuePool->createIdentifierValue(discretionaryLigaturesState == FontDescription::DisabledLigaturesState ? CSSValueNoDiscretionaryLigatures : CSSValueDiscretionaryLigatures));
+            if (historicalLigaturesState != FontDescription::NormalLigaturesState)
+                valueList->append(cssValuePool->createIdentifierValue(historicalLigaturesState == FontDescription::DisabledLigaturesState ? CSSValueNoHistoricalLigatures : CSSValueHistoricalLigatures));
+            return valueList;
+        }
         case CSSPropertyZIndex:
             if (style->hasAutoZIndex())
                 return cssValuePool->createIdentifierValue(CSSValueAuto);
@@ -2408,24 +2476,8 @@ String CSSComputedStyleDeclaration::getPropertyValue(int propertyID) const
     return "";
 }
 
-bool CSSComputedStyleDeclaration::getPropertyPriority(int /*propertyID*/) const
-{
-    // All computed styles have a priority of false (not "important").
-    return false;
-}
 
-String CSSComputedStyleDeclaration::removeProperty(int /*propertyID*/, ExceptionCode& ec)
-{
-    ec = NO_MODIFICATION_ALLOWED_ERR;
-    return String();
-}
-
-void CSSComputedStyleDeclaration::setProperty(int /*propertyID*/, const String& /*value*/, bool /*important*/, ExceptionCode& ec)
-{
-    ec = NO_MODIFICATION_ALLOWED_ERR;
-}
-
-unsigned CSSComputedStyleDeclaration::virtualLength() const
+unsigned CSSComputedStyleDeclaration::length() const
 {
     Node* node = m_node.get();
     if (!node)
@@ -2454,12 +2506,12 @@ bool CSSComputedStyleDeclaration::cssPropertyMatches(const CSSProperty* property
         if (style && style->fontDescription().keywordSize()) {
             int sizeValue = cssIdentifierForFontSizeKeyword(style->fontDescription().keywordSize());
             CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(property->value());
-            if (primitiveValue->primitiveType() == CSSPrimitiveValue::CSS_IDENT && primitiveValue->getIdent() == sizeValue)
+            if (primitiveValue->isIdent() && primitiveValue->getIdent() == sizeValue)
                 return true;
         }
     }
-
-    return CSSStyleDeclaration::cssPropertyMatches(property);
+    RefPtr<CSSValue> value = getPropertyCSSValue(property->id());
+    return value && value->cssText() == property->value()->cssText();
 }
 
 PassRefPtr<CSSMutableStyleDeclaration> CSSComputedStyleDeclaration::copy() const
@@ -2508,6 +2560,76 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getCSSPropertyValuesForSid
         list->append(leftValue);
 
     return list.release();
+}
+
+PassRefPtr<CSSMutableStyleDeclaration> CSSComputedStyleDeclaration::copyPropertiesInSet(const int* set, unsigned length) const
+{
+    Vector<CSSProperty> list;
+    list.reserveInitialCapacity(length);
+    for (unsigned i = 0; i < length; ++i) {
+        RefPtr<CSSValue> value = getPropertyCSSValue(set[i]);
+        if (value)
+            list.append(CSSProperty(set[i], value.release(), false));
+    }
+    return CSSMutableStyleDeclaration::create(list);
+}
+
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(const String& propertyName)
+{
+    int propertyID = cssPropertyID(propertyName);
+    if (!propertyID)
+        return 0;
+    return getPropertyCSSValue(propertyID);
+}
+
+String CSSComputedStyleDeclaration::getPropertyValue(const String &propertyName)
+{
+    int propertyID = cssPropertyID(propertyName);
+    if (!propertyID)
+        return String();
+    return getPropertyValue(propertyID);
+}
+
+String CSSComputedStyleDeclaration::getPropertyPriority(const String&)
+{
+    // All computed styles have a priority of not "important".
+    return "";
+}
+
+String CSSComputedStyleDeclaration::getPropertyShorthand(const String&)
+{
+    return "";
+}
+
+bool CSSComputedStyleDeclaration::isPropertyImplicit(const String&)
+{
+    return false;
+}
+
+void CSSComputedStyleDeclaration::setProperty(const String&, const String&, const String&, ExceptionCode& ec)
+{
+    ec = NO_MODIFICATION_ALLOWED_ERR;
+}
+
+String CSSComputedStyleDeclaration::removeProperty(const String&, ExceptionCode& ec)
+{
+    ec = NO_MODIFICATION_ALLOWED_ERR;
+    return String();
+}
+    
+PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValueInternal(CSSPropertyID propertyID)
+{
+    return getPropertyCSSValue(propertyID);
+}
+
+String CSSComputedStyleDeclaration::getPropertyValueInternal(CSSPropertyID propertyID)
+{
+    return getPropertyValue(propertyID);
+}
+
+void CSSComputedStyleDeclaration::setPropertyInternal(CSSPropertyID, const String&, bool, ExceptionCode& ec)
+{
+    ec = NO_MODIFICATION_ALLOWED_ERR;
 }
 
 } // namespace WebCore

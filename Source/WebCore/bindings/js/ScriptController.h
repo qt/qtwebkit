@@ -33,12 +33,7 @@
 
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
-
-#ifdef __OBJC__
-@class WebScriptObject;
-#else
-class WebScriptObject;
-#endif
+OBJC_CLASS WebScriptObject;
 #endif
 
 struct NPObject;
@@ -172,8 +167,6 @@ private:
     ShellMap m_windowShells;
     Frame* m_frame;
     const String* m_sourceURL;
-
-    bool m_inExecuteScript;
 
     bool m_paused;
 

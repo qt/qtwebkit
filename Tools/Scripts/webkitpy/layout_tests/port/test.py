@@ -223,8 +223,10 @@ layer at (0,0) size 800x34
 
 if sys.platform == 'win32':
     LAYOUT_TEST_DIR = 'c:/test.checkout/LayoutTests'
+    PERF_TEST_DIR = 'c:/test.checkout/PerformanceTests'
 else:
     LAYOUT_TEST_DIR = '/test.checkout/LayoutTests'
+    PERF_TEST_DIR = '/test.checkout/PerformanceTests'
 
 
 # Here we synthesize an in-memory filesystem from the test list
@@ -304,6 +306,8 @@ WONTFIX SKIP : failures/expected/exception.html = CRASH
 
 
 class TestPort(Port):
+    port_name = 'test'
+
     """Test implementation of the Port interface."""
     ALL_BASELINE_VARIANTS = (
         'test-mac-snowleopard', 'test-mac-leopard',
@@ -311,15 +315,20 @@ class TestPort(Port):
         'test-linux-x86_64',
     )
 
-    def __init__(self, host, port_name=None, **kwargs):
-        if not port_name or port_name == 'test':
-            port_name = 'test-mac-leopard'
+    @classmethod
+    def determine_full_port_name(cls, host, options, port_name):
+        if port_name == 'test':
+            return 'test-mac-leopard'
+        return port_name
 
+    def __init__(self, host, port_name=None, **kwargs):
+        # FIXME: Consider updating all of the callers to pass in a port_name so it can be a
+        # required parameter like all of the other Port objects.
+        port_name = port_name or 'test-mac-leopard'
+        Port.__init__(self, host, port_name, **kwargs)
         self._tests = unit_test_list()
         self._expectations_path = LAYOUT_TEST_DIR + '/platform/test/test_expectations.txt'
         self._results_directory = None
-
-        Port.__init__(self, host, port_name=port_name, **kwargs)
 
         self._operating_system = 'mac'
         if port_name.startswith('test-win'):
@@ -336,7 +345,6 @@ class TestPort(Port):
             'test-linux-x86_64': 'lucid',
         }
         self._version = version_map[port_name]
-
 
     def _path_to_driver(self):
         # This routine shouldn't normally be called, but it is called by
@@ -377,6 +385,12 @@ class TestPort(Port):
 
     def layout_tests_dir(self):
         return LAYOUT_TEST_DIR
+
+    def perf_tests_dir(self):
+        return PERF_TEST_DIR
+
+    def webkit_base(self):
+        return '/test.checkout'
 
     def name(self):
         return self._name

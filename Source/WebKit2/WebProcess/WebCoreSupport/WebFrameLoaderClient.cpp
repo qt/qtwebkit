@@ -552,6 +552,18 @@ void WebFrameLoaderClient::dispatchDidFirstVisuallyNonEmptyLayout()
     webPage->send(Messages::WebPageProxy::DidFirstVisuallyNonEmptyLayoutForFrame(m_frame->frameID(), InjectedBundleUserMessageEncoder(userData.get())));
 }
 
+void WebFrameLoaderClient::dispatchDidNewFirstVisuallyNonEmptyLayout()
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+
+    RefPtr<APIObject> userData;
+
+    // Notify the UIProcess.
+    webPage->send(Messages::WebPageProxy::DidNewFirstVisuallyNonEmptyLayout(InjectedBundleUserMessageEncoder(userData.get())));
+}
+
 void WebFrameLoaderClient::dispatchDidLayout()
 {
     WebPage* webPage = m_frame->page();
@@ -1372,6 +1384,11 @@ void WebFrameLoaderClient::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld* 
         return;
 
     webPage->injectedBundleLoaderClient().didClearWindowObjectForFrame(webPage, m_frame, world);
+
+#if PLATFORM(GTK)
+    // Ensure the accessibility hierarchy is updated.
+    webPage->updateAccessibilityTree();
+#endif
 }
 
 void WebFrameLoaderClient::documentElementAvailable()
@@ -1439,12 +1456,6 @@ void WebFrameLoaderClient::didChangeScrollOffset()
 PassRefPtr<FrameNetworkingContext> WebFrameLoaderClient::createNetworkingContext()
 {
     RefPtr<WebFrameNetworkingContext> context = WebFrameNetworkingContext::create(m_frame);
-#if PLATFORM(QT)
-    // We encapsulate the WebPage pointer as a property of the originating QObject.
-    QObject* originatingObject = context->originatingObject();
-    ASSERT(originatingObject);
-    originatingObject->setProperty("PagePointer", QVariant::fromValue(static_cast<void*>(m_frame->page())));
-#endif
     return context.release();
 }
 

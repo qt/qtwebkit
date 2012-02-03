@@ -27,6 +27,7 @@
 #include "MessageID.h"
 #include "ShareableBitmap.h"
 #include "TextureMapperGL.h"
+#include "TextureMapperQt.h"
 #include "UpdateInfo.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebLayerTreeInfo.h"
@@ -56,6 +57,8 @@ public:
     virtual ~LayerTreeMessageToRenderer() { }
     virtual Type type() const = 0;
 };
+
+using namespace WebCore;
 
 template<class MessageData, LayerTreeMessageToRenderer::Type messageType>
 class LayerTreeMessageToRendererWithData : public LayerTreeMessageToRenderer {
@@ -94,7 +97,7 @@ struct UpdateTileMessageData {
     int remoteTileID;
     IntRect sourceRect;
     IntRect targetRect;
-    QImage image;
+    RefPtr<ShareableBitmap> bitmap;
 };
 
 struct RemoveTileMessageData {
@@ -104,7 +107,7 @@ struct RemoveTileMessageData {
 
 struct CreateImageMessageData {
     int64_t imageID;
-    QImage image;
+    RefPtr<ShareableBitmap> bitmap;
 };
 
 struct DestroyImageMessageData {
@@ -165,10 +168,11 @@ LayerTreeHostProxy::~LayerTreeHostProxy()
 }
 
 // This function needs to be reentrant.
-void LayerTreeHostProxy::paintToCurrentGLContext(const TransformationMatrix& matrix, float opacity)
+void LayerTreeHostProxy::paintToCurrentGLContext(const TransformationMatrix& matrix, float opacity, const FloatRect& clipRect)
 {
     if (!m_textureMapper)
         m_textureMapper = TextureMapperGL::create();
+    ASSERT(dynamic_cast<TextureMapperGL*>(m_textureMapper.get()));
 
     syncRemoteContent();
     GraphicsLayer* currentRootLayer = rootLayer();
@@ -182,11 +186,11 @@ void LayerTreeHostProxy::paintToCurrentGLContext(const TransformationMatrix& mat
 
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
-    IntRect viewportRect(viewport[0], viewport[1], viewport[2], viewport[3]);
     m_textureMapper->setViewportSize(IntSize(viewport[2], viewport[3]));
     node->setTextureMapper(m_textureMapper.get());
     m_textureMapper->beginPainting();
     m_textureMapper->bindSurface(0);
+    m_textureMapper->beginClip(TransformationMatrix(), clipRect);
 
     if (currentRootLayer->opacity() != opacity || currentRootLayer->transform() != matrix) {
         currentRootLayer->setOpacity(opacity);
@@ -194,20 +198,8 @@ void LayerTreeHostProxy::paintToCurrentGLContext(const TransformationMatrix& mat
         currentRootLayer->syncCompositingStateForThisLayerOnly();
     }
 
-    TextureMapperNode::NodeRectMap nodeVisualContentsRectMap;
-    if (node->collectVisibleContentsRects(nodeVisualContentsRectMap, viewportRect)) {
-        TextureMapperNode::NodeRectMap::iterator endIterator = nodeVisualContentsRectMap.end();
-        for (TextureMapperNode::NodeRectMap::iterator it = nodeVisualContentsRectMap.begin(); it != endIterator; ++it) {
-            WebLayerID layerID = it->first->id();
-            // avoid updating non-synced root layer
-            if (!layerID)
-                continue;
-            IntRect visibleRect = IntRect(it->second);
-            setVisibleContentsRectForLayer(layerID, visibleRect);
-        }
-    }
     node->paint();
-
+    m_textureMapper->endClip();
     m_textureMapper->endPainting();
 
     if (node->descendantsOrSelfHaveRunningAnimations()) {
@@ -215,6 +207,28 @@ void LayerTreeHostProxy::paintToCurrentGLContext(const TransformationMatrix& mat
         m_viewportUpdateTimer.startOneShot(0);
     }
 }
+
+void LayerTreeHostProxy::paintToGraphicsContext(QPainter* painter)
+{
+    if (!m_textureMapper)
+        m_textureMapper = TextureMapperQt::create();
+    ASSERT(dynamic_cast<TextureMapperQt*>(m_textureMapper.get()));
+
+    syncRemoteContent();
+    TextureMapperNode* node = toTextureMapperNode(rootLayer());
+
+    if (!node)
+        return;
+
+    GraphicsContext graphicsContext(painter);
+    m_textureMapper->setGraphicsContext(&graphicsContext);
+    m_textureMapper->beginPainting();
+    m_textureMapper->bindSurface(0);
+    node->paint();
+    m_textureMapper->endPainting();
+    m_textureMapper->setGraphicsContext(0);
+}
+
 
 void LayerTreeHostProxy::didFireViewportUpdateTimer(Timer<LayerTreeHostProxy>*)
 {
@@ -224,11 +238,6 @@ void LayerTreeHostProxy::didFireViewportUpdateTimer(Timer<LayerTreeHostProxy>*)
 void LayerTreeHostProxy::updateViewport()
 {
     m_drawingAreaProxy->updateViewport();
-}
-
-void LayerTreeHostProxy::setVisibleContentsRectForLayer(WebLayerID layerID, const IntRect& rect)
-{
-    m_drawingAreaProxy->page()->process()->send(Messages::LayerTreeHost::SetVisibleContentRectForLayer(layerID, rect), m_drawingAreaProxy->page()->pageID());
 }
 
 int LayerTreeHostProxy::remoteTileIDToNodeTileID(int tileID) const
@@ -245,6 +254,7 @@ void LayerTreeHostProxy::syncLayerParameters(const WebLayerInfo& layerInfo)
     ensureLayer(id);
     LayerMap::iterator it = m_layers.find(id);
     GraphicsLayer* layer = it->second;
+    bool needsToUpdateImageTiles = layerInfo.imageIsUpdated || layerInfo.contentsRect != layer->contentsRect();
 
     layer->setName(layerInfo.name);
 
@@ -261,7 +271,7 @@ void LayerTreeHostProxy::syncLayerParameters(const WebLayerInfo& layerInfo)
     layer->setContentsRect(layerInfo.contentsRect);
     layer->setDrawsContent(layerInfo.drawsContent);
 
-    if (layerInfo.imageIsUpdated)
+    if (needsToUpdateImageTiles)
         assignImageToLayer(layer, layerInfo.imageBackingStoreID);
 
     // Never make the root layer clip.
@@ -366,7 +376,7 @@ void LayerTreeHostProxy::removeTile(WebLayerID layerID, int tileID)
     m_tileToNodeTile.remove(tileID);
 }
 
-void LayerTreeHostProxy::updateTile(WebLayerID layerID, int tileID, const IntRect& sourceRect, const IntRect& targetRect, const QImage& image)
+void LayerTreeHostProxy::updateTile(WebLayerID layerID, int tileID, const IntRect& sourceRect, const IntRect& targetRect, ShareableBitmap* bitmap)
 {
     ensureLayer(layerID);
     TextureMapperNode* node = toTextureMapperNode(layerByID(layerID));
@@ -377,15 +387,16 @@ void LayerTreeHostProxy::updateTile(WebLayerID layerID, int tileID, const IntRec
     if (!nodeTileID)
         return;
 
-    QImage imageRef(image);
     node->setTextureMapper(m_textureMapper.get());
-    node->setContentsTileBackBuffer(nodeTileID, sourceRect, targetRect, imageRef.bits(), BitmapTexture::BGRAFormat);
+    QImage image = bitmap->createQImage();
+    node->setContentsTileBackBuffer(nodeTileID, sourceRect, targetRect, image.constBits());
 }
 
-void LayerTreeHostProxy::createImage(int64_t imageID, const QImage& image)
+void LayerTreeHostProxy::createImage(int64_t imageID, ShareableBitmap* bitmap)
 {
     TiledImage tiledImage;
     static const int TileDimension = 1024;
+    QImage image = bitmap->createQImage();
     bool imageHasAlpha = image.hasAlphaChannel();
     IntRect imageRect(0, 0, image.width(), image.height());
     for (int y = 0; y < image.height(); y += TileDimension) {
@@ -399,13 +410,12 @@ void LayerTreeHostProxy::createImage(int64_t imageID, const QImage& image)
                 subImage = image.copy(rect);
             RefPtr<BitmapTexture> texture = m_textureMapper->createTexture();
             texture->reset(rect.size(), !imageHasAlpha);
-            texture->updateContents(imageHasAlpha ? BitmapTexture::BGRAFormat : BitmapTexture::BGRFormat, IntRect(IntPoint::zero(), rect.size()), subImage.bits());
+            texture->updateRawContents(IntRect(IntPoint::zero(), rect.size()), subImage.constBits());
             tiledImage.add(rect.location(), texture);
         }
     }
 
-    m_directlyCompositedImages.remove(imageID);
-    m_directlyCompositedImages.add(imageID, tiledImage);
+    m_directlyCompositedImages.set(imageID, tiledImage);
 }
 
 void LayerTreeHostProxy::destroyImage(int64_t imageID)
@@ -447,6 +457,8 @@ void LayerTreeHostProxy::assignImageToLayer(GraphicsLayer* layer, int64_t imageI
 void LayerTreeHostProxy::flushLayerChanges()
 {
     m_rootLayer->syncCompositingState(FloatRect());
+    // The pending tiles state is on its way for the screen, tell the web process to render the next one.
+    m_drawingAreaProxy->page()->process()->send(Messages::LayerTreeHost::RenderNextFrame(), m_drawingAreaProxy->page()->pageID());
 }
 
 void LayerTreeHostProxy::ensureRootLayer()
@@ -504,18 +516,18 @@ void LayerTreeHostProxy::syncRemoteContent()
 
         case LayerTreeMessageToRenderer::UpdateTile: {
             const UpdateTileMessageData& data = static_cast<UpdateTileMessage*>(nextMessage.get())->data();
-            updateTile(data.layerID, data.remoteTileID, data.sourceRect, data.targetRect, data.image);
+            updateTile(data.layerID, data.remoteTileID, data.sourceRect, data.targetRect, data.bitmap.get());
             break;
         }
 
         case LayerTreeMessageToRenderer::CreateImage: {
             const CreateImageMessageData& data = static_cast<CreateImageMessage*>(nextMessage.get())->data();
-            createImage(data.imageID, data.image);
+            createImage(data.imageID, data.bitmap.get());
             break;
         }
 
         case LayerTreeMessageToRenderer::DestroyImage: {
-            const CreateImageMessageData& data = static_cast<CreateImageMessage*>(nextMessage.get())->data();
+            const DestroyImageMessageData& data = static_cast<DestroyImageMessage*>(nextMessage.get())->data();
             destroyImage(data.imageID);
             break;
         }
@@ -548,8 +560,7 @@ void LayerTreeHostProxy::updateTileForLayer(int layerID, int tileID, const WebKi
     UpdateTileMessageData data;
     data.layerID = layerID;
     data.remoteTileID = tileID;
-    RefPtr<ShareableBitmap> bitmap = ShareableBitmap::create(updateInfo.bitmapHandle);
-    data.image = bitmap->createQImage().copy();
+    data.bitmap = ShareableBitmap::create(updateInfo.bitmapHandle);
     data.sourceRect = IntRect(IntPoint::zero(), updateInfo.updateRectBounds.size());
     data.targetRect = updateInfo.updateRectBounds;
     pushUpdateToQueue(UpdateTileMessage::create(data));
@@ -587,7 +598,6 @@ void LayerTreeHostProxy::syncCompositingLayerState(const WebLayerInfo& info)
 
 void LayerTreeHostProxy::didRenderFrame()
 {
-    m_drawingAreaProxy->page()->process()->send(Messages::LayerTreeHost::RenderNextFrame(), m_drawingAreaProxy->page()->pageID());
     pushUpdateToQueue(FlushLayerChangesMessage::create());
     updateViewport();
 }
@@ -595,9 +605,8 @@ void LayerTreeHostProxy::didRenderFrame()
 void LayerTreeHostProxy::createDirectlyCompositedImage(int64_t key, const WebKit::ShareableBitmap::Handle& handle)
 {
     CreateImageMessageData data;
-    RefPtr<ShareableBitmap> bitmap = ShareableBitmap::create(handle);
     data.imageID = key;
-    data.image = bitmap->createQImage().copy();
+    data.bitmap = ShareableBitmap::create(handle);
     pushUpdateToQueue(CreateImageMessage::create(data));
 }
 

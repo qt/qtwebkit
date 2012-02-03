@@ -176,7 +176,7 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 
 // CSS3 Flexbox Properties
 
-enum EFlexPack { PackStart, PackEnd, PackCenter, PackJustify };
+enum EFlexPack { PackStart, PackEnd, PackCenter, PackJustify, PackDistribute };
 enum EFlexAlign { AlignAuto, AlignStart, AlignEnd, AlignCenter, AlignStretch, AlignBaseline };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
 enum EFlexWrap { FlexNoWrap, FlexWrap, FlexWrapReverse };
@@ -460,7 +460,7 @@ enum RegionOverflow { AutoRegionOverflow, BreakRegionOverflow };
 
 enum ColumnAxis { HorizontalColumnAxis, VerticalColumnAxis, AutoColumnAxis };
 
-enum LineGridSnap { LineGridSnapNone, LineGridSnapBaseline, LineGridSnapBounds };
+enum LineGridSnap { LineGridSnapNone, LineGridSnapBaseline, LineGridSnapContain };
 
 enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowLeft, WrapFlowRight, WrapFlowMaximum, WrapFlowClear };
 

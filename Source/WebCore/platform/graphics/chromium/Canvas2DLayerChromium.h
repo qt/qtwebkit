@@ -37,9 +37,12 @@
 #include "CanvasLayerChromium.h"
 #include "ManagedTexture.h"
 
+class SkCanvas;
+
 namespace WebCore {
 
 class GraphicsContext3D;
+class Region;
 
 // A layer containing an accelerated 2d canvas
 class Canvas2DLayerChromium : public CanvasLayerChromium {
@@ -52,13 +55,15 @@ public:
     virtual void contentChanged();
 
     virtual bool drawsContent() const;
-    virtual void paintContentsIfDirty();
+    virtual void paintContentsIfDirty(const Region& occludedScreenSpace);
 
     virtual void setLayerTreeHost(CCLayerTreeHost*);
     virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
     virtual void pushPropertiesTo(CCLayerImpl*);
     virtual void unreserveContentsTexture();
     virtual void cleanupResources();
+
+    void setCanvas(SkCanvas*);
 
 private:
     Canvas2DLayerChromium(GraphicsContext3D*, const IntSize&);
@@ -76,6 +81,7 @@ private:
     // synchronize its draws with the canvas updates.
     bool m_useDoubleBuffering;
     OwnPtr<ManagedTexture> m_frontTexture;
+    SkCanvas* m_canvas;
 };
 
 }

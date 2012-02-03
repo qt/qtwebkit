@@ -48,6 +48,7 @@ namespace JSC {
     class JSCell;
     class Structure;
     class StructureChain;
+    struct ValueProfile;
 
 #if ENABLE(JIT)
     typedef MacroAssemblerCodeRef PolymorphicAccessStructureListStubRoutineType;
@@ -98,6 +99,10 @@ namespace JSC {
                 this->isDirect = isDirect;
             }
         } list[POLYMORPHIC_LIST_CACHE_SIZE];
+        
+        PolymorphicAccessStructureList()
+        {
+        }
         
         PolymorphicAccessStructureList(JSGlobalData& globalData, JSCell* owner, PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase, bool isDirect)
         {
@@ -176,6 +181,8 @@ namespace JSC {
         }
 
         Instruction(PropertySlot::GetValueFunc getterFunc) { u.getterFunc = getterFunc; }
+        
+        Instruction(ValueProfile* profile) { u.profile = profile; }
 
         union {
             Opcode opcode;
@@ -184,6 +191,7 @@ namespace JSC {
             WriteBarrierBase<StructureChain> structureChain;
             WriteBarrierBase<JSCell> jsCell;
             PropertySlot::GetValueFunc getterFunc;
+            ValueProfile* profile;
         } u;
         
     private:

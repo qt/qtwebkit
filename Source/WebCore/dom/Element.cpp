@@ -65,6 +65,7 @@
 #include "TextIterator.h"
 #include "WebKitMutationObserver.h"
 #include "WebKitAnimationList.h"
+#include "XMLNSNames.h"
 #include "XMLNames.h"
 #include "htmlediting.h"
 #include <wtf/text/CString.h>
@@ -615,14 +616,14 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
 
     const AtomicString& localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
 
-    size_t index = attributes(false)->getAttributeItemIndex(localName, false);
+    size_t index = ensureUpdatedAttributes()->getAttributeItemIndex(localName, false);
     const QualifiedName& qName = index != notFound ? m_attributeMap->attributeItem(index)->name() : QualifiedName(nullAtom, localName, nullAtom);
     setAttributeInternal(index, qName, value);
 }
 
 void Element::setAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    setAttributeInternal(attributes(false)->getAttributeItemIndex(name), name, value);
+    setAttributeInternal(ensureUpdatedAttributes()->getAttributeItemIndex(name), name, value);
 }
 
 inline void Element::setAttributeInternal(size_t index, const QualifiedName& name, const AtomicString& value)
@@ -709,13 +710,13 @@ void Element::recalcStyleIfNeededAfterAttributeChanged(Attribute* attr)
 void Element::idAttributeChanged(Attribute* attr)
 {
     setHasID(!attr->isNull());
-    if (attributeMap()) {
+    if (attributeData()) {
         if (attr->isNull())
-            attributeMap()->setIdForStyleResolution(nullAtom);
+            attributeData()->setIdForStyleResolution(nullAtom);
         else if (document()->inQuirksMode())
-            attributeMap()->setIdForStyleResolution(attr->value().lower());
+            attributeData()->setIdForStyleResolution(attr->value().lower());
         else
-            attributeMap()->setIdForStyleResolution(attr->value());
+            attributeData()->setIdForStyleResolution(attr->value());
     }
     setNeedsStyleRecalc();
 }
@@ -774,14 +775,7 @@ void Element::parserSetAttributeMap(PassOwnPtr<NamedNodeMap> list, FragmentScrip
 
 bool Element::hasAttributes() const
 {
-    if (!isStyleAttributeValid())
-        updateStyleAttribute();
-
-#if ENABLE(SVG)
-    if (!areSVGAttributesValid())
-        updateAnimatedSVGAttribute(anyQName());
-#endif
-
+    updateInvalidAttributes();
     return m_attributeMap && m_attributeMap->length();
 }
 
@@ -939,16 +933,25 @@ void Element::attach()
     RenderWidget::suspendWidgetHierarchyUpdates();
 
     createRendererIfNeeded();
-    
     StyleSelectorParentPusher parentPusher(this);
 
-    if (firstChild())
-        parentPusher.push();
-    ContainerNode::attach();
-
+    // When a shadow root exists, it does the work of attaching the children.
     if (ShadowRoot* shadow = shadowRoot()) {
         parentPusher.push();
+        Node::attach();
         shadow->attach();
+
+        // In a shadow tree, some of light children may be attached by 'content' element.
+        // However, when there is no content element or content element does not select
+        // all light children, we have to attach the rest of light children here.
+        for (Node* child = firstChild(); child; child = child->nextSibling()) {
+            if (!child->attached())
+                child->attach();
+        }
+    } else {
+        if (firstChild())
+            parentPusher.push();
+        ContainerNode::attach();
     }
 
     if (hasRareData()) {   
@@ -1219,6 +1222,11 @@ void Element::removeShadowRoot()
             oldRoot->removedFromDocument();
         else
             oldRoot->removedFromTree(true);
+        if (attached()) {
+            for (Node* child = firstChild(); child; child = child->nextSibling())
+                if (!child->attached())
+                    child->lazyAttach();
+        }
     }
 }
 
@@ -1407,7 +1415,7 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attr, ExceptionCode& ec)
         ec = TYPE_MISMATCH_ERR;
         return 0;
     }
-    return static_pointer_cast<Attr>(attributes(false)->setNamedItem(attr, ec));
+    return static_pointer_cast<Attr>(ensureUpdatedAttributes()->setNamedItem(attr, ec));
 }
 
 PassRefPtr<Attr> Element::setAttributeNodeNS(Attr* attr, ExceptionCode& ec)
@@ -1416,7 +1424,7 @@ PassRefPtr<Attr> Element::setAttributeNodeNS(Attr* attr, ExceptionCode& ec)
         ec = TYPE_MISMATCH_ERR;
         return 0;
     }
-    return static_pointer_cast<Attr>(attributes(false)->setNamedItem(attr, ec));
+    return static_pointer_cast<Attr>(ensureUpdatedAttributes()->setNamedItem(attr, ec));
 }
 
 PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
@@ -1432,7 +1440,7 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
 
     ASSERT(document() == attr->document());
 
-    NamedNodeMap* attrs = attributes(true);
+    NamedNodeMap* attrs = updatedAttributes();
     if (!attrs)
         return 0;
 
@@ -1445,12 +1453,12 @@ void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicStrin
     if (!Document::parseQualifiedName(qualifiedName, prefix, localName, ec))
         return;
 
-    if (namespaceURI.isNull() && !prefix.isNull()) {
+    QualifiedName qName(prefix, localName, namespaceURI);
+
+    if (!Document::hasValidNamespaceForAttributes(qName)) {
         ec = NAMESPACE_ERR;
         return;
     }
-
-    QualifiedName qName(prefix, localName, namespaceURI);
 
     if (scriptingPermission == FragmentScriptingNotAllowed && (isEventHandlerAttribute(qName) || isAttributeToRemove(qName, value)))
         return;
@@ -1478,7 +1486,7 @@ void Element::removeAttributeNS(const String& namespaceURI, const String& localN
 
 PassRefPtr<Attr> Element::getAttributeNode(const String& name)
 {
-    NamedNodeMap* attrs = attributes(true);
+    NamedNodeMap* attrs = updatedAttributes();
     if (!attrs)
         return 0;
     String localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
@@ -1487,7 +1495,7 @@ PassRefPtr<Attr> Element::getAttributeNode(const String& name)
 
 PassRefPtr<Attr> Element::getAttributeNodeNS(const String& namespaceURI, const String& localName)
 {
-    NamedNodeMap* attrs = attributes(true);
+    NamedNodeMap* attrs = updatedAttributes();
     if (!attrs)
         return 0;
     return static_pointer_cast<Attr>(attrs->getNamedItem(QualifiedName(nullAtom, localName, namespaceURI)));
@@ -1495,7 +1503,7 @@ PassRefPtr<Attr> Element::getAttributeNodeNS(const String& namespaceURI, const S
 
 bool Element::hasAttribute(const String& name) const
 {
-    NamedNodeMap* attrs = attributes(true);
+    NamedNodeMap* attrs = updatedAttributes();
     if (!attrs)
         return false;
 
@@ -1507,7 +1515,7 @@ bool Element::hasAttribute(const String& name) const
 
 bool Element::hasAttributeNS(const String& namespaceURI, const String& localName) const
 {
-    NamedNodeMap* attrs = attributes(true);
+    NamedNodeMap* attrs = updatedAttributes();
     if (!attrs)
         return false;
     return attrs->getAttributeItem(QualifiedName(nullAtom, localName, namespaceURI));
@@ -1697,8 +1705,7 @@ void Element::cancelFocusAppearanceUpdate()
 
 void Element::normalizeAttributes()
 {
-    // Normalize attributes.
-    NamedNodeMap* attrs = attributes(true);
+    NamedNodeMap* attrs = updatedAttributes();
     if (!attrs)
         return;
 
@@ -1754,6 +1761,30 @@ unsigned Element::childElementCount() const
     }
     return count;
 }
+
+#if ENABLE(STYLE_SCOPED)
+bool Element::hasScopedHTMLStyleChild() const
+{
+    return hasRareData() && rareData()->hasScopedHTMLStyleChild();
+}
+
+size_t Element::numberOfScopedHTMLStyleChildren() const
+{
+    return hasRareData() ? rareData()->numberOfScopedHTMLStyleChildren() : 0;
+}
+
+void Element::registerScopedHTMLStyleChild()
+{
+    ensureRareData()->registerScopedHTMLStyleChild();
+}
+
+void Element::unregisterScopedHTMLStyleChild()
+{
+    ASSERT(hasRareData());
+    if (hasRareData())
+        rareData()->unregisterScopedHTMLStyleChild();
+}
+#endif
 
 bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
 {

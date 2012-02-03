@@ -166,6 +166,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_areMemoryCacheClientCallsEnabled(true)
     , m_useFixedLayout(false)
     , m_paginationMode(Page::Pagination::Unpaginated)
+    , m_paginationBehavesLikeColumns(false)
     , m_pageLength(0)
     , m_gapBetweenPages(0)
     , m_isValid(true)
@@ -199,6 +200,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_pageCount(0)
     , m_renderTreeSize(0)
     , m_shouldSendEventsSynchronously(false)
+    , m_mediaVolume(1)
 {
 #ifndef NDEBUG
     webPageProxyCounter.increment();
@@ -976,6 +978,13 @@ void WebPageProxy::handleGestureEvent(const WebGestureEvent& event)
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
+#if PLATFORM(QT)
+void WebPageProxy::handlePotentialActivation(const IntPoint& layoutPoint)
+{
+    process()->send(Messages::WebPage::HighlightPotentialActivation(layoutPoint), m_pageID);
+}
+#endif
+
 void WebPageProxy::handleTouchEvent(const NativeWebTouchEvent& event)
 {
     if (!isValid())
@@ -1303,6 +1312,18 @@ void WebPageProxy::setPaginationMode(WebCore::Page::Pagination::Mode mode)
     if (!isValid())
         return;
     process()->send(Messages::WebPage::SetPaginationMode(mode), m_pageID);
+}
+
+void WebPageProxy::setPaginationBehavesLikeColumns(bool behavesLikeColumns)
+{
+    if (behavesLikeColumns == m_paginationBehavesLikeColumns)
+        return;
+
+    m_paginationBehavesLikeColumns = behavesLikeColumns;
+
+    if (!isValid())
+        return;
+    process()->send(Messages::WebPage::SetPaginationBehavesLikeColumns(behavesLikeColumns), m_pageID);
 }
 
 void WebPageProxy::setPageLength(double pageLength)
@@ -1858,6 +1879,16 @@ void WebPageProxy::didFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, Core
     m_loaderClient.didFirstVisuallyNonEmptyLayoutForFrame(this, frame, userData.get());
 }
 
+void WebPageProxy::didNewFirstVisuallyNonEmptyLayout(CoreIPC::ArgumentDecoder* arguments)
+{
+    RefPtr<APIObject> userData;
+    WebContextUserMessageDecoder messageDecoder(userData, m_process->context());
+    if (!arguments->decode(messageDecoder))
+        return;
+
+    m_loaderClient.didNewFirstVisuallyNonEmptyLayout(this, userData.get());
+}
+
 void WebPageProxy::didRemoveFrameFromHierarchy(uint64_t frameID, CoreIPC::ArgumentDecoder* arguments)
 {
     RefPtr<APIObject> userData;
@@ -2320,6 +2351,19 @@ void WebPageProxy::printMainFrame()
     printFrame(m_mainFrame->frameID());
 }
 
+void WebPageProxy::setMediaVolume(float volume)
+{
+    if (volume == m_mediaVolume)
+        return;
+    
+    m_mediaVolume = volume;
+    
+    if (!isValid())
+        return;
+    
+    process()->send(Messages::WebPage::SetMediaVolume(volume), m_pageID);    
+}
+
 #if PLATFORM(QT)
 void WebPageProxy::didChangeContentsSize(const IntSize& size)
 {
@@ -2329,11 +2373,6 @@ void WebPageProxy::didChangeContentsSize(const IntSize& size)
 void WebPageProxy::didFindZoomableArea(const IntPoint& target, const IntRect& area)
 {
     m_pageClient->didFindZoomableArea(target, area);
-}
-
-void WebPageProxy::focusEditableArea(const WebCore::IntRect& caret, const WebCore::IntRect& area)
-{
-    m_pageClient->focusEditableArea(caret, area);
 }
 
 void WebPageProxy::findZoomableAreaForPoint(const IntPoint& point)
@@ -2353,7 +2392,17 @@ void WebPageProxy::handleDownloadRequest(DownloadProxy* download)
 {
     m_pageClient->handleDownloadRequest(download);
 }
-#endif
+
+void WebPageProxy::authenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password)
+{
+    m_pageClient->handleAuthenticationRequiredRequest(hostname, realm, prefilledUsername, username, password);
+}
+
+void WebPageProxy::certificateVerificationRequest(const String& hostname, bool& ignoreErrors)
+{
+    m_pageClient->handleCertificateVerificationRequest(hostname, ignoreErrors);
+}
+#endif // PLATFORM(QT).
 
 #if ENABLE(TOUCH_EVENTS)
 void WebPageProxy::needTouchEvents(bool needTouchEvents)
@@ -3234,6 +3283,7 @@ WebPageCreationParameters WebPageProxy::creationParameters() const
     parameters.useFixedLayout = m_useFixedLayout;
     parameters.fixedLayoutSize = m_fixedLayoutSize;
     parameters.paginationMode = m_paginationMode;
+    parameters.paginationBehavesLikeColumns = m_paginationBehavesLikeColumns;
     parameters.pageLength = m_pageLength;
     parameters.gapBetweenPages = m_gapBetweenPages;
     parameters.userAgent = userAgent();
@@ -3242,6 +3292,7 @@ WebPageCreationParameters WebPageProxy::creationParameters() const
     parameters.canRunBeforeUnloadConfirmPanel = m_uiClient.canRunBeforeUnloadConfirmPanel();
     parameters.canRunModal = m_uiClient.canRunModal();
     parameters.deviceScaleFactor = m_intrinsicDeviceScaleFactor;
+    parameters.mediaVolume = m_mediaVolume;
 
 #if PLATFORM(MAC)
     parameters.isSmartInsertDeleteEnabled = m_isSmartInsertDeleteEnabled;
@@ -3296,7 +3347,7 @@ void WebPageProxy::exceededDatabaseQuota(uint64_t frameID, const String& originI
     WebFrameProxy* frame = process()->webFrame(frameID);
     MESSAGE_CHECK(frame);
 
-    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::create(originIdentifier);
+    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::createFromDatabaseIdentifier(originIdentifier);
 
     newQuota = m_uiClient.exceededDatabaseQuota(this, frame, origin.get(), databaseName, displayName, currentQuota, currentOriginUsage, currentDatabaseUsage, expectedUsage);
 }
@@ -3306,28 +3357,29 @@ void WebPageProxy::requestGeolocationPermissionForFrame(uint64_t geolocationID, 
     WebFrameProxy* frame = process()->webFrame(frameID);
     MESSAGE_CHECK(frame);
 
-    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::create(originIdentifier);
+    // FIXME: Geolocation should probably be using toString() as its string representation instead of databaseIdentifier().
+    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::createFromDatabaseIdentifier(originIdentifier);
     RefPtr<GeolocationPermissionRequestProxy> request = m_geolocationPermissionRequestManager.createRequest(geolocationID);
 
     if (!m_uiClient.decidePolicyForGeolocationPermissionRequest(this, frame, origin.get(), request.get()))
         request->deny();
 }
 
-void WebPageProxy::requestNotificationPermission(uint64_t requestID, const String& originIdentifier)
+void WebPageProxy::requestNotificationPermission(uint64_t requestID, const String& originString)
 {
     if (!isRequestIDValid(requestID))
         return;
 
-    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::create(originIdentifier);
+    RefPtr<WebSecurityOrigin> origin = WebSecurityOrigin::createFromString(originString);
     RefPtr<NotificationPermissionRequest> request = m_notificationPermissionRequestManager.createRequest(requestID);
     
     if (!m_uiClient.decidePolicyForNotificationPermissionRequest(this, origin.get(), request.get()))
         request->deny();
 }
 
-void WebPageProxy::showNotification(const String& title, const String& body, const String& originIdentifier, uint64_t notificationID)
+void WebPageProxy::showNotification(const String& title, const String& body, const String& originString, uint64_t notificationID)
 {
-    m_process->context()->notificationManagerProxy()->show(this, title, body, originIdentifier, notificationID);
+    m_process->context()->notificationManagerProxy()->show(this, title, body, originString, notificationID);
 }
 
 float WebPageProxy::headerHeight(WebFrameProxy* frame)
@@ -3474,6 +3526,20 @@ void WebPageProxy::drawPagesToPDF(WebFrameProxy* frame, const PrintInfo& printIn
     uint64_t callbackID = callback->callbackID();
     m_dataCallbacks.set(callbackID, callback.get());
     process()->send(Messages::WebPage::DrawPagesToPDF(frame->frameID(), printInfo, first, count, callbackID), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
+}
+#elif PLATFORM(GTK)
+void WebPageProxy::drawPagesForPrinting(WebFrameProxy* frame, const PrintInfo& printInfo, PassRefPtr<VoidCallback> didPrintCallback)
+{
+    RefPtr<VoidCallback> callback = didPrintCallback;
+    if (!isValid()) {
+        callback->invalidate();
+        return;
+    }
+
+    uint64_t callbackID = callback->callbackID();
+    m_voidCallbacks.set(callbackID, callback.get());
+    m_isInPrintingMode = true;
+    process()->send(Messages::WebPage::DrawPagesForPrinting(frame->frameID(), printInfo, callbackID), m_pageID, m_isPerformingDOMPrintOperation ? CoreIPC::DispatchMessageEvenWhenWaitingForSyncReply : 0);
 }
 #endif
 

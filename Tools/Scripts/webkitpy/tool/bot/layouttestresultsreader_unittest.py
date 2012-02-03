@@ -39,7 +39,7 @@ class LayoutTestResultsReaderTest(unittest.TestCase):
     def test_missing_layout_test_results(self):
         tool = MockTool()
         reader = LayoutTestResultsReader(tool, "/var/logs")
-        results_path = '/mock-results/results.html'
+        results_path = '/mock-results/full_results.json'
         tool.filesystem = MockFileSystem({results_path: None})
         # Make sure that our filesystem mock functions as we expect.
         self.assertRaises(IOError, tool.filesystem.read_text_file, results_path)
@@ -55,7 +55,7 @@ class LayoutTestResultsReaderTest(unittest.TestCase):
         reader._create_layout_test_results = lambda: LayoutTestResults([])
         results = reader.results()
         self.assertNotEquals(results, None)
-        self.assertEquals(results.failure_limit_count(), 20)  # This value matches RunTests.NON_INTERACTIVE_FAILURE_LIMIT_COUNT
+        self.assertEquals(results.failure_limit_count(), 30)  # This value matches RunTests.NON_INTERACTIVE_FAILURE_LIMIT_COUNT
 
     def test_archive_last_layout_test_results(self):
         tool = MockTool()

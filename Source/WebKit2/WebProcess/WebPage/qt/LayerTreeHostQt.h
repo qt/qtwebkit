@@ -62,19 +62,18 @@ public:
     virtual void pauseRendering() { m_isSuspended = true; }
     virtual void resumeRendering() { m_isSuspended = false; scheduleLayerFlush(); }
     virtual void deviceScaleFactorDidChange() { }
-    virtual int64_t adoptImageBackingStore(Image*);
+    virtual int64_t adoptImageBackingStore(WebCore::Image*);
     virtual void releaseImageBackingStore(int64_t);
 
 #if USE(TILED_BACKING_STORE)
     virtual void createTile(WebLayerID, int tileID, const UpdateInfo&);
     virtual void updateTile(WebLayerID, int tileID, const UpdateInfo&);
     virtual void removeTile(WebLayerID, int tileID);
-    virtual void setVisibleContentRectForLayer(int layerID, const WebCore::IntRect&);
     virtual void renderNextFrame();
     virtual void purgeBackingStores();
     virtual bool layerTreeTileUpdatesAllowed() const;
-    virtual void setVisibleContentRectAndScale(const IntRect&, float scale);
-    virtual void setVisibleContentRectTrajectoryVector(const FloatPoint&);
+    virtual void setVisibleContentRectAndScale(const WebCore::IntRect&, float scale);
+    virtual void setVisibleContentRectTrajectoryVector(const WebCore::FloatPoint&);
     virtual void didSyncCompositingStateForLayer(const WebLayerInfo&);
     virtual void didDeleteLayer(WebLayerID);
 #endif
@@ -87,8 +86,8 @@ private:
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time);
     virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& clipRect);
-    virtual bool showDebugBorders() const;
-    virtual bool showRepaintCounter() const;
+    virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
+    virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
 
     // LayerTreeHostQt
     void createPageOverlayLayer();

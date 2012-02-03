@@ -59,12 +59,6 @@ public:
 
     void setEncoding(const String& encoding, bool userChosen);
 
-#if PLATFORM(MAC) || PLATFORM(WIN)
-    // This code exists only to service a quirk in the Apple Mac and Windows ports.
-    // FIXME: We should remove this code once CFNetwork implements RFC 6266.
-    String deprecatedFrameEncoding() const;
-#endif
-
     const String& mimeType() const { return m_mimeType; }
     void setMIMEType(const String& type) { m_mimeType = type; }
 

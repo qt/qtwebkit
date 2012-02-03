@@ -140,6 +140,7 @@ CachedResource::CachedResource(const ResourceRequest& request, Type type)
     , m_requestedFromNetworkingLayer(false)
     , m_inCache(false)
     , m_loading(false)
+    , m_switchingClientsToRevalidatedResource(false)
     , m_type(type)
     , m_status(Pending)
 #ifndef NDEBUG
@@ -214,7 +215,7 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
     m_resourceRequest.setPriority(loadPriority());
     
     m_loader = resourceLoadScheduler()->scheduleSubresourceLoad(cachedResourceLoader->document()->frame(), this, m_resourceRequest, m_resourceRequest.priority(), options);
-    if (!m_loader || m_loader->reachedTerminalState()) {
+    if (!m_loader) {
         // FIXME: What if resources in other frames were waiting for this revalidation?
         LOG(ResourceLoading, "Cannot start loading '%s'", url().string().latin1().data());
         if (m_resourceToRevalidate) 
@@ -224,7 +225,6 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
     }
 
     m_status = Pending;
-    cachedResourceLoader->incrementRequestCount(this);
 }
 
 void CachedResource::checkNotify()
@@ -521,6 +521,9 @@ void CachedResource::setResourceToRevalidate(CachedResource* resource)
 void CachedResource::clearResourceToRevalidate() 
 { 
     ASSERT(m_resourceToRevalidate);
+    if (m_switchingClientsToRevalidatedResource)
+        return;
+
     // A resource may start revalidation before this method has been called, so check that this resource is still the proxy resource before clearing it out.
     if (m_resourceToRevalidate->m_proxyResource == this) {
         m_resourceToRevalidate->m_proxyResource = 0;
@@ -539,6 +542,7 @@ void CachedResource::switchClientsToRevalidatedResource()
 
     LOG(ResourceLoading, "CachedResource %p switchClientsToRevalidatedResource %p", this, m_resourceToRevalidate);
 
+    m_switchingClientsToRevalidatedResource = true;
     HashSet<CachedResourceHandleBase*>::iterator end = m_handlesToRevalidate.end();
     for (HashSet<CachedResourceHandleBase*>::iterator it = m_handlesToRevalidate.begin(); it != end; ++it) {
         CachedResourceHandleBase* handle = *it;
@@ -566,10 +570,14 @@ void CachedResource::switchClientsToRevalidatedResource()
     for (unsigned n = 0; n < moveCount; ++n)
         m_resourceToRevalidate->addClientToSet(clientsToMove[n]);
     for (unsigned n = 0; n < moveCount; ++n) {
+        // Calling didAddClient may do anything, including trying to cancel revalidation.
+        // Assert that it didn't succeed.
+        ASSERT(m_resourceToRevalidate);
         // Calling didAddClient for a client may end up removing another client. In that case it won't be in the set anymore.
         if (m_resourceToRevalidate->m_clients.contains(clientsToMove[n]))
             m_resourceToRevalidate->didAddClient(clientsToMove[n]);
     }
+    m_switchingClientsToRevalidatedResource = false;
 }
     
 void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& validatingResponse)

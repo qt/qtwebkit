@@ -39,6 +39,7 @@
     <file>DataGrid.js</file>
     <file>DebuggerModel.js</file>
     <file>DebuggerPresentationModel.js</file>
+    <file>Dialog.js</file>
     <file>DOMAgent.js</file>
     <file>DOMBreakpointsSidebarPane.js</file>
     <file>DOMPresentationUtils.js</file>
@@ -55,6 +56,7 @@
     <file>ExtensionPanel.js</file>
     <file>ExtensionRegistryStub.js</file>
     <file>ExtensionServer.js</file>
+    <file>FilteredItemSelectionDialog.js</file>
     <file>FontView.js</file>
     <file>GoToLineDialog.js</file>
     <file>HAREntry.js</file>
@@ -65,6 +67,7 @@
     <file>HeapSnapshotWorkerDispatcher.js</file>
     <file>HelpScreen.js</file>
     <file>ImageView.js</file>
+    <file>IndexedDBModel.js</file>
     <file>InjectedFakeWorker.js</file>
     <file>inspector.js</file>
     <file>InspectorBackend.js</file>
@@ -73,9 +76,9 @@
     <file>InspectorView.js</file>
     <file>JavaScriptContextManager.js</file>
     <file>JavaScriptFormatter.js</file>
-    <file>JavaScriptOutlineDialog.js</file>
     <file>JavaScriptSourceFrame.js</file>
     <file>KeyboardShortcut.js</file>
+    <file>MemoryStatistics.js</file>
     <file>MetricsSidebarPane.js</file>
     <file>NetworkItemView.js</file>
     <file>NetworkLog.js</file>
@@ -160,14 +163,14 @@
     <file>UglifyJS/parse-js.js</file>
     <file>auditsPanel.css</file>
     <file>dataGrid.css</file>
+    <file>dialog.css</file>
     <file>elementsPanel.css</file>
-    <file>goToLineDialog.css</file>
+    <file>filteredItemSelectionDialog.css</file>
     <file>heapProfiler.css</file>
     <file>helpScreen.css</file>
     <file>inspector.css</file>
     <file>inspectorCommon.css</file>
     <file>inspectorSyntaxHighlight.css</file>
-    <file>javaScriptOutlineDialog.css</file>
     <file>networkLogView.css</file>
     <file>networkPanel.css</file>
     <file>panelEnablerView.css</file>

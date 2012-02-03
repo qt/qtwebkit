@@ -47,6 +47,13 @@
 #include "mkl_dfti.h"
 #endif // USE(WEBAUDIO_MKL)
 
+#if USE(WEBAUDIO_GSTREAMER)
+#include <glib.h>
+G_BEGIN_DECLS
+#include <gst/fft/gstfftf32.h>
+G_END_DECLS
+#endif // USE(WEBAUDIO_GSTREAMER)
+
 #if USE(WEBAUDIO_FFMPEG)
 struct RDFTContext;
 #endif // USE(WEBAUDIO_FFMPEG)
@@ -73,7 +80,7 @@ public:
 
     static void initialize();
     static void cleanup();
-    void doFFT(float* data);
+    void doFFT(const float* data);
     void doInverseFFT(float* data);
     void multiply(const FFTFrame& frame); // multiplies ourself with frame : effectively operator*=()
 
@@ -88,7 +95,7 @@ public:
     // Interpolates from frame1 -> frame2 as x goes from 0.0 -> 1.0
     static PassOwnPtr<FFTFrame> createInterpolatedFrame(const FFTFrame& frame1, const FFTFrame& frame2, double x);
 
-    void doPaddedFFT(float* data, size_t dataSize); // zero-padding with dataSize <= fftSize
+    void doPaddedFFT(const float* data, size_t dataSize); // zero-padding with dataSize <= fftSize
     double extractAverageGroupDelay();
     void addConstantGroupDelay(double sampleFrameDelay);
 
@@ -145,6 +152,14 @@ private:
     AudioFloatArray m_realData;
     AudioFloatArray m_imagData;
 #endif // USE(WEBAUDIO_FFMPEG)
+
+#if USE(WEBAUDIO_GSTREAMER)
+    GstFFTF32* m_fft;
+    GstFFTF32* m_inverseFft;
+    GstFFTF32Complex* m_complexData;
+    AudioFloatArray m_realData;
+    AudioFloatArray m_imagData;
+#endif // USE(WEBAUDIO_GSTREAMER)
 
 #endif // !USE_ACCELERATE_FFT
 };

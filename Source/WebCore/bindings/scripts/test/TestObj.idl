@@ -56,12 +56,10 @@ module test {
         attribute [Reflect] unsigned long reflectedUnsignedIntegralAttr;
         attribute [Reflect] boolean reflectedBooleanAttr;
         attribute [Reflect, URL] DOMString reflectedURLAttr;
-        attribute [Reflect, NonEmpty, URL] DOMString reflectedNonEmptyURLAttr;
         attribute [Reflect=customContentStringAttr] DOMString reflectedStringAttr;
         attribute [Reflect=customContentIntegralAttr] long reflectedCustomIntegralAttr;
         attribute [Reflect=customContentBooleanAttr] boolean reflectedCustomBooleanAttr;
         attribute [Reflect=customContentURLAttr, URL] DOMString reflectedCustomURLAttr;
-        attribute [Reflect=customContentNonEmptyURLAttr, NonEmpty, URL] DOMString reflectedCustomNonEmptyURLAttr;
 
         // Methods
         void    voidMethod();
@@ -108,6 +106,13 @@ module test {
         [CallWith=ScriptState] TestObj withScriptStateObjException()
             raises(DOMException);
         [CallWith=ScriptExecutionContext] void withScriptExecutionContext();
+
+        attribute [CallWith=ScriptState] long withScriptStateAttribute;
+        attribute [CallWith=ScriptExecutionContext] TestObj withScriptExecutionContextAttribute;
+        attribute [CallWith=ScriptState] TestObj withScriptStateAttributeRaises
+            getter raises(DOMException);
+        attribute [CallWith=ScriptExecutionContext] TestObj withScriptExecutionContextAttributeRaises
+            getter raises(DOMException);
 
         // 'Optional' extended attribute
         void    methodWithOptionalArg(in [Optional] long opt);
@@ -179,14 +184,14 @@ module test {
         attribute double[]                  doubleArray;
 #endif
 
-        readonly attribute [CheckFrameSecurity] Document contentDocument;
-        [SVGCheckSecurityDocument] SVGDocument getSVGDocument()
+        readonly attribute [CheckAccessToNode] Document contentDocument;
+        [CheckAccessToNode] SVGDocument getSVGDocument()
             raises(DOMException);
 
         void convert1(in [ConvertNullStringTo=Null] a);
         void convert2(in [ConvertNullStringTo=Undefined] b);
         void convert3(in [ConvertNullStringTo=False] c);
-        void convert4(in [ConvertNullToNullString] d);
+        void convert4(in [TreatNullAs=EmptyString] d);
         void convert5(in [ConvertUndefinedOrNullToNullString] e);
 
         attribute SVGPoint mutablePoint;

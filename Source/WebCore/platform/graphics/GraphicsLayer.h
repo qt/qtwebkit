@@ -44,11 +44,7 @@
 #include <wtf/PassOwnPtr.h>
 
 #if PLATFORM(MAC)
-#ifdef __OBJC__
-@class CALayer;
-#else
-class CALayer;
-#endif
+OBJC_CLASS CALayer;
 typedef CALayer PlatformLayer;
 #elif PLATFORM(WIN)
 typedef struct _CACFLayer PlatformLayer;
@@ -258,7 +254,7 @@ public:
 
     // Offset is origin of the renderer minus origin of the graphics layer (so either zero or negative).
     IntSize offsetFromRenderer() const { return m_offsetFromRenderer; }
-    void setOffsetFromRenderer(const IntSize& offset) { m_offsetFromRenderer = offset; }
+    void setOffsetFromRenderer(const IntSize&);
 
     // The position of the layer (the location of its top-left corner in its parent)
     const FloatPoint& position() const { return m_position; }
@@ -374,8 +370,8 @@ public:
     virtual void setContentsOrientation(CompositingCoordinatesOrientation orientation) { m_contentsOrientation = orientation; }
     CompositingCoordinatesOrientation contentsOrientation() const { return m_contentsOrientation; }
 
-    bool showDebugBorders() const { return m_client ? m_client->showDebugBorders() : false; }
-    bool showRepaintCounter() const { return m_client ? m_client->showRepaintCounter() : false; }
+    bool showDebugBorders() const { return m_client ? m_client->showDebugBorders(this) : false; }
+    bool showRepaintCounter() const { return m_client ? m_client->showRepaintCounter(this) : false; }
     
     void updateDebugIndicators();
     
@@ -412,6 +408,9 @@ public:
 
     bool usingTiledLayer() const { return m_usingTiledLayer; }
 
+    // Called whenever the visible rect of the given GraphicsLayer changed.
+    virtual void visibleRectChanged() { }
+
 #if PLATFORM(QT) || PLATFORM(GTK)
     // This allows several alternative GraphicsLayer implementations in the same port,
     // e.g. if a different GraphicsLayer implementation is needed in WebKit1 vs. WebKit2.
@@ -420,11 +419,19 @@ public:
 #endif
 
 protected:
+#if ENABLE(CSS_FILTERS)
+    // This method is used by platform GraphicsLayer classes to clear the filters
+    // when compositing is not done in hardware. It is not virtual, so the caller
+    // needs to notifiy the change to the platform layer as needed.
+    void clearFilters() { m_filters.clear(); }
+#endif
 
-    typedef Vector<TransformOperation::OperationType> TransformOperationList;
-    // Given a list of TransformAnimationValues, return an array of transform operations.
-    // On return, if hasBigRotation is true, functions contain rotations of >= 180 degrees
-    static void fetchTransformOperationList(const KeyframeValueList&, TransformOperationList&, bool& isValid, bool& hasBigRotation);
+    // Given a list of TransformAnimationValues, see if all the operations for each keyframe match. If so
+    // return the index of the KeyframeValueList entry that has that list of operations (it may not be
+    // the first entry because some keyframes might have an empty transform and those match any list).
+    // If the lists don't match return -1. On return, if hasBigRotation is true, functions contain 
+    // rotations of >= 180 degrees
+    static int validateTransformOperations(const KeyframeValueList&, bool& hasBigRotation);
 
     virtual void setOpacityInternal(float) { }
 

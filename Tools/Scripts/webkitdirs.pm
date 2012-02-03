@@ -95,6 +95,7 @@ my $isBlackBerry;
 my $isChromium;
 my $isChromiumAndroid;
 my $isChromiumMacMake;
+my $isChromiumNinja;
 my $forceChromiumUpdate;
 my $isInspectorFrontend;
 my $isWK2;
@@ -416,7 +417,9 @@ sub setConfigurationProductDir($)
 
 sub determineCurrentSVNRevision
 {
-    return if defined $currentSVNRevision;
+    # We always update the current SVN revision here, and leave the caching
+    # to currentSVNRevision(), so that changes to the SVN revision while the
+    # script is running can be picked up by calling this function again.
     determineSourceDir();
     $currentSVNRevision = svnRevisionForDirectory($sourceDir);
     return $currentSVNRevision;
@@ -470,7 +473,7 @@ sub configurationForVisualStudio()
 
 sub currentSVNRevision
 {
-    determineCurrentSVNRevision();
+    determineCurrentSVNRevision() if not defined $currentSVNRevision;
     return $currentSVNRevision;
 }
 
@@ -876,12 +879,12 @@ sub determineIsQt()
         return;
     }
 
-    # The presence of QTDIR only means Qt if --gtk or --wx or --efl or --blackberry are not on the command-line
-    if (isGtk() || isWx() || isEfl() || isBlackBerry()) {
+    # The presence of QTDIR only means Qt if --gtk or --wx or --efl or --blackberry or --chromium or --wincairo are not on the command-line
+    if (isGtk() || isWx() || isEfl() || isBlackBerry() || isChromium() || isWinCairo()) {
         $isQt = 0;
         return;
     }
-    
+
     $isQt = defined($ENV{'QTDIR'});
 }
 
@@ -1137,6 +1140,37 @@ sub determineIsChromiumMacMake()
     $isChromiumMacMake = isDarwin() && $hasUpToDateMakefile;
 }
 
+sub isChromiumNinja()
+{
+    determineIsChromiumNinja();
+    return $isChromiumNinja;
+}
+
+sub determineIsChromiumNinja()
+{
+    return if defined($isChromiumNinja);
+
+    my $config = configuration();
+
+    my $hasUpToDateNinjabuild = 0;
+    if (-e "out/$config/build.ninja") {
+        my $statNinja = stat("out/$config/build.ninja");
+
+        my $statXcode = 0;
+        if (-e 'Source/WebKit/chromium/WebKit.xcodeproj') {
+          $statXcode = stat('Source/WebKit/chromium/WebKit.xcodeproj')->mtime;
+        }
+
+        my $statMake = 0;
+        if (-e 'Makefile.chromium') {
+          $statXcode = stat('Makefile.chromium')->mtime;
+        }
+
+        $hasUpToDateNinjabuild = $statNinja > $statXcode && $statNinja > $statMake;
+    }
+    $isChromiumNinja = $hasUpToDateNinjabuild;
+}
+
 sub forceChromiumUpdate()
 {
     determineIsChromium();
@@ -1228,6 +1262,19 @@ sub isLinux()
 sub isARM()
 {
     return $Config{archname} =~ /^arm-/;
+}
+
+sub isCrossCompilation()
+{
+  my $compiler = "" unless $ENV{'CC'};
+  if ($compiler =~ /gcc/) {
+      my $compiler_options = `$compiler -v 2>&1`;
+      my @host = $compiler_options =~ m/--host=(.*?)\s/;
+      my @target = $compiler_options =~ m/--target=(.*?)\s/;
+
+      return ($host[0] ne "" && $target[0] ne "" && $host[0] ne $target[0]);
+  }
+  return 0;
 }
 
 sub isAppleWebKit()
@@ -1838,6 +1885,25 @@ sub buildAutotoolsProject($@)
     my $config = passedConfiguration() || configuration();
     my $prefix;
 
+    # Use rm to clean the build directory since distclean may miss files
+    if ($clean && -d $dir) {
+        system "rm", "-rf", "$dir";
+    }
+
+    if (! -d $dir) {
+        File::Path::mkpath($dir) or die "Failed to create build directory " . $dir
+    }
+    chdir $dir or die "Failed to cd into " . $dir . "\n";
+
+    if ($clean) {
+        return 0;
+    }
+
+    # We might need to update jhbuild dependencies.
+    if (checkForArgumentAndRemoveFromArrayRef("--update-gtk", \@buildParams)) {
+        system("perl", "$sourceDir/Tools/Scripts/update-webkitgtk-libs") == 0 or die $!;
+    }
+
     my @buildArgs = ();
     my $makeArgs = $ENV{"WebKitMakeArguments"} || "";
     for my $i (0 .. $#buildParams) {
@@ -1873,20 +1939,6 @@ sub buildAutotoolsProject($@)
         push @buildArgs, "--disable-debug";
     }
 
-    # Use rm to clean the build directory since distclean may miss files
-    if ($clean && -d $dir) {
-        system "rm", "-rf", "$dir";
-    }
-
-    if (! -d $dir) {
-        File::Path::mkpath($dir) or die "Failed to create build directory " . $dir
-    }
-    chdir $dir or die "Failed to cd into " . $dir . "\n";
-
-    if ($clean) {
-        return 0;
-    }
-
     # If GNUmakefile exists, don't run autogen.sh unless its arguments
     # have changed. The makefile should be smart enough to track autotools
     # dependencies and re-run autogen.sh when build files change.
@@ -1900,7 +1952,7 @@ sub buildAutotoolsProject($@)
 
     chdir ".." or die;
 
-    if ($project eq 'WebKit') {
+    if ($project eq 'WebKit' && !isCrossCompilation()) {
         my @docGenerationOptions = ($runWithJhbuild, "$gtkScriptsPath/generate-gtkdoc", "--skip-html");
         if ($debug) {
             push(@docGenerationOptions, "--debug");
@@ -2007,9 +2059,9 @@ sub promptUser
     return $input ? $input : $default;
 }
 
-sub buildQMakeProject($@)
+sub buildQMakeProjects
 {
-    my ($project, $clean, @buildParams) = @_;
+    my ($projects, $clean, @buildParams) = @_;
 
     my @buildArgs = ();
 
@@ -2063,7 +2115,9 @@ sub buildQMakeProject($@)
 
     my %defines = qtFeatureDefaults(\@buildArgs);
 
-    my $needsCleanBuild = 0;
+    my $svnRevision = currentSVNRevision();
+
+    my $buildHint = "";
 
     my $pathToDefinesCache = File::Spec->catfile($dir, ".webkit.config");
     my $pathToOldDefinesFile = File::Spec->catfile($dir, "defaults.txt");
@@ -2071,39 +2125,55 @@ sub buildQMakeProject($@)
     # Ease transition to new build layout
     if (-e $pathToOldDefinesFile) {
         print "Old build layout detected";
-        $needsCleanBuild = 1;
+        $buildHint = "clean";
     } elsif (-e $pathToDefinesCache && open(DEFAULTS, $pathToDefinesCache)) {
         my %previousDefines;
         while (<DEFAULTS>) {
-            if ($_ =~ m/(\S+?)=(\S+?)/gi) {
+            if ($_ =~ m/(\S+)=(\S+)/gi) {
                 $previousDefines{$1} = $2;
             }
         }
         close (DEFAULTS);
 
+        $previousDefines{"SVN_REVISION"} = "unknown" if not exists $previousDefines{"SVN_REVISION"};
+
+        if ($svnRevision ne $previousDefines{"SVN_REVISION"}) {
+            print "Last built revision was " . $previousDefines{"SVN_REVISION"} .
+                ", now at revision $svnRevision. Full incremental build needed.\n";
+
+            $buildHint = "incremental";
+        }
+
+        # Don't confuse the should-we-clean heuristics below
+        delete($previousDefines{"SVN_REVISION"});
+
         my @uniqueDefineNames = keys %{ +{ map { $_, 1 } (keys %defines, keys %previousDefines) } };
         foreach my $define (@uniqueDefineNames) {
             if (! exists $previousDefines{$define}) {
                 print "Feature $define added";
-                $needsCleanBuild = 1;
+                $buildHint = "clean";
                 last;
             }
 
             if (! exists $defines{$define}) {
                 print "Feature $define removed";
-                $needsCleanBuild = 1;
+                $buildHint = "clean";
                 last;
             }
 
             if ($defines{$define} != $previousDefines{$define}) {
                 print "Feature $define changed ($previousDefines{$define} -> $defines{$define})";
-                $needsCleanBuild = 1;
+                $buildHint = "clean";
                 last;
             }
         }
+    } else {
+        # Missing build cache suggests we had a broken build after a clean,
+        # so we assume we have to do an incremental build just in case.
+        $buildHint = "incremental";
     }
 
-    if ($needsCleanBuild) {
+    if ($buildHint eq "clean") {
         print ", clean build needed!\n";
         # FIXME: This STDIN/STDOUT check does not work on the bots. Disable until it does.
         # if (! -t STDIN || ( &promptUser("Would you like to clean the build directory?", "yes") eq "yes")) {
@@ -2118,6 +2188,8 @@ sub buildQMakeProject($@)
         #}
     }
 
+    # Save config up-front so we can detect changes to the build config even
+    # when the user re-configures after aborting the build.
     open(DEFAULTS, ">$pathToDefinesCache");
     print DEFAULTS "# These defines were set when building WebKit last time\n";
     foreach my $key (sort keys %defines) {
@@ -2129,9 +2201,7 @@ sub buildQMakeProject($@)
 
     my $makefile = File::Spec->catfile($dir, "Makefile");
     if (! -e $makefile) {
-        if ($project) {
-            push @buildArgs, "-after OVERRIDE_SUBDIRS=" . $project;
-        }
+        push @buildArgs, "-after OVERRIDE_SUBDIRS=\"@{$projects}\"" if @{$projects};
 
         push @buildArgs, File::Spec->catfile(sourceDir(), "WebKit.pro");
         my $command = "$qmakecommand @buildArgs";
@@ -2143,10 +2213,6 @@ sub buildQMakeProject($@)
         if ($result ne 0) {
            die "Failed to setup build environment using $qmakebin!\n";
         }
-    } elsif ($project) {
-        $dir = File::Spec->catfile($dir, "Source", $project);
-        chdir $dir or die "Failed to cd into " . $dir . "\n";
-        $make = "$make -f Makefile.$project";
     }
 
     my $command = "$make $makeargs";
@@ -2154,7 +2220,7 @@ sub buildQMakeProject($@)
 
     if ($clean) {
         $command = "$command distclean";
-    } else {
+    } elsif ($buildHint eq "incremental") {
         $command = "$command incremental";
     }
 
@@ -2162,14 +2228,38 @@ sub buildQMakeProject($@)
     $result = system $command;
 
     chdir ".." or die;
+
+    if ($result eq 0) {
+        # Now that the build completed successfully we can save the SVN revision
+        open(DEFAULTS, ">>$pathToDefinesCache");
+        print DEFAULTS "SVN_REVISION=$svnRevision\n";
+        close(DEFAULTS);
+    } elsif ($buildHint eq "" && exitStatus($result)) {
+        my $exitCode = exitStatus($result);
+        my $failMessage = <<EOF;
+
+===== BUILD FAILED ======
+
+The build failed with exit code $exitCode. This may have been because you
+
+  - added an #include to a source/header
+  - added a Q_OBJECT macro to a class
+  - added a new resource to a qrc file
+
+as dependencies are not automatically re-computed for local developer builds.
+You may try computing dependencies manually by running 'make qmake' in:
+
+  $dir
+
+or passing --makeargs="qmake" to build-webkit.
+
+=========================
+
+EOF
+        print "$failMessage";
+    }
+
     return $result;
-}
-
-sub buildQMakeQtProject($$@)
-{
-    my ($project, $clean, @buildArgs) = @_;
-
-    return buildQMakeProject("", $clean, @buildArgs);
 }
 
 sub buildGtkProject
@@ -2209,6 +2299,19 @@ sub buildChromiumMakefile($$@)
 
     $command .= "make -fMakefile.chromium $makeArgs BUILDTYPE=$config $target";
     $command .= "\"" if isChromiumAndroid();
+
+    print "$command\n";
+    return system $command;
+}
+
+sub buildChromiumNinja($$@)
+{
+    # rm -rf out requires rerunning gyp, so don't support --clean for now.
+    my ($target, @options) = @_;
+    my $config = configuration();
+    my $command = "";
+
+    $command .= "ninja -C out/$config $target";
 
     print "$command\n";
     return system $command;
@@ -2264,12 +2367,14 @@ sub buildChromium($@)
     }
 
     my $result = 1;
-    if (isDarwin() && !isChromiumAndroid() && !isChromiumMacMake()) {
+    if (isDarwin() && !isChromiumAndroid() && !isChromiumMacMake() && !isChromiumNinja()) {
         # Mac build - builds the root xcode project.
-        $result = buildXCodeProject("Source/WebKit/chromium/WebKit", $clean, "-configuration", configuration(), @options);
+        $result = buildXCodeProject("Source/WebKit/chromium/All", $clean, "-configuration", configuration(), @options);
     } elsif (isCygwin() || isWindows()) {
         # Windows build - builds the root visual studio solution.
-        $result = buildChromiumVisualStudioProject("Source/WebKit/chromium/WebKit.sln", $clean);
+        $result = buildChromiumVisualStudioProject("Source/WebKit/chromium/All.sln", $clean);
+    } elsif (isChromiumNinja()) {
+        $result = buildChromiumNinja("all", $clean, @options);
     } elsif (isLinux() || isChromiumAndroid() || isChromiumMacMake()) {
         # Linux build - build using make.
         $result = buildChromiumMakefile("all", $clean, @options);

@@ -77,10 +77,13 @@ public:
     void didChangeViewportProperties(const WebCore::ViewportArguments& args);
     void didChangeBackForwardList();
 
-    void updateViewportSize();
+    void setNeedsDisplay();
+
+    void updateDesktopViewportSize();
+    void updateTouchViewportSize();
     QtViewportInteractionEngine::Constraints computeViewportConstraints();
 
-    void updateVisibleContentRectAndScale();
+    void _q_updateVisibleContentRectAndScale();
 
     void _q_suspend();
     void _q_resume();
@@ -96,11 +99,16 @@ public:
     bool runJavaScriptConfirm(const QString&);
     QString runJavaScriptPrompt(const QString&, const QString& defaultValue, bool& ok);
 
+    void handleAuthenticationRequiredRequest(const QString& hostname, const QString& realm, const QString& prefilledUsername, QString& username, QString& password);
+    bool handleCertificateVerificationRequest(const QString& hostname);
+
     void setUseTraditionalDesktopBehaviour(bool enable);
+    void setRenderToOffscreenBuffer(bool enable) { m_renderToOffscreenBuffer = enable; }
     void setViewInAttachedProperties(QObject*);
     void setIcon(const QUrl&);
 
     bool navigatorQtObjectEnabled() const;
+    bool renderToOffscreenBuffer() const { return m_renderToOffscreenBuffer; }
     void setNavigatorQtObjectEnabled(bool);
 
     // PageClient.
@@ -150,6 +158,8 @@ private:
     QDeclarativeComponent* alertDialog;
     QDeclarativeComponent* confirmDialog;
     QDeclarativeComponent* promptDialog;
+    QDeclarativeComponent* authenticationDialog;
+    QDeclarativeComponent* certificateVerificationDialog;
     QDeclarativeComponent* itemSelector;
 
     WebCore::ViewportArguments viewportArguments;
@@ -160,6 +170,7 @@ private:
     bool isTransitioningToNewPage;
     bool pageIsSuspended;
     bool m_navigatorQtObjectEnabled;
+    bool m_renderToOffscreenBuffer;
     QUrl m_iconURL;
 };
 

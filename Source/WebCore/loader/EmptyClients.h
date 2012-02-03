@@ -54,6 +54,10 @@
 #include "ColorChooser.h"
 #endif
 
+#if ENABLE(WEB_INTENTS)
+#include "IntentRequest.h"
+#endif
+
 /*
  This file holds empty Client stubs for use by WebCore.
  Viewless element needs to create a dummy Page->Frame->FrameView tree for use in parsing or executing JavaScript.
@@ -288,6 +292,7 @@ public:
     virtual void dispatchDidFinishLoad() { }
     virtual void dispatchDidFirstLayout() { }
     virtual void dispatchDidFirstVisuallyNonEmptyLayout() { }
+    virtual void dispatchDidNewFirstVisuallyNonEmptyLayout() { }
 
     virtual Frame* dispatchCreatePage(const NavigationAction&) { return 0; }
     virtual void dispatchShow() { }
@@ -407,6 +412,10 @@ public:
 #endif
 
     virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() { return PassRefPtr<FrameNetworkingContext>(); }
+
+#if ENABLE(WEB_INTENTS)
+    virtual void dispatchIntent(PassRefPtr<IntentRequest>) { }
+#endif
 };
 
 class EmptyTextCheckerClient : public TextCheckerClient {

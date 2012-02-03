@@ -384,33 +384,7 @@ class JsonResultsTest(unittest.TestCase):
                            "results": [[7,"F"]],
                            "times": [[7,0]]}}})
 
-    def test_merge_remove_test_with_no_data(self):
-        # Remove test where there is no data in all runs.
-        self._test_merge(
-            # Aggregated results
-            {"builds": ["2", "1"],
-             "tests": {"001.html": {
-                           "results": [[200,"N"]],
-                           "times": [[200,0]]},
-                       "002.html": {
-                           "results": [[10,"F"]],
-                           "times": [[10,0]]}}},
-            # Incremental results
-            {"builds": ["3"],
-             "tests": {"001.html": {
-                           "results": [[1,"N"]],
-                           "times": [[1,0]]},
-                       "002.html": {
-                           "results": [[1,"P"]],
-                           "times": [[1,0]]}}},
-            # Expected results
-            {"builds": ["3", "2", "1"],
-             "tests": {"002.html": {
-                           "results": [[1,"P"],[10,"F"]],
-                           "times": [[11,0]]}}})
-
-    def test_merge_remove_test_with_all_pass(self):
-        # Remove test where all run pass and max running time < 1 seconds
+    def test_merge_remove_test(self):
         self._test_merge(
             # Aggregated results
             {"builds": ["2", "1"],
@@ -419,7 +393,11 @@ class JsonResultsTest(unittest.TestCase):
                            "times": [[200,0]]},
                        "002.html": {
                            "results": [[10,"F"]],
-                           "times": [[10,0]]}}},
+                           "times": [[10,0]]},
+                       "003.html": {
+                           "results": [[190, 'X'], [9, 'N'], [1,"F"]],
+                           "times": [[200,0]]},
+                       }},
             # Incremental results
             {"builds": ["3"],
              "tests": {"001.html": {
@@ -427,21 +405,26 @@ class JsonResultsTest(unittest.TestCase):
                            "times": [[1,0]]},
                        "002.html": {
                            "results": [[1,"P"]],
-                           "times": [[1,0]]}}},
+                           "times": [[1,0]]},
+                       "003.html": {
+                           "results": [[1,"P"]],
+                           "times": [[1,0]]},
+                       }},
             # Expected results
             {"builds": ["3", "2", "1"],
              "tests": {"002.html": {
                            "results": [[1,"P"],[10,"F"]],
-                           "times": [[11,0]]}}})
+                           "times": [[11,0]]}}},
+            max_builds=200)
 
     def test_merge_keep_test_with_all_pass_but_slow_time(self):
-        # Do not remove test where all run pass but max running time >= 1 seconds
+        # Do not remove test where all run pass but max running time >= 5 seconds
         self._test_merge(
             # Aggregated results
             {"builds": ["2", "1"],
              "tests": {"001.html": {
                            "results": [[200,"P"]],
-                           "times": [[200,0]]},
+                           "times": [[200,5]]},
                        "002.html": {
                            "results": [[10,"F"]],
                            "times": [[10,0]]}}},
@@ -457,7 +440,7 @@ class JsonResultsTest(unittest.TestCase):
             {"builds": ["3", "2", "1"],
              "tests": {"001.html": {
                            "results": [[201,"P"]],
-                           "times": [[1,1],[200,0]]},
+                           "times": [[1,1],[200,5]]},
                        "002.html": {
                            "results": [[1,"P"],[10,"F"]],
                            "times": [[11,0]]}}})
@@ -672,7 +655,7 @@ class JsonResultsTest(unittest.TestCase):
             # Expected results
             {"foo": {"001.html":{}}, "002.html":{}})
 
-    def test_remove_gtest_modifiers(self):
+    def test_gtest(self):
         self._test_merge(
             # Aggregated results
             {"builds": ["2", "1"],
@@ -682,49 +665,30 @@ class JsonResultsTest(unittest.TestCase):
                        "foo.bar2": {
                            "results": [[100,"I"]],
                            "times": [[100,0]]},
-                       "foo.FAILS_bar3": {
-                           "results": [[100,"I"]],
-                           "times": [[100,0]]},
                        },
              "version": 3},
             # Incremental results
             {"builds": ["3"],
-             "tests": {"foo.DISABLED_bar": {
-                           "results": [[1,"F"]],
-                           "times": [[1,0]]},
-                       "foo.FLAKY_bar2": {
-                           "results": [[1,"N"]],
-                           "times": [[1,0]]},
-                       "foo.bar2": {
+             "tests": {"foo.bar2": {
                            "results": [[1,"I"]],
                            "times": [[1,0]]},
                        "foo.bar3": {
-                           "results": [[1,"N"]],
+                           "results": [[1,"F"]],
                            "times": [[1,0]]},
-                       "foo.FAILS_bar3": {
-                           "results": [[1,"I"]],
-                           "times": [[1,0]]},
-                       "foo.MAYBE_bar4": {
-                           "results": [[1,"I"]],
-                           "times": [[1,0]]}},
+                       },
              "version": 4},
             # Expected results
             {"builds": ["3", "2", "1"],
-             "tests": {"foo.FAILS_bar3": {
-                           "results": [[1,"N"],[100,"I"]],
-                           "times": [[101,0]]},
-                       "foo.bar": {
-                           "results": [[51,"F"]],
+             "tests": {"foo.bar": {
+                           "results": [[1, "N"], [50,"F"]],
                            "times": [[51,0]]},
                        "foo.bar2": {
                            "results": [[101,"I"]],
                            "times": [[101,0]]},
                        "foo.bar3": {
-                           "results": [[1,"I"]],
+                           "results": [[1,"F"]],
                            "times": [[1,0]]},
-                       "foo.bar4": {
-                           "results": [[1,"I"]],
-                           "times": [[1,0]]}},
+                       },
              "version": 4})
 
 if __name__ == '__main__':

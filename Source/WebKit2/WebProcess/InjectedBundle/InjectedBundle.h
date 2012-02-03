@@ -97,12 +97,15 @@ public:
     void setShouldTrackVisitedLinks(bool);
     void removeAllVisitedLinks();
     void activateMacFontAscentHack();
+    void overrideBoolPreferenceForTestRunner(WebPageGroupProxy*, const String& preference, bool enabled);
     void overrideXSSAuditorEnabledForTestRunner(WebPageGroupProxy* pageGroup, bool enabled);
     void setAllowUniversalAccessFromFileURLs(WebPageGroupProxy*, bool);
     void setAllowFileAccessFromFileURLs(WebPageGroupProxy*, bool);
     void setFrameFlatteningEnabled(WebPageGroupProxy*, bool);
+    void setGeoLocationPermission(WebPageGroupProxy*, bool);
     void setJavaScriptCanAccessClipboard(WebPageGroupProxy*, bool);
     void setPrivateBrowsingEnabled(WebPageGroupProxy*, bool);
+    void setPopupBlockingEnabled(WebPageGroupProxy*, bool);
     void switchNetworkLoaderToNewTestingSession();
     void setAuthorAndUserStylesEnabled(WebPageGroupProxy*, bool);
     void addOriginAccessWhitelistEntry(const String&, const String&, const String&, bool);

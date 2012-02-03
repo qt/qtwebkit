@@ -24,6 +24,7 @@
 #if ENABLE(SVG)
 #include "RenderSVGInline.h"
 
+#include "RenderSVGInlineText.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGText.h"
 #include "SVGInlineFlowBox.h"
@@ -96,9 +97,6 @@ void RenderSVGInline::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) co
 
 void RenderSVGInline::willBeDestroyed()
 {
-    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
-        textRenderer->setNeedsPositioningValuesUpdate();
-
     SVGResourcesCache::clientDestroyed(this);
     RenderInline::willBeDestroyed();
 }
@@ -122,6 +120,12 @@ void RenderSVGInline::updateFromElement()
     SVGResourcesCache::clientUpdatedFromElement(this, style());
 }
 
+void RenderSVGInline::addChild(RenderObject* child, RenderObject* beforeChild)
+{
+    RenderInline::addChild(child, beforeChild);
+    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
+        textRenderer->layoutAttributesChanged(child);
+}
 
 }
 

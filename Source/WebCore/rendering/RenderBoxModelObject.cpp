@@ -311,15 +311,16 @@ void RenderBoxModelObject::styleWillChange(StyleDifference diff, const RenderSty
 
     // If our z-index changes value or our visibility changes,
     // we need to dirty our stacking context's z-order list.
-    if (style() && newStyle) {
+    RenderStyle* oldStyle = style();
+    if (oldStyle && newStyle) {
         if (parent()) {
             // Do a repaint with the old style first, e.g., for example if we go from
             // having an outline to not having an outline.
             if (diff == StyleDifferenceRepaintLayer) {
                 layer()->repaintIncludingDescendants();
-                if (!(style()->clip() == newStyle->clip()))
+                if (!(oldStyle->clip() == newStyle->clip()))
                     layer()->clearClipRectsIncludingDescendants();
-            } else if (diff == StyleDifferenceRepaint || newStyle->outlineSize() < style()->outlineSize())
+            } else if (diff == StyleDifferenceRepaint || newStyle->outlineSize() < oldStyle->outlineSize())
                 repaint();
         }
         
@@ -327,13 +328,13 @@ void RenderBoxModelObject::styleWillChange(StyleDifference diff, const RenderSty
             // When a layout hint happens, we go ahead and do a repaint of the layer, since the layer could
             // end up being destroyed.
             if (hasLayer()) {
-                if (style()->position() != newStyle->position() ||
-                    style()->zIndex() != newStyle->zIndex() ||
-                    style()->hasAutoZIndex() != newStyle->hasAutoZIndex() ||
-                    !(style()->clip() == newStyle->clip()) ||
-                    style()->hasClip() != newStyle->hasClip() ||
-                    style()->opacity() != newStyle->opacity() ||
-                    style()->transform() != newStyle->transform())
+                if (oldStyle->position() != newStyle->position()
+                    || oldStyle->zIndex() != newStyle->zIndex()
+                    || oldStyle->hasAutoZIndex() != newStyle->hasAutoZIndex()
+                    || !(oldStyle->clip() == newStyle->clip())
+                    || oldStyle->hasClip() != newStyle->hasClip()
+                    || oldStyle->opacity() != newStyle->opacity()
+                    || oldStyle->transform() != newStyle->transform())
                 layer()->repaintIncludingDescendants();
             } else if (newStyle->hasTransform() || newStyle->opacity() < 1) {
                 // If we don't have a layer yet, but we are going to get one because of transform or opacity,
@@ -342,11 +343,12 @@ void RenderBoxModelObject::styleWillChange(StyleDifference diff, const RenderSty
             }
         }
 
-        if (hasLayer() && (style()->hasAutoZIndex() != newStyle->hasAutoZIndex() ||
-                           style()->zIndex() != newStyle->zIndex() ||
-                           style()->visibility() != newStyle->visibility())) {
+        if (hasLayer()
+            && (oldStyle->hasAutoZIndex() != newStyle->hasAutoZIndex()
+                || oldStyle->zIndex() != newStyle->zIndex()
+                || oldStyle->visibility() != newStyle->visibility())) {
             layer()->dirtyStackingContextZOrderLists();
-            if (style()->hasAutoZIndex() != newStyle->hasAutoZIndex() || style()->visibility() != newStyle->visibility())
+            if (oldStyle->hasAutoZIndex() != newStyle->hasAutoZIndex() || oldStyle->visibility() != newStyle->visibility())
                 layer()->dirtyZOrderLists();
         }
     }
@@ -392,10 +394,11 @@ void RenderBoxModelObject::updateBoxModelInfoFromStyle()
 {
     // Set the appropriate bits for a box model object.  Since all bits are cleared in styleWillChange,
     // we only check for bits that could possibly be set to true.
-    setHasBoxDecorations(hasBackground() || style()->hasBorder() || style()->hasAppearance() || style()->boxShadow());
-    setInline(style()->isDisplayInlineType());
-    setRelPositioned(style()->position() == RelativePosition);
-    setHorizontalWritingMode(style()->isHorizontalWritingMode());
+    RenderStyle* styleToUse = style();
+    setHasBoxDecorations(hasBackground() || styleToUse->hasBorder() || styleToUse->hasAppearance() || styleToUse->boxShadow());
+    setInline(styleToUse->isDisplayInlineType());
+    setRelPositioned(styleToUse->position() == RelativePosition);
+    setHorizontalWritingMode(styleToUse->isHorizontalWritingMode());
 }
 
 LayoutUnit RenderBoxModelObject::relativePositionOffsetX() const
@@ -869,16 +872,22 @@ IntSize RenderBoxModelObject::calculateImageIntrinsicDimensions(StyleImage* imag
         Length intrinsicHeight;
         image->computeIntrinsicDimensions(this, intrinsicWidth, intrinsicHeight, intrinsicRatio);
 
+        // Intrinsic dimensions expressed as percentages must be resolved relative to the dimensions of the rectangle
+        // that establishes the coordinate system for the 'background-position' property. 
+
         // FIXME: Remove unnecessary rounding when layout is off ints: webkit.org/b/63656
-        if (intrinsicWidth.isFixed())
-            resolvedWidth = static_cast<int>(ceilf(intrinsicWidth.value() * style()->effectiveZoom()));
-        if (intrinsicHeight.isFixed())
-            resolvedHeight = static_cast<int>(ceilf(intrinsicHeight.value() * style()->effectiveZoom()));
+        if (intrinsicWidth.isPercent() && intrinsicHeight.isPercent() && intrinsicRatio.isEmpty()) {
+            // Resolve width/height percentages against positioningAreaSize, only if no intrinsic ratio is provided.
+            resolvedWidth = static_cast<int>(round(positioningAreaSize.width() * intrinsicWidth.percent() / 100));
+            resolvedHeight = static_cast<int>(round(positioningAreaSize.height() * intrinsicHeight.percent() / 100));
+        } else {
+            if (intrinsicWidth.isFixed())
+                resolvedWidth = static_cast<int>(intrinsicWidth.value() * style()->effectiveZoom());
+            if (intrinsicHeight.isFixed())
+                resolvedHeight = static_cast<int>(intrinsicHeight.value() * style()->effectiveZoom());
+        }
     }
 
-    // Intrinsic dimensions expressed as percentages must be resolved relative to the dimensions of the rectangle
-    // that establishes the coordinate system for the 'background-position' property. SVG on the other hand
-    // _explicitely_ says that percentage values for the width/height attributes do NOT define intrinsic dimensions.
     if (resolvedWidth > 0 && resolvedHeight > 0)
         return IntSize(resolvedWidth, resolvedHeight);
 
@@ -1114,11 +1123,10 @@ bool RenderBoxModelObject::paintNinePieceImage(GraphicsContext* graphicsContext,
     IntSize imageSize = calculateImageIntrinsicDimensions(styleImage, borderImageRect.size());
 
     // If both values are ‘auto’ then the intrinsic width and/or height of the image should be used, if any.
-    IntSize containerSize = imageSize.isEmpty() ? borderImageRect.size() : imageSize;
-    styleImage->setContainerSizeForRenderer(this, containerSize, style->effectiveZoom());
+    styleImage->setContainerSizeForRenderer(this, imageSize, style->effectiveZoom());
 
-    int imageWidth = imageSize.width();
-    int imageHeight = imageSize.height();
+    int imageWidth = imageSize.width() / style->effectiveZoom();
+    int imageHeight = imageSize.height() / style->effectiveZoom();
 
     int topSlice = min<int>(imageHeight, ninePieceImage.imageSlices().top().calcValue(imageHeight));
     int rightSlice = min<int>(imageWidth, ninePieceImage.imageSlices().right().calcValue(imageWidth));
@@ -1185,10 +1193,11 @@ bool RenderBoxModelObject::paintNinePieceImage(GraphicsContext* graphicsContext,
 
         // Paint the left edge.
         // Have to scale and tile into the border rect.
-        graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x(), borderImageRect.y() + topWidth, leftWidth,
-                                        destinationHeight),
-                                        IntRect(0, topSlice, leftSlice, sourceHeight),
-                                        FloatSize(leftSideScale, leftSideScale), Image::StretchTile, (Image::TileRule)vRule, op);
+        if (sourceHeight > 0)
+            graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x(), borderImageRect.y() + topWidth, leftWidth,
+                                            destinationHeight),
+                                            IntRect(0, topSlice, leftSlice, sourceHeight),
+                                            FloatSize(leftSideScale, leftSideScale), Image::StretchTile, (Image::TileRule)vRule, op);
     }
 
     if (drawRight) {
@@ -1206,21 +1215,22 @@ bool RenderBoxModelObject::paintNinePieceImage(GraphicsContext* graphicsContext,
                                        LayoutRect(imageWidth - rightSlice, imageHeight - bottomSlice, rightSlice, bottomSlice), op);
 
         // Paint the right edge.
-        graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.maxX() - rightWidth, borderImageRect.y() + topWidth, rightWidth,
-                                        destinationHeight),
-                                        IntRect(imageWidth - rightSlice, topSlice, rightSlice, sourceHeight),
-                                        FloatSize(rightSideScale, rightSideScale),
-                                        Image::StretchTile, (Image::TileRule)vRule, op);
+        if (sourceHeight > 0)
+            graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.maxX() - rightWidth, borderImageRect.y() + topWidth, rightWidth,
+                                            destinationHeight),
+                                            IntRect(imageWidth - rightSlice, topSlice, rightSlice, sourceHeight),
+                                            FloatSize(rightSideScale, rightSideScale),
+                                            Image::StretchTile, (Image::TileRule)vRule, op);
     }
 
     // Paint the top edge.
-    if (drawTop)
+    if (drawTop && sourceWidth > 0)
         graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x() + leftWidth, borderImageRect.y(), destinationWidth, topWidth),
                                         IntRect(leftSlice, 0, sourceWidth, topSlice),
                                         FloatSize(topSideScale, topSideScale), (Image::TileRule)hRule, Image::StretchTile, op);
 
     // Paint the bottom edge.
-    if (drawBottom)
+    if (drawBottom && sourceWidth > 0)
         graphicsContext->drawTiledImage(image.get(), colorSpace, IntRect(borderImageRect.x() + leftWidth, borderImageRect.maxY() - bottomWidth,
                                         destinationWidth, bottomWidth),
                                         IntRect(leftSlice, imageHeight - bottomSlice, sourceWidth, bottomSlice),
@@ -2759,7 +2769,7 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransform
 
     LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
 
-    if (style()->position() != AbsolutePosition && style()->position() != FixedPosition && o->hasColumns()) {
+    if (!style()->isPositioned() && o->hasColumns()) {
         RenderBlock* block = static_cast<RenderBlock*>(o);
         LayoutPoint point(roundedLayoutPoint(transformState.mappedPoint()));
         point -= containerOffset;

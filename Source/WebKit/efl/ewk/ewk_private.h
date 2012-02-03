@@ -39,10 +39,6 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // If defined, ewk will do type checking to ensure objects are of correct type
 #define EWK_TYPE_CHECK 1
 #define EWK_ARGB_BYTES_SIZE 4
@@ -61,6 +57,10 @@ struct _Ewk_JS_Object {
     EINA_MAGIC;
 };
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
+
+// Defines the names for initializing ewk_view_smart_class
+const char ewkViewTiledName[] = "Ewk_View_Tiled";
+const char ewkViewSingleName[] = "Ewk_View_Single";
 
 // forward declarations
 namespace WebCore {
@@ -227,8 +227,4 @@ void ewk_frame_mixed_content_run_set(Evas_Object* ewkFrame, bool hasRun);
 void ewk_view_mixed_content_displayed_set(Evas_Object* ewkView, bool hasDisplayed);
 void ewk_view_mixed_content_run_set(Evas_Object* ewkView, bool hasRun);
 
-#ifdef __cplusplus
-
-}
-#endif
 #endif // ewk_private_h

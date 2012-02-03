@@ -31,20 +31,20 @@ namespace WebCore {
 
     class ChildNodeList : public DynamicNodeList {
     public:
-        static PassRefPtr<ChildNodeList> create(PassRefPtr<Node> rootNode, Caches* caches)
+        static PassRefPtr<ChildNodeList> create(PassRefPtr<Node> rootNode)
         {
-            return adoptRef(new ChildNodeList(rootNode, caches));
+            return adoptRef(new ChildNodeList(rootNode));
         }
+
+        virtual ~ChildNodeList();
 
         virtual unsigned length() const;
         virtual Node* item(unsigned index) const;
 
     protected:
-        ChildNodeList(PassRefPtr<Node> rootNode, Caches*);
+        ChildNodeList(PassRefPtr<Node> rootNode);
 
         virtual bool nodeMatches(Element*) const;
-
-        mutable RefPtr<DynamicNodeList::Caches> m_caches;
     };
 
 } // namespace WebCore

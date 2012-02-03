@@ -104,8 +104,6 @@ public:
     void setReflectedBooleanAttr(bool);
     WebDOMString reflectedURLAttr() const;
     void setReflectedURLAttr(const WebDOMString&);
-    WebDOMString reflectedNonEmptyURLAttr() const;
-    void setReflectedNonEmptyURLAttr(const WebDOMString&);
     WebDOMString reflectedStringAttr() const;
     void setReflectedStringAttr(const WebDOMString&);
     int reflectedCustomIntegralAttr() const;
@@ -114,8 +112,6 @@ public:
     void setReflectedCustomBooleanAttr(bool);
     WebDOMString reflectedCustomURLAttr() const;
     void setReflectedCustomURLAttr(const WebDOMString&);
-    WebDOMString reflectedCustomNonEmptyURLAttr() const;
-    void setReflectedCustomNonEmptyURLAttr(const WebDOMString&);
     int attrWithGetterException() const;
     void setAttrWithGetterException(int);
     int attrWithSetterException() const;
@@ -124,8 +120,14 @@ public:
     void setStringAttrWithGetterException(const WebDOMString&);
     WebDOMString stringAttrWithSetterException() const;
     void setStringAttrWithSetterException(const WebDOMString&);
-    int customAttr() const;
-    void setCustomAttr(int);
+    int withScriptStateAttribute() const;
+    void setWithScriptStateAttribute(int);
+    WebDOMTestObj withScriptExecutionContextAttribute() const;
+    void setWithScriptExecutionContextAttribute(const WebDOMTestObj&);
+    WebDOMTestObj withScriptStateAttributeRaises() const;
+    void setWithScriptStateAttributeRaises(const WebDOMTestObj&);
+    WebDOMTestObj withScriptExecutionContextAttributeRaises() const;
+    void setWithScriptExecutionContextAttributeRaises(const WebDOMTestObj&);
     WebDOMString scriptStringAttr() const;
 #if ENABLE(Condition1)
     int conditionalAttr1() const;
@@ -174,8 +176,6 @@ public:
     void idbKey(const WebDOMIDBKey& key);
     void optionsObject(const WebDOMOptionsObject& oo, const WebDOMOptionsObject& ooo);
     void methodWithException();
-    void customMethod();
-    void customMethodWithArgs(int intArg, const WebDOMString& strArg, const WebDOMTestObj& objArg);
     void addEventListener(const WebDOMString& type, const WebDOMEventListener& listener, bool useCapture);
     void removeEventListener(const WebDOMString& type, const WebDOMEventListener& listener, bool useCapture);
     void withScriptStateVoid();

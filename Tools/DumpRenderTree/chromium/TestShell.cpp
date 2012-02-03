@@ -52,7 +52,6 @@
 #include "WebScriptController.h"
 #include "WebSettings.h"
 #include "platform/WebSize.h"
-#include "WebSpeechInputControllerMock.h"
 #include "platform/WebString.h"
 #include "platform/WebURLRequest.h"
 #include "platform/WebURLResponse.h"
@@ -127,6 +126,7 @@ TestShell::TestShell(bool testShellMode)
     WebRuntimeFeatures::enableWebAudio(true); 
     WebRuntimeFeatures::enableVideoTrack(true);
     WebRuntimeFeatures::enableGamepad(true);
+    WebRuntimeFeatures::enableShadowDOM(true);
 
     m_webPermissions = adoptPtr(new WebPermissions(this));
     m_accessibilityController = adoptPtr(new AccessibilityController(this));

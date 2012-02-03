@@ -99,7 +99,7 @@ void JIT::emitOptimizationCheck(OptimizationCheckKind kind)
     if (!shouldEmitProfiling())
         return;
     
-    Jump skipOptimize = branchAdd32(Signed, TrustedImm32(kind == LoopOptimizationCheck ? Options::executionCounterIncrementForLoop : Options::executionCounterIncrementForReturn), AbsoluteAddress(m_codeBlock->addressOfExecuteCounter()));
+    Jump skipOptimize = branchAdd32(Signed, TrustedImm32(kind == LoopOptimizationCheck ? Options::executionCounterIncrementForLoop : Options::executionCounterIncrementForReturn), AbsoluteAddress(m_codeBlock->addressOfJITExecuteCounter()));
     JITStubCall stubCall(this, kind == LoopOptimizationCheck ? cti_optimize_from_loop : cti_optimize_from_ret);
     if (kind == LoopOptimizationCheck)
         stubCall.addArgument(Imm32(m_bytecodeOffset));
@@ -328,10 +328,9 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_put_by_id)
         DEFINE_OP(op_put_by_index)
         DEFINE_OP(op_put_by_val)
-        DEFINE_OP(op_put_getter)
+        DEFINE_OP(op_put_getter_setter)
         DEFINE_OP(op_put_global_var)
         DEFINE_OP(op_put_scoped_var)
-        DEFINE_OP(op_put_setter)
         DEFINE_OP(op_resolve)
         DEFINE_OP(op_resolve_base)
         DEFINE_OP(op_ensure_property_exists)
@@ -614,7 +613,7 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck)
 
     ASSERT(m_jmpTable.isEmpty());
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     // Translate vPC offsets into addresses in JIT generated code, for switch tables.
     for (unsigned i = 0; i < m_switches.size(); ++i) {

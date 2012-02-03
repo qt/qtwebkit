@@ -55,8 +55,12 @@ class IRCCommand(object):
 
 class LastGreenRevision(IRCCommand):
     def execute(self, nick, args, tool, sheriff):
-        return "%s: %s" % (nick,
-            urls.view_revision_url(tool.buildbot.last_green_revision()))
+        if not args:
+            return "%s: Usage: last-green-revision BUILDER_NAME" % nick
+        result = tool.buildbot.last_green_revision(' '.join(args))
+        for line in result.split('\n'):
+            if line:
+                tool.irc().post("%s: %s" % (nick, line))
 
 
 class Restart(IRCCommand):
@@ -128,7 +132,7 @@ class Rollout(IRCCommand):
             return "%s: Usage: rollout SVN_REVISION [SVN_REVISIONS] REASON" % nick
 
         revision_urls_string = join_with_separators([urls.view_revision_url(revision) for revision in svn_revision_list])
-        tool.irc().post("%s: Preparing rollout for %s..." % (nick, revision_urls_string))
+        tool.irc().post("%s: Preparing rollout for %s ..." % (nick, revision_urls_string))
 
         self._update_working_copy(tool)
 

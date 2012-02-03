@@ -28,17 +28,19 @@
 #include "ProcessLauncher.h"
 
 #include "Connection.h"
-#include "RunLoop.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/ResourceHandle.h>
+#include <WebCore/RunLoop.h>
 #include <errno.h>
-#if OS(LINUX)
-#include <sys/prctl.h>
-#endif
+#include <locale.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GlibUtilities.h>
+
+#if OS(LINUX)
+#include <sys/prctl.h>
+#endif
 
 #ifdef SOCK_SEQPACKET
 #define SOCKET_TYPE SOCK_SEQPACKET
@@ -57,6 +59,9 @@ static void childSetupFunction(gpointer userData)
 {
     int socket = GPOINTER_TO_INT(userData);
     close(socket);
+
+    // Make child process inherit parent's locale.
+    g_setenv("LC_ALL", setlocale(LC_ALL, 0), TRUE);
 
 #if OS(LINUX)
     // Kill child process when parent dies.

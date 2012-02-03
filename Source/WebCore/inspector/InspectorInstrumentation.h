@@ -107,6 +107,8 @@ public:
     static void didChangeXHRReadyState(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willDispatchEvent(Document*, const Event& event, DOMWindow* window, Node* node, const Vector<EventContext>& ancestors);
     static void didDispatchEvent(const InspectorInstrumentationCookie&);
+    static InspectorInstrumentationCookie willHandleEvent(ScriptExecutionContext*, Event*);
+    static void didHandleEvent(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willDispatchEventOnWindow(Frame*, const Event& event, DOMWindow* window);
     static void didDispatchEventOnWindow(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willEvaluateScript(Frame*, const String& url, int lineNumber);
@@ -128,6 +130,8 @@ public:
     static void didProcessRule(const InspectorInstrumentationCookie&);
 
     static void applyUserAgentOverride(Frame*, String*);
+    static void applyScreenWidthOverride(Frame*, long*);
+    static void applyScreenHeightOverride(Frame*, long*);
     static void willSendRequest(Frame*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse& redirectResponse);
     static void continueAfterPingLoader(Frame*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse&);
     static void markResourceAsCached(Page*, unsigned long identifier);
@@ -158,10 +162,10 @@ public:
     static void didWriteHTML(const InspectorInstrumentationCookie&, unsigned int endLine);
 
     static void addMessageToConsole(Page*, MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
-    static void addMessageToConsole(Page*, MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String&);
+    static void addMessageToConsole(Page*, MessageSource, MessageType, MessageLevel, const String& message, const String&, unsigned lineNumber);
 #if ENABLE(WORKERS)
     static void addMessageToConsole(WorkerContext*, MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
-    static void addMessageToConsole(WorkerContext*, MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String&);
+    static void addMessageToConsole(WorkerContext*, MessageSource, MessageType, MessageLevel, const String& message, const String&, unsigned lineNumber);
 #endif
     static void consoleCount(Page*, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
     static void startConsoleTiming(Page*, const String& title);
@@ -251,6 +255,8 @@ private:
     static InspectorInstrumentationCookie willChangeXHRReadyStateImpl(InstrumentingAgents*, XMLHttpRequest*);
     static void didChangeXHRReadyStateImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willDispatchEventImpl(InstrumentingAgents*, const Event&, DOMWindow*, Node*, const Vector<EventContext>& ancestors);
+    static InspectorInstrumentationCookie willHandleEventImpl(InstrumentingAgents*, Event*);
+    static void didHandleEventImpl(const InspectorInstrumentationCookie&);
     static void didDispatchEventImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willDispatchEventOnWindowImpl(InstrumentingAgents*, const Event&, DOMWindow*);
     static void didDispatchEventOnWindowImpl(const InspectorInstrumentationCookie&);
@@ -273,6 +279,8 @@ private:
     static void didProcessRuleImpl(const InspectorInstrumentationCookie&);
 
     static void applyUserAgentOverrideImpl(InstrumentingAgents*, String*);
+    static void applyScreenWidthOverrideImpl(InstrumentingAgents*, long*);
+    static void applyScreenHeightOverrideImpl(InstrumentingAgents*, long*);
     static void willSendRequestImpl(InstrumentingAgents*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse& redirectResponse);
     static void continueAfterPingLoaderImpl(InstrumentingAgents*, unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse&);
     static void markResourceAsCachedImpl(InstrumentingAgents*, unsigned long identifier);
@@ -304,7 +312,7 @@ private:
     static void didWriteHTMLImpl(const InspectorInstrumentationCookie&, unsigned int endLine);
 
     static void addMessageToConsoleImpl(InstrumentingAgents*, MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
-    static void addMessageToConsoleImpl(InstrumentingAgents*, MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& scriptId);
+    static void addMessageToConsoleImpl(InstrumentingAgents*, MessageSource, MessageType, MessageLevel, const String& message, const String& scriptId, unsigned lineNumber);
     static void consoleCountImpl(InstrumentingAgents*, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
     static void startConsoleTimingImpl(InstrumentingAgents*, const String& title);
     static void stopConsoleTimingImpl(InstrumentingAgents*, const String& title, PassRefPtr<ScriptCallStack>);
@@ -359,7 +367,7 @@ private:
 #endif
 
     static bool collectingHTMLParseErrors(InstrumentingAgents*);
-    static void pauseOnNativeEventIfNeeded(InstrumentingAgents*, const String& categoryType, const String& eventName, bool synchronous);
+    static void pauseOnNativeEventIfNeeded(InstrumentingAgents*, bool isDOMEvent, const String& eventName, bool synchronous);
     static void cancelPauseOnNativeEvent(InstrumentingAgents*);
     static InspectorTimelineAgent* retrieveTimelineAgent(const InspectorInstrumentationCookie&);
 
@@ -588,6 +596,25 @@ inline void InspectorInstrumentation::didDispatchEvent(const InspectorInstrument
 #endif
 }
 
+inline InspectorInstrumentationCookie InspectorInstrumentation::willHandleEvent(ScriptExecutionContext* context, Event* event)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(InspectorInstrumentationCookie());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
+        return willHandleEventImpl(instrumentingAgents, event);
+#endif
+    return InspectorInstrumentationCookie();
+}
+
+inline void InspectorInstrumentation::didHandleEvent(const InspectorInstrumentationCookie& cookie)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (cookie.first)
+        didHandleEventImpl(cookie);
+#endif
+}
+
 inline InspectorInstrumentationCookie InspectorInstrumentation::willDispatchEventOnWindow(Frame* frame, const Event& event, DOMWindow* window)
 {
 #if ENABLE(INSPECTOR)
@@ -776,6 +803,24 @@ inline void InspectorInstrumentation::applyUserAgentOverride(Frame* frame, Strin
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
         applyUserAgentOverrideImpl(instrumentingAgents, userAgent);
+#endif
+}
+
+inline void InspectorInstrumentation::applyScreenWidthOverride(Frame* frame, long* width)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
+        applyScreenWidthOverrideImpl(instrumentingAgents, width);
+#endif
+}
+
+inline void InspectorInstrumentation::applyScreenHeightOverride(Frame* frame, long* height)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
+        applyScreenHeightOverrideImpl(instrumentingAgents, height);
 #endif
 }
 

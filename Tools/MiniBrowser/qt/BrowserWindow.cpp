@@ -37,6 +37,7 @@
 #include <QPointF>
 
 BrowserWindow::BrowserWindow(WindowOptions* options)
+    : m_windowOptions(options)
 {
     setWindowTitle("MiniBrowser");
     setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
@@ -52,6 +53,7 @@ BrowserWindow::BrowserWindow(WindowOptions* options)
     engine()->rootContext()->setContextProperty("options", options);
     setSource(QUrl("qrc:/qml/BrowserWindow.qml"));
     connect(rootObject(), SIGNAL(pageTitleChanged(QString)), this, SLOT(setWindowTitle(QString)));
+    connect(rootObject(), SIGNAL(newWindow(QString)), this, SLOT(newWindow(QString)));
     if (options->useTraditionalDesktopBehavior())
         webView()->experimental()->setUseTraditionalDesktopBehaviour(true);
     if (options->startFullScreen())
@@ -88,7 +90,7 @@ void BrowserWindow::focusAddressBar()
 
 BrowserWindow* BrowserWindow::newWindow(const QString& url)
 {
-    BrowserWindow* window = new BrowserWindow();
+    BrowserWindow* window = new BrowserWindow(m_windowOptions);
     window->load(url);
     return window;
 }

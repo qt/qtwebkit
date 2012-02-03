@@ -33,6 +33,8 @@ static const char* contents = "<html><body><p>This is a test. This is the second
 
 static const char* contentsWithNewlines = "<html><body><p>This is a test. \n\nThis\n is the second sentence. And this the third.</p></body></html>";
 
+static const char* contentsWithPreformattedText = "<html><body><pre>\n\t\n\tfirst line\n\tsecond line\n</pre></body></html>";
+
 static const char* contentsWithSpecialChars = "<html><body><p>&laquo;&nbsp;This is a paragraph with &ldquo;special&rdquo; characters inside.&nbsp;&raquo;</p></body></html>";
 
 static const char* contentsInTextarea = "<html><body><textarea cols='80'>This is a test. This is the second sentence. And this the third.</textarea></body></html>";
@@ -254,6 +256,17 @@ static void runGetTextTests(AtkText* textObject)
     }
 }
 
+static gchar* textCaretMovedResult = 0;
+
+static void textCaretMovedCallback(AtkText* text, gint pos, gpointer data)
+{
+    g_assert(ATK_IS_TEXT(text));
+
+    g_free(textCaretMovedResult);
+    AtkRole role = atk_object_get_role(ATK_OBJECT(text));
+    textCaretMovedResult = g_strdup_printf("|%s|%d|", atk_role_get_name(role), pos);
+}
+
 static void testWebkitAtkCaretOffsets()
 {
     WebKitWebView* webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
@@ -267,6 +280,8 @@ static void testWebkitAtkCaretOffsets()
 
     AtkObject* header = atk_object_ref_accessible_child(object, 0);
     g_assert(ATK_IS_TEXT(header));
+    g_signal_connect(header, "text-caret-moved", G_CALLBACK(textCaretMovedCallback), 0);
+
     gchar* text = atk_text_get_text(ATK_TEXT(header), 0, -1);
     g_assert_cmpstr(text, ==, "A text header");
     g_free (text);
@@ -276,9 +291,12 @@ static void testWebkitAtkCaretOffsets()
     g_assert_cmpint(result, ==, TRUE);
     gint offset = atk_text_get_caret_offset(ATK_TEXT(header));
     g_assert_cmpint(offset, ==, 5);
+    g_assert_cmpstr(textCaretMovedResult, ==, "|heading|5|");
 
     AtkObject* paragraph = atk_object_ref_accessible_child(object, 1);
     g_assert(ATK_IS_TEXT(paragraph));
+    g_signal_connect(paragraph, "text-caret-moved", G_CALLBACK(textCaretMovedCallback), 0);
+
     text = atk_text_get_text(ATK_TEXT(paragraph), 0, -1);
     g_assert_cmpstr(text, ==, "A paragraph with a link in the middle");
     g_free (text);
@@ -288,16 +306,32 @@ static void testWebkitAtkCaretOffsets()
     g_assert_cmpint(result, ==, TRUE);
     offset = atk_text_get_caret_offset(ATK_TEXT(paragraph));
     g_assert_cmpint(offset, ==, 5);
+    g_assert_cmpstr(textCaretMovedResult, ==, "|paragraph|5|");
 
     result = atk_text_set_caret_offset(ATK_TEXT(paragraph), 20);
     g_assert_cmpint(result, ==, TRUE);
     offset = atk_text_get_caret_offset(ATK_TEXT(paragraph));
     g_assert_cmpint(offset, ==, 20);
+    g_assert_cmpstr(textCaretMovedResult, ==, "|paragraph|20|");
 
     result = atk_text_set_caret_offset(ATK_TEXT(paragraph), 30);
     g_assert_cmpint(result, ==, TRUE);
     offset = atk_text_get_caret_offset(ATK_TEXT(paragraph));
     g_assert_cmpint(offset, ==, 30);
+    g_assert_cmpstr(textCaretMovedResult, ==, "|paragraph|30|");
+
+    AtkObject* link = atk_object_ref_accessible_child(paragraph, 0);
+    g_assert(ATK_IS_TEXT(link));
+    text = atk_text_get_text(ATK_TEXT(link), 0, -1);
+    g_assert_cmpstr(text, ==, "with a link");
+    g_free (text);
+
+    result = atk_text_set_caret_offset(ATK_TEXT(link), 5);
+    g_assert_cmpint(result, ==, TRUE);
+    offset = atk_text_get_caret_offset(ATK_TEXT(link));
+    g_assert_cmpint(offset, ==, 5);
+    /* Positions inside links are reported relative to the paragraph. */
+    g_assert_cmpstr(textCaretMovedResult, ==, "|paragraph|17|");
 
     AtkObject* list = atk_object_ref_accessible_child(object, 2);
     g_assert(ATK_OBJECT(list));
@@ -355,8 +389,11 @@ static void testWebkitAtkCaretOffsets()
     offset = atk_text_get_caret_offset(ATK_TEXT(textEntry));
     g_assert_cmpint(offset, ==, 5);
 
+    g_free(textCaretMovedResult);
+
     g_object_unref(header);
     g_object_unref(paragraph);
+    g_object_unref(link);
     g_object_unref(list);
     g_object_unref(listItem);
     g_object_unref(panel);
@@ -642,28 +679,6 @@ static void testWebkitAtkEmbeddedObjects()
     g_object_unref(webView);
 }
 
-static void testWebkitAtkGetTextAtOffsetForms()
-{
-    WebKitWebView* webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
-    g_object_ref_sink(webView);
-    GtkAllocation allocation = { 0, 0, 800, 600 };
-    gtk_widget_size_allocate(GTK_WIDGET(webView), &allocation);
-    webkit_web_view_load_string(webView, contents, 0, 0, 0);
-
-    /* Get to the inner AtkText object. */
-    AtkObject* object = getWebAreaObject(webView);
-    g_assert(object);
-    object = atk_object_ref_accessible_child(object, 0);
-    g_assert(object);
-
-    AtkText* textObject = ATK_TEXT(object);
-    g_assert(ATK_IS_TEXT(textObject));
-
-    runGetTextTests(textObject);
-
-    g_object_unref(webView);
-}
-
 static void testWebkitAtkGetTextAtOffset()
 {
     WebKitWebView* webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
@@ -753,6 +768,34 @@ static void testWebkitAtkGetTextAtOffsetTextInput()
 
     runGetTextTests(textObject);
 
+    g_object_unref(webView);
+}
+
+static void testWebkitAtkGetTextAtOffsetWithPreformattedText()
+{
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
+    g_object_ref_sink(webView);
+    GtkAllocation allocation = { 0, 0, 800, 600 };
+    gtk_widget_size_allocate(GTK_WIDGET(webView), &allocation);
+    webkit_web_view_load_string(webView, contentsWithPreformattedText, 0, 0, 0);
+
+    AtkObject* object = getWebAreaObject(webView);
+    g_assert(object);
+
+    AtkObject* preformattedText = atk_object_ref_accessible_child(object, 0);
+    g_assert(ATK_IS_OBJECT(preformattedText));
+    g_assert(atk_object_get_role(preformattedText) == ATK_ROLE_PANEL);
+    g_assert(ATK_IS_TEXT(preformattedText));
+    char* text = atk_text_get_text(ATK_TEXT(preformattedText), 0, -1);
+    g_assert_cmpstr(text, ==, "\t\n\tfirst line\n\tsecond line\n");
+    g_free(text);
+
+    /* Try retrieving all the lines indicating the position of the offsets at the beginning of each of them. */
+    testGetTextFunction(ATK_TEXT(preformattedText), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 0, "\t\n", 0, 2);
+    testGetTextFunction(ATK_TEXT(preformattedText), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 2, "\tfirst line\n", 2, 14);
+    testGetTextFunction(ATK_TEXT(preformattedText), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 14, "\tsecond line\n", 14, 27);
+
+    g_object_unref(preformattedText);
     g_object_unref(webView);
 }
 
@@ -1109,6 +1152,20 @@ static void testWebkitAtkTextAttributes()
     atk_attribute_set_free(set3);
 }
 
+static gchar* textSelectionChangedResult = 0;
+
+static void textSelectionChangedCallback(AtkText* text, gpointer data)
+{
+    g_assert(ATK_IS_TEXT(text));
+
+    g_free(textSelectionChangedResult);
+    AtkRole role = atk_object_get_role(ATK_OBJECT(text));
+    int startOffset = 0;
+    int endOffset = 0;
+    atk_text_get_selection(ATK_TEXT(text), 0, &startOffset, &endOffset);
+    textSelectionChangedResult = g_strdup_printf("|%s|%d|%d|", atk_role_get_name(role), startOffset, endOffset);
+}
+
 static void testWebkitAtkTextSelections()
 {
     WebKitWebView* webView = WEBKIT_WEB_VIEW(webkit_web_view_new());
@@ -1122,9 +1179,11 @@ static void testWebkitAtkTextSelections()
 
     AtkText* paragraph1 = ATK_TEXT(atk_object_ref_accessible_child(object, 0));
     g_assert(ATK_IS_TEXT(paragraph1));
+    g_signal_connect(paragraph1, "text-selection-changed", G_CALLBACK(textSelectionChangedCallback), 0);
 
     AtkText* paragraph2 = ATK_TEXT(atk_object_ref_accessible_child(object, 1));
     g_assert(ATK_IS_TEXT(paragraph2));
+    g_signal_connect(paragraph2, "text-selection-changed", G_CALLBACK(textSelectionChangedCallback), 0);
 
     AtkText* link = ATK_TEXT(atk_object_ref_accessible_child(ATK_OBJECT(paragraph2), 0));
     g_assert(ATK_IS_TEXT(link));
@@ -1160,11 +1219,13 @@ static void testWebkitAtkTextSelections()
     result = atk_text_set_selection(paragraph1, 0, 5, 25);
     g_assert(result);
     g_assert_cmpint(atk_text_get_n_selections(paragraph1), ==, 1);
+    g_assert_cmpstr(textSelectionChangedResult, ==, "|paragraph|5|25|");
     selectedText = atk_text_get_selection(paragraph1, 0, &startOffset, &endOffset);
     g_assert_cmpint(startOffset, ==, 5);
     g_assert_cmpint(endOffset, ==, 25);
     g_assert_cmpstr(selectedText, ==, "agraph with plain te");
     g_free (selectedText);
+
     /* Try removing the selection from other AtkText object (should fail). */
     result = atk_text_remove_selection(paragraph2, 0);
     g_assert(!result);
@@ -1207,6 +1268,7 @@ static void testWebkitAtkTextSelections()
     result = atk_text_set_selection(paragraph2, 0, 27, 37);
     g_assert(result);
     g_assert_cmpint(atk_text_get_n_selections(paragraph2), ==, 1);
+    g_assert_cmpstr(textSelectionChangedResult, ==, "|paragraph|27|37|");
     selectedText = atk_text_get_selection(paragraph2, 0, &startOffset, &endOffset);
     g_assert_cmpint(startOffset, ==, 27);
     g_assert_cmpint(endOffset, ==, 37);
@@ -1255,6 +1317,8 @@ static void testWebkitAtkTextSelections()
     g_assert_cmpint(endOffset, ==, 9);
     g_assert_cmpstr(selectedText, ==, "A list");
     g_free (selectedText);
+
+    g_free(textSelectionChangedResult);
 
     g_object_unref(paragraph1);
     g_object_unref(paragraph2);
@@ -1794,10 +1858,10 @@ int main(int argc, char** argv)
     g_test_add_func("/webkit/atk/documentLoadingEvents", testWebkitAtkDocumentLoadingEvents);
     g_test_add_func("/webkit/atk/embeddedObjects", testWebkitAtkEmbeddedObjects);
     g_test_add_func("/webkit/atk/getTextAtOffset", testWebkitAtkGetTextAtOffset);
-    g_test_add_func("/webkit/atk/getTextAtOffsetForms", testWebkitAtkGetTextAtOffsetForms);
     g_test_add_func("/webkit/atk/getTextAtOffsetNewlines", testWebkitAtkGetTextAtOffsetNewlines);
     g_test_add_func("/webkit/atk/getTextAtOffsetTextarea", testWebkitAtkGetTextAtOffsetTextarea);
     g_test_add_func("/webkit/atk/getTextAtOffsetTextInput", testWebkitAtkGetTextAtOffsetTextInput);
+    g_test_add_func("/webkit/atk/getTextAtOffsetWithPreformattedText", testWebkitAtkGetTextAtOffsetWithPreformattedText);
     g_test_add_func("/webkit/atk/getTextAtOffsetWithSpecialCharacters", testWebkitAtkGetTextAtOffsetWithSpecialCharacters);
     g_test_add_func("/webkit/atk/getTextInParagraphAndBodySimple", testWebkitAtkGetTextInParagraphAndBodySimple);
     g_test_add_func("/webkit/atk/getTextInParagraphAndBodyModerate", testWebkitAtkGetTextInParagraphAndBodyModerate);

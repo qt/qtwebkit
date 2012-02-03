@@ -386,6 +386,9 @@
 #define WTF_OS_WINDOWS 1
 #endif
 
+#define WTF_OS_WIN ERROR "USE WINDOWS WITH OS NOT WIN"
+#define WTF_OS_MAC ERROR "USE MAC_OS_X WITH OS NOT MAC"
+
 /* OS(UNIX) - Any Unix-like system */
 #if   OS(AIX)              \
     || OS(ANDROID)          \
@@ -543,7 +546,9 @@
 #define ENABLE_SMOOTH_SCROLLING 1
 #define ENABLE_WEB_ARCHIVE 1
 #define ENABLE_WEB_AUDIO 1
+#if defined(ENABLE_VIDEO)
 #define ENABLE_VIDEO_TRACK 1
+#endif
 #endif /* PLATFORM(MAC) && !PLATFORM(IOS) */
 
 #if PLATFORM(CHROMIUM) && OS(DARWIN)
@@ -667,7 +672,7 @@
 #endif
 #endif
 
-#if !OS(WINDOWS) && !OS(SOLARIS) && !OS(QNX) \
+#if !OS(WINDOWS) && !OS(SOLARIS) \
     && !OS(RVCT) \
     && !OS(ANDROID)
 #define HAVE_TM_GMTOFF 1
@@ -721,6 +726,8 @@
 
 #define HAVE_ERRNO_H 1
 #define HAVE_MMAP 1
+#define HAVE_MADV_FREE_REUSE 1
+#define HAVE_MADV_FREE 1
 #define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
 #define HAVE_SYS_PARAM_H 1
@@ -1159,5 +1166,8 @@
 /* Using V8 implies not using JSC and vice versa */
 #define WTF_USE_JSC !WTF_USE_V8
 
+#if ENABLE(NOTIFICATIONS) && PLATFORM(MAC)
+#define ENABLE_TEXT_NOTIFICATIONS_ONLY 1
+#endif
 
 #endif /* WTF_Platform_h */

@@ -227,8 +227,6 @@ JSC::JSValue jsTestObjReflectedBooleanAttr(JSC::ExecState*, JSC::JSValue, const 
 void setJSTestObjReflectedBooleanAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjReflectedURLAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestObjReflectedURLAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
-JSC::JSValue jsTestObjReflectedNonEmptyURLAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
-void setJSTestObjReflectedNonEmptyURLAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjReflectedStringAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestObjReflectedStringAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjReflectedCustomIntegralAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
@@ -237,8 +235,6 @@ JSC::JSValue jsTestObjReflectedCustomBooleanAttr(JSC::ExecState*, JSC::JSValue, 
 void setJSTestObjReflectedCustomBooleanAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjReflectedCustomURLAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestObjReflectedCustomURLAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
-JSC::JSValue jsTestObjReflectedCustomNonEmptyURLAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
-void setJSTestObjReflectedCustomNonEmptyURLAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjAttrWithGetterException(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestObjAttrWithGetterException(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjAttrWithSetterException(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
@@ -249,6 +245,14 @@ JSC::JSValue jsTestObjStringAttrWithSetterException(JSC::ExecState*, JSC::JSValu
 void setJSTestObjStringAttrWithSetterException(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjCustomAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestObjCustomAttr(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+JSC::JSValue jsTestObjWithScriptStateAttribute(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
+void setJSTestObjWithScriptStateAttribute(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+JSC::JSValue jsTestObjWithScriptExecutionContextAttribute(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
+void setJSTestObjWithScriptExecutionContextAttribute(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+JSC::JSValue jsTestObjWithScriptStateAttributeRaises(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
+void setJSTestObjWithScriptStateAttributeRaises(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+JSC::JSValue jsTestObjWithScriptExecutionContextAttributeRaises(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
+void setJSTestObjWithScriptExecutionContextAttributeRaises(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
 JSC::JSValue jsTestObjScriptStringAttr(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 JSC::JSValue jsTestObjConditionalAttr1(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestObjConditionalAttr1(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);

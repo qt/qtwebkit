@@ -28,12 +28,19 @@
 
 #include "CCLayerTreeTestCommon.h"
 #include "LayerChromium.h"
+#include "Region.h"
 #include "TransformationMatrix.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 using namespace WebCore;
+
+#define EXPECT_EQ_RECT(a, b) \
+    EXPECT_EQ(a.x(), b.x()); \
+    EXPECT_EQ(a.y(), b.y()); \
+    EXPECT_EQ(a.width(), b.width()); \
+    EXPECT_EQ(a.height(), b.height());
 
 namespace {
 
@@ -71,8 +78,8 @@ TransformationMatrix remove3DComponentOfMatrix(const TransformationMatrix& mat)
 
 class LayerChromiumWithForcedDrawsContent : public LayerChromium {
 public:
-    explicit LayerChromiumWithForcedDrawsContent(CCLayerDelegate* delegate)
-        : LayerChromium(delegate)
+    LayerChromiumWithForcedDrawsContent()
+        : LayerChromium()
     {
     }
 
@@ -86,9 +93,9 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForNoOpLayer)
     // screenSpaceTransform, and the hierarchy passed on to children
     // layers should also be identity transforms.
 
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> child = LayerChromium::create(0);
-    RefPtr<LayerChromium> grandChild = LayerChromium::create(0);
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild = LayerChromium::create();
     parent->createRenderSurface();
     parent->addChild(child);
     child->addChild(grandChild);
@@ -116,7 +123,7 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForSingleLayer)
     // different position. When we initialize layers for testing here, we need to initialize that unintutive position value.
 
     TransformationMatrix identityMatrix;
-    RefPtr<LayerChromium> layer = LayerChromium::create(0);
+    RefPtr<LayerChromium> layer = LayerChromium::create();
     layer->createRenderSurface();
 
     // Case 1: setting the sublayer transform should not affect this layer's draw transform or screen-space transform.
@@ -181,9 +188,9 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForSingleLayer)
 TEST(CCLayerTreeHostCommonTest, verifyTransformsForSimpleHierarchy)
 {
     TransformationMatrix identityMatrix;
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> child = LayerChromium::create(0);
-    RefPtr<LayerChromium> grandChild = LayerChromium::create(0);
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild = LayerChromium::create();
     parent->createRenderSurface();
     parent->addChild(child);
     child->addChild(grandChild);
@@ -263,9 +270,9 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForSimpleHierarchy)
 
 TEST(CCLayerTreeHostCommonTest, verifyTransformsForSingleRenderSurface)
 {
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> child = LayerChromium::create(0);
-    RefPtr<LayerChromiumWithForcedDrawsContent> grandChild = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> grandChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
     parent->createRenderSurface();
     parent->addChild(child);
     child->addChild(grandChild);
@@ -318,15 +325,15 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForRenderSurfaceHierarchy)
     //   - Sanity check on recursion: verify transforms of layers described w.r.t. a render surface that is described w.r.t. an ancestor render surface.
     //   - verifying that each layer has a reference to the correct renderSurface and targetRenderSurface values.
 
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create(0);
-    RefPtr<LayerChromium> renderSurface2 = LayerChromium::create(0);
-    RefPtr<LayerChromium> childOfRoot = LayerChromium::create(0);
-    RefPtr<LayerChromium> childOfRS1 = LayerChromium::create(0);
-    RefPtr<LayerChromium> childOfRS2 = LayerChromium::create(0);
-    RefPtr<LayerChromium> grandChildOfRoot = LayerChromium::create(0);
-    RefPtr<LayerChromiumWithForcedDrawsContent> grandChildOfRS1 = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
-    RefPtr<LayerChromiumWithForcedDrawsContent> grandChildOfRS2 = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create();
+    RefPtr<LayerChromium> renderSurface2 = LayerChromium::create();
+    RefPtr<LayerChromium> childOfRoot = LayerChromium::create();
+    RefPtr<LayerChromium> childOfRS1 = LayerChromium::create();
+    RefPtr<LayerChromium> childOfRS2 = LayerChromium::create();
+    RefPtr<LayerChromium> grandChildOfRoot = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> grandChildOfRS1 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> grandChildOfRS2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
     parent->createRenderSurface();
     parent->addChild(renderSurface1);
     parent->addChild(childOfRoot);
@@ -454,9 +461,9 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForRenderSurfaceHierarchy)
 
 TEST(CCLayerTreeHostCommonTest, verifyRenderSurfaceListForClipLayer)
 {
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create(0);
-    RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent());
     renderSurface1->setOpacity(0.9);
 
     const TransformationMatrix identityMatrix;
@@ -483,9 +490,9 @@ TEST(CCLayerTreeHostCommonTest, verifyRenderSurfaceListForClipLayer)
 
 TEST(CCLayerTreeHostCommonTest, verifyRenderSurfaceListForTransparentChild)
 {
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create(0);
-    RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent());
     renderSurface1->setOpacity(0);
 
     const TransformationMatrix identityMatrix;
@@ -526,12 +533,12 @@ TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfaces)
     //
 
     const TransformationMatrix identityMatrix;
-    RefPtr<LayerChromium> parent = LayerChromium::create(0);
-    RefPtr<LayerChromium> child = LayerChromium::create(0);
-    RefPtr<LayerChromium> grandChild = LayerChromium::create(0);
-    RefPtr<LayerChromium> greatGrandChild = LayerChromium::create(0);
-    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode1 = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
-    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode2 = adoptRef(new LayerChromiumWithForcedDrawsContent(0));
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild = LayerChromium::create();
+    RefPtr<LayerChromium> greatGrandChild = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode1 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
     parent->createRenderSurface();
     parent->addChild(child);
     child->addChild(grandChild);
@@ -594,5 +601,175 @@ TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfaces)
 //  - test the special cases for mask layers and replica layers
 //  - test the other functions in CCLayerTreeHostCommon
 //
+
+TEST(CCLayerTreeHostCommonTest, layerAddsSelfToOccludedRegion)
+{
+    // This tests that the right transforms are being used.
+    Region occluded;
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> layer = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    parent->createRenderSurface();
+    parent->addChild(layer);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(layer.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), false);
+
+    layer->setOpaque(true);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->renderSurface()->setContentRect(IntRect(IntPoint::zero(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent);
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    occluded = Region();
+    layer->addSelfToOccludedScreenSpace(occluded);
+    EXPECT_EQ_RECT(IntRect(30, 30, 70, 70), occluded.bounds());
+    EXPECT_EQ(1u, occluded.rects().size());
+}
+
+TEST(CCLayerTreeHostCommonTest, layerAddsSelfToOccludedRegionWithRotation)
+{
+    // This tests that the right transforms are being used.
+    Region occluded;
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> layer = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    parent->createRenderSurface();
+    parent->addChild(layer);
+
+    TransformationMatrix layerTransform;
+    layerTransform.translate(250, 250);
+    layerTransform.rotate(90);
+    layerTransform.translate(-250, -250);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(layer.get(), layerTransform, identityMatrix, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), false);
+
+    layer->setOpaque(true);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->renderSurface()->setContentRect(IntRect(IntPoint::zero(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent);
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    occluded = Region();
+    layer->addSelfToOccludedScreenSpace(occluded);
+    EXPECT_EQ_RECT(IntRect(30, 30, 70, 70), occluded.bounds());
+    EXPECT_EQ(1u, occluded.rects().size());
+}
+
+TEST(CCLayerTreeHostCommonTest, layerAddsSelfToOccludedRegionWithTranslation)
+{
+    // This tests that the right transforms are being used.
+    Region occluded;
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> layer = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    parent->createRenderSurface();
+    parent->addChild(layer);
+
+    TransformationMatrix layerTransform;
+    layerTransform.translate(20, 20);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(layer.get(), layerTransform, identityMatrix, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), false);
+
+    layer->setOpaque(true);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->renderSurface()->setContentRect(IntRect(IntPoint::zero(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent);
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    occluded = Region();
+    layer->addSelfToOccludedScreenSpace(occluded);
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), occluded.bounds());
+    EXPECT_EQ(1u, occluded.rects().size());
+}
+
+TEST(CCLayerTreeHostCommonTest, layerAddsSelfToOccludedRegionWithRotatedSurface)
+{
+    // This tests that the right transforms are being used.
+    Region occluded;
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> layer = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    parent->createRenderSurface();
+    parent->addChild(child);
+    child->addChild(layer);
+
+    TransformationMatrix childTransform;
+    childTransform.translate(250, 250);
+    childTransform.rotate(90);
+    childTransform.translate(-250, -250);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(child.get(), childTransform, identityMatrix, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), false);
+    setLayerPropertiesForTesting(layer.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), false);
+
+    child->setMasksToBounds(true);
+    layer->setOpaque(true);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    // FIXME: when we fix this "root-layer special case" behavior in CCLayerTreeHost, we will have to fix it here, too.
+    parent->renderSurface()->setContentRect(IntRect(IntPoint::zero(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent);
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    occluded = Region();
+    layer->addSelfToOccludedScreenSpace(occluded);
+    EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), occluded.bounds());
+    EXPECT_EQ(1u, occluded.rects().size());
+
+    /* Justification for the above opaque rect from |layer|:
+               100
+      +---------------------+                                      +---------------------+
+      |                     |                                      |                     |30  Visible region of |layer|: /////
+      |    30               |           rotate(90)                 |                     |
+      | 30 + ---------------------------------+                    |     +---------------------------------+
+  100 |    |  10            |                 |            ==>     |     |               |10               |
+      |    |10+---------------------------------+                  |  +---------------------------------+  |
+      |    |  |             |                 | |                  |  |  |///////////////|     420      |  |
+      |    |  |             |                 | |                  |  |  |///////////////|60            |  |
+      |    |  |             |                 | |                  |  |  |///////////////|              |  |
+      +----|--|-------------+                 | |                  +--|--|---------------+              |  |
+           |  |                               | |                   20|10|     70                       |  |
+           |  |                               | |                     |  |                              |  |
+           |  |                               | |500                  |  |                              |  |
+           |  |                               | |                     |  |                              |  |
+           |  |                               | |                     |  |                              |  |
+           |  |                               | |                     |  |                              |  |
+           |  |                               | |                     |  |                              |10|
+           +--|-------------------------------+ |                     |  +------------------------------|--+
+              |                                 |                     |                 490             |
+              +---------------------------------+                     +---------------------------------+
+                             500                                                     500
+     */
+}
 
 } // namespace

@@ -29,6 +29,7 @@
 #include "LayerChromium.h"
 #include "LayerPainterChromium.h"
 #include "LayerRendererChromium.h"
+#include "Region.h"
 #include "TraceEvent.h"
 #include "TreeSynchronizer.h"
 #include "cc/CCLayerIterator.h"
@@ -94,6 +95,9 @@ bool CCLayerTreeHost::initialize()
 
     // Update m_settings based on capabilities that we got back from the renderer.
     m_settings.acceleratePainting = m_proxy->layerRendererCapabilities().usingAcceleratedPainting;
+
+    // Update m_settings based on partial update capability.
+    m_settings.partialTextureUpdates = m_settings.partialTextureUpdates && m_proxy->partialTextureUpdateCapability();
 
     m_contentsTextureManager = TextureManager::create(TextureManager::highLimitBytes(viewportSize()),
                                                       TextureManager::reclaimLimitBytes(viewportSize()),
@@ -165,6 +169,7 @@ void CCLayerTreeHost::finishCommitOnImplThread(CCLayerTreeHostImpl* hostImpl)
 
 void CCLayerTreeHost::commitComplete()
 {
+    m_deleteTextureAfterCommitList.clear();
     clearPendingUpdate();
     m_contentsTextureManager->unprotectAllTextures();
 }
@@ -181,10 +186,6 @@ PassOwnPtr<CCLayerTreeHostImpl> CCLayerTreeHost::createLayerTreeHostImpl(CCLayer
 
 void CCLayerTreeHost::didRecreateGraphicsContext(bool success)
 {
-    if (m_rootLayer) {
-        m_rootLayer->setLayerTreeHost(0);
-        m_rootLayer->setLayerTreeHost(this);
-    }
     m_client->didRecreateGraphicsContext(success);
 }
 
@@ -379,6 +380,8 @@ void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer)
         CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(rootLayer, rootLayer, identityMatrix, identityMatrix, m_updateList, rootRenderSurface->layerList(), layerRendererCapabilities().maxTextureSize);
     }
 
+    reserveTextures();
+
     paintLayerContents(m_updateList, PaintVisible);
     if (!m_triggerIdlePaints)
         return;
@@ -397,13 +400,26 @@ void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer)
     m_contentsTextureManager->setMaxMemoryLimitBytes(maxLimitBytes);
 }
 
+void CCLayerTreeHost::reserveTextures()
+{
+    // Use BackToFront since it's cheap and this isn't order-dependent.
+    typedef CCLayerIterator<LayerChromium, RenderSurfaceChromium, CCLayerIteratorActions::BackToFront> CCLayerIteratorType;
+
+    CCLayerIteratorType end = CCLayerIteratorType::end(&m_updateList);
+    for (CCLayerIteratorType it = CCLayerIteratorType::begin(&m_updateList); it != end; ++it) {
+        if (it.representsTargetRenderSurface() || !it->alwaysReserveTextures())
+            continue;
+        it->reserveTextures();
+    }
+}
+
 // static
-void CCLayerTreeHost::paintContentsIfDirty(LayerChromium* layer, PaintType paintType)
+void CCLayerTreeHost::paintContentsIfDirty(LayerChromium* layer, PaintType paintType, const Region& occludedScreenSpace)
 {
     ASSERT(layer);
     ASSERT(PaintVisible == paintType || PaintIdle == paintType);
     if (PaintVisible == paintType)
-        layer->paintContentsIfDirty();
+        layer->paintContentsIfDirty(occludedScreenSpace);
     else
         layer->idlePaintContentsIfDirty();
 }
@@ -414,19 +430,57 @@ void CCLayerTreeHost::paintMaskAndReplicaForRenderSurface(LayerChromium* renderS
     // in code, we already know that at least something will be drawn into this render surface, so the
     // mask and replica should be painted.
 
+    // FIXME: If the surface has a replica, it should be painted with occlusion that excludes the current target surface subtree.
+    Region noOcclusion;
+
     if (renderSurfaceLayer->maskLayer()) {
         renderSurfaceLayer->maskLayer()->setVisibleLayerRect(IntRect(IntPoint(), renderSurfaceLayer->contentBounds()));
-        paintContentsIfDirty(renderSurfaceLayer->maskLayer(), paintType);
+        paintContentsIfDirty(renderSurfaceLayer->maskLayer(), paintType, noOcclusion);
     }
 
     LayerChromium* replicaLayer = renderSurfaceLayer->replicaLayer();
     if (replicaLayer) {
-        paintContentsIfDirty(replicaLayer, paintType);
+        paintContentsIfDirty(replicaLayer, paintType, noOcclusion);
 
         if (replicaLayer->maskLayer()) {
             replicaLayer->maskLayer()->setVisibleLayerRect(IntRect(IntPoint(), replicaLayer->maskLayer()->contentBounds()));
-            paintContentsIfDirty(replicaLayer->maskLayer(), paintType);
+            paintContentsIfDirty(replicaLayer->maskLayer(), paintType, noOcclusion);
         }
+    }
+}
+
+struct RenderSurfaceRegion {
+    RenderSurfaceChromium* surface;
+    Region occludedInScreen;
+};
+
+// Add the surface to the top of the stack and copy the occlusion from the old top of the stack to the new.
+static void enterTargetRenderSurface(Vector<RenderSurfaceRegion>& stack, RenderSurfaceChromium* newTarget)
+{
+    if (stack.isEmpty()) {
+        stack.append(RenderSurfaceRegion());
+        stack.last().surface = newTarget;
+    } else if (stack.last().surface != newTarget) {
+        const RenderSurfaceRegion& previous = stack.last();
+        stack.append(RenderSurfaceRegion());
+        stack.last().surface = newTarget;
+        stack.last().occludedInScreen = previous.occludedInScreen;
+    }
+}
+
+// Pop the top of the stack off, push on the new surface, and merge the old top's occlusion into the new top surface.
+static void leaveTargetRenderSurface(Vector<RenderSurfaceRegion>& stack, RenderSurfaceChromium* newTarget)
+{
+    int lastIndex = stack.size() - 1;
+    bool surfaceWillBeAtTopAfterPop = stack.size() > 1 && stack[lastIndex - 1].surface == newTarget;
+
+    if (surfaceWillBeAtTopAfterPop) {
+        // Merge the top of the stack down.
+        stack[lastIndex - 1].occludedInScreen.unite(stack[lastIndex].occludedInScreen);
+        stack.removeLast();
+    } else {
+        // Replace the top of the stack with the new pushed surface. Copy the occluded region to the top.
+        stack.last().surface = newTarget;
     }
 }
 
@@ -435,14 +489,34 @@ void CCLayerTreeHost::paintLayerContents(const LayerList& renderSurfaceLayerList
     // Use FrontToBack to allow for testing occlusion and performing culling during the tree walk.
     typedef CCLayerIterator<LayerChromium, RenderSurfaceChromium, CCLayerIteratorActions::FrontToBack> CCLayerIteratorType;
 
+    // The stack holds occluded regions for subtrees in the RenderSurface-Layer tree, so that when we leave a subtree we may
+    // apply a mask to it, but not to the parts outside the subtree.
+    // - The first time we see a new subtree under a target, we add that target to the top of the stack. This can happen as a layer representing itself, or as a target surface.
+    // - When we visit a target surface, we apply its mask to its subtree, which is at the top of the stack.
+    // - When we visit a layer representing itself, we add its occlusion to the current subtree, which is at the top of the stack.
+    // - When we visit a layer representing a contributing surface, the current target will never be the top of the stack since we just came from the contributing surface.
+    // We merge the occlusion at the top of the stack with the new current subtree. This new target is pushed onto the stack if not already there.
+    Vector<RenderSurfaceRegion> targetSurfaceStack;
+
     CCLayerIteratorType end = CCLayerIteratorType::end(&renderSurfaceLayerList);
     for (CCLayerIteratorType it = CCLayerIteratorType::begin(&renderSurfaceLayerList); it != end; ++it) {
         if (it.representsTargetRenderSurface()) {
             ASSERT(it->renderSurface()->drawOpacity());
+
+            enterTargetRenderSurface(targetSurfaceStack, it->renderSurface());
             paintMaskAndReplicaForRenderSurface(*it, paintType);
+            // FIXME: add the replica layer to the current occlusion
+
+            if (it->maskLayer() || it->renderSurface()->drawOpacity() < 1)
+                targetSurfaceStack.last().occludedInScreen = Region();
         } else if (it.representsItself()) {
             ASSERT(!it->bounds().isEmpty());
-            paintContentsIfDirty(*it, paintType);
+
+            enterTargetRenderSurface(targetSurfaceStack, it->targetRenderSurface());
+            paintContentsIfDirty(*it, paintType, targetSurfaceStack.last().occludedInScreen);
+            it->addSelfToOccludedScreenSpace(targetSurfaceStack.last().occludedInScreen);
+        } else {
+            leaveTargetRenderSurface(targetSurfaceStack, it.targetRenderSurfaceLayer()->renderSurface());
         }
     }
 }
@@ -512,6 +586,11 @@ void CCLayerTreeHost::stopRateLimiter(GraphicsContext3D* context)
         it->second->stop();
         m_rateLimiters.remove(it);
     }
+}
+
+void CCLayerTreeHost::deleteTextureAfterCommit(PassOwnPtr<ManagedTexture> texture)
+{
+    m_deleteTextureAfterCommitList.append(texture);
 }
 
 }

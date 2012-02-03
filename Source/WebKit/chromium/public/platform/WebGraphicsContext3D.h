@@ -118,6 +118,12 @@ public:
         virtual ~WebGraphicsContextLostCallback() { }
     };
 
+    class WebGraphicsErrorMessageCallback {
+    public:
+        virtual void onErrorMessage(const WebString&, WGC3Dint) = 0;
+        virtual ~WebGraphicsErrorMessageCallback() { }
+    };
+
     class WebGraphicsSwapBuffersCompleteCallbackCHROMIUM {
     public:
         virtual void onSwapBuffersComplete() = 0;
@@ -127,9 +133,8 @@ public:
     // This destructor needs to be public so that using classes can destroy instances if initialization fails.
     virtual ~WebGraphicsContext3D() {}
 
-    // Initializes the graphics context; should be the first operation performed
-    // on newly-constructed instances. Returns true on success.
-    virtual bool initialize(Attributes, WebView*, bool renderDirectlyToWebView) = 0;
+    // This function is deprecated and will be removed soon.
+    virtual bool initialize(Attributes, WebView*, bool renderDirectlyToWebView) { return false; }
 
     // Makes the OpenGL context current on the current thread. Returns true on
     // success.
@@ -369,6 +374,7 @@ public:
     virtual void deleteTexture(WebGLId) = 0;
 
     virtual void setContextLostCallback(WebGraphicsContextLostCallback* callback) {}
+    virtual void setErrorMessageCallback(WebGraphicsErrorMessageCallback* callback) { }
     // GL_ARB_robustness
     //
     // This entry point must provide slightly different semantics than

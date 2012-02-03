@@ -25,7 +25,7 @@
 #ifndef StyledElement_h
 #define StyledElement_h
 
-#include "CSSInlineStyleDeclaration.h"
+#include "CSSMutableStyleDeclaration.h"
 #include "Element.h"
 #include "MappedAttributeEntry.h"
 
@@ -38,7 +38,7 @@ class StyledElement : public Element {
 public:
     virtual ~StyledElement();
 
-    bool hasMappedAttributes() const { return attributeMap() && attributeMap()->hasMappedAttributes(); }
+    size_t mappedAttributeCount() const { return attributeMap() ? attributeMap()->mappedAttributeCount() : 0; }
     bool isMappedAttribute(const QualifiedName& name) const { MappedAttributeEntry res = eNone; mapToEntry(name, res); return res != eNone; }
 
     void addCSSLength(Attribute*, int id, const String& value);
@@ -55,13 +55,12 @@ public:
     static CSSMappedAttributeDeclaration* getMappedAttributeDecl(MappedAttributeEntry, Attribute*);
     static void setMappedAttributeDecl(MappedAttributeEntry, Attribute*, CSSMappedAttributeDeclaration*);
 
-    virtual bool canHaveAdditionalAttributeStyleDecls() const { return false; }
-    virtual void additionalAttributeStyleDecls(Vector<CSSMutableStyleDeclaration*>&) { }
+    virtual PassRefPtr<CSSMutableStyleDeclaration> additionalAttributeStyle() { return 0; }
     void invalidateStyleAttribute();
 
-    CSSInlineStyleDeclaration* inlineStyleDecl() const { return m_inlineStyleDecl.get(); }
-    CSSInlineStyleDeclaration* ensureInlineStyleDecl();
-    virtual CSSStyleDeclaration* style() OVERRIDE;
+    CSSMutableStyleDeclaration* inlineStyleDecl() const { return attributeMap() ? attributeMap()->inlineStyleDecl() : 0; }
+    CSSMutableStyleDeclaration* ensureInlineStyleDecl() { return ensureAttributeMap()->ensureInlineStyleDecl(); }
+    virtual CSSStyleDeclaration* style() OVERRIDE { return ensureInlineStyleDecl(); }
 
     const SpaceSplitString& classNames() const;
 
@@ -89,18 +88,20 @@ protected:
 private:
     void createMappedDecl(Attribute*);
 
-    void createInlineStyleDecl();
-    void destroyInlineStyleDecl();
     virtual void updateStyleAttribute() const;
 
-    RefPtr<CSSInlineStyleDeclaration> m_inlineStyleDecl;
+    void destroyInlineStyleDecl()
+    {
+        if (attributeMap())
+            attributeMap()->destroyInlineStyleDecl();
+    }
 };
 
 inline const SpaceSplitString& StyledElement::classNames() const
 {
     ASSERT(hasClass());
-    ASSERT(attributeMap());
-    return attributeMap()->classNames();
+    ASSERT(attributeData());
+    return attributeData()->classNames();
 }
 
 inline void StyledElement::invalidateStyleAttribute()

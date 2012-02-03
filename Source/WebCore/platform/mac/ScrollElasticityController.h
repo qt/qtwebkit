@@ -30,19 +30,25 @@
 
 #include "FloatPoint.h"
 #include "FloatSize.h"
+#include "ScrollTypes.h"
 #include <wtf/Noncopyable.h>
 
 namespace WebCore {
+
+class PlatformWheelEvent;
 
 class ScrollElasticityControllerClient {
 protected:
     virtual ~ScrollElasticityControllerClient() { } 
 
 public:
+    virtual bool allowsHorizontalStretching() = 0;
+    virtual bool allowsVerticalStretching() = 0;
     virtual IntSize stretchAmount() = 0;
     virtual bool pinnedInDirection(const FloatSize&) = 0;
     virtual bool canScrollHorizontally() = 0;
     virtual bool canScrollVertically() = 0;
+    virtual bool shouldRubberBandInDirection(ScrollDirection) = 0;
 
     // Return the absolute scroll position, not relative to the scroll origin.
     virtual WebCore::IntPoint absoluteScrollPosition() = 0;
@@ -59,14 +65,15 @@ class ScrollElasticityController {
 public:
     explicit ScrollElasticityController(ScrollElasticityControllerClient*);
 
-    void beginScrollGesture();
+    bool handleWheelEvent(const PlatformWheelEvent&);
+    void snapRubberBandTimerFired();
 
 private:
     void stopSnapRubberbandTimer();
+    void snapRubberBand();
 
-    // FIXME: These member variables should be private. They are currently public as a stop-gap measure, while
-    // the rubber-band related code from ScrollAnimatorMac is being moved over.
-public:
+    bool shouldRubberBandInHorizontalDirection(const PlatformWheelEvent&);
+
     ScrollElasticityControllerClient* m_client;
 
     bool m_inScrollGesture;

@@ -21,6 +21,8 @@
 #ifndef qquicknetworkrequest_p_h
 #define qquicknetworkrequest_p_h
 
+#include "QtNetworkRequestData.h"
+#include "RefPtr.h"
 #include "qwebkitglobal.h"
 #include <QObject>
 #include <QtDeclarative/qdeclarativelist.h>
@@ -28,20 +30,17 @@
 
 class QWEBKIT_EXPORT QQuickNetworkRequest : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QString url READ url)
+    Q_PROPERTY(QUrl url READ url)
 
 public:
-    QQuickNetworkRequest(QObject* parent)
-        : QObject(parent)
-    {
-        Q_ASSERT(parent);
-    }
+    QQuickNetworkRequest(QObject* parent);
 
-    QString url() const { return m_url; }
-    void setUrl(const QString& url) { m_url = url; }
+    void setNetworkRequestData(WTF::PassRefPtr<WebKit::QtRefCountedNetworkRequestData> data);
+
+    QUrl url() const;
 
 private:
-    QString m_url;
+    WTF::RefPtr<WebKit::QtRefCountedNetworkRequestData> m_networkRequestData;
 };
 
 QML_DECLARE_TYPE(QQuickNetworkRequest)

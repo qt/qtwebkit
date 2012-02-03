@@ -699,6 +699,8 @@ void LayoutTestController::overridePreference(const QString& name, const QVarian
         settings->setAttribute(QWebSettings::HyperlinkAuditingEnabled, value.toBool());
     else if (name == "WebKitHixie76WebSocketProtocolEnabled")
         DumpRenderTreeSupportQt::setHixie76WebSocketProtocolEnabled(m_topLoadingFrame->page(), value.toBool());
+    else if (name == "WebKitAcceleratedCompositingEnabled")
+        settings->setAttribute(QWebSettings::AcceleratedCompositingEnabled, value.toBool());
     else
         printf("ERROR: LayoutTestController::overridePreference() does not support the '%s' preference\n",
             name.toLatin1().data());
@@ -892,6 +894,12 @@ void LayoutTestController::setMockGeolocationPosition(double latitude, double lo
 }
 
 void LayoutTestController::addMockSpeechInputResult(const QString& result, double confidence, const QString& language)
+{
+    // FIXME: Implement for speech input layout tests.
+    // See https://bugs.webkit.org/show_bug.cgi?id=39485.
+}
+
+void LayoutTestController::setMockSpeechInputDumpRect(bool flag)
 {
     // FIXME: Implement for speech input layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.

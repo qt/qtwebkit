@@ -66,6 +66,11 @@ class AbstractRolloutPrepCommandTest(unittest.TestCase):
         self.assertRaises(ScriptError, command._prepare_state, options=None, args=["125 r122  123", "Reason"], tool=None)
         self.assertRaises(ScriptError, command._prepare_state, options=None, args=["125 foo 123", "Reason"], tool=None)
 
+        command._commit_info = lambda revision: None
+        state = command._prepare_state(None, ["124 123 125", "Reason"], None)
+        self.assertEqual(123, state["revision"])
+        self.assertEqual([123, 124, 125], state["revision_list"])
+
 
 class DownloadCommandsTest(CommandsTest):
     def _default_options(self):
@@ -77,7 +82,6 @@ class DownloadCommandsTest(CommandsTest):
         options.clean = True
         options.close_bug = True
         options.force_clean = False
-        options.force_patch = True
         options.non_interactive = False
         options.parent_command = 'MOCK parent command'
         options.quiet = False

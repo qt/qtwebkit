@@ -94,15 +94,20 @@ ScheduledAction::~ScheduledAction()
 
 void ScheduledAction::execute(ScriptExecutionContext* context)
 {
-    V8Proxy* proxy = V8Proxy::retrieve(context);
-    if (proxy)
+    if (context->isDocument()) {
+        Frame* frame = static_cast<Document*>(context)->frame();
+        ScriptController* scriptController = frame->script();
+        if (!scriptController->canExecuteScripts(NotAboutToExecuteScript))
+            return;
+        V8Proxy* proxy = V8Proxy::retrieve(frame);
         execute(proxy);
+    }
 #if ENABLE(WORKERS)
-    else if (context->isWorkerContext())
+    else {
+        ASSERT(context->isWorkerContext());
         execute(static_cast<WorkerContext*>(context));
+    }
 #endif
-    // It's possible that Javascript is disabled and that we have neither a V8Proxy
-    // nor a WorkerContext.  Do nothing in that case.
 }
 
 void ScheduledAction::execute(V8Proxy* proxy)
@@ -121,10 +126,9 @@ void ScheduledAction::execute(V8Proxy* proxy)
     v8::Context::Scope scope(v8Context);
 
     // FIXME: Need to implement timeouts for preempting a long-running script.
-    if (!m_function.IsEmpty() && m_function->IsFunction()) {
+    if (!m_function.IsEmpty() && m_function->IsFunction())
         proxy->callFunction(v8::Persistent<v8::Function>::Cast(m_function), v8Context->Global(), m_argc, m_argv);
-        Document::updateStyleForAllDocuments();
-    } else
+    else
         proxy->evaluate(m_code, 0);
 
     // The 'proxy' may be invalid at this point since JS could have released the owning Frame.

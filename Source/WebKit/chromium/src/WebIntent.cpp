@@ -31,48 +31,75 @@
 #include "config.h"
 #include "WebIntent.h"
 
+#include "Intent.h"
+#include "SerializedScriptValue.h"
+
 namespace WebKit {
 
-WebIntent::WebIntent() { }
+#if ENABLE(WEB_INTENTS)
+WebIntent::WebIntent(const PassRefPtr<WebCore::Intent>& intent)
+    : m_private(intent)
+{
+}
+#endif
+
+void WebIntent::reset()
+{
+#if ENABLE(WEB_INTENTS)
+    m_private.reset();
+#endif
+}
+
+bool WebIntent::isNull() const
+{
+#if ENABLE(WEB_INTENTS)
+    return m_private.isNull();
+#else
+    return true;
+#endif
+}
+
+bool WebIntent::equals(const WebIntent& other) const
+{
+#if ENABLE(WEB_INTENTS)
+    return (m_private.get() == other.m_private.get());
+#else
+    return true;
+#endif
+}
+
+void WebIntent::assign(const WebIntent& other)
+{
+#if ENABLE(WEB_INTENTS)
+    m_private = other.m_private;
+#endif
+}
 
 WebString WebIntent::action() const
 {
-    return m_action;
-}
-
-void WebIntent::setAction(const WebString& action)
-{
-    m_action = action;
+#if ENABLE(WEB_INTENTS)
+    return m_private->action();
+#else
+    return WebString();
+#endif
 }
 
 WebString WebIntent::type() const
 {
-    return m_type;
-}
-
-void WebIntent::setType(const WebString& type)
-{
-    m_type = type;
+#if ENABLE(WEB_INTENTS)
+    return m_private->type();
+#else
+    return WebString();
+#endif
 }
 
 WebString WebIntent::data() const
 {
-    return m_data;
-}
-
-void WebIntent::setData(const WebString& data)
-{
-    m_data = data;
-}
-
-int WebIntent::identifier() const
-{
-    return m_identifier;
-}
-
-void WebIntent::setIdentifier(int identifier)
-{
-    m_identifier = identifier;
+#if ENABLE(WEB_INTENTS)
+    return m_private->data()->toWireString();
+#else
+    return WebString();
+#endif
 }
 
 } // namespace WebKit

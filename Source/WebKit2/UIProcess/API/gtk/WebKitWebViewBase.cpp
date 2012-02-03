@@ -35,6 +35,8 @@
 #include "PageClientImpl.h"
 #include "WebContext.h"
 #include "WebEventFactory.h"
+#include "WebKitPrivate.h"
+#include "WebKitWebViewBaseAccessible.h"
 #include "WebKitWebViewBasePrivate.h"
 #include "WebPageProxy.h"
 #include <WebCore/ClipboardGtk.h>
@@ -50,7 +52,6 @@
 #include <WebCore/PasteboardHelper.h>
 #include <WebCore/RefPtrCairo.h>
 #include <WebCore/Region.h>
-#include <WebKit2/WKContext.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
@@ -69,6 +70,7 @@ struct _WebKitWebViewBasePrivate {
     GtkDragAndDropHelper dragAndDropHelper;
     DragIcon dragIcon;
     IntSize resizerSize;
+    GRefPtr<AtkObject> accessible;
 };
 
 G_DEFINE_TYPE(WebKitWebViewBase, webkit_web_view_base, GTK_TYPE_CONTAINER)
@@ -118,6 +120,7 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
         | GDK_EXPOSURE_MASK
         | GDK_BUTTON_PRESS_MASK
         | GDK_BUTTON_RELEASE_MASK
+        | GDK_SCROLL_MASK
         | GDK_POINTER_MOTION_MASK
         | GDK_KEY_PRESS_MASK
         | GDK_KEY_RELEASE_MASK
@@ -139,7 +142,7 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
     gtk_im_context_set_client_window(priv->imContext.get(), window);
 
     GtkWidget* toplevel = gtk_widget_get_toplevel(widget);
-    if (gtk_widget_is_toplevel(toplevel) && GTK_IS_WINDOW(toplevel)) {
+    if (widgetIsOnscreenToplevelWindow(toplevel)) {
         webkitWebViewBaseNotifyResizerSizeForWindow(webView, GTK_WINDOW(toplevel));
         g_signal_connect(toplevel, "notify::resize-grip-visible",
                          G_CALLBACK(toplevelWindowResizeGripVisibilityChanged), webView);
@@ -211,7 +214,7 @@ static void webkitWebViewBaseSizeAllocate(GtkWidget* widget, GtkAllocation* allo
     priv->pageProxy->drawingArea()->setSize(IntSize(allocation->width, allocation->height), IntSize());
 
     GtkWidget* toplevel = gtk_widget_get_toplevel(widget);
-    if (gtk_widget_is_toplevel(toplevel) && GTK_IS_WINDOW(toplevel))
+    if (widgetIsOnscreenToplevelWindow(toplevel))
         webkitWebViewBaseNotifyResizerSizeForWindow(webViewBase, GTK_WINDOW(toplevel));
 }
 
@@ -221,7 +224,7 @@ static gboolean webkitWebViewBaseFocusInEvent(GtkWidget* widget, GdkEventFocus* 
     WebKitWebViewBasePrivate* priv = webViewBase->priv;
 
     GtkWidget* toplevel = gtk_widget_get_toplevel(widget);
-    if (gtk_widget_is_toplevel(toplevel) && gtk_window_has_toplevel_focus(GTK_WINDOW(toplevel))) {
+    if (widgetIsOnscreenToplevelWindow(toplevel) && gtk_window_has_toplevel_focus(GTK_WINDOW(toplevel))) {
         gtk_im_context_focus_in(priv->imContext.get());
         if (!priv->isPageActive) {
             priv->isPageActive = TRUE;
@@ -374,6 +377,34 @@ static void webkitWebViewBaseDragDataReceived(GtkWidget* widget, GdkDragContext*
     gdk_drag_status(context, dragOperationToSingleGdkDragAction(operation), time);
 }
 
+static AtkObject* webkitWebViewBaseGetAccessible(GtkWidget* widget)
+{
+    // If the socket has already been created and embedded a plug ID, return it.
+    WebKitWebViewBasePrivate* priv = WEBKIT_WEB_VIEW_BASE(widget)->priv;
+    if (priv->accessible && atk_socket_is_occupied(ATK_SOCKET(priv->accessible.get())))
+        return priv->accessible.get();
+
+    // Create the accessible object and associate it to the widget.
+    if (!priv->accessible) {
+        priv->accessible = adoptGRef(ATK_OBJECT(webkitWebViewBaseAccessibleNew(widget)));
+
+        // Set the parent not to break bottom-up navigation.
+        GtkWidget* parentWidget = gtk_widget_get_parent(widget);
+        AtkObject* axParent = parentWidget ? gtk_widget_get_accessible(parentWidget) : 0;
+        if (axParent)
+            atk_object_set_parent(priv->accessible.get(), axParent);
+    }
+
+    // Try to embed the plug in the socket, if posssible.
+    String plugID = priv->pageProxy->accessibilityPlugID();
+    if (plugID.isNull())
+        return priv->accessible.get();
+
+    atk_socket_embed(ATK_SOCKET(priv->accessible.get()), const_cast<gchar*>(plugID.utf8().data()));
+
+    return priv->accessible.get();
+}
+
 static gboolean webkitWebViewBaseDragMotion(GtkWidget* widget, GdkDragContext* context, gint x, gint y, guint time)
 {
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(widget);
@@ -438,6 +469,7 @@ static void webkit_web_view_base_class_init(WebKitWebViewBaseClass* webkitWebVie
     widgetClass->drag_leave = webkitWebViewBaseDragLeave;
     widgetClass->drag_drop = webkitWebViewBaseDragDrop;
     widgetClass->drag_data_received = webkitWebViewBaseDragDataReceived;
+    widgetClass->get_accessible = webkitWebViewBaseGetAccessible;
 
     GObjectClass* gobjectClass = G_OBJECT_CLASS(webkitWebViewBaseClass);
     gobjectClass->finalize = webkitWebViewBaseFinalize;

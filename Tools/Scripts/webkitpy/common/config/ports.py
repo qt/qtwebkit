@@ -36,6 +36,8 @@ from webkitpy.common.system.executive import Executive
 
 
 class WebKitPort(object):
+    results_directory = "/tmp/layout-test-results"
+
     # We might need to pass scm into this function for scm.checkout_root
     @classmethod
     def script_path(cls, script_name):
@@ -122,7 +124,7 @@ class WebKitPort(object):
 
     @classmethod
     def layout_tests_results_path(cls):
-        return "/tmp/layout-test-results/results.html"
+        return os.path.join(cls.results_directory, "full_results.json")
 
 
 class MacPort(WebKitPort):
@@ -172,6 +174,7 @@ class GtkPort(WebKitPort):
     def build_webkit_command(cls, build_style=None):
         command = WebKitPort.build_webkit_command(build_style=build_style)
         command.append("--gtk")
+        command.append("--update-gtk")
         command.append(WebKitPort.makeArgs())
         return command
 
@@ -244,10 +247,6 @@ class ChromiumPort(WebKitPort):
         return command
 
     @classmethod
-    def run_webkit_unit_tests_command(cls):
-        return cls.script_shell_command("run-chromium-webkit-unit-tests")
-
-    @classmethod
     def run_webkit_tests_command(cls):
         command = cls.script_shell_command("new-run-webkit-tests")
         command.append("--chromium")
@@ -259,10 +258,7 @@ class ChromiumPort(WebKitPort):
         return None
 
 
-# FIXME: This port is a bit of a hack to get our infrastructure running on EC2.
 class ChromiumXVFBPort(ChromiumPort):
-
-    results_directory = "/tmp/layout-test-results"
 
     @classmethod
     def flag(cls):
@@ -270,23 +266,4 @@ class ChromiumXVFBPort(ChromiumPort):
 
     @classmethod
     def run_webkit_tests_command(cls):
-        # FIXME: We should find a better way to do this. Some of these options
-        # are specific to new-run-webkit-tests and some of them are due to
-        # running in non-interactive mode.
-        return ["xvfb-run"] + ChromiumPort.run_webkit_tests_command() + [
-            "--results-directory=%s" % cls.results_directory,
-            "--skip-failing-tests",
-            "--print=actual,config,expected,misc,slowest,unexpected,unexpected-results",
-        ]
-
-    @classmethod
-    def run_python_unittests_command(cls):
-        return None
-
-    @classmethod
-    def run_perl_unittests_command(cls):
-        return None
-
-    @classmethod
-    def layout_tests_results_path(cls):
-        return os.path.join(cls.results_directory, "full_results.json")
+        return ["xvfb-run"] + ChromiumPort.run_webkit_tests_command()

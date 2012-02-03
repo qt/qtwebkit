@@ -43,6 +43,8 @@
 #include "IDBFactoryBackendInterface.h"
 #include "InspectorInstrumentation.h"
 #include "PlatformSupport.h"
+#include "ScriptCallStack.h"
+#include "ScriptCallStackFactory.h"
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
@@ -137,10 +139,12 @@ void V8Proxy::reportUnsafeAccessTo(Frame* target)
     String str = "Unsafe JavaScript attempt to access frame with URL " + targetDocument->url().string() +
                  " from frame with URL " + sourceDocument->url().string() + ". Domains, protocols and ports must match.\n";
 
+    RefPtr<ScriptCallStack> stackTrace = createScriptCallStack(ScriptCallStack::maxCallStackSizeToCapture, true);
+
     // NOTE: Safari prints the message in the target page, but it seems like
     // it should be in the source page. Even for delayed messages, we put it in
     // the source page.
-    sourceDocument->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, str);
+    sourceDocument->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, str, stackTrace.release());
 }
 
 static void handleFatalErrorInV8()
@@ -190,7 +194,7 @@ bool V8Proxy::handleOutOfMemory()
     Frame* frame = V8Proxy::retrieveFrame(context);
 
     V8Proxy* proxy = V8Proxy::retrieve(frame);
-    if (proxy) {
+    if (proxy && frame->script()->canExecuteScripts(NotAboutToExecuteScript)) {
         // Clean m_context, and event handlers.
         proxy->clearForClose();
 
@@ -488,6 +492,14 @@ Frame* V8Proxy::retrieveFrameForCurrentContext()
     return retrieveFrame(context);
 }
 
+DOMWindow* V8Proxy::retrieveWindowForCallingContext()
+{
+    v8::Handle<v8::Context> context = v8::Context::GetCalling();
+    if (context.IsEmpty())
+        return 0;
+    return retrieveWindow(context);
+}
+
 Frame* V8Proxy::retrieveFrameForCallingContext()
 {
     v8::Handle<v8::Context> context = v8::Context::GetCalling();
@@ -505,9 +517,7 @@ V8Proxy* V8Proxy::retrieve()
 
 V8Proxy* V8Proxy::retrieve(Frame* frame)
 {
-    if (!frame)
-        return 0;
-    return frame->script()->canExecuteScripts(NotAboutToExecuteScript) ? frame->script()->proxy() : 0;
+    return frame ? frame->script()->proxy() : 0;
 }
 
 V8Proxy* V8Proxy::retrieve(ScriptExecutionContext* context)
@@ -708,8 +718,11 @@ int V8Proxy::contextDebugId(v8::Handle<v8::Context> context)
 v8::Local<v8::Context> toV8Context(ScriptExecutionContext* context, const WorldContextHandle& worldContext)
 {
     if (context->isDocument()) {
-        if (V8Proxy* proxy = V8Proxy::retrieve(context))
-            return worldContext.adjustedContext(proxy);
+        if (V8Proxy* proxy = V8Proxy::retrieve(context)) {
+            Frame* frame = static_cast<Document*>(context)->frame();
+            if (frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+                return worldContext.adjustedContext(proxy);
+        }
 #if ENABLE(WORKERS)
     } else if (context->isWorkerContext()) {
         if (WorkerContextExecutionProxy* proxy = static_cast<WorkerContext*>(context)->script()->proxy())

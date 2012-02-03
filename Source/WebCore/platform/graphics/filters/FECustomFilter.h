@@ -45,6 +45,8 @@ namespace WebCore {
 
 class CachedShader;
 class CustomFilterMesh;
+class CustomFilterNumberParameter;
+class CustomFilterProgram;
 class CustomFilterShader;
 class Document;
 class DrawingBuffer;
@@ -54,7 +56,7 @@ class Texture;
 
 class FECustomFilter : public FilterEffect {
 public:
-    static PassRefPtr<FECustomFilter> create(Filter*, Document*, const String& vertexShader, const String& fragmentShader,
+    static PassRefPtr<FECustomFilter> create(Filter*, Document*, PassRefPtr<CustomFilterProgram>, const CustomFilterParameterList&,
                    unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType, 
                    CustomFilterOperation::MeshType);
 
@@ -64,13 +66,15 @@ public:
     virtual TextStream& externalRepresentation(TextStream&, int indention) const;
 
 private:
-    FECustomFilter(Filter*, Document*, const String& vertexShader, const String& fragmentShader,
+    FECustomFilter(Filter*, Document*, PassRefPtr<CustomFilterProgram>, const CustomFilterParameterList&,
                    unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType, 
                    CustomFilterOperation::MeshType);
     
     void initializeContext(const IntSize& contextSize);
     void resizeContext(const IntSize& newContextSize);
     void bindVertexAttribute(int attributeLocation, unsigned size, unsigned& offset);
+    void bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter*);
+    void bindProgramParameters();
     void bindProgramAndBuffers(ByteArray* srcPixelArray);
     
     Document* m_document;
@@ -81,9 +85,9 @@ private:
     RefPtr<CustomFilterShader> m_shader;
     RefPtr<CustomFilterMesh> m_mesh;
     IntSize m_contextSize;
-    
-    String m_vertexShader;
-    String m_fragmentShader;
+
+    RefPtr<CustomFilterProgram> m_program;
+    CustomFilterParameterList m_parameters;
 
     unsigned m_meshRows;
     unsigned m_meshColumns;

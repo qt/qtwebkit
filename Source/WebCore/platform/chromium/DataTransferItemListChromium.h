@@ -40,7 +40,8 @@
 namespace WebCore {
 
 class Clipboard;
-class DataTransferItemChromium;
+class ClipboardChromium;
+class File;
 class ScriptExecutionContext;
 
 typedef int ExceptionCode;
@@ -49,12 +50,23 @@ class DataTransferItemListChromium : public DataTransferItemList {
 public:
     static PassRefPtr<DataTransferItemListChromium> create(PassRefPtr<Clipboard>, ScriptExecutionContext*);
 
+    virtual size_t length() const;
+    virtual PassRefPtr<DataTransferItem> item(unsigned long index);
+    // FIXME: Implement V8DataTransferItemList::indexedPropertyDeleter to get this called.
+    virtual void deleteItem(unsigned long index, ExceptionCode&);
+    virtual void clear();
+    virtual void add(const String& data, const String& type, ExceptionCode&);
+    virtual void add(PassRefPtr<File>);
+
 private:
-    friend class ClipboardChromium;
-
     DataTransferItemListChromium(PassRefPtr<Clipboard>, ScriptExecutionContext*);
+    ClipboardChromium* clipboardChromium() const;
 
-    virtual void addPasteboardItem(const String& type);
+    RefPtr<Clipboard> m_owner;
+    // Indirectly owned by our parent.
+    ScriptExecutionContext* m_context;
+    // FIXME: m_items should not be mutable. This will be fixed by https://bugs.webkit.org/show_bug.cgi?id=76598
+    mutable Vector<RefPtr<DataTransferItem> > m_items;
 };
 
 } // namespace WebCore
@@ -62,4 +74,3 @@ private:
 #endif // ENABLE(DATA_TRANSFER_ITEMS)
 
 #endif // DataTransferItemListChromium_h
-

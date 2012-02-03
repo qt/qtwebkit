@@ -28,6 +28,7 @@
 #include "ExecutableAllocator.h"
 
 #if ENABLE(EXECUTABLE_ALLOCATOR_DEMAND)
+#include "CodeProfiling.h"
 #include <wtf/MetaAllocator.h>
 #include <wtf/PageReservation.h>
 #include <wtf/VMTags.h>
@@ -93,6 +94,7 @@ void ExecutableAllocator::initializeAllocator()
 {
     ASSERT(!allocator);
     allocator = new DemandExecutableAllocator();
+    CodeProfiling::notifyAllocator(allocator);
 }
 
 ExecutableAllocator::ExecutableAllocator(JSGlobalData&)
@@ -110,9 +112,9 @@ bool ExecutableAllocator::underMemoryPressure()
     return false;
 }
 
-PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(JSGlobalData&, size_t sizeInBytes)
+PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(JSGlobalData&, size_t sizeInBytes, void* ownerUID)
 {
-    RefPtr<ExecutableMemoryHandle> result = allocator->allocate(sizeInBytes);
+    RefPtr<ExecutableMemoryHandle> result = allocator->allocate(sizeInBytes, ownerUID);
     if (!result)
         CRASH();
     return result.release();

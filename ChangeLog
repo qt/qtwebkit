@@ -1,3 +1,820 @@
+2012-02-02  Rakesh KN  <rakesh.kn@motorola.com>
+
+        hidden attribute on <input type=file /> suppresses the file selection dialog
+        https://bugs.webkit.org/show_bug.cgi?id=58208
+
+        Reviewed by Ryosuke Niwa.
+
+        * ManualTests/input-file-hidden-open-dialog-on-click.html: Added.
+        Adding manual test as the file dialog opens only in User gesture.
+
+2012-02-01  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer] FFTFrame implementation
+        https://bugs.webkit.org/show_bug.cgi?id=73545
+
+        Reviewed by Chris Rogers.
+
+        * configure.ac: Enable the WebAudio option again and remove
+        libfftw checks.
+
+2012-01-31  Ryosuke Niwa  <rniwa@webkit.org>
+
+        webkit-perf.appspot.com should accept test results without medians
+        https://bugs.webkit.org/show_bug.cgi?id=77513
+
+        Reviewed by Hajime Morita.
+
+        Don't store 0s when values are not in JSON.
+
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post._float_or_none):
+        (ReportHandler.post):
+
+2012-01-31  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Tap highlighting: Support better outlines for multiline inlines
+        https://bugs.webkit.org/show_bug.cgi?id=77428
+
+        Reviewed by Simon Hausmann.
+
+        Update the test to use a transform.
+
+        * ManualTests/qt/tap-highlighting-inlines.html:
+
+2012-01-31  Nayan Kumar K  <nayankk@motorola.com>
+
+        [GTK] Remove V8 compilation option.
+        https://bugs.webkit.org/show_bug.cgi?id=77405
+
+        Reviewed by Philippe Normand.
+
+        Revert the changes introduced as part of bug 69469
+        to provide an option to compile V8 as JavaScript engine.
+
+        * GNUmakefile.am: Remove defining USE_JSC macro.
+        * configure.ac: Remove --with-jsengine option.
+
+2012-01-25  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer] 0.11 build support
+        https://bugs.webkit.org/show_bug.cgi?id=77085
+
+        Reviewed by Martin Robinson.
+
+        * configure.ac: New --with-gstreamer option, defaulting to 0.10.
+
+2012-01-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r106321.
+
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        * Websites/webkit-perf.appspot.com/manifest_handler.py:
+        (ManifestHandler.get):
+
+2012-01-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Python code in webkit-perf.appspot.com uses camelCase
+        https://bugs.webkit.org/show_bug.cgi?id=77392
+
+        Reviewed by Adam Barth.
+
+        Use PEP8 style naming conventions instead of camelCase.
+
+        * Websites/webkit-perf.appspot.com/create_handler.py:
+        (CreateHandler.post):
+        (CreateHandler._create_builder):
+        (CreateHandler._create_branch):
+        (CreateHandler._create_platform):
+        * Websites/webkit-perf.appspot.com/dashboard_handler.py:
+        (DashboardHandler.get):
+        * Websites/webkit-perf.appspot.com/manifest_handler.py:
+        (ManifestHandler.get):
+        * Websites/webkit-perf.appspot.com/merge_tests_handler.py:
+        (MergeTestsHandler.post):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (create_in_transaction_with_numeric_id_holder):
+        (delete_model_with_numeric_id_holder):
+        (modelFromNumericId):
+        (Builder.authenticate):
+        (Builder.hashed_password):
+        (Test.cache_key):
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+        (ReportHandler._model_by_key_name_in_body_or_error):
+        (ReportHandler._integer_in_body):
+        (ReportHandler._timestamp_in_body):
+        (ReportHandler.bypass_authentication):
+        (ReportHandler._results_are_valid):
+        (ReportHandler._results_are_valid._is_float_convertible):
+        (ReportHandler._create_build_if_possible):
+        (ReportHandler._create_build_if_possible.execute):
+        (ReportHandler._add_test_if_needed):
+        (ReportHandler._add_test_if_needed.execute):
+        (ReportHandler):
+        (AdminReportHandler.bypass_authentication):
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.get):
+
+2012-01-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Enable memcache on webkit-perf.appspot.com
+        https://bugs.webkit.org/show_bug.cgi?id=77378
+
+        Reviewed by Adam Barth.
+
+        Eanble memcache on dashboard, manifest, and runs handlers. Clear appropriate caches when new runs are reported,
+        or new models are created. We flush all caches when tests are merged since it's hard to figure out dependencies
+        in that case. Luckily, we merge tests only occassionally and manually (or hope so) so this shouldn't be an issue.
+
+        * Websites/webkit-perf.appspot.com/create_handler.py:
+        (CreateHandler.post):
+        * Websites/webkit-perf.appspot.com/dashboard_handler.py:
+        (DashboardHandler.get):
+        * Websites/webkit-perf.appspot.com/manifest_handler.py:
+        (ManifestHandler.get):
+        * Websites/webkit-perf.appspot.com/merge_tests_handler.py:
+        (MergeTestsHandler.post):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (createInTransactionWithNumericIdHolder):
+        (Test):
+        (Test.cacheKey):
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+        (ReportHandler._addTestIfNeeded):
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.get):
+
+2012-01-30  Ryosuke Niwa  <rniwa@webkit.org>
+
+        webkit-perf.appspot.com should have an ability to merge tests
+        https://bugs.webkit.org/show_bug.cgi?id=77250
+
+        Reviewed by Adam Barth.
+
+        Added admin/merge-tests. This page allows administrators to easily merge test objects.
+
+        Also add the forgotten title.png and rename api/create to admin/create since we don't allow
+        non-admins to create new models anyway.
+
+        * Websites/webkit-perf.appspot.com/app.yaml:
+        * Websites/webkit-perf.appspot.com/css: Added.
+        * Websites/webkit-perf.appspot.com/css/title.png: Added.
+        * Websites/webkit-perf.appspot.com/main.py:
+        * Websites/webkit-perf.appspot.com/merge_tests.yaml: Added.
+        * Websites/webkit-perf.appspot.com/merge_tests_handler.py: Added.
+        (MergeTestHandler):
+        (MergeTestHandler.get):
+        (MergeTestHandler.post):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (deleteModelWithNumericIdHolder):
+        * Websites/webkit-perf.appspot.com/static/create-models.html:
+
+2012-01-30  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Add manual tests for tap highlighting
+
+        Rubberstamped by Simon Hausmann.
+
+        * ManualTests/qt/tap-highlighting-colors.html: Added.
+        * ManualTests/qt/tap-highlighting-images.html: Added.
+        * ManualTests/qt/tap-highlighting-inlines.html: Added.
+
+2012-01-30  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        Manual test of number of resize events emitted during page generation.
+        https://bugs.webkit.org/show_bug.cgi?id=77212
+
+        Is needed to test if too many resize events are send when using fixed
+        layout, and needs to be a manual test because the test framework does
+        not currently support testing fixed layout.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * ManualTests/resize-events.html: Added.
+
+2012-01-29  Zoltan Herczeg  <zherczeg@webkit.org>
+
+        Custom written CSS lexer
+        https://bugs.webkit.org/show_bug.cgi?id=70107
+
+        Reviewed by Antti Koivisto and Oliver Hunt.
+
+        Remove tokenizer.cpp from intermediate sources.
+
+        * wscript:
+
+2012-01-27  Fady Samuel  <fsamuel@chromium.org>
+
+        Rename shouldLayoutFixedElementsRelativeToFrame and make it a setting
+        https://bugs.webkit.org/show_bug.cgi?id=76459
+
+        Reviewed by Darin Fisher.
+
+        * Source/autotools/symbols.filter:
+
+2012-01-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add basic printing support to WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=76172
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Check whether GTK+ UNIX printing is available.
+
+2012-01-27  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [EFL] SVG_FONT is not disabled when SVG is disabled.
+        https://bugs.webkit.org/show_bug.cgi?id=77174
+
+        Reviewed by Eric Seidel.
+
+        SVG_FONTS should be disabled when SVG is disabled. Or else it causes build-break.
+        Relocated checking ENABLE_GLIB_SUPPORT & ENABLE_VIDEO to avoid duplication.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2012-01-26  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed. Build fix, don't build some sources
+        which appear to no longer be needed.
+
+        * wscript:
+
+2012-01-24  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Port Mozilla's Graph Server
+        https://bugs.webkit.org/show_bug.cgi?id=76312
+
+        Reviewed by Adam Barth.
+
+        Add the app engine backend for the Mozilla's graph server used on perf-webkit.appspot.com.
+
+        To deploy webkit-perf.appspot.com, you also need to pull index.html, embed.html, graph.html, jq,
+        js (except config.js), and css (except title.png) from https://github.com/mozilla/graphs.
+
+        * Websites/perf-webkit.appspot.com: Added.
+        * Websites/perf-webkit.appspot.com/app.yaml: Added.
+        * Websites/perf-webkit.appspot.com/create_handler.py: Added.
+        (CreateHandler):
+        (CreateHandler.post):
+        (CreateHandler._createBuilder):
+        (CreateHandler._createBuilder.execute):
+        (CreateHandler._createBranch):
+        (CreateHandler._createBranch.execute):
+        (CreateHandler._createPlatform):
+        (CreateHandler._createPlatform.execute):
+        * Websites/perf-webkit.appspot.com/dashboard_handler.py: Added.
+        (DashboardHandler):
+        (DashboardHandler.get):
+        * Websites/perf-webkit.appspot.com/index.yaml: Added.
+        * Websites/perf-webkit.appspot.com/main.py: Added.
+        (main):
+        * Websites/perf-webkit.appspot.com/manifest_handler.py: Added.
+        (ManifestHandler):
+        (ManifestHandler.get):
+        * Websites/perf-webkit.appspot.com/models.py: Added.
+        (NumericIdHolder):
+        (NumericIdHolder.whose):
+        (createInTransactionWithNumericIdHolder):
+        (modelFromNumericId):
+        (Branch):
+        (Platform):
+        (Builder):
+        (Builder.authenticate):
+        (Builder.hashedPassword):
+        (Build):
+        (Test):
+        (TestResult):
+        (ReportLog):
+        * Websites/perf-webkit.appspot.com/report_handler.py: Added.
+        (ReportHandler):
+        (ReportHandler.post):
+        (ReportHandler._modelByKeyNameInBodyOrError):
+        (ReportHandler._integerInBody):
+        (ReportHandler._timestampInBody):
+        (ReportHandler._output):
+        (ReportHandler._resultsAreValid):
+        (ReportHandler._createBuildIfPossible):
+        (ReportHandler._createBuildIfPossible.execute):
+        (ReportHandler._addTestIfNeeded):
+        (ReportHandler._addTestIfNeeded.execute):
+        * Websites/perf-webkit.appspot.com/runs_handler.py: Added.
+        (RunsHandler):
+        (RunsHandler.get):
+        * Websites/perf-webkit.appspot.com/static: Added.
+        * Websites/perf-webkit.appspot.com/static/create-models.html: Added.
+        * Websites/perf-webkit.appspot.com/static/manual-submit.html: Added.
+
+2012-01-25  Hajime Morita  <morrita@google.com>>
+
+        ENABLE_SHADOW_DOM should be available via build-webkit --shadow-dom
+        https://bugs.webkit.org/show_bug.cgi?id=76863
+
+        Reviewed by Dimitri Glazkov.
+
+        Added a feature flag.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+        * configure.ac:
+
+2012-01-25  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Implement tap feedback respecting -webkit-tap-highlight-color
+        https://bugs.webkit.org/show_bug.cgi?id=76914
+
+        Reviewed by Simon Hausmann.
+
+        Add a manual test.
+
+        * ManualTests/qt/tap-highlighting.html: Added.
+
+2012-01-25  Roland Steiner  <rolandsteiner@chromium.org>
+
+        <style scoped>: Implement registering of <style scoped> with the scoping element
+        https://bugs.webkit.org/show_bug.cgi?id=67790
+
+        windows.internals updates
+
+        Reviewed by Dimitri Glazkov.
+
+        * Source/autotools/symbols.filter:
+
+2012-01-24  Mark Rowe  <mrowe@apple.com>
+
+        Death to JavaScriptGlue.
+
+        Rubber-stamped by Geoffrey Garen.
+
+        * Source/JavaScriptGlue: Removed.
+        * Source/Makefile: Stop building JavaScriptGlue.
+
+2012-01-24  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Some qmake build files must include Qt5's "quick" module.
+        https://bugs.webkit.org/show_bug.cgi?id=76671
+
+        Unreviewed build fix.
+
+        * Source/api.pri:
+
+2012-01-21  Priit Laes  <plaes@plaes.org>
+
+        [GTK][PATCH] Enable MathML support by default
+        https://bugs.webkit.org/show_bug.cgi?id=76790
+
+        Reviewed by Martin Robinson.
+
+        * configure.ac: Enable MathML by default.
+
+2012-01-20  Marc-Andre Decoste  <mad@chromium.org>
+
+        Add proper offset to position right click to simulate a context menu invocation.
+        https://bugs.webkit.org/show_bug.cgi?id=76421
+
+        Reviewed by Ojan Vafai.
+
+        * ManualTests/win/contextmenu-key3.html: Added.
+
+2012-01-20  Kinuko Yasuda  <kinuko@chromium.org>
+
+        Unreviewed; Windows buildbot update failure fix.
+
+        * ../ManualTests/data-transfer-items-file-dragout.html: Removed the notion of test:lorem-text.html.
+        * ../ManualTests/resources/test:lorem-text.html: Removed as this doesn't work on Windows.
+
+2012-01-20  Kinuko Yasuda  <kinuko@chromium.org>
+
+        Add DataTransferItems support for drag-and-drop'ed files and texts
+        https://bugs.webkit.org/show_bug.cgi?id=76367
+
+        Reviewed by Tony Chang.
+
+        * ManualTests/data-transfer-items-file-dragout.html: Added.
+        * ManualTests/test:lorem-text.html: Added.
+
+2012-01-20  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Expose accessibility hierarchy in WebKit2 to ATK/AT-SPI based ATs
+        https://bugs.webkit.org/show_bug.cgi?id=72589
+
+        Reviewed by Martin Robinson.
+
+        New optional dependency for WK2's accessibility unit test: AT-SPI2.
+
+        * configure.ac: Check for AT-SPI2 when building with WK2 support.
+
+2012-01-19  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt] Public API watch dog auto test.
+        https://bugs.webkit.org/show_bug.cgi?id=73922
+
+        Reviewed by Simon Hausmann.
+
+        This test aims to prevent unintended/unapproved
+        modifications to the public QML API.
+
+        * Source/tests.pri:
+
+2012-01-19  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Rubber-stamped by Martin Robinson.
+
+        * Source/autotools/symbols.filter: try to fix the 32 bits release
+        bot by also adding the symbol it generates
+
+2012-01-19  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make build-webkit always do safe incremental builds after update-webkit
+
+        When building against Qt5 with GCC we would just run 'make' in the build dir,
+        and rely on the dependency files output by GCC (-MD) to handle dependency
+        tracking, but that fails for special-cases like adding a Q_OBJECT macro
+        to a header.
+
+        To guarantee that an incrmental build will work, we have to run 'make qmake',
+        which we now do on every build-webkit that's followed by a successful run
+        of update-webkit. The reasoning is that update-webkit can result in such
+        potential corner-cases being applied, and since we can't know for sure
+        unless we inspect the diff and account for all the corner cases we assume
+        the worst and always run 'make qmake'.
+
+        After a succesful run of build-webkit we proceed to do just 'make' for any
+        subsequent runs, since we assume that the developer knows what kind of
+        changes he/she is doing, and when a 'make qmake' is needed.
+
+        Reviewed by Simon Hausmann.
+
+        * .gitignore:
+
+2012-01-18  Dirk Pranke  <dpranke@chromium.org>
+
+        [chromium] move Tools.gyp, switch build-webkit --chromium to All.gyp
+        https://bugs.webkit.org/show_bug.cgi?id=76505
+
+        Reviewed by Tony Chang.
+
+        Update with newly-generated files.
+
+        * .gitignore:
+
+2012-01-18  Eric Carlson  <eric.carlson@apple.com>
+
+        Provide access to user's list of preferred languages
+        https://bugs.webkit.org/show_bug.cgi?id=76138
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Source/autotools/symbols.filter: List the new functions.
+
+2012-01-18  Luciano Wolf  <luciano.wolf@openbossa.org>
+
+        [Qt][WK2] Broken build with undefined reference to shm_open and shm_unlink
+        https://bugs.webkit.org/show_bug.cgi?id=76538
+
+        Reviewed by Tor Arne Vestbø.
+
+        The -lrt parameter was coming before -lWebKit2 during linkage.
+
+        Moved rt lib inclusion from Source/api.pri to WebKit2.pri as it should be aware
+        of its own dependencies instead of letting WebKit guess about. Letting
+        it on api.pri can lead to a wrong parameter's order during linker phase.
+        Ubuntu 11.10 was giving errors about SharedMemory (shm_open and
+        shm_unlink undefined symbols).
+
+        * Source/api.pri:
+
+2012-01-18  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] Consolidate layout test crash logging
+        https://bugs.webkit.org/show_bug.cgi?id=75088
+
+        Reviewed by Simon Hausmann.
+
+        Move backtrace generating logic into WTFReportBacktrace
+        and add a way to deinstall signal handlers if we know
+        that we have already printed the backtrace.
+
+        * Source/qtwebkit-export.map:
+
+2012-01-18  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Move OTHER_FILES from WebKit.pro to Tools.pro
+
+        Reviewed by Simon Hausmann.
+
+        * WebKit.pro:
+
+2012-01-18  Shinya Kawanaka  <shinyak@google.com>
+
+        Move ShadowContentElement from dom/ to html/ and make ShadowContentElement subclass of HTMLElement.
+        https://bugs.webkit.org/show_bug.cgi?id=76241
+
+        Reviewed by Dimitri Glazkov.
+
+        * Source/autotools/symbols.filter: Exposed necessary symbols.
+
+2012-01-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ build after r105245.
+
+        * Source/autotools/symbols.filter: Fix symbol name.
+
+2012-01-17  Hajime Morrita  <morrita@chromium.org>
+
+        [Internals] Should be able to access corresponding Document object.
+        https://bugs.webkit.org/show_bug.cgi?id=76425
+
+        Added exported symbols.
+
+        Reviewed by Adam Barth.
+
+        * Source/autotools/symbols.filter:
+
+2012-01-17  Stephen Chenney  <schenney@chromium.org>
+
+        NULL ptr in WebCore::RenderSVGInlineText::localCaretRect
+        https://bugs.webkit.org/show_bug.cgi?id=75851
+
+        Reviewed by Ryosuke Niwa.
+
+        Added a check for null box in localCaretRect, to match test in other
+        implementations. Adding a manual test because the crash is not
+        reproducible in DRT.
+
+        * ManualTests/svg-modify-deleted-selection.svg: Added.
+
+2012-01-17  Raul Hudea  <rhudea@adobe.com>
+
+        Move tests out of WebCore/manual-tests to toplevel ManualTests.
+        It looks like the manual-tests folder wasn't noticed by git (or me :).
+
+        Move some SVG manual tests from deprecated WebCore/manual-tests to toplevel ManualTests
+        https://bugs.webkit.org/show_bug.cgi?id=76437
+
+        Reviewed by Daniel Bates.
+
+        * ManualTests/svg-animation-css-transform.html: Renamed from Source/WebCore/manual-tests/svg-animation-css-transform.html.
+        * ManualTests/svg-css-animate-compound.html: Renamed from Source/WebCore/manual-tests/svg-css-animate-compound.html.
+        * ManualTests/svg-css-transition-compound.html: Renamed from Source/WebCore/manual-tests/svg-css-transition-compound.html.
+
+2012-01-16  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Add more files to project-files for easier navigation in Qt Creator
+
+        Reviewed by Simon Hausmann.
+
+        * WebKit.pro:
+
+2012-01-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.4 release
+        https://bugs.webkit.org/show_bug.cgi?id=76375
+
+        Reviewed by Philippe Normand.
+
+        * configure.ac: Bumped version number.
+
+2012-01-16  Shinya Kawanaka  <shinyak@google.com>
+
+        [crash] Renderer crashes when spell checking a disabled input field.
+        https://bugs.webkit.org/show_bug.cgi?id=75941
+
+        Reviewed by Hajime Morita.
+
+        * ManualTests/editing-disabled-node-replace-crash.html: Added.
+
+2012-01-13  Simon Fraser  <simon.fraser@apple.com>
+
+        Unmatched transparency layer begin/end on a filtered element with an opacity ancestor
+        https://bugs.webkit.org/show_bug.cgi?id=76329
+
+        Reviewed by Dan Bernstein.
+        
+        Manual test with a filtered element as a descendant of an element with
+        opacity. Doing a Find is necessary to exercise the test.
+
+        * ManualTests/filters/opacity-above-filter.html: Added.
+
+2012-01-13  Eli Fidler  <efidler@rim.com>
+
+        GCC compiler version is not detected properly for QNX qcc variant
+        https://bugs.webkit.org/show_bug.cgi?id=76288
+
+        Reviewed by Rob Buis.
+
+        Provide an alternative way of getting the compiler version for GCC variants
+        that don't support -dumpversion (such as qcc).
+
+        * Source/cmake/WebKitHelpers.cmake:
+
+2012-01-13  Gregg Tavares  <gman@google.com>
+
+        Add WebGLContextGroup as step toward sharing WebGL resources
+        https://bugs.webkit.org/show_bug.cgi?id=75906
+
+        The WebGL Working Group will soon add the ability to share
+        WebGL resources among WebGL contexts. This is the necessary
+        prep work. NO API changes.
+
+        Added WebGLSharedObject for objects that are shared vs
+        WebGLContextObject for objects that are not.
+
+        Reviewed by Kenneth Russell.
+
+        No new tests. No change in behavior.
+
+        * GNUmakefile.list.am:
+        * WebCore.gypi:
+        * html/canvas/OESVertexArrayObject.cpp:
+        (WebCore::OESVertexArrayObject::createVertexArrayOES):
+        (WebCore::OESVertexArrayObject::deleteVertexArrayOES):
+        (WebCore::OESVertexArrayObject::isVertexArrayOES):
+        (WebCore::OESVertexArrayObject::bindVertexArrayOES):
+        * html/canvas/WebGLBuffer.cpp:
+        (WebCore::WebGLBuffer::WebGLBuffer):
+        (WebCore::WebGLBuffer::~WebGLBuffer):
+        (WebCore::WebGLBuffer::deleteObjectImpl):
+        * html/canvas/WebGLBuffer.h:
+        * html/canvas/WebGLContextGroup.cpp: Added.
+        (WebCore::WebGLContextGroup::create):
+        (WebCore::WebGLContextGroup::WebGLContextGroup):
+        (WebCore::WebGLContextGroup::~WebGLContextGroup):
+        (WebCore::WebGLContextGroup::getAGraphicsContext3D):
+        (WebCore::WebGLContextGroup::addContext):
+        (WebCore::WebGLContextGroup::removeContext):
+        (WebCore::WebGLContextGroup::removeObject):
+        (WebCore::WebGLContextGroup::addObject):
+        (WebCore::WebGLContextGroup::detachAndRemoveAllObjects):
+        (WebCore::WebGLContextGroup::loseContextGroup):
+        * html/canvas/WebGLContextGroup.h: Copied from Source/WebCore/html/canvas/WebGLShader.h.
+        * html/canvas/WebGLContextObject.cpp: Copied from Source/WebCore/html/canvas/WebGLShader.cpp.
+        (WebCore::WebGLContextObject::WebGLContextObject):
+        (WebCore::WebGLContextObject::~WebGLContextObject):
+        (WebCore::WebGLContextObject::detachContext):
+        (WebCore::WebGLContextObject::getAGraphicsContext3D):
+        * html/canvas/WebGLContextObject.h: Copied from Source/WebCore/html/canvas/WebGLShader.h.
+        (WebCore::WebGLContextObject::context):
+        (WebCore::WebGLContextObject::validate):
+        (WebCore::WebGLContextObject::hasGroupOrContext):
+        * html/canvas/WebGLFramebuffer.cpp:
+        (WebCore::WebGLFramebuffer::WebGLFramebuffer):
+        (WebCore::WebGLFramebuffer::~WebGLFramebuffer):
+        (WebCore::WebGLFramebuffer::setAttachmentForBoundFramebuffer):
+        (WebCore::WebGLFramebuffer::getAttachment):
+        (WebCore::WebGLFramebuffer::removeAttachmentFromBoundFramebuffer):
+        (WebCore::WebGLFramebuffer::checkStatus):
+        (WebCore::WebGLFramebuffer::onAccess):
+        (WebCore::WebGLFramebuffer::deleteObjectImpl):
+        (WebCore::WebGLFramebuffer::initializeRenderbuffers):
+        * html/canvas/WebGLFramebuffer.h:
+        * html/canvas/WebGLObject.cpp:
+        (WebCore::WebGLObject::WebGLObject):
+        (WebCore::WebGLObject::~WebGLObject):
+        (WebCore::WebGLObject::deleteObject):
+        (WebCore::WebGLObject::detach):
+        (WebCore::WebGLObject::onDetached):
+        * html/canvas/WebGLObject.h:
+        * html/canvas/WebGLProgram.cpp:
+        (WebCore::WebGLProgram::WebGLProgram):
+        (WebCore::WebGLProgram::~WebGLProgram):
+        (WebCore::WebGLProgram::deleteObjectImpl):
+        (WebCore::WebGLProgram::cacheActiveAttribLocations):
+        * html/canvas/WebGLProgram.h:
+        * html/canvas/WebGLRenderbuffer.cpp:
+        (WebCore::WebGLRenderbuffer::~WebGLRenderbuffer):
+        (WebCore::WebGLRenderbuffer::WebGLRenderbuffer):
+        (WebCore::WebGLRenderbuffer::deleteObjectImpl):
+        * html/canvas/WebGLRenderbuffer.h:
+        * html/canvas/WebGLRenderingContext.cpp:
+        (WebCore::WebGLRenderingContext::WebGLRenderingContext):
+        (WebCore::WebGLRenderingContext::initializeNewContext):
+        (WebCore::WebGLRenderingContext::~WebGLRenderingContext):
+        (WebCore::WebGLRenderingContext::clearIfComposited):
+        (WebCore::WebGLRenderingContext::checkObjectToBeBound):
+        (WebCore::WebGLRenderingContext::clear):
+        (WebCore::WebGLRenderingContext::copyTexImage2D):
+        (WebCore::WebGLRenderingContext::copyTexSubImage2D):
+        (WebCore::WebGLRenderingContext::createBuffer):
+        (WebCore::WebGLRenderingContext::createFramebuffer):
+        (WebCore::WebGLRenderingContext::createTexture):
+        (WebCore::WebGLRenderingContext::createProgram):
+        (WebCore::WebGLRenderingContext::createRenderbuffer):
+        (WebCore::WebGLRenderingContext::createShader):
+        (WebCore::WebGLRenderingContext::deleteObject):
+        (WebCore::WebGLRenderingContext::deleteRenderbuffer):
+        (WebCore::WebGLRenderingContext::deleteTexture):
+        (WebCore::WebGLRenderingContext::detachShader):
+        (WebCore::WebGLRenderingContext::validateElementArraySize):
+        (WebCore::WebGLRenderingContext::validateIndexArrayConservative):
+        (WebCore::WebGLRenderingContext::validateIndexArrayPrecise):
+        (WebCore::WebGLRenderingContext::validateWebGLObject):
+        (WebCore::WebGLRenderingContext::drawArrays):
+        (WebCore::WebGLRenderingContext::drawElements):
+        (WebCore::WebGLRenderingContext::framebufferRenderbuffer):
+        (WebCore::WebGLRenderingContext::framebufferTexture2D):
+        (WebCore::WebGLRenderingContext::getFramebufferAttachmentParameter):
+        (WebCore::WebGLRenderingContext::linkProgram):
+        (WebCore::WebGLRenderingContext::readPixels):
+        (WebCore::WebGLRenderingContext::useProgram):
+        (WebCore::WebGLRenderingContext::removeSharedObject):
+        (WebCore::WebGLRenderingContext::addSharedObject):
+        (WebCore::WebGLRenderingContext::removeContextObject):
+        (WebCore::WebGLRenderingContext::addContextObject):
+        (WebCore::WebGLRenderingContext::detachAndRemoveAllObjects):
+        (WebCore::WebGLRenderingContext::initVertexAttrib0):
+        (WebCore::WebGLRenderingContext::loseContext):
+        (WebCore::WebGLRenderingContext::loseContextImpl):
+        * html/canvas/WebGLRenderingContext.h:
+        (WebCore::WebGLRenderingContext::contextGroup):
+        * html/canvas/WebGLShader.cpp:
+        (WebCore::WebGLShader::WebGLShader):
+        (WebCore::WebGLShader::~WebGLShader):
+        (WebCore::WebGLShader::deleteObjectImpl):
+        * html/canvas/WebGLShader.h:
+        * html/canvas/WebGLSharedObject.cpp: Copied from Source/WebCore/html/canvas/WebGLRenderbuffer.cpp.
+        (WebCore::WebGLSharedObject::WebGLSharedObject):
+        (WebCore::WebGLSharedObject::~WebGLSharedObject):
+        (WebCore::WebGLSharedObject::detachContextGroup):
+        (WebCore::WebGLSharedObject::getAGraphicsContext3D):
+        * html/canvas/WebGLSharedObject.h: Copied from Source/WebCore/html/canvas/WebGLShader.h.
+        (WebCore::WebGLSharedObject::contextGroup):
+        (WebCore::WebGLSharedObject::isBuffer):
+        (WebCore::WebGLSharedObject::isFramebuffer):
+        (WebCore::WebGLSharedObject::isProgram):
+        (WebCore::WebGLSharedObject::isRenderbuffer):
+        (WebCore::WebGLSharedObject::isShader):
+        (WebCore::WebGLSharedObject::isTexture):
+        (WebCore::WebGLSharedObject::validate):
+        (WebCore::WebGLSharedObject::hasGroupOrContext):
+        * html/canvas/WebGLTexture.cpp:
+        (WebCore::WebGLTexture::WebGLTexture):
+        (WebCore::WebGLTexture::~WebGLTexture):
+        (WebCore::WebGLTexture::deleteObjectImpl):
+        * html/canvas/WebGLTexture.h:
+        * html/canvas/WebGLVertexArrayObjectOES.cpp:
+        (WebCore::WebGLVertexArrayObjectOES::WebGLVertexArrayObjectOES):
+        (WebCore::WebGLVertexArrayObjectOES::~WebGLVertexArrayObjectOES):
+        (WebCore::WebGLVertexArrayObjectOES::deleteObjectImpl):
+        * html/canvas/WebGLVertexArrayObjectOES.h:
+
+2012-01-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r104805.
+        http://trac.webkit.org/changeset/104805
+        https://bugs.webkit.org/show_bug.cgi?id=76180
+
+        Breaks apple win compilation. (Requested by vsevik on
+        #webkit).
+
+        * Source/autotools/symbols.filter:
+
+2012-01-12  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        Make the new WTF module build on Qt
+        https://bugs.webkit.org/show_bug.cgi?id=76163
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit.pro: Build the new WTF instead of the old one.
+
+2012-01-12  Shinya Kawanaka  <shinyak@google.com>
+
+        ShadowContentElement should be able to use query.
+        https://bugs.webkit.org/show_bug.cgi?id=75302
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter: Exposed necessary symbols.
+
+2012-01-11  Ulan Degenbaev  <ulan@chromium.org>
+
+        [v8] Int16Array.set(array, offset) fails on first execution
+        https://bugs.webkit.org/show_bug.cgi?id=76040
+
+        Reviewed by Kenneth Russell.
+
+        * LayoutTests/fast/canvas/webgl/array-set-with-offset-expected.txt: Added.
+        * LayoutTests/fast/canvas/webgl/array-set-with-offset.html: Added.
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustom.cpp:
+        * Source/WebCore/bindings/v8/custom/V8ArrayBufferViewCustom.h:
+
+2012-01-11  Eli Fidler  <efidler@rim.com>
+
+        Fix OpenGL dependency in CMake build system
+        https://bugs.webkit.org/show_bug.cgi?id=73559
+
+        Reviewed by Daniel Bates.
+
+        Apparently the EFL port uses desktop OpenGL to implement WebGL, but
+        other ports such as BlackBerry use other libraries like OpenGL ES 2.0 or
+        ANGLE.
+
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+
 2012-01-09  Martin Robinson  <mrobinson@igalia.com>
 
         [GTK] [AC] Simplify accelerated compositing build options

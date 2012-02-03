@@ -12,10 +12,11 @@ LIST(APPEND WebCore_SOURCES
     bindings/js/DOMObjectHashTableMap.cpp
     bindings/js/DOMWrapperWorld.cpp
     bindings/js/GCController.cpp
-    bindings/js/JSAttrCustom.cpp
     bindings/js/JSArrayBufferCustom.cpp
-    bindings/js/JSDataViewCustom.cpp
+    bindings/js/JSAttrCustom.cpp
+    bindings/js/JSBlobCustom.cpp
     bindings/js/JSCDATASectionCustom.cpp
+    bindings/js/JSDataViewCustom.cpp
     bindings/js/JSCSSFontFaceRuleCustom.cpp
     bindings/js/JSCSSImportRuleCustom.cpp
     bindings/js/JSCSSMediaRuleCustom.cpp
@@ -118,6 +119,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/js/JSUint16ArrayCustom.cpp 
     bindings/js/JSUint32ArrayCustom.cpp
     bindings/js/JSUint8ArrayCustom.cpp
+    bindings/js/JSUint8ClampedArrayCustom.cpp
     bindings/js/JSWebKitAnimationCustom.cpp
     bindings/js/JSWebKitAnimationListCustom.cpp
     bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp

@@ -431,7 +431,7 @@ public:
     bool hasVisualOverflow() const { return m_overflow && !borderBoxRect().contains(m_overflow->visualOverflowRect()); }
 
     virtual bool needsPreferredWidthsRecalculation() const;
-    virtual void computeIntrinsicRatioInformation(FloatSize& /* intrinsicRatio */, bool& /* isPercentageIntrinsicSize */) const { }
+    virtual void computeIntrinsicRatioInformation(FloatSize& /* intrinsicSize */, double& /* intrinsicRatio */, bool& /* isPercentageIntrinsicSize */) const { }
 
 protected:
     virtual void willBeDestroyed();
@@ -462,7 +462,7 @@ protected:
     void paintRootBoxFillLayers(const PaintInfo&);
 
 private:
-    bool shouldLayoutFixedElementRelativeToFrame(Frame*, FrameView*) const;
+    bool fixedElementLaysOutRelativeToFrame(Frame*, FrameView*) const;
 
     bool includeVerticalScrollbarSize() const;
     bool includeHorizontalScrollbarSize() const;

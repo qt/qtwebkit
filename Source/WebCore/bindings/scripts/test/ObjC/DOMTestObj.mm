@@ -290,18 +290,6 @@
     IMPL->setAttribute(WebCore::HTMLNames::reflectedurlattrAttr, newReflectedURLAttr);
 }
 
-- (NSString *)reflectedNonEmptyURLAttr
-{
-    WebCore::JSMainThreadNullState state;
-    return IMPL->getNonEmptyURLAttribute(WebCore::HTMLNames::reflectednonemptyurlattrAttr);
-}
-
-- (void)setReflectedNonEmptyURLAttr:(NSString *)newReflectedNonEmptyURLAttr
-{
-    WebCore::JSMainThreadNullState state;
-    IMPL->setAttribute(WebCore::HTMLNames::reflectednonemptyurlattrAttr, newReflectedNonEmptyURLAttr);
-}
-
 - (NSString *)reflectedStringAttr
 {
     WebCore::JSMainThreadNullState state;
@@ -348,18 +336,6 @@
 {
     WebCore::JSMainThreadNullState state;
     IMPL->setAttribute(WebCore::HTMLNames::customContentURLAttrAttr, newReflectedCustomURLAttr);
-}
-
-- (NSString *)reflectedCustomNonEmptyURLAttr
-{
-    WebCore::JSMainThreadNullState state;
-    return IMPL->getNonEmptyURLAttribute(WebCore::HTMLNames::customContentNonEmptyURLAttrAttr);
-}
-
-- (void)setReflectedCustomNonEmptyURLAttr:(NSString *)newReflectedCustomNonEmptyURLAttr
-{
-    WebCore::JSMainThreadNullState state;
-    IMPL->setAttribute(WebCore::HTMLNames::customContentNonEmptyURLAttrAttr, newReflectedCustomNonEmptyURLAttr);
 }
 
 - (int)attrWithGetterException
@@ -434,6 +410,70 @@
 {
     WebCore::JSMainThreadNullState state;
     IMPL->setCustomAttr(newCustomAttr);
+}
+
+- (int)withScriptStateAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->withScriptStateAttribute();
+}
+
+- (void)setWithScriptStateAttribute:(int)newWithScriptStateAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setWithScriptStateAttribute(newWithScriptStateAttribute);
+}
+
+- (DOMTestObj *)withScriptExecutionContextAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return kit(WTF::getPtr(IMPL->withScriptExecutionContextAttribute()));
+}
+
+- (void)setWithScriptExecutionContextAttribute:(DOMTestObj *)newWithScriptExecutionContextAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    ASSERT(newWithScriptExecutionContextAttribute);
+
+    IMPL->setWithScriptExecutionContextAttribute(core(newWithScriptExecutionContextAttribute));
+}
+
+- (DOMTestObj *)withScriptStateAttributeRaises
+{
+    WebCore::JSMainThreadNullState state;
+    WebCore::ExceptionCode ec = 0;
+    DOMTestObj *result = kit(WTF::getPtr(IMPL->withScriptStateAttributeRaises(ec)));
+    WebCore::raiseOnDOMError(ec);
+    return result;
+}
+
+- (void)setWithScriptStateAttributeRaises:(DOMTestObj *)newWithScriptStateAttributeRaises
+{
+    WebCore::JSMainThreadNullState state;
+    ASSERT(newWithScriptStateAttributeRaises);
+
+    WebCore::ExceptionCode ec = 0;
+    IMPL->setWithScriptStateAttributeRaises(core(newWithScriptStateAttributeRaises), ec);
+    WebCore::raiseOnDOMError(ec);
+}
+
+- (DOMTestObj *)withScriptExecutionContextAttributeRaises
+{
+    WebCore::JSMainThreadNullState state;
+    WebCore::ExceptionCode ec = 0;
+    DOMTestObj *result = kit(WTF::getPtr(IMPL->withScriptExecutionContextAttributeRaises(ec)));
+    WebCore::raiseOnDOMError(ec);
+    return result;
+}
+
+- (void)setWithScriptExecutionContextAttributeRaises:(DOMTestObj *)newWithScriptExecutionContextAttributeRaises
+{
+    WebCore::JSMainThreadNullState state;
+    ASSERT(newWithScriptExecutionContextAttributeRaises);
+
+    WebCore::ExceptionCode ec = 0;
+    IMPL->setWithScriptExecutionContextAttributeRaises(core(newWithScriptExecutionContextAttributeRaises), ec);
+    WebCore::raiseOnDOMError(ec);
 }
 
 - (NSString *)scriptStringAttr

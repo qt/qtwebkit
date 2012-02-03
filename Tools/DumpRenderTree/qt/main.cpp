@@ -29,6 +29,8 @@
 
 #include "DumpRenderTreeQt.h"
 
+#include "QtInitializeTestFonts.h"
+
 #include <wtf/AlwaysInline.h>
 
 #include <qstringlist.h>
@@ -53,9 +55,8 @@
 #include <limits.h>
 #include <signal.h>
 
-#if defined(__GLIBC__) && !defined(__UCLIBC__)
-#include <execinfo.h>
-#endif
+#include <wtf/ExportMacros.h>
+#include <wtf/Assertions.h>
 
 void messageHandler(QtMsgType type, const char *message)
 {
@@ -93,38 +94,31 @@ void printUsage()
     fflush(stderr);
 }
 
-QString get_backtrace() {
-    QString s;
-
-#if defined(__GLIBC__) && !defined(__UCLIBC__)
-    void* array[256];
-    size_t size; /* number of stack frames */
-
-    size = backtrace(array, 256);
-
-    if (!size)
-        return s;
-
-    char** strings = backtrace_symbols(array, size);
-    for (int i = 0; i < int(size); ++i) {
-        s += QString::number(i) +
-             QLatin1String(": ") +
-             QLatin1String(strings[i]) + QLatin1String("\n");
-    }
-
-    if (strings)
-        free (strings);
-#endif
-
-    return s;
-}
-
 #if HAVE(SIGNAL_H)
+typedef void (*SignalHandler)(int);
+
 static NO_RETURN void crashHandler(int sig)
 {
-    fprintf(stderr, "%s\n", strsignal(sig));
-    fprintf(stderr, "%s\n", get_backtrace().toLatin1().constData());
+    WTFReportBacktrace();
     exit(128 + sig);
+}
+
+static void setupSignalHandlers(SignalHandler handler)
+{
+    signal(SIGILL, handler);    /* 4:   illegal instruction (not reset when caught) */
+    signal(SIGTRAP, handler);   /* 5:   trace trap (not reset when caught) */
+    signal(SIGFPE, handler);    /* 8:   floating point exception */
+    signal(SIGBUS, handler);    /* 10:  bus error */
+    signal(SIGSEGV, handler);   /* 11:  segmentation violation */
+    signal(SIGSYS, handler);    /* 12:  bad argument to system call */
+    signal(SIGPIPE, handler);   /* 13:  write on a pipe with no reader */
+    signal(SIGXCPU, handler);   /* 24:  exceeded CPU time limit */
+    signal(SIGXFSZ, handler);   /* 25:  exceeded file size limit */
+}
+
+static void WTFCrashHook()
+{
+    setupSignalHandlers(SIG_DFL);
 }
 #endif
 
@@ -149,13 +143,14 @@ int main(int argc, char* argv[])
     if (suppressQtDebugOutput)
         qInstallMsgHandler(messageHandler);
 
-    WebCore::DumpRenderTree::initializeFonts();
+    WebKit::initializeTestFonts();
 
     QApplication::setGraphicsSystem("raster");
     QApplication::setStyle(new QWindowsStyle);
 
     QApplication app(argc, argv);
 
+#if QT_VERSION <= QT_VERSION_CHECK(5, 0, 0) // FIXME: need a way to port this to Qt5.
 #ifdef Q_WS_X11
     QX11Info::setAppDpiY(0, 96);
     QX11Info::setAppDpiX(0, 96);
@@ -173,17 +168,11 @@ int main(int argc, char* argv[])
     * default font, but with the correct paint-device DPI.
    */
     QApplication::setFont(QWidget().font());
+#endif
 
 #if HAVE(SIGNAL_H)
-    signal(SIGILL, crashHandler);    /* 4:   illegal instruction (not reset when caught) */
-    signal(SIGTRAP, crashHandler);   /* 5:   trace trap (not reset when caught) */
-    signal(SIGFPE, crashHandler);    /* 8:   floating point exception */
-    signal(SIGBUS, crashHandler);    /* 10:  bus error */
-    signal(SIGSEGV, crashHandler);   /* 11:  segmentation violation */
-    signal(SIGSYS, crashHandler);    /* 12:  bad argument to system call */
-    signal(SIGPIPE, crashHandler);   /* 13:  write on a pipe with no reader */
-    signal(SIGXCPU, crashHandler);   /* 24:  exceeded CPU time limit */
-    signal(SIGXFSZ, crashHandler);   /* 25:  exceeded file size limit */
+    setupSignalHandlers(&crashHandler);
+    WTFSetCrashHook(&WTFCrashHook);
 #endif
 
     QStringList args = app.arguments();

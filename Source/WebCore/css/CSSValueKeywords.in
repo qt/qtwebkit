@@ -52,6 +52,17 @@ all
 //
 //normal
 small-caps
+
+// -webkit-font-variant-ligatures:
+//
+// normal
+common-ligatures
+no-common-ligatures
+discretionary-ligatures
+no-discretionary-ligatures
+historical-ligatures
+no-historical-ligatures
+
 //
 // CSS_PROP_FONT_WEIGHT:
 //
@@ -481,6 +492,13 @@ multiple
 // baseline
 // stretch
 
+// CSS_PROP_FLEX_PACK
+// start
+// end
+// center
+// justify
+distribute
+
 // CSS_PROP_FLEX_FLOW
 row
 row-reverse
@@ -831,11 +849,6 @@ font
 glyphs
 inline-box
 replaced
-
-// -webkit-line-grid-snap
-//none
-//baseline
-bounds
 
 // -webkit-font-feature-settings
 on

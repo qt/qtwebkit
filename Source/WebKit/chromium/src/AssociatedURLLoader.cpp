@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,6 +31,7 @@
 #include "config.h"
 #include "AssociatedURLLoader.h"
 
+#include "CrossOriginAccessControl.h"
 #include "DocumentThreadableLoader.h"
 #include "DocumentThreadableLoaderClient.h"
 #include "HTTPValidation.h"
@@ -45,9 +46,12 @@
 #include "XMLHttpRequest.h"
 #include "platform/WebHTTPHeaderVisitor.h"
 #include "platform/WebKitPlatformSupport.h"
+#include "platform/WebString.h"
 #include "platform/WebURLError.h"
 #include "platform/WebURLLoaderClient.h"
 #include "platform/WebURLRequest.h"
+#include <wtf/HashSet.h>
+#include <wtf/text/WTFString.h>
 
 using namespace WebCore;
 using namespace WTF;
@@ -56,10 +60,10 @@ namespace WebKit {
 
 namespace {
 
-class SafeHTTPHeaderValidator : public WebHTTPHeaderVisitor {
-    WTF_MAKE_NONCOPYABLE(SafeHTTPHeaderValidator);
+class HTTPRequestHeaderValidator : public WebHTTPHeaderVisitor {
+    WTF_MAKE_NONCOPYABLE(HTTPRequestHeaderValidator);
 public:
-    SafeHTTPHeaderValidator() : m_isSafe(true) { }
+    HTTPRequestHeaderValidator() : m_isSafe(true) { }
 
     void visitHeader(const WebString& name, const WebString& value);
     bool isSafe() const { return m_isSafe; }
@@ -68,9 +72,53 @@ private:
     bool m_isSafe;
 };
 
-void SafeHTTPHeaderValidator::visitHeader(const WebString& name, const WebString& value)
+typedef HashSet<String, CaseFoldingHash> HTTPHeaderSet;
+
+void HTTPRequestHeaderValidator::visitHeader(const WebString& name, const WebString& value)
 {
     m_isSafe = m_isSafe && isValidHTTPToken(name) && XMLHttpRequest::isAllowedHTTPHeader(name) && isValidHTTPHeaderValue(value);
+}
+
+class HTTPResponseHeaderValidator : public WebHTTPHeaderVisitor {
+    WTF_MAKE_NONCOPYABLE(HTTPResponseHeaderValidator);
+public:
+    HTTPResponseHeaderValidator(bool usingAccessControl) : m_usingAccessControl(usingAccessControl) { }
+
+    void visitHeader(const WebString& name, const WebString& value);
+    const HTTPHeaderSet& blockedHeaders();
+
+private:
+    HTTPHeaderSet m_exposedHeaders;
+    HTTPHeaderSet m_blockedHeaders;
+    bool m_usingAccessControl;
+};
+
+void HTTPResponseHeaderValidator::visitHeader(const WebString& name, const WebString& value)
+{
+    String headerName(name);
+    if (m_usingAccessControl) {
+        if (equalIgnoringCase(headerName, "access-control-expose-header"))
+            parseAccessControlExposeHeadersAllowList(value, m_exposedHeaders);
+        else if (!isOnAccessControlResponseHeaderWhitelist(headerName))
+            m_blockedHeaders.add(name);
+    }
+}
+
+const HTTPHeaderSet& HTTPResponseHeaderValidator::blockedHeaders()
+{
+    // Remove exposed headers from the blocked set.
+    if (!m_exposedHeaders.isEmpty()) {
+        // Don't allow Set-Cookie headers to be exposed.
+        m_exposedHeaders.remove("set-cookie");
+        m_exposedHeaders.remove("set-cookie2");
+        // Block Access-Control-Expose-Header itself. It could be exposed later.
+        m_blockedHeaders.add("access-control-expose-header");
+        HTTPHeaderSet::const_iterator end = m_exposedHeaders.end();
+        for (HTTPHeaderSet::const_iterator it = m_exposedHeaders.begin(); it != end; ++it)
+            m_blockedHeaders.remove(*it);
+    }
+
+    return m_blockedHeaders;
 }
 
 }
@@ -80,7 +128,7 @@ void SafeHTTPHeaderValidator::visitHeader(const WebString& name, const WebString
 class AssociatedURLLoader::ClientAdapter : public DocumentThreadableLoaderClient {
     WTF_MAKE_NONCOPYABLE(ClientAdapter);
 public:
-    static PassOwnPtr<ClientAdapter> create(AssociatedURLLoader*, WebURLLoaderClient*, bool /*downloadToFile*/);
+    static PassOwnPtr<ClientAdapter> create(AssociatedURLLoader*, WebURLLoaderClient*, const WebURLLoaderOptions&);
 
     virtual void didSendData(unsigned long long /*bytesSent*/, unsigned long long /*totalBytesToBeSent*/);
     virtual void willSendRequest(ResourceRequest& /*newRequest*/, const ResourceResponse& /*redirectResponse*/);
@@ -105,30 +153,30 @@ public:
     void clearClient() { m_client = 0; } 
 
 private:
-    ClientAdapter(AssociatedURLLoader*, WebURLLoaderClient*, bool /*downloadToFile*/);
+    ClientAdapter(AssociatedURLLoader*, WebURLLoaderClient*, const WebURLLoaderOptions&);
 
     void notifyError(Timer<ClientAdapter>*);
 
     AssociatedURLLoader* m_loader;
     WebURLLoaderClient* m_client;
+    WebURLLoaderOptions m_options;
     WebURLError m_error;
 
     Timer<ClientAdapter> m_errorTimer;
-    bool m_downloadToFile;
     bool m_enableErrorNotifications;
     bool m_didFail;
 };
 
-PassOwnPtr<AssociatedURLLoader::ClientAdapter> AssociatedURLLoader::ClientAdapter::create(AssociatedURLLoader* loader, WebURLLoaderClient* client, bool downloadToFile)
+PassOwnPtr<AssociatedURLLoader::ClientAdapter> AssociatedURLLoader::ClientAdapter::create(AssociatedURLLoader* loader, WebURLLoaderClient* client, const WebURLLoaderOptions& options)
 {
-    return adoptPtr(new ClientAdapter(loader, client, downloadToFile));
+    return adoptPtr(new ClientAdapter(loader, client, options));
 }
 
-AssociatedURLLoader::ClientAdapter::ClientAdapter(AssociatedURLLoader* loader, WebURLLoaderClient* client, bool downloadToFile)
+AssociatedURLLoader::ClientAdapter::ClientAdapter(AssociatedURLLoader* loader, WebURLLoaderClient* client, const WebURLLoaderOptions& options)
     : m_loader(loader)
     , m_client(client)
+    , m_options(options)
     , m_errorTimer(this, &ClientAdapter::notifyError)
-    , m_downloadToFile(downloadToFile)
     , m_enableErrorNotifications(false)
     , m_didFail(false)
 {
@@ -156,8 +204,19 @@ void AssociatedURLLoader::ClientAdapter::didSendData(unsigned long long bytesSen
 
 void AssociatedURLLoader::ClientAdapter::didReceiveResponse(unsigned long, const ResourceResponse& response)
 {
-    WrappedResourceResponse wrappedResponse(response);
-    m_client->didReceiveResponse(m_loader, wrappedResponse);
+    // Try to use the original ResourceResponse if possible.
+    WebURLResponse validatedResponse = WrappedResourceResponse(response);
+    HTTPResponseHeaderValidator validator(m_options.crossOriginRequestPolicy == WebURLLoaderOptions::CrossOriginRequestPolicyUseAccessControl);
+    validatedResponse.visitHTTPHeaderFields(&validator);
+    // If there are blocked headers, copy the response so we can remove them.
+    const HTTPHeaderSet& blockedHeaders = validator.blockedHeaders();
+    if (!blockedHeaders.isEmpty()) {
+        validatedResponse = WebURLResponse(validatedResponse);
+        HTTPHeaderSet::const_iterator end = blockedHeaders.end();
+        for (HTTPHeaderSet::const_iterator it = blockedHeaders.begin(); it != end; ++it)
+            validatedResponse.clearHTTPHeaderField(*it);
+    }
+    m_client->didReceiveResponse(m_loader, validatedResponse);
 }
 
 void AssociatedURLLoader::ClientAdapter::didDownloadData(int dataLength)
@@ -263,13 +322,13 @@ void AssociatedURLLoader::loadAsynchronously(const WebURLRequest& request, WebUR
         allowLoad = isValidHTTPToken(method) && XMLHttpRequest::isAllowedHTTPMethod(method);
         if (allowLoad) {
             newRequest.setHTTPMethod(XMLHttpRequest::uppercaseKnownHTTPMethod(method));
-            SafeHTTPHeaderValidator validator;
+            HTTPRequestHeaderValidator validator;
             newRequest.visitHTTPHeaderFields(&validator);
             allowLoad = validator.isSafe();
         }
     }
 
-    m_clientAdapter = ClientAdapter::create(this, m_client, request.downloadToFile());
+    m_clientAdapter = ClientAdapter::create(this, m_client, m_options);
 
     if (allowLoad) {
         ThreadableLoaderOptions options;

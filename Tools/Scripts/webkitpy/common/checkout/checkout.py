@@ -1,9 +1,9 @@
 # Copyright (c) 2010 Google Inc. All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
 # met:
-# 
+#
 #     * Redistributions of source code must retain the above copyright
 # notice, this list of conditions and the following disclaimer.
 #     * Redistributions in binary form must reproduce the above
@@ -13,7 +13,7 @@
 #     * Neither the name of Google Inc. nor the names of its
 # contributors may be used to endorse or promote products derived from
 # this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 # "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 # LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -121,13 +121,13 @@ class Checkout(object):
     def modified_non_changelogs(self, git_commit, changed_files=None):
         return self._modified_files_matching_predicate(git_commit, lambda path: not self.is_path_to_changelog(path), changed_files=changed_files)
 
-    def commit_message_for_this_commit(self, git_commit, changed_files=None):
+    def commit_message_for_this_commit(self, git_commit, changed_files=None, return_stderr=False):
         changelog_paths = self.modified_changelogs(git_commit, changed_files)
         if not len(changelog_paths):
             raise ScriptError(message="Found no modified ChangeLogs, cannot create a commit message.\n"
                               "All changes require a ChangeLog.  See:\n %s" % urls.contribution_guidelines)
 
-        message_text = self._scm.run([self._scm.script_path('commit-log-editor'), '--print-log'] + changelog_paths, return_stderr=False)
+        message_text = self._scm.run([self._scm.script_path('commit-log-editor'), '--print-log'] + changelog_paths, return_stderr=return_stderr)
         return CommitMessage(message_text.splitlines())
 
     def recent_commit_infos_for_files(self, paths):
@@ -150,16 +150,15 @@ class Checkout(object):
     def chromium_deps(self):
         return DEPS(self._scm.absolute_path(self._filesystem.join("Source", "WebKit", "chromium", "DEPS")))
 
-    def apply_patch(self, patch, force=False):
+    def apply_patch(self, patch):
         # It's possible that the patch was not made from the root directory.
         # We should detect and handle that case.
         # FIXME: Move _scm.script_path here once we get rid of all the dependencies.
-        args = [self._scm.script_path('svn-apply')]
+        # --force (continue after errors) is the common case, so we always use it.
+        args = [self._scm.script_path('svn-apply'), "--force"]
         if patch.reviewer():
             args += ['--reviewer', patch.reviewer().full_name]
-        if force:
-            args.append('--force')
-        self._executive.run_command(args, input=patch.contents())
+        self._executive.run_command(args, input=patch.contents(), cwd=self._scm.checkout_root)
 
     def apply_reverse_diff(self, revision):
         self._scm.apply_reverse_diff(revision)

@@ -59,6 +59,7 @@ namespace JSC {
     class PutPropertySlot;
     class RegisterFile;
     class RegExp;
+    class Structure;
 
     template <typename T> class Weak;
 
@@ -78,6 +79,7 @@ namespace JSC {
         JSPropertyNameIterator* propertyNameIterator() { return static_cast<JSPropertyNameIterator*>(asPointer); }
         JSGlobalObject* globalObject() { return static_cast<JSGlobalObject*>(asPointer); }
         JSString* jsString() { return static_cast<JSString*>(asPointer); }
+        Structure* structure() { return static_cast<Structure*>(asPointer); }
         ReturnAddressPtr returnAddress() { return ReturnAddressPtr(asPointer); }
     };
     
@@ -281,6 +283,15 @@ namespace JSC {
     extern "C" void ctiVMThrowTrampoline();
     extern "C" void ctiOpThrowNotCaught();
     extern "C" EncodedJSValue ctiTrampoline(void* code, RegisterFile*, CallFrame*, void* /*unused1*/, Profiler**, JSGlobalData*);
+#if ENABLE(DFG_JIT)
+    extern "C" void ctiTrampolineEnd();
+
+    inline bool returnAddressIsInCtiTrampoline(ReturnAddressPtr returnAddress)
+    {
+        return returnAddress.value() >= bitwise_cast<void*>(&ctiTrampoline)
+            && returnAddress.value() < bitwise_cast<void*>(&ctiTrampolineEnd);
+    }
+#endif
 
     class JITThunks {
     public:
@@ -423,8 +434,7 @@ extern "C" {
     void JIT_STUB cti_op_put_by_index(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_put_by_val(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_put_by_val_byte_array(STUB_ARGS_DECLARATION);
-    void JIT_STUB cti_op_put_getter(STUB_ARGS_DECLARATION);
-    void JIT_STUB cti_op_put_setter(STUB_ARGS_DECLARATION);
+    void JIT_STUB cti_op_put_getter_setter(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_tear_off_activation(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_tear_off_arguments(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_throw_reference_error(STUB_ARGS_DECLARATION);

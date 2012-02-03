@@ -83,6 +83,8 @@
 #include "PlatformScreen.h"
 #include "ScheduledAction.h"
 #include "Screen.h"
+#include "ScriptCallStack.h"
+#include "ScriptCallStackFactory.h"
 #include "SecurityOrigin.h"
 #include "SerializedScriptValue.h"
 #include "Settings.h"
@@ -103,7 +105,6 @@
 #if ENABLE(FILE_SYSTEM)
 #include "AsyncFileSystem.h"
 #include "DOMFileSystem.h"
-#include "DOMFileSystemBase.h"
 #include "EntryCallback.h"
 #include "ErrorCallback.h"
 #include "FileError.h"
@@ -123,13 +124,14 @@ namespace WebCore {
 
 class PostMessageTimer : public TimerBase {
 public:
-    PostMessageTimer(DOMWindow* window, PassRefPtr<SerializedScriptValue> message, const String& sourceOrigin, PassRefPtr<DOMWindow> source, PassOwnPtr<MessagePortChannelArray> channels, SecurityOrigin* targetOrigin)
+    PostMessageTimer(DOMWindow* window, PassRefPtr<SerializedScriptValue> message, const String& sourceOrigin, PassRefPtr<DOMWindow> source, PassOwnPtr<MessagePortChannelArray> channels, SecurityOrigin* targetOrigin, PassRefPtr<ScriptCallStack> stackTrace)
         : m_window(window)
         , m_message(message)
         , m_origin(sourceOrigin)
         , m_source(source)
         , m_channels(channels)
         , m_targetOrigin(targetOrigin)
+        , m_stackTrace(stackTrace)
     {
     }
 
@@ -139,6 +141,7 @@ public:
         return MessageEvent::create(messagePorts.release(), m_message, m_origin, "", m_source);
     }
     SecurityOrigin* targetOrigin() const { return m_targetOrigin.get(); }
+    ScriptCallStack* stackTrace() const { return m_stackTrace.get(); }
 
 private:
     virtual void fired()
@@ -153,6 +156,7 @@ private:
     RefPtr<DOMWindow> m_source;
     OwnPtr<MessagePortChannelArray> m_channels;
     RefPtr<SecurityOrigin> m_targetOrigin;
+    RefPtr<ScriptCallStack> m_stackTrace;
 };
 
 typedef HashCountedSet<DOMWindow*> DOMWindowSet;
@@ -745,22 +749,9 @@ void DOMWindow::resetGeolocation()
 }
 
 #if ENABLE(INDEXED_DATABASE)
-IDBFactory* DOMWindow::webkitIndexedDB() const
+void DOMWindow::setIDBFactory(PassRefPtr<IDBFactory> idbFactory)
 {
-    Document* document = this->document();
-    if (!document)
-        return 0;
-
-    Page* page = document->page();
-    if (!page)
-        return 0;
-
-    if (!document->securityOrigin()->canAccessDatabase())
-        return 0;
-
-    if (!m_idbFactory && isCurrentlyDisplayedInFrame())
-        m_idbFactory = IDBFactory::create(page->group().idbFactory());
-    return m_idbFactory.get();
+    m_idbFactory = idbFactory;
 }
 #endif
 
@@ -780,7 +771,7 @@ void DOMWindow::webkitRequestFileSystem(int type, long long size, PassRefPtr<Fil
     }
 
     AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
-    if (fileSystemType != AsyncFileSystem::Temporary && fileSystemType != AsyncFileSystem::Persistent && fileSystemType != AsyncFileSystem::External) {
+    if (!AsyncFileSystem::isValidType(fileSystemType)) {
         DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::INVALID_MODIFICATION_ERR));
         return;
     }
@@ -806,15 +797,13 @@ void DOMWindow::webkitResolveLocalFileSystemURL(const String& url, PassRefPtr<En
 
     AsyncFileSystem::Type type;
     String filePath;
-    if (!completedURL.isValid() || !DOMFileSystemBase::crackFileSystemURL(completedURL, type, filePath)) {
+    if (!completedURL.isValid() || !AsyncFileSystem::crackFileSystemURL(completedURL, type, filePath)) {
         DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::ENCODING_ERR));
         return;
     }
 
     LocalFileSystem::localFileSystem().readFileSystem(document, type, ResolveURICallbacks::create(successCallback, errorCallback, document, filePath));
 }
-
-COMPILE_ASSERT(static_cast<int>(DOMWindow::EXTERNAL) == static_cast<int>(AsyncFileSystem::External), enum_mismatch);
 
 COMPILE_ASSERT(static_cast<int>(DOMWindow::TEMPORARY) == static_cast<int>(AsyncFileSystem::Temporary), enum_mismatch);
 COMPILE_ASSERT(static_cast<int>(DOMWindow::PERSISTENT) == static_cast<int>(AsyncFileSystem::Persistent), enum_mismatch);
@@ -834,10 +823,16 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
     if (!isCurrentlyDisplayedInFrame())
         return;
 
+    Document* sourceDocument = source->document();
+
     // Compute the target origin.  We need to do this synchronously in order
     // to generate the SYNTAX_ERR exception correctly.
     RefPtr<SecurityOrigin> target;
-    if (targetOrigin != "*") {
+    if (targetOrigin == "/") {
+        if (!sourceDocument)
+            return;
+        target = sourceDocument->securityOrigin();
+    } else if (targetOrigin != "*") {
         target = SecurityOrigin::createFromString(targetOrigin);
         // It doesn't make sense target a postMessage at a unique origin
         // because there's no way to represent a unique origin in a string.
@@ -853,13 +848,17 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
 
     // Capture the source of the message.  We need to do this synchronously
     // in order to capture the source of the message correctly.
-    Document* sourceDocument = source->document();
     if (!sourceDocument)
         return;
     String sourceOrigin = sourceDocument->securityOrigin()->toString();
 
+    // Capture stack trace only when inspector front-end is loaded as it may be time consuming.
+    RefPtr<ScriptCallStack> stackTrace;
+    if (InspectorInstrumentation::hasFrontends())
+        stackTrace = createScriptCallStack(ScriptCallStack::maxCallStackSizeToCapture, true);
+
     // Schedule the message.
-    PostMessageTimer* timer = new PostMessageTimer(this, message, sourceOrigin, source, channels.release(), target.get());
+    PostMessageTimer* timer = new PostMessageTimer(this, message, sourceOrigin, source, channels.release(), target.get(), stackTrace.release());
     timer->startOneShot(0);
 }
 
@@ -883,7 +882,7 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
         if (!timer->targetOrigin()->isSameSchemeHostPort(document()->securityOrigin())) {
             String message = "Unable to post message to " + timer->targetOrigin()->toString() +
                              ". Recipient has origin " + document()->securityOrigin()->toString() + ".\n";
-            console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 0, String());
+            console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, timer->stackTrace());
             return;
         }
     }
@@ -1126,7 +1125,9 @@ int DOMWindow::innerHeight() const
     if (!view)
         return 0;
     
-    return static_cast<int>(view->visibleContentRect(/* includeScrollbars */ true).height() / m_frame->pageZoomFactor());
+    long height = view->visibleContentRect(/* includeScrollbars */ true).height();
+    InspectorInstrumentation::applyScreenHeightOverride(m_frame, &height);
+    return static_cast<int>(height / (m_frame->pageZoomFactor() * m_frame->frameScaleFactor()));
 }
 
 int DOMWindow::innerWidth() const
@@ -1138,7 +1139,9 @@ int DOMWindow::innerWidth() const
     if (!view)
         return 0;
 
-    return static_cast<int>(view->visibleContentRect(/* includeScrollbars */ true).width() / m_frame->pageZoomFactor());
+    long width = view->visibleContentRect(/* includeScrollbars */ true).width();
+    InspectorInstrumentation::applyScreenWidthOverride(m_frame, &width);
+    return static_cast<int>(width / (m_frame->pageZoomFactor() * m_frame->frameScaleFactor()));
 }
 
 int DOMWindow::screenX() const
@@ -1710,7 +1713,8 @@ void DOMWindow::printErrorMessage(const String& message)
         return;
 
     // FIXME: Add arguments so that we can provide a correct source URL and line number.
-    console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, 1, String());
+    RefPtr<ScriptCallStack> stackTrace = createScriptCallStack(ScriptCallStack::maxCallStackSizeToCapture, true);
+    console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, stackTrace.release());
 }
 
 String DOMWindow::crossDomainAccessErrorMessage(DOMWindow* activeWindow)
@@ -1758,6 +1762,12 @@ Frame* DOMWindow::createWindow(const String& urlString, const AtomicString& fram
     String referrer = firstFrame->loader()->outgoingReferrer();
 
     KURL completedURL = urlString.isEmpty() ? KURL(ParsedURLString, emptyString()) : firstFrame->document()->completeURL(urlString);
+    if (!completedURL.isEmpty() && !completedURL.isValid()) {
+        // Don't expose client code to invalid URLs.
+        activeWindow->printErrorMessage("Unable to open a window with invalid URL '" + completedURL.string() + "'.\n");
+        return 0;
+    }
+
     ResourceRequest request(completedURL, referrer);
     FrameLoader::addHTTPOriginIfNeeded(request, firstFrame->loader()->outgoingOrigin());
     FrameLoadRequest frameRequest(activeWindow->securityOrigin(), request, frameName);

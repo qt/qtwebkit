@@ -28,8 +28,8 @@
 #include "CSSValue.h"
 
 #include "CSSAspectRatioValue.h"
-#include "CSSBorderImageValue.h"
 #include "CSSBorderImageSliceValue.h"
+#include "CSSCalculationValue.h"
 #include "CSSCanvasValue.h"
 #include "CSSCrossfadeValue.h"
 #include "CSSCursorImageValue.h"
@@ -89,8 +89,6 @@ void CSSValue::addSubresourceStyleURLs(ListHashSet<KURL>& urls, const CSSStyleSh
         static_cast<CSSPrimitiveValue*>(this)->addSubresourceStyleURLs(urls, styleSheet);
     else if (isValueList())
         static_cast<CSSValueList*>(this)->addSubresourceStyleURLs(urls, styleSheet);
-    else if (classType() == BorderImageClass)
-        static_cast<CSSBorderImageValue*>(this)->addSubresourceStyleURLs(urls, styleSheet);
     else if (classType() == FontFaceSrcClass)
         static_cast<CSSFontFaceSrcValue*>(this)->addSubresourceStyleURLs(urls, styleSheet);
     else if (classType() == ReflectClass)
@@ -102,8 +100,6 @@ String CSSValue::cssText() const
     switch (classType()) {
     case AspectRatioClass:
         return static_cast<const CSSAspectRatioValue*>(this)->customCssText();
-    case BorderImageClass:
-        return static_cast<const CSSBorderImageValue*>(this)->customCssText();
     case BorderImageSliceClass:
         return static_cast<const CSSBorderImageSliceValue*>(this)->customCssText();
     case CanvasClass:
@@ -154,6 +150,8 @@ String CSSValue::cssText() const
         return static_cast<const CSSLineBoxContainValue*>(this)->customCssText();
     case FlexClass:
         return static_cast<const CSSFlexValue*>(this)->customCssText();
+    case CalculationClass:
+        return static_cast<const CSSCalcValue*>(this)->customCssText();
 #if ENABLE(CSS_FILTERS)
     case WebKitCSSFilterClass:
         return static_cast<const WebKitCSSFilterValue*>(this)->customCssText();
@@ -178,9 +176,6 @@ void CSSValue::destroy()
     switch (classType()) {
     case AspectRatioClass:
         delete static_cast<CSSAspectRatioValue*>(this);
-        return;
-    case BorderImageClass:
-        delete static_cast<CSSBorderImageValue*>(this);
         return;
     case BorderImageSliceClass:
         delete static_cast<CSSBorderImageSliceValue*>(this);
@@ -256,6 +251,9 @@ void CSSValue::destroy()
         return;
     case FlexClass:
         delete static_cast<CSSFlexValue*>(this);
+        return;
+    case CalculationClass:
+        delete static_cast<CSSCalcValue*>(this);
         return;
 #if ENABLE(CSS_FILTERS)
     case WebKitCSSFilterClass:

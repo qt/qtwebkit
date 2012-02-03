@@ -240,6 +240,8 @@ private:
 
     virtual void computeLogicalWidth();
 
+    LayoutUnit convertStyleLogicalWidthToComputedWidth(const Length& styleLogicalWidth, LayoutUnit availableWidth);
+
     virtual LayoutRect overflowClipRect(const LayoutPoint& location, RenderRegion*, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize);
 
     virtual void addOverflowFromChildren();
@@ -248,7 +250,7 @@ private:
 
     void recalcCollapsedBorders();
     void recalcSections() const;
-    void adjustLogicalHeightForCaption(RenderBlock*);
+    void layoutCaption(RenderTableCaption*);
 
     mutable Vector<LayoutUnit> m_columnPos;
     mutable Vector<ColumnStruct> m_columns;
@@ -275,6 +277,7 @@ private:
 
 inline RenderTableSection* RenderTable::topSection() const
 {
+    ASSERT(!needsSectionRecalc());
     if (m_head)
         return m_head;
     if (m_firstBody)

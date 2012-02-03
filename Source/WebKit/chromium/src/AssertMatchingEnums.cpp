@@ -37,6 +37,7 @@
 #include "AccessibilityObject.h"
 #include "ApplicationCacheHost.h"
 #include "AsyncFileSystem.h"
+#include "ContentSecurityPolicy.h"
 #include "DocumentMarker.h"
 #include "EditorInsertAction.h"
 #include "ExceptionCode.h"
@@ -60,6 +61,7 @@
 #include "Settings.h"
 #include "StorageInfo.h"
 #include "TextAffinity.h"
+#include "TextChecking.h"
 #include "TextControlInnerElements.h"
 #include "UserContentTypes.h"
 #include "UserScriptTypes.h"
@@ -68,6 +70,7 @@
 #include "WebAccessibilityNotification.h"
 #include "WebAccessibilityObject.h"
 #include "WebApplicationCacheHost.h"
+#include "WebContentSecurityPolicy.h"
 #include "WebCursorInfo.h"
 #include "WebEditingAction.h"
 #include "WebFileError.h"
@@ -89,6 +92,7 @@
 #include "WebStorageQuotaType.h"
 #include "WebTextAffinity.h"
 #include "WebTextCaseSensitivity.h"
+#include "WebTextCheckingType.h"
 #include "WebTextCheckingResult.h"
 #include "WebVideoFrame.h"
 #include "WebView.h"
@@ -429,7 +433,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::NumberType, IDBKey::NumberType);
 #if ENABLE(FILE_SYSTEM)
 COMPILE_ASSERT_MATCHING_ENUM(WebFileSystem::TypeTemporary, AsyncFileSystem::Temporary);
 COMPILE_ASSERT_MATCHING_ENUM(WebFileSystem::TypePersistent, AsyncFileSystem::Persistent);
-COMPILE_ASSERT_MATCHING_ENUM(WebFileSystem::TypeExternal, AsyncFileSystem::External);
 COMPILE_ASSERT_MATCHING_ENUM(WebFileInfo::TypeUnknown, FileMetadata::TypeUnknown);
 COMPILE_ASSERT_MATCHING_ENUM(WebFileInfo::TypeFile, FileMetadata::TypeFile);
 COMPILE_ASSERT_MATCHING_ENUM(WebFileInfo::TypeDirectory, FileMetadata::TypeDirectory);
@@ -453,6 +456,15 @@ COMPILE_ASSERT_MATCHING_ENUM(WebGeolocationError::ErrorPositionUnavailable, Geol
 
 COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingResult::ErrorSpelling, DocumentMarker::Spelling);
 COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingResult::ErrorGrammar, DocumentMarker::Grammar);
+
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeSpelling, TextCheckingTypeSpelling);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeGrammar, TextCheckingTypeGrammar);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeLink, TextCheckingTypeLink);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeQuote, TextCheckingTypeQuote);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeDash, TextCheckingTypeDash);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeReplacement, TextCheckingTypeReplacement);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeCorrection, TextCheckingTypeCorrection);
+COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeShowCorrectionPanel, TextCheckingTypeShowCorrectionPanel);
 
 #if ENABLE(QUOTA)
 COMPILE_ASSERT_MATCHING_ENUM(WebStorageQuotaErrorNotSupported, NOT_SUPPORTED_ERR);
@@ -494,3 +506,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyAlways, SecurityPolicy::ReferrerPo
 COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyDefault, SecurityPolicy::ReferrerPolicyDefault);
 COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyNever, SecurityPolicy::ReferrerPolicyNever);
 COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyOrigin, SecurityPolicy::ReferrerPolicyOrigin);
+
+COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypeReportOnly, ContentSecurityPolicy::ReportOnly);
+COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypeEnforcePolicy, ContentSecurityPolicy::EnforcePolicy);

@@ -382,7 +382,7 @@ private:
             
             if (left && right) {
                 if (isNumberPrediction(left) && isNumberPrediction(right)) {
-                    if (isInt32Prediction(mergePredictions(left, right)) && nodeCanSpeculateInteger(node.arithNodeFlags()))
+                    if (m_graph.addShouldSpeculateInteger(node, m_codeBlock))
                         changed |= mergePrediction(PredictInt32);
                     else
                         changed |= mergePrediction(PredictDouble);
@@ -396,7 +396,19 @@ private:
         }
             
         case ArithAdd:
-        case ArithSub:
+        case ArithSub: {
+            PredictedType left = m_graph[node.child1()].prediction();
+            PredictedType right = m_graph[node.child2()].prediction();
+            
+            if (left && right) {
+                if (m_graph.addShouldSpeculateInteger(node, m_codeBlock))
+                    changed |= mergePrediction(PredictInt32);
+                else
+                    changed |= mergePrediction(PredictDouble);
+            }
+            break;
+        }
+            
         case ArithMul:
         case ArithMin:
         case ArithMax:
@@ -454,15 +466,21 @@ private:
                 bool isInt16Array = m_graph[node.child1()].shouldSpeculateInt16Array();
                 bool isInt32Array = m_graph[node.child1()].shouldSpeculateInt32Array();
                 bool isUint8Array = m_graph[node.child1()].shouldSpeculateUint8Array();
+                bool isUint8ClampedArray = m_graph[node.child1()].shouldSpeculateUint8ClampedArray();
                 bool isUint16Array = m_graph[node.child1()].shouldSpeculateUint16Array();
                 bool isUint32Array = m_graph[node.child1()].shouldSpeculateUint32Array();
                 bool isFloat32Array = m_graph[node.child1()].shouldSpeculateFloat32Array();
                 bool isFloat64Array = m_graph[node.child1()].shouldSpeculateFloat64Array();
-                if (isArray || isString || isByteArray || isInt8Array || isInt16Array || isInt32Array || isUint8Array || isUint16Array || isUint32Array || isFloat32Array || isFloat64Array)
+                if (isArray || isString || isByteArray || isInt8Array || isInt16Array || isInt32Array || isUint8Array || isUint8ClampedArray || isUint16Array || isUint32Array || isFloat32Array || isFloat64Array)
                     changed |= mergePrediction(PredictInt32);
             }
             break;
         }
+            
+        case GetByIdFlush:
+            if (node.getHeapPrediction())
+                changed |= mergePrediction(node.getHeapPrediction());
+            break;
             
         case GetByVal: {
             if (m_graph[node.child1()].shouldSpeculateUint32Array() || m_graph[node.child1()].shouldSpeculateFloat32Array() || m_graph[node.child1()].shouldSpeculateFloat64Array())
@@ -586,6 +604,7 @@ private:
         case GetInt16ArrayLength:
         case GetInt32ArrayLength:
         case GetUint8ArrayLength:
+        case GetUint8ClampedArrayLength:
         case GetUint16ArrayLength:
         case GetUint32ArrayLength:
         case GetFloat32ArrayLength:
@@ -705,7 +724,23 @@ private:
             switch (node.op) {
             case ValueAdd:
             case ArithAdd:
-            case ArithSub:
+            case ArithSub: {
+                PredictedType left = m_graph[node.child1()].prediction();
+                PredictedType right = m_graph[node.child2()].prediction();
+                
+                VariableAccessData::Ballot ballot;
+                
+                if (isNumberPrediction(left) && isNumberPrediction(right)
+                    && !m_graph.addShouldSpeculateInteger(node, m_codeBlock))
+                    ballot = VariableAccessData::VoteDouble;
+                else
+                    ballot = VariableAccessData::VoteValue;
+                
+                vote(node.child1(), ballot);
+                vote(node.child2(), ballot);
+                break;
+            }
+                
             case ArithMul:
             case ArithMin:
             case ArithMax:
@@ -822,27 +857,21 @@ private:
 #endif
         
         switch (op) {
-        case ValueAdd: {
-            if (!nodeCanSpeculateInteger(node.arithNodeFlags())) {
-                toDouble(node.child1());
-                toDouble(node.child2());
-                break;
-            }
-            
+        case ValueAdd:
+        case ArithAdd:
+        case ArithSub: {
             PredictedType left = m_graph[node.child1()].prediction();
             PredictedType right = m_graph[node.child2()].prediction();
             
             if (left && right
                 && isNumberPrediction(left) && isNumberPrediction(right)
-                && ((left & PredictDouble) || (right & PredictDouble))) {
+                && !m_graph.addShouldSpeculateInteger(node, m_codeBlock)) {
                 toDouble(node.child1());
                 toDouble(node.child2());
             }
             break;
         }
             
-        case ArithAdd:
-        case ArithSub:
         case ArithMul:
         case ArithMin:
         case ArithMax:
@@ -894,11 +923,12 @@ private:
             bool isInt16Array = m_graph[node.child1()].shouldSpeculateInt16Array();
             bool isInt32Array = m_graph[node.child1()].shouldSpeculateInt32Array();
             bool isUint8Array = m_graph[node.child1()].shouldSpeculateUint8Array();
+            bool isUint8ClampedArray = m_graph[node.child1()].shouldSpeculateUint8ClampedArray();
             bool isUint16Array = m_graph[node.child1()].shouldSpeculateUint16Array();
             bool isUint32Array = m_graph[node.child1()].shouldSpeculateUint32Array();
             bool isFloat32Array = m_graph[node.child1()].shouldSpeculateFloat32Array();
             bool isFloat64Array = m_graph[node.child1()].shouldSpeculateFloat64Array();
-            if (!isArray && !isString && !isByteArray && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
+            if (!isArray && !isString && !isByteArray && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint8ClampedArray && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
                 break;
             
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
@@ -918,6 +948,8 @@ private:
                 node.op = GetInt32ArrayLength;
             else if (isUint8Array)
                 node.op = GetUint8ArrayLength;
+            else if (isUint8ClampedArray)
+                node.op = GetUint8ClampedArrayLength;
             else if (isUint16Array)
                 node.op = GetUint16ArrayLength;
             else if (isUint32Array)
@@ -1517,6 +1549,7 @@ private:
         case GetInt16ArrayLength:
         case GetInt32ArrayLength:
         case GetUint8ArrayLength:
+        case GetUint8ClampedArrayLength:
         case GetUint16ArrayLength:
         case GetUint32ArrayLength:
         case GetFloat32ArrayLength:

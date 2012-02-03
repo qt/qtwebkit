@@ -47,9 +47,13 @@ namespace WebPreferencesKey {
 
 } // namespace WebPreferencesKey
 
+typedef HashMap<String, bool> BoolOverridesMap;
 
-static bool hasXSSAuditorEnabledTestRunnerOverride;
-static bool xssAuditorEnabledTestRunnerOverride;
+static BoolOverridesMap& boolTestRunnerOverridesMap()
+{
+    DEFINE_STATIC_LOCAL(BoolOverridesMap, map, ());
+    return map;
+}
 
 WebPreferencesStore::WebPreferencesStore()
 {
@@ -73,22 +77,17 @@ bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferenc
         return false;
     if (!decoder->decode(result.m_doubleValues))
         return false;
-
-    if (hasXSSAuditorEnabledTestRunnerOverride)
-        result.m_boolValues.set(WebPreferencesKey::xssAuditorEnabledKey(), xssAuditorEnabledTestRunnerOverride);
-
     return true;
 }
 
-void WebPreferencesStore::overrideXSSAuditorEnabledForTestRunner(bool enabled)
+void WebPreferencesStore::overrideBoolValueForKey(const String& key, bool value)
 {
-    hasXSSAuditorEnabledTestRunnerOverride = true;
-    xssAuditorEnabledTestRunnerOverride = enabled;
+    boolTestRunnerOverridesMap().set(key, value);
 }
 
 void WebPreferencesStore::removeTestRunnerOverrides()
 {
-    hasXSSAuditorEnabledTestRunnerOverride = false;
+    boolTestRunnerOverridesMap().clear();
 }
 
 
@@ -185,6 +184,10 @@ bool WebPreferencesStore::setBoolValueForKey(const String& key, bool value)
 
 bool WebPreferencesStore::getBoolValueForKey(const String& key) const
 {
+    // FIXME: Extend overriding to other key types used from LayoutTestController.
+    BoolOverridesMap::const_iterator it = boolTestRunnerOverridesMap().find(key);
+    if (it != boolTestRunnerOverridesMap().end())
+        return it->second;
     return valueForKey(m_boolValues, key);
 }
 

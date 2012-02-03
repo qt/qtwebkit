@@ -39,6 +39,7 @@
 #include "Page.h"
 #include "RenderLayer.h"
 #include "RenderTextControlSingleLine.h"
+#include "RenderView.h"
 #include "ScriptController.h"
 #include "ScrollbarTheme.h"
 #include "SpeechInput.h"
@@ -498,8 +499,13 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
         return;
 
     RefPtr<InputFieldSpeechButtonElement> holdRefButton(this);
-    if (document() && document()->domWindow())
+    if (document() && document()->domWindow()) {
+        // Call selectionChanged, causing the element to cache the selection,
+        // so that the text event inserts the text in this element even if
+        // focus has moved away from it.
+        input->selectionChanged(false);
         input->dispatchEvent(TextEvent::create(document()->domWindow(), results.isEmpty() ? "" : results[0]->utterance(), TextEventInputOther));
+    }
 
     // This event is sent after the text event so the website can perform actions using the input field content immediately.
     // It provides alternative recognition hypotheses and notifies that the results come from speech input.
@@ -544,7 +550,7 @@ void InputFieldSpeechButtonElement::startSpeechInput()
     AtomicString language = input->computeInheritedLanguage();
     String grammar = input->getAttribute(webkitgrammarAttr);
     // FIXME: this should probably respect transforms
-    IntRect rect = renderer()->absoluteBoundingBoxRectIgnoringTransforms();
+    IntRect rect = renderer()->view()->frameView()->contentsToWindow(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
     if (speechInput()->startRecognition(m_listenerId, rect, language, grammar, document()->securityOrigin()))
         setState(Recording);
 }

@@ -38,6 +38,11 @@ class RenderStyle;
 class ShadowData;
 class SVGPaint;
 
+#if ENABLE(CSS_SHADERS)
+class CustomFilterNumberParameter;
+class CustomFilterParameter;
+#endif
+
 enum EUpdateLayout { DoNotUpdateLayout = false, UpdateLayout = true };
 
 class CSSComputedStyleDeclaration : public CSSStyleDeclaration {
@@ -45,16 +50,9 @@ public:
     friend PassRefPtr<CSSComputedStyleDeclaration> computedStyle(PassRefPtr<Node>, bool allowVisitedStyle, const String& pseudoElementName);
     virtual ~CSSComputedStyleDeclaration();
 
-    virtual String cssText() const;
-
-    virtual unsigned virtualLength() const;
-    virtual String item(unsigned index) const;
-
-    virtual PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
-    virtual String getPropertyValue(int propertyID) const;
-    virtual bool getPropertyPriority(int propertyID) const;
-    virtual int getPropertyShorthand(int /*propertyID*/) const { return -1; }
-    virtual bool isPropertyImplicit(int /*propertyID*/) const { return false; }
+    PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
+    String getPropertyValue(int propertyID) const;
+    bool getPropertyPriority(int propertyID) const;
 
     virtual PassRefPtr<CSSMutableStyleDeclaration> copy() const;
     virtual PassRefPtr<CSSMutableStyleDeclaration> makeMutable();
@@ -66,21 +64,38 @@ public:
     PassRefPtr<CSSValue> getSVGPropertyCSSValue(int propertyID, EUpdateLayout) const;
 #endif
 
-protected:
-    virtual bool cssPropertyMatches(const CSSProperty*) const;
+    PassRefPtr<CSSMutableStyleDeclaration> copyPropertiesInSet(const int* set, unsigned length) const;
 
 private:
     CSSComputedStyleDeclaration(PassRefPtr<Node>, bool allowVisitedStyle, const String&);
 
+    // CSSOM functions. Don't make these public.
+    virtual unsigned length() const;
+    virtual String item(unsigned index) const;
+    virtual PassRefPtr<CSSValue> getPropertyCSSValue(const String& propertyName);
+    virtual String getPropertyValue(const String& propertyName);
+    virtual String getPropertyPriority(const String& propertyName);
+    virtual String getPropertyShorthand(const String& propertyName);
+    virtual bool isPropertyImplicit(const String& propertyName);
+    virtual void setProperty(const String& propertyName, const String& value, const String& priority, ExceptionCode&);
+    virtual String removeProperty(const String& propertyName, ExceptionCode&);
+    virtual String cssText() const;
     virtual void setCssText(const String&, ExceptionCode&);
+    virtual PassRefPtr<CSSValue> getPropertyCSSValueInternal(CSSPropertyID);
+    virtual String getPropertyValueInternal(CSSPropertyID);
+    virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&);
 
-    virtual String removeProperty(int propertyID, ExceptionCode&);
-    virtual void setProperty(int propertyId, const String& value, bool important, ExceptionCode&);
+    virtual bool cssPropertyMatches(const CSSProperty*) const;
 
     PassRefPtr<CSSValue> valueForShadow(const ShadowData*, int, RenderStyle*) const;
     PassRefPtr<CSSPrimitiveValue> currentColorOrValidColor(RenderStyle*, const Color&) const;
 #if ENABLE(SVG)
     PassRefPtr<SVGPaint> adjustSVGPaintForCurrentColor(PassRefPtr<SVGPaint>, RenderStyle*) const;
+#endif
+
+#if ENABLE(CSS_SHADERS)
+    PassRefPtr<CSSValue> valueForCustomFilterNumberParameter(const CustomFilterNumberParameter*) const;
+    PassRefPtr<CSSValue> valueForCustomFilterParameter(const CustomFilterParameter*) const;
 #endif
 
 #if ENABLE(CSS_FILTERS)

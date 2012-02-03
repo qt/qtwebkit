@@ -224,6 +224,11 @@ void WebSettingsImpl::setDNSPrefetchingEnabled(bool enabled)
     m_settings->setDNSPrefetchingEnabled(enabled);
 }
 
+void WebSettingsImpl::setFixedElementsLayoutRelativeToFrame(bool fixedElementsLayoutRelativeToFrame)
+{
+    m_settings->setFixedElementsLayoutRelativeToFrame(fixedElementsLayoutRelativeToFrame);
+}
+
 void WebSettingsImpl::setLocalStorageEnabled(bool enabled)
 {
     m_settings->setLocalStorageEnabled(enabled);
@@ -368,6 +373,11 @@ void WebSettingsImpl::setAccelerated2dCanvasEnabled(bool enabled)
     m_settings->setAccelerated2dCanvasEnabled(enabled);
 }
 
+void WebSettingsImpl::setDeferred2dCanvasEnabled(bool enabled)
+{
+    m_settings->setDeferred2dCanvasEnabled(enabled);
+}
+
 void WebSettingsImpl::setAcceleratedCompositingForFixedPositionEnabled(bool enabled)
 {
     m_settings->setAcceleratedCompositingForFixedPositionEnabled(enabled);
@@ -386,6 +396,11 @@ void WebSettingsImpl::setMemoryInfoEnabled(bool enabled)
 void WebSettingsImpl::setHyperlinkAuditingEnabled(bool enabled)
 {
     m_settings->setHyperlinkAuditingEnabled(enabled);
+}
+
+void WebSettingsImpl::setLayoutFallbackWidth(int width)
+{
+    m_settings->setLayoutFallbackWidth(width);
 }
 
 void WebSettingsImpl::setAsynchronousSpellCheckingEnabled(bool enabled)

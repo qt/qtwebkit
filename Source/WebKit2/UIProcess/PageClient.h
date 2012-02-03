@@ -106,11 +106,12 @@ public:
 #if PLATFORM(QT)
     virtual void didChangeContentsSize(const WebCore::IntSize&) = 0;
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
-    virtual void focusEditableArea(const WebCore::IntRect&, const WebCore::IntRect&) = 0;
     virtual void didReceiveMessageFromNavigatorQtObject(const String&) = 0;
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
     virtual void updateTextInputState() = 0;
-#endif
+    virtual void handleAuthenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password) = 0;
+    virtual void handleCertificateVerificationRequest(const String& hostname, bool& ignoreErrors) = 0;
+#endif // PLATFORM(QT).
 
 #if PLATFORM(QT) || PLATFORM(GTK)
     virtual void startDrag(const WebCore::DragData&, PassRefPtr<ShareableBitmap> dragImage) = 0;

@@ -177,7 +177,7 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     }
     
     // Turn the attributes of the <object> element into arrays, but don't override <param> values.
-    NamedNodeMap* attributes = this->attributes(true);
+    NamedNodeMap* attributes = updatedAttributes();
     if (attributes) {
         for (unsigned i = 0; i < attributes->length(); ++i) {
             Attribute* it = attributes->attributeItem(i);
@@ -289,22 +289,13 @@ void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
     if (pluginCreationOption == CreateOnlyNonNetscapePlugins && wouldLoadAsNetscapePlugin(url, serviceType))
         return;
 
-    ASSERT(!m_inBeforeLoadEventHandler);
-    m_inBeforeLoadEventHandler = true;
-    bool beforeLoadAllowedLoad = dispatchBeforeLoadEvent(url);
-    m_inBeforeLoadEventHandler = false;
-
-    // beforeload events can modify the DOM, potentially causing
-    // RenderWidget::destroy() to be called.  Ensure we haven't been
-    // destroyed before continuing.
-    // FIXME: Should this render fallback content?
-    if (!renderer())
+    RefPtr<HTMLObjectElement> protect(this); // beforeload and plugin loading can make arbitrary DOM mutations.
+    bool beforeLoadAllowedLoad = guardedDispatchBeforeLoadEvent(url);
+    if (!renderer()) // Do not load the plugin if beforeload removed this element or its renderer.
         return;
 
-    RefPtr<HTMLObjectElement> protect(this); // Loading the plugin might remove us from the document.
     SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
     bool success = beforeLoadAllowedLoad && hasValidClassId() && loader->requestObject(this, url, getAttribute(nameAttr), serviceType, paramNames, paramValues);
-
     if (!success && fallbackContent)
         renderFallbackContent();
 }
@@ -520,9 +511,9 @@ String HTMLObjectElement::itemValueText() const
     return getURLAttribute(dataAttr);
 }
 
-void HTMLObjectElement::setItemValueText(const String& value, ExceptionCode& ec)
+void HTMLObjectElement::setItemValueText(const String& value, ExceptionCode&)
 {
-    setAttribute(dataAttr, value, ec);
+    setAttribute(dataAttr, value);
 }
 #endif
 

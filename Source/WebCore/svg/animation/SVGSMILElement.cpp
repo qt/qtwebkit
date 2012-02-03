@@ -134,6 +134,7 @@ SVGSMILElement::SVGSMILElement(const QualifiedName& tagName, Document* doc)
     , m_cachedMin(invalidCachedTime)
     , m_cachedMax(invalidCachedTime)
 {
+    reset();
 }
 
 SVGSMILElement::~SVGSMILElement()
@@ -166,7 +167,21 @@ static inline QualifiedName constructQualifiedName(const SVGElement* svgElement,
     
     return QualifiedName(nullAtom, localName, namespaceURI);
 }
-    
+
+void SVGSMILElement::reset()
+{
+    m_activeState = Inactive;
+    m_isWaitingForFirstInterval = true;
+    m_intervalBegin = SMILTime::unresolved();
+    m_intervalEnd = SMILTime::unresolved();
+    m_previousIntervalBegin = SMILTime::unresolved();
+    m_lastPercent = 0;
+    m_lastRepeat = 0;
+    m_nextProgressTime = 0;
+
+    resolveFirstInterval();
+}
+
 void SVGSMILElement::insertedIntoDocument()
 {
     SVGElement::insertedIntoDocument();
@@ -787,8 +802,14 @@ void SVGSMILElement::beginListChanged(SMILTime eventTime)
             m_intervalEnd = eventTime;
             resolveInterval(false, m_intervalBegin, m_intervalEnd);  
             ASSERT(!m_intervalBegin.isUnresolved());
-            if (m_intervalBegin != oldBegin)
+            if (m_intervalBegin != oldBegin) {
+                if (m_activeState == Active && m_intervalBegin > eventTime) {
+                    m_activeState = determineActiveState(eventTime);
+                    if (m_activeState != Active)
+                        endedActiveInterval();
+                }
                 notifyDependentsIntervalChanged(ExistingInterval);
+            }
         }
     }
     m_nextProgressTime = elapsed();

@@ -110,7 +110,7 @@ WebInspector.HeapSnapshotGridNode.prototype = {
                         continue;
                     }
                 }
-                this.insertChild(this._createChildNode(item, provider), atIndex++);
+                this.insertChild(this._createChildNode(item, provider, this), atIndex++);
             }
             provider.instanceCount += items.length;
             if (part < howMany) {
@@ -188,6 +188,8 @@ WebInspector.HeapSnapshotGenericObjectNode = function(tree, node)
         this.hasHoverMessage = true;
     } else if (node.flags & tree.snapshot.nodeFlags.canBeQueried)
         this.hasHoverMessage = true;
+    if (node.flags & tree.snapshot.nodeFlags.detachedDOMTreeNode)
+        this.detachedDOMTreeNode = true;
 };
 
 WebInspector.HeapSnapshotGenericObjectNode.prototype = {
@@ -205,7 +207,7 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         cell.className = "object-column";
         var div = document.createElement("div");
         div.className = "source-code event-properties";
-        div.style.overflow = "hidden";
+        div.style.overflow = "visible";
         var data = this.data["object"];
         if (this._prefixObjectCell)
             this._prefixObjectCell(div, data);
@@ -213,6 +215,8 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         valueSpan.className = "value console-formatted-" + data.valueStyle;
         valueSpan.textContent = data.value;
         div.appendChild(valueSpan);
+        if (this._postfixObjectCell)
+            this._postfixObjectCell(div, data);
         cell.appendChild(div);
         cell.addStyleClass("disclosure");
         if (this.depth)
@@ -259,11 +263,13 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         };
         if (this.hasHoverMessage)
             valueStyle += " highlight";
-        data["object"] = { valueStyle: valueStyle, value: value + " @" + this.snapshotNodeId };
+        if (this.detachedDOMTreeNode)
+            valueStyle += " detached-dom-tree-node";
+        data["object"] = { valueStyle: valueStyle, value: value + ": @" + this.snapshotNodeId };
 
         var view = this.dataGrid.snapshotView;
-        data["shallowSize"] = view.showShallowSizeAsPercent ? WebInspector.UIString("%.2f%%", this._shallowSizePercent) : Number.bytesToString(this._shallowSize);
-        data["retainedSize"] = view.showRetainedSizeAsPercent ? WebInspector.UIString("%.2f%%", this._retainedSizePercent) : Number.bytesToString(this._retainedSize);
+        data["shallowSize"] = view.showShallowSizeAsPercent ? WebInspector.UIString("%.2f%%", this._shallowSizePercent) : Number.withThousandsSeparator(this._shallowSize);
+        data["retainedSize"] = view.showRetainedSizeAsPercent ? WebInspector.UIString("%.2f%%", this._retainedSizePercent) : Number.withThousandsSeparator(this._retainedSize);
 
         return this._enhanceData ? this._enhanceData(data) : data;
     },
@@ -330,8 +336,10 @@ WebInspector.HeapSnapshotObjectNode = function(tree, isFromBaseSnapshot, edge)
     WebInspector.HeapSnapshotGenericObjectNode.call(this, tree, edge.node);
     this._referenceName = edge.name;
     this._referenceType = edge.type;
+    this._propertyAccessor = edge.propertyAccessor;
+    this._retainerNode = tree.showRetainingEdges;
     this._isFromBaseSnapshot = isFromBaseSnapshot;
-    this._provider = this._createProvider(!isFromBaseSnapshot ? tree.snapshot : tree.baseSnapshot, edge.nodeIndex);
+    this._provider = this._createProvider(!isFromBaseSnapshot ? tree.snapshot : tree.baseSnapshot, edge.nodeIndex, tree);
     this._updateHasChildren();
 }
 
@@ -341,15 +349,17 @@ WebInspector.HeapSnapshotObjectNode.prototype = {
         return new WebInspector.HeapSnapshotObjectNode(this.dataGrid, this._isFromBaseSnapshot, item);
     },
 
-    _createProvider: function(snapshot, nodeIndex)
+    _createProvider: function(snapshot, nodeIndex, tree)
     {
         var showHiddenData = WebInspector.settings.showHeapSnapshotObjectsHiddenProperties.get();
-        return snapshot.createEdgesProvider(
-            nodeIndex,
-            "function(edge) {" +
+        var filter = "function(edge) {" +
             "    return !edge.isInvisible" +
             "        && (" + showHiddenData + " || (!edge.isHidden && !edge.node.isHidden));" +
-            "}");
+            "}";
+        if (tree.showRetainingEdges)
+            return snapshot.createRetainingEdgesProvider(nodeIndex, filter);
+        else
+            return snapshot.createEdgesProvider(nodeIndex, filter);
     },
 
     _childHashForEntity: function(edge)
@@ -401,14 +411,32 @@ WebInspector.HeapSnapshotObjectNode.prototype = {
 
     _prefixObjectCell: function(div, data)
     {
+        if (this._retainerNode) {
+            var prefixSpan = document.createElement("span");
+            prefixSpan.textContent = WebInspector.UIString("retained by ");
+            div.appendChild(prefixSpan);
+            return;
+        }
+
         var nameSpan = document.createElement("span");
         nameSpan.className = data.nameClass;
         nameSpan.textContent = data.name;
+        div.appendChild(nameSpan);
+
         var separatorSpan = document.createElement("span");
         separatorSpan.className = "separator";
         separatorSpan.textContent = ": ";
-        div.appendChild(nameSpan);
         div.appendChild(separatorSpan);
+    },
+
+    _postfixObjectCell: function(div, data)
+    {
+        if (this._retainerNode) {
+            var referenceTypeSpan = document.createElement("span");
+            referenceTypeSpan.className = "console-formatted-object";
+            referenceTypeSpan.textContent = this._propertyAccessor;
+            div.appendChild(referenceTypeSpan);
+        }
     }
 }
 
@@ -475,10 +503,10 @@ WebInspector.HeapSnapshotInstanceNode.prototype = {
             data["addedCount"] = "";
             data["addedSize"] = "";
             data["removedCount"] = "\u2022";
-            data["removedSize"] = Number.bytesToString(this._shallowSize);
+            data["removedSize"] = Number.withThousandsSeparator(this._shallowSize);
         } else {
             data["addedCount"] = "\u2022";
-            data["addedSize"] = Number.bytesToString(this._shallowSize);
+            data["addedSize"] = Number.withThousandsSeparator(this._shallowSize);
             data["removedCount"] = "";
             data["removedSize"] = "";
         }
@@ -542,8 +570,8 @@ WebInspector.HeapSnapshotConstructorNode.prototype = {
         var data = {object: this._name, count: this._count};
         var view = this.dataGrid.snapshotView;
         data["count"] = view.showCountAsPercent ? WebInspector.UIString("%.2f%%", this._countPercent) : this._count;
-        data["shallowSize"] = view.showShallowSizeAsPercent ? WebInspector.UIString("%.2f%%", this._shallowSizePercent) : Number.bytesToString(this._shallowSize);
-        data["retainedSize"] = "> " + (view.showRetainedSizeAsPercent ? WebInspector.UIString("%.2f%%", this._retainedSizePercent) : Number.bytesToString(this._retainedSize));
+        data["shallowSize"] = view.showShallowSizeAsPercent ? WebInspector.UIString("%.2f%%", this._shallowSizePercent) : Number.withThousandsSeparator(this._shallowSize);
+        data["retainedSize"] = view.showRetainedSizeAsPercent ? "~" + WebInspector.UIString("%.2f%%", this._retainedSizePercent) : Number.withThousandsSeparator(this._retainedSize) + "+";
         return data;
     },
 
@@ -723,9 +751,9 @@ WebInspector.HeapSnapshotDiffNode.prototype = {
         data["addedCount"] = this._addedCount;
         data["removedCount"] = this._removedCount;
         data["countDelta"] = WebInspector.UIString("%s%d", this._signForDelta(this._countDelta), Math.abs(this._countDelta));
-        data["addedSize"] = Number.bytesToString(this._addedSize);
-        data["removedSize"] = Number.bytesToString(this._removedSize);
-        data["sizeDelta"] = WebInspector.UIString("%s%s", this._signForDelta(this._sizeDelta), Number.bytesToString(Math.abs(this._sizeDelta)));
+        data["addedSize"] = Number.withThousandsSeparator(this._addedSize);
+        data["removedSize"] = Number.withThousandsSeparator(this._removedSize);
+        data["sizeDelta"] = WebInspector.UIString("%s%s", this._signForDelta(this._sizeDelta), Number.withThousandsSeparator(Math.abs(this._sizeDelta)));
 
         return data;
     }

@@ -78,7 +78,7 @@ static UString valueToSourceString(ExecState* exec, JSValue val)
         return "0";
 
     if (val.isString())
-        return makeUString("\"", escapeQuotes(val.toString(exec)), "\"");
+        return makeUString("\"", escapeQuotes(val.toString(exec)->value(exec)), "\"");
 
     return val.description();
 }
@@ -180,7 +180,16 @@ void CodeBlock::printGetByIdOp(ExecState* exec, int location, Vector<Instruction
     int r1 = (++it)->u.operand;
     int id0 = (++it)->u.operand;
     printf("[%4d] %s\t %s, %s, %s\n", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
-    it += 4;
+    it += 5;
+}
+
+void CodeBlock::printCallOp(ExecState* exec, int location, Vector<Instruction>::const_iterator& it, const char* op) const
+{
+    int func = (++it)->u.operand;
+    int argCount = (++it)->u.operand;
+    int registerOffset = (++it)->u.operand;
+    printf("[%4d] %s\t %s, %d, %d\n", location, op, registerName(exec, func).data(), argCount, registerOffset);
+    it += 2;
 }
 
 void CodeBlock::printPutByIdOp(ExecState* exec, int location, Vector<Instruction>::const_iterator& it, const char* op) const
@@ -522,7 +531,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
         }
         case op_convert_this: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] convert_this %s\n", location, registerName(exec, r0).data());
+            printf("[%4d] convert_this\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_new_object: {
@@ -734,6 +743,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             printf("[%4d] resolve\t\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
+            it++;
             break;
         }
         case op_resolve_skip: {
@@ -741,13 +751,14 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int id0 = (++it)->u.operand;
             int skipLevels = (++it)->u.operand;
             printf("[%4d] resolve_skip\t %s, %s, %d\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), skipLevels);
+            it++;
             break;
         }
         case op_resolve_global: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             printf("[%4d] resolve_global\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
-            it += 2;
+            it += 3;
             break;
         }
         case op_resolve_global_dynamic: {
@@ -757,6 +768,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             ++it;
             int depth = (++it)->u.operand;
             printf("[%4d] resolve_global_dynamic\t %s, %s, %s, %d\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).utf8().data(), idName(id0, m_identifiers[id0]).data(), depth);
+            ++it;
             break;
         }
         case op_get_scoped_var: {
@@ -764,6 +776,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int index = (++it)->u.operand;
             int skipLevels = (++it)->u.operand;
             printf("[%4d] get_scoped_var\t %s, %d, %d\n", location, registerName(exec, r0).data(), index, skipLevels);
+            it++;
             break;
         }
         case op_put_scoped_var: {
@@ -777,6 +790,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r0 = (++it)->u.operand;
             int index = (++it)->u.operand;
             printf("[%4d] get_global_var\t %s, %d\n", location, registerName(exec, r0).data(), index);
+            it++;
             break;
         }
         case op_put_global_var: {
@@ -790,6 +804,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int id0 = (++it)->u.operand;
             int isStrict = (++it)->u.operand;
             printf("[%4d] resolve_base%s\t %s, %s\n", location, isStrict ? "_strict" : "", registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
+            it++;
             break;
         }
         case op_ensure_property_exists: {
@@ -803,6 +818,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r1 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             printf("[%4d] resolve_with_base %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
+            it++;
             break;
         }
         case op_resolve_with_this: {
@@ -810,6 +826,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r1 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             printf("[%4d] resolve_with_this %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
+            it++;
             break;
         }
         case op_get_by_id: {
@@ -885,18 +902,12 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             printPutByIdOp(exec, location, it, "put_by_id_generic");
             break;
         }
-        case op_put_getter: {
+        case op_put_getter_setter: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] put_getter\t %s, %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
-            break;
-        }
-        case op_put_setter: {
-            int r0 = (++it)->u.operand;
-            int id0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            printf("[%4d] put_setter\t %s, %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
+            int r2 = (++it)->u.operand;
+            printf("[%4d] put_getter_setter\t %s, %s, %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_method_check: {
@@ -915,6 +926,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
             printf("[%4d] get_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
+            it++;
             break;
         }
         case op_get_argument_by_val: {
@@ -922,6 +934,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
             printf("[%4d] get_argument_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
+            ++it;
             break;
         }
         case op_get_by_pname: {
@@ -1119,17 +1132,11 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             break;
         }
         case op_call: {
-            int func = (++it)->u.operand;
-            int argCount = (++it)->u.operand;
-            int registerOffset = (++it)->u.operand;
-            printf("[%4d] call\t\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
+            printCallOp(exec, location, it, "call");
             break;
         }
         case op_call_eval: {
-            int func = (++it)->u.operand;
-            int argCount = (++it)->u.operand;
-            int registerOffset = (++it)->u.operand;
-            printf("[%4d] call_eval\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
+            printCallOp(exec, location, it, "call_eval");
             break;
         }
         case op_call_varargs: {
@@ -1148,7 +1155,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
         }
         case op_tear_off_arguments: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] tear_off_arguments\t %s\n", location, registerName(exec, r0).data());
+            printf("[%4d] tear_off_arguments %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_ret: {
@@ -1159,6 +1166,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
         case op_call_put_result: {
             int r0 = (++it)->u.operand;
             printf("[%4d] op_call_put_result\t\t %s\n", location, registerName(exec, r0).data());
+            it++;
             break;
         }
         case op_ret_object_or_this: {
@@ -1168,10 +1176,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             break;
         }
         case op_construct: {
-            int func = (++it)->u.operand;
-            int argCount = (++it)->u.operand;
-            int registerOffset = (++it)->u.operand;
-            printf("[%4d] construct\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
+            printCallOp(exec, location, it, "construct");
             break;
         }
         case op_strcat: {
@@ -1446,6 +1451,9 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_speculativeFailCounter(0)
     , m_optimizationDelayCounter(0)
     , m_reoptimizationRetryCounter(0)
+#if ENABLE(JIT)
+    , m_canCompileWithDFGState(CompileWithDFGUnset)
+#endif
 {
     setNumParameters(other.numParameters());
     optimizeAfterWarmUp();
@@ -2054,6 +2062,16 @@ void CodeBlock::createActivation(CallFrame* callFrame)
     callFrame->uncheckedR(activationRegister()) = JSValue(activation);
     callFrame->setScopeChain(callFrame->scopeChain()->push(activation));
 }
+
+unsigned CodeBlock::addOrFindConstant(JSValue v)
+{
+    unsigned numberOfConstants = numberOfConstantRegisters();
+    for (unsigned i = 0; i < numberOfConstants; ++i) {
+        if (getConstant(FirstConstantRegisterIndex + i) == v)
+            return i;
+    }
+    return addConstant(v);
+}
     
 #if ENABLE(JIT)
 void CodeBlock::unlinkCalls()
@@ -2154,17 +2172,17 @@ JSObject* FunctionCodeBlock::compileOptimized(ExecState* exec, ScopeChainNode* s
     return error;
 }
 
-bool ProgramCodeBlock::canCompileWithDFG()
+bool ProgramCodeBlock::canCompileWithDFGInternal()
 {
     return DFG::canCompileProgram(this);
 }
 
-bool EvalCodeBlock::canCompileWithDFG()
+bool EvalCodeBlock::canCompileWithDFGInternal()
 {
     return DFG::canCompileEval(this);
 }
 
-bool FunctionCodeBlock::canCompileWithDFG()
+bool FunctionCodeBlock::canCompileWithDFGInternal()
 {
     if (m_isConstructor)
         return DFG::canCompileFunctionForConstruct(this);

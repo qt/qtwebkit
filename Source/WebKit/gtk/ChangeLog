@@ -1,3 +1,230 @@
+2012-02-02  Claudio Saavedra  <csaavedra@igalia.com> and Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] WebKitWebView won't work in a GtkOffscreenWindow
+        https://bugs.webkit.org/show_bug.cgi?id=76911
+
+        Reviewed by Philippe Normand.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::windowRect): Use the new widgetIsOnscreenToplevelWindow helper.
+        (WebKit::ChromeClient::setWindowRect): Ditto.
+        (WebKit::ChromeClient::unfocus): Ditto.
+        (WebKit::ChromeClient::runOpenPanel): Ditto.
+        * tests/testwebview.c: Added a test to ensure that loading a page in an offscreen window does not crash.
+        * webkit/webkitglobals.cpp:
+        (currentToplevelCallback):
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_print_full):
+        (webkit_web_frame_print):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_focus_in_event):
+        (webkit_web_view_script_dialog):
+
+2012-02-02  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [Gtk] atk_text_get_text_at_offset() sometimes fails to provide the correct line
+        https://bugs.webkit.org/show_bug.cgi?id=72382
+
+        Reviewed by Martin Robinson.
+
+        New unit test to ensure the right line is retrieved for the first
+        position of each line in a multiline preformatted portion of text.
+
+        * tests/testatk.c:
+        (testWebkitAtkGetTextAtOffsetWithPreformattedText): New unit test.
+        (main): Add the new unit test.
+
+2012-02-01  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer] FFTFrame implementation
+        https://bugs.webkit.org/show_bug.cgi?id=73545
+
+        Reviewed by Chris Rogers.
+
+        * GNUmakefile.am: Remove libfftw compilation flags.
+
+2012-02-01  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] unittests/testloading crashes
+        https://bugs.webkit.org/show_bug.cgi?id=77544
+
+        Reviewed by Xan Lopez.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidFailLoading): Bail out
+        early from dispatchDidFailLoading if the error is the result of an
+        interrupted load.
+
+2012-02-01  Philippe Normand  <pnormand@igalia.com> and Sergio Villar Senin  <svillar@igalia.com>
+
+        Reviewed by Martin Robinson.
+
+        [GTK] Improve FrameLoader signals. Resource loading
+        https://bugs.webkit.org/show_bug.cgi?id=49543
+
+        New signals:
+        WebKitWebFrame::resource-request-starting
+        WebKitWebFrame::resource-response-received
+        WebKitWebFrame::resource-load-finished
+        WebKitWebFrame::resource-content-length-received
+        WebKitWebFrame::resource-load-failed
+        WebKitWebResource::response-received
+        WebKitWebResource::load-failed
+        WebKitWebResource::load-finished
+        WebKitWebResource::content-length-received
+        WebKitWebView::resource-response-received
+        WebKitWebView::resource-load-finished
+        WebKitWebView::resource-content-length-received
+        WebKitWebView::resource-load-failed
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchWillSendRequest):
+        (WebKit::FrameLoaderClient::dispatchDidReceiveResponse):
+        (WebKit::FrameLoaderClient::dispatchDidReceiveContentLength):
+        (WebKit::FrameLoaderClient::dispatchDidFinishLoading):
+        (WebKit::FrameLoaderClient::dispatchDidFailLoading):
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_class_init):
+        * webkit/webkitwebresource.cpp:
+        (webkit_web_resource_class_init):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init):
+        * webkitmarshal.list:
+
+2012-01-23  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Refactor GTK's accessibilitity code to be more modular
+        https://bugs.webkit.org/show_bug.cgi?id=76783
+
+        Reviewed by Martin Robinson.
+
+        Update callers to WebKitAccessible's public functions.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::getFocusedAccessibleElement):
+        (modifyAccessibilityValue):
+        (DumpRenderTreeSupportGtk::accessibilityHelpText):
+
+2012-01-22  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Refactor GTK's accessibilitity code to be more modular
+        https://bugs.webkit.org/show_bug.cgi?id=76783
+
+        Reviewed by Martin Robinson.
+
+        Update the include for the AccessibilityObject wrapper header.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp: Update include.
+        * webkit/webkitwebframe.cpp: Ditto.
+
+2012-01-22  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] ATK text-caret-moved and text-selection-changed events not being emitted
+        https://bugs.webkit.org/show_bug.cgi?id=76069
+
+        Reviewed by Martin Robinson.
+
+        Update caret browsing related unit tests to check emissions of
+        'text-caret-moved' and 'text-selection-changed' signals.
+
+        * tests/testatk.c:
+        (textCaretMovedCallback): New callback for 'text-caret-moved'.
+        (testWebkitAtkCaretOffsets): Check emissions of 'text-caret-moved'.
+        (textSelectionChangedCallback): New callback for 'text-selection-changed'.
+        (testWebkitAtkTextSelections): Check emissions of 'text-selection-changed'.
+
+2012-01-18  Evan Nemerson  <evan@coeus-group.com>
+
+        [GTK] WebKit-3.0.gir does not include information about C includes or exported packages
+        https://bugs.webkit.org/show_bug.cgi?id=49875
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Add some information to the GIR generator to fix
+        Vala binding generation.
+
+2012-01-18  Carlos Garnacho  <carlosg@gnome.org>
+
+        [GTK] Listen to GDK_SCROLL_MASK
+        https://bugs.webkit.org/show_bug.cgi?id=76529
+
+        Set GDK_SCROLL_MASK explicitly, as WebKitWebView does handle
+        scroll events, scrolling currently works because GTK+ happens 
+        to send such events to widgets listening to GDK_BUTTON_PRESS_MASK,
+        but this isn't the intended behavior, so it's subject to change.
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_realize):
+
+2012-01-17  Martin Robinson  <mrobinson@igalia.com>
+
+        [Gtk] Input text field not repainted when value is changed
+        https://bugs.webkit.org/show_bug.cgi?id=76279
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Force pending relayouts before freezing the dirty region in a temporary.
+        This prevents the following code from throwing the dirty updates away
+        after the original paint is finished.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::paintWebView): Remove the relayout.
+        (WebKit::ChromeClient::paint): Move the relayout here, before the
+        dirty region is frozen.
+
+2012-01-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.4 release
+        https://bugs.webkit.org/show_bug.cgi?id=76375
+
+        Reviewed by Philippe Normand.
+
+        * NEWS: Added release notes for 1.7.4.
+
+2012-01-13  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        Unreviewed, rolling out r104905.
+        http://trac.webkit.org/changeset/104905
+        https://bugs.webkit.org/show_bug.cgi?id=76267
+
+        This patch broke tests in the GTK 64bit Debug bot (Requested
+        by msanchez on #webkit).
+
+        * tests/testatk.c:
+        (testWebkitAtkCaretOffsets):
+        (testWebkitAtkTextSelections):
+
+2012-01-13  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] ATK text-caret-moved and text-selection-changed events not being emitted
+        https://bugs.webkit.org/show_bug.cgi?id=76069
+
+        Reviewed by Martin Robinson.
+
+        Update caret browsing related unit tests to check emissions of
+        'text-caret-moved' and 'text-selection-changed' signals.
+
+        * tests/testatk.c:
+        (textCaretMovedCallback): New callback for 'text-caret-moved'.
+        (testWebkitAtkCaretOffsets): Check emissions of 'text-caret-moved'.
+        (textSelectionChangedCallback): New callback for 'text-selection-changed'.
+        (testWebkitAtkTextSelections): Check emissions of 'text-selection-changed'.
+
+2012-01-12  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [Gtk] Removed duplicated unit test.
+
+        The unit test testWebkitAtkGetTextAtOffsetForms is exactly the
+        same test case than testWebkitAtkGetTextAtOffset, so it makes no
+        sense to have it duplicated.
+
+        Rubber-stamped by Martin Robinson.
+
+        * tests/testatk.c:
+        (main): Removed testWebkitAtkGetTextAtOffsetForms.
+
 2012-01-10  Mario Sanchez Prada  <msanchez@igalia.com>
 
         AX: support helpText() in DumpRenderTree

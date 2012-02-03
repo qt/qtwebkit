@@ -32,13 +32,14 @@
 #include "WebContext.h"
 #include "WebContextMenuProxy.h"
 #include "WebPageProxy.h"
+#include "ewk_private.h"
 
 using namespace WebCore;
 
 namespace WebKit {
 
-PageClientImpl::PageClientImpl(WebContext* context, WebPageGroup* pageGroup, Evas_Object* viewObject)
-    : m_viewObject(viewObject)
+PageClientImpl::PageClientImpl(WebContext* context, WebPageGroup* pageGroup, Evas_Object* viewWidget)
+    : m_viewWidget(viewWidget)
 {
     m_page = context->createWebPage(this, pageGroup);
     m_page->initializeWebPage();
@@ -56,7 +57,7 @@ PassOwnPtr<DrawingAreaProxy> PageClientImpl::createDrawingAreaProxy()
 
 void PageClientImpl::setViewNeedsDisplay(const WebCore::IntRect& rect)
 {
-    evas_object_image_data_update_add(m_viewObject, rect.x(), rect.y(), rect.width(), rect.height());
+    ewk_view_display(m_viewWidget, rect);
 }
 
 void PageClientImpl::displayView()
@@ -72,7 +73,7 @@ void PageClientImpl::scrollView(const WebCore::IntRect& scrollRect, const WebCor
 WebCore::IntSize PageClientImpl::viewSize()
 {
     int width, height;
-    evas_object_geometry_get(m_viewObject, 0, 0, &width, &height);
+    evas_object_geometry_get(m_viewWidget, 0, 0, &width, &height);
     return IntSize(width, height);
 }
 

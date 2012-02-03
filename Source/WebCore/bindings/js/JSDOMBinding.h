@@ -22,8 +22,8 @@
 #ifndef JSDOMBinding_h
 #define JSDOMBinding_h
 
-#include "CSSElementStyleDeclaration.h"
 #include "CSSImportRule.h"
+#include "CSSMutableStyleDeclaration.h"
 #include "CSSStyleSheet.h"
 #include "JSDOMGlobalObject.h"
 #include "JSDOMWrapper.h"
@@ -138,8 +138,10 @@ enum ParameterMissingPolicy {
     {
         if (setInlineCachedWrapper(world, domObject, wrapper))
             return;
-        ASSERT(!world->m_wrappers.contains(domObject));
-        world->m_wrappers.set(domObject, JSC::Weak<JSDOMWrapper>(*world->globalData(), wrapper, wrapperOwner(world, domObject), wrapperContext(world, domObject)));
+        pair<DOMObjectWrapperMap::iterator, bool> entry = world->m_wrappers.add(domObject, JSC::Weak<JSDOMWrapper>());
+        ASSERT(entry.second);
+        JSC::Weak<JSDOMWrapper> handle(*world->globalData(), wrapper, wrapperOwner(world, domObject), wrapperContext(world, domObject));
+        entry.first->second.swap(handle);
     }
 
     template <typename DOMClass> inline void uncacheWrapper(DOMWrapperWorld* world, DOMClass* domObject, JSDOMWrapper* wrapper)
@@ -207,8 +209,6 @@ enum ParameterMissingPolicy {
             return root(parentRule);
         if (CSSStyleSheet* styleSheet = style->parentStyleSheet())
             return root(styleSheet);
-        // A style declaration with an associated element should've returned a style sheet above.
-        ASSERT(!style->isElementStyleDeclaration() || !static_cast<CSSElementStyleDeclaration*>(style)->element());
         return style;
     }
 

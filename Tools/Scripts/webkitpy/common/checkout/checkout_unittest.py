@@ -42,6 +42,7 @@ from webkitpy.common.system.executive import Executive, ScriptError
 from webkitpy.common.system.filesystem import FileSystem  # FIXME: This should not be needed.
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.common.system.executive_mock import MockExecutive
+from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.thirdparty.mock import Mock
 
 
@@ -139,7 +140,9 @@ Second part of this complicated change by me, Tor Arne Vestb\u00f8!
 
         checkout = Checkout(mock_scm)
         checkout.modified_changelogs = lambda git_commit, changed_files=None: self.changelogs
-        commit_message = checkout.commit_message_for_this_commit(git_commit=None)
+        commit_message = checkout.commit_message_for_this_commit(git_commit=None, return_stderr=True)
+        # Throw away the first line - a warning about unknown VCS root.
+        commit_message.message_lines = commit_message.message_lines[1:]
         self.assertEqual(commit_message.message(), self.expected_commit_message)
 
 
@@ -250,3 +253,13 @@ class CheckoutTest(unittest.TestCase):
         checkout = self._make_checkout()
         checkout._scm.checkout_root = "/foo/bar"
         self.assertEqual(checkout.chromium_deps()._path, '/foo/bar/Source/WebKit/chromium/DEPS')
+
+    def test_apply_patch(self):
+        checkout = self._make_checkout()
+        checkout._executive = MockExecutive(should_log=True)
+        checkout._scm.script_path = lambda script: script
+        mock_patch = Mock()
+        mock_patch.contents = lambda: "foo"
+        mock_patch.reviewer = lambda: None
+        expected_stderr = "MOCK run_command: ['svn-apply', '--force'], cwd=/mock-checkout\n"
+        OutputCapture().assert_outputs(self, checkout.apply_patch, [mock_patch], expected_stderr=expected_stderr)

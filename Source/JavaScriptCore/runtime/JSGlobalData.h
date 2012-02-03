@@ -134,18 +134,18 @@ namespace JSC {
         enum GlobalDataType { Default, APIContextGroup, APIShared };
         
         struct ClientData {
-            virtual ~ClientData() = 0;
+            JS_EXPORT_PRIVATE virtual ~ClientData() = 0;
         };
 
         bool isSharedInstance() { return globalDataType == APIShared; }
         bool usingAPI() { return globalDataType != Default; }
         static bool sharedInstanceExists();
-        static JSGlobalData& sharedInstance();
+        JS_EXPORT_PRIVATE static JSGlobalData& sharedInstance();
 
-        static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapSize = SmallHeap);
-        static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapSize = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapSize = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapSize = SmallHeap);
         static PassRefPtr<JSGlobalData> createContextGroup(ThreadStackType, HeapSize = SmallHeap);
-        ~JSGlobalData();
+        JS_EXPORT_PRIVATE ~JSGlobalData();
 
         void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
 
@@ -222,13 +222,6 @@ namespace JSC {
 #else
         bool canUseJIT() { return m_canUseJIT; }
 #endif
-
-        const StackBounds& stack()
-        {
-            return (globalDataType == Default)
-                ? m_stack
-                : wtfThreadData().stack();
-        }
 
         OwnPtr<ParserArena> parserArena;
         OwnPtr<Keywords> keywords;
@@ -308,21 +301,21 @@ namespace JSC {
 
         CachedTranscendentalFunction<sin> cachedSin;
 
-        void resetDateCache();
+        JS_EXPORT_PRIVATE void resetDateCache();
 
-        void startSampling();
-        void stopSampling();
-        void dumpSampleData(ExecState* exec);
+        JS_EXPORT_PRIVATE void startSampling();
+        JS_EXPORT_PRIVATE void stopSampling();
+        JS_EXPORT_PRIVATE void dumpSampleData(ExecState* exec);
         void recompileAllJSFunctions();
         RegExpCache* regExpCache() { return m_regExpCache; }
 #if ENABLE(REGEXP_TRACING)
         void addRegExpToTrace(PassRefPtr<RegExp> regExp);
 #endif
-        void dumpRegExpTrace();
-        void clearBuiltinStructures();
+        JS_EXPORT_PRIVATE void dumpRegExpTrace();
+        JS_EXPORT_PRIVATE void clearBuiltinStructures();
 
         bool isCollectorBusy() { return heap.isBusy(); }
-        void releaseExecutableMemory();
+        JS_EXPORT_PRIVATE void releaseExecutableMemory();
 
 #if ENABLE(GC_VALIDATION)
         bool isInitializingObject() const; 
@@ -345,6 +338,7 @@ namespace JSC {
         registerTypedArrayFunction(int16, Int16);
         registerTypedArrayFunction(int32, Int32);
         registerTypedArrayFunction(uint8, Uint8);
+        registerTypedArrayFunction(uint8Clamped, Uint8Clamped);
         registerTypedArrayFunction(uint16, Uint16);
         registerTypedArrayFunction(uint32, Uint32);
         registerTypedArrayFunction(float32, Float32);
@@ -358,7 +352,6 @@ namespace JSC {
 #if ENABLE(JIT) && ENABLE(INTERPRETER)
         bool m_canUseJIT;
 #endif
-        StackBounds m_stack;
 #if ENABLE(GC_VALIDATION)
         bool m_isInitializingObject;
 #endif
@@ -366,6 +359,7 @@ namespace JSC {
         TypedArrayDescriptor m_int16ArrayDescriptor;
         TypedArrayDescriptor m_int32ArrayDescriptor;
         TypedArrayDescriptor m_uint8ArrayDescriptor;
+        TypedArrayDescriptor m_uint8ClampedArrayDescriptor;
         TypedArrayDescriptor m_uint16ArrayDescriptor;
         TypedArrayDescriptor m_uint32ArrayDescriptor;
         TypedArrayDescriptor m_float32ArrayDescriptor;

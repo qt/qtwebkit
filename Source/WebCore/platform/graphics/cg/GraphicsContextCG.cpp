@@ -630,9 +630,12 @@ void GraphicsContext::fillPath(const Path& path)
     if (m_state.fillGradient) {
         if (hasShadow()) {
             FloatRect rect = path.fastBoundingRect();
-            CGLayerRef layer = CGLayerCreateWithContext(context, CGSizeMake(rect.width(), rect.height()), 0);
+            FloatSize layerSize = getCTM().mapSize(rect.size());
+
+            CGLayerRef layer = CGLayerCreateWithContext(context, layerSize, 0);
             CGContextRef layerContext = CGLayerGetContext(layer);
 
+            CGContextScaleCTM(layerContext, layerSize.width() / rect.width(), layerSize.height() / rect.height());
             CGContextTranslateCTM(layerContext, -rect.x(), -rect.y());
             CGContextBeginPath(layerContext);
             CGContextAddPath(layerContext, path.platformPath());
@@ -644,7 +647,7 @@ void GraphicsContext::fillPath(const Path& path)
                 CGContextClip(layerContext);
 
             m_state.fillGradient->paint(layerContext);
-            CGContextDrawLayerAtPoint(context, CGPointMake(rect.x(), rect.y()), layer);
+            CGContextDrawLayerInRect(context, rect, layer);
             CGLayerRelease(layer);
         } else {
             CGContextBeginPath(context);
@@ -687,10 +690,12 @@ void GraphicsContext::strokePath(const Path& path)
             FloatRect rect = path.fastBoundingRect();
             float lineWidth = strokeThickness();
             float doubleLineWidth = lineWidth * 2;
-            float layerWidth = ceilf(rect.width() + doubleLineWidth);
-            float layerHeight = ceilf(rect.height() + doubleLineWidth);
+            float adjustedWidth = ceilf(rect.width() + doubleLineWidth);
+            float adjustedHeight = ceilf(rect.height() + doubleLineWidth);
 
-            CGLayerRef layer = CGLayerCreateWithContext(context, CGSizeMake(layerWidth, layerHeight), 0);
+            FloatSize layerSize = getCTM().mapSize(FloatSize(adjustedWidth, adjustedHeight));
+
+            CGLayerRef layer = CGLayerCreateWithContext(context, layerSize, 0);
             CGContextRef layerContext = CGLayerGetContext(layer);
             CGContextSetLineWidth(layerContext, lineWidth);
 
@@ -699,6 +704,7 @@ void GraphicsContext::strokePath(const Path& path)
             // the layer on the left and top sides.
             float translationX = lineWidth - rect.x();
             float translationY = lineWidth - rect.y();
+            CGContextScaleCTM(layerContext, layerSize.width() / adjustedWidth, layerSize.height() / adjustedHeight);
             CGContextTranslateCTM(layerContext, translationX, translationY);
 
             CGContextAddPath(layerContext, path.platformPath());
@@ -709,7 +715,7 @@ void GraphicsContext::strokePath(const Path& path)
 
             float destinationX = roundf(rect.x() - lineWidth);
             float destinationY = roundf(rect.y() - lineWidth);
-            CGContextDrawLayerAtPoint(context, CGPointMake(destinationX, destinationY), layer);
+            CGContextDrawLayerInRect(context, CGRectMake(destinationX, destinationY, adjustedWidth, adjustedHeight), layer);
             CGLayerRelease(layer);
         } else {
             CGContextSaveGState(context);
@@ -747,16 +753,19 @@ void GraphicsContext::fillRect(const FloatRect& rect)
     if (m_state.fillGradient) {
         CGContextSaveGState(context);
         if (hasShadow()) {
-            CGLayerRef layer = CGLayerCreateWithContext(context, CGSizeMake(rect.width(), rect.height()), 0);
+            FloatSize layerSize = getCTM().mapSize(rect.size());
+
+            CGLayerRef layer = CGLayerCreateWithContext(context, layerSize, 0);
             CGContextRef layerContext = CGLayerGetContext(layer);
 
+            CGContextScaleCTM(layerContext, layerSize.width() / rect.width(), layerSize.height() / rect.height());
             CGContextTranslateCTM(layerContext, -rect.x(), -rect.y());
             CGContextAddRect(layerContext, rect);
             CGContextClip(layerContext);
 
             CGContextConcatCTM(layerContext, m_state.fillGradient->gradientSpaceTransform());
             m_state.fillGradient->paint(layerContext);
-            CGContextDrawLayerAtPoint(context, CGPointMake(rect.x(), rect.y()), layer);
+            CGContextDrawLayerInRect(context, rect, layer);
             CGLayerRelease(layer);
         } else {
             CGContextClipToRect(context, rect);
@@ -1027,6 +1036,7 @@ void GraphicsContext::setPlatformShadow(const FloatSize& offset, float blur, con
     blurRadius = min(blurRadius, narrowPrecisionToCGFloat(1000.0));
 
 
+#if defined(BUILDING_ON_SNOW_LEOPARD) || defined(BUILDING_ON_LION)
     if (!isAcceleratedContext()) {
         // Work around <rdar://problem/5539388> by ensuring that the offsets will get truncated
         // to the desired integer. Also see: <rdar://problem/10056277>
@@ -1041,6 +1051,7 @@ void GraphicsContext::setPlatformShadow(const FloatSize& offset, float blur, con
         else if (yOffset < 0)
             yOffset -= extraShadowOffset;
     }
+#endif
 
     // Check for an invalid color, as this means that the color was not set for the shadow
     // and we should therefore just use the default shadow color.
@@ -1088,9 +1099,11 @@ void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
     if (m_state.strokeGradient) {
         if (hasShadow()) {
             const float doubleLineWidth = lineWidth * 2;
-            const float layerWidth = ceilf(rect.width() + doubleLineWidth);
-            const float layerHeight = ceilf(rect.height() + doubleLineWidth);
-            CGLayerRef layer = CGLayerCreateWithContext(context, CGSizeMake(layerWidth, layerHeight), 0);
+            float adjustedWidth = ceilf(rect.width() + doubleLineWidth);
+            float adjustedHeight = ceilf(rect.height() + doubleLineWidth);
+            FloatSize layerSize = getCTM().mapSize(FloatSize(adjustedWidth, adjustedHeight));
+
+            CGLayerRef layer = CGLayerCreateWithContext(context, layerSize, 0);
 
             CGContextRef layerContext = CGLayerGetContext(layer);
             m_state.strokeThickness = lineWidth;
@@ -1101,6 +1114,7 @@ void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
             // the layer on the left and top sides.
             const float translationX = lineWidth - rect.x();
             const float translationY = lineWidth - rect.y();
+            CGContextScaleCTM(layerContext, layerSize.width() / adjustedWidth, layerSize.height() / adjustedHeight);
             CGContextTranslateCTM(layerContext, translationX, translationY);
 
             CGContextAddRect(layerContext, rect);
@@ -1111,7 +1125,7 @@ void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
 
             const float destinationX = roundf(rect.x() - lineWidth);
             const float destinationY = roundf(rect.y() - lineWidth);
-            CGContextDrawLayerAtPoint(context, CGPointMake(destinationX, destinationY), layer);
+            CGContextDrawLayerInRect(context, CGRectMake(destinationX, destinationY, adjustedWidth, adjustedHeight), layer);
             CGLayerRelease(layer);
         } else {
             CGContextSaveGState(context);
@@ -1588,6 +1602,9 @@ void GraphicsContext::setPlatformCompositeOperation(CompositeOperator mode)
         break;
     case CompositePlusLighter:
         target = kCGBlendModePlusLighter;
+        break;
+    case CompositeDifference:
+        target = kCGBlendModeDifference;
         break;
     }
     CGContextSetBlendMode(platformContext(), target);

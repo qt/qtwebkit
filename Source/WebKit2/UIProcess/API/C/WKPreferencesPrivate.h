@@ -80,6 +80,10 @@ WK_EXPORT bool WKPreferencesGetCompositingBordersVisible(WKPreferencesRef);
 WK_EXPORT void WKPreferencesSetCompositingRepaintCountersVisible(WKPreferencesRef, bool);
 WK_EXPORT bool WKPreferencesGetCompositingRepaintCountersVisible(WKPreferencesRef);
 
+// Defaults to true.
+WK_EXPORT void WKPreferencesSetCSSCustomFilterEnabled(WKPreferencesRef, bool flag);
+WK_EXPORT bool WKPreferencesGetCSSCustomFilterEnabled(WKPreferencesRef);
+
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetWebGLEnabled(WKPreferencesRef, bool);
 WK_EXPORT bool WKPreferencesGetWebGLEnabled(WKPreferencesRef);
@@ -155,6 +159,8 @@ WK_EXPORT bool WKPreferencesGetMockScrollbarsEnabled(WKPreferencesRef preference
 // Defaults to false.
 WK_EXPORT void WKPreferencesSetApplicationChromeModeEnabled(WKPreferencesRef preferencesRef, bool enabled);
 WK_EXPORT bool WKPreferencesGetApplicationChromeModeEnabled(WKPreferencesRef preferencesRef);
+
+WK_EXPORT void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef);
 
 #ifdef __cplusplus
 }

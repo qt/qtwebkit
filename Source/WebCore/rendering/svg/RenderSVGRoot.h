@@ -25,7 +25,7 @@
 
 #if ENABLE(SVG)
 #include "FloatRect.h"
-#include "RenderBox.h"
+#include "RenderReplaced.h"
 
 #include "SVGRenderSupport.h"
 
@@ -34,7 +34,7 @@ namespace WebCore {
 class AffineTransform;
 class SVGStyledElement;
 
-class RenderSVGRoot : public RenderBox {
+class RenderSVGRoot : public RenderReplaced {
 public:
     explicit RenderSVGRoot(SVGStyledElement*);
     virtual ~RenderSVGRoot();
@@ -42,17 +42,9 @@ public:
     bool isEmbeddedThroughSVGImage() const;
     bool isEmbeddedThroughFrameContainingSVGDocument() const;
 
-    virtual void computeIntrinsicRatioInformation(FloatSize& intrinsicRatio, bool& isPercentageIntrinsicSize) const;
+    virtual void computeIntrinsicRatioInformation(FloatSize& intrinsicSize, double& intrinsicRatio, bool& isPercentageIntrinsicSize) const;
     const RenderObjectChildList* children() const { return &m_children; }
     RenderObjectChildList* children() { return &m_children; }
-
-    bool needsSizeNegotiationWithHostDocument() const { return m_needsSizeNegotiationWithHostDocument; }
-
-    void scheduledSizeNegotiationWithHostDocument()
-    {
-        ASSERT(m_needsSizeNegotiationWithHostDocument);
-        m_needsSizeNegotiationWithHostDocument = false;
-    }
 
     bool isLayoutSizeChanged() const { return m_isLayoutSizeChanged; }
     virtual void setNeedsBoundariesUpdate() { m_needsBoundariesOrTransformUpdate = true; }
@@ -64,15 +56,15 @@ public:
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
+    virtual bool canHaveChildren() const { return true; }
 
     virtual bool isSVGRoot() const { return true; }
     virtual const char* renderName() const { return "RenderSVGRoot"; }
 
-    virtual void computePreferredLogicalWidths();
     virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
     virtual LayoutUnit computeReplacedLogicalHeight() const;
     virtual void layout();
-    virtual void paint(PaintInfo&, const LayoutPoint&);
+    virtual void paintReplaced(PaintInfo&, const LayoutPoint&);
 
     virtual void willBeDestroyed();
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
@@ -94,14 +86,10 @@ private:
     virtual void computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const;
 
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
+    virtual bool canBeSelectionLeaf() const { return false; }
 
-    bool selfWillPaint();
     void updateCachedBoundaries();
-
-    LayoutSize parentOriginToBorderBox() const;
-    LayoutSize borderOriginToContentBox() const;
-    AffineTransform localToRepaintContainerTransform(const LayoutPoint& parentOriginInContainer) const;
-    AffineTransform localToBorderBoxTransform() const;
+    void buildLocalToBorderBoxTransform();
 
     RenderObjectChildList m_children;
     IntSize m_containerSize;
@@ -109,9 +97,9 @@ private:
     FloatRect m_strokeBoundingBox;
     FloatRect m_repaintBoundingBox;
     mutable AffineTransform m_localToParentTransform;
+    AffineTransform m_localToBorderBoxTransform;
     bool m_isLayoutSizeChanged : 1;
     bool m_needsBoundariesOrTransformUpdate : 1;
-    bool m_needsSizeNegotiationWithHostDocument : 1;
 };
 
 inline RenderSVGRoot* toRenderSVGRoot(RenderObject* object)

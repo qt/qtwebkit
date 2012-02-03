@@ -31,6 +31,7 @@
 #include "LayerRendererChromium.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCSingleThreadProxy.h"
+#include "cc/CCSolidColorDrawQuad.h"
 #include <gtest/gtest.h>
 
 using namespace WebCore;
@@ -71,6 +72,20 @@ public:
         }
 
         ASSERT_EQ(timesEncountered, 1);
+    }
+
+    void setupScrollAndContentsLayers(const IntSize& contentSize)
+    {
+        RefPtr<CCLayerImpl> root = CCLayerImpl::create(0);
+        root->setScrollable(true);
+        root->setScrollPosition(IntPoint(0, 0));
+        root->setMaxScrollPosition(contentSize);
+        RefPtr<CCLayerImpl> contents = CCLayerImpl::create(1);
+        contents->setDrawsContent(true);
+        contents->setBounds(contentSize);
+        contents->setContentBounds(contentSize);
+        root->addChild(contents);
+        m_hostImpl->setRootLayer(root);
     }
 
 protected:
@@ -155,6 +170,112 @@ TEST_F(CCLayerTreeHostImplTest, scrollRootCallsCommitAndRedraw)
     EXPECT_TRUE(m_didRequestCommit);
 }
 
+TEST_F(CCLayerTreeHostImplTest, pinchGesture)
+{
+    setupScrollAndContentsLayers(IntSize(100, 100));
+    m_hostImpl->setViewportSize(IntSize(50, 50));
+
+    CCLayerImpl* scrollLayer = m_hostImpl->scrollLayer();
+    ASSERT(scrollLayer);
+
+    const float minPageScale = 0.5, maxPageScale = 4;
+
+    // Basic pinch zoom in gesture
+    {
+        m_hostImpl->setPageScaleFactorAndLimits(1, minPageScale, maxPageScale);
+        scrollLayer->setPageScaleDelta(1);
+
+        float pageScaleDelta = 2;
+        m_hostImpl->pinchGestureBegin();
+        m_hostImpl->pinchGestureUpdate(pageScaleDelta, IntPoint(50, 50));
+        m_hostImpl->pinchGestureEnd();
+        EXPECT_TRUE(m_didRequestRedraw);
+        EXPECT_TRUE(m_didRequestCommit);
+
+        OwnPtr<CCScrollAndScaleSet> scrollInfo = m_hostImpl->processScrollDeltas();
+        EXPECT_EQ(scrollInfo->pageScaleDelta, pageScaleDelta);
+    }
+
+    // Zoom-in clamping
+    {
+        m_hostImpl->setPageScaleFactorAndLimits(1, minPageScale, maxPageScale);
+        scrollLayer->setPageScaleDelta(1);
+        float pageScaleDelta = 10;
+
+        m_hostImpl->pinchGestureBegin();
+        m_hostImpl->pinchGestureUpdate(pageScaleDelta, IntPoint(50, 50));
+        m_hostImpl->pinchGestureEnd();
+
+        OwnPtr<CCScrollAndScaleSet> scrollInfo = m_hostImpl->processScrollDeltas();
+        EXPECT_EQ(scrollInfo->pageScaleDelta, maxPageScale);
+    }
+
+    // Zoom-out clamping
+    {
+        m_hostImpl->setPageScaleFactorAndLimits(1, minPageScale, maxPageScale);
+        scrollLayer->setPageScaleDelta(1);
+        scrollLayer->setScrollPosition(IntPoint(50, 50));
+
+        float pageScaleDelta = 0.1;
+        m_hostImpl->pinchGestureBegin();
+        m_hostImpl->pinchGestureUpdate(pageScaleDelta, IntPoint(0, 0));
+        m_hostImpl->pinchGestureEnd();
+
+        OwnPtr<CCScrollAndScaleSet> scrollInfo = m_hostImpl->processScrollDeltas();
+        EXPECT_EQ(scrollInfo->pageScaleDelta, minPageScale);
+
+        // Pushed to (0,0) via clamping against contents layer size.
+        expectContains(*scrollInfo.get(), scrollLayer->id(), IntSize(-50, -50));
+    }
+}
+
+TEST_F(CCLayerTreeHostImplTest, pageScaleAnimation)
+{
+    setupScrollAndContentsLayers(IntSize(100, 100));
+    m_hostImpl->setViewportSize(IntSize(50, 50));
+
+    CCLayerImpl* scrollLayer = m_hostImpl->scrollLayer();
+    ASSERT(scrollLayer);
+
+    const float minPageScale = 0.5, maxPageScale = 4;
+    const double startTimeMs = 1000;
+    const double durationMs = 100;
+
+    // Non-anchor zoom-in
+    {
+        m_hostImpl->setPageScaleFactorAndLimits(1, minPageScale, maxPageScale);
+        scrollLayer->setPageScaleDelta(1);
+        scrollLayer->setScrollPosition(IntPoint(50, 50));
+
+        m_hostImpl->startPageScaleAnimation(IntSize(0, 0), false, 2, startTimeMs, durationMs);
+        m_hostImpl->animate(startTimeMs + durationMs / 2);
+        EXPECT_TRUE(m_didRequestRedraw);
+        m_hostImpl->animate(startTimeMs + durationMs);
+        EXPECT_TRUE(m_didRequestCommit);
+
+        OwnPtr<CCScrollAndScaleSet> scrollInfo = m_hostImpl->processScrollDeltas();
+        EXPECT_EQ(scrollInfo->pageScaleDelta, 2);
+        expectContains(*scrollInfo.get(), scrollLayer->id(), IntSize(-50, -50));
+    }
+
+    // Anchor zoom-out
+    {
+        m_hostImpl->setPageScaleFactorAndLimits(1, minPageScale, maxPageScale);
+        scrollLayer->setPageScaleDelta(1);
+        scrollLayer->setScrollPosition(IntPoint(50, 50));
+
+        m_hostImpl->startPageScaleAnimation(IntSize(25, 25), true, minPageScale, startTimeMs, durationMs);
+        m_hostImpl->animate(startTimeMs + durationMs);
+        EXPECT_TRUE(m_didRequestRedraw);
+        EXPECT_TRUE(m_didRequestCommit);
+
+        OwnPtr<CCScrollAndScaleSet> scrollInfo = m_hostImpl->processScrollDeltas();
+        EXPECT_EQ(scrollInfo->pageScaleDelta, minPageScale);
+        // Pushed to (0,0) via clamping against contents layer size.
+        expectContains(*scrollInfo.get(), scrollLayer->id(), IntSize(-50, -50));
+    }
+}
+
 class BlendStateTrackerContext: public FakeWebGraphicsContext3D {
 public:
     BlendStateTrackerContext() : m_blend(false) { }
@@ -183,11 +304,13 @@ class BlendStateCheckLayer : public CCLayerImpl {
 public:
     static PassRefPtr<BlendStateCheckLayer> create(int id) { return adoptRef(new BlendStateCheckLayer(id)); }
 
-    virtual void draw(LayerRendererChromium* renderer)
+    virtual void appendQuads(CCQuadList& quadList, const CCSharedQuadState* sharedQuadState)
     {
-        m_drawn = true;
-        BlendStateTrackerContext* context = static_cast<BlendStateTrackerContext*>(GraphicsContext3DPrivate::extractWebGraphicsContext3D(renderer->context()));
-        EXPECT_EQ(m_blend, context->blend());
+        m_quadsAppended = true;
+
+        Color color = m_opaqueColor ? Color::white : Color(0, 0, 0, 0);
+        OwnPtr<CCDrawQuad> testBlendingDrawQuad = CCSolidColorDrawQuad::create(sharedQuadState, IntRect(5, 5, 5, 5), color);
+        EXPECT_EQ(m_blend, testBlendingDrawQuad->needsBlending());
         EXPECT_EQ(m_hasRenderSurface, !!renderSurface());
     }
 
@@ -195,17 +318,20 @@ public:
     {
         m_blend = blend;
         m_hasRenderSurface = hasRenderSurface;
-        m_drawn = false;
+        m_quadsAppended = false;
     }
 
-    bool drawn() const { return m_drawn; }
+    bool quadsAppended() const { return m_quadsAppended; }
+
+    void setOpaqueColor(bool opaqueColor) { m_opaqueColor = opaqueColor; }
 
 private:
     explicit BlendStateCheckLayer(int id)
         : CCLayerImpl(id)
         , m_blend(false)
         , m_hasRenderSurface(false)
-        , m_drawn(false)
+        , m_quadsAppended(false)
+        , m_opaqueColor(true)
     {
         setAnchorPoint(FloatPoint(0, 0));
         setBounds(IntSize(10, 10));
@@ -214,7 +340,8 @@ private:
 
     bool m_blend;
     bool m_hasRenderSurface;
-    bool m_drawn;
+    bool m_quadsAppended;
+    bool m_opaqueColor;
 };
 
 // https://bugs.webkit.org/show_bug.cgi?id=75783
@@ -236,45 +363,76 @@ TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
 
     // Opaque layer, drawn without blending.
     layer1->setOpaque(true);
+    layer1->setOpaqueColor(true);
     layer1->setExpectation(false, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
 
-    // Layer with translucent content, drawn with blending.
+    // Layer with translucent content, but solid color is opaque, so drawn without blending.
     layer1->setOpaque(false);
+    layer1->setOpaqueColor(true);
+    layer1->setExpectation(false, false);
+    m_hostImpl->drawLayers();
+    EXPECT_TRUE(layer1->quadsAppended());
+
+    // Layer with translucent content and painting, so drawn with blending.
+    layer1->setOpaque(false);
+    layer1->setOpaqueColor(false);
     layer1->setExpectation(true, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
 
     // Layer with translucent opacity, drawn with blending.
     layer1->setOpaque(true);
+    layer1->setOpaqueColor(true);
     layer1->setOpacity(0.5);
     layer1->setExpectation(true, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
+
+    // Layer with translucent opacity and painting, drawn with blending.
+    layer1->setOpaque(true);
+    layer1->setOpaqueColor(false);
+    layer1->setOpacity(0.5);
+    layer1->setExpectation(true, false);
+    m_hostImpl->drawLayers();
+    EXPECT_TRUE(layer1->quadsAppended());
 
     RefPtr<BlendStateCheckLayer> layer2 = BlendStateCheckLayer::create(2);
     layer1->addChild(layer2);
 
     // 2 opaque layers, drawn without blending.
     layer1->setOpaque(true);
+    layer1->setOpaqueColor(true);
     layer1->setOpacity(1);
     layer1->setExpectation(false, false);
     layer2->setOpaque(true);
+    layer2->setOpaqueColor(true);
     layer2->setOpacity(1);
     layer2->setExpectation(false, false);
     m_hostImpl->drawLayers();
-    EXPECT_FALSE(layer1->drawn());
-    EXPECT_TRUE(layer2->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
 
     // Parent layer with translucent content, drawn with blending.
     // Child layer with opaque content, drawn without blending.
     layer1->setOpaque(false);
+    layer1->setOpaqueColor(false);
     layer1->setExpectation(true, false);
     layer2->setExpectation(false, false);
     m_hostImpl->drawLayers();
-    EXPECT_FALSE(layer1->drawn());
-    EXPECT_TRUE(layer2->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
+
+    // Parent layer with translucent content but opaque painting, drawn without blending.
+    // Child layer with opaque content, drawn without blending.
+    layer1->setOpaque(false);
+    layer1->setOpaqueColor(true);
+    layer1->setExpectation(false, false);
+    layer2->setExpectation(false, false);
+    m_hostImpl->drawLayers();
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
 
     // Parent layer with translucent opacity and opaque content. Since it has a
     // drawing child, it's drawn to a render surface which carries the opacity,
@@ -282,35 +440,51 @@ TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
     // Child layer with opaque content, drawn without blending (parent surface
     // carries the inherited opacity).
     layer1->setOpaque(true);
+    layer1->setOpaqueColor(true);
     layer1->setOpacity(0.5);
     layer1->setExpectation(false, true);
     layer2->setExpectation(false, false);
     m_hostImpl->drawLayers();
-    EXPECT_FALSE(layer1->drawn());
-    EXPECT_TRUE(layer2->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
 
     // Draw again, but with child non-opaque, to make sure
     // layer1 not culled.
     layer1->setOpaque(true);
+    layer1->setOpaqueColor(true);
     layer1->setOpacity(1);
     layer1->setExpectation(false, false);
     layer2->setOpaque(true);
+    layer2->setOpaqueColor(true);
     layer2->setOpacity(0.5);
     layer2->setExpectation(true, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
-    EXPECT_TRUE(layer2->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
 
     // A second way of making the child non-opaque.
     layer1->setOpaque(true);
     layer1->setOpacity(1);
     layer1->setExpectation(false, false);
     layer2->setOpaque(false);
+    layer2->setOpaqueColor(false);
     layer2->setOpacity(1);
     layer2->setExpectation(true, false);
     m_hostImpl->drawLayers();
-    EXPECT_TRUE(layer1->drawn());
-    EXPECT_TRUE(layer2->drawn());
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
+
+    // And when the layer says its not opaque but is painted opaque, it is not blended.
+    layer1->setOpaque(true);
+    layer1->setOpacity(1);
+    layer1->setExpectation(false, false);
+    layer2->setOpaque(false);
+    layer2->setOpaqueColor(true);
+    layer2->setOpacity(1);
+    layer2->setExpectation(false, false);
+    m_hostImpl->drawLayers();
+    EXPECT_TRUE(layer1->quadsAppended());
+    EXPECT_TRUE(layer2->quadsAppended());
 }
 
 class ReshapeTrackerContext: public FakeWebGraphicsContext3D {

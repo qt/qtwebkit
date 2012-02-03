@@ -29,6 +29,7 @@
 
 #include "FilterEffectRenderer.h"
 
+#include "Document.h"
 #include "FEColorMatrix.h"
 #include "FEComponentTransfer.h"
 #include "FEDropShadow.h"
@@ -36,12 +37,13 @@
 #include "FEMerge.h"
 #include "FilterEffectObserver.h"
 #include "FloatConversion.h"
+#include "RenderLayer.h"
 
 #include <algorithm>
 #include <wtf/MathExtras.h>
 
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-#include "CachedShader.h"
+#include "CustomFilterProgram.h"
 #include "CustomFilterOperation.h"
 #include "FECustomFilter.h"
 #include "Settings.h"
@@ -66,11 +68,11 @@ static inline void lastMatrixRow(Vector<float>& parameters)
     
     
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-static bool isWebGLEnabled(Document* document)
+static bool isCSSCustomFilterEnabled(Document* document)
 {
     // We only want to enable shaders if WebGL is also enabled on this platform.
     Settings* settings = document->settings();
-    return settings && settings->webGLEnabled();
+    return settings && settings->isCSSCustomFilterEnabled() && settings->webGLEnabled();
 }
 #endif
 
@@ -84,6 +86,9 @@ FilterEffectRenderer::FilterEffectRenderer(FilterEffectObserver* observer)
 
 FilterEffectRenderer::~FilterEffectRenderer()
 {
+#if ENABLE(CSS_SHADERS)
+    removeCustomFilterClients();
+#endif
 }
 
 GraphicsContext* FilterEffectRenderer::inputContext()
@@ -96,14 +101,14 @@ void FilterEffectRenderer::build(Document* document, const FilterOperations& ope
 #if !ENABLE(CSS_SHADERS) || !ENABLE(WEBGL)
     UNUSED_PARAM(document);
 #else
-    CachedShaderList cachedShaders;
+    CustomFilterProgramList cachedCustomFilterPrograms;
 #endif
 
     m_effects.clear();
 
-    RefPtr<FilterEffect> effect;
     RefPtr<FilterEffect> previousEffect;
     for (size_t i = 0; i < operations.operations().size(); ++i) {
+        RefPtr<FilterEffect> effect;
         FilterOperation* filterOperation = operations.operations().at(i).get();
         switch (filterOperation->getOperationType()) {
         case FilterOperation::REFERENCE: {
@@ -211,7 +216,8 @@ void FilterEffectRenderer::build(Document* document, const FilterOperations& ope
             BasicComponentTransferFilterOperation* componentTransferOperation = static_cast<BasicComponentTransferFilterOperation*>(filterOperation);
             ComponentTransferFunction transferFunction;
             transferFunction.type = FECOMPONENTTRANSFER_TYPE_LINEAR;
-            transferFunction.slope = narrowPrecisionToFloat(componentTransferOperation->amount());
+            transferFunction.slope = 1;
+            transferFunction.intercept = narrowPrecisionToFloat(componentTransferOperation->amount());
 
             ComponentTransferFunction nullFunction;
             effect = FEComponentTransfer::create(this, transferFunction, transferFunction, transferFunction, nullFunction);
@@ -244,36 +250,15 @@ void FilterEffectRenderer::build(Document* document, const FilterOperations& ope
 #if ENABLE(CSS_SHADERS)
         case FilterOperation::CUSTOM: {
 #if ENABLE(WEBGL)
-            if (!isWebGLEnabled(document))
+            if (!isCSSCustomFilterEnabled(document))
                 continue;
             
             CustomFilterOperation* customFilterOperation = static_cast<CustomFilterOperation*>(filterOperation);
-            
-            // Check that the filters are already loaded. If not just skip them here.
-            String vertexShader, fragmentShader;
-            bool shadersLoaded = true;
-            if (customFilterOperation->vertexShader()) {
-                CachedShader* cachedShader = customFilterOperation->vertexShader()->cachedShader();
-                ASSERT(cachedShader);
-                cachedShaders.append(cachedShader);
-                cachedShader->addClient(this);
-                if (cachedShader->isLoaded())
-                    vertexShader = cachedShader->shaderString();
-                else
-                    shadersLoaded = false;
-            }
-            if (customFilterOperation->fragmentShader()) {
-                CachedShader* cachedShader = customFilterOperation->fragmentShader()->cachedShader();
-                ASSERT(cachedShader);
-                cachedShaders.append(cachedShader);
-                cachedShader->addClient(this);
-                if (cachedShader->isLoaded())
-                    fragmentShader = cachedShader->shaderString();
-                else
-                    shadersLoaded = false;
-            }
-            if (shadersLoaded) {
-                effect = FECustomFilter::create(this, document, vertexShader, fragmentShader,
+            RefPtr<CustomFilterProgram> program = customFilterOperation->program();
+            cachedCustomFilterPrograms.append(program);
+            program->addClient(this);
+            if (program->isLoaded()) {
+                effect = FECustomFilter::create(this, document, program, customFilterOperation->parameters(),
                                                 customFilterOperation->meshRows(), customFilterOperation->meshColumns(),
                                                 customFilterOperation->meshBoxType(), customFilterOperation->meshType());
             }
@@ -292,28 +277,44 @@ void FilterEffectRenderer::build(Document* document, const FilterOperations& ope
             if (previousEffect)
                 effect->inputEffects().append(previousEffect);
             m_effects.append(effect);
-            previousEffect = effect;
+            previousEffect = effect.release();
         }
     }
 
     // If we didn't make a real filter, create a null-op (FEMerge with one input).
-    if (!effect)
+    if (!previousEffect)
         m_effects.append(FEMerge::create(this));
 
     m_effects.first()->inputEffects().append(m_sourceGraphic);
     setMaxEffectRects(m_sourceDrawingRegion);
     
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
-    for (CachedShaderList::iterator iter = m_cachedShaders.begin(), end = m_cachedShaders.end(); iter != end; ++iter)
-        iter->get()->removeClient(this);
-    m_cachedShaders.swap(cachedShaders);
+    removeCustomFilterClients();
+    m_cachedCustomFilterPrograms.swap(cachedCustomFilterPrograms);
 #endif
 }
 
-void FilterEffectRenderer::notifyFinished(CachedResource*)
+void FilterEffectRenderer::updateBackingStore(const FloatRect& filterRect)
+{
+    if (!filterRect.isZero()) {
+        FloatRect currentSourceRect = sourceImageRect();
+        if (filterRect != currentSourceRect)
+            setSourceImageRect(filterRect);
+    }
+}
+
+#if ENABLE(CSS_SHADERS)
+void FilterEffectRenderer::notifyCustomFilterProgramLoaded(CustomFilterProgram*)
 {
     m_observer->filterNeedsRepaint();
 }
+
+void FilterEffectRenderer::removeCustomFilterClients()
+{
+    for (CustomFilterProgramList::iterator iter = m_cachedCustomFilterPrograms.begin(), end = m_cachedCustomFilterPrograms.end(); iter != end; ++iter)
+        iter->get()->removeClient(this);
+}
+#endif
 
 void FilterEffectRenderer::prepare()
 {
@@ -331,6 +332,53 @@ void FilterEffectRenderer::prepare()
 void FilterEffectRenderer::apply()
 {
     lastEffect()->apply();
+}
+
+
+GraphicsContext* FilterEffectRendererHelper::beginFilterEffect(RenderLayer* renderLayer, GraphicsContext* oldContext, const LayoutRect& filterRect)
+{
+    ASSERT(m_haveFilterEffect && renderLayer->filter());
+    m_savedGraphicsContext = oldContext;
+    m_renderLayer = renderLayer;
+    m_paintOffset = filterRect.location();
+    
+    FloatRect filterSourceRect = filterRect;
+    filterSourceRect.setLocation(LayoutPoint());
+    
+    FilterEffectRenderer* filter = renderLayer->filter();
+    filter->updateBackingStore(filterSourceRect);
+    filter->prepare();
+    
+    // Paint into the context that represents the SourceGraphic of the filter.
+    GraphicsContext* sourceGraphicsContext = filter->inputContext();
+    if (!sourceGraphicsContext) {
+        // Could not allocate a new graphics context. Disable the filters and continue.
+        m_haveFilterEffect = false;
+        return m_savedGraphicsContext;
+    }
+    
+    sourceGraphicsContext->save();
+    sourceGraphicsContext->translate(-filterRect.x(), -filterRect.y());
+    sourceGraphicsContext->clearRect(filterRect);
+    
+    return sourceGraphicsContext;
+}
+
+GraphicsContext* FilterEffectRendererHelper::applyFilterEffect()
+{
+    ASSERT(m_haveFilterEffect && m_renderLayer->filter());
+    FilterEffectRenderer* filter = m_renderLayer->filter();
+    filter->apply();
+    
+    filter->inputContext()->restore();
+    
+    // Get the filtered output and draw it in place.
+    IntRect destRect = filter->outputRect();
+    destRect.move(m_paintOffset.x(), m_paintOffset.y());
+    
+    m_savedGraphicsContext->drawImageBuffer(filter->output(), m_renderLayer->renderer()->style()->colorSpace(), destRect, CompositeSourceOver);
+    
+    return m_savedGraphicsContext;
 }
 
 } // namespace WebCore

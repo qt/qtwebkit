@@ -129,6 +129,17 @@ public:
             break;
         }
 
+        switch (m_fontDescription.commonLigaturesState()) {
+        case FontDescription::DisabledLigaturesState:
+            features &= ~Ligatures;
+            break;
+        case FontDescription::EnabledLigaturesState:
+            features |= Ligatures;
+            break;
+        case FontDescription::NormalLigaturesState:
+            break;
+        }
+
         return features;
     }
 
@@ -171,6 +182,7 @@ public:
     static bool shouldUseSmoothing();
 
     enum CodePath { Auto, Simple, Complex, SimpleWithGlyphOverflow };
+    CodePath codePath(const TextRun&) const;
 
 private:
     enum ForTextEmphasisOrNot { NotForTextEmphasis, ForTextEmphasis };
@@ -190,8 +202,6 @@ private:
 
     static bool canReturnFallbackFontsForComplexText();
     static bool canExpandAroundIdeographsInComplexText();
-
-    CodePath codePath(const TextRun&) const;
 
     // Returns the initial in-stream advance.
     float getGlyphsAndAdvancesForComplexText(const TextRun&, int from, int to, GlyphBuffer&, ForTextEmphasisOrNot = NotForTextEmphasis) const;

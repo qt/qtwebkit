@@ -150,8 +150,7 @@ PassRefPtr<IDBTransaction> IDBDatabase::transaction(ScriptExecutionContext* cont
     }
 
     if (mode != IDBTransaction::READ_WRITE && mode != IDBTransaction::READ_ONLY) {
-        // FIXME: May need to change when specced: http://www.w3.org/Bugs/Public/show_bug.cgi?id=11406
-        ec = IDBDatabaseException::CONSTRAINT_ERR;
+        ec = IDBDatabaseException::NON_TRANSIENT_ERR;
         return 0;
     }
     if (m_closePending) {
@@ -201,16 +200,6 @@ void IDBDatabase::onVersionChange(const String& version)
         return;
 
     enqueueEvent(IDBVersionChangeEvent::create(version, eventNames().versionchangeEvent));
-}
-
-bool IDBDatabase::hasPendingActivity() const
-{
-    // FIXME: Try to find some way not to just leak this object until page navigation.
-    // FIXME: In an ideal world, we should return true as long as anyone has or can
-    //        get a handle to us or any derivative transaction/request object and any
-    //        of those have event listeners. This is in order to handle user generated
-    //        events properly.
-    return !m_contextStopped || ActiveDOMObject::hasPendingActivity();
 }
 
 void IDBDatabase::open()

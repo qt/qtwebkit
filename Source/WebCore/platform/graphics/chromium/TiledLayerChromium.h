@@ -35,6 +35,7 @@
 namespace WebCore {
 
 class LayerTextureUpdater;
+class Region;
 class UpdatableTile;
 
 class TiledLayerChromium : public LayerChromium {
@@ -61,8 +62,12 @@ public:
     // recycled by the texture manager.
     void protectTileTextures(const IntRect& layerRect);
 
+    virtual void reserveTextures();
+
+    virtual void addSelfToOccludedScreenSpace(Region& occludedScreenSpace);
+
 protected:
-    explicit TiledLayerChromium(CCLayerDelegate*);
+    TiledLayerChromium();
 
     virtual void cleanupResources();
     void updateTileSizeAndTilingOption();
@@ -87,6 +92,8 @@ protected:
 
     // After preparing an update, returns true if more pre-painting is needed.
     bool needsIdlePaint(const IntRect& layerRect);
+
+    bool skipsDraw() const { return m_skipsDraw; }
 
     virtual void protectVisibleTileTextures();
 

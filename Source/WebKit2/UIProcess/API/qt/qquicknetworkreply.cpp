@@ -30,151 +30,95 @@ using namespace WebKit;
 
 QQuickNetworkReply::QQuickNetworkReply(QObject* parent)
     : QObject(parent)
-    , m_networkReplyData(adoptRef(new WebKit::QtNetworkReplyData))
+    , m_networkReplyData(adoptRef(new WebKit::QtRefCountedNetworkReplyData))
 {
     Q_ASSERT(parent);
 }
 
 QString QQuickNetworkReply::contentType() const
 {
-    return m_networkReplyData->m_contentType;
+    return m_networkReplyData->data().m_contentType;
 }
 
 void QQuickNetworkReply::setContentType(const QString& contentType)
 {
-    m_networkReplyData->m_contentType = contentType;
+    m_networkReplyData->data().m_contentType = contentType;
 }
 
-QNetworkAccessManager::Operation QQuickNetworkReply::operation() const
+QVariant QQuickNetworkReply::data() const
 {
-    return m_networkReplyData->m_operation;
+    return m_data;
 }
 
-void QQuickNetworkReply::setOperation(QNetworkAccessManager::Operation operation)
+void QQuickNetworkReply::setData(const QVariant& data)
 {
-    m_networkReplyData->m_operation = operation;
-}
-
-QString QQuickNetworkReply::contentDisposition() const
-{
-    return m_networkReplyData->m_contentDisposition;
-}
-
-void QQuickNetworkReply::setContentDisposition(const QString& disposition)
-{
-    m_networkReplyData->m_contentDisposition = disposition;
-}
-
-QString QQuickNetworkReply::location() const
-{
-    return m_networkReplyData->m_location;
-}
-
-void QQuickNetworkReply::setLocation(const QString& location)
-{
-    m_networkReplyData->m_location = location;
-}
-
-QString QQuickNetworkReply::lastModified() const
-{
-    return QDateTime::fromMSecsSinceEpoch(m_networkReplyData->m_lastModified).toString(Qt::ISODate);
-}
-
-void QQuickNetworkReply::setLastModified(const QString& lastModified)
-{
-    m_networkReplyData->m_lastModified = QDateTime::fromString(lastModified, Qt::ISODate).toMSecsSinceEpoch();
-}
-
-QString QQuickNetworkReply::cookie() const
-{
-    return m_networkReplyData->m_cookie;
-}
-
-void QQuickNetworkReply::setCookie(const QString& cookie)
-{
-    m_networkReplyData->m_cookie = cookie;
-}
-
-QString QQuickNetworkReply::userAgent() const
-{
-    return m_networkReplyData->m_userAgent;
-}
-
-void QQuickNetworkReply::setUserAgent(const QString& userAgent)
-{
-    m_networkReplyData->m_userAgent = userAgent;
-}
-
-QString QQuickNetworkReply::server() const
-{
-    return m_networkReplyData->m_server;
-}
-
-void QQuickNetworkReply::setServer(const QString& server)
-{
-    m_networkReplyData->m_server = server;
-}
-
-QString QQuickNetworkReply::data() const
-{
-    if (m_networkReplyData->m_dataHandle.isNull())
-        return QString();
-    RefPtr<SharedMemory> sm = SharedMemory::create(m_networkReplyData->m_dataHandle, SharedMemory::ReadOnly);
-    if (!sm)
-        return QString();
-
-    uint64_t stringLength = m_networkReplyData->m_contentLength / sizeof(UChar);
-    return QString(reinterpret_cast<const QChar*>(sm->data()), stringLength);
-}
-
-void QQuickNetworkReply::setData(const QString& data)
-{
-    // This function can be called several times. In this case the previous SharedMemory handles
-    // will be overwritten and the previously allocated SharedMemory will die with the last handle.
-    m_networkReplyData->m_contentLength = 0;
-
-    if (data.isNull())
-        return;
-    const UChar* ucharData = reinterpret_cast<const UChar*>(data.constData());
-    uint64_t smLength = sizeof(UChar) * data.length();
-
-    RefPtr<SharedMemory> sm = SharedMemory::create(smLength);
-    if (!sm)
-        return;
-    // The size of the allocated shared memory can be bigger than requested.
-    // Usually the size will be rounded up to the next multiple of a page size.
-    memcpy(sm->data(), ucharData, smLength);
-
-    if (!sm->createHandle(m_networkReplyData->m_dataHandle, SharedMemory::ReadOnly))
-        return;
-    m_networkReplyData->m_contentLength = smLength;
+    m_data = data;
 }
 
 void QQuickNetworkReply::send()
 {
-    QObject* schemeParent = parent()->parent();
-    if (!schemeParent)
+    if (m_data.isNull())
         return;
-    QQuickWebViewExperimental* webViewExperimental = qobject_cast<QQuickWebViewExperimental*>(schemeParent->parent());
-    if (!webViewExperimental)
+
+    uint64_t smLength = 0;
+    const void* ptrData = 0;
+    QString stringData;
+    QByteArray byteArrayData;
+    if (m_data.type() == QVariant::String) {
+        stringData = m_data.toString();
+        ptrData = reinterpret_cast<const void*>(stringData.constData());
+        smLength = sizeof(QChar) * stringData.length();
+        setContentType(QLatin1String("text/html; charset=utf-16"));
+    } else {
+        if (!m_data.canConvert<QByteArray>())
+            return;
+        byteArrayData = m_data.toByteArray();
+        ptrData = byteArrayData.data();
+        smLength = byteArrayData.size();
+    }
+
+    if (contentType().isEmpty()) {
+        qWarning("QQuickNetworkReply::send - Cannot send raw data without a content type being specified!");
         return;
-    webViewExperimental->sendApplicationSchemeReply(this);
+    }
+
+    WTF::RefPtr<WebKit::SharedMemory> sharedMemory = SharedMemory::create(smLength);
+    if (!sharedMemory)
+        return;
+    // The size of the allocated shared memory can be bigger than requested.
+    // Usually the size will be rounded up to the next multiple of a page size.
+    memcpy(sharedMemory->data(), ptrData, smLength);
+
+    if (sharedMemory->createHandle(m_networkReplyData->data().m_dataHandle, SharedMemory::ReadOnly)) {
+        m_networkReplyData->data().m_contentLength = smLength;
+        if (m_webViewExperimental)
+            m_webViewExperimental.data()->sendApplicationSchemeReply(this);
+    }
+
+    // After sending the reply data, we have to reinitialize the m_networkReplyData,
+    // to make sure we have a fresh SharesMemory::Handle.
+    m_networkReplyData = adoptRef(new WebKit::QtRefCountedNetworkReplyData);
 }
 
-WTF::RefPtr<WebKit::QtNetworkRequestData> QQuickNetworkReply::networkRequestData() const
+void QQuickNetworkReply::setWebViewExperimental(QQuickWebViewExperimental* webViewExperimental)
 {
-    return m_networkRequestData;
+    m_webViewExperimental = webViewExperimental;
 }
 
-void QQuickNetworkReply::setNetworkRequestData(WTF::RefPtr<WebKit::QtNetworkRequestData> data)
+WebKit::QtRefCountedNetworkRequestData* QQuickNetworkReply::networkRequestData() const
+{
+    return m_networkRequestData.get();
+}
+
+void QQuickNetworkReply::setNetworkRequestData(WTF::PassRefPtr<WebKit::QtRefCountedNetworkRequestData> data)
 {
     m_networkRequestData = data;
-    m_networkReplyData->m_replyUuid = data->m_replyUuid;
+    m_networkReplyData->data().m_replyUuid = m_networkRequestData->data().m_replyUuid;
 }
 
-WTF::RefPtr<WebKit::QtNetworkReplyData> QQuickNetworkReply::networkReplyData() const
+WebKit::QtRefCountedNetworkReplyData* QQuickNetworkReply::networkReplyData() const
 {
-    return m_networkReplyData;
+    return m_networkReplyData.get();
 }
 
 #include "moc_qquicknetworkreply_p.cpp"

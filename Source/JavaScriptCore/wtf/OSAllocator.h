@@ -26,6 +26,7 @@
 #ifndef OSAllocator_h
 #define OSAllocator_h
 
+#include <algorithm>
 #include <wtf/UnusedParam.h>
 #include <wtf/VMTags.h>
 #include <wtf/VMTags.h>
@@ -46,7 +47,7 @@ public:
     // releaseDecommitted should be called on a region of VM allocated by a single reservation,
     // the memory must all currently be in a decommitted state.
     static void* reserveUncommitted(size_t, Usage = UnknownUsage, bool writable = true, bool executable = false, bool includesGuardPages = false);
-    static void releaseDecommitted(void*, size_t);
+    WTF_EXPORT_PRIVATE static void releaseDecommitted(void*, size_t);
 
     // These methods are symmetric; they commit or decommit a region of VM (uncommitted VM should
     // never be accessed, since the OS may not have attached physical memory for these regions).
@@ -57,7 +58,7 @@ public:
     // These methods are symmetric; reserveAndCommit allocates VM in an committed state,
     // decommitAndRelease should be called on a region of VM allocated by a single reservation,
     // the memory must all currently be in a committed state.
-    static void* reserveAndCommit(size_t, Usage = UnknownUsage, bool writable = true, bool executable = false, bool includesGuardPages = false);
+    WTF_EXPORT_PRIVATE static void* reserveAndCommit(size_t, Usage = UnknownUsage, bool writable = true, bool executable = false, bool includesGuardPages = false);
     static void decommitAndRelease(void* base, size_t size);
 
     // These methods are akin to reserveAndCommit/decommitAndRelease, above - however rather than
@@ -65,6 +66,12 @@ public:
     // specified.
     static void* reserveAndCommit(size_t reserveSize, size_t commitSize, Usage = UnknownUsage, bool writable = true, bool executable = false);
     static void decommitAndRelease(void* releaseBase, size_t releaseSize, void* decommitBase, size_t decommitSize);
+
+    // Reallocate an existing, committed allocation.
+    // The prior allocation must be fully comitted, and the new size will also be fully committed.
+    // This interface is provided since it may be possible to optimize this operation on some platforms.
+    template<typename T>
+    static T* reallocateCommitted(T*, size_t oldSize, size_t newSize, Usage = UnknownUsage, bool writable = true, bool executable = false);
 };
 
 inline void* OSAllocator::reserveAndCommit(size_t reserveSize, size_t commitSize, Usage usage, bool writable, bool executable)
@@ -91,6 +98,15 @@ inline void OSAllocator::decommitAndRelease(void* releaseBase, size_t releaseSiz
 inline void OSAllocator::decommitAndRelease(void* base, size_t size)
 {
     decommitAndRelease(base, size, base, size);
+}
+
+template<typename T>
+inline T* OSAllocator::reallocateCommitted(T* oldBase, size_t oldSize, size_t newSize, Usage usage, bool writable, bool executable)
+{
+    void* newBase = reserveAndCommit(newSize, usage, writable, executable);
+    memcpy(newBase, oldBase, std::min(oldSize, newSize));
+    decommitAndRelease(oldBase, oldSize);
+    return static_cast<T*>(newBase);
 }
 
 } // namespace WTF

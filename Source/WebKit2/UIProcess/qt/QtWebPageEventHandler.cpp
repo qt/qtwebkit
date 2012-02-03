@@ -26,6 +26,7 @@
 #include "NativeWebWheelEvent.h"
 #include "QtViewportInteractionEngine.h"
 #include "qquickwebpage_p.h"
+#include "qquickwebview_p.h"
 #include <QDrag>
 #include <QGraphicsSceneMouseEvent>
 #include <QGuiApplication>
@@ -84,20 +85,23 @@ static inline WebCore::DragOperation dropActionToDragOperation(Qt::DropActions a
     return (DragOperation)result;
 }
 
-QtWebPageEventHandler::QtWebPageEventHandler(WKPageRef pageRef, QQuickWebPage* qmlWebPage)
+QtWebPageEventHandler::QtWebPageEventHandler(WKPageRef pageRef, QQuickWebPage* qmlWebPage, QQuickWebView* qmlWebView)
     : m_webPageProxy(toImpl(pageRef))
     , m_panGestureRecognizer(this)
     , m_pinchGestureRecognizer(this)
     , m_tapGestureRecognizer(this)
     , m_webPage(qmlWebPage)
+    , m_webView(qmlWebView)
     , m_previousClickButton(Qt::NoButton)
     , m_clickCount(0)
     , m_postponeTextInputStateChanged(false)
 {
+    connect(qApp->inputPanel(), SIGNAL(visibleChanged()), this, SLOT(inputPanelVisibleChanged()));
 }
 
 QtWebPageEventHandler::~QtWebPageEventHandler()
 {
+    disconnect(qApp->inputPanel(), SIGNAL(visibleChanged()), this, SLOT(inputPanelVisibleChanged()));
 }
 
 bool QtWebPageEventHandler::handleEvent(QEvent* ev)
@@ -282,6 +286,12 @@ bool QtWebPageEventHandler::handleDropEvent(QDropEvent* ev)
     return accepted;
 }
 
+void QtWebPageEventHandler::handlePotentialSingleTapEvent(const QTouchEvent::TouchPoint& point)
+{
+    QTransform fromItemTransform = m_webPage->transformFromItem();
+    m_webPageProxy->handlePotentialActivation(fromItemTransform.map(point.pos()).toPoint());
+}
+
 void QtWebPageEventHandler::handleSingleTapEvent(const QTouchEvent::TouchPoint& point)
 {
     m_postponeTextInputStateChanged = true;
@@ -429,12 +439,31 @@ static void setInputPanelVisible(bool visible)
     qApp->inputPanel()->setVisible(visible);
 }
 
+void QtWebPageEventHandler::inputPanelVisibleChanged()
+{
+    if (!m_interactionEngine)
+        return;
+
+    // We only respond to the input panel becoming visible.
+    if (!m_webView->hasFocus() || !qApp->inputPanel()->visible())
+        return;
+
+    const EditorState& editor = m_webPageProxy->editorState();
+    if (editor.isContentEditable)
+        m_interactionEngine->focusEditableArea(QRectF(editor.cursorRect), QRectF(editor.editorRect));
+}
+
 void QtWebPageEventHandler::updateTextInputState()
 {
     if (m_postponeTextInputStateChanged)
         return;
 
     const EditorState& editor = m_webPageProxy->editorState();
+
+    m_webView->setInputMethodHints(Qt::InputMethodHints(editor.inputMethodHints));
+
+    if (!m_webView->hasFocus())
+        return;
 
     // Ignore input method requests not due to a tap gesture.
     if (!editor.isContentEditable)
@@ -448,7 +477,7 @@ void QtWebPageEventHandler::doneWithGestureEvent(const WebGestureEvent& event, b
 
     m_postponeTextInputStateChanged = false;
 
-    if (!wasEventHandled)
+    if (!wasEventHandled || !m_webView->hasFocus())
         return;
 
     const EditorState& editor = m_webPageProxy->editorState();
@@ -515,14 +544,6 @@ void QtWebPageEventHandler::didFindZoomableArea(const IntPoint& target, const In
     // FIXME: As the find method might not respond immediately during load etc,
     // we should ignore all but the latest request.
     m_interactionEngine->zoomToAreaGestureEnded(QPointF(target), QRectF(area));
-}
-
-void QtWebPageEventHandler::focusEditableArea(const IntRect& caret, const IntRect& area)
-{
-    if (!m_interactionEngine)
-        return;
-
-    m_interactionEngine->focusEditableArea(QRectF(caret), QRectF(area));
 }
 
 void QtWebPageEventHandler::startDrag(const WebCore::DragData& dragData, PassRefPtr<ShareableBitmap> dragImage)

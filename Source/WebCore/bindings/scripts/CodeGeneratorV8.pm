@@ -32,7 +32,7 @@ use Digest::MD5;
 
 use constant FileNamePrefix => "V8";
 
-my ($codeGenerator, $IMPL, $HEADER);
+my ($codeGenerator);
 
 my $module = "";
 my $outputDir = "";
@@ -85,14 +85,6 @@ sub new
     return $reference;
 }
 
-sub finish
-{
-    my $object = shift;
-
-    # Commit changes!
-    $object->WriteData();
-}
-
 # Params: 'domClass' struct
 sub GenerateInterface
 {
@@ -109,15 +101,7 @@ sub GenerateInterface
         $object->GenerateImplementation($dataNode);
     }
 
-    my $name = $dataNode->name;
-
-    # Open files for writing
-    my $prefix = FileNamePrefix;
-    my $headerFileName = "$outputHeadersDir/$prefix$name.h";
-    my $implFileName = "$outputDir/$prefix$name.cpp";
-
-    open($IMPL, ">$implFileName") || die "Couldn't open file $implFileName";
-    open($HEADER, ">$headerFileName") || die "Couldn't open file $headerFileName";
+    $object->WriteData($dataNode);
 }
 
 # Params: 'idlDocument' struct
@@ -400,7 +384,7 @@ END
         my $name = $function->signature->name;
         my $attrExt = $function->signature->extendedAttributes;
 
-        if (($attrExt->{"Custom"} || $attrExt->{"V8Custom"}) && $function->{overloadIndex} == 1) {
+        if (($attrExt->{"Custom"} || $attrExt->{"V8Custom"}) && !$attrExt->{"ImplementedBy"} && $function->{overloadIndex} == 1) {
             push(@headerContent, <<END);
     static v8::Handle<v8::Value> ${name}Callback(const v8::Arguments&);
 END
@@ -721,7 +705,7 @@ sub IsConstructable
 {
     my $dataNode = shift;
 
-    return $dataNode->extendedAttributes->{"CustomConstructor"} || $dataNode->extendedAttributes->{"V8CustomConstructor"} || $dataNode->extendedAttributes->{"Constructor"} || $dataNode->extendedAttributes->{"V8ConstructorTemplate"} || $dataNode->extendedAttributes->{"ConstructorTemplate"};
+    return $dataNode->extendedAttributes->{"CustomConstructor"} || $dataNode->extendedAttributes->{"V8CustomConstructor"} || $dataNode->extendedAttributes->{"Constructor"} || $dataNode->extendedAttributes->{"ConstructorTemplate"};
 }
 
 sub IsConstructorTemplate
@@ -729,7 +713,7 @@ sub IsConstructorTemplate
     my $dataNode = shift;
     my $template = shift;
 
-    return ($dataNode->extendedAttributes->{"V8ConstructorTemplate"} && $dataNode->extendedAttributes->{"V8ConstructorTemplate"} eq $template) || ($dataNode->extendedAttributes->{"ConstructorTemplate"} && $dataNode->extendedAttributes->{"ConstructorTemplate"} eq $template);
+    return $dataNode->extendedAttributes->{"ConstructorTemplate"} && $dataNode->extendedAttributes->{"ConstructorTemplate"} eq $template;
 }
 
 sub GenerateDomainSafeFunctionGetter
@@ -845,7 +829,7 @@ END
 END
             }
         }
-    } elsif ($attrExt->{"v8OnProto"} || $attrExt->{"V8DisallowShadowing"}) {
+    } elsif ($attrExt->{"v8OnProto"} || $attrExt->{"V8Unforgeable"}) {
         if ($interfaceName eq "DOMWindow") {
             push(@implContentDecls, <<END);
     v8::Handle<v8::Object> holder = info.Holder();
@@ -881,10 +865,8 @@ END
     }
 
     # Generate security checks if necessary
-    if ($attribute->signature->extendedAttributes->{"allowAccessToNode"}) {
-        push(@implContentDecls, "    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->$attrName()))\n    return v8::Handle<v8::Value>();\n\n");
-    } elsif ($attribute->signature->extendedAttributes->{"CheckFrameSecurity"}) {
-        push(@implContentDecls, "    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->contentDocument()))\n    return v8::Handle<v8::Value>();\n\n");
+    if ($attribute->signature->extendedAttributes->{"CheckAccessToNode"}) {
+        push(@implContentDecls, "    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->" . $attribute->signature->name . "()))\n    return v8::Handle<v8::Value>();\n\n");
     }
 
     my $useExceptions = 1 if @{$attribute->getterExceptions};
@@ -893,14 +875,17 @@ END
         push(@implContentDecls, "    ExceptionCode ec = 0;\n");
     }
 
-    if ($attribute->signature->extendedAttributes->{"v8referenceattr"}) {
-        $attrName = $attribute->signature->extendedAttributes->{"v8referenceattr"};
-    }
-
     my $returnType = GetTypeFromSignature($attribute->signature);
     my $getterString;
+    my $callWith = $attribute->signature->extendedAttributes->{"CallWith"} || "";
+
     if ($getterStringUsesImp) {
         my ($functionName, @arguments) = $codeGenerator->GetterExpression(\%implIncludes, $interfaceName, $attribute);
+
+        if ($callWith) {
+            push(@arguments, GenerateCallWith($callWith, \@implContentDecls, "    ", 0, 0));
+        }
+
         push(@arguments, "ec") if $useExceptions;
         if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
             my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
@@ -930,6 +915,12 @@ END
             push(@implContentDecls, "    $nativeType v = $getterString;\n");
         }
         push(@implContentDecls, GenerateSetDOMException("    "));
+
+        if ($callWith eq "ScriptState") {
+            push(@implContentDecls, "    if (state.hadException())\n");
+            push(@implContentDecls, "        return throwError(state.exception());\n");
+        }
+
         $result = "v";
         $result .= ".release()" if (IsRefPtrType($returnType));
     } else {
@@ -1128,6 +1119,8 @@ END
         push(@implContentDecls, "    ExceptionCode ec = 0;\n");
     }
 
+    my $callWith = $attribute->signature->extendedAttributes->{"CallWith"} || "";
+
     if ($implClassName eq "SVGNumber") {
         push(@implContentDecls, "    *imp = $result;\n");
     } else {
@@ -1152,6 +1145,11 @@ END
             push(@implContentDecls, ");\n");
         } else {
             my ($functionName, @arguments) = $codeGenerator->SetterExpression(\%implIncludes, $interfaceName, $attribute);
+
+            if ($callWith) {
+                push(@arguments, GenerateCallWith($callWith, \@implContentDecls, "    ", 1, 0));
+            }
+
             push(@arguments, $result);
             push(@arguments, "ec") if $useExceptions;
             if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
@@ -1169,6 +1167,11 @@ END
     if ($useExceptions) {
         push(@implContentDecls, "    if (UNLIKELY(ec))\n");
         push(@implContentDecls, "        V8Proxy::setDOMException(ec);\n");
+    }
+
+    if ($callWith eq "ScriptState") {
+        push(@implContentDecls, "    if (state.hadException())\n");
+        push(@implContentDecls, "        throwError(state.exception());\n");
     }
 
     if ($svgNativeType) {
@@ -1430,10 +1433,9 @@ END
         AddToImplIncludes("ScriptCallStack.h");
         AddToImplIncludes("ScriptCallStackFactory.h");
     }
-    if ($function->signature->extendedAttributes->{"SVGCheckSecurityDocument"}) {
-        push(@implContentDecls, <<END);
-    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->getSVGDocument(ec)))
-        return v8::Handle<v8::Value>();
+    if ($function->signature->extendedAttributes->{"CheckAccessToNode"}) {
+        push(@implContentDecls, "    if (!V8BindingSecurity::allowAccessToNode(V8BindingState::Only(), imp->" . $function->signature->name . "(ec)))\n");
+        push(@implContentDecls, "        return v8::Handle<v8::Value>();\n");
 END
     }
 
@@ -1452,6 +1454,35 @@ END
 
     push(@implContentDecls, "}\n\n");
     push(@implContentDecls, "#endif // ${conditionalString}\n\n") if $conditionalString;
+}
+
+sub GenerateCallWith
+{
+    my $callWith = shift;
+    my $outputArray = shift;
+    my $indent = shift;
+    my $returnVoid = shift;
+    my $emptyContext = shift;
+    my $callWithArg = "COMPILE_ASSERT(false)";
+
+    if ($callWith eq "ScriptState") {
+        if ($emptyContext) {
+            push(@$outputArray, $indent . "EmptyScriptState state;\n");
+            $callWithArg = "&state";
+        } else {
+            push(@$outputArray, $indent . "ScriptState* state = ScriptState::current();\n");
+            push(@$outputArray, $indent . "if (!state)\n");
+            push(@$outputArray, $indent . "    return" . ($returnVoid ? "" : " v8::Undefined()") . ";\n");
+            $callWithArg = "state";
+        }
+    } elsif ($callWith eq "ScriptExecutionContext") {
+        push(@$outputArray, $indent . "ScriptExecutionContext* scriptContext = getScriptExecutionContext();\n");
+        push(@$outputArray, $indent . "if (!scriptContext)\n");
+        push(@$outputArray, $indent . "    return" . ($returnVoid ? "" : " v8::Undefined()") . ";\n");
+        $callWithArg = "scriptContext";
+    }
+
+    return $callWithArg;
 }
 
 sub GenerateArgumentsCountCheck
@@ -1916,7 +1947,7 @@ sub GenerateSingleBatchedAttribute
             $accessControl .= " | v8::ALL_CAN_WRITE";
         }
     }
-    if ($attrExt->{"V8DisallowShadowing"}) {
+    if ($attrExt->{"V8Unforgeable"}) {
         $accessControl .= " | v8::PROHIBITS_OVERWRITING";
     }
     $accessControl = "static_cast<v8::AccessControl>(" . $accessControl . ")";
@@ -1931,12 +1962,7 @@ sub GenerateSingleBatchedAttribute
         "";
     if ($customAccessor eq 1) {
         # use the naming convension, interface + (capitalize) attr name
-        if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
-            $customAccessor = $attribute->signature->extendedAttributes->{"ImplementedBy"} . "::" . $attrName;
-            AddToImplIncludes("V8" . $attribute->signature->extendedAttributes->{"ImplementedBy"} . ".h");
-        } else {
-            $customAccessor = $interfaceName . "::" . $attrName;
-        }
+        $customAccessor = $interfaceName . "::" . $attrName;
     }
 
     my $getter;
@@ -1948,7 +1974,7 @@ sub GenerateSingleBatchedAttribute
     if ($attrExt->{"DontEnum"}) {
         $propAttr .= " | v8::DontEnum";
     }
-    if ($attrExt->{"V8DisallowShadowing"}) {
+    if ($attrExt->{"V8Unforgeable"}) {
         $propAttr .= " | v8::DontDelete";
     }
 
@@ -2194,7 +2220,7 @@ sub IsTypedArrayType
 {
     my $type = shift;
     return 1 if (($type eq "ArrayBuffer") or ($type eq "ArrayBufferView"));
-    return 1 if (($type eq "Uint8Array") or ($type eq "Uint16Array") or ($type eq "Uint32Array"));
+    return 1 if (($type eq "Uint8Array") or ($type eq "Uint8ClampedArray") or ($type eq "Uint16Array") or ($type eq "Uint32Array"));
     return 1 if (($type eq "Int8Array") or ($type eq "Int16Array") or ($type eq "Int32Array"));
     return 1 if (($type eq "Float32Array") or ($type eq "Float64Array"));
     return 0;
@@ -2339,7 +2365,7 @@ sub GenerateImplementation
     my @normal;
     foreach my $attribute (@$attributes) {
 
-        if ($interfaceName eq "DOMWindow" && $attribute->signature->extendedAttributes->{"V8DisallowShadowing"}) {
+        if ($interfaceName eq "DOMWindow" && $attribute->signature->extendedAttributes->{"V8Unforgeable"}) {
             push(@disallowsShadowing, $attribute);
         } elsif ($attribute->signature->extendedAttributes->{"EnabledAtRuntime"}) {
             push(@enabledAtRuntime, $attribute);
@@ -3174,10 +3200,6 @@ sub GenerateFunctionCallString()
     my $isSVGTearOffType = ($codeGenerator->IsSVGTypeNeedingTearOff($returnType) and not $implClassName =~ /List$/);
     $nativeReturnType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($returnType) if $isSVGTearOffType;
 
-    if ($function->signature->extendedAttributes->{"v8implname"}) {
-        $name = $function->signature->extendedAttributes->{"v8implname"};
-    }
-
     if ($function->signature->extendedAttributes->{"ImplementationFunction"}) {
         $name = $function->signature->extendedAttributes->{"ImplementationFunction"};
     }
@@ -3198,20 +3220,11 @@ sub GenerateFunctionCallString()
         $functionName = "imp->${name}";
     }
 
-    my $callWith = $function->signature->extendedAttributes->{"CallWith"};
+    my $callWith = $function->signature->extendedAttributes->{"CallWith"} || "";
     if ($callWith) {
-        my $callWithArg = "COMPILE_ASSERT(false)";
-        if ($callWith eq "ScriptState") {
-            $result .= $indent . "EmptyScriptState state;\n";
-            $callWithArg = "&state";
-            $hasScriptState = 1;
-        } elsif ($callWith eq "ScriptExecutionContext") {
-            $result .= $indent . "ScriptExecutionContext* scriptContext = getScriptExecutionContext();\n";
-            $result .= $indent . "if (!scriptContext)\n";
-            $result .= $indent . "    return v8::Undefined();\n";
-            $callWithArg = "scriptContext";
-        }
-        push @arguments, $callWithArg;
+        my @callWithOutput = ();
+        push(@arguments, GenerateCallWith($callWith, \@callWithOutput, $indent, 0, 1));
+        $result .= join("", @callWithOutput);
         $index++;
         $numberOfParameters++
     }
@@ -3254,7 +3267,7 @@ sub GenerateFunctionCallString()
 
     if ($returnType eq "void") {
         $result .= $indent . "$functionString;\n";
-    } elsif ($hasScriptState or @{$function->raisesExceptions}) {
+    } elsif ($callWith eq "ScriptState" or @{$function->raisesExceptions}) {
         $result .= $indent . $nativeReturnType . " result = $functionString;\n";
     } else {
         # Can inline the function call into the return statement to avoid overhead of using a Ref<> temporary
@@ -3271,7 +3284,7 @@ sub GenerateFunctionCallString()
         $result .= $indent . "    goto fail;\n";
     }
 
-    if ($hasScriptState) {
+    if ($callWith eq "ScriptState") {
         $result .= $indent . "if (state.hadException())\n";
         $result .= $indent . "    return throwError(state.exception());\n"
     }
@@ -3322,7 +3335,7 @@ sub GetNativeTypeFromSignature
         my $mode = "";
         if ($signature->extendedAttributes->{"ConvertUndefinedOrNullToNullString"}) {
             $mode = "WithUndefinedOrNullCheck";
-        } elsif ($signature->extendedAttributes->{"ConvertNullToNullString"} || $signature->extendedAttributes->{"Reflect"}) {
+        } elsif (($signature->extendedAttributes->{"TreatNullAs"} and $signature->extendedAttributes->{"TreatNullAs"} eq "EmptyString") or $signature->extendedAttributes->{"Reflect"}) {
             $mode = "WithNullCheck";
         }
         $type .= "<$mode>";
@@ -3767,63 +3780,62 @@ sub ReturnNativeToJSValue
 # Internal helper
 sub WriteData
 {
-    if (defined($IMPL)) {
-        # Write content to file.
-        print $IMPL @implContentHeader;
+    my $object = shift;
+    my $dataNode = shift;
 
-        print $IMPL @implFixedHeader;
+    my $name = $dataNode->name;
+    my $prefix = FileNamePrefix;
+    my $headerFileName = "$outputHeadersDir/$prefix$name.h";
+    my $implFileName = "$outputDir/$prefix$name.cpp";
 
-        my @includes = ();
-        my %implIncludeConditions = ();
-        foreach my $include (keys %implIncludes) {
-            my $condition = $implIncludes{$include};
-            my $checkType = $include;
-            $checkType =~ s/\.h//;
-            next if $codeGenerator->IsSVGAnimatedType($checkType);
+    # Update a .cpp file if the contents are changed.
+    my $contents = join "", @implContentHeader, @implFixedHeader;
 
-            if ($include =~ /wtf/) {
-                $include = "\<$include\>";
-            } else {
-                $include = "\"$include\"";
-            }
+    my @includes = ();
+    my %implIncludeConditions = ();
+    foreach my $include (keys %implIncludes) {
+        my $condition = $implIncludes{$include};
+        my $checkType = $include;
+        $checkType =~ s/\.h//;
+        next if $codeGenerator->IsSVGAnimatedType($checkType);
 
-            if ($condition eq 1) {
-                push @includes, $include;
-            } else {
-                push @{$implIncludeConditions{$condition}}, $include;
-            }
-        }
-        foreach my $include (sort @includes) {
-            print $IMPL "#include $include\n";
-        }
-        foreach my $condition (sort keys %implIncludeConditions) {
-            print $IMPL "\n#if " . $codeGenerator->GenerateConditionalStringFromAttributeValue($condition) . "\n";
-            foreach my $include (sort @{$implIncludeConditions{$condition}}) {
-                print $IMPL "#include $include\n";
-            }
-            print $IMPL "#endif\n";
+        if ($include =~ /wtf/) {
+            $include = "\<$include\>";
+        } else {
+            $include = "\"$include\"";
         }
 
-        print $IMPL "\n";
-        print $IMPL @implContentDecls;
-        print $IMPL @implContent;
-        close($IMPL);
-        undef($IMPL);
-
-        %implIncludes = ();
-        @implFixedHeader = ();
-        @implContentDecls = ();
-        @implContent = ();
+        if ($condition eq 1) {
+            push @includes, $include;
+        } else {
+            push @{$implIncludeConditions{$condition}}, $include;
+        }
+    }
+    foreach my $include (sort @includes) {
+        $contents .= "#include $include\n";
+    }
+    foreach my $condition (sort keys %implIncludeConditions) {
+        $contents .= "\n#if " . $codeGenerator->GenerateConditionalStringFromAttributeValue($condition) . "\n";
+        foreach my $include (sort @{$implIncludeConditions{$condition}}) {
+            $contents .= "#include $include\n";
+        }
+        $contents .= "#endif\n";
     }
 
-    if (defined($HEADER)) {
-        # Write content to file.
-        print $HEADER @headerContent;
-        close($HEADER);
-        undef($HEADER);
+    $contents .= "\n";
+    $contents .= join "", @implContentDecls, @implContent;
+    $codeGenerator->UpdateFile($implFileName, $contents);
 
-        @headerContent = ();
-    }
+    %implIncludes = ();
+    @implFixedHeader = ();
+    @implContentDecls = ();
+    @implContent = ();
+
+    # Update a .h file if the contents are changed.
+    $contents = join "", @headerContent;
+    $codeGenerator->UpdateFile($headerFileName, $contents);
+
+    @headerContent = ();
 }
 
 sub GetVisibleInterfaceName

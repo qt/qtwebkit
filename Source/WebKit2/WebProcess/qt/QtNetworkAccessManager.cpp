@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Zeno Albisser <zeno@webkit.org>
+ * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +30,9 @@
 #include "SharedMemory.h"
 #include "WebFrameNetworkingContext.h"
 #include "WebPage.h"
+#include "WebPageProxyMessages.h"
 #include "WebProcess.h"
+#include <QAuthenticator>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 
@@ -39,12 +42,8 @@ QtNetworkAccessManager::QtNetworkAccessManager(WebProcess* webProcess)
     : QNetworkAccessManager()
     , m_webProcess(webProcess)
 {
-}
-
-QtNetworkAccessManager::QtNetworkAccessManager(QObject* parent)
-    : QNetworkAccessManager(parent)
-    , m_webProcess(0)
-{
+    connect(this, SIGNAL(authenticationRequired(QNetworkReply*, QAuthenticator*)), SLOT(onAuthenticationRequired(QNetworkReply*, QAuthenticator*)));
+    connect(this, SIGNAL(sslErrors(QNetworkReply*, QList<QSslError>)), SLOT(onSslErrors(QNetworkReply*, QList<QSslError>)));
 }
 
 WebPage* QtNetworkAccessManager::obtainOriginatingWebPage(const QNetworkRequest& request)
@@ -53,13 +52,8 @@ WebPage* QtNetworkAccessManager::obtainOriginatingWebPage(const QNetworkRequest&
     if (!originatingObject)
         return 0;
 
-    QVariant pagePtr = originatingObject->property("PagePointer");
-    if (!pagePtr.isValid() || !pagePtr.canConvert<void*>())
-        return 0;
-
-    WebPage* webPage = static_cast<WebPage*>(pagePtr.value<void*>());
-    Q_ASSERT(webPage);
-    return webPage;
+    qulonglong pageID = originatingObject->property("pageID").toULongLong();
+    return m_webProcess->webPage(pageID);
 }
 
 QNetworkReply* QtNetworkAccessManager::createRequest(Operation operation, const QNetworkRequest& request, QIODevice* outData)
@@ -77,6 +71,49 @@ QNetworkReply* QtNetworkAccessManager::createRequest(Operation operation, const 
 void QtNetworkAccessManager::registerApplicationScheme(const WebPage* page, const QString& scheme)
 {
     m_applicationSchemes.insert(page, scheme.toLower());
+}
+
+void QtNetworkAccessManager::onAuthenticationRequired(QNetworkReply* reply, QAuthenticator* authenticator)
+{
+    WebPage* webPage = obtainOriginatingWebPage(reply->request());
+
+    // FIXME: This check can go away once our Qt version is up-to-date. See: QTBUG-23512.
+    if (!webPage)
+        return;
+
+    String hostname = reply->url().toString(QUrl::RemovePath | QUrl::RemoveQuery | QUrl::RemoveFragment | QUrl::StripTrailingSlash);
+    String realm = authenticator->realm();
+    String prefilledUsername = authenticator->user();
+    String username;
+    String password;
+
+    if (webPage->sendSync(
+        Messages::WebPageProxy::AuthenticationRequiredRequest(hostname, realm, prefilledUsername),
+        Messages::WebPageProxy::AuthenticationRequiredRequest::Reply(username, password))) {
+        if (!username.isEmpty())
+            authenticator->setUser(username);
+        if (!password.isEmpty())
+            authenticator->setPassword(password);
+    }
+}
+
+void QtNetworkAccessManager::onSslErrors(QNetworkReply* reply, const QList<QSslError>& qSslErrors)
+{
+    WebPage* webPage = obtainOriginatingWebPage(reply->request());
+
+    // FIXME: This check can go away once our Qt version is up-to-date. See: QTBUG-23512.
+    if (!webPage)
+        return;
+
+    String hostname = reply->url().host();
+    bool ignoreErrors = false;
+
+    if (webPage->sendSync(
+        Messages::WebPageProxy::CertificateVerificationRequest(hostname),
+        Messages::WebPageProxy::CertificateVerificationRequest::Reply(ignoreErrors))) {
+        if (ignoreErrors)
+            reply->ignoreSslErrors(qSslErrors);
+    }
 }
 
 }

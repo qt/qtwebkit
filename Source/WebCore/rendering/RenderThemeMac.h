@@ -27,16 +27,12 @@
 #import <wtf/HashMap.h>
 #import <wtf/RetainPtr.h>
 
-class RenderProgress;
 
-#ifdef __OBJC__
-@class WebCoreRenderThemeNotificationObserver;
-#else
-class WebCoreRenderThemeNotificationObserver;
-#endif
+OBJC_CLASS WebCoreRenderThemeNotificationObserver;
 
 namespace WebCore {
 
+class RenderProgress;
 class RenderStyle;
 
 class RenderThemeMac : public RenderTheme {
@@ -79,6 +75,8 @@ public:
     virtual int popupInternalPaddingBottom(RenderStyle*) const;
     
     virtual bool paintCapsLockIndicator(RenderObject*, const PaintInfo&, const IntRect&);
+
+    virtual bool popsMenuByArrowKeys() const OVERRIDE { return true; }
 
 #if ENABLE(METER_TAG)
     virtual IntSize meterSizeForBounds(const RenderMeter*, const IntRect&) const;

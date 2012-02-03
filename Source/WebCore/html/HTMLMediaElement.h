@@ -30,6 +30,7 @@
 
 #include "HTMLElement.h"
 #include "ActiveDOMObject.h"
+#include "GenericEventQueue.h"
 #include "MediaCanStartListener.h"
 #include "MediaControllerInterface.h"
 #include "MediaPlayer.h"
@@ -196,18 +197,39 @@ public:
     float percentLoaded() const;
 
 #if ENABLE(VIDEO_TRACK)
-    PassRefPtr<TextTrack> addTrack(const String& kind, const String& label, const String& language, ExceptionCode&);
-    PassRefPtr<TextTrack> addTrack(const String& kind, const String& label, ExceptionCode& ec) { return addTrack(kind, label, emptyString(), ec); }
-    PassRefPtr<TextTrack> addTrack(const String& kind, ExceptionCode& ec) { return addTrack(kind, emptyString(), emptyString(), ec); }
+    PassRefPtr<TextTrack> addTextTrack(const String& kind, const String& label, const String& language, ExceptionCode&);
+    PassRefPtr<TextTrack> addTextTrack(const String& kind, const String& label, ExceptionCode& ec) { return addTextTrack(kind, label, emptyString(), ec); }
+    PassRefPtr<TextTrack> addTextTrack(const String& kind, ExceptionCode& ec) { return addTextTrack(kind, emptyString(), emptyString(), ec); }
 
     TextTrackList* textTracks();
     CueList currentlyActiveCues() const { return m_currentlyActiveCues; }
 
     virtual void trackWasAdded(HTMLTrackElement*);
-    virtual void trackWillBeRemoved(HTMLTrackElement*);
-    
-    void configureTextTrack(HTMLTrackElement*);
-    void configureTextTracks();
+    virtual void trackWasRemoved(HTMLTrackElement*);
+
+    struct TrackGroup {
+        enum GroupKind { CaptionsAndSubtitles, Description, Chapter, Metadata, Other };
+
+        TrackGroup(GroupKind kind)
+            : visibleTrack(0)
+            , defaultTrack(0)
+            , kind(kind)
+            , hasSrcLang(false)
+        {
+        }
+
+        Vector<HTMLTrackElement*> tracks;
+        HTMLTrackElement* visibleTrack;
+        HTMLTrackElement* defaultTrack;
+        GroupKind kind;
+        bool hasSrcLang;
+    };
+
+    void configureTextTrackGroupForLanguage(const TrackGroup&) const;
+    void configureNewTextTracks();
+    void configureTextTrackGroup(const TrackGroup&) const;
+
+    bool userIsInterestedInThisTrackKind(String) const;
     bool textTracksAreReady() const;
     void configureTextTrackDisplay();
 
@@ -272,6 +294,8 @@ public:
 
     MediaController* controller() const;
     void setController(PassRefPtr<MediaController>);
+
+    virtual bool dispatchEvent(PassRefPtr<Event>);
 
 protected:
     HTMLMediaElement(const QualifiedName&, Document*, bool);
@@ -347,6 +371,7 @@ private:
     virtual void mediaPlayerRateChanged(MediaPlayer*);
     virtual void mediaPlayerPlaybackStateChanged(MediaPlayer*);
     virtual void mediaPlayerSawUnsupportedTracks(MediaPlayer*);
+    virtual void mediaPlayerResourceNotSupported(MediaPlayer*);
     virtual void mediaPlayerRepaint(MediaPlayer*);
     virtual void mediaPlayerSizeChanged(MediaPlayer*);
 #if USE(ACCELERATED_COMPOSITING)
@@ -364,7 +389,6 @@ private:
 #endif
 
     void loadTimerFired(Timer<HTMLMediaElement>*);
-    void asyncEventTimerFired(Timer<HTMLMediaElement>*);
     void progressEventTimerFired(Timer<HTMLMediaElement>*);
     void playbackProgressTimerFired(Timer<HTMLMediaElement>*);
     void startPlaybackProgressTimer();
@@ -398,7 +422,6 @@ private:
 #if ENABLE(VIDEO_TRACK)
     void updateActiveTextTrackCues(float);
     bool userIsInterestedInThisLanguage(const String&) const;
-    bool userIsInterestedInThisTrack(HTMLTrackElement*) const;
     HTMLTrackElement* showingTrackWithSameKind(HTMLTrackElement*) const;
 
     bool ignoreTrackDisplayUpdateRequests() const { return m_ignoreTrackDisplayUpdate > 0; }
@@ -449,6 +472,8 @@ private:
 
     virtual void* preDispatchEventHandler(Event*);
 
+    void changeNetworkStateFromLoadingToIdle();
+
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const;
     virtual void setItemValueText(const String&, ExceptionCode&);
@@ -467,11 +492,10 @@ private:
 #endif
 
     Timer<HTMLMediaElement> m_loadTimer;
-    Timer<HTMLMediaElement> m_asyncEventTimer;
     Timer<HTMLMediaElement> m_progressEventTimer;
     Timer<HTMLMediaElement> m_playbackProgressTimer;
-    Vector<RefPtr<Event> > m_pendingEvents;
     RefPtr<TimeRanges> m_playedTimeRanges;
+    GenericEventQueue m_asyncEventQueue;
 
     float m_playbackRate;
     float m_defaultPlaybackRate;

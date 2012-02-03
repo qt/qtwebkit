@@ -44,6 +44,7 @@
 namespace WebKit {
 
 class WebInputEvent;
+class WebMouseEvent;
 class WebString;
 struct WebPoint;
 template <typename T> class WebVector;
@@ -169,6 +170,22 @@ public:
     // Returns true if the WebWidget uses GPU accelerated compositing
     // to render its contents.
     virtual bool isAcceleratedCompositingActive() const { return false; }
+
+    // Calling WebWidgetClient::requestPointerLock() will result in one
+    // return call to didAcquirePointerLock() or didNotAcquirePointerLock().
+    virtual void didAcquirePointerLock() { }
+    virtual void didNotAcquirePointerLock() { }
+
+    // Pointer lock was held, but has been lost. This may be due to a
+    // request via WebWidgetClient::requestPointerUnlock(), or for other
+    // reasons such as the user exiting lock, window focus changing, etc.
+    virtual void didLosePointerLock() { }
+
+    // Informs the WebWidget that the resizer rect changed. Happens for example
+    // on mac, when a widget appears below the WebWidget without changing the
+    // WebWidget's size (WebWidget::resize() automatically checks the resizer
+    // rect.)
+    virtual void didChangeWindowResizerRect() { }
 
 protected:
     ~WebWidget() { }

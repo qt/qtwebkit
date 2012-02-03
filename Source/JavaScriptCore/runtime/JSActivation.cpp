@@ -45,7 +45,7 @@ JSActivation::JSActivation(CallFrame* callFrame, FunctionExecutable* functionExe
     : Base(callFrame->globalData(), callFrame->globalData().activationStructure.get(), functionExecutable->symbolTable(), callFrame->registers())
     , m_numCapturedArgs(max(callFrame->argumentCount(), functionExecutable->parameterCount()))
     , m_numCapturedVars(functionExecutable->capturedVariableCount())
-    , m_requiresDynamicChecks(functionExecutable->usesEval())
+    , m_requiresDynamicChecks(functionExecutable->usesEval() && !functionExecutable->isStrictMode())
     , m_argumentsRegister(functionExecutable->generatedBytecode().argumentsRegister())
 {
 }
@@ -184,11 +184,11 @@ void JSActivation::put(JSCell* cell, ExecState* exec, const Identifier& property
     // properties are non-standard extensions that other implementations do not
     // expose in the activation object.
     ASSERT(!thisObject->hasGetterSetterProperties());
-    thisObject->putDirect(exec->globalData(), propertyName, value, 0, true, slot);
+    thisObject->putOwnDataProperty(exec->globalData(), propertyName, value, slot);
 }
 
 // FIXME: Make this function honor ReadOnly (const) and DontEnum
-void JSActivation::putWithAttributes(JSObject* object, ExecState* exec, const Identifier& propertyName, JSValue value, unsigned attributes)
+void JSActivation::putDirectVirtual(JSObject* object, ExecState* exec, const Identifier& propertyName, JSValue value, unsigned attributes)
 {
     JSActivation* thisObject = jsCast<JSActivation*>(object);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(thisObject));
@@ -200,7 +200,7 @@ void JSActivation::putWithAttributes(JSObject* object, ExecState* exec, const Id
     // properties are non-standard extensions that other implementations do not
     // expose in the activation object.
     ASSERT(!thisObject->hasGetterSetterProperties());
-    JSObject::putWithAttributes(thisObject, exec, propertyName, value, attributes);
+    JSObject::putDirectVirtual(thisObject, exec, propertyName, value, attributes);
 }
 
 bool JSActivation::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)

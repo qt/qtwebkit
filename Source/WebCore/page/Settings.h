@@ -189,6 +189,9 @@ namespace WebCore {
         void setUserStyleSheetLocation(const KURL&);
         const KURL& userStyleSheetLocation() const { return m_userStyleSheetLocation; }
 
+        void setFixedElementsLayoutRelativeToFrame(bool);
+        bool fixedElementsLayoutRelativeToFrame() const { return m_fixedElementsLayoutRelativeToFrame; }
+
         void setShouldPrintBackgrounds(bool);
         bool shouldPrintBackgrounds() const { return m_shouldPrintBackgrounds; }
 
@@ -307,6 +310,9 @@ namespace WebCore {
         void setAcceleratedFiltersEnabled(bool enabled) { m_acceleratedFiltersEnabled = enabled; }
         bool acceleratedFiltersEnabled() const { return m_acceleratedFiltersEnabled; }
 
+        void setCSSCustomFilterEnabled(bool enabled) { m_isCSSCustomFilterEnabled = enabled; }
+        bool isCSSCustomFilterEnabled() const { return m_isCSSCustomFilterEnabled; }
+
         void setAcceleratedCompositingEnabled(bool);
         bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
 
@@ -359,6 +365,9 @@ namespace WebCore {
 
         void setAccelerated2dCanvasEnabled(bool);
         bool accelerated2dCanvasEnabled() const { return m_acceleratedCanvas2dEnabled; }
+
+        void setDeferred2dCanvasEnabled(bool);
+        bool deferred2dCanvasEnabled() const { return m_deferredCanvas2dEnabled; }
 
         // Number of pixels below which 2D canvas is rendered in software
         // even if hardware acceleration is enabled.
@@ -511,6 +520,9 @@ namespace WebCore {
         bool scrollingCoordinatorEnabled() const { return m_scrollingCoordinatorEnabled; }
 #endif
 
+        void setNotificationsEnabled(bool enabled) { m_notificationsEnabled = enabled; }
+        bool notificationsEnabled() const { return m_notificationsEnabled; }
+
     private:
         Settings(Page*);
 
@@ -591,6 +603,7 @@ namespace WebCore {
         bool m_canvasUsesAcceleratedDrawing : 1;
         bool m_acceleratedDrawingEnabled : 1;
         bool m_acceleratedFiltersEnabled : 1;
+        bool m_isCSSCustomFilterEnabled : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;
@@ -609,6 +622,7 @@ namespace WebCore {
         bool m_privilegedWebGLExtensionsEnabled : 1;
         bool m_webAudioEnabled : 1;
         bool m_acceleratedCanvas2dEnabled : 1;
+        bool m_deferredCanvas2dEnabled : 1;
         bool m_loadDeferringEnabled : 1;
         bool m_tiledBackingStoreEnabled : 1;
         bool m_paginateDuringLayoutEnabled : 1;
@@ -625,6 +639,7 @@ namespace WebCore {
         bool m_crossOriginCheckInGetMatchedCSSRulesDisabled : 1;
         bool m_forceCompositingMode : 1;
         bool m_shouldInjectUserScriptsInInitialEmptyDocument : 1;
+        bool m_fixedElementsLayoutRelativeToFrame : 1;
         bool m_allowDisplayOfInsecureContent : 1;
         bool m_allowRunningOfInsecureContent : 1;
 #if ENABLE(SMOOTH_SCROLLING)
@@ -651,6 +666,8 @@ namespace WebCore {
 #if ENABLE(THREADED_SCROLLING)
         bool m_scrollingCoordinatorEnabled : 1;
 #endif
+
+        bool m_notificationsEnabled : 1;
 
         Timer<Settings> m_loadsImagesAutomaticallyTimer;
         void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);

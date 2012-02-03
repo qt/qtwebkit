@@ -86,7 +86,7 @@ JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
     jit.move(TrustedImm32(0), regT0);
     jit.ret();
     
-    LinkBuffer patchBuffer(*globalData, &jit);
+    LinkBuffer patchBuffer(*globalData, &jit, GLOBAL_THUNK_ID);
     return patchBuffer.finalizeCode();
 }
 
@@ -116,7 +116,7 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
     loadPtr(BaseIndex(regT2, regT1, ScalePtr, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])), regT0);
     addSlowCase(branchTestPtr(Zero, regT0));
 
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitPutVirtualRegister(dst);
 }
 
@@ -147,7 +147,7 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     stubCall.addArgument(property, regT2);
     stubCall.call(dst);
 
-    emitValueProfilingSite(SubsequentProfilingSite);
+    emitValueProfilingSite();
 }
 
 void JIT::compileGetDirectOffset(RegisterID base, RegisterID result, RegisterID offset, RegisterID scratch)
@@ -261,21 +261,13 @@ void JIT::emit_op_put_by_index(Instruction* currentInstruction)
     stubCall.call();
 }
 
-void JIT::emit_op_put_getter(Instruction* currentInstruction)
+void JIT::emit_op_put_getter_setter(Instruction* currentInstruction)
 {
-    JITStubCall stubCall(this, cti_op_put_getter);
+    JITStubCall stubCall(this, cti_op_put_getter_setter);
     stubCall.addArgument(currentInstruction[1].u.operand, regT2);
     stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(currentInstruction[2].u.operand)));
     stubCall.addArgument(currentInstruction[3].u.operand, regT2);
-    stubCall.call();
-}
-
-void JIT::emit_op_put_setter(Instruction* currentInstruction)
-{
-    JITStubCall stubCall(this, cti_op_put_setter);
-    stubCall.addArgument(currentInstruction[1].u.operand, regT2);
-    stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(currentInstruction[2].u.operand)));
-    stubCall.addArgument(currentInstruction[3].u.operand, regT2);
+    stubCall.addArgument(currentInstruction[4].u.operand, regT2);
     stubCall.call();
 }
 
@@ -332,7 +324,7 @@ void JIT::emit_op_method_check(Instruction* currentInstruction)
     compileGetByIdHotPath(baseVReg, ident);
 
     match.link(this);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite(m_bytecodeOffset + OPCODE_LENGTH(op_method_check));
     emitPutVirtualRegister(resultVReg);
 
     // We've already generated the following get_by_id, so make sure it's skipped over.
@@ -347,7 +339,7 @@ void JIT::emitSlow_op_method_check(Instruction* currentInstruction, Vector<SlowC
     Identifier* ident = &(m_codeBlock->identifier(currentInstruction[3].u.operand));
 
     compileGetByIdSlowCase(resultVReg, baseVReg, ident, iter, true);
-    emitValueProfilingSite(SubsequentProfilingSite);
+    emitValueProfilingSite(m_bytecodeOffset + OPCODE_LENGTH(op_method_check));
 
     // We've already generated the following get_by_id, so make sure it's skipped over.
     m_bytecodeOffset += OPCODE_LENGTH(op_get_by_id);
@@ -361,7 +353,7 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
 
     emitGetVirtualRegister(baseVReg, regT0);
     compileGetByIdHotPath(baseVReg, ident);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitPutVirtualRegister(resultVReg);
 }
 
@@ -405,7 +397,7 @@ void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCase
     Identifier* ident = &(m_codeBlock->identifier(currentInstruction[3].u.operand));
 
     compileGetByIdSlowCase(resultVReg, baseVReg, ident, iter, false);
-    emitValueProfilingSite(SubsequentProfilingSite);
+    emitValueProfilingSite();
 }
 
 void JIT::compileGetByIdSlowCase(int resultVReg, int baseVReg, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter, bool isMethodCheck)
@@ -548,7 +540,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
         stubCall.skipArgument(); // ident
         stubCall.skipArgument(); // value
         stubCall.addArgument(TrustedImm32(oldStructure->propertyStorageCapacity()));
-        stubCall.addArgument(TrustedImm32(newStructure->propertyStorageCapacity()));
+        stubCall.addArgument(TrustedImmPtr(newStructure));
         stubCall.call(regT0);
         emitGetJITStubArg(2, regT1);
 
@@ -570,7 +562,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
     restoreArgumentReferenceForTrampoline();
     Call failureCall = tailRecursiveCall();
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     patchBuffer.link(failureCall, FunctionPtr(direct ? cti_op_put_by_id_direct_fail : cti_op_put_by_id_fail));
 
@@ -629,7 +621,7 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     emitFastArithIntToImmNoCheck(regT2, regT0);
     Jump success = jump();
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-patchOffsetGetByIdSlowCaseCall);
@@ -686,7 +678,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
     } else
         compileGetDirectOffset(protoObject, regT0, cachedOffset);
     Jump success = jump();
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-patchOffsetGetByIdSlowCaseCall);
@@ -741,7 +733,7 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
     }
     Jump success = jump();
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
@@ -809,7 +801,7 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
 
     Jump success = jump();
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
@@ -878,7 +870,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     }
     Jump success = jump();
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
@@ -946,7 +938,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
         compileGetDirectOffset(protoObject, regT0, cachedOffset);
     Jump success = jump();
 
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
 
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
@@ -994,7 +986,7 @@ void JIT::emit_op_get_scoped_var(Instruction* currentInstruction)
     loadPtr(Address(regT0, OBJECT_OFFSETOF(ScopeChainNode, object)), regT0);
     loadPtr(Address(regT0, JSVariableObject::offsetOfRegisters()), regT0);
     loadPtr(Address(regT0, currentInstruction[2].u.operand * sizeof(Register)), regT0);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitPutVirtualRegister(currentInstruction[1].u.operand);
 }
 
@@ -1029,7 +1021,7 @@ void JIT::emit_op_get_global_var(Instruction* currentInstruction)
     JSVariableObject* globalObject = m_codeBlock->globalObject();
     loadPtr(&globalObject->m_registers, regT0);
     loadPtr(Address(regT0, currentInstruction[2].u.operand * sizeof(Register)), regT0);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitPutVirtualRegister(currentInstruction[1].u.operand);
 }
 

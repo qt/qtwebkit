@@ -69,7 +69,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static bool propertyMissingOrEqualToNone(CSSStyleDeclaration*, int propertyID);
+static bool propertyMissingOrEqualToNone(CSSMutableStyleDeclaration*, int propertyID);
 
 class AttributeChange {
 public:
@@ -104,7 +104,9 @@ static void completeURLs(Node* node, const String& baseURL)
     for (Node* n = node; n != end; n = n->traverseNextNode()) {
         if (n->isElementNode()) {
             Element* e = static_cast<Element*>(n);
-            NamedNodeMap* attributes = e->attributes();
+            NamedNodeMap* attributes = e->updatedAttributes();
+            if (!attributes)
+                continue;
             unsigned length = attributes->length();
             for (unsigned i = 0; i < length; i++) {
                 Attribute* attribute = attributes->attributeItem(i);
@@ -127,11 +129,11 @@ public:
     Node* serializeNodes(Node* startNode, Node* pastEnd);
     virtual void appendString(const String& s) { return MarkupAccumulator::appendString(s); }
     void wrapWithNode(Node*, bool convertBlocksToInlines = false, RangeFullySelectsNode = DoesFullySelectNode);
-    void wrapWithStyleNode(CSSStyleDeclaration*, Document*, bool isBlock = false);
+    void wrapWithStyleNode(CSSMutableStyleDeclaration*, Document*, bool isBlock = false);
     String takeResults();
 
 private:
-    void appendStyleNodeOpenTag(StringBuilder&, CSSStyleDeclaration*, Document*, bool isBlock = false);
+    void appendStyleNodeOpenTag(StringBuilder&, CSSMutableStyleDeclaration*, Document*, bool isBlock = false);
     const String styleNodeCloseTag(bool isBlock = false);
     virtual void appendText(StringBuilder& out, Text*);
     String renderedText(const Node*, const Range*);
@@ -176,7 +178,7 @@ void StyledMarkupAccumulator::wrapWithNode(Node* node, bool convertBlocksToInlin
         m_nodes->append(node);
 }
 
-void StyledMarkupAccumulator::wrapWithStyleNode(CSSStyleDeclaration* style, Document* document, bool isBlock)
+void StyledMarkupAccumulator::wrapWithStyleNode(CSSMutableStyleDeclaration* style, Document* document, bool isBlock)
 {
     StringBuilder openTag;
     appendStyleNodeOpenTag(openTag, style, document, isBlock);
@@ -184,14 +186,14 @@ void StyledMarkupAccumulator::wrapWithStyleNode(CSSStyleDeclaration* style, Docu
     appendString(styleNodeCloseTag(isBlock));
 }
 
-void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, CSSStyleDeclaration* style, Document* document, bool isBlock)
+void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, CSSMutableStyleDeclaration* style, Document* document, bool isBlock)
 {
     // wrappingStyleForSerialization should have removed -webkit-text-decorations-in-effect
     ASSERT(propertyMissingOrEqualToNone(style, CSSPropertyWebkitTextDecorationsInEffect));
     DEFINE_STATIC_LOCAL(const String, divStyle, ("<div style=\""));
     DEFINE_STATIC_LOCAL(const String, styleSpanOpen, ("<span style=\""));
     out.append(isBlock ? divStyle : styleSpanOpen);
-    appendAttributeValue(out, style->cssText(), document->isHTMLDocument());
+    appendAttributeValue(out, style->asText(), document->isHTMLDocument());
     out.append('\"');
     out.append('>');
 }
@@ -287,8 +289,8 @@ void StyledMarkupAccumulator::appendElement(StringBuilder& out, Element* element
     const bool documentIsHTML = element->document()->isHTMLDocument();
     appendOpenTag(out, element, 0);
 
-    NamedNodeMap* attributes = element->attributes();
-    const unsigned length = attributes->length();
+    NamedNodeMap* attributes = element->updatedAttributes();
+    const unsigned length = attributes ? attributes->length() : 0;
     const bool shouldAnnotateOrForceInline = element->isHTMLElement() && (shouldAnnotate() || addDisplayInline);
     const bool shouldOverrideStyleAttr = shouldAnnotateOrForceInline || shouldApplyWrappingStyle(element);
     for (unsigned int i = 0; i < length; i++) {
@@ -328,7 +330,7 @@ void StyledMarkupAccumulator::appendElement(StringBuilder& out, Element* element
         if (!newInlineStyle->isEmpty()) {
             DEFINE_STATIC_LOCAL(const String, stylePrefix, (" style=\""));
             out.append(stylePrefix);
-            appendAttributeValue(out, newInlineStyle->style()->cssText(), documentIsHTML);
+            appendAttributeValue(out, newInlineStyle->style()->asText(), documentIsHTML);
             out.append('\"');
         }
     }
@@ -465,7 +467,7 @@ static inline Node* ancestorToRetainStructureAndAppearanceWithNoRenderer(Node* c
     return ancestorToRetainStructureAndAppearanceForBlock(commonAncestorBlock);
 }
 
-static bool propertyMissingOrEqualToNone(CSSStyleDeclaration* style, int propertyID)
+static bool propertyMissingOrEqualToNone(CSSMutableStyleDeclaration* style, int propertyID)
 {
     if (!style)
         return false;
@@ -822,7 +824,7 @@ static void fillContainerFromString(ContainerNode* paragraph, const String& stri
 
 bool isPlainTextMarkup(Node *node)
 {
-    if (!node->isElementNode() || !node->hasTagName(divTag) || static_cast<Element*>(node)->attributes()->length())
+    if (!node->isElementNode() || !node->hasTagName(divTag) || static_cast<Element*>(node)->hasAttributes())
         return false;
     
     if (node->childNodeCount() == 1 && (node->firstChild()->isTextNode() || (node->firstChild()->firstChild())))

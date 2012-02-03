@@ -118,9 +118,10 @@ void HTMLConstructionSite::attachLater(ContainerNode* parent, PassRefPtr<Node> p
     }
 
     // Add as a sibling of the parent if we have reached the maximum depth allowed.
-    if (m_openElements.stackDepth() > m_maximumDOMTreeDepth)
+    if (m_openElements.stackDepth() > m_maximumDOMTreeDepth && task.parent->parentNode())
         task.parent = task.parent->parentNode();
 
+    ASSERT(task.parent);
     m_attachmentQueue.append(task);
 }
 
@@ -196,7 +197,8 @@ void HTMLConstructionSite::insertHTMLHtmlStartTagBeforeHTML(AtomicHTMLToken& tok
     element->parserSetAttributeMap(token.takeAttributes(), m_fragmentScriptingPermission);
     attachLater(m_attachmentRoot, element);
     m_openElements.pushHTMLHtmlElement(element);
-    // FIXME: We probably need to call executeQueuedTasks() before calling these methods.
+
+    executeQueuedTasks();
     element->insertedByParser();
     dispatchDocumentElementAvailableIfNeeded();
 }
@@ -206,7 +208,7 @@ void HTMLConstructionSite::mergeAttributesFromTokenIntoElement(AtomicHTMLToken& 
     if (!token.attributes())
         return;
 
-    NamedNodeMap* attributes = element->attributes(false);
+    NamedNodeMap* attributes = element->ensureUpdatedAttributes();
     for (unsigned i = 0; i < token.attributes()->length(); ++i) {
         Attribute* attribute = token.attributes()->attributeItem(i);
         if (!attributes->getAttributeItem(attribute->name()))
@@ -423,7 +425,7 @@ namespace {
 // FIXME: Move this function to the top of the file.
 inline PassOwnPtr<NamedNodeMap> cloneAttributes(Element* element)
 {
-    NamedNodeMap* attributes = element->attributes(true);
+    NamedNodeMap* attributes = element->updatedAttributes();
     if (!attributes)
         return nullptr;
 
@@ -527,6 +529,7 @@ void HTMLConstructionSite::fosterParent(PassRefPtr<Node> node)
     HTMLConstructionSiteTask task;
     findFosterSite(task);
     task.child = node;
+    ASSERT(task.parent);
     m_attachmentQueue.append(task);
 }
 

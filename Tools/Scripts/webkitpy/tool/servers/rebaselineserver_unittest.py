@@ -311,7 +311,7 @@ def get_test_config(test_files=[], result_files=[]):
         port_name = "mac"
 
     return TestConfig(
-        TestMacPort(host),
+        TestMacPort(host, 'mac'),
         layout_tests_directory,
         results_directory,
         ('mac', 'mac-leopard', 'win', 'linux'),

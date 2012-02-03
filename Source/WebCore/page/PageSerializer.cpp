@@ -69,11 +69,12 @@ static bool isCharsetSpecifyingNode(Node* node)
     if (!element->hasTagName(HTMLNames::metaTag))
         return false;
     HTMLMetaCharsetParser::AttributeList attributes;
-    const NamedNodeMap* attributesMap = element->attributes(true);
-    for (unsigned i = 0; i < attributesMap->length(); ++i) {
-        Attribute* item = attributesMap->attributeItem(i);
-        // FIXME: We should deal appropriately with the attribute if they have a namespace.
-        attributes.append(make_pair(item->name().toString(), item->value().string()));
+    if (const NamedNodeMap* attributesMap = element->updatedAttributes()) {
+        for (unsigned i = 0; i < attributesMap->length(); ++i) {
+            Attribute* item = attributesMap->attributeItem(i);
+            // FIXME: We should deal appropriately with the attribute if they have a namespace.
+            attributes.append(make_pair(item->name().toString(), item->value().string()));
+        }
     }
     TextEncoding textEncoding = HTMLMetaCharsetParser::encodingFromMetaAttributes(attributes);
     return textEncoding.isValid();
@@ -225,7 +226,8 @@ void PageSerializer::serializeFrame(Frame* frame)
 
         Element* element = toElement(node);
         // We have to process in-line style as it might contain some resources (typically background images).
-        retrieveResourcesForCSSDeclaration(element->style());
+        if (element->isStyledElement())
+            retrieveResourcesForCSSDeclaration(static_cast<StyledElement*>(element)->inlineStyleDecl());
 
         if (element->hasTagName(HTMLNames::imgTag)) {
             HTMLImageElement* imageElement = static_cast<HTMLImageElement*>(element);
@@ -302,10 +304,10 @@ void PageSerializer::addImageToResources(CachedImage* image, RenderObject* image
 
 void PageSerializer::retrieveResourcesForCSSRule(CSSStyleRule* rule)
 {
-    retrieveResourcesForCSSDeclaration(rule->style());
+    retrieveResourcesForCSSDeclaration(rule->declaration());
 }
 
-void PageSerializer::retrieveResourcesForCSSDeclaration(CSSStyleDeclaration* styleDeclaration)
+void PageSerializer::retrieveResourcesForCSSDeclaration(CSSMutableStyleDeclaration* styleDeclaration)
 {
     if (!styleDeclaration)
         return;
@@ -316,12 +318,9 @@ void PageSerializer::retrieveResourcesForCSSDeclaration(CSSStyleDeclaration* sty
     // The background-image and list-style-image (for ul or ol) are the CSS properties
     // that make use of images. We iterate to make sure we include any other
     // image properties there might be.
-    for (unsigned i = 0; i < styleDeclaration->length(); ++i) {
-        // FIXME: It's kind of ridiculous to get the property name and then get
-        // the value out of the name. Ideally we would get the value out of the
-        // property ID, but CSSStyleDeclaration only gives access to property
-        // names, not IDs.
-        RefPtr<CSSValue> cssValue = styleDeclaration->getPropertyCSSValue(styleDeclaration->item(i));
+    unsigned propertyCount = styleDeclaration->propertyCount();
+    for (unsigned i = 0; i < propertyCount; ++i) {
+        RefPtr<CSSValue> cssValue = styleDeclaration->propertyAt(i).value();
         if (!cssValue->isImageValue())
             continue;
 

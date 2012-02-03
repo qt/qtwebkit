@@ -50,8 +50,10 @@ namespace JSC {
 void JIT::emit_op_call_put_result(Instruction* instruction)
 {
     int dst = instruction[1].u.operand;
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitPutVirtualRegister(dst);
+    if (canBeOptimized())
+        killLastResultRegister(); // Make lastResultRegister tracking simpler in the DFG.
 }
 
 void JIT::compileLoadVarargs(Instruction* instruction)

@@ -257,7 +257,7 @@ public:
 
     bool isTransparent() const;
     RenderLayer* transparentPaintingAncestor();
-    void beginTransparencyLayers(GraphicsContext*, const RenderLayer* rootLayer, PaintBehavior);
+    void beginTransparencyLayers(GraphicsContext*, const RenderLayer* rootLayer, const LayoutRect& paintDirtyRect, PaintBehavior);
 
     bool hasReflection() const { return renderer()->hasReflection(); }
     bool isReflection() const { return renderer()->isReplica(); }
@@ -436,10 +436,11 @@ public:
         PaintLayerAppliedTransform = 1 << 1,
         PaintLayerTemporaryClipRects = 1 << 2,
         PaintLayerPaintingReflection = 1 << 3,
-        PaintLayerPaintingOverlayScrollbars = 1 << 4
-#if ENABLE(CSS_FILTERS)
-        , PaintLayerAppliedFilters = 1 << 5
-#endif
+        PaintLayerPaintingOverlayScrollbars = 1 << 4,
+        PaintLayerPaintingCompositingBackgroundPhase = 1 << 5,
+        PaintLayerPaintingCompositingForegroundPhase = 1 << 6,
+        PaintLayerPaintingCompositingMaskPhase = 1 << 7,
+        PaintLayerPaintingCompositingAllPhases = (PaintLayerPaintingCompositingBackgroundPhase | PaintLayerPaintingCompositingForegroundPhase | PaintLayerPaintingCompositingMaskPhase)
     };
     
     typedef unsigned PaintLayerFlags;
@@ -556,11 +557,12 @@ public:
     bool containsDirtyOverlayScrollbars() const { return m_containsDirtyOverlayScrollbars; }
     void setContainsDirtyOverlayScrollbars(bool dirtyScrollbars) { m_containsDirtyOverlayScrollbars = dirtyScrollbars; }
 
-private:
 #if ENABLE(CSS_FILTERS)
     bool paintsWithFilters() const;
+    FilterEffectRenderer* filter() const { return m_filter.get(); }
 #endif
 
+private:
     void updateZOrderListsSlowCase();
 
     void computeRepaintRects(IntPoint* offsetFromRoot = 0);
@@ -591,6 +593,9 @@ private:
     void updateCompositingAndLayerListsIfNeeded();
 
     void paintLayer(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
+                    PaintBehavior, RenderObject* paintingRoot, RenderRegion* = 0, OverlapTestRequestMap* = 0,
+                    PaintLayerFlags = 0);
+    void paintLayerContentsAndReflection(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
                     PaintBehavior, RenderObject* paintingRoot, RenderRegion* = 0, OverlapTestRequestMap* = 0,
                     PaintLayerFlags = 0);
     void paintLayerContents(RenderLayer* rootLayer, GraphicsContext*, const LayoutRect& paintDirtyRect,
@@ -695,11 +700,11 @@ private:
 
 #if ENABLE(CSS_FILTERS)
     void updateOrRemoveFilterEffect();
-    void updateFilterBackingStore(const FloatRect& filterRect);
 #endif
 
     void parentClipRects(const RenderLayer* rootLayer, RenderRegion*, ClipRects&, bool temporaryClipRects = false, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
     ClipRect backgroundClipRect(const RenderLayer* rootLayer, RenderRegion*, bool temporaryClipRects, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
+    LayoutRect paintingExtent(const RenderLayer* rootLayer, const LayoutRect& paintDirtyRect, PaintBehavior);
 
     RenderLayer* enclosingTransformedAncestor() const;
 

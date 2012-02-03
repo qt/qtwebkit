@@ -47,6 +47,7 @@
 #include "HTMLAppletElement.h"
 #include "HTMLFormElement.h"  // needed by FormState.h
 #include "HTMLNames.h"
+#include "IntentRequest.h"
 #include "MessageEvent.h"
 #include "MIMETypeRegistry.h"
 #include "MouseEvent.h"
@@ -66,6 +67,7 @@
 #include "WebFormElement.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
+#include "WebIntentRequest.h"
 #include "WebKit.h"
 #include "platform/WebKitPlatformSupport.h"
 #include <public/WebMimeRegistry.h>
@@ -692,7 +694,7 @@ void FrameLoaderClientImpl::dispatchDidNavigateWithinPage()
     }
 
     bool isNewNavigation;
-    webView->didCommitLoad(&isNewNavigation);
+    webView->didCommitLoad(&isNewNavigation, true);
     if (m_webFrame->client())
         m_webFrame->client()->didNavigateWithinPage(m_webFrame, isNewNavigation);
 
@@ -804,7 +806,7 @@ void FrameLoaderClientImpl::dispatchDidCommitLoad()
 {
     WebViewImpl* webview = m_webFrame->viewImpl();
     bool isNewNavigation;
-    webview->didCommitLoad(&isNewNavigation);
+    webview->didCommitLoad(&isNewNavigation, false);
 
     if (m_webFrame->client())
         m_webFrame->client()->didCommitProvisionalLoad(m_webFrame, isNewNavigation);
@@ -1628,5 +1630,12 @@ bool FrameLoaderClientImpl::willCheckAndDispatchMessageEvent(
     return m_webFrame->client()->willCheckAndDispatchMessageEvent(
         m_webFrame, WebSecurityOrigin(target), WebDOMMessageEvent(event));
 }
+
+#if ENABLE(WEB_INTENTS)
+void FrameLoaderClientImpl::dispatchIntent(PassRefPtr<WebCore::IntentRequest> intentRequest)
+{
+    m_webFrame->client()->dispatchIntent(webFrame(), intentRequest);
+}
+#endif
 
 } // namespace WebKit

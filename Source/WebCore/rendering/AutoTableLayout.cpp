@@ -262,12 +262,18 @@ void AutoTableLayout::computePreferredLogicalWidths(LayoutUnit& minWidth, Layout
     maxWidth += bordersPaddingAndSpacing;
 
     Length tableLogicalWidth = m_table->style()->logicalWidth();
-    if (tableLogicalWidth.isFixed() && tableLogicalWidth.value() > 0) {
+    if (tableLogicalWidth.isFixed() && tableLogicalWidth.isPositive()) {
         minWidth = max<int>(minWidth, tableLogicalWidth.value());
         maxWidth = minWidth;
     } else if (!remainingPercent && maxNonPercent) {
         // if there was no remaining percent, maxWidth is invalid.
         maxWidth = intMaxForLength;        
+    }
+
+    Length tableLogicalMinWidth = m_table->style()->logicalMinWidth();
+    if (tableLogicalMinWidth.isFixed() && tableLogicalMinWidth.isPositive()) {
+        minWidth = max<int>(minWidth, tableLogicalMinWidth.value());
+        maxWidth = max<int>(minWidth, maxWidth);
     }
 }
 
@@ -400,7 +406,7 @@ int AutoTableLayout::calcEffectiveLogicalWidth()
                     ASSERT(m_layoutStruct[pos].logicalWidth.isPercent() || m_layoutStruct[pos].effectiveLogicalWidth.isPercent());
                     // |allColsArePercent| means that either the logicalWidth *or* the effectiveLogicalWidth are percents, handle both of them here.
                     float percent = m_layoutStruct[pos].logicalWidth.isPercent() ? m_layoutStruct[pos].logicalWidth.percent() : m_layoutStruct[pos].effectiveLogicalWidth.percent();
-                    m_layoutStruct[pos].effectiveMinLogicalWidth = percent * cellMinLogicalWidth / totalPercent;
+                    m_layoutStruct[pos].effectiveMinLogicalWidth = max(m_layoutStruct[pos].effectiveMinLogicalWidth, static_cast<int>(percent * cellMinLogicalWidth / totalPercent));
                     m_layoutStruct[pos].effectiveMaxLogicalWidth = percent * cellMaxLogicalWidth / totalPercent;
                 }
             } else {

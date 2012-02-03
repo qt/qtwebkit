@@ -35,7 +35,6 @@ QtTapGestureRecognizer::QtTapGestureRecognizer(QtWebPageEventHandler* eventHandl
     : QtGestureRecognizer(eventHandler)
     , m_tapState(NoTap)
 {
-    reset();
 }
 
 bool QtTapGestureRecognizer::recognize(const QTouchEvent* event, qint64 eventTimestampMillis)
@@ -68,6 +67,11 @@ bool QtTapGestureRecognizer::recognize(const QTouchEvent* event, qint64 eventTim
         } else
             m_tapState = SingleTapStarted;
         m_touchBeginEventForTap = adoptPtr(new QTouchEvent(*event));
+
+        if (m_tapState == SingleTapStarted) {
+            const QTouchEvent::TouchPoint& touchPoint = event->touchPoints().first();
+            m_eventHandler->handlePotentialSingleTapEvent(touchPoint);
+        }
         break;
     case QEvent::TouchUpdate:
         // If the touch point moves further than the threshold, we cancel the tap gesture.
@@ -82,6 +86,7 @@ bool QtTapGestureRecognizer::recognize(const QTouchEvent* event, qint64 eventTim
         break;
     case QEvent::TouchEnd:
         m_tapAndHoldTimer.stop();
+        m_eventHandler->handlePotentialSingleTapEvent(QTouchEvent::TouchPoint());
 
         switch (m_tapState) {
         case DoubleTapCandidate:
@@ -111,6 +116,7 @@ bool QtTapGestureRecognizer::recognize(const QTouchEvent* event, qint64 eventTim
     default:
         break;
     }
+
     return false;
 }
 
@@ -140,6 +146,8 @@ void QtTapGestureRecognizer::tapAndHoldTimeout()
 
 void QtTapGestureRecognizer::reset()
 {
+    m_eventHandler->handlePotentialSingleTapEvent(QTouchEvent::TouchPoint());
+
     m_tapState = NoTap;
     m_touchBeginEventForTap.clear();
     m_tapAndHoldTimer.stop();

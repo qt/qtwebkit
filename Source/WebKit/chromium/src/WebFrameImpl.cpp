@@ -106,6 +106,7 @@
 #include "IconURL.h"
 #include "InspectorController.h"
 #include "KURL.h"
+#include "Node.h"
 #include "Page.h"
 #include "PageOverlay.h"
 #include "painting/GraphicsContextBuilder.h"
@@ -133,6 +134,7 @@
 #include "SecurityPolicy.h"
 #include "Settings.h"
 #include "SkiaUtils.h"
+#include "SpellChecker.h"
 #include "SubstituteData.h"
 #include "TextAffinity.h"
 #include "TextIterator.h"
@@ -858,9 +860,7 @@ void WebFrameImpl::addMessageToConsole(const WebConsoleMessage& message)
         return;
     }
 
-    frame()->domWindow()->console()->addMessage(
-        OtherMessageSource, LogMessageType, webCoreMessageLevel, message.text,
-        1, String());
+    frame()->domWindow()->console()->addMessage(OtherMessageSource, LogMessageType, webCoreMessageLevel, message.text);
 }
 
 void WebFrameImpl::collectGarbage()
@@ -1296,6 +1296,16 @@ bool WebFrameImpl::isContinuousSpellCheckingEnabled() const
     return frame()->editor()->isContinuousSpellCheckingEnabled();
 }
 
+void WebFrameImpl::requestTextChecking(const WebElement& webElem)
+{
+    if (webElem.isNull())
+        return;
+
+    RefPtr<Range> rangeToCheck = rangeOfContents(const_cast<Element*>(webElem.constUnwrap<Element>()));
+
+    frame()->editor()->spellChecker()->requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling | TextCheckingTypeGrammar, rangeToCheck, rangeToCheck));
+}
+
 bool WebFrameImpl::hasSelection() const
 {
     WebPluginContainerImpl* pluginContainer = pluginContainerFromFrame(frame());
@@ -1374,7 +1384,7 @@ void WebFrameImpl::selectRange(const WebPoint& start, const WebPoint& end)
 
 VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& point)
 {
-    HitTestRequest::HitTestRequestType hitType = HitTestRequest::MouseMove;
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::Move;
     hitType |= HitTestRequest::ReadOnly;
     hitType |= HitTestRequest::Active;
     HitTestRequest request(hitType);
@@ -2154,11 +2164,18 @@ void WebFrameImpl::setFindEndstateFocusAndSelection()
         // Try to find the first focusable node up the chain, which will, for
         // example, focus links if we have found text within the link.
         Node* node = m_activeMatch->firstNode();
+        if (node && node->isInShadowTree()) {
+            Node* host = node->shadowAncestorNode();
+            if (host->hasTagName(HTMLNames::inputTag) || host->hasTagName(HTMLNames::textareaTag))
+                node = host;
+        }
         while (node && !node->isFocusable() && node != frame()->document())
             node = node->parentNode();
 
         if (node && node != frame()->document()) {
-            // Found a focusable parent node. Set focus to it.
+            // Found a focusable parent node. Set the active match as the
+            // selection and focus to the focusable node.
+            frame()->selection()->setSelection(m_activeMatch.get());
             frame()->document()->setFocusedNode(node);
             return;
         }

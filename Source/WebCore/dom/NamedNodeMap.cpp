@@ -30,6 +30,7 @@
 #include "Element.h"
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
+#include "StyledElement.h"
 
 namespace WebCore {
 
@@ -200,9 +201,7 @@ size_t NamedNodeMap::getAttributeItemIndexSlowCase(const String& name, bool shou
 
 void NamedNodeMap::clearAttributes()
 {
-    m_classNames.clear();
-    m_mappedAttributeCount = 0;
-
+    attributeData()->clearClass();
     detachAttributesFromElement();
     m_attributes.clear();
 }
@@ -303,20 +302,10 @@ void NamedNodeMap::replaceAttribute(size_t index, PassRefPtr<Attribute> prpAttri
         m_element->didModifyAttribute(attribute.get());
 }
 
-void NamedNodeMap::setClass(const String& classStr) 
-{ 
-    if (!element()->hasClass()) { 
-        m_classNames.clear(); 
-        return;
-    }
-
-    m_classNames.set(classStr, element()->document()->inQuirksMode()); 
-}
-
 bool NamedNodeMap::mapsEquivalent(const NamedNodeMap* otherMap) const
 {
     if (!otherMap)
-        return false;
+        return isEmpty();
     
     unsigned len = length();
     if (len != otherMap->length())
@@ -332,23 +321,22 @@ bool NamedNodeMap::mapsEquivalent(const NamedNodeMap* otherMap) const
     return true;
 }
 
-bool NamedNodeMap::mappedMapsEquivalent(const NamedNodeMap* otherMap) const
+CSSMutableStyleDeclaration* NamedNodeMap::ensureInlineStyleDecl()
 {
-    if (m_mappedAttributeCount != otherMap->m_mappedAttributeCount)
-        return false;
-
-    // The values for each decl must match.
-    for (unsigned i = 0; i < length(); i++) {
-        Attribute* attr = attributeItem(i);
-        if (attr->decl()) {
-            ASSERT(attr->isMappedAttribute());
-
-            Attribute* otherAttr = otherMap->getAttributeItem(attr->name());
-            if (!otherAttr || attr->decl() != otherAttr->decl() || attr->value() != otherAttr->value())
-                return false;
-        }
+    if (!attributeData()->m_inlineStyleDecl) {
+        ASSERT(m_element->isStyledElement());
+        attributeData()->m_inlineStyleDecl = CSSMutableStyleDeclaration::createInline(static_cast<StyledElement*>(m_element));
+        attributeData()->m_inlineStyleDecl->setStrictParsing(m_element->isHTMLElement() && !m_element->document()->inQuirksMode());
     }
-    return true;
+    return attributeData()->m_inlineStyleDecl.get();
+}
+
+void NamedNodeMap::destroyInlineStyleDecl()
+{
+    if (!attributeData()->m_inlineStyleDecl)
+        return;
+    attributeData()->m_inlineStyleDecl->clearParentElement();
+    attributeData()->m_inlineStyleDecl = 0;
 }
 
 } // namespace WebCore

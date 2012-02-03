@@ -68,33 +68,65 @@ static PassRefPtr<StringImpl> applySVGWhitespaceRules(PassRefPtr<StringImpl> str
 RenderSVGInlineText::RenderSVGInlineText(Node* n, PassRefPtr<StringImpl> string)
     : RenderText(n, applySVGWhitespaceRules(string, false))
     , m_scalingFactor(1)
+    , m_layoutAttributes(this)
 {
 }
 
 void RenderSVGInlineText::willBeDestroyed()
 {
-    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
-        textRenderer->setNeedsPositioningValuesUpdate();
+    RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this);
+    if (!textRenderer) {
+        RenderText::willBeDestroyed();
+        return;
+    }
+
+    Vector<SVGTextLayoutAttributes*> affectedAttributes;
+    textRenderer->layoutAttributesWillBeDestroyed(this, affectedAttributes);
 
     RenderText::willBeDestroyed();
+    if (affectedAttributes.isEmpty())
+        return;
+
+    textRenderer->rebuildLayoutAttributes(affectedAttributes);
+}
+
+void RenderSVGInlineText::setTextInternal(PassRefPtr<StringImpl> text)
+{
+    RenderText::setTextInternal(text);
+
+    // When the underlying text content changes, call both textDOMChanged() & layoutAttributesChanged()
+    // The former will clear the SVGTextPositioningElement cache, which depends on the textLength() of
+    // the RenderSVGInlineText objects, and thus needs to be rebuild. The latter will assure that the
+    // SVGTextLayoutAttributes associated with the RenderSVGInlineText will be updated.
+    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this)) {
+        textRenderer->textDOMChanged();
+        textRenderer->layoutAttributesChanged(this);
+    }
 }
 
 void RenderSVGInlineText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderText::styleDidChange(diff, oldStyle);
+    updateScaledFont();
 
-    if (diff == StyleDifferenceLayout) {
-        // The text metrics may be influenced by style changes.
-        if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
-            textRenderer->setNeedsPositioningValuesUpdate();
+    bool newPreserves = style() ? style()->whiteSpace() == PRE : false;
+    bool oldPreserves = oldStyle ? oldStyle->whiteSpace() == PRE : false;
+    if (oldPreserves && !newPreserves) {
+        setText(applySVGWhitespaceRules(originalText(), false), true);
+        return;
     }
 
-    const RenderStyle* newStyle = style();
-    if (!newStyle || newStyle->whiteSpace() != PRE)
+    if (!oldPreserves && newPreserves) {
+        setText(applySVGWhitespaceRules(originalText(), true), true);
+        return;
+    }
+
+    if (diff != StyleDifferenceLayout)
         return;
 
-    if (!oldStyle || oldStyle->whiteSpace() != PRE)
-        setText(applySVGWhitespaceRules(originalText(), true), true);
+    // The text metrics may be influenced by style changes.
+    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
+        textRenderer->layoutAttributesChanged(this);
 }
 
 InlineTextBox* RenderSVGInlineText::createTextBox()
@@ -106,7 +138,7 @@ InlineTextBox* RenderSVGInlineText::createTextBox()
 
 LayoutRect RenderSVGInlineText::localCaretRect(InlineBox* box, int caretOffset, LayoutUnit*)
 {
-    if (!box->isInlineTextBox())
+    if (!box || !box->isInlineTextBox())
         return LayoutRect();
 
     InlineTextBox* textBox = static_cast<InlineTextBox*>(box);
@@ -140,8 +172,6 @@ LayoutRect RenderSVGInlineText::linesBoundingBox() const
 
 bool RenderSVGInlineText::characterStartsNewTextChunk(int position) const
 {
-    ASSERT(m_attributes.xValues().size() == textLength());
-    ASSERT(m_attributes.yValues().size() == textLength());
     ASSERT(position >= 0);
     ASSERT(position < static_cast<int>(textLength()));
 
@@ -149,27 +179,11 @@ bool RenderSVGInlineText::characterStartsNewTextChunk(int position) const
     if (!position && parent()->isSVGTextPath() && !previousSibling())
         return true;
 
-    int currentPosition = 0;
-    unsigned size = m_attributes.textMetricsValues().size();
-    for (unsigned i = 0; i < size; ++i) {
-        const SVGTextMetrics& metrics = m_attributes.textMetricsValues().at(i);
+    const SVGCharacterDataMap::const_iterator it = m_layoutAttributes.characterDataMap().find(static_cast<unsigned>(position + 1));
+    if (it == m_layoutAttributes.characterDataMap().end())
+        return false;
 
-        // We found the desired character.
-        if (currentPosition == position) {
-            return m_attributes.xValues().at(position) != SVGTextLayoutAttributes::emptyValue()
-                || m_attributes.yValues().at(position) != SVGTextLayoutAttributes::emptyValue();
-        }
-
-        currentPosition += metrics.length();
-        if (currentPosition > position)
-            break;
-    }
-
-    // The desired position is available in the x/y list, but not in the character data values list.
-    // That means the previous character data described a single glyph, consisting of multiple unicode characters.
-    // The consequence is that the desired character does not define a new absolute x/y position, even if present in the x/y test.
-    // This code is tested by svg/W3C-SVG-1.1/text-text-06-t.svg (and described in detail, why this influences chunk detection).
-    return false;
+    return it->second.x != SVGTextLayoutAttributes::emptyValue() || it->second.y != SVGTextLayoutAttributes::emptyValue();
 }
 
 VisiblePosition RenderSVGInlineText::positionForPoint(const LayoutPoint& point)
@@ -224,19 +238,6 @@ VisiblePosition RenderSVGInlineText::positionForPoint(const LayoutPoint& point)
 
     int offset = closestDistanceBox->offsetForPositionInFragment(*closestDistanceFragment, absolutePoint.x() - closestDistancePosition, true);
     return createVisiblePosition(offset + closestDistanceBox->start(), offset > 0 ? VP_UPSTREAM_IF_POSSIBLE : DOWNSTREAM);
-}
-
-void RenderSVGInlineText::setStyle(PassRefPtr<RenderStyle> style)
-{
-    RenderText::setStyle(style);
-
-    // The cached scaledFont needs to be updated on every style set call. It
-    // is not similar to m_style which can get derived from parent's style and
-    // hence will get automatically updated on ancestor's style change. This is
-    // required, otherwise we will maintain stale font list in cached scaledFont
-    // when custom fonts are retired on Document::recalcStyle. See webkit bug
-    // https://bugs.webkit.org/show_bug.cgi?id=68060.
-    updateScaledFont();
 }
 
 void RenderSVGInlineText::updateScaledFont()

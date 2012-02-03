@@ -29,7 +29,7 @@
 #include "BackingStore.h"
 #include "DrawingAreaProxy.h"
 #include "LayerTreeContext.h"
-#include "RunLoop.h"
+#include <WebCore/RunLoop.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 
@@ -80,7 +80,8 @@ private:
 #if USE(TILED_BACKING_STORE)
     virtual void setVisibleContentsRectAndScale(const WebCore::IntRect& visibleContentsRect, float scale);
     virtual void setVisibleContentRectTrajectoryVector(const WebCore::FloatPoint&);
-    virtual void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float opacity);
+    virtual void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float opacity, const WebCore::FloatRect&);
+    virtual void paintLayerTree(BackingStore::PlatformGraphicsContext);
     void didReceiveLayerTreeHostProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 #endif
 #else
@@ -116,7 +117,7 @@ private:
     bool m_isBackingStoreDiscardable;
     OwnPtr<BackingStore> m_backingStore;
 
-    RunLoop::Timer<DrawingAreaProxyImpl> m_discardBackingStoreTimer;
+    WebCore::RunLoop::Timer<DrawingAreaProxyImpl> m_discardBackingStoreTimer;
 };
 
 } // namespace WebKit

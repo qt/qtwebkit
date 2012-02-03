@@ -53,6 +53,10 @@
 #include "RenderVideo.h"
 #include "RenderView.h"
 
+#if ENABLE(CSS_FILTERS)
+#include "FilterEffectRenderer.h"
+#endif
+
 #if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
 #include "GraphicsContext3D.h"
 #endif
@@ -399,8 +403,12 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
 #endif
     
     m_owningLayer->updateVisibilityStatus();
-    m_graphicsLayer->setContentsVisible(m_owningLayer->hasVisibleContent());
-    
+
+    // m_graphicsLayer is the corresponding GraphicsLayer for this RenderLayer and its non-compositing
+    // descendants. So, the visibility flag for m_graphicsLayer should be true if there are any
+    // non-compositing visible layers.
+    m_graphicsLayer->setContentsVisible(m_owningLayer->hasVisibleContent() || hasVisibleNonCompositingDescendantLayers());
+
     RenderStyle* style = renderer()->style();
     m_graphicsLayer->setPreserves3D(style->transformStyle3D() == TransformStyle3DPreserve3D && !renderer()->hasReflection());
     m_graphicsLayer->setBackfaceVisibility(style->backfaceVisibility() == BackfaceVisibilityVisible);
@@ -449,13 +457,7 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
     }
 
     m_graphicsLayer->setPosition(FloatPoint() + (relativeCompositingBounds.location() - graphicsLayerParentLocation));
-    
-    LayoutSize oldOffsetFromRenderer = m_graphicsLayer->offsetFromRenderer();
     m_graphicsLayer->setOffsetFromRenderer(localCompositingBounds.location() - LayoutPoint());
-    
-    // If the compositing layer offset changes, we need to repaint.
-    if (oldOffsetFromRenderer != m_graphicsLayer->offsetFromRenderer())
-        m_graphicsLayer->setNeedsDisplay();
     
     FloatSize oldSize = m_graphicsLayer->size();
     FloatSize newSize = relativeCompositingBounds.size();
@@ -818,7 +820,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         return true;
     
     if (renderObject->node() && renderObject->node()->isDocumentNode()) {
-        // Look to see if the root object has a non-simple backgound
+        // Look to see if the root object has a non-simple background
         RenderObject* rootObject = renderObject->document()->documentElement()->renderer();
         if (!rootObject)
             return false;
@@ -840,23 +842,19 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         
         if (hasBoxDecorationsOrBackgroundImage(style))
             return false;
-
-        // Check to see if all the body's children are compositing layers.
-        if (hasVisibleNonCompositingDescendants())
-            return false;
-        
-        return true;
     }
 
     // Check to see if all the renderer's children are compositing layers.
-    if (isVisible && hasVisibleNonCompositingDescendants())
+    if (isVisible && containsNonEmptyRenderers())
+        return false;
+        
+    if (hasVisibleNonCompositingDescendantLayers())
         return false;
     
     return true;
 }
 
-// Conservative test for having no rendered children.
-bool RenderLayerBacking::hasVisibleNonCompositingDescendants() const
+bool RenderLayerBacking::containsNonEmptyRenderers() const
 {
     // Some HTML can cause whitespace text nodes to have renderers, like:
     // <div>
@@ -872,7 +870,12 @@ bool RenderLayerBacking::hasVisibleNonCompositingDescendants() const
                 return true;
         }
     }
+    return false;
+}
 
+// Conservative test for having no rendered children.
+bool RenderLayerBacking::hasVisibleNonCompositingDescendantLayers() const
+{
     if (Vector<RenderLayer*>* normalFlowList = m_owningLayer->normalFlowList()) {
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
@@ -1095,7 +1098,6 @@ void RenderLayerBacking::setContentsNeedDisplayInRect(const LayoutRect& r)
     }
 }
 
-// Share this with RenderLayer::paintLayer, which would have to be educated about GraphicsLayerPaintingPhase?
 void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext* context,
                     const LayoutRect& paintDirtyRect, // In the coords of rootLayer.
                     PaintBehavior paintBehavior, GraphicsLayerPaintingPhase paintingPhase,
@@ -1108,93 +1110,16 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
 
     FontCachePurgePreventer fontCachePurgePreventer;
     
-    m_owningLayer->updateLayerListsIfNeeded();
-
-    bool shouldPaintContent = (m_owningLayer->hasVisibleContent() || m_owningLayer->hasVisibleDescendant()) && m_owningLayer->isSelfPaintingLayer();
-    if (!shouldPaintContent)
-        return;
-
-    // Calculate the clip rects we should use.
-    LayoutRect layerBounds;
-    ClipRect damageRect, clipRectToApply, outlineRect;
-    m_owningLayer->calculateRects(rootLayer, 0, paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect); // FIXME: Incorrect for CSS regions.
-    LayoutPoint paintOffset = toPoint(layerBounds.location() - m_owningLayer->renderBoxLocation());
-
-    // If this layer's renderer is a child of the paintingRoot, we render unconditionally, which
-    // is done by passing a nil paintingRoot down to our renderer (as if no paintingRoot was ever set).
-    // Else, our renderer tree may or may not contain the painting root, so we pass that root along
-    // so it will be tested against as we decend through the renderers.
-    RenderObject *paintingRootForRenderer = 0;
-    if (paintingRoot && !renderer()->isDescendantOf(paintingRoot))
-        paintingRootForRenderer = paintingRoot;
-
-    if (paintingPhase & GraphicsLayerPaintBackground) {
-        // Paint our background first, before painting any child layers.
-        // Establish the clip used to paint our background.
-        m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius);
+    RenderLayer::PaintLayerFlags paintFlags = 0;
+    if (paintingPhase & GraphicsLayerPaintBackground)
+        paintFlags |= RenderLayer::PaintLayerPaintingCompositingBackgroundPhase;
+    if (paintingPhase & GraphicsLayerPaintForeground)
+        paintFlags |= RenderLayer::PaintLayerPaintingCompositingForegroundPhase;
+    if (paintingPhase & GraphicsLayerPaintMask)
+        paintFlags |= RenderLayer::PaintLayerPaintingCompositingMaskPhase;
         
-        PaintInfo info(context, damageRect.rect(), PaintPhaseBlockBackground, false, paintingRootForRenderer, 0, 0);
-        renderer()->paint(info, paintOffset);
-
-        // Restore the clip.
-        m_owningLayer->restoreClip(context, paintDirtyRect, damageRect);
-
-        // Now walk the sorted list of children with negative z-indices. Only RenderLayers without compositing layers will paint.
-        m_owningLayer->paintList(m_owningLayer->negZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
-    }
-                
-    bool forceBlackText = paintBehavior & PaintBehaviorForceBlackText;
-    bool selectionOnly  = paintBehavior & PaintBehaviorSelectionOnly;
-
-    if (paintingPhase & GraphicsLayerPaintForeground) {
-        // Set up the clip used when painting our children.
-        m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, clipRectToApply);
-        PaintInfo paintInfo(context, clipRectToApply.rect(), 
-                            selectionOnly ? PaintPhaseSelection : PaintPhaseChildBlockBackgrounds,
-                            forceBlackText, paintingRootForRenderer, 0, 0);
-        renderer()->paint(paintInfo, paintOffset);
-
-        if (!selectionOnly) {
-            paintInfo.phase = PaintPhaseFloat;
-            renderer()->paint(paintInfo, paintOffset);
-
-            paintInfo.phase = PaintPhaseForeground;
-            renderer()->paint(paintInfo, paintOffset);
-
-            paintInfo.phase = PaintPhaseChildOutlines;
-            renderer()->paint(paintInfo, paintOffset);
-        }
-
-        // Now restore our clip.
-        m_owningLayer->restoreClip(context, paintDirtyRect, clipRectToApply);
-
-        if (!outlineRect.isEmpty()) {
-            // Paint our own outline
-            PaintInfo paintInfo(context, outlineRect.rect(), PaintPhaseSelfOutline, false, paintingRootForRenderer, 0, 0);
-            m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, outlineRect, DoNotIncludeSelfForBorderRadius);
-            renderer()->paint(paintInfo, paintOffset);
-            m_owningLayer->restoreClip(context, paintDirtyRect, outlineRect);
-        }
-
-        // Paint any child layers that have overflow.
-        m_owningLayer->paintList(m_owningLayer->normalFlowList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
-
-        // Now walk the sorted list of children with positive z-indices.
-        m_owningLayer->paintList(m_owningLayer->posZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, 0);
-    }
-
-    if (paintingPhase & GraphicsLayerPaintMask) {
-        if (renderer()->hasMask() && !selectionOnly && !damageRect.isEmpty()) {
-            m_owningLayer->clipToRect(rootLayer, context, paintDirtyRect, damageRect, DoNotIncludeSelfForBorderRadius);
-
-            // Paint the mask.
-            PaintInfo paintInfo(context, damageRect.rect(), PaintPhaseMask, false, paintingRootForRenderer, 0, 0);
-            renderer()->paint(paintInfo, paintOffset);
-            
-            // Restore the clip.
-            m_owningLayer->restoreClip(context, paintDirtyRect, damageRect);
-        }
-    }
+    // FIXME: GraphicsLayers need a way to split for RenderRegions.
+    m_owningLayer->paintLayerContents(rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, paintFlags);
 
     ASSERT(!m_owningLayer->m_usedTransparency);
 }
@@ -1219,15 +1144,9 @@ void RenderLayerBacking::paintContents(const GraphicsLayer* graphicsLayer, Graph
     if (graphicsLayer == m_graphicsLayer.get() || graphicsLayer == m_foregroundLayer.get() || graphicsLayer == m_maskLayer.get()) {
         InspectorInstrumentationCookie cookie = InspectorInstrumentation::willPaint(m_owningLayer->renderer()->frame(), clip);
 
-        LayoutSize offset = graphicsLayer->offsetFromRenderer();
-        context.translate(-offset);
-
-        LayoutRect clipRect(clip);
-        clipRect.move(offset);
-
         // The dirtyRect is in the coords of the painting root.
         LayoutRect dirtyRect = compositedBounds();
-        dirtyRect.intersect(clipRect);
+        dirtyRect.intersect(clip);
 
         // We have to use the same root as for hit testing, because both methods can compute and cache clipRects.
         paintIntoLayer(m_owningLayer, &context, dirtyRect, PaintBehaviorNormal, paintingPhase, renderer());
@@ -1264,12 +1183,12 @@ void RenderLayerBacking::didCommitChangesForLayer(const GraphicsLayer*) const
     compositor()->didFlushChangesForLayer(m_owningLayer);
 }
 
-bool RenderLayerBacking::showDebugBorders() const
+bool RenderLayerBacking::showDebugBorders(const GraphicsLayer*) const
 {
     return compositor() ? compositor()->compositorShowDebugBorders() : false;
 }
 
-bool RenderLayerBacking::showRepaintCounter() const
+bool RenderLayerBacking::showRepaintCounter(const GraphicsLayer*) const
 {
     return compositor() ? compositor()->compositorShowRepaintCounter() : false;
 }

@@ -31,6 +31,7 @@ code interfaceName=HTMLElement
 col interfaceName=HTMLTableColElement
 colgroup interfaceName=HTMLTableColElement
 command interfaceName=HTMLElement
+content interfaceName=HTMLContentElement, conditional=SHADOW_DOM
 datalist interfaceName=HTMLDataListElement, conditional=DATALIST
 dd interfaceName=HTMLElement
 del interfaceName=HTMLModElement
@@ -67,7 +68,7 @@ image mapToTagName=img
 img interfaceName=HTMLImageElement, constructorNeedsFormElement
 input constructorNeedsFormElement, constructorNeedsCreatedByParser
 ins interfaceName=HTMLModElement
-isindex interfaceName=HTMLIsIndexElement, constructorNeedsFormElement
+isindex interfaceName=HTMLUnknownElement
 kbd interfaceName=HTMLElement
 keygen constructorNeedsFormElement
 label

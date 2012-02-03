@@ -514,7 +514,7 @@
                 "properties": [
                     { "name": "url", "type": "string", "description": "Resource URL." },
                     { "name": "type", "$ref": "Page.ResourceType", "description": "Type of this resource." },
-                    { "name": "response", "$ref": "Response", "description": "Cached response data." },
+                    { "name": "response", "$ref": "Response", "optional": true, "description": "Cached response data." },
                     { "name": "bodySize", "type": "number", "description": "Cached response body size." }
                 ]
             },
@@ -1046,9 +1046,6 @@
                 "parameters": [
                     { "name": "nodeId", "$ref": "NodeId", "description": "Id of the node to set markup for." },
                     { "name": "outerHTML", "type": "string", "description": "Outer HTML markup to set." }
-                ],
-                "returns": [
-                    { "name": "nodeId", "$ref": "NodeId", "description": "Setting outer HTML can change node's id." }
                 ],
                 "description": "Sets node HTML markup, returns new node id."
             },

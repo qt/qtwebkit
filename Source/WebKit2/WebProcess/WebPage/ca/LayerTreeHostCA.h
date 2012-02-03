@@ -54,6 +54,7 @@ protected:
 
     // LayerTreeHostCA
     virtual void didPerformScheduledLayerFlush();
+    virtual bool flushPendingLayerChanges();
 
     bool m_layerFlushSchedulingEnabled;
 
@@ -73,15 +74,13 @@ private:
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time);
     virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& clipRect);
-    virtual bool showDebugBorders() const;
-    virtual bool showRepaintCounter() const;
+    virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
+    virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
     virtual float deviceScaleFactor() const;
     virtual void didCommitChangesForLayer(const WebCore::GraphicsLayer*) const { }
 
     // LayerTreeHostCA
     virtual void platformInitialize(LayerTreeContext&) = 0;
-
-    bool flushPendingLayerChanges();
 
     void createPageOverlayLayer();
     void destroyPageOverlayLayer();

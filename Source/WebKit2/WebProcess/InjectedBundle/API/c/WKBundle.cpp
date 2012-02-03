@@ -126,9 +126,9 @@ void WKBundleRemoveAllUserContent(WKBundleRef bundleRef, WKBundlePageGroupRef pa
     toImpl(bundleRef)->removeAllUserContent(toImpl(pageGroupRef));
 }
 
-void WKBundleOverrideXSSAuditorEnabledForTestRunner(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+void WKBundleOverrideBoolPreferenceForTestRunner(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKStringRef preference, bool enabled)
 {
-    toImpl(bundleRef)->overrideXSSAuditorEnabledForTestRunner(toImpl(pageGroupRef), enabled);
+    toImpl(bundleRef)->overrideBoolPreferenceForTestRunner(toImpl(pageGroupRef), toImpl(preference)->string(), enabled);
 }
 
 void WKBundleSetAllowUniversalAccessFromFileURLs(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
@@ -146,6 +146,11 @@ void WKBundleSetFrameFlatteningEnabled(WKBundleRef bundleRef, WKBundlePageGroupR
     toImpl(bundleRef)->setFrameFlatteningEnabled(toImpl(pageGroupRef), enabled);
 }
 
+void WKBundleSetGeolocationPermission(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+{
+    toImpl(bundleRef)->setGeoLocationPermission(toImpl(pageGroupRef), enabled);
+}
+
 void WKBundleSetJavaScriptCanAccessClipboard(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
 {
     toImpl(bundleRef)->setJavaScriptCanAccessClipboard(toImpl(pageGroupRef), enabled);
@@ -154,6 +159,11 @@ void WKBundleSetJavaScriptCanAccessClipboard(WKBundleRef bundleRef, WKBundlePage
 void WKBundleSetPrivateBrowsingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
 {
     toImpl(bundleRef)->setPrivateBrowsingEnabled(toImpl(pageGroupRef), enabled);
+}
+
+void WKBundleSetPopupBlockingEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+{
+    toImpl(bundleRef)->setPopupBlockingEnabled(toImpl(pageGroupRef), enabled);
 }
 
 void WKBundleSwitchNetworkLoaderToNewTestingSession(WKBundleRef bundleRef)

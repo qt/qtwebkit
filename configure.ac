@@ -2,14 +2,14 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [7])
-m4_define([webkit_micro_version], [3])
+m4_define([webkit_micro_version], [4])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
 m4_define([webkit_user_agent_major_version], [535])
-m4_define([webkit_user_agent_minor_version], [14])
+m4_define([webkit_user_agent_minor_version], [18])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=11:3:11
+LIBWEBKITGTK_VERSION=11:4:11
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -269,6 +269,38 @@ if test "$with_hildon" = "yes"; then
     AC_SUBST([HILDON_LIBS])
 fi
 
+AC_MSG_CHECKING([the GStreamer version to use])
+AC_ARG_WITH([gstreamer],
+        [AS_HELP_STRING([--with-gstreamer=0.10|0.11], [the GStreamer version to use (default: 0.10)])],
+        [case "$with_gstreamer" in
+        0.10|0.11) ;;
+        *) AC_MSG_ERROR([invalid GStreamer version specified]) ;;
+        esac],
+        [with_gstreamer=0.10])
+AC_MSG_RESULT([$with_gstreamer])
+
+GSTREAMER_0_10_REQUIRED_VERSION=0.10
+GSTREAMER_0_10_PLUGINS_BASE_REQUIRED_VERSION=0.10.30
+GSTREAMER_0_11_REQUIRED_VERSION=0.11
+GSTREAMER_0_11_PLUGINS_BASE_REQUIRED_VERSION=0.11.0.2
+
+case "$with_gstreamer" in
+     0.10) GSTREAMER_REQUIRED_VERSION=GSTREAMER_0_10_REQUIRED_VERSION
+           GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=GSTREAMER_0_10_PLUGINS_BASE_REQUIRED_VERSION
+           GST_API_VERSION=0.10
+           ;;
+     0.11) GSTREAMER_REQUIRED_VERSION=GSTREAMER_0_11_REQUIRED_VERSION
+           GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=GSTREAMER_0_11_PLUGINS_BASE_REQUIRED_VERSION
+           GST_API_VERSION=0.11
+           ;;
+esac
+
+AC_SUBST([GST_API_VERSION])
+if test "$GST_API_VERSION" = "0.11"; then
+AC_DEFINE([GST_USE_UNSTABLE_API], [1], [Using unstable GStreamer API])
+AC_DEFINE([GST_API_VERSION_1],[1], [Using GStreamer 0.11])
+fi
+
 # minimum base dependencies
 LIBSOUP_REQUIRED_VERSION=2.37.2.1
 CAIRO_REQUIRED_VERSION=1.10
@@ -282,12 +314,11 @@ PANGO_REQUIRED_VERSION=1.12
 # optional modules
 LIBXSLT_REQUIRED_VERSION=1.1.7
 SQLITE_REQUIRED_VERSION=3.0
-GSTREAMER_REQUIRED_VERSION=0.10
-GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=0.10.30
 ENCHANT_REQUIRED_VERSION=0.22
 LIBFFTW_REQUIRED_VERSION=3.2.2
 CLUTTER_REQUIRED_VERSION=1.8.2
 CLUTTER_GTK_REQUIRED_VERSION=1.0.2
+ATSPI2_REQUIRED_VERSION=2.2.1
 
 # Available modules
 #
@@ -646,8 +677,8 @@ AC_MSG_RESULT([$enable_geolocation])
 AC_MSG_CHECKING([whether to enable MathML support])
 AC_ARG_ENABLE(mathml,
               AC_HELP_STRING([--enable-mathml],
-                             [enable support for MathML [default=no]]),
-              [],[enable_mathml="no"])
+                             [enable support for MathML [default=yes]]),
+              [],[enable_mathml="yes"])
 AC_MSG_RESULT([$enable_mathml])
 
 # check whether to enable SVG support
@@ -657,6 +688,14 @@ AC_ARG_ENABLE(svg,
                              [enable support for SVG [default=yes]]),
               [],[enable_svg="yes"])
 AC_MSG_RESULT([$enable_svg])
+
+# check whether to enable Shadow DOM support
+AC_MSG_CHECKING([whether to enable Shadow DOM support])
+AC_ARG_ENABLE(shadow_dom,
+              AC_HELP_STRING([--enable-shadow-dom],
+                             [enable support for Shadow DOM [default=yes]]),
+              [],[enable_shadow_dom="yes"])
+AC_MSG_RESULT([$enable_shadow_dom])
 
 # check whether to enable SharedWorkers support
 AC_MSG_CHECKING([whether to enable SharedWorkers support])
@@ -745,7 +784,11 @@ AC_ARG_ENABLE(web_sockets,
 AC_MSG_RESULT([$enable_web_sockets])
 
 # check whether to enable Web Audio support
-enable_web_audio=no
+AC_MSG_CHECKING([whether to enable Web Audio support])
+AC_ARG_ENABLE(web_audio,
+              AC_HELP_STRING([--enable-web-audio],
+                             [enable support for Web Audio [default=no]]),
+              [],[enable_web_audio="no"])
 AC_MSG_RESULT([$enable_web_audio])
 
 # check whether to enable Web Timing support
@@ -803,19 +846,6 @@ AC_ARG_ENABLE(debug_features,
                              [enable debug features default=no, default=yes for debug builds]),
               [],[if test "$enable_debug" = "yes"; then enable_debug_features="yes"; else enable_debug_features="no"; fi])
 AC_MSG_RESULT([$enable_debug_features])
-
-# Determine JavaScript engine to use.
-AC_MSG_CHECKING([Javascript engine])
-AC_ARG_WITH(jsengine,
-            AC_HELP_STRING([--with-jsengine=@<:@jsc@:>@],
-                           [Select Javascript engine [default=jsc]]),
-            [],[with_jsengine="jsc"])
-
-case "$with_jsengine" in
-     jsc) ;;
-     *) AC_MSG_ERROR([Invalid JS engine: Must be jsc]) ;;
-esac
-AC_MSG_RESULT([$with_jsengine])
 
 AC_MSG_CHECKING([whether to enable JIT compilation])
 AC_ARG_ENABLE(jit,
@@ -1023,29 +1053,41 @@ fi
 # check if gstreamer is available
 if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
    PKG_CHECK_MODULES([GSTREAMER],
-                     [gstreamer-0.10 >= $GSTREAMER_REQUIRED_VERSION
-                     gstreamer-app-0.10
-                     gstreamer-audio-0.10
-                     gstreamer-base-0.10
-                     gstreamer-interfaces-0.10
-                     gstreamer-pbutils-0.10
-                     gstreamer-plugins-base-0.10 >= $GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION
-                     gstreamer-video-0.10],
+                     [gstreamer-$GST_API_VERSION >= $GSTREAMER_REQUIRED_VERSION
+                     gstreamer-app-$GST_API_VERSION
+                     gstreamer-audio-$GST_API_VERSION
+                     gstreamer-fft-$GST_API_VERSION
+                     gstreamer-base-$GST_API_VERSION
+                     gstreamer-interfaces-$GST_API_VERSION
+                     gstreamer-pbutils-$GST_API_VERSION
+                     gstreamer-plugins-base-$GST_API_VERSION >= $GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION
+                     gstreamer-video-$GST_API_VERSION],
                      [have_gstreamer=yes])
 
    AC_SUBST([GSTREAMER_CFLAGS])
    AC_SUBST([GSTREAMER_LIBS])
 fi
 
-# check if libfftw is available
-if test "$enable_web_audio" = "yes"; then
-   PKG_CHECK_MODULES([LIBFFTW],
-                     [fftw3 >= $LIBFFTW_REQUIRED_VERSION
-                     fftw3f >= $LIBFFTW_REQUIRED_VERSION],
-                     [have_fftw=yes])
 
-    AC_SUBST([LIBFFTW_CFLAGS])
-    AC_SUBST([LIBFFTW_LIBS])
+if test "$with_accelerated_compositing" = "clutter"; then
+   PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
+   PKG_CHECK_MODULES([CLUTTER_GTK],
+                     [clutter-gtk-1.0 >= $CLUTTER_GTK_REQUIRED_VERSION])
+
+   AC_SUBST(CLUTTER_CFLAGS)
+   AC_SUBST(CLUTTER_LIBS)
+   AC_SUBST(CLUTTER_GTK_CFLAGS)
+   AC_SUBST(CLUTTER_GTK_LIBS)
+fi
+
+# check if atspi2 is available (only needed for Webkit2 unit tests)
+if test "$enable_webkit2" = "yes"; then
+   PKG_CHECK_MODULES([ATSPI2],
+                     [atspi-2 >= $ATSPI2_REQUIRED_VERSION],
+                     [have_atspi2=yes], [have_atspi2=no])
+
+   AC_SUBST([ATSPI2_CFLAGS])
+   AC_SUBST([ATSPI2_LIBS])
 fi
 
 # check for code coverage support
@@ -1070,6 +1112,16 @@ AC_MSG_RESULT([$enable_webkit2])
 if test "$enable_webkit2" = "yes"; then
    if test "$GTK_API_VERSION" = "2.0"; then
       AC_MSG_ERROR([WebKit2 requires GTK+ 3.x, use --with-gtk=3.0])
+   fi
+
+   # Check Unix printing
+   PKG_CHECK_MODULES(GTK_UNIX_PRINTING, gtk+-unix-print-3.0,
+                     [have_gtk_unix_printing=yes],
+                     [have_gtk_unix_printing=no])
+   AC_SUBST(GTK_UNIX_PRINTING_CFLAGS)
+   AC_SUBST(GTK_UNIX_PRINTING_LIBS)
+   if test "$have_gtk_unix_printing" = "yes"; then
+       AC_DEFINE([HAVE_GTK_UNIX_PRINTING], [1], [Define if GTK+ UNIX Printing is available])
    fi
 fi
 
@@ -1107,9 +1159,6 @@ AM_CONDITIONAL([TARGET_WIN32], [test "$with_target" = "win32"])
 AM_CONDITIONAL([TARGET_QUARTZ], [test "$with_target" = "quartz"])
 AM_CONDITIONAL([TARGET_DIRECTFB], [test "$with_target" = "directfb"])
 
-# JS engine conditionals
-AM_CONDITIONAL([USE_JSC], [test "$with_jsengine" = "jsc"])
-
 # Unicode backend conditionals
 AM_CONDITIONAL([USE_ICU_UNICODE], [test "$with_unicode_backend" = "icu"])
 AM_CONDITIONAL([USE_GLIB_UNICODE], [test "$with_unicode_backend" = "glib"])
@@ -1120,6 +1169,10 @@ AM_CONDITIONAL([USE_PANGO], [test "$with_font_backend" = "pango"])
 
 # GStreamer feature conditional
 AM_CONDITIONAL([USE_GSTREAMER], [test "$have_gstreamer" = "yes"])
+AM_CONDITIONAL([USE_WEBAUDIO_GSTREAMER], [test "$enable_web_audio" = "yes"])
+
+# ATSPI2 conditional
+AM_CONDITIONAL([HAVE_ATSPI2], [test "$have_atspi2" = "yes"])
 
 # Accelerated compositing conditional
 AM_CONDITIONAL([USE_ACCELERATED_COMPOSITING], [test "$with_accelerated_compositing" = "cairo" || test "$with_accelerated_compositing" = "opengl" || test "$with_accelerated_compositing" = "clutter"])
@@ -1171,6 +1224,7 @@ AM_CONDITIONAL([ENABLE_SVG_FONTS],[test "$enable_svg_fonts" = "yes"])
 AM_CONDITIONAL([ENABLE_COVERAGE],[test "$enable_coverage" = "yes"])
 AM_CONDITIONAL([ENABLE_FAST_MALLOC],[test "$enable_fast_malloc" = "yes"])
 AM_CONDITIONAL([ENABLE_WORKERS],[test "$enable_workers" = "yes"])
+AM_CONDITIONAL([ENABLE_SHADOW_DOM],[test "$enable_shadow_dom" = "yes"])
 AM_CONDITIONAL([ENABLE_SHARED_WORKERS],[test "$enable_shared_workers" = "yes"])
 AM_CONDITIONAL([SVG_FLAGS],[test "$svg_flags" = "yes"])
 AM_CONDITIONAL([HTML_FLAGS],[test "$html_flags" = "yes"])
@@ -1232,7 +1286,6 @@ Build configuration:
  Unicode backend                                          : $with_unicode_backend
  Font backend                                             : $with_font_backend
  Optimized memory allocator                               : $enable_fast_malloc
- JavaScript Engine                                        : $with_jsengine
  Accelerated Compositing                                  : $with_accelerated_compositing
 
 Features:
@@ -1270,6 +1323,7 @@ Features:
  Image resizer support                                    : $enable_image_resizer
  Link prefetch support                                    : $enable_link_prefetch
  Opcode stats                                             : $enable_opcode_stats
+ Shadow DOM support                                       : $enable_shadow_dom
  SharedWorkers support                                    : $enable_shared_workers
  Color input support                                      : $enable_input_color
  Speech input support                                     : $enable_input_speech
@@ -1292,6 +1346,7 @@ GTK+ configuration:
  GTK+ version                                             : $with_gtk
  GDK target                                               : $with_target
  Hildon UI extensions                                     : $with_hildon
+ GStreamer version                                        : $with_gstreamer
  Introspection support                                    : $enable_introspection
  Generate documentation                                   : $enable_gtk_doc
 "

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,10 +32,10 @@
 #include "WebViewHost.h"
 
 #include "LayoutTestController.h"
+#include "MockWebSpeechInputController.h"
 #include "TestNavigationController.h"
 #include "TestShell.h"
 #include "TestWebPlugin.h"
-#include "TestWebWorker.h"
 #include "platform/WebCString.h"
 #include "WebConsoleMessage.h"
 #include "WebContextMenuData.h"
@@ -56,16 +56,17 @@
 #include "platform/WebRect.h"
 #include "WebScreenInfo.h"
 #include "platform/WebSize.h"
-#include "WebSpeechInputControllerMock.h"
 #include "WebStorageNamespace.h"
 #include "WebTextCheckingCompletion.h"
 #include "WebTextCheckingResult.h"
+#include "WebUserMediaClientMock.h"
 #include "platform/WebThread.h"
 #include "platform/WebURLRequest.h"
 #include "platform/WebURLResponse.h"
 #include "WebView.h"
 #include "WebWindowFeatures.h"
 #include "skia/ext/platform_canvas.h"
+#include "webkit/support/test_media_stream_client.h"
 #include "webkit/support/webkit_support.h"
 
 #include <wtf/Assertions.h>
@@ -271,6 +272,13 @@ WebStorageNamespace* WebViewHost::createSessionStorageNamespace(unsigned quota)
     return WebKit::WebStorageNamespace::createSessionStorageNamespace(quota);
 }
 
+WebKit::WebGraphicsContext3D* WebViewHost::createGraphicsContext3D(const WebKit::WebGraphicsContext3D::Attributes& attributes, bool direct)
+{
+    if (!webView())
+        return 0;
+    return webkit_support::CreateGraphicsContext3D(attributes, webView(), direct);
+}
+
 void WebViewHost::didAddMessageToConsole(const WebConsoleMessage& message, const WebString& sourceName, unsigned sourceLine)
 {
     // This matches win DumpRenderTree's UIDelegate.cpp.
@@ -285,7 +293,10 @@ void WebViewHost::didAddMessageToConsole(const WebConsoleMessage& message, const
                 + urlSuitableForTestResult(newMessage.substr(fileProtocol));
         }
     }
-    printf("CONSOLE MESSAGE: line %d: %s\n", sourceLine, newMessage.data());
+    printf("CONSOLE MESSAGE: ");
+    if (sourceLine)
+        printf("line %d: ", sourceLine);
+    printf("%s\n", newMessage.data());
 }
 
 void WebViewHost::didStartLoading()
@@ -674,7 +685,7 @@ WebKit::WebGeolocationClientMock* WebViewHost::geolocationClientMock()
 WebSpeechInputController* WebViewHost::speechInputController(WebKit::WebSpeechInputListener* listener)
 {
     if (!m_speechInputControllerMock)
-        m_speechInputControllerMock = adoptPtr(WebSpeechInputControllerMock::create(listener));
+        m_speechInputControllerMock = MockWebSpeechInputController::create(listener);
     return m_speechInputControllerMock.get();
 }
 
@@ -693,6 +704,18 @@ MockSpellCheck* WebViewHost::mockSpellCheck()
 WebDeviceOrientationClient* WebViewHost::deviceOrientationClient()
 {
     return deviceOrientationClientMock();
+}
+
+WebUserMediaClient* WebViewHost::userMediaClient()
+{
+    return userMediaClientMock();
+}
+
+WebUserMediaClientMock* WebViewHost::userMediaClientMock()
+{
+    if (!m_userMediaClientMock.get())
+        m_userMediaClientMock = WebUserMediaClientMock::create();
+    return m_userMediaClientMock.get();
 }
 
 // WebWidgetClient -----------------------------------------------------------
@@ -754,6 +777,57 @@ WebScreenInfo WebViewHost::screenInfo()
                                  screenHeight - screenUnavailableBorder * 2);
     return info;
 }
+
+#if ENABLE(POINTER_LOCK)
+bool WebViewHost::requestPointerLock()
+{
+    switch (m_pointerLockPlannedResult) {
+    case PointerLockWillSucceed:
+        postDelayedTask(new HostMethodTask(this, &WebViewHost::didAcquirePointerLock), 0);
+        return true;
+    case PointerLockWillFailAsync:
+        ASSERT(!m_pointerLocked);
+        postDelayedTask(new HostMethodTask(this, &WebViewHost::didNotAcquirePointerLock), 0);
+        return true;
+    case PointerLockWillFailSync:
+        ASSERT(!m_pointerLocked);
+        return false;
+    default:
+        ASSERT_NOT_REACHED();
+        return false;
+    }
+}
+
+void WebViewHost::requestPointerUnlock()
+{
+    postDelayedTask(new HostMethodTask(this, &WebViewHost::didLosePointerLock), 0);
+}
+
+bool WebViewHost::isPointerLocked()
+{
+    return m_pointerLocked;
+}
+
+void WebViewHost::didAcquirePointerLock()
+{
+    m_pointerLocked = true;
+    webWidget()->didAcquirePointerLock();
+}
+
+void WebViewHost::didNotAcquirePointerLock()
+{
+    ASSERT(!m_pointerLocked);
+    m_pointerLocked = false;
+    webWidget()->didNotAcquirePointerLock();
+}
+
+void WebViewHost::didLosePointerLock()
+{
+    ASSERT(m_pointerLocked);
+    m_pointerLocked = false;
+    webWidget()->didLosePointerLock();
+}
+#endif
 
 void WebViewHost::show(WebNavigationPolicy)
 {
@@ -839,19 +913,14 @@ void WebViewHost::exitFullScreen()
 WebPlugin* WebViewHost::createPlugin(WebFrame* frame, const WebPluginParams& params)
 {
     if (params.mimeType == TestWebPlugin::mimeType())
-        return new TestWebPlugin(frame, params);
+        return new TestWebPlugin(this, frame, params);
 
     return webkit_support::CreateWebPlugin(frame, params);
 }
 
-WebWorker* WebViewHost::createWorker(WebFrame*, WebSharedWorkerClient*)
-{
-    return new TestWebWorker();
-}
-
 WebMediaPlayer* WebViewHost::createMediaPlayer(WebFrame* frame, WebMediaPlayerClient* client)
 {
-    return webkit_support::CreateMediaPlayer(frame, client);
+    return webkit_support::CreateMediaPlayer(frame, client, testMediaStreamClient());
 }
 
 WebApplicationCacheHost* WebViewHost::createApplicationCacheHost(WebFrame* frame, WebApplicationCacheHostClient* client)
@@ -1291,6 +1360,10 @@ void WebViewHost::reset()
     m_requestReturnNull = false;
     m_isPainting = false;
     m_canvas.clear();
+#if ENABLE(POINTER_LOCK)
+    m_pointerLocked = false;
+    m_pointerLockPlannedResult = PointerLockWillSucceed;
+#endif
 
     m_navigationController = adoptPtr(new TestNavigationController(this));
 
@@ -1560,6 +1633,18 @@ void WebViewHost::exitFullScreenNow()
     webView()->didExitFullScreen();
 }
 
+webkit_support::MediaStreamUtil* WebViewHost::mediaStreamUtil()
+{
+    return userMediaClientMock();
+}
+
+webkit_support::TestMediaStreamClient* WebViewHost::testMediaStreamClient()
+{
+    if (!m_testMediaStreamClient.get())
+        m_testMediaStreamClient = adoptPtr(new webkit_support::TestMediaStreamClient(mediaStreamUtil()));
+    return m_testMediaStreamClient.get();
+}
+
 // Painting functions ---------------------------------------------------------
 
 void WebViewHost::updatePaintRect(const WebRect& rect)
@@ -1691,4 +1776,13 @@ void WebViewHost::discardBackingStore()
 void WebViewHost::displayRepaintMask()
 {
     canvas()->drawARGB(167, 0, 0, 0);
+}
+
+// Simulate a print by going into print mode and then exit straight away.
+void WebViewHost::printPage(WebKit::WebFrame* frame)
+{
+    WebSize pageSizeInPixels = webWidget()->size();
+
+    frame->printBegin(pageSizeInPixels);
+    frame->printEnd();
 }

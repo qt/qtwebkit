@@ -45,21 +45,22 @@ namespace WebCore {
 
 class Image;
 class ImageLayerTextureUpdater;
+class Region;
 
 // A Layer that contains only an Image element.
 class ImageLayerChromium : public TiledLayerChromium {
 public:
-    static PassRefPtr<ImageLayerChromium> create(CCLayerDelegate*);
+    static PassRefPtr<ImageLayerChromium> create();
     virtual ~ImageLayerChromium();
 
     virtual bool drawsContent() const;
-    virtual void paintContentsIfDirty();
+    virtual void paintContentsIfDirty(const Region& occludedScreenSpace);
     virtual bool needsContentsScale() const;
 
     void setContents(Image* image);
 
 private:
-    explicit ImageLayerChromium(CCLayerDelegate*);
+    ImageLayerChromium();
 
     virtual void createTextureUpdater(const CCLayerTreeHost*);
     void setTilingOption(TilingOption);

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2009, 2010 Google Inc. All rights reserved.
+# Copyright (C) 2009, 2010, 2012 Google Inc. All rights reserved.
 # Copyright (C) 2009 Torch Mobile Inc.
 # Copyright (C) 2009 Apple Inc. All rights reserved.
 # Copyright (C) 2010 Chris Jerdonek (cjerdonek@webkit.org)
@@ -1662,6 +1662,31 @@ def check_pass_ptr_usage(clean_lines, line_number, function_state, error):
                   'http://webkit.org/coding/RefPtr.html).' % type_name)
 
 
+def check_for_leaky_patterns(clean_lines, line_number, function_state, error):
+    """Check for constructs known to be leak prone.
+    Args:
+      clean_lines: A CleansedLines instance containing the file.
+      line_number: The number of the line to check.
+      function_state: Current function name and lines in body so far.
+      error: The function to call with any errors found.
+    """
+    lines = clean_lines.lines
+    line = lines[line_number]
+
+    matched_get_dc = search(r'\b(?P<function_name>GetDC(Ex)?)\s*\(', line)
+    if matched_get_dc:
+        error(line_number, 'runtime/leaky_pattern', 5,
+              'Use the class HWndDC instead of calling %s to avoid potential '
+              'memory leaks.' % matched_get_dc.group('function_name'))
+
+    matched_create_dc = search(r'\b(?P<function_name>Create(Compatible)?DC)\s*\(', line)
+    matched_own_dc = search(r'\badoptPtr\b', line)
+    if matched_create_dc and not matched_own_dc:
+        error(line_number, 'runtime/leaky_pattern', 5,
+              'Use adoptPtr and OwnPtr<HDC> when calling %s to avoid potential '
+              'memory leaks.' % matched_create_dc.group('function_name'))
+
+
 def check_spacing(file_extension, clean_lines, line_number, error):
     """Checks for the correctness of various spacing issues in the code.
 
@@ -1783,7 +1808,7 @@ def check_spacing(file_extension, clean_lines, line_number, error):
     line = clean_lines.elided[line_number]  # get rid of comments and strings
 
     # Don't try to do spacing checks for operator methods
-    line = sub(r'operator(==|!=|<|<<|<=|>=|>>|>|\+=|-=|\*=|/=|%=|&=|\|=|^=|<<=|>>=)\(', 'operator\(', line)
+    line = sub(r'operator(==|!=|<|<<|<=|>=|>>|>|\+=|-=|\*=|/=|%=|&=|\|=|^=|<<=|>>=|/)\(', 'operator\(', line)
     # Don't try to do spacing checks for #include or #import statements at
     # minimum because it messes up checks for spacing around /
     if match(r'\s*#\s*(?:include|import)', line):
@@ -3400,6 +3425,7 @@ def process_line(filename, file_extension,
         return
     check_function_definition(filename, file_extension, clean_lines, line, function_state, error)
     check_pass_ptr_usage(clean_lines, line, function_state, error)
+    check_for_leaky_patterns(clean_lines, line, function_state, error)
     check_for_multiline_comments_and_strings(clean_lines, line, error)
     check_style(clean_lines, line, file_extension, class_state, file_state, error)
     check_language(filename, clean_lines, line, file_extension, include_state,
@@ -3497,6 +3523,7 @@ class CppChecker(object):
         'runtime/init',
         'runtime/int',
         'runtime/invalid_increment',
+        'runtime/leaky_pattern',
         'runtime/max_min_macros',
         'runtime/memset',
         'runtime/printf',

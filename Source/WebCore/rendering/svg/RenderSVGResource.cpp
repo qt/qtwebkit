@@ -25,6 +25,8 @@
 #if ENABLE(SVG)
 #include "RenderSVGResource.h"
 
+#include "Frame.h"
+#include "FrameView.h"
 #include "RenderSVGResourceContainer.h"
 #include "RenderSVGResourceFilter.h"
 #include "RenderSVGResourceSolidColor.h"
@@ -55,12 +57,23 @@ static inline RenderSVGResource* requestPaintingResource(RenderSVGResourceMode m
     if (!svgStyle)
         return 0;
 
+    bool isRenderingMask = false;
+    if (object->frame() && object->frame()->view())
+        isRenderingMask = object->frame()->view()->paintBehavior() & PaintBehaviorRenderingSVGMask;
+
     // If we have no fill/stroke, return 0.
     if (mode == ApplyToFillMode) {
+        // When rendering the mask for a RenderSVGResourceClipper, always use the initial fill paint server, and ignore stroke.
+        if (isRenderingMask) {
+            RenderSVGResourceSolidColor* colorResource = RenderSVGResource::sharedSolidPaintingResource();
+            colorResource->setColor(SVGRenderStyle::initialFillPaintColor());
+            return colorResource;
+        }
+
         if (!svgStyle->hasFill())
             return 0;
     } else {
-        if (!svgStyle->hasStroke())
+        if (!svgStyle->hasStroke() || isRenderingMask)
             return 0;
     }
 

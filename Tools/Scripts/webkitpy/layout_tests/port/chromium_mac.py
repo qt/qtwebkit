@@ -30,13 +30,9 @@
 """Chromium Mac implementation of the Port interface."""
 
 import logging
-import os
 import signal
 
-from webkitpy.layout_tests.port import mac
 from webkitpy.layout_tests.port import chromium
-
-from webkitpy.common.system.executive import Executive
 
 
 _log = logging.getLogger(__name__)
@@ -44,6 +40,7 @@ _log = logging.getLogger(__name__)
 
 class ChromiumMacPort(chromium.ChromiumPort):
     SUPPORTED_OS_VERSIONS = ('leopard', 'snowleopard', 'lion', 'future')
+    port_name = 'chromium-mac'
 
     FALLBACK_PATHS = {
         'leopard': [
@@ -77,18 +74,19 @@ class ChromiumMacPort(chromium.ChromiumPort):
         ],
     }
 
-    def __init__(self, host, port_name=None, os_version_string=None, **kwargs):
+    @classmethod
+    def determine_full_port_name(cls, host, options, port_name):
+        if port_name.endswith('-mac'):
+            return port_name + '-' + host.platform.os_version
+        return port_name
+
+    def __init__(self, host, port_name, **kwargs):
+        chromium.ChromiumPort.__init__(self, host, port_name, **kwargs)
+
         # We're a little generic here because this code is reused by the
         # 'google-chrome' port as well as the 'mock-' and 'dryrun-' ports.
-        port_name = port_name or 'chromium-mac'
-        chromium.ChromiumPort.__init__(self, host, port_name=port_name, **kwargs)
-        if port_name.endswith('-mac'):
-            # FIXME: Use host.platforminfo.os_version instead.
-            self._version = mac.os_version(os_version_string, self.SUPPORTED_OS_VERSIONS)
-            self._name = port_name + '-' + self._version
-        else:
-            self._version = port_name[port_name.index('-mac-') + len('-mac-'):]
-            assert self._version in self.SUPPORTED_OS_VERSIONS
+        self._version = port_name[port_name.index('-mac-') + len('-mac-'):]
+        assert self._version in self.SUPPORTED_OS_VERSIONS
 
     def baseline_search_path(self):
         fallback_paths = self.FALLBACK_PATHS
@@ -141,7 +139,7 @@ class ChromiumMacPort(chromium.ChromiumPort):
     def check_wdiff(self, logging=True):
         try:
             # We're ignoring the return and always returning True
-            self._executive.run_command([self._path_to_wdiff()], error_handler=Executive.ignore_error)
+            self._executive.run_command([self._path_to_wdiff()], error_handler=self._executive.ignore_error)
         except OSError:
             if logging:
                 _log.warning('wdiff not found. Install using MacPorts or some other means')

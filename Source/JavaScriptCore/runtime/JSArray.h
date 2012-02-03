@@ -114,8 +114,6 @@ namespace JSC {
     struct ArrayStorage {
         unsigned m_length; // The "length" property on the array
         unsigned m_numValuesInVector;
-        SparseArrayValueMap* m_sparseValueMap;
-        void* subclassData; // A JSArray subclass can use this to fill the vector lazily.
         void* m_allocBase; // Pointer to base address returned by malloc().  Keeping this pointer does eliminate false positives from the leak detector.
 #if CHECK_ARRAY_CONSISTENCY
         bool m_inCompactInitialization;
@@ -127,16 +125,15 @@ namespace JSC {
         friend class Walker;
 
     protected:
-        explicit JSArray(JSGlobalData&, Structure*);
+        JS_EXPORT_PRIVATE explicit JSArray(JSGlobalData&, Structure*);
 
-        void finishCreation(JSGlobalData&, unsigned initialLength = 0);
-        JSArray* tryFinishCreationUninitialized(JSGlobalData&, unsigned initialLength);
+        JS_EXPORT_PRIVATE void finishCreation(JSGlobalData&, unsigned initialLength = 0);
+        JS_EXPORT_PRIVATE JSArray* tryFinishCreationUninitialized(JSGlobalData&, unsigned initialLength);
     
     public:
         typedef JSNonFinalObject Base;
 
-        ~JSArray();
-        static void destroy(JSCell*);
+        static void finalize(JSCell*);
 
         static JSArray* create(JSGlobalData& globalData, Structure* structure, unsigned initialLength = 0)
         {
@@ -156,10 +153,10 @@ namespace JSC {
             return array->tryFinishCreationUninitialized(globalData, initialLength);
         }
 
-        static bool defineOwnProperty(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool throwException);
+        JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&, bool throwException);
 
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
-        static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
+        JS_EXPORT_PRIVATE static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
 
@@ -232,7 +229,7 @@ namespace JSC {
 
         bool inSparseMode()
         {
-            SparseArrayValueMap* map = m_storage->m_sparseValueMap;
+            SparseArrayValueMap* map = m_sparseValueMap;
             return map && map->sparseMode();
         }
 
@@ -254,7 +251,7 @@ namespace JSC {
             return OBJECT_OFFSETOF(JSArray, m_vectorLength);
         }
 
-        static void visitChildren(JSCell*, SlotVisitor&);
+        JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSObject::StructureFlags;
@@ -264,29 +261,31 @@ namespace JSC {
         static bool deletePropertyByIndex(JSCell*, ExecState*, unsigned propertyName);
         static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
 
-        void* subclassData() const;
-        void setSubclassData(void*);
+        JS_EXPORT_PRIVATE void* subclassData() const;
+        JS_EXPORT_PRIVATE void setSubclassData(void*);
 
     private:
         bool isLengthWritable()
         {
-            SparseArrayValueMap* map = m_storage->m_sparseValueMap;
+            SparseArrayValueMap* map = m_sparseValueMap;
             return !map || !map->lengthIsReadOnly();
         }
 
         void setLengthWritable(ExecState*, bool writable);
         void putDescriptor(ExecState*, SparseArrayEntry*, PropertyDescriptor&, PropertyDescriptor& old);
         bool defineOwnNumericProperty(ExecState*, unsigned, PropertyDescriptor&, bool throwException);
-        void enterSparseMode(JSGlobalData&);
+        void enterDictionaryMode(JSGlobalData&);
+        void allocateSparseMap(JSGlobalData&);
+        void deallocateSparseMap();
 
         bool getOwnPropertySlotSlowCase(ExecState*, unsigned propertyName, PropertySlot&);
         void putByIndexBeyondVectorLength(ExecState*, unsigned propertyName, JSValue);
 
         unsigned getNewVectorLength(unsigned desiredLength);
-        bool increaseVectorLength(unsigned newLength);
-        bool unshiftCountSlowCase(unsigned count);
+        bool increaseVectorLength(JSGlobalData&, unsigned newLength);
+        bool unshiftCountSlowCase(JSGlobalData&, unsigned count);
         
-        unsigned compactForSorting();
+        unsigned compactForSorting(JSGlobalData&);
 
         enum ConsistencyCheckType { NormalConsistencyCheck, DestructorConsistencyCheck, SortConsistencyCheck };
         void checkConsistency(ConsistencyCheckType = NormalConsistencyCheck);
@@ -294,6 +293,10 @@ namespace JSC {
         unsigned m_vectorLength; // The valid length of m_vector
         unsigned m_indexBias; // The number of JSValue sized blocks before ArrayStorage.
         ArrayStorage *m_storage;
+
+        // FIXME: Maybe SparseArrayValueMap should be put into its own JSCell?
+        SparseArrayValueMap* m_sparseValueMap;
+        void* m_subclassData; // A JSArray subclass can use this to fill the vector lazily.
     };
 
     JSArray* asArray(JSValue);

@@ -55,8 +55,9 @@ class WebDataSource;
 class WebDOMEvent;
 class WebFormElement;
 class WebFrame;
-class WebIntentServiceInfo;
 class WebIntent;
+class WebIntentRequest;
+class WebIntentServiceInfo;
 class WebMediaPlayer;
 class WebMediaPlayerClient;
 class WebNode;
@@ -81,9 +82,6 @@ public:
 
     // May return null.
     virtual WebPlugin* createPlugin(WebFrame*, const WebPluginParams&) { return 0; }
-
-    // May return null.
-    virtual WebWorker* createWorker(WebFrame*, WebSharedWorkerClient*) { return 0; }
 
     // May return null.
     virtual WebSharedWorker* createSharedWorker(WebFrame*, const WebURL&, const WebString&, unsigned long long) { return 0; }
@@ -383,9 +381,9 @@ public:
     // Register a service to handle Web Intents.
     virtual void registerIntentService(WebFrame*, const WebIntentServiceInfo&) { }
 
-    // Start a Web Intents activity. Replies to this request should be sent to
-    // the WebFrame starting the activity.
-    virtual void dispatchIntent(WebFrame*, const WebIntent&) { }
+    // Start a Web Intents activity. The callee uses the |WebIntentRequest|
+    // object to coordinate replies to the intent invocation.
+    virtual void dispatchIntent(WebFrame*, const WebIntentRequest&) { }
 
     // Messages ------------------------------------------------------
 

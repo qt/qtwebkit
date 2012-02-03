@@ -38,10 +38,48 @@ import sys
 
 from webkitpy.common.host import Host
 from webkitpy.layout_tests.controllers.manager import Manager, WorkerException
+from webkitpy.layout_tests.models import test_expectations
 from webkitpy.layout_tests.views import printing
 
 
 _log = logging.getLogger(__name__)
+
+
+def lint(port, options, expectations_class):
+    host = port.host
+    if options.platform:
+        ports_to_lint = [port]
+    else:
+        ports_to_lint = [host.port_factory.get(name) for name in host.port_factory.all_port_names()]
+
+    files_linted = set()
+    lint_failed = False
+
+    for port_to_lint in ports_to_lint:
+        expectations_file = port_to_lint.path_to_test_expectations_file()
+        if expectations_file in files_linted:
+            continue
+
+        try:
+            expectations_class(port_to_lint,
+                tests=None,
+                expectations=port_to_lint.test_expectations(),
+                test_config=port_to_lint.test_configuration(),
+                is_lint_mode=True,
+                overrides=port_to_lint.test_expectations_overrides())
+        except test_expectations.ParseError, e:
+            lint_failed = True
+            _log.error('')
+            for error in e.errors:
+                _log.error(error)
+            _log.error('')
+        files_linted.add(expectations_file)
+
+    if lint_failed:
+        _log.error('Lint failed.')
+        return -1
+    _log.info('Lint succeeded.')
+    return 0
 
 
 def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdout):
@@ -57,6 +95,9 @@ def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdo
         printer.cleanup()
         return 0
 
+    if options.lint_test_files:
+        return lint(port, options, test_expectations.TestExpectations)
+
     # We wrap any parts of the run that are slow or likely to raise exceptions
     # in a try/finally to ensure that we clean up the logging configuration.
     unexpected_result_count = -1
@@ -71,9 +112,6 @@ def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdo
             if e.errno == errno.ENOENT:
                 return -1
             raise
-
-        if options.lint_test_files:
-            return manager.lint()
 
         printer.print_update("Checking build ...")
         if not port.check_build(manager.needs_servers()):
@@ -137,6 +175,9 @@ def _set_up_derived_options(port, options):
         warnings.append("--no-http is ignored since --force is also provided")
         options.http = True
 
+    if options.ignore_metrics and (options.new_baseline or options.reset_results):
+        warnings.append("--ignore-metrics has no effect with --new-baselines or with --reset-results")
+
     return warnings
 
 
@@ -170,17 +211,16 @@ def parse_args(args=None):
                              help='Set the configuration to Release'),
         # old-run-webkit-tests also accepts -c, --configuration CONFIGURATION.
         optparse.make_option("--platform", help="Override port/platform being tested (i.e. chromium-mac)"),
-        optparse.make_option('--qt', action='store_const', const='qt', dest="platform", help='Alias for --platform=qt'),
-        optparse.make_option('--gtk', action='store_const', const='gtk', dest="platform", help='Alias for --platform=gtk'),
+        optparse.make_option("--chromium", action="store_const", const='chromium', dest='platform', help='Alias for --platform=chromium'),
         optparse.make_option('--efl', action='store_const', const='efl', dest="platform", help='Alias for --platform=efl'),
+        optparse.make_option('--gtk', action='store_const', const='gtk', dest="platform", help='Alias for --platform=gtk'),
+        optparse.make_option('--qt', action='store_const', const='qt', dest="platform", help='Alias for --platform=qt'),
     ]
 
     print_options = printing.print_options()
 
     # FIXME: These options should move onto the ChromiumPort.
     chromium_options = [
-        optparse.make_option("--chromium", action="store_true", default=False,
-            help="use the Chromium port"),
         optparse.make_option("--startup-dialog", action="store_true",
             default=False, help="create a dialog on DumpRenderTree startup"),
         optparse.make_option("--gp-fault-error-box", action="store_true",
@@ -305,6 +345,9 @@ def parse_args(args=None):
             default=True, help="Run HTTP and WebSocket tests (default)"),
         optparse.make_option("--no-http", action="store_false", dest="http",
             help="Don't run HTTP and WebSocket tests"),
+        optparse.make_option("--ignore-metrics", action="store_true", dest="ignore_metrics",
+            default=False, help="Ignore rendering metrics related information from test "
+            "output, only compare the structure of the rendertree."),
     ]
 
     test_options = [
@@ -379,6 +422,8 @@ def parse_args(args=None):
         optparse.make_option("--no-retry-failures", action="store_false",
             dest="retry_failures",
             help="Don't re-try any tests that produce unexpected results."),
+        optparse.make_option("--max-locked-shards", type="int",
+            help="Set the maximum number of locked shards"),
     ]
 
     misc_options = [
@@ -390,7 +435,7 @@ def parse_args(args=None):
     # FIXME: Move these into json_results_generator.py
     results_json_options = [
         optparse.make_option("--master-name", help="The name of the buildbot master."),
-        optparse.make_option("--builder-name", default="DUMMY_BUILDER_NAME",
+        optparse.make_option("--builder-name", default="",
             help=("The name of the builder shown on the waterfall running "
                   "this script e.g. WebKit.")),
         optparse.make_option("--build-name", default="DUMMY_BUILD_NAME",
@@ -413,7 +458,14 @@ def parse_args(args=None):
 
 def main():
     options, args = parse_args()
-    host = Host()
+    if options.platform and options.platform.startswith('test'):
+        # It's a bit lame to import mocks into real code, but this allows the user
+        # to run tests against the test platform interactively, which is useful for
+        # debugging test failures.
+        from webkitpy.common.host_mock import MockHost
+        host = MockHost()
+    else:
+        host = Host()
     host._initialize_scm()
     port = host.port_factory.get(options.platform, options)
     return run(port, options, args)

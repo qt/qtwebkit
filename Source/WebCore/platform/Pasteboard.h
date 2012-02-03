@@ -43,15 +43,9 @@
 // knowledge of the frame and editor or moved into the editing directory.
 
 #if PLATFORM(MAC)
-#ifdef __OBJC__
-@class NSFileWrapper;
-@class NSPasteboard;
-@class NSArray;
-#else
-class NSFileWrapper;
-class NSPasteboard;
-class NSArray;
-#endif
+OBJC_CLASS NSFileWrapper;
+OBJC_CLASS NSPasteboard;
+OBJC_CLASS NSArray;
 #endif
 
 #if PLATFORM(WIN)
@@ -86,12 +80,10 @@ class Pasteboard {
     WTF_MAKE_NONCOPYABLE(Pasteboard); WTF_MAKE_FAST_ALLOCATED;
 public:
 #if PLATFORM(MAC)
-    //Helper functions to allow Clipboard to share code
-    static void writeSelection(NSPasteboard*, NSArray* pasteboardTypes, Range* selectedRange, bool canSmartCopyOrDelete, Frame*);
-    static void writeURL(NSPasteboard* pasteboard, NSArray* types, const KURL& url, const String& titleStr, Frame* frame);
-    static void writePlainText(NSPasteboard* pasteboard, const String& text);
+    void writeSelectionForTypes(NSArray* pasteboardTypes, Range* selectedRange, bool canSmartCopyOrDelete, Frame*);
+    void writeURLForTypes(NSArray* types, const KURL&, const String& titleStr, Frame*);
 
-    Pasteboard(NSPasteboard *);
+    Pasteboard(const String& pasteboardName);
 #endif
     
     static Pasteboard* generalPasteboard();

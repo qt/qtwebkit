@@ -31,6 +31,7 @@
 #ifndef WebSharedWorker_h
 #define WebSharedWorker_h
 
+#include "WebContentSecurityPolicy.h"
 #include "platform/WebCommon.h"
 
 namespace WebCore {
@@ -61,6 +62,8 @@ public:
                                     const WebString& name,
                                     const WebString& userAgent,
                                     const WebString& sourceCode,
+                                    const WebString& contentSecurityPolicy,
+                                    WebContentSecurityPolicyType,
                                     long long scriptResourceAppCacheID) = 0;
 
     class ConnectListener {

@@ -62,29 +62,18 @@ void JIT::emit_op_put_by_index(Instruction* currentInstruction)
     stubCall.call();
 }
 
-void JIT::emit_op_put_getter(Instruction* currentInstruction)
+void JIT::emit_op_put_getter_setter(Instruction* currentInstruction)
 {
     unsigned base = currentInstruction[1].u.operand;
     unsigned property = currentInstruction[2].u.operand;
-    unsigned function = currentInstruction[3].u.operand;
+    unsigned getter = currentInstruction[3].u.operand;
+    unsigned setter = currentInstruction[4].u.operand;
     
-    JITStubCall stubCall(this, cti_op_put_getter);
+    JITStubCall stubCall(this, cti_op_put_getter_setter);
     stubCall.addArgument(base);
     stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(property)));
-    stubCall.addArgument(function);
-    stubCall.call();
-}
-
-void JIT::emit_op_put_setter(Instruction* currentInstruction)
-{
-    unsigned base = currentInstruction[1].u.operand;
-    unsigned property = currentInstruction[2].u.operand;
-    unsigned function = currentInstruction[3].u.operand;
-    
-    JITStubCall stubCall(this, cti_op_put_setter);
-    stubCall.addArgument(base);
-    stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(property)));
-    stubCall.addArgument(function);
+    stubCall.addArgument(getter);
+    stubCall.addArgument(setter);
     stubCall.call();
 }
 
@@ -144,7 +133,7 @@ void JIT::emit_op_method_check(Instruction* currentInstruction)
     compileGetByIdHotPath();
     
     match.link(this);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite(m_bytecodeOffset + OPCODE_LENGTH(op_method_check));
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_method_check) + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
     
@@ -161,7 +150,7 @@ void JIT::emitSlow_op_method_check(Instruction* currentInstruction, Vector<SlowC
     int ident = currentInstruction[3].u.operand;
     
     compileGetByIdSlowCase(dst, base, &(m_codeBlock->identifier(ident)), iter, true);
-    emitValueProfilingSite(SubsequentProfilingSite);
+    emitValueProfilingSite(m_bytecodeOffset + OPCODE_LENGTH(op_method_check));
     
     // We've already generated the following get_by_id, so make sure it's skipped over.
     m_bytecodeOffset += OPCODE_LENGTH(op_get_by_id);
@@ -205,7 +194,7 @@ JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
     jit.move(TrustedImm32(0), regT0);
     jit.ret();
     
-    LinkBuffer patchBuffer(*globalData, &jit);
+    LinkBuffer patchBuffer(*globalData, &jit, GLOBAL_THUNK_ID);
     return patchBuffer.finalizeCode();
 }
 
@@ -228,7 +217,7 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
     load32(BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + OBJECT_OFFSETOF(JSValue, u.asBits.payload)), regT0); // payload
     addSlowCase(branch32(Equal, regT1, TrustedImm32(JSValue::EmptyValueTag)));
     
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_val), dst, regT1, regT0);
 }
@@ -261,7 +250,7 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     stubCall.addArgument(property);
     stubCall.call(dst);
 
-    emitValueProfilingSite(SubsequentProfilingSite);
+    emitValueProfilingSite();
 }
 
 void JIT::emit_op_put_by_val(Instruction* currentInstruction)
@@ -325,7 +314,7 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
     emitLoad(base, regT1, regT0);
     emitJumpSlowCaseIfNotJSCell(base, regT1);
     compileGetByIdHotPath();
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
 }
@@ -369,7 +358,7 @@ void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCase
     int ident = currentInstruction[3].u.operand;
     
     compileGetByIdSlowCase(dst, base, &(m_codeBlock->identifier(ident)), iter);
-    emitValueProfilingSite(SubsequentProfilingSite);
+    emitValueProfilingSite();
 }
 
 void JIT::compileGetByIdSlowCase(int dst, int base, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter, bool isMethodCheck)
@@ -517,7 +506,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
         stubCall.skipArgument(); // ident
         stubCall.skipArgument(); // value
         stubCall.addArgument(TrustedImm32(oldStructure->propertyStorageCapacity()));
-        stubCall.addArgument(TrustedImm32(newStructure->propertyStorageCapacity()));
+        stubCall.addArgument(TrustedImmPtr(newStructure));
         stubCall.call(regT0);
 
         restoreReturnAddressBeforeReturn(regT3);
@@ -553,7 +542,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
     restoreArgumentReferenceForTrampoline();
     Call failureCall = tailRecursiveCall();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     
     patchBuffer.link(failureCall, FunctionPtr(direct ? cti_op_put_by_id_direct_fail : cti_op_put_by_id_fail));
     
@@ -617,7 +606,7 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     move(TrustedImm32(JSValue::Int32Tag), regT1);
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-patchOffsetGetByIdSlowCaseCall);
@@ -676,7 +665,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
     
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-patchOffsetGetByIdSlowCaseCall);
@@ -735,7 +724,7 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
 
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -802,7 +791,7 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -872,7 +861,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
 
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -939,7 +928,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
         compileGetDirectOffset(protoObject, regT1, regT0, cachedOffset);
     Jump success = jump();
     
-    LinkBuffer patchBuffer(*m_globalData, this);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock);
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -1043,7 +1032,7 @@ void JIT::emit_op_get_scoped_var(Instruction* currentInstruction)
     loadPtr(Address(regT2, JSVariableObject::offsetOfRegisters()), regT2);
 
     emitLoad(index, regT1, regT0, regT2);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_scoped_var), dst, regT1, regT0);
 }
@@ -1085,7 +1074,7 @@ void JIT::emit_op_get_global_var(Instruction* currentInstruction)
     loadPtr(&globalObject->m_registers, regT2);
 
     emitLoad(index, regT1, regT0, regT2);
-    emitValueProfilingSite(FirstProfilingSite);
+    emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_global_var), dst, regT1, regT0);
 }

@@ -83,7 +83,7 @@ public:
                 LayerTextureUpdater::SampledTexelFormatRGBA : LayerTextureUpdater::SampledTexelFormatBGRA;
     }
 
-    virtual void prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, int /* borderTexels */, float /* contentsScale */)
+    virtual void prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, int /* borderTexels */, float /* contentsScale */, IntRect* /* resultingOpaqueRect */)
     {
         m_texSubImage.setSubImageSize(tileSize);
     }
@@ -129,13 +129,13 @@ private:
     LayerTextureSubImage m_texSubImage;
 };
 
-PassRefPtr<ImageLayerChromium> ImageLayerChromium::create(CCLayerDelegate* delegate)
+PassRefPtr<ImageLayerChromium> ImageLayerChromium::create()
 {
-    return adoptRef(new ImageLayerChromium(delegate));
+    return adoptRef(new ImageLayerChromium());
 }
 
-ImageLayerChromium::ImageLayerChromium(CCLayerDelegate* delegate)
-    : TiledLayerChromium(delegate)
+ImageLayerChromium::ImageLayerChromium()
+    : TiledLayerChromium()
     , m_imageForCurrentFrame(0)
 {
 }
@@ -158,7 +158,7 @@ void ImageLayerChromium::setContents(Image* contents)
     setNeedsDisplay();
 }
 
-void ImageLayerChromium::paintContentsIfDirty()
+void ImageLayerChromium::paintContentsIfDirty(const Region& /* occludedScreenSpace */)
 {
     if (m_needsDisplay) {
         m_textureUpdater->updateFromImage(m_contents->nativeImageForCurrentFrame());

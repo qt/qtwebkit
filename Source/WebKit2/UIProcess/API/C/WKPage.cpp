@@ -379,6 +379,16 @@ WKPaginationMode WKPageGetPaginationMode(WKPageRef pageRef)
     return kWKPaginationModeUnpaginated;
 }
 
+void WKPageSetPaginationBehavesLikeColumns(WKPageRef pageRef, bool behavesLikeColumns)
+{
+    toImpl(pageRef)->setPaginationBehavesLikeColumns(behavesLikeColumns);
+}
+
+bool WKPageGetPaginationBehavesLikeColumns(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->paginationBehavesLikeColumns();
+}
+
 void WKPageSetPageLength(WKPageRef pageRef, double pageLength)
 {
     toImpl(pageRef)->setPageLength(pageLength);
@@ -660,4 +670,9 @@ WKImageRef WKPageCreateSnapshotOfVisibleContent(WKPageRef)
 void WKPageSetShouldSendEventsSynchronously(WKPageRef page, bool sync)
 {
     toImpl(page)->setShouldSendEventsSynchronously(sync);
+}
+
+void WKPageSetMediaVolume(WKPageRef page, float volume)
+{
+    toImpl(page)->setMediaVolume(volume);    
 }

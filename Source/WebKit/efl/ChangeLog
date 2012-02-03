@@ -1,3 +1,235 @@
+2012-01-31  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Add basic DRT/Efl implementation to support viewport test.
+        https://bugs.webkit.org/show_bug.cgi?id=77320
+
+        Reviewed by Andreas Kling.
+
+        Add dumpConfigurationForViewport.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::dumpConfigurationForViewport):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-01-31  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] Set content hint information for ewk_view_single.
+        https://bugs.webkit.org/show_bug.cgi?id=77319
+
+        Reviewed by Ryosuke Niwa.
+
+        The content hint information corresponding to opengl_x11 engine is set
+        for the image object which ewk_view_single owns when evas is based on
+        opengl_x11 engine.
+
+        * ewk/ewk_view_single.cpp:
+        (_ewk_view_single_smart_backing_store_add):
+
+2012-01-30  Eunsol Park  <eunsol47.park@samsung.com>
+
+        [EFL] Define the names of view smart class
+        https://bugs.webkit.org/show_bug.cgi?id=76370
+
+        Reviewed by Andreas Kling.
+
+        Strings of ewk_tiled_view's name were defined differently,
+        so the definitions were modified to make users not confused.
+
+        * ewk/ewk_private.h:
+        * ewk/ewk_view.cpp:
+        * ewk/ewk_view_single.cpp:
+        (_ewk_view_single_smart_class_new):
+        * ewk/ewk_view_tiled.cpp:
+        (ewk_view_tiled_smart_set):
+        (_ewk_view_tiled_smart_class_new):
+
+2012-01-26  Tomasz Morawski  <t.morawski@samsung.com>
+
+        [EFL] Added missing NETSCAPE_PLUGIN_API macro.
+        https://bugs.webkit.org/show_bug.cgi?id=77093
+
+        Reviewed by Andreas Kling.
+
+        The ewk_view_js_window_object_clear function should be inside ENABLE(NETSCAPE_PLUGIN_API) macro.
+
+        * ewk/ewk_view.cpp:
+
+2012-01-17  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Use static const insted of #define macro.
+        https://bugs.webkit.org/show_bug.cgi?id=76499
+
+        Reviewed by Hajime Morita.
+
+        WebKit coding style prefers const to #define. EFL port needs to use const insted of #define macro.
+        This patch replace global variables defined by #define with const.
+
+        * ewk/ewk_tiled_backing_store.cpp:
+        (_ewk_tiled_backing_store_smart_add):
+        (_ewk_tiled_backing_store_zoom_set_internal):
+        * ewk/ewk_tiled_backing_store.h:
+        * ewk/ewk_tiled_matrix.cpp:
+        (ewk_tile_matrix_new):
+        * ewk/ewk_view.cpp:
+        (_ewk_view_repaint_add):
+        (_ewk_view_repaints_flush):
+        (_ewk_view_scroll_add):
+        (_ewk_view_scrolls_flush):
+        (_ewk_view_priv_new):
+        (ewk_view_base_smart_set):
+        * ewk/ewk_view_tiled.cpp:
+        (_ewk_view_tiled_smart_pre_render_start):
+
+2012-01-13  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Emit "resource,request,willsend" from ewk_view.
+        https://bugs.webkit.org/show_bug.cgi?id=76292
+
+        Reviewed by Andreas Kling.
+
+        Make ewk_view dispatch the "resource,request,willsend" signal as well,
+        so that it is possible to know whether the request is for the main
+        frame itself or for anything else.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchWillSendRequest):
+        * ewk/ewk_view.h:
+
+2012-01-16  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Build fix when using pango as font backends.
+        https://bugs.webkit.org/show_bug.cgi?id=76368
+
+        Unreviewed build fix.
+
+        * ewk/ewk_view.cpp: include RefPtrCairo.h
+
+2012-01-13  Leandro Pereira  <leandro@profusion.mobi>
+
+        [EFL] SecurityPolicy whitelist interface should be exposed to EWebKit
+        https://bugs.webkit.org/show_bug.cgi?id=76082
+
+        Reviewed by Andreas Kling.
+
+        * CMakeListsEfl.txt: Added reference to ewk_security_policy.{cpp,h}.
+        * ewk/EWebKit.h: Include ewk_security_policy.h.
+        * ewk/ewk_security_policy.cpp: Added.
+        (ewk_security_policy_whitelist_origin_add): Implemented thin layer around SecurityPolicy::addOriginAccessWhitelistEntry().
+        (ewk_security_policy_whitelist_origin_del): Implemented thin layer around SecurityPolicy::removeOriginAccessWhitelistEntry().
+        (ewk_security_policy_whitelist_origin_reset): Implemented thin layer around SecurityPolicy::resetOriginAccessWhitelists().
+        * ewk/ewk_security_policy.h: Added.
+
+2012-01-13  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Remove extern "C" from ewk_private.h
+        https://bugs.webkit.org/show_bug.cgi?id=76250
+
+        Reviewed by Andreas Kling.
+
+        ewk_private.h defines internal functions used by WebKit itself. There is no chance to be used by C application.
+        So, extern "C" keyword is unneeded in ewk_private.h.
+
+        * ewk/ewk_private.h:
+
+2012-01-13  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL] Add 'Copy Image Address' to context menu.
+        https://bugs.webkit.org/show_bug.cgi?id=76153
+
+        Reviewed by Andreas Kling.
+
+        Adds EWK_CONTEXT_MENU_ITEM_TAG_COPY_IMAGE_URL_TO_CLIPBOARD to Ewk_Context_Menu_Action to synchronize it with ContextMenuItem.h
+
+        * ewk/ewk_contextmenu.h:
+
+2012-01-13  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] Add visible field into ewk_tiled_backing_store's data.
+        https://bugs.webkit.org/show_bug.cgi?id=76165
+
+        Reviewed by Nikolas Zimmermann.
+
+        Using of evas_object_visible_get() API can't gurantee the correctness of
+        evas_object's visible status if it's called inside of evas_object's
+        smart_show() method.
+        So, a visible flag for the ewk_tiled_backing_store is added.
+        In addition, as tiles are not visible, ewk_tiled_backing_store will push
+        its own tiles into the cache when it disapear.
+
+        * ewk/ewk_tiled_backing_store.cpp:
+        (_ewk_tiled_backing_store_updates_process):
+        (_ewk_tiled_backing_store_item_process_idler_start):
+        (_ewk_tiled_backing_store_item_fill):
+        (_ewk_tiled_backing_store_smart_member_add):
+        (_ewk_tiled_backing_store_smart_show):
+        (_ewk_tiled_backing_store_smart_hide):
+
+2012-01-13  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] Unused code cleanup on ewk_tiled_model.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=76031
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove unused code from ewk_tiled_model.cpp.
+
+        * ewk/ewk_tiled_model.cpp:
+
+2012-01-12  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL] Move macro checking to functions' definition in ewk_js.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=76037
+
+        Reviewed by Andreas Kling.
+
+        Moves macro checking to functions' definition instead of duplicate them in source depending on macro value.
+        It's known practice in WebKit and EFL port.
+        Duplicating functions in the same file whose return value is different may confuse user,
+        especially if macro isn't included in a patch.
+
+        * ewk/ewk_js.cpp:
+        (ewk_js_object_new):
+        (ewk_js_object_free):
+        (ewk_js_object_view_get):
+        (ewk_js_object_properties_get):
+        (ewk_js_object_name_get):
+        (ewk_js_object_invoke):
+        (ewk_js_object_type_get):
+        (ewk_js_object_type_set):
+        (ewk_js_variant_free):
+        (ewk_js_variant_array_free):
+
+2012-01-12  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] Modify some API's implementation to let it directly pass Eina_Rectangle into IntRect.
+        https://bugs.webkit.org/show_bug.cgi?id=75695
+
+        Reviewed by Andreas Kling.
+
+        Dereference Eina_Rectangle pointers so the shorter IntRect constructor can be used.
+
+        * ewk/ewk_view.cpp:
+        (ewk_view_paint_context_clip):
+        (ewk_view_paint_context_paint):
+        (ewk_view_paint_context_paint_contents):
+        (ewk_view_paint):
+        (ewk_view_paint_contents):
+
+2012-01-11  JungJik Lee  <jungjik.lee@samsung.com>
+
+        [EFL] Refactor single backing store scroll code.
+        https://bugs.webkit.org/show_bug.cgi?id=75243
+
+        Reviewed by Zoltan Herczeg.
+
+        Remove the duplicated code and refactor the scroll procedure.
+        Wherever the page is scrolled, there are one screen copy and two updates.
+        This patch optimises the scroll procedure by less calculation.
+
+        * ewk/ewk_view_single.cpp:
+        (_ewk_view_screen_move):
+        (_ewk_view_single_scroll_process_single):
+
 2012-01-11  KwangHyuk Kim  <hyuki.kim@samsung.com>
 
         [EFL] Fix page rendering issue on ewk_view_tiled.

@@ -36,15 +36,10 @@ import sys
 from common import TabChecker
 from webkitpy.common.host import Host
 from webkitpy.layout_tests.models import test_expectations
+from webkitpy.layout_tests.port.base import DummyOptions
 
 
 _log = logging.getLogger(__name__)
-
-
-# FIXME: This could use mocktool.MockOptions(chromium=True) or base.DummyOptions(chromium=True) instead.
-class ChromiumOptions(object):
-    def __init__(self):
-        self.chromium = True
 
 
 class TestExpectationsChecker(object):
@@ -54,15 +49,12 @@ class TestExpectationsChecker(object):
 
     def _determine_port_from_exepectations_path(self, host, expectations_path):
         try:
-            # I believe what this is trying to do is "when the port name is chromium,
-            # get the chromium-port for this platform".  Unclear why that's needed??
             port_name = expectations_path.split(host.filesystem.sep)[-2]
-            if port_name == "chromium":
-                return host.port_factory.get(options=ChromiumOptions())
-            # Passing port_name=None to the factory would just return the current port, which isn't what we want, I don't think.
             if not port_name:
                 return None
-            return host.port_factory.get(port_name)
+
+            # Pass a configuration to avoid calling default_configuration() when initializing the port (takes 0.5 seconds on a Mac Pro!).
+            return host.port_factory.get(port_name, options=DummyOptions(configuration="Release"))
         except Exception, e:
             _log.warn("Exception while getting port for path %s" % expectations_path)
             return None
@@ -72,7 +64,7 @@ class TestExpectationsChecker(object):
         self._handle_style_error = handle_style_error
         self._handle_style_error.turn_off_line_filtering()
         self._tab_checker = TabChecker(file_path, handle_style_error)
-        self._output_regex = re.compile('Line:(?P<line>\d+)\s*(?P<message>.+)')
+        self._output_regex = re.compile('.*test_expectations.txt:(?P<line>\d+)\s*(?P<message>.+)')
 
         # FIXME: host should be a required parameter, not an optional one.
         host = host or Host()

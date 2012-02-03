@@ -955,6 +955,9 @@ void RenderTableSection::paint(PaintInfo& paintInfo, const LayoutPoint& paintOff
     paintObject(paintInfo, adjustedPaintOffset);
     if (pushedClip)
         popContentsClip(paintInfo, phase, adjustedPaintOffset);
+
+    if ((phase == PaintPhaseOutline || phase == PaintPhaseSelfOutline) && style()->visibility() == VISIBLE)
+        paintOutline(paintInfo.context, LayoutRect(adjustedPaintOffset, size()));
 }
 
 static inline bool compareCellPositions(RenderTableCell* elem1, RenderTableCell* elem2)
@@ -1085,6 +1088,9 @@ void RenderTableSection::paintObject(PaintInfo& paintInfo, const LayoutPoint& pa
             } else {
                 // Draw the dirty cells in the order that they appear.
                 for (unsigned r = startrow; r < endrow; r++) {
+                    RenderTableRow* row = m_grid[r].rowRenderer;
+                    if (row && !row->hasSelfPaintingLayer())
+                        row->paintOutlineForRowIfNeeded(paintInfo, paintOffset);
                     for (unsigned c = startcol; c < endcol; c++) {
                         CellStruct& current = cellAt(r, c);
                         RenderTableCell* cell = current.primaryCell();
@@ -1105,6 +1111,9 @@ void RenderTableSection::paintObject(PaintInfo& paintInfo, const LayoutPoint& pa
             HashSet<RenderTableCell*> spanningCells;
 
             for (unsigned r = startrow; r < endrow; r++) {
+                RenderTableRow* row = m_grid[r].rowRenderer;
+                if (row && !row->hasSelfPaintingLayer())
+                    row->paintOutlineForRowIfNeeded(paintInfo, paintOffset);
                 for (unsigned c = startcol; c < endcol; c++) {
                     CellStruct& current = cellAt(r, c);
                     if (!current.hasCells())
@@ -1189,6 +1198,9 @@ void RenderTableSection::recalcCells()
 // FIXME: This function could be made O(1) in certain cases (like for the non-most-constrainive cells' case).
 void RenderTableSection::rowLogicalHeightChanged(unsigned rowIndex)
 {
+    if (needsCellRecalc())
+        return;
+
     setRowLogicalHeightToRowStyleLogicalHeightIfNotRelative(m_grid[rowIndex]);
 
     for (RenderObject* cell = m_grid[rowIndex].rowRenderer->firstChild(); cell; cell = cell->nextSibling()) {
@@ -1338,6 +1350,29 @@ unsigned RenderTableSection::rowIndexForRenderer(const RenderTableRow* row) cons
     }
     ASSERT_NOT_REACHED();
     return 0;
+}
+
+void RenderTableSection::removeCachedCollapsedBorders(const RenderTableCell* cell)
+{
+    if (!table()->collapseBorders())
+        return;
+    
+    for (int side = CBSBefore; side <= CBSEnd; ++side)
+        m_cellsCollapsedBorders.remove(make_pair(cell, side));
+}
+
+void RenderTableSection::setCachedCollapsedBorder(const RenderTableCell* cell, CollapsedBorderSide side, CollapsedBorderValue border)
+{
+    ASSERT(table()->collapseBorders());
+    m_cellsCollapsedBorders.set(make_pair(cell, side), border);
+}
+
+CollapsedBorderValue& RenderTableSection::cachedCollapsedBorder(const RenderTableCell* cell, CollapsedBorderSide side)
+{
+    ASSERT(table()->collapseBorders());
+    HashMap<pair<const RenderTableCell*, int>, CollapsedBorderValue>::iterator it = m_cellsCollapsedBorders.find(make_pair(cell, side));
+    ASSERT(it != m_cellsCollapsedBorders.end());
+    return it->second;
 }
 
 } // namespace WebCore

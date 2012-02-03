@@ -503,7 +503,7 @@ QStringList QWebElement::attributeNames(const QString& namespaceUri) const
         return QStringList();
 
     QStringList attributeNameList;
-    const NamedNodeMap* const attrs = m_element->attributes(/* read only = */ true);
+    const NamedNodeMap* const attrs = m_element->updatedAttributes();
     if (attrs) {
         const String namespaceUriString(namespaceUri); // convert QString -> String once
         const unsigned attrsCount = attrs->length();
@@ -844,13 +844,13 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (!propID)
         return QString();
 
-    CSSStyleDeclaration* style = static_cast<StyledElement*>(m_element)->style();
+    CSSMutableStyleDeclaration* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
 
     if (strategy == InlineStyle)
         return style->getPropertyValue(propID);
 
     if (strategy == CascadedStyle) {
-        if (style->getPropertyPriority(propID))
+        if (style->propertyIsImportant(propID))
             return style->getPropertyValue(propID);
 
         // We are going to resolve the style property by walking through the
@@ -866,11 +866,11 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
             for (int i = rules->length(); i > 0; --i) {
                 CSSStyleRule* rule = static_cast<CSSStyleRule*>(rules->item(i - 1));
 
-                if (rule->style()->getPropertyPriority(propID))
-                    return rule->style()->getPropertyValue(propID);
+                if (rule->declaration()->propertyIsImportant(propID))
+                    return rule->declaration()->getPropertyValue(propID);
 
                 if (style->getPropertyValue(propID).isEmpty())
-                    style = rule->style();
+                    style = rule->declaration();
             }
         }
 
@@ -909,12 +909,11 @@ void QWebElement::setStyleProperty(const QString &name, const QString &value)
         return;
 
     int propID = cssPropertyID(name);
-    CSSStyleDeclaration* style = static_cast<StyledElement*>(m_element)->style();
+    CSSMutableStyleDeclaration* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
     if (!propID || !style)
         return;
 
-    ExceptionCode exception = 0;
-    style->setProperty(name, value,emptyString(), exception);
+    style->setProperty(propID, value);
 }
 
 /*!

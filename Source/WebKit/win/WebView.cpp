@@ -95,6 +95,7 @@
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/HTMLMediaElement.h>
 #include <WebCore/HTMLNames.h>
+#include <WebCore/HWndDC.h>
 #include <WebCore/HistoryItem.h>
 #include <WebCore/HitTestRequest.h>
 #include <WebCore/HitTestResult.h>
@@ -331,6 +332,7 @@ bool WebView::s_allowSiteSpecificHacks = false;
 
 WebView::WebView()
     : m_refCount(0)
+    , m_shouldInvertColors(false)
 #if !ASSERT_DISABLED
     , m_deletionHasBegun(false)
 #endif
@@ -862,7 +864,7 @@ void WebView::scrollBackingStore(FrameView* frameView, int dx, int dy, const Int
     HRGN updateRegion = ::CreateRectRgn(0, 0, 0, 0);
 
     // Collect our device context info and select the bitmap to scroll.
-    HDC windowDC = ::GetDC(m_viewWindow);
+    HWndDC windowDC(m_viewWindow);
     HDC bitmapDC = ::CreateCompatibleDC(windowDC);
     HGDIOBJ oldBitmap = ::SelectObject(bitmapDC, m_backingStoreBitmap->handle());
     
@@ -888,7 +890,6 @@ void WebView::scrollBackingStore(FrameView* frameView, int dx, int dy, const Int
     // Clean up.
     ::SelectObject(bitmapDC, oldBitmap);
     ::DeleteDC(bitmapDC);
-    ::ReleaseDC(m_viewWindow, windowDC);
 }
 
 void WebView::sizeChanged(const IntSize& newSize)
@@ -958,11 +959,10 @@ void WebView::updateBackingStore(FrameView* frameView, HDC dc, bool backingStore
 
     LOCAL_GDI_COUNTER(0, __FUNCTION__);
 
-    HDC windowDC = 0;
     HDC bitmapDC = dc;
     HGDIOBJ oldBitmap = 0;
     if (!dc) {
-        windowDC = ::GetDC(m_viewWindow);
+        HWndDC windowDC(m_viewWindow);
         bitmapDC = ::CreateCompatibleDC(windowDC);
         oldBitmap = ::SelectObject(bitmapDC, m_backingStoreBitmap->handle());
     }
@@ -996,7 +996,6 @@ void WebView::updateBackingStore(FrameView* frameView, HDC dc, bool backingStore
     if (!dc) {
         ::SelectObject(bitmapDC, oldBitmap);
         ::DeleteDC(bitmapDC);
-        ::ReleaseDC(m_viewWindow, windowDC);
     }
 
     GdiFlush();
@@ -1008,7 +1007,7 @@ void WebView::performLayeredWindowUpdate()
     if (!m_backingStoreBitmap)
         return;
 
-    HDC hdcScreen = ::GetDC(m_viewWindow);
+    HWndDC hdcScreen(m_viewWindow);
     OwnPtr<HDC> hdcMem = adoptPtr(::CreateCompatibleDC(hdcScreen));
     HBITMAP hbmOld = static_cast<HBITMAP>(::SelectObject(hdcMem.get(), m_backingStoreBitmap->handle()));
 
@@ -1026,7 +1025,6 @@ void WebView::performLayeredWindowUpdate()
     ::UpdateLayeredWindow(m_viewWindow, hdcScreen, 0, &windowSize, hdcMem.get(), &layerPos, 0, &blendFunction, ULW_ALPHA);
 
     ::SelectObject(hdcMem.get(), hbmOld);
-    ::ReleaseDC(0, hdcScreen);
 }
 
 void WebView::paint(HDC dc, LPARAM options)
@@ -1132,13 +1130,14 @@ void WebView::paintIntoBackingStore(FrameView* frameView, HDC bitmapDC, const In
     RECT rect = dirtyRect;
 
 #if FLASH_BACKING_STORE_REDRAW
-    HDC dc = ::GetDC(m_viewWindow);
-    OwnPtr<HBRUSH> yellowBrush(CreateSolidBrush(RGB(255, 255, 0)));
-    FillRect(dc, &rect, yellowBrush.get());
-    GdiFlush();
-    Sleep(50);
-    paintIntoWindow(bitmapDC, dc, dirtyRect);
-    ::ReleaseDC(m_viewWindow, dc);
+    {
+        HWndDC dc(m_viewWindow);
+        OwnPtr<HBRUSH> yellowBrush(CreateSolidBrush(RGB(255, 255, 0)));
+        FillRect(dc, &rect, yellowBrush.get());
+        GdiFlush();
+        Sleep(50);
+        paintIntoWindow(bitmapDC, dc, dirtyRect);
+    }
 #endif
 
     GraphicsContext gc(bitmapDC, m_transparent);
@@ -1156,6 +1155,8 @@ void WebView::paintIntoBackingStore(FrameView* frameView, HDC bitmapDC, const In
     if (frameView && frameView->frame() && frameView->frame()->contentRenderer()) {
         gc.clip(dirtyRect);
         frameView->paint(&gc, dirtyRect);
+        if (m_shouldInvertColors)
+            gc.fillRect(dirtyRect, Color::white, ColorSpaceDeviceRGB, CompositeDifference);
     }
     gc.restore();
 }
@@ -6630,12 +6631,12 @@ void WebView::paintContents(const GraphicsLayer*, GraphicsContext& context, Grap
     context.restore();
 }
 
-bool WebView::showDebugBorders() const
+bool WebView::showDebugBorders(const GraphicsLayer*) const
 {
     return m_page->settings()->showDebugBorders();
 }
 
-bool WebView::showRepaintCounter() const
+bool WebView::showRepaintCounter(const GraphicsLayer*) const
 {
     return m_page->settings()->showRepaintCounter();
 }

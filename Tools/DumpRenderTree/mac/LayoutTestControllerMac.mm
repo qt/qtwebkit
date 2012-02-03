@@ -545,6 +545,12 @@ void LayoutTestController::addMockSpeechInputResult(JSStringRef result, double c
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
 }
 
+void LayoutTestController::setMockSpeechInputDumpRect(bool flag)
+{
+    // FIXME: Implement for speech input layout tests.
+    // See https://bugs.webkit.org/show_bug.cgi?id=39485.
+}
+
 void LayoutTestController::startSpeechInput(JSContextRef inputElement)
 {
     // FIXME: Implement for speech input layout tests.
@@ -724,10 +730,8 @@ static void waitUntilDoneWatchdogFired(CFRunLoopTimerRef timer, void* info)
 void LayoutTestController::setWaitToDump(bool waitUntilDone)
 {
     m_waitToDump = waitUntilDone;
-    if (m_waitToDump && !waitToDumpWatchdog) {
-        waitToDumpWatchdog = CFRunLoopTimerCreate(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + waitToDumpWatchdogInterval, 0, 0, 0, waitUntilDoneWatchdogFired, NULL);
-        CFRunLoopAddTimer(CFRunLoopGetCurrent(), waitToDumpWatchdog, kCFRunLoopCommonModes);
-    }
+    if (m_waitToDump && shouldSetWaitToDumpWatchdog())
+        setWaitToDumpWatchdog(CFRunLoopTimerCreate(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + waitToDumpWatchdogInterval, 0, 0, 0, waitUntilDoneWatchdogFired, NULL));
 }
 
 int LayoutTestController::windowCount()

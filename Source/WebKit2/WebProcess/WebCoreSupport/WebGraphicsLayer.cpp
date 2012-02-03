@@ -25,6 +25,7 @@
 
 #include "Animation.h"
 #include "BackingStore.h"
+#include "FloatQuad.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
@@ -40,8 +41,6 @@
 using namespace WebKit;
 
 namespace WebCore {
-
-static const float gTileDimension = 1024.0;
 
 static HashMap<WebLayerID, WebGraphicsLayer*>& layerByIDMap()
 {
@@ -70,8 +69,18 @@ void WebGraphicsLayer::notifyChange()
         client()->notifySyncRequired(this);
 }
 
+void WebGraphicsLayer::notifyChangeRecursively()
+{
+    notifyChange();
+    for (size_t i = 0; i < children().size(); ++i)
+        toWebGraphicsLayer(children()[i])->notifyChangeRecursively();
+    if (replicaLayer())
+        toWebGraphicsLayer(replicaLayer())->notifyChange();
+}
+
 WebGraphicsLayer::WebGraphicsLayer(GraphicsLayerClient* client)
     : GraphicsLayer(client)
+    , m_maskTarget(0)
     , m_needsDisplay(false)
     , m_modified(true)
     , m_contentNeedsDisplay(false)
@@ -107,7 +116,7 @@ bool WebGraphicsLayer::setChildren(const Vector<GraphicsLayer*>& children)
         return false;
     for (int i = 0; i < children.size(); ++i) {
         WebGraphicsLayer* child = toWebGraphicsLayer(children[i]);
-        child->setContentsScale(m_contentsScale);
+        child->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
         child->notifyChange();
     }
     notifyChange();
@@ -117,7 +126,7 @@ bool WebGraphicsLayer::setChildren(const Vector<GraphicsLayer*>& children)
 void WebGraphicsLayer::addChild(GraphicsLayer* layer)
 {
     GraphicsLayer::addChild(layer);
-    toWebGraphicsLayer(layer)->setContentsScale(m_contentsScale);
+    toWebGraphicsLayer(layer)->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
     toWebGraphicsLayer(layer)->notifyChange();
     notifyChange();
 }
@@ -125,7 +134,7 @@ void WebGraphicsLayer::addChild(GraphicsLayer* layer)
 void WebGraphicsLayer::addChildAtIndex(GraphicsLayer* layer, int index)
 {
     GraphicsLayer::addChildAtIndex(layer, index);
-    toWebGraphicsLayer(layer)->setContentsScale(m_contentsScale);
+    toWebGraphicsLayer(layer)->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
     toWebGraphicsLayer(layer)->notifyChange();
     notifyChange();
 }
@@ -133,7 +142,7 @@ void WebGraphicsLayer::addChildAtIndex(GraphicsLayer* layer, int index)
 void WebGraphicsLayer::addChildAbove(GraphicsLayer* layer, GraphicsLayer* sibling)
 {
     GraphicsLayer::addChildAbove(layer, sibling);
-    toWebGraphicsLayer(layer)->setContentsScale(m_contentsScale);
+    toWebGraphicsLayer(layer)->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
     toWebGraphicsLayer(layer)->notifyChange();
     notifyChange();
 }
@@ -141,7 +150,7 @@ void WebGraphicsLayer::addChildAbove(GraphicsLayer* layer, GraphicsLayer* siblin
 void WebGraphicsLayer::addChildBelow(GraphicsLayer* layer, GraphicsLayer* sibling)
 {
     GraphicsLayer::addChildBelow(layer, sibling);
-    toWebGraphicsLayer(layer)->setContentsScale(m_contentsScale);
+    toWebGraphicsLayer(layer)->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
     toWebGraphicsLayer(layer)->notifyChange();
     notifyChange();
 }
@@ -153,7 +162,8 @@ bool WebGraphicsLayer::replaceChild(GraphicsLayer* oldChild, GraphicsLayer* newC
         return false;
     notifyChange();
     toWebGraphicsLayer(oldChild)->notifyChange();
-    toWebGraphicsLayer(newChild)->setContentsScale(m_contentsScale);
+    toWebGraphicsLayer(oldChild)->setLayerTreeTileClient(0);
+    toWebGraphicsLayer(newChild)->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
     toWebGraphicsLayer(newChild)->notifyChange();
     return true;
 }
@@ -165,6 +175,7 @@ void WebGraphicsLayer::removeFromParent()
     GraphicsLayer::removeFromParent();
 
     notifyChange();
+    setLayerTreeTileClient(0);
 }
 
 void WebGraphicsLayer::setPosition(const FloatPoint& p)
@@ -173,7 +184,7 @@ void WebGraphicsLayer::setPosition(const FloatPoint& p)
         return;
 
     GraphicsLayer::setPosition(p);
-    notifyChange();
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setAnchorPoint(const FloatPoint3D& p)
@@ -182,7 +193,7 @@ void WebGraphicsLayer::setAnchorPoint(const FloatPoint3D& p)
         return;
 
     GraphicsLayer::setAnchorPoint(p);
-    notifyChange();
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setSize(const FloatSize& size)
@@ -192,7 +203,9 @@ void WebGraphicsLayer::setSize(const FloatSize& size)
 
     GraphicsLayer::setSize(size);
     setNeedsDisplay();
-    notifyChange();
+    if (maskLayer())
+        maskLayer()->setSize(size);
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setTransform(const TransformationMatrix& t)
@@ -201,7 +214,7 @@ void WebGraphicsLayer::setTransform(const TransformationMatrix& t)
         return;
 
     GraphicsLayer::setTransform(t);
-    notifyChange();
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setChildrenTransform(const TransformationMatrix& t)
@@ -210,7 +223,7 @@ void WebGraphicsLayer::setChildrenTransform(const TransformationMatrix& t)
         return;
 
     GraphicsLayer::setChildrenTransform(t);
-    notifyChange();
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setPreserves3D(bool b)
@@ -219,7 +232,7 @@ void WebGraphicsLayer::setPreserves3D(bool b)
         return;
 
     GraphicsLayer::setPreserves3D(b);
-    notifyChange();
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setMasksToBounds(bool b)
@@ -227,7 +240,7 @@ void WebGraphicsLayer::setMasksToBounds(bool b)
     if (masksToBounds() == b)
         return;
     GraphicsLayer::setMasksToBounds(b);
-    notifyChange();
+    notifyChangeRecursively();
 }
 
 void WebGraphicsLayer::setDrawsContent(bool b)
@@ -294,9 +307,11 @@ bool WebGraphicsLayer::addAnimation(const KeyframeValueList& valueList, const In
     webAnimation.animation = Animation::create(anim);
     webAnimation.startTime = timeOffset;
     m_layerInfo.animations.append(webAnimation);
+    if (valueList.property() == AnimatedPropertyWebkitTransform)
+        m_transformAnimations.add(keyframesName);
 
     m_hasPendingAnimations = true;
-    notifyChange();
+    notifyChangeRecursively();
 
     return true;
 }
@@ -317,6 +332,7 @@ void WebGraphicsLayer::removeAnimation(const String& animationName)
     webAnimation.name = animationName;
     webAnimation.operation = WebLayerAnimation::RemoveAnimation;
     m_layerInfo.animations.append(webAnimation);
+    m_transformAnimations.remove(animationName);
     notifyChange();
 }
 
@@ -354,14 +370,32 @@ void WebGraphicsLayer::setContentsToImage(Image* image)
 
 void WebGraphicsLayer::setMaskLayer(GraphicsLayer* layer)
 {
+    if (layer == maskLayer())
+        return;
+
     GraphicsLayer::setMaskLayer(layer);
+
+    if (!layer)
+        return;
+
+    layer->setSize(size());
+    WebGraphicsLayer* webGraphicsLayer = toWebGraphicsLayer(layer);
+    webGraphicsLayer->setLayerTreeTileClient(layerTreeTileClient());
+    webGraphicsLayer->setMaskTarget(this);
+    webGraphicsLayer->setVisibleContentRectAndScale(m_pageVisibleRect, m_contentsScale);
+    webGraphicsLayer->notifyChange();
     notifyChange();
+
 }
 
 void WebGraphicsLayer::setReplicatedByLayer(GraphicsLayer* layer)
 {
     if (layer == replicaLayer())
         return;
+
+    if (layer)
+        toWebGraphicsLayer(layer)->setLayerTreeTileClient(layerTreeTileClient());
+
     GraphicsLayer::setReplicatedByLayer(layer);
     notifyChange();
 }
@@ -385,13 +419,16 @@ WebLayerID WebGraphicsLayer::id() const
 
 void WebGraphicsLayer::syncCompositingState(const FloatRect& rect)
 {
+    if (WebGraphicsLayer* mask = toWebGraphicsLayer(maskLayer()))
+        mask->syncCompositingStateForThisLayerOnly();
+
+    if (WebGraphicsLayer* replica = toWebGraphicsLayer(replicaLayer()))
+        replica->syncCompositingStateForThisLayerOnly();
+
+    syncCompositingStateForThisLayerOnly();
+
     for (size_t i = 0; i < children().size(); ++i)
         children()[i]->syncCompositingState(rect);
-    if (replicaLayer())
-        replicaLayer()->syncCompositingState(rect);
-    if (maskLayer())
-        maskLayer()->syncCompositingState(rect);
-    syncCompositingStateForThisLayerOnly();
 }
 
 WebGraphicsLayer* toWebGraphicsLayer(GraphicsLayer* layer)
@@ -409,16 +446,14 @@ void WebGraphicsLayer::syncCompositingStateForThisLayerOnly()
     if (!m_modified)
         return;
 
+    computeTransformedVisibleRect();
     m_layerInfo.name = name();
     m_layerInfo.anchorPoint = anchorPoint();
     m_layerInfo.backfaceVisible = backfaceVisibility();
     m_layerInfo.childrenTransform = childrenTransform();
     m_layerInfo.contentsOpaque = contentsOpaque();
     m_layerInfo.contentsRect = contentsRect();
-
-    // In the shadow layer tree we create in the UI process, layers with directly composited images are always considered to draw content.
-    // Otherwise, we'd have to check whether an layer with drawsContent==false has a directly composited image multiple times.
-    m_layerInfo.drawsContent = drawsContent() || m_image;
+    m_layerInfo.drawsContent = drawsContent();
     m_layerInfo.mask = toWebLayerID(maskLayer());
     m_layerInfo.masksToBounds = masksToBounds();
     m_layerInfo.opacity = opacity();
@@ -452,24 +487,6 @@ void WebGraphicsLayer::tiledBackingStorePaintBegin()
 {
 }
 
-void WebGraphicsLayer::setContentsScale(float scale)
-{
-    for (size_t i = 0; i < children().size(); ++i) {
-        WebGraphicsLayer* layer = toWebGraphicsLayer(this->children()[i]);
-        layer->setContentsScale(scale);
-    }
-
-    m_contentsScale = scale;
-    if (m_mainBackingStore && m_mainBackingStore->contentsScale() == scale)
-        return;
-
-    notifyChange();
-
-    m_previousBackingStore = m_mainBackingStore.release();
-    m_mainBackingStore = adoptPtr(new TiledBackingStore(this, TiledBackingStoreRemoteTileBackend::create(this)));
-    m_mainBackingStore->setContentsScale(scale);
-}
-
 void WebGraphicsLayer::setRootLayer(bool isRoot)
 {
     m_layerInfo.isRootLayer = isRoot;
@@ -481,11 +498,25 @@ void WebGraphicsLayer::setVisibleContentRectTrajectoryVector(const FloatPoint& t
     m_mainBackingStore->setVisibleRectTrajectoryVector(trajectoryVector);
 }
 
-void WebGraphicsLayer::setVisibleContentRect(const IntRect& rect)
+void WebGraphicsLayer::setVisibleContentRectAndScale(const IntRect& pageVisibleRect, float scale)
 {
-    m_visibleContentRect = rect;
-    notifyChange();
-    m_mainBackingStore->adjustVisibleRect();
+    if (m_pageVisibleRect == pageVisibleRect && m_contentsScale == scale)
+        return;
+
+    m_pageVisibleRect = pageVisibleRect;
+    m_contentsScale = scale;
+
+    if (!m_mainBackingStore || m_mainBackingStore->contentsScale() != scale) {
+        m_previousBackingStore = m_mainBackingStore.release();
+        m_mainBackingStore = adoptPtr(new TiledBackingStore(this, TiledBackingStoreRemoteTileBackend::create(this)));
+        m_mainBackingStore->setContentsScale(scale);
+    } else
+        m_mainBackingStore->adjustVisibleRect();
+
+    if (maskLayer())
+        toWebGraphicsLayer(maskLayer())->setVisibleContentRectAndScale(pageVisibleRect, scale);
+    for (size_t i = 0; i < children().size(); ++i)
+        toWebGraphicsLayer(children()[i])->setVisibleContentRectAndScale(pageVisibleRect, scale);
 }
 
 void WebGraphicsLayer::tiledBackingStorePaint(GraphicsContext* context, const IntRect& rect)
@@ -511,14 +542,26 @@ bool WebGraphicsLayer::tiledBackingStoreUpdatesAllowed() const
 
 IntRect WebGraphicsLayer::tiledBackingStoreContentsRect()
 {
-    if (m_image)
+    if (!drawsContent())
         return IntRect();
     return IntRect(0, 0, size().width(), size().height());
 }
 
 IntRect WebGraphicsLayer::tiledBackingStoreVisibleRect()
 {
-    return m_visibleContentRect;
+    // If this layer is part of an active transform animation, the visible rect might change,
+    // so we rather render the whole layer until some better optimization is available.
+    if (selfOrAncestorHasActiveTransformAnimations())
+        return tiledBackingStoreContentsRect();
+
+    // Non-invertible layers are not visible.
+    if (!m_layerTransform.combined().isInvertible())
+        return IntRect();
+
+    // Return a projection of the visible rect (surface coordinates) onto the layer's plane (layer coordinates).
+    // The resulting quad might be squewed and the visible rect is the bounding box of this quad,
+    // so it might spread further than the real visible area (and then even more amplified by the cover rect multiplier).
+    return m_layerTransform.combined().inverse().clampedBoundsOfProjectedQuad(FloatQuad(FloatRect(m_pageVisibleRect)));
 }
 
 Color WebGraphicsLayer::tiledBackingStoreBackgroundColor() const
@@ -554,13 +597,23 @@ void WebGraphicsLayer::updateTileBuffersRecursively()
         WebGraphicsLayer* layer = toWebGraphicsLayer(this->children()[i]);
         layer->updateTileBuffersRecursively();
     }
+
+    if (WebGraphicsLayer* mask = toWebGraphicsLayer(maskLayer()))
+        mask->updateTileBuffersRecursively();
 }
 
 WebLayerTreeTileClient* WebGraphicsLayer::layerTreeTileClient() const
 {
     if (m_layerTreeTileClient)
         return m_layerTreeTileClient;
-    WebGraphicsLayer* parent = toWebGraphicsLayer(this->parent());
+    WebGraphicsLayer* parent;
+    if (this->replicatedLayer())
+        parent = toWebGraphicsLayer(this->replicatedLayer());
+    else if (this->maskTarget())
+        parent = toWebGraphicsLayer(this->maskTarget());
+    else
+        parent = toWebGraphicsLayer(this->parent());
+
     if (!parent)
         return 0;
     return parent->layerTreeTileClient();
@@ -589,6 +642,9 @@ void WebGraphicsLayer::purgeBackingStores()
         layer->purgeBackingStores();
     }
 
+    if (WebGraphicsLayer* mask = toWebGraphicsLayer(maskLayer()))
+        mask->purgeBackingStores();
+
     if (m_mainBackingStore)
         m_mainBackingStore.clear();
 
@@ -605,6 +661,8 @@ void WebGraphicsLayer::recreateBackingStoreIfNeeded()
         WebGraphicsLayer* layer = toWebGraphicsLayer(this->children()[i]);
         layer->recreateBackingStoreIfNeeded();
     }
+    if (WebGraphicsLayer* mask = toWebGraphicsLayer(maskLayer()))
+        mask->recreateBackingStoreIfNeeded();
 
     if (!m_mainBackingStore) {
         m_mainBackingStore = adoptPtr(new TiledBackingStore(this, TiledBackingStoreRemoteTileBackend::create(this)));
@@ -620,6 +678,10 @@ void WebGraphicsLayer::setLayerTreeTileClient(WebKit::WebLayerTreeTileClient* cl
     if (m_layerTreeTileClient == client)
         return;
 
+    if (WebGraphicsLayer* replica = toWebGraphicsLayer(replicaLayer()))
+        replica->setLayerTreeTileClient(client);
+    if (WebGraphicsLayer* mask = toWebGraphicsLayer(maskLayer()))
+        mask->setLayerTreeTileClient(client);
     for (size_t i = 0; i < children().size(); ++i) {
         WebGraphicsLayer* layer = toWebGraphicsLayer(this->children()[i]);
         layer->setLayerTreeTileClient(client);
@@ -629,6 +691,20 @@ void WebGraphicsLayer::setLayerTreeTileClient(WebKit::WebLayerTreeTileClient* cl
     if (m_layerTreeTileClient)
         m_layerTreeTileClient->didDeleteLayer(id());
     m_layerTreeTileClient = client;
+}
+
+void WebGraphicsLayer::computeTransformedVisibleRect()
+{
+    // FIXME: Consider transform animations in the visible rect calculation.
+    m_layerTransform.setLocalTransform(transform());
+    m_layerTransform.setPosition(position());
+    m_layerTransform.setAnchorPoint(anchorPoint());
+    m_layerTransform.setSize(size());
+    m_layerTransform.setFlattening(!preserves3D());
+    m_layerTransform.setChildrenTransform(childrenTransform());
+    m_layerTransform.combineTransforms(parent() ? toWebGraphicsLayer(parent())->m_layerTransform.combinedForChildren() : TransformationMatrix());
+    // The combined transform will be used in tiledBackingStoreVisibleRect.
+    m_mainBackingStore->adjustVisibleRect();
 }
 #endif
 
@@ -640,6 +716,17 @@ static PassOwnPtr<GraphicsLayer> createWebGraphicsLayer(GraphicsLayerClient* cli
 void WebGraphicsLayer::initFactory()
 {
     GraphicsLayer::setGraphicsLayerFactory(createWebGraphicsLayer);
+}
+
+bool WebGraphicsLayer::selfOrAncestorHasActiveTransformAnimations() const
+{
+    if (!m_transformAnimations.isEmpty())
+        return true;
+
+    if (parent())
+        return toWebGraphicsLayer(parent())->selfOrAncestorHasActiveTransformAnimations();
+
+    return false;
 }
 
 }

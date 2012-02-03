@@ -44,7 +44,7 @@ class PlatformWebView;
 }
 
 namespace WebKit {
-class QtNetworkRequestData;
+class QtRefCountedNetworkRequestData;
 }
 
 namespace WTF {
@@ -165,6 +165,7 @@ private:
     Q_PRIVATE_SLOT(d_func(), void _q_suspend());
     Q_PRIVATE_SLOT(d_func(), void _q_resume());
     Q_PRIVATE_SLOT(d_func(), void _q_viewportTrajectoryVectorChanged(const QPointF&));
+    Q_PRIVATE_SLOT(d_func(), void _q_updateVisibleContentRectAndScale());
     Q_PRIVATE_SLOT(d_func(), void _q_onOpenPanelFilesSelected());
     Q_PRIVATE_SLOT(d_func(), void _q_onOpenPanelFinished(int result));
     Q_PRIVATE_SLOT(d_func(), void _q_onVisibleChanged());
@@ -208,6 +209,8 @@ class QWEBKIT_EXPORT QQuickWebViewExperimental : public QObject {
     Q_PROPERTY(QDeclarativeComponent* alertDialog READ alertDialog WRITE setAlertDialog NOTIFY alertDialogChanged)
     Q_PROPERTY(QDeclarativeComponent* confirmDialog READ confirmDialog WRITE setConfirmDialog NOTIFY confirmDialogChanged)
     Q_PROPERTY(QDeclarativeComponent* promptDialog READ promptDialog WRITE setPromptDialog NOTIFY promptDialogChanged)
+    Q_PROPERTY(QDeclarativeComponent* authenticationDialog READ authenticationDialog WRITE setAuthenticationDialog NOTIFY authenticationDialogChanged)
+    Q_PROPERTY(QDeclarativeComponent* certificateVerificationDialog READ certificateVerificationDialog WRITE setCertificateVerificationDialog NOTIFY certificateVerificationDialogChanged)
     Q_PROPERTY(QDeclarativeComponent* itemSelector READ itemSelector WRITE setItemSelector NOTIFY itemSelectorChanged)
     Q_PROPERTY(QWebPreferences* preferences READ preferences CONSTANT FINAL)
     Q_PROPERTY(bool useTraditionalDesktopBehaviour READ useTraditionalDesktopBehaviour WRITE setUseTraditionalDesktopBehaviour)
@@ -229,13 +232,18 @@ public:
     void setConfirmDialog(QDeclarativeComponent*);
     QDeclarativeComponent* promptDialog() const;
     void setPromptDialog(QDeclarativeComponent*);
+    QDeclarativeComponent* authenticationDialog() const;
+    void setAuthenticationDialog(QDeclarativeComponent*);
+    QDeclarativeComponent* certificateVerificationDialog() const;
+    void setCertificateVerificationDialog(QDeclarativeComponent*);
     QDeclarativeComponent* itemSelector() const;
     void setItemSelector(QDeclarativeComponent*);
-    
+    bool useTraditionalDesktopBehaviour() const;
+    void setUseTraditionalDesktopBehaviour(bool enable);
+
     QWebViewportInfo* viewportInfo();
 
     QWebPreferences* preferences() const;
-    bool useTraditionalDesktopBehaviour() const;
     QWebNavigationHistory* navigationHistory() const;
     QQuickWebPage* page();
 
@@ -244,11 +252,14 @@ public:
     static int schemeDelegates_Count(QDeclarativeListProperty<QQuickUrlSchemeDelegate>*);
     static void schemeDelegates_Clear(QDeclarativeListProperty<QQuickUrlSchemeDelegate>*);
     QDeclarativeListProperty<QQuickUrlSchemeDelegate> schemeDelegates();
-    void invokeApplicationSchemeHandler(WTF::PassRefPtr<WebKit::QtNetworkRequestData>);
+    void invokeApplicationSchemeHandler(WTF::PassRefPtr<WebKit::QtRefCountedNetworkRequestData>);
     void sendApplicationSchemeReply(QQuickNetworkReply*);
 
+    // C++ only
+    bool renderToOffscreenBuffer() const;
+    void setRenderToOffscreenBuffer(bool enable);
+
 public Q_SLOTS:
-    void setUseTraditionalDesktopBehaviour(bool enable);
     void goBackTo(int index);
     void goForwardTo(int index);
     void postMessage(const QString&);
@@ -257,6 +268,8 @@ Q_SIGNALS:
     void alertDialogChanged();
     void confirmDialogChanged();
     void promptDialogChanged();
+    void authenticationDialogChanged();
+    void certificateVerificationDialogChanged();
     void itemSelectorChanged();
     void downloadRequested(QWebDownloadItem* downloadItem);
     void permissionRequested(QWebPermissionRequest* permission);

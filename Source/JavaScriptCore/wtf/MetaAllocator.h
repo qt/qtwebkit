@@ -43,15 +43,36 @@ namespace WTF {
 
 #define ENABLE_META_ALLOCATOR_PROFILE 0
 
+class MetaAllocatorTracker {
+public:
+    void notify(MetaAllocatorHandle*);
+    void release(MetaAllocatorHandle*);
+
+    MetaAllocatorHandle* find(void* address)
+    {
+        MetaAllocatorHandle* handle = m_allocations.findGreatestLessThanOrEqual(address);
+        if (handle && address < handle->end())
+            return handle;
+        return 0;
+    }
+
+    RedBlackTree<MetaAllocatorHandle, void*> m_allocations;
+};
+
 class MetaAllocator {
     WTF_MAKE_NONCOPYABLE(MetaAllocator);
+
 public:
-    
-    MetaAllocator(size_t allocationGranule);
+    WTF_EXPORT_PRIVATE MetaAllocator(size_t allocationGranule);
     
     virtual ~MetaAllocator();
     
-    PassRefPtr<MetaAllocatorHandle> allocate(size_t sizeInBytes);
+    WTF_EXPORT_PRIVATE PassRefPtr<MetaAllocatorHandle> allocate(size_t sizeInBytes, void* ownerUID);
+
+    void trackAllocations(MetaAllocatorTracker* tracker)
+    {
+        m_tracker = tracker;
+    }
     
     // Non-atomic methods for getting allocator statistics.
     size_t bytesAllocated() { return m_bytesAllocated; }
@@ -69,11 +90,11 @@ public:
     // Add more free space to the allocator. Call this directly from
     // the constructor if you wish to operate the allocator within a
     // fixed pool.
-    void addFreshFreeSpace(void* start, size_t sizeInBytes);
+    WTF_EXPORT_PRIVATE void addFreshFreeSpace(void* start, size_t sizeInBytes);
 
     // This is meant only for implementing tests. Never call this in release
     // builds.
-    size_t debugFreeSpaceSize();
+    WTF_EXPORT_PRIVATE size_t debugFreeSpaceSize();
     
 #if ENABLE(META_ALLOCATOR_PROFILE)
     void dumpProfile();
@@ -101,8 +122,26 @@ private:
     
     friend class MetaAllocatorHandle;
     
-    typedef RedBlackTree<size_t, void*> Tree;
-    typedef Tree::Node FreeSpaceNode;
+    class FreeSpaceNode : public RedBlackTree<FreeSpaceNode, size_t>::Node {
+    public:
+        FreeSpaceNode(void* start, size_t sizeInBytes)
+            : m_start(start)
+            , m_sizeInBytes(sizeInBytes)
+        {
+        }
+
+        size_t key()
+        {
+            return m_sizeInBytes;
+        }
+
+        void* m_start;
+        size_t m_sizeInBytes;
+    };
+    typedef RedBlackTree<FreeSpaceNode, size_t> Tree;
+
+    // Release a MetaAllocatorHandle.
+    void release(MetaAllocatorHandle*);
     
     // Remove free space from the allocator. This is effectively
     // the allocate() function, except that it does not mark the
@@ -121,13 +160,13 @@ private:
     
     void incrementPageOccupancy(void* address, size_t sizeInBytes);
     void decrementPageOccupancy(void* address, size_t sizeInBytes);
-    
+
     // Utilities.
     
     size_t roundUp(size_t sizeInBytes);
     
     FreeSpaceNode* allocFreeSpaceNode();
-    void freeFreeSpaceNode(FreeSpaceNode*);
+    WTF_EXPORT_PRIVATE void freeFreeSpaceNode(FreeSpaceNode*);
     
     size_t m_allocationGranule;
     unsigned m_logAllocationGranule;
@@ -144,6 +183,8 @@ private:
     size_t m_bytesCommitted;
     
     SpinLock m_lock;
+
+    MetaAllocatorTracker* m_tracker;
 
 #ifndef NDEBUG
     size_t m_mallocBalance;

@@ -19,7 +19,7 @@ DEFINES += QT_MAKEDLL
 haveQt(5) {
     # Add a QtScript dependency for the time being, in order to pull in the include
     # path for QtScript when it's built as a standalone module
-    QT += script
+    QT += script widgets
 } else {
     INCLUDEPATH += $$PWD/../JavaScriptCore/wtf/qt/compat
 }
@@ -78,6 +78,7 @@ v8 {
     SOURCES += \
         bindings/v8/custom/V8ArrayBufferCustom.cpp \
         bindings/v8/custom/V8ArrayBufferViewCustom.cpp \
+        bindings/v8/custom/V8BlobCustom.cpp \
         bindings/v8/custom/V8CustomXPathNSResolver.cpp \
         bindings/v8/custom/V8DataViewCustom.cpp \
         bindings/v8/custom/V8DeviceMotionEventCustom.cpp \
@@ -225,6 +226,7 @@ v8 {
         bindings/v8/custom/V8ConsoleCustom.cpp \
         bindings/v8/custom/V8SQLTransactionSyncCustom.cpp \
         bindings/v8/V8WorkerContextErrorHandler.cpp \
+        testing/v8/V8InternalsCustom.cpp \
         testing/v8/WebCoreTestSupport.cpp
 } else {
     SOURCES += \
@@ -235,6 +237,7 @@ v8 {
         bindings/js/GCController.cpp \
         bindings/js/JSArrayBufferCustom.cpp \
         bindings/js/JSAttrCustom.cpp \
+        bindings/js/JSBlobCustom.cpp \
         bindings/js/JSCDATASectionCustom.cpp \
         bindings/js/JSCSSFontFaceRuleCustom.cpp \
         bindings/js/JSCSSImportRuleCustom.cpp \
@@ -342,6 +345,7 @@ v8 {
         bindings/js/JSUint16ArrayCustom.cpp \
         bindings/js/JSUint32ArrayCustom.cpp \
         bindings/js/JSUint8ArrayCustom.cpp \
+        bindings/js/JSUint8ClampedArrayCustom.cpp \
         bindings/js/JSWebKitAnimationCustom.cpp \
         bindings/js/JSWebKitAnimationListCustom.cpp \
         bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp \
@@ -383,19 +387,20 @@ v8 {
         bridge/runtime_method.cpp \
         bridge/runtime_object.cpp \
         bridge/runtime_root.cpp \
+        testing/js/JSInternalsCustom.cpp \
         testing/js/WebCoreTestSupport.cpp
 }
 
 SOURCES += \
     css/CSSAspectRatioValue.cpp \
     css/CSSBorderImageSliceValue.cpp \
-    css/CSSBorderImageValue.cpp \
+    css/CSSBorderImage.cpp \
+    css/CSSCalculationValue.cpp \
     css/CSSCanvasValue.cpp \
     css/CSSCharsetRule.cpp \
     css/CSSComputedStyleDeclaration.cpp \
     css/CSSCrossfadeValue.cpp \
     css/CSSCursorImageValue.cpp \
-    css/CSSElementStyleDeclaration.cpp \
     css/CSSFlexValue.cpp \
     css/CSSFontFace.cpp \
     css/CSSFontFaceRule.cpp \
@@ -504,6 +509,7 @@ SOURCES += \
     dom/DynamicNodeList.cpp \
     dom/EditingText.cpp \
     dom/Element.cpp \
+    dom/ElementAttributeData.cpp \
     dom/EntityReference.cpp \
     dom/ErrorEvent.cpp \
     dom/Event.cpp \
@@ -516,6 +522,7 @@ SOURCES += \
     dom/EventTarget.cpp \
     dom/ExceptionBase.cpp \
     dom/ExceptionCodePlaceholder.cpp \
+    dom/GenericEventQueue.cpp \
     dom/IconURL.cpp \
     dom/KeyboardEvent.cpp \
     dom/MessageChannel.cpp \
@@ -559,8 +566,6 @@ SOURCES += \
     dom/ScriptRunner.cpp \
     dom/SecurityContext.cpp \
     dom/SelectorQuery.cpp \
-    dom/ShadowContentElement.cpp \
-    dom/ShadowInclusionSelector.cpp \
     dom/ShadowRoot.cpp \
     dom/SpaceSplitString.cpp \
     dom/StaticNodeList.cpp \
@@ -627,7 +632,6 @@ SOURCES += \
     editing/ReplaceSelectionCommand.cpp \
     editing/SetNodeAttributeCommand.cpp \
     editing/SetSelectionCommand.cpp \
-    editing/SmartReplaceICU.cpp \
     editing/SpellChecker.cpp \
     editing/SpellingCorrectionCommand.cpp \
     editing/SpellingCorrectionController.cpp \
@@ -739,7 +743,6 @@ SOURCES += \
     html/HTMLImageElement.cpp \
     html/HTMLImageLoader.cpp \
     html/HTMLInputElement.cpp \
-    html/HTMLIsIndexElement.cpp \
     html/HTMLKeygenElement.cpp \
     html/HTMLLIElement.cpp \
     html/HTMLLabelElement.cpp \
@@ -840,7 +843,10 @@ SOURCES += \
     html/parser/TextDocumentParser.cpp \
     html/parser/TextViewSourceParser.cpp \
     html/parser/XSSAuditor.cpp \
+    html/shadow/ContentSelectorQuery.cpp \
+    html/shadow/ContentInclusionSelector.cpp \
     html/shadow/DetailsMarkerControl.cpp \
+    html/shadow/HTMLContentElement.cpp \
     html/shadow/MediaControls.cpp \
     html/shadow/MediaControlRootElement.cpp \
     html/shadow/MeterShadowElement.cpp \
@@ -981,6 +987,7 @@ SOURCES += \
     page/FrameView.cpp \
     page/Geolocation.cpp \
     page/GeolocationController.cpp \
+    page/GestureTapHighlighter.cpp \
     page/GroupSettings.cpp \
     page/History.cpp \
     page/Location.cpp \
@@ -1021,6 +1028,7 @@ SOURCES += \
     platform/text/LocalizedDateNone.cpp \
     platform/text/LocalizedNumberNone.cpp \
     platform/text/QuotedPrintable.cpp \
+    platform/CalculationValue.cpp \
     platform/Clock.cpp \
     platform/ClockGeneric.cpp \
     platform/ContentType.cpp \
@@ -1098,7 +1106,6 @@ SOURCES += \
     platform/mock/DeviceOrientationClientMock.cpp \
     platform/mock/GeolocationClientMock.cpp \
     platform/mock/GeolocationServiceMock.cpp \
-    platform/mock/SpeechInputClientMock.cpp \
     platform/mock/ScrollbarThemeMock.cpp \
     platform/network/AuthenticationChallengeBase.cpp \
     platform/network/BlobData.cpp \
@@ -1124,6 +1131,7 @@ SOURCES += \
     platform/text/RegularExpression.cpp \
     platform/PlatformEvent.cpp \
     platform/RuntimeApplicationChecks.cpp \
+    platform/RunLoop.cpp \
     platform/SchemeRegistry.cpp \
     platform/ScrollableArea.cpp \
     platform/ScrollAnimator.cpp \
@@ -1296,6 +1304,7 @@ SOURCES += \
     storage/StorageSyncManager.cpp \
     storage/StorageTracker.cpp \
     testing/Internals.cpp \
+    testing/InternalSettings.cpp \
     xml/DOMParser.cpp \
     xml/NativeXPathNSResolver.cpp \
     xml/XMLHttpRequest.cpp \
@@ -1499,13 +1508,13 @@ v8 {
 HEADERS += \
     css/CSSAspectRatioValue.h \
     css/CSSBorderImageSliceValue.h \
-    css/CSSBorderImageValue.h \
+    css/CSSBorderImage.h \
+    css/CSSCalculationValue.h \
     css/CSSCanvasValue.h \
     css/CSSCharsetRule.h \
     css/CSSComputedStyleDeclaration.h \
     css/CSSCrossfadeValue.h \
     css/CSSCursorImageValue.h \
-    css/CSSElementStyleDeclaration.h \
     css/CSSFlexValue.h \
     css/CSSFontFace.h \
     css/CSSFontFaceRule.h \
@@ -1520,7 +1529,6 @@ HEADERS += \
     css/CSSImportRule.h \
     css/CSSInheritedValue.h \
     css/CSSInitialValue.h \
-    css/CSSInlineStyleDeclaration.h \
     css/CSSMediaRule.h \
     css/CSSMutableStyleDeclaration.h \
     css/CSSOMUtils.h \
@@ -1613,6 +1621,7 @@ HEADERS += \
     dom/DynamicNodeList.h \
     dom/EditingText.h \
     dom/Element.h \
+    dom/ElementAttributeData.h \
     dom/Entity.h \
     dom/EntityReference.h \
     dom/Event.h \
@@ -1659,8 +1668,6 @@ HEADERS += \
     dom/ScriptElement.h \
     dom/ScriptExecutionContext.h \
     dom/SelectorQuery.h \
-    dom/ShadowContentElement.h \
-    dom/ShadowInclusionSelector.h \
     dom/ShadowRoot.h \
     dom/SpaceSplitString.h \
     dom/StaticNodeList.h \
@@ -1815,7 +1822,6 @@ HEADERS += \
     html/HTMLImageElement.h \
     html/HTMLImageLoader.h \
     html/HTMLInputElement.h \
-    html/HTMLIsIndexElement.h \
     html/HTMLKeygenElement.h \
     html/HTMLLabelElement.h \
     html/HTMLLegendElement.h \
@@ -1899,6 +1905,9 @@ HEADERS += \
     html/parser/HTMLTreeBuilder.h \
     html/parser/HTMLViewSourceParser.h \
     html/parser/XSSAuditor.h \
+    html/shadow/ContentSelectorQuery.h \
+    html/shadow/ContentInclusionSelector.h \
+    html/shadow/HTMLContentElement.h \
     html/shadow/MediaControlElements.h \
     html/shadow/DetailsMarkerControl.h \
     html/track/TextTrackList.h \
@@ -2039,6 +2048,7 @@ HEADERS += \
     page/FrameView.h \
     page/Geolocation.h \
     page/Geoposition.h \
+    page/GestureTapHighlighter.h\
     page/GroupSettings.h \
     page/History.h \
     page/Location.h \
@@ -2069,6 +2079,7 @@ HEADERS += \
     platform/animation/AnimationUtilities.h \
     platform/Arena.h \
     platform/AsyncFileStream.h \
+    platform/CalculationValue.h \
     platform/Clock.h \
     platform/ClockGeneric.h \
     platform/ContentType.h \
@@ -2088,13 +2099,16 @@ HEADERS += \
     platform/mock/DeviceOrientationClientMock.h \
     platform/mock/GeolocationClientMock.cpp \
     platform/mock/GeolocationServiceMock.h \
-    platform/mock/SpeechInputClientMock.h \
     platform/mock/ScrollbarThemeMock.h \
     platform/graphics/BitmapImage.h \
     platform/graphics/Color.h \
     platform/graphics/CrossfadeGeneratedImage.h \
     platform/graphics/filters/CustomFilterMesh.h \
+    platform/graphics/filters/CustomFilterNumberParameter.h \
     platform/graphics/filters/CustomFilterShader.h \
+    platform/graphics/filters/CustomFilterOperation.h \
+    platform/graphics/filters/CustomFilterParameter.h \
+    platform/graphics/filters/CustomFilterProgram.h \
     platform/graphics/filters/FEBlend.h \
     platform/graphics/filters/FEColorMatrix.h \
     platform/graphics/filters/FEComponentTransfer.h \
@@ -2389,7 +2403,6 @@ HEADERS += \
     rendering/style/CounterDirectives.h \
     rendering/style/CursorData.h \
     rendering/style/CursorList.h \
-    rendering/style/CustomFilterOperation.h \
     rendering/style/FillLayer.h \
     rendering/style/KeyframeList.h \
     rendering/style/NinePieceImage.h \
@@ -2400,6 +2413,7 @@ HEADERS += \
     rendering/style/StyleBoxData.h \
     rendering/style/StyleCachedImage.h \
     rendering/style/StyleCachedShader.h \
+    rendering/style/StyleCustomFilterProgram.h \
     rendering/style/StyleDeprecatedFlexibleBoxData.h \
     rendering/style/StyleFilterData.h \
     rendering/style/StyleFlexibleBoxData.h \
@@ -2470,6 +2484,7 @@ HEADERS += \
     rendering/svg/SVGTextLayoutEngineBaseline.h \
     rendering/svg/SVGTextLayoutEngineSpacing.h \
     rendering/svg/SVGTextMetrics.h \
+    rendering/svg/SVGTextMetricsBuilder.h \
     rendering/svg/SVGTextQuery.h \
     rendering/svg/SVGTextRunRenderingContext.h \
     storage/AbstractDatabase.h \
@@ -2701,6 +2716,7 @@ HEADERS += \
     svg/SVGZoomAndPan.h \
     svg/SVGZoomEvent.h \
     testing/Internals.h \
+    testing/InternalSettings.h \
     workers/AbstractWorker.h \
     workers/DedicatedWorkerContext.h \
     workers/DedicatedWorkerThread.h \
@@ -2781,7 +2797,6 @@ SOURCES += \
     platform/network/qt/QtMIMETypeSniffer.cpp \
     platform/network/qt/QNetworkReplyHandler.cpp \
     editing/qt/EditorQt.cpp \
-    editing/qt/SmartReplaceQt.cpp \
     platform/Cursor.cpp \
     platform/qt/ClipboardQt.cpp \
     platform/qt/ContextMenuItemQt.cpp \
@@ -2792,6 +2807,7 @@ SOURCES += \
     platform/qt/DragImageQt.cpp \
     platform/qt/EventLoopQt.cpp \
     platform/qt/FileSystemQt.cpp \
+    platform/qt/RunLoopQt.cpp \
     platform/qt/SharedBufferQt.cpp \
     platform/qt/ThirdPartyCookiesQt.cpp \
     platform/graphics/qt/FontCacheQt.cpp \
@@ -2817,7 +2833,6 @@ SOURCES += \
     platform/qt/LanguageQt.cpp \
     platform/qt/TemporaryLinkStubsQt.cpp \
     platform/text/qt/TextBoundariesQt.cpp \
-    platform/text/qt/TextBreakIteratorQt.cpp \
     platform/text/qt/TextBreakIteratorInternalICUQt.cpp \
     platform/text/qt/TextCodecQt.cpp \
     platform/qt/WheelEventQt.cpp \
@@ -2856,8 +2871,18 @@ mac {
         platform/text/cf/StringImplCF.cpp
 }
 
-contains (CONFIG, use_system_icu) {
-    SOURCES += platform/text/TextBreakIteratorICU.cpp
+haveQt(5) {
+    contains(QT_CONFIG,icu)|mac: SOURCES += platform/text/TextBreakIteratorICU.cpp
+    mac {
+        # For Mac we use the same SmartReplace implementation as the Apple port.
+        SOURCES += editing/SmartReplaceCF.cpp
+        INCLUDEPATH += $$PWD/icu
+    } else {
+        SOURCES += editing/SmartReplaceICU.cpp
+    }
+} else {
+    SOURCES += platform/text/qt/TextBreakIteratorQt.cpp \
+               editing/qt/SmartReplaceQt.cpp
 }
 
 contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
@@ -3003,7 +3028,6 @@ contains(DEFINES, ENABLE_DATA_TRANSFER_ITEMS=1) {
         platform/qt/DataTransferItemListQt.h
     SOURCES += \
         dom/DataTransferItem.cpp \
-        dom/DataTransferItemList.cpp \
         dom/StringCallback.cpp \
         platform/qt/DataTransferItemQt.cpp \
         platform/qt/DataTransferItemListQt.cpp
@@ -3258,8 +3282,10 @@ contains(DEFINES, ENABLE_XSLT=1) {
 
 contains(DEFINES, ENABLE_FILTERS=1) {
     SOURCES += \
-        platform/graphics/filters/CustomFilterMesh.cpp \
+        platform/graphics/filters/CustomFilterOperation.cpp \
+        platform/graphics/filters/CustomFilterProgram.cpp \
         platform/graphics/filters/CustomFilterShader.cpp \
+        platform/graphics/filters/CustomFilterMesh.cpp \
         platform/graphics/filters/DistantLightSource.cpp \
         platform/graphics/filters/FEBlend.cpp \
         platform/graphics/filters/FEColorMatrix.cpp \
@@ -3425,6 +3451,7 @@ contains(DEFINES, ENABLE_SVG=1) {
               rendering/svg/SVGTextLayoutEngineBaseline.cpp \
               rendering/svg/SVGTextLayoutEngineSpacing.cpp \
               rendering/svg/SVGTextMetrics.cpp \
+              rendering/svg/SVGTextMetricsBuilder.cpp \
               rendering/svg/SVGTextQuery.cpp \
               rendering/svg/SVGTextRunRenderingContext.cpp \
               svg/SVGDocumentExtensions.cpp \
@@ -3667,6 +3694,8 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLCompressedTextures.h \
         html/canvas/WebGLContextAttributes.h \
         html/canvas/WebGLContextEvent.h \
+        html/canvas/WebGLContextGroup.h \
+        html/canvas/WebGLContextObject.h \
         html/canvas/WebGLDebugRendererInfo.h \
         html/canvas/WebGLDebugShaders.h \
         html/canvas/WebGLExtension.h \
@@ -3677,6 +3706,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLRenderbuffer.h \
         html/canvas/WebGLRenderingContext.h \
         html/canvas/WebGLShader.h \
+        html/canvas/WebGLSharedObject.h \
         html/canvas/OESStandardDerivatives.h \
         html/canvas/OESTextureFloat.h \
         html/canvas/OESVertexArrayObject.h \
@@ -3704,6 +3734,8 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLCompressedTextures.cpp \
         html/canvas/WebGLContextAttributes.cpp \
         html/canvas/WebGLContextEvent.cpp \
+        html/canvas/WebGLContextGroup.cpp \
+        html/canvas/WebGLContextObject.cpp \
         html/canvas/WebGLDebugRendererInfo.cpp \
         html/canvas/WebGLDebugShaders.cpp \
         html/canvas/WebGLExtension.cpp \
@@ -3714,6 +3746,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLRenderbuffer.cpp \
         html/canvas/WebGLRenderingContext.cpp \
         html/canvas/WebGLShader.cpp \
+        html/canvas/WebGLSharedObject.cpp \
         html/canvas/OESStandardDerivatives.cpp \
         html/canvas/OESTextureFloat.cpp \
         html/canvas/OESVertexArrayObject.cpp \
@@ -3735,7 +3768,8 @@ contains(DEFINES, ENABLE_WEBGL=1) {
 
         SOURCES += \
             platform/graphics/opengl/Extensions3DOpenGL.cpp \
-            platform/graphics/opengl/GraphicsContext3DOpenGL.cpp
+            platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
+            platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
 
         ANGLE_DIR = $$replace(PWD, "WebCore", "ThirdParty/ANGLE")
 
@@ -3907,13 +3941,17 @@ contains(CONFIG, texmap) {
     HEADERS += \
         platform/graphics/qt/TextureMapperQt.h \
         platform/graphics/texmap/GraphicsLayerTextureMapper.h \
+        platform/graphics/texmap/LayerTransform.h \
         platform/graphics/texmap/TextureMapper.h \
+        platform/graphics/texmap/TextureMapperAnimation.h \
         platform/graphics/texmap/TextureMapperNode.h \
         platform/graphics/texmap/TextureMapperPlatformLayer.h
 
     SOURCES += \
         platform/graphics/qt/TextureMapperQt.cpp \
+        platform/graphics/texmap/LayerTransform.cpp \
         platform/graphics/texmap/TextureMapper.cpp \
+        platform/graphics/texmap/TextureMapperAnimation.cpp \
         platform/graphics/texmap/TextureMapperNode.cpp \
         platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
 

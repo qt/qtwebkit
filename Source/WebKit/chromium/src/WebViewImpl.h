@@ -129,6 +129,10 @@ public:
     virtual bool caretOrSelectionRange(size_t* location, size_t* length);
     virtual void setTextDirection(WebTextDirection direction);
     virtual bool isAcceleratedCompositingActive() const;
+    virtual void didAcquirePointerLock();
+    virtual void didNotAcquirePointerLock();
+    virtual void didLosePointerLock();
+    virtual void didChangeWindowResizerRect();
 
     // WebView methods:
     virtual void initializeMainFrame(WebFrameClient*);
@@ -173,8 +177,6 @@ public:
 
     virtual float deviceScaleFactor() const;
     virtual void setDeviceScaleFactor(float);
-    virtual bool shouldLayoutFixedElementsRelativeToFrame() const;
-    virtual void setShouldLayoutFixedElementsRelativeToFrame(bool);
     virtual bool isFixedLayoutModeEnabled() const;
     virtual void enableFixedLayoutMode(bool enable);
     virtual WebSize fixedLayoutSize() const;
@@ -331,8 +333,9 @@ public:
 
     // Notifies the WebView that a load has been committed. isNewNavigation
     // will be true if a new session history item should be created for that
-    // load.
-    void didCommitLoad(bool* isNewNavigation);
+    // load. isNavigationWithinPage will be true if the navigation does
+    // not take the user away from the current page.
+    void didCommitLoad(bool* isNewNavigation, bool isNavigationWithinPage);
 
     // Indicates two things:
     //   1) This view may have a new layout now.
@@ -468,6 +471,14 @@ public:
     bool hasHorizontalScrollbar();
     bool hasVerticalScrollbar();
 
+    // Pointer Lock calls allow a page to capture all mouse events and
+    // disable the system cursor.
+#if ENABLE(POINTER_LOCK)
+    virtual bool requestPointerLock();
+    virtual void requestPointerUnlock();
+    virtual bool isPointerLocked();
+#endif
+
 private:
     bool computePageScaleFactorLimits();
     float clampPageScaleFactorToLimits(float scale);
@@ -519,6 +530,10 @@ private:
     void doPixelReadbackToCanvas(WebCanvas*, const WebCore::IntRect&);
     void reallocateRenderer();
     void updateLayerTreeViewport();
+#endif
+
+#if ENABLE(POINTER_LOCK)
+    void pointerLockMouseEvent(const WebInputEvent&);
 #endif
 
     WebViewClient* m_client;

@@ -129,7 +129,7 @@ WebFrame *topLoadingFrame = nil;     // !nil iff a load is in progress
 
 
 CFMutableSetRef disallowedURLs = 0;
-CFRunLoopTimerRef waitToDumpWatchdog = 0;
+static CFRunLoopTimerRef waitToDumpWatchdog = 0;
 
 // Delegates
 static FrameLoadDelegate *frameLoadDelegate;
@@ -143,6 +143,7 @@ StorageTrackerDelegate *storageDelegate;
 static int dumpPixels;
 static int threaded;
 static int dumpTree = YES;
+static int useTimeoutWatchdog = YES;
 static int forceComplexText;
 static int gcBetweenTests;
 static BOOL printSeparators;
@@ -608,6 +609,7 @@ static void resetDefaultsToConsistentValues()
     [preferences setDefaultFontSize:16];
     [preferences setDefaultFixedFontSize:13];
     [preferences setMinimumFontSize:0];
+    [preferences setDefaultTextEncodingName:@"ISO-8859-1"];
     [preferences setJavaEnabled:NO];
     [preferences setJavaScriptEnabled:YES];
     [preferences setEditableLinkBehavior:WebKitEditableLinkOnlyLiveWithShiftKey];
@@ -649,6 +651,7 @@ static void resetDefaultsToConsistentValues()
     [preferences setUsePreHTML5ParserQuirks:NO];
     [preferences setAsynchronousSpellCheckingEnabled:NO];
     [preferences setHixie76WebSocketProtocolEnabled:YES];
+    [preferences setMockScrollbarsEnabled:YES];
 
 #if ENABLE(WEB_AUDIO)
     [preferences setWebAudioEnabled:YES];
@@ -764,6 +767,7 @@ static void initializeGlobalsFromCommandLineOptions(int argc, const char *argv[]
         {"threaded", no_argument, &threaded, YES},
         {"complex-text", no_argument, &forceComplexText, YES},
         {"gc-between-tests", no_argument, &gcBetweenTests, YES},
+        {"no-timeout", no_argument, &useTimeoutWatchdog, NO},
         {NULL, 0, NULL, 0}
     };
     
@@ -1100,6 +1104,19 @@ static void invalidateAnyPreviousWaitToDumpWatchdog()
     }
 }
 
+void setWaitToDumpWatchdog(CFRunLoopTimerRef timer)
+{
+    ASSERT(timer);
+    ASSERT(shouldSetWaitToDumpWatchdog());
+    waitToDumpWatchdog = timer;
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), waitToDumpWatchdog, kCFRunLoopCommonModes);
+}
+
+bool shouldSetWaitToDumpWatchdog()
+{
+    return !waitToDumpWatchdog && useTimeoutWatchdog;
+}
+
 void dump()
 {
     invalidateAnyPreviousWaitToDumpWatchdog();
@@ -1267,7 +1284,7 @@ static void runTest(const string& testPathOrURL)
     }
 
     NSURL *url;
-    if ([pathOrURLString hasPrefix:@"http://"] || [pathOrURLString hasPrefix:@"https://"])
+    if ([pathOrURLString hasPrefix:@"http://"] || [pathOrURLString hasPrefix:@"https://"] || [pathOrURLString hasPrefix:@"file://"])
         url = [NSURL URLWithString:pathOrURLString];
     else
         url = [NSURL fileURLWithPath:pathOrURLString];

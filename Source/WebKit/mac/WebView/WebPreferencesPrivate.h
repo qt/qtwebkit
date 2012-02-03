@@ -186,6 +186,9 @@ extern NSString *WebPreferencesChangedInternalNotification;
 - (BOOL)acceleratedCompositingEnabled;
 - (void)setAcceleratedCompositingEnabled:(BOOL)enabled;
 
+- (BOOL)cssCustomFilterEnabled;
+- (void)setCSSCustomFilterEnabled:(BOOL)enabled;
+
 - (BOOL)showDebugBorders;
 - (void)setShowDebugBorders:(BOOL)show;
 

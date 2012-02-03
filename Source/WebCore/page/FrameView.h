@@ -196,8 +196,7 @@ public:
     int scrollYForFixedPosition() const;
     IntSize scrollOffsetForFixedPosition() const;
 
-    bool shouldLayoutFixedElementsRelativeToFrame() const { return m_shouldLayoutFixedElementsRelativeToFrame; }
-    void setShouldLayoutFixedElementsRelativeToFrame(bool);
+    bool fixedElementsLayoutRelativeToFrame() const;
 
     void beginDeferredRepaints();
     void endDeferredRepaints();
@@ -346,6 +345,8 @@ private:
     virtual void contentsResized() OVERRIDE;
     virtual void visibleContentsResized();
 
+    virtual void delegatesScrollingDidChange();
+
     // Override ScrollView methods to do point conversion via renderers, in order to
     // take transforms into account.
     virtual IntRect convertToContainingView(const IntRect&) const;
@@ -363,11 +364,11 @@ private:
     virtual ScrollableArea* enclosingScrollableArea() const;
 
 #if USE(ACCELERATED_COMPOSITING)
-    virtual GraphicsLayer* layerForHorizontalScrollbar() const;
-    virtual GraphicsLayer* layerForVerticalScrollbar() const;
-    virtual GraphicsLayer* layerForScrollCorner() const;
-#if PLATFORM(CHROMIUM) && ENABLE(RUBBER_BANDING)
-    virtual GraphicsLayer* layerForOverhangAreas() const;
+    virtual GraphicsLayer* layerForHorizontalScrollbar() const OVERRIDE;
+    virtual GraphicsLayer* layerForVerticalScrollbar() const OVERRIDE;
+    virtual GraphicsLayer* layerForScrollCorner() const OVERRIDE;
+#if ENABLE(RUBBER_BANDING)
+    virtual GraphicsLayer* layerForOverhangAreas() const OVERRIDE;
 #endif
 #endif
 
@@ -410,7 +411,6 @@ private:
     bool m_cannotBlitToWindow;
     bool m_isOverlapped;
     bool m_contentIsOpaque;
-    bool m_shouldLayoutFixedElementsRelativeToFrame;
     unsigned m_slowRepaintObjectCount;
     unsigned m_fixedObjectCount;
     int m_borderX;
@@ -422,10 +422,6 @@ private:
     
     bool m_layoutSchedulingEnabled;
     bool m_inLayout;
-#if ENABLE(SVG)
-    bool m_inLayoutParentView;
-#endif
-    bool m_hasPendingPostLayoutTasks;
     bool m_inSynchronousPostLayout;
     int m_layoutCount;
     unsigned m_nestedLayoutCount;

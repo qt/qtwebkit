@@ -36,6 +36,7 @@ Rectangle {
     property alias webview: webView
 
     signal pageTitleChanged(string title)
+    signal newWindow(string url)
 
     function load(address) {
         webView.load(address)
@@ -209,6 +210,26 @@ Rectangle {
                     }
                 }
             }
+
+            Rectangle {
+                id: newBrowserWindowButton
+                height: parent.height
+                width: height
+                color: "#efefef"
+                radius: 6
+
+                Image {
+                    anchors.centerIn: parent
+                    source: "../icons/plus.png"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        newWindow("about:blank")
+                    }
+                }
+            }
         }
         Rectangle {
             color: "white"
@@ -247,6 +268,7 @@ Rectangle {
             }
             TextInput {
                 id: addressLine
+                clip: true
                 selectByMouse: true
                 font {
                     pointSize: 11

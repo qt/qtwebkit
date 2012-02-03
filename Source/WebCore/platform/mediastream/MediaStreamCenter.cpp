@@ -57,6 +57,7 @@ void MediaStreamCenter::endLocalMediaStream(MediaStreamDescriptor* streamDescrip
 
 // FIXME: remove when real implementations are available
 // Empty implementations for ports that build with MEDIA_STREAM enabled by default.
+
 MediaStreamCenter::MediaStreamCenter()
 {
 }
@@ -67,15 +68,19 @@ MediaStreamCenter::~MediaStreamCenter()
 
 void MediaStreamCenter::queryMediaStreamSources(PassRefPtr<MediaStreamSourcesQueryClient> client)
 {
-    MediaStreamSourceVector sources;
-    client->mediaStreamSourcesQueryCompleted(sources);
+    MediaStreamSourceVector audioSources, videoSources;
+    client->mediaStreamSourcesQueryCompleted(audioSources, videoSources);
 }
 
-void MediaStreamCenter::didSetMediaStreamTrackEnabled(MediaStreamDescriptor*, unsigned)
+void MediaStreamCenter::didSetMediaStreamTrackEnabled(MediaStreamDescriptor*, MediaStreamComponent*)
 {
 }
 
 void MediaStreamCenter::didStopLocalMediaStream(MediaStreamDescriptor*)
+{
+}
+
+void MediaStreamCenter::didConstructMediaStream(MediaStreamDescriptor*)
 {
 }
 

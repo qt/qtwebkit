@@ -41,6 +41,12 @@
 
 using namespace WTF;
 
+namespace {
+
+static const size_t textureUpdatesPerFrame = 0;
+
+} // anonymous namespace
+
 namespace WebCore {
 
 PassOwnPtr<CCProxy> CCThreadProxy::create(CCLayerTreeHost* layerTreeHost)
@@ -438,8 +444,7 @@ void CCThreadProxy::scheduledActionUpdateMoreResources()
 {
     TRACE_EVENT("CCThreadProxy::scheduledActionUpdateMoreResources", this, 0);
     ASSERT(m_currentTextureUpdaterOnImplThread);
-    static const int UpdatesPerFrame = 99999;
-    m_currentTextureUpdaterOnImplThread->update(m_layerTreeHostImpl->context(), UpdatesPerFrame);
+    m_currentTextureUpdaterOnImplThread->update(m_layerTreeHostImpl->context(), textureUpdatesPerFrame > 0 ? textureUpdatesPerFrame : 99999);
 }
 
 void CCThreadProxy::scheduledActionCommit()
@@ -528,8 +533,7 @@ void CCThreadProxy::initializeImplOnImplThread(CCCompletionEvent* completion)
     TRACE_EVENT("CCThreadProxy::initializeImplOnImplThread", this, 0);
     ASSERT(isImplThread());
     m_layerTreeHostImpl = m_layerTreeHost->createLayerTreeHostImpl(this);
-    ASSERT(m_layerTreeHostImpl->settings().refreshRate > 0);
-    const double displayRefreshIntervalMs = 1000.0 / m_layerTreeHostImpl->settings().refreshRate;
+    const double displayRefreshIntervalMs = 1000.0 / 60.0;
     OwnPtr<CCFrameRateController> frameRateController = adoptPtr(new CCFrameRateController(CCDelayBasedTimeSource::create(displayRefreshIntervalMs, CCProxy::implThread())));
     m_schedulerOnImplThread = CCScheduler::create(this, frameRateController.release());
     m_schedulerOnImplThread->setVisible(m_layerTreeHostImpl->visible());
@@ -563,6 +567,11 @@ void CCThreadProxy::layerTreeHostClosedOnImplThread(CCCompletionEvent* completio
     m_inputHandlerOnImplThread.clear();
     m_schedulerOnImplThread.clear();
     completion->signal();
+}
+
+bool CCThreadProxy::partialTextureUpdateCapability() const
+{
+    return !textureUpdatesPerFrame;
 }
 
 } // namespace WebCore

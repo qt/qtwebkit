@@ -43,15 +43,15 @@ public:
     String selectorText() const;
     void setSelectorText(const String&);
 
-    CSSMutableStyleDeclaration* style() const { return m_style.get(); }
+    CSSStyleDeclaration* style() const { return m_style.get(); }
 
     String cssText() const;
 
     void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectors) { m_selectorList.adoptSelectorVector(selectors); }
-    void setDeclaration(PassRefPtr<CSSMutableStyleDeclaration> style) { m_style = style; }
+    void setDeclaration(PassRefPtr<CSSMutableStyleDeclaration> style) { ASSERT(style->parentRule() == this); m_style = style; }
 
     const CSSSelectorList& selectorList() const { return m_selectorList; }
-    CSSMutableStyleDeclaration* declaration() { return m_style.get(); }
+    CSSMutableStyleDeclaration* declaration() const { return m_style.get(); }
 
     void addSubresourceStyleURLs(ListHashSet<KURL>& urls);
 

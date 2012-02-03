@@ -27,13 +27,13 @@
 #include "NodeRenderingContext.h"
 
 #include "ContainerNode.h"
+#include "ContentInclusionSelector.h"
+#include "HTMLContentElement.h"
 #include "Node.h"
 #include "RenderFlowThread.h"
 #include "RenderFullScreen.h"
 #include "RenderObject.h"
 #include "RenderView.h"
-#include "ShadowContentElement.h"
-#include "ShadowInclusionSelector.h"
 #include "ShadowRoot.h"
 
 #if ENABLE(SVG)
@@ -73,11 +73,20 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
                 m_phase = AttachContentForwarded;
                 m_parentNodeForRenderingAndStyle = NodeRenderingContext(m_includer).parentNodeForRenderingAndStyle();
                 return;
-            } 
-                
+            }
+
             m_phase = AttachContentLight;
             m_parentNodeForRenderingAndStyle = parent;
             return;
+        }
+
+        if (parent->isContentElement()) {
+            HTMLContentElement* shadowContentElement = toHTMLContentElement(parent);
+            if (!shadowContentElement->hasInclusion()) {
+                m_phase = AttachContentFallback;
+                m_parentNodeForRenderingAndStyle = NodeRenderingContext(parent).parentNodeForRenderingAndStyle();
+                return;
+            }
         }
     }
 
@@ -111,7 +120,7 @@ PassRefPtr<RenderStyle> NodeRenderingContext::releaseStyle()
     return m_style.release();
 }
 
-static RenderObject* nextRendererOf(ShadowContentElement* parent, Node* current)
+static RenderObject* nextRendererOf(HTMLContentElement* parent, Node* current)
 {
     ShadowInclusion* currentInclusion = parent->inclusions()->find(current);
     if (!currentInclusion)
@@ -125,7 +134,7 @@ static RenderObject* nextRendererOf(ShadowContentElement* parent, Node* current)
     return 0;
 }
 
-static RenderObject* previousRendererOf(ShadowContentElement* parent, Node* current)
+static RenderObject* previousRendererOf(HTMLContentElement* parent, Node* current)
 {
     RenderObject* lastRenderer = 0;
 
@@ -139,7 +148,7 @@ static RenderObject* previousRendererOf(ShadowContentElement* parent, Node* curr
     return lastRenderer;
 }
 
-static RenderObject* firstRendererOf(ShadowContentElement* parent)
+static RenderObject* firstRendererOf(HTMLContentElement* parent)
 {
     for (ShadowInclusion* inclusion = parent->inclusions()->first(); inclusion; inclusion = inclusion->next()) {
         if (RenderObject* renderer = inclusion->content()->renderer())
@@ -149,7 +158,7 @@ static RenderObject* firstRendererOf(ShadowContentElement* parent)
     return 0;
 }
 
-static RenderObject* lastRendererOf(ShadowContentElement* parent)
+static RenderObject* lastRendererOf(HTMLContentElement* parent)
 {
     for (ShadowInclusion* inclusion = parent->inclusions()->last(); inclusion; inclusion = inclusion->previous()) {
         if (RenderObject* renderer = inclusion->content()->renderer())
@@ -176,7 +185,7 @@ RenderObject* NodeRenderingContext::nextRenderer() const
 
     // Avoid an O(n^2) problem with this function by not checking for
     // nextRenderer() when the parent element hasn't attached yet.
-    if (m_node->parentOrHostNode() && !m_node->parentOrHostNode()->attached())
+    if (m_node->parentOrHostNode() && !m_node->parentOrHostNode()->attached() && m_phase != AttachContentFallback)
         return 0;
 
     for (Node* node = m_node->nextSibling(); node; node = node->nextSibling()) {
@@ -187,10 +196,13 @@ RenderObject* NodeRenderingContext::nextRenderer() const
             return node->renderer();
         }
         if (node->isContentElement()) {
-            if (RenderObject* first = firstRendererOf(toShadowContentElement(node)))
+            if (RenderObject* first = firstRendererOf(toHTMLContentElement(node)))
                 return first;
         }
     }
+
+    if (m_phase == AttachContentFallback)
+        return NodeRenderingContext(m_node->parentNode()).nextRenderer();
 
     return 0;
 }
@@ -220,10 +232,13 @@ RenderObject* NodeRenderingContext::previousRenderer() const
             return node->renderer();
         }
         if (node->isContentElement()) {
-            if (RenderObject* last = lastRendererOf(toShadowContentElement(node)))
+            if (RenderObject* last = lastRendererOf(toHTMLContentElement(node)))
                 return last;
         }
     }
+
+    if (m_phase == AttachContentFallback)
+        return NodeRenderingContext(m_node->parentNode()).previousRenderer();
 
     return 0;
 }
@@ -265,8 +280,8 @@ bool NodeRenderingContext::shouldCreateRenderer() const
         // See https://bugs.webkit.org/show_bug.cgi?id=52423
         if (!parentRenderer->canHaveChildren())
             return false;
-    
-        if (m_visualParentShadowRoot && !m_parentNodeForRenderingAndStyle->canHaveLightChildRendererWithShadow())
+
+        if (m_visualParentShadowRoot)
             return false;
     }
 

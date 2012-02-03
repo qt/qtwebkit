@@ -27,31 +27,41 @@
 #ifndef ShadowRoot_h
 #define ShadowRoot_h
 
+#include "DocumentFragment.h"
+#include "ExceptionCode.h"
 #include "TreeScope.h"
 
 namespace WebCore {
 
+class ContentInclusionSelector;
 class Document;
-class ShadowContentElement;
-class ShadowInclusionSelector;
+class HTMLContentElement;
 
-class ShadowRoot : public TreeScope {
+class ShadowRoot : public DocumentFragment, public TreeScope {
 public:
     static PassRefPtr<ShadowRoot> create(Document*);
+    static PassRefPtr<ShadowRoot> create(Element*, ExceptionCode&);
 
     void recalcShadowTreeStyle(StyleChange);
 
-    ShadowContentElement* includerFor(Node*) const;
+    void setNeedsReattachHostChildrenAndShadow();
+    void clearNeedsReattachHostChildrenAndShadow();
+    bool needsReattachHostChildrenAndShadow();
+
+    HTMLContentElement* includerFor(Node*) const;
     void hostChildrenChanged();
     bool isInclusionSelectorActive() const;
 
     virtual void attach();
+    void reattachHostChildrenAndShadow();
 
     virtual bool applyAuthorSheets() const;
     void setApplyAuthorSheets(bool);
 
-    ShadowInclusionSelector* inclusions() const;
-    ShadowInclusionSelector* ensureInclusions();
+    Element* host() const { return shadowHost(); }
+
+    ContentInclusionSelector* inclusions() const;
+    ContentInclusionSelector* ensureInclusions();
 
 private:
     ShadowRoot(Document*);
@@ -64,13 +74,24 @@ private:
 
     bool hasContentElement() const;
 
-    bool m_applyAuthorSheets;
-    OwnPtr<ShadowInclusionSelector> m_inclusions;
+    bool m_applyAuthorSheets : 1;
+    bool m_needsRecalculateContent : 1;
+    OwnPtr<ContentInclusionSelector> m_inclusions;
 };
 
 inline PassRefPtr<ShadowRoot> ShadowRoot::create(Document* document)
 {
     return adoptRef(new ShadowRoot(document));
+}
+
+inline void ShadowRoot::clearNeedsReattachHostChildrenAndShadow()
+{
+    m_needsRecalculateContent = false;
+}
+
+inline bool ShadowRoot::needsReattachHostChildrenAndShadow()
+{
+    return m_needsRecalculateContent || hasContentElement();
 }
 
 inline ShadowRoot* toShadowRoot(Node* node)

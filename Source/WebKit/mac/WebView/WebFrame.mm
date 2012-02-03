@@ -613,7 +613,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         return @"";
 
     JSLock lock(SilenceAssertionsOnly);
-    return ustringToString(result.toString(_private->coreFrame->script()->globalObject(mainThreadNormalWorld())->globalExec()));
+    JSC::ExecState* exec = _private->coreFrame->script()->globalObject(mainThreadNormalWorld())->globalExec();
+    return ustringToString(result.toString(exec)->value(exec));
 }
 
 - (NSRect)_caretRectAtPosition:(const Position&)pos affinity:(NSSelectionAffinity)affinity
@@ -995,6 +996,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 // This method is only intended to be used for testing the SVG animation system.
 - (BOOL)_pauseSVGAnimation:(NSString*)elementId onSMILNode:(DOMNode *)node atTime:(NSTimeInterval)time
 {
+#if ENABLE(SVG)
     Frame* frame = core(self);
     if (!frame)
         return false;
@@ -1007,7 +1009,6 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (!coreNode || !SVGSMILElement::isSMILElement(coreNode))
         return false;
 
-#if ENABLE(SVG)
     return document->accessSVGExtensions()->sampleAnimationAtTime(elementId, static_cast<SVGSMILElement*>(coreNode), time);
 #else
     return false;
@@ -1191,7 +1192,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         return @"";
 
     JSLock lock(SilenceAssertionsOnly);
-    return ustringToString(result.toString(anyWorldGlobalObject->globalExec()));
+    JSC::ExecState* exec = anyWorldGlobalObject->globalExec();
+    return ustringToString(result.toString(exec)->value(exec));
 }
 
 - (JSGlobalContextRef)_globalContextForScriptWorld:(WebScriptWorld *)world

@@ -29,7 +29,6 @@
 #include "config.h"
 #include "SubresourceLoader.h"
 
-#include "CachedImage.h"
 #include "CachedResourceLoader.h"
 #include "Document.h"
 #include "DocumentLoader.h"
@@ -47,12 +46,25 @@ namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, subresourceLoaderCounter, ("SubresourceLoader"));
 
+SubresourceLoader::RequestCountTracker::RequestCountTracker(CachedResourceLoader* cachedResourceLoader, CachedResource* resource)
+    : m_cachedResourceLoader(cachedResourceLoader)
+    , m_resource(resource)
+{
+    m_cachedResourceLoader->incrementRequestCount(m_resource);
+}
+
+SubresourceLoader::RequestCountTracker::~RequestCountTracker()
+{
+    m_cachedResourceLoader->decrementRequestCount(m_resource);
+}
+
 SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, const ResourceLoaderOptions& options)
     : ResourceLoader(frame, options)
     , m_resource(resource)
     , m_document(frame->document())
     , m_loadingMultipartContent(false)
     , m_state(Uninitialized)
+    , m_requestCountTracker(adoptPtr(new RequestCountTracker(frame->document()->cachedResourceLoader(), resource)))
 {
 #ifndef NDEBUG
     subresourceLoaderCounter.increment();
@@ -61,6 +73,9 @@ SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, con
 
 SubresourceLoader::~SubresourceLoader()
 {
+    ASSERT(m_state != Initialized);
+    ASSERT(!m_document);
+    ASSERT(reachedTerminalState());
 #ifndef NDEBUG
     subresourceLoaderCounter.decrement();
 #endif
@@ -119,6 +134,7 @@ bool SubresourceLoader::init(const ResourceRequest& request)
     if (!ResourceLoader::init(request))
         return false;
 
+    ASSERT(!reachedTerminalState());
     m_state = Initialized;
     m_documentLoader->addSubresourceLoader(this);
     return true;
@@ -141,6 +157,7 @@ void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const Resou
 
 void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
 {
+    ASSERT(m_state == Initialized);
     RefPtr<SubresourceLoader> protect(this);
     m_resource->didSendData(bytesSent, totalBytesToBeSent);
 }
@@ -148,6 +165,7 @@ void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long 
 void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 {
     ASSERT(!response.isNull());
+    ASSERT(m_state == Initialized);
 
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
@@ -157,14 +175,11 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         if (response.httpStatusCode() == 304) {
             // 304 Not modified / Use local copy
             // Existing resource is ok, just use it updating the expiration time.
-            m_state = Revalidating;
             memoryCache()->revalidationSucceeded(m_resource, response);
-            if (!reachedTerminalState()) {
+            if (!reachedTerminalState())
                 ResourceLoader::didReceiveResponse(response);
-                didFinishLoading(currentTime());
-            }
             return;
-        } 
+        }
         // Did not get 304 response, continue as a regular resource load.
         memoryCache()->revalidationFailed(m_resource);
     }
@@ -174,14 +189,11 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         return;
     ResourceLoader::didReceiveResponse(response);
 
-    if (m_loadingMultipartContent) {
-        ASSERT(m_resource->isImage());
-        static_cast<CachedImage*>(m_resource)->clear();
-    } else if (response.isMultipart()) {
+    if (response.isMultipart()) {
         m_loadingMultipartContent = true;
 
         // We don't count multiParts in a CachedResourceLoader's request count
-        m_document->cachedResourceLoader()->decrementRequestCount(m_resource);
+        m_requestCountTracker.clear();
         if (!m_resource->isImage()) {
             cancel();
             return;
@@ -190,12 +202,9 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
     RefPtr<SharedBuffer> buffer = resourceData();
     if (m_loadingMultipartContent && buffer && buffer->size()) {
-        // Since a subresource loader does not load multipart sections progressively,
-        // deliver the previously received data to the loader all at once now.
-        // Then clear the data to make way for the next multipart section.
         sendDataToResource(buffer->data(), buffer->size());
         clearResourceData();
-        
+        // Since a subresource loader does not load multipart sections progressively, data was delivered to the loader all at once.        
         // After the first multipart section is complete, signal to delegates that this load is "finished" 
         m_documentLoader->subresourceLoaderFinishedLoadingOnePart(this);
         didFinishLoadingOnePart(0);
@@ -206,16 +215,16 @@ void SubresourceLoader::didReceiveData(const char* data, int length, long long e
 {
     ASSERT(!m_resource->resourceToRevalidate());
     ASSERT(!m_resource->errorOccurred());
+    ASSERT(m_state == Initialized);
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
     RefPtr<SubresourceLoader> protect(this);
     ResourceLoader::didReceiveData(data, length, encodedDataLength, allAtOnce);
 
-    if (errorLoadingResource())
+    if (errorLoadingResource() || m_loadingMultipartContent)
         return;
 
-    if (!m_loadingMultipartContent)
-        sendDataToResource(data, length);
+    sendDataToResource(data, length);
 }
 
 bool SubresourceLoader::errorLoadingResource()
@@ -231,28 +240,29 @@ bool SubresourceLoader::errorLoadingResource()
 
 void SubresourceLoader::sendDataToResource(const char* data, int length)
 {
-    // There are two cases where we might need to create our own SharedBuffer instead of copying the one in ResourceLoader.
-    // (1) Multipart content: The loader delivers the data in a multipart section all at once, then sends eof.
-    //     The resource data will change as the next part is loaded, so we need to make a copy.
-    // (2) Our client requested that the data not be buffered at the ResourceLoader level via ResourceLoaderOptions. In this case,
-    //     ResourceLoader::resourceData() will be null. However, unlike the multipart case, we don't want to tell the CachedResource
-    //     that all data has been received yet.
-    if (m_loadingMultipartContent || !resourceData()) {
-        RefPtr<SharedBuffer> copiedData = SharedBuffer::create(data, length);
-        m_resource->data(copiedData.release(), m_loadingMultipartContent);
-    } else
+    // There are two cases where we might need to create our own SharedBuffer instead of copying the one in ResourceLoader. 
+    // (1) Multipart content: The loader delivers the data in a multipart section all at once, then sends eof. 
+    //     The resource data will change as the next part is loaded, so we need to make a copy. 
+    // (2) Our client requested that the data not be buffered at the ResourceLoader level via ResourceLoaderOptions. In this case, 
+    //     ResourceLoader::resourceData() will be null. However, unlike the multipart case, we don't want to tell the CachedResource 
+    //     that all data has been received yet. 
+    if (m_loadingMultipartContent || !resourceData()) { 
+        RefPtr<SharedBuffer> copiedData = SharedBuffer::create(data, length); 
+        m_resource->data(copiedData.release(), m_loadingMultipartContent); 
+    } else 
         m_resource->data(resourceData(), false);
 }
 
 void SubresourceLoader::didReceiveCachedMetadata(const char* data, int length)
 {
+    ASSERT(m_state == Initialized);
     ASSERT(!m_resource->resourceToRevalidate());
     m_resource->setSerializedCachedMetadata(data, length);
 }
 
 void SubresourceLoader::didFinishLoading(double finishTime)
 {
-    if (m_state != Initialized && m_state != Revalidating)
+    if (m_state != Initialized)
         return;
     ASSERT(!reachedTerminalState());
     ASSERT(!m_resource->resourceToRevalidate());
@@ -303,9 +313,7 @@ void SubresourceLoader::releaseResources()
 {
     ASSERT(!reachedTerminalState());
     if (m_state != Uninitialized) {
-        if (!m_loadingMultipartContent && m_state != Releasing)
-            m_document->cachedResourceLoader()->decrementRequestCount(m_resource);
-        m_state = Releasing;
+        m_requestCountTracker.clear();
         m_document->cachedResourceLoader()->loadDone();
         if (reachedTerminalState())
             return;

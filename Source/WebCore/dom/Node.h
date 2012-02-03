@@ -224,7 +224,6 @@ public:
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootOrSVGShadowRootFlag) && !isSVGElement(); }
     virtual bool isContentElement() const { return false; }
-    virtual bool canHaveLightChildRendererWithShadow() const { return false; }
 
     Node* shadowAncestorNode() const;
     // Returns 0, a ShadowRoot, or a legacy shadow root.
@@ -553,6 +552,8 @@ public:
     void removeCachedTagNodeList(TagNodeList*, const QualifiedName&);
     void removeCachedLabelsNodeList(DynamicSubtreeNodeList*);
 
+    void removeCachedChildNodeList();
+
     PassRefPtr<NodeList> getElementsByTagName(const AtomicString&);
     PassRefPtr<NodeList> getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName);
     PassRefPtr<NodeList> getElementsByName(const String& elementName);
@@ -593,6 +594,7 @@ public:
     bool dispatchWheelEvent(const PlatformWheelEvent&);
     bool dispatchMouseEvent(const PlatformMouseEvent&, const AtomicString& eventType, int clickCount = 0, Node* relatedTarget = 0);
     void dispatchSimulatedClick(PassRefPtr<Event> underlyingEvent, bool sendMouseEvents = false, bool showPressedLook = true);
+    bool dispatchBeforeLoadEvent(const String& sourceURL);
 
     virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode);
     virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);

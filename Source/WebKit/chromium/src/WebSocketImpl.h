@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc.  All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -42,7 +42,6 @@ namespace WebCore { class WebSocketChannel; }
 
 namespace WebKit {
 
-class WebData;
 class WebDocument;
 class WebString;
 class WebURL;
@@ -54,10 +53,12 @@ public:
 
     bool isNull() const { return !m_private; }
 
+    BinaryType binaryType() const;
+    virtual bool setBinaryType(BinaryType);
     virtual void connect(const WebURL&, const WebString& protocol);
     virtual WebString subprotocol();
-    virtual bool sendText(const WebString& message);
-    virtual bool sendBinary(const WebData& binaryData);
+    virtual bool sendText(const WebString&);
+    virtual bool sendArrayBuffer(const WebArrayBuffer&);
     virtual unsigned long bufferedAmount() const;
     virtual void close(int code, const WebString& reason);
     virtual void fail(const WebString& reason);
@@ -75,6 +76,7 @@ public:
 private:
     RefPtr<WebCore::WebSocketChannel> m_private;
     WebSocketClient* m_client;
+    BinaryType m_binaryType;
 };
 
 } // namespace WebKit

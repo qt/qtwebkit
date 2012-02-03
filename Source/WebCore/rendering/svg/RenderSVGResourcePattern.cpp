@@ -236,7 +236,7 @@ PassOwnPtr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternA
 
     OwnPtr<ImageBuffer> tileImage;
 
-    if (!SVGImageBufferTools::createImageBuffer(absoluteTileBoundaries, clampedAbsoluteTileBoundaries, tileImage, ColorSpaceDeviceRGB, Unaccelerated))
+    if (!SVGImageBufferTools::createImageBufferForPattern(absoluteTileBoundaries, clampedAbsoluteTileBoundaries, tileImage, ColorSpaceDeviceRGB, Unaccelerated))
         return nullptr;
 
     GraphicsContext* tileImageContext = tileImage->context();
@@ -258,6 +258,8 @@ PassOwnPtr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternA
     for (Node* node = attributes.patternContentElement()->firstChild(); node; node = node->nextSibling()) {
         if (!node->isSVGElement() || !static_cast<SVGElement*>(node)->isStyled() || !node->renderer())
             continue;
+        if (node->renderer()->needsLayout())
+            return nullptr;
         SVGImageBufferTools::renderSubtreeToImageBuffer(tileImage.get(), node->renderer(), contentTransformation);
     }
 

@@ -40,7 +40,6 @@
 #include "PluginProxy.h"
 #include "PluginView.h"
 #include "PrintInfo.h"
-#include "RunLoop.h"
 #include "SessionState.h"
 #include "ShareableBitmap.h"
 #include "WebBackForwardList.h"
@@ -90,6 +89,7 @@
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/FrameView.h>
 #include <WebCore/HTMLFormElement.h>
+#include <WebCore/HTMLInputElement.h>
 #include <WebCore/HistoryItem.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/MouseEvent.h>
@@ -103,6 +103,7 @@
 #include <WebCore/RenderView.h>
 #include <WebCore/ReplaceSelectionCommand.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/RunLoop.h>
 #include <WebCore/SchemeRegistry.h>
 #include <WebCore/ScriptValue.h>
 #include <WebCore/SerializedScriptValue.h>
@@ -133,7 +134,9 @@
 #endif
 
 #if PLATFORM(GTK)
+#include <gtk/gtk.h>
 #include "DataObjectGtk.h"
+#include "WebPrintOperationGtk.h"
 #endif
 
 #ifndef NDEBUG
@@ -188,9 +191,14 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_keyboardEventBeingInterpreted(0)
 #elif PLATFORM(WIN)
     , m_nativeWindow(parameters.nativeWindow)
+#elif PLATFORM(GTK)
+    , m_accessibilityObject(0)
 #endif
     , m_setCanStartMediaTimer(WebProcess::shared().runLoop(), this, &WebPage::setCanStartMediaTimerFired)
     , m_findController(this)
+#if PLATFORM(QT)
+    , m_tapHighlightController(this)
+#endif
     , m_geolocationPermissionRequestManager(this)
     , m_pageID(pageID)
     , m_canRunBeforeUnloadConfirmPanel(parameters.canRunBeforeUnloadConfirmPanel)
@@ -253,6 +261,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     setDrawsTransparentBackground(parameters.drawsTransparentBackground);
 
     setPaginationMode(parameters.paginationMode);
+    setPaginationBehavesLikeColumns(parameters.paginationBehavesLikeColumns);
     setPageLength(parameters.pageLength);
     setGapBetweenPages(parameters.gapBetweenPages);
 
@@ -270,6 +279,8 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
         restoreSession(parameters.sessionState);
 
     m_drawingArea->setPaintingEnabled(true);
+    
+    setMediaVolume(parameters.mediaVolume);
 
 #ifndef NDEBUG
     webPageCounter.increment();
@@ -398,6 +409,32 @@ EditorState WebPage::editorState() const
     if (!scope)
         return result;
 
+    if (scope->hasTagName(HTMLNames::inputTag)) {
+        HTMLInputElement* input = static_cast<HTMLInputElement*>(scope);
+        if (input->isTelephoneField())
+            result.inputMethodHints |= Qt::ImhDialableCharactersOnly;
+        else if (input->isNumberField())
+            result.inputMethodHints |= Qt::ImhDigitsOnly;
+        else if (input->isEmailField()) {
+            result.inputMethodHints |= Qt::ImhEmailCharactersOnly;
+            result.inputMethodHints |= Qt::ImhNoAutoUppercase;
+        } else if (input->isURLField()) {
+            result.inputMethodHints |= Qt::ImhUrlCharactersOnly;
+            result.inputMethodHints |= Qt::ImhNoAutoUppercase;
+        } else if (input->isPasswordField()) {
+            // Set ImhHiddenText flag for password fields. The Qt platform
+            // is responsible for determining which widget will receive input
+            // method events for password fields.
+            result.inputMethodHints |= Qt::ImhHiddenText;
+            result.inputMethodHints |= Qt::ImhNoAutoUppercase;
+            result.inputMethodHints |= Qt::ImhNoPredictiveText;
+            result.inputMethodHints |= Qt::ImhSensitiveData;
+        }
+    }
+
+    if (selectionRoot)
+        result.editorRect = frame->view()->contentsToWindow(selectionRoot->getRect());
+
     RefPtr<Range> range;
     if (result.hasComposition && (range = frame->editor()->compositionRange())) {
         frame->editor()->getCompositionSelection(result.anchorPosition, result.cursorPosition);
@@ -415,7 +452,7 @@ EditorState WebPage::editorState() const
     }
 
     if (range)
-        result.microFocus = frame->view()->contentsToWindow(frame->editor()->firstRectForRange(range.get()));
+        result.cursorRect = frame->view()->contentsToWindow(frame->editor()->firstRectForRange(range.get()));
 
     // FIXME: We should only transfer innerText when it changes and do this on the UI side.
     if (result.isContentEditable && !result.isInPasswordField) {
@@ -449,6 +486,13 @@ uint64_t WebPage::renderTreeSize() const
         size += coreFrame->document()->renderArena()->totalRenderArenaSize();
 
     return size;
+}
+
+void WebPage::setPaintedObjectsCounterThreshold(uint64_t threshold)
+{
+    if (!m_page)
+        return;
+    m_page->setRelevantRepaintedObjectsCounterThreshold(threshold);
 }
 
 void WebPage::setTracksRepaints(bool trackRepaints)
@@ -980,6 +1024,13 @@ void WebPage::setPaginationMode(uint32_t mode)
     m_page->setPagination(pagination);
 }
 
+void WebPage::setPaginationBehavesLikeColumns(bool behavesLikeColumns)
+{
+    Page::Pagination pagination = m_page->pagination();
+    pagination.behavesLikeColumns = behavesLikeColumns;
+    m_page->setPagination(pagination);
+}
+
 void WebPage::setPageLength(double pageLength)
 {
     Page::Pagination pagination = m_page->pagination();
@@ -1205,7 +1256,9 @@ static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page, bool o
         case PlatformEvent::MouseReleased:
             return frame->eventHandler()->handleMouseReleaseEvent(platformMouseEvent);
         case PlatformEvent::MouseMoved:
-            return frame->eventHandler()->mouseMoved(platformMouseEvent, onlyUpdateScrollbars);
+            if (onlyUpdateScrollbars)
+                return frame->eventHandler()->passMouseMovedEventToScrollbars(platformMouseEvent);
+            return frame->eventHandler()->mouseMoved(platformMouseEvent);
         default:
             ASSERT_NOT_REACHED();
             return false;
@@ -1391,6 +1444,27 @@ void WebPage::restoreSessionAndNavigateToCurrentItem(const SessionState& session
 }
 
 #if ENABLE(TOUCH_EVENTS)
+#if PLATFORM(QT)
+void WebPage::highlightPotentialActivation(const IntPoint& point)
+{
+    Node* activationNode = 0;
+    Frame* mainframe = m_page->mainFrame();
+
+    if (point != IntPoint::zero()) {
+        HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
+        activationNode = result.innerNode();
+
+        if (!activationNode->isFocusable())
+            activationNode = activationNode->enclosingLinkEventParentOrSelf();
+    }
+
+    if (activationNode)
+        tapHighlightController().highlight(activationNode);
+    else
+        tapHighlightController().hideHighlight();
+}
+#endif
+
 static bool handleTouchEvent(const WebTouchEvent& touchEvent, Page* page)
 {
     Frame* frame = page->mainFrame();
@@ -1811,10 +1885,20 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setCanvasUsesAcceleratedDrawing(store.getBoolValueForKey(WebPreferencesKey::canvasUsesAcceleratedDrawingKey()) && LayerTreeHost::supportsAcceleratedCompositing());
     settings->setShowDebugBorders(store.getBoolValueForKey(WebPreferencesKey::compositingBordersVisibleKey()));
     settings->setShowRepaintCounter(store.getBoolValueForKey(WebPreferencesKey::compositingRepaintCountersVisibleKey()));
+    settings->setCSSCustomFilterEnabled(store.getBoolValueForKey(WebPreferencesKey::cssCustomFilterEnabledKey()));
     settings->setWebGLEnabled(store.getBoolValueForKey(WebPreferencesKey::webGLEnabledKey()));
     settings->setMediaPlaybackRequiresUserGesture(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackRequiresUserGestureKey()));
     settings->setMediaPlaybackAllowsInline(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackAllowsInlineKey()));
     settings->setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
+
+    // <rdar://problem/10697417>: It is necessary to force compositing when accelerate drawing
+    // is enabled on Mac so that scrollbars are always in their own layers.
+#if PLATFORM(MAC)
+    if (settings->acceleratedDrawingEnabled())
+        settings->setForceCompositingMode(LayerTreeHost::supportsAcceleratedCompositing());
+    else
+#endif
+        settings->setForceCompositingMode(store.getBoolValueForKey(WebPreferencesKey::forceCompositingModeKey()) && LayerTreeHost::supportsAcceleratedCompositing());
 
 #if ENABLE(SQL_DATABASE)
     AbstractDatabase::setIsAvailable(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
@@ -1847,6 +1931,10 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setShouldDisplaySubtitles(store.getBoolValueForKey(WebPreferencesKey::shouldDisplaySubtitlesKey()));
     settings->setShouldDisplayCaptions(store.getBoolValueForKey(WebPreferencesKey::shouldDisplayCaptionsKey()));
     settings->setShouldDisplayTextDescriptions(store.getBoolValueForKey(WebPreferencesKey::shouldDisplayTextDescriptionsKey()));
+#endif
+
+#if ENABLE(NOTIFICATIONS)
+    settings->setNotificationsEnabled(store.getBoolValueForKey(WebPreferencesKey::notificationsEnabledKey()));
 #endif
 
     platformPreferencesDidChange(store);
@@ -2608,14 +2696,24 @@ void WebPage::beginPrinting(uint64_t frameID, const PrintInfo& printInfo)
     if (!m_printContext)
         m_printContext = adoptPtr(new PrintContext(coreFrame));
 
+    drawingArea()->setLayerTreeStateIsFrozen(true);
     m_printContext->begin(printInfo.availablePaperWidth, printInfo.availablePaperHeight);
 
     float fullPageHeight;
     m_printContext->computePageRects(FloatRect(0, 0, printInfo.availablePaperWidth, printInfo.availablePaperHeight), 0, 0, printInfo.pageSetupScaleFactor, fullPageHeight, true);
+
+#if PLATFORM(GTK)
+    if (!m_printOperation)
+        m_printOperation = WebPrintOperationGtk::create(this, printInfo);
+#endif
 }
 
 void WebPage::endPrinting()
 {
+    drawingArea()->setLayerTreeStateIsFrozen(false);
+#if PLATFORM(GTK)
+    m_printOperation = 0;
+#endif
     m_printContext = nullptr;
 }
 
@@ -2795,7 +2893,23 @@ void WebPage::drawPagesToPDF(uint64_t frameID, const PrintInfo& printInfo, uint3
 
     send(Messages::WebPageProxy::DataCallback(CoreIPC::DataReference(CFDataGetBytePtr(pdfPageData.get()), CFDataGetLength(pdfPageData.get())), callbackID));
 }
+#elif PLATFORM(GTK)
+void WebPage::drawPagesForPrinting(uint64_t frameID, const PrintInfo& printInfo, uint64_t callbackID)
+{
+    beginPrinting(frameID, printInfo);
+    if (m_printContext && m_printOperation) {
+        m_printOperation->startPrint(m_printContext.get(), callbackID);
+        return;
+    }
+
+    send(Messages::WebPageProxy::VoidCallback(callbackID));
+}
 #endif
+
+void WebPage::setMediaVolume(float volume)
+{
+    m_page->setMediaVolume(volume);
+}
 
 void WebPage::runModal()
 {

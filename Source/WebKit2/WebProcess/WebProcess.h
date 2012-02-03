@@ -82,10 +82,10 @@ class WebProcess : public ChildProcess, private CoreIPC::Connection::QueueClient
 public:
     static WebProcess& shared();
 
-    void initialize(CoreIPC::Connection::Identifier, RunLoop*);
+    void initialize(CoreIPC::Connection::Identifier, WebCore::RunLoop*);
 
     CoreIPC::Connection* connection() const { return m_connection->connection(); }
-    RunLoop* runLoop() const { return m_runLoop; }
+    WebCore::RunLoop* runLoop() const { return m_runLoop; }
 
     WebConnectionToUIProcess* webConnectionToUIProcess() const { return m_connection.get(); }
 
@@ -161,7 +161,7 @@ private:
     void setDefaultRequestTimeoutInterval(double);
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
-    void languageChanged(const String&) const;
+    void userPreferredLanguagesChanged(const Vector<String>&) const;
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
 #if PLATFORM(WIN)
     void setShouldPaintNativeControls(bool);
@@ -241,7 +241,7 @@ private:
 
     bool m_inDidClose;
 
-    RunLoop* m_runLoop;
+    WebCore::RunLoop* m_runLoop;
 
     // FIXME: The visited link table should not be per process.
     VisitedLinkTable m_visitedLinkTable;

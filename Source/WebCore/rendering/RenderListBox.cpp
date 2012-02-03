@@ -254,8 +254,10 @@ void RenderListBox::computeLogicalHeight()
         m_vBar->setEnabled(enabled);
         m_vBar->setSteps(1, max(1, numVisibleItems() - 1), itemHeight);
         m_vBar->setProportion(numVisibleItems(), numItems());
-        if (!enabled)
+        if (!enabled) {
+            scrollToYOffsetWithoutAnimation(0);
             m_indexOffset = 0;
+        }
     }
 }
 
@@ -448,7 +450,7 @@ void RenderListBox::paintItemBackground(PaintInfo& paintInfo, const LayoutPoint&
 
 bool RenderListBox::isPointInOverflowControl(HitTestResult& result, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset)
 {
-    if (!m_vBar)
+    if (!m_vBar || !m_vBar->shouldParticipateInHitTesting())
         return false;
 
     LayoutRect vertRect(accumulatedOffset.x() + width() - borderRight() - m_vBar->width(),

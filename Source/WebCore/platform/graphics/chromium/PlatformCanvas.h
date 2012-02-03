@@ -85,6 +85,7 @@ public:
         ~Painter();
 
         GraphicsContext* context() const { return m_context.get(); }
+        PlatformContextSkia* skiaContext() const { return m_skiaContext.get(); }
     private:
         OwnPtr<GraphicsContext> m_context;
 #if USE(SKIA)
@@ -98,13 +99,19 @@ public:
     void resize(const IntSize&);
     IntSize size() const { return m_size; }
 
+    void setOpaque(bool);
+    bool opaque() const { return m_opaque; }
+
 private:
+    void createBackingCanvas();
+
 #if USE(SKIA)
     OwnPtr<SkCanvas> m_skiaCanvas;
 #elif USE(CG)
     OwnArrayPtr<uint8_t> m_pixelData;
 #endif
     IntSize m_size;
+    bool m_opaque;
 };
 
 } // namespace WebCore

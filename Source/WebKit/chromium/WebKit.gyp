@@ -30,6 +30,7 @@
 
 {
     'includes': [
+        'WinPrecompile.gypi',
         '../../WebCore/WebCore.gypi',
         'WebKit.gypi',
         'features.gypi',
@@ -187,6 +188,7 @@
                 'public/WebInputElement.h',
                 'public/WebInputEvent.h',
                 'public/WebIntent.h',
+                'public/WebIntentRequest.h',
                 'public/WebIntentServiceInfo.h',
                 'public/WebKit.h',
                 'public/WebLabelElement.h',
@@ -243,7 +245,6 @@
                 'public/WebSocket.h',
                 'public/WebSocketClient.h',
                 'public/WebSpeechInputController.h',
-                'public/WebSpeechInputControllerMock.h',
                 'public/WebSpeechInputListener.h',
                 'public/WebSpeechInputResult.h',
                 'public/WebSpellCheckClient.h',
@@ -266,7 +267,7 @@
                 'public/WebViewClient.h',
                 'public/WebWidget.h',
                 'public/WebWidgetClient.h',
-                'public/WebWorker.h',
+                'public/WebWorkerInfo.h',
                 'public/WebWorkerRunLoop.h',
                 'public/android/WebInputEventFactory.h',
                 'public/android/WebSandboxSupport.h',
@@ -325,6 +326,7 @@
                 'public/platform/WebSocketStreamError.h',
                 'public/platform/WebSocketStreamHandle.h',
                 'public/platform/WebSocketStreamHandleClient.h',
+                'public/platform/WebSolidColorLayer.h',
                 'public/platform/WebString.h',
                 'public/platform/WebThread.h',
                 'public/platform/WebThreadSafeData.h',
@@ -443,6 +445,8 @@
                 'src/NotificationPresenterImpl.h',
                 'src/NotificationPresenterImpl.cpp',
                 'src/painting/GraphicsContextBuilder.h',
+                'src/painting/PaintAggregator.h',
+                'src/painting/PaintAggregator.cpp',
                 'src/PageOverlay.cpp',
                 'src/PageOverlay.h',
                 'src/PageOverlayList.cpp',
@@ -469,6 +473,7 @@
                 'src/UserMediaClientImpl.cpp',
                 'src/WebTextCheckingCompletionImpl.h',
                 'src/WebTextCheckingCompletionImpl.cpp',
+                'src/WebTextCheckingResult.cpp',
                 'src/VideoFrameChromiumImpl.cpp',
                 'src/VideoFrameChromiumImpl.h',
                 'src/WebAccessibilityObject.cpp',
@@ -579,6 +584,7 @@
                 'src/WebInputEventConversion.cpp',
                 'src/WebInputEventConversion.h',
                 'src/WebIntent.cpp',
+                'src/WebIntentRequest.cpp',
                 'src/WebIntentServiceInfo.cpp',
                 'src/WebKit.cpp',
                 'src/WebLabelElement.cpp',
@@ -635,8 +641,8 @@
                 'src/WebSocket.cpp',
                 'src/WebSocketImpl.cpp',
                 'src/WebSocketImpl.h',
-                'src/WebSpeechInputControllerMockImpl.cpp',
-                'src/WebSpeechInputControllerMockImpl.h',
+                'src/WebSolidColorLayer.cpp',
+                'src/WebSolidColorLayerImpl.cpp',
                 'src/WebSpeechInputResult.cpp',
                 'src/WebStorageAreaImpl.cpp',
                 'src/WebStorageAreaImpl.h',
@@ -662,6 +668,7 @@
                 'src/WebWorkerBase.h',
                 'src/WebWorkerClientImpl.cpp',
                 'src/WebWorkerClientImpl.h',
+                'src/WebWorkerInfo.cpp',
                 'src/WebWorkerRunLoop.cpp',
                 'src/WorkerAsyncFileSystemChromium.cpp',
                 'src/WorkerAsyncFileSystemChromium.h',
@@ -728,7 +735,6 @@
                                 # These tests depend on webkit_support and
                                 # functions defined only in !WEBKIT_IMPLEMENTATION.
                                 'tests/AssociatedURLLoaderTest.cpp',
-                                'tests/CCLayerTreeHostTest.cpp',
                                 'tests/FrameTestHelpers.cpp',
                                 'tests/PopupMenuTest.cpp',
                                 'tests/RenderTableCellTest.cpp',
@@ -762,6 +768,12 @@
                             },
                         }],
                     ],
+                }, { # else: inside_chromium_build==0
+                    'direct_dependent_settings': {
+                        'include_dirs': [
+                            '<(SHARED_INTERMEDIATE_DIR)/webkit', # in a chromium-inside-WebKit build, headers in the public WebKit API are copied beneath this directory so includes referencing third_party/WebKit work.
+                        ],
+                    },
                 }],
                 ['use_x11 == 1', {
                     'dependencies': [
@@ -1143,430 +1155,6 @@
                         ],
                     }],
                 },
-            ],
-        }],
-        # FIXME: Delete this whole block once chromium's build/common.gypi
-        # is setting this flag to 0 by default. See
-        # https://bugs.webkit.org/show_bug.cgi?id=68463.
-        ['build_webkit_exes_from_webkit_gyp==1', {
-            'includes': [
-                '../../../Tools/DumpRenderTree/DumpRenderTree.gypi',
-                '../../../Tools/TestWebKitAPI/TestWebKitAPI.gypi',
-            ],
-            'targets': [
-                {
-                    'target_name': 'webkit_unit_tests',
-                    'type': 'executable',
-                    'dependencies': [
-                        'webkit',
-                        '../../WebCore/WebCore.gyp/WebCore.gyp:webcore',
-                        '<(chromium_src_dir)/testing/gtest.gyp:gtest',
-                        '<(chromium_src_dir)/testing/gmock.gyp:gmock',
-                        '<(chromium_src_dir)/base/base.gyp:base',
-                        '<(chromium_src_dir)/base/base.gyp:base_i18n',
-                        '<(chromium_src_dir)/base/base.gyp:test_support_base',
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_user_agent',
-                    ],
-                    'sources': [
-                        'tests/RunAllTests.cpp',
-                    ],
-                    'include_dirs': [
-                        'public',
-                        'src',
-                    ],
-                    'conditions': [
-                        ['inside_chromium_build==1 and component=="shared_library"', {
-                            'defines': [
-                                'WEBKIT_DLL_UNITTEST',
-                            ],
-                        }, {
-                            'sources': [
-                                '<@(webkit_unittest_files)',
-                            ],
-                            'conditions': [
-                                ['toolkit_uses_gtk == 1', {
-                                    'include_dirs': [
-                                        'public/gtk',
-                                    ],
-                                    'variables': {
-                                    # FIXME: Enable warnings on other platforms.
-                                    'chromium_code': 1,
-                                    },
-                                }],
-                            ],
-                        }],
-                        ['inside_chromium_build==1 and OS=="win" and component!="shared_library"', {
-                            'configurations': {
-                                'Debug_Base': {
-                                    'msvs_settings': {
-                                        'VCLinkerTool': {
-                                            'LinkIncremental': '<(msvs_large_module_debug_link_mode)',
-                                        },
-                                    },
-                                },
-                            },
-                        }],
-                    ],
-                },
-                {
-                    'target_name': 'ImageDiff',
-                    'type': 'executable',
-                    'dependencies': [
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support_gfx',
-                    ],
-                    'include_dirs': [
-                        '../../JavaScriptCore',
-                        '<(DEPTH)',
-                    ],
-                    'sources': [
-                        '../../../Tools/DumpRenderTree/chromium/ImageDiff.cpp',
-                    ],
-                    'conditions': [
-                        ['OS=="android"', {
-                            'toolsets': ['host'],
-                        }],
-                    ],
-                },
-                {
-                    'target_name': 'DumpRenderTree',
-                    'type': 'executable',
-                    'mac_bundle': 1,
-                    'dependencies': [
-                        'inspector_resources',
-                        'webkit',
-                        '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf_config',
-                        '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
-                        '<(chromium_src_dir)/third_party/icu/icu.gyp:icuuc',
-                        '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:blob',
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_user_agent',
-                    ],
-                    'include_dirs': [
-                        '<(chromium_src_dir)',
-                        'public',
-                        '../../JavaScriptCore',
-                        '../../JavaScriptCore/wtf', # wtf/text/*.h refers headers in wtf/ without wtf/.
-                        '<(DEPTH)',
-                    ],
-                    'defines': [
-                        # Technically not a unit test but require functions available only to
-                        # unit tests.
-                        'UNIT_TEST',
-                    ],
-                    'sources': [
-                        '<@(drt_files)',
-                    ],
-                    'conditions': [
-                        ['OS=="win"', {
-                            'dependencies': [
-                                'LayoutTestHelper',
-                                '<(chromium_src_dir)/third_party/angle/src/build_angle.gyp:libEGL',
-                                '<(chromium_src_dir)/third_party/angle/src/build_angle.gyp:libGLESv2',
-                            ],
-
-                            'resource_include_dirs': ['<(SHARED_INTERMEDIATE_DIR)/webkit'],
-                            'sources': [
-                                '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.rc',
-                                '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.rc',
-                                '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources.rc',
-                                '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.rc',
-                            ],
-                            'conditions': [
-                                ['inside_chromium_build==1', {
-                                    'configurations': {
-                                        'Debug_Base': {
-                                            'msvs_settings': {
-                                                'VCLinkerTool': {
-                                                    'LinkIncremental': '<(msvs_large_module_debug_link_mode)',
-                                                },
-                                            },
-                                        },
-                                    },
-                                }],
-                            ],
-                            'copies': [{
-                                'destination': '<(PRODUCT_DIR)',
-                                'files': ['<(ahem_path)'],
-                            }],
-                        },{ # OS!="win"
-                            'sources/': [
-                                ['exclude', 'Win\\.cpp$'],
-                            ],
-                            'actions': [
-                                {
-                                    'action_name': 'repack_locale',
-                                    'variables': {
-                                        'repack_path': '<(chromium_src_dir)/tools/grit/grit/format/repack.py',
-                                        'pak_inputs': [
-                                            '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.pak',
-                                            '<(SHARED_INTERMEDIATE_DIR)/ui/gfx/gfx_resources.pak',
-                                            '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.pak',
-                                            '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.pak',
-                                            '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources.pak',
-                                    ]},
-                                    'inputs': [
-                                        '<(repack_path)',
-                                        '<@(pak_inputs)',
-                                    ],
-                                    'outputs': [
-                                        '<(INTERMEDIATE_DIR)/repack/DumpRenderTree.pak',
-                                    ],
-                                    'action': ['python', '<(repack_path)', '<@(_outputs)', '<@(pak_inputs)'],
-                                    'process_outputs_as_mac_bundle_resources': 1,
-                                },
-                            ], # actions
-                        }],
-                        ['OS=="mac"', {
-                            'dependencies': [
-                                'copy_mesa',
-                                'LayoutTestHelper',
-                            ],
-                            'mac_bundle_resources': [
-                                '<(ahem_path)',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher100.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher200.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher300.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher400.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher500.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher600.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher700.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher800.ttf',
-                                '../../../Tools/DumpRenderTree/fonts/WebKitWeightWatcher900.ttf',
-                                '<(SHARED_INTERMEDIATE_DIR)/webkit/textAreaResizeCorner.png',
-                            ],
-                        },{ # OS!="mac"
-                            'sources/': [
-                                # .mm is already excluded by common.gypi
-                                ['exclude', 'Mac\\.cpp$'],
-                            ],
-                        }],
-                        ['use_x11 == 1', {
-                            'dependencies': [
-                                '<(chromium_src_dir)/build/linux/system.gyp:fontconfig',
-                            ],
-                            'copies': [{
-                                'destination': '<(PRODUCT_DIR)',
-                                'files': [
-                                    '<(ahem_path)',
-                                    '../../../Tools/DumpRenderTree/chromium/fonts.conf',
-                                    '<(INTERMEDIATE_DIR)/repack/DumpRenderTree.pak',
-                                ]
-                            }],
-                            'variables': {
-                                # FIXME: Enable warnings on other platforms.
-                                'chromium_code': 1,
-                            },
-                            'conditions': [
-                                ['linux_use_tcmalloc == 1', {
-                                    'dependencies': [
-                                        '<(chromium_src_dir)/base/allocator/allocator.gyp:allocator',
-                                    ],
-                                }],
-                            ],
-                        },{ # use_x11 != 1
-                            'sources/': [
-                                ['exclude', 'Linux\\.cpp$']
-                            ]
-                        }],
-                        ['toolkit_uses_gtk == 1', {
-                            'defines': [
-                                'WTF_USE_GTK=1',
-                            ],
-                            'dependencies': [
-                                '<(chromium_src_dir)/build/linux/system.gyp:gtk',
-                            ],
-                            'include_dirs': [
-                                'public/gtk',
-                            ],
-                        },{ # toolkit_uses_gtk != 1
-                            'sources/': [
-                                ['exclude', 'Gtk\\.cpp$']
-                            ]
-                        }],
-                        ['OS=="android"', {
-                            'sources/': [
-                                ['include', 'chromium/TestShellLinux\\.cpp$'],
-                            ],
-                            'dependencies': [
-                                'ImageDiff#host',
-                            ],
-                        },{ # OS!="android"
-                            'dependencies': [
-                                'ImageDiff',
-                                'copy_TestNetscapePlugIn',
-                                '<(chromium_src_dir)/third_party/mesa/mesa.gyp:osmesa',
-                            ],
-                        }],
-                        ['inside_chromium_build==1 and component=="shared_library"', {
-                            'sources': [
-                                'src/ChromiumCurrentTime.cpp',
-                                'src/ChromiumThreading.cpp',
-                            ],
-                            'include_dirs': [
-                                'public',
-                            ],
-                            'dependencies': [
-                                '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf',
-                                '../../WTF/WTF.gyp/WTF.gyp:newwtf',
-                            ],
-                        }],
-                        ['inside_chromium_build==0', {
-                            'dependencies': [
-                                '<(chromium_src_dir)/webkit/support/setup_third_party.gyp:third_party_headers',
-                            ]
-                        }],
-                        ['inside_chromium_build==0 or component!="shared_library"', {
-                            'dependencies': [
-                                '../../WebCore/WebCore.gyp/WebCore.gyp:webcore_test_support',
-                            ],
-                            'include_dirs': [
-                                # WARNING: Do not view this particular case as a precedent for
-                                # including WebCore headers in DumpRenderTree project.
-                                '../../WebCore/testing/v8', # for WebCoreTestSupport.h, needed to link in window.internals code.
-                            ],
-                            'sources': [
-                                'src/WebTestingSupport.cpp',
-                                'public/WebTestingSupport.h',
-                            ],
-                        }],
-                    ],
-                },
-                {
-                    'target_name': 'TestNetscapePlugIn',
-                    'type': 'loadable_module',
-                    'sources': [ '<@(test_plugin_files)' ],
-                    'dependencies': [
-                        '<(chromium_src_dir)/third_party/npapi/npapi.gyp:npapi',
-                    ],
-                    'include_dirs': [
-                        '<(chromium_src_dir)',
-                        '../../../Tools/DumpRenderTree/TestNetscapePlugIn',
-                        '../../../Tools/DumpRenderTree/chromium/TestNetscapePlugIn/ForwardingHeaders',
-                    ],
-                    'conditions': [
-                        ['OS=="mac"', {
-                            'mac_bundle': 1,
-                            'product_extension': 'plugin',
-                            'link_settings': {
-                                'libraries': [
-                                    '$(SDKROOT)/System/Library/Frameworks/Carbon.framework',
-                                    '$(SDKROOT)/System/Library/Frameworks/Cocoa.framework',
-                                    '$(SDKROOT)/System/Library/Frameworks/QuartzCore.framework',
-                                ]
-                            },
-                            'xcode_settings': {
-                                'GCC_SYMBOLS_PRIVATE_EXTERN': 'NO',
-                                'INFOPLIST_FILE': '../../../Tools/DumpRenderTree/TestNetscapePlugIn/mac/Info.plist',
-                            },
-                        }],
-                        ['os_posix == 1 and OS != "mac"', {
-                            'cflags': [
-                                '-fvisibility=default',
-                            ],
-                        }],
-                        ['OS=="android"', {
-                            'ldflags!': [
-                                '-nostdlib',
-                            ],
-                        }],
-                        ['OS=="win"', {
-                            'defines': [
-                                # This seems like a hack, but this is what Safari Win does.
-                                'snprintf=_snprintf',
-                            ],
-                            'sources': [
-                                '../../../Tools/DumpRenderTree/TestNetscapePlugIn/win/TestNetscapePlugin.def',
-                                '../../../Tools/DumpRenderTree/TestNetscapePlugIn/win/TestNetscapePlugin.rc',
-                            ],
-                            # The .rc file requires that the name of the dll is npTestNetscapePlugin.dll.
-                            'product_name': 'npTestNetscapePlugin',
-                        }],
-                    ],
-                },
-                {
-                    'target_name': 'copy_TestNetscapePlugIn',
-                    'type': 'none',
-                    'dependencies': [
-                        'TestNetscapePlugIn',
-                    ],
-                    'conditions': [
-                        ['OS=="win"', {
-                            'copies': [{
-                                'destination': '<(PRODUCT_DIR)/plugins',
-                                'files': ['<(PRODUCT_DIR)/npTestNetscapePlugIn.dll'],
-                            }],
-                        }],
-                        ['OS=="mac"', {
-                            'dependencies': ['TestNetscapePlugIn'],
-                            'copies': [{
-                                'destination': '<(PRODUCT_DIR)/plugins/',
-                                'files': ['<(PRODUCT_DIR)/TestNetscapePlugIn.plugin/'],
-                            }],
-                        }],
-                        ['os_posix == 1 and OS != "mac"', {
-                            'copies': [{
-                                'destination': '<(PRODUCT_DIR)/plugins',
-                                'files': ['<(PRODUCT_DIR)/libTestNetscapePlugIn.so'],
-                            }],
-                        }],
-                    ],
-                },
-                {
-                    'target_name': 'TestWebKitAPI',
-                    'type': 'executable',
-                    'dependencies': [
-                        'webkit',
-                        '../../WebCore/WebCore.gyp/WebCore.gyp:webcore',
-                        '<(chromium_src_dir)/base/base.gyp:test_support_base',
-                        '<(chromium_src_dir)/testing/gtest.gyp:gtest',
-                        '<(chromium_src_dir)/testing/gmock.gyp:gmock',
-                        '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
-                    ],
-                    'include_dirs': [
-                        '../../../Tools/TestWebKitAPI',
-                        # Needed by tests/RunAllTests.cpp, as well as ChromiumCurrentTime.cpp and
-                        # ChromiumThreading.cpp in chromium shared library configuration.
-                        'public',
-                    ],
-                    'sources': [
-                        # Reuse the same testing driver of Chromium's webkit_unit_tests.
-                        'tests/RunAllTests.cpp',
-                        '<@(TestWebKitAPI_files)',
-                    ],
-                    'conditions': [
-                        ['inside_chromium_build==1 and component=="shared_library"', {
-                            'sources': [
-                                # To satisfy linking of WTF::currentTime() etc. in shared library configuration,
-                                # as the symbols are not exported from the DLLs.
-                                'src/ChromiumCurrentTime.cpp',
-                                'src/ChromiumThreading.cpp',
-                            ],
-                        }],
-                    ],
-                },
-            ], # targets
-            'conditions': [
-                ['OS=="win"', {
-                    'targets': [{
-                        'target_name': 'LayoutTestHelper',
-                        'type': 'executable',
-                        'sources': ['../../../Tools/DumpRenderTree/chromium/LayoutTestHelperWin.cpp'],
-                    }],
-                }],
-                ['OS=="mac"', {
-                    'targets': [{
-                        'target_name': 'LayoutTestHelper',
-                        'type': 'executable',
-                        'sources': ['../../../Tools/DumpRenderTree/chromium/LayoutTestHelper.mm'],
-                        'link_settings': {
-                            'libraries': [
-                                '$(SDKROOT)/System/Library/Frameworks/AppKit.framework',
-                            ],
-                        },
-                    }],
-                }],
             ],
         }],
     ], # conditions

@@ -208,11 +208,6 @@ sub new
     return $reference;
 }
 
-sub finish
-{
-    my $object = shift;
-}
-
 sub ReadPublicInterfaces
 {
     my $class = shift;
@@ -882,10 +877,8 @@ sub GenerateHeader
                 $typesToForwardDeclare{$param->type} = 1;
 
                 if ($parameterIndex >= 1) {
-                    my $paramPrefix = $param->extendedAttributes->{"ObjCPrefix"};
-                    $paramPrefix = $paramName unless defined($paramPrefix);
-                    $functionSig .= " $paramPrefix";
-                    $methodName .= $paramPrefix;
+                    $functionSig .= " $paramName";
+                    $methodName .= $paramName;
                 }
 
                 $functionSig .= ":($paramType)$paramName";
@@ -1509,9 +1502,7 @@ sub GenerateImplementation
                 }
 
                 if ($parameterIndex >= 1) {
-                    my $paramPrefix = $param->extendedAttributes->{"ObjCPrefix"};
-                    $paramPrefix = $param->name unless defined($paramPrefix);
-                    $functionSig .= " $paramPrefix";
+                    $functionSig .= " " . $param->name;
                 }
 
                 $functionSig .= ":($paramType)$paramName";
@@ -1776,25 +1767,15 @@ sub WriteData
     my $internalHeaderFileName = "$outputDir/" . $name . "Internal.h";
     my $depsFileName = "$outputDir/" . $name . ".dep";
 
-    # Remove old files.
-    unlink($headerFileName);
-    unlink($privateHeaderFileName);
-    unlink($implFileName);
-    unlink($internalHeaderFileName);
-    unlink($depsFileName);
-
     # Write public header.
-    open(HEADER, ">$headerFileName") or die "Couldn't open file $headerFileName";
-    
-    print HEADER @headerContentHeader;
-    print HEADER map { "\@class $_;\n" } sort keys(%headerForwardDeclarations);
-    print HEADER map { "\@protocol $_;\n" } sort keys(%headerForwardDeclarationsForProtocols);
+    my $contents = join "", @headerContentHeader;
+    map { $contents .= "\@class $_;\n" } sort keys(%headerForwardDeclarations);
+    map { $contents .= "\@protocol $_;\n" } sort keys(%headerForwardDeclarationsForProtocols);
 
     my $hasForwardDeclarations = keys(%headerForwardDeclarations) + keys(%headerForwardDeclarationsForProtocols);
-    print HEADER "\n" if $hasForwardDeclarations;
-    print HEADER @headerContent;
-
-    close(HEADER);
+    $contents .= "\n" if $hasForwardDeclarations;
+    $contents .= join "", @headerContent;
+    $codeGenerator->UpdateFile($headerFileName, $contents);
 
     @headerContentHeader = ();
     @headerContent = ();
@@ -1802,17 +1783,14 @@ sub WriteData
     %headerForwardDeclarationsForProtocols = ();
 
     if (@privateHeaderContent > 0) {
-        open(PRIVATE_HEADER, ">$privateHeaderFileName") or die "Couldn't open file $privateHeaderFileName";
-
-        print PRIVATE_HEADER @privateHeaderContentHeader;
-        print PRIVATE_HEADER map { "\@class $_;\n" } sort keys(%privateHeaderForwardDeclarations);
-        print PRIVATE_HEADER map { "\@protocol $_;\n" } sort keys(%privateHeaderForwardDeclarationsForProtocols);
+        $contents = join "", @privateHeaderContentHeader;
+        map { $contents .= "\@class $_;\n" } sort keys(%privateHeaderForwardDeclarations);
+        map { $contents .= "\@protocol $_;\n" } sort keys(%privateHeaderForwardDeclarationsForProtocols);
 
         $hasForwardDeclarations = keys(%privateHeaderForwardDeclarations) + keys(%privateHeaderForwardDeclarationsForProtocols);
-        print PRIVATE_HEADER "\n" if $hasForwardDeclarations;
-        print PRIVATE_HEADER @privateHeaderContent;
-
-        close(PRIVATE_HEADER);
+        $contents .= "\n" if $hasForwardDeclarations;
+        $contents .= join "", @privateHeaderContent;
+        $codeGenerator->UpdateFile($privateHeaderFileName, $contents);
 
         @privateHeaderContentHeader = ();
         @privateHeaderContent = ();
@@ -1822,34 +1800,28 @@ sub WriteData
 
     # Write implementation file.
     unless ($noImpl) {
-        open(IMPL, ">$implFileName") or die "Couldn't open file $implFileName";
-
-        print IMPL @implContentHeader;
-        print IMPL map { "#import \"$_\"\n" } sort keys(%implIncludes);
-        print IMPL @implContent;
-
-        close(IMPL);
+        $contents = join "", @implContentHeader;
+        map { $contents .= "#import \"$_\"\n" } sort keys(%implIncludes);
+        $contents .= join "", @implContent;
+        $codeGenerator->UpdateFile($implFileName, $contents);
 
         @implContentHeader = ();
         @implContent = ();
         %implIncludes = ();
     }
-    
+
     if (@internalHeaderContent > 0) {
-       open(INTERNAL_HEADER, ">$internalHeaderFileName") or die "Couldn't open file $internalHeaderFileName";
+        $contents = join "", @internalHeaderContent;
+        $codeGenerator->UpdateFile($internalHeaderFileName, $contents);
 
-       print INTERNAL_HEADER @internalHeaderContent;
-
-       close(INTERNAL_HEADER);
-
-       @internalHeaderContent = ();
+        @internalHeaderContent = ();
     }
 
     # Write dependency file.
     if (@depsContent) {
-        open(DEPS, ">$depsFileName") or die "Couldn't open file $depsFileName";
-        print DEPS @depsContent;
-        close(DEPS);
+        $contents = join "", @depsContent;
+        $codeGenerator->UpdateFile($depsFileName, $contents);
+
         @depsContent = ();
     }
 }

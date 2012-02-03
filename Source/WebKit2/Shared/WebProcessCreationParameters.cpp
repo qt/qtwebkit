@@ -67,7 +67,7 @@ void WebProcessCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) con
 #if ENABLE(PLUGIN_PROCESS)
     encoder->encode(disablePluginProcessMessageTimeout);
 #endif
-    encoder->encode(languageCode);
+    encoder->encode(languages);
     encoder->encode(textCheckerState);
     encoder->encode(fullKeyboardAccessEnabled);
     encoder->encode(defaultRequestTimeoutInterval);
@@ -98,6 +98,10 @@ void WebProcessCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) con
 #endif
 #if PLATFORM(QT)
     encoder->encode(cookieStorageDirectory);
+#endif
+
+#if ENABLE(NOTIFICATIONS)
+    encoder->encode(notificationPermissions);
 #endif
 }
 
@@ -138,7 +142,7 @@ bool WebProcessCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, Web
         return false;
 #endif
 
-    if (!decoder->decode(parameters.languageCode))
+    if (!decoder->decode(parameters.languages))
         return false;
     if (!decoder->decode(parameters.textCheckerState))
         return false;
@@ -190,6 +194,11 @@ bool WebProcessCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, Web
 
 #if PLATFORM(QT)
     if (!decoder->decode(parameters.cookieStorageDirectory))
+        return false;
+#endif
+
+#if ENABLE(NOTIFICATIONS)
+    if (!decoder->decode(parameters.notificationPermissions))
         return false;
 #endif
 

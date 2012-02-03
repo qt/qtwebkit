@@ -97,8 +97,6 @@ enum {
 - (void)setReflectedBooleanAttr:(BOOL)newReflectedBooleanAttr;
 - (NSString *)reflectedURLAttr;
 - (void)setReflectedURLAttr:(NSString *)newReflectedURLAttr;
-- (NSString *)reflectedNonEmptyURLAttr;
-- (void)setReflectedNonEmptyURLAttr:(NSString *)newReflectedNonEmptyURLAttr;
 - (NSString *)reflectedStringAttr;
 - (void)setReflectedStringAttr:(NSString *)newReflectedStringAttr;
 - (int)reflectedCustomIntegralAttr;
@@ -107,8 +105,6 @@ enum {
 - (void)setReflectedCustomBooleanAttr:(BOOL)newReflectedCustomBooleanAttr;
 - (NSString *)reflectedCustomURLAttr;
 - (void)setReflectedCustomURLAttr:(NSString *)newReflectedCustomURLAttr;
-- (NSString *)reflectedCustomNonEmptyURLAttr;
-- (void)setReflectedCustomNonEmptyURLAttr:(NSString *)newReflectedCustomNonEmptyURLAttr;
 - (int)attrWithGetterException;
 - (void)setAttrWithGetterException:(int)newAttrWithGetterException;
 - (int)attrWithSetterException;
@@ -119,6 +115,14 @@ enum {
 - (void)setStringAttrWithSetterException:(NSString *)newStringAttrWithSetterException;
 - (int)customAttr;
 - (void)setCustomAttr:(int)newCustomAttr;
+- (int)withScriptStateAttribute;
+- (void)setWithScriptStateAttribute:(int)newWithScriptStateAttribute;
+- (DOMTestObj *)withScriptExecutionContextAttribute;
+- (void)setWithScriptExecutionContextAttribute:(DOMTestObj *)newWithScriptExecutionContextAttribute;
+- (DOMTestObj *)withScriptStateAttributeRaises;
+- (void)setWithScriptStateAttributeRaises:(DOMTestObj *)newWithScriptStateAttributeRaises;
+- (DOMTestObj *)withScriptExecutionContextAttributeRaises;
+- (void)setWithScriptExecutionContextAttributeRaises:(DOMTestObj *)newWithScriptExecutionContextAttributeRaises;
 - (NSString *)scriptStringAttr;
 #if ENABLE(Condition1)
 - (int)conditionalAttr1;

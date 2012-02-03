@@ -155,8 +155,6 @@ bool MiniBrowserApplication::notify(QObject* target, QEvent* event)
         }
 
         // Update current touch-point
-        if (m_touchPoints.isEmpty())
-            touchPoint.flags |= QTouchEvent::TouchPoint::Primary;
         m_touchPoints.insert(touchPoint.id, touchPoint);
 
         // Update states for all other touch-points
@@ -181,10 +179,11 @@ void MiniBrowserApplication::sendTouchEvent(BrowserWindow* browserWindow)
     }
 
     m_pendingFakeTouchEventCount++;
-    QWindowSystemInterface::handleTouchEvent(browserWindow, QEvent::None, device, m_touchPoints.values());
+    QWindowSystemInterface::handleTouchEvent(browserWindow, device, m_touchPoints.values());
 
+    bool holdingControl = QApplication::keyboardModifiers().testFlag(Qt::ControlModifier);
     if (!m_windowOptions.useTraditionalDesktopBehavior())
-        browserWindow->updateVisualMockTouchPoints(m_touchPoints.values());
+        browserWindow->updateVisualMockTouchPoints(holdingControl ? m_touchPoints.values() : QList<QWindowSystemInterface::TouchPoint>());
 
     // Get rid of touch-points that are no longer valid
     foreach (const QWindowSystemInterface::TouchPoint& touchPoint, m_touchPoints) {
@@ -249,8 +248,9 @@ void MiniBrowserApplication::handleUserOptions()
         m_robotTimeoutSeconds = takeOptionValue(&args, "--robot-timeout").toInt();
         m_robotExtraTimeSeconds = takeOptionValue(&args, "--robot-extra-time").toInt();
     } else {
-        int urlArg = args.indexOf(QRegExp("^[^-].*"));
-        if (urlArg != -1)
+        int urlArg;
+
+        while ((urlArg = args.indexOf(QRegExp("^[^-].*"))) != -1)
             m_urls += args.takeAt(urlArg);
     }
 

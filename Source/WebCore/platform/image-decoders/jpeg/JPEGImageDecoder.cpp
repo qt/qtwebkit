@@ -56,16 +56,12 @@
 #endif
 
 extern "C" {
-
 #include "jpeglib.h"
-
 #if USE(ICCJPEG)
 #include "iccjpeg.h"
 #endif
-
-}
-
 #include <setjmp.h>
+}
 
 #if CPU(BIG_ENDIAN) || CPU(MIDDLE_ENDIAN)
 #define ASSUME_LITTLE_ENDIAN 0
@@ -73,12 +69,12 @@ extern "C" {
 #define ASSUME_LITTLE_ENDIAN 1
 #endif
 
-#if defined(JCS_EXTENSIONS) && ASSUME_LITTLE_ENDIAN
+#if defined(JCS_ALPHA_EXTENSIONS) && ASSUME_LITTLE_ENDIAN
 #define TURBO_JPEG_RGB_SWIZZLE
 #if USE(SKIA) && (!SK_R32_SHIFT && SK_G32_SHIFT == 8 && SK_B32_SHIFT == 16)
-inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_EXT_RGBX; }
+inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_EXT_RGBA; }
 #else
-inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_EXT_BGRX; }
+inline J_COLOR_SPACE rgbOutputColorSpace() { return JCS_EXT_BGRA; }
 #endif
 inline bool turboSwizzled(J_COLOR_SPACE colorSpace) { return colorSpace == rgbOutputColorSpace(); }
 #else
@@ -98,7 +94,7 @@ enum jstate {
     JPEG_DECOMPRESS_PROGRESSIVE, // Output progressive pixels
     JPEG_DECOMPRESS_SEQUENTIAL,  // Output sequential pixels
     JPEG_DONE,
-    JPEG_ERROR    
+    JPEG_ERROR
 };
 
 void init_source(j_decompress_ptr jd);
@@ -115,32 +111,6 @@ struct decoder_source_mgr {
     JPEGImageReader* decoder;
 };
 
-#if USE(ICCJPEG)
-
-#define iccProfileHeaderSize 128
-
-static bool rgbColorProfile(const char* profileData, unsigned profileLength)
-{
-    ASSERT(profileLength >= iccProfileHeaderSize);
-
-    if (!memcmp(&profileData[16], "RGB ", 4))
-        return true;
-    return false;
-}
-
-static bool inputDeviceColorProfile(const char* profileData, unsigned profileLength)
-{
-    ASSERT(profileLength >= iccProfileHeaderSize);
-
-    if (!memcmp(&profileData[12], "mntr", 4))
-        return true;
-    if (!memcmp(&profileData[12], "scnr", 4))
-        return true;
-    return false;
-}
-
-#endif
-
 static ColorProfile readColorProfile(jpeg_decompress_struct* info)
 {
 #if USE(ICCJPEG)
@@ -153,11 +123,11 @@ static ColorProfile readColorProfile(jpeg_decompress_struct* info)
     // Only accept RGB color profiles from input class devices.
     bool ignoreProfile = false;
     char* profileData = reinterpret_cast<char*>(profile);
-    if (profileLength < iccProfileHeaderSize)
+    if (profileLength < ImageDecoder::iccColorProfileHeaderLength)
         ignoreProfile = true;
-    else if (!rgbColorProfile(profileData, profileLength))
+    else if (!ImageDecoder::rgbColorProfile(profileData, profileLength))
         ignoreProfile = true;
-    else if (!inputDeviceColorProfile(profileData, profileLength))
+    else if (!ImageDecoder::inputDeviceColorProfile(profileData, profileLength))
         ignoreProfile = true;
 
     ColorProfile colorProfile;
@@ -181,14 +151,14 @@ public:
         , m_samples(0)
     {
         memset(&m_info, 0, sizeof(jpeg_decompress_struct));
- 
+
         // We set up the normal JPEG error routines, then override error_exit.
         m_info.err = jpeg_std_error(&m_err.pub);
         m_err.pub.error_exit = error_exit;
 
         // Allocate and initialize JPEG decompression object.
         jpeg_create_decompress(&m_info);
-  
+
         decoder_source_mgr* src = 0;
         if (!m_info.src) {
             src = (decoder_source_mgr*)fastCalloc(sizeof(decoder_source_mgr), 1);
@@ -254,7 +224,7 @@ public:
             skipBytes(m_bytesToSkip);
 
         m_bufferLength = data.size();
-        
+
         // We need to do the setjmp here. Otherwise bad things will happen
         if (setjmp(m_err.setjmp_buffer))
             return m_decoder->setFailed();
@@ -337,10 +307,10 @@ public:
 
         case JPEG_DECOMPRESS_SEQUENTIAL:
             if (m_state == JPEG_DECOMPRESS_SEQUENTIAL) {
-  
+
                 if (!m_decoder->outputScanlines())
                     return false; // I/O suspension.
-  
+
                 // If we've completed image output...
                 ASSERT(m_info.output_scanline == m_info.output_height);
                 m_state = JPEG_DONE;

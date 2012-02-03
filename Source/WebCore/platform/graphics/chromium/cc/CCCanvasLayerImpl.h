@@ -40,9 +40,9 @@ public:
     }
     virtual ~CCCanvasLayerImpl();
 
-    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderRGBATexFlipAlpha> Program;
+    virtual void appendQuads(CCQuadList&, const CCSharedQuadState*);
 
-    virtual void draw(LayerRendererChromium*);
+    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderRGBATexFlipAlpha> Program;
 
     virtual void dumpLayerProperties(TextStream&, int indent) const;
 

@@ -76,8 +76,10 @@ namespace WebCore {
     class NotificationPresenter;
     class PageGroup;
     class PluginData;
+    class PointerLockController;
     class ProgressTracker;
     class Range;
+    class RenderObject;
     class RenderTheme;
     class VisibleSelection;
     class ScrollableArea;
@@ -190,6 +192,9 @@ namespace WebCore {
 #if ENABLE(NOTIFICATIONS)
         NotificationController* notificationController() const { return m_notificationController.get(); }
 #endif
+#if ENABLE(POINTER_LOCK)
+        PointerLockController* pointerLockController() const { return m_pointerLockController.get(); }
+#endif
 #if ENABLE(INPUT_SPEECH)
         SpeechInput* speechInput();
 #endif
@@ -266,6 +271,7 @@ namespace WebCore {
 
             Pagination()
                 : mode(Unpaginated)
+                , behavesLikeColumns(false)
                 , pageLength(0)
                 , gap(0)
             {
@@ -273,10 +279,11 @@ namespace WebCore {
 
             bool operator==(const Pagination& other) const
             {
-                return mode == other.mode && pageLength == other.pageLength && gap == other.gap;
+                return mode == other.mode && behavesLikeColumns == other.behavesLikeColumns && pageLength == other.pageLength && gap == other.gap;
             }
 
             Mode mode;
+            bool behavesLikeColumns;
             unsigned pageLength;
             unsigned gap;
         };
@@ -348,6 +355,10 @@ namespace WebCore {
 #endif
 
         PlatformDisplayID displayID() const { return m_displayID; }
+
+        void setRelevantRepaintedObjectsCounterThreshold(uint64_t);
+        void startCountingRelevantRepaintedObjects();
+        void addRelevantRepaintedObject(RenderObject*, const IntRect& objectPaintRect);
         
     private:
         void initGroup();
@@ -385,6 +396,9 @@ namespace WebCore {
 #endif
 #if ENABLE(NOTIFICATIONS)
         OwnPtr<NotificationController> m_notificationController;
+#endif
+#if ENABLE(POINTER_LOCK)
+        OwnPtr<PointerLockController> m_pointerLockController;
 #endif
 #if ENABLE(INPUT_SPEECH)
         SpeechInputClient* m_speechInputClient;
@@ -462,6 +476,9 @@ namespace WebCore {
         PageVisibilityState m_visibilityState;
 #endif
         PlatformDisplayID m_displayID;
+
+        HashSet<RenderObject*> m_relevantPaintedRenderObjects;
+        bool m_isCountingRelevantRepaintedObjects;
     };
 
 } // namespace WebCore

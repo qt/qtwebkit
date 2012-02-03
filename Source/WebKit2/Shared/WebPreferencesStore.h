@@ -66,10 +66,12 @@ namespace WebKit {
     macro(HyperlinkAuditingEnabled, hyperlinkAuditingEnabled, Bool, bool, true) \
     macro(NeedsSiteSpecificQuirks, needsSiteSpecificQuirks, Bool, bool, false) \
     macro(AcceleratedCompositingEnabled, acceleratedCompositingEnabled, Bool, bool, true) \
+    macro(ForceCompositingMode, forceCompositingMode, Bool, bool, false) \
     macro(AcceleratedDrawingEnabled, acceleratedDrawingEnabled, Bool, bool, false) \
     macro(CanvasUsesAcceleratedDrawing, canvasUsesAcceleratedDrawing, Bool, bool, true) \
     macro(CompositingBordersVisible, compositingBordersVisible, Bool, bool, false) \
     macro(CompositingRepaintCountersVisible, compositingRepaintCountersVisible, Bool, bool, false) \
+    macro(CSSCustomFilterEnabled, cssCustomFilterEnabled, Bool, bool, true) \
     macro(WebGLEnabled, webGLEnabled, Bool, bool, false) \
     macro(ForceFTPDirectoryListings, forceFTPDirectoryListings, Bool, bool, false) \
     macro(TabsToLinks, tabsToLinks, Bool, bool, DEFAULT_WEBKIT_TABSTOLINKS_ENABLED) \
@@ -102,6 +104,7 @@ namespace WebKit {
     macro(ShouldDisplaySubtitles, shouldDisplaySubtitles, Bool, bool, false) \
     macro(ShouldDisplayCaptions, shouldDisplayCaptions, Bool, bool, false) \
     macro(ShouldDisplayTextDescriptions, shouldDisplayTextDescriptions, Bool, bool, false) \
+    macro(NotificationsEnabled, notificationsEnabled, Bool, bool, true) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -126,6 +129,7 @@ namespace WebKit {
     macro(DeviceHeight, deviceHeight, UInt32, uint32_t, 854) \
     macro(PDFDisplayMode, pdfDisplayMode, UInt32, uint32_t, 1) \
     macro(EditableLinkBehavior, editableLinkBehavior, UInt32, uint32_t, WebCore::EditableLinkNeverLive) \
+    macro(InspectorAttachedHeight, inspectorAttachedHeight, UInt32, uint32_t, 300) \
     \
 
 #if PLATFORM(WIN)
@@ -152,7 +156,7 @@ namespace WebKit {
     macro(PictographFontFamily, pictographFontFamily, String, String, "Apple Color Emoji") \
     \
 
-#elif PLATFORM(QT) || PLATFORM(GTK)
+#elif PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
 
 #define FOR_EACH_WEBKIT_FONT_FAMILY_PREFERENCE(macro) \
     macro(StandardFontFamily, standardFontFamily, String, String, "Times") \
@@ -210,7 +214,8 @@ struct WebPreferencesStore {
     bool setDoubleValueForKey(const String& key, double value);
     double getDoubleValueForKey(const String& key) const;
 
-    static void overrideXSSAuditorEnabledForTestRunner(bool);
+    // For WebKitTestRunner usage.
+    static void overrideBoolValueForKey(const String& key, bool value);
     static void removeTestRunnerOverrides();
 
     HashMap<String, String> m_stringValues;

@@ -26,6 +26,7 @@
 #ifndef MarkStack_h
 #define MarkStack_h
 
+#include "BumpSpace.h"
 #include "HandleTypes.h"
 #include "Options.h"
 #include "JSValue.h"
@@ -111,7 +112,7 @@ namespace JSC {
     private:
         MarkStackSegment* m_topSegment;
         
-        void expand();
+        JS_EXPORT_PRIVATE void expand();
         
         MarkStackSegmentAllocator& m_allocator;
 
@@ -181,6 +182,7 @@ namespace JSC {
 #endif
 
         JSGlobalData* m_globalData;
+        BumpSpace* m_bumpSpace;
         
         MarkStackSegmentAllocator m_segmentAllocator;
         
@@ -241,7 +243,7 @@ namespace JSC {
         }
 
     protected:
-        static void validate(JSCell*);
+        JS_EXPORT_PRIVATE static void validate(JSCell*);
 
         void append(JSValue*);
         void append(JSValue*, size_t count);
@@ -250,7 +252,7 @@ namespace JSC {
         void internalAppend(JSCell*);
         void internalAppend(JSValue);
         
-        void mergeOpaqueRoots();
+        JS_EXPORT_PRIVATE void mergeOpaqueRoots();
         
         void mergeOpaqueRootsIfNecessary()
         {

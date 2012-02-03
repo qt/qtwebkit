@@ -31,7 +31,6 @@
 #include "InjectedBundleMessageKinds.h"
 #include "Logging.h"
 #include "MutableDictionary.h"
-#include "RunLoop.h"
 #include "SandboxExtension.h"
 #include "StatisticsData.h"
 #include "TextChecker.h"
@@ -58,6 +57,7 @@
 #include <WebCore/LinkHash.h>
 #include <WebCore/Logging.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/RunLoop.h>
 #include <runtime/InitializeThreading.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
@@ -231,7 +231,7 @@ void WebContext::languageChanged(void* context)
 
 void WebContext::languageChanged()
 {
-    sendToAllProcesses(Messages::WebProcess::LanguageChanged(defaultLanguage()));
+    sendToAllProcesses(Messages::WebProcess::UserPreferredLanguagesChanged(userPreferredLanguages()));
 }
 
 void WebContext::fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled)
@@ -255,7 +255,7 @@ void WebContext::ensureWebProcess()
 
     parameters.shouldTrackVisitedLinks = m_historyClient.shouldTrackVisitedLinks();
     parameters.cacheModel = m_cacheModel;
-    parameters.languageCode = defaultLanguage();
+    parameters.languages = userPreferredLanguages();
     parameters.applicationCacheDirectory = applicationCacheDirectory();
     parameters.databaseDirectory = databaseDirectory();
     parameters.localStorageDirectory = localStorageDirectory();
@@ -280,6 +280,10 @@ void WebContext::ensureWebProcess()
     parameters.fullKeyboardAccessEnabled = WebProcessProxy::fullKeyboardAccessEnabled();
 
     parameters.defaultRequestTimeoutInterval = WebURLRequest::defaultTimeoutInterval();
+
+#if ENABLE(NOTIFICATIONS)
+    m_notificationManagerProxy->populateCopyOfNotificationPermissions(parameters.notificationPermissions);
+#endif
 
     // Add any platform specific parameters
     platformInitializeWebProcess(parameters);

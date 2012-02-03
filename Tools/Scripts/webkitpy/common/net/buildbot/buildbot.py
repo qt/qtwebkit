@@ -432,23 +432,78 @@ class BuildBot(object):
                 return build
             build = build.previous_build()
 
-    def last_green_revision(self):
-        builds = self._latest_builds_from_builders()
-        target_revision = builds[0].revision()
-        # An alternate way to do this would be to start at one revision and walk backwards
-        # checking builder.build_for_revision, however build_for_revision is very slow on first load.
-        while True:
-            # Make builds agree on revision
-            builds = [self._build_at_or_before_revision(build, target_revision) for build in builds]
-            if None in builds: # One of the builds failed to load from the server.
-                return None
-            min_revision = min(map(lambda build: build.revision(), builds))
-            if min_revision != target_revision:
-                target_revision = min_revision
-                continue # Builds don't all agree on revision, keep searching
-            # Check to make sure they're all green
-            all_are_green = reduce(operator.and_, map(lambda build: build.is_green(), builds))
-            if not all_are_green:
-                target_revision -= 1
+    def _fetch_builder_page(self, builder):
+        builder_page_url = "%s/builders/%s?numbuilds=100" % (self.buildbot_url, urllib2.quote(builder.name()))
+        return urllib2.urlopen(builder_page_url)
+
+    def _revisions_for_builder(self, builder):
+        soup = BeautifulSoup(self._fetch_builder_page(builder))
+        revisions = []
+        for status_row in soup.find('table').findAll('tr'):
+            revision_anchor = status_row.find('a')
+            table_cells = status_row.findAll('td')
+            if not table_cells or len(table_cells) < 3 or not table_cells[2].string:
                 continue
-            return min_revision
+            if revision_anchor and revision_anchor.string and re.match(r'^\d+$', revision_anchor.string):
+                revisions.append((int(revision_anchor.string), 'success' in table_cells[2].string))
+        return revisions
+
+    def _find_green_revision(self, builder_revisions):
+        revision_statuses = {}
+        for builder in builder_revisions:
+            for revision, succeeded in builder_revisions[builder]:
+                revision_statuses.setdefault(revision, set())
+                if succeeded and revision_statuses[revision] != None:
+                    revision_statuses[revision].add(builder)
+                else:
+                    revision_statuses[revision] = None
+
+        # In descending order, look for a revision X with successful builds
+        # Once we found X, check if remaining builders succeeded in the neighborhood of X.
+        revisions_in_order = sorted(revision_statuses.keys(), reverse=True)
+        for i, revision in enumerate(revisions_in_order):
+            if not revision_statuses[revision]:
+                continue
+
+            builders_succeeded_in_future = set()
+            for future_revision in sorted(revisions_in_order[:i + 1]):
+                if not revision_statuses[future_revision]:
+                    break
+                builders_succeeded_in_future = builders_succeeded_in_future.union(revision_statuses[future_revision])
+
+            builders_succeeded_in_past = set()
+            for past_revision in revisions_in_order[i:]:
+                if not revision_statuses[past_revision]:
+                    break
+                builders_succeeded_in_past = builders_succeeded_in_past.union(revision_statuses[past_revision])
+
+            if len(builders_succeeded_in_future) == len(builder_revisions) and len(builders_succeeded_in_past) == len(builder_revisions):
+                return revision
+        return None
+
+    def last_green_revision(self, builder_name_regex):
+        compiled_builder_name_regex = re.compile(builder_name_regex, flags=re.IGNORECASE)
+        builders = [builder for builder in self.builders() if compiled_builder_name_regex.search(builder.name())]
+        if len(builders) > 10:
+            return '"%s" matches too many bots' % builder_name_regex
+        elif not len(builders):
+            return '"%s" doesn\'t match any bot' % builder_name_regex
+
+        builder_revisions = {}
+        for builder in builders:
+            builder_revisions[builder] = self._revisions_for_builder(builder)
+
+        result = ''
+        revision_with_all_builders = self._find_green_revision(builder_revisions)
+        if revision_with_all_builders:
+            result += 'The last known green revision is %d\n' % revision_with_all_builders
+
+        for builder in builders:
+            succeeded_revisions = [revision for revision, succeeded in builder_revisions[builder] if succeeded]
+            if not succeeded_revisions:
+                result += '%s has had no green revision in the last %d runs' % (builder.name(), len(builder_revisions[builder]))
+            else:
+                result += '%s: %d' % (builder.name(), max(succeeded_revisions))
+            result += "\n"
+
+        return result

@@ -52,6 +52,7 @@
 #include "InspectorFileSystemAgent.h"
 #include "InspectorFrontend.h"
 #include "InspectorFrontendClient.h"
+#include "InspectorIndexedDBAgent.h"
 #include "InspectorInstrumentation.h"
 #include "InspectorMemoryAgent.h"
 #include "InspectorPageAgent.h"
@@ -98,6 +99,10 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     m_agents.append(databaseAgentPtr.release());
 #endif
 
+#if ENABLE(INDEXED_DATABASE)
+    m_agents.append(InspectorIndexedDBAgent::create(m_instrumentingAgents.get(), m_state.get(), pageAgent));
+#endif
+
 #if ENABLE(FILE_SYSTEM)
     m_agents.append(InspectorFileSystemAgent::create(m_instrumentingAgents.get(), m_state.get()));
 #endif
@@ -105,7 +110,12 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     InspectorDOMStorageAgent* domStorageAgent = domStorageAgentPtr.get();
     m_agents.append(domStorageAgentPtr.release());
 
-    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), m_state.get()));
+
+    OwnPtr<InspectorMemoryAgent>memoryAgentPtr = InspectorMemoryAgent::create(m_instrumentingAgents.get(), m_state.get(), m_page, m_domAgent);
+    InspectorMemoryAgent* memoryAgent = memoryAgentPtr.get();
+    m_agents.append(memoryAgentPtr.release());
+
+    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), m_state.get(), memoryAgent));
     m_agents.append(InspectorApplicationCacheAgent::create(m_instrumentingAgents.get(), m_state.get(), pageAgent));
 
     OwnPtr<InspectorResourceAgent> resourceAgentPtr(InspectorResourceAgent::create(m_instrumentingAgents.get(), pageAgent, inspectorClient, m_state.get()));
@@ -135,8 +145,6 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
 #if ENABLE(WORKERS)
     m_agents.append(InspectorWorkerAgent::create(m_instrumentingAgents.get(), m_state.get()));
 #endif
-
-    m_agents.append(InspectorMemoryAgent::create(m_instrumentingAgents.get(), m_state.get(), m_page, m_domAgent));
 
     ASSERT_ARG(inspectorClient, inspectorClient);
     m_injectedScriptManager->injectedScriptHost()->init(m_inspectorAgent
@@ -210,7 +218,7 @@ void InspectorController::connectFrontend()
     InspectorInstrumentation::frontendCreated();
 
     ASSERT(m_inspectorClient);
-    m_inspectorBackendDispatcher = adoptRef(new InspectorBackendDispatcher(m_inspectorClient));
+    m_inspectorBackendDispatcher = InspectorBackendDispatcher::create(m_inspectorClient);
 
     InspectorBackendDispatcher* dispatcher = m_inspectorBackendDispatcher.get();
     for (Agents::iterator it = m_agents.begin(); it != m_agents.end(); ++it)

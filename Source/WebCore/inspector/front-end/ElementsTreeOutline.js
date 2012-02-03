@@ -184,7 +184,7 @@ WebInspector.ElementsTreeOutline.prototype = {
 
     _selectedNodeChanged: function()
     {
-        this._eventSupport.dispatchEventToListeners(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged);
+        this._eventSupport.dispatchEventToListeners(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged, this._selectedDOMNode);
     },
 
     findTreeElement: function(node)
@@ -721,6 +721,8 @@ WebInspector.ElementsTreeElement.prototype = {
         this.updateTitle();
         this._preventFollowingLinksOnDoubleClick();
         this.listItemElement.draggable = true;
+        this.listItemElement.addEventListener("click", this._mouseClick.bind(this));
+        this.listItemElement.addEventListener("mousedown", this._mouseDown.bind(this));
     },
 
     _preventFollowingLinksOnDoubleClick: function()
@@ -943,6 +945,7 @@ WebInspector.ElementsTreeElement.prototype = {
             WebInspector.domAgent.highlightDOMNode(this.representedObject.id);
         this.updateSelection();
         this.treeOutline.suppressRevealAndSelect = false;
+        return true;
     },
 
     ondelete: function()
@@ -992,6 +995,20 @@ WebInspector.ElementsTreeElement.prototype = {
 
         if (this.hasChildren && !this.expanded)
             this.expand();
+    },
+
+    _mouseClick: function(event)
+    {
+        if (this._isSingleClickCandidate)
+            this._startEditingTarget(event.target);
+        this._isSingleClickCandidate = false;
+    },
+
+    _mouseDown: function(event)
+    {
+        if (event.handled || event.which !== 1 || this._editing || this._elementCloseTag || !this.selected)
+            return;
+        this._isSingleClickCandidate = true;
     },
 
     _insertInLastAttributePosition: function(tag, node)
@@ -1271,6 +1288,9 @@ WebInspector.ElementsTreeElement.prototype = {
         this._editing = false;
 
         var treeOutline = this.treeOutline;
+        /**
+         * @param {Protocol.Error=} error
+         */
         function moveToNextAttributeIfNeeded(error)
         {
             if (error)
@@ -1320,7 +1340,10 @@ WebInspector.ElementsTreeElement.prototype = {
             }
         }
 
-        this.representedObject.setAttribute(attributeName, newText, moveToNextAttributeIfNeeded.bind(this));
+        if (oldText !== newText)
+            this.representedObject.setAttribute(attributeName, newText, moveToNextAttributeIfNeeded.bind(this));
+        else
+            moveToNextAttributeIfNeeded.call(this);
     },
 
     _tagNameEditingCommitted: function(element, newText, oldText, tagName, moveDirection)
@@ -1518,10 +1541,6 @@ WebInspector.ElementsTreeElement.prototype = {
         var info = {titleDOM: document.createDocumentFragment(), hasChildren: this.hasChildren};
 
         switch (node.nodeType()) {
-            case Node.DOCUMENT_NODE:
-                info.titleDOM.appendChild(document.createTextNode("Document"));
-                break;
-
             case Node.DOCUMENT_FRAGMENT_NODE:
                 info.titleDOM.appendChild(document.createTextNode("Document Fragment"));
                 break;
@@ -1664,20 +1683,26 @@ WebInspector.ElementsTreeElement.prototype = {
     {
         var treeOutline = this.treeOutline;
         var node = this.representedObject;
+        var parentNode = node.parentNode;
+        var index = node.index;
         var wasExpanded = this.expanded;
 
         function selectNode(error, nodeId)
         {
-            if (error || !nodeId)
+            if (error)
                 return;
 
-            var node = WebInspector.domAgent.nodeForId(nodeId);
             // Select it and expand if necessary. We force tree update so that it processes dom events and is up to date.
             treeOutline._updateModifiedNodes();
-            treeOutline.selectDOMNode(node, true);
+
+            var newNode = parentNode ? parentNode.children[index] || parentNode : null;
+            if (!newNode)
+                return;
+
+            treeOutline.selectDOMNode(newNode, true);
 
             if (wasExpanded) {
-                var newTreeItem = treeOutline.findTreeElement(node);
+                var newTreeItem = treeOutline.findTreeElement(newNode);
                 if (newTreeItem)
                     newTreeItem.expand();
             }

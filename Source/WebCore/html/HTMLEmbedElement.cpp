@@ -117,7 +117,7 @@ void HTMLEmbedElement::parseMappedAttribute(Attribute* attr)
 
 void HTMLEmbedElement::parametersForPlugin(Vector<String>& paramNames, Vector<String>& paramValues)
 {
-    NamedNodeMap* attributes = this->attributes(true);
+    NamedNodeMap* attributes = updatedAttributes();
     if (!attributes)
         return;
 
@@ -154,11 +154,8 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
     Vector<String> paramValues;
     parametersForPlugin(paramNames, paramValues);
 
-    ASSERT(!m_inBeforeLoadEventHandler);
-    m_inBeforeLoadEventHandler = true;
-    bool beforeLoadAllowedLoad = dispatchBeforeLoadEvent(m_url);
-    m_inBeforeLoadEventHandler = false;
-
+    RefPtr<HTMLEmbedElement> protect(this); // Loading the plugin might remove us from the document.
+    bool beforeLoadAllowedLoad = guardedDispatchBeforeLoadEvent(m_url);
     if (!beforeLoadAllowedLoad) {
         if (document()->isPluginDocument()) {
             // Plugins inside plugin documents load differently than other plugins. By the time
@@ -168,8 +165,9 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
         }
         return;
     }
+    if (!renderer()) // Do not load the plugin if beforeload removed this element or its renderer.
+        return;
 
-    RefPtr<HTMLEmbedElement> protect(this); // Loading the plugin might remove us from the document.
     SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
     // FIXME: beforeLoad could have detached the renderer!  Just like in the <object> case above.
     loader->requestObject(this, m_url, getAttribute(nameAttr), m_serviceType, paramNames, paramValues);
@@ -211,33 +209,6 @@ void HTMLEmbedElement::insertedIntoDocument()
     HTMLPlugInImageElement::insertedIntoDocument();
     if (!inDocument())
         return;
-
-    String width = getAttribute(widthAttr);
-    String height = getAttribute(heightAttr);
-    if (!width.isEmpty() || !height.isEmpty()) {
-        Node* n = parentNode();
-        while (n && !n->hasTagName(objectTag))
-            n = n->parentNode();
-        if (n) {
-            if (!width.isEmpty())
-                static_cast<HTMLObjectElement*>(n)->setAttribute(widthAttr, width);
-            if (!height.isEmpty())
-                static_cast<HTMLObjectElement*>(n)->setAttribute(heightAttr, height);
-        }
-    }
-}
-
-void HTMLEmbedElement::attributeChanged(Attribute* attr, bool preserveDecls)
-{
-    HTMLPlugInImageElement::attributeChanged(attr, preserveDecls);
-
-    if ((attr->name() == widthAttr || attr->name() == heightAttr) && !attr->isEmpty()) {
-        ContainerNode* n = parentNode();
-        while (n && !n->hasTagName(objectTag))
-            n = n->parentNode();
-        if (n)
-            static_cast<HTMLObjectElement*>(n)->setAttribute(attr->name(), attr->value());
-    }
 }
 
 bool HTMLEmbedElement::isURLAttribute(Attribute* attr) const
@@ -263,9 +234,9 @@ String HTMLEmbedElement::itemValueText() const
     return getURLAttribute(srcAttr);
 }
 
-void HTMLEmbedElement::setItemValueText(const String& value, ExceptionCode& ec)
+void HTMLEmbedElement::setItemValueText(const String& value, ExceptionCode&)
 {
-    setAttribute(srcAttr, value, ec);
+    setAttribute(srcAttr, value);
 }
 #endif
 

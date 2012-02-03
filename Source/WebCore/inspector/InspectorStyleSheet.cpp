@@ -657,6 +657,14 @@ PassRefPtr<InspectorStyleSheet> InspectorStyleSheet::create(const String& id, Pa
     return adoptRef(new InspectorStyleSheet(id, pageStyleSheet, origin, documentURL));
 }
 
+// static
+String InspectorStyleSheet::styleSheetURL(CSSStyleSheet* pageStyleSheet)
+{
+    if (pageStyleSheet && !pageStyleSheet->finalURL().isEmpty())
+        return pageStyleSheet->finalURL().string();
+    return emptyString();
+}
+
 InspectorStyleSheet::InspectorStyleSheet(const String& id, PassRefPtr<CSSStyleSheet> pageStyleSheet, const String& origin, const String& documentURL)
     : m_id(id)
     , m_pageStyleSheet(pageStyleSheet)
@@ -674,9 +682,8 @@ InspectorStyleSheet::~InspectorStyleSheet()
 
 String InspectorStyleSheet::finalURL() const
 {
-    if (m_pageStyleSheet && !m_pageStyleSheet->finalURL().isEmpty())
-        return m_pageStyleSheet->finalURL().string();
-    return m_documentURL;
+    String url = styleSheetURL(m_pageStyleSheet.get());
+    return url.isEmpty() ? m_documentURL : url;
 }
 
 void InspectorStyleSheet::reparseStyleSheet(const String& text)
@@ -704,7 +711,7 @@ bool InspectorStyleSheet::setRuleSelector(const InspectorCSSId& id, const String
     CSSStyleRule* rule = ruleForId(id);
     if (!rule)
         return false;
-    CSSStyleSheet* styleSheet = InspectorCSSAgent::parentStyleSheet(rule);
+    CSSStyleSheet* styleSheet = rule->parentStyleSheet();
     if (!styleSheet || !ensureParsedDataReady())
         return false;
 
@@ -841,8 +848,7 @@ PassRefPtr<InspectorObject> InspectorStyleSheet::buildObjectForStyle(CSSStyleDec
     if (id.isEmpty()) {
         RefPtr<InspectorObject> bogusStyle = InspectorObject::create();
         bogusStyle->setArray("cssProperties", InspectorArray::create());
-        bogusStyle->setObject("shorthandValues", InspectorObject::create());
-        bogusStyle->setObject("properties", InspectorObject::create());
+        bogusStyle->setObject("shorthandEntries", InspectorObject::create());
         return bogusStyle.release();
     }
     RefPtr<InspectorStyle> inspectorStyle = inspectorStyleForId(id);
@@ -1079,7 +1085,7 @@ void InspectorStyleSheet::revalidateStyle(CSSStyleDeclaration* pageStyle)
     for (unsigned i = 0, size = m_flatRules.size(); i < size; ++i) {
         CSSStyleRule* parsedRule = m_flatRules.at(i);
         if (parsedRule->style() == pageStyle) {
-            if (parsedRule->style()->cssText() != pageStyle->cssText()) {
+            if (parsedRule->declaration()->asText() != pageStyle->cssText()) {
                 // Clear the disabled properties for the invalid style here.
                 m_inspectorStyles.remove(pageStyle);
                 setStyleText(pageStyle, pageStyle->cssText());

@@ -31,13 +31,8 @@
 #include <wtf/RefPtr.h>
 
 #if PLATFORM(MAC)
-#ifdef __OBJC__
-    @class NSScreen;
-    @class NSWindow;
-#else
-    class NSScreen;
-    class NSWindow;
-#endif
+OBJC_CLASS NSScreen;
+OBJC_CLASS NSWindow;
 #endif
 
 typedef uint32_t PlatformDisplayID;
@@ -45,6 +40,7 @@ typedef uint32_t PlatformDisplayID;
 namespace WebCore {
 
     class FloatRect;
+    class FrameView;
     class Widget;
 
     int screenHorizontalDPI(Widget*);
@@ -53,19 +49,14 @@ namespace WebCore {
     int screenDepthPerComponent(Widget*);
     bool screenIsMonochrome(Widget*);
 
-    FloatRect screenRect(Widget*);
-    FloatRect screenAvailableRect(Widget*);
-
-#if PLATFORM(CHROMIUM)
-    // Measured in frames per second. 0 if the refresh rate is unknown, or not applicable.
-    double screenRefreshRate(Widget*);
-#endif
+    FloatRect screenRect(FrameView*);
+    FloatRect screenAvailableRect(FrameView*);
 
 #if PLATFORM(MAC)
     NSScreen *screenForWindow(NSWindow *);
 
-    FloatRect toUserSpace(const NSRect&, NSWindow *destination);
-    NSRect toDeviceSpace(const FloatRect&, NSWindow *source);
+    FloatRect toUserSpace(const NSRect&, NSWindow *destination, float deviceScaleFactor);
+    NSRect toDeviceSpace(const FloatRect&, NSWindow *source, float deviceScaleFactor);
 
     NSPoint flipScreenPoint(const NSPoint&, NSScreen *);
 #endif

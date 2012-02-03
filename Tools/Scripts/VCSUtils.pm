@@ -49,6 +49,7 @@ BEGIN {
         &callSilently
         &canonicalizePath
         &changeLogEmailAddress
+        &changeLogFileName
         &changeLogName
         &chdirReturningRelativePath
         &decodeGitBinaryChunk
@@ -374,7 +375,10 @@ sub svnRevisionForDirectory($)
         my $gitLog = `cd $dir && LC_ALL=C git log --grep='git-svn-id: ' -n 1 | grep git-svn-id:`;
         ($revision) = ($gitLog =~ m/ +git-svn-id: .+@(\d+) /g);
     }
-    die "Unable to determine current SVN revision in $dir" unless (defined $revision);
+    if (!defined($revision)) {
+        $revision = "unknown";
+        warn "Unable to determine current SVN revision in $dir";
+    }
     return $revision;
 }
 
@@ -1754,6 +1758,23 @@ sub gitConfig($)
     }
     chomp $result;
     return $result;
+}
+
+sub changeLogSuffix()
+{
+    my $rootPath = determineVCSRoot();
+    my $changeLogSuffixFile = File::Spec->catfile($rootPath, ".changeLogSuffix");
+    return "" if ! -e $changeLogSuffixFile;
+    open FILE, $changeLogSuffixFile or die "Could not open $changeLogSuffixFile: $!";
+    my $changeLogSuffix = <FILE>;
+    chomp $changeLogSuffix;
+    close FILE;
+    return $changeLogSuffix;
+}
+
+sub changeLogFileName()
+{
+    return "ChangeLog" . changeLogSuffix()
 }
 
 sub changeLogNameError($)

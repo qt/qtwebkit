@@ -38,4 +38,4 @@ _log = logging.getLogger(__name__)
 
 if '__main__' == __name__:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    sys.exit(PerfTestsRunner('inspector').run())
+    sys.exit(PerfTestsRunner(args=['inspector']).run())

@@ -46,13 +46,9 @@
 #include "GraphicsLayer.h"
 #endif
 
-#ifdef __OBJC__
-@class AVPlayer;
-@class QTMovie;
-#else
-class AVPlayer;
-class QTMovie;
-#endif
+OBJC_CLASS AVPlayer;
+OBJC_CLASS QTMovie;
+
 class AVCFPlayer;
 class QTMovieGWorld;
 class QTMovieVisualContext;
@@ -138,6 +134,9 @@ public:
     // This is used internally to trigger swapping from a <video>
     // element to an <embed> in standalone documents
     virtual void mediaPlayerSawUnsupportedTracks(MediaPlayer*) { }
+
+    // The MediaPlayer could not discover an engine which supports the requested resource.
+    virtual void mediaPlayerResourceNotSupported(MediaPlayer*) { }
 
 // Presentation-related methods
     // a new frame of video is available

@@ -55,19 +55,14 @@ class CCLayerImpl;
 class CCLayerTreeHost;
 class CCTextureUpdater;
 class GraphicsContext3D;
-
-class CCLayerDelegate {
-public:
-    virtual ~CCLayerDelegate() { }
-    virtual void paintContents(GraphicsContext&, const IntRect& clip) = 0;
-};
+class Region;
 
 // Base class for composited layers. Special layer types are derived from
 // this class.
 class LayerChromium : public RefCounted<LayerChromium> {
     friend class LayerTilerChromium;
 public:
-    static PassRefPtr<LayerChromium> create(CCLayerDelegate*);
+    static PassRefPtr<LayerChromium> create();
 
     virtual ~LayerChromium();
 
@@ -90,6 +85,9 @@ public:
     void setBackgroundColor(const Color&);
     Color backgroundColor() const { return m_backgroundColor; }
 
+    void setBackgroundCoversViewport(bool);
+    bool backgroundCoversViewport() const { return m_backgroundCoversViewport; }
+
     void setBounds(const IntSize&);
     const IntSize& bounds() const { return m_bounds; }
     virtual IntSize contentBounds() const { return bounds(); }
@@ -110,7 +108,7 @@ public:
     void setOpacity(float);
     float opacity() const { return m_opacity; }
 
-    void setOpaque(bool);
+    virtual void setOpaque(bool);
     bool opaque() const { return m_opaque; }
 
     void setPosition(const FloatPoint&);
@@ -149,8 +147,6 @@ public:
 
     virtual void setLayerTreeHost(CCLayerTreeHost*);
 
-    void setDelegate(CCLayerDelegate* delegate) { m_delegate = delegate; }
-
     void setIsDrawable(bool);
 
     void setReplicaLayer(LayerChromium*);
@@ -158,7 +154,7 @@ public:
 
     // These methods typically need to be overwritten by derived classes.
     virtual bool drawsContent() const { return m_isDrawable; }
-    virtual void paintContentsIfDirty() { }
+    virtual void paintContentsIfDirty(const Region& /* occludedScreenSpace */) { }
     virtual void idlePaintContentsIfDirty() { }
     virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&) { }
     virtual void setIsMask(bool) { }
@@ -187,8 +183,10 @@ public:
     void setClipRect(const IntRect& clipRect) { m_clipRect = clipRect; }
     RenderSurfaceChromium* targetRenderSurface() const { return m_targetRenderSurface; }
     void setTargetRenderSurface(RenderSurfaceChromium* surface) { m_targetRenderSurface = surface; }
+    // This moves from layer space, with origin in the center to target space with origin in the top left
     const TransformationMatrix& drawTransform() const { return m_drawTransform; }
     void setDrawTransform(const TransformationMatrix& matrix) { m_drawTransform = matrix; }
+    // This moves from layer space, with origin the top left to screen space with origin in the top left
     const TransformationMatrix& screenSpaceTransform() const { return m_screenSpaceTransform; }
     void setScreenSpaceTransform(const TransformationMatrix& matrix) { m_screenSpaceTransform = matrix; }
     const IntRect& drawableContentRect() const { return m_drawableContentRect; }
@@ -196,21 +194,32 @@ public:
     float contentsScale() const { return m_contentsScale; }
     void setContentsScale(float);
 
+    TransformationMatrix contentToScreenSpaceTransform() const;
+
+    // Adds any opaque visible pixels to the occluded region.
+    virtual void addSelfToOccludedScreenSpace(Region& occludedScreenSpace);
+
     // Returns true if any of the layer's descendants has content to draw.
     bool descendantDrawsContent();
     virtual void contentChanged() { }
 
     CCLayerTreeHost* layerTreeHost() const { return m_layerTreeHost.get(); }
-    void cleanupResourcesRecursive();
+
+    // Reserve any textures needed for this layer.
+    virtual void reserveTextures() { }
+
+    void setAlwaysReserveTextures(bool alwaysReserveTextures) { m_alwaysReserveTextures = alwaysReserveTextures; }
+    bool alwaysReserveTextures() const { return m_alwaysReserveTextures; }
 
 protected:
-    CCLayerDelegate* m_delegate;
-    explicit LayerChromium(CCLayerDelegate*);
+    LayerChromium();
 
     // This is called to clean up resources being held in the same context as
     // layerRendererContext(). Subclasses should override this method if they
     // hold context-dependent resources such as textures.
     virtual void cleanupResources();
+
+    bool isPaintedAxisAlignedInScreen() const;
 
     void setNeedsCommit();
 
@@ -220,6 +229,7 @@ protected:
     // The update rect is the region of the compositor resource that was actually updated by the compositor.
     // For layers that may do updating outside the compositor's control (i.e. plugin layers), this information
     // is not available and the update rect will remain empty.
+    // Note this rect is in layer space (not content space).
     FloatRect m_updateRect;
 
     RefPtr<LayerChromium> m_maskLayer;
@@ -258,6 +268,7 @@ private:
     FloatPoint m_position;
     FloatPoint m_anchorPoint;
     Color m_backgroundColor;
+    bool m_backgroundCoversViewport;
     Color m_debugBorderColor;
     float m_debugBorderWidth;
     float m_opacity;
@@ -269,6 +280,7 @@ private:
     bool m_usesLayerClipping;
     bool m_isNonCompositedContent;
     bool m_preserves3D;
+    bool m_alwaysReserveTextures;
 
     TransformationMatrix m_transform;
     TransformationMatrix m_sublayerTransform;

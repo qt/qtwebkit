@@ -51,8 +51,8 @@ class WebKitPortTest(unittest.TestCase):
         self.assertEquals(GtkPort.name(), "Gtk")
         self.assertEquals(GtkPort.flag(), "--port=gtk")
         self.assertEquals(GtkPort.run_webkit_tests_command(), WebKitPort.script_shell_command("run-webkit-tests") + ["--gtk"])
-        self.assertEquals(GtkPort.build_webkit_command(), WebKitPort.script_shell_command("build-webkit") + ["--gtk", WebKitPort.makeArgs()])
-        self.assertEquals(GtkPort.build_webkit_command(build_style="debug"), WebKitPort.script_shell_command("build-webkit") + ["--debug", "--gtk", WebKitPort.makeArgs()])
+        self.assertEquals(GtkPort.build_webkit_command(), WebKitPort.script_shell_command("build-webkit") + ["--gtk", "--update-gtk", WebKitPort.makeArgs()])
+        self.assertEquals(GtkPort.build_webkit_command(build_style="debug"), WebKitPort.script_shell_command("build-webkit") + ["--debug", "--gtk", "--update-gtk", WebKitPort.makeArgs()])
 
     def test_qt_port(self):
         self.assertEquals(QtPort.name(), "Qt")
@@ -70,7 +70,7 @@ class WebKitPortTest(unittest.TestCase):
         self.assertEquals(ChromiumPort.update_webkit_command(), WebKitPort.script_shell_command("update-webkit") + ["--chromium"])
 
     def test_chromium_xvfb_port(self):
-        self.assertEquals(ChromiumXVFBPort.run_webkit_tests_command(), ['xvfb-run'] + WebKitPort.script_shell_command('new-run-webkit-tests') + ['--chromium', '--skip-failing-tests', '--results-directory=/tmp/layout-test-results', '--skip-failing-tests', '--print=actual,config,expected,misc,slowest,unexpected,unexpected-results'])
+        self.assertEquals(ChromiumXVFBPort.run_webkit_tests_command(), ['xvfb-run'] + WebKitPort.script_shell_command('new-run-webkit-tests') + ['--chromium', '--skip-failing-tests'])
 
 if __name__ == '__main__':
     unittest.main()

@@ -37,7 +37,6 @@
 namespace JSC {
 
 static const char* linePropertyName = "line";
-static const char* sourceIdPropertyName = "sourceId";
 static const char* sourceURLPropertyName = "sourceURL";
 
 JSObject* createError(JSGlobalObject* globalObject, const UString& message)
@@ -119,15 +118,12 @@ JSObject* createURIError(ExecState* exec, const UString& message)
 
 JSObject* addErrorInfo(JSGlobalData* globalData, JSObject* error, int line, const SourceCode& source)
 {
-    intptr_t sourceID = source.provider()->asID();
     const UString& sourceURL = source.provider()->url();
 
     if (line != -1)
-        error->putWithAttributes(globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
-    if (sourceID != -1)
-        error->putWithAttributes(globalData, Identifier(globalData, sourceIdPropertyName), jsNumber((double)sourceID), ReadOnly | DontDelete);
+        error->putDirect(*globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
     if (!sourceURL.isNull())
-        error->putWithAttributes(globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
+        error->putDirect(*globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
 
     return error;
 }
@@ -140,7 +136,6 @@ JSObject* addErrorInfo(ExecState* exec, JSObject* error, int line, const SourceC
 bool hasErrorInfo(ExecState* exec, JSObject* error)
 {
     return error->hasProperty(exec, Identifier(exec, linePropertyName))
-        || error->hasProperty(exec, Identifier(exec, sourceIdPropertyName))
         || error->hasProperty(exec, Identifier(exec, sourceURLPropertyName));
 }
 

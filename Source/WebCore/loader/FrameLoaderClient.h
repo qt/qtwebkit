@@ -161,6 +161,7 @@ namespace WebCore {
 
         virtual void dispatchDidFirstLayout() = 0;
         virtual void dispatchDidFirstVisuallyNonEmptyLayout() = 0;
+        virtual void dispatchDidNewFirstVisuallyNonEmptyLayout() { }
         virtual void dispatchDidLayout() { }
 
         virtual Frame* dispatchCreatePage(const NavigationAction&) = 0;
@@ -328,7 +329,7 @@ namespace WebCore {
         virtual bool willCheckAndDispatchMessageEvent(SecurityOrigin* /*target*/, MessageEvent*) const { return false; }
 
 #if ENABLE(WEB_INTENTS)
-        virtual void dispatchIntent(PassRefPtr<IntentRequest> intentRequest) { }
+        virtual void dispatchIntent(PassRefPtr<IntentRequest>) = 0;
 #endif
     };
 

@@ -134,6 +134,8 @@ public:
     virtual void syncCompositingState(const FloatRect&);
     virtual void syncCompositingStateForThisLayerOnly();
 
+    virtual void visibleRectChanged() OVERRIDE;
+
     bool allowTiledLayer() const { return m_allowTiledLayer; }
     virtual void setAllowTiledLayer(bool b);
 
@@ -155,6 +157,7 @@ private:
     virtual bool platformCALayerContentsOpaque() const { return contentsOpaque(); }
     virtual bool platformCALayerDrawsContent() const { return drawsContent(); }
     virtual void platformCALayerLayerDidDisplay(PlatformLayer* layer) { return layerDidDisplay(layer); }
+    virtual void platformCALayerDidCreateTiles() OVERRIDE;
 
     void updateOpacityOnLayer();
     
@@ -321,7 +324,7 @@ private:
     static void moveOrCopyLayerAnimation(MoveOrCopy, const String& animationIdentifier, PlatformCALayer *fromLayer, PlatformCALayer *toLayer);
     void moveOrCopyAnimationsForProperty(MoveOrCopy, AnimatedPropertyID, PlatformCALayer * fromLayer, PlatformCALayer * toLayer);
     
-    bool appendToUncommittedAnimations(const KeyframeValueList&, const TransformOperationList&, const Animation*, const String& animationName, const IntSize& boxSize, int animationIndex, double timeOffset, bool isMatrixAnimation);
+    bool appendToUncommittedAnimations(const KeyframeValueList&, const TransformOperations*, const Animation*, const String& animationName, const IntSize& boxSize, int animationIndex, double timeOffset, bool isMatrixAnimation);
     
     enum LayerChange {
         NoChange = 0,

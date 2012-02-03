@@ -36,6 +36,7 @@ VPATH = \
     $(WebCore)/fileapi \
     $(WebCore)/html \
     $(WebCore)/html/canvas \
+    $(WebCore)/html/shadow \
     $(WebCore)/html/track \
     $(WebCore)/inspector \
     $(WebCore)/loader/appcache \
@@ -79,6 +80,7 @@ BINDING_IDLS = \
     $(WebCore)/css/WebKitCSSKeyframeRule.idl \
     $(WebCore)/css/WebKitCSSKeyframesRule.idl \
     $(WebCore)/css/WebKitCSSMatrix.idl \
+    $(WebCore)/css/WebKitCSSRegionRule.idl \
     $(WebCore)/css/WebKitCSSTransformValue.idl \
     $(WebCore)/dom/Attr.idl \
     $(WebCore)/dom/BeforeLoadEvent.idl \
@@ -132,6 +134,7 @@ BINDING_IDLS = \
     $(WebCore)/dom/Range.idl \
     $(WebCore)/dom/RangeException.idl \
     $(WebCore)/dom/RequestAnimationFrameCallback.idl \
+    $(WebCore)/dom/ShadowRoot.idl \
     $(WebCore)/dom/StringCallback.idl \
     $(WebCore)/dom/Text.idl \
     $(WebCore)/dom/TextEvent.idl \
@@ -212,7 +215,6 @@ BINDING_IDLS = \
     $(WebCore)/html/HTMLIFrameElement.idl \
     $(WebCore)/html/HTMLImageElement.idl \
     $(WebCore)/html/HTMLInputElement.idl \
-    $(WebCore)/html/HTMLIsIndexElement.idl \
     $(WebCore)/html/HTMLKeygenElement.idl \
     $(WebCore)/html/HTMLLIElement.idl \
     $(WebCore)/html/HTMLLabelElement.idl \
@@ -281,6 +283,7 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/Uint16Array.idl \
     $(WebCore)/html/canvas/Uint32Array.idl \
     $(WebCore)/html/canvas/Uint8Array.idl \
+    $(WebCore)/html/canvas/Uint8ClampedArray.idl \
     $(WebCore)/html/canvas/WebGLActiveInfo.idl \
     $(WebCore)/html/canvas/WebGLBuffer.idl \
     $(WebCore)/html/canvas/WebGLCompressedTextures.idl \
@@ -295,6 +298,7 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/WebGLTexture.idl \
     $(WebCore)/html/canvas/WebGLUniformLocation.idl \
     $(WebCore)/html/canvas/WebGLVertexArrayObjectOES.idl \
+    $(WebCore)/html/shadow/HTMLContentElement.idl \
     $(WebCore)/html/track/TextTrackList.idl \
     $(WebCore)/html/track/TrackEvent.idl \
     $(WebCore)/inspector/InjectedScriptHost.idl \
@@ -522,6 +526,7 @@ BINDING_IDLS = \
     $(WebCore)/svg/SVGZoomAndPan.idl \
     $(WebCore)/svg/SVGZoomEvent.idl \
     $(WebCore)/testing/Internals.idl \
+    $(WebCore)/testing/InternalSettings.idl \
     $(WebCore)/webaudio/AudioBuffer.idl \
     $(WebCore)/webaudio/AudioBufferCallback.idl \
     $(WebCore)/webaudio/AudioBufferSourceNode.idl \
@@ -612,7 +617,6 @@ all : \
     MathMLElementFactory.cpp \
     MathMLNames.cpp \
     XPathGrammar.cpp \
-    tokenizer.cpp \
 #
 
 # --------
@@ -623,13 +627,13 @@ ifeq ($(OS),MACOS)
 
 FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
 
-ifeq ($(shell gcc -E -P -dM $(FRAMEWORK_FLAGS) WebCore/ForwardingHeaders/wtf/Platform.h | grep ENABLE_DASHBOARD_SUPPORT | cut -d' ' -f3), 1)
+ifeq ($(shell $(CC) -E -P -dM $(FRAMEWORK_FLAGS) WebCore/ForwardingHeaders/wtf/Platform.h | grep ENABLE_DASHBOARD_SUPPORT | cut -d' ' -f3), 1)
     ENABLE_DASHBOARD_SUPPORT = 1
 else
     ENABLE_DASHBOARD_SUPPORT = 0
 endif
 
-ifeq ($(shell gcc -E -P -dM $(FRAMEWORK_FLAGS) WebCore/ForwardingHeaders/wtf/Platform.h | grep ENABLE_ORIENTATION_EVENTS | cut -d' ' -f3), 1)
+ifeq ($(shell $(CC) -E -P -dM $(FRAMEWORK_FLAGS) WebCore/ForwardingHeaders/wtf/Platform.h | grep ENABLE_ORIENTATION_EVENTS | cut -d' ' -f3), 1)
     ENABLE_ORIENTATION_EVENTS = 1
 else
     ENABLE_ORIENTATION_EVENTS = 0
@@ -706,13 +710,6 @@ HTMLEntityTable.cpp : html/parser/HTMLEntityNames.in $(WebCore)/html/parser/crea
 
 ColorData.cpp : platform/ColorData.gperf $(WebCore)/make-hash-tools.pl
 	perl $(WebCore)/make-hash-tools.pl . $(WebCore)/platform/ColorData.gperf
-
-# --------
-
-# CSS tokenizer
-
-tokenizer.cpp : css/tokenizer.flex css/maketokenizer
-	flex -t $< | perl $(WebCore)/css/maketokenizer > $@
 
 # --------
 
@@ -803,6 +800,10 @@ endif
 
 ifeq ($(findstring ENABLE_VIDEO_TRACK,$(FEATURE_DEFINES)), ENABLE_VIDEO_TRACK)
     HTML_FLAGS := $(HTML_FLAGS) ENABLE_VIDEO_TRACK=0
+endif
+
+ifeq ($(findstring ENABLE_SHADOW_DOM,$(FEATURE_DEFINES)), ENABLE_SHADOW_DOM)
+    HTML_FLAGS := $(HTML_FLAGS) ENABLE_SHADOW_DOM=1
 endif
 
 ifdef HTML_FLAGS
@@ -940,7 +941,7 @@ all : InspectorFrontend.h
 INSPECTOR_GENERATOR_SCRIPTS = inspector/CodeGeneratorInspector.py
 
 InspectorFrontend.h : Inspector.json $(INSPECTOR_GENERATOR_SCRIPTS)
-	python $(WebCore)/inspector/CodeGeneratorInspector.py $(WebCore)/inspector/Inspector.json --output_h_dir . --output_cpp_dir . --defines "$(FEATURE_DEFINES) LANGUAGE_JAVASCRIPT"
+	python $(WebCore)/inspector/CodeGeneratorInspector.py $(WebCore)/inspector/Inspector.json --output_h_dir . --output_cpp_dir .
 
 all : InjectedScriptSource.h
 

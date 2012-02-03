@@ -1447,8 +1447,68 @@
 			</File>
 		</Filter>
 		<Filter
+			Name="tools"
+			>
+			<File
+				RelativePath="..\..\tools\CodeProfile.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\tools\CodeProfile.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\tools\CodeProfiling.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\tools\CodeProfiling.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\tools\ProfileTreeNode.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\tools\TieredMMapArray.h"
+				>
+			</File>
+		</Filter>
+		<Filter
 			Name="bytecode"
 			>
+			<File
+				RelativePath="..\..\bytecode\GetByIdStatus.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\PutByIdStatus.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\CallLinkStatus.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\MethodCallLinkStatus.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\GetByIdStatus.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\PutByIdStatus.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\CallLinkStatus.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\MethodCallLinkStatus.cpp"
+				>
+			</File>
 			<File
 				RelativePath="..\..\bytecode\HandlerInfo.h"
 				>
@@ -1786,6 +1846,14 @@
 			Name="interpreter"
 			>
 			<File
+				RelativePath="..\..\interpreter\AbstractPC.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\interpreter\AbstractPC.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\interpreter\CachedCall.h"
 				>
 			</File>
@@ -1966,11 +2034,19 @@
 			Name="heap"
 			>
                             <File
-                                    RelativePath="..\..\heap\AllocationSpace.cpp"
+                                    RelativePath="..\..\heap\BumpBlock.h"
                                     >
                             </File>
                             <File
-                                    RelativePath="..\..\heap\AllocationSpace.h"
+                                    RelativePath="..\..\heap\BumpSpace.cpp"
+                                    >
+                            </File>
+                            <File
+                                    RelativePath="..\..\heap\BumpSpace.h"
+                                    >
+                            </File>
+                            <File
+                                    RelativePath="..\..\heap\BumpSpaceInlineMethods.h"
                                     >
                             </File>
                             <File
@@ -2023,6 +2099,10 @@
                             </File>
                             <File
                                     RelativePath="..\..\heap\Heap.h"
+                                    >
+                            </File>
+                            <File
+                                    RelativePath="..\..\heap\HeapBlock.h"
                                     >
                             </File>
                             <File

@@ -181,7 +181,7 @@ namespace JSC {
         StatementNode(int);
 
     public:
-        void setLoc(int firstLine, int lastLine);
+        JS_EXPORT_PRIVATE void setLoc(int firstLine, int lastLine);
         int firstLine() const { return lineNo(); }
         int lastLine() const { return m_lastLine; }
 
@@ -1348,7 +1348,7 @@ namespace JSC {
 
     class TryNode : public StatementNode {
     public:
-        TryNode(int, StatementNode* tryBlock, const Identifier& exceptionIdent, bool catchHasEval, StatementNode* catchBlock, StatementNode* finallyBlock);
+        TryNode(int, StatementNode* tryBlock, const Identifier& exceptionIdent, StatementNode* catchBlock, StatementNode* finallyBlock);
 
     private:
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
@@ -1357,7 +1357,6 @@ namespace JSC {
         const Identifier& m_exceptionIdent;
         StatementNode* m_catchBlock;
         StatementNode* m_finallyBlock;
-        bool m_catchHasEval;
     };
 
     class ParameterNode : public ParserArenaFreeable {
@@ -1494,6 +1493,8 @@ namespace JSC {
         void finishParsing(PassRefPtr<FunctionParameters>, const Identifier&);
         
         const Identifier& ident() { return m_ident; }
+        void setInferredName(const Identifier& inferredName) { m_inferredName = inferredName; }
+        const Identifier& inferredName() { return m_inferredName.isEmpty() ? m_ident : m_inferredName; }
 
         static const bool scopeIsFunction = true;
 
@@ -1502,6 +1503,7 @@ namespace JSC {
         FunctionBodyNode(JSGlobalData*, int, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         Identifier m_ident;
+        Identifier m_inferredName;
         RefPtr<FunctionParameters> m_parameters;
     };
 

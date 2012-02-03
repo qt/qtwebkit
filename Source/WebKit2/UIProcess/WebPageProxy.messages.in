@@ -74,7 +74,8 @@ messages -> WebPageProxy {
 #if PLATFORM(QT)
     DidChangeContentsSize(WebCore::IntSize newSize)
     DidFindZoomableArea(WebCore::IntPoint target, WebCore::IntRect area)
-    FocusEditableArea(WebCore::IntRect caret, WebCore::IntRect area)
+    AuthenticationRequiredRequest(WTF::String hostname, WTF::String realm, WTF::String prefilledUsername) -> (WTF::String username, WTF::String password)
+    CertificateVerificationRequest(WTF::String hostname) -> (bool ignoreErrors)
 #endif
 #if ENABLE(TOUCH_EVENTS)
     NeedTouchEvents(bool needTouchEvents)
@@ -105,6 +106,7 @@ messages -> WebPageProxy {
     DidFinishLoadForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
     DidFirstLayoutForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
     DidFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
+    DidNewFirstVisuallyNonEmptyLayout(WebKit::InjectedBundleUserMessageEncoder userData)
     DidReceiveServerRedirectForProvisionalLoadForFrame(uint64_t frameID, WTF::String url, WebKit::InjectedBundleUserMessageEncoder userData)
     DidRemoveFrameFromHierarchy(uint64_t frameID, WebKit::InjectedBundleUserMessageEncoder userData)
     DidStartProvisionalLoadForFrame(uint64_t frameID, WTF::String url, WTF::String unreachableURL, WebKit::InjectedBundleUserMessageEncoder userData)
@@ -147,6 +149,9 @@ messages -> WebPageProxy {
 #if PLATFORM(GTK)
     # Support for GTK+ platform keybindings
     GetEditorCommandsForKeyEvent(AtomicString eventType) -> (Vector<WTF::String> commandsList)
+
+    # Support for connecting the Accessibility worlds of the UI and the Web processes
+    BindAccessibilityTree(WTF::String plugID)
 #endif
 
     # BackForward messages

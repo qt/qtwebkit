@@ -116,7 +116,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
 {
     // Link the code, populate data in CodeBlock data structures.
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "JIT code for %p start at [%p, %p). Size = %lu.\n", m_codeBlock, linkBuffer.debugAddress(), static_cast<char*>(linkBuffer.debugAddress()) + linkBuffer.debugSize(), linkBuffer.debugSize());
+    fprintf(stderr, "JIT code for %p start at [%p, %p). Size = %zu.\n", m_codeBlock, linkBuffer.debugAddress(), static_cast<char*>(linkBuffer.debugAddress()) + linkBuffer.debugSize(), linkBuffer.debugSize());
 #endif
 
     // Link all calls out from the JIT code to their respective functions.
@@ -151,6 +151,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
                 unsigned returnAddressOffset = linkBuffer.returnAddressOffset(m_exceptionChecks[i].m_call);
                 codeOrigins[j].codeOrigin = record.m_codeOrigin;
                 codeOrigins[j].callReturnOffset = returnAddressOffset;
+                record.m_token.assertCodeOriginIndex(j);
                 j++;
             }
         }
@@ -160,6 +161,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
     for (unsigned i = 0; i < m_propertyAccesses.size(); ++i) {
         StructureStubInfo& info = m_codeBlock->structureStubInfo(i);
         CodeLocationCall callReturnLocation = linkBuffer.locationOf(m_propertyAccesses[i].m_functionCall);
+        info.codeOrigin = m_propertyAccesses[i].m_codeOrigin;
         info.callReturnLocation = callReturnLocation;
         info.deltaCheckImmToCall = differenceBetweenCodePtr(linkBuffer.locationOf(m_propertyAccesses[i].m_deltaCheckImmToCall), callReturnLocation);
         info.deltaCallToStructCheck = differenceBetweenCodePtr(callReturnLocation, linkBuffer.locationOf(m_propertyAccesses[i].m_deltaCallToStructCheck));
@@ -179,6 +181,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
         info.valueGPR = m_propertyAccesses[i].m_valueGPR;
 #endif
         info.scratchGPR = m_propertyAccesses[i].m_scratchGPR;
+        info.registersFlushed = m_propertyAccesses[i].m_registerMode == PropertyAccessRecord::RegistersFlushed;
     }
     
     m_codeBlock->setNumberOfCallLinkInfos(m_jsCalls.size());
@@ -209,7 +212,7 @@ void JITCompiler::compile(JITCode& entry)
     SpeculativeJIT speculative(*this);
     compileBody(speculative);
 
-    LinkBuffer linkBuffer(*m_globalData, this);
+    LinkBuffer linkBuffer(*m_globalData, this, m_codeBlock);
     link(linkBuffer);
     speculative.linkOSREntries(linkBuffer);
 
@@ -269,7 +272,7 @@ void JITCompiler::compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWi
 
 
     // === Link ===
-    LinkBuffer linkBuffer(*m_globalData, this);
+    LinkBuffer linkBuffer(*m_globalData, this, m_codeBlock);
     link(linkBuffer);
     speculative.linkOSREntries(linkBuffer);
     

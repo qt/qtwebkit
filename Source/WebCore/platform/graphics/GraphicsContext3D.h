@@ -50,13 +50,8 @@
 #if PLATFORM(MAC)
 #include <OpenGL/OpenGL.h>
 #include <wtf/RetainPtr.h>
-#ifdef __OBJC__
-@class CALayer;
-@class WebGLLayer;
-#else
-class CALayer;
-class WebGLLayer;
-#endif
+OBJC_CLASS CALayer;
+OBJC_CLASS WebGLLayer;
 #elif PLATFORM(QT)
 QT_BEGIN_NAMESPACE
 class QPainter;
@@ -459,7 +454,14 @@ public:
         virtual ~ContextLostCallback() {}
     };
 
+    class ErrorMessageCallback {
+    public:
+        virtual void onErrorMessage(const String& message, GC3Dint id) = 0;
+        virtual ~ErrorMessageCallback() { }
+    };
+
     void setContextLostCallback(PassOwnPtr<ContextLostCallback>);
+    void setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>);
 
     static PassRefPtr<GraphicsContext3D> create(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
     ~GraphicsContext3D();

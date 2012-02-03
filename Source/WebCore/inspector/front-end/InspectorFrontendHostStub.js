@@ -77,10 +77,6 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     {
     },
 
-    search: function(sourceRow, query)
-    {
-    },
-
     setAttachedWindowHeight: function(height)
     {
     },
@@ -114,6 +110,11 @@ WebInspector.InspectorFrontendHostStub.prototype = {
 
     copyText: function()
     {
+    },
+
+    openInNewTab: function(url)
+    {
+        window.open(url, "_blank");
     },
 
     canSaveAs: function(fileName, content)

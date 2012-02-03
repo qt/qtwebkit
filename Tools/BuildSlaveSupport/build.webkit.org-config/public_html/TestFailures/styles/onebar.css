@@ -41,9 +41,9 @@
 }
 
 #summary {
-    min-height: 360px;
+    min-height: 550px;
 }
 
 #onebar.partytime #summary {
-    background: url(../images/partytime.gif) top center no-repeat;
+    background: url(../images/partytime.gif) center center no-repeat;
 }

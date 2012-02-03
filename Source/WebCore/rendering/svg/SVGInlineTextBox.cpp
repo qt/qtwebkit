@@ -25,6 +25,8 @@
 #if ENABLE(SVG)
 #include "FloatConversion.h"
 #include "FontCache.h"
+#include "Frame.h"
+#include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "InlineFlowBox.h"
@@ -195,24 +197,10 @@ void SVGInlineTextBox::paintSelectionBackground(PaintInfo& paintInfo)
     RenderStyle* style = parentRenderer->style();
     ASSERT(style);
 
-    const SVGRenderStyle* svgStyle = style->svgStyle();
-    ASSERT(svgStyle);
-
-    bool hasFill = svgStyle->hasFill();
-    bool hasStroke = svgStyle->hasStroke();
-
     RenderStyle* selectionStyle = style;
     if (hasSelection) {
         selectionStyle = parentRenderer->getCachedPseudoStyle(SELECTION);
-        if (selectionStyle) {
-            const SVGRenderStyle* svgSelectionStyle = selectionStyle->svgStyle();
-            ASSERT(svgSelectionStyle);
-
-            if (!hasFill)
-                hasFill = svgSelectionStyle->hasFill();
-            if (!hasStroke)
-                hasStroke = svgSelectionStyle->hasStroke();
-        } else
+        if (!selectionStyle)
             selectionStyle = style;
     }
 
@@ -293,6 +281,11 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
                 hasStroke = svgSelectionStyle->hasStroke();
         } else
             selectionStyle = style;
+    }
+
+    if (textRenderer->frame() && textRenderer->frame()->view() && textRenderer->frame()->view()->paintBehavior() & PaintBehaviorRenderingSVGMask) {
+        hasFill = true;
+        hasStroke = false;
     }
 
     AffineTransform fragmentTransform;

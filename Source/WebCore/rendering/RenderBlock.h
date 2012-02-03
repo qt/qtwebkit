@@ -23,6 +23,7 @@
 #ifndef RenderBlock_h
 #define RenderBlock_h
 
+#include "ColumnInfo.h"
 #include "GapRects.h"
 #include "PODIntervalTree.h"
 #include "RenderBox.h"
@@ -35,7 +36,6 @@
 namespace WebCore {
 
 class BidiContext;
-class ColumnInfo;
 class InlineIterator;
 class LayoutStateMaintainer;
 class LazyLineBreakIterator;
@@ -118,7 +118,7 @@ public:
     bool generatesLineBoxesForInlineChild(RenderObject*);
 
     void markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove = 0, bool inLayout = true);
-    void markSiblingsWithFloatsForLayout();
+    void markSiblingsWithFloatsForLayout(RenderBox* floatToRemove = 0);
     void markPositionedObjectsForLayout();
     virtual void markForPaginationRelayoutIfNeeded();
     
@@ -238,6 +238,17 @@ public:
     // direction (so an x-offset in vertical text and a y-offset for horizontal text).
     int pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : 0; }
     void setPageLogicalOffset(int);
+
+    RootInlineBox* lineGridBox() const { return m_rareData ? m_rareData->m_lineGridBox : 0; }
+    void setLineGridBox(RootInlineBox* box)
+    {
+        if (!m_rareData)
+            m_rareData = adoptPtr(new RenderBlockRareData(this));
+        if (m_rareData->m_lineGridBox)
+            m_rareData->m_lineGridBox->destroy(renderArena());
+        m_rareData->m_lineGridBox = box;
+    }
+    void layoutLineGridBox();
 
     // Accessors for logical width/height and margins in the containing block's block-flow direction.
     enum ApplyLayoutDeltaMode { ApplyLayoutDelta, DoNotApplyLayoutDelta };
@@ -450,6 +461,8 @@ private:
     void makeChildrenNonInline(RenderObject* insertionPoint = 0);
     virtual void removeLeftoverAnonymousBlock(RenderBlock* child);
 
+    static void collapseAnonymousBoxChild(RenderBlock* parent, RenderObject* child);
+
     virtual void dirtyLinesFromChangedChild(RenderObject* child) { m_lineBoxes.dirtyLinesFromChangedChild(this, child); }
 
     void addChildToContinuation(RenderObject* newChild, RenderObject* beforeChild);
@@ -471,7 +484,7 @@ private:
     virtual void borderFitAdjust(LayoutRect&) const; // Shrink the box in which the border paints if border-fit is set.
 
     virtual void updateBeforeAfterContent(PseudoId);
-
+    
     virtual RootInlineBox* createRootInlineBox(); // Subclassed by SVG and Ruby.
 
     // Called to lay out the legend for a fieldset or the ruby text of a ruby run.
@@ -892,11 +905,17 @@ protected:
     LayoutUnit nextPageLogicalTop(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary) const;
     bool hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule = ExcludePageBoundary) const;
 
+    virtual ColumnInfo::PaginationUnit paginationUnit() const;
+
     LayoutUnit applyBeforeBreak(RenderBox* child, LayoutUnit logicalOffset); // If the child has a before break, then return a new yPos that shifts to the top of the next page/column.
     LayoutUnit applyAfterBreak(RenderBox* child, LayoutUnit logicalOffset, MarginInfo&); // If the child has an after break, then return a new offset that shifts to the top of the next page/column.
 
+public:
+    LayoutUnit pageLogicalTopForOffset(LayoutUnit offset) const;
     LayoutUnit pageLogicalHeightForOffset(LayoutUnit offset) const;
     LayoutUnit pageRemainingLogicalHeightForOffset(LayoutUnit offset, PageBoundaryRule = IncludePageBoundary) const;
+    
+protected:
     bool pushToNextPageWithMinimumLogicalHeight(LayoutUnit& adjustment, LayoutUnit logicalOffset, LayoutUnit minimumLogicalHeight) const;
 
     LayoutUnit adjustForUnsplittableChild(RenderBox* child, LayoutUnit logicalOffset, bool includeMargins = false); // If the child is unsplittable and can't fit on the current page, return the top of the next page/column.
@@ -1017,6 +1036,7 @@ protected:
             : m_margins(positiveMarginBeforeDefault(block), negativeMarginBeforeDefault(block), positiveMarginAfterDefault(block), negativeMarginAfterDefault(block))
             , m_paginationStrut(0)
             , m_pageLogicalOffset(0)
+            , m_lineGridBox(0)
         { 
         }
 
@@ -1039,8 +1059,10 @@ protected:
         }
         
         MarginValues m_margins;
-        int m_paginationStrut;
-        int m_pageLogicalOffset;
+        LayoutUnit m_paginationStrut;
+        LayoutUnit m_pageLogicalOffset;
+        
+        RootInlineBox* m_lineGridBox;
      };
 
     OwnPtr<RenderBlockRareData> m_rareData;

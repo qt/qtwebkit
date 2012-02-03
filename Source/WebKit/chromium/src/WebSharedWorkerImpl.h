@@ -36,6 +36,7 @@
 #if ENABLE(SHARED_WORKERS)
 #include "ScriptExecutionContext.h"
 #include "WebCommonWorkerClient.h"
+#include "WebContentSecurityPolicy.h"
 #include "WebFrameClient.h"
 #include "WebSharedWorkerClient.h"
 #include "WebWorkerBase.h"
@@ -95,7 +96,9 @@ public:
 
     // WebSharedWorker methods:
     virtual bool isStarted();
-    virtual void startWorkerContext(const WebURL&, const WebString& name, const WebString& userAgent, const WebString& sourceCode, long long);
+
+    virtual void startWorkerContext(const WebURL&, const WebString& name, const WebString& userAgent, const WebString& sourceCode, const WebString& contentSecurityPolicy, WebContentSecurityPolicyType, long long cacheId);
+
     virtual void connect(WebMessagePortChannel*, ConnectListener*);
     virtual void terminateWorkerContext();
     virtual void clientDestroyed();

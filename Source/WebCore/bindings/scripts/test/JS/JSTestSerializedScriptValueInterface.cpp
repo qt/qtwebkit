@@ -87,7 +87,7 @@ EncodedJSValue JSC_HOST_CALL JSTestSerializedScriptValueInterfaceConstructor::co
     JSTestSerializedScriptValueInterfaceConstructor* jsConstructor = static_cast<JSTestSerializedScriptValueInterfaceConstructor*>(exec->callee());
     if (exec->argumentCount() < 2)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    const String& hello(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toString(exec)));
+    const String& hello(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toString(exec)->value(exec)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     RefPtr<SerializedScriptValue> value(SerializedScriptValue::create(exec, MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined)));
@@ -162,7 +162,7 @@ JSValue jsTestSerializedScriptValueInterfaceValue(ExecState* exec, JSValue slotB
     JSTestSerializedScriptValueInterface* castedThis = static_cast<JSTestSerializedScriptValueInterface*>(asObject(slotBase));
     UNUSED_PARAM(exec);
     TestSerializedScriptValueInterface* impl = static_cast<TestSerializedScriptValueInterface*>(castedThis->impl());
-    JSValue result = impl->value() ? impl->value()->deserialize(exec, castedThis->globalObject()) : jsNull();
+    JSValue result = impl->value() ? impl->value()->deserialize(exec, castedThis->globalObject(), 0) : jsNull();
     return result;
 }
 

@@ -69,7 +69,7 @@ bool TextFieldInputType::isTextField() const
 
 bool TextFieldInputType::valueMissing(const String& value) const
 {
-    return value.isEmpty();
+    return element()->required() && value.isEmpty();
 }
 
 bool TextFieldInputType::canSetSuggestedValue()
@@ -159,6 +159,13 @@ void TextFieldInputType::forwardEvent(Event* event)
 
         element()->forwardEvent(event);
     }
+}
+
+void TextFieldInputType::handleBlurEvent()
+{
+    InputType::handleBlurEvent();
+    if (Frame* frame = element()->document()->frame())
+        frame->editor()->textFieldDidEndEditing(element());
 }
 
 bool TextFieldInputType::shouldSubmitImplicitly(Event* event)

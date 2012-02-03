@@ -232,3 +232,158 @@ void func31()
 
 }
 }
+
+class Class104 {
+    int a;
+    int b;
+    int c;
+    int d;
+};
+
+class Class105 {
+public:
+    int a;
+    int b;
+private:
+    int c;
+    int d;
+};
+
+class Class106 {
+    int a;
+    int b;
+    void func32()
+    {
+        int c;
+        int d;
+    }
+    int e;
+    int f;
+    void func33()
+    {
+        int g;
+        int h;
+    }
+    int i;
+    int j;
+};
+
+namespace NameSpace3 {
+int a;
+int b;
+namespace NameSpace4 {
+int c;
+int d;
+};
+int e;
+int f;
+};
+
+namespace NameSpace5 {
+int a;
+int b;
+namespace NameSpace6 {
+int c;
+int d;
+class Class107 {
+    int e;
+    int f;
+    void func34()
+    {
+        int g;
+        int h;
+    }
+    int i;
+    int j;
+};
+int k;
+int ll;
+};
+int m;
+int n;
+};
+
+class Class108 {
+    int a;
+    void func35()
+    {
+        int b;
+        if (1) {
+            int c;
+            for (;;) {
+                int d;
+                int e;
+            }
+            int f;
+        }
+        int g;
+    }
+    int h;
+};
+
+int a[] = { };
+int a[] = {
+};
+int a[] = { 1, 2, 3 };
+int a[] = {
+    1,
+    2,
+    3
+};
+int a[3] = { 1, 2, 3 };
+int a[][3] = { {1, 2, 3}, {4, 5, 6} };
+int a[2][3] = { {1, 2, 3}, {4, 5, 6} };
+extern int a[];
+char a[4] = "test";
+
+namespace NameSpace7 {
+int a[] = { };
+int a[] = {
+};
+int a[] = { 1, 2, 3 };
+int a[] = {
+    1,
+    2,
+    3
+};
+int a[3] = { 1, 2, 3 };
+int a[][3] = { {1, 2, 3}, {4, 5, 6} };
+int a[2][3] = { {1, 2, 3}, {4, 5, 6} };
+extern int a[];
+char a[4] = "test";
+
+namespace NameSpace8 {
+int a[] = { };
+int a[] = {
+};
+int a[] = { 1, 2, 3 };
+int a[] = {
+    1,
+    2,
+    3
+};
+int a[3] = { 1, 2, 3 };
+int a[][3] = { {1, 2, 3}, {4, 5, 6} };
+int a[2][3] = { {1, 2, 3}, {4, 5, 6} };
+extern int a[];
+char a[4] = "test";
+};
+
+class Class109 {
+    int a[] = { };
+    int a[] = {
+    };
+    int a[] = { 1, 2, 3 };
+    int a[] = {
+        1,
+        2,
+        3
+    };
+    int a[3] = { 1, 2, 3 };
+    int a[][3] = { {1, 2, 3}, {4, 5, 6} };
+    int a[2][3] = { {1, 2, 3}, {4, 5, 6} };
+    extern int a[];
+    char a[4] = "test";
+};
+
+};

@@ -46,7 +46,7 @@ from webkitpy.layout_tests.servers import http_server_base
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.tool.mocktool import MockOptions
 from webkitpy.common.system.executive_mock import MockExecutive
-from webkitpy.common.host_mock import MockHost
+from webkitpy.common.system.systemhost_mock import MockSystemHost
 
 
 class PortTestCase(unittest.TestCase):
@@ -55,12 +55,16 @@ class PortTestCase(unittest.TestCase):
     WEBSOCKET_PORTS = (8880,)
 
     # Subclasses override this to point to their Port subclass.
+    os_name = None
+    os_version = None
     port_maker = None
 
-    def make_port(self, host=None, options=None, **kwargs):
-        host = host or MockHost()
+    def make_port(self, host=None, port_name=None, options=None, os_name=None, os_version=None, **kwargs):
+        host = host or MockSystemHost(os_name=(os_name or self.os_name), os_version=(os_version or self.os_version))
         options = options or MockOptions(configuration='Release')
-        return self.port_maker(host, options=options, **kwargs)
+        port_name = port_name or self.port_name
+        port_name = self.port_maker.determine_full_port_name(host, options, port_name)
+        return self.port_maker(host, port_name, options=options, **kwargs)
 
     def test_default_worker_model(self):
         port = self.make_port()

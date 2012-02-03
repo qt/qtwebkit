@@ -124,8 +124,18 @@ var WebInspector = {
 
     _escPressed: function()
     {
-        // If drawer was open with some view other than console then just close it.
-        if (!this._consoleWasShown && WebInspector.drawer.visible)
+        
+        // If drawer is open with some view other than console then close it.
+        if (!this._toggleConsoleButton.toggled && WebInspector.drawer.visible)
+            this.closeDrawerView();
+        else
+            this._toggleConsoleButtonClicked();
+    },
+
+    closeDrawerView: function()
+    {
+        // Once drawer is closed console should be shown if it was shown before current view replaced it in drawer. 
+        if (!this._consoleWasShown)
             this.drawer.hide(WebInspector.Drawer.AnimationType.Immediately);
         else
             this._toggleConsoleButtonClicked();            
@@ -187,6 +197,11 @@ var WebInspector = {
             this._dockToggleButton.toggled = !x;
         }
 
+        if (x)
+            document.body.removeStyleClass("detached");
+        else
+            document.body.addStyleClass("detached");
+
         this._setCompactMode(x && !WebInspector.settings.dockToRight.get());
     },
 
@@ -198,13 +213,10 @@ var WebInspector = {
     _setCompactMode: function(x)
     {
         var body = document.body;
-        if (x) {
-            body.removeStyleClass("detached");
+        if (x)
             body.addStyleClass("compact");
-        } else {
+        else
             body.removeStyleClass("compact");
-            body.addStyleClass("detached");
-        }
 
         // This may be called before doLoadedDone, hence the bulk of inspector objects may
         // not be created yet.
@@ -586,7 +598,7 @@ WebInspector.openResource = function(resourceURL, inResourcesPanel)
         WebInspector.panels.resources.showResource(resource);
         WebInspector.showPanel("resources");
     } else
-        PageAgent.open(resourceURL, true);
+        InspectorFrontendHost.openInNewTab(resourceURL);
 }
 
 WebInspector.openRequestInNetworkPanel = function(resource)
@@ -624,12 +636,10 @@ WebInspector._registerShortcuts = function()
 
 WebInspector.documentKeyDown = function(event)
 {
-    var isInputElement = event.target.nodeName === "INPUT";
-    var isInEditMode = event.target.enclosingNodeOrSelfWithClass("text-prompt") || WebInspector.isEditingAnyField();
     const helpKey = WebInspector.isMac() ? "U+003F" : "U+00BF"; // "?" for both platforms
 
     if (event.keyIdentifier === "F1" ||
-        (event.keyIdentifier === helpKey && event.shiftKey && (!isInEditMode && !isInputElement || event.metaKey))) {
+        (event.keyIdentifier === helpKey && event.shiftKey && (!WebInspector.isInEditMode(event) || event.metaKey))) {
         WebInspector.shortcutsScreen.show();
         event.stopPropagation();
         event.preventDefault();
@@ -659,23 +669,24 @@ WebInspector.documentKeyDown = function(event)
         return;
     }
 
-    if (WebInspector.isEditingAnyField())
-        return;
-
     var isMac = WebInspector.isMac();
     switch (event.keyIdentifier) {
         case "U+001B": // Escape key
-            event.preventDefault();
-            this._escPressed();
+            if (event.target.hasStyleClass("text-prompt") || !WebInspector.isInEditMode(event)) {
+                event.preventDefault();
+                this._escPressed();
+            }
             break;
         case "U+0052": // R key
+            if (WebInspector.isInEditMode(event))
+                return;
             if ((event.metaKey && isMac) || (event.ctrlKey && !isMac)) {
                 PageAgent.reload(event.shiftKey);
                 event.preventDefault();
             }
             break;
         case "F5":
-            if (!isMac) {
+            if (!isMac && !WebInspector.isInEditMode(event)) {
                 PageAgent.reload(event.ctrlKey || event.shiftKey);
                 event.preventDefault();
             }

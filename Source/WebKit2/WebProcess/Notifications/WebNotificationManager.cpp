@@ -34,8 +34,10 @@
 #include "WebNotificationManagerProxyMessages.h"
 #include "WebPageProxyMessages.h"
 #include <WebCore/Notification.h>
+#include <WebCore/Page.h>
 #include <WebCore/ScriptExecutionContext.h>
 #include <WebCore/SecurityOrigin.h>
+#include <WebCore/Settings.h>
 #endif
 
 using namespace WebCore;
@@ -64,17 +66,54 @@ void WebNotificationManager::didReceiveMessage(CoreIPC::Connection* connection, 
     didReceiveWebNotificationManagerMessage(connection, messageID, arguments);
 }
 
+void WebNotificationManager::initialize(const HashMap<String, bool>& permissions)
+{
+#if ENABLE(NOTIFICATIONS)
+    m_permissionsMap = permissions;
+#endif
+}
+
+void WebNotificationManager::didUpdateNotificationDecision(const String& originString, bool allowed)
+{
+#if ENABLE(NOTIFICATIONS)
+    m_permissionsMap.set(originString, allowed);
+#endif
+}
+
+void WebNotificationManager::didRemoveNotificationDecisions(const Vector<String>& originStrings)
+{
+#if ENABLE(NOTIFICATIONS)
+    size_t count = originStrings.size();
+    for (size_t i = 0; i < count; ++i)
+        m_permissionsMap.remove(originStrings[i]);
+#endif
+}
+
+NotificationPresenter::Permission WebNotificationManager::policyForOrigin(WebCore::SecurityOrigin *origin) const
+{
+#if ENABLE(NOTIFICATIONS)
+    if (!origin)
+        return NotificationPresenter::PermissionNotAllowed;
+    
+    HashMap<String, bool>::const_iterator it = m_permissionsMap.find(origin->toString());
+    if (it != m_permissionsMap.end())
+        return it->second ? NotificationPresenter::PermissionAllowed : NotificationPresenter::PermissionDenied;
+#endif
+    
+    return NotificationPresenter::PermissionNotAllowed;
+}
+
 bool WebNotificationManager::show(Notification* notification, WebPage* page)
 {
 #if ENABLE(NOTIFICATIONS)
-    if (!notification)
+    if (!notification || !page->corePage()->settings()->notificationsEnabled())
         return true;
     
     uint64_t notificationID = generateNotificationID();
     m_notificationMap.set(notification, notificationID);
     m_notificationIDMap.set(notificationID, notification);
     
-    m_process->connection()->send(Messages::WebPageProxy::ShowNotification(notification->contents().title, notification->contents().body, notification->scriptExecutionContext()->securityOrigin()->databaseIdentifier(), notificationID), page->pageID());
+    m_process->connection()->send(Messages::WebPageProxy::ShowNotification(notification->contents().title, notification->contents().body, notification->scriptExecutionContext()->securityOrigin()->toString(), notificationID), page->pageID());
 #endif
     return true;
 }
@@ -82,7 +121,7 @@ bool WebNotificationManager::show(Notification* notification, WebPage* page)
 void WebNotificationManager::cancel(Notification* notification, WebPage* page)
 {
 #if ENABLE(NOTIFICATIONS)
-    if (!notification)
+    if (!notification || !page->corePage()->settings()->notificationsEnabled())
         return;
     
     uint64_t notificationID = m_notificationMap.get(notification);

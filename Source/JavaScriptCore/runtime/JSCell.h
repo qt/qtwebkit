@@ -51,6 +51,7 @@ namespace JSC {
         TypedArrayInt16,
         TypedArrayInt32,
         TypedArrayUint8,
+        TypedArrayUint8Clamped,
         TypedArrayUint16,
         TypedArrayUint32,
         TypedArrayFloat32,
@@ -67,7 +68,7 @@ namespace JSC {
 
     protected:
         JSCell(JSGlobalData&, Structure*);
-        static void destroy(JSCell*);
+        JS_EXPORT_PRIVATE static void destroy(JSCell*);
 
     public:
         // Querying the type.
@@ -82,21 +83,20 @@ namespace JSC {
         void clearStructure() { m_structure.clear(); }
 
         // Extracting the value.
-        bool getString(ExecState* exec, UString&) const;
-        UString getString(ExecState* exec) const; // null string if not a string
-        JSObject* getObject(); // NULL if not an object
+        JS_EXPORT_PRIVATE bool getString(ExecState* exec, UString&) const;
+        JS_EXPORT_PRIVATE UString getString(ExecState* exec) const; // null string if not a string
+        JS_EXPORT_PRIVATE JSObject* getObject(); // NULL if not an object
         const JSObject* getObject() const; // NULL if not an object
         
-        static CallType getCallData(JSCell*, CallData&);
-        static ConstructType getConstructData(JSCell*, ConstructData&);
+        JS_EXPORT_PRIVATE static CallType getCallData(JSCell*, CallData&);
+        JS_EXPORT_PRIVATE static ConstructType getConstructData(JSCell*, ConstructData&);
 
         // Basic conversions.
-        JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
+        JS_EXPORT_PRIVATE JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
         bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
         bool toBoolean(ExecState*) const;
-        double toNumber(ExecState*) const;
-        UString toString(ExecState*) const;
-        JSObject* toObject(ExecState*, JSGlobalObject*) const;
+        JS_EXPORT_PRIVATE double toNumber(ExecState*) const;
+        JS_EXPORT_PRIVATE JSObject* toObject(ExecState*, JSGlobalObject*) const;
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
@@ -159,7 +159,7 @@ namespace JSC {
         static NO_RETURN_DUE_TO_ASSERT void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
         static UString className(const JSObject*);
         static bool hasInstance(JSObject*, ExecState*, JSValue, JSValue prototypeProperty);
-        static NO_RETURN_DUE_TO_ASSERT void putWithAttributes(JSObject*, ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
+        static NO_RETURN_DUE_TO_ASSERT void putDirectVirtual(JSObject*, ExecState*, const Identifier& propertyName, JSValue, unsigned attributes);
         static bool defineOwnProperty(JSObject*, ExecState*, const Identifier& propertyName, PropertyDescriptor&, bool shouldThrow);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
 

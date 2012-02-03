@@ -55,7 +55,7 @@ PassOwnPtr<ScheduledAction> ScheduledAction::create(ExecState* exec, DOMWrapperW
     if (getCallData(v, callData) == CallTypeNone) {
         if (policy && !policy->allowEval())
             return nullptr;
-        UString string = v.toString(exec);
+        UString string = v.toString(exec)->value(exec);
         if (exec->hadException())
             return nullptr;
         return adoptPtr(new ScheduledAction(ustringToString(string), isolatedWorld));
@@ -126,10 +126,9 @@ void ScheduledAction::execute(Document* document)
     if (!frame || !frame->script()->canExecuteScripts(AboutToExecuteScript))
         return;
 
-    if (m_function) {
+    if (m_function)
         executeFunctionInContext(window, window->shell(), document);
-        Document::updateStyleForAllDocuments();
-    } else
+    else
         frame->script()->executeScriptInWorld(m_isolatedWorld.get(), m_code);
 }
 

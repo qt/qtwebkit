@@ -28,6 +28,7 @@
 #include "AXObjectCache.h"
 #include "Attr.h"
 #include "Attribute.h"
+#include "BeforeLoadEvent.h"
 #include "ChildListMutationScope.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
@@ -93,8 +94,6 @@
 #include "TreeScopeAdopter.h"
 #include "UIEvent.h"
 #include "UIEventWithKeyState.h"
-#include "WebKitAnimationEvent.h"
-#include "WebKitTransitionEvent.h"
 #include "WheelEvent.h"
 #include "WindowEventContext.h"
 #include "XMLNames.h"
@@ -552,7 +551,13 @@ void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
 
 PassRefPtr<NodeList> Node::childNodes()
 {
-    return ChildNodeList::create(this, ensureRareData()->ensureChildNodeListCache());
+    NodeRareData* data = ensureRareData();
+    if (data->childNodeList())
+        return PassRefPtr<NodeList>(data->childNodeList());
+
+    RefPtr<ChildNodeList> list = ChildNodeList::create(this);
+    data->setChildNodeList(list.get());
+    return list.release();
 }
 
 Node *Node::lastDescendant() const
@@ -1074,6 +1079,12 @@ void Node::removeCachedLabelsNodeList(DynamicSubtreeNodeList* list)
     data->m_labelsNodeListCache = 0;
 }
 
+void Node::removeCachedChildNodeList()
+{
+    ASSERT(rareData());
+    rareData()->setChildNodeList(0);
+}
+
 Node* Node::traverseNextNode(const Node* stayWithin) const
 {
     if (firstChild())
@@ -1176,8 +1187,11 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionCode& ec)
     // Perform error checking as required by spec for setting Node.prefix. Used by
     // Element::setPrefix() and Attr::setPrefix()
 
-    // FIXME: Implement support for INVALID_CHARACTER_ERR: Raised if the specified prefix contains an illegal character.
-    
+    if (!prefix.isEmpty() && !Document::isValidName(prefix)) {
+        ec = INVALID_CHARACTER_ERR;
+        return;
+    }
+
     if (isReadOnlyNode()) {
         ec = NO_MODIFICATION_ALLOWED_ERR;
         return;
@@ -1532,7 +1546,7 @@ Element* Node::parentOrHostElement() const
         return 0;
 
     if (parent->isShadowRoot())
-        parent = parent->shadowHost();
+        return parent->shadowHost();
 
     if (!parent->isElementNode())
         return 0;
@@ -1750,14 +1764,16 @@ bool Node::isEqualNode(Node* other) const
     if (nodeValue() != other->nodeValue())
         return false;
     
-    NamedNodeMap* attributes = this->attributes();
-    NamedNodeMap* otherAttributes = other->attributes();
-    
-    if (!attributes && otherAttributes)
-        return false;
-    
-    if (attributes && !attributes->mapsEquivalent(otherAttributes))
-        return false;
+    if (isElementNode()) {
+        NamedNodeMap* attributes = toElement(this)->updatedAttributes();
+        NamedNodeMap* otherAttributes = toElement(other)->updatedAttributes();
+
+        if (attributes && !attributes->mapsEquivalent(otherAttributes))
+            return false;
+
+        if (otherAttributes && !otherAttributes->mapsEquivalent(attributes))
+            return false;
+    }
     
     Node* child = firstChild();
     Node* otherChild = other->firstChild();
@@ -1815,9 +1831,7 @@ bool Node::isDefaultNamespace(const AtomicString& namespaceURIMaybeEmpty) const
             if (elem->prefix().isNull())
                 return elem->namespaceURI() == namespaceURI;
 
-            if (elem->hasAttributes()) {
-                NamedNodeMap* attrs = elem->attributes();
-                
+            if (NamedNodeMap* attrs = elem->updatedAttributes()) {
                 for (unsigned i = 0; i < attrs->length(); i++) {
                     Attribute* attr = attrs->attributeItem(i);
                     
@@ -1903,9 +1917,7 @@ String Node::lookupNamespaceURI(const String &prefix) const
             if (!elem->namespaceURI().isNull() && elem->prefix() == prefix)
                 return elem->namespaceURI();
             
-            if (elem->hasAttributes()) {
-                NamedNodeMap *attrs = elem->attributes();
-                
+            if (NamedNodeMap* attrs = elem->updatedAttributes()) {
                 for (unsigned i = 0; i < attrs->length(); i++) {
                     Attribute *attr = attrs->attributeItem(i);
                     
@@ -1959,15 +1971,12 @@ String Node::lookupNamespacePrefix(const AtomicString &_namespaceURI, const Elem
     if (originalElement->lookupNamespaceURI(prefix()) == _namespaceURI)
         return prefix();
     
-    if (hasAttributes()) {
-        NamedNodeMap *attrs = attributes();
-        
+    if (NamedNodeMap* attrs = toElement(this)->updatedAttributes()) {
         for (unsigned i = 0; i < attrs->length(); i++) {
-            Attribute *attr = attrs->attributeItem(i);
+            Attribute* attr = attrs->attributeItem(i);
             
-            if (attr->prefix() == xmlnsAtom &&
-                attr->value() == _namespaceURI &&
-                originalElement->lookupNamespaceURI(attr->localName()) == _namespaceURI)
+            if (attr->prefix() == xmlnsAtom && attr->value() == _namespaceURI
+                    && originalElement->lookupNamespaceURI(attr->localName()) == _namespaceURI)
                 return attr->localName();
         }
     }
@@ -2107,7 +2116,7 @@ unsigned short Node::compareDocumentPosition(Node* otherNode)
     if (attr1 && attr2 && start1 == start2 && start1) {
         // We are comparing two attributes on the same node.  Crawl our attribute map
         // and see which one we hit first.
-        NamedNodeMap* map = attr1->ownerElement()->attributes(true);
+        NamedNodeMap* map = attr1->ownerElement()->updatedAttributes();
         unsigned length = map->length();
         for (unsigned i = 0; i < length; ++i) {
             // If neither of the two determining nodes is a child node and nodeType is the same for both determining nodes, then an 
@@ -2796,6 +2805,17 @@ void Node::dispatchSimulatedClick(PassRefPtr<Event> event, bool sendMouseEvents,
     EventDispatcher::dispatchSimulatedClick(this, event, sendMouseEvents, showPressedLook);
 }
 
+bool Node::dispatchBeforeLoadEvent(const String& sourceURL)
+{
+    if (!document()->hasListenerType(Document::BEFORELOAD_LISTENER))
+        return true;
+
+    RefPtr<Node> protector(this);
+    RefPtr<BeforeLoadEvent> beforeLoadEvent = BeforeLoadEvent::create(sourceURL);
+    dispatchEvent(beforeLoadEvent.get());
+    return !beforeLoadEvent->defaultPrevented();
+}
+
 bool Node::dispatchWheelEvent(const PlatformWheelEvent& event)
 {
     return EventDispatcher::dispatchEvent(this, WheelEventDispatchMediator::create(event, document()->defaultView()));
@@ -2935,13 +2955,8 @@ void NodeRareData::createNodeLists(Node* node)
 
 void NodeRareData::clearChildNodeListCache()
 {
-    if (!m_childNodeListCache)
-        return;
-
-    if (m_childNodeListCache->hasOneRef())
-        m_childNodeListCache.clear();
-    else
-        m_childNodeListCache->reset();
+    if (m_childNodeList)
+        m_childNodeList->invalidateCache();
 }
 
 } // namespace WebCore

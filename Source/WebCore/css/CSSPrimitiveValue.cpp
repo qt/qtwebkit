@@ -338,38 +338,60 @@ void CSSPrimitiveValue::cleanup()
     }
 }
 
-template<> int CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+double CSSPrimitiveValue::computeDegrees()
+{
+    switch (m_primitiveUnitType) {
+    case CSS_DEG:
+        return getDoubleValue();
+    case CSS_RAD:
+        return rad2deg(getDoubleValue());
+    case CSS_GRAD:
+        return grad2deg(getDoubleValue());
+    case CSS_TURN:
+        return turn2deg(getDoubleValue());
+    default:
+        ASSERT_NOT_REACHED();
+        return 0;
+    }
+}
+
+template<> int CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     return roundForImpreciseConversion<int, INT_MAX, INT_MIN>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize));
 }
 
-template<> Length CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+template<> unsigned CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
+{
+    return roundForImpreciseConversion<unsigned, UINT_MAX, 0>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize));
+}
+
+template<> Length CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     // FIXME: Length.h no longer expects 28 bit integers, so these bounds should be INT_MAX and INT_MIN
     return Length(roundForImpreciseConversion<int, intMaxForLength, intMinForLength>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize)), Fixed);
 }
 
-template<> short CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+template<> short CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     return roundForImpreciseConversion<short, SHRT_MAX, SHRT_MIN>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize));
 }
 
-template<> unsigned short CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+template<> unsigned short CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     return roundForImpreciseConversion<unsigned short, USHRT_MAX, 0>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize));
 }
 
-template<> float CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+template<> float CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     return static_cast<float>(computeLengthDouble(style, rootStyle, multiplier, computingFontSize));
 }
 
-template<> double CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+template<> double CSSPrimitiveValue::computeLength(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     return computeLengthDouble(style, rootStyle, multiplier, computingFontSize);
 }
 
-double CSSPrimitiveValue::computeLengthDouble(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
+double CSSPrimitiveValue::computeLengthDouble(RenderStyle* style, RenderStyle* rootStyle, float multiplier, bool computingFontSize)
 {
     unsigned short type = primitiveType();
 
@@ -394,7 +416,8 @@ double CSSPrimitiveValue::computeLengthDouble(RenderStyle* style, RenderStyle* r
             break;
         case CSS_REMS:
             applyZoomMultiplier = false;
-            factor = computingFontSize ? rootStyle->fontDescription().specifiedSize() : rootStyle->fontDescription().computedSize();
+            if (rootStyle)
+                factor = computingFontSize ? rootStyle->fontDescription().specifiedSize() : rootStyle->fontDescription().computedSize();
             break;
         case CSS_PX:
             break;
@@ -420,7 +443,7 @@ double CSSPrimitiveValue::computeLengthDouble(RenderStyle* style, RenderStyle* r
     }
 
     double result = getDoubleValue() * factor;
-    if (!applyZoomMultiplier || multiplier == 1.0)
+    if (!applyZoomMultiplier || multiplier == 1.0f)
         return result;
 
     // Any original result that was >= 1 should not be allowed to fall below 1.  This keeps border lines from

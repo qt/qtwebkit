@@ -52,7 +52,7 @@
 #define ASSERT_VALID_CODE_OFFSET(offset) // Anything goes!
 #endif
 
-#if CPU(X86) && OS(WIN)
+#if CPU(X86) && OS(WINDOWS)
 #define CALLING_CONVENTION_IS_STDCALL 1
 #ifndef CDECL
 #if COMPILER(MSVC)
@@ -126,7 +126,9 @@ public:
         ASSERT_VALID_CODE_POINTER(m_value);
     }
 
-#if CALLING_CONVENTION_IS_STDCALL
+// MSVC doesn't seem to treat functions with different calling conventions as
+// different types; these methods already defined for fastcall, below.
+#if CALLING_CONVENTION_IS_STDCALL && !OS(WINDOWS)
 
     template<typename returnType>
     FunctionPtr(returnType (CDECL *value)())

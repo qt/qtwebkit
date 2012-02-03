@@ -333,14 +333,15 @@ namespace JSC {
         template<typename T> void emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID storagePtr);
         void emitAllocateJSFunction(FunctionExecutable*, RegisterID scopeChain, RegisterID result, RegisterID storagePtr);
         
-        enum ValueProfilingSiteKind { FirstProfilingSite, SubsequentProfilingSite };
 #if ENABLE(VALUE_PROFILER)
         // This assumes that the value to profile is in regT0 and that regT3 is available for
         // scratch.
         void emitValueProfilingSite(ValueProfile*);
-        void emitValueProfilingSite(ValueProfilingSiteKind);
+        void emitValueProfilingSite(unsigned bytecodeOffset);
+        void emitValueProfilingSite();
 #else
-        void emitValueProfilingSite(ValueProfilingSiteKind) { }
+        void emitValueProfilingSite(unsigned) { }
+        void emitValueProfilingSite() { }
 #endif
 
 #if USE(JSVALUE32_64)
@@ -856,10 +857,9 @@ namespace JSC {
         void emit_op_put_by_id(Instruction*);
         void emit_op_put_by_index(Instruction*);
         void emit_op_put_by_val(Instruction*);
-        void emit_op_put_getter(Instruction*);
+        void emit_op_put_getter_setter(Instruction*);
         void emit_op_put_global_var(Instruction*);
         void emit_op_put_scoped_var(Instruction*);
-        void emit_op_put_setter(Instruction*);
         void emit_op_resolve(Instruction*);
         void emit_op_resolve_base(Instruction*);
         void emit_op_ensure_property_exists(Instruction*);

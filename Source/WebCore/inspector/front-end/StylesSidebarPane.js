@@ -231,7 +231,7 @@ WebInspector.StylesSidebarPane.prototype = {
 
         function stylesCallback(matchedResult)
         {
-            if (matchedResult) {
+            if (matchedResult && this.node === node) {
                 resultStyles.matchedCSSRules = matchedResult.matchedCSSRules;
                 resultStyles.pseudoElements = matchedResult.pseudoElements;
                 resultStyles.inherited = matchedResult.inherited;
@@ -873,16 +873,16 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule, editable, 
                 break;
             }
 
-            var mediaTextElement = mediaDataElement.createChild("span");
-            mediaTextElement.textContent = mediaText;
-            mediaTextElement.title = media.text;
-
             if (media.sourceURL) {
                 var refElement = mediaDataElement.createChild("div", "subtitle");
                 var anchor = WebInspector.linkifyResourceAsNode(media.sourceURL, media.sourceLine < 0 ? undefined : media.sourceLine, "subtitle");
                 anchor.style.float = "right";
                 refElement.appendChild(anchor);
             }
+
+            var mediaTextElement = mediaDataElement.createChild("span");
+            mediaTextElement.textContent = mediaText;
+            mediaTextElement.title = media.text;
         }
     }
 
@@ -899,8 +899,9 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule, editable, 
     closeBrace.textContent = "}";
     this.element.appendChild(closeBrace);
 
-    this._selectorElement.addEventListener("dblclick", this._handleSelectorDoubleClick.bind(this), false);
-    this.element.addEventListener("dblclick", this._handleEmptySpaceDoubleClick.bind(this), false);
+    var eventName = WebInspector.experimentsSettings.singleClickEditing.isEnabled() ? "click" : "dblclick";
+    this._selectorElement.addEventListener(eventName, this._handleSelectorDoubleClick.bind(this), false);
+    this.element.addEventListener(eventName, this._handleEmptySpaceDoubleClick.bind(this), false);
 
     this._parentPane = parentPane;
     this.styleRule = styleRule;
@@ -920,7 +921,7 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule, editable, 
     this._selectorRefElement = document.createElement("div");
     this._selectorRefElement.className = "subtitle";
     this._selectorRefElement.appendChild(this._createRuleOriginNode());
-    selectorContainer.appendChild(this._selectorRefElement);
+    selectorContainer.insertBefore(this._selectorRefElement, selectorContainer.firstChild);
     this.titleElement.appendChild(selectorContainer);
 
     if (isInherited)
@@ -1522,6 +1523,28 @@ WebInspector.StylePropertyTreeElement.prototype = {
     onattach: function()
     {
         this.updateTitle();
+        var eventName;
+        if (WebInspector.experimentsSettings.singleClickEditing.isEnabled()) {
+            this.listItemElement.addEventListener("mousedown", this._mouseDown.bind(this));
+            this.listItemElement.addEventListener("mouseup", this._resetMouseDownElement.bind(this));
+            eventName = "click";
+        } else
+            eventName = "dblclick";
+        this.listItemElement.addEventListener(eventName, this._startEditing.bind(this));
+    },
+
+    _mouseDown: function(event)
+    {
+        this._parentPane._mouseDownTreeElement = this;
+        this._parentPane._mouseDownTreeElementIsName = this._isNameElement(event.target);
+        this._parentPane._mouseDownTreeElementIsValue = this._isValueElement(event.target);
+    },
+
+    _resetMouseDownElement: function()
+    {
+        delete this._parentPane._mouseDownTreeElement;
+        delete this._parentPane._mouseDownTreeElementIsName;
+        delete this._parentPane._mouseDownTreeElementIsValue;
     },
 
     updateTitle: function()
@@ -1809,12 +1832,6 @@ WebInspector.StylePropertyTreeElement.prototype = {
         }
     },
 
-    ondblclick: function(event)
-    {
-        this.startEditing(event.target);
-        event.stopPropagation();
-    },
-
     restoreNameElement: function()
     {
         // Restore <span class="webkit-css-property"> if it doesn't yet exist or was accidentally deleted.
@@ -1825,6 +1842,22 @@ WebInspector.StylePropertyTreeElement.prototype = {
         this.nameElement.className = "webkit-css-property";
         this.nameElement.textContent = "";
         this.listItemElement.insertBefore(this.nameElement, this.listItemElement.firstChild);
+    },
+
+    _startEditing: function(event)
+    {
+        this.startEditing(event.target);
+        event.stopPropagation();
+    },
+
+    _isNameElement: function(element)
+    {
+        return element.enclosingNodeOrSelfWithClass("webkit-css-property") === this.nameElement;
+    },
+
+    _isValueElement: function(element)
+    {
+        return !!element.enclosingNodeOrSelfWithClass("value");
     },
 
     startEditing: function(selectElement)
@@ -1892,7 +1925,15 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
         function blurListener(context, event)
         {
-            this.editingCommitted(null, event.target.textContent, context.previousContent, context, "");
+            var treeElement = this._parentPane._mouseDownTreeElement;
+            var moveDirection = "";
+            if (treeElement === this) {
+                if (isEditingName && this._parentPane._mouseDownTreeElementIsValue)
+                    moveDirection = "forward";
+                if (!isEditingName && this._parentPane._mouseDownTreeElementIsName)
+                    moveDirection = "backward";
+            }
+            this.editingCommitted(null, event.target.textContent, context.previousContent, context, moveDirection);
         }
 
         delete this.originalPropertyText;
@@ -1987,7 +2028,9 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
         function apply()
         {
-            this.applyStyleText(this.nameElement.textContent + ": " + this.valueElement.textContent, false, false, false);
+            var valueText = this.valueElement.textContent;
+            if (valueText.indexOf(";") === -1)
+                this.applyStyleText(this.nameElement.textContent + ": " + valueText, false, false, false);
         }
         if (now)
             apply.call(this);
@@ -2002,6 +2045,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
     editingEnded: function(context)
     {
+        this._resetMouseDownElement();
         if (this._applyFreeFlowStyleTextEditTimer)
             clearTimeout(this._applyFreeFlowStyleTextEditTimer);
 
@@ -2156,9 +2200,9 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
     _hasBeenModifiedIncrementally: function()
     {
-        // New properties applied via up/down have an originalPropertyText and will be deleted later
+        // New properties applied via up/down or live editing have an originalPropertyText and will be deleted later
         // on, if cancelled, when the empty string gets applied as their style text.
-        return typeof this.originalPropertyText === "string";
+        return typeof this.originalPropertyText === "string" || (!!this.property.propertyText && this._newProperty);
     },
 
     applyStyleText: function(styleText, updateInterface, majorChange, isRevert)
@@ -2184,7 +2228,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
         styleText = styleText.replace(/\s/g, " ").trim(); // Replace &nbsp; with whitespace.
         var styleTextLength = styleText.length;
         if (!styleTextLength && updateInterface && !isRevert && this._newProperty && !this._hasBeenModifiedIncrementally()) {
-            // The user deleted everything and never applied a new property value via Up/Down scrolling, so remove the tree element and update.
+            // The user deleted everything and never applied a new property value via Up/Down scrolling/live editing, so remove the tree element and update.
             this.parent.removeChild(this);
             section.afterUpdate();
             return;
@@ -2258,15 +2302,17 @@ WebInspector.StylesSidebarPane.CSSPropertyPrompt.prototype = {
                 return;
             }
             break;
-        case "U+0009":
-            if (this.isSuggestBoxVisible()) {
-                this._suggestBox.acceptSuggestion();
-                return !this._isEditingName;
-            }
-            return this.acceptAutoComplete();
         }
 
         WebInspector.TextPrompt.prototype.onKeyDown.call(this, event);
+    },
+
+    tabKeyPressed: function()
+    {
+        this.acceptAutoComplete();
+
+        // Always tab to the next field.
+        return false;
     },
 
     _handleNameOrValueUpDown: function(event)
@@ -2290,7 +2336,7 @@ WebInspector.StylesSidebarPane.CSSPropertyPrompt.prototype = {
             return false;
 
         var selectionRange = selection.getRangeAt(0);
-        if (selectionRange.commonAncestorContainer !== this._sidebarPane.valueElement && !selectionRange.commonAncestorContainer.isDescendant(this._sidebarPane.valueElement))
+        if (!selectionRange.commonAncestorContainer.isSelfOrDescendant(this._sidebarPane.valueElement))
             return false;
 
         var wordRange = selectionRange.startContainer.rangeOfWord(selectionRange.startOffset, WebInspector.StylesSidebarPane.StyleValueDelimiters, this._sidebarPane.valueElement);

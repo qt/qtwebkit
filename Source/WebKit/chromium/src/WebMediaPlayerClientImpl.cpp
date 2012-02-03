@@ -120,7 +120,7 @@ void WebMediaPlayerClientImpl::readyStateChanged()
     m_mediaPlayer->readyStateChanged();
 #if USE(ACCELERATED_COMPOSITING)
     if (hasVideo() && supportsAcceleratedRendering() && !m_videoLayer) {
-        m_videoLayer = VideoLayerChromium::create(0, this);
+        m_videoLayer = VideoLayerChromium::create(this);
         m_videoLayer->setOpaque(m_opaque);
     }
 #endif
@@ -603,7 +603,7 @@ VideoFrameChromium* WebMediaPlayerClientImpl::getCurrentFrame()
 {
     MutexLocker locker(m_compositingMutex);
     ASSERT(!m_currentVideoFrame);
-    if (m_webMediaPlayer && !m_currentVideoFrame) {
+    if (m_webMediaPlayer) {
         WebVideoFrame* webkitVideoFrame = m_webMediaPlayer->getCurrentFrame();
         if (webkitVideoFrame)
             m_currentVideoFrame = adoptPtr(new VideoFrameChromiumImpl(webkitVideoFrame));
@@ -614,14 +614,14 @@ VideoFrameChromium* WebMediaPlayerClientImpl::getCurrentFrame()
 void WebMediaPlayerClientImpl::putCurrentFrame(VideoFrameChromium* videoFrame)
 {
     MutexLocker locker(m_compositingMutex);
-    if (videoFrame && videoFrame == m_currentVideoFrame) {
-        if (m_webMediaPlayer) {
-            m_webMediaPlayer->putCurrentFrame(
-                VideoFrameChromiumImpl::toWebVideoFrame(videoFrame));
-        }
-        ASSERT(videoFrame == m_currentVideoFrame);
-        m_currentVideoFrame.clear();
+    ASSERT(videoFrame == m_currentVideoFrame);
+    if (!videoFrame)
+        return;
+    if (m_webMediaPlayer) {
+        m_webMediaPlayer->putCurrentFrame(
+            VideoFrameChromiumImpl::toWebVideoFrame(videoFrame));
     }
+    m_currentVideoFrame.clear();
 }
 #endif
 
@@ -726,7 +726,7 @@ void WebMediaPlayerClientImpl::AudioSourceProviderImpl::provideInput(AudioBus* b
     size_t n = bus->numberOfChannels();
     WebVector<float*> webAudioData(n);
     for (size_t i = 0; i < n; ++i)
-        webAudioData[i] = bus->channel(i)->data();
+        webAudioData[i] = bus->channel(i)->mutableData();
 
     m_webAudioSourceProvider->provideInput(webAudioData, framesToProcess);
 }

@@ -129,7 +129,7 @@ bool FileInputType::appendFormData(FormDataList& encoding, bool multipart) const
 
 bool FileInputType::valueMissing(const String& value) const
 {
-    return value.isEmpty();
+    return element()->required() && value.isEmpty();
 }
 
 String FileInputType::valueMissingText() const
@@ -139,7 +139,7 @@ String FileInputType::valueMissingText() const
 
 void FileInputType::handleDOMActivateEvent(Event* event)
 {
-    if (element()->disabled() || !element()->renderer())
+    if (element()->disabled())
         return;
 
     if (!ScriptController::processingUserGesture())

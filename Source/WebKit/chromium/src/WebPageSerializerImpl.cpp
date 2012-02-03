@@ -283,7 +283,7 @@ void WebPageSerializerImpl::encodeAndFlushBuffer(
         return;
 
     String content = m_dataBuffer.toString();
-    m_dataBuffer = StringBuilder();
+    m_dataBuffer.clear();
 
     // Convert the unicode content to target encoding
     CString encodedContent = param->textEncoding.encode(
@@ -307,7 +307,7 @@ void WebPageSerializerImpl::openTagToString(Element* element,
     // Add open tag
     result += "<" + element->nodeName().lower();
     // Go through all attributes and serialize them.
-    const NamedNodeMap *attrMap = element->attributes(true);
+    const NamedNodeMap *attrMap = element->updatedAttributes();
     if (attrMap) {
         unsigned numAttrs = attrMap->length();
         for (unsigned i = 0; i < numAttrs; i++) {

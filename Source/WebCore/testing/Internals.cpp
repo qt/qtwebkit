@@ -35,18 +35,20 @@
 #include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "HTMLContentElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLTextAreaElement.h"
 #include "InspectorController.h"
+#include "InternalSettings.h"
 #include "IntRect.h"
+#include "Language.h"
 #include "NodeRenderingContext.h"
 #include "Page.h"
 #include "Range.h"
 #include "RenderObject.h"
 #include "RenderTreeAsText.h"
 #include "Settings.h"
-#include "ShadowContentElement.h"
 #include "ShadowRoot.h"
 #include "SpellChecker.h"
 #include "TextIterator.h"
@@ -103,19 +105,19 @@ static SpellChecker* spellchecker(Document* document)
 
 const char* Internals::internalsId = "internals";
 
-PassRefPtr<Internals> Internals::create()
+PassRefPtr<Internals> Internals::create(Document* document)
 {
-    return adoptRef(new Internals);
+    return adoptRef(new Internals(document));
 }
 
 Internals::~Internals()
 {
 }
 
-Internals::Internals()
-    : passwordEchoDurationInSecondsBackedUp(false)
-    , passwordEchoEnabledBackedUp(false)
+Internals::Internals(Document* document)
+    : FrameDestructionObserver(0)
 {
+    reset(document);
 }
 
 bool Internals::isPreloaded(Document* document, const String& url)
@@ -126,14 +128,14 @@ bool Internals::isPreloaded(Document* document, const String& url)
     return document->cachedResourceLoader()->isPreloaded(url);
 }
 
-PassRefPtr<Element> Internals::createShadowContentElement(Document* document, ExceptionCode& ec)
+PassRefPtr<Element> Internals::createContentElement(Document* document, ExceptionCode& ec)
 {
     if (!document) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
 
-    return ShadowContentElement::create(document);
+    return HTMLContentElement::create(document);
 }
 
 Element* Internals::getElementByIdInShadowRoot(Node* shadowRoot, const String& id, ExceptionCode& ec)
@@ -143,6 +145,16 @@ Element* Internals::getElementByIdInShadowRoot(Node* shadowRoot, const String& i
         return 0;
     }
     return toShadowRoot(shadowRoot)->getElementById(id);
+}
+
+bool Internals::isValidContentSelect(Element* contentElement, ExceptionCode& ec)
+{
+    if (!contentElement || !contentElement->isContentElement()) {
+        ec = INVALID_ACCESS_ERR;
+        return false;
+    }
+
+    return toHTMLContentElement(contentElement)->isSelectValid();
 }
 
 String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
@@ -161,7 +173,20 @@ String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
     return representation;
 }
 
-Node* Internals::ensureShadowRoot(Element* host, ExceptionCode& ec)
+size_t Internals::numberOfScopedHTMLStyleChildren(const Element* element, ExceptionCode& ec) const
+{
+    if (element)
+#if ENABLE(STYLE_SCOPED)
+        return element->numberOfScopedHTMLStyleChildren();
+#else
+        return 0;
+#endif
+
+    ec = INVALID_ACCESS_ERR;
+    return 0;
+}
+
+Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::ensureShadowRoot(Element* host, ExceptionCode& ec)
 {
     if (!host) {
         ec = INVALID_ACCESS_ERR;
@@ -171,7 +196,7 @@ Node* Internals::ensureShadowRoot(Element* host, ExceptionCode& ec)
     return host->ensureShadowRoot();
 }
 
-Node* Internals::shadowRoot(Element* host, ExceptionCode& ec)
+Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::shadowRoot(Element* host, ExceptionCode& ec)
 {
     if (!host) {
         ec = INVALID_ACCESS_ERR;
@@ -220,17 +245,6 @@ void Internals::selectColorInColorChooser(Element* element, const String& colorV
     if (!inputElement)
         return;
     inputElement->selectColorInColorChooser(Color(colorValue));
-}
-#endif
-
-#if ENABLE(INSPECTOR)
-void Internals::setInspectorResourcesDataSizeLimits(Document* document, int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode& ec)
-{
-    if (!document || !document->page() || !document->page()->inspectorController()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-    document->page()->inspectorController()->setResourcesDataSizeLimitsFromInternals(maximumResourcesContentSize, maximumSingleResourceContentSize);
 }
 #endif
 
@@ -283,141 +297,6 @@ PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& marker
     return Range::create(node->document(), node, markers[index]->startOffset(), node, markers[index]->endOffset());
 }
 
-void Internals::setForceCompositingMode(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->settings()->setForceCompositingMode(enabled);
-}
-
-void Internals::setEnableCompositingForFixedPosition(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->settings()->setAcceleratedCompositingForFixedPositionEnabled(enabled);
-}
-
-void Internals::setEnableCompositingForScrollableFrames(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->settings()->setAcceleratedCompositingForScrollableFramesEnabled(enabled);
-}
-
-void Internals::setAcceleratedDrawingEnabled(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->settings()->setAcceleratedDrawingEnabled(enabled);
-}
-
-void Internals::setAcceleratedFiltersEnabled(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->settings()->setAcceleratedFiltersEnabled(enabled);
-}
-
-void Internals::setEnableScrollAnimator(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-#if ENABLE(SMOOTH_SCROLLING)
-    document->settings()->setEnableScrollAnimator(enabled);
-#else
-    UNUSED_PARAM(enabled);
-#endif
-}
-
-void Internals::setZoomAnimatorTransform(Document *document, float scale, float tx, float ty, ExceptionCode& ec)
-{
-    if (!document || !document->view() || !document->view()->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-#if ENABLE(GESTURE_EVENTS)
-    PlatformGestureEvent pge(PlatformEvent::GestureDoubleTap, IntPoint(tx, ty), IntPoint(tx, ty), 0, scale, 0.f, 0, 0, 0, 0);
-    document->view()->frame()->eventHandler()->handleGestureEvent(pge);
-#else
-    UNUSED_PARAM(scale);
-    UNUSED_PARAM(tx);
-    UNUSED_PARAM(ty);
-#endif
-}
-
-void Internals::setZoomParameters(Document* document, float scale, float x, float y, ExceptionCode& ec)
-{
-    if (!document || !document->view() || !document->view()->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-#if ENABLE(SMOOTH_SCROLLING)
-    document->view()->scrollAnimator()->setZoomParametersForTest(scale, x, y);
-#else
-    UNUSED_PARAM(scale);
-    UNUSED_PARAM(x);
-    UNUSED_PARAM(y);
-#endif
-}
-
-void Internals::setMockScrollbarsEnabled(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->settings()->setMockScrollbarsEnabled(enabled);
-}
-
-void Internals::setPasswordEchoEnabled(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    if (!passwordEchoEnabledBackedUp) {
-        passwordEchoEnabledBackup = document->settings()->passwordEchoEnabled();
-        passwordEchoEnabledBackedUp = true;
-    }
-    document->settings()->setPasswordEchoEnabled(enabled);
-}
-
-void Internals::setPasswordEchoDurationInSeconds(Document* document, double durationInSeconds, ExceptionCode& ec)
-{
-    if (!document || !document->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    if (!passwordEchoDurationInSecondsBackedUp) {
-        passwordEchoDurationInSecondsBackup = document->settings()->passwordEchoDurationInSeconds();
-        passwordEchoDurationInSecondsBackedUp = true;
-    }
-    document->settings()->setPasswordEchoDurationInSeconds(durationInSeconds);
-}
-
 void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionCode& ec)
 {
     if (!document || !document->view()) {
@@ -465,16 +344,8 @@ void Internals::reset(Document* document)
     if (!document || !document->settings())
         return;
 
-    if (passwordEchoDurationInSecondsBackedUp) {
-        document->settings()->setPasswordEchoDurationInSeconds(passwordEchoDurationInSecondsBackup);
-        passwordEchoDurationInSecondsBackedUp = false;
-    }
-
-    if (passwordEchoEnabledBackedUp) {
-        document->settings()->setPasswordEchoEnabled(passwordEchoEnabledBackup);
-        passwordEchoEnabledBackedUp = false;
-    }
-
+    observeFrame(document->frame());
+    m_settings = InternalSettings::create(document->frame(), m_settings.get());
     if (Page* page = document->page())
         page->setPagination(Page::Pagination());
 }
@@ -586,56 +457,6 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
     return length;
 }
 
-void Internals::setShouldLayoutFixedElementsRelativeToFrame(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->view()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    FrameView* frameView = document->view();
-    frameView->setShouldLayoutFixedElementsRelativeToFrame(enabled);
-}
-
-void Internals::setUnifiedTextCheckingEnabled(Document* document, bool enabled, ExceptionCode& ec)
-{
-    if (!document || !document->frame() || !document->frame()->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    document->frame()->settings()->setUnifiedTextCheckerEnabled(enabled);
-}
-
-bool Internals::unifiedTextCheckingEnabled(Document* document, ExceptionCode& ec)
-{
-    if (!document || !document->frame() || !document->frame()->settings()) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-    return document->frame()->settings()->unifiedTextCheckerEnabled();
-}
-
-float Internals::pageScaleFactor(Document *document, ExceptionCode& ec)
-{
-    if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-    return document->page()->pageScaleFactor();
-}
-
-void Internals::setPageScaleFactor(Document* document, float scaleFactor, int x, int y, ExceptionCode& ec)
-{
-    if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-    document->page()->setPageScaleFactor(scaleFactor, IntPoint(x, y));
-}
-
 int Internals::lastSpellCheckRequestSequence(Document* document, ExceptionCode& ec)
 {
     SpellChecker* checker = spellchecker(document);
@@ -660,14 +481,63 @@ int Internals::lastSpellCheckProcessedSequence(Document* document, ExceptionCode
     return checker->lastProcessedSequence();
 }
 
-void Internals::setPerTileDrawingEnabled(Document* document, bool enabled, ExceptionCode& ec)
+Vector<String> Internals::userPreferredLanguages() const
 {
-    if (!document || !document->settings()) {
+    return WebCore::userPreferredLanguages();
+}
+
+void Internals::setUserPreferredLanguages(const Vector<String>& languages)
+{
+    WebCore::overrideUserPreferredLanguages(languages);
+}
+
+void Internals::setShouldDisplayTrackKind(Document* document, const String& kind, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->frame() || !document->frame()->settings()) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
-
-    document->settings()->setPerTileDrawingEnabled(enabled);
+    
+#if ENABLE(VIDEO_TRACK)
+    Settings* settings = document->frame()->settings();
+    
+    if (equalIgnoringCase(kind, "Subtitles"))
+        settings->setShouldDisplaySubtitles(enabled);
+    else if (equalIgnoringCase(kind, "Captions"))
+        settings->setShouldDisplayCaptions(enabled);
+    else if (equalIgnoringCase(kind, "TextDescriptions"))
+        settings->setShouldDisplayTextDescriptions(enabled);
+    else
+        ec = SYNTAX_ERR;
+#else
+    UNUSED_PARAM(kind);
+    UNUSED_PARAM(enabled);
+#endif
 }
 
+bool Internals::shouldDisplayTrackKind(Document* document, const String& kind, ExceptionCode& ec)
+{
+    if (!document || !document->frame() || !document->frame()->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return false;
+    }
+    
+#if ENABLE(VIDEO_TRACK)
+    Settings* settings = document->frame()->settings();
+    
+    if (equalIgnoringCase(kind, "Subtitles"))
+        return settings->shouldDisplaySubtitles();
+    if (equalIgnoringCase(kind, "Captions"))
+        return settings->shouldDisplayCaptions();
+    if (equalIgnoringCase(kind, "TextDescriptions"))
+        return settings->shouldDisplayTextDescriptions();
+
+    ec = SYNTAX_ERR;
+    return false;
+#else
+    UNUSED_PARAM(kind);
+    return false;
+#endif
+}
+    
 }

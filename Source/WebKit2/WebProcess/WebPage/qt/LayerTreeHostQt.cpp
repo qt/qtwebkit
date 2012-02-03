@@ -240,15 +240,15 @@ void LayerTreeHostQt::didDeleteLayer(WebLayerID id)
 
 void LayerTreeHostQt::performScheduledLayerFlush()
 {
-    m_webPage->layoutIfNeeded();
-
-    if (!m_isValid)
-        return;
-
 #if USE(TILED_BACKING_STORE)
     if (m_isSuspended || m_waitingForUIProcess)
         return;
 #endif
+
+    m_webPage->layoutIfNeeded();
+
+    if (!m_isValid)
+        return;
 
     m_shouldSyncFrame = false;
     flushPendingLayerChanges();
@@ -261,6 +261,7 @@ void LayerTreeHostQt::performScheduledLayerFlush()
     }
 
     m_webPage->send(Messages::LayerTreeHostProxy::DidRenderFrame());
+    m_waitingForUIProcess = true;
 
     if (!m_notifyAfterScheduledLayerFlush)
         return;
@@ -320,6 +321,8 @@ int64_t LayerTreeHostQt::adoptImageBackingStore(Image* image)
         graphicsContext->drawImage(image, ColorSpaceDeviceRGB, IntPoint::zero());
     }
 
+    // Qt uses BGRA internally, we swizzle to RGBA for OpenGL.
+    bitmap->swizzleRGB();
     ShareableBitmap::Handle handle;
     bitmap->createHandle(handle);
     m_webPage->send(Messages::LayerTreeHostProxy::CreateDirectlyCompositedImage(key, handle));
@@ -368,12 +371,12 @@ void LayerTreeHostQt::paintContents(const WebCore::GraphicsLayer* graphicsLayer,
     }
 }
 
-bool LayerTreeHostQt::showDebugBorders() const
+bool LayerTreeHostQt::showDebugBorders(const WebCore::GraphicsLayer*) const
 {
     return m_webPage->corePage()->settings()->showDebugBorders();
 }
 
-bool LayerTreeHostQt::showRepaintCounter() const
+bool LayerTreeHostQt::showRepaintCounter(const WebCore::GraphicsLayer*) const
 {
     return m_webPage->corePage()->settings()->showRepaintCounter();
 }
@@ -398,22 +401,12 @@ void LayerTreeHostQt::removeTile(WebLayerID layerID, int tileID)
     m_webPage->send(Messages::LayerTreeHostProxy::RemoveTileForLayer(layerID, tileID));
 }
 
-void LayerTreeHostQt::setVisibleContentRectForLayer(int layerID, const WebCore::IntRect& rect)
-{
-    WebGraphicsLayer* layer = WebGraphicsLayer::layerByID(layerID);
-    if (!layer)
-        return;
-    FloatRect visibleRect(rect);
-    layer->setVisibleContentRect(rect);
-}
-
 void LayerTreeHostQt::setVisibleContentRectAndScale(const IntRect& rect, float scale)
 {
-    WebGraphicsLayer* layer = toWebGraphicsLayer(m_rootLayer.get());
-    if (!layer)
-        return;
-    layer->setContentsScale(scale);
-    toWebGraphicsLayer(m_nonCompositedContentLayer.get())->setVisibleContentRect(rect);
+    if (m_rootLayer) {
+        toWebGraphicsLayer(m_rootLayer.get())->setVisibleContentRectAndScale(rect, scale);
+        scheduleLayerFlush();
+    }
 }
 
 void LayerTreeHostQt::setVisibleContentRectTrajectoryVector(const FloatPoint& trajectoryVector)

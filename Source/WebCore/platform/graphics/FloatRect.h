@@ -152,6 +152,7 @@ public:
 
     void intersect(const FloatRect&);
     void unite(const FloatRect&);
+    void uniteEvenIfEmpty(const FloatRect&);
     void uniteIfNonZero(const FloatRect&);
 
     // Note, this doesn't match what IntRect::contains(IntPoint&) does; the int version
@@ -268,6 +269,9 @@ inline bool operator!=(const FloatRect& a, const FloatRect& b)
 }
 
 IntRect enclosingIntRect(const FloatRect&);
+
+// Returns a valid IntRect contained within the given FloatRect.
+IntRect enclosedIntRect(const FloatRect&);
 
 // Map rect r from srcRect to an equivalent rect in destRect.
 FloatRect mapRect(const FloatRect& r, const FloatRect& srcRect, const FloatRect& destRect);

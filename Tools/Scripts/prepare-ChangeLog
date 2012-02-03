@@ -270,6 +270,14 @@ sub generateFunctionLists($$$$$)
             FUNCTION: foreach my $function_range_ref (@function_ranges) {
                 my @function_range = @$function_range_ref;
 
+                # FIXME: This is a hack. If the function name is empty, skip it.
+                # The cpp, python, javascript, perl, css and java parsers
+                # are not perfectly implemented and sometimes function names cannot be retrieved
+                # correctly. As you can see in get_function_line_ranges_XXXX(), those parsers
+                # are not intended to implement real parsers but intended to just retrieve function names
+                # for most practical syntaxes.
+                next unless $function_range[2];
+
                 # Advance to successive change ranges.
                 for (;; @change_range = @{shift @change_ranges}) {
                     last FUNCTION unless @change_range;
@@ -420,7 +428,7 @@ sub getLatestChangeLogs($)
 
     my @changeLogs = ();
     foreach my $prefix (@$prefixes) {
-        push @changeLogs, File::Spec->catfile($prefix || ".", "ChangeLog");
+        push @changeLogs, File::Spec->catfile($prefix || ".", changeLogFileName());
     }
     return \@changeLogs;
 }
@@ -459,7 +467,7 @@ sub generateNewChangeLogs($$$$$$$$$$$)
         my @old_change_log;
 
         if ($writeChangeLogs) {
-            my $changeLogPath = File::Spec->catfile($prefix || ".", "ChangeLog");
+            my $changeLogPath = File::Spec->catfile($prefix || ".", changeLogFileName());
             print STDERR "  Editing the ${changeLogPath} file.\n";
             open OLD_CHANGE_LOG, ${changeLogPath} or die "Could not open ${changeLogPath} file: $!.\n";
             # It's less efficient to read the whole thing into memory than it would be
@@ -532,7 +540,7 @@ sub openChangeLogs($)
     my ($changeLogs) = @_;
 
     print STDERR "  Opening the edited ChangeLog files.\n";
-    my $editor = $ENV{CHANGE_LOG_EDITOR};
+    my $editor = $ENV{CHANGE_LOG_EDITOR} || $ENV{VISUAL} || $ENV{EDITOR};
     if ($editor) {
         system ((split ' ', $editor), @$changeLogs);
     } else {
@@ -618,9 +626,12 @@ sub get_function_line_ranges_for_cpp($$)
     my $in_method_declaration = 0;
     my $in_parentheses = 0;
     my $in_braces = 0;
+    my $in_toplevel_array_brace = 0;
     my $brace_start = 0;
     my $brace_end = 0;
+    my $namespace_start = -1;
     my $skip_til_brace_or_semicolon = 0;
+    my $equal_observed = 0;
 
     my $word = "";
     my $interface_name = "";
@@ -695,11 +706,11 @@ sub get_function_line_ranges_for_cpp($$)
               } elsif (/{/) {
                   my $selector = method_decl_to_selector ($potential_method_spec);
                   $potential_name = "${potential_method_char}\[${interface_name} ${selector}\]";
-                  
+
                   $potential_method_spec = "";
                   $potential_method_char = "";
                   $in_method_declaration = 0;
-  
+
                   $_ = $original;
                   s/^[^;{]*//;
               } elsif (/\@end/) {
@@ -711,7 +722,7 @@ sub get_function_line_ranges_for_cpp($$)
               }
         }
 
-        
+
         # start of method declaration
         if ((my $method_char, my $method_spec) = m&^([-+])([^0-9;][^;]*);?$&) {
             my $original = $_;
@@ -731,7 +742,7 @@ sub get_function_line_ranges_for_cpp($$)
             if (/\{/) {
               my $selector = method_decl_to_selector ($potential_method_spec);
               $potential_name = "${potential_method_char}\[${interface_name} ${selector}\]";
-              
+
               $potential_method_spec = "";
               $potential_method_char = "";
               $in_method_declaration = 0;
@@ -748,7 +759,23 @@ sub get_function_line_ranges_for_cpp($$)
 
 
         # Find function, interface and method names.
-        while (m&((?:[[:word:]]+::)*operator(?:[ \t]*\(\)|[^()]*)|[[:word:]:~]+|[(){}:;])|\@(?:implementation|interface|protocol)\s+(\w+)[^{]*&g) {
+        while (m&((?:[[:word:]]+::)*operator(?:[ \t]*\(\)|[^()]*)|[[:word:]:~]+|[(){}:;=])|\@(?:implementation|interface|protocol)\s+(\w+)[^{]*&g) {
+            # Skip an array definition at the top level.
+            # e.g. static int arr[] = { 1, 2, 3 };
+            if ($1) {
+                if ($1 eq "=" and !$in_parentheses and !$in_braces) {
+                    $equal_observed = 1;
+                } elsif ($1 eq "{" and $equal_observed) {
+                    # This '{' is the beginning of an array definition, not the beginning of a method.
+                    $in_toplevel_array_brace = 1;
+                    $in_braces++;
+                    $equal_observed = 0;
+                    next;
+                } elsif ($1 !~ /[ \t]/) {
+                    $equal_observed = 0;
+                }
+            }
+
             # interface name
             if ($2) {
                 $interface_name = $2;
@@ -777,19 +804,27 @@ sub get_function_line_ranges_for_cpp($$)
             if ($1 eq "{") {
                 $skip_til_brace_or_semicolon = 0;
 
-                if ($potential_namespace) {
-                    push @namespaces, $potential_namespace;
-                    $potential_namespace = "";
-                    next;
-                }
+                if (!$in_braces) {
+                    if ($namespace_start >= 0 and $namespace_start < $potential_start) {
+                        push @ranges, [ $namespace_start . "", $potential_start - 1, $name ];
+                    }
 
-                # Promote potential name to real function name at the
-                # start of the outer level set of braces (function body?).
-                if (!$in_braces and $potential_start) {
-                    $start = $potential_start;
-                    $name = $potential_name;
-                    if (@namespaces && $name && (length($name) < 2 || substr($name,1,1) ne "[")) {
-                        $name = join ('::', @namespaces, $name);
+                    if ($potential_namespace) {
+                        push @namespaces, $potential_namespace;
+                        $potential_namespace = "";
+                        $name = $namespaces[-1];
+                        $namespace_start = $. + 1;
+                        next;
+                    }
+
+                    # Promote potential name to real function name at the
+                    # start of the outer level set of braces (function body?).
+                    if ($potential_start) {
+                        $start = $potential_start;
+                        $name = $potential_name;
+                        if (@namespaces && $name && (length($name) < 2 || substr($name,1,1) ne "[")) {
+                            $name = join ('::', @namespaces, $name);
+                        }
                     }
                 }
 
@@ -803,7 +838,18 @@ sub get_function_line_ranges_for_cpp($$)
             # Close brace.
             if ($1 eq "}") {
                 if (!$in_braces && @namespaces) {
+                    if ($namespace_start >= 0 and $namespace_start < $.) {
+                        push @ranges, [ $namespace_start . "", $. - 1, $name ];
+                    }
+
                     pop @namespaces;
+                    if (@namespaces) {
+                        $name = $namespaces[-1];
+                        $namespace_start = $. + 1;
+                    } else {
+                        $name = "";
+                        $namespace_start = -1;
+                    }
                     next;
                 }
 
@@ -813,8 +859,20 @@ sub get_function_line_ranges_for_cpp($$)
                 # End of an outer level set of braces.
                 # This could be a function body.
                 if (!$in_braces and $name) {
+                    # This is the end of an array definition at the top level, not the end of a method.
+                    if ($in_toplevel_array_brace) {
+                        $in_toplevel_array_brace = 0;
+                        next;
+                    }
+
                     push @ranges, [ $start, $., $name ];
-                    $name = "";
+                    if (@namespaces) {
+                        $name = $namespaces[-1];
+                        $namespace_start = $. + 1;
+                    } else {
+                        $name = "";
+                        $namespace_start = -1;
+                    }
                 }
 
                 $potential_start = 0;
@@ -1307,10 +1365,7 @@ sub get_function_line_ranges_for_perl($$)
                 $hereDocumentIdentifier = $1;
             }
             if (index($_, "}") == 0) {
-                unless ($start) {
-                    warn "nested functions found at top-level at $fileName:$.\n";
-                    next;
-                }
+                next unless $start;
                 push(@ranges, [$start, $., $currentFunction]);
                 $currentFunction = "";
                 $start = 0;
@@ -1707,11 +1762,11 @@ sub generateFileList(\%$$$)
                        && !scalar(grep(/^resources$/i, @components))
                        && !scalar(grep(/^script-tests$/i, @components));
             }
-            push @changedFiles, $file if $components[$#components] ne "ChangeLog";
+            push @changedFiles, $file if $components[$#components] ne changeLogFileName();
         } elsif (isConflictStatus($status, $gitCommit, $gitIndex) || isConflictStatus($propertyStatus, $gitCommit, $gitIndex)) {
             push @conflictFiles, $file;
         }
-        if (basename($file) ne "ChangeLog") {
+        if (basename($file) ne changeLogFileName()) {
             my $description = statusDescription($status, $propertyStatus, $original, $propertyChanges);
             $functionLists{$file} = $description if defined $description;
         }

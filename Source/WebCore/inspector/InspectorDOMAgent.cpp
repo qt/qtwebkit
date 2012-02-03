@@ -292,16 +292,19 @@ int InspectorDOMAgent::bind(Node* node, NodeToIdMap* nodesMap)
 
 void InspectorDOMAgent::unbind(Node* node, NodeToIdMap* nodesMap)
 {
+    int id = nodesMap->get(node);
+    if (!id)
+        return;
+
+    m_idToNode.remove(id);
+
     if (node->isFrameOwnerElement()) {
         const HTMLFrameOwnerElement* frameOwner = static_cast<const HTMLFrameOwnerElement*>(node);
         if (m_domListener)
             m_domListener->didRemoveDocument(frameOwner->contentDocument());
+        unbind(frameOwner->contentDocument(), nodesMap);
     }
 
-    int id = nodesMap->get(node);
-    if (!id)
-        return;
-    m_idToNode.remove(id);
     nodesMap->remove(node);
     bool childrenRequested = m_childrenRequested.contains(id);
     if (childrenRequested) {
@@ -527,7 +530,7 @@ void InspectorDOMAgent::setAttributesAsText(ErrorString* errorString, int elemen
         return;
     }
 
-    const NamedNodeMap* attrMap = toHTMLElement(child)->attributes(true);
+    const NamedNodeMap* attrMap = toHTMLElement(child)->updatedAttributes();
     if (!attrMap && name) {
         element->removeAttribute(*name);
         return;
@@ -613,30 +616,14 @@ void InspectorDOMAgent::getOuterHTML(ErrorString* errorString, int nodeId, WTF::
     if (!node)
         return;
 
-    if (node->isHTMLElement()) {
-        *outerHTML = static_cast<HTMLElement*>(node)->outerHTML();
-        return;
-    }
-
-    if (node->isCommentNode()) {
-        *outerHTML = "<!--" + node->nodeValue() + "-->";
-        return;
-    }
-
-    if (node->isTextNode()) {
-        *outerHTML = node->nodeValue();
-        return;
-    }
-
-    *errorString = "Only HTMLElements, Comments, and Text nodes are supported";
+    *outerHTML = createMarkup(node);
 }
 
-void InspectorDOMAgent::setOuterHTML(ErrorString* errorString, int nodeId, const String& outerHTML, int* newId)
+void InspectorDOMAgent::setOuterHTML(ErrorString* errorString, int nodeId, const String& outerHTML)
 {
     if (!nodeId) {
         DOMEditor domEditor(m_document.get());
-        domEditor.patch(outerHTML);
-        *newId = 0;
+        domEditor.patchDocument(outerHTML);
         return;
     }
 
@@ -644,54 +631,32 @@ void InspectorDOMAgent::setOuterHTML(ErrorString* errorString, int nodeId, const
     if (!node)
         return;
 
-    Node* parentNode = node->parentNode();
-    if (!parentNode) {
-        *errorString = "Editing of the detached nodes is not supported";
-        return;
-    }
-
-    Document* document = node->ownerDocument();
-    if (!document->isHTMLDocument()) {
+    Document* document = node->isDocumentNode() ? static_cast<Document*>(node) : node->ownerDocument();
+    if (!document || !document->isHTMLDocument()) {
         *errorString = "Not an HTML document";
         return;
     }
 
-    Node* previousSibling = node->previousSibling(); // Remember previous sibling before replacing node.
-
-    RefPtr<DocumentFragment> fragment = DocumentFragment::create(document);
-    fragment->parseHTML(outerHTML, parentNode->nodeType() == Node::ELEMENT_NODE ? static_cast<Element*>(parentNode) : document->documentElement());
+    DOMEditor domEditor(document);
 
     ExceptionCode ec = 0;
-    parentNode->replaceChild(fragment.release(), node, ec);
+    Node* newNode = domEditor.patchNode(node, outerHTML, ec);
     if (ec) {
-        *errorString = "Failed to replace Node with new contents";
+        ExceptionCodeDescription description(ec);
+        *errorString = description.name;
         return;
     }
 
-    bool requiresTotalUpdate = false;
-    if (node->isHTMLElement())
-        requiresTotalUpdate = node->nodeName() == "HTML" || node->nodeName() == "BODY" || node->nodeName() == "HEAD";
-
-    if (requiresTotalUpdate) {
-        RefPtr<Document> document = m_document;
-        reset();
-        setDocument(document.get());
-        *newId = 0;
-        return;
-    }
-
-    Node* newNode = previousSibling ? previousSibling->nextSibling() : parentNode->firstChild();
     if (!newNode) {
         // The only child node has been deleted.
-        *newId = 0;
         return;
     }
 
-    *newId = pushNodePathToFrontend(newNode);
+    int newId = pushNodePathToFrontend(newNode);
 
     bool childrenRequested = m_childrenRequested.contains(nodeId);
     if (childrenRequested)
-        pushChildNodesToFrontend(*newId);
+        pushChildNodesToFrontend(newId);
 }
 
 void InspectorDOMAgent::setNodeValue(ErrorString* errorString, int nodeId, const String& value)
@@ -816,7 +781,7 @@ void InspectorDOMAgent::performSearch(ErrorString*, const String& whitespaceTrim
                     break;
                 }
                 // Go through all attributes and serialize them.
-                const NamedNodeMap* attrMap = static_cast<Element*>(node)->attributes(true);
+                const NamedNodeMap* attrMap = static_cast<Element*>(node)->updatedAttributes();
                 if (!attrMap)
                     break;
 
@@ -1156,31 +1121,33 @@ PassRefPtr<InspectorObject> InspectorDOMAgent::buildObjectForNode(Node* node, in
         .setLocalName(localName)
         .setNodeValue(nodeValue);
 
-    if (node->nodeType() == Node::ELEMENT_NODE || node->nodeType() == Node::DOCUMENT_NODE || node->nodeType() == Node::DOCUMENT_FRAGMENT_NODE) {
+    if (node->isContainerNode()) {
         int nodeCount = innerChildNodeCount(node);
         value->setChildNodeCount(nodeCount);
         RefPtr<InspectorArray> children = buildArrayForContainerChildren(node, depth, nodesMap);
         if (children->length() > 0)
             value->setArray("children", children.release());
+    }
 
-        if (node->nodeType() == Node::ELEMENT_NODE) {
-            Element* element = static_cast<Element*>(node);
-            value->setArray("attributes", buildArrayForElementAttributes(element));
-            if (node->isFrameOwnerElement()) {
-                HTMLFrameOwnerElement* frameOwner = static_cast<HTMLFrameOwnerElement*>(node);
-                value->setDocumentURL(documentURLString(frameOwner->contentDocument()));
-            }
-        } else if (node->nodeType() == Node::DOCUMENT_NODE) {
-            Document* document = static_cast<Document*>(node);
-            value->setDocumentURL(documentURLString(document));
-            value->setXmlVersion(document->xmlVersion());
+    if (node->isElementNode()) {
+        Element* element = static_cast<Element*>(node);
+        value->setArray("attributes", buildArrayForElementAttributes(element));
+        if (node->isFrameOwnerElement()) {
+            HTMLFrameOwnerElement* frameOwner = static_cast<HTMLFrameOwnerElement*>(node);
+            Document* doc = frameOwner->contentDocument();
+            if (doc)
+                value->setContentDocument(buildObjectForNode(doc, 0, nodesMap));
         }
+    } else if (node->isDocumentNode()) {
+        Document* document = static_cast<Document*>(node);
+        value->setDocumentURL(documentURLString(document));
+        value->setXmlVersion(document->xmlVersion());
     } else if (node->nodeType() == Node::DOCUMENT_TYPE_NODE) {
         DocumentType* docType = static_cast<DocumentType*>(node);
         value->setPublicId(docType->publicId());
         value->setSystemId(docType->systemId());
         value->setInternalSubset(docType->internalSubset());
-    } else if (node->nodeType() == Node::ATTRIBUTE_NODE) {
+    } else if (node->isAttributeNode()) {
         Attr* attribute = static_cast<Attr*>(node);
         value->setName(attribute->name());
         value->setValue(attribute->value());
@@ -1192,7 +1159,7 @@ PassRefPtr<InspectorArray> InspectorDOMAgent::buildArrayForElementAttributes(Ele
 {
     RefPtr<InspectorArray> attributesValue = InspectorArray::create();
     // Go through all attributes and serialize them.
-    const NamedNodeMap* attrMap = element->attributes(true);
+    const NamedNodeMap* attrMap = element->updatedAttributes();
     if (!attrMap)
         return attributesValue.release();
     unsigned numAttrs = attrMap->length();
@@ -1249,12 +1216,6 @@ PassRefPtr<InspectorObject> InspectorDOMAgent::buildObjectForEventListener(const
 
 Node* InspectorDOMAgent::innerFirstChild(Node* node)
 {
-    if (node->isFrameOwnerElement()) {
-        HTMLFrameOwnerElement* frameOwner = static_cast<HTMLFrameOwnerElement*>(node);
-        Document* doc = frameOwner->contentDocument();
-        if (doc)
-            return doc->firstChild();
-    }
     node = node->firstChild();
     while (isWhitespace(node))
         node = node->nextSibling();
@@ -1290,10 +1251,11 @@ unsigned InspectorDOMAgent::innerChildNodeCount(Node* node)
 
 Node* InspectorDOMAgent::innerParentNode(Node* node)
 {
-    ContainerNode* parent = node->parentNode();
-    if (parent && parent->isDocumentNode())
-        return static_cast<Document*>(parent)->ownerElement();
-    return parent;
+    if (node->isDocumentNode()) {
+        Document* document = static_cast<Document*>(node);
+        return document->ownerElement();
+    }
+    return node->parentNode();
 }
 
 bool InspectorDOMAgent::isWhitespace(Node* node)
@@ -1477,15 +1439,6 @@ Node* InspectorDOMAgent::nodeForPath(const String& path)
         node = child;
     }
     return node;
-}
-
-void InspectorDOMAgent::copyNode(ErrorString*, int nodeId)
-{
-    Node* node = nodeForId(nodeId);
-    if (!node)
-        return;
-    String markup = createMarkup(node);
-    Pasteboard::generalPasteboard()->writePlainText(markup);
 }
 
 void InspectorDOMAgent::pushNodeByPathToFrontend(ErrorString*, const String& path, int* nodeId)

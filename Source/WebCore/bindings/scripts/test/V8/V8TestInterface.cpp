@@ -33,7 +33,6 @@
 #include "V8IsolatedContext.h"
 #include "V8Proxy.h"
 #include "V8TestObj.h"
-#include "V8TestSupplemental.h"
 #include <wtf/GetPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -134,7 +133,7 @@ static const BatchedAttribute TestInterfaceAttrs[] = {
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 #if ENABLE(Condition11) || ENABLE(Condition12)
     // Attribute 'supplementalStr3' (Type: 'attribute' ExtAttr: 'CustomSetter CustomGetter Conditional ImplementedBy')
-    {"supplementalStr3", V8TestSupplemental::supplementalStr3AccessorGetter, V8TestSupplemental::supplementalStr3AccessorSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    {"supplementalStr3", V8TestInterface::supplementalStr3AccessorGetter, V8TestInterface::supplementalStr3AccessorSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 };
 
@@ -142,7 +141,27 @@ static const BatchedCallback TestInterfaceCallbacks[] = {
 #if ENABLE(Condition11) || ENABLE(Condition12)
     {"supplementalMethod1", TestInterfaceInternal::supplementalMethod1Callback},
 #endif
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    {"supplementalMethod3", V8TestInterface::supplementalMethod3Callback},
+#endif
 };
+
+static const BatchedConstant TestInterfaceConsts[] = {
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    {"SUPPLEMENTALCONSTANT1", static_cast<signed int>(1)},
+#endif
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    {"SUPPLEMENTALCONSTANT2", static_cast<signed int>(2)},
+#endif
+};
+
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+COMPILE_ASSERT(1 == TestInterface::SUPPLEMENTALCONSTANT1, TestInterfaceEnumSUPPLEMENTALCONSTANT1IsWrongUseDontCheckEnums);
+#endif
+#if ENABLE(Condition11) || ENABLE(Condition12)
+COMPILE_ASSERT(2 == TestInterface::CONST_IMPL, TestInterfaceEnumCONST_IMPLIsWrongUseDontCheckEnums);
+#endif
 
 v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& args)
 {
@@ -200,6 +219,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceTemplate(v8:
 #if ENABLE(Condition11) || ENABLE(Condition12)
     proto->Set(v8::String::New("supplementalMethod2"), v8::FunctionTemplate::New(TestInterfaceInternal::supplementalMethod2Callback, v8::Handle<v8::Value>(), supplementalMethod2Signature));
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
+    batchConfigureConstants(desc, proto, TestInterfaceConsts, WTF_ARRAY_LENGTH(TestInterfaceConsts));
 
     // Custom toString template
     desc->Set(getToStringName(), getToStringTemplate());

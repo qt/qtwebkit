@@ -31,6 +31,9 @@
 #ifndef DOMEditor_h
 #define DOMEditor_h
 
+#include "ExceptionCode.h"
+
+#include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
@@ -40,7 +43,7 @@ namespace WebCore {
 
 class ContainerNode;
 class Document;
-class Element;
+class NamedNodeMap;
 class Node;
 
 #if ENABLE(INSPECTOR)
@@ -50,17 +53,25 @@ public:
     explicit DOMEditor(Document*);
     virtual ~DOMEditor();
 
-    void patch(const String& markup);
+    void patchDocument(const String& markup);
+    Node* patchNode(Node*, const String& markup, ExceptionCode&);
 
 private:
-    struct NodeDigest;
+    struct Digest;
+    typedef Vector<pair<Digest*, size_t> > ResultMap;
+    typedef HashMap<String, Digest*> UnusedNodesMap;
 
-    bool patchElement(Element* oldElement, Element* newElement);
-    bool patchNode(NodeDigest* oldNode, NodeDigest* newNode);
-    bool patchChildren(ContainerNode* oldParent, Vector<OwnPtr<NodeDigest> >& oldChildren, Vector<OwnPtr<NodeDigest> >& newChildren);
-    PassOwnPtr<NodeDigest> createNodeDigest(Node*);
+    void innerPatchNode(Digest* oldNode, Digest* newNode, ExceptionCode&);
+    std::pair<ResultMap, ResultMap> diff(const Vector<OwnPtr<Digest> >& oldChildren, const Vector<OwnPtr<Digest> >& newChildren);
+    void innerPatchChildren(ContainerNode*, const Vector<OwnPtr<Digest> >& oldChildren, const Vector<OwnPtr<Digest> >& newChildren, ExceptionCode&);
+    PassOwnPtr<Digest> createDigest(Node*, UnusedNodesMap*);
+    void insertBefore(ContainerNode*, Digest*, Node* anchor, ExceptionCode&);
+    void removeChild(Digest*, ExceptionCode&);
+    void markNodeAsUsed(Digest*);
 
     Document* m_document;
+
+    UnusedNodesMap m_unusedNodesMap;
 };
 
 #endif // ENABLE(INSPECTOR)

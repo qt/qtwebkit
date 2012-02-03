@@ -40,18 +40,18 @@ class QtWebPageEventHandler : public QObject {
     Q_OBJECT
 
 public:
-    QtWebPageEventHandler(WKPageRef, QQuickWebPage*);
+    QtWebPageEventHandler(WKPageRef, QQuickWebPage*, QQuickWebView*);
     ~QtWebPageEventHandler();
 
     bool handleEvent(QEvent*);
 
     void setViewportInteractionEngine(QtViewportInteractionEngine*);
 
+    void handlePotentialSingleTapEvent(const QTouchEvent::TouchPoint&);
     void handleSingleTapEvent(const QTouchEvent::TouchPoint&);
     void handleDoubleTapEvent(const QTouchEvent::TouchPoint&);
 
     void didFindZoomableArea(const WebCore::IntPoint& target, const WebCore::IntRect& area);
-    void focusEditableArea(const WebCore::IntRect& caret, const WebCore::IntRect& area);
     void updateTextInputState();
     void doneWithGestureEvent(const WebGestureEvent& event, bool wasEventHandled);
     void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled);
@@ -68,6 +68,10 @@ protected:
     QtPinchGestureRecognizer m_pinchGestureRecognizer;
     QtTapGestureRecognizer m_tapGestureRecognizer;
     QQuickWebPage* m_webPage;
+    QQuickWebView* m_webView;
+
+private slots:
+    void inputPanelVisibleChanged();
 
 private:
     bool handleKeyPressEvent(QKeyEvent*);

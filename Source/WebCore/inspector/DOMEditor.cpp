@@ -33,14 +33,18 @@
 
 #if ENABLE(INSPECTOR)
 
+#include "Attribute.h"
 #include "Base64.h"
 #include "Document.h"
+#include "DocumentFragment.h"
 #include "HTMLDocument.h"
 #include "HTMLDocumentParser.h"
 #include "HTMLElement.h"
 #include "HTMLHeadElement.h"
+#include "HTMLNames.h"
 #include "Node.h"
 
+#include <wtf/Deque.h>
 #include <wtf/RefPtr.h>
 #include <wtf/SHA1.h>
 #include <wtf/text/CString.h>
@@ -49,20 +53,24 @@ using namespace std;
 
 namespace WebCore {
 
-struct DOMEditor::NodeDigest {
-    NodeDigest(Node* node) : m_node(node) { }
+using HTMLNames::bodyTag;
+using HTMLNames::headTag;
+using HTMLNames::htmlTag;
 
-    String m_digest;
-    String m_attrsDigest;
+struct DOMEditor::Digest {
+    explicit Digest(Node* node) : m_node(node) { }
+
+    String m_sha1;
+    String m_attrsSHA1;
     Node* m_node;
-    Vector<OwnPtr<NodeDigest> > m_children;
+    Vector<OwnPtr<Digest> > m_children;
 };
 
 DOMEditor::DOMEditor(Document* document) : m_document(document) { }
 
 DOMEditor::~DOMEditor() { }
 
-void DOMEditor::patch(const String& markup)
+void DOMEditor::patchDocument(const String& markup)
 {
     RefPtr<HTMLDocument> newDocument = HTMLDocument::create(0, KURL());
     RefPtr<DocumentParser> parser = HTMLDocumentParser::create(newDocument.get(), false);
@@ -70,103 +78,150 @@ void DOMEditor::patch(const String& markup)
     parser->finish();
     parser->detach();
 
-    if (!patchElement(m_document->head(), newDocument->head()) || !patchElement(m_document->body(), newDocument->body())) {
+    ExceptionCode ec = 0;
+    OwnPtr<Digest> oldInfo = createDigest(m_document->documentElement(), 0);
+    OwnPtr<Digest> newInfo = createDigest(newDocument->documentElement(), &m_unusedNodesMap);
+    innerPatchNode(oldInfo.get(), newInfo.get(), ec);
+
+    if (ec) {
         // Fall back to rewrite.
         m_document->write(markup);
         m_document->close();
     }
 }
 
-bool DOMEditor::patchElement(Element* oldElement, Element* newElement)
+Node* DOMEditor::patchNode(Node* node, const String& markup, ExceptionCode& ec)
 {
-    if (oldElement)  {
-        if (newElement) {
-            OwnPtr<NodeDigest> oldInfo = createNodeDigest(oldElement);
-            OwnPtr<NodeDigest> newInfo = createNodeDigest(newElement);
-            return patchNode(oldInfo.get(), newInfo.get());
-        }
-        oldElement->removeAllChildren();
-        return true;
+    // Don't parse <html> as a fragment.
+    if (node->isDocumentNode() || (node->parentNode() && node->parentNode()->isDocumentNode())) {
+        patchDocument(markup);
+        return 0;
     }
-    if (newElement) {
-        ExceptionCode ec = 0;
-        m_document->documentElement()->appendChild(newElement, ec);
-        return !ec;
+
+    Node* previousSibling = node->previousSibling();
+    RefPtr<DocumentFragment> fragment = DocumentFragment::create(m_document);
+    fragment->parseHTML(markup, node->parentElement() ? node->parentElement() : m_document->documentElement());
+
+    // Compose the old list.
+    ContainerNode* parentNode = node->parentNode();
+    Vector<OwnPtr<Digest> > oldList;
+    for (Node* child = parentNode->firstChild(); child; child = child->nextSibling())
+        oldList.append(createDigest(child, 0));
+
+    // Compose the new list.
+    String markupCopy = markup;
+    markupCopy.makeLower();
+    Vector<OwnPtr<Digest> > newList;
+    for (Node* child = parentNode->firstChild(); child != node; child = child->nextSibling())
+        newList.append(createDigest(child, 0));
+    for (Node* child = fragment->firstChild(); child; child = child->nextSibling()) {
+        if (child->hasTagName(headTag) && !child->firstChild() && markupCopy.find("</head>") == notFound)
+            continue; // HTML5 parser inserts empty <head> tag whenever it parses <body>
+        if (child->hasTagName(bodyTag) && !child->firstChild() && markupCopy.find("</body>") == notFound)
+            continue; // HTML5 parser inserts empty <body> tag whenever it parses </head>
+        newList.append(createDigest(child, &m_unusedNodesMap));
     }
-    return true;
+    for (Node* child = node->nextSibling(); child; child = child->nextSibling())
+        newList.append(createDigest(child, 0));
+
+    innerPatchChildren(parentNode, oldList, newList, ec);
+    if (ec) {
+        // Fall back to total replace.
+        ec = 0;
+        parentNode->replaceChild(fragment.release(), node, ec);
+        if (ec)
+            return 0;
+    }
+    return previousSibling ? previousSibling->nextSibling() : parentNode->firstChild();
 }
 
-bool DOMEditor::patchNode(NodeDigest* oldDigest, NodeDigest* newDigest)
+void DOMEditor::innerPatchNode(Digest* oldDigest, Digest* newDigest, ExceptionCode& ec)
 {
-    if (oldDigest->m_digest == newDigest->m_digest)
-        return true;
+    if (oldDigest->m_sha1 == newDigest->m_sha1)
+        return;
 
     Node* oldNode = oldDigest->m_node;
     Node* newNode = newDigest->m_node;
 
     if (newNode->nodeType() != oldNode->nodeType() || newNode->nodeName() != oldNode->nodeName()) {
-        ExceptionCode ec = 0;
         oldNode->parentNode()->replaceChild(newNode, oldNode, ec);
-        if (ec)
-            return false;
-        return true;
+        return;
     }
 
-    ExceptionCode ec = 0;
     if (oldNode->nodeValue() != newNode->nodeValue())
         oldNode->setNodeValue(newNode->nodeValue(), ec);
     if (ec)
-        return false;
+        return;
 
-    if (oldNode->nodeType() == Node::ELEMENT_NODE && oldDigest->m_attrsDigest != newDigest->m_attrsDigest) {
-        Element* oldElement = static_cast<Element*>(oldNode);
-        Element* newElement = static_cast<Element*>(newNode);
-        oldElement->setAttributesFromElement(*newElement);
+    if (oldNode->nodeType() != Node::ELEMENT_NODE)
+        return;
+
+    // Patch attributes
+    Element* oldElement = static_cast<Element*>(oldNode);
+    Element* newElement = static_cast<Element*>(newNode);
+    if (oldDigest->m_attrsSHA1 != newDigest->m_attrsSHA1) {
+        NamedNodeMap* oldAttributeMap = oldElement->attributeMap();
+
+        while (oldAttributeMap && oldAttributeMap->length())
+            oldAttributeMap->removeAttribute(0);
+
+        NamedNodeMap* newAttributeMap = newElement->attributeMap();
+        if (newAttributeMap) {
+            size_t numAttrs = newAttributeMap->length();
+            for (size_t i = 0; i < numAttrs; ++i) {
+                const Attribute* attribute = newAttributeMap->attributeItem(i);
+                oldElement->setAttribute(attribute->name(), attribute->value());
+            }
+        }
     }
-    if (oldDigest->m_node->nodeType() != Node::ELEMENT_NODE)
-        return true;
 
-    return patchChildren(static_cast<ContainerNode*>(oldNode), oldDigest->m_children, newDigest->m_children);
+    innerPatchChildren(oldElement, oldDigest->m_children, newDigest->m_children, ec);
+    m_unusedNodesMap.remove(newDigest->m_sha1);
 }
 
-bool DOMEditor::patchChildren(ContainerNode* oldParent, Vector<OwnPtr<NodeDigest> >& oldList, Vector<OwnPtr<NodeDigest> >& newList)
+pair<DOMEditor::ResultMap, DOMEditor::ResultMap>
+DOMEditor::diff(const Vector<OwnPtr<Digest> >& oldList, const Vector<OwnPtr<Digest> >& newList)
 {
-    // Trim tail.
-    size_t offset = 0;
-    for (; offset < oldList.size() && offset < newList.size() && oldList[oldList.size() - offset - 1]->m_digest == newList[newList.size() - offset - 1]->m_digest; ++offset) { }
-    if (offset > 0) {
-        oldList.resize(oldList.size() - offset);
-        newList.resize(newList.size() - offset);
-    }
-
-    // Trim head.
-    for (offset = 0; offset < oldList.size() && offset < newList.size() && oldList[offset]->m_digest == newList[offset]->m_digest; ++offset) { }
-    if (offset > 0) {
-        oldList.remove(0, offset);
-        newList.remove(0, offset);
-    }
-
-    // Diff the children lists.
-    typedef Vector<pair<NodeDigest*, size_t> > ResultMap;
     ResultMap newMap(newList.size());
     ResultMap oldMap(oldList.size());
 
-    for (size_t i = 0; i < oldMap.size(); ++i)
+    for (size_t i = 0; i < oldMap.size(); ++i) {
         oldMap[i].first = 0;
-    for (size_t i = 0; i < newMap.size(); ++i)
+        oldMap[i].second = 0;
+    }
+
+    for (size_t i = 0; i < newMap.size(); ++i) {
         newMap[i].first = 0;
+        newMap[i].second = 0;
+    }
+
+    // Trim head and tail.
+    for (size_t i = 0; i < oldList.size() && i < newList.size() && oldList[i]->m_sha1 == newList[i]->m_sha1; ++i) {
+        oldMap[i].first = oldList[i].get();
+        oldMap[i].second = i;
+        newMap[i].first = newList[i].get();
+        newMap[i].second = i;
+    }
+    for (size_t i = 0; i < oldList.size() && i < newList.size() && oldList[oldList.size() - i - 1]->m_sha1 == newList[newList.size() - i - 1]->m_sha1; ++i) {
+        size_t oldIndex = oldList.size() - i - 1;
+        size_t newIndex = newList.size() - i - 1;
+        oldMap[oldIndex].first = oldList[oldIndex].get();
+        oldMap[oldIndex].second = newIndex;
+        newMap[newIndex].first = newList[newIndex].get();
+        newMap[newIndex].second = oldIndex;
+    }
 
     typedef HashMap<String, Vector<size_t> > DiffTable;
     DiffTable newTable;
     DiffTable oldTable;
 
     for (size_t i = 0; i < newList.size(); ++i) {
-        DiffTable::iterator it = newTable.add(newList[i]->m_digest, Vector<size_t>()).first;
+        DiffTable::iterator it = newTable.add(newList[i]->m_sha1, Vector<size_t>()).first;
         it->second.append(i);
     }
 
     for (size_t i = 0; i < oldList.size(); ++i) {
-        DiffTable::iterator it = oldTable.add(oldList[i]->m_digest, Vector<size_t>()).first;
+        DiffTable::iterator it = oldTable.add(oldList[i]->m_sha1, Vector<size_t>()).first;
         it->second.append(i);
     }
 
@@ -177,7 +232,7 @@ bool DOMEditor::patchChildren(ContainerNode* oldParent, Vector<OwnPtr<NodeDigest
         DiffTable::iterator oldIt = oldTable.find(newIt->first);
         if (oldIt == oldTable.end() || oldIt->second.size() != 1)
             continue;
-        make_pair(newList[newIt->second[0]].get(), oldIt->second[0]);
+
         newMap[newIt->second[0]] = make_pair(newList[newIt->second[0]].get(), oldIt->second[0]);
         oldMap[oldIt->second[0]] = make_pair(oldList[oldIt->second[0]].get(), newIt->second[0]);
     }
@@ -187,7 +242,7 @@ bool DOMEditor::patchChildren(ContainerNode* oldParent, Vector<OwnPtr<NodeDigest
             continue;
 
         size_t j = newMap[i].second + 1;
-        if (j < oldMap.size() && !oldMap[j].first && newList[i + 1]->m_digest == oldList[j]->m_digest) {
+        if (j < oldMap.size() && !oldMap[j].first && newList[i + 1]->m_sha1 == oldList[j]->m_sha1) {
             newMap[i + 1] = make_pair(newList[i + 1].get(), j);
             oldMap[j] = make_pair(oldList[j].get(), i + 1);
         }
@@ -198,45 +253,108 @@ bool DOMEditor::patchChildren(ContainerNode* oldParent, Vector<OwnPtr<NodeDigest
             continue;
 
         size_t j = newMap[i].second - 1;
-        if (!oldMap[j].first && newList[i - 1]->m_digest == oldList[j]->m_digest) {
+        if (!oldMap[j].first && newList[i - 1]->m_sha1 == oldList[j]->m_sha1) {
             newMap[i - 1] = make_pair(newList[i - 1].get(), j);
             oldMap[j] = make_pair(oldList[j].get(), i - 1);
         }
     }
 
-    HashSet<NodeDigest*> merges;
+    return make_pair(oldMap, newMap);
+}
+
+void DOMEditor::innerPatchChildren(ContainerNode* parentNode, const Vector<OwnPtr<Digest> >& oldList, const Vector<OwnPtr<Digest> >& newList, ExceptionCode& ec)
+{
+    pair<ResultMap, ResultMap> resultMaps = diff(oldList, newList);
+    ResultMap& oldMap = resultMaps.first;
+    ResultMap& newMap = resultMaps.second;
+
+    Digest* oldHead = 0;
+    Digest* oldBody = 0;
+
+    // 1. First strip everything except for the nodes that retain. Collect pending merges.
+    HashMap<Digest*, Digest*> merges;
     for (size_t i = 0; i < oldList.size(); ++i) {
         if (oldMap[i].first)
             continue;
 
+        // Always match <head> and <body> tags with each other - we can't remove them from the DOM
+        // upon patching.
+        if (oldList[i]->m_node->hasTagName(headTag)) {
+            oldHead = oldList[i].get();
+            continue;
+        }
+        if (oldList[i]->m_node->hasTagName(bodyTag)) {
+            oldBody = oldList[i].get();
+            continue;
+        }
+
         // Check if this change is between stable nodes. If it is, consider it as "modified".
-        if ((!i || oldMap[i - 1].first) && (i == oldMap.size() - 1 || oldMap[i + 1].first)) {
+        if (!m_unusedNodesMap.contains(oldList[i]->m_sha1) && (!i || oldMap[i - 1].first) && (i == oldMap.size() - 1 || oldMap[i + 1].first)) {
             size_t anchorCandidate = i ? oldMap[i - 1].second + 1 : 0;
             size_t anchorAfter = i == oldMap.size() - 1 ? anchorCandidate + 1 : oldMap[i + 1].second;
-            if (anchorAfter - anchorCandidate == 1 && anchorCandidate < newList.size()) {
-                if (!patchNode(oldList[i].get(), newList[anchorCandidate].get()))
-                    return false;
-
-                merges.add(newList[anchorCandidate].get());
-            } else
-                oldList[i]->m_node->parentNode()->removeChild(oldList[i]->m_node);
+            if (anchorAfter - anchorCandidate == 1 && anchorCandidate < newList.size())
+                merges.set(newList[anchorCandidate].get(), oldList[i].get());
+            else {
+                removeChild(oldList[i].get(), ec);
+                if (ec)
+                    return;
+            }
         } else {
-            ContainerNode* parentNode = static_cast<ContainerNode*>(oldList[i]->m_node->parentNode());
-            parentNode->removeChild(oldList[i]->m_node);
+            removeChild(oldList[i].get(), ec);
+            if (ec)
+                return;
         }
     }
 
+    // Mark retained nodes as used.
+    for (size_t i = 0; i < newList.size(); ++i) {
+        if (newMap[i].first)
+            markNodeAsUsed(newMap[i].first);
+    }
+
+    // Mark <head> and <body> nodes for merge.
+    if (oldHead || oldBody) {
+        for (size_t i = 0; i < newList.size(); ++i) {
+            if (oldHead && newList[i]->m_node->hasTagName(headTag))
+                merges.set(newList[i].get(), oldHead);
+            if (oldBody && newList[i]->m_node->hasTagName(bodyTag))
+                merges.set(newList[i].get(), oldBody);
+        }
+    }
+
+    // 2. Patch nodes marked for merge.
+    for (HashMap<Digest*, Digest*>::iterator it = merges.begin(); it != merges.end(); ++it) {
+        innerPatchNode(it->second, it->first, ec);
+        if (ec)
+            return;
+    }
+
+    // 3. Insert missing nodes.
     for (size_t i = 0; i < newMap.size(); ++i) {
         if (newMap[i].first || merges.contains(newList[i].get()))
             continue;
 
         ExceptionCode ec = 0;
-        oldParent->insertBefore(newList[i]->m_node, oldParent->childNode(i + offset), ec);
+        insertBefore(parentNode, newList[i].get(), parentNode->childNode(i), ec);
         if (ec)
-            return false;
+            return;
     }
 
-    return true;
+    // 4. Then put all nodes that retained into their slots (sort by new index).
+    for (size_t i = 0; i < oldMap.size(); ++i) {
+        if (!oldMap[i].first)
+            continue;
+        RefPtr<Node> node = oldMap[i].first->m_node;
+        Node* anchorNode = parentNode->childNode(oldMap[i].second);
+        if (node.get() == anchorNode)
+            continue;
+        if (node->hasTagName(bodyTag) || node->hasTagName(headTag))
+            continue; // Never move head or body, move the rest of the nodes around them.
+
+        parentNode->insertBefore(node, anchorNode, ec);
+        if (ec)
+            return;
+    }
 }
 
 static void addStringToSHA1(SHA1& sha1, const String& string)
@@ -245,9 +363,9 @@ static void addStringToSHA1(SHA1& sha1, const String& string)
     sha1.addBytes(reinterpret_cast<const uint8_t*>(cString.data()), cString.length());
 }
 
-PassOwnPtr<DOMEditor::NodeDigest> DOMEditor::createNodeDigest(Node* node)
+PassOwnPtr<DOMEditor::Digest> DOMEditor::createDigest(Node* node, UnusedNodesMap* unusedNodesMap)
 {
-    NodeDigest* nodeDigest = new NodeDigest(node);
+    Digest* digest = new Digest(node);
 
     SHA1 sha1;
 
@@ -259,33 +377,78 @@ PassOwnPtr<DOMEditor::NodeDigest> DOMEditor::createNodeDigest(Node* node)
     if (node->nodeType() == Node::ELEMENT_NODE) {
         Node* child = node->firstChild();
         while (child) {
-            OwnPtr<NodeDigest> childInfo = createNodeDigest(child);
-            addStringToSHA1(sha1, childInfo->m_digest);
+            OwnPtr<Digest> childInfo = createDigest(child, unusedNodesMap);
+            addStringToSHA1(sha1, childInfo->m_sha1);
             child = child->nextSibling();
-            nodeDigest->m_children.append(childInfo.release());
+            digest->m_children.append(childInfo.release());
         }
-
         Element* element = static_cast<Element*>(node);
-        const NamedNodeMap* attrMap = element->attributes(true);
+
+        NamedNodeMap* attrMap = element->attributeMap();
         if (attrMap && attrMap->length()) {
-            unsigned numAttrs = attrMap->length();
+            size_t numAttrs = attrMap->length();
             SHA1 attrsSHA1;
-            for (unsigned i = 0; i < numAttrs; ++i) {
+            for (size_t i = 0; i < numAttrs; ++i) {
                 const Attribute* attribute = attrMap->attributeItem(i);
                 addStringToSHA1(attrsSHA1, attribute->name().toString());
                 addStringToSHA1(attrsSHA1, attribute->value());
             }
             Vector<uint8_t, 20> attrsHash;
             attrsSHA1.computeHash(attrsHash);
-            nodeDigest->m_attrsDigest = base64Encode(reinterpret_cast<const char*>(attrsHash.data()), 10);
-            addStringToSHA1(sha1, nodeDigest->m_attrsDigest);
+            digest->m_attrsSHA1 = base64Encode(reinterpret_cast<const char*>(attrsHash.data()), 10);
+            addStringToSHA1(sha1, digest->m_attrsSHA1);
         }
     }
 
     Vector<uint8_t, 20> hash;
     sha1.computeHash(hash);
-    nodeDigest->m_digest = base64Encode(reinterpret_cast<const char*>(hash.data()), 10);
-    return adoptPtr(nodeDigest);
+    digest->m_sha1 = base64Encode(reinterpret_cast<const char*>(hash.data()), 10);
+    if (unusedNodesMap)
+        unusedNodesMap->add(digest->m_sha1, digest);
+    return adoptPtr(digest);
+}
+
+void DOMEditor::insertBefore(ContainerNode* parentNode, Digest* digest, Node* anchor, ExceptionCode& ec)
+{
+    parentNode->insertBefore(digest->m_node, anchor, ec);
+    markNodeAsUsed(digest);
+}
+
+void DOMEditor::removeChild(Digest* oldDigest, ExceptionCode& ec)
+{
+    RefPtr<Node> oldNode = oldDigest->m_node;
+    oldNode->parentNode()->removeChild(oldNode.get(), ec);
+
+    // Diff works within levels. In order not to lose the node identity when user
+    // prepends his HTML with "<div>" (i.e. all nodes are shifted to the next nested level),
+    // prior to dropping the original node on the floor, check whether new DOM has a digest
+    // with matching sha1. If it does, replace it with the original DOM chunk. Chances are
+    // high that it will get merged back into the original DOM during the further patching.
+
+    UnusedNodesMap::iterator it = m_unusedNodesMap.find(oldDigest->m_sha1);
+    if (it != m_unusedNodesMap.end()) {
+        Digest* newDigest = it->second;
+        Node* newNode = newDigest->m_node;
+        newNode->parentNode()->replaceChild(oldNode, newNode, ec);
+        newDigest->m_node = oldNode.get();
+        markNodeAsUsed(newDigest);
+        return;
+    }
+
+    for (size_t i = 0; i < oldDigest->m_children.size(); ++i)
+        removeChild(oldDigest->m_children[i].get(), ec);
+}
+
+void DOMEditor::markNodeAsUsed(Digest* digest)
+{
+    Deque<Digest*> queue;
+    queue.append(digest);
+    while (!queue.isEmpty()) {
+        Digest* first = queue.takeFirst();
+        m_unusedNodesMap.remove(first->m_sha1);
+        for (size_t i = 0; i < first->m_children.size(); ++i)
+            queue.append(first->m_children[i].get());
+    }
 }
 
 } // namespace WebCore

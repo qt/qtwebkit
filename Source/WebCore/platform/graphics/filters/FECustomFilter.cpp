@@ -34,6 +34,9 @@
 
 #include "CachedShader.h"
 #include "CustomFilterMesh.h"
+#include "CustomFilterNumberParameter.h"
+#include "CustomFilterParameter.h"
+#include "CustomFilterProgram.h"
 #include "CustomFilterShader.h"
 #include "Document.h"
 #include "DrawingBuffer.h"
@@ -73,13 +76,13 @@ static void orthogonalProjectionMatrix(TransformationMatrix& matrix, float left,
     matrix.setM44(1.0f);
 }
 
-FECustomFilter::FECustomFilter(Filter* filter, Document* document, const String& vertexShader, const String& fragmentShader,
+FECustomFilter::FECustomFilter(Filter* filter, Document* document, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
                                unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType meshBoxType,
                                CustomFilterOperation::MeshType meshType)
     : FilterEffect(filter)
     , m_document(document)
-    , m_vertexShader(vertexShader)
-    , m_fragmentShader(fragmentShader)
+    , m_program(program)
+    , m_parameters(parameters)
     , m_meshRows(meshRows)
     , m_meshColumns(meshColumns)
     , m_meshBoxType(meshBoxType)
@@ -87,11 +90,11 @@ FECustomFilter::FECustomFilter(Filter* filter, Document* document, const String&
 {
 }
 
-PassRefPtr<FECustomFilter> FECustomFilter::create(Filter* filter, Document* document, const String& vertexShader, const String& fragmentShader,
+PassRefPtr<FECustomFilter> FECustomFilter::create(Filter* filter, Document* document, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
                                            unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType meshBoxType,
                                            CustomFilterOperation::MeshType meshType)
 {
-    return adoptRef(new FECustomFilter(filter, document, vertexShader, fragmentShader, meshRows, meshColumns, meshBoxType, meshType));
+    return adoptRef(new FECustomFilter(filter, document, program, parameters, meshRows, meshColumns, meshBoxType, meshType));
 }
 
 void FECustomFilter::platformApplySoftware()
@@ -116,6 +119,10 @@ void FECustomFilter::platformApplySoftware()
     if (m_inputTexture->tiles().numTiles() != 1)
         return;
     
+    // The shader had compiler errors. We cannot draw anything.
+    if (!m_shader->isInitialized())
+        return;
+    
     m_context->clearColor(0, 0, 0, 0);
     m_context->clear(GraphicsContext3D::COLOR_BUFFER_BIT | GraphicsContext3D::DEPTH_BUFFER_BIT);
     
@@ -137,10 +144,11 @@ void FECustomFilter::initializeContext(const IntSize& contextSize)
     attributes.preserveDrawingBuffer = true;
     attributes.premultipliedAlpha = false;
     
+    ASSERT(!m_context.get());
     m_context = GraphicsContext3D::create(attributes, m_document->view()->root()->hostWindow(), GraphicsContext3D::RenderOffscreen);
     m_drawingBuffer = DrawingBuffer::create(m_context.get(), contextSize, !attributes.preserveDrawingBuffer);
     
-    m_shader = CustomFilterShader::create(m_context.get(), m_vertexShader, m_fragmentShader);
+    m_shader = m_program->createShaderWithContext(m_context.get());
     m_mesh = CustomFilterMesh::create(m_context.get(), m_meshColumns, m_meshRows, 
                                       FloatRect(0, 0, 1, 1),
                                       m_meshType);
@@ -163,6 +171,46 @@ void FECustomFilter::bindVertexAttribute(int attributeLocation, unsigned size, u
         m_context->enableVertexAttribArray(attributeLocation);
     }
     offset += size * sizeof(float);
+}
+
+void FECustomFilter::bindProgramNumberParameters(int uniformLocation, CustomFilterNumberParameter* numberParameter)
+{
+    switch (numberParameter->size()) {
+    case 1:
+        m_context->uniform1f(uniformLocation, numberParameter->valueAt(0));
+        break;
+    case 2:
+        m_context->uniform2f(uniformLocation, numberParameter->valueAt(0), numberParameter->valueAt(1));
+        break;
+    case 3:
+        m_context->uniform3f(uniformLocation, numberParameter->valueAt(0), numberParameter->valueAt(1), numberParameter->valueAt(2));
+        break;
+    case 4:
+        m_context->uniform4f(uniformLocation, numberParameter->valueAt(0), numberParameter->valueAt(1), numberParameter->valueAt(2), numberParameter->valueAt(3));
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+}
+
+void FECustomFilter::bindProgramParameters()
+{
+    // FIXME: Find a way to reset uniforms that are not specified in CSS. This is needed to avoid using values
+    // set by other previous rendered filters.
+    // https://bugs.webkit.org/show_bug.cgi?id=76440
+    
+    size_t parametersSize = m_parameters.size();
+    for (size_t i = 0; i < parametersSize; ++i) {
+        CustomFilterParameter* parameter = m_parameters.at(i).get();
+        int uniformLocation = m_shader->uniformLocationByName(parameter->name());
+        if (uniformLocation == -1)
+            continue;
+        switch (parameter->parameterType()) {
+        case CustomFilterParameter::NUMBER:
+            bindProgramNumberParameters(uniformLocation, static_cast<CustomFilterNumberParameter*>(parameter));
+            break;
+        }
+    }
 }
 
 void FECustomFilter::bindProgramAndBuffers(ByteArray* srcPixelArray)
@@ -193,6 +241,8 @@ void FECustomFilter::bindProgramAndBuffers(ByteArray* srcPixelArray)
     bindVertexAttribute(m_shader->meshAttribLocation(), 2, offset);
     if (m_meshType == CustomFilterOperation::DETACHED)
         bindVertexAttribute(m_shader->triangleAttribLocation(), 3, offset);
+    
+    bindProgramParameters();
 }
 
 void FECustomFilter::dump()

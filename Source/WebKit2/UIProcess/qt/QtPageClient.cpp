@@ -62,7 +62,7 @@ PassOwnPtr<DrawingAreaProxy> QtPageClient::createDrawingAreaProxy()
 
 void QtPageClient::setViewNeedsDisplay(const WebCore::IntRect& rect)
 {
-    m_webView->page()->update();
+    QQuickWebViewPrivate::get(m_webView)->setNeedsDisplay();
 }
 
 void QtPageClient::pageDidRequestScroll(const IntPoint& pos)
@@ -100,11 +100,27 @@ void QtPageClient::handleDownloadRequest(DownloadProxy* download)
     QQuickWebViewPrivate::get(m_webView)->handleDownloadRequest(download);
 }
 
-void QtPageClient::handleApplicationSchemeRequest(PassRefPtr<QtNetworkRequestData> requestData)
+void QtPageClient::handleApplicationSchemeRequest(PassRefPtr<QtRefCountedNetworkRequestData> requestData)
 {
     if (!m_webView || !m_webView->experimental())
         return;
-    m_webView->experimental()->invokeApplicationSchemeHandler(requestData.get());
+    m_webView->experimental()->invokeApplicationSchemeHandler(requestData);
+}
+
+void QtPageClient::handleAuthenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password)
+{
+    QString qUsername;
+    QString qPassword;
+
+    QQuickWebViewPrivate::get(m_webView)->handleAuthenticationRequiredRequest(hostname, realm, prefilledUsername, qUsername, qPassword);
+
+    username = qUsername;
+    password = qPassword;
+}
+
+void QtPageClient::handleCertificateVerificationRequest(const String& hostname, bool& ignoreErrors)
+{
+    ignoreErrors = QQuickWebViewPrivate::get(m_webView)->handleCertificateVerificationRequest(hostname);
 }
 
 void QtPageClient::setCursor(const WebCore::Cursor& cursor)
@@ -182,12 +198,6 @@ void QtPageClient::didFindZoomableArea(const IntPoint& target, const IntRect& ar
 {
     ASSERT(m_eventHandler);
     m_eventHandler->didFindZoomableArea(target, area);
-}
-
-void QtPageClient::focusEditableArea(const IntRect& caret, const IntRect& area)
-{
-    ASSERT(m_eventHandler);
-    m_eventHandler->focusEditableArea(caret, area);
 }
 
 void QtPageClient::didReceiveMessageFromNavigatorQtObject(const String& message)

@@ -21,24 +21,24 @@
 #include "AXObjectCache.h"
 
 #include "AccessibilityObject.h"
-#include "AccessibilityObjectWrapperAtk.h"
 #include "Document.h"
 #include "Element.h"
 #include "GOwnPtr.h"
 #include "HTMLSelectElement.h"
 #include "Range.h"
 #include "TextIterator.h"
+#include "WebKitAccessibleWrapperAtk.h"
 
 namespace WebCore {
 
 void AXObjectCache::detachWrapper(AccessibilityObject* obj)
 {
-    webkit_accessible_detach(WEBKIT_ACCESSIBLE(obj->wrapper()));
+    webkitAccessibleDetach(WEBKIT_ACCESSIBLE(obj->wrapper()));
 }
 
 void AXObjectCache::attachWrapper(AccessibilityObject* obj)
 {
-    AtkObject* atkObj = ATK_OBJECT(webkit_accessible_new(obj));
+    AtkObject* atkObj = ATK_OBJECT(webkitAccessibleNew(obj));
     obj->setWrapper(atkObj);
     g_object_unref(atkObj);
 }

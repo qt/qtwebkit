@@ -147,8 +147,6 @@ sub ProcessDocument
         print "Generating $useGenerator bindings code for IDL interface \"" . $class->name . "\"...\n" if $verbose;
         $codeGenerator->GenerateInterface($class, $defines);
     }
-
-    $codeGenerator->finish();
 }
 
 sub FileNamePrefix
@@ -161,6 +159,17 @@ sub FileNamePrefix
     # Dynamically load external code generation perl module
     $codeGenerator = $ifaceName->new($object, $useOutputDir, $useOutputHeadersDir, $useLayerOnTop, $preprocessor, $writeDependencies, $verbose);
     return $codeGenerator->FileNamePrefix();
+}
+
+sub UpdateFile
+{
+    my $object = shift;
+    my $fileName = shift;
+    my $contents = shift;
+
+    open FH, "> $fileName" or die "Couldn't open $fileName: $!\n";
+    print FH $contents;
+    close FH;
 }
 
 sub ForAllParents
@@ -539,11 +548,7 @@ sub GetterExpression
 
     my $functionName;
     if ($attribute->signature->extendedAttributes->{"URL"}) {
-        if ($attribute->signature->extendedAttributes->{"NonEmpty"}) {
-            $functionName = "getNonEmptyURLAttribute";
-        } else {
-            $functionName = "getURLAttribute";
-        }
+        $functionName = "getURLAttribute";
     } elsif ($attribute->signature->type eq "boolean") {
         $functionName = "hasAttribute";
     } elsif ($attribute->signature->type eq "long") {

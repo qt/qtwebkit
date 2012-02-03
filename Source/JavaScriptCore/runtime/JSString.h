@@ -214,10 +214,9 @@ namespace JSC {
         unsigned length() { return m_length; }
 
         JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
-        bool toBoolean(ExecState*) const;
+        JS_EXPORT_PRIVATE bool toBoolean(ExecState*) const;
         bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
         JSObject* toObject(ExecState*, JSGlobalObject*) const;
-        UString toString(ExecState*) const;
         double toNumber(ExecState*) const;
         
         bool getStringPropertySlot(ExecState*, const Identifier& propertyName, PropertySlot&);
@@ -236,12 +235,12 @@ namespace JSC {
         static size_t offsetOfLength() { return OBJECT_OFFSETOF(JSString, m_length); }
         static size_t offsetOfValue() { return OBJECT_OFFSETOF(JSString, m_value); }
 
-        static const ClassInfo s_info;
+        static JS_EXPORTDATA const ClassInfo s_info;
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
     private:
-        void resolveRope(ExecState*) const;
+        JS_EXPORT_PRIVATE void resolveRope(ExecState*) const;
         void resolveRopeSlowCase8(LChar*) const;
         void resolveRopeSlowCase(UChar*) const;
         void outOfMemory(ExecState*) const;
@@ -453,24 +452,11 @@ namespace JSC {
         return isTrue(); // false, null, and undefined all convert to false.
     }
 
-    inline UString JSValue::toString(ExecState* exec) const
+    inline JSString* JSValue::toString(ExecState* exec) const
     {
         if (isString())
-            return static_cast<JSString*>(asCell())->value(exec);
-        if (isInt32())
-            return exec->globalData().numericStrings.add(asInt32());
-        if (isDouble())
-            return exec->globalData().numericStrings.add(asDouble());
-        if (isTrue())
-            return "true";
-        if (isFalse())
-            return "false";
-        if (isNull())
-            return "null";
-        if (isUndefined())
-            return "undefined";
-        ASSERT(isCell());
-        return asCell()->toString(exec);
+            return static_cast<JSString*>(asCell());
+        return toStringSlowCase(exec);
     }
 
 } // namespace JSC

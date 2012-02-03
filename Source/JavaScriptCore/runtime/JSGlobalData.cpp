@@ -101,7 +101,7 @@ extern const HashTable globalObjectTable;
 extern const HashTable mathTable;
 extern const HashTable numberConstructorTable;
 extern const HashTable numberPrototypeTable;
-extern const HashTable objectConstructorTable;
+JS_EXPORTDATA extern const HashTable objectConstructorTable;
 extern const HashTable objectPrototypeTable;
 extern const HashTable regExpTable;
 extern const HashTable regExpConstructorTable;
@@ -162,8 +162,6 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
 #endif
 {
     interpreter = new Interpreter;
-    if (globalDataType == Default)
-        m_stack = wtfThreadData().stack();
 
     // Need to be careful to keep everything consistent here
     IdentifierTable* existingEntryIdentifierTable = wtfThreadData().setCurrentIdentifierTable(identifierTable);

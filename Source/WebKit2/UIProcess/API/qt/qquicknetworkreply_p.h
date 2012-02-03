@@ -23,50 +23,42 @@
 
 #include "QtNetworkReplyData.h"
 #include "QtNetworkRequestData.h"
+#include "qquickwebview_p.h"
+#include "SharedMemory.h"
 #include "qwebkitglobal.h"
 #include <QNetworkAccessManager>
 #include <QObject>
+#include <QWeakPointer>
 #include <QtDeclarative/qdeclarativelist.h>
 #include <QtQuick/qquickitem.h>
 
 class QWEBKIT_EXPORT QQuickNetworkReply : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString contentType READ contentType WRITE setContentType)
-    Q_PROPERTY(QString data READ data WRITE setData)
+    Q_PROPERTY(QVariant data READ data WRITE setData)
     Q_ENUMS(QNetworkAccessManager::Operation)
 
 public:
     QQuickNetworkReply(QObject* parent);
     QString contentType() const;
     void setContentType(const QString&);
-    QNetworkAccessManager::Operation operation() const;
-    void setOperation(QNetworkAccessManager::Operation);
-    QString contentDisposition() const;
-    void setContentDisposition(const QString&);
-    QString location() const;
-    void setLocation(const QString&);
-    QString lastModified() const;
-    void setLastModified(const QString&);
-    QString cookie() const;
-    void setCookie(const QString&);
-    QString userAgent() const;
-    void setUserAgent(const QString&);
-    QString server() const;
-    void setServer(const QString&);
 
-    QString data() const;
-    void setData(const QString& data);
+    QVariant data() const;
+    void setData(const QVariant& data);
 
-    WTF::RefPtr<WebKit::QtNetworkRequestData> networkRequestData() const;
-    void setNetworkRequestData(WTF::RefPtr<WebKit::QtNetworkRequestData> data);
-    WTF::RefPtr<WebKit::QtNetworkReplyData> networkReplyData() const;
+    void setWebViewExperimental(QQuickWebViewExperimental*);
+    WebKit::QtRefCountedNetworkRequestData* networkRequestData() const;
+    void setNetworkRequestData(WTF::PassRefPtr<WebKit::QtRefCountedNetworkRequestData> data);
+    WebKit::QtRefCountedNetworkReplyData* networkReplyData() const;
 
 public Q_SLOTS:
     void send();
 
 private:
-    WTF::RefPtr<WebKit::QtNetworkRequestData> m_networkRequestData;
-    WTF::RefPtr<WebKit::QtNetworkReplyData> m_networkReplyData;
+    WTF::RefPtr<WebKit::QtRefCountedNetworkRequestData> m_networkRequestData;
+    WTF::RefPtr<WebKit::QtRefCountedNetworkReplyData> m_networkReplyData;
+    QVariant m_data;
+    QWeakPointer<QQuickWebViewExperimental> m_webViewExperimental;
 };
 
 QML_DECLARE_TYPE(QQuickNetworkReply)

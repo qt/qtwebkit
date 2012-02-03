@@ -293,28 +293,28 @@ EventTarget* WorkerContext::errorEventTarget()
     return this;
 }
 
-void WorkerContext::logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>)
+void WorkerContext::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>)
 {
     thread()->workerReportingProxy().postExceptionToWorkerObject(errorMessage, lineNumber, sourceURL);
 }
 
-void WorkerContext::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
+void WorkerContext::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     if (!isContextThread()) {
         postTask(AddConsoleMessageTask::create(source, type, level, message));
         return;
     }
     thread()->workerReportingProxy().postConsoleMessageToWorkerObject(source, type, level, message, lineNumber, sourceURL);
-    addMessageToWorkerConsole(source, type, level, message, lineNumber, sourceURL, callStack);
+    addMessageToWorkerConsole(source, type, level, message, sourceURL, lineNumber, callStack);
 }
 
-void WorkerContext::addMessageToWorkerConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
+void WorkerContext::addMessageToWorkerConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     ASSERT(isContextThread());
     if (callStack)
         InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, 0, callStack);
     else
-        InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, lineNumber, sourceURL);
+        InspectorInstrumentation::addMessageToConsole(this, source, type, level, message, sourceURL, lineNumber);
 }
 
 #if ENABLE(NOTIFICATIONS)
@@ -395,7 +395,7 @@ void WorkerContext::webkitRequestFileSystem(int type, long long size, PassRefPtr
     }
 
     AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
-    if (fileSystemType != AsyncFileSystem::Temporary && fileSystemType != AsyncFileSystem::Persistent && fileSystemType != AsyncFileSystem::External) {
+    if (!AsyncFileSystem::isValidType(fileSystemType)) {
         DOMFileSystem::scheduleCallback(this, errorCallback, FileError::create(FileError::INVALID_MODIFICATION_ERR));
         return;
     }
@@ -412,7 +412,7 @@ PassRefPtr<DOMFileSystemSync> WorkerContext::webkitRequestFileSystemSync(int typ
     }
 
     AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
-    if (fileSystemType != AsyncFileSystem::Temporary && fileSystemType != AsyncFileSystem::Persistent && fileSystemType != AsyncFileSystem::External) {
+    if (!AsyncFileSystem::isValidType(fileSystemType)) {
         ec = FileException::INVALID_MODIFICATION_ERR;
         return 0;
     }
@@ -432,7 +432,7 @@ void WorkerContext::webkitResolveLocalFileSystemURL(const String& url, PassRefPt
 
     AsyncFileSystem::Type type;
     String filePath;
-    if (!completedURL.isValid() || !DOMFileSystemBase::crackFileSystemURL(completedURL, type, filePath)) {
+    if (!completedURL.isValid() || !AsyncFileSystem::crackFileSystemURL(completedURL, type, filePath)) {
         DOMFileSystem::scheduleCallback(this, errorCallback, FileError::create(FileError::ENCODING_ERR));
         return;
     }
@@ -451,7 +451,7 @@ PassRefPtr<EntrySync> WorkerContext::webkitResolveLocalFileSystemSyncURL(const S
 
     AsyncFileSystem::Type type;
     String filePath;
-    if (!completedURL.isValid() || !DOMFileSystemBase::crackFileSystemURL(completedURL, type, filePath)) {
+    if (!completedURL.isValid() || !AsyncFileSystem::crackFileSystemURL(completedURL, type, filePath)) {
         ec = FileException::ENCODING_ERR;
         return 0;
     }
@@ -471,7 +471,6 @@ PassRefPtr<EntrySync> WorkerContext::webkitResolveLocalFileSystemSyncURL(const S
 
 COMPILE_ASSERT(static_cast<int>(WorkerContext::TEMPORARY) == static_cast<int>(AsyncFileSystem::Temporary), enum_mismatch);
 COMPILE_ASSERT(static_cast<int>(WorkerContext::PERSISTENT) == static_cast<int>(AsyncFileSystem::Persistent), enum_mismatch);
-COMPILE_ASSERT(static_cast<int>(WorkerContext::EXTERNAL) == static_cast<int>(AsyncFileSystem::External), enum_mismatch);
 #endif
 
 WorkerContext::Observer::Observer(WorkerContext* context)

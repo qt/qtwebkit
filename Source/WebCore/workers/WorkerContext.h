@@ -112,7 +112,6 @@ namespace WebCore {
         void clearInterval(int timeoutId);
 
         // ScriptExecutionContext
-        virtual void addMessage(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
         virtual WorkerEventQueue* eventQueue() const;
 
 #if ENABLE(NOTIFICATIONS)
@@ -140,7 +139,6 @@ namespace WebCore {
         enum FileSystemType {
             TEMPORARY,
             PERSISTENT,
-            EXTERNAL,
         };
         void webkitRequestFileSystem(int type, long long size, PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback>);
         PassRefPtr<DOMFileSystemSync> webkitRequestFileSystemSync(int type, long long size, ExceptionCode&);
@@ -182,8 +180,8 @@ namespace WebCore {
     protected:
         WorkerContext(const KURL&, const String&, WorkerThread*, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType);
 
-        virtual void logExceptionToConsole(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
-        void addMessageToWorkerConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack>);
+        virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>);
+        void addMessageToWorkerConsole(MessageSource, MessageType, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>);
 
     private:
         virtual void refScriptExecutionContext() { ref(); }
@@ -196,6 +194,8 @@ namespace WebCore {
 
         virtual const KURL& virtualURL() const;
         virtual KURL virtualCompleteURL(const String&) const;
+
+        virtual void addMessage(MessageSource, MessageType, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>);
 
         virtual EventTarget* errorEventTarget();
 

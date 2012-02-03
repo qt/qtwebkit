@@ -38,13 +38,12 @@ inline void CSSMappedAttributeDeclaration::setNeedsStyleRecalc(StyledElement* el
 
 CSSMappedAttributeDeclaration::~CSSMappedAttributeDeclaration()
 {
-    if (m_entryType != ePersistent)
-        StyledElement::removeMappedAttributeDecl(m_entryType, m_attrName, m_attrValue);
+    StyledElement::removeMappedAttributeDecl(m_entryType, m_attrName, m_attrValue);
 }
 
 void CSSMappedAttributeDeclaration::setMappedImageProperty(StyledElement* element, int propertyId, const String& url)
 {
-    setPropertyInternal(CSSProperty(propertyId, CSSImageValue::create(url)));
+    m_declaration->setProperty(CSSProperty(propertyId, CSSImageValue::create(url)));
     setNeedsStyleRecalc(element);
 }
 
@@ -56,7 +55,7 @@ void CSSMappedAttributeDeclaration::setMappedLengthProperty(StyledElement* eleme
 void CSSMappedAttributeDeclaration::setMappedProperty(StyledElement* element, int propertyId, int value)
 {
     ASSERT(element->document());
-    setPropertyInternal(CSSProperty(propertyId, element->document()->cssValuePool()->createIdentifierValue(value)));
+    m_declaration->setProperty(CSSProperty(propertyId, element->document()->cssValuePool()->createIdentifierValue(value)));
     setNeedsStyleRecalc(element);
 }
 
@@ -75,7 +74,7 @@ void CSSMappedAttributeDeclaration::setMappedProperty(StyledElement* element, in
 
 void CSSMappedAttributeDeclaration::removeMappedProperty(StyledElement* element, int propertyId)
 {
-    removeProperty(propertyId, false, false);
+    m_declaration->removeProperty(propertyId, false, false);
     setNeedsStyleRecalc(element);
 }
 

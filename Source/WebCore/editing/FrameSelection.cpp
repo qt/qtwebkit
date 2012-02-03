@@ -936,6 +936,19 @@ bool FrameSelection::modify(EAlteration alter, SelectionDirection direction, Tex
         moveTo(position, userTriggered);
         break;
     case AlterationExtend:
+        if (!m_selection.isCaret()
+            && (granularity == WordGranularity || granularity == ParagraphGranularity || granularity == LineGranularity)
+            && m_frame && !m_frame->editor()->behavior().shouldExtendSelectionByWordOrLineAcrossCaret()) {
+            // Don't let the selection go across the base position directly. Needed to match mac
+            // behavior when, for instance, word-selecting backwards starting with the caret in
+            // the middle of a word and then word-selecting forward, leaving the caret in the
+            // same place where it was, instead of directly selecting to the end of the word.
+            VisibleSelection newSelection = m_selection;
+            newSelection.setExtent(position);
+            if (m_selection.isBaseFirst() != newSelection.isBaseFirst())
+                position = m_selection.base();
+        }
+
         // Standard Mac behavior when extending to a boundary is grow the selection rather than leaving the
         // base in place and moving the extent. Matches NSTextView.
         if (!m_frame || !m_frame->editor()->behavior().shouldAlwaysGrowSelectionWhenExtendingToBoundary() || m_selection.isCaret() || !isBoundary(granularity))
@@ -1654,6 +1667,11 @@ bool FrameSelection::isFocusedAndActive() const
     return m_focused && m_frame->page() && m_frame->page()->focusController()->isActive();
 }
 
+inline static bool shouldStopBlinkingDueToTypingCommand(Frame* frame)
+{
+    return frame->editor()->lastEditCommand() && frame->editor()->lastEditCommand()->shouldStopCaretBlinking();
+}
+
 void FrameSelection::updateAppearance()
 {
 #if ENABLE(TEXT_CARET)
@@ -1661,13 +1679,10 @@ void FrameSelection::updateAppearance()
 
     bool caretBrowsing = m_frame->settings() && m_frame->settings()->caretBrowsingEnabled();
     bool shouldBlink = caretIsVisible() && isCaret() && (isContentEditable() || caretBrowsing);
-    
-    CompositeEditCommand* lastEditCommand = m_frame ? m_frame->editor()->lastEditCommand() : 0;
-    bool shouldStopBlinkingDueToTypingCommand = lastEditCommand && lastEditCommand->shouldStopCaretBlinking();
 
     // If the caret moved, stop the blink timer so we can restart with a
     // black caret in the new location.
-    if (caretRectChanged || !shouldBlink || shouldStopBlinkingDueToTypingCommand)
+    if (caretRectChanged || !shouldBlink || shouldStopBlinkingDueToTypingCommand(m_frame))
         m_caretBlinkTimer.stop();
 
     // Start blinking with a black caret. Be sure not to restart if we're

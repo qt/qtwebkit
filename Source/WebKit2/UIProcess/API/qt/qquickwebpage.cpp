@@ -30,9 +30,9 @@
 #include <QtQuick/QSGGeometryNode>
 #include <QtQuick/QSGMaterial>
 
-QQuickWebPage::QQuickWebPage(QQuickItem* parent)
-    : QQuickItem(parent)
-    , d(new QQuickWebPagePrivate(this))
+QQuickWebPage::QQuickWebPage(QQuickWebView* viewportItem)
+    : QQuickItem(viewportItem)
+    , d(new QQuickWebPagePrivate(this, viewportItem))
 {
     setFlag(ItemHasContents);
 
@@ -62,8 +62,9 @@ void QQuickWebPage::geometryChanged(const QRectF& newGeometry, const QRectF& old
         d->setDrawingAreaSize(newGeometry.size().toSize());
 }
 
-QQuickWebPagePrivate::QQuickWebPagePrivate(QQuickWebPage* q)
+QQuickWebPagePrivate::QQuickWebPagePrivate(QQuickWebPage* q, QQuickWebView* viewportItem)
     : q(q)
+    , viewportItem(viewportItem)
     , webPageProxy(0)
     , sgUpdateQueue(q)
     , paintingIsInitialized(false)
@@ -76,7 +77,7 @@ QQuickWebPagePrivate::QQuickWebPagePrivate(QQuickWebPage* q)
 void QQuickWebPagePrivate::initialize(WebKit::WebPageProxy* webPageProxy)
 {
     this->webPageProxy = webPageProxy;
-    eventHandler.reset(new QtWebPageEventHandler(toAPI(webPageProxy), q));
+    eventHandler.reset(new QtWebPageEventHandler(toAPI(webPageProxy), q, viewportItem));
 }
 
 static float computeEffectiveOpacity(const QQuickItem* item)
@@ -99,6 +100,12 @@ void QQuickWebPagePrivate::setDrawingAreaSize(const QSize& size)
     drawingArea->setSize(WebCore::IntSize(size), WebCore::IntSize());
 }
 
+void QQuickWebPagePrivate::paint(QPainter* painter)
+{
+    if (webPageProxy->drawingArea())
+        webPageProxy->drawingArea()->paintLayerTree(painter);
+}
+
 void QQuickWebPagePrivate::paintToCurrentGLContext()
 {
     if (!q->isVisible())
@@ -117,23 +124,7 @@ void QQuickWebPagePrivate::paintToCurrentGLContext()
     if (!drawingArea)
         return;
 
-    // Make sure that no GL error code stays from previous QT operations.
-    glGetError();
-
-    glEnable(GL_SCISSOR_TEST);
-    ASSERT(!glGetError());
-    const int left = clipRect.left();
-    const int width = clipRect.width();
-    const int bottom = q->canvas()->height() - (clipRect.bottom() + 1);
-    const int height = clipRect.height();
-
-    glScissor(left, bottom, width, height);
-    ASSERT(!glGetError());
-
-    drawingArea->paintToCurrentGLContext(transform, opacity);
-
-    glDisable(GL_SCISSOR_TEST);
-    ASSERT(!glGetError());
+    drawingArea->paintToCurrentGLContext(transform, opacity, clipRect);
 }
 
 struct PageProxyMaterial;

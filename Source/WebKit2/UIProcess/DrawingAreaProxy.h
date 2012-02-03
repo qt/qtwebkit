@@ -27,6 +27,7 @@
 #ifndef DrawingAreaProxy_h
 #define DrawingAreaProxy_h
 
+#include "BackingStore.h"
 #include "DrawingAreaInfo.h"
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
@@ -87,7 +88,8 @@ public:
     virtual WebCore::IntRect viewportVisibleRect() const { return contentsRect(); }
     virtual WebCore::IntRect contentsRect() const;
     virtual bool isBackingStoreReady() const { return true; }
-    virtual void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float opacity) { }
+    virtual void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&) { }
+    virtual void paintLayerTree(BackingStore::PlatformGraphicsContext) { }
     LayerTreeHostProxy* layerTreeHostProxy() const { return m_layerTreeHostProxy.get(); }
 
 #if USE(TILED_BACKING_STORE)

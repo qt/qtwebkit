@@ -20,10 +20,10 @@
 #include "config.h"
 #include "FrameSelection.h"
 
-#include "AccessibilityObjectWrapperAtk.h"
 #include "AXObjectCache.h"
 #include "Frame.h"
 #include "RefPtr.h"
+#include "WebKitAccessibleWrapperAtk.h"
 
 #include <gtk/gtk.h>
 
@@ -84,8 +84,10 @@ void FrameSelection::notifyAccessibilityForSelectionChange()
     if (!m_selection.start().isNotNull() || !m_selection.end().isNotNull())
         return;
 
-    // Look for the accessibility object for the Frame.
-    AccessibilityObject* accessibilityObject = m_frame->document()->axObjectCache()->rootObjectForFrame(m_frame);
+    RenderObject* focusedNode = m_selection.end().containerNode()->renderer();
+    AccessibilityObject* accessibilityObject = m_frame->document()->axObjectCache()->getOrCreate(focusedNode);
+
+    // Need to check this as getOrCreate could return 0.
     if (!accessibilityObject)
         return;
 

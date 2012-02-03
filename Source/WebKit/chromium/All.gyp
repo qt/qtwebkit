@@ -34,14 +34,15 @@
     ],
     'targets': [
         {
-            # These two targets should be sufficient to cause everything
+            # These targets should be sufficient to cause everything
             # else to build (incl. webkit); if they aren't, we have our
             # dependencies wrong.
             'target_name': 'all_webkit',
             'type': 'none',
             'dependencies': [
                 'WebKitUnitTests.gyp:webkit_unit_tests',
-                'Tools.gyp:DumpRenderTree',
+                '../../../Tools/DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:DumpRenderTree',
+                '../../../Tools/TestWebKitAPI/TestWebKitAPI.gyp/TestWebKitAPI.gyp:TestWebKitAPI',
             ],
         }
     ],
