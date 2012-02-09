@@ -44,6 +44,7 @@ extern "C" {
 typedef struct _WebKitWebViewPrivate WebKitWebViewPrivate;
 struct _WebKitWebViewPrivate {
     WebCore::Page* corePage;
+    bool hasNativeWindow;
     OwnPtr<WebCore::WidgetBackingStore> backingStore;
     GRefPtr<WebKitWebSettings> webSettings;
     GRefPtr<WebKitWebInspector> webInspector;
@@ -61,6 +62,7 @@ struct _WebKitWebViewPrivate {
     GRefPtr<GtkIMContext> imContext;
 
     gboolean transparent;
+    bool needsResizeOnMap;
 
 #ifndef GTK_API_VERSION_2
     // GtkScrollablePolicy needs to be checked when

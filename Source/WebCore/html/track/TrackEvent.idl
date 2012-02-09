@@ -27,10 +27,10 @@ module html {
 
     interface [
         Conditional=VIDEO_TRACK,
-        EnabledAtRuntime=webkitVideoTrack,
+        V8EnabledAtRuntime=webkitVideoTrack,
         ConstructorTemplate=Event
     ] TrackEvent : Event {
-        readonly attribute [InitializedByConstructor, CustomGetter] object track;
+        readonly attribute [InitializedByEventConstructor, CustomGetter] object track;
     };
 
 }

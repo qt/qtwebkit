@@ -39,9 +39,9 @@ module threads {
         Constructor(in DOMString scriptURL, in [Optional=CallWithNullValue] DOMString name),
         CallWith=ScriptExecutionContext,
         ConstructorRaisesException,
-        CustomMarkFunction,
-        GenerateNativeConverter,
-        GenerateToJS
+        JSCustomMarkFunction,
+        JSGenerateToNativeObject,
+        JSGenerateToJS
     ] SharedWorker : AbstractWorker {
         readonly attribute MessagePort port;
     };

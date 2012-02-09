@@ -26,8 +26,8 @@
 #ifndef ElementAttributeData_h
 #define ElementAttributeData_h
 
-#include "CSSMutableStyleDeclaration.h"
 #include "SpaceSplitString.h"
+#include "StylePropertySet.h"
 
 namespace WebCore {
 
@@ -42,6 +42,13 @@ public:
     const AtomicString& idForStyleResolution() const { return m_idForStyleResolution; }
     void setIdForStyleResolution(const AtomicString& newId) { m_idForStyleResolution = newId; }
 
+    StylePropertySet* inlineStyleDecl() { return m_inlineStyleDecl.get(); }
+    StylePropertySet* ensureInlineStyleDecl(Element*);
+    void destroyInlineStyleDecl();
+
+    StylePropertySet* attributeStyle() const { return m_attributeStyle.get(); }
+    StylePropertySet* ensureAttributeStyle(StyledElement*);
+
 private:
     friend class NamedNodeMap;
 
@@ -49,7 +56,8 @@ private:
     {
     }
 
-    RefPtr<CSSMutableStyleDeclaration> m_inlineStyleDecl;
+    RefPtr<StylePropertySet> m_inlineStyleDecl;
+    RefPtr<StylePropertySet> m_attributeStyle;
     SpaceSplitString m_classNames;
     AtomicString m_idForStyleResolution;
 };

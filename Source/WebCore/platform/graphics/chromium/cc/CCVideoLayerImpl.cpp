@@ -246,10 +246,15 @@ bool CCVideoLayerImpl::reserveTextures(const VideoFrameChromium* frame, GC3Denum
             if (!m_textures[plane].m_texture)
                 return false;
             m_textures[plane].m_visibleSize = IntSize();
+        } else {
+            // The renderSurfaceTextureManager may have been destroyed and recreated since the last frame, so pass the new one.
+            // This is a no-op if the TextureManager is still around.
+            m_textures[plane].m_texture->setTextureManager(layerRenderer->renderSurfaceTextureManager());
         }
         if (m_textures[plane].m_texture->size() != requiredTextureSize)
             m_textures[plane].m_visibleSize = computeVisibleSize(frame, plane);
-        m_textures[plane].m_texture->reserve(requiredTextureSize, format);
+        if (!m_textures[plane].m_texture->reserve(requiredTextureSize, format))
+            return false;
     }
     return true;
 }

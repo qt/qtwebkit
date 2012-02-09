@@ -31,9 +31,9 @@
 module storage {
     interface [
         Conditional=FILE_SYSTEM,
-        GenerateNativeConverter,
-        GenerateToJS,
-        NoStaticTables
+        JSGenerateToNativeObject,
+        JSGenerateToJS,
+        JSNoStaticTables
     ] FileEntrySync : EntrySync {
         File file() raises (FileException);
         FileWriterSync createWriter() raises (FileException);

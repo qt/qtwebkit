@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,8 +30,10 @@
 // FIXME: We should probably move to makeing the WebCore/PlatformFooEvents trivial classes so that
 // we can use them as the event type.
 
+#include <WebCore/FloatPoint.h>
 #include <WebCore/FloatSize.h>
 #include <WebCore/IntPoint.h>
+#include <WebCore/IntSize.h>
 #include <wtf/text/WTFString.h>
 
 namespace CoreIPC {
@@ -254,9 +257,12 @@ class WebGestureEvent : public WebEvent {
 public:
     WebGestureEvent() { }
     WebGestureEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, Modifiers, double timestamp);
+    WebGestureEvent(Type, const WebCore::IntPoint& position, const WebCore::IntPoint& globalPosition, Modifiers, double timestamp, const WebCore::IntSize& area, const WebCore::FloatPoint& delta);
 
     const WebCore::IntPoint position() const { return m_position; }
     const WebCore::IntPoint globalPosition() const { return m_globalPosition; }
+    const WebCore::IntSize area() const { return m_area; }
+    const WebCore::FloatPoint delta() const { return m_delta; }
 
     void encode(CoreIPC::ArgumentEncoder*) const;
     static bool decode(CoreIPC::ArgumentDecoder*, WebGestureEvent&);
@@ -266,6 +272,8 @@ private:
 
     WebCore::IntPoint m_position;
     WebCore::IntPoint m_globalPosition;
+    WebCore::IntSize m_area;
+    WebCore::FloatPoint m_delta;
 };
 #endif // ENABLE(GESTURE_EVENTS)
 
@@ -284,16 +292,21 @@ public:
         TouchCancelled
     };
 
-    WebPlatformTouchPoint() { }
+    WebPlatformTouchPoint() : m_rotationAngle(0.0), m_force(0.0) { }
 
     WebPlatformTouchPoint(uint32_t id, TouchPointState, const WebCore::IntPoint& screenPosition, const WebCore::IntPoint& position);
 
+    WebPlatformTouchPoint(uint32_t id, TouchPointState, const WebCore::IntPoint& screenPosition, const WebCore::IntPoint& position, const WebCore::IntSize& radius, float rotationAngle = 0.0, float force = 0.0);
+    
     uint32_t id() const { return m_id; }
     TouchPointState state() const { return static_cast<TouchPointState>(m_state); }
 
     const WebCore::IntPoint& screenPosition() const { return m_screenPosition; }
     const WebCore::IntPoint& position() const { return m_position; }
-          
+    const WebCore::IntSize& radius() const { return m_radius; }
+    float rotationAngle() const { return m_rotationAngle; }
+    float force() const { return m_force; }
+
     void setState(TouchPointState state) { m_state = state; }
 
     void encode(CoreIPC::ArgumentEncoder*) const;
@@ -304,7 +317,9 @@ private:
     uint32_t m_state;
     WebCore::IntPoint m_screenPosition;
     WebCore::IntPoint m_position;
-
+    WebCore::IntSize m_radius;
+    float m_rotationAngle;
+    float m_force;
 };
 
 // FIXME: Move this class to its own header file.

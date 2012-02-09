@@ -73,9 +73,10 @@ RenderObject* HTMLSummaryElement::createRenderer(RenderArena* arena, RenderStyle
 
 void HTMLSummaryElement::createShadowSubtree()
 {
-    ExceptionCode ec = 0;
-    ensureShadowRoot()->appendChild(DetailsMarkerControl::create(document()), ec, true);
-    ensureShadowRoot()->appendChild(SummaryContentElement::create(document()), ec, true);
+    ASSERT(!shadowRoot());
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
+    root->appendChild(DetailsMarkerControl::create(document()), ASSERT_NO_EXCEPTION, true);
+    root->appendChild(SummaryContentElement::create(document()), ASSERT_NO_EXCEPTION, true);
 }
 
 HTMLDetailsElement* HTMLSummaryElement::detailsElement() const
@@ -89,8 +90,9 @@ HTMLDetailsElement* HTMLSummaryElement::detailsElement() const
 bool HTMLSummaryElement::isMainSummary() const
 {
     if (HTMLDetailsElement* details = detailsElement())
-        return details->mainSummary() == this;
-    return 0;
+        return details->findMainSummary() == this;
+
+    return false;
 }
 
 static bool isClickableControl(Node* node)

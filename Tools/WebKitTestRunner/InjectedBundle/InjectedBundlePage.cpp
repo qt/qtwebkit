@@ -227,7 +227,9 @@ InjectedBundlePage::InjectedBundlePage(WKBundlePageRef page)
         didReceiveResponseForResource,
         didReceiveContentLengthForResource,
         didFinishLoadForResource,
-        didFailLoadForResource
+        didFailLoadForResource,
+        0, // shouldCacheResponse
+        0 // shouldUseCredentialStorage
     };
     WKBundlePageSetResourceLoadClient(m_page, &resourceLoadClient);
 

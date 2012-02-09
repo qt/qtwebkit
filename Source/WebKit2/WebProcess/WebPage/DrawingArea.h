@@ -79,7 +79,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) = 0;
     virtual void scheduleCompositingLayerSync() = 0;
-#if USE(TEXTURE_MAPPER)
+#if USE(TEXTURE_MAPPER) && USE(TILED_BACKING_STORE)
     virtual void didReceiveLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) = 0;
 #endif
 #endif
@@ -105,15 +105,6 @@ private:
 #if PLATFORM(MAC)
     // Used by TiledCoreAnimationDrawingArea.
     virtual void updateGeometry(const WebCore::IntSize& viewSize) { }
-#endif
-
-#if USE(TILED_BACKING_STORE)
-    virtual void setSize(const WebCore::IntSize& viewSize) { }
-    virtual void setVisibleContentRectAndScale(const WebCore::IntRect&, float) { }
-    virtual void setVisibleContentRectTrajectoryVector(const WebCore::FloatPoint&) { }
-    virtual void setContentsScale(float scale) { }
-    virtual void renderNextFrame() { }
-    virtual void takeSnapshot(const WebCore::IntSize& targetSize, const WebCore::IntRect& contentsRect) { }
 #endif
 };
 

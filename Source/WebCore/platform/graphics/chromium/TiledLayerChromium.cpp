@@ -53,7 +53,11 @@ namespace WebCore {
 class UpdatableTile : public CCLayerTilingData::Tile {
     WTF_MAKE_NONCOPYABLE(UpdatableTile);
 public:
-    explicit UpdatableTile(PassOwnPtr<LayerTextureUpdater::Texture> texture) : m_texture(texture) { }
+    explicit UpdatableTile(PassOwnPtr<LayerTextureUpdater::Texture> texture)
+        : m_partialUpdate(false)
+        , m_texture(texture)
+    {
+    }
 
     LayerTextureUpdater::Texture* texture() { return m_texture.get(); }
     ManagedTexture* managedTexture() { return m_texture->texture(); }
@@ -68,6 +72,7 @@ public:
     IntRect m_dirtyRect;
     IntRect m_updateRect;
     IntRect m_opaqueRect;
+    bool m_partialUpdate;
 private:
     OwnPtr<LayerTextureUpdater::Texture> m_texture;
 };
@@ -90,15 +95,6 @@ TiledLayerChromium::~TiledLayerChromium()
 PassRefPtr<CCLayerImpl> TiledLayerChromium::createCCLayerImpl()
 {
     return CCTiledLayerImpl::create(id());
-}
-
-void TiledLayerChromium::cleanupResources()
-{
-    LayerChromium::cleanupResources();
-
-    m_tiler->reset();
-    m_paintRect = IntRect();
-    m_requestedUpdateTilesRect = IntRect();
 }
 
 void TiledLayerChromium::updateTileSizeAndTilingOption()
@@ -174,21 +170,6 @@ IntSize TiledLayerChromium::contentBounds() const
     return IntSize(lroundf(bounds().width() * contentsScale()), lroundf(bounds().height() * contentsScale()));
 }
 
-void TiledLayerChromium::setLayerTreeHost(CCLayerTreeHost* host)
-{
-    if (host == layerTreeHost())
-        return;
-
-    LayerChromium::setLayerTreeHost(host);
-
-    if (!host)
-        return;
-
-    createTextureUpdater(host);
-    setTextureFormat(host->layerRendererCapabilities().bestTextureFormat);
-    m_sampledTexelFormat = textureUpdater()->sampledTexelFormat(m_textureFormat);
-}
-
 void TiledLayerChromium::updateCompositorResources(GraphicsContext3D*, CCTextureUpdater& updater)
 {
     // Painting could cause compositing to get turned off, which may cause the tiler to become invalidated mid-update.
@@ -234,7 +215,10 @@ void TiledLayerChromium::updateCompositorResources(GraphicsContext3D*, CCTexture
             if (paintOffset.y() + destRect.height() > m_paintRect.height())
                 CRASH();
 
-            updater.append(tile->texture(), sourceRect, destRect);
+            if (tile->m_partialUpdate)
+                updater.appendPartial(tile->texture(), sourceRect, destRect);
+            else
+                updater.append(tile->texture(), sourceRect, destRect);
         }
     }
 
@@ -264,18 +248,23 @@ void TiledLayerChromium::pushPropertiesTo(CCLayerImpl* layer)
     tiledLayer->setSkipsDraw(m_skipsDraw);
     tiledLayer->setContentsSwizzled(m_sampledTexelFormat != LayerTextureUpdater::SampledTexelFormatRGBA);
     tiledLayer->setTilingData(*m_tiler);
+    Vector<UpdatableTile*> invalidTiles;
 
     for (CCLayerTilingData::TileMap::const_iterator iter = m_tiler->tiles().begin(); iter != m_tiler->tiles().end(); ++iter) {
         int i = iter->first.first;
         int j = iter->first.second;
         UpdatableTile* tile = static_cast<UpdatableTile*>(iter->second.get());
-        if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat))
+        if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat)) {
+            invalidTiles.append(tile);
             continue;
+        }
         if (tile->isDirty())
             continue;
 
         tiledLayer->pushTileProperties(i, j, tile->managedTexture()->textureId(), tile->m_opaqueRect);
     }
+    for (Vector<UpdatableTile*>::const_iterator iter = invalidTiles.begin(); iter != invalidTiles.end(); ++iter)
+        m_tiler->takeTile((*iter)->i(), (*iter)->j());
 }
 
 TextureManager* TiledLayerChromium::textureManager() const
@@ -283,6 +272,17 @@ TextureManager* TiledLayerChromium::textureManager() const
     if (!layerTreeHost())
         return 0;
     return layerTreeHost()->contentsTextureManager();
+}
+
+void TiledLayerChromium::setLayerTreeHost(CCLayerTreeHost* host)
+{
+    if (host && host != layerTreeHost()) {
+        for (CCLayerTilingData::TileMap::const_iterator iter = m_tiler->tiles().begin(); iter != m_tiler->tiles().end(); ++iter) {
+            UpdatableTile* tile = static_cast<UpdatableTile*>(iter->second.get());
+            tile->managedTexture()->setTextureManager(host->contentsTextureManager());
+        }
+    }
+    LayerChromium::setLayerTreeHost(host);
 }
 
 UpdatableTile* TiledLayerChromium::tileAt(int i, int j) const
@@ -322,20 +322,16 @@ void TiledLayerChromium::setIsNonCompositedContent(bool isNonCompositedContent)
 
 void TiledLayerChromium::invalidateRect(const IntRect& layerRect)
 {
+    updateBounds();
     if (m_tiler->isEmpty() || layerRect.isEmpty() || m_skipsDraw)
         return;
 
-    int left, top, right, bottom;
-    m_tiler->layerRectToTileIndices(layerRect, left, top, right, bottom);
-    for (int j = top; j <= bottom; ++j) {
-        for (int i = left; i <= right; ++i) {
-            UpdatableTile* tile = tileAt(i, j);
-            if (!tile)
-                continue;
-            IntRect bound = m_tiler->tileRect(tile);
-            bound.intersect(layerRect);
-            tile->m_dirtyRect.unite(bound);
-        }
+    for (CCLayerTilingData::TileMap::const_iterator iter = m_tiler->tiles().begin(); iter != m_tiler->tiles().end(); ++iter) {
+        UpdatableTile* tile = static_cast<UpdatableTile*>(iter->second.get());
+        ASSERT(tile);
+        IntRect bound = m_tiler->tileRect(tile);
+        bound.intersect(layerRect);
+        tile->m_dirtyRect.unite(bound);
     }
 }
 
@@ -363,13 +359,45 @@ void TiledLayerChromium::protectTileTextures(const IntRect& layerRect)
     }
 }
 
+// Returns true if tile is dirty and only part of it needs to be updated.
+bool TiledLayerChromium::tileOnlyNeedsPartialUpdate(UpdatableTile* tile)
+{
+    if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat))
+        return false;
+
+    if (!tile->isDirty())
+        return false;
+
+    return !tile->m_dirtyRect.contains(m_tiler->tileRect(tile));
+}
+
+// Dirty tiles with valid textures needs buffered update to guarantee that
+// we don't modify textures currently used for drawing by the impl thread.
+bool TiledLayerChromium::tileNeedsBufferedUpdate(UpdatableTile* tile)
+{
+    // No impl thread?.
+    if (!CCProxy::hasImplThread())
+        return false;
+
+    if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat))
+        return false;
+
+    if (!tile->isDirty())
+        return false;
+
+    return true;
+}
+
 void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int right, int bottom)
 {
     // Reset m_updateRect for all tiles.
     for (CCLayerTilingData::TileMap::const_iterator iter = m_tiler->tiles().begin(); iter != m_tiler->tiles().end(); ++iter) {
         UpdatableTile* tile = static_cast<UpdatableTile*>(iter->second.get());
         tile->m_updateRect = IntRect();
+        tile->m_partialUpdate = false;
     }
+
+    createTextureUpdaterIfNeeded();
 
     // Create tiles as needed, expanding a dirty rect to contain all
     // the dirty regions currently being drawn. All dirty tiles that are to be painted
@@ -382,9 +410,11 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
             if (!tile)
                 tile = createTile(i, j);
 
-            // Do post commit deletion of current texture when partial texture
-            // updates are not used.
-            if (tile->isDirty() && layerTreeHost() && !layerTreeHost()->settings().partialTextureUpdates)
+            // FIXME: Decide if partial update should be allowed based on cost
+            // of update. https://bugs.webkit.org/show_bug.cgi?id=77376
+            if (tileOnlyNeedsPartialUpdate(tile) && layerTreeHost() && layerTreeHost()->requestPartialTextureUpdate())
+                tile->m_partialUpdate = true;
+            else if (tileNeedsBufferedUpdate(tile) && layerTreeHost())
                 layerTreeHost()->deleteTextureAfterCommit(tile->managedTexture()->steal());
 
             if (!tile->managedTexture()->isValid(m_tiler->tileSize(), m_textureFormat))
@@ -397,7 +427,9 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
                     // layer so that checkerboarded tiles will still draw.
                     if (!backgroundCoversViewport())
                         m_skipsDraw = true;
-                    cleanupResources();
+                    m_tiler->reset();
+                    m_paintRect = IntRect();
+                    m_requestedUpdateTilesRect = IntRect();
                 }
                 return;
             }
@@ -473,6 +505,7 @@ void TiledLayerChromium::reserveTextures()
     int left, top, right, bottom;
     m_tiler->layerRectToTileIndices(layerRect, left, top, right, bottom);
 
+    createTextureUpdaterIfNeeded();
     for (int j = top; j <= bottom; ++j) {
         for (int i = left; i <= right; ++i) {
             UpdatableTile* tile = tileAt(i, j);

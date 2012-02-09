@@ -24,6 +24,7 @@
 
 #include "config.h"
 
+#include "ManagedTexture.h"
 #include "TextureManager.h"
 
 #include <gtest/gtest.h>
@@ -64,8 +65,7 @@ public:
 
     bool requestTexture(TextureManager* manager, TextureToken token)
     {
-        unsigned textureId;
-        bool result = manager->requestTexture(token, m_textureSize, m_textureFormat, textureId);
+        bool result = manager->requestTexture(token, m_textureSize, m_textureFormat);
         if (result)
             manager->allocateTexture(&m_fakeTextureAllocator, token);
         return result;
@@ -116,8 +116,16 @@ TEST_F(TextureManagerTest, requestTextureExceedingPreferredLimit)
         tokens[i] = textureManager->getToken();
         EXPECT_TRUE(requestTexture(textureManager.get(), tokens[i]));
         EXPECT_TRUE(textureManager->hasTexture(tokens[i]));
-        textureManager->unprotectTexture(tokens[i]);
     }
+
+    textureManager->unprotectTexture(tokens[4]);
+    textureManager->unprotectTexture(tokens[5]);
+
+    // These textures should be valid before the reduceMemoryToLimit call.
+    EXPECT_TRUE(textureManager->hasTexture(tokens[0]));
+    EXPECT_TRUE(textureManager->hasTexture(tokens[2]));
+
+    textureManager->reduceMemoryToLimit(texturesMemorySize(preferredTextures));
 
     EXPECT_FALSE(textureManager->hasTexture(tokens[0]));
     EXPECT_TRUE(textureManager->hasTexture(tokens[1]));
@@ -241,6 +249,52 @@ TEST_F(TextureManagerTest, setPreferredMemoryLimitBytes)
     EXPECT_EQ(texturesMemorySize(maxTextures), textureManager->currentMemoryUseBytes());
     EXPECT_EQ(texturesMemorySize(maxTextures), textureManager->maxMemoryLimitBytes());
     EXPECT_EQ(texturesMemorySize(preferredTextures), textureManager->preferredMemoryLimitBytes());
+}
+
+TEST_F(TextureManagerTest, textureManagerDestroyedBeforeManagedTexture)
+{
+    OwnPtr<TextureManager> textureManager = createTextureManager(1, 1);
+    OwnPtr<ManagedTexture> managedTexture = ManagedTexture::create(textureManager.get());
+
+    IntSize size(50, 50);
+    unsigned format = GraphicsContext3D::RGBA;
+
+    // Texture is initially invalid, but we should be able to reserve.
+    EXPECT_FALSE(managedTexture->isValid(size, format));
+    EXPECT_TRUE(managedTexture->reserve(size, format));
+    EXPECT_TRUE(managedTexture->isValid(size, format));
+
+    textureManager.clear();
+
+    // Deleting the manager should invalidate the texture and reservation attempts should fail.
+    EXPECT_FALSE(managedTexture->isValid(size, format));
+    EXPECT_FALSE(managedTexture->reserve(size, format));
+}
+
+TEST_F(TextureManagerTest, textureMovedToNewManager)
+{
+    OwnPtr<TextureManager> textureManagerOne = createTextureManager(1, 1);
+    OwnPtr<TextureManager> textureManagerTwo = createTextureManager(1, 1);
+    OwnPtr<ManagedTexture> managedTexture = ManagedTexture::create(textureManagerOne.get());
+
+    IntSize size(50, 50);
+    unsigned format = GraphicsContext3D::RGBA;
+
+    // Texture is initially invalid, but we should be able to reserve.
+    EXPECT_FALSE(managedTexture->isValid(size, format));
+    EXPECT_TRUE(managedTexture->reserve(size, format));
+    EXPECT_TRUE(managedTexture->isValid(size, format));
+
+    // Setting to the same manager should be a no-op.
+    managedTexture->setTextureManager(textureManagerOne.get());
+    EXPECT_TRUE(managedTexture->isValid(size, format));
+
+    // Setting to a different manager should invalidate the texture.
+    managedTexture->setTextureManager(textureManagerTwo.get());
+
+    EXPECT_FALSE(managedTexture->isValid(size, format));
+    EXPECT_TRUE(managedTexture->reserve(size, format));
+    EXPECT_TRUE(managedTexture->isValid(size, format));
 }
 
 } // namespace

@@ -126,8 +126,6 @@ public:
 
     void setupInitialView(const String& fragmentIdentifier, Element* anchorNode);
 
-    bool isOutermostSVG() const;
-
     Element* getElementById(const AtomicString&) const;
 
     bool widthAttributeEstablishesViewport() const;
@@ -142,7 +140,7 @@ private:
 
     virtual bool isSVG() const { return true; }
     
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext& context) { return StyledElement::rendererIsNeeded(context); }
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);

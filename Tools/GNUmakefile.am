@@ -65,6 +65,7 @@ libWebCoreInternals_la_CPPFLAGS = \
 	$(javascriptcore_cppflags) \
 	$(CAIRO_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
+	$(PANGO_CFLAGS) \
 	-I$(top_builddir)/DerivedSources \
 	-I$(top_builddir)/DerivedSources/WebCore
 
@@ -325,6 +326,7 @@ if ENABLE_WEBKIT2
 	  fi; \
 	fi
 endif
+	$(srcdir)/Tools/gtk/generate-gtkdoc --rebase --virtual-root=$${DESTDIR}
 
 uninstall-local:
 	@DOC_MODULE_VERSION=`cat ./Documentation/webkitgtk/version.xml`; \

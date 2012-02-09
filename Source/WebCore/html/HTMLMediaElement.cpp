@@ -315,9 +315,14 @@ bool HTMLMediaElement::supportsFocus() const
     return controls() ||  HTMLElement::supportsFocus();
 }
 
-void HTMLMediaElement::attributeChanged(Attribute* attr, bool preserveDecls)
+bool HTMLMediaElement::isMouseFocusable() const
 {
-    HTMLElement::attributeChanged(attr, preserveDecls);
+    return false;
+}
+
+void HTMLMediaElement::attributeChanged(Attribute* attr)
+{
+    HTMLElement::attributeChanged(attr);
 
     const QualifiedName& attrName = attr->name();
     if (attrName == srcAttr) {
@@ -332,7 +337,7 @@ void HTMLMediaElement::attributeChanged(Attribute* attr, bool preserveDecls)
 #endif
 }
 
-void HTMLMediaElement::parseMappedAttribute(Attribute* attr)
+void HTMLMediaElement::parseAttribute(Attribute* attr)
 {
     const QualifiedName& attrName = attr->name();
 
@@ -406,7 +411,7 @@ void HTMLMediaElement::parseMappedAttribute(Attribute* attr)
     else if (attrName == onwebkitendfullscreenAttr)
         setAttributeEventListener(eventNames().webkitendfullscreenEvent, createAttributeEventListener(this, attr));
     else
-        HTMLElement::parseMappedAttribute(attr);
+        HTMLElement::parseAttribute(attr);
 }
 
 void HTMLMediaElement::finishParsingChildren()

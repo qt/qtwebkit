@@ -21,9 +21,9 @@
 module window {
 
     interface [
-        GenerateIsReachable=ImplFrame,
-        HasNameGetter,
-        HasIndexGetter
+        JSGenerateIsReachable=ImplFrame,
+        NamedGetter,
+        IndexedGetter
     ] DOMMimeTypeArray {
         readonly attribute unsigned long length;
         DOMMimeType item(in [Optional=CallWithDefaultValue] unsigned long index);

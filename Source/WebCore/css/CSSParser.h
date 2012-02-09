@@ -43,8 +43,6 @@
 namespace WebCore {
 
 class CSSBorderImageSliceValue;
-class CSSMappedAttributeDeclaration;
-class CSSMutableStyleDeclaration;
 class CSSPrimitiveValue;
 class CSSValuePool;
 class CSSProperty;
@@ -58,6 +56,7 @@ class CSSWrapShape;
 class Document;
 class MediaList;
 class MediaQueryExp;
+class StylePropertySet;
 class StyledElement;
 class WebKitCSSKeyframeRule;
 class WebKitCSSKeyframesRule;
@@ -70,14 +69,12 @@ public:
     void parseSheet(CSSStyleSheet*, const String&, int startLineNumber = 0, StyleRuleRangeMap* ruleRangeMap = 0);
     PassRefPtr<CSSRule> parseRule(CSSStyleSheet*, const String&);
     PassRefPtr<WebKitCSSKeyframeRule> parseKeyframeRule(CSSStyleSheet*, const String&);
-    static bool parseValue(CSSMutableStyleDeclaration*, int propId, const String&, bool important, bool strict);
+    static bool parseValue(StylePropertySet*, int propId, const String&, bool important, bool strict);
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
     PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(int propId, CSSParserValue*);
-    bool parseDeclaration(CSSMutableStyleDeclaration*, const String&, RefPtr<CSSStyleSourceData>* = 0, CSSStyleSheet* contextStyleSheet = 0);
+    bool parseDeclaration(StylePropertySet*, const String&, RefPtr<CSSStyleSourceData>* = 0, CSSStyleSheet* contextStyleSheet = 0);
     bool parseMediaQuery(MediaList*, const String&);
-
-    static bool parseMappedAttributeValue(CSSMappedAttributeDeclaration*, StyledElement*, int propertyId, const String&);
 
     Document* findDocument() const;
 
@@ -358,7 +355,7 @@ private:
     bool isGeneratedImageValue(CSSParserValue*) const;
     bool parseGeneratedImage(CSSParserValueList*, RefPtr<CSSValue>&);
 
-    bool parseValue(CSSMutableStyleDeclaration*, int propId, const String&, bool important, CSSStyleSheet* contextStyleSheet = 0);
+    bool parseValue(StylePropertySet*, int propId, const String&, bool important, CSSStyleSheet* contextStyleSheet = 0);
 
     enum SizeParameterType {
         None,

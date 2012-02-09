@@ -34,8 +34,7 @@ public:
 private:
     HTMLEmbedElement(const QualifiedName&, Document*, bool createdByParser);
 
-    virtual bool mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const;
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     virtual void insertedIntoDocument();

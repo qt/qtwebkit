@@ -178,8 +178,6 @@ public:
     static bool allowsIndependentlyCompositedFrames(const FrameView*);
     bool shouldPropagateCompositingToEnclosingFrame() const;
 
-    HTMLFrameOwnerElement* enclosingFrameElement() const;
-
     static RenderLayerCompositor* frameContentsCompositor(RenderPart*);
     // Return true if the layers changed.
     static bool parentFrameContentLayers(RenderPart*);
@@ -293,6 +291,7 @@ private:
     bool requiresScrollCornerLayer() const;
 #if ENABLE(RUBBER_BANDING)
     bool requiresOverhangAreasLayer() const;
+    bool requiresContentShadowLayer() const;
 #endif
 
 #if ENABLE(THREADED_SCROLLING)
@@ -339,6 +338,7 @@ private:
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
 #if ENABLE(RUBBER_BANDING)
     OwnPtr<GraphicsLayer> m_layerForOverhangAreas;
+    OwnPtr<GraphicsLayer> m_contentShadowLayer;
 #endif
 #if PROFILE_LAYER_REBUILD
     int m_rootLayerUpdateCount;

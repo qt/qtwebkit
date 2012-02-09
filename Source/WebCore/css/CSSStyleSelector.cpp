@@ -297,17 +297,17 @@ static const MediaQueryEvaluator& printEval()
     return staticPrintEval;
 }
 
-static CSSMutableStyleDeclaration* leftToRightDeclaration()
+static StylePropertySet* leftToRightDeclaration()
 {
-    DEFINE_STATIC_LOCAL(RefPtr<CSSMutableStyleDeclaration>, leftToRightDecl, (CSSMutableStyleDeclaration::create()));
+    DEFINE_STATIC_LOCAL(RefPtr<StylePropertySet>, leftToRightDecl, (StylePropertySet::create()));
     if (leftToRightDecl->isEmpty())
         leftToRightDecl->setProperty(CSSPropertyDirection, CSSValueLtr);
     return leftToRightDecl.get();
 }
 
-static CSSMutableStyleDeclaration* rightToLeftDeclaration()
+static StylePropertySet* rightToLeftDeclaration()
 {
-    DEFINE_STATIC_LOCAL(RefPtr<CSSMutableStyleDeclaration>, rightToLeftDecl, (CSSMutableStyleDeclaration::create()));
+    DEFINE_STATIC_LOCAL(RefPtr<StylePropertySet>, rightToLeftDecl, (StylePropertySet::create()));
     if (rightToLeftDecl->isEmpty())
         rightToLeftDecl->setProperty(CSSPropertyDirection, CSSValueRtl);
     return rightToLeftDecl.get();
@@ -747,7 +747,7 @@ static void ensureDefaultStyleSheetsForElement(Element* element)
     ASSERT_UNUSED(loadedMathMLUserAgentSheet, loadedMathMLUserAgentSheet || defaultStyle->features().siblingRules.isEmpty());
 }
 
-void CSSStyleSelector::addMatchedDeclaration(CSSMutableStyleDeclaration* styleDeclaration, unsigned linkMatchType)
+void CSSStyleSelector::addMatchedDeclaration(StylePropertySet* styleDeclaration, unsigned linkMatchType)
 {
     m_matchedDecls.grow(m_matchedDecls.size() + 1);
     MatchedStyleDeclaration& newDeclaration = m_matchedDecls.last();
@@ -940,7 +940,7 @@ void CSSStyleSelector::collectMatchingRulesForList(const Vector<RuleData>* rules
                 continue;
             }
             // If the rule has no properties to apply, then ignore it in the non-debug mode.
-            CSSMutableStyleDeclaration* decl = rule->declaration();
+            StylePropertySet* decl = rule->declaration();
             if (!decl || (decl->isEmpty() && !includeEmptyRules)) {
                 InspectorInstrumentation::didMatchRule(cookie, false);
                 continue;
@@ -996,28 +996,24 @@ void CSSStyleSelector::matchAllRules(MatchResult& result)
         
     // Now check author rules, beginning first with presentational attributes mapped from HTML.
     if (m_styledElement) {
-        if (const NamedNodeMap* map = m_styledElement->attributeMap()) {
-            // Walk the element's attribute map and add all mapped attribute declarations.
-            for (unsigned i = 0; i < map->length(); ++i) {
-                Attribute* attribute = map->attributeItem(i);
-                if (!attribute->decl())
-                    continue;
-                ASSERT(attribute->isMappedAttribute());
-                result.ranges.lastAuthorRule = m_matchedDecls.size();
+        if (StylePropertySet* attributeStyle = m_styledElement->attributeStyle()) {
+            if (!attributeStyle->isEmpty()) {
+                result.ranges.lastAuthorRule = m_matchedRules.size();
                 if (result.ranges.firstAuthorRule == -1)
                     result.ranges.firstAuthorRule = result.ranges.lastAuthorRule;
-                addMatchedDeclaration(attribute->decl());
+                addMatchedDeclaration(attributeStyle);
+                result.isCacheable = false;
             }
         }
 
         // Now we check additional mapped declarations.
         // Tables and table cells share an additional mapped rule that must be applied
         // after all attributes, since their mapped style depends on the values of multiple attributes.
-        if (RefPtr<CSSMutableStyleDeclaration> additionalStyle = m_styledElement->additionalAttributeStyle()) {
+        if (StylePropertySet* additionalStyle = m_styledElement->additionalAttributeStyle()) {
             if (result.ranges.firstAuthorRule == -1)
                 result.ranges.firstAuthorRule = m_matchedDecls.size();
             result.ranges.lastAuthorRule = m_matchedDecls.size();
-            addMatchedDeclaration(additionalStyle.get());
+            addMatchedDeclaration(additionalStyle);
             result.isCacheable = false;
         }
 
@@ -1035,7 +1031,7 @@ void CSSStyleSelector::matchAllRules(MatchResult& result)
 
     // Now check our inline style attribute.
     if (m_matchAuthorAndUserStyles && m_styledElement) {
-        CSSMutableStyleDeclaration* inlineDecl = m_styledElement->inlineStyleDecl();
+        StylePropertySet* inlineDecl = m_styledElement->inlineStyleDecl();
         if (inlineDecl) {
             result.ranges.lastAuthorRule = m_matchedDecls.size();
             if (result.ranges.firstAuthorRule == -1)
@@ -1178,37 +1174,46 @@ bool CSSStyleSelector::canShareStyleWithControl(StyledElement* element) const
     if (element->isDefaultButtonForForm() != m_element->isDefaultButtonForForm())
         return false;
 
-    if (!m_element->document()->containsValidityStyleRules())
-        return false;
+    if (m_element->document()->containsValidityStyleRules()) {
+        bool willValidate = element->willValidate();
 
-    bool willValidate = element->willValidate();
+        if (willValidate != m_element->willValidate())
+            return false;
 
-    if (willValidate != m_element->willValidate())
-        return false;
+        if (willValidate && (element->isValidFormControlElement() != m_element->isValidFormControlElement()))
+            return false;
 
-    if (willValidate && (element->isValidFormControlElement() != m_element->isValidFormControlElement()))
-        return false;
+        if (element->isInRange() != m_element->isInRange())
+            return false;
 
-    if (element->isInRange() != m_element->isInRange())
-        return false;
-
-    if (element->isOutOfRange() != m_element->isOutOfRange())
-        return false;
+        if (element->isOutOfRange() != m_element->isOutOfRange())
+            return false;
+    }
 
     return true;
 }
 
-static inline bool mappedAttributesEquivalent(NamedNodeMap* a, NamedNodeMap* b)
+// This function makes some assumptions that only make sense for attribute styles (we only compare CSSProperty::id() and CSSProperty::value().)
+static inline bool attributeStylesEqual(StylePropertySet* a, StylePropertySet* b)
 {
-    ASSERT(a->mappedAttributeCount() == b->mappedAttributeCount());
-
-    for (size_t i = 0; i < a->length(); ++i) {
-        Attribute* attribute = a->attributeItem(i);
-        if (!attribute->decl())
-            continue;
-        ASSERT(attribute->isMappedAttribute());
-        Attribute* otherAttribute = b->getAttributeItem(attribute->name());
-        if (!otherAttribute || attribute->value() != otherAttribute->value() || attribute->decl() != otherAttribute->decl())
+    if (a == b)
+        return true;
+    if (a->propertyCount() != b->propertyCount())
+        return false;
+    unsigned propertyCount = a->propertyCount();
+    for (unsigned i = 0; i < propertyCount; ++i) {
+        const CSSProperty& aProperty = a->propertyAt(i);
+        unsigned j;
+        for (j = 0; j < propertyCount; ++j) {
+            const CSSProperty& bProperty = b->propertyAt(j);
+            if (aProperty.id() != bProperty.id())
+                continue;
+            // We could get a few more hits by comparing cssText() here, but that gets expensive quickly.
+            if (aProperty.value() != bProperty.value())
+                return false;
+            break;
+        }
+        if (j == propertyCount)
             return false;
     }
     return true;
@@ -1228,8 +1233,11 @@ bool CSSStyleSelector::canShareStyleWithElement(StyledElement* element) const
         return false;
     if (element->inlineStyleDecl())
         return false;
-    size_t mappedAttributeCount = element->mappedAttributeCount();
-    if (mappedAttributeCount != m_styledElement->mappedAttributeCount())
+    if (!!element->attributeStyle() != !!m_styledElement->attributeStyle())
+        return false;
+    StylePropertySet* additionalAttributeStyleA = element->additionalAttributeStyle();
+    StylePropertySet* additionalAttributeStyleB = m_styledElement->additionalAttributeStyle();
+    if (!additionalAttributeStyleA != !additionalAttributeStyleB)
         return false;
     if (element->isLink() != m_element->isLink())
         return false;
@@ -1295,7 +1303,10 @@ bool CSSStyleSelector::canShareStyleWithElement(StyledElement* element) const
     if (element->hasClass() && m_element->getAttribute(classAttr) != element->getAttribute(classAttr))
         return false;
 
-    if (mappedAttributeCount && !mappedAttributesEquivalent(element->attributeMap(), m_styledElement->attributeMap()))
+    if (element->attributeStyle() && !attributeStylesEqual(element->attributeStyle(), m_styledElement->attributeStyle()))
+        return false;
+
+    if (additionalAttributeStyleA && !attributeStylesEqual(additionalAttributeStyleA, additionalAttributeStyleB))
         return false;
 
     if (element->isLink() && m_elementLinkState != style->insideLink())
@@ -1403,6 +1414,7 @@ PassRefPtr<RenderStyle> CSSStyleSelector::styleForDocument(Document* document, C
     documentStyle->setZoom(frame ? frame->pageZoomFactor() : 1);
     documentStyle->setPageScaleTransform(frame ? frame->frameScaleFactor() : 1);
     documentStyle->setUserModify(document->inDesignMode() ? READ_WRITE : READ_ONLY);
+    documentStyle->setLocale(document->contentLanguage());
 
     Element* docElement = document->documentElement();
     RenderObject* docElementRenderer = docElement ? docElement->renderer() : 0;
@@ -1433,12 +1445,13 @@ PassRefPtr<RenderStyle> CSSStyleSelector::styleForDocument(Document* document, C
 
     FontDescription fontDescription;
     fontDescription.setUsePrinterFont(document->printing());
+    fontDescription.setScript(localeToScriptCodeForFontSelection(documentStyle->locale()));
     if (Settings* settings = document->settings()) {
         fontDescription.setRenderingMode(settings->fontRenderingMode());
-        const AtomicString& stdfont = settings->standardFontFamily();
-        if (!stdfont.isEmpty()) {
+        const AtomicString& standardFont = settings->standardFontFamily(fontDescription.script());
+        if (!standardFont.isEmpty()) {
             fontDescription.setGenericFamily(FontDescription::StandardFamily);
-            fontDescription.firstFamily().setFamily(stdfont);
+            fontDescription.firstFamily().setFamily(standardFont);
             fontDescription.firstFamily().appendFamily(0);
         }
         fontDescription.setKeywordSize(CSSValueMedium - CSSValueXxSmall + 1);
@@ -1528,7 +1541,7 @@ PassRefPtr<RenderStyle> CSSStyleSelector::styleForElement(Element* element, Rend
 
 PassRefPtr<RenderStyle> CSSStyleSelector::styleForKeyframe(const RenderStyle* elementStyle, const WebKitCSSKeyframeRule* keyframeRule, KeyframeValue& keyframe)
 {
-    if (keyframeRule->style())
+    if (keyframeRule->declaration())
         addMatchedDeclaration(keyframeRule->declaration());
 
     ASSERT(!m_style);
@@ -1568,7 +1581,7 @@ PassRefPtr<RenderStyle> CSSStyleSelector::styleForKeyframe(const RenderStyle* el
 #endif
 
     // Add all the animating properties to the keyframe.
-    if (CSSMutableStyleDeclaration* styleDeclaration = keyframeRule->declaration()) {
+    if (StylePropertySet* styleDeclaration = keyframeRule->declaration()) {
         unsigned propertyCount = styleDeclaration->propertyCount();
         for (unsigned i = 0; i < propertyCount; ++i) {
             int property = styleDeclaration->propertyAt(i).id();
@@ -1746,6 +1759,55 @@ static void addIntrinsicMargins(RenderStyle* style)
     }
 }
 
+static EDisplay equivalentBlockDisplay(EDisplay display, bool isFloating, bool strictParsing)
+{
+    switch (display) {
+    case BLOCK:
+    case TABLE:
+    case BOX:
+    case FLEXBOX:
+#if ENABLE(CSS_GRID_LAYOUT)
+    case GRID:
+#endif
+        return display;
+
+    case LIST_ITEM:
+        // It is a WinIE bug that floated list items lose their bullets, so we'll emulate the quirk, but only in quirks mode.
+        if (!strictParsing && isFloating)
+            return BLOCK;
+        return display;
+    case INLINE_TABLE:
+        return TABLE;
+    case INLINE_BOX:
+        return BOX;
+    case INLINE_FLEXBOX:
+        return FLEXBOX;
+#if ENABLE(CSS_GRID_LAYOUT)
+    case INLINE_GRID:
+        return GRID;
+#endif
+
+    case INLINE:
+    case RUN_IN:
+    case COMPACT:
+    case INLINE_BLOCK:
+    case TABLE_ROW_GROUP:
+    case TABLE_HEADER_GROUP:
+    case TABLE_FOOTER_GROUP:
+    case TABLE_ROW:
+    case TABLE_COLUMN_GROUP:
+    case TABLE_COLUMN:
+    case TABLE_CELL:
+    case TABLE_CAPTION:
+        return BLOCK;
+    case NONE:
+        ASSERT_NOT_REACHED();
+        return NONE;
+    }
+    ASSERT_NOT_REACHED();
+    return BLOCK;
+}
+
 void CSSStyleSelector::adjustRenderStyle(RenderStyle* style, RenderStyle* parentStyle, Element *e)
 {
     // Cache our original display.
@@ -1795,26 +1857,9 @@ void CSSStyleSelector::adjustRenderStyle(RenderStyle* style, RenderStyle* parent
         if (e && e->hasTagName(legendTag))
             style->setDisplay(BLOCK);
 
-        // Mutate the display to BLOCK or TABLE for certain cases, e.g., if someone attempts to
-        // position or float an inline, compact, or run-in.  Cache the original display, since it
-        // may be needed for positioned elements that have to compute their static normal flow
-        // positions.  We also force inline-level roots to be block-level.
-        if (style->display() != BLOCK && style->display() != TABLE && style->display() != BOX &&
-            (style->position() == AbsolutePosition || style->position() == FixedPosition || style->isFloating() ||
-             (e && e->document()->documentElement() == e))) {
-            if (style->display() == INLINE_TABLE)
-                style->setDisplay(TABLE);
-            else if (style->display() == INLINE_BOX)
-                style->setDisplay(BOX);
-            else if (style->display() == LIST_ITEM) {
-                // It is a WinIE bug that floated list items lose their bullets, so we'll emulate the quirk,
-                // but only in quirks mode.
-                if (!m_checker.strictParsing() && style->isFloating())
-                    style->setDisplay(BLOCK);
-            }
-            else
-                style->setDisplay(BLOCK);
-        }
+        // Absolute/fixed positioned elements, floating elements and the document element need block-like outside display.
+        if (style->position() == AbsolutePosition || style->position() == FixedPosition || style->isFloating() || (e && e->document()->documentElement() == e))
+            style->setDisplay(equivalentBlockDisplay(style->display(), style->isFloating(), m_checker.strictParsing()));
 
         // FIXME: Don't support this mutation for pseudo styles like first-letter or first-line, since it's not completely
         // clear how that should work.
@@ -2047,7 +2092,8 @@ inline bool CSSStyleSelector::checkSelector(const RuleData& ruleData)
     }
 
     // Slow path.
-    SelectorChecker::SelectorMatch match = m_checker.checkSelector(ruleData.selector(), m_element, m_dynamicPseudo, false, SelectorChecker::VisitedMatchEnabled, style(), m_parentNode ? m_parentNode->renderStyle() : 0);
+    SelectorChecker::SelectorCheckingContext context(ruleData.selector(), m_element, SelectorChecker::VisitedMatchEnabled, style(), m_parentNode ? m_parentNode->renderStyle() : 0);
+    SelectorChecker::SelectorMatch match = m_checker.checkSelector(context, m_dynamicPseudo);
     if (match != SelectorChecker::SelectorMatches)
         return false;
     if (m_checker.pseudoStyle() != NOPSEUDO && m_checker.pseudoStyle() != m_dynamicPseudo)
@@ -2433,11 +2479,11 @@ static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, RenderStyl
     return convertToLength(primitiveValue, style, rootStyle, true, multiplier, ok);
 }
 
-static inline bool isInsideRegionRule(CSSMutableStyleDeclaration* styleDeclaration)
+static inline bool isInsideRegionRule(StylePropertySet* styleDeclaration)
 {
     ASSERT(styleDeclaration);
 
-    CSSRule* parentRule = styleDeclaration->parentRule();
+    CSSRule* parentRule = styleDeclaration->parentRuleInternal();
     while (parentRule) {
         if (parentRule->isRegionRule())
             return true;
@@ -2447,9 +2493,9 @@ static inline bool isInsideRegionRule(CSSMutableStyleDeclaration* styleDeclarati
 }
 
 template <bool applyFirst>
-void CSSStyleSelector::applyDeclaration(CSSMutableStyleDeclaration* styleDeclaration, bool isImportant, bool inheritedOnly)
+void CSSStyleSelector::applyDeclaration(StylePropertySet* styleDeclaration, bool isImportant, bool inheritedOnly)
 {
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willProcessRule(document(), styleDeclaration->parentRule());
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willProcessRule(document(), styleDeclaration->parentRuleInternal());
     bool styleDeclarationInsideRegionRule = m_regionForStyling ? isInsideRegionRule(styleDeclaration) : false;
 
     unsigned propertyCount = styleDeclaration->propertyCount();
@@ -2499,7 +2545,7 @@ void CSSStyleSelector::applyDeclarations(bool isImportant, int startIndex, int e
 
     if (m_style->insideLink() != NotInsideLink) {
         for (int i = startIndex; i <= endIndex; ++i) {
-            CSSMutableStyleDeclaration* styleDeclaration = m_matchedDecls[i].styleDeclaration.get();
+            StylePropertySet* styleDeclaration = m_matchedDecls[i].styleDeclaration.get();
             unsigned linkMatchType = m_matchedDecls[i].linkMatchType;
             // FIXME: It would be nicer to pass these as arguments but that requires changes in many places.
             m_applyPropertyToRegularStyle = linkMatchType & SelectorChecker::MatchLink;
@@ -2718,7 +2764,7 @@ void CSSStyleSelector::matchPageRulesForList(const Vector<RuleData>* rules, bool
             continue;
 
         // If the rule has no properties to apply, then ignore it.
-        CSSMutableStyleDeclaration* decl = rule->declaration();
+        StylePropertySet* decl = rule->declaration();
         if (!decl || decl->isEmpty())
             continue;
 
@@ -4305,7 +4351,20 @@ void CSSStyleSelector::mapAnimationDirection(Animation* layer, CSSValue* value)
         return;
 
     CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
-    layer->setDirection(primitiveValue->getIdent() == CSSValueAlternate ? Animation::AnimationDirectionAlternate : Animation::AnimationDirectionNormal);
+    switch (primitiveValue->getIdent()) {
+    case CSSValueNormal:
+        layer->setDirection(Animation::AnimationDirectionNormal);
+        break;
+    case CSSValueAlternate:
+        layer->setDirection(Animation::AnimationDirectionAlternate);
+        break;
+    case CSSValueReverse:
+        layer->setDirection(Animation::AnimationDirectionReverse);
+        break;
+    case CSSValueAlternateReverse:
+        layer->setDirection(Animation::AnimationDirectionAlternateReverse);
+        break;
+    }
 }
 
 void CSSStyleSelector::mapAnimationDuration(Animation* animation, CSSValue* value)

@@ -27,13 +27,13 @@ module html {
 
     interface [
         Conditional=VIDEO_TRACK,
-        EnabledAtRuntime=webkitVideoTrack,
-        GenerateNativeConverter,
+        V8EnabledAtRuntime=webkitVideoTrack,
+        JSGenerateToNativeObject,
         Constructor(in DOMString id, in double startTime, in double endTime, in DOMString text, in [Optional=CallWithDefaultValue] DOMString settings, in [Optional=CallWithDefaultValue] boolean pauseOnExit),
         CallWith=ScriptExecutionContext,
         EventTarget,
-        CustomMarkFunction,
-        CustomIsReachable
+        JSCustomMarkFunction,
+        JSCustomIsReachable
     ] TextTrackCue {
         readonly attribute TextTrack track;
 

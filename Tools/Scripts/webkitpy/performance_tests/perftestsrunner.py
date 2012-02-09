@@ -46,8 +46,6 @@ _log = logging.getLogger(__name__)
 
 
 class PerfTestsRunner(object):
-    _perf_tests_base_dir = 'PerformanceTests'
-    _initial_page_relative_path = 'resources/init.html'
     _test_directories_for_chromium_style_tests = ['inspector']
     _default_branch = 'webkit-trunk'
     _EXIT_CODE_BAD_BUILD = -1
@@ -67,7 +65,6 @@ class PerfTestsRunner(object):
         self._printer = printing.Printer(self._port, self._options, regular_output, buildbot_output, configure_logging=False)
         self._webkit_base_dir_len = len(self._port.webkit_base())
         self._base_path = self._port.perf_tests_dir()
-        self._initial_page_path = self._host.filesystem.join(self._base_path, self._initial_page_relative_path)
         self._results = {}
         self._timestamp = time.time()
 
@@ -109,8 +106,15 @@ class PerfTestsRunner(object):
         def _is_test_file(filesystem, dirname, filename):
             return filename.endswith('.html')
 
+        paths = []
+        for arg in self._args:
+            paths.append(arg)
+            relpath = self._host.filesystem.relpath(arg, self._base_path)
+            if relpath:
+                paths.append(relpath)
+
         skipped_directories = set(['.svn', 'resources'])
-        tests = find_files.find(self._host.filesystem, self._base_path, self._args, skipped_directories, _is_test_file)
+        tests = find_files.find(self._host.filesystem, self._base_path, paths, skipped_directories, _is_test_file)
         return [test for test in tests if not self._port.skips_perf_test(self._port.relative_perf_test_filename(test))]
 
     def run(self):
@@ -147,14 +151,16 @@ class PerfTestsRunner(object):
         return unexpected
 
     def _generate_json(self, timestamp, output_json_path, source_json_path, branch, platform, builder_name, build_number):
-        revision = self._host.scm().head_svn_revision()
-        contents = {'timestamp': int(timestamp), 'revision': revision, 'results': self._results}
+        contents = {'timestamp': int(timestamp), 'results': self._results}
+        for (name, path) in self._port.repository_paths():
+            contents[name + '-revision'] = self._host.scm().svn_revision(path)
 
         for key, value in {'branch': branch, 'platform': platform, 'builder-name': builder_name, 'build-number': build_number}.items():
             if value:
                 contents[key] = value
 
         filesystem = self._host.filesystem
+        succeeded = False
         if source_json_path:
             try:
                 source_json_file = filesystem.open_text_file_for_reading(source_json_path)
@@ -204,6 +210,7 @@ class PerfTestsRunner(object):
         result_count = len(tests)
         expected = 0
         unexpected = 0
+        driver = None
 
         for test in tests:
             driver = port.create_driver(worker_number=1, no_timeout=True)
@@ -245,7 +252,8 @@ class PerfTestsRunner(object):
         re.compile(r'^\d+(.\d+)?$'),
         # Following are for handle existing test like Dromaeo
         re.compile(re.escape("""main frame - has 1 onunload handler(s)""")),
-        re.compile(re.escape("""frame "<!--framePath //<!--frame0-->-->" - has 1 onunload handler(s)"""))]
+        re.compile(re.escape("""frame "<!--framePath //<!--frame0-->-->" - has 1 onunload handler(s)""")),
+        re.compile(re.escape("""frame "<!--framePath //<!--frame0-->/<!--frame0-->-->" - has 1 onunload handler(s)"""))]
 
     def _should_ignore_line_in_parser_test_result(self, line):
         if not line:
@@ -283,9 +291,6 @@ class PerfTestsRunner(object):
 
     def _run_single_test(self, test, driver, is_chromium_style):
         test_failed = False
-        output = driver.run_test(DriverInput(self._initial_page_path, 10000, None, False))
-        if output.text != 'PASS\n':
-            self._printer.write('Initialization page failed to load.')
         output = driver.run_test(DriverInput(test, self._options.time_out_ms, None, False))
 
         if output.text == None:

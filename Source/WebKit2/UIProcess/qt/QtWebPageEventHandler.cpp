@@ -87,6 +87,7 @@ static inline WebCore::DragOperation dropActionToDragOperation(Qt::DropActions a
 
 QtWebPageEventHandler::QtWebPageEventHandler(WKPageRef pageRef, QQuickWebPage* qmlWebPage, QQuickWebView* qmlWebView)
     : m_webPageProxy(toImpl(pageRef))
+    , m_interactionEngine(0)
     , m_panGestureRecognizer(this)
     , m_pinchGestureRecognizer(this)
     , m_tapGestureRecognizer(this)
@@ -297,7 +298,7 @@ void QtWebPageEventHandler::handleSingleTapEvent(const QTouchEvent::TouchPoint& 
     m_postponeTextInputStateChanged = true;
 
     QTransform fromItemTransform = m_webPage->transformFromItem();
-    WebGestureEvent gesture(WebEvent::GestureSingleTap, fromItemTransform.map(point.pos()).toPoint(), point.screenPos().toPoint(), WebEvent::Modifiers(0), 0);
+    WebGestureEvent gesture(WebEvent::GestureSingleTap, fromItemTransform.map(point.pos()).toPoint(), point.screenPos().toPoint(), WebEvent::Modifiers(0), 0, IntSize(point.rect().size().toSize()), FloatPoint(0, 0));
     m_webPageProxy->handleGestureEvent(gesture);
 }
 

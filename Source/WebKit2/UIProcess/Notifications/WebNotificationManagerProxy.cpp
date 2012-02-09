@@ -77,12 +77,12 @@ void WebNotificationManagerProxy::didReceiveMessage(CoreIPC::Connection* connect
     didReceiveWebNotificationManagerProxyMessage(connection, messageID, arguments);
 }
 
-void WebNotificationManagerProxy::show(WebPageProxy* page, const String& title, const String& body, const String& originString, uint64_t notificationID)
+void WebNotificationManagerProxy::show(WebPageProxy* page, const String& title, const String& body, const String& iconURL, const String& originString, uint64_t notificationID)
 {
     if (!isNotificationIDValid(notificationID))
         return;
     
-    RefPtr<WebNotification> notification = WebNotification::create(title, body, originString, notificationID);
+    RefPtr<WebNotification> notification = WebNotification::create(title, body, iconURL, originString, notificationID);
     m_notifications.set(notificationID, notification);
     m_provider.show(page, notification.get());
 }
@@ -109,6 +109,14 @@ void WebNotificationManagerProxy::didDestroyNotification(uint64_t notificationID
         return;
 
     m_provider.didDestroyNotification(notification.get());
+}
+
+void WebNotificationManagerProxy::clearNotifications(const Vector<uint64_t>& notificationIDs)
+{
+    m_provider.clearNotifications(notificationIDs);
+    size_t count = notificationIDs.size();
+    for (size_t i = 0; i < count; ++i)
+        m_notifications.remove(notificationIDs[i]);
 }
 
 void WebNotificationManagerProxy::providerDidShowNotification(uint64_t notificationID)

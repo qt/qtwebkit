@@ -26,11 +26,11 @@
 module html {
 
     interface [
-        HasIndexGetter,
-        HasNameGetter,
+        IndexedGetter,
+        NamedGetter,
         CustomCall,
         MasqueradesAsUndefined,
-        GenerateIsReachable
+        JSGenerateIsReachable
     ] HTMLAllCollection {
         readonly attribute unsigned long length;
         [Custom] Node item(in [Optional=CallWithDefaultValue] unsigned long index);

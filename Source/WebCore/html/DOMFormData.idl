@@ -32,8 +32,8 @@ module html {
 
     interface [
         CustomConstructor,
-        GenerateNativeConverter,
-        GenerateToJS
+        JSGenerateToNativeObject,
+        JSGenerateToJS
     ] DOMFormData {
         // void append(DOMString name, DOMString value);
         // void append(DOMString name, Blob value, optional DOMString filename);

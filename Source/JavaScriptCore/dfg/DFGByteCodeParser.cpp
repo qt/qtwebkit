@@ -170,7 +170,7 @@ private:
                 Node& flushChild = m_graph[nodePtr->child1()];
                 if (flushChild.op == Phi) {
                     VariableAccessData* variableAccessData = flushChild.variableAccessData();
-                    nodeIndex = addToGraph(GetLocal, OpInfo(variableAccessData), nodePtr->child1());
+                    nodeIndex = addToGraph(GetLocal, OpInfo(variableAccessData), nodePtr->child1().index());
                     m_currentBlock->variablesAtTail.local(operand) = nodeIndex;
                     return nodeIndex;
                 }
@@ -179,7 +179,7 @@ private:
             if (nodePtr->op == GetLocal)
                 return nodeIndex;
             ASSERT(nodePtr->op == SetLocal);
-            return nodePtr->child1();
+            return nodePtr->child1().index();
         }
 
         // Check for reads of temporaries from prior blocks,
@@ -219,7 +219,7 @@ private:
                 Node& flushChild = m_graph[nodePtr->child1()];
                 if (flushChild.op == Phi) {
                     VariableAccessData* variableAccessData = flushChild.variableAccessData();
-                    nodeIndex = addToGraph(GetLocal, OpInfo(variableAccessData), nodePtr->child1());
+                    nodeIndex = addToGraph(GetLocal, OpInfo(variableAccessData), nodePtr->child1().index());
                     m_currentBlock->variablesAtTail.local(operand) = nodeIndex;
                     return nodeIndex;
                 }
@@ -238,7 +238,7 @@ private:
                 return nodeIndex;
             
             ASSERT(nodePtr->op == SetLocal);
-            return nodePtr->child1();
+            return nodePtr->child1().index();
         }
         
         VariableAccessData* variableAccessData = newVariableAccessData(operand);
@@ -313,10 +313,6 @@ private:
     {
         return toInt32(get(operand));
     }
-    NodeIndex getToNumber(int operand)
-    {
-        return toNumber(get(operand));
-    }
 
     // Perform an ES5 ToInt32 operation - returns a node of type NodeResultInt32.
     NodeIndex toInt32(NodeIndex index)
@@ -327,7 +323,7 @@ private:
             return index;
 
         if (node.op == UInt32ToNumber)
-            return node.child1();
+            return node.child1().index();
 
         // Check for numeric constants boxed as JSValues.
         if (node.op == JSConstant) {
@@ -341,23 +337,6 @@ private:
         return addToGraph(ValueToInt32, index);
     }
 
-    // Perform an ES5 ToNumber operation - returns a node of type NodeResultDouble.
-    NodeIndex toNumber(NodeIndex index)
-    {
-        Node& node = m_graph[index];
-
-        if (node.hasNumberResult())
-            return index;
-
-        if (node.op == JSConstant) {
-            JSValue v = valueOfJSConstant(index);
-            if (v.isNumber())
-                return getJSConstant(node.constantNumber());
-        }
-
-        return addToGraph(ValueToNumber, OpInfo(NodeUseBottom), index);
-    }
-    
     NodeIndex getJSConstantForValue(JSValue constantValue)
     {
         unsigned constantIndex = m_codeBlock->addOrFindConstant(constantValue);
@@ -572,7 +551,7 @@ private:
     }
     void addVarArgChild(NodeIndex child)
     {
-        m_graph.m_varArgChildren.append(child);
+        m_graph.m_varArgChildren.append(NodeUse(child));
         m_numPassedVarArgs++;
     }
     
@@ -1198,12 +1177,12 @@ bool ByteCodeParser::handleMinMax(bool usesResult, int resultOperand, NodeType o
     }
      
     if (argumentCountIncludingThis == 2) { // Math.min(x)
-        set(resultOperand, getToNumber(registerOffset + argumentToOperand(1)));
+        set(resultOperand, get(registerOffset + argumentToOperand(1)));
         return true;
     }
     
     if (argumentCountIncludingThis == 3) { // Math.min(x, y)
-        set(resultOperand, addToGraph(op, OpInfo(NodeUseBottom), getToNumber(registerOffset + argumentToOperand(1)), getToNumber(registerOffset + argumentToOperand(2))));
+        set(resultOperand, addToGraph(op, OpInfo(NodeUseBottom), get(registerOffset + argumentToOperand(1)), get(registerOffset + argumentToOperand(2))));
         return true;
     }
     
@@ -1231,7 +1210,7 @@ bool ByteCodeParser::handleIntrinsic(bool usesResult, int resultOperand, Intrins
         if (!MacroAssembler::supportsFloatingPointAbs())
             return false;
 
-        NodeIndex nodeIndex = addToGraph(ArithAbs, OpInfo(NodeUseBottom), getToNumber(registerOffset + argumentToOperand(1)));
+        NodeIndex nodeIndex = addToGraph(ArithAbs, OpInfo(NodeUseBottom), get(registerOffset + argumentToOperand(1)));
         if (m_inlineStackTop->m_exitProfile.hasExitSite(m_currentIndex, Overflow))
             m_graph[nodeIndex].mergeArithNodeFlags(NodeMayOverflow);
         set(resultOperand, nodeIndex);
@@ -1256,7 +1235,7 @@ bool ByteCodeParser::handleIntrinsic(bool usesResult, int resultOperand, Intrins
         if (!MacroAssembler::supportsFloatingPointSqrt())
             return false;
         
-        set(resultOperand, addToGraph(ArithSqrt, getToNumber(registerOffset + argumentToOperand(1))));
+        set(resultOperand, addToGraph(ArithSqrt, get(registerOffset + argumentToOperand(1))));
         return true;
     }
         
@@ -1512,7 +1491,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
 
         case op_pre_inc: {
             unsigned srcDst = currentInstruction[1].u.operand;
-            NodeIndex op = getToNumber(srcDst);
+            NodeIndex op = get(srcDst);
             set(srcDst, makeSafe(addToGraph(ArithAdd, OpInfo(NodeUseBottom), op, one())));
             NEXT_OPCODE(op_pre_inc);
         }
@@ -1521,7 +1500,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             unsigned result = currentInstruction[1].u.operand;
             unsigned srcDst = currentInstruction[2].u.operand;
             ASSERT(result != srcDst); // Required for assumptions we make during OSR.
-            NodeIndex op = getToNumber(srcDst);
+            NodeIndex op = get(srcDst);
             set(result, op);
             set(srcDst, makeSafe(addToGraph(ArithAdd, OpInfo(NodeUseBottom), op, one())));
             NEXT_OPCODE(op_post_inc);
@@ -1529,7 +1508,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
 
         case op_pre_dec: {
             unsigned srcDst = currentInstruction[1].u.operand;
-            NodeIndex op = getToNumber(srcDst);
+            NodeIndex op = get(srcDst);
             set(srcDst, makeSafe(addToGraph(ArithSub, OpInfo(NodeUseBottom), op, one())));
             NEXT_OPCODE(op_pre_dec);
         }
@@ -1537,7 +1516,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
         case op_post_dec: {
             unsigned result = currentInstruction[1].u.operand;
             unsigned srcDst = currentInstruction[2].u.operand;
-            NodeIndex op = getToNumber(srcDst);
+            NodeIndex op = get(srcDst);
             set(result, op);
             set(srcDst, makeSafe(addToGraph(ArithSub, OpInfo(NodeUseBottom), op, one())));
             NEXT_OPCODE(op_post_dec);
@@ -1549,37 +1528,37 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             NodeIndex op1 = get(currentInstruction[2].u.operand);
             NodeIndex op2 = get(currentInstruction[3].u.operand);
             if (m_graph[op1].hasNumberResult() && m_graph[op2].hasNumberResult())
-                set(currentInstruction[1].u.operand, makeSafe(addToGraph(ArithAdd, OpInfo(NodeUseBottom), toNumber(op1), toNumber(op2))));
+                set(currentInstruction[1].u.operand, makeSafe(addToGraph(ArithAdd, OpInfo(NodeUseBottom), op1, op2)));
             else
                 set(currentInstruction[1].u.operand, makeSafe(addToGraph(ValueAdd, OpInfo(NodeUseBottom), op1, op2)));
             NEXT_OPCODE(op_add);
         }
 
         case op_sub: {
-            NodeIndex op1 = getToNumber(currentInstruction[2].u.operand);
-            NodeIndex op2 = getToNumber(currentInstruction[3].u.operand);
+            NodeIndex op1 = get(currentInstruction[2].u.operand);
+            NodeIndex op2 = get(currentInstruction[3].u.operand);
             set(currentInstruction[1].u.operand, makeSafe(addToGraph(ArithSub, OpInfo(NodeUseBottom), op1, op2)));
             NEXT_OPCODE(op_sub);
         }
 
         case op_mul: {
             // Multiply requires that the inputs are not truncated, unfortunately.
-            NodeIndex op1 = getToNumber(currentInstruction[2].u.operand);
-            NodeIndex op2 = getToNumber(currentInstruction[3].u.operand);
+            NodeIndex op1 = get(currentInstruction[2].u.operand);
+            NodeIndex op2 = get(currentInstruction[3].u.operand);
             set(currentInstruction[1].u.operand, makeSafe(addToGraph(ArithMul, OpInfo(NodeUseBottom), op1, op2)));
             NEXT_OPCODE(op_mul);
         }
 
         case op_mod: {
-            NodeIndex op1 = getToNumber(currentInstruction[2].u.operand);
-            NodeIndex op2 = getToNumber(currentInstruction[3].u.operand);
+            NodeIndex op1 = get(currentInstruction[2].u.operand);
+            NodeIndex op2 = get(currentInstruction[3].u.operand);
             set(currentInstruction[1].u.operand, makeSafe(addToGraph(ArithMod, OpInfo(NodeUseBottom), op1, op2)));
             NEXT_OPCODE(op_mod);
         }
 
         case op_div: {
-            NodeIndex op1 = getToNumber(currentInstruction[2].u.operand);
-            NodeIndex op2 = getToNumber(currentInstruction[3].u.operand);
+            NodeIndex op1 = get(currentInstruction[2].u.operand);
+            NodeIndex op2 = get(currentInstruction[3].u.operand);
             set(currentInstruction[1].u.operand, makeDivSafe(addToGraph(ArithDiv, OpInfo(NodeUseBottom), op1, op2)));
             NEXT_OPCODE(op_div);
         }
@@ -2241,9 +2220,9 @@ void ByteCodeParser::processPhiStack()
                 // GetLocal and its block-local Phi. Strictly speaking we only need the two
                 // to be unified. But for efficiency, we want the code that creates GetLocals
                 // and Phis to try to reuse VariableAccessDatas as much as possible.
-                ASSERT(m_graph[valueInPredecessor].variableAccessData() == m_graph[m_graph[valueInPredecessor].child1()].variableAccessData());
+                ASSERT(m_graph[valueInPredecessor].variableAccessData() == m_graph[m_graph[valueInPredecessor].child1().index()].variableAccessData());
                 
-                valueInPredecessor = m_graph[valueInPredecessor].child1();
+                valueInPredecessor = m_graph[valueInPredecessor].child1().index();
             } else {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Found @%u.\n", valueInPredecessor);
@@ -2266,11 +2245,11 @@ void ByteCodeParser::processPhiStack()
                 m_graph.ref(valueInPredecessor);
             }
 
-            if (phiNode->child1() == NoNode) {
+            if (!phiNode->child1()) {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Setting @%u->child1 = @%u.\n", entry.m_phi, valueInPredecessor);
 #endif
-                phiNode->children.fixed.child1 = valueInPredecessor;
+                phiNode->children.setChild1(NodeUse(valueInPredecessor));
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Children of @%u: ", entry.m_phi);
                 phiNode->dumpChildren(stdout);
@@ -2278,11 +2257,11 @@ void ByteCodeParser::processPhiStack()
 #endif
                 continue;
             }
-            if (phiNode->child2() == NoNode) {
+            if (!phiNode->child2()) {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Setting @%u->child2 = @%u.\n", entry.m_phi, valueInPredecessor);
 #endif
-                phiNode->children.fixed.child2 = valueInPredecessor;
+                phiNode->children.setChild2(NodeUse(valueInPredecessor));
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Children of @%u: ", entry.m_phi);
                 phiNode->dumpChildren(stdout);
@@ -2290,11 +2269,11 @@ void ByteCodeParser::processPhiStack()
 #endif
                 continue;
             }
-            if (phiNode->child3() == NoNode) {
+            if (!phiNode->child3()) {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Setting @%u->child3 = @%u.\n", entry.m_phi, valueInPredecessor);
 #endif
-                phiNode->children.fixed.child3 = valueInPredecessor;
+                phiNode->children.setChild3(NodeUse(valueInPredecessor));
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                 printf("      Children of @%u: ", entry.m_phi);
                 phiNode->dumpChildren(stdout);
@@ -2314,9 +2293,7 @@ void ByteCodeParser::processPhiStack()
             if (phiNode->refCount())
                 m_graph.ref(newPhi);
 
-            newPhiNode.children.fixed.child1 = phiNode->child1();
-            newPhiNode.children.fixed.child2 = phiNode->child2();
-            newPhiNode.children.fixed.child3 = phiNode->child3();
+            newPhiNode.children = phiNode->children;
 
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
             printf("      Children of @%u: ", newPhi);
@@ -2324,9 +2301,7 @@ void ByteCodeParser::processPhiStack()
             printf(".\n");
 #endif
 
-            phiNode->children.fixed.child1 = newPhi;
-            phiNode->children.fixed.child2 = valueInPredecessor;
-            phiNode->children.fixed.child3 = NoNode;
+            phiNode->children.initialize(newPhi, valueInPredecessor, NoNode);
 
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
             printf("      Children of @%u: ", entry.m_phi);

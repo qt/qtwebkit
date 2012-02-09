@@ -138,8 +138,6 @@ private:
             break;
         }
             
-        case ValueToNumber:
-        case ValueToDouble:
         case UInt32ToNumber: {
             changed |= m_graph[node.child1()].mergeArithNodeFlags(flags);
             break;
@@ -147,7 +145,7 @@ private:
             
         case ArithAdd:
         case ValueAdd: {
-            if (isNotNegZero(node.child1()) || isNotNegZero(node.child2()))
+            if (isNotNegZero(node.child1().index()) || isNotNegZero(node.child2().index()))
                 flags &= ~NodeNeedsNegZero;
             
             changed |= m_graph[node.child1()].mergeArithNodeFlags(flags);
@@ -156,7 +154,7 @@ private:
         }
             
         case ArithSub: {
-            if (isNotZero(node.child1()) || isNotZero(node.child2()))
+            if (isNotZero(node.child1().index()) || isNotZero(node.child2().index()))
                 flags &= ~NodeNeedsNegZero;
             
             changed |= m_graph[node.child1()].mergeArithNodeFlags(flags);
@@ -210,13 +208,13 @@ private:
                 for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
                     changed |= m_graph[m_graph.m_varArgChildren[childIdx]].mergeArithNodeFlags(flags);
             } else {
-                if (node.child1() == NoNode)
+                if (!node.child1())
                     break;
                 changed |= m_graph[node.child1()].mergeArithNodeFlags(flags);
-                if (node.child2() == NoNode)
+                if (!node.child2())
                     break;
                 changed |= m_graph[node.child2()].mergeArithNodeFlags(flags);
-                if (node.child3() == NoNode)
+                if (!node.child3())
                     break;
                 changed |= m_graph[node.child3()].mergeArithNodeFlags(flags);
             }
@@ -360,19 +358,6 @@ private:
                 changed |= setPrediction(PredictInt32);
             else
                 changed |= setPrediction(PredictNumber);
-            break;
-        }
-
-        case ValueToNumber: {
-            PredictedType prediction = m_graph[node.child1()].prediction();
-            
-            if (prediction) {
-                if (!(prediction & PredictDouble) && nodeCanSpeculateInteger(node.arithNodeFlags()))
-                    changed |= mergePrediction(PredictInt32);
-                else
-                    changed |= mergePrediction(PredictNumber);
-            }
-            
             break;
         }
 
@@ -597,7 +582,6 @@ private:
             break;
         }
             
-        case ValueToDouble:
         case GetArrayLength:
         case GetByteArrayLength:
         case GetInt8ArrayLength:
@@ -676,21 +660,19 @@ private:
             propagateNodePredictions(m_graph[m_compileIndex]);
     }
     
-    void vote(NodeIndex nodeIndex, VariableAccessData::Ballot ballot)
+    void vote(NodeUse nodeUse, VariableAccessData::Ballot ballot)
     {
-        switch (m_graph[nodeIndex].op) {
-        case ValueToNumber:
-        case ValueToDouble:
+        switch (m_graph[nodeUse].op) {
         case ValueToInt32:
         case UInt32ToNumber:
-            nodeIndex = m_graph[nodeIndex].child1();
+            nodeUse = m_graph[nodeUse].child1();
             break;
         default:
             break;
         }
         
-        if (m_graph[nodeIndex].op == GetLocal)
-            m_graph[nodeIndex].variableAccessData()->vote(ballot);
+        if (m_graph[nodeUse].op == GetLocal)
+            m_graph[nodeUse].variableAccessData()->vote(ballot);
     }
     
     void vote(Node& node, VariableAccessData::Ballot ballot)
@@ -701,13 +683,13 @@ private:
             return;
         }
         
-        if (node.child1() == NoNode)
+        if (!node.child1())
             return;
         vote(node.child1(), ballot);
-        if (node.child2() == NoNode)
+        if (!node.child2())
             return;
         vote(node.child2(), ballot);
-        if (node.child3() == NoNode)
+        if (!node.child3())
             return;
         vote(node.child3(), ballot);
     }
@@ -775,11 +757,6 @@ private:
                 vote(node.child1(), VariableAccessData::VoteDouble);
                 break;
                 
-            case ValueToNumber:
-            case ValueToDouble:
-                // Don't vote.
-                break;
-                
             case SetLocal: {
                 PredictedType prediction = m_graph[node.child1()].prediction();
                 if (isDoublePrediction(prediction))
@@ -835,16 +812,6 @@ private:
         } while (m_changed);
     }
     
-    void toDouble(NodeIndex nodeIndex)
-    {
-        if (m_graph[nodeIndex].op == ValueToNumber) {
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            printf("  @%u -> ValueToDouble", nodeIndex);
-#endif
-            m_graph[nodeIndex].op = ValueToDouble;
-        }
-    }
-
     void fixupNode(Node& node)
     {
         if (!node.shouldGenerate())
@@ -857,60 +824,6 @@ private:
 #endif
         
         switch (op) {
-        case ValueAdd:
-        case ArithAdd:
-        case ArithSub: {
-            PredictedType left = m_graph[node.child1()].prediction();
-            PredictedType right = m_graph[node.child2()].prediction();
-            
-            if (left && right
-                && isNumberPrediction(left) && isNumberPrediction(right)
-                && !m_graph.addShouldSpeculateInteger(node, m_codeBlock)) {
-                toDouble(node.child1());
-                toDouble(node.child2());
-            }
-            break;
-        }
-            
-        case ArithMul:
-        case ArithMin:
-        case ArithMax:
-        case ArithMod:
-        case ArithDiv: {
-            if (!nodeCanSpeculateInteger(node.arithNodeFlags())) {
-                toDouble(node.child1());
-                toDouble(node.child2());
-                break;
-            }
-            
-            PredictedType left = m_graph[node.child1()].prediction();
-            PredictedType right = m_graph[node.child2()].prediction();
-            
-            if (left && right
-                && ((left & PredictDouble) || (right & PredictDouble))) {
-                toDouble(node.child1());
-                toDouble(node.child2());
-            }
-            break;
-        }
-            
-        case ArithAbs: {
-            if (!nodeCanSpeculateInteger(node.arithNodeFlags())) {
-                toDouble(node.child1());
-                break;
-            }
-            
-            PredictedType prediction = m_graph[node.child1()].prediction();
-            if (prediction & PredictDouble)
-                toDouble(node.child1());
-            break;
-        }
-            
-        case ArithSqrt: {
-            toDouble(node.child1());
-            break;
-        }
-            
         case GetById: {
             if (!isInt32Prediction(m_graph[m_compileIndex].prediction()))
                 break;
@@ -977,8 +890,8 @@ private:
         case GetByVal:
         case StringCharAt:
         case StringCharCodeAt: {
-            if (node.child3() != NoNode && m_graph[node.child3()].op == Nop)
-                node.children.fixed.child3 = NoNode;
+            if (!!node.child3() && m_graph[node.child3()].op == Nop)
+                node.children.child3() = NodeUse();
             break;
         }
         default:
@@ -1004,13 +917,14 @@ private:
         if (nodeIndex == NoNode)
             return NoNode;
         
-        if (m_graph[nodeIndex].op == ValueToNumber)
-            nodeIndex = m_graph[nodeIndex].child1();
-        
         if (m_graph[nodeIndex].op == ValueToInt32)
-            nodeIndex = m_graph[nodeIndex].child1();
+            nodeIndex = m_graph[nodeIndex].child1().index();
         
         return nodeIndex;
+    }
+    NodeIndex canonicalize(NodeUse nodeUse)
+    {
+        return canonicalize(nodeUse.indexUnchecked());
     }
     
     // Computes where the search for a candidate for CSE should start. Don't call
@@ -1061,7 +975,10 @@ private:
     NodeIndex startIndex()
     {
         Node& node = m_graph[m_compileIndex];
-        return startIndexForChildren(node.child1(), node.child2(), node.child3());
+        return startIndexForChildren(
+            node.child1().indexUnchecked(),
+            node.child2().indexUnchecked(),
+            node.child3().indexUnchecked());
     }
     
     NodeIndex endIndexForPureCSE()
@@ -1207,7 +1124,7 @@ private:
                 break;
             case PutGlobalVar:
                 if (node.varNumber() == varNumber && m_codeBlock->globalObjectFor(node.codeOrigin) == globalObject)
-                    return node.child1();
+                    return node.child1().index();
                 break;
             default:
                 break;
@@ -1235,7 +1152,7 @@ private:
                 if (!byValIsPure(node))
                     return NoNode;
                 if (node.child1() == child1 && canonicalize(node.child2()) == canonicalize(child2))
-                    return node.child3();
+                    return node.child3().index();
                 // We must assume that the PutByVal will clobber the location we're getting from.
                 // FIXME: We can do better; if we know that the PutByVal is accessing an array of a
                 // different type than the GetByVal, then we know that they won't clobber each other.
@@ -1328,7 +1245,7 @@ private:
             case PutByOffset:
                 if (m_graph.m_storageAccessData[node.storageAccessDataIndex()].identifierNumber == identifierNumber) {
                     if (node.child2() == child1)
-                        return node.child3();
+                        return node.child3().index();
                     return NoNode;
                 }
                 break;
@@ -1442,22 +1359,22 @@ private:
         return NoNode;
     }
     
-    void performSubstitution(NodeIndex& child, bool addRef = true)
+    void performSubstitution(NodeUse& child, bool addRef = true)
     {
         // Check if this operand is actually unused.
-        if (child == NoNode)
+        if (!child)
             return;
         
         // Check if there is any replacement.
-        NodeIndex replacement = m_replacements[child];
+        NodeIndex replacement = m_replacements[child.index()];
         if (replacement == NoNode)
             return;
         
-        child = replacement;
+        child.setIndex(replacement);
         
         // There is definitely a replacement. Assert that the replacement does not
         // have a replacement.
-        ASSERT(m_replacements[child] == NoNode);
+        ASSERT(m_replacements[child.index()] == NoNode);
         
         if (addRef)
             m_graph[child].ref();
@@ -1505,9 +1422,9 @@ private:
             for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
                 performSubstitution(m_graph.m_varArgChildren[childIdx], shouldGenerate);
         } else {
-            performSubstitution(node.children.fixed.child1, shouldGenerate);
-            performSubstitution(node.children.fixed.child2, shouldGenerate);
-            performSubstitution(node.children.fixed.child3, shouldGenerate);
+            performSubstitution(node.children.child1(), shouldGenerate);
+            performSubstitution(node.children.child2(), shouldGenerate);
+            performSubstitution(node.children.child3(), shouldGenerate);
         }
         
         if (!shouldGenerate)
@@ -1602,37 +1519,37 @@ private:
             
         case GetByVal:
             if (byValIsPure(node))
-                setReplacement(getByValLoadElimination(node.child1(), node.child2()));
+                setReplacement(getByValLoadElimination(node.child1().index(), node.child2().index()));
             break;
             
         case PutByVal:
-            if (byValIsPure(node) && getByValLoadElimination(node.child1(), node.child2()) != NoNode)
+            if (byValIsPure(node) && getByValLoadElimination(node.child1().index(), node.child2().index()) != NoNode)
                 node.op = PutByValAlias;
             break;
             
         case CheckStructure:
-            if (checkStructureLoadElimination(node.structureSet(), node.child1()))
+            if (checkStructureLoadElimination(node.structureSet(), node.child1().index()))
                 eliminate();
             break;
 
         case CheckFunction:
-            if (checkFunctionElimination(node.function(), node.child1()))
+            if (checkFunctionElimination(node.function(), node.child1().index()))
                 eliminate();
             break;
                 
         case GetIndexedPropertyStorage: {
             PredictedType basePrediction = m_graph[node.child2()].prediction();
             bool nodeHasIntegerIndexPrediction = !(!(basePrediction & PredictInt32) && basePrediction);
-            setReplacement(getIndexedPropertyStorageLoadElimination(node.child1(), nodeHasIntegerIndexPrediction));
+            setReplacement(getIndexedPropertyStorageLoadElimination(node.child1().index(), nodeHasIntegerIndexPrediction));
             break;
         }
 
         case GetPropertyStorage:
-            setReplacement(getPropertyStorageLoadElimination(node.child1()));
+            setReplacement(getPropertyStorageLoadElimination(node.child1().index()));
             break;
 
         case GetByOffset:
-            setReplacement(getByOffsetLoadElimination(m_graph.m_storageAccessData[node.storageAccessDataIndex()].identifierNumber, node.child1()));
+            setReplacement(getByOffsetLoadElimination(m_graph.m_storageAccessData[node.storageAccessDataIndex()].identifierNumber, node.child1().index()));
             break;
             
         default:

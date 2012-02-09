@@ -63,18 +63,23 @@ ui.onebar = base.extends('div', {
         this.id = 'onebar';
         this.innerHTML =
             '<ul>' +
-                '<li><a href="#summary">Summary</a></li>' +
+                '<li><a href="#unexpected">Unexpected Failures</a></li>' +
                 '<li><a href="#results">Results</a></li>' +
             '</ul>' +
-            '<div id="summary"></div>' +
+            '<div id="unexpected"></div>' +
+            '<div id="failures"></div>' +
             '<div id="results"></div>';
         this._tabNames = [
-            'summary',
+            'unexpected',
             'results',
         ]
         this._tabs = $(this).tabs({
             disabled: [1],
         });
+        if (config.kExperimentalFeatures) {
+            this._tabs.tabs('add', '#failures', 'All Failures (experimental)');
+            this._tabNames.push('failures');
+        }
     },
     attach: function()
     {
@@ -82,6 +87,8 @@ ui.onebar = base.extends('div', {
     },
     tabNamed: function(tabName)
     {
+        if (this._tabNames.indexOf(tabName) == -1)
+            return null;
         tab = document.getElementById(tabName);
         // We perform this sanity check below to make sure getElementById
         // hasn't given us a node in some other unrelated part of the document.
@@ -91,9 +98,13 @@ ui.onebar = base.extends('div', {
             return null;
         return tab;
     },
-    summary: function()
+    unexpected: function()
     {
-        return this.tabNamed('summary');
+        return this.tabNamed('unexpected');
+    },
+    failures: function()
+    {
+        return this.tabNamed('failures');
     },
     results: function()
     {

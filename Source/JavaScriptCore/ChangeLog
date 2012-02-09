@@ -1,3 +1,783 @@
+2012-02-08  Oliver Hunt  <oliver@apple.com>
+
+        Whoops, fix the build.
+
+        * runtime/Executable.cpp:
+        (JSC::FunctionExecutable::FunctionExecutable):
+
+2012-02-08  Oliver Hunt  <oliver@apple.com>
+
+        Fix issue encountered while debugging stacktraces
+        https://bugs.webkit.org/show_bug.cgi?id=78147
+
+        Reviewed by Gavin Barraclough.
+
+        Debugging is easier if we always ensure that we have a non-null
+        inferred name.
+
+        * runtime/Executable.cpp:
+        (JSC::FunctionExecutable::FunctionExecutable):
+
+2012-02-08  Oliver Hunt  <oliver@apple.com>
+
+        updateTopCallframe in the baseline JIT doesn't provide enough information to the stubs
+        https://bugs.webkit.org/show_bug.cgi?id=78145
+
+        Reviewed by Gavin Barraclough.
+
+        Fix the updateTopCallFrame helper to store additional information
+        that becomes necessary when we are trying to provide more stack
+        frame information.
+
+        * interpreter/CallFrame.h:
+        (JSC::ExecState::bytecodeOffsetForBaselineJIT):
+        (ExecState):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompile):
+        * jit/JIT.h:
+        (JSC::JIT::compileGetByIdProto):
+        (JSC::JIT::compileGetByIdSelfList):
+        (JSC::JIT::compileGetByIdProtoList):
+        (JSC::JIT::compileGetByIdChainList):
+        (JSC::JIT::compileGetByIdChain):
+        (JSC::JIT::compilePutByIdTransition):
+        (JIT):
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::updateTopCallFrame):
+
+2012-02-07  Robert Kroeger  <rjkroege@chromium.org>
+
+        [chromium] Remove the enable marcro for the no longer necessary Chromium
+        gesture recognizer.
+        https://bugs.webkit.org/show_bug.cgi?id=77492
+
+        Reviewed by Adam Barth.
+
+        * wtf/Platform.h:
+
+2012-02-07  Tony Chang  <tony@chromium.org>
+
+        merge DashboardSupportCSSPropertyNames.in into CSSPropertyNames.in
+        https://bugs.webkit.org/show_bug.cgi?id=78036
+
+        Reviewed by Darin Adler.
+
+        * Configurations/FeatureDefines.xcconfig: Add ENABLE_DASHBOARD_SUPPORT to FEATURE_DEFINES.
+
+2012-02-07  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Use *bin* and *lib* directories for executable and libraries.
+        https://bugs.webkit.org/show_bug.cgi?id=77928
+
+        Reviewed by Daniel Bates.
+
+        CMake has used *Programs* directory for executable. In addition, shared libraries are being
+        built in source directory. It is better to set common places in order to maintain executable
+        and libraries. *bin* is for executable and *lib* is for library.
+
+        * shell/CMakeLists.txt: Change *Programs* with *bin*.
+
+2012-02-07  Gavin Barraclough  <barraclough@apple.com>
+
+        Crash on http://www.rickshawbags.com/
+        https://bugs.webkit.org/show_bug.cgi?id=78045
+
+        Reviewed by Darin Adler.
+
+        Problem URL is: http://www.rickshawbags.com/customize/custom-bag#!thl=rickshaw/bag()
+        
+        This is a bug introduced by https://bugs.webkit.org/show_bug.cgi?id=71933,
+        isVariableObject() checks were excluding StaticScopeObjects, this patch
+        inadvertently changed them to be included.
+
+        * runtime/JSType.h:
+            - sort JSType enum such that StaticScopeObjectType comes before VariableObjectType,
+              and thus is excluded from isVariableObject() checks.
+
+2012-02-06  Jer Noble  <jer.noble@apple.com>
+
+        Use CMClock as a timing source for PlatformClock where available.
+        https://bugs.webkit.org/show_bug.cgi?id=77885
+
+        Reviewed by Eric Carlson.
+
+        * wtf/Platform.h: Added WTF_USE_COREMEDIA.
+
+2012-02-06  Filip Pizlo  <fpizlo@apple.com>
+
+        ValueToNumber and ValueToDouble nodes don't do anything and should be removed
+        https://bugs.webkit.org/show_bug.cgi?id=77855
+        <rdar://problem/10811325>
+
+        Reviewed by Gavin Barraclough.
+        
+        Removed ValueToNumber and ValueToDouble, because the only thing they were doing
+        was wasting registers.
+        
+        This looks like a 1% win on V8 (with a 5% win on crypto) and a 2-3% win on Kraken,
+        mostly due to a >10% win on gaussian-blur. No win anywhere else.
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::getToInt32):
+        (ByteCodeParser):
+        (JSC::DFG::ByteCodeParser::handleMinMax):
+        (JSC::DFG::ByteCodeParser::handleIntrinsic):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGNode.h:
+        (DFG):
+        (JSC::DFG::Node::hasArithNodeFlags):
+        * dfg/DFGPropagator.cpp:
+        (JSC::DFG::Propagator::propagateArithNodeFlags):
+        (JSC::DFG::Propagator::propagateNodePredictions):
+        (JSC::DFG::Propagator::vote):
+        (JSC::DFG::Propagator::doRoundOfDoubleVoting):
+        (Propagator):
+        (JSC::DFG::Propagator::fixupNode):
+        (JSC::DFG::Propagator::canonicalize):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::computeValueRecoveryFor):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-02-06  Patrick Gansterer  <paroga@webkit.org>
+
+        Unreviewed WinCE build fix after r106197.
+
+        * tools/CodeProfiling.cpp:
+        (JSC::CodeProfiling::notifyAllocator): getenv() isn't supported by WinCE. Don't call it.
+
+2012-02-05  Gavin Barraclough  <barraclough@apple.com>
+
+        Remove JSObject defineGetter/defineSetter lookupGetter/lookupSetter
+        https://bugs.webkit.org/show_bug.cgi?id=77451
+
+        Reviewed by Sam Weinig.
+
+        These can now all be implemented in terms of defineOwnProperty & getPropertyDescriptor.
+        Also remove initializeGetterSetterProperty, since this is equivalent to putDirectAccessor.
+
+        * JavaScriptCore.exp:
+        * debugger/DebuggerActivation.cpp:
+        (JSC::DebuggerActivation::defineOwnProperty):
+        * debugger/DebuggerActivation.h:
+        (DebuggerActivation):
+        * runtime/ClassInfo.h:
+        (MethodTable):
+        (JSC):
+        * runtime/JSBoundFunction.cpp:
+        (JSC::JSBoundFunction::finishCreation):
+        * runtime/JSCell.cpp:
+        (JSC):
+        * runtime/JSCell.h:
+        (JSCell):
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::getOwnPropertySlot):
+        (JSC::JSFunction::getOwnPropertyDescriptor):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::defineOwnProperty):
+        (JSC):
+        * runtime/JSGlobalObject.h:
+        (JSGlobalObject):
+        * runtime/JSObject.cpp:
+        (JSC):
+        * runtime/JSObject.h:
+        (JSObject):
+        * runtime/ObjectPrototype.cpp:
+        (JSC::objectProtoFuncDefineGetter):
+        (JSC::objectProtoFuncDefineSetter):
+        (JSC::objectProtoFuncLookupGetter):
+        (JSC::objectProtoFuncLookupSetter):
+
+2012-02-06  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.list.am: Add missing files.
+
+2012-02-05  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG's child references from one node to another should have room for type information
+        https://bugs.webkit.org/show_bug.cgi?id=77797
+
+        Reviewed by Oliver Hunt.
+        
+        The DFG::Node::child fields now contain both a DFG::NodeIndex (which is just an unsigned)
+        and a DFG::UseKind (which is currently an effectively empty enum). They are encapsulated
+        together as a DFG::NodeUse, which can in most cases still be used as an index (for
+        example DFG::Graph, AbstractState, and SpeculativeJIT all accept NodeUse in most places
+        where they really want a NodeIndex).
+        
+        The NodeUse stores both the index and the UseKind without bloating the memory usage of
+        DFG::Node, since we really don't need full 32 bits for the NodeIndex (a DFG::Node is
+        roughly 11 words, so if we assume that we never want to use more than 1GB to DFG compile
+        something - likely a sensible assumption! - then we will only be able to have room for
+        about 24 million nodes, which means we only need about 24.5 bits for the node index).
+        Currently the DFG::NodeUse allocates 4 bits for the UseKind and 28 bits for the index,
+        but stores the index as a signed number to make NoNode work naturally. Hence we really
+        just have 27 bits for the index.
+        
+        This is performance-neutral on all benchmarks we track.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * dfg/DFGAbstractState.h:
+        (JSC::DFG::AbstractState::forNode):
+        (AbstractState):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::getLocal):
+        (JSC::DFG::ByteCodeParser::getArgument):
+        (JSC::DFG::ByteCodeParser::toInt32):
+        (JSC::DFG::ByteCodeParser::addVarArgChild):
+        (JSC::DFG::ByteCodeParser::processPhiStack):
+        * dfg/DFGCommon.h:
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::dump):
+        (DFG):
+        * dfg/DFGGraph.h:
+        (Graph):
+        (JSC::DFG::Graph::operator[]):
+        (JSC::DFG::Graph::at):
+        (JSC::DFG::Graph::ref):
+        (JSC::DFG::Graph::deref):
+        (JSC::DFG::Graph::clearAndDerefChild1):
+        (JSC::DFG::Graph::clearAndDerefChild2):
+        (JSC::DFG::Graph::clearAndDerefChild3):
+        * dfg/DFGJITCompiler.h:
+        (JSC::DFG::JITCompiler::getPrediction):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::Node):
+        (JSC::DFG::Node::child1):
+        (JSC::DFG::Node::child1Unchecked):
+        (JSC::DFG::Node::child2):
+        (JSC::DFG::Node::child3):
+        (JSC::DFG::Node::firstChild):
+        (JSC::DFG::Node::numChildren):
+        (JSC::DFG::Node::dumpChildren):
+        (Node):
+        * dfg/DFGNodeReferenceBlob.h: Added.
+        (DFG):
+        (NodeReferenceBlob):
+        (JSC::DFG::NodeReferenceBlob::NodeReferenceBlob):
+        (JSC::DFG::NodeReferenceBlob::child):
+        (JSC::DFG::NodeReferenceBlob::child1):
+        (JSC::DFG::NodeReferenceBlob::child2):
+        (JSC::DFG::NodeReferenceBlob::child3):
+        (JSC::DFG::NodeReferenceBlob::child1Unchecked):
+        (JSC::DFG::NodeReferenceBlob::initialize):
+        (JSC::DFG::NodeReferenceBlob::firstChild):
+        (JSC::DFG::NodeReferenceBlob::setFirstChild):
+        (JSC::DFG::NodeReferenceBlob::numChildren):
+        (JSC::DFG::NodeReferenceBlob::setNumChildren):
+        * dfg/DFGNodeUse.h: Added.
+        (DFG):
+        (NodeUse):
+        (JSC::DFG::NodeUse::NodeUse):
+        (JSC::DFG::NodeUse::indexUnchecked):
+        (JSC::DFG::NodeUse::index):
+        (JSC::DFG::NodeUse::setIndex):
+        (JSC::DFG::NodeUse::useKind):
+        (JSC::DFG::NodeUse::setUseKind):
+        (JSC::DFG::NodeUse::isSet):
+        (JSC::DFG::NodeUse::operator!):
+        (JSC::DFG::NodeUse::operator==):
+        (JSC::DFG::NodeUse::operator!=):
+        (JSC::DFG::NodeUse::shift):
+        (JSC::DFG::NodeUse::makeWord):
+        (JSC::DFG::operator==):
+        (JSC::DFG::operator!=):
+        * dfg/DFGPropagator.cpp:
+        (JSC::DFG::Propagator::propagateArithNodeFlags):
+        (JSC::DFG::Propagator::vote):
+        (JSC::DFG::Propagator::toDouble):
+        (JSC::DFG::Propagator::fixupNode):
+        (JSC::DFG::Propagator::canonicalize):
+        (JSC::DFG::Propagator::startIndex):
+        (JSC::DFG::Propagator::globalVarLoadElimination):
+        (JSC::DFG::Propagator::getByValLoadElimination):
+        (JSC::DFG::Propagator::getByOffsetLoadElimination):
+        (JSC::DFG::Propagator::performSubstitution):
+        (JSC::DFG::Propagator::performNodeCSE):
+        * dfg/DFGScoreBoard.h:
+        (JSC::DFG::ScoreBoard::use):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::useChildren):
+        (JSC::DFG::SpeculativeJIT::writeBarrier):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeStrictEq):
+        (JSC::DFG::SpeculativeJIT::compilePeepHoleObjectEquality):
+        (JSC::DFG::SpeculativeJIT::compilePeepHoleIntegerBranch):
+        (JSC::DFG::SpeculativeJIT::compileMovHint):
+        (JSC::DFG::SpeculativeJIT::computeValueRecoveryFor):
+        (JSC::DFG::SpeculativeJIT::compilePutByValForByteArray):
+        (JSC::DFG::SpeculativeJIT::compilePutByValForIntTypedArray):
+        (JSC::DFG::SpeculativeJIT::compilePutByValForFloatTypedArray):
+        (JSC::DFG::SpeculativeJIT::compileSoftModulo):
+        (JSC::DFG::SpeculativeJIT::compileAdd):
+        (JSC::DFG::SpeculativeJIT::compileArithSub):
+        (JSC::DFG::SpeculativeJIT::compileStrictEqForConstant):
+        (JSC::DFG::SpeculativeJIT::compileStrictEq):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::at):
+        (JSC::DFG::SpeculativeJIT::canReuse):
+        (JSC::DFG::SpeculativeJIT::use):
+        (SpeculativeJIT):
+        (JSC::DFG::SpeculativeJIT::detectPeepHoleBranch):
+        (JSC::DFG::SpeculativeJIT::speculationCheck):
+        (JSC::DFG::SpeculativeJIT::terminateSpeculativeExecution):
+        (JSC::DFG::IntegerOperand::IntegerOperand):
+        (JSC::DFG::DoubleOperand::DoubleOperand):
+        (JSC::DFG::JSValueOperand::JSValueOperand):
+        (JSC::DFG::StorageOperand::StorageOperand):
+        (JSC::DFG::SpeculateIntegerOperand::SpeculateIntegerOperand):
+        (JSC::DFG::SpeculateStrictInt32Operand::SpeculateStrictInt32Operand):
+        (JSC::DFG::SpeculateDoubleOperand::SpeculateDoubleOperand):
+        (JSC::DFG::SpeculateCellOperand::SpeculateCellOperand):
+        (JSC::DFG::SpeculateBooleanOperand::SpeculateBooleanOperand):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeValueToNumber):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeValueToInt32):
+        (JSC::DFG::SpeculativeJIT::cachedPutById):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeNonPeepholeCompareNull):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativePeepholeBranchNull):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeCompareNull):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativePeepholeBranch):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeNonPeepholeCompare):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativePeepholeStrictEq):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeNonPeepholeStrictEq):
+        (JSC::DFG::SpeculativeJIT::emitCall):
+        (JSC::DFG::SpeculativeJIT::compileValueAdd):
+        (JSC::DFG::SpeculativeJIT::compileObjectOrOtherLogicalNot):
+        (JSC::DFG::SpeculativeJIT::compileLogicalNot):
+        (JSC::DFG::SpeculativeJIT::emitObjectOrOtherBranch):
+        (JSC::DFG::SpeculativeJIT::emitBranch):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeValueToNumber):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeValueToInt32):
+        (JSC::DFG::SpeculativeJIT::cachedPutById):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeNonPeepholeCompareNull):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativePeepholeBranchNull):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeCompareNull):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativePeepholeBranch):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeNonPeepholeCompare):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativePeepholeStrictEq):
+        (JSC::DFG::SpeculativeJIT::nonSpeculativeNonPeepholeStrictEq):
+        (JSC::DFG::SpeculativeJIT::emitCall):
+        (JSC::DFG::SpeculativeJIT::compileObjectEquality):
+        (JSC::DFG::SpeculativeJIT::compileValueAdd):
+        (JSC::DFG::SpeculativeJIT::compileObjectOrOtherLogicalNot):
+        (JSC::DFG::SpeculativeJIT::compileLogicalNot):
+        (JSC::DFG::SpeculativeJIT::emitObjectOrOtherBranch):
+        (JSC::DFG::SpeculativeJIT::emitBranch):
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-02-05  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Support javascriptcore test for EFL port. 
+        https://bugs.webkit.org/show_bug.cgi?id=77425
+
+        Reviewed by Daniel Bates.
+
+        Efl and WinCE as well as Blackberry port are now using Cmake as its build system
+        and they are share the make file to create jsc excutable. In order to run
+        "run-javascriptcore-tests", EFL port needs to change jsc installation configuration
+        with executable output directory(e.g. Programs). So, this patch change jsc installation
+        configuration only for EFL port.
+
+        * shell/CMakeLists.txt:
+
+2012-02-04  Gavin Barraclough  <barraclough@apple.com>
+
+        Rubber stamped by Sam Weinig.
+
+        * yarr/YarrPattern.cpp:
+        (JSC::Yarr::YarrPatternConstructor::quantifyAtom):
+            - Fix comment.
+
+2012-02-04  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] CurrentTime: Reorder headers for win32
+        https://bugs.webkit.org/show_bug.cgi?id=77808
+
+        Reviewed by Martin Robinson.
+
+        In GTK+ win32 port, monotonicallyIncreasingTime() implementation is
+        based on g_get_monotonic_time(). Reorder headers to make sure glib.h
+        gets included even when the platform is win32.
+
+        CurrentTime.cpp: In function 'double WTF::monotonicallyIncreasingTime()':
+        CurrentTime.cpp:321:53: error: 'g_get_monotonic_time' was not declared in this scope
+        CurrentTime.cpp:322:1: warning: control reaches end of non-void function [-Wreturn-type]
+
+        * wtf/CurrentTime.cpp:
+
+2012-02-03  Anders Carlsson  <andersca@apple.com>
+
+        Prefix the typedef in WTF_MAKE_FAST_ALLOCATED with underscores
+        https://bugs.webkit.org/show_bug.cgi?id=77788
+
+        Reviewed by Andreas Kling.
+
+        The current typedef name, 'ThisIsHereToForceASemicolonAfterThisMacro', shows up when trying to 
+        code-complete 'this' in Xcode. Prefix the typedef with two underscores to stop this from happening.
+
+        * wtf/FastAllocBase.h:
+
+2012-02-03  Rob Buis  <rbuis@rim.com>
+
+        Fix alignment warnings in ARMv7
+        https://bugs.webkit.org/show_bug.cgi?id=55368
+
+        Reviewed by Filip Pizlo.
+
+        Use reinterpret_cast_ptr and static_cast to get rid of alignment issues in ARMv7 code.
+
+        * heap/HandleTypes.h:
+        (JSC::HandleTypes::getFromSlot):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::specializedSweep):
+        * heap/MarkedBlock.h:
+        (JSC::MarkedBlock::forEachCell):
+        * runtime/WriteBarrier.h:
+        (JSC::WriteBarrierBase::get):
+        (JSC::WriteBarrierBase::unvalidatedGet):
+
+2012-02-03  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Build fix
+
+        Unreviewed build fix
+
+        Forgot to add a couple files.
+
+        * heap/MarkedAllocator.cpp: Added.
+        (JSC):
+        (JSC::MarkedAllocator::tryAllocateHelper):
+        (JSC::MarkedAllocator::tryAllocate):
+        (JSC::MarkedAllocator::allocateSlowCase):
+        (JSC::MarkedAllocator::allocateBlock):
+        (JSC::MarkedAllocator::addBlock):
+        (JSC::MarkedAllocator::removeBlock):
+        * heap/MarkedAllocator.h: Added.
+        (JSC):
+        (DFG):
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::cellSize):
+        (JSC::MarkedAllocator::heap):
+        (JSC::MarkedAllocator::setHeap):
+        (JSC::MarkedAllocator::setCellSize):
+        (JSC::MarkedAllocator::setMarkedSpace):
+        (JSC::MarkedAllocator::MarkedAllocator):
+        (JSC::MarkedAllocator::allocate):
+        (JSC::MarkedAllocator::reset):
+        (JSC::MarkedAllocator::zapFreeList):
+        (JSC::MarkedAllocator::forEachBlock):
+
+2012-02-03  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Refactor MarkedBlock::SizeClass into a separate class
+        https://bugs.webkit.org/show_bug.cgi?id=77600
+
+        Reviewed by Geoffrey Garen.
+
+        We pulled SizeClass out into its own class, named MarkedAllocator, and gave it
+        the responsibility of allocating objects from the collection of MarkedBlocks 
+        that it manages. Also limited the amount of coupling to internal data fields 
+        from other places, although it's mostly unavoidable in the JIT code.
+
+        Eventually MarkedAllocator will implement various policies to do with object 
+        management, e.g. whether or not to run destructors on objects that it manages.
+        MarkedSpace will manage a collection of MarkedAllocators with varying policies,
+        as it does now but to a larger extent. 
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::emitAllocateJSFinalObject):
+        * heap/Heap.cpp:
+        (JSC::Heap::collect):
+        (JSC::Heap::resetAllocators):
+        * heap/Heap.h:
+        (JSC::Heap::allocatorForObject):
+        (Heap):
+        * heap/MarkedAllocator.cpp: Added.
+        (JSC):
+        (JSC::MarkedAllocator::tryAllocateHelper):
+        (JSC::MarkedAllocator::tryAllocate):
+        (JSC::MarkedAllocator::allocateSlowCase):
+        (JSC::MarkedAllocator::allocateBlock):
+        (JSC::MarkedAllocator::addBlock):
+        (JSC::MarkedAllocator::removeBlock):
+        * heap/MarkedAllocator.h: Added.
+        (JSC):
+        (DFG):
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::cellSize):
+        (JSC::MarkedAllocator::heap):
+        (JSC::MarkedAllocator::setHeap):
+        (JSC::MarkedAllocator::setCellSize):
+        (JSC::MarkedAllocator::setMarkedSpace):
+        (JSC::MarkedAllocator::MarkedAllocator):
+        (JSC::MarkedAllocator::allocate):
+        (JSC::MarkedAllocator::reset):
+        (JSC::MarkedAllocator::zapFreeList):
+        (JSC::MarkedAllocator::forEachBlock):
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedSpace::MarkedSpace):
+        (JSC::MarkedSpace::resetAllocators):
+        (JSC::MarkedSpace::canonicalizeCellLivenessData):
+        (JSC::TakeIfUnmarked::operator()):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+        (JSC::MarkedSpace::allocatorFor):
+        (JSC::MarkedSpace::allocate):
+        (JSC::MarkedSpace::forEachBlock):
+        (JSC::MarkedSpace::didAddBlock):
+        (JSC::MarkedSpace::didConsumeFreeList):
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateBasicJSObject):
+
+2012-02-03  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Replace GNU linker script for exports with export macros in WTF/JSC
+        https://bugs.webkit.org/show_bug.cgi?id=77723
+
+        Reviewed by Tor Arne Vestbø.
+
+        * wtf/Platform.h: Enable use of export macros.
+
+2012-02-02  Hajime Morrita  <morrita@chromium.org>
+
+        Unreviewed, removing an unnecessarily JS_PRIVATE_EXPORT annotation.
+
+        * interpreter/Interpreter.h:
+        (Interpreter):
+
+2012-01-31  Hajime Morrita  <morrita@chromium.org>
+
+        [Mac] eliminate JavaScriptCore.exp
+        https://bugs.webkit.org/show_bug.cgi?id=72854
+
+        Reviewed by Darin Adler.
+
+        - Removed exp files and corresponding makefile entries.
+        - Changed the build configuration no to use exp file.
+
+        * Configurations/JavaScriptCore.xcconfig:
+        * DerivedSources.make:
+        * JavaScriptCore.JSVALUE32_64only.exp: Removed.
+        * JavaScriptCore.JSVALUE64only.exp: Removed.
+        * JavaScriptCore.exp: Removed.
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * wtf/Platform.h:
+
+2012-02-02  Benjamin Poulain  <bpoulain@apple.com>
+
+        Running a Web Worker on about:blank crashes the interpreter
+        https://bugs.webkit.org/show_bug.cgi?id=77593
+
+        Reviewed by Michael Saboff.
+
+        The method Interpreter::execute() was crashing on empty programs because
+        the assumption is made the source is not null.
+
+        This patch shortcut the execution when the String is null to avoid invalid
+        memory access.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::execute):
+
+2012-02-02  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] Use win32 native threading
+        https://bugs.webkit.org/show_bug.cgi?id=77676
+
+        Reviewed by Martin Robinson.
+
+        r97269 switched from glib threading to pthreads, breaking win32 GTK+.
+        This is a follow up, removing some leftovers in ThreadSpecific.h and
+        switching win32 to use the native threading in ThreadingWin.cpp.
+
+        * GNUmakefile.list.am: Compile in win32 native threading support
+        * wtf/ThreadSpecific.h: Remove GTK+-specific definitions
+        (ThreadSpecific):
+        (WTF::::destroy):
+
+2012-02-02  Filip Pizlo  <fpizlo@apple.com>
+
+        retrieveCallerFromVMCode should call trueCallerFrame
+        https://bugs.webkit.org/show_bug.cgi?id=77684
+
+        Reviewed by Oliver Hunt.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::retrieveCallerFromVMCode):
+
+2012-02-02  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] Implement current executable path finding for win32
+        https://bugs.webkit.org/show_bug.cgi?id=77677
+
+        Reviewed by Martin Robinson.
+
+        The WTF helper for getting the binary path that was added in r101710
+        left out the win32 implementation. Fix this.
+
+        * wtf/gobject/GlibUtilities.cpp:
+        (getCurrentExecutablePath):
+
+2012-02-02  Filip Pizlo  <fpizlo@apple.com>
+
+        Throwing away bytecode and then reparsing during DFG optimization is just
+        plain wrong and makes things crash
+        https://bugs.webkit.org/show_bug.cgi?id=77680
+        <rdar://problem/10798490>
+
+        Reviewed by Oliver Hunt.
+
+        This is the minimal surgical fix: it removes the code that triggered bytecode
+        throw-away. Once we're confident that this is a good idea, we can kill all of
+        the code that implements the feature.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::discardBytecodeLater):
+        (JSC::CodeBlock::addValueProfile):
+        * jit/JITDriver.h:
+        (JSC::jitCompileIfAppropriate):
+        (JSC::jitCompileFunctionIfAppropriate):
+
+2012-02-02  Filip Pizlo  <fpizlo@apple.com>
+
+        Release build debugging should be easier
+        https://bugs.webkit.org/show_bug.cgi?id=77669
+
+        Reviewed by Gavin Barraclough.
+
+        * assembler/ARMAssembler.h:
+        (ARMAssembler):
+        (JSC::ARMAssembler::debugOffset):
+        * assembler/ARMv7Assembler.h:
+        (ARMv7Assembler):
+        (JSC::ARMv7Assembler::debugOffset):
+        (ARMInstructionFormatter):
+        (JSC::ARMv7Assembler::ARMInstructionFormatter::debugOffset):
+        * assembler/AbstractMacroAssembler.h:
+        (AbstractMacroAssembler):
+        (JSC::AbstractMacroAssembler::debugOffset):
+        * assembler/AssemblerBuffer.h:
+        (AssemblerBuffer):
+        (JSC::AssemblerBuffer::debugOffset):
+        * assembler/LinkBuffer.h:
+        (LinkBuffer):
+        (JSC::LinkBuffer::debugSize):
+        * assembler/MIPSAssembler.h:
+        (MIPSAssembler):
+        (JSC::MIPSAssembler::debugOffset):
+        * assembler/X86Assembler.h:
+        (X86Assembler):
+        (JSC::X86Assembler::debugOffset):
+        (X86InstructionFormatter):
+        (JSC::X86Assembler::X86InstructionFormatter::debugOffset):
+        * bytecode/CodeBlock.cpp:
+        (JSC):
+        * bytecode/CodeBlock.h:
+        (CodeBlock):
+        * bytecode/CodeOrigin.h:
+        (CodeOrigin):
+        (JSC):
+        (JSC::CodeOrigin::inlineStack):
+        * bytecode/DFGExitProfile.h:
+        (JSC::DFG::exitKindToString):
+        * bytecode/DataFormat.h:
+        (JSC::dataFormatToString):
+        * bytecode/PredictedType.cpp:
+        (JSC):
+        (JSC::predictionToString):
+        * bytecode/PredictedType.h:
+        (JSC):
+        * bytecode/ValueRecovery.h:
+        (ValueRecovery):
+        (JSC::ValueRecovery::dump):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC):
+        (JSC::BytecodeGenerator::setDumpsGeneratedCode):
+        (JSC::BytecodeGenerator::dumpsGeneratedCode):
+        (JSC::BytecodeGenerator::generate):
+        * dfg/DFGAbstractValue.h:
+        (StructureAbstractValue):
+        (JSC::DFG::StructureAbstractValue::dump):
+        (AbstractValue):
+        (JSC::DFG::AbstractValue::dump):
+        * dfg/DFGAssemblyHelpers.h:
+        (DFG):
+        (AssemblyHelpers):
+        (JSC::DFG::AssemblyHelpers::debugCall):
+        * dfg/DFGFPRInfo.h:
+        (FPRInfo):
+        (JSC::DFG::FPRInfo::debugName):
+        * dfg/DFGGPRInfo.h:
+        (GPRInfo):
+        (JSC::DFG::GPRInfo::debugName):
+        * dfg/DFGGraph.cpp:
+        (DFG):
+        * dfg/DFGGraph.h:
+        (Graph):
+        * dfg/DFGNode.h:
+        (DFG):
+        (JSC::DFG::arithNodeFlagsAsString):
+        (Node):
+        (JSC::DFG::Node::hasIdentifier):
+        (JSC::DFG::Node::dumpChildren):
+        * dfg/DFGOSRExit.cpp:
+        (DFG):
+        (JSC::DFG::OSRExit::dump):
+        * dfg/DFGOSRExit.h:
+        (OSRExit):
+        * runtime/JSValue.cpp:
+        (JSC):
+        (JSC::JSValue::description):
+        * runtime/JSValue.h:
+        (JSValue):
+        * wtf/BitVector.cpp:
+        (WTF):
+        (WTF::BitVector::dump):
+        * wtf/BitVector.h:
+        (BitVector):
+
+2012-02-02  Oliver Hunt  <oliver@apple.com>
+
+        Getters and setters cause line numbers in errors/console.log to be offset for the whole file
+        https://bugs.webkit.org/show_bug.cgi?id=77675
+
+        Reviewed by Timothy Hatcher.
+
+        Our default literal parsing logic doesn't handle the extra work required for
+        getters and setters.  When it encounters one, it rolls back the lexer and 
+        then switches to a more complete parsing function.  Unfortunately it was only
+        winding back the character position, and was ignoring the line number and
+        other lexer data.  This led to every getter and setter causing the line number
+        to be incorrectly incremented leading to increasingly incorrect numbers for
+        the rest of the file.
+
+        * parser/Parser.cpp:
+        (JSC::::parseObjectLiteral):
+
+2012-02-02  Andy Wingo  <wingo@igalia.com>
+
+        Fix type punning warning in HashTable.h debug builds
+        https://bugs.webkit.org/show_bug.cgi?id=77422
+
+        Reviewed by Gavin Barraclough.
+
+        * wtf/HashTable.h (WTF::HashTable::checkKey): Fix type punning
+        warning appearing in debug builds with gcc-4.6.2 on GNU/Linux.
+
 2012-02-01  Michael Saboff  <msaboff@apple.com>
 
         Yarr crash with regexp replace

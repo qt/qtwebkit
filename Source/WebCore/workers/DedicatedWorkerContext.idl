@@ -34,8 +34,8 @@ module threads {
         Conditional=WORKERS,
         ExtendsDOMGlobalObject,
         IsWorkerContext,
-        GenerateNativeConverter,
-        NoStaticTables,
+        JSGenerateToNativeObject,
+        JSNoStaticTables,
         OmitConstructor
     ] DedicatedWorkerContext : WorkerContext {
 

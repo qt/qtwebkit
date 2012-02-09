@@ -44,6 +44,10 @@
 using namespace std;
 using namespace WebCore;
 
+@interface NSColor (WebNSColorDetails)
++ (NSImage *)_linenPatternImage;
+@end
+
 namespace WebCore {
 
 typedef HashMap<Scrollbar*, RetainPtr<ScrollbarPainter> > ScrollbarPainterMap;
@@ -598,5 +602,49 @@ bool ScrollbarThemeMac::paint(Scrollbar* scrollbar, GraphicsContext* context, co
 }
 #endif
 
+#if !PLATFORM(CHROMIUM) && USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
+static RetainPtr<CGColorRef> linenBackgroundColor()
+{
+    NSImage *image = [NSColor _linenPatternImage];
+    CGImageRef cgImage = [image CGImageForProposedRect:NULL context:NULL hints:nil];
+
+    RetainPtr<CGPatternRef> pattern = adoptCF(wkCGPatternCreateWithImageAndTransform(cgImage, CGAffineTransformIdentity, wkPatternTilingNoDistortion));
+    RetainPtr<CGColorSpaceRef> colorSpace = adoptCF(CGColorSpaceCreatePattern(0));
+
+    const CGFloat alpha = 1.0;
+    return adoptCF(CGColorCreateWithPattern(colorSpace.get(), pattern.get(), &alpha));
 }
 
+void ScrollbarThemeMac::setUpOverhangAreasLayerContents(GraphicsLayer* graphicsLayer)
+{
+    static CGColorRef cachedLinenBackgroundColor = linenBackgroundColor().leakRef();
+
+    // We operate on the CALayer directly here, since GraphicsLayer doesn't have the concept
+    // of pattern images, and we know that WebCore won't touch this layer.
+    graphicsLayer->platformLayer().backgroundColor = cachedLinenBackgroundColor;
+}
+
+void ScrollbarThemeMac::setUpContentShadowLayer(GraphicsLayer* graphicsLayer)
+{
+    // We operate on the CALayer directly here, since GraphicsLayer doesn't have the concept
+    // of shadows, and we know that WebCore won't touch this layer.
+    CALayer *contentShadowLayer = graphicsLayer->platformLayer();
+
+    static const CGFloat shadowOpacity = 0.66;
+    static const CGFloat shadowRadius = 3;
+
+    // We only need to set these shadow properties once.
+    if (!contentShadowLayer.shadowOpacity) {
+        contentShadowLayer.shadowColor = CGColorGetConstantColor(kCGColorBlack);
+        contentShadowLayer.shadowOffset = CGSizeZero;
+        contentShadowLayer.shadowOpacity = shadowOpacity;
+        contentShadowLayer.shadowRadius = shadowRadius;
+    }
+
+    RetainPtr<CGPathRef> shadowPath = adoptCF(CGPathCreateWithRect(CGRectMake(0, 0, graphicsLayer->size().width(), graphicsLayer->size().height()), NULL));
+    contentShadowLayer.shadowPath = shadowPath.get();
+}
+
+#endif
+
+} // namespace WebCore

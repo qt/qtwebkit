@@ -153,6 +153,14 @@ void IDBObjectStoreBackendImpl::put(PassRefPtr<SerializedScriptValue> prpValue, 
                 ec = IDBDatabaseException::DATA_ERR;
                 return;
             }
+            if (autoIncrement && !keyPathKey) {
+                RefPtr<IDBKey> dummyKey = IDBKey::createNumber(-1);
+                RefPtr<SerializedScriptValue> valueAfterInjection = injectKeyIntoKeyPath(dummyKey, value, objectStore->m_keyPath);
+                if (!valueAfterInjection) {
+                    ec = IDBDatabaseException::DATA_ERR;
+                    return;
+                }
+            }
         }
         if (key && !key->valid()) {
             ec = IDBDatabaseException::DATA_ERR;
@@ -178,8 +186,16 @@ void IDBObjectStoreBackendImpl::put(PassRefPtr<SerializedScriptValue> prpValue, 
         }
     }
 
-    if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::putInternal, objectStore, value, key, putMode, callbacks, transaction)))
+    if (!transaction->scheduleTask(
+            createCallbackTask(&IDBObjectStoreBackendImpl::putInternal, objectStore, value, key, putMode, callbacks, transaction),
+            // FIXME: One of these per put() is overkill, since it's simply a cache invalidation.
+            createCallbackTask(&IDBObjectStoreBackendImpl::revertAutoIncrementKeyCache, objectStore)))
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
+}
+
+void IDBObjectStoreBackendImpl::revertAutoIncrementKeyCache(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore)
+{
+    objectStore->resetAutoIncrementKeyCache();
 }
 
 void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<SerializedScriptValue> prpValue, PassRefPtr<IDBKey> prpKey, PutMode putMode, PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBTransactionBackendInterface> transaction)
@@ -200,11 +216,13 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
             if (!key) {
                 RefPtr<IDBKey> autoIncKey = objectStore->genAutoIncrementKey();
                 if (hasKeyPath) {
-                    // FIXME: Add checks in put() to ensure this will always succeed (apart from I/O errors).
-                    // https://bugs.webkit.org/show_bug.cgi?id=77374
                     RefPtr<SerializedScriptValue> valueAfterInjection = injectKeyIntoKeyPath(autoIncKey, value, objectStore->m_keyPath);
+                    ASSERT(valueAfterInjection);
                     if (!valueAfterInjection) {
-                        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::DATA_ERR, "The generated key could not be inserted into the object using the keyPath."));
+                        objectStore->resetAutoIncrementKeyCache();
+                        // Checks in put() ensure this should only happen if I/O error occurs.
+                        // FIXME: The Indexed Database specification does not have an error code dedicated to I/O errors.
+                        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Internal error inserting generated key into the object."));
                         return;
                     }
                     value = valueAfterInjection;
@@ -221,6 +239,7 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
 
     RefPtr<IDBBackingStore::ObjectStoreRecordIdentifier> recordIdentifier = objectStore->m_backingStore->createInvalidRecordIdentifier();
     if (putMode == AddOnly && objectStore->m_backingStore->keyExistsInObjectStore(objectStore->m_databaseId, objectStore->id(), *key, recordIdentifier.get())) {
+        objectStore->resetAutoIncrementKeyCache();
         callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::CONSTRAINT_ERR, "Key already exists in the object store."));
         return;
     }
@@ -237,13 +256,15 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
         ASSERT(indexKey->valid());
 
         if ((!index->multiEntry() || indexKey->type() != IDBKey::ArrayType) && !index->addingKeyAllowed(indexKey.get(), key.get())) {
+            objectStore->resetAutoIncrementKeyCache();
             callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::CONSTRAINT_ERR, "One of the derived (from a keyPath) keys for an index does not satisfy its uniqueness requirements."));
             return;
         }
 
-       if (index->multiEntry() && indexKey->type() == IDBKey::ArrayType) {
+        if (index->multiEntry() && indexKey->type() == IDBKey::ArrayType) {
            for (size_t j = 0; j < indexKey->array().size(); ++j) {
                 if (!index->addingKeyAllowed(indexKey->array()[j].get(), key.get())) {
+                    objectStore->resetAutoIncrementKeyCache();
                     callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::CONSTRAINT_ERR, "One of the derived (from a keyPath) keys for an index does not satisfy its uniqueness requirements."));
                     return;
                 }

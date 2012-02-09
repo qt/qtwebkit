@@ -65,8 +65,6 @@ DEBUGGER_SCRIPT_SOURCE = $$PWD/bindings/v8/DebuggerScript.js
 
 ARRAY_BUFFER_VIEW_CUSTOM_SCRIPT_SOURCE = $$PWD/bindings/v8/custom/V8ArrayBufferViewCustomScript.js
 
-contains(DEFINES, ENABLE_DASHBOARD_SUPPORT=1): DASHBOARDSUPPORTCSSPROPERTIES = $$PWD/css/DashboardSupportCSSPropertyNames.in
-
 XPATHBISON = $$PWD/xml/XPathGrammar.y
 
 contains(DEFINES, ENABLE_SVG=1) {
@@ -224,6 +222,7 @@ IDL_BINDINGS += \
     $$PWD/html/canvas/OESVertexArrayObject.idl \
     $$PWD/html/canvas/WebGLActiveInfo.idl \
     $$PWD/html/canvas/WebGLBuffer.idl \
+    $$PWD/html/canvas/WebGLCompressedTextureS3TC.idl \
     $$PWD/html/canvas/WebGLContextAttributes.idl \
     $$PWD/html/canvas/WebGLContextEvent.idl \
     $$PWD/html/canvas/WebGLDebugRendererInfo.idl \
@@ -327,6 +326,7 @@ IDL_BINDINGS += \
     $$PWD/html/ValidityState.idl \
     $$PWD/html/VoidCallback.idl \
     $$PWD/html/shadow/HTMLContentElement.idl \
+    $$PWD/html/shadow/HTMLShadowElement.idl \
     $$PWD/inspector/InjectedScriptHost.idl \
     $$PWD/inspector/InspectorFrontendHost.idl \
     $$PWD/inspector/JavaScriptCallFrame.idl \
@@ -642,8 +642,8 @@ GENERATORS += xlinknames
 cssprops.script = $$PWD/css/makeprop.pl
 cssprops.output = CSSPropertyNames.cpp
 cssprops.input = WALDOCSSPROPS
-cssprops.commands = perl -ne \"print $1\" ${QMAKE_FILE_NAME} $${DASHBOARDSUPPORTCSSPROPERTIES} $${EXTRACSSPROPERTIES} > ${QMAKE_FUNC_FILE_OUT_PATH}/${QMAKE_FILE_BASE}.in && cd ${QMAKE_FUNC_FILE_OUT_PATH} && perl -I$$PWD/bindings/scripts $$cssprops.script --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" --preprocessor \"$${QMAKE_MOC} -E\" ${QMAKE_FILE_NAME} && $(DEL_FILE) ${QMAKE_FILE_BASE}.in ${QMAKE_FILE_BASE}.gperf
-cssprops.depends = ${QMAKE_FILE_NAME} $${DASHBOARDSUPPORTCSSPROPERTIES} $${EXTRACSSPROPERTIES} $$cssprops.script
+cssprops.commands = perl -ne \"print $1\" ${QMAKE_FILE_NAME} $${EXTRACSSPROPERTIES} > ${QMAKE_FUNC_FILE_OUT_PATH}/${QMAKE_FILE_BASE}.in && cd ${QMAKE_FUNC_FILE_OUT_PATH} && perl -I$$PWD/bindings/scripts $$cssprops.script --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" --preprocessor \"$${QMAKE_MOC} -E\" ${QMAKE_FILE_NAME} && $(DEL_FILE) ${QMAKE_FILE_BASE}.in ${QMAKE_FILE_BASE}.gperf
+cssprops.depends = ${QMAKE_FILE_NAME} $${EXTRACSSPROPERTIES} $$cssprops.script
 GENERATORS += cssprops
 
 # GENERATOR 6-B:

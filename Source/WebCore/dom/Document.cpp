@@ -173,6 +173,7 @@
 #include "SVGDocumentExtensions.h"
 #include "SVGElementFactory.h"
 #include "SVGNames.h"
+#include "SVGSVGElement.h"
 #include "SVGStyleElement.h"
 #endif
 
@@ -198,6 +199,10 @@
 #if ENABLE(MICRODATA)
 #include "MicroDataItemList.h"
 #include "NodeRareData.h"
+#endif
+
+#if ENABLE(THREADED_SCROLLING)
+#include "ScrollingCoordinator.h"
 #endif
 
 using namespace std;
@@ -811,7 +816,7 @@ PassRefPtr<EditingText> Document::createEditingTextNode(const String& text)
 
 PassRefPtr<CSSStyleDeclaration> Document::createCSSStyleDeclaration()
 {
-    return CSSMutableStyleDeclaration::create();
+    return StylePropertySet::create()->ensureCSSStyleDeclaration();
 }
 
 PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCode& ec)
@@ -850,15 +855,7 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
         if (ec)
             return 0;
 
-        NamedNodeMap* attrs = oldElement->updatedAttributes();
-        if (attrs) {
-            unsigned length = attrs->length();
-            for (unsigned i = 0; i < length; i++) {
-                Attribute* attr = attrs->attributeItem(i);
-                newElement->setAttribute(attr->name(), attr->value().impl());
-            }
-        }
-
+        newElement->setAttributesFromElement(*oldElement);
         newElement->copyNonAttributeProperties(oldElement);
 
         if (deep) {
@@ -1100,6 +1097,16 @@ void Document::setCharset(const String& charset)
     if (!decoder())
         return;
     decoder()->setEncoding(charset, TextResourceDecoder::UserChosenEncoding);
+}
+
+void Document::setContentLanguage(const String& language)
+{
+    if (m_contentLanguage == language)
+        return;
+    m_contentLanguage = language;
+
+    // Recalculate style so language is used when selecting the initial font.
+    styleSelectorChanged(DeferRecalcStyle);
 }
 
 void Document::setXMLVersion(const String& version, ExceptionCode& ec)
@@ -2251,6 +2258,15 @@ void Document::implicitClose()
 
     ImageLoader::dispatchPendingBeforeLoadEvents();
     ImageLoader::dispatchPendingLoadEvents();
+
+#if ENABLE(SVG)
+    // To align the HTML load event and the SVGLoad event for the outermost <svg> element, fire it from
+    // here, instead of doing it from SVGElement::finishedParsingChildren (if externalResourcesRequired="false",
+    // which is the default, for ='true' its fired at a later time, once all external resources finished loading).
+    if (svgExtensions())
+        accessSVGExtensions()->dispatchSVGLoadEventToOutermostSVGElements();
+#endif
+
     dispatchWindowLoadEvent();
     enqueuePageshowEvent(PageshowEventNotPersisted);
     enqueuePopstateEvent(m_pendingStateObject ? m_pendingStateObject.release() : SerializedScriptValue::nullValue());
@@ -2320,9 +2336,6 @@ void Document::implicitClose()
 #endif
 
 #if ENABLE(SVG)
-    // FIXME: Officially, time 0 is when the outermost <svg> receives its
-    // SVGLoad event, but we don't implement those yet.  This is close enough
-    // for now.  In some cases we should have fired earlier.
     if (svgExtensions())
         accessSVGExtensions()->startAnimations();
 #endif
@@ -2788,11 +2801,13 @@ void Document::processViewport(const String& features)
     m_viewportArguments = ViewportArguments(ViewportArguments::ViewportMeta);
     processArguments(features, (void*)&m_viewportArguments, &setViewportFeature);
 
-    Frame* frame = this->frame();
-    if (!frame || !frame->page())
-        return;
+    updateViewportArguments();
+}
 
-    frame->page()->updateViewportArguments();
+void Document::updateViewportArguments()
+{
+    if (page() && page()->mainFrame() == frame())
+        page()->chrome()->dispatchViewportPropertiesDidChange(m_viewportArguments);
 }
 
 void Document::processReferrerPolicy(const String& policy)
@@ -4070,9 +4085,6 @@ void Document::setInPageCache(bool flag)
         setRenderer(m_savedRenderer);
         m_savedRenderer = 0;
 
-        if (frame() && frame()->page())
-            frame()->page()->updateViewportArguments();
-
         if (childNeedsStyleRecalc())
             scheduleStyleRecalc();
     }
@@ -4113,6 +4125,8 @@ void Document::documentDidResumeFromPageCache()
 
     ASSERT(m_frame);
     m_frame->loader()->client()->dispatchDidBecomeFrameset(isFrameSet());
+
+    updateViewportArguments();
 }
 
 void Document::registerForPageCacheSuspensionCallbacks(Element* e)
@@ -4325,9 +4339,7 @@ PassRefPtr<Attr> Document::createAttributeNS(const String& namespaceURI, const S
         return 0;
     }
 
-    // FIXME: Assume this is a mapped attribute, since createAttribute isn't namespace-aware.  There's no harm to XML
-    // documents if we're wrong.
-    return Attr::create(0, this, Attribute::createMapped(qName, StringImpl::empty()));
+    return Attr::create(0, this, Attribute::create(qName, StringImpl::empty()));
 }
 
 #if ENABLE(SVG)
@@ -5352,12 +5364,35 @@ PassRefPtr<TouchList> Document::createTouchList(ExceptionCode&) const
 }
 #endif
 
+static void wheelEventHandlerCountChanged(Document* document)
+{
+#if ENABLE(THREADED_SCROLLING)
+    Page* page = document->page();
+    if (!page)
+        return;
+
+    ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator();
+    if (!scrollingCoordinator)
+        return;
+
+    FrameView* frameView = document->view();
+    if (!frameView)
+        return;
+
+    scrollingCoordinator->frameViewWheelEventHandlerCountChanged(frameView);
+#else
+    UNUSED_PARAM(document);
+#endif
+}
+
 void Document::didAddWheelEventHandler()
 {
     ++m_wheelEventHandlerCount;
     Frame* mainFrame = page() ? page()->mainFrame() : 0;
     if (mainFrame)
         mainFrame->notifyChromeClientWheelEventHandlerCountChanged();
+
+    wheelEventHandlerCountChanged(this);
 }
 
 void Document::didRemoveWheelEventHandler()
@@ -5367,6 +5402,8 @@ void Document::didRemoveWheelEventHandler()
     Frame* mainFrame = page() ? page()->mainFrame() : 0;
     if (mainFrame)
         mainFrame->notifyChromeClientWheelEventHandlerCountChanged();
+
+    wheelEventHandlerCountChanged(this);
 }
 
 bool Document::visualUpdatesAllowed() const

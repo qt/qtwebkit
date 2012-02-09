@@ -182,7 +182,9 @@ namespace WebKit {
         Vector<IntRect> m_rectsToScroll;
         Vector<IntSize> m_scrollOffsets;
         double m_lastDisplayTime;
-        uint m_repaintSoonSourceId;
+        unsigned int m_repaintSoonSourceId;
+
+        void invalidateWidgetRect(const IntRect&);
     };
 }
 

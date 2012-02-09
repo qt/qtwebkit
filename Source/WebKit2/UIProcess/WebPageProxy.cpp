@@ -195,6 +195,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_mainFrameHasCustomRepresentation(false)
     , m_mainFrameHasHorizontalScrollbar(false)
     , m_mainFrameHasVerticalScrollbar(false)
+    , m_canShortCircuitHorizontalWheelEvents(true)
     , m_mainFrameIsPinnedToLeftSide(false)
     , m_mainFrameIsPinnedToRightSide(false)
     , m_pageCount(0)
@@ -1533,7 +1534,7 @@ void WebPageProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::M
         return;
     }
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER) && USE(TILED_BACKING_STORE)
     if (messageID.is<CoreIPC::MessageClassLayerTreeHostProxy>()) {
         m_drawingArea->didReceiveLayerTreeHostProxyMessage(connection, messageID, arguments);
         return;
@@ -3377,9 +3378,9 @@ void WebPageProxy::requestNotificationPermission(uint64_t requestID, const Strin
         request->deny();
 }
 
-void WebPageProxy::showNotification(const String& title, const String& body, const String& originString, uint64_t notificationID)
+void WebPageProxy::showNotification(const String& title, const String& body, const String& iconURL, const String& originString, uint64_t notificationID)
 {
-    m_process->context()->notificationManagerProxy()->show(this, title, body, originString, notificationID);
+    m_process->context()->notificationManagerProxy()->show(this, title, body, iconURL, originString, notificationID);
 }
 
 float WebPageProxy::headerHeight(WebFrameProxy* frame)
@@ -3456,7 +3457,7 @@ void WebPageProxy::didFailToInitializePlugin(const String& mimeType)
 
 bool WebPageProxy::willHandleHorizontalScrollEvents() const
 {
-    return m_wheelEventHandlerCount > 0;
+    return !m_canShortCircuitHorizontalWheelEvents;
 }
 
 void WebPageProxy::didFinishLoadingDataForCustomRepresentation(const String& suggestedFilename, const CoreIPC::DataReference& dataReference)

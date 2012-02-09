@@ -49,9 +49,7 @@ class MainTest(unittest.TestCase):
             text = ''
             timeout = False
             crash = False
-            if driver_input.test_name.endswith('init.html'):
-                text = 'PASS\n'
-            elif driver_input.test_name.endswith('pass.html'):
+            if driver_input.test_name.endswith('pass.html'):
                 text = 'RESULT group_name: test_name= 42 ms'
             elif driver_input.test_name.endswith('timeout.html'):
                 timeout = True
@@ -124,24 +122,6 @@ max 1120
         runner = self.create_runner()
         driver = MainTest.TestDriver()
         return runner._run_single_test(test_name, driver, is_chromium_style=True)
-
-    def test_initial_page_loaded(self):
-        runner = self.create_runner()
-        driver = MainTest.TestDriver()
-        inputs = []
-
-        def run_test(input):
-            inputs.append(input)
-            if input.test_name.endswith('init.html'):
-                return DriverOutput('PASS\n', 'image output', 'some hash', None)
-            else:
-                return DriverOutput('RESULT group_name: test_name= 42 ms\n', 'image output', 'some hash', None)
-
-        driver.run_test = run_test
-        self.assertTrue(runner._run_single_test('pass.html', driver, is_chromium_style=True))
-        self.assertEqual(len(inputs), 2)
-        self.assertEqual(inputs[0].test_name, runner._base_path + '/resources/init.html')
-        self.assertEqual(inputs[1].test_name, 'pass.html')
 
     def test_run_passing_test(self):
         self.assertTrue(self.run_test('pass.html'))
@@ -220,7 +200,7 @@ max 1120
             "timestamp": 123456789, "results":
             {"Bindings/event-target-wrapper": {"max": 1510, "avg": 1489.05, "median": 1487, "min": 1471, "stdev": 14.46},
             "group_name:test_name": 42},
-            "revision": 1234})
+            "webkit-revision": 5678})
 
     def test_run_test_set_with_json_source(self):
         buildbot_output = array_stream.ArrayStream()
@@ -240,8 +220,19 @@ max 1120
             "timestamp": 123456789, "results":
             {"Bindings/event-target-wrapper": {"max": 1510, "avg": 1489.05, "median": 1487, "min": 1471, "stdev": 14.46},
             "group_name:test_name": 42},
-            "revision": 1234,
+            "webkit-revision": 5678,
             "key": "value"})
+
+    def test_run_test_set_with_multiple_repositories(self):
+        buildbot_output = array_stream.ArrayStream()
+        runner = self.create_runner(buildbot_output, args=['--output-json-path=/mock-checkout/output.json'])
+        runner._host.filesystem.files[runner._base_path + '/inspector/pass.html'] = True
+        runner._timestamp = 123456789
+        runner._port.repository_paths = lambda: [('webkit', '/mock-checkout'), ('some', '/mock-checkout/some')]
+        self.assertEqual(runner.run(), 0)
+
+        self.assertEqual(json.loads(runner._host.filesystem.files['/mock-checkout/output.json']), {
+            "timestamp": 123456789, "results": {"group_name:test_name": 42.0}, "webkit-revision": 5678, "some-revision": 5678})
 
     def test_run_with_upload_json(self):
         runner = self.create_runner(args=['--output-json-path=/mock-checkout/output.json',
@@ -315,6 +306,19 @@ max 1120
         runner._host.filesystem.files[filename] = 'a content'
         tests = runner._collect_tests()
         self.assertEqual(len(tests), 1)
+
+    def test_collect_tests(self):
+        runner = self.create_runner(args=['PerformanceTests/test1.html', 'test2.html'])
+
+        def add_file(filename):
+            runner._host.filesystem.files[runner._host.filesystem.join(runner._base_path, filename)] = 'some content'
+
+        add_file('test1.html')
+        add_file('test2.html')
+        add_file('test3.html')
+        runner._host.filesystem.chdir(runner._port.perf_tests_dir()[:runner._port.perf_tests_dir().rfind(runner._host.filesystem.sep)])
+        tests = [runner._port.relative_perf_test_filename(test) for test in runner._collect_tests()]
+        self.assertEqual(sorted(tests), ['test1.html', 'test2.html'])
 
     def test_collect_tests_with_skipped_list(self):
         runner = self.create_runner()

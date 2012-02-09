@@ -186,7 +186,7 @@ SVGViewSpec* SVGSVGElement::currentView() const
 
 float SVGSVGElement::currentScale() const
 {
-    if (!inDocument() || !isOutermostSVG())
+    if (!inDocument() || !isOutermostSVGSVGElement())
         return 1;
 
     Frame* frame = document()->frame();
@@ -204,7 +204,7 @@ float SVGSVGElement::currentScale() const
 
 void SVGSVGElement::setCurrentScale(float scale)
 {
-    if (!inDocument() || !isOutermostSVG())
+    if (!inDocument() || !isOutermostSVGSVGElement())
         return;
 
     Frame* frame = document()->frame();
@@ -238,7 +238,7 @@ void SVGSVGElement::updateCurrentTranslate()
         document()->renderer()->repaint();
 }
 
-void SVGSVGElement::parseMappedAttribute(Attribute* attr)
+void SVGSVGElement::parseAttribute(Attribute* attr)
 {
     SVGParsingError parseError = NoError;
 
@@ -273,13 +273,13 @@ void SVGSVGElement::parseMappedAttribute(Attribute* attr)
         setWidthBaseValue(SVGLength::construct(LengthModeWidth, attr->value(), parseError, ForbidNegativeLengths));
     else if (attr->name() == SVGNames::heightAttr)
         setHeightBaseValue(SVGLength::construct(LengthModeHeight, attr->value(), parseError, ForbidNegativeLengths));
-    else if (SVGTests::parseMappedAttribute(attr)
-               || SVGLangSpace::parseMappedAttribute(attr)
-               || SVGExternalResourcesRequired::parseMappedAttribute(attr)
-               || SVGFitToViewBox::parseMappedAttribute(document(), attr)
-               || SVGZoomAndPan::parseMappedAttribute(attr)) {
+    else if (SVGTests::parseAttribute(attr)
+               || SVGLangSpace::parseAttribute(attr)
+               || SVGExternalResourcesRequired::parseAttribute(attr)
+               || SVGFitToViewBox::parseAttribute(document(), attr)
+               || SVGZoomAndPan::parseAttribute(attr)) {
     } else
-        SVGStyledLocatableElement::parseMappedAttribute(attr);
+        SVGStyledLocatableElement::parseAttribute(attr);
 
     reportAttributeParsingError(parseError, attr);
 }
@@ -303,7 +303,8 @@ void SVGSVGElement::svgAttributeChanged(const QualifiedName& attrName)
     if (updateRelativeLengths
         || SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName)
-        || SVGZoomAndPan::isKnownAttribute(attrName)) {
+        || SVGZoomAndPan::isKnownAttribute(attrName)
+        || attrName == SVGNames::viewBoxAttr) {
         if (renderer())
             RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer());
         return;
@@ -428,7 +429,7 @@ AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMSc
     }
 
     AffineTransform transform;
-    if (!isOutermostSVG()) {
+    if (!isOutermostSVGSVGElement()) {
         SVGLengthContext lengthContext(this);
         transform.translate(x().value(lengthContext), y().value(lengthContext));
     } else if (mode == SVGLocatable::ScreenScope) {
@@ -455,7 +456,7 @@ AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMSc
 
 RenderObject* SVGSVGElement::createRenderer(RenderArena* arena, RenderStyle*)
 {
-    if (isOutermostSVG())
+    if (isOutermostSVGSVGElement())
         return new (arena) RenderSVGRoot(this);
 
     return new (arena) RenderSVGViewportContainer(this);
@@ -510,20 +511,6 @@ bool SVGSVGElement::selfHasRelativeLengths() const
         || width().isRelative()
         || height().isRelative()
         || hasAttribute(SVGNames::viewBoxAttr);
-}
-
-bool SVGSVGElement::isOutermostSVG() const
-{
-    // Element may not be in the document, pretend we're outermost for viewport(), getCTM(), etc.
-    if (!parentNode())
-        return true;
-
-    // We act like an outermost SVG element, if we're a direct child of a <foreignObject> element.
-    if (parentNode()->hasTagName(SVGNames::foreignObjectTag))
-        return true;
-
-    // This is true whenever this is the outermost SVG, even if there are HTML elements outside it
-    return !parentNode()->isSVGElement();
 }
 
 FloatRect SVGSVGElement::currentViewBoxRect() const

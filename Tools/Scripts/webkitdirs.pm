@@ -453,8 +453,8 @@ sub productDir
 sub jscProductDir
 {
     my $productDir = productDir();
-    $productDir .= "/bin" if isQt();
-    $productDir .= "/Programs" if (isGtk() || isEfl());
+    $productDir .= "/bin" if (isQt() || isEfl());
+    $productDir .= "/Programs" if isGtk();
 
     return $productDir;
 }
@@ -2309,9 +2309,13 @@ sub buildChromiumNinja($$@)
     # rm -rf out requires rerunning gyp, so don't support --clean for now.
     my ($target, @options) = @_;
     my $config = configuration();
+    my $makeArgs;
+    for (@options) {
+        $makeArgs = $1 if /^--makeargs=(.*)/i;
+    }
     my $command = "";
 
-    $command .= "ninja -C out/$config $target";
+    $command .= "ninja -C out/$config $target $makeArgs";
 
     print "$command\n";
     return system $command;

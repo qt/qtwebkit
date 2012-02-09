@@ -27,8 +27,8 @@ module html {
 
     interface [
         Conditional=VIDEO_TRACK,
-        EnabledAtRuntime=webkitVideoTrack,
-        HasIndexGetter
+        V8EnabledAtRuntime=webkitVideoTrack,
+        IndexedGetter
     ] TextTrackCueList {
         readonly attribute unsigned long length;
         TextTrackCue item(in unsigned long index);

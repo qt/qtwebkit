@@ -66,7 +66,6 @@
 #include "cc/CCVideoDrawQuad.h"
 #if USE(SKIA)
 #include "Extensions3D.h"
-#include "GrContext.h"
 #include "NativeImageSkia.h"
 #include "PlatformContextSkia.h"
 #elif USE(CG)
@@ -307,9 +306,9 @@ void LayerRendererChromium::viewportChanged()
     m_currentRenderSurface = 0;
 }
 
-void LayerRendererChromium::clearSurfaceForDebug(CCRenderSurface* renderSurface, CCRenderSurface* rootRenderSurface, const FloatRect& surfaceDamageRect)
+void LayerRendererChromium::clearRenderSurface(CCRenderSurface* renderSurface, CCRenderSurface* rootRenderSurface, const FloatRect& surfaceDamageRect)
 {
-    // Non-root layers should clear their entire contents to transparent. The root layer
+    // Non-root layers should clear their entire contents to transparent. On DEBUG builds, the root layer
     // is cleared to blue to easily see regions that were not drawn on the screen. If we
     // are using partial swap / scissor optimization, then the surface should only
     // clear the damaged region, so that we don't accidentally clear un-changed portions
@@ -325,7 +324,11 @@ void LayerRendererChromium::clearSurfaceForDebug(CCRenderSurface* renderSurface,
     else
         GLC(m_context.get(), m_context->disable(GraphicsContext3D::SCISSOR_TEST));
 
-    m_context->clear(GraphicsContext3D::COLOR_BUFFER_BIT);
+#if defined(NDEBUG)
+    if (renderSurface != rootRenderSurface)
+#endif
+        m_context->clear(GraphicsContext3D::COLOR_BUFFER_BIT);
+
     GLC(m_context.get(), m_context->enable(GraphicsContext3D::SCISSOR_TEST));
 }
 
@@ -375,8 +378,7 @@ void LayerRendererChromium::drawRenderPass(const CCRenderPass* renderPass)
     if (!useRenderSurface(renderSurface))
         return;
 
-    // FIXME: eventually we should place this under a debug flag.
-    clearSurfaceForDebug(renderSurface, m_defaultRenderSurface, renderPass->surfaceDamageRect());
+    clearRenderSurface(renderSurface, m_defaultRenderSurface, renderPass->surfaceDamageRect());
 
     const CCQuadList& quadList = renderPass->quadList();
     for (size_t i = 0; i < quadList.size(); ++i)
@@ -698,10 +700,92 @@ void LayerRendererChromium::drawVideoQuad(const CCVideoDrawQuad* quad)
     layer->draw(this);
 }
 
+struct PluginProgramBinding {
+    template<class Program> void set(Program* program)
+    {
+        ASSERT(program && program->initialized());
+        programId = program->program();
+        samplerLocation = program->fragmentShader().samplerLocation();
+        matrixLocation = program->vertexShader().matrixLocation();
+        alphaLocation = program->fragmentShader().alphaLocation();
+    }
+    int programId;
+    int samplerLocation;
+    int matrixLocation;
+    int alphaLocation;
+};
+
+struct TexStretchPluginProgramBinding : PluginProgramBinding {
+    template<class Program> void set(Program* program)
+    {
+        PluginProgramBinding::set(program);
+        offsetLocation = program->vertexShader().offsetLocation();
+        scaleLocation = program->vertexShader().scaleLocation();
+    }
+    int offsetLocation;
+    int scaleLocation;
+};
+
+struct TexTransformPluginProgramBinding : PluginProgramBinding {
+    template<class Program> void set(Program* program)
+    {
+        PluginProgramBinding::set(program);
+        texTransformLocation = program->vertexShader().texTransformLocation();
+    }
+    int texTransformLocation;
+};
+
 void LayerRendererChromium::drawPluginQuad(const CCPluginDrawQuad* quad)
 {
-    CCLayerImpl* layer = quad->layer();
-    layer->draw(this);
+    ASSERT(CCProxy::isImplThread());
+
+    if (quad->ioSurfaceTextureId()) {
+        TexTransformPluginProgramBinding binding;
+        if (quad->flipped())
+            binding.set(pluginLayerTexRectProgramFlip());
+        else
+            binding.set(pluginLayerTexRectProgram());
+
+        GLC(context(), context()->activeTexture(GraphicsContext3D::TEXTURE0));
+        GLC(context(), context()->bindTexture(Extensions3D::TEXTURE_RECTANGLE_ARB, quad->ioSurfaceTextureId()));
+
+        GLC(context(), context()->useProgram(binding.programId));
+        GLC(context(), context()->uniform1i(binding.samplerLocation, 0));
+        // Note: this code path ignores quad->uvRect().
+        GLC(context(), context()->uniform4f(binding.texTransformLocation, 0, 0, quad->ioSurfaceWidth(), quad->ioSurfaceHeight()));
+        const IntSize& bounds = quad->quadRect().size();
+        drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), sharedGeometryQuad(),
+                                        binding.matrixLocation,
+                                        binding.alphaLocation,
+                                        -1);
+        GLC(context(), context()->bindTexture(Extensions3D::TEXTURE_RECTANGLE_ARB, 0));
+    } else {
+        TexStretchPluginProgramBinding binding;
+        if (quad->flipped())
+            binding.set(pluginLayerProgramFlip());
+        else
+            binding.set(pluginLayerProgram());
+
+        GLC(context(), context()->activeTexture(GraphicsContext3D::TEXTURE0));
+        GLC(context(), context()->bindTexture(GraphicsContext3D::TEXTURE_2D, quad->textureId()));
+
+        // FIXME: setting the texture parameters every time is redundant. Move this code somewhere
+        // where it will only happen once per texture.
+        GLC(context, context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR));
+        GLC(context, context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR));
+        GLC(context, context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE));
+        GLC(context, context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE));
+
+        GLC(context, context()->useProgram(binding.programId));
+        GLC(context, context()->uniform1i(binding.samplerLocation, 0));
+        GLC(context, context()->uniform2f(binding.offsetLocation, quad->uvRect().x(), quad->uvRect().y()));
+        GLC(context, context()->uniform2f(binding.scaleLocation, quad->uvRect().width(), quad->uvRect().height()));
+        const IntSize& bounds = quad->quadRect().size();
+        drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), sharedGeometryQuad(),
+                                        binding.matrixLocation,
+                                        binding.alphaLocation,
+                                        -1);
+    }
 }
 
 void LayerRendererChromium::finishDrawingFrame()

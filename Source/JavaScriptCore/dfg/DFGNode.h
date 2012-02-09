@@ -33,6 +33,7 @@
 #include "CodeBlock.h"
 #include "CodeOrigin.h"
 #include "DFGCommon.h"
+#include "DFGNodeReferenceBlob.h"
 #include "DFGOperands.h"
 #include "DFGVariableAccessData.h"
 #include "JSValue.h"
@@ -96,7 +97,6 @@ static inline bool nodeCanSpeculateInteger(ArithNodeFlags flags)
     return true;
 }
 
-#ifndef NDEBUG
 static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
 {
     if (!flags)
@@ -138,7 +138,6 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     
     return description;
 }
-#endif
 
 // Entries in the NodeType enum (below) are composed of an id, a result type (possibly none)
 // and some additional informative flags (must generate, is constant, etc).
@@ -212,11 +211,6 @@ static inline const char* arithNodeFlagsAsString(ArithNodeFlags flags)
     macro(ArithMin, NodeResultNumber) \
     macro(ArithMax, NodeResultNumber) \
     macro(ArithSqrt, NodeResultNumber) \
-    /* Arithmetic operators call ToNumber on their operands. */\
-    macro(ValueToNumber, NodeResultNumber | NodeMustGenerate) \
-    \
-    /* A variant of ValueToNumber, which a hint that the parents will always use this as a double. */\
-    macro(ValueToDouble, NodeResultNumber | NodeMustGenerate) \
     \
     /* Add of values may either be arithmetic, or result in string concatenation. */\
     macro(ValueAdd, NodeResultJS | NodeMustGenerate | NodeMightClobber) \
@@ -349,36 +343,33 @@ struct Node {
     Node(NodeType op, CodeOrigin codeOrigin, NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
         : op(op)
         , codeOrigin(codeOrigin)
+        , children(NodeReferenceBlob::Fixed, child1, child2, child3)
         , m_virtualRegister(InvalidVirtualRegister)
         , m_refCount(0)
         , m_prediction(PredictNone)
     {
         ASSERT(!(op & NodeHasVarArgs));
         ASSERT(!hasArithNodeFlags());
-        children.fixed.child1 = child1;
-        children.fixed.child2 = child2;
-        children.fixed.child3 = child3;
     }
 
     // Construct a node with up to 3 children and an immediate value.
     Node(NodeType op, CodeOrigin codeOrigin, OpInfo imm, NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
         : op(op)
         , codeOrigin(codeOrigin)
+        , children(NodeReferenceBlob::Fixed, child1, child2, child3)
         , m_virtualRegister(InvalidVirtualRegister)
         , m_refCount(0)
         , m_opInfo(imm.m_value)
         , m_prediction(PredictNone)
     {
         ASSERT(!(op & NodeHasVarArgs));
-        children.fixed.child1 = child1;
-        children.fixed.child2 = child2;
-        children.fixed.child3 = child3;
     }
 
     // Construct a node with up to 3 children and two immediate values.
     Node(NodeType op, CodeOrigin codeOrigin, OpInfo imm1, OpInfo imm2, NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
         : op(op)
         , codeOrigin(codeOrigin)
+        , children(NodeReferenceBlob::Fixed, child1, child2, child3)
         , m_virtualRegister(InvalidVirtualRegister)
         , m_refCount(0)
         , m_opInfo(imm1.m_value)
@@ -386,15 +377,13 @@ struct Node {
         , m_prediction(PredictNone)
     {
         ASSERT(!(op & NodeHasVarArgs));
-        children.fixed.child1 = child1;
-        children.fixed.child2 = child2;
-        children.fixed.child3 = child3;
     }
     
     // Construct a node with a variable number of children and two immediate values.
     Node(VarArgTag, NodeType op, CodeOrigin codeOrigin, OpInfo imm1, OpInfo imm2, unsigned firstChild, unsigned numChildren)
         : op(op)
         , codeOrigin(codeOrigin)
+        , children(NodeReferenceBlob::Variable, firstChild, numChildren)
         , m_virtualRegister(InvalidVirtualRegister)
         , m_refCount(0)
         , m_opInfo(imm1.m_value)
@@ -402,8 +391,6 @@ struct Node {
         , m_prediction(PredictNone)
     {
         ASSERT(op & NodeHasVarArgs);
-        children.variable.firstChild = firstChild;
-        children.variable.numChildren = numChildren;
     }
 
     bool mustGenerate()
@@ -499,7 +486,6 @@ struct Node {
         return variableAccessData()->local();
     }
 
-#ifndef NDEBUG
     bool hasIdentifier()
     {
         switch (op) {
@@ -515,7 +501,6 @@ struct Node {
             return false;
         }
     }
-#endif
 
     unsigned identifierNumber()
     {
@@ -532,8 +517,6 @@ struct Node {
     bool hasArithNodeFlags()
     {
         switch (op) {
-        case ValueToNumber:
-        case ValueToDouble:
         case UInt32ToNumber:
         case ArithAdd:
         case ArithSub:
@@ -849,42 +832,42 @@ struct Node {
         return !--m_refCount;
     }
     
-    NodeIndex child1()
+    NodeUse child1()
     {
         ASSERT(!(op & NodeHasVarArgs));
-        return children.fixed.child1;
+        return children.child1();
     }
     
     // This is useful if you want to do a fast check on the first child
     // before also doing a check on the opcode. Use this with care and
     // avoid it if possible.
-    NodeIndex child1Unchecked()
+    NodeUse child1Unchecked()
     {
-        return children.fixed.child1;
+        return children.child1Unchecked();
     }
 
-    NodeIndex child2()
+    NodeUse child2()
     {
         ASSERT(!(op & NodeHasVarArgs));
-        return children.fixed.child2;
+        return children.child2();
     }
 
-    NodeIndex child3()
+    NodeUse child3()
     {
         ASSERT(!(op & NodeHasVarArgs));
-        return children.fixed.child3;
+        return children.child3();
     }
     
     unsigned firstChild()
     {
         ASSERT(op & NodeHasVarArgs);
-        return children.variable.firstChild;
+        return children.firstChild();
     }
     
     unsigned numChildren()
     {
         ASSERT(op & NodeHasVarArgs);
-        return children.variable.numChildren;
+        return children.numChildren();
     }
     
     PredictedType prediction()
@@ -1036,35 +1019,25 @@ struct Node {
         return nodeCanSpeculateInteger(arithNodeFlags());
     }
     
-#ifndef NDEBUG
     void dumpChildren(FILE* out)
     {
-        if (child1() == NoNode)
+        if (!child1())
             return;
-        fprintf(out, "@%u", child1());
-        if (child2() == NoNode)
+        fprintf(out, "@%u", child1().index());
+        if (!child2())
             return;
-        fprintf(out, ", @%u", child2());
-        if (child3() == NoNode)
+        fprintf(out, ", @%u", child2().index());
+        if (!child3())
             return;
-        fprintf(out, ", @%u", child3());
+        fprintf(out, ", @%u", child3().index());
     }
-#endif
     
     // This enum value describes the type of the node.
     NodeType op;
     // Used to look up exception handling information (currently implemented as a bytecode index).
     CodeOrigin codeOrigin;
-    // References to up to 3 children (0 for no child).
-    union {
-        struct {
-            NodeIndex child1, child2, child3;
-        } fixed;
-        struct {
-            unsigned firstChild;
-            unsigned numChildren;
-        } variable;
-    } children;
+    // References to up to 3 children, or links to a variable length set of children.
+    NodeReferenceBlob children;
 
 private:
     // The virtual register number (spill location) associated with this .

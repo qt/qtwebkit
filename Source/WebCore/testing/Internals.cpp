@@ -193,7 +193,10 @@ Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::ensureShadowRoot(Eleme
         return 0;
     }
 
-    return host->ensureShadowRoot();
+    if (ShadowRoot* root = host->shadowRoot())
+        return root;
+
+    return ShadowRoot::create(host, ec).get();
 }
 
 Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::shadowRoot(Element* host, ExceptionCode& ec)
@@ -278,7 +281,7 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
     return node->document()->markers()->markersFor(node, markerTypes).size();
 }
 
-PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
     if (!node) {
         ec = INVALID_ACCESS_ERR;
@@ -294,7 +297,23 @@ PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& marker
     Vector<DocumentMarker*> markers = node->document()->markers()->markersFor(node, markerTypes);
     if (markers.size() <= index)
         return 0;
-    return Range::create(node->document(), node, markers[index]->startOffset(), node, markers[index]->endOffset());
+    return markers[index];
+}
+
+PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+{
+    DocumentMarker* marker = markerAt(node, markerType, index, ec);
+    if (!marker)
+        return 0;
+    return Range::create(node->document(), node, marker->startOffset(), node, marker->endOffset());
+}
+
+String Internals::markerDescriptionForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+{
+    DocumentMarker* marker = markerAt(node, markerType, index, ec);
+    if (!marker)
+        return String();
+    return marker->description();
 }
 
 void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionCode& ec)
@@ -539,5 +558,15 @@ bool Internals::shouldDisplayTrackKind(Document* document, const String& kind, E
     return false;
 #endif
 }
-    
+
+unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec)
+{
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return document->wheelEventHandlerCount();
+}
+
 }

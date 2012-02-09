@@ -32,7 +32,7 @@ module window {
     // This is based off of Mozilla's Selection interface
     // https://developer.mozilla.org/En/DOM/Selection
     interface [
-        GenerateIsReachable=ImplFrame,
+        JSGenerateIsReachable=ImplFrame,
         OmitConstructor
     ] DOMSelection {
         readonly attribute Node anchorNode;
@@ -67,7 +67,7 @@ module window {
         void addRange(in [Optional=CallWithDefaultValue] Range range);
 
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
-        [DontEnum] DOMString toString();
+        [NotEnumerable] DOMString toString();
 #endif
 
         // WebKit extensions

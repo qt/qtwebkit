@@ -50,6 +50,7 @@
 #include "RenderReplica.h"
 #include "RenderVideo.h"
 #include "RenderView.h"
+#include "ScrollbarTheme.h"
 #include "Settings.h"
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
@@ -971,11 +972,6 @@ void RenderLayerCompositor::frameViewDidChangeSize()
         if (m_layerForOverhangAreas)
             m_layerForOverhangAreas->setSize(frameView->frameRect().size());
 #endif
-
-#if ENABLE(THREADED_SCROLLING)
-        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
-            scrollingCoordinator->syncFrameViewGeometry(frameView);
-#endif
     }
 }
 
@@ -1236,9 +1232,16 @@ void RenderLayerCompositor::updateRootLayerPosition()
         m_clipLayer->setSize(frameView->visibleContentRect(false /* exclude scrollbars */).size());
     }
 
-#if ENABLE(THREADED_SCROLLING)
-    if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
-        scrollingCoordinator->syncFrameViewGeometry(m_renderView->frameView());
+#if ENABLE(RUBBER_BANDING)
+    if (m_contentShadowLayer) {
+        m_contentShadowLayer->setPosition(m_rootContentLayer->position());
+
+        FloatSize rootContentLayerSize = m_rootContentLayer->size();
+        if (m_contentShadowLayer->size() != rootContentLayerSize) {
+            m_contentShadowLayer->setSize(rootContentLayerSize);
+            ScrollbarTheme::theme()->setUpContentShadowLayer(m_contentShadowLayer.get());
+        }
+    }
 #endif
 }
 
@@ -1270,7 +1273,7 @@ bool RenderLayerCompositor::shouldPropagateCompositingToEnclosingFrame() const
     // Parent document content needs to be able to render on top of a composited frame, so correct behavior
     // is to have the parent document become composited too. However, this can cause problems on platforms that
     // use native views for frames (like Mac), so disable that behavior on those platforms for now.
-    HTMLFrameOwnerElement* ownerElement = enclosingFrameElement();
+    HTMLFrameOwnerElement* ownerElement = m_renderView->document()->ownerElement();
     RenderObject* renderer = ownerElement ? ownerElement->renderer() : 0;
 
     // If we are the top-level frame, don't propagate.
@@ -1299,14 +1302,6 @@ bool RenderLayerCompositor::shouldPropagateCompositingToEnclosingFrame() const
     }
 
     return false;
-}
-
-HTMLFrameOwnerElement* RenderLayerCompositor::enclosingFrameElement() const
-{
-    if (HTMLFrameOwnerElement* ownerElement = m_renderView->document()->ownerElement())
-        return (ownerElement->hasTagName(iframeTag) || ownerElement->hasTagName(frameTag) || ownerElement->hasTagName(objectTag)) ? ownerElement : 0;
-
-    return 0;
 }
 
 bool RenderLayerCompositor::needsToBeComposited(const RenderLayer* layer) const
@@ -1739,6 +1734,21 @@ bool RenderLayerCompositor::requiresOverhangAreasLayer() const
 
     return false;
 }
+
+bool RenderLayerCompositor::requiresContentShadowLayer() const
+{
+    // We don't want a layer if this is a subframe.
+    if (m_renderView->document()->ownerElement())
+        return false;
+
+#if PLATFORM(MAC) && ENABLE(THREADED_SCROLLING)
+    // On Mac, we want a content shadow layer if we have a scrolling coordinator.
+    if (scrollingCoordinator())
+        return true;
+#endif
+
+    return false;
+}
 #endif
 
 void RenderLayerCompositor::updateOverflowControlsLayers()
@@ -1753,6 +1763,8 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
             m_layerForOverhangAreas->setDrawsContent(false);
             m_layerForOverhangAreas->setSize(m_renderView->frameView()->frameRect().size());
 
+            ScrollbarTheme::theme()->setUpOverhangAreasLayerContents(m_layerForOverhangAreas.get());
+
             // We want the overhang areas layer to be positioned below the frame contents,
             // so insert it below the clip layer.
             m_overflowControlsHostLayer->addChildBelow(m_layerForOverhangAreas.get(), m_clipLayer.get());
@@ -1760,6 +1772,23 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
     } else if (m_layerForOverhangAreas) {
         m_layerForOverhangAreas->removeFromParent();
         m_layerForOverhangAreas = nullptr;
+    }
+
+    if (requiresContentShadowLayer()) {
+        if (!m_contentShadowLayer) {
+            m_contentShadowLayer = GraphicsLayer::create(this);
+#ifndef NDEBUG
+            m_contentShadowLayer->setName("content shadow");
+#endif
+            m_contentShadowLayer->setSize(m_rootContentLayer->size());
+            m_contentShadowLayer->setPosition(m_rootContentLayer->position());
+            ScrollbarTheme::theme()->setUpContentShadowLayer(m_contentShadowLayer.get());
+
+            m_scrollLayer->addChildBelow(m_contentShadowLayer.get(), m_rootContentLayer.get());
+        }
+    } else if (m_contentShadowLayer) {
+        m_contentShadowLayer->removeFromParent();
+        m_contentShadowLayer = nullptr;
     }
 #endif
 

@@ -42,7 +42,6 @@
 #include "CSSInitialValue.h"
 #include "CSSLineBoxContainValue.h"
 #include "CSSMediaRule.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPageRule.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSProperty.h"
@@ -75,6 +74,7 @@
 #include "RenderTheme.h"
 #include "Settings.h"
 #include "ShadowValue.h"
+#include "StylePropertySet.h"
 #if ENABLE(CSS_FILTERS)
 #include "WebKitCSSFilterValue.h"
 #endif
@@ -326,7 +326,7 @@ static inline bool isColorPropertyID(int propertyId)
     }
 }
 
-static bool parseColorValue(CSSMutableStyleDeclaration* declaration, int propertyId, const String& string, bool important, bool strict, CSSStyleSheet* contextStyleSheet = 0)
+static bool parseColorValue(StylePropertySet* declaration, int propertyId, const String& string, bool important, bool strict, CSSStyleSheet* contextStyleSheet = 0)
 {
     if (!string.length())
         return false;
@@ -346,7 +346,7 @@ static bool parseColorValue(CSSMutableStyleDeclaration* declaration, int propert
         validPrimitive = true;
     }
 
-    CSSStyleSheet* styleSheet = contextStyleSheet ? contextStyleSheet : declaration->parentStyleSheet();
+    CSSStyleSheet* styleSheet = contextStyleSheet ? contextStyleSheet : declaration->contextStyleSheet();
     if (!styleSheet)
         return false;
     Document* document = styleSheet->findDocument();
@@ -409,7 +409,7 @@ static inline bool isSimpleLengthPropertyID(int propertyId, bool& acceptsNegativ
     }
 }
 
-static bool parseSimpleLengthValue(CSSMutableStyleDeclaration* declaration, int propertyId, const String& string, bool important, bool strict, CSSStyleSheet* contextStyleSheet = 0)
+static bool parseSimpleLengthValue(StylePropertySet* declaration, int propertyId, const String& string, bool important, bool strict)
 {
     bool acceptsNegativeNumbers;
     unsigned length = string.length();
@@ -473,7 +473,7 @@ static bool parseSimpleLengthValue(CSSMutableStyleDeclaration* declaration, int 
     if (number < 0 && !acceptsNegativeNumbers)
         return false;
 
-    CSSStyleSheet* styleSheet = contextStyleSheet ? contextStyleSheet : declaration->parentStyleSheet();
+    CSSStyleSheet* styleSheet = declaration->contextStyleSheet();
     if (!styleSheet)
         return false;
     Document* document = styleSheet->findDocument();
@@ -484,21 +484,7 @@ static bool parseSimpleLengthValue(CSSMutableStyleDeclaration* declaration, int 
     return true;
 }
 
-bool CSSParser::parseMappedAttributeValue(CSSMappedAttributeDeclaration* mappedAttribute, StyledElement* element, int propertyId, const String& value)
-{
-    ASSERT(mappedAttribute);
-    ASSERT(element);
-    ASSERT(element->document());
-    CSSStyleSheet* elementSheet = element->document()->elementSheet();
-    if (parseSimpleLengthValue(mappedAttribute->declaration(), propertyId, value, false, false, elementSheet))
-        return true;
-    if (parseColorValue(mappedAttribute->declaration(), propertyId, value, false, false, elementSheet))
-        return true;
-    CSSParser parser(false);
-    return parser.parseValue(mappedAttribute->declaration(), propertyId, value, false, elementSheet);
-}
-
-bool CSSParser::parseValue(CSSMutableStyleDeclaration* declaration, int propertyId, const String& string, bool important, bool strict)
+bool CSSParser::parseValue(StylePropertySet* declaration, int propertyId, const String& string, bool important, bool strict)
 {
     if (parseSimpleLengthValue(declaration, propertyId, string, important, strict))
         return true;
@@ -508,12 +494,12 @@ bool CSSParser::parseValue(CSSMutableStyleDeclaration* declaration, int property
     return parser.parseValue(declaration, propertyId, string, important);
 }
 
-bool CSSParser::parseValue(CSSMutableStyleDeclaration* declaration, int propertyId, const String& string, bool important, CSSStyleSheet* contextStyleSheet)
+bool CSSParser::parseValue(StylePropertySet* declaration, int propertyId, const String& string, bool important, CSSStyleSheet* contextStyleSheet)
 {
     if (contextStyleSheet)
         setStyleSheet(contextStyleSheet);
     else
-        setStyleSheet(declaration->parentStyleSheet());
+        setStyleSheet(declaration->contextStyleSheet());
 
     setupParser("@-webkit-value{", string, "} ");
 
@@ -608,7 +594,7 @@ void CSSParser::parseSelector(const String& string, Document* doc, CSSSelectorLi
     ASSERT(dummyStyleSheet->hasOneRef());
 }
 
-bool CSSParser::parseDeclaration(CSSMutableStyleDeclaration* declaration, const String& string, RefPtr<CSSStyleSourceData>* styleSourceData, CSSStyleSheet* contextStyleSheet)
+bool CSSParser::parseDeclaration(StylePropertySet* declaration, const String& string, RefPtr<CSSStyleSourceData>* styleSourceData, CSSStyleSheet* contextStyleSheet)
 {
     // Length of the "@-webkit-decls{" prefix.
     static const unsigned prefixLength = 15;
@@ -616,7 +602,7 @@ bool CSSParser::parseDeclaration(CSSMutableStyleDeclaration* declaration, const 
     if (contextStyleSheet)
         setStyleSheet(contextStyleSheet);
     else
-        setStyleSheet(declaration->parentStyleSheet());
+        setStyleSheet(declaration->contextStyleSheet());
     if (styleSourceData) {
         m_currentRuleData = CSSRuleSourceData::create();
         m_currentRuleData->styleSourceData = CSSStyleSourceData::create();
@@ -3390,7 +3376,7 @@ PassRefPtr<CSSValue> CSSParser::parseAnimationDelay()
 PassRefPtr<CSSValue> CSSParser::parseAnimationDirection()
 {
     CSSParserValue* value = m_valueList->current();
-    if (value->id == CSSValueNormal || value->id == CSSValueAlternate)
+    if (value->id == CSSValueNormal || value->id == CSSValueAlternate || value->id == CSSValueReverse || value->id == CSSValueAlternateReverse)
         return cssValuePool()->createIdentifierValue(value->id);
     return 0;
 }
@@ -4963,9 +4949,7 @@ bool CSSParser::fastParseColor(RGBA32& rgb, const String& name, bool strict)
     
 inline double CSSParser::parsedDouble(CSSParserValue *v, ReleaseParsedCalcValueCondition releaseCalc)
 {
-    // FIXME calc (http://webkit.org/b/16662): evaluate calc here, eg
-    // const double result = m_parsedCalculation ? m_parsedCalculation->doubleValue() : v->fValue;
-    const double result = m_parsedCalculation ? 0 : v->fValue;
+    const double result = m_parsedCalculation ? m_parsedCalculation->doubleValue() : v->fValue;
     if (releaseCalc == ReleaseParsedCalcValue)
         m_parsedCalculation.release();
     return result;
@@ -8847,7 +8831,7 @@ CSSRule* CSSParser::createStyleRule(Vector<OwnPtr<CSSParserSelector> >* selector
         rule->adoptSelectorVector(*selectors);
         if (m_hasFontFaceOnlyValues)
             deleteFontFaceOnlyValues();
-        rule->setDeclaration(CSSMutableStyleDeclaration::create(rule.get(), m_parsedProperties, m_numParsedProperties));
+        rule->setDeclaration(StylePropertySet::create(rule.get(), m_parsedProperties, m_numParsedProperties));
         result = rule.get();
         m_parsedRules.append(rule.release());
         if (m_ruleRangeMap) {
@@ -8886,7 +8870,7 @@ CSSRule* CSSParser::createFontFaceRule()
         }
     }
     RefPtr<CSSFontFaceRule> rule = CSSFontFaceRule::create(m_styleSheet);
-    rule->setDeclaration(CSSMutableStyleDeclaration::create(rule.get(), m_parsedProperties, m_numParsedProperties));
+    rule->setDeclaration(StylePropertySet::create(rule.get(), m_parsedProperties, m_numParsedProperties));
     clearProperties();
     CSSFontFaceRule* result = rule.get();
     m_parsedRules.append(rule.release());
@@ -8957,7 +8941,7 @@ CSSRule* CSSParser::createPageRule(PassOwnPtr<CSSParserSelector> pageSelector)
         Vector<OwnPtr<CSSParserSelector> > selectorVector;
         selectorVector.append(pageSelector);
         rule->adoptSelectorVector(selectorVector);
-        rule->setDeclaration(CSSMutableStyleDeclaration::create(rule.get(), m_parsedProperties, m_numParsedProperties));
+        rule->setDeclaration(StylePropertySet::create(rule.get(), m_parsedProperties, m_numParsedProperties));
         pageRule = rule.get();
         m_parsedRules.append(rule.release());
     }
@@ -9041,7 +9025,7 @@ WebKitCSSKeyframeRule* CSSParser::createKeyframeRule(CSSParserValueList* keys)
 
     RefPtr<WebKitCSSKeyframeRule> keyframe = WebKitCSSKeyframeRule::create(m_styleSheet);
     keyframe->setKeyText(keyString);
-    keyframe->setDeclaration(CSSMutableStyleDeclaration::create(keyframe.get(), m_parsedProperties, m_numParsedProperties));
+    keyframe->setDeclaration(StylePropertySet::create(keyframe.get(), m_parsedProperties, m_numParsedProperties));
 
     clearProperties();
 

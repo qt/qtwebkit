@@ -30,6 +30,7 @@
 
 #include "GraphicsLayer.h"
 #include "IntRect.h"
+#include "Timer.h"
 #include <wtf/Forward.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/Threading.h>
@@ -44,6 +45,8 @@ class FrameView;
 class GraphicsLayer;
 class Page;
 class PlatformWheelEvent;
+class ScrollingTree;
+class ScrollingTreeState;
 
 #if ENABLE(GESTURE_EVENTS)
 class PlatformGestureEvent;
@@ -56,8 +59,17 @@ public:
 
     void pageDestroyed();
 
+    ScrollingTree* scrollingTree() const;
+
     // Return whether this scrolling coordinator handles scrolling for the given frame view.
     bool coordinatesScrollingForFrameView(FrameView*) const;
+
+    // Should be called whenever the given frame view has been laid out.
+    void frameViewLayoutUpdated(FrameView*);
+
+    // Should be called whenever a wheel event handler is added or removed in the 
+    // frame view's underlying document.
+    void frameViewWheelEventHandlerCountChanged(FrameView*);
 
     // Should be called whenever the scroll layer for the given frame view changes.
     void frameViewScrollLayerDidChange(FrameView*, const GraphicsLayer*);
@@ -68,49 +80,24 @@ public:
     // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
     void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer* verticalScrollbarLayer);
 
-    // Should be called whenever the geometry of the given frame view changes,
-    // including the visible content rect and the content size.
-    void syncFrameViewGeometry(FrameView*);
-
-    // Can be called from any thread. Will try to handle the wheel event on the scrolling thread,
-    // and return false if the event must be sent again to the WebCore event handler.
-    bool handleWheelEvent(const PlatformWheelEvent&);
-
-#if ENABLE(GESTURE_EVENTS)
-    // Can be called from any thread. Will try to handle the gesture event on the scrolling thread,
-    // and return false if the event must be sent again to the WebCore event handler.
-    bool handleGestureEvent(const PlatformGestureEvent&);
-#endif
+    // Dispatched by the scrolling tree whenever the main frame scroll position changes.
+    void updateMainFrameScrollPosition(const IntPoint&);
 
 private:
     explicit ScrollingCoordinator(Page*);
 
-    // FIXME: Once we have a proper thread/run loop abstraction we should get rid of these
-    // functions and just use something like scrollingRunLoop()->dispatch(function);
-    static bool isScrollingThread();
-    static void dispatchOnScrollingThread(const Function<void()>&);
+    void recomputeWheelEventHandlerCount();
 
-    // The following functions can only be called from the main thread.
-    void didUpdateMainFrameScrollPosition();
+    void scheduleTreeStateCommit();
+    void scrollingTreeStateCommitterTimerFired(Timer<ScrollingCoordinator>*);
+    void commitTreeStateIfNeeded();
+    void commitTreeState();
 
-    // The following functions can only be called from the scrolling thread.
-    void scrollByOnScrollingThread(const IntSize& offset);
-
-    // This function must be called with the main frame geometry mutex held.
-    void updateMainFrameScrollLayerPositionOnScrollingThread(const FloatPoint&);
-
-private:
     Page* m_page;
+    RefPtr<ScrollingTree> m_scrollingTree;
 
-    Mutex m_mainFrameGeometryMutex;
-    IntRect m_mainFrameVisibleContentRect;
-    IntSize m_mainFrameContentsSize;
-#if PLATFORM(MAC)
-    RetainPtr<PlatformLayer> m_mainFrameScrollLayer;
-#endif
-
-    bool m_didDispatchDidUpdateMainFrameScrollPosition;
-    IntPoint m_mainFrameScrollPosition;
+    OwnPtr<ScrollingTreeState> m_scrollingTreeState;
+    Timer<ScrollingCoordinator> m_scrollingTreeStateCommitterTimer;
 };
 
 } // namespace WebCore

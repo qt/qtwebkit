@@ -21,8 +21,8 @@
 module html {
 
     interface [
-        HasIndexGetter,
-        HasOverridingNameGetter
+        IndexedGetter,
+        CustomNamedGetter
     ] HTMLFormElement : HTMLElement {
         readonly attribute HTMLCollection elements;
         readonly attribute long length;
@@ -31,14 +31,14 @@ module html {
         attribute [Reflect] boolean noValidate;
         attribute [Reflect=accept_charset] DOMString acceptCharset;
         attribute [Reflect, URL] DOMString action;
-        attribute [TreatNullAs=EmptyString] DOMString encoding;
-        attribute [TreatNullAs=EmptyString] DOMString enctype;
-        attribute [TreatNullAs=EmptyString] DOMString method;
+        attribute [TreatNullAs=NullString] DOMString encoding;
+        attribute [TreatNullAs=NullString] DOMString enctype;
+        attribute [TreatNullAs=NullString] DOMString method;
         attribute [Reflect] DOMString target;
         attribute [Reflect] DOMString autocomplete;
         
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
-        [ImplementationFunction=submitFromJavaScript] void submit();
+        [ImplementedAs=submitFromJavaScript] void submit();
 #else
         void submit();
 #endif

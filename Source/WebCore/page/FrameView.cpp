@@ -152,16 +152,17 @@ FrameView::FrameView(Frame* frame)
 {
     init();
 
-    if (m_frame) {
-        if (Page* page = m_frame->page()) {
-            m_page = page;
-            m_page->addScrollableArea(this);
+    // FIXME: Can m_frame ever be null here?
+    if (!m_frame)
+        return;
 
-            if (m_frame == m_page->mainFrame()) {
-                ScrollableArea::setVerticalScrollElasticity(ScrollElasticityAllowed);
-                ScrollableArea::setHorizontalScrollElasticity(ScrollElasticityAllowed);
-            }
-        }
+    Page* page = m_frame->page();
+    if (!page)
+        return;
+
+    if (m_frame == page->mainFrame()) {
+        ScrollableArea::setVerticalScrollElasticity(ScrollElasticityAllowed);
+        ScrollableArea::setHorizontalScrollElasticity(ScrollElasticityAllowed);
     }
 }
 
@@ -201,9 +202,6 @@ FrameView::~FrameView()
     
     ASSERT(!m_scrollCorner);
     ASSERT(m_actionScheduler->isEmpty());
-
-    if (m_page)
-        m_page->removeScrollableArea(this);
 
     if (m_frame) {
         ASSERT(m_frame->view() != this || !m_frame->contentRenderer());
@@ -321,21 +319,6 @@ void FrameView::detachCustomScrollbars()
         m_scrollCorner->destroy();
         m_scrollCorner = 0;
     }
-}
-
-void FrameView::didAddHorizontalScrollbar(Scrollbar* scrollbar)
-{
-    if (m_frame && m_frame->document())
-        m_frame->document()->didAddWheelEventHandler();
-    ScrollView::didAddHorizontalScrollbar(scrollbar);
-}
-
-void FrameView::willRemoveHorizontalScrollbar(Scrollbar* scrollbar)
-{
-    ScrollView::willRemoveHorizontalScrollbar(scrollbar);
-    // FIXME: maybe need a separate ScrollableArea::didRemoveHorizontalScrollbar callback?
-    if (m_frame && m_frame->document())
-        m_frame->document()->didRemoveWheelEventHandler();
 }
 
 void FrameView::recalculateScrollbarOverlayStyle()
@@ -1242,8 +1225,8 @@ void FrameView::removeWidgetToUpdate(RenderEmbeddedObject* object)
 void FrameView::zoomAnimatorTransformChanged(float scale, float x, float y, ZoomAnimationState state)
 {
     if (state == ZoomAnimationFinishing) {
-        m_page->setPageScaleFactor(m_page->pageScaleFactor() * scale,
-                                   IntPoint(scale * scrollX() - x, scale * scrollY() - y));
+        if (Page* page = m_frame->page())
+            page->setPageScaleFactor(page->pageScaleFactor() * scale, IntPoint(scale * scrollX() - x, scale * scrollY() - y));
         scrollAnimator()->resetZoom();
     }
 
@@ -2280,8 +2263,10 @@ void FrameView::performPostLayoutTasks()
         if (m_firstLayoutCallbackPending) {
             m_firstLayoutCallbackPending = false;
             m_frame->loader()->didFirstLayout();
-            if (Page* page = m_frame->page())
-                page->startCountingRelevantRepaintedObjects();
+            if (Page* page = m_frame->page()) {
+                if (page->mainFrame() == m_frame)
+                    page->startCountingRelevantRepaintedObjects();
+            }
         }
 
         // Ensure that we always send this eventually.
@@ -2304,6 +2289,13 @@ void FrameView::performPostLayoutTasks()
         if (updateWidgets())
             break;
     }
+
+#if ENABLE(THREADED_SCROLLING)
+    if (Page* page = m_frame->page()) {
+        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+            scrollingCoordinator->frameViewLayoutUpdated(this);
+    }
+#endif
 
     scrollToAnchor();
 
@@ -2542,6 +2534,12 @@ ScrollableArea* FrameView::enclosingScrollableArea() const
     return 0;
 }
 
+IntRect FrameView::scrollableAreaBoundingBox() const
+{
+    // FIXME: This isn't correct for transformed frames. We probably need to ask the renderer instead.
+    return frameRect();
+}
+
 bool FrameView::shouldSuspendScrollAnimations() const
 {
     return m_frame->loader()->state() != FrameStateComplete;
@@ -2566,18 +2564,16 @@ void FrameView::setAnimatorsAreActive()
     if (!page)
         return;
 
-    const HashSet<ScrollableArea*>* scrollableAreas = page->scrollableAreaSet();
-    if (!scrollableAreas)
+    scrollAnimator()->setIsActive();
+
+    if (!m_scrollableAreas)
         return;
 
-    HashSet<ScrollableArea*>::const_iterator end = scrollableAreas->end(); 
-    for (HashSet<ScrollableArea*>::const_iterator it = scrollableAreas->begin(); it != end; ++it) {
-        // FIXME: This extra check to make sure the ScrollableArea is on an active page needs 
-        // to be here as long as the ScrollableArea HashSet lives on Page. But it should really be
-        // moved to the top-level Document or a similar class that really represents a single 
-        // web page. https://bugs.webkit.org/show_bug.cgi?id=62762
-        if ((*it)->isOnActivePage())
-            (*it)->scrollAnimator()->setIsActive();
+    for (HashSet<ScrollableArea*>::const_iterator it = m_scrollableAreas->begin(), end = m_scrollableAreas->end(); it != end; ++it) {
+        ScrollableArea* scrollableArea = *it;
+
+        ASSERT(scrollableArea->isOnActivePage());
+        scrollableArea->scrollAnimator()->setIsActive();
     }
 }
 
@@ -2587,21 +2583,28 @@ void FrameView::notifyPageThatContentAreaWillPaint() const
     if (!page)
         return;
 
-    const HashSet<ScrollableArea*>* scrollableAreas = page->scrollableAreaSet();
-    if (!scrollableAreas)
+    contentAreaWillPaint();
+
+    if (!m_scrollableAreas)
         return;
 
-    HashSet<ScrollableArea*>::const_iterator end = scrollableAreas->end(); 
-    for (HashSet<ScrollableArea*>::const_iterator it = scrollableAreas->begin(); it != end; ++it)
-        (*it)->contentAreaWillPaint();
+    for (HashSet<ScrollableArea*>::const_iterator it = m_scrollableAreas->begin(), end = m_scrollableAreas->end(); it != end; ++it) {
+        ScrollableArea* scrollableArea = *it;
+
+        if (!scrollableArea->isOnActivePage())
+            continue;
+
+        scrollableArea->contentAreaWillPaint();
+    }
 }
 
 bool FrameView::scrollAnimatorEnabled() const
 {
 #if ENABLE(SMOOTH_SCROLLING)
-    if (m_page && m_page->settings())
-        return m_page->settings()->scrollAnimatorEnabled();
+    if (Page* page = m_frame->page())
+        return page->settings()->scrollAnimatorEnabled();
 #endif
+
     return false;
 }
 
@@ -3251,6 +3254,43 @@ void FrameView::setTracksRepaints(bool trackRepaints)
     
     m_trackedRepaintRects.clear();
     m_isTrackingRepaints = trackRepaints;
+}
+
+void FrameView::addScrollableArea(ScrollableArea* scrollableArea)
+{
+    if (!m_scrollableAreas)
+        m_scrollableAreas = adoptPtr(new ScrollableAreaSet);
+    m_scrollableAreas->add(scrollableArea);
+}
+
+void FrameView::removeScrollableArea(ScrollableArea* scrollableArea)
+{
+    if (!m_scrollableAreas)
+        return;
+    m_scrollableAreas->remove(scrollableArea);
+}
+
+bool FrameView::containsScrollableArea(ScrollableArea* scrollableArea) const
+{
+    if (!m_scrollableAreas)
+        return false;
+    return m_scrollableAreas->contains(scrollableArea);
+}
+
+void FrameView::addChild(PassRefPtr<Widget> widget)
+{
+    if (widget->isFrameView())
+        addScrollableArea(static_cast<FrameView*>(widget.get()));
+
+    ScrollView::addChild(widget);
+}
+
+void FrameView::removeChild(Widget* widget)
+{
+    if (widget->isFrameView())
+        removeScrollableArea(static_cast<FrameView*>(widget));
+
+    ScrollView::removeChild(widget);
 }
 
 bool FrameView::isVerticalDocument() const

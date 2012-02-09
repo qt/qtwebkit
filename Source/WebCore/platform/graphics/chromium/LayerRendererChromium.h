@@ -56,10 +56,6 @@
 #include <wtf/RetainPtr.h>
 #endif
 
-#if USE(SKIA)
-class GrContext;
-#endif
-
 namespace WebCore {
 
 class CCHeadsUpDisplay;
@@ -177,7 +173,7 @@ private:
     void setDrawViewportRect(const IntRect&, bool flipY);
 
     bool useRenderSurface(CCRenderSurface*);
-    void clearSurfaceForDebug(CCRenderSurface*, CCRenderSurface* rootRenderSurface, const FloatRect& surfaceDamageRect);
+    void clearRenderSurface(CCRenderSurface*, CCRenderSurface* rootRenderSurface, const FloatRect& surfaceDamageRect);
 
     void releaseRenderSurfaceTextures();
 

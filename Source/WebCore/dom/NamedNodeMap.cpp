@@ -30,7 +30,6 @@
 #include "Element.h"
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
-#include "StyledElement.h"
 
 namespace WebCore {
 
@@ -239,15 +238,12 @@ void NamedNodeMap::setAttributes(const NamedNodeMap& other)
     clearAttributes();
     unsigned newLength = other.length();
     m_attributes.resize(newLength);
+
+    // FIXME: These loops can probably be combined.
     for (unsigned i = 0; i < newLength; i++)
         m_attributes[i] = other.m_attributes[i]->clone();
-
-    // FIXME: This is wasteful.  The class list could be preserved on a copy, and we
-    // wouldn't have to waste time reparsing the attribute.
-    // The derived class, HTMLNamedNodeMap, which manages a parsed class list for the CLASS attribute,
-    // will update its member variable when parse attribute is called.
     for (unsigned i = 0; i < newLength; i++)
-        m_element->attributeChanged(m_attributes[i].get(), true);
+        m_element->attributeChanged(m_attributes[i].get());
 }
 
 void NamedNodeMap::addAttribute(PassRefPtr<Attribute> prpAttribute)
@@ -319,24 +315,6 @@ bool NamedNodeMap::mapsEquivalent(const NamedNodeMap* otherMap) const
     }
     
     return true;
-}
-
-CSSMutableStyleDeclaration* NamedNodeMap::ensureInlineStyleDecl()
-{
-    if (!attributeData()->m_inlineStyleDecl) {
-        ASSERT(m_element->isStyledElement());
-        attributeData()->m_inlineStyleDecl = CSSMutableStyleDeclaration::createInline(static_cast<StyledElement*>(m_element));
-        attributeData()->m_inlineStyleDecl->setStrictParsing(m_element->isHTMLElement() && !m_element->document()->inQuirksMode());
-    }
-    return attributeData()->m_inlineStyleDecl.get();
-}
-
-void NamedNodeMap::destroyInlineStyleDecl()
-{
-    if (!attributeData()->m_inlineStyleDecl)
-        return;
-    attributeData()->m_inlineStyleDecl->clearParentElement();
-    attributeData()->m_inlineStyleDecl = 0;
 }
 
 } // namespace WebCore

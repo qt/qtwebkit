@@ -31,8 +31,8 @@
 module storage {
     interface [
         Conditional=FILE_SYSTEM,
-        CustomToJS,
-        NoStaticTables
+        JSCustomToJS,
+        JSNoStaticTables
     ] EntrySync {
         readonly attribute boolean isFile;
         readonly attribute boolean isDirectory;
@@ -41,8 +41,8 @@ module storage {
         readonly attribute DOMFileSystemSync filesystem;
 
         Metadata getMetadata() raises (FileException);
-        EntrySync moveTo(in DirectoryEntrySync parent, in [ConvertUndefinedOrNullToNullString] DOMString name) raises (FileException);
-        EntrySync copyTo(in DirectoryEntrySync parent, in [ConvertUndefinedOrNullToNullString] DOMString name) raises (FileException);
+        EntrySync moveTo(in DirectoryEntrySync parent, in [TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString name) raises (FileException);
+        EntrySync copyTo(in DirectoryEntrySync parent, in [TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString name) raises (FileException);
         DOMString toURL();
         void remove() raises (FileException);
         DirectoryEntrySync getParent();

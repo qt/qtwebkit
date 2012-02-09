@@ -50,7 +50,7 @@ public:
 
     // WebCore::UserMediaClient ----------------------------------------------
     virtual void pageDestroyed();
-    virtual void requestUserMedia(PassRefPtr<WebCore::UserMediaRequest>, const WebCore::MediaStreamSourceVector&, const WebCore::MediaStreamSourceVector&);
+    virtual void requestUserMedia(PassRefPtr<WebCore::UserMediaRequest>, const WebCore::MediaStreamSourceVector& audioSources, const WebCore::MediaStreamSourceVector& videoSources);
     virtual void cancelUserMediaRequest(WebCore::UserMediaRequest*);
 
 private:

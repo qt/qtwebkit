@@ -28,15 +28,15 @@ module core {
 
     interface [
         Conditional=SHADOW_DOM,
-        EnabledAtRuntime=shadowDOM,
+        V8EnabledAtRuntime=shadowDOM,
         Constructor(in Element host),
         ConstructorRaisesException
-    ] ShadowRoot : Node {
+    ] ShadowRoot : DocumentFragment {
         readonly attribute Element host;
         Element getElementById(in [Optional=CallWithDefaultValue] DOMString elementId);
         NodeList getElementsByClassName(in [Optional=CallWithDefaultValue] DOMString className);
         NodeList getElementsByTagName(in [Optional=CallWithDefaultValue] DOMString tagName);
-        NodeList getElementsByTagNameNS(in [TreatNullAs=EmptyString,Optional=CallWithDefaultValue] DOMString namespaceURI,
+        NodeList getElementsByTagNameNS(in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString namespaceURI,
                                         in [Optional=CallWithDefaultValue] DOMString localName);
     };
 

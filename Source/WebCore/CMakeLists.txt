@@ -307,6 +307,7 @@ SET(WebCore_IDL_FILES
     html/canvas/Uint8ClampedArray.idl
 
     html/shadow/HTMLContentElement.idl
+    html/shadow/HTMLShadowElement.idl
 
     html/track/TextTrackList.idl
     html/track/TrackEvent.idl
@@ -452,7 +453,6 @@ SET(WebCore_SOURCES
     css/CSSInitialValue.cpp
     css/CSSLineBoxContainValue.cpp
     css/CSSMediaRule.cpp
-    css/CSSMutableStyleDeclaration.cpp
     css/CSSOMUtils.cpp
     css/CSSPageRule.cpp
     css/CSSParser.cpp
@@ -493,6 +493,7 @@ SET(WebCore_SOURCES
     css/SelectorChecker.cpp
     css/ShadowValue.cpp
     css/StyleMedia.cpp
+    css/StylePropertySet.cpp
     css/StyleSheet.cpp
     css/StyleSheetList.cpp
     css/WebKitCSSFilterValue.cpp
@@ -520,7 +521,6 @@ SET(WebCore_SOURCES
     dom/Comment.cpp
     dom/CompositionEvent.cpp
     dom/ContainerNode.cpp
-    dom/CSSMappedAttributeDeclaration.cpp
     dom/CustomEvent.cpp
     dom/DatasetDOMStringMap.cpp
     dom/DecodedDataDocumentParser.cpp
@@ -808,7 +808,6 @@ SET(WebCore_SOURCES
     html/ImageDocument.cpp
     html/ImageInputType.cpp
     html/InputType.cpp
-    html/IsIndexInputType.cpp
     html/LabelsNodeList.cpp
     html/LinkRelAttribute.cpp
     html/MediaController.cpp
@@ -867,6 +866,7 @@ SET(WebCore_SOURCES
     html/shadow/ContentInclusionSelector.cpp
     html/shadow/DetailsMarkerControl.cpp
     html/shadow/HTMLContentElement.cpp
+    html/shadow/HTMLShadowElement.cpp
     html/shadow/MediaControls.cpp
     html/shadow/MediaControlRootElement.cpp
     html/shadow/MeterShadowElement.cpp
@@ -900,6 +900,7 @@ SET(WebCore_SOURCES
     inspector/InspectorFileSystemAgent.cpp
     inspector/InspectorFrontendClientLocal.cpp
     inspector/InspectorFrontendHost.cpp
+    inspector/InspectorHistory.cpp
     inspector/InspectorIndexedDBAgent.cpp
     inspector/InspectorInstrumentation.cpp
     inspector/InspectorMemoryAgent.cpp
@@ -1585,6 +1586,7 @@ if (ENABLE_FILE_SYSTEM)
         fileapi/Entry.cpp
         fileapi/EntryArray.cpp
         fileapi/EntryArraySync.cpp
+        fileapi/EntryBase.cpp
         fileapi/EntrySync.cpp
         fileapi/FileEntry.cpp
         fileapi/FileEntrySync.cpp
@@ -2022,8 +2024,8 @@ IF (ENABLE_VIDEO)
         html/HTMLSourceElement.cpp
         html/HTMLVideoElement.cpp
         html/MediaFragmentURIParser.cpp
-        html/shadow/MediaControlElements.cpp
         html/TimeRanges.cpp
+        html/shadow/MediaControlElements.cpp
         platform/graphics/MediaPlayer.cpp
         rendering/RenderMedia.cpp
         rendering/RenderVideo.cpp
@@ -2137,21 +2139,27 @@ IF (ENABLE_WEBGL)
         ${DERIVED_SOURCES_WEBCORE_DIR}/glslang.cpp
         ${DERIVED_SOURCES_WEBCORE_DIR}/glslang_tab.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/CodeGenGLSL.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/BuiltInFunctionEmulator.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/CodeGenGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Compiler.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/debug.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/DetectRecursion.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/ForLoopUnroll.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/InfoSink.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Initialize.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/InitializeDll.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Intermediate.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/intermOut.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/IntermTraverse.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/MapLongVariableNames.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ossource_posix.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/OutputESSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/OutputGLSL.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/OutputGLSLBase.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/OutputHLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/parseConst.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ParseHelper.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/PoolAlloc.cpp
-        ${THIRDPARTY_DIR}/ANGLE/src/compiler/preprocessor
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/preprocessor/atom.c
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/preprocessor/cpp.c
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/preprocessor/cppstruct.c
@@ -2165,15 +2173,15 @@ IF (ENABLE_WEBGL)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ShaderLang.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/SymbolTable.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/VersionGLSL.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/TranslatorESSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/TranslatorGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/TranslatorHLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/UnfoldSelect.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/util.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ValidateLimitations.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/VariableInfo.cpp
-
         html/canvas/WebGLBuffer.cpp
-        html/canvas/WebGLCompressedTextures.cpp
+        html/canvas/WebGLCompressedTextureS3TC.cpp
         html/canvas/WebGLContextAttributes.cpp
         html/canvas/WebGLContextEvent.cpp
         html/canvas/WebGLContextGroup.cpp
@@ -2196,10 +2204,8 @@ IF (ENABLE_WEBGL)
         html/canvas/OESStandardDerivatives.cpp
         html/canvas/OESTextureFloat.cpp
         html/canvas/OESVertexArrayObject.cpp
-
         platform/graphics/ANGLEWebKitBridge.cpp
         platform/graphics/GraphicsContext3D.cpp
-        
         platform/graphics/gpu/DrawingBuffer.cpp
     )
     LIST(APPEND WebCore_IDL_FILES
@@ -2208,7 +2214,7 @@ IF (ENABLE_WEBGL)
         html/canvas/OESVertexArrayObject.idl
         html/canvas/WebGLActiveInfo.idl
         html/canvas/WebGLBuffer.idl
-        html/canvas/WebGLCompressedTextures.idl
+        html/canvas/WebGLCompressedTextureS3TC.idl
         html/canvas/WebGLContextAttributes.idl
         html/canvas/WebGLContextEvent.idl
         html/canvas/WebGLDebugRendererInfo.idl

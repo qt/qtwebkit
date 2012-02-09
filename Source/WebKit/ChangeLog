@@ -1,3 +1,177 @@
+2012-02-08  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Upstream BlackBerry WebCoreSupport FrameNetworkingContextBlackBerry and IconDatabaseClientBlackBerry classes
+        https://bugs.webkit.org/show_bug.cgi?id=78049
+
+        Reviewed by Rob Buis.
+
+        Initial upstream, no new tests.
+
+        * blackberry/WebCoreSupport/FrameNetworkingContextBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/FrameNetworkingContextBlackBerry.h: Added.
+        * blackberry/WebCoreSupport/IconDatabaseClientBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/IconDatabaseClientBlackBerry.h: Added.
+
+2012-02-08  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Upstream InspectorClientBlackBerry.{h, cpp}
+        https://bugs.webkit.org/show_bug.cgi?id=78082
+
+        Reviewed by Rob Buis.
+
+        Initial upstream, no new tests.
+
+        * blackberry/WebCoreSupport/InspectorClientBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/InspectorClientBlackBerry.h: Added.
+
+2012-02-08  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Remove EditCommandBlackBerry.cpp from build system
+        https://bugs.webkit.org/show_bug.cgi?id=78078
+
+        Reviewed by Rob Buis.
+
+        WebKit/blackberry/WebCoreSupport/EditCommandBlackBerry.cpp which hasn't
+        been upstreamed has been removed from the BlackBerry porting internally.
+        So we should remove it from the build system.
+
+        * blackberry/CMakeListsBlackBerry.txt:
+
+2012-02-08  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Upstream DumpRenderTreeBlackBerry
+        https://bugs.webkit.org/show_bug.cgi?id=78042
+
+        Reviewed by Antonio Gomes.
+
+        Add abstract interface for our DumpRenderTree solution.
+
+        * blackberry/Api/DumpRenderTreeClient.h: Added.
+
+2012-02-08  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        Initial upstreaming of input handling for BlackBerry port
+        https://bugs.webkit.org/show_bug.cgi?id=77992
+
+        Reviewed by Rob Buis.
+
+        * blackberry/WebKitSupport/InputHandler.cpp: Added.
+        * blackberry/WebKitSupport/InputHandler.h: Added.
+
+2012-02-07  Robert Kroeger  <rjkroege@chromium.org>
+
+        [chromium] Remove no longer necessary Chromium gesture recognizer code.
+        https://bugs.webkit.org/show_bug.cgi?id=77492
+
+        Reviewed by Adam Barth.
+
+        * blackberry/WebCoreSupport/AboutDataEnableFeatures.in:
+
+2012-02-07  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Upstream ChromeClientBlackBerry.{h, cpp}
+        https://bugs.webkit.org/show_bug.cgi?id=77843
+
+        Reviewed by Rob Buis.
+
+        Initial upstream, no new tests.
+
+        * blackberry/WebCoreSupport/ChromeClientBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/ChromeClientBlackBerry.h: Added.
+
+2012-02-07  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Upstream DumpRenderTreeSupport
+        https://bugs.webkit.org/show_bug.cgi?id=77991
+
+        Reviewed by Antonio Gomes.
+
+        No functionalities changed, no new tests.
+
+        * blackberry/WebKitSupport/DumpRenderTreeSupport.cpp: Added.
+        (toGeolocationClientMock):
+        (DumpRenderTreeSupport::DumpRenderTreeSupport):
+        (DumpRenderTreeSupport::~DumpRenderTreeSupport):
+        (DumpRenderTreeSupport::javaScriptObjectsCount):
+        (DumpRenderTreeSupport::garbageCollectorCollect):
+        (DumpRenderTreeSupport::garbageCollectorCollectOnAlternateThread):
+        (DumpRenderTreeSupport::setLinksIncludedInFocusChain):
+        (DumpRenderTreeSupport::linksIncludedInFocusChain):
+        (DumpRenderTreeSupport::dumpConfigurationForViewport):
+        (DumpRenderTreeSupport::numberOfPendingGeolocationPermissionRequests):
+        (DumpRenderTreeSupport::resetGeolocationMock):
+        (DumpRenderTreeSupport::setMockGeolocationError):
+        (DumpRenderTreeSupport::setMockGeolocationPermission):
+        (DumpRenderTreeSupport::setMockGeolocationPosition):
+        (DumpRenderTreeSupport::scalePageBy):
+        (DumpRenderTreeSupport::computedStyleIncludingVisitedInfo):
+        * blackberry/WebKitSupport/DumpRenderTreeSupport.h: Added.
+        (WebKit):
+        (WebCore):
+        (WTF):
+        (DumpRenderTreeSupport):
+
+2012-02-07  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Upstream BlackBerry WebCoreSupport DeviceOrientationClientBlackBerry and DeviceMotionClientBlackBerry classes
+        https://bugs.webkit.org/show_bug.cgi?id=77993
+
+        Reviewed by Rob Buis.
+
+        Initial upstream, no new tests.
+
+        * blackberry/WebCoreSupport/DeviceMotionClientBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/DeviceMotionClientBlackBerry.h: Added.
+        * blackberry/WebCoreSupport/DeviceOrientationClientBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/DeviceOrientationClientBlackBerry.h: Added.
+
+2012-02-06  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Use WebPagePrivate instead of WebPage in GeolocationControllerClientBlackBerry
+        https://bugs.webkit.org/show_bug.cgi?id=77927
+
+        Reviewed by Antonio Gomes.
+
+        WebKit/blackberry/Api/WebPage which has a d pointer is designed for public API.
+        GeolocationControllerClientBlackBerry in WebKit/blackberry/WebCoreSupport should
+        use the d pointer directly because the client is internal implementation.
+
+        No functionalities changed, no new tests.
+
+        * blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.cpp:
+        (GeolocationControllerClientBlackBerry::GeolocationControllerClientBlackBerry):
+        (GeolocationControllerClientBlackBerry::requestPermission):
+        (GeolocationControllerClientBlackBerry::cancelPermissionRequest):
+        (GeolocationControllerClientBlackBerry::onLocationUpdate):
+        (GeolocationControllerClientBlackBerry::onLocationError):
+        * blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.h:
+        (WebKit):
+        (GeolocationControllerClientBlackBerry):
+
+2012-02-06  Robin Cao  <robin.cao@torchmobile.com.cn>
+
+        [BlackBerry] Remove unused variable in BackingStore
+        https://bugs.webkit.org/show_bug.cgi?id=77851
+
+        Reviewed by Kentaro Hara.
+
+        * blackberry/Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::blitContents):
+
+2012-02-04  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Upstream BlackBerry WebCoreSupport ClientExtension and GeolocationControllerClientBlackBerry classes
+        https://bugs.webkit.org/show_bug.cgi?id=77751
+
+        Reviewed by Rob Buis.
+
+        Initial upstream, no new tests.
+
+        * blackberry/WebCoreSupport/ClientExtension.cpp: Added.
+        * blackberry/WebCoreSupport/ClientExtension.h: Added.
+        * blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.cpp: Added.
+        * blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.h: Added.
+
 2012-01-11  Jacky Jiang  <zhajiang@rim.com>
 
         [BlackBerry] ASSERT failure in BackingStorePrivate::blitVisibleContents()

@@ -382,7 +382,7 @@ void SVGSMILElement::parseBeginOrEnd(const String& parseString, BeginOrEnd begin
     sortTimeList(timeList);
 }
 
-void SVGSMILElement::parseMappedAttribute(Attribute* attr)
+void SVGSMILElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == SVGNames::beginAttr) {
         if (!m_conditions.isEmpty()) {
@@ -403,13 +403,13 @@ void SVGSMILElement::parseMappedAttribute(Attribute* attr)
         if (inDocument())
             connectConditions();
     } else
-        SVGElement::parseMappedAttribute(attr);
+        SVGElement::parseAttribute(attr);
 }
 
-void SVGSMILElement::attributeChanged(Attribute* attr, bool preserveDecls)
+void SVGSMILElement::attributeChanged(Attribute* attr)
 {
-    SVGElement::attributeChanged(attr, preserveDecls);
-    
+    SVGElement::attributeChanged(attr);
+
     const QualifiedName& attrName = attr->name();
     if (attrName == SVGNames::durAttr)
         m_cachedDur = invalidCachedTime;

@@ -32,8 +32,6 @@
 
 namespace JSC { namespace DFG {
 
-#ifndef NDEBUG
-
 // Creates an array of stringized names.
 static const char* dfgOpNames[] = {
 #define STRINGIZE_DFG_OP_ENUM(opcode, flags) #opcode ,
@@ -165,16 +163,16 @@ void Graph::dump(NodeIndex nodeIndex, CodeBlock* codeBlock)
                 printf(", ");
             else
                 hasPrinted = true;
-            printf("@%u", m_varArgChildren[childIdx]);
+            printf("@%u", m_varArgChildren[childIdx].index());
         }
     } else {
-        if (node.child1() != NoNode)
-            printf("@%u", node.child1());
-        if (node.child2() != NoNode)
-            printf(", @%u", node.child2());
-        if (node.child3() != NoNode)
-            printf(", @%u", node.child3());
-        hasPrinted = node.child1() != NoNode;
+        if (!!node.child1())
+            printf("@%u", node.child1().index());
+        if (!!node.child2())
+            printf(", @%u", node.child2().index());
+        if (!!node.child3())
+            printf(", @%u", node.child3().index());
+        hasPrinted = !!node.child1();
     }
 
     if (node.hasArithNodeFlags()) {
@@ -298,8 +296,6 @@ void Graph::dump(CodeBlock* codeBlock)
         dump(i, codeBlock);
 }
 
-#endif
-
 // FIXME: Convert this to be iterative, not recursive.
 #define DO_TO_CHILDREN(node, thingToDo) do {                            \
         Node& _node = (node);                                           \
@@ -309,20 +305,20 @@ void Graph::dump(CodeBlock* codeBlock)
                  _childIdx++)                                           \
                 thingToDo(m_varArgChildren[_childIdx]);                 \
         } else {                                                        \
-            if (_node.child1() == NoNode) {                             \
-                ASSERT(_node.child2() == NoNode                         \
-                       && _node.child3() == NoNode);                    \
+            if (!_node.child1()) {                                      \
+                ASSERT(!_node.child2()                                  \
+                       && !_node.child3());                             \
                 break;                                                  \
             }                                                           \
             thingToDo(_node.child1());                                  \
                                                                         \
-            if (_node.child2() == NoNode) {                             \
-                ASSERT(_node.child3() == NoNode);                       \
+            if (!_node.child2()) {                                      \
+                ASSERT(!_node.child3());                                \
                 break;                                                  \
             }                                                           \
             thingToDo(_node.child2());                                  \
                                                                         \
-            if (_node.child3() == NoNode)                               \
+            if (!_node.child3())                                        \
                 break;                                                  \
             thingToDo(_node.child3());                                  \
         }                                                               \

@@ -34,6 +34,8 @@
 
 #include "PlatformContextSkia.h"
 
+#include "SkCanvas.h"
+#include "SkColorFilter.h"
 #include "SkShader.h"
 
 namespace WebCore {
@@ -133,10 +135,19 @@ static inline bool paintIsOpaque(const SkPaint& paint, const SkBitmap* bitmap = 
         return false;
     if (bitmap && !bitmap->isOpaque())
         return false;
+    if (paint.getLooper())
+        return false;
+    if (paint.getImageFilter())
+        return false;
+    if (paint.getMaskFilter())
+        return false;
+    SkColorFilter* colorFilter = paint.getColorFilter();
+    if (colorFilter && !(colorFilter->getFlags() & SkColorFilter::kAlphaUnchanged_Flag))
+        return false;
     return true;
 }
 
-void OpaqueRegionSkia::didDrawRect(const PlatformContextSkia* context, const SkRect& fillRect, const SkPaint& paint, const SkBitmap* bitmap)
+void OpaqueRegionSkia::didDrawRect(const PlatformContextSkia* context, const AffineTransform& transform, const SkRect& fillRect, const SkPaint& paint, const SkBitmap* bitmap)
 {
     // Any stroking may put alpha in pixels even if the filling part does not.
     if (paint.getStyle() != SkPaint::kFill_Style) {
@@ -148,21 +159,21 @@ void OpaqueRegionSkia::didDrawRect(const PlatformContextSkia* context, const SkR
         else {
             SkRect strokeRect;
             strokeRect = paint.computeFastBounds(fillRect, &strokeRect);
-            didDraw(context, strokeRect, paint, opaque, fillsBounds);
+            didDraw(context, transform, strokeRect, paint, opaque, fillsBounds);
         }
     }
 
     bool checkFillOnly = true;
     bool opaque = paintIsOpaque(paint, bitmap, checkFillOnly);
     bool fillsBounds = paint.getStyle() != SkPaint::kStroke_Style;
-    didDraw(context, fillRect, paint, opaque, fillsBounds);
+    didDraw(context, transform, fillRect, paint, opaque, fillsBounds);
 }
 
-void OpaqueRegionSkia::didDrawPath(const PlatformContextSkia* context, const SkPath& path, const SkPaint& paint)
+void OpaqueRegionSkia::didDrawPath(const PlatformContextSkia* context, const AffineTransform& transform, const SkPath& path, const SkPaint& paint)
 {
     SkRect rect;
     if (path.isRect(&rect)) {
-        didDrawRect(context, rect, paint, 0);
+        didDrawRect(context, transform, rect, paint, 0);
         return;
     }
 
@@ -173,11 +184,11 @@ void OpaqueRegionSkia::didDrawPath(const PlatformContextSkia* context, const SkP
         didDrawUnbounded(paint, opaque);
     else {
         rect = paint.computeFastBounds(path.getBounds(), &rect);
-        didDraw(context, rect, paint, opaque, fillsBounds);
+        didDraw(context, transform, rect, paint, opaque, fillsBounds);
     }
 }
 
-void OpaqueRegionSkia::didDrawPoints(const PlatformContextSkia* context, SkCanvas::PointMode mode, int numPoints, const SkPoint points[], const SkPaint& paint)
+void OpaqueRegionSkia::didDrawPoints(const PlatformContextSkia* context, const AffineTransform& transform, SkCanvas::PointMode mode, int numPoints, const SkPoint points[], const SkPaint& paint)
 {
     if (!numPoints)
         return;
@@ -202,11 +213,11 @@ void OpaqueRegionSkia::didDrawPoints(const PlatformContextSkia* context, SkCanva
         didDrawUnbounded(paint, opaque);
     else {
         rect = paint.computeFastBounds(rect, &rect);
-        didDraw(context, rect, paint, opaque, fillsBounds);
+        didDraw(context, transform, rect, paint, opaque, fillsBounds);
     }
 }
 
-void OpaqueRegionSkia::didDrawBounded(const PlatformContextSkia* context, const SkRect& bounds, const SkPaint& paint)
+void OpaqueRegionSkia::didDrawBounded(const PlatformContextSkia* context, const AffineTransform& transform, const SkRect& bounds, const SkPaint& paint)
 {
     bool opaque = paintIsOpaque(paint);
     bool fillsBounds = false;
@@ -216,16 +227,38 @@ void OpaqueRegionSkia::didDrawBounded(const PlatformContextSkia* context, const 
     else {
         SkRect rect;
         rect = paint.computeFastBounds(bounds, &rect);
-        didDraw(context, rect, paint, opaque, fillsBounds);
+        didDraw(context, transform, rect, paint, opaque, fillsBounds);
     }
 }
 
-void OpaqueRegionSkia::didDraw(const PlatformContextSkia* context, const SkRect& rect, const SkPaint& paint, bool drawsOpaque, bool fillsBounds)
+void OpaqueRegionSkia::didDraw(const PlatformContextSkia* context, const AffineTransform& transform, const SkRect& rect, const SkPaint& paint, bool drawsOpaque, bool fillsBounds)
 {
+    SkRect targetRect = rect;
+
+    // Apply the current clip.
+    if (context->canvas()->getClipType() != SkCanvas::kRect_ClipType)
+        fillsBounds = false;
+    else {
+        SkIRect deviceClip;
+        context->canvas()->getClipDeviceBounds(&deviceClip);
+        if (!targetRect.intersect(SkIntToScalar(deviceClip.fLeft), SkIntToScalar(deviceClip.fTop), SkIntToScalar(deviceClip.fRight), SkIntToScalar(deviceClip.fBottom)))
+            return;
+    }
+    if (!context->clippedToImage().isOpaque())
+        fillsBounds = false;
+
+    // Apply the transforms.
+    SkMatrix canvasTransform = context->canvas()->getTotalMatrix();
+    if (!canvasTransform.mapRect(&targetRect))
+        fillsBounds = false;
+    SkMatrix canvasToTargetTransform = transform;
+    if (!canvasToTargetTransform.mapRect(&targetRect))
+        fillsBounds = false;
+
     if (fillsBounds && xfermodeIsOpaque(paint, drawsOpaque))
-        markRectAsOpaque(context, rect);
-    else if (SkRect::Intersects(rect, m_opaqueRect) && !xfermodePreservesOpaque(paint, drawsOpaque))
-        markRectAsNonOpaque(rect);
+        markRectAsOpaque(targetRect);
+    else if (SkRect::Intersects(targetRect, m_opaqueRect) && !xfermodePreservesOpaque(paint, drawsOpaque))
+        markRectAsNonOpaque(targetRect);
 }
 
 void OpaqueRegionSkia::didDrawUnbounded(const SkPaint& paint, bool drawsOpaque)
@@ -236,7 +269,7 @@ void OpaqueRegionSkia::didDrawUnbounded(const SkPaint& paint, bool drawsOpaque)
     }
 }
 
-void OpaqueRegionSkia::markRectAsOpaque(const PlatformContextSkia* context, const SkRect& rect)
+void OpaqueRegionSkia::markRectAsOpaque(const SkRect& rect)
 {
     // We want to keep track of an opaque region but bound its complexity at a constant size.
     // We keep track of the largest rectangle seen by area. If we can add the new rect to this
@@ -244,8 +277,6 @@ void OpaqueRegionSkia::markRectAsOpaque(const PlatformContextSkia* context, cons
     // without increasing the complexity.
 
     if (rect.isEmpty())
-        return;
-    if (!context->clippedToImage().isOpaque())
         return;
     if (m_opaqueRect.contains(rect))
         return;

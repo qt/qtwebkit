@@ -31,7 +31,6 @@
 
 #include "CDATASection.h"
 #include "CSSComputedStyleDeclaration.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSProperty.h"
 #include "CSSPropertyNames.h"
@@ -54,6 +53,7 @@
 #include "MarkupAccumulator.h"
 #include "Range.h"
 #include "RenderObject.h"
+#include "StylePropertySet.h"
 #include "TextIterator.h"
 #include "VisibleSelection.h"
 #include "XMLNSNames.h"
@@ -69,7 +69,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static bool propertyMissingOrEqualToNone(CSSMutableStyleDeclaration*, int propertyID);
+static bool propertyMissingOrEqualToNone(StylePropertySet*, int propertyID);
 
 class AttributeChange {
 public:
@@ -104,12 +104,11 @@ static void completeURLs(Node* node, const String& baseURL)
     for (Node* n = node; n != end; n = n->traverseNextNode()) {
         if (n->isElementNode()) {
             Element* e = static_cast<Element*>(n);
-            NamedNodeMap* attributes = e->updatedAttributes();
-            if (!attributes)
+            if (!e->hasAttributes())
                 continue;
-            unsigned length = attributes->length();
+            unsigned length = e->attributeCount();
             for (unsigned i = 0; i < length; i++) {
-                Attribute* attribute = attributes->attributeItem(i);
+                Attribute* attribute = e->attributeItem(i);
                 if (e->isURLAttribute(attribute))
                     changes.append(AttributeChange(e, attribute->name(), KURL(parsedBaseURL, attribute->value()).string()));
             }
@@ -129,11 +128,11 @@ public:
     Node* serializeNodes(Node* startNode, Node* pastEnd);
     virtual void appendString(const String& s) { return MarkupAccumulator::appendString(s); }
     void wrapWithNode(Node*, bool convertBlocksToInlines = false, RangeFullySelectsNode = DoesFullySelectNode);
-    void wrapWithStyleNode(CSSMutableStyleDeclaration*, Document*, bool isBlock = false);
+    void wrapWithStyleNode(StylePropertySet*, Document*, bool isBlock = false);
     String takeResults();
 
 private:
-    void appendStyleNodeOpenTag(StringBuilder&, CSSMutableStyleDeclaration*, Document*, bool isBlock = false);
+    void appendStyleNodeOpenTag(StringBuilder&, StylePropertySet*, Document*, bool isBlock = false);
     const String styleNodeCloseTag(bool isBlock = false);
     virtual void appendText(StringBuilder& out, Text*);
     String renderedText(const Node*, const Range*);
@@ -178,7 +177,7 @@ void StyledMarkupAccumulator::wrapWithNode(Node* node, bool convertBlocksToInlin
         m_nodes->append(node);
 }
 
-void StyledMarkupAccumulator::wrapWithStyleNode(CSSMutableStyleDeclaration* style, Document* document, bool isBlock)
+void StyledMarkupAccumulator::wrapWithStyleNode(StylePropertySet* style, Document* document, bool isBlock)
 {
     StringBuilder openTag;
     appendStyleNodeOpenTag(openTag, style, document, isBlock);
@@ -186,7 +185,7 @@ void StyledMarkupAccumulator::wrapWithStyleNode(CSSMutableStyleDeclaration* styl
     appendString(styleNodeCloseTag(isBlock));
 }
 
-void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, CSSMutableStyleDeclaration* style, Document* document, bool isBlock)
+void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, StylePropertySet* style, Document* document, bool isBlock)
 {
     // wrappingStyleForSerialization should have removed -webkit-text-decorations-in-effect
     ASSERT(propertyMissingOrEqualToNone(style, CSSPropertyWebkitTextDecorationsInEffect));
@@ -289,12 +288,11 @@ void StyledMarkupAccumulator::appendElement(StringBuilder& out, Element* element
     const bool documentIsHTML = element->document()->isHTMLDocument();
     appendOpenTag(out, element, 0);
 
-    NamedNodeMap* attributes = element->updatedAttributes();
-    const unsigned length = attributes ? attributes->length() : 0;
+    const unsigned length = element->hasAttributes() ? element->attributeCount() : 0;
     const bool shouldAnnotateOrForceInline = element->isHTMLElement() && (shouldAnnotate() || addDisplayInline);
     const bool shouldOverrideStyleAttr = shouldAnnotateOrForceInline || shouldApplyWrappingStyle(element);
     for (unsigned int i = 0; i < length; i++) {
-        Attribute* attribute = attributes->attributeItem(i);
+        Attribute* attribute = element->attributeItem(i);
         // We'll handle the style attribute separately, below.
         if (attribute->name() == styleAttr && shouldOverrideStyleAttr)
             continue;
@@ -467,7 +465,7 @@ static inline Node* ancestorToRetainStructureAndAppearanceWithNoRenderer(Node* c
     return ancestorToRetainStructureAndAppearanceForBlock(commonAncestorBlock);
 }
 
-static bool propertyMissingOrEqualToNone(CSSMutableStyleDeclaration* style, int propertyID)
+static bool propertyMissingOrEqualToNone(StylePropertySet* style, int propertyID)
 {
     if (!style)
         return false;

@@ -29,6 +29,7 @@
 #include "TextureManager.h"
 
 #include "LayerRendererChromium.h"
+#include "ManagedTexture.h"
 
 using namespace std;
 
@@ -103,6 +104,12 @@ TextureManager::TextureManager(size_t maxMemoryLimitBytes, size_t preferredMemor
 {
 }
 
+TextureManager::~TextureManager()
+{
+    for (HashSet<ManagedTexture*>::iterator it = m_registeredTextures.begin(); it != m_registeredTextures.end(); ++it)
+        (*it)->clearManager();
+}
+
 void TextureManager::setMaxMemoryLimitBytes(size_t memoryLimitBytes)
 {
     reduceMemoryToLimit(memoryLimitBytes);
@@ -113,6 +120,22 @@ void TextureManager::setMaxMemoryLimitBytes(size_t memoryLimitBytes)
 void TextureManager::setPreferredMemoryLimitBytes(size_t memoryLimitBytes)
 {
     m_preferredMemoryLimitBytes = memoryLimitBytes;
+}
+
+void TextureManager::registerTexture(ManagedTexture* texture)
+{
+    ASSERT(texture);
+    ASSERT(!m_registeredTextures.contains(texture));
+
+    m_registeredTextures.add(texture);
+}
+
+void TextureManager::unregisterTexture(ManagedTexture* texture)
+{
+    ASSERT(texture);
+    ASSERT(m_registeredTextures.contains(texture));
+
+    m_registeredTextures.remove(texture);
 }
 
 TextureToken TextureManager::getToken()
@@ -180,30 +203,6 @@ void TextureManager::reduceMemoryToLimit(size_t limit)
     }
 }
 
-unsigned TextureManager::replaceTexture(TextureToken newToken, TextureInfo newInfo)
-{
-    for (ListHashSet<TextureToken>::iterator lruIt = m_textureLRUSet.begin(); lruIt != m_textureLRUSet.end(); ++lruIt) {
-        TextureToken token = *lruIt;
-        TextureInfo info = m_textures.get(token);
-        if (info.isProtected)
-            continue;
-        if (!info.textureId)
-            continue;
-        if (newInfo.size != info.size || newInfo.format != info.format)
-            continue;
-        newInfo.textureId = info.textureId;
-#ifndef NDEBUG
-        newInfo.allocator = info.allocator;
-#endif
-        m_textures.remove(token);
-        m_textureLRUSet.remove(token);
-        m_textures.set(newToken, newInfo);
-        m_textureLRUSet.add(newToken);
-        return info.textureId;
-    }
-    return 0;
-}
-
 void TextureManager::addTexture(TextureToken token, TextureInfo info)
 {
     ASSERT(!m_textureLRUSet.contains(token));
@@ -268,10 +267,8 @@ unsigned TextureManager::allocateTexture(TextureAllocator* allocator, TextureTok
     return textureId;
 }
 
-bool TextureManager::requestTexture(TextureToken token, IntSize size, unsigned format, unsigned& textureId)
+bool TextureManager::requestTexture(TextureToken token, IntSize size, unsigned format)
 {
-    textureId = 0;
-
     if (size.width() > m_maxTextureSize || size.height() > m_maxTextureSize)
         return false;
 
@@ -297,13 +294,6 @@ bool TextureManager::requestTexture(TextureToken token, IntSize size, unsigned f
 #ifndef NDEBUG
     info.allocator = 0;
 #endif
-    // Avoid churning by reusing the texture if it is about to be reclaimed and
-    // it has the same size and format as the requesting texture.
-    if (m_memoryUseBytes + memoryRequiredBytes > m_preferredMemoryLimitBytes) {
-        textureId = replaceTexture(token, info);
-        if (textureId)
-            return true;
-    }
     addTexture(token, info);
     return true;
 }

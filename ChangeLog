@@ -1,3 +1,278 @@
+2012-02-09  Kent Tamura  <tkent@chromium.org>
+
+        Do not localize numbers in scientific notation
+        https://bugs.webkit.org/show_bug.cgi?id=78208
+
+        Reviewed by Hajime Morita.
+
+        * ManualTests/input-number-localization.html: Updated for scientific notation.
+
+2012-02-09  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Change lowercase variable with uppercase's.
+        https://bugs.webkit.org/show_bug.cgi?id=78198
+
+        Reviewed by Daniel Bates.
+
+        CMake variable is only written by uppercase.
+
+        * CMakeLists.txt:
+
+2012-02-07  MORITA Hajime  <morrita@google.com>
+
+        Replacement text should be available from the marker.
+        https://bugs.webkit.org/show_bug.cgi?id=77934
+
+        Reviewed by Kent Tamura.
+
+        * Source/autotools/symbols.filter: Added an exporting symbol.
+
+2012-02-07  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Use *bin* and *lib* directories for executable and libraries.
+        https://bugs.webkit.org/show_bug.cgi?id=77928
+
+        Reviewed by Daniel Bates.
+
+        CMake has used *Programs* directory for executable. In addition, shared libraries are being
+        built in source directory. It is better to set common places in order to maintain executable
+        and libraries. *bin* is for executable and *lib* is for library.
+
+        * CMakeLists.txt: Set library output path.
+        * Source/cmake/WebKitFS.cmake: Remove *Programs* creation.
+
+2012-02-07  Priit Laes  <plaes@plaes.org>
+
+        Get rid of Source/autotools/webkit.m4
+        https://bugs.webkit.org/show_bug.cgi?id=77833
+
+        Reviewed by Martin Robinson.
+
+        Move checks from webkit.m4 to configure.ac and modernize macros:
+          . Check for visibility flags after CXX has been defined
+          . Use PKG_PROG_PKG_CONFIG for pkg-config lookup
+          . Drop unused LIBFFTW_REQUIRED_VERSION
+          . Update ICU libs for mingw (bug 77837).
+          . Require Pango 1.21.0 (as per unicode backend)
+          . Bump minimum glib version due to g_thread_init changes
+
+        * Source/autotools/webkit.m4: Removed.
+        * configure.ac:
+
+2012-02-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Dashboard on perf-o-matic should be sorted
+        https://bugs.webkit.org/show_bug.cgi?id=77924
+
+        Reviewed by Tony Chang.
+
+        Sort tests in the frontend using the fact ES5 keeps the property order in the insertion order.
+
+        * Websites/webkit-perf.appspot.com/js/config.js:
+        (fetchDashboardManifest):
+
+2012-02-07  Frederik Gladhorn  <frederik.gladhorn@nokia.com>
+
+        Update .gitignore for Qt Creator/KDevelop.
+        https://bugs.webkit.org/show_bug.cgi?id=77984
+
+        Reviewed by Simon Hausmann.
+
+        * .gitignore: Ignore temp files created by Qt Creator and KDevelop.
+
+2012-02-07  Priit Laes  <plaes@plaes.org>
+
+        [GTK] Broken "HTML5 <scoped style>" detection
+        https://bugs.webkit.org/show_bug.cgi?id=77979
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Fix wrong variable for HTML5 <style scoped> detection
+
+2012-02-06  Shinya Kawanaka  <shinyak@google.com>
+
+        Remove Element::ensureShadowRoot export.
+        https://bugs.webkit.org/show_bug.cgi?id=77932
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter:
+
+2012-02-06  Martin Robinson  <mrobinson@igalia.com> and Nayan Kumar K  <nayankk@motorola.com>
+
+        [GTK] Add TextureMapperGL implementation
+        https://bugs.webkit.org/show_bug.cgi?id=75308
+
+        Reviewed by Alejandro G. Castro.
+
+        * GNUmakefile.am: TextureMapperGL implies USE(TEXTURE_MAPPER)
+        * configure.ac: Only allow enabling the GL version of TextureMapper on X11.
+
+2012-02-06  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic should show min/max/stdev on graphs
+        https://bugs.webkit.org/show_bug.cgi?id=77702
+
+        Reviewed by Andreas Kling.
+
+        Include min/max/stdev in test runs when available to be shown on the perf-o-matic.
+
+        Also merge a change to config.js and increment the version number by 1 (unreviewed).
+
+        * Websites/webkit-perf.appspot.com/app.yaml:
+        * Websites/webkit-perf.appspot.com/js/config.js:
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.get):
+
+2012-02-06  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Update NEWS and configure.ac for 1.7.5 release
+        https://bugs.webkit.org/show_bug.cgi?id=77859
+
+        Reviewed by Philippe Normand.
+
+        * configure.ac: Bumped version number.
+
+2012-02-05  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [EFL] Enable WebGL with glx backend
+        https://bugs.webkit.org/show_bug.cgi?id=77308
+
+        Reviewed by Martin Robinson.
+
+        Enabled WebGL feature for EFL port. The way is very similar to the one of GTK port.
+
+        * Source/cmake/OptionsEfl.cmake: Added feature option for WebGL.
+
+2012-02-05  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Support javascriptcore test for EFL port. 
+        https://bugs.webkit.org/show_bug.cgi?id=77425
+
+        Reviewed by Daniel Bates.
+
+        Efl and WinCE as well as Blackberry port are now using Cmake as its build system
+        and they are share the make file to create jsc excutable. In order to run
+        "run-javascriptcore-tests", EFL port needs to change jsc installation configuration
+        with executable output directory(e.g. Programs). So, this patch change jsc installation
+        configuration only for EFL port.
+
+        * Source/cmake/OptionsEfl.cmake: Change *jsc_efl* name with *jsc*.
+
+2012-02-05  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Do not build Tools when building jsc only. 
+        https://bugs.webkit.org/show_bug.cgi?id=77826
+
+        Reviewed by Daniel Bates.
+
+        Do not build Tools when jsc is only built. Build breaks occur because
+        Tools is built together when building jsc.
+
+        * CMakeLists.txt: Build Tools directory when ENABLE_TOOLS is on.
+
+2012-02-04  Philip Rogers  <pdr@google.com>
+
+        Fix bug in svg-link-hover-use.svg
+        https://bugs.webkit.org/show_bug.cgi?id=77768
+
+        Reviewed by Eric Seidel.
+
+        * ManualTests/svg-link-hover-use.svg:
+
+2012-02-04  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] Use the wide character version of win32 API by default
+        https://bugs.webkit.org/show_bug.cgi?id=77809
+
+        Reviewed by Martin Robinson.
+
+        Certain win32-specific files (like PluginDatabaseWin.cpp) make the
+        assumption that the wide character version of win32 API is the default.
+        Define _UNICODE and UNICODE to do this, similar to what other win32
+        ports are doing.
+
+        * GNUmakefile.am:
+
+2012-02-03  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] configure: Print out the -Wno-c++0x-compat test result
+        https://bugs.webkit.org/show_bug.cgi?id=77757
+
+        Reviewed by Martin Robinson.
+
+        The check whether -Wno-c++0x-compat flag is needed didn't print out
+        the test result (and newline), which caused the following test to be
+        displayed on the same line.
+
+        checking if we have to disable C++0x compat warnings for GCC >= 4.6.0... checking pthread.h usability... yes
+
+        * configure.ac:
+
+2012-02-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        perf-o-matic should store chromium svn revision
+        https://bugs.webkit.org/show_bug.cgi?id=77725
+
+        Reviewed by Dirk Pranke.
+
+        Store both WebKit and Chromium revisions when both are reported.
+
+        * Websites/webkit-perf.appspot.com/models.py:
+        (Build):
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+        (ReportHandler._create_build_if_possible):
+        (ReportHandler._create_build_if_possible.execute):
+        * Websites/webkit-perf.appspot.com/static/manual-submit.html:
+
+2012-02-03  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Replace GNU linker script for exports with export macros in WTF/JSC
+        https://bugs.webkit.org/show_bug.cgi?id=77723
+
+        Reviewed by Tor Arne Vestbø.
+
+        * Source/api.pri: Remove use of GNU linker script on Linux.
+        * Source/qtwebkit-export.map: Removed.
+
+2012-02-03  Shinya Kawanaka  <shinyak@google.com>
+
+        Stop calling Element::ensureShadowRoot in Internals.
+        https://bugs.webkit.org/show_bug.cgi?id=77612
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter:
+
+2012-02-02  Mark Rowe  <mrowe@apple.com>
+
+        <http://webkit.org/b/77717> Makefile should provide control over output verbosity
+
+        Allow the filtering of the output of our Makefile to be configured via a user default
+        and overriden via a command-line argument to make.
+
+        The Makefile takes the verbosity from BuildTranscriptVerbosity default in the
+        org.webkit.BuildConfiguration domain. The supported values are "default", "quiet"
+        and "noisy". "default" maintains the existing behavior of only filtering out
+        the setenv lines from Xcode's shell script build phases. "quiet" filters all output
+        through filter-build-webkit. "noisy" provides unfiltered output. The verbosity can
+        be overriden for a single invocation of make by specifying the VERBOSITY variable
+        on the make command line.
+
+        To always get full output:
+        defaults write org.webkit.BuildConfiguration BuildTranscriptVerbosity noisy
+
+        To always get filtered ouptut:
+        defaults write org.webkit.BuildConfiguration BuildTranscriptVerbosity quiet
+
+        To get full output for a single build:
+        make VERBOSITY=noisy
+
+        Reviewed by Dan Bernstein.
+
+        * Makefile.shared:
+
 2012-02-02  Rakesh KN  <rakesh.kn@motorola.com>
 
         hidden attribute on <input type=file /> suppresses the file selection dialog

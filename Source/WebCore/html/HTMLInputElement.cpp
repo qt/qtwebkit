@@ -502,7 +502,7 @@ void HTMLInputElement::updateType()
 
     if (hadType && !newType->canChangeFromAnotherType()) {
         // Set the attribute back to the old value.
-        // Useful in case we were called from inside parseMappedAttribute.
+        // Useful in case we were called from inside parseAttribute.
         setAttribute(typeAttr, type());
         return;
     }
@@ -545,14 +545,13 @@ void HTMLInputElement::updateType()
         registerForSuspensionCallbackIfNeeded();
 
     if (didRespectHeightAndWidth != m_inputType->shouldRespectHeightAndWidthAttributes()) {
-        NamedNodeMap* map = attributeMap();
-        ASSERT(map);
-        if (Attribute* height = map->getAttributeItem(heightAttr))
-            attributeChanged(height, false);
-        if (Attribute* width = map->getAttributeItem(widthAttr))
-            attributeChanged(width, false);
-        if (Attribute* align = map->getAttributeItem(alignAttr))
-            attributeChanged(align, false);
+        ASSERT(attributeMap());
+        if (Attribute* height = getAttributeItem(heightAttr))
+            attributeChanged(height);
+        if (Attribute* width = getAttributeItem(widthAttr))
+            attributeChanged(width);
+        if (Attribute* align = getAttributeItem(alignAttr))
+            attributeChanged(align);
     }
 
     if (wasAttached) {
@@ -659,31 +658,13 @@ void HTMLInputElement::accessKeyAction(bool sendMouseEvents)
     m_inputType->accessKeyAction(sendMouseEvents);
 }
 
-bool HTMLInputElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
-{
-    if (((attrName == heightAttr || attrName == widthAttr) && m_inputType->shouldRespectHeightAndWidthAttributes())
-        || attrName == vspaceAttr
-        || attrName == hspaceAttr) {
-        result = eUniversal;
-        return false;
-    }
-
-    if (attrName == alignAttr && m_inputType->shouldRespectAlignAttribute()) {
-        // Share with <img> since the alignment behavior is the same.
-        result = eReplaced;
-        return false;
-    }
-
-    return HTMLElement::mapToEntry(attrName, result);
-}
-
-void HTMLInputElement::parseMappedAttribute(Attribute* attr)
+void HTMLInputElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == nameAttr) {
         checkedRadioButtons().removeButton(this);
         m_name = attr->value();
         checkedRadioButtons().addButton(this);
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     } else if (attr->name() == autocompleteAttr) {
         if (equalIgnoringCase(attr->value(), "off")) {
             m_autocomplete = Off;
@@ -733,20 +714,26 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
     else if (attr->name() == usemapAttr || attr->name() == accesskeyAttr) {
         // FIXME: ignore for the moment
     } else if (attr->name() == vspaceAttr) {
-        addCSSLength(attr, CSSPropertyMarginTop, attr->value());
-        addCSSLength(attr, CSSPropertyMarginBottom, attr->value());
+        addCSSLength(CSSPropertyMarginTop, attr->value());
+        addCSSLength(CSSPropertyMarginBottom, attr->value());
     } else if (attr->name() == hspaceAttr) {
-        addCSSLength(attr, CSSPropertyMarginLeft, attr->value());
-        addCSSLength(attr, CSSPropertyMarginRight, attr->value());
+        addCSSLength(CSSPropertyMarginLeft, attr->value());
+        addCSSLength(CSSPropertyMarginRight, attr->value());
     } else if (attr->name() == alignAttr) {
         if (m_inputType->shouldRespectAlignAttribute())
             addHTMLAlignment(attr);
+        else
+            removeHTMLAlignment();
     } else if (attr->name() == widthAttr) {
         if (m_inputType->shouldRespectHeightAndWidthAttributes())
-            addCSSLength(attr, CSSPropertyWidth, attr->value());
+            addCSSLength(CSSPropertyWidth, attr->value());
+        else
+            removeCSSProperty(CSSPropertyWidth);
     } else if (attr->name() == heightAttr) {
         if (m_inputType->shouldRespectHeightAndWidthAttributes())
-            addCSSLength(attr, CSSPropertyHeight, attr->value());
+            addCSSLength(CSSPropertyHeight, attr->value());
+        else
+            removeCSSProperty(CSSPropertyHeight);
     } else if (attr->name() == borderAttr && isImageButton()) {
         applyBorderAttribute(attr);
     } else if (attr->name() == onsearchAttr) {
@@ -775,10 +762,10 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
         setNeedsValidityCheck();
     else if (attr->name() == disabledAttr) {
         m_inputType->disabledAttributeChanged();
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     } else if (attr->name() == readonlyAttr) {
         m_inputType->readonlyAttributeChanged();
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     }
 #if ENABLE(DATALIST)
     else if (attr->name() == listAttr)
@@ -805,7 +792,7 @@ void HTMLInputElement::parseMappedAttribute(Attribute* attr)
         setAttributeEventListener(eventNames().webkitspeechchangeEvent, createAttributeEventListener(this, attr));
 #endif
     else
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
     updateInnerTextValue();
 }
 
@@ -946,7 +933,7 @@ void HTMLInputElement::setChecked(bool nowChecked, bool sendChangeEvent)
 
 void HTMLInputElement::setIndeterminate(bool newValue)
 {
-    if (!m_inputType->isCheckable() || indeterminate() == newValue)
+    if (indeterminate() == newValue)
         return;
 
     m_isIndeterminate = newValue;
@@ -1254,13 +1241,6 @@ String HTMLInputElement::defaultValue() const
 void HTMLInputElement::setDefaultValue(const String &value)
 {
     setAttribute(valueAttr, value);
-}
-
-void HTMLInputElement::setInitialName(const AtomicString& name)
-{
-    ASSERT(hasTagName(isindexTag));
-    ASSERT(m_name.isNull());
-    m_name = name;
 }
 
 static inline bool isRFC2616TokenCharacter(UChar ch)
@@ -1827,6 +1807,11 @@ void HTMLInputElement::updateValueIfNeeded()
 String HTMLInputElement::defaultToolTip() const
 {
     return m_inputType->defaultToolTip();
+}
+
+bool HTMLInputElement::isIndeterminate() const 
+{
+    return m_inputType->supportsIndeterminateAppearance() && indeterminate();
 }
 
 } // namespace

@@ -69,6 +69,7 @@
 #include "PlatformWheelEvent.h"
 #include "PrintContext.h"
 #if USE(JSC)
+#include "PropertyDescriptor.h"
 #include "PutPropertySlot.h"
 #endif
 #include "RenderLayer.h"
@@ -336,7 +337,6 @@ void QWebFramePrivate::renderCompositedLayers(GraphicsContext* context, const In
     textureMapper->setGraphicsContext(context);
     textureMapper->setImageInterpolationQuality(context->imageInterpolationQuality());
     textureMapper->setTextDrawingMode(context->textDrawingMode());
-    textureMapper->setViewportSize(frame->view()->frameRect().size());
     QPainter* painter = context->platformContext();
     const QTransform transform = painter->worldTransform();
     const TransformationMatrix matrix(
@@ -518,8 +518,12 @@ void QWebFramePrivate::addQtSenderToGlobalObject()
     JSObjectRef function = JSObjectMakeFunctionWithCallback(context, propertyName.get(), qtSenderCallback);
 
     // JSC public API doesn't support setting a Getter for a property of a given object, https://bugs.webkit.org/show_bug.cgi?id=61374.
-    window->methodTable()->defineGetter(window, exec, propertyName.get()->identifier(&exec->globalData()), ::toJS(function),
-                         JSC::ReadOnly | JSC::DontEnum | JSC::DontDelete);
+    JSC::PropertyDescriptor descriptor;
+    descriptor.setGetter(::toJS(function));
+    descriptor.setSetter(JSC::jsUndefined());
+    descriptor.setEnumerable(false);
+    descriptor.setConfigurable(false);
+    window->methodTable()->defineOwnProperty(window, exec, propertyName.get()->identifier(&exec->globalData()), descriptor, false);
 }
 #endif
 

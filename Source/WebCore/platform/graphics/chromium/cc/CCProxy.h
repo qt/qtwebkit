@@ -31,10 +31,6 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/Threading.h>
 
-#if USE(SKIA)
-class GrContext;
-#endif
-
 namespace WebCore {
 
 class CCThread;
@@ -65,6 +61,11 @@ public:
 
     virtual bool isStarted() const = 0;
 
+    // Attempts to initialize a context to use for rendering. Returns false if the context could not be created.
+    // The context will not be used and no frames may be produced until initializeLayerRenderer() is called.
+    virtual bool initializeContext() = 0;
+
+    // Attempts to initialize the layer renderer. Returns false if the context isn't usable for compositing.
     virtual bool initializeLayerRenderer() = 0;
 
     virtual int compositorIdentifier() const = 0;
@@ -79,9 +80,8 @@ public:
     virtual void start() = 0; // Must be called before using the proxy.
     virtual void stop() = 0; // Must be called before deleting the proxy.
 
-    // Whether sub-regions of textures can be updated or if complete texture
-    // updates are required.
-    virtual bool partialTextureUpdateCapability() const = 0;
+    // Maximum number of sub-region texture updates supported for each commit.
+    virtual size_t maxPartialTextureUpdates() const = 0;
 
     // Debug hooks
 #ifndef NDEBUG

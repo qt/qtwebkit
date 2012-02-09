@@ -282,6 +282,8 @@ public:
 
     LayoutUnit scrollWidth();
     LayoutUnit scrollHeight();
+    int pixelSnappedScrollWidth();
+    int pixelSnappedScrollHeight();
 
     void panScrollFromPoint(const LayoutPoint&);
 
@@ -310,8 +312,6 @@ public:
     bool scrollsOverflow() const;
     bool allowsScrolling() const; // Returns true if at least one scrollbar is visible and enabled.
     bool hasScrollbars() const { return m_hBar || m_vBar; }
-    virtual void didAddHorizontalScrollbar(Scrollbar*);
-    virtual void willRemoveHorizontalScrollbar(Scrollbar*);
     void setHasHorizontalScrollbar(bool);
     void setHasVerticalScrollbar(bool);
 
@@ -664,11 +664,10 @@ private:
     virtual IntPoint currentMousePosition() const;
     virtual bool shouldSuspendScrollAnimations() const;
     virtual bool isOnActivePage() const;
+    virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
 
     // Rectangle encompassing the scroll corner and resizer rect.
     IntRect scrollCornerAndResizerRect() const;
-
-    virtual void disconnectFromPage() { m_scrollableAreaPage = 0; }
 
     // NOTE: This should only be called by the overriden setScrollOffset from ScrollableArea.
     void scrollTo(int, int);
@@ -868,8 +867,6 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     OwnPtr<RenderLayerBacking> m_backing;
 #endif
-
-    Page* m_scrollableAreaPage; // Page on which this is registered as a scrollable area.
 };
 
 inline void RenderLayer::updateZOrderLists()

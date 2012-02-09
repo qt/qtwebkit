@@ -130,6 +130,9 @@ public:
 #endif
 
     bool hasAttributes() const;
+    // This variant will not update the potentially invalid attributes. To be used when not interested
+    // in style attribute or one of the SVG animation attributes.
+    bool hasAttributesWithoutUpdate() const;
 
     bool hasAttribute(const String& name) const;
     bool hasAttributeNS(const String& namespaceURI, const String& localName) const;
@@ -148,6 +151,13 @@ public:
     // The value will already be lowercased if the document is in compatibility mode,
     // so this function is not suitable for non-style uses.
     const AtomicString& idForStyleResolution() const;
+
+    // Internal methods that assume the existence of attribute storage, one should use hasAttributes()
+    // before calling them.
+    size_t attributeCount() const;
+    Attribute* attributeItem(unsigned index) const;
+    Attribute* getAttributeItem(const QualifiedName&) const;
+    void removeAttribute(unsigned index);
 
     void scrollIntoView(bool alignToTop = true);
     void scrollIntoViewIfNeeded(bool centerIfNeeded = true);
@@ -177,7 +187,7 @@ public:
     PassRefPtr<ClientRect> getBoundingClientRect();
     
     // Returns the absolute bounding box translated into screen coordinates:
-    LayoutRect screenRect() const;
+    IntRect screenRect() const;
 
     void removeAttribute(const String& name);
     void removeAttributeNS(const String& namespaceURI, const String& localName);
@@ -221,7 +231,7 @@ public:
     NamedNodeMap* updatedAttributes() const;
 
     // This method is called whenever an attribute is added, changed or removed.
-    virtual void attributeChanged(Attribute*, bool preserveDecls = false);
+    virtual void attributeChanged(Attribute*);
 
     // Only called by the parser immediately after element construction.
     void parserSetAttributeMap(PassOwnPtr<NamedNodeMap>, FragmentScriptingPermission);
@@ -231,6 +241,9 @@ public:
 
     ElementAttributeData* attributeData() const { return m_attributeMap ? m_attributeMap->attributeData() : 0; }
     ElementAttributeData* ensureAttributeData() const { return ensureUpdatedAttributes()->attributeData(); }
+
+    // FIXME: This method should be removed once AttributeData is moved to Element.
+    ElementAttributeData* ensureAttributeDataWithoutUpdate() const { return ensureAttributeMap()->attributeData(); }
 
     void setAttributesFromElement(const Element&);
 
@@ -383,6 +396,8 @@ public:
     
     PassRefPtr<RenderStyle> styleForRenderer();
 
+    PassRefPtr<Attribute> createAttribute(const QualifiedName&, const AtomicString& value);
+
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -422,8 +437,7 @@ private:
     virtual bool childTypeAllowed(NodeType) const;
 
     void setAttributeInternal(size_t index, const QualifiedName&, const AtomicString& value);
-    virtual PassRefPtr<Attribute> createAttribute(const QualifiedName&, const AtomicString& value);
-    
+
 #ifndef NDEBUG
     virtual void formatForDebugger(char* buffer, unsigned length) const;
 #endif
@@ -506,6 +520,22 @@ inline Element* Node::parentElement() const
     return parent && parent->isElementNode() ? toElement(parent) : 0;
 }
 
+inline Element* Element::previousElementSibling() const
+{
+    Node* n = previousSibling();
+    while (n && !n->isElementNode())
+        n = n->previousSibling();
+    return static_cast<Element*>(n);
+}
+
+inline Element* Element::nextElementSibling() const
+{
+    Node* n = nextSibling();
+    while (n && !n->isElementNode())
+        n = n->nextSibling();
+    return static_cast<Element*>(n);
+}
+
 inline NamedNodeMap* Element::ensureUpdatedAttributes() const
 {
     updateInvalidAttributes();
@@ -576,6 +606,11 @@ inline const AtomicString& Element::fastGetAttribute(const QualifiedName& name) 
     return nullAtom;
 }
 
+inline bool Element::hasAttributesWithoutUpdate() const
+{
+    return m_attributeMap && !m_attributeMap->isEmpty();
+}
+
 inline const AtomicString& Element::idForStyleResolution() const
 {
     ASSERT(hasID());
@@ -599,6 +634,30 @@ inline const AtomicString& Element::getIdAttribute() const
 inline void Element::setIdAttribute(const AtomicString& value)
 {
     setAttribute(document()->idAttributeName(), value);
+}
+
+inline size_t Element::attributeCount() const
+{
+    ASSERT(m_attributeMap);
+    return m_attributeMap->length();
+}
+
+inline Attribute* Element::attributeItem(unsigned index) const
+{
+    ASSERT(m_attributeMap);
+    return m_attributeMap->attributeItem(index);
+}
+
+inline Attribute* Element::getAttributeItem(const QualifiedName& name) const
+{
+    ASSERT(m_attributeMap);
+    return m_attributeMap->getAttributeItem(name);
+}
+
+inline void Element::removeAttribute(unsigned index)
+{
+    ASSERT(m_attributeMap);
+    m_attributeMap->removeAttribute(index);
 }
 
 inline NamedNodeMap* Element::ensureAttributeMap() const

@@ -157,10 +157,10 @@ bool SVGAnimationElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
      
-void SVGAnimationElement::parseMappedAttribute(Attribute* attr)
+void SVGAnimationElement::parseAttribute(Attribute* attr)
 {
     if (!isSupportedAttribute(attr->name())) {
-        SVGSMILElement::parseMappedAttribute(attr);
+        SVGSMILElement::parseAttribute(attr);
         return;
     }
 
@@ -193,20 +193,20 @@ void SVGAnimationElement::parseMappedAttribute(Attribute* attr)
         return;
     }
 
-    if (SVGTests::parseMappedAttribute(attr))
+    if (SVGTests::parseAttribute(attr))
         return;
-    if (SVGExternalResourcesRequired::parseMappedAttribute(attr))
+    if (SVGExternalResourcesRequired::parseAttribute(attr))
         return;
 
     ASSERT_NOT_REACHED();
 }
 
-void SVGAnimationElement::attributeChanged(Attribute* attr, bool preserveDecls)
+void SVGAnimationElement::attributeChanged(Attribute* attr)
 {
     // Assumptions may not hold after an attribute change.
     m_animationValid = false;
     setInactive();
-    SVGSMILElement::attributeChanged(attr, preserveDecls);
+    SVGSMILElement::attributeChanged(attr);
 }
 
 float SVGAnimationElement::getStartTime() const

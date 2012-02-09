@@ -60,7 +60,7 @@ public:
     void initializeProvider(const WKNotificationProvider*);
     void populateCopyOfNotificationPermissions(HashMap<String, bool>&);
 
-    void show(WebPageProxy*, const String& title, const String& body, const String& originString, uint64_t notificationID);
+    void show(WebPageProxy*, const String& title, const String& body, const String& iconURL, const String& originString, uint64_t notificationID);
 
     void providerDidShowNotification(uint64_t notificationID);
     void providerDidClickNotification(uint64_t notificationID);
@@ -80,6 +80,7 @@ private:
     // Message handlers
     void cancel(uint64_t notificationID);
     void didDestroyNotification(uint64_t notificationID);
+    void clearNotifications(const Vector<uint64_t>& notificationIDs);
 
     typedef HashMap<uint64_t, RefPtr<WebNotification> > WebNotificationMap;
     

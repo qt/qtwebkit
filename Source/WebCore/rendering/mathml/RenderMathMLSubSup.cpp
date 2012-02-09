@@ -29,14 +29,7 @@
 
 #include "RenderMathMLSubSup.h"
 
-#include "FontSelector.h"
 #include "MathMLNames.h"
-#include "RenderInline.h"
-#include "RenderTable.h"
-#include "RenderTableCell.h"
-#include "RenderTableRow.h"
-#include "RenderTableSection.h"
-#include "RenderText.h"
 
 namespace WebCore {
     
@@ -181,13 +174,13 @@ void RenderMathMLSubSup::layout()
     }    
 }
 
-int RenderMathMLSubSup::baselinePosition(FontBaseline, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
+LayoutUnit RenderMathMLSubSup::baselinePosition(FontBaseline, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
 {
     RenderObject* base = firstChild();
     if (!base) 
         return offsetHeight();
     
-    int baseline = offsetHeight();
+    LayoutUnit baseline = offsetHeight();
     if (!base || !base->isBoxModelObject()) 
         return baseline;
 

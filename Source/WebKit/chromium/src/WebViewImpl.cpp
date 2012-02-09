@@ -148,10 +148,6 @@
 #include "PlatformGestureEvent.h"
 #endif
 
-#if ENABLE(GESTURE_RECOGNIZER)
-#include "PlatformGestureRecognizer.h"
-#endif
-
 #if USE(CG)
 #include <CoreGraphics/CGBitmapContext.h>
 #include <CoreGraphics/CGContext.h>
@@ -375,9 +371,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
 #endif
     , m_deviceOrientationClientProxy(adoptPtr(new DeviceOrientationClientProxy(client ? client->deviceOrientationClient() : 0)))
     , m_geolocationClientProxy(adoptPtr(new GeolocationClientProxy(client ? client->geolocationClient() : 0)))
-#if ENABLE(GESTURE_RECOGNIZER)
-    , m_gestureRecognizer(WebCore::PlatformGestureRecognizer::create())
-#endif
 #if ENABLE(MEDIA_STREAM)
     , m_userMediaClientImpl(this)
 #endif
@@ -800,13 +793,6 @@ bool WebViewImpl::touchEvent(const WebTouchEvent& event)
 
     PlatformTouchEventBuilder touchEventBuilder(mainFrameImpl()->frameView(), event);
     bool defaultPrevented = mainFrameImpl()->frame()->eventHandler()->handleTouchEvent(touchEventBuilder);
-
-#if ENABLE(GESTURE_RECOGNIZER)
-    OwnPtr<Vector<WebCore::PlatformGestureEvent> > gestureEvents(m_gestureRecognizer->processTouchEventForGestures(touchEventBuilder, defaultPrevented));
-    for (unsigned int  i = 0; i < gestureEvents->size(); i++)
-        mainFrameImpl()->frame()->eventHandler()->handleGestureEvent(gestureEvents->at(i));
-#endif
-
     return defaultPrevented;
 }
 #endif
@@ -1206,7 +1192,7 @@ void WebViewImpl::doPixelReadbackToCanvas(WebCanvas* canvas, const IntRect& rect
     RefPtr<ByteArray> pixelArray(ByteArray::create(rect.width() * rect.height() * 4));
     if (imageBuffer && pixelArray) {
         m_layerTreeHost->compositeAndReadback(pixelArray->data(), invertRect);
-        imageBuffer->putPremultipliedImageData(pixelArray.get(), rect.size(), IntRect(IntPoint(), rect.size()), IntPoint());
+        imageBuffer->putByteArray(Premultiplied, pixelArray.get(), rect.size(), IntRect(IntPoint(), rect.size()), IntPoint());
         gc.save();
         gc.translate(IntSize(0, bitmapHeight));
         gc.scale(FloatSize(1.0f, -1.0f));
@@ -1427,6 +1413,15 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
     case WebInputEvent::TouchEnd:
     case WebInputEvent::TouchCancel:
         handled = touchEvent(*static_cast<const WebTouchEvent*>(&inputEvent));
+        break;
+#endif
+
+#if ENABLE(GESTURE_EVENTS)
+    case WebInputEvent::GesturePinchBegin:
+    case WebInputEvent::GesturePinchEnd:
+    case WebInputEvent::GesturePinchUpdate:
+        // FIXME: Once PlatformGestureEvent is updated to support pinch, this should call handleGestureEvent, just like it currently does for gesture scroll.
+        handled = false;
         break;
 #endif
 
@@ -3179,13 +3174,6 @@ void WebViewImpl::setVisibilityState(WebPageVisibilityState visibilityState,
     }
 #endif
 }
-
-#if ENABLE(GESTURE_RECOGNIZER)
-void WebViewImpl::resetGestureRecognizer()
-{
-    m_gestureRecognizer->reset();
-}
-#endif
 
 #if ENABLE(POINTER_LOCK)
 bool WebViewImpl::requestPointerLock()

@@ -55,7 +55,7 @@
 #import <WebCore/AXObjectCache.h>
 #import <WebCore/AccessibilityObject.h>
 #import <WebCore/AnimationController.h>
-#import <WebCore/CSSMutableStyleDeclaration.h>
+#import <WebCore/CSSStyleDeclaration.h>
 #import <WebCore/CachedResourceLoader.h>
 #import <WebCore/Chrome.h>
 #import <WebCore/ColorMac.h>
@@ -791,10 +791,10 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 {
     if (!_private->coreFrame)
         return nil;
-    RefPtr<CSSMutableStyleDeclaration> typingStyle = _private->coreFrame->selection()->copyTypingStyle();
+    RefPtr<StylePropertySet> typingStyle = _private->coreFrame->selection()->copyTypingStyle();
     if (!typingStyle)
         return nil;
-    return kit(typingStyle.get());
+    return kit(typingStyle->ensureCSSStyleDeclaration());
 }
 
 - (void)_setTypingStyle:(DOMCSSStyleDeclaration *)style withUndoAction:(EditAction)undoAction

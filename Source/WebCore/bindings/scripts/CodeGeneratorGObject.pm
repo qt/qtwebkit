@@ -152,9 +152,10 @@ sub GetCoreObject {
 
 sub SkipAttribute {
     my $attribute = shift;
-    
-    if ($attribute->signature->extendedAttributes->{"CustomGetter"} ||
-        $attribute->signature->extendedAttributes->{"CustomSetter"}) {
+
+    if ($attribute->signature->extendedAttributes->{"Custom"}
+        || $attribute->signature->extendedAttributes->{"CustomGetter"}
+        || $attribute->signature->extendedAttributes->{"CustomSetter"}) {
         return 1;
     }
 
@@ -1231,9 +1232,6 @@ EOF
 sub Generate {
     my ($object, $dataNode) = @_;
 
-    my $hasLegacyParent = $dataNode->extendedAttributes->{"LegacyParent"};
-    my $hasRealParent = @{$dataNode->parents} > 0;
-    my $hasParent = $hasLegacyParent || $hasRealParent;
     my $parentClassName = GetParentClassName($dataNode);
     my $parentGObjType = GetParentGObjType($dataNode);
     my $interfaceName = $dataNode->name;

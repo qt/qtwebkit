@@ -96,8 +96,10 @@ void ScheduledAction::execute(ScriptExecutionContext* context)
 {
     if (context->isDocument()) {
         Frame* frame = static_cast<Document*>(context)->frame();
+        if (!frame)
+            return;
         ScriptController* scriptController = frame->script();
-        if (!scriptController->canExecuteScripts(NotAboutToExecuteScript))
+        if (!scriptController->canExecuteScripts(AboutToExecuteScript))
             return;
         V8Proxy* proxy = V8Proxy::retrieve(frame);
         execute(proxy);

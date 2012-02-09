@@ -1709,7 +1709,7 @@ static bool maybeCreateSandboxExtensionFromPasteboard(NSPasteboard *pasteboard, 
 
 - (void)_updateWindowVisibility
 {
-    _data->_page->updateWindowIsVisible(![[self window] isMiniaturized]);
+    _data->_page->updateWindowIsVisible([[self window] isVisible]);
 }
 
 - (BOOL)_ownsWindowGrowBox
@@ -1924,6 +1924,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     // we hide it first and then update the active state.
     _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
     _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
+    [self _updateWindowVisibility];
 }
 
 - (void)_windowDidOrderOnScreen:(NSNotification *)notification
@@ -1932,6 +1933,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     // we update the active state first and then make it visible.
     _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
     _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
+    [self _updateWindowVisibility];
 }
 
 - (void)_windowDidChangeBackingProperties:(NSNotification *)notification
@@ -2279,12 +2281,12 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 
 - (NSRect)_convertToDeviceSpace:(NSRect)rect
 {
-    return toDeviceSpace(rect, [self window], _data->_page->deviceScaleFactor());
+    return toDeviceSpace(rect, [self window]);
 }
 
 - (NSRect)_convertToUserSpace:(NSRect)rect
 {
-    return toUserSpace(rect, [self window], _data->_page->deviceScaleFactor());
+    return toUserSpace(rect, [self window]);
 }
 
 // Any non-zero value will do, but using something recognizable might help us debug some day.
@@ -2734,6 +2736,7 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     _data->_pageClient = PageClientImpl::create(self);
     _data->_page = toImpl(contextRef)->createWebPage(_data->_pageClient.get(), toImpl(pageGroupRef));
     _data->_page->initializeWebPage();
+    _data->_page->setIntrinsicDeviceScaleFactor([self _intrinsicDeviceScaleFactor]);
 #if ENABLE(FULLSCREEN_API)
     _data->_page->fullScreenManager()->setWebView(self);
 #endif

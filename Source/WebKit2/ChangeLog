@@ -1,3 +1,1135 @@
+2012-02-08  Keunsoon Lee  <keunsoon.lee@samsung.com>
+
+        [WK2][EFL] creating dummy class derived from ResourceHandleClient for Efl download module.
+        https://bugs.webkit.org/show_bug.cgi?id=76171
+
+        Reviewed by Andreas Kling.
+
+        FileDownloaderEfl is a practical class to operate file download.
+        It communicates with Download class to start download
+        and to notify downloading states to user(e.g. client application).
+        Besides FileDownloaderEfl derives from ResourceHandleClient
+        and receives chunked data from ResourceHandle directly
+        or redirects data flow which is started from MainResourceLoader
+        by mean of exchanging ResourceHandle's existing client for FileDownloaderEfl.
+
+        This patch has only dummy functions to make easy to review.
+        Working patch will be uploaded on another bug thread.
+
+        * PlatformEfl.cmake: added new file to compile.
+        * WebProcess/Downloads/Download.h: added FileDownloaderEfl's instance as a form of OwnPtr<FileDownloaderEfl>.
+        (WebKit):
+        (Download):
+        * WebProcess/Downloads/efl/DownloadEfl.cpp:
+        (WebKit::Download::start): calling to FileDownloaderEfl::start() to start download for passing ResourceRequest.
+        * WebProcess/Downloads/efl/FileDownloaderEfl.cpp: Added. a practical class to operate file download.
+        (WebKit):
+        (WebKit::FileDownloaderEfl::create): create function, which returns PassOwnPtr<FileDownloaderEfl>.
+        (WebKit::FileDownloaderEfl::FileDownloaderEfl): constructor, which receives Download* as a parameter.
+        (WebKit::FileDownloaderEfl::~FileDownloaderEfl): deconstructor.
+        (WebKit::FileDownloaderEfl::start): a function to start downloading for passed ResourceRequest.
+        It does nothing for now, but shows how Download class can call FileDownloaderEfl's function.
+        (WebKit::FileDownloaderEfl::didReceiveResponse): virtual function for ResourceHandleClient.
+        It will receive response header information from ResourceHandle.
+        (WebKit::FileDownloaderEfl::didReceiveData): virtual function for ResourceHandleClient.
+        It will receive chunk data from ResourceHandle.
+        (WebKit::FileDownloaderEfl::didFinishLoading): virtual function for ResourceHandleClient.
+        It will be notified loading is finished from ResourceHandle.
+        (WebKit::FileDownloaderEfl::didFail): virtual function for ResourceHandleClient.
+        It will be notified loading is fail with ResourceError from ResourceHandle.
+        (WebKit::FileDownloaderEfl::shouldUseCredentialStorage): virtual function for ResourceHandleClient.
+        It returns whether to use credential storage or not.
+        (WebKit::FileDownloaderEfl::didReceiveAuthenticationChallenge): virtual function for ResourceHandleClient.
+        It will receive AuthenticationChallenge.
+        (WebKit::FileDownloaderEfl::didCancelAuthenticationChallenge): virtual function for ResourceHandleClient.
+        It will be notified AuthenticationChallenge is canceled.
+        (WebKit::FileDownloaderEfl::receivedCancellation): virtual function for ResourceHandleClient.
+        * WebProcess/Downloads/efl/FileDownloaderEfl.h: Added.
+        (WebCore):
+        (WebKit):
+        (FileDownloaderEfl):
+
+2012-02-07  MORITA Hajime  <morrita@google.com>
+
+        Replacement text should be available from the marker.
+        https://bugs.webkit.org/show_bug.cgi?id=77934
+
+        Reviewed by Kent Tamura.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-02-08  Anders Carlsson  <andersca@apple.com>
+
+        Don't use the wheel event handler count to track if a page has horizontal scrollbars
+        https://bugs.webkit.org/show_bug.cgi?id=78192
+
+        Reviewed by Andreas Kling.
+
+        Prior to this change, we were incrementing and decrementing the wheel event handler count
+        whenever a scrollable area gained or lost a horizontal scrollbar, so we could use the count
+        to determine if Safari can handle horizontal wheel events directly or whether they have to be sent
+        to the web process first.
+
+        What this meant was that whenever a page had horizontal scrollbars we'd have to send all scroll wheel events
+        to the main thread instead of the scrolling thread, regardless of whether there were any wheel event handlers.
+        
+        After this change, we traverse the tree of scrollable areas after every layout and check if any of them
+        have a horizontal scrollbar. (We still also check if there are wheel event handlers).
+
+        If traversing the tree after every layout is deemed to slow we can go back to caching the number of horizontal scrollbars
+        in a page, but the number of subframes in a page is usually very small and the number of other scrollable areas is even smaller.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::WebPageProxy):
+        (WebKit::WebPageProxy::willHandleHorizontalScrollEvents):
+        * UIProcess/WebPageProxy.h:
+        (WebKit::WebPageProxy::setCanShortCircuitHorizontalWheelEvents):
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.messages.in:
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::numWheelEventHandlersChanged):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::dispatchDidLayout):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::WebPage):
+        (WebKit::WebPage::numWheelEventHandlersChanged):
+        (WebKit):
+        (WebKit::hasEnabledHorizontalScrollbar):
+        (WebKit::pageContainsAnyHorizontalScrollbars):
+        (WebKit::WebPage::recomputeShortCircuitHorizontalWheelEventsState):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+
+2012-02-08  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r106920, r106924, r106933, r106939,
+        and r107090.
+        http://trac.webkit.org/changeset/106920
+        http://trac.webkit.org/changeset/106924
+        http://trac.webkit.org/changeset/106933
+        http://trac.webkit.org/changeset/106939
+        http://trac.webkit.org/changeset/107090
+        https://bugs.webkit.org/show_bug.cgi?id=78124
+
+        Something is completely wrong this change (Requested by
+        Ossy_gardener on #webkit).
+
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::encode):
+        (WebKit::WebProcessCreationParameters::decode):
+        * Shared/WebProcessCreationParameters.h:
+        (WebProcessCreationParameters):
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::WebContext):
+        * UIProcess/qt/WebContextQt.cpp:
+        (WebKit::WebContext::platformInitializeWebProcess):
+        * WebProcess/qt/WebProcessQt.cpp:
+        (WebKit):
+        (WebKit::WebProcess::platformSetCacheModel):
+        (WebKit::WebProcess::platformInitializeWebProcess):
+
+2012-02-08  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Fix a crash when WebKitWebView is created without a WebContext
+        https://bugs.webkit.org/show_bug.cgi?id=78104
+
+        Reviewed by Philippe Normand.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewSetProperty): Make sure WebKitWebView:web-context
+        property is initialized to the default web context when a web
+        context is not passed to g_object_new().
+        * UIProcess/API/gtk/tests/TestWebKitWebView.cpp:
+        (testWebViewDefaultContext): Check that a web view created with
+        g_object_new has the default context.
+
+2012-02-08  Michael Brüning  <michael.bruning@nokia.com>
+
+        [Qt][WK2] Compute and set cache capacities using the current CacheModel
+        https://bugs.webkit.org/show_bug.cgi?id=73918
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::WebContext): Set default cacheModel for Qt platform to
+        CacheModelPrimaryWebBrowser.
+
+2012-02-08  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Fix WebKitWebView::decide-policy API documentation
+        https://bugs.webkit.org/show_bug.cgi?id=78101
+
+        Reviewed by Martin Robinson.
+
+        - It refers to WebKitPolicyClient instead of WebKitWebView
+        - Trailing ':' is missing
+        - References @decision as WebKitNavigationPolicyDecision instead
+        of WebKitPolicyDecision
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkit_web_view_class_init):
+
+2012-02-08  Mahesh Kulkarni  <mahesh.kulkarni@nokia.com>
+
+        [Qt] Build broken if qt missing openssl
+        https://bugs.webkit.org/show_bug.cgi?id=77894
+
+        Reviewed by Chang Shu.
+
+        Build fix. No new test content. 
+
+        * WebProcess/qt/QtNetworkAccessManager.cpp:
+        (WebKit::QtNetworkAccessManager::onSslErrors):
+
+2012-02-08  Yael Aharon  <yael.aharon@nokia.com>
+
+        [WK2] Text notifications should have an iconURL
+        https://bugs.webkit.org/show_bug.cgi?id=77968
+
+        Reviewed by Simon Hausmann.
+        
+        Per http://www.w3.org/TR/notifications simple text notifications should have an iconURL.
+        Add an iconURL to WebNotification and add a public API to access it.
+       
+        * UIProcess/API/C/WKNotification.cpp:
+        (WKNotificationCopyiconURL):
+        * UIProcess/API/C/WKNotification.h:
+        * UIProcess/Notifications/WebNotification.cpp:
+        (WebKit::WebNotification::WebNotification):
+        * UIProcess/Notifications/WebNotification.h:
+        (WebKit::WebNotification::create):
+        (WebKit::WebNotification::iconURL):
+        (WebNotification):
+        * UIProcess/Notifications/WebNotificationManagerProxy.cpp:
+        (WebKit::WebNotificationManagerProxy::show):
+        * UIProcess/Notifications/WebNotificationManagerProxy.h:
+        (WebNotificationManagerProxy):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::showNotification):
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.messages.in:
+        * WebProcess/Notifications/WebNotificationManager.cpp:
+        (WebKit::WebNotificationManager::show):
+
+2012-02-08  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK][WK2] enable-webaudio WebSetting
+        https://bugs.webkit.org/show_bug.cgi?id=77959
+
+        Reviewed by Martin Robinson.
+
+        Add a new WebKitGTK WebSetting to enable/disable WebAudio at
+        runtime.
+
+        * UIProcess/API/gtk/WebKitSettings.cpp:
+        (webKitSettingsSetProperty):
+        (webKitSettingsGetProperty):
+        (webkit_settings_class_init):
+        (webkit_settings_get_enable_webaudio):
+        (webkit_settings_set_enable_webaudio):
+        * UIProcess/API/gtk/WebKitSettings.h:
+        * UIProcess/API/gtk/tests/TestWebKitSettings.cpp:
+        (testWebKitSettings):
+
+2012-02-07  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [WK2] Add WebKitResponsePolicyDecision
+        https://bugs.webkit.org/show_bug.cgi?id=76789
+
+        Reviewed by Philippe Normand.
+
+        Add a WebKitResponsePolicyDecision GObject, use it for response
+        policy decisions and add a test.
+
+        * GNUmakefile.am: Added new source files to the list.
+        * UIProcess/API/gtk/WebKitPolicyClient.cpp:
+        (decidePolicyForResponseCallback): Added this callback which creates the request
+        and fires the signal.
+        (attachPolicyClientToPage): Added new callback to the C API policy client.
+        * UIProcess/API/gtk/WebKitResponsePolicyDecision.cpp: Added.
+        * UIProcess/API/gtk/WebKitResponsePolicyDecision.h: Added.
+        * UIProcess/API/gtk/WebKitResponsePolicyDecisionPrivate.h: Added.
+        * UIProcess/API/gtk/docs/webkit2gtk-docs.sgml: Added new docs.
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Ditto.
+        * UIProcess/API/gtk/tests/TestWebKitPolicyClient.cpp:
+        (testResponsePolicy): Added this test for response policy decisions.
+        (serverCallback): Added a SoupServer to test policy response policy decisions.
+        (beforeAll): Ditto.
+        (afterAll): Ditto.
+
+2012-02-07  Timothy Hatcher  <timothy@apple.com>
+
+        Avoid making a window for the Web Inspector when it is docked.
+
+        This also makes sure the inspector WKView is in a window before the page is loaded.
+        This avoids some redundant work caused by moving it to a window later.
+
+        https://webkit.org/b/78064
+
+        Reviewed by Brian Weinstein.
+
+        * UIProcess/WebInspectorProxy.cpp:
+        (WebKit::WebInspectorProxy::createInspectorPage): Set m_isAttached here...
+        (WebKit::WebInspectorProxy::didLoadInspectorPage): ... instead of here.
+        * UIProcess/WebInspectorProxy.h:
+        (WebInspectorProxy):
+        * UIProcess/mac/WebInspectorProxyMac.mm:
+        (WebKit::WebInspectorProxy::createInspectorWindow): Added. Factored out of platformOpen.
+        (WebKit::WebInspectorProxy::updateInspectorWindowTitle): Added. Factored out of platformInspectedURLChanged.
+        (WebKit::WebInspectorProxy::platformCreateInspectorPage): Call platformAttach or createInspectorWindow.
+        (WebKit::WebInspectorProxy::platformOpen): Make the view or window visible.
+        (WebKit::WebInspectorProxy::platformDidClose): Only message m_inspectorWindow if it isn't nil.
+        (WebKit::WebInspectorProxy::platformInspectedURLChanged): Store the urlString and call updateInspectorWindowTitle.
+        (WebKit::WebInspectorProxy::inspectedViewFrameDidChange): Return early if not visible.
+        (WebKit::WebInspectorProxy::platformAttach): Start out hidden if we are not visible yet. Destroy the window.
+        (WebKit::WebInspectorProxy::platformDetach): Use createInspectorWindow to create it again.
+
+2012-02-07  Tony Chang  <tony@chromium.org>
+
+        merge DashboardSupportCSSPropertyNames.in into CSSPropertyNames.in
+        https://bugs.webkit.org/show_bug.cgi?id=78036
+
+        Reviewed by Darin Adler.
+
+        * Configurations/FeatureDefines.xcconfig: Add ENABLE_DASHBOARD_SUPPORT to FEATURE_DEFINES.
+
+2012-02-07  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Use *bin* and *lib* directories for executable and libraries.
+        https://bugs.webkit.org/show_bug.cgi?id=77928
+
+        Reviewed by Daniel Bates.
+
+        CMake has used *Programs* directory for executable. In addition, shared libraries are being
+        built in source directory. It is better to set common places in order to maintain executable
+        and libraries. *bin* is for executable and *lib* is for library.
+
+        * CMakeLists.txt:
+
+2012-02-07  Timothy Hatcher  <timothy@apple.com>
+
+        Initilize the WebPageProxy intrinsicDeviceScaleFactor on creation of the WKView.
+
+        If WKView was created and loaded a page with canvas elements before beinging moved
+        to a window, the canvas elements would be locked in at a pixel ratio of 1. With this
+        change the WKView will use the main screen's pixel ratio until it moves to a window.
+
+        Reviewed by Anders Carlsson.
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView initWithFrame:contextRef:pageGroupRef:]): Call setIntrinsicDeviceScaleFactor.
+
+2012-02-07  Alexey Proskuryakov  <ap@apple.com>
+
+        Keep a reference in didReceiveInvalidMessage.
+        https://bugs.webkit.org/show_bug.cgi?id=78024
+
+        Reviewed by Anders Carlsson.
+
+        * UIProcess/WebConnectionToWebProcess.cpp:
+        (WebKit::WebConnectionToWebProcess::didReceiveInvalidMessage):
+
+2012-02-06  Anders Carlsson  <andersca@apple.com>
+
+        ScrollableAreaSet should be moved from Page to FrameView
+        https://bugs.webkit.org/show_bug.cgi?id=62762
+
+        Reviewed by Beth Dakin.
+
+        * WebProcess/Plugins/PDF/BuiltInPDFView.cpp:
+        (WebKit::BuiltInPDFView::initialize):
+        Call FrameView::addScrollableArea instead.
+
+        (WebKit::BuiltInPDFView::destroy):
+        Call FrameView::removeScrollableArea instead.
+
+        * WebProcess/Plugins/PDF/BuiltInPDFView.h:
+        Remove disconnectFromPage since it no longer exists on ScrollableArea.
+
+2012-02-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add cut, copy and paste methods to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=76998
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Add WebKitEditingCommands.h.
+        * UIProcess/API/gtk/WebKitEditingCommands.h: Added.
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (didValidateCommand): Callback called by the C API when an editor
+        command has been validated.
+        (webkit_web_view_can_execute_editing_command): Asynchronously
+        validate the given editing command.
+        (webkit_web_view_can_execute_editing_command_finish): Finish async
+        operation started by webkit_web_view_can_execute_editing_command().
+        (webkit_web_view_execute_editing_command): Execute the given
+        command.
+        * UIProcess/API/gtk/WebKitWebView.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbols.
+        * UIProcess/API/gtk/tests/GNUmakefile.am:
+        * UIProcess/API/gtk/tests/LoadTrackingTest.cpp:
+        (LoadTrackingTest::provisionalLoadFailed): Do not finish the main
+        loop on load failure, now finished is always called.
+        * UIProcess/API/gtk/tests/TestBackForwardList.cpp: Use WebViewTest
+        instead of LoadTrackingTest.
+        * UIProcess/API/gtk/tests/TestWebViewEditor.cpp: Added.
+        (testWebViewEditorCutCopyPasteNonEditable):
+        (testWebViewEditorCutCopyPasteEditable):
+        (beforeAll):
+        (afterAll):
+        * UIProcess/API/gtk/tests/WebViewTest.cpp:
+        (loadChanged):
+        (WebViewTest::waitUntilLoadFinished): Run a main loop until load
+        finished.
+        * UIProcess/API/gtk/tests/WebViewTest.h: Add waitUntilLoadFinished().
+        * UIProcess/API/gtk/webkit2.h: Include WebKitEditingCommands.h.
+
+2012-02-07  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        Encode radius, force and rotationAngle in WebPlatformTouchPoint.
+        https://bugs.webkit.org/show_bug.cgi?id=77986
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Shared/WebEvent.h:
+        (WebKit::WebPlatformTouchPoint::WebPlatformTouchPoint):
+        (WebPlatformTouchPoint):
+        (WebKit::WebPlatformTouchPoint::radius):
+        (WebKit::WebPlatformTouchPoint::rotationAngle):
+        (WebKit::WebPlatformTouchPoint::force):
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformTouchPoint::WebKit2PlatformTouchPoint):
+        * Shared/WebPlatformTouchPoint.cpp:
+        (WebKit::WebPlatformTouchPoint::WebPlatformTouchPoint):
+        (WebKit::WebPlatformTouchPoint::encode):
+        (WebKit::WebPlatformTouchPoint::decode):
+
+2012-02-07  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt] [WK2] Fix the debug build after r106920
+
+        * WebProcess/qt/WebProcessQt.cpp:
+        (WebKit::WebProcess::platformSetCacheModel):
+        Remove unnecessary assert.
+
+2012-02-03  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt][WK2] Add the componentComplete method to WebView
+        https://bugs.webkit.org/show_bug.cgi?id=77111
+
+        Reviewed by Simon Hausmann.
+
+        Move the initialization of the interaction engine to componentComplete
+        in preparation of switching to a Flickable based content positioning
+        for the touch based WebView.
+        Suspend the page and delay the dispatch of load success on startup until
+        the component finished initialization. With this patch instantiating the
+        WebView in C++ is only possible by creating a QDeclarativeComponent as
+        the initialization depends on the componentComplete method being called.
+        Also return valid default values in the viewport info functions if the
+        interaction engine is not yet initialized because the viewport info
+        component could finish initialization earlier than the WebView, which
+        results in QML warnings during MiniBrowser startup.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::initialize):
+        (QQuickWebViewPrivate::loadDidSucceed):
+        (QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate):
+        (QQuickWebViewFlickablePrivate::initialize):
+        (QQuickWebViewFlickablePrivate::onComponentComplete):
+        (QQuickWebViewFlickablePrivate::loadDidSucceed):
+        (QQuickWebViewFlickablePrivate::updateViewportSize):
+        (QQuickWebViewFlickablePrivate::_q_resume):
+        (QQuickWebView::geometryChanged):
+        (QQuickWebView::componentComplete):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate::onComponentComplete):
+        (QQuickWebViewPrivate):
+        (QQuickWebViewFlickablePrivate):
+        * UIProcess/API/qt/qwebviewportinfo.cpp:
+        (QWebViewportInfo::currentScale):
+        (QWebViewportInfo::devicePixelRatio):
+        (QWebViewportInfo::initialScale):
+        (QWebViewportInfo::minimumScale):
+        (QWebViewportInfo::maximumScale):
+        (QWebViewportInfo::isScalable):
+        (QWebViewportInfo::layoutSize):
+        * UIProcess/API/qt/tests/qquickwebview/qquickwebview.pro:
+        * UIProcess/API/qt/tests/qquickwebview/tst_qquickwebview.cpp:
+        (tst_QQuickWebView::tst_QQuickWebView):
+        (tst_QQuickWebView::init):
+        (tst_QQuickWebView::multipleWebViewWindows):
+        (tst_QQuickWebView::multipleWebViews):
+        * UIProcess/qt/QtWebPageLoadClient.cpp:
+        (QtWebPageLoadClient::dispatchLoadSucceeded):
+
+2012-02-07  YoungTaeck Song  <youngtaeck.song@samsung.com>
+
+        [EFL][WK2] Add ModuleEfl.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=63608
+
+        Reviewed by Andreas Kling.
+
+        Add first version of ModuleEfl.cpp including load(), unload() and platformFunctionPointer().
+
+        * Platform/Module.h:
+        * Platform/efl/ModuleEfl.cpp: Added.
+        (WebKit::Module::load):
+        (WebKit::Module::unload):
+        (WebKit::Module::platformFunctionPointer):
+
+2012-02-07  Michael Brüning  <michael.bruning@nokia.com>
+
+        [Qt][WK2] Compute and set cache capacities using the current CacheModel
+        https://bugs.webkit.org/show_bug.cgi?id=73918
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        First part of the implementation. The next steps are the implementation
+        of the API for the Qt WebKit 2 port and the hybrid memory and disk cache.
+
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::encode):
+        (WebKit::WebProcessCreationParameters::decode):
+        * Shared/WebProcessCreationParameters.h:
+        (WebProcessCreationParameters):
+        * UIProcess/qt/WebContextQt.cpp:
+        (WebKit::defaultDiskCacheDirectory):
+        (WebKit):
+        (WebKit::WebContext::platformInitializeWebProcess):
+        * WebProcess/qt/WebProcessQt.cpp:
+        (WebKit::physicalMemorySizeInBytes):
+        (WebKit):
+        (WebKit::WebProcess::platformSetCacheModel):
+        (WebKit::WebProcess::platformInitializeWebProcess):
+
+2012-02-06  Shinya Kawanaka  <shinyak@google.com>
+
+        Remove Element::ensureShadowRoot export.
+        https://bugs.webkit.org/show_bug.cgi?id=77932
+
+        Reviewed by Hajime Morita.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-02-06  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add TextureMapperGL implementation
+        https://bugs.webkit.org/show_bug.cgi?id=75308
+
+        Reviewed by Alejandro G. Castro.
+
+        Fix the WebKit2 + AC build for GTK+.
+
+        * GNUmakefile.am: Add some missing source files.
+        * UIProcess/DrawingAreaProxy.cpp:
+        (WebKit): Add USE(TILED_BACKING_STORE) to the guard.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didReceiveMessage): Ditto.
+        * WebProcess/WebPage/DrawingArea.h:
+        (DrawingArea): Ditto.
+        * WebProcess/WebPage/DrawingAreaImpl.cpp:
+        (WebKit): Ditto.
+        * WebProcess/WebPage/DrawingAreaImpl.h:
+        (DrawingAreaImpl): Ditto.
+
+2012-02-06  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix some miscellaneous 'make dist' error for WebKitGTK+.
+
+        * GNUmakefile.am: Do not distribute generated files.
+
+2012-02-06  Anders Carlsson  <andersca@apple.com>
+
+        Overlay scrollbars flash when window is simply activated
+        https://bugs.webkit.org/show_bug.cgi?id=77911
+
+        Reviewed by Kenneth Russell.
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView _updateWindowVisibility]):
+        Use -[NSWindow isVisible] here, since we also want to consider the window hidden if the application itself is hidden.
+
+        (-[WKView _windowDidOrderOffScreen:]):
+        (-[WKView _windowDidOrderOnScreen:]):
+        Call -[WKView updateWindowVisibility].
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::setWindowIsVisible):
+        Call FocusController::setContainingWindowIsVisible.
+
+2012-02-06  Martin Robinson  <mrobinson@igalia.com>
+
+         [GTK] Fix remaining errors in GTK+ WebKit2 API
+        https://bugs.webkit.org/show_bug.cgi?id=77890
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Fix some style issues in the GTK+ WebKit2 API section of the source code.
+
+        * UIProcess/API/gtk/WebKitPrivate.h:
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        * UIProcess/API/gtk/tests/TestMain.h:
+
+2012-02-06  Matthew Delaney  <mdelaney@apple.com>
+
+        toDataURL() uses stale data after putImageData()
+        https://bugs.webkit.org/show_bug.cgi?id=65767
+
+        Reviewed by Chris Marrin.
+
+        * WebProcess/WebCoreSupport/mac/WebSystemInterface.mm:
+        (InitWebCoreSystemInterface):
+
+2012-02-06  Ryosuke Niwa  <rniwa@webkit.org>
+
+        gcc build fix after r106749.
+
+        * UIProcess/WebPreferences.cpp:
+        (WebKit::WebPreferences::WebPreferences):
+
+2012-02-06  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] WebKitWebView does a lot of work during size_allocate when not mapped
+        https://bugs.webkit.org/show_bug.cgi?id=77743
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Instead of resizing the guts of a WebView when it's not mapped, wait
+        until it's mapped and do one resize. This prevents unmapped WebViews
+        from adding to a container's resize cost.
+
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (_WebKitWebViewBasePrivate): Added a new member needsResizeOnMap.
+        (resizeWebKitWebViewBaseFromAllocation): Abstracted out this helper.
+        (webkitWebViewBaseSizeAllocate): Wait until map to resize unmapped WebViews.
+        (webkitWebViewBaseMap): Added this vmethod implementation.
+        (webkit_web_view_base_class_init): Added vmethod.
+
+2012-02-06  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        WebGestureEvent can not encode delta and area.
+        https://bugs.webkit.org/show_bug.cgi?id=77728
+
+        Support delta and area fields in WebGestureEvent, and send area with Qt tap gesture.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Shared/WebEvent.h:
+        (WebKit::WebGestureEvent::area):
+        (WebKit::WebGestureEvent::delta):
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformGestureEvent::WebKit2PlatformGestureEvent):
+        * Shared/WebGestureEvent.cpp:
+        (WebKit::WebGestureEvent::WebGestureEvent):
+        (WebKit::WebGestureEvent::encode):
+        (WebKit::WebGestureEvent::decode):
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (QtWebPageEventHandler::handleSingleTapEvent):
+
+2012-02-03  Zalan Bujtas  <zbujtas@gmail.com>  and  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt][WK2] Remove TiledDrawingArea and dependencies.
+        https://bugs.webkit.org/show_bug.cgi?id=71681
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Tiled drawing surface functionality got converted to LayerTree.
+        TiledDrawingArea and its dependencies are not used by any port anymore.
+
+        * CMakeLists.txt:
+        * GNUmakefile.am:
+        * Shared/DrawingAreaInfo.h:
+        * Target.pri:
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPagePrivate::QQuickWebPagePrivate):
+        * UIProcess/API/qt/qquickwebpage_p.h:
+        * UIProcess/API/qt/qquickwebpage_p_p.h:
+        (QQuickWebPagePrivate):
+        * UIProcess/DrawingAreaProxy.h:
+        * UIProcess/DrawingAreaProxy.messages.in:
+        * UIProcess/TiledDrawingAreaProxy.cpp: Removed.
+        * UIProcess/TiledDrawingAreaProxy.h: Removed.
+        * UIProcess/qt/QtSGTileNode.cpp: Removed.
+        * UIProcess/qt/QtSGTileNode.h: Removed.
+        * UIProcess/qt/QtSGUpdateQueue.cpp: Removed.
+        * UIProcess/qt/QtSGUpdateQueue.h: Removed.
+        * UIProcess/qt/TiledDrawingAreaProxyQt.cpp: Removed.
+        * WebProcess/WebPage/DrawingArea.cpp:
+        (WebKit::DrawingArea::create):
+        * WebProcess/WebPage/DrawingArea.h:
+        * WebProcess/WebPage/DrawingArea.messages.in:
+        * WebProcess/WebPage/TiledDrawingArea.cpp: Removed.
+        * WebProcess/WebPage/TiledDrawingArea.h: Removed.
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+
+2012-02-03  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt] Don't version QtWebKit.experimental.
+        https://bugs.webkit.org/show_bug.cgi?id=77739
+
+        Reviewed by Tor Arne Vestbø.
+
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_itemSelector.qml:
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_messaging.qml:
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_navigationRequested.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_applicationScheme.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_download.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_geopermission.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_javaScriptDialogs.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_navigationHistory.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_preferences.qml:
+
+2012-02-06  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Fix several gtkdoc-fixxref warnings
+        https://bugs.webkit.org/show_bug.cgi?id=77613
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/WebKitWindowProperties.cpp: Fix a typo, a
+        colon was missing in WebKitWebView::ready-to-show.
+
+2012-02-05  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/10809525> WebKit2’s WebFrameLoaderClient::shouldUseCredentialStorage() always returns true
+        https://bugs.webkit.org/show_bug.cgi?id=77823
+
+        Reviewed by Anders Carlsson.
+
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/InjectedBundlePageResourceLoadClient.cpp:
+        (WebKit::InjectedBundlePageResourceLoadClient::shouldUseCredentialStorage): Added. Calls
+        through to the client if it implements shouldUseCredentialStorage. Returns true otherwise.
+        * WebProcess/InjectedBundle/InjectedBundlePageResourceLoadClient.h:
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::shouldUseCredentialStorage): Changed to call the injected
+        bundle resource load client.
+
+2012-02-04  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/10660698> Clients cannot prevent caching of individual responses
+        https://bugs.webkit.org/show_bug.cgi?id=77822
+
+        Reviewed by Sam Weinig.
+
+        * Shared/APIClientTraits.cpp: Added definition of interfaceSizesByVersion for
+        WKBundlePageResourceLoadClient.
+        * Shared/APIClientTraits.h: Added APIClientTraits specialization for WKBundlePageResourceLoadClient.
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h: Added WKBundlePageShouldCacheResponseCallback
+        typedef, added shouldCacheResponse member to WKBundlePageResourceLoadClient, and bumped
+        kWKBundlePageResourceLoadClientCurrentVersion to 1.
+        * WebProcess/InjectedBundle/InjectedBundlePageResourceLoadClient.cpp:
+        (WebKit::InjectedBundlePageResourceLoadClient::shouldCacheResponse): Added. Calls through
+        to the client if it implements shouldCacheResponse. Returns true otherwise.
+        * WebProcess/InjectedBundle/InjectedBundlePageResourceLoadClient.h:
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::willCacheResponse): Changed to call
+        InjectedBundlePageResourceLoadClient::shouldCacheResponse() and return nil if the former
+        returns false.
+        (WebKit::WebFrameLoaderClient::shouldCacheResponse): Changed to call
+        InjectedBundlePageResourceLoadClient::shouldCacheResponse().
+
+2012-02-04  Sam Weinig  <sam@webkit.org>
+
+        Add ability to send WKURLRequests in WebKit2 API user messages
+        https://bugs.webkit.org/show_bug.cgi?id=77819
+
+        Reviewed by Anders Carlsson.
+
+        Test: WebKit2UserMessageRoundTripTest API test.
+
+        * Shared/UserMessageCoders.h:
+        (WebKit::UserMessageEncoder::baseEncode):
+        (WebKit::UserMessageDecoder::baseDecode):
+        Add encode/decode for WebURLRequest.
+
+2012-02-04  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/10772406> WKPreferences instances cannot be copied
+        https://bugs.webkit.org/show_bug.cgi?id=77816
+
+        Reviewed by Sam Weinig.
+
+        Test added in TestWebKitAPI/Tests/WebKit2/WKPreferences.cpp.
+
+        * UIProcess/API/C/WKPreferences.cpp:
+        (WKPreferencesCreateCopy): Added.
+        * UIProcess/API/C/WKPreferencesPrivate.h:
+        * UIProcess/WebPreferences.cpp:
+        (WebKit::WebPreferences::WebPreferences): Added this constructor that copies the
+        WebPreferencesStore of the given WebPreferences.
+        * UIProcess/WebPreferences.h:
+        (WebKit::WebPreferences::create): Added this create function that takes a WebPreferences
+        instance and creates a new instance with a copy of the given instance’s store.
+
+2012-02-03  Anders Carlsson  <andersca@apple.com>
+
+        WebKit2 should dispatch wheel events to the new ScrollingTree class
+        https://bugs.webkit.org/show_bug.cgi?id=77795
+
+        Reviewed by Andreas Kling.
+
+        Replace all uses of ScrollingCoordinator with ScrollingTree instead.
+        Also, don't try to handle gesture events on the scrolling thread anymore;
+        we don't need to to that right now.
+
+        * WebProcess/WebPage/EventDispatcher.cpp:
+        (WebKit::EventDispatcher::addScrollingTreeForPage):
+        (WebKit::EventDispatcher::removeScrollingTreeForPage):
+        (WebKit::EventDispatcher::wheelEvent):
+        (WebKit::EventDispatcher::gestureEvent):
+        * WebProcess/WebPage/EventDispatcher.h:
+        (WebCore):
+        (EventDispatcher):
+        * WebProcess/WebPage/mac/TiledCoreAnimationDrawingArea.mm:
+        (WebKit::TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea):
+        (WebKit::TiledCoreAnimationDrawingArea::~TiledCoreAnimationDrawingArea):
+
+2012-02-03  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2 Mac] No need to allow access to input methods or keyboard layouts
+        https://bugs.webkit.org/show_bug.cgi?id=77775
+        <rdar://problem/9276253>
+        <rdar://problem/9276268>
+
+        Reviewed by Dan Bernstein.
+
+        * WebProcess/com.apple.WebProcess.sb: These rules were likely only necessary in early days
+        of WebKit2. If there are cases when this happens, that's likely wrong, and we need to know
+        about that.
+
+2012-02-03  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Use properly quoted string literals
+        https://bugs.webkit.org/show_bug.cgi?id=77583
+
+        Reviewed by Darin Adler.
+
+        Also added some FIXMEs.
+
+        * WebProcess/com.apple.WebProcess.sb:
+
+2012-02-03  Brady Eidson  <beidson@apple.com>
+
+        <rdar://problem/10742441> and https://bugs.webkit.org/show_bug.cgi?id=77766
+        Need a WK2 API to filter which subframes go into WebArchives as they are created.
+
+        Reviewed by Darin Adler.
+
+        Add a new WKBundleFrame API that takes a filter callback object to allow or reject
+        subframes from a WebArchive:
+        * WebProcess/InjectedBundle/API/c/WKBundleFrame.cpp:
+        (WKBundleFrameCopyWebArchive):
+        (WKBundleFrameCopyWebArchiveFilteringSubframes):
+        * WebProcess/InjectedBundle/API/c/WKBundleFrame.h:
+
+        Implement the above API by calling through to WebCore:
+        * WebProcess/WebPage/WebFrame.cpp:
+        (WebFrameFilter):
+        (WebKit::WebFrameFilter::WebFrameFilter):
+        (WebKit::WebFrameFilter::shouldIncludeSubframe):
+        (WebKit::WebFrame::webArchiveData):
+        * WebProcess/WebPage/WebFrame.h:
+        (WebFrame):
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::getWebArchiveOfFrame):
+
+2012-02-03  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac WK2] Use a minimally invasive way to fake plug-in process name
+        https://bugs.webkit.org/show_bug.cgi?id=77682
+
+        Reviewed by Darin Adler.
+
+        * PluginProcess/PluginProcess.cpp: (WebKit::PluginProcess::netscapePluginModule):
+        Only change the name as it's seen from within the process.
+
+        * Shared/Plugins/PluginQuirks.h: Fixed a typo.
+
+2012-02-03  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=77691
+        Fix PlatformScreen layering violation and PlatformScreenMac's incorrect use 
+        of device scale
+
+        Reviewed by Andy Estes.
+
+        toUserSpace() and toDeviceSpace() don't need to take device scale.
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView _convertToDeviceSpace:]):
+        (-[WKView _convertToUserSpace:]):
+
+2012-02-03  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        [Qt][Texmap] Refactor TextureMapper API to use ImageBuffers when possible.
+        https://bugs.webkit.org/show_bug.cgi?id=77148
+
+        Reviewed by Martin Robinson.
+
+        Use TextureMapper::create instead of creating TextureMapperGL/TextureMapperQt directly.
+        Remove calls to unused API.
+
+        * UIProcess/qt/LayerTreeHostProxyQt.cpp:
+        (WebKit::LayerTreeHostProxy::paintToCurrentGLContext):
+        (WebKit::LayerTreeHostProxy::paintToGraphicsContext):
+        (WebKit::LayerTreeHostProxy::createImage):
+        (WebKit::LayerTreeHostProxy::ensureRootLayer):
+
+2012-02-03  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt] Split QQuickWebViewPrivate in two classes, for desktop and touch behavior.
+        https://bugs.webkit.org/show_bug.cgi?id=77632
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Replace the runtime property setting the desktop behavior on each instance
+        by a static boolean controlling the behavior used by future created WebViews.
+
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        Let only setContentsSize control the size of the drawing area instead of deferring
+        it until geometryChanged is called.
+        (QQuickWebPagePrivate::QQuickWebPagePrivate):
+        * UIProcess/API/qt/qquickwebpage_p.h:
+        * UIProcess/API/qt/qquickwebpage_p_p.h:
+        (QQuickWebPagePrivate):
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (createPrivateObject):
+        (QQuickWebViewPrivate::QQuickWebViewPrivate):
+        (QQuickWebViewPrivate::~QQuickWebViewPrivate):
+        (QQuickWebViewPrivate::initialize):
+        (QQuickWebViewPrivate::processDidCrash):
+        (QQuickWebViewLegacyPrivate::QQuickWebViewLegacyPrivate):
+        (QQuickWebViewLegacyPrivate::initialize):
+        (QQuickWebViewLegacyPrivate::updateViewportSize):
+        (QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate):
+        (QQuickWebViewFlickablePrivate::~QQuickWebViewFlickablePrivate):
+        (QQuickWebViewFlickablePrivate::initialize):
+        (QQuickWebViewFlickablePrivate::loadDidCommit):
+        (QQuickWebViewFlickablePrivate::didFinishFirstNonEmptyLayout):
+        (QQuickWebViewFlickablePrivate::didChangeViewportProperties):
+        (QQuickWebViewFlickablePrivate::updateViewportSize):
+        (QQuickWebViewFlickablePrivate::_q_updateVisibleContentRectAndScale):
+        (QQuickWebViewFlickablePrivate::_q_suspend):
+        (QQuickWebViewFlickablePrivate::_q_resume):
+        (QQuickWebViewFlickablePrivate::pageDidRequestScroll):
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+        (QQuickWebViewFlickablePrivate::computeViewportConstraints):
+        (QQuickWebViewFlickablePrivate::PostTransitionState::apply):
+        (QQuickWebViewExperimental::setFlickableViewportEnabled):
+        The switch is now a static function that has to be called before a WebView
+        is created. The switch can have it's default defined by the deploying platform.
+        (QQuickWebViewExperimental::flickableViewportEnabled):
+        (QQuickWebView::QQuickWebView):
+        On creation of QQuickWebView, the static boolean is read to know if we want
+        a QQuickWebViewTouchPrivate or a QQuickWebViewDesktopPrivate.
+        (QQuickWebView::geometryChanged):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        (QQuickWebViewPrivate::loadDidCommit):
+        (QQuickWebViewPrivate::didFinishFirstNonEmptyLayout):
+        (QQuickWebViewPrivate::didChangeViewportProperties):
+        (QQuickWebViewPrivate::viewportInteractionEngine):
+        (QQuickWebViewPrivate::updateViewportSize):
+        (QQuickWebViewPrivate::_q_updateVisibleContentRectAndScale):
+        (QQuickWebViewPrivate::_q_suspend):
+        (QQuickWebViewPrivate::_q_resume):
+        (QQuickWebViewPrivate::pageDidRequestScroll):
+        (QQuickWebViewPrivate::didChangeContentsSize):
+        (QQuickWebViewLegacyPrivate):
+        (QQuickWebViewFlickablePrivate):
+        (QQuickWebViewFlickablePrivate::viewportInteractionEngine):
+        (PostTransitionState):
+        (QQuickWebViewFlickablePrivate::PostTransitionState::PostTransitionState):
+        * UIProcess/API/qt/qwebviewportinfo.cpp:
+        (QWebViewportInfo::currentScale):
+        (QWebViewportInfo::devicePixelRatio):
+        (QWebViewportInfo::initialScale):
+        (QWebViewportInfo::minimumScale):
+        (QWebViewportInfo::maximumScale):
+        (QWebViewportInfo::isScalable):
+        (QWebViewportInfo::layoutSize):
+        * UIProcess/API/qt/tests/publicapi/publicapi.pro:
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior.pro: Added.
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/DesktopWebView.qml: Removed.
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_itemSelector.qml: Renamed
+        from Source/WebKit2/UIProcess/API/qt/tests/qmltests/WebView/tst_itemSelector.qml.
+        Moved to DesktopBehavior instead of using a DesktopWebView to workaround the touch event limitation.
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_linkHovered.qml:
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_loadHtml.qml:
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_messaging.qml:
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_navigationRequested.qml:
+        * UIProcess/API/qt/tests/qmltests/WebView.pro: Copied
+        from Source/WebKit2/UIProcess/API/qt/tests/qmltests/qmltests.pro.
+        * UIProcess/API/qt/tests/qmltests/qmltests.pro:
+        Split qmltests in two executables, tst_qmltests_DesktopBehavior and tst_qmltests_WebView.
+        The former runs without setFlickableViewportEnabled and the later does.
+        * UIProcess/API/qt/tests/qmltests/tst_qmltests.cpp:
+        (main):
+        * UIProcess/API/qt/tests/qquickwebview/qquickwebview.pro:
+        * UIProcess/API/qt/tests/tests.pri:
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (QtWebPageEventHandler::QtWebPageEventHandler):
+
+2012-02-02  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt] Rename content* to contents* in QQuickWebPage.
+        https://bugs.webkit.org/show_bug.cgi?id=77629
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPagePrivate::QQuickWebPagePrivate):
+        (QQuickWebPagePrivate::paintToCurrentGLContext):
+        (QQuickWebPage::setContentsSize):
+        (QQuickWebPage::contentsSize):
+        (QQuickWebPage::setContentsScale):
+        (QQuickWebPage::contentsScale):
+        (QQuickWebPage::transformToItem):
+        (QQuickWebPagePrivate::updateSize):
+        * UIProcess/API/qt/qquickwebpage_p.h:
+        * UIProcess/API/qt/qquickwebpage_p_p.h:
+        (QQuickWebPagePrivate):
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::didChangeContentsSize):
+        (QQuickWebViewPrivate::updateVisibleContentRectAndScale):
+        (QQuickWebViewPrivate::PostTransitionState::apply):
+        * UIProcess/API/qt/qwebviewportinfo.cpp:
+        (QWebViewportInfo::contentsSize):
+        * UIProcess/API/qt/tests/qquickwebview/tst_qquickwebview.cpp:
+        (tst_QQuickWebView::scrollRequest):
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::setItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::event):
+        (WebKit::QtViewportInteractionEngine::wheelEvent):
+        (WebKit::QtViewportInteractionEngine::pagePositionRequest):
+        (WebKit::QtViewportInteractionEngine::computePosRangeForItemAtScale):
+        (WebKit::QtViewportInteractionEngine::applyConstraints):
+        (WebKit::QtViewportInteractionEngine::currentCSSScale):
+        (WebKit::QtViewportInteractionEngine::pinchGestureStarted):
+        (WebKit::QtViewportInteractionEngine::scaleContent):
+
+2012-02-03  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix build when cross-compiling
+        https://bugs.webkit.org/show_bug.cgi?id=77634
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit2.pri: Link in -lrt on linux mkspecs, regardless of whether gcc
+        is in use or not. More specifically this fixes the case where the makespace
+        is not linux-g++* but for a cross-compiling one like linux-arm-gnueabi-g++.
+
+2012-02-03  Shinya Kawanaka  <shinyak@google.com>
+
+        Stop calling Element::ensureShadowRoot in Internals.
+        https://bugs.webkit.org/show_bug.cgi?id=77612
+
+        Reviewed by Hajime Morita.
+
+        Exports symbols.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-02-02  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r106620.
+        http://trac.webkit.org/changeset/106620
+        https://bugs.webkit.org/show_bug.cgi?id=77716
+
+        It broke non ENABLE(3D_RENDERING) builds (Requested by
+        Ossy_morning on #webkit).
+
+        * UIProcess/qt/LayerTreeHostProxyQt.cpp:
+        (WebKit::LayerTreeHostProxy::paintToCurrentGLContext):
+        (WebKit::LayerTreeHostProxy::paintToGraphicsContext):
+        (WebKit::LayerTreeHostProxy::createImage):
+        (WebKit::LayerTreeHostProxy::ensureRootLayer):
+
+2012-02-02  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        [Qt][Texmap] Refactor TextureMapper API to use ImageBuffers when possible.
+        https://bugs.webkit.org/show_bug.cgi?id=77148
+
+        Reviewed by Martin Robinson.
+
+        Use TextureMapper::create instead of creating TextureMapperGL/TextureMapperQt directly.
+        Remove calls to unused API.
+
+        * UIProcess/qt/LayerTreeHostProxyQt.cpp:
+        (WebKit::LayerTreeHostProxy::paintToCurrentGLContext):
+        (WebKit::LayerTreeHostProxy::paintToGraphicsContext):
+        (WebKit::LayerTreeHostProxy::createImage):
+        (WebKit::LayerTreeHostProxy::ensureRootLayer):
+
+2012-02-02  Jon Lee  <jonlee@apple.com>
+
+        Clear shown notifications when context is no longer active
+        https://bugs.webkit.org/show_bug.cgi?id=77363
+        <rdar://problem/10568907>
+
+        Reviewed by Darin Adler.
+
+        * WebProcess/WebCoreSupport/WebNotificationClient.cpp:
+        (WebKit::WebNotificationClient::clearNotifications): Forward the call to
+        WebNotificationManager.
+        * WebProcess/WebCoreSupport/WebNotificationClient.h:
+        (WebNotificationClient):
+
+        * WebProcess/Notifications/WebNotificationManager.h: Add an additional map that maps
+        all notifications associated with a given ScriptExecutionContext instance.
+        * WebProcess/Notifications/WebNotificationManager.cpp:
+        (WebKit::WebNotificationManager::show): Create a map entry for the notification's
+        context if it doesn't exist already, and note that notification's ID. Also, correct
+        the return value of show() if notifications are not enabled, to return false.
+        (WebKit::WebNotificationManager::didCloseNotifications): When the notification is closed,
+        we remove that notification from the map.
+        (WebKit::WebNotificationManager::clearNotifications): Use the map entry for the given
+        context, and pass that along to the proxy so that all of the notifications with those IDs
+        can be cleared. In the meantime, we remove that context's map entry.
+
+        * UIProcess/Notifications/WebNotificationManagerProxy.messages.in: New ClearNotifications()
+        message.
+        * UIProcess/Notifications/WebNotificationManagerProxy.h:
+        * UIProcess/Notifications/WebNotificationManagerProxy.cpp:
+        (WebKit::WebNotificationManagerProxy::clearNotifications): Forward the call to the provider.
+        Then remove this proxy's entries for the given notification IDs.
+
+        * UIProcess/Notifications/WebNotificationProvider.cpp:
+        (WebKit::WebNotificationProvider::clearNotifications): Convert the vector of IDs to a mutable
+        array.
+        * UIProcess/Notifications/WebNotificationProvider.h:
+        (WebNotificationProvider):
+
+        * UIProcess/API/C/WKNotificationProvider.h: Add WK API to tell the platform to clear the notifications.
+
+        Remove the #if guard since they already exist in WebNotificationManager functions:
+        * WebProcess/WebCoreSupport/WebNotificationClient.cpp:
+        (WebKit::WebNotificationClient::show):
+        (WebKit::WebNotificationClient::cancel):
+        (WebKit::WebNotificationClient::notificationObjectDestroyed):
+
+2012-02-02  Anders Carlsson  <andersca@apple.com>
+
+        NPAPI will not send mouse up events when mouse is outside plugin area
+        https://bugs.webkit.org/show_bug.cgi?id=77657
+        <rdar://problem/10160674>
+
+        Reviewed by Andreas Kling.
+
+        Use EventHandler::setCapturingMouseEventsNode to ensure we get all the mouse events when the mouse is down.
+
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::handleEvent):
+
 2012-02-02  Claudio Saavedra  <csaavedra@igalia.com> and Martin Robinson  <mrobinson@igalia.com>
 
         [GTK] WebKitWebView won't work in a GtkOffscreenWindow

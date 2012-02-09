@@ -263,6 +263,8 @@ public:
     // string. This should not be called for types without valueAsNumber.
     virtual String serialize(double) const;
 
+    virtual bool supportsIndeterminateAppearance() const;
+
 protected:
     InputType(HTMLInputElement* element) : m_element(element) { }
     HTMLInputElement* element() const { return m_element; }
@@ -290,7 +292,6 @@ const AtomicString& email();
 const AtomicString& file();
 const AtomicString& hidden();
 const AtomicString& image();
-const AtomicString& isindex();
 const AtomicString& month();
 const AtomicString& number();
 const AtomicString& password();

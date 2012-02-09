@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2004 Zack Rusin <zack@kde.org>
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
  * Copyright (C) 2007 Nicholas Shanks <webkit@nickshanks.com>
  * Copyright (C) 2011 Sencha, Inc. All rights reserved.
@@ -28,7 +28,6 @@
 #include "CSSAspectRatioValue.h"
 #include "CSSBorderImage.h"
 #include "CSSLineBoxContainValue.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSParser.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPrimitiveValueMappings.h"
@@ -58,6 +57,7 @@
 #include "RenderLayer.h"
 #include "RenderStyle.h"
 #include "ShadowValue.h"
+#include "StylePropertySet.h"
 #if ENABLE(CSS_FILTERS)
 #include "StyleCustomFilterProgram.h"
 #include "WebKitCSSFilterValue.h"
@@ -668,7 +668,7 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
     if (!renderer || style->transform().operations().isEmpty())
         return cssValuePool->createIdentifierValue(CSSValueNone);
 
-    IntRect box = sizingBox(renderer);
+    LayoutRect box = sizingBox(renderer);
 
     TransformationMatrix transform;
     style->applyTransform(transform, box.size(), RenderStyle::ExcludeTransformOrigin);
@@ -2113,7 +2113,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyWebkitPerspectiveOrigin: {
             RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
             if (renderer) {
-                IntRect box = sizingBox(renderer);
+                LayoutRect box = sizingBox(renderer);
                 list->append(zoomAdjustedPixelValue(style->perspectiveOriginX().calcMinValue(box.width()), style.get(), cssValuePool));
                 list->append(zoomAdjustedPixelValue(style->perspectiveOriginY().calcMinValue(box.height()), style.get(), cssValuePool));
             }
@@ -2514,12 +2514,12 @@ bool CSSComputedStyleDeclaration::cssPropertyMatches(const CSSProperty* property
     return value && value->cssText() == property->value()->cssText();
 }
 
-PassRefPtr<CSSMutableStyleDeclaration> CSSComputedStyleDeclaration::copy() const
+PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copy() const
 {
     return copyPropertiesInSet(computedProperties, numComputedProperties);
 }
 
-PassRefPtr<CSSMutableStyleDeclaration> CSSComputedStyleDeclaration::makeMutable()
+PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::makeMutable()
 {
     return copy();
 }
@@ -2562,7 +2562,7 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getCSSPropertyValuesForSid
     return list.release();
 }
 
-PassRefPtr<CSSMutableStyleDeclaration> CSSComputedStyleDeclaration::copyPropertiesInSet(const int* set, unsigned length) const
+PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(const int* set, unsigned length) const
 {
     Vector<CSSProperty> list;
     list.reserveInitialCapacity(length);
@@ -2571,7 +2571,12 @@ PassRefPtr<CSSMutableStyleDeclaration> CSSComputedStyleDeclaration::copyProperti
         if (value)
             list.append(CSSProperty(set[i], value.release(), false));
     }
-    return CSSMutableStyleDeclaration::create(list);
+    return StylePropertySet::create(list);
+}
+
+CSSRule* CSSComputedStyleDeclaration::parentRule() const
+{
+    return 0;
 }
 
 PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(const String& propertyName)

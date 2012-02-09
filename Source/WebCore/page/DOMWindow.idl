@@ -28,23 +28,22 @@ module window {
 
     interface [
         CheckDomainSecurity,
-        CustomDefineGetter,
-        CustomDefineSetter,
+        JSCustomDefineOwnProperty,
         CustomDeleteProperty,
         CustomGetOwnPropertySlot,
         CustomGetPropertyNames,
-        CustomMarkFunction,
-        CustomNativeConverter,
+        JSCustomMarkFunction,
+        JSCustomToNativeObject,
         CustomPutFunction,
         EventTarget,
         ExtendsDOMGlobalObject,
-        GenerateNativeConverter,
+        JSGenerateToNativeObject,
         ReplaceableConstructor,
-        LegacyParent=JSDOMWindowBase
+        JSLegacyParent=JSDOMWindowBase
     ] DOMWindow {
         // DOM Level 0
         attribute [Replaceable] Screen screen;
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet, JSCCustomGetter] History history;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter, JSCustomGetter] History history;
         attribute [Replaceable] BarInfo locationbar;
         attribute [Replaceable] BarInfo menubar;
         attribute [Replaceable] BarInfo personalbar;
@@ -54,14 +53,14 @@ module window {
         attribute [Replaceable] Navigator navigator;
         attribute [Replaceable] Navigator clientInformation;
         readonly attribute Crypto crypto;
-        attribute [DoNotCheckDomainSecurity, JSCCustom, V8CustomSetter, V8Unforgeable, CPPCustom] Location location;
+        attribute [DoNotCheckDomainSecurity, JSCustom, V8CustomSetter, V8Unforgeable, CPPCustom] Location location;
 
         attribute [Replaceable, CustomGetter, V8CustomSetter] Event event;
 
 
         DOMSelection getSelection();
 
-        readonly attribute [CheckNodeSecurity] Element frameElement;
+        readonly attribute [CheckAccessToNode] Element frameElement;
 
         [DoNotCheckDomainSecurity] void focus();
         [DoNotCheckDomainSecurity] void blur();
@@ -81,7 +80,7 @@ module window {
         void alert(in [Optional=CallWithDefaultValue] DOMString message);
         boolean confirm(in [Optional=CallWithDefaultValue] DOMString message);
         [ConvertNullStringTo=Null] DOMString prompt(in [Optional=CallWithDefaultValue] DOMString message,
-                                                    in [ConvertUndefinedOrNullToNullString,Optional=CallWithDefaultValue] DOMString defaultValue);
+                                                    in [TreatNullAs=NullString, TreatUndefinedAs=NullString,Optional=CallWithDefaultValue] DOMString defaultValue);
 
         boolean find(in [Optional=CallWithDefaultValue] DOMString string,
                      in [Optional=CallWithDefaultValue] boolean caseSensitive,
@@ -116,7 +115,7 @@ module window {
 
         readonly attribute [DoNotCheckDomainSecurity] boolean closed;
 
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet] unsigned long length;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter] unsigned long length;
 
         attribute DOMString name;
 
@@ -128,13 +127,13 @@ module window {
 #endif
 
         // Self referential attributes
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet] DOMWindow self;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter] DOMWindow self;
         readonly attribute [DoNotCheckDomainSecurity, V8Unforgeable] DOMWindow window;
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet] DOMWindow frames;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter] DOMWindow frames;
 
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet, V8CustomSetter] DOMWindow opener;
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet] DOMWindow parent;
-        attribute [Replaceable, DoNotCheckDomainSecurityOnGet, V8Unforgeable, V8ReadOnly] DOMWindow top;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter, V8CustomSetter] DOMWindow opener;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter] DOMWindow parent;
+        attribute [Replaceable, DoNotCheckDomainSecurityOnGetter, V8Unforgeable, V8ReadOnly] DOMWindow top;
 
         // DOM Level 2 AbstractView Interface
         readonly attribute Document document;
@@ -147,7 +146,7 @@ module window {
 
         // DOM Level 2 Style Interface
         CSSStyleDeclaration getComputedStyle(in [Optional=CallWithDefaultValue] Element element,
-                                             in [ConvertUndefinedOrNullToNullString,Optional=CallWithDefaultValue] DOMString pseudoElement);
+                                             in [TreatNullAs=NullString, TreatUndefinedAs=NullString,Optional=CallWithDefaultValue] DOMString pseudoElement);
 
         // WebKit extensions
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
@@ -162,21 +161,21 @@ module window {
         WebKitPoint webkitConvertPointFromNodeToPage(in [Optional=CallWithDefaultValue] Node node, 
                                                      in [Optional=CallWithDefaultValue] WebKitPoint p);
 
-        readonly attribute [EnabledAtRuntime] DOMApplicationCache applicationCache;
+        readonly attribute [V8EnabledAtRuntime] DOMApplicationCache applicationCache;
 
-        readonly attribute [EnabledAtRuntime] Storage sessionStorage
+        readonly attribute [V8EnabledAtRuntime] Storage sessionStorage
             getter raises(DOMException);
-        readonly attribute [EnabledAtRuntime] Storage localStorage
+        readonly attribute [V8EnabledAtRuntime] Storage localStorage
             getter raises(DOMException);
 
 #if defined(ENABLE_NOTIFICATIONS) && ENABLE_NOTIFICATIONS
-        readonly attribute [EnabledAtRuntime] NotificationCenter webkitNotifications;
+        readonly attribute [V8EnabledAtRuntime] NotificationCenter webkitNotifications;
 #endif
 #if defined(ENABLE_FILE_SYSTEM) && ENABLE_FILE_SYSTEM
         const unsigned short TEMPORARY = 0;
         const unsigned short PERSISTENT = 1;
-        [EnabledAtRuntime=FileSystem] void webkitRequestFileSystem(in unsigned short type, in long long size, in [Callback] FileSystemCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
-        [EnabledAtRuntime=FileSystem] void webkitResolveLocalFileSystemURL(in DOMString url, in [Callback, Optional] EntryCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
+        [V8EnabledAtRuntime=FileSystem] void webkitRequestFileSystem(in unsigned short type, in long long size, in [Callback] FileSystemCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
+        [V8EnabledAtRuntime=FileSystem] void webkitResolveLocalFileSystemURL(in DOMString url, in [Callback, Optional] EntryCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
 #endif
 
 #if defined(ENABLE_ORIENTATION_EVENTS) && ENABLE_ORIENTATION_EVENTS
@@ -228,9 +227,9 @@ module window {
 #endif
 
         // Base64
-        DOMString atob(in [TreatNullAs=EmptyString,Optional=CallWithDefaultValue] DOMString string)
+        DOMString atob(in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString string)
             raises(DOMException);
-        DOMString btoa(in [TreatNullAs=EmptyString,Optional=CallWithDefaultValue] DOMString string)
+        DOMString btoa(in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString string)
             raises(DOMException);
 
         // Events
@@ -314,15 +313,15 @@ module window {
 #if defined(ENABLE_ORIENTATION_EVENTS) && ENABLE_ORIENTATION_EVENTS
         attribute EventListener onorientationchange;
 #endif
-        attribute [Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchstart;
-        attribute [Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchmove;
-        attribute [Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchend;
-        attribute [Conditional=TOUCH_EVENTS,EnabledAtRuntime] EventListener ontouchcancel;
+        attribute [Conditional=TOUCH_EVENTS,V8EnabledAtRuntime] EventListener ontouchstart;
+        attribute [Conditional=TOUCH_EVENTS,V8EnabledAtRuntime] EventListener ontouchmove;
+        attribute [Conditional=TOUCH_EVENTS,V8EnabledAtRuntime] EventListener ontouchend;
+        attribute [Conditional=TOUCH_EVENTS,V8EnabledAtRuntime] EventListener ontouchcancel;
 
-        attribute [Conditional=DEVICE_ORIENTATION,EnabledAtRuntime] EventListener ondevicemotion;
-        attribute [Conditional=DEVICE_ORIENTATION,EnabledAtRuntime] EventListener ondeviceorientation;
+        attribute [Conditional=DEVICE_ORIENTATION,V8EnabledAtRuntime] EventListener ondevicemotion;
+        attribute [Conditional=DEVICE_ORIENTATION,V8EnabledAtRuntime] EventListener ondeviceorientation;
 
-        attribute [Conditional=MEDIA_STREAM,EnabledAtRuntime] PeerConnectionConstructor webkitPeerConnection;
+        attribute [Conditional=MEDIA_STREAM,V8EnabledAtRuntime] PeerConnectionConstructor webkitPeerConnection;
 
         // EventTarget interface
         [Custom] void addEventListener(in DOMString type,
@@ -398,7 +397,7 @@ module window {
         attribute EntityConstructor Entity;
         attribute EntityReferenceConstructor EntityReference;
         attribute ProcessingInstructionConstructor ProcessingInstruction;
-        attribute [Conditional=SHADOW_DOM, EnabledAtRuntime=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
+        attribute [Conditional=SHADOW_DOM, V8EnabledAtRuntime=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
 
         attribute HTMLDocumentConstructor HTMLDocument;
 
@@ -472,8 +471,8 @@ module window {
         attribute [Conditional=MICRODATA] HTMLPropertiesCollectionConstructor HTMLPropertiesCollection;
         attribute HTMLUnknownElementConstructor HTMLUnknownElement;
 
-        attribute [JSCCustomGetter, CustomConstructor] HTMLImageElementConstructorConstructor Image; // Usable with new operator
-        attribute [JSCCustomGetter] HTMLOptionElementConstructorConstructor Option; // Usable with new operator
+        attribute [JSCustomGetter, CustomConstructor] HTMLImageElementConstructorConstructor Image; // Usable with new operator
+        attribute [JSCustomGetter] HTMLOptionElementConstructorConstructor Option; // Usable with new operator
 
         attribute CanvasPatternConstructor CanvasPattern;
         attribute CanvasGradientConstructor CanvasGradient;
@@ -526,8 +525,8 @@ module window {
         attribute WheelEventConstructor WheelEvent;
         attribute XMLHttpRequestProgressEventConstructor XMLHttpRequestProgressEvent;
         attribute [Conditional=SVG] SVGZoomEventConstructor SVGZoomEvent;
-        attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceMotionEventConstructor DeviceMotionEvent;
-        attribute [Conditional=DEVICE_ORIENTATION, EnabledAtRuntime] DeviceOrientationEventConstructor DeviceOrientationEvent;
+        attribute [Conditional=DEVICE_ORIENTATION, V8EnabledAtRuntime] DeviceMotionEventConstructor DeviceMotionEvent;
+        attribute [Conditional=DEVICE_ORIENTATION, V8EnabledAtRuntime] DeviceOrientationEventConstructor DeviceOrientationEvent;
         attribute [Conditional=TOUCH_EVENTS] TouchEventConstructor TouchEvent;
         attribute StorageEventConstructor StorageEvent;
         attribute [Conditional=INPUT_SPEECH] SpeechInputEventConstructor SpeechInputEvent;
@@ -579,16 +578,16 @@ module window {
 #endif
 
 #if defined(ENABLE_SHARED_WORKERS) && ENABLE_SHARED_WORKERS
-        attribute [JSCCustomGetter, EnabledAtRuntime] SharedWorkerConstructor SharedWorker; // Usable with the new operator
+        attribute [JSCustomGetter, V8EnabledAtRuntime] SharedWorkerConstructor SharedWorker; // Usable with the new operator
 #endif
 
 #if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK
-        attribute [EnabledAtRuntime=webkitVideoTrack] HTMLTrackElementConstructor HTMLTrackElement;
-        attribute [EnabledAtRuntime=webkitVideoTrack] TextTrackConstructor TextTrack;
-        attribute [EnabledAtRuntime=webkitVideoTrack] TextTrackCueConstructor TextTrackCue; // Usable with the new operator
-        attribute [EnabledAtRuntime=webkitVideoTrack] TextTrackCueListConstructor TextTrackCueList;
-        attribute [EnabledAtRuntime=webkitVideoTrack] TextTrackListConstructor TextTrackList;
-        attribute [EnabledAtRuntime=webkitVideoTrack] TrackEventConstructor TrackEvent;
+        attribute [V8EnabledAtRuntime=webkitVideoTrack] HTMLTrackElementConstructor HTMLTrackElement;
+        attribute [V8EnabledAtRuntime=webkitVideoTrack] TextTrackConstructor TextTrack;
+        attribute [V8EnabledAtRuntime=webkitVideoTrack] TextTrackCueConstructor TextTrackCue; // Usable with the new operator
+        attribute [V8EnabledAtRuntime=webkitVideoTrack] TextTrackCueListConstructor TextTrackCueList;
+        attribute [V8EnabledAtRuntime=webkitVideoTrack] TextTrackListConstructor TextTrackList;
+        attribute [V8EnabledAtRuntime=webkitVideoTrack] TrackEventConstructor TrackEvent;
 #endif
 
         attribute DOMPluginConstructor Plugin;
@@ -602,14 +601,14 @@ module window {
 
         attribute StorageConstructor Storage;
 
-        attribute [JSCCustomGetter, Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructorConstructor Audio; // Usable with the new operator
-        attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLAudioElementConstructor HTMLAudioElement;
-        attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLMediaElementConstructor HTMLMediaElement;
-        attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLVideoElementConstructor HTMLVideoElement;
-        attribute [Conditional=VIDEO, EnabledAtRuntime] MediaErrorConstructor MediaError;
-        attribute [Conditional=VIDEO, EnabledAtRuntime] TimeRangesConstructor TimeRanges;
-        attribute [Conditional=VIDEO, EnabledAtRuntime] HTMLSourceElementConstructor HTMLSourceElement;
-        attribute [Conditional=VIDEO, EnabledAtRuntime] MediaControllerConstructor MediaController;
+        attribute [JSCustomGetter, Conditional=VIDEO, V8EnabledAtRuntime] HTMLAudioElementConstructorConstructor Audio; // Usable with the new operator
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLAudioElementConstructor HTMLAudioElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLMediaElementConstructor HTMLMediaElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLVideoElementConstructor HTMLVideoElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] MediaErrorConstructor MediaError;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] TimeRangesConstructor TimeRanges;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLSourceElementConstructor HTMLSourceElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] MediaControllerConstructor MediaController;
 
 #if defined(ENABLE_ANIMATION_API) && ENABLE_ANIMATION_API
         attribute WebKitAnimationConstructor WebKitAnimation;
@@ -783,10 +782,10 @@ module window {
 
         attribute [Conditional=BLOB] WebKitBlobBuilderConstructor WebKitBlobBuilder;
 
-        readonly attribute [Conditional=BLOB] DOMURL webkitURL;
+        attribute [Conditional=BLOB] DOMURLConstructor webkitURL;
 
 #if defined(ENABLE_QUOTA) && ENABLE_QUOTA
-        readonly attribute [EnabledAtRuntime=Quota] StorageInfo webkitStorageInfo;
+        readonly attribute [V8EnabledAtRuntime=Quota] StorageInfo webkitStorageInfo;
 #endif
 
         attribute [Conditional=MUTATION_OBSERVERS] WebKitMutationObserverConstructor WebKitMutationObserver;
@@ -795,7 +794,7 @@ module window {
 
 #if defined(V8_BINDING) && V8_BINDING
         // window.toString() requires special handling in V8
-        [V8DoNotCheckSignature, DoNotCheckDomainSecurity, Custom, DontEnum] DOMString toString();
+        [V8DoNotCheckSignature, DoNotCheckDomainSecurity, Custom, NotEnumerable] DOMString toString();
 #endif // defined(V8_BINDING)
     };
 

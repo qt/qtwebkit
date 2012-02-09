@@ -148,7 +148,7 @@ void CCLayerTreeHostImpl::trackDamageForAllSurfaces(CCLayerImpl* rootDrawLayer, 
         CCLayerImpl* renderSurfaceLayer = renderSurfaceLayerList[surfaceIndex].get();
         CCRenderSurface* renderSurface = renderSurfaceLayer->renderSurface();
         ASSERT(renderSurface);
-        renderSurface->damageTracker()->updateDamageRectForNextFrame(renderSurface->layerList(), renderSurfaceLayer->id(), renderSurfaceLayer->maskLayer());
+        renderSurface->damageTracker()->updateDamageTrackingState(renderSurface->layerList(), renderSurfaceLayer->id(), renderSurfaceLayer->maskLayer());
     }
 }
 
@@ -231,6 +231,7 @@ void CCLayerTreeHostImpl::calculateRenderPasses(CCRenderPassList& passes)
                 continue;
             }
 
+            layer->willDraw(m_layerRenderer.get());
             pass->appendQuadsForLayer(layer);
         }
 
@@ -284,8 +285,7 @@ void CCLayerTreeHostImpl::finishAllRendering()
 
 bool CCLayerTreeHostImpl::isContextLost()
 {
-    ASSERT(m_layerRenderer);
-    return m_layerRenderer->isContextLost();
+    return m_layerRenderer && m_layerRenderer->isContextLost();
 }
 
 const LayerRendererCapabilities& CCLayerTreeHostImpl::layerRendererCapabilities() const

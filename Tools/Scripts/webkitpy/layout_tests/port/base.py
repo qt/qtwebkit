@@ -27,10 +27,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Abstract base class of Port-specific entrypoints for the layout tests
+"""Abstract base class of Port-specific entry points for the layout tests
 test infrastructure (the Port and Driver classes)."""
-
-from __future__ import with_statement
 
 import cgi
 import difflib
@@ -40,14 +38,6 @@ import re
 
 from webkitpy.common.memoized import memoized
 from webkitpy.common.system import path
-
-
-# Handle Python < 2.6 where multiprocessing isn't available.
-try:
-    import multiprocessing
-except ImportError:
-    multiprocessing = None
-
 from webkitpy.common import find_files
 from webkitpy.common.system import logutils
 from webkitpy.common.system.executive import ScriptError
@@ -150,7 +140,6 @@ class Port(object):
             self.set_option_default('configuration', self.default_configuration())
         self._test_configuration = None
         self._reftest_list = {}
-        self._multiprocessing_is_available = (multiprocessing is not None)
         self._results_directory = None
 
     def wdiff_available(self):
@@ -178,9 +167,7 @@ class Port(object):
         return cpu_count
 
     def default_worker_model(self):
-        if self._multiprocessing_is_available:
-            return 'processes'
-        return 'inline'
+        return 'processes'
 
     def baseline_path(self):
         """Return the absolute path to the directory to store new baselines in for this port."""
@@ -468,18 +455,15 @@ class Port(object):
 
         reftest_list = self._get_reftest_list(test_name)
         if not reftest_list:
-            expected_filenames = [('==', self.expected_filename(test_name, '.html')), ('!=', self.expected_filename(test_name, '-mismatch.html'))]
-            return [(expectation, filename) for expectation, filename in expected_filenames if self._filesystem.exists(filename)]
+            reftest_list = []
+            for expectation, prefix in (('==', ''), ('!=', '-mismatch')):
+                for extention in Port._supported_file_extensions:
+                    path = self.expected_filename(test_name, prefix + extention)
+                    if self._filesystem.exists(path):
+                        reftest_list.append((expectation, path))
+            return reftest_list
 
         return reftest_list.get(self._filesystem.join(self.layout_tests_dir(), test_name), [])
-
-    def is_reftest(self, test_name):
-        reftest_list = self._get_reftest_list(test_name)
-        if not reftest_list:
-            has_expected = self._filesystem.exists(self.expected_filename(test_name, '.html'))
-            return has_expected or self._filesystem.exists(self.expected_filename(test_name, '-mismatch.html'))
-        filename = self._filesystem.join(self.layout_tests_dir(), test_name)
-        return filename in reftest_list
 
     def tests(self, paths):
         """Return the list of tests found."""
@@ -900,11 +884,12 @@ class Port(object):
         sync up the two repos."""
         return None
 
-    def test_repository_paths(self):
-        """Returns a list of (repository_name, repository_path) tuples
-        of its depending code base.  By default it returns a list that only
-        contains a ('webkit', <webkitRepossitoryPath>) tuple.
-        """
+    def repository_paths(self):
+        """Returns a list of (repository_name, repository_path) tuples of its depending code base.
+        By default it returns a list that only contains a ('webkit', <webkitRepossitoryPath>) tuple."""
+
+        # We use LayoutTest directory here because webkit_base isn't a part webkit repository in Chromium port
+        # where turnk isn't checked out as a whole.
         return [('webkit', self.layout_tests_dir())]
 
 

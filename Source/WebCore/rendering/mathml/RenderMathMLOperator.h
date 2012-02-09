@@ -41,7 +41,7 @@ public:
     virtual void stretchToHeight(int pixelHeight);
     virtual void updateFromElement(); 
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
-    virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
+    virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
         
 protected:
     virtual void layout();
@@ -67,6 +67,9 @@ inline const RenderMathMLOperator* toRenderMathMLOperator(const RenderMathMLBloc
     ASSERT(!block || block->isRenderMathMLOperator());
     return static_cast<const RenderMathMLOperator*>(block);
 }
+
+// This will catch anyone doing an unnecessary cast.
+void toRenderMathMLOperator(const RenderMathMLOperator*);
 
 inline UChar convertHyphenMinusToMinusSign(UChar glyph)
 {

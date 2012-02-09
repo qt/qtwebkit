@@ -51,9 +51,8 @@
 #include "platform/WebRect.h"
 #include <skia/ext/platform_canvas.h>
 
-#if ENABLE(GESTURE_RECOGNIZER)
+#if ENABLE(GESTURE_EVENTS)
 #include "PlatformGestureEvent.h"
-#include "PlatformGestureRecognizer.h"
 #endif
 
 using namespace WebCore;
@@ -73,9 +72,6 @@ WebPopupMenu* WebPopupMenu::create(WebWidgetClient* client)
 WebPopupMenuImpl::WebPopupMenuImpl(WebWidgetClient* client)
     : m_client(client)
     , m_widget(0)
-#if ENABLE(GESTURE_RECOGNIZER)
-    , m_gestureRecognizer(WebCore::PlatformGestureRecognizer::create())
-#endif
 {
     // Set to impossible point so we always get the first mouse position.
     m_lastMousePosition = WebPoint(-1, -1);
@@ -143,11 +139,6 @@ bool WebPopupMenuImpl::handleTouchEvent(const WebTouchEvent& event)
 
     PlatformTouchEventBuilder touchEventBuilder(m_widget, event);
     bool defaultPrevented(m_widget->handleTouchEvent(touchEventBuilder));
-#if ENABLE(GESTURE_RECOGNIZER)
-    OwnPtr<Vector<WebCore::PlatformGestureEvent> > gestureEvents(m_gestureRecognizer->processTouchEventForGestures(touchEventBuilder, defaultPrevented));
-    for (unsigned int  i = 0; i < gestureEvents->size(); i++)
-        m_widget->handleGestureEvent((*gestureEvents)[i]);
-#endif
     return defaultPrevented;
 }
 #endif
@@ -283,6 +274,12 @@ bool WebPopupMenuImpl::handleInputEvent(const WebInputEvent& inputEvent)
     case WebInputEvent::Undefined:
     case WebInputEvent::MouseEnter:
     case WebInputEvent::ContextMenu:
+        return false;
+
+    case WebInputEvent::GesturePinchBegin:
+    case WebInputEvent::GesturePinchEnd:
+    case WebInputEvent::GesturePinchUpdate:
+        // FIXME: Once PlatformGestureEvent is updated to support pinch, this should call handleGestureEvent, just like it currently does for gesture scroll.
         return false;
     }
     return false;

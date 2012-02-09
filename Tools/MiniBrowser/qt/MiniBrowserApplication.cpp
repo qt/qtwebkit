@@ -29,6 +29,7 @@
 #include "MiniBrowserApplication.h"
 
 #include "BrowserWindow.h"
+#include "qquickwebview_p.h"
 #include "utils.h"
 #include <QRegExp>
 #include <QEvent>
@@ -124,7 +125,7 @@ bool MiniBrowserApplication::notify(QObject* target, QEvent* event)
         const QMouseEvent* const mouseEvent = static_cast<QMouseEvent*>(event);
 
         QWindowSystemInterface::TouchPoint touchPoint;
-        touchPoint.area = QRectF(mouseEvent->globalPos(), QSizeF(1, 1));
+        touchPoint.area = QRectF(mouseEvent->globalPos() - QPointF(30, 40), QSizeF(60, 80));
         touchPoint.pressure = 1;
 
         switch (mouseEvent->type()) {
@@ -182,7 +183,7 @@ void MiniBrowserApplication::sendTouchEvent(BrowserWindow* browserWindow)
     QWindowSystemInterface::handleTouchEvent(browserWindow, device, m_touchPoints.values());
 
     bool holdingControl = QApplication::keyboardModifiers().testFlag(Qt::ControlModifier);
-    if (!m_windowOptions.useTraditionalDesktopBehavior())
+    if (QQuickWebViewExperimental::flickableViewportEnabled())
         browserWindow->updateVisualMockTouchPoints(holdingControl ? m_touchPoints.values() : QList<QWindowSystemInterface::TouchPoint>());
 
     // Get rid of touch-points that are no longer valid
@@ -220,9 +221,9 @@ void MiniBrowserApplication::handleUserOptions()
     }
 
     const bool useDesktopBehavior = takeOptionFlag(&args, "--desktop");
+    QQuickWebViewExperimental::setFlickableViewportEnabled(!useDesktopBehavior);
     if (!useDesktopBehavior)
         qputenv("QT_WEBKIT_USE_MOBILE_THEME", QByteArray("1"));
-    m_windowOptions.setUseTraditionalDesktopBehavior(useDesktopBehavior);
     m_windowOptions.setPrintLoadedUrls(takeOptionFlag(&args, "-v"));
     m_windowOptions.setStartMaximized(takeOptionFlag(&args, "--maximize"));
     m_windowOptions.setStartFullScreen(takeOptionFlag(&args, "-f"));

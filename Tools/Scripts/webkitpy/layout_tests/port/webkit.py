@@ -307,6 +307,9 @@ class WebKitPort(Port):
         }
 
     def _has_test_in_directories(self, directory_lists, test_list):
+        if not test_list:
+            return False
+
         directories = itertools.chain.from_iterable(directory_lists)
         for directory, test in itertools.product(directories, test_list):
             if test.startswith(directory):
@@ -464,6 +467,8 @@ class WebKitDriver(Driver):
     def cmd_line(self):
         cmd = self._command_wrapper(self._port.get_option('wrapper'))
         cmd.append(self._port._path_to_driver())
+        if self._port.get_option('skip_pixel_test_if_no_baseline'):
+            cmd.append('--skip-pixel-test-if-no-baseline')
         if self._pixel_tests:
             cmd.append('--pixel-tests')
         if self._port.get_option('gc_between_tests'):

@@ -33,14 +33,11 @@
 #include "cc/CCLayerTreeHostCommon.h"
 #include "cc/CCProxy.h"
 
+#include <limits>
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
-
-#if USE(SKIA)
-class GrContext;
-#endif
 
 namespace WebCore {
 
@@ -78,7 +75,7 @@ struct CCSettings {
             , refreshRate(0)
             , perTilePainting(false)
             , partialSwapEnabled(false)
-            , partialTextureUpdates(true) { }
+            , maxPartialTextureUpdates(std::numeric_limits<size_t>::max()) { }
 
     bool acceleratePainting;
     bool compositeOffscreen;
@@ -87,7 +84,7 @@ struct CCSettings {
     double refreshRate;
     bool perTilePainting;
     bool partialSwapEnabled;
-    bool partialTextureUpdates;
+    size_t maxPartialTextureUpdates;
 };
 
 // Provides information on an Impl's rendering capabilities back to the CCLayerTreeHost
@@ -158,7 +155,7 @@ public:
 
     const LayerRendererCapabilities& layerRendererCapabilities() const;
 
-    // Test-only hook
+    // Test only hook
     void loseCompositorContext(int numTimes);
 
     void setNeedsAnimate();
@@ -188,13 +185,15 @@ public:
 
     void setHaveWheelEventHandlers(bool);
 
-    void updateLayers();
+    // Returns false if we should abort this frame due to initialization failure.
+    bool updateLayers();
 
     void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
     void applyScrollAndScale(const CCScrollAndScaleSet&);
     void startRateLimiter(GraphicsContext3D*);
     void stopRateLimiter(GraphicsContext3D*);
 
+    bool requestPartialTextureUpdate();
     void deleteTextureAfterCommit(PassOwnPtr<ManagedTexture>);
 
 protected:
@@ -204,6 +203,8 @@ protected:
 private:
     typedef Vector<RefPtr<LayerChromium> > LayerList;
     typedef Vector<OwnPtr<ManagedTexture> > TextureList;
+
+    void initializeLayerRenderer();
 
     enum PaintType { PaintVisible, PaintIdle };
     static void paintContentsIfDirty(LayerChromium*, PaintType, const Region& occludedScreenSpace);
@@ -224,6 +225,7 @@ private:
     int m_frameNumber;
 
     OwnPtr<CCProxy> m_proxy;
+    bool m_layerRendererInitialized;
 
     RefPtr<LayerChromium> m_rootLayer;
     OwnPtr<TextureManager> m_contentsTextureManager;
@@ -243,6 +245,7 @@ private:
     bool m_triggerIdlePaints;
 
     TextureList m_deleteTextureAfterCommitList;
+    size_t m_partialTextureUpdateRequests;
 };
 
 }

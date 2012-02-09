@@ -31,8 +31,8 @@
 module storage {
     interface [
         Conditional=FILE_SYSTEM,
-        HasIndexGetter,
-        NoStaticTables
+        IndexedGetter,
+        JSNoStaticTables
     ] EntryArraySync {
         readonly attribute unsigned long length;
         EntrySync item(in [IsIndex] unsigned long index);

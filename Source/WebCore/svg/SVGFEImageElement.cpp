@@ -73,6 +73,9 @@ void SVGFEImageElement::clearResourceReferences()
         m_cachedImage->removeClient(this);
         m_cachedImage = 0;
     }
+
+    ASSERT(document());
+    document()->accessSVGExtensions()->removeAllTargetReferencesForElement(this);
 }
 
 void SVGFEImageElement::requestImageResource()
@@ -102,6 +105,10 @@ void SVGFEImageElement::buildPendingResource()
             document()->accessSVGExtensions()->addPendingResource(id, this);
             ASSERT(hasPendingResources());
         }
+    } else if (target->isSVGElement()) {
+        // Register us with the target in the dependencies map. Any change of hrefElement
+        // that leads to relayout/repainting now informs us, so we can react to it.
+        document()->accessSVGExtensions()->addElementReferencingTarget(this, static_cast<SVGElement*>(target));
     }
 
     invalidate();
@@ -119,10 +126,10 @@ bool SVGFEImageElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGFEImageElement::parseMappedAttribute(Attribute* attr)
+void SVGFEImageElement::parseAttribute(Attribute* attr)
 {
     if (!isSupportedAttribute(attr->name())) {
-        SVGFilterPrimitiveStandardAttributes::parseMappedAttribute(attr);
+        SVGFilterPrimitiveStandardAttributes::parseAttribute(attr);
         return;
     }
 
@@ -132,11 +139,11 @@ void SVGFEImageElement::parseMappedAttribute(Attribute* attr)
         return;
     }
 
-    if (SVGURIReference::parseMappedAttribute(attr))
+    if (SVGURIReference::parseAttribute(attr))
         return;
-    if (SVGLangSpace::parseMappedAttribute(attr))
+    if (SVGLangSpace::parseAttribute(attr))
         return;
-    if (SVGExternalResourcesRequired::parseMappedAttribute(attr))
+    if (SVGExternalResourcesRequired::parseAttribute(attr))
         return;
 
     ASSERT_NOT_REACHED();

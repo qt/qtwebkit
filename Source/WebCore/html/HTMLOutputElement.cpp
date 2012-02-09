@@ -61,22 +61,12 @@ bool HTMLOutputElement::supportsFocus() const
     return Node::supportsFocus() && !disabled();
 }
 
-bool HTMLOutputElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
-{
-    if (attrName == HTMLNames::dirAttr) {
-        result = eBDI;
-        return true;
-    }
-
-    return HTMLElement::mapToEntry(attrName, result);
-}
-
-void HTMLOutputElement::parseMappedAttribute(Attribute* attr)
+void HTMLOutputElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == HTMLNames::forAttr)
         setFor(attr->value());
     else
-        HTMLFormControlElement::parseMappedAttribute(attr);
+        HTMLFormControlElement::parseAttribute(attr);
 }
 
 DOMSettableTokenList* HTMLOutputElement::htmlFor() const

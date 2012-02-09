@@ -58,14 +58,14 @@ void HTMLScriptElement::childrenChanged(bool changedByParser, Node* beforeChange
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-void HTMLScriptElement::attributeChanged(Attribute* attr, bool preserveDecls)
+void HTMLScriptElement::attributeChanged(Attribute* attr)
 {
     if (attr->name() == asyncAttr)
         handleAsyncAttribute();
-    HTMLElement::attributeChanged(attr, preserveDecls);
+    HTMLElement::attributeChanged(attr);
 }
 
-void HTMLScriptElement::parseMappedAttribute(Attribute* attr)
+void HTMLScriptElement::parseAttribute(Attribute* attr)
 {
     const QualifiedName& attrName = attr->name();
 
@@ -76,7 +76,7 @@ void HTMLScriptElement::parseMappedAttribute(Attribute* attr)
     else if (attrName == onbeforeloadAttr)
         setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attr));
     else
-        HTMLElement::parseMappedAttribute(attr);
+        HTMLElement::parseAttribute(attr);
 }
 
 void HTMLScriptElement::insertedIntoDocument()

@@ -22,7 +22,6 @@
 
 #include "qwebelement_p.h"
 #include "CSSComputedStyleDeclaration.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSParser.h"
 #include "CSSRule.h"
 #include "CSSRuleList.h"
@@ -33,6 +32,7 @@
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HTMLElement.h"
+#include "StylePropertySet.h"
 #if USE(JSC)
 #include "Completion.h"
 #include "JSGlobalObject.h"
@@ -503,12 +503,11 @@ QStringList QWebElement::attributeNames(const QString& namespaceUri) const
         return QStringList();
 
     QStringList attributeNameList;
-    const NamedNodeMap* const attrs = m_element->updatedAttributes();
-    if (attrs) {
+    if (m_element->hasAttributes()) {
         const String namespaceUriString(namespaceUri); // convert QString -> String once
-        const unsigned attrsCount = attrs->length();
+        const unsigned attrsCount = m_element->attributeCount();
         for (unsigned i = 0; i < attrsCount; ++i) {
-            const Attribute* const attribute = attrs->attributeItem(i);
+            const Attribute* const attribute = m_element->attributeItem(i);
             if (namespaceUriString == attribute->namespaceURI())
                 attributeNameList.append(attribute->localName());
         }
@@ -844,7 +843,7 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (!propID)
         return QString();
 
-    CSSMutableStyleDeclaration* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
+    StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
 
     if (strategy == InlineStyle)
         return style->getPropertyValue(propID);
@@ -909,7 +908,7 @@ void QWebElement::setStyleProperty(const QString &name, const QString &value)
         return;
 
     int propID = cssPropertyID(name);
-    CSSMutableStyleDeclaration* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
+    StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
     if (!propID || !style)
         return;
 

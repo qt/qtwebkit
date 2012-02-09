@@ -301,7 +301,7 @@ protected:
     HTMLMediaElement(const QualifiedName&, Document*, bool);
     virtual ~HTMLMediaElement();
 
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual void finishParsingChildren();
     virtual bool isURLAttribute(Attribute*) const;
     virtual void attach();
@@ -336,7 +336,8 @@ private:
     void createMediaPlayer();
 
     virtual bool supportsFocus() const;
-    virtual void attributeChanged(Attribute*, bool preserveDecls);
+    virtual bool isMouseFocusable() const;
+    virtual void attributeChanged(Attribute*) OVERRIDE;
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual void insertedIntoDocument();

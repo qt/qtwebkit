@@ -31,7 +31,6 @@
 #include "config.h"
 #include "V8Proxy.h"
 
-#include "CSSMutableStyleDeclaration.h"
 #include "CachedMetadata.h"
 #include "DateExtension.h"
 #include "Document.h"
@@ -48,6 +47,7 @@
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "StylePropertySet.h"
 #include "V8Binding.h"
 #include "V8BindingState.h"
 #include "V8Collection.h"
@@ -194,7 +194,7 @@ bool V8Proxy::handleOutOfMemory()
     Frame* frame = V8Proxy::retrieveFrame(context);
 
     V8Proxy* proxy = V8Proxy::retrieve(frame);
-    if (proxy && frame->script()->canExecuteScripts(NotAboutToExecuteScript)) {
+    if (proxy) {
         // Clean m_context, and event handlers.
         proxy->clearForClose();
 
@@ -378,7 +378,7 @@ v8::Local<v8::Value> V8Proxy::runScript(v8::Handle<v8::Script> script)
     v8::TryCatch tryCatch;
     tryCatch.SetVerbose(true);
     {
-        V8RecursionScope recursionScope;
+        V8RecursionScope recursionScope(frame()->document());
         result = script->Run();
     }
 
@@ -404,10 +404,10 @@ v8::Local<v8::Value> V8Proxy::callFunction(v8::Handle<v8::Function> function, v8
 {
     // Keep Frame (and therefore ScriptController and V8Proxy) alive.
     RefPtr<Frame> protect(frame());
-    return V8Proxy::instrumentedCallFunction(m_frame->page(), function, receiver, argc, args);
+    return V8Proxy::instrumentedCallFunction(frame(), function, receiver, argc, args);
 }
 
-v8::Local<v8::Value> V8Proxy::instrumentedCallFunction(Page* page, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[])
+v8::Local<v8::Value> V8Proxy::instrumentedCallFunction(Frame* frame, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[])
 {
     V8GCController::checkMemoryUsage();
 
@@ -415,7 +415,7 @@ v8::Local<v8::Value> V8Proxy::instrumentedCallFunction(Page* page, v8::Handle<v8
         return handleMaxRecursionDepthExceeded();
 
     InspectorInstrumentationCookie cookie;
-    if (InspectorInstrumentation::hasFrontends()) {
+    if (InspectorInstrumentation::hasFrontends() && frame) {
         String resourceName("undefined");
         int lineNumber = 1;
         v8::ScriptOrigin origin = function->GetScriptOrigin();
@@ -423,12 +423,12 @@ v8::Local<v8::Value> V8Proxy::instrumentedCallFunction(Page* page, v8::Handle<v8
             resourceName = toWebCoreString(origin.ResourceName());
             lineNumber = function->GetScriptLineNumber() + 1;
         }
-        cookie = InspectorInstrumentation::willCallFunction(page, resourceName, lineNumber);
+        cookie = InspectorInstrumentation::willCallFunction(frame->page(), resourceName, lineNumber);
     }
 
     v8::Local<v8::Value> result;
     {
-        V8RecursionScope recursionScope;
+        V8RecursionScope recursionScope(frame ? frame->document() : 0);
         result = function->Call(receiver, argc, args);
     }
 
@@ -718,11 +718,8 @@ int V8Proxy::contextDebugId(v8::Handle<v8::Context> context)
 v8::Local<v8::Context> toV8Context(ScriptExecutionContext* context, const WorldContextHandle& worldContext)
 {
     if (context->isDocument()) {
-        if (V8Proxy* proxy = V8Proxy::retrieve(context)) {
-            Frame* frame = static_cast<Document*>(context)->frame();
-            if (frame->script()->canExecuteScripts(NotAboutToExecuteScript))
-                return worldContext.adjustedContext(proxy);
-        }
+        if (V8Proxy* proxy = V8Proxy::retrieve(context))
+            return worldContext.adjustedContext(proxy);
 #if ENABLE(WORKERS)
     } else if (context->isWorkerContext()) {
         if (WorkerContextExecutionProxy* proxy = static_cast<WorkerContext*>(context)->script()->proxy())

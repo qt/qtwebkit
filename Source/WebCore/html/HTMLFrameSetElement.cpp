@@ -64,17 +64,7 @@ PassRefPtr<HTMLFrameSetElement> HTMLFrameSetElement::create(const QualifiedName&
     return adoptRef(new HTMLFrameSetElement(tagName, document));
 }
 
-bool HTMLFrameSetElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
-{
-    if (attrName == bordercolorAttr) {
-        result = eUniversal;
-        return true;
-    }
-
-    return HTMLElement::mapToEntry(attrName, result);
-}
-
-void HTMLFrameSetElement::parseMappedAttribute(Attribute* attr)
+void HTMLFrameSetElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == rowsAttr) {
         if (!attr->isNull()) {
@@ -109,11 +99,11 @@ void HTMLFrameSetElement::parseMappedAttribute(Attribute* attr)
         } else
             m_borderSet = false;
     } else if (attr->name() == bordercolorAttr) {
-        m_borderColorSet = attr->decl();
-        if (!attr->decl() && !attr->isEmpty()) {
-            addCSSColor(attr, CSSPropertyBorderColor, attr->value());
-            m_borderColorSet = true;
-        }
+        m_borderColorSet = !attr->isEmpty();
+        if (attr->value().isNull())
+            removeCSSProperty(CSSPropertyBorderColor);
+        else
+            addCSSColor(CSSPropertyBorderColor, attr->value());
     } else if (attr->name() == onloadAttr)
         document()->setWindowAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(document()->frame(), attr));
     else if (attr->name() == onbeforeunloadAttr)
@@ -147,7 +137,7 @@ void HTMLFrameSetElement::parseMappedAttribute(Attribute* attr)
     else if (attr->name() == onpopstateAttr)
         document()->setWindowAttributeEventListener(eventNames().popstateEvent, createAttributeEventListener(document()->frame(), attr));
     else
-        HTMLElement::parseMappedAttribute(attr);
+        HTMLElement::parseAttribute(attr);
 }
 
 bool HTMLFrameSetElement::rendererIsNeeded(const NodeRenderingContext& context)

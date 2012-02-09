@@ -28,6 +28,7 @@
 #include "cc/CCCompletionEvent.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCProxy.h"
+#include <limits>
 #include <wtf/OwnPtr.h>
 
 namespace WebCore {
@@ -44,6 +45,7 @@ public:
     virtual GraphicsContext3D* context();
     virtual void finishAllRendering();
     virtual bool isStarted() const;
+    virtual bool initializeContext();
     virtual bool initializeLayerRenderer();
     virtual int compositorIdentifier() const { return m_compositorIdentifier; }
     virtual const LayerRendererCapabilities& layerRendererCapabilities() const;
@@ -54,7 +56,7 @@ public:
     virtual void setVisible(bool);
     virtual void start();
     virtual void stop();
-    virtual bool partialTextureUpdateCapability() const { return true; }
+    virtual size_t maxPartialTextureUpdates() const { return std::numeric_limits<size_t>::max(); }
 
     // CCLayerTreeHostImplClient implementation
     virtual void onSwapBuffersCompleteOnImplThread() { ASSERT_NOT_REACHED(); }
@@ -67,7 +69,7 @@ public:
 private:
     explicit CCSingleThreadProxy(CCLayerTreeHost*);
     bool recreateContextIfNeeded();
-    void commitIfNeeded();
+    bool commitIfNeeded();
     void doCommit();
     bool doComposite();
 
@@ -75,8 +77,13 @@ private:
     CCLayerTreeHost* m_layerTreeHost;
     int m_compositorIdentifier;
 
+    // Holds on to the context between initializeContext() and initializeLayerRenderer() calls. Shouldn't
+    // be used for anything else.
+    RefPtr<GraphicsContext3D> m_contextBeforeInitialization;
+
     // Used on the CCThread, but checked on main thread during initialization/shutdown.
     OwnPtr<CCLayerTreeHostImpl> m_layerTreeHostImpl;
+    bool m_layerRendererInitialized;
     LayerRendererCapabilities m_layerRendererCapabilitiesForMainThread;
 
     int m_numFailedRecreateAttempts;

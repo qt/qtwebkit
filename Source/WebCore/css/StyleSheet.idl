@@ -22,10 +22,10 @@ module stylesheets {
 
     // Introduced in DOM Level 2:
     interface [
-        CustomMarkFunction,
-        GenerateIsReachable,
-        CustomToJS,
-        Polymorphic,
+        JSCustomMarkFunction,
+        JSGenerateIsReachable,
+        JSCustomToJS,
+        ObjCPolymorphic,
         V8DependentLifetime
     ] StyleSheet {
         readonly attribute [ConvertNullStringTo=Null] DOMString        type;

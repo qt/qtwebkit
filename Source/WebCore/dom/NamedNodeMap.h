@@ -94,14 +94,8 @@ public:
 
     Element* element() const { return m_element; }
 
-    size_t mappedAttributeCount() const;
-
     ElementAttributeData* attributeData() { return &m_attributeData; }
     const ElementAttributeData* attributeData() const { return &m_attributeData; }
-
-    CSSMutableStyleDeclaration* inlineStyleDecl() { return attributeData()->m_inlineStyleDecl.get(); }
-    CSSMutableStyleDeclaration* ensureInlineStyleDecl();
-    void destroyInlineStyleDecl();
 
 private:
     NamedNodeMap(Element* element)
@@ -182,16 +176,6 @@ inline void NamedNodeMap::removeAttribute(const QualifiedName& name)
         return;
 
     removeAttribute(index);
-}
-
-inline size_t NamedNodeMap::mappedAttributeCount() const
-{
-    size_t count = 0;
-    for (size_t i = 0; i < m_attributes.size(); ++i) {
-        if (m_attributes[i]->decl())
-            ++count;
-    }
-    return count;
 }
 
 } // namespace WebCore

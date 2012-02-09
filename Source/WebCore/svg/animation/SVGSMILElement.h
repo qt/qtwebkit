@@ -44,8 +44,8 @@ public:
 
     static bool isSMILElement(Node*);
 
-    virtual void parseMappedAttribute(Attribute*);
-    virtual void attributeChanged(Attribute*, bool preserveDecls);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void attributeChanged(Attribute*) OVERRIDE;
     virtual void insertedIntoDocument();
     virtual void removedFromDocument();
     

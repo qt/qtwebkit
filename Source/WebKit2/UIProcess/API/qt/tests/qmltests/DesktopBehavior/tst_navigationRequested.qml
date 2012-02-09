@@ -1,7 +1,7 @@
 import QtQuick 2.0
 import QtTest 1.0
 import QtWebKit 3.0
-import QtWebKit.experimental 3.0
+import QtWebKit.experimental 1.0
 
 Item {
     property int expectedLength: 0
@@ -11,7 +11,7 @@ Item {
     property url beginUrl: Qt.resolvedUrl("../common/test2.html")
     property url endUrl: Qt.resolvedUrl("../common/test1.html")
 
-    DesktopWebView {
+    WebView {
         id: webView
         width: 200
         height: 200
@@ -51,7 +51,7 @@ Item {
         signalName: "loadSucceeded"
     }
 
-    DesktopWebView {
+    WebView {
         id: otherWebView
     }
 

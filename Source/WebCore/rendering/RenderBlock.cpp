@@ -1024,8 +1024,9 @@ void RenderBlock::collapseAnonymousBoxChild(RenderBlock* parent, RenderObject* c
 {
     parent->setNeedsLayoutAndPrefWidthsRecalc();
     parent->setChildrenInline(child->childrenInline());
+    RenderObject* nextSibling = child->nextSibling();
     RenderBlock* anonBlock = toRenderBlock(parent->children()->removeChildNode(parent, child, child->hasLayer()));
-    anonBlock->moveAllChildrenTo(parent, child->hasLayer());
+    anonBlock->moveAllChildrenTo(parent, nextSibling, child->hasLayer());
     // Delete the now-empty block's lines and nuke it.
     if (!parent->documentBeingDestroyed())
         anonBlock->deleteLineBoxTree();
@@ -1089,7 +1090,7 @@ void RenderBlock::removeChild(RenderObject* oldChild)
         // box.  We can go ahead and pull the content right back up into our
         // box.
         collapseAnonymousBoxChild(this, child);
-    } else if ((prev && prev->isAnonymousBlock()) || (next && next->isAnonymousBlock())) {
+    } else if (((prev && prev->isAnonymousBlock()) || (next && next->isAnonymousBlock())) && !isFlexibleBoxIncludingDeprecated()) {
         // It's possible that the removal has knocked us down to a single anonymous
         // block with pseudo-style element siblings (e.g. first-letter). If these
         // are floating, then we need to pull the content up also.
@@ -1207,6 +1208,27 @@ void RenderBlock::layout()
         clearLayoutOverflow();
 }
 
+void RenderBlock::computeInitialRegionRangeForBlock()
+{
+    if (inRenderFlowThread()) {
+        // Set our start and end regions. No regions above or below us will be considered by our children. They are
+        // effectively clamped to our region range.
+        LayoutUnit oldHeight =  logicalHeight();
+        LayoutUnit oldLogicalTop = logicalTop();
+        setLogicalHeight(numeric_limits<LayoutUnit>::max() / 2);
+        computeLogicalHeight();
+        enclosingRenderFlowThread()->setRegionRangeForBox(this, offsetFromLogicalTopOfFirstPage());
+        setLogicalHeight(oldHeight);
+        setLogicalTop(oldLogicalTop);
+    }
+}
+
+void RenderBlock::computeRegionRangeForBlock()
+{
+    if (inRenderFlowThread())
+        enclosingRenderFlowThread()->setRegionRangeForBox(this, offsetFromLogicalTopOfFirstPage());
+}
+
 void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight, BlockLayoutPass layoutPass)
 {
     ASSERT(needsLayout());
@@ -1268,22 +1290,13 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     RenderView* renderView = view();
     RenderStyle* styleToUse = style();
     LayoutStateMaintainer statePusher(renderView, this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || styleToUse->isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, colInfo);
-    
+
     if (inRenderFlowThread()) {
         // Regions changing widths can force us to relayout our children.
         if (logicalWidthChangedInRegions())
             relayoutChildren = true;
-    
-        // Set our start and end regions. No regions above or below us will be considered by our children. They are
-        // effectively clamped to our region range.
-        LayoutUnit oldHeight =  logicalHeight();
-        LayoutUnit oldLogicalTop = logicalTop();
-        setLogicalHeight(numeric_limits<LayoutUnit>::max() / 2); 
-        computeLogicalHeight();
-        enclosingRenderFlowThread()->setRegionRangeForBox(this, offsetFromLogicalTopOfFirstPage());
-        setLogicalHeight(oldHeight);
-        setLogicalTop(oldLogicalTop);
     }
+    computeInitialRegionRangeForBlock();
 
     // We use four values, maxTopPos, maxTopNeg, maxBottomPos, and maxBottomNeg, to track
     // our current maximal positive and negative margins.  These values are used when we
@@ -1313,7 +1326,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     }
 
     // For overflow:scroll blocks, ensure we have both scrollbars in place always.
-    if (scrollsOverflow()) {
+    if (scrollsOverflow() && style()->appearance() != ListboxPart) {
         if (styleToUse->overflowX() == OSCROLL)
             layer()->setHasHorizontalScrollbar(true);
         if (styleToUse->overflowY() == OSCROLL)
@@ -1361,8 +1374,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
 
     bool needAnotherLayoutPass = layoutPositionedObjects(relayoutChildren || isRoot());
 
-    if (inRenderFlowThread())
-        enclosingRenderFlowThread()->setRegionRangeForBox(this, offsetFromLogicalTopOfFirstPage());
+    computeRegionRangeForBlock();
 
     // Add overflow from children (unless we're multi-column, since in that case all our child overflow is clipped anyway).
     computeOverflow(oldClientAfterEdge);
@@ -2010,7 +2022,7 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloa
     setLogicalHeight(beforeEdge);
     
     // Lay out our hypothetical grid line as though it occurs at the top of the block.
-    if (view()->layoutState()->currentLineGrid() == this)
+    if (view()->layoutState()->lineGrid() == this)
         layoutLineGridBox();
 
     // The margin struct caches all our current margin collapsing state.  The compact struct caches state when we encounter compacts,
@@ -3661,7 +3673,7 @@ inline void RenderBlock::FloatIntervalSearchAdapter<FloatTypeValue>::collectIfNe
     const FloatingObject* r = interval.data();
     if (r->type() == FloatTypeValue && interval.low() <= m_value && m_value < interval.high()) {
         // All the objects returned from the tree should be already placed.
-        ASSERT(r->isPlaced() && m_renderer->logicalTopForFloat(r) <= m_value && m_renderer->logicalBottomForFloat(r) > m_value);
+        ASSERT(r->isPlaced() && m_renderer->pixelSnappedLogicalTopForFloat(r) <= m_value && m_renderer->pixelSnappedLogicalBottomForFloat(r) > m_value);
 
         if (FloatTypeValue == FloatingObject::FloatLeft 
             && m_renderer->logicalRightForFloat(r) > m_offset) {
@@ -3909,9 +3921,17 @@ void RenderBlock::clearFloats(BlockLayoutPass layoutPass)
                     if (logicalWidthForFloat(f) != logicalWidthForFloat(oldFloatingObject) || logicalLeftForFloat(f) != logicalLeftForFloat(oldFloatingObject)) {
                         changeLogicalTop = 0;
                         changeLogicalBottom = max(changeLogicalBottom, max(logicalBottom, oldLogicalBottom));
-                    } else if (logicalBottom != oldLogicalBottom) {
-                        changeLogicalTop = min(changeLogicalTop, min(logicalBottom, oldLogicalBottom));
-                        changeLogicalBottom = max(changeLogicalBottom, max(logicalBottom, oldLogicalBottom));
+                    } else {
+                        if (logicalBottom != oldLogicalBottom) {
+                            changeLogicalTop = min(changeLogicalTop, min(logicalBottom, oldLogicalBottom));
+                            changeLogicalBottom = max(changeLogicalBottom, max(logicalBottom, oldLogicalBottom));
+                        }
+                        LayoutUnit logicalTop = logicalTopForFloat(f);
+                        LayoutUnit oldLogicalTop = logicalTopForFloat(oldFloatingObject);
+                        if (logicalTop != oldLogicalTop) {
+                            changeLogicalTop = min(changeLogicalTop, min(logicalTop, oldLogicalTop));
+                            changeLogicalBottom = max(changeLogicalBottom, max(logicalTop, oldLogicalTop));
+                        }
                     }
 
                     floatMap.remove(f->m_renderer);

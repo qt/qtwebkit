@@ -253,6 +253,9 @@ class GlobalVariablesTest(unittest.TestCase):
         assertNoCheck("Source/WebCore/ForwardingHeaders/debugger/Debugger.h",
                       "build/header_guard")
 
+        assertNoCheck("Source/WebCore/platform/graphics/gstreamer/VideoSinkGStreamer.cpp",
+                      "readability/naming")
+
         # Third-party Python code: webkitpy/thirdparty
         path = "Tools/Scripts/webkitpy/thirdparty/mock.py"
         assertNoCheck(path, "build/include")
@@ -315,6 +318,8 @@ class CheckerDispatcherSkipTest(unittest.TestCase):
            "Source/WebKit2/UIProcess/API/gtk/HelperClass.h",
            "Source/WebKit2/UIProcess/API/gtk/WebKitWebView.cpp",
            "Source/WebKit2/UIProcess/API/gtk/WebKitWebViewPrivate.h",
+           "Source/WebKit2/UIProcess/API/gtk/tests/WebViewTest.cpp",
+           "Source/WebKit2/UIProcess/API/gtk/tests/WebViewTest.h",
             ]
 
         for path in paths_not_to_skip:

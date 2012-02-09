@@ -27,8 +27,8 @@ module css {
 
     interface [
             Conditional=CSS_FILTERS,
-            HasIndexGetter,
-            DontCheckEnums
+            IndexedGetter,
+            DoNotCheckConstants
     ] WebKitCSSFilterValue : CSSValueList {
 
         // OperationTypes

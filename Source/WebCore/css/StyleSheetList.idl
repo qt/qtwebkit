@@ -22,9 +22,9 @@ module stylesheets {
 
     // Introduced in DOM Level 2:
     interface [
-        GenerateIsReachable=ImplDocument,
-        HasIndexGetter,
-        HasNameGetter,
+        JSGenerateIsReachable=ImplDocument,
+        IndexedGetter,
+        NamedGetter,
         V8DependentLifetime
     ] StyleSheetList {
         readonly attribute unsigned long    length;

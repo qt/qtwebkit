@@ -77,7 +77,7 @@ RenderWidget* HTMLObjectElement::renderWidgetForJSBindings()
     return renderPart(); // This will return 0 if the renderer is not a RenderPart.
 }
 
-void HTMLObjectElement::parseMappedAttribute(Attribute* attr)
+void HTMLObjectElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == formAttr)
         formAttributeChanged();
@@ -111,7 +111,7 @@ void HTMLObjectElement::parseMappedAttribute(Attribute* attr)
     else if (attr->name() == borderAttr)
         applyBorderAttribute(attr);
     else
-        HTMLPlugInImageElement::parseMappedAttribute(attr);
+        HTMLPlugInImageElement::parseAttribute(attr);
 }
 
 static void mapDataParamToSrc(Vector<String>* paramNames, Vector<String>* paramValues)
@@ -177,10 +177,9 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     }
     
     // Turn the attributes of the <object> element into arrays, but don't override <param> values.
-    NamedNodeMap* attributes = updatedAttributes();
-    if (attributes) {
-        for (unsigned i = 0; i < attributes->length(); ++i) {
-            Attribute* it = attributes->attributeItem(i);
+    if (hasAttributes()) {
+        for (unsigned i = 0; i < attributeCount(); ++i) {
+            Attribute* it = attributeItem(i);
             const AtomicString& name = it->name().localName();
             if (!uniqueParamNames.contains(name.impl())) {
                 paramNames.append(name.string());
@@ -286,8 +285,14 @@ void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
     bool fallbackContent = hasFallbackContent();
     renderEmbeddedObject()->setHasFallbackContent(fallbackContent);
 
-    if (pluginCreationOption == CreateOnlyNonNetscapePlugins && wouldLoadAsNetscapePlugin(url, serviceType))
+    // FIXME: It's sadness that we have this special case here.
+    //        See http://trac.webkit.org/changeset/25128 and
+    //        plugins/netscape-plugin-setwindow-size.html
+    if (pluginCreationOption == CreateOnlyNonNetscapePlugins && wouldLoadAsNetscapePlugin(url, serviceType)) {
+        // Ensure updateWidget() is called again during layout to create the Netscape plug-in.
+        setNeedsWidgetUpdate(true);
         return;
+    }
 
     RefPtr<HTMLObjectElement> protect(this); // beforeload and plugin loading can make arbitrary DOM mutations.
     bool beforeLoadAllowedLoad = guardedDispatchBeforeLoadEvent(url);

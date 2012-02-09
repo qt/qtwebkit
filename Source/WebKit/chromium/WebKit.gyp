@@ -91,6 +91,9 @@
                 'WEBKIT_IMPLEMENTATION=1',
             ],
             'sources': [
+                'bridge/MediaStreamCenter.cpp',
+                'bridge/MediaStreamCenterInternal.cpp',
+                'bridge/MediaStreamCenterInternal.h',
                 'bridge/PeerConnectionHandler.cpp',
                 'bridge/PeerConnectionHandlerInternal.cpp',
                 'bridge/PeerConnectionHandlerInternal.h',
@@ -312,8 +315,11 @@
                 'public/platform/WebLayerTreeView.h',
                 'public/platform/WebLayerTreeViewClient.h',
                 'public/platform/WebLocalizedString.h',
+                'public/platform/WebMediaStreamCenter.h',
+                'public/platform/WebMediaStreamComponent.h',
                 'public/platform/WebMediaStreamDescriptor.h',
                 'public/platform/WebMediaStreamSource.h',
+                'public/platform/WebMediaStreamSourcesRequest.h',
                 'public/platform/WebNonCopyable.h',
                 'public/platform/WebPeerConnectionHandler.h',
                 'public/platform/WebPeerConnectionHandlerClient.h',
@@ -532,7 +538,6 @@
                 'src/WebFileChooserCompletionImpl.h',
                 'src/WebFileSystemCallbacksImpl.cpp',
                 'src/WebFileSystemCallbacksImpl.h',
-                'src/WebFloatQuad.cpp',
                 'src/WebFontCache.cpp',
                 'src/WebFontDescription.cpp',
                 'src/WebFontImpl.cpp',
@@ -597,9 +602,11 @@
                 'src/WebMediaElement.cpp',
                 'src/WebMediaPlayerClientImpl.cpp',
                 'src/WebMediaPlayerClientImpl.h',
+                'src/WebMediaStreamComponent.cpp',
                 'src/WebMediaStreamDescriptor.cpp',
                 'src/WebMediaStreamRegistry.cpp',
                 'src/WebMediaStreamSource.cpp',
+                'src/WebMediaStreamSourcesRequest.cpp',
                 'src/WebNamedNodeMap.cpp',
                 'src/WebNetworkStateNotifier.cpp',
                 'src/WebNode.cpp',
@@ -755,6 +762,9 @@
                                     # and we pull in the test files into the webkit target in the
                                     # shared build.
                                     'cflags!': ['-Wglobal-constructors'],
+                                    'xcode_settings': {
+                                      'WARNING_CFLAGS!': ['-Wglobal-constructors'],
+                                    },
                                 }],
                             ],
                             'msvs_settings': {
@@ -848,6 +858,7 @@
                         ['OS=="mac"', {
                             'link_settings': {
                                 'libraries': [
+                                    '$(SDKROOT)/System/Library/Frameworks/Accelerate.framework',
                                     '$(SDKROOT)/System/Library/Frameworks/OpenGL.framework',
                                 ],
                             },

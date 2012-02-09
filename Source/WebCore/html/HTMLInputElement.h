@@ -128,7 +128,7 @@ public:
     void setIndeterminate(bool);
     // shouldAppearChecked is used by the rendering tree/CSS while checked() is used by JS to determine checked state
     bool shouldAppearChecked() const;
-    virtual bool isIndeterminate() const { return indeterminate(); }
+    virtual bool isIndeterminate() const;
 
     int size() const;
     bool sizeShouldIncludeDecoration(int& preferredSize) const;
@@ -241,7 +241,6 @@ public:
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
     void createShadowSubtree();
-    void setInitialName(const AtomicString&);
     virtual void defaultEventHandler(Event*);
 
 private:
@@ -276,8 +275,7 @@ private:
 
     virtual void accessKeyAction(bool sendMouseEvents);
 
-    virtual bool mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const;
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual void finishParsingChildren();
 
     virtual void copyNonAttributeProperties(const Element* source);

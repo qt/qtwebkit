@@ -46,6 +46,8 @@ public:
     static PassRefPtr<SVGElement> create(const QualifiedName&, Document*);
     virtual ~SVGElement();
 
+    bool isOutermostSVGSVGElement() const;
+
     String xmlbase() const;
     void setXmlbase(const String&, ExceptionCode&);
 
@@ -108,10 +110,10 @@ public:
 protected:
     SVGElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
 
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 
     virtual void finishParsingChildren();
-    virtual void attributeChanged(Attribute*, bool preserveDecls = false);
+    virtual void attributeChanged(Attribute*) OVERRIDE;
     virtual bool childShouldCreateRenderer(Node*) const;
     
     virtual void removedFromDocument();

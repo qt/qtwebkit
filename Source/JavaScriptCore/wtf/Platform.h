@@ -859,10 +859,6 @@
 #define ENABLE_GEOLOCATION 0
 #endif
 
-#if !defined(ENABLE_GESTURE_RECOGNIZER)
-#define ENABLE_GESTURE_RECOGNIZER 0
-#endif
-
 #if !defined(ENABLE_VIEWPORT)
 #define ENABLE_VIEWPORT 0
 #endif
@@ -1113,7 +1109,11 @@
    since most ports try to support sub-project independence, adding new headers
    to WTF causes many ports to break, and so this way we can address the build
    breakages one port at a time. */
+#if PLATFORM(MAC) || PLATFORM(QT)
+#define WTF_USE_EXPORT_MACROS 1
+#else
 #define WTF_USE_EXPORT_MACROS 0
+#endif
 
 #if (PLATFORM(QT) && !OS(DARWIN)) || PLATFORM(GTK) || PLATFORM(EFL)
 #define WTF_USE_UNIX_DOMAIN_SOCKETS 1
@@ -1135,6 +1135,10 @@
 
 #if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
 #define WTF_USE_AVFOUNDATION 1
+#endif
+
+#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
+#define WTF_USE_COREMEDIA 1
 #endif
 
 #if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || (PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(WIN_CAIRO)) || PLATFORM(QT)

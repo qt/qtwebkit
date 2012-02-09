@@ -32,8 +32,8 @@ module storage {
 
     interface [
         Conditional=SQL_DATABASE,
-        NoStaticTables,
-        DontCheckEnums
+        JSNoStaticTables,
+        DoNotCheckConstants
     ] SQLException {
         readonly attribute unsigned long code;
         readonly attribute DOMString message;

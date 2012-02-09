@@ -26,9 +26,9 @@ module audio {
     // A linear convolution effect
     interface [
         Conditional=WEB_AUDIO,
-        GenerateToJS
+        JSGenerateToJS
     ] ConvolverNode : AudioNode {
-        attribute [JSCCustomSetter] AudioBuffer buffer;
+        attribute [JSCustomSetter] AudioBuffer buffer;
         attribute boolean normalize;
     };
 }

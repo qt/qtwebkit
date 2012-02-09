@@ -153,15 +153,9 @@ VALIDATOR_IFDEF_NAME = "!ASSERT_DISABLED"
 class DomainNameFixes:
     @classmethod
     def get_fixed_data(cls, domain_name):
-        if domain_name in cls.agent_type_map:
-            agent_name_res = cls.agent_type_map[domain_name]
-        else:
-            agent_name_res = "Inspector%sAgent" % domain_name
-
         field_name_res = Capitalizer.upper_camel_case_to_lower(domain_name) + "Agent"
 
         class Res(object):
-            agent_type_name = agent_name_res
             skip_js_bind = domain_name in cls.skip_js_bind_domains
             agent_field_name = field_name_res
 
@@ -184,7 +178,6 @@ class DomainNameFixes:
         return Res
 
     skip_js_bind_domains = set(["Runtime", "DOMDebugger"])
-    agent_type_map = {"Network": "InspectorResourceAgent", "Inspector": "InspectorAgent", }
 
 
 class CParamType(object):
@@ -429,7 +422,11 @@ class RawTypes(object):
 
         @staticmethod
         def get_validate_method_params():
-            raise Exception("TODO")
+            class ValidateMethodParams:
+                name = "Boolean"
+                var_type = "bool"
+                as_method_name = "Boolean"
+            return ValidateMethodParams
 
         @staticmethod
         def get_output_pass_model():
@@ -1129,7 +1126,7 @@ class TypeBindings:
     }
 """ % class_name)
 
-                                writer.newline("    typedef StructItemTraits ItemTraits;\n")
+                                writer.newline("    typedef TypeBuilder::StructItemTraits ItemTraits;\n")
 
                                 for prop_data in resolve_data.optional_properties:
                                     prop_name = prop_data.p["name"]
@@ -1174,22 +1171,29 @@ class TypeBindings:
                                     validator_writer.newline("    RefPtr<InspectorObject> object;\n")
                                     validator_writer.newline("    bool castRes = value->asObject(&object);\n")
                                     validator_writer.newline("    ASSERT_UNUSED(castRes, castRes);\n")
-                                    validator_writer.newline("    InspectorObject::iterator it;\n")
                                     for prop_data in resolve_data.main_properties:
-                                        validator_writer.newline("    it = object->find(\"%s\");\n" % prop_data.p["name"])
-                                        validator_writer.newline("    ASSERT(it != object->end());\n")
-                                        validator_writer.newline("    %s(it->second.get());\n" % prop_data.param_type_binding.get_validator_call_text())
-
-                                    validator_writer.newline("    int count = %s;\n" % len(resolve_data.main_properties))
-
-                                    for prop_data in resolve_data.optional_properties:
-                                        validator_writer.newline("    it = object->find(\"%s\");\n" % prop_data.p["name"])
-                                        validator_writer.newline("    if (it != object->end()) {\n")
-                                        validator_writer.newline("        %s(it->second.get());\n" % prop_data.param_type_binding.get_validator_call_text())
-                                        validator_writer.newline("        ++count;\n")
+                                        validator_writer.newline("    {\n")
+                                        it_name = "%sPos" % prop_data.p["name"]
+                                        validator_writer.newline("        InspectorObject::iterator %s;\n" % it_name)
+                                        validator_writer.newline("        %s = object->find(\"%s\");\n" % (it_name, prop_data.p["name"]))
+                                        validator_writer.newline("        ASSERT(%s != object->end());\n" % it_name)
+                                        validator_writer.newline("        %s(%s->second.get());\n" % (prop_data.param_type_binding.get_validator_call_text(), it_name))
                                         validator_writer.newline("    }\n")
 
-                                    validator_writer.newline("    ASSERT(count == object->size());\n")
+                                    validator_writer.newline("    int foundPropertiesCount = %s;\n" % len(resolve_data.main_properties))
+
+                                    for prop_data in resolve_data.optional_properties:
+                                        validator_writer.newline("    {\n")
+                                        it_name = "%sPos" % prop_data.p["name"]
+                                        validator_writer.newline("        InspectorObject::iterator %s;\n" % it_name)
+                                        validator_writer.newline("        %s = object->find(\"%s\");\n" % (it_name, prop_data.p["name"]))
+                                        validator_writer.newline("        if (%s != object->end()) {\n" % it_name)
+                                        validator_writer.newline("            %s(%s->second.get());\n" % (prop_data.param_type_binding.get_validator_call_text(), it_name))
+                                        validator_writer.newline("            ++foundPropertiesCount;\n")
+                                        validator_writer.newline("        }\n")
+                                        validator_writer.newline("    }\n")
+
+                                    validator_writer.newline("    ASSERT(foundPropertiesCount == object->size());\n")
                                     validator_writer.newline("}\n\n\n")
 
                                 writer.newline("};\n\n")
@@ -1675,8 +1679,6 @@ class InspectorObject;
 class InspectorArray;
 class InspectorFrontendChannel;
 
-$forwardDeclarations
-
 typedef String ErrorString;
 
 class InspectorBackendDispatcher: public RefCounted<InspectorBackendDispatcher> {
@@ -1731,7 +1733,6 @@ $methodNamesEnumContent
 #include "InspectorValues.h"
 #include "InspectorFrontendChannel.h"
 #include <wtf/text/WTFString.h>
-$includes
 
 namespace WebCore {
 
@@ -1747,9 +1748,9 @@ public:
 $constructorInit
     { }
 
-    void clearFrontend() { m_inspectorFrontendChannel = 0; }
-    void dispatch(const String& message);
-    void reportProtocolError(const long* const callId, CommonErrorCode, const String& errorMessage, PassRefPtr<InspectorArray> data) const;
+    virtual void clearFrontend() { m_inspectorFrontendChannel = 0; }
+    virtual void dispatch(const String& message);
+    virtual void reportProtocolError(const long* const callId, CommonErrorCode, const String& errorMessage, PassRefPtr<InspectorArray> data) const;
     using InspectorBackendDispatcher::reportProtocolError;
 
 $setters
@@ -2153,8 +2154,28 @@ public:
         return adoptRef(new Array<T>());
     }
 
+    static PassRefPtr<Array<T> > runtimeCast(PassRefPtr<InspectorValue> value)
+    {
+        RefPtr<InspectorArray> array;
+        bool castRes = value->asArray(&array);
+        ASSERT_UNUSED(castRes, castRes);
+#if !ASSERT_DISABLED
+        assertCorrectValue(array.get());
+#endif  // !ASSERT_DISABLED
+        COMPILE_ASSERT(sizeof(Array<T>) == sizeof(InspectorArray), type_cast_problem);
+        return static_cast<Array<T>*>(array.get());
+    }
+
 #if """ + VALIDATOR_IFDEF_NAME + """
-    static void assertCorrectValue(InspectorValue* value);
+    static void assertCorrectValue(InspectorValue* value)
+    {
+        RefPtr<InspectorArray> array;
+        bool castRes = value->asArray(&array);
+        ASSERT_UNUSED(castRes, castRes);
+        for (unsigned i = 0; i < array->length(); i++)
+            ArrayItemHelper<T>::Traits::template assertCorrectValue<T>(array->get(i).get());
+    }
+
 #endif // """ + VALIDATOR_IFDEF_NAME + """
 };
 
@@ -2228,16 +2249,6 @@ String getEnumConstantValue(int code) {
 } // namespace TypeBuilder
 
 #if """ + VALIDATOR_IFDEF_NAME + """
-
-template<typename T>
-void TypeBuilder::Array<T>::assertCorrectValue(InspectorValue* value)
-{
-    RefPtr<InspectorArray> array;
-    bool castRes = value->asArray(&array);
-    ASSERT_UNUSED(castRes, castRes);
-    for (unsigned i = 0; i < array->length(); i++)
-        ArrayItemHelper<T>::Traits::template assertCorrectValue<T>(array->get(i).get());
-}
 
 $validatorCode
 
@@ -2397,8 +2408,6 @@ class Generator:
     backend_setters_list = []
     backend_constructor_init_list = []
     backend_field_list = []
-    backend_forward_list = []
-    backend_include_list = []
     frontend_constructor_init_list = []
     type_builder_fragments = []
     type_builder_forwards = []
@@ -2459,10 +2468,11 @@ class Generator:
             agent_interface_name = Capitalizer.lower_camel_case_to_upper(domain_name) + "CommandHandler"
             Generator.backend_agent_interface_list.append("    class %s {\n" % agent_interface_name)
             Generator.backend_agent_interface_list.append("    public:\n")
-            Generator.backend_agent_interface_list.append("        virtual ~%s() { }\n" % agent_interface_name);
             if "commands" in json_domain:
                 for json_command in json_domain["commands"]:
                     Generator.process_command(json_command, domain_name, agent_field_name)
+            Generator.backend_agent_interface_list.append("\n    protected:\n")
+            Generator.backend_agent_interface_list.append("        virtual ~%s() { }\n" % agent_interface_name)
             Generator.backend_agent_interface_list.append("    };\n\n")
 
             if domain_guard:
@@ -2477,9 +2487,7 @@ class Generator:
             Generator.backend_constructor_init_list,
             Generator.backend_virtual_setters_list,
             Generator.backend_setters_list,
-            Generator.backend_field_list,
-            Generator.backend_forward_list,
-            Generator.backend_include_list]
+            Generator.backend_field_list]
 
         for json_domain in sorted_json_domains:
             domain_name = json_domain["domain"]
@@ -2493,14 +2501,11 @@ class Generator:
 
             agent_interface_name = Capitalizer.lower_camel_case_to_upper(domain_name) + "CommandHandler"
 
-            agent_type_name = domain_fixes.agent_type_name
             agent_field_name = domain_fixes.agent_field_name
             Generator.backend_constructor_init_list.append("        , m_%s(0)" % agent_field_name)
-            Generator.backend_virtual_setters_list.append("    virtual void registerAgent(%s /* %s */* %s) = 0;" % (agent_type_name, agent_interface_name, agent_field_name))
-            Generator.backend_setters_list.append("    void registerAgent(%s /* %s */* %s) { ASSERT(!m_%s); m_%s = %s; }" % (agent_type_name, agent_interface_name, agent_field_name, agent_field_name, agent_field_name, agent_field_name))
-            Generator.backend_field_list.append("    %s /* %s */* m_%s;" % (agent_type_name, agent_interface_name, agent_field_name))
-            Generator.backend_forward_list.append("class %s;" % agent_type_name)
-            Generator.backend_include_list.append("#include \"%s.h\"" % agent_type_name)
+            Generator.backend_virtual_setters_list.append("    virtual void registerAgent(%s* %s) = 0;" % (agent_interface_name, agent_field_name))
+            Generator.backend_setters_list.append("    virtual void registerAgent(%s* %s) { ASSERT(!m_%s); m_%s = %s; }" % (agent_interface_name, agent_field_name, agent_field_name, agent_field_name, agent_field_name))
+            Generator.backend_field_list.append("    %s* m_%s;" % (agent_interface_name, agent_field_name))
 
             if domain_guard:
                 for l in reversed(sorted_cycle_guardable_list_list):
@@ -2677,8 +2682,9 @@ class Generator:
                 param = ", %sout_%s" % (raw_type.get_output_pass_model().get_argument_prefix(), json_return_name)
                 cook = "        result->set%s(\"%s\", out_%s);\n" % (setter_type, json_return_name, json_return_name)
                 if optional:
-                        # FIXME: support optional properly. Probably an additional output parameter should be in each case.
-                    if var_type.get_text() == "bool":
+                    # FIXME: support optional properly. Probably an additional output parameter should be in each case.
+                    # FIXME: refactor this condition; it's a hack now.
+                    if var_type.get_text() == "bool" or var_type.get_text().startswith("RefPtr<"):
                         cook = ("        if (out_%s)\n    " % json_return_name) + cook
                     else:
                         cook = "        // FIXME: support optional here.\n" + cook
@@ -2802,15 +2808,13 @@ backend_js_file = open(output_cpp_dirname + "/InspectorBackendStub.js", "w")
 backend_h_file.write(Templates.backend_h.substitute(None,
     virtualSetters=join(Generator.backend_virtual_setters_list, "\n"),
     agentInterfaces=join(Generator.backend_agent_interface_list, ""),
-    methodNamesEnumContent=join(Generator.method_name_enum_list, "\n"),
-    forwardDeclarations=join(Generator.backend_forward_list, "\n")))
+    methodNamesEnumContent=join(Generator.method_name_enum_list, "\n")))
 
 backend_cpp_file.write(Templates.backend_cpp.substitute(None,
     constructorInit=join(Generator.backend_constructor_init_list, "\n"),
     setters=join(Generator.backend_setters_list, "\n"),
     fieldDeclarations=join(Generator.backend_field_list, "\n"),
     methodNameDeclarations=join(Generator.backend_method_name_declaration_list, "\n"),
-    includes=join(Generator.backend_include_list, "\n"),
     methods=join(Generator.backend_method_implementation_list, "\n"),
     methodDeclarations=join(Generator.backend_method_declaration_list, "\n"),
     messageHandlers=join(Generator.method_handler_list, "\n")))

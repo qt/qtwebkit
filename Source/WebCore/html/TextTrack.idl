@@ -27,10 +27,10 @@ module html {
 
     interface [
         Conditional=VIDEO_TRACK,
-        EnabledAtRuntime=webkitVideoTrack,
+        V8EnabledAtRuntime=webkitVideoTrack,
         EventTarget,
-        CustomMarkFunction,
-        CustomIsReachable
+        JSCustomMarkFunction,
+        JSCustomIsReachable
     ] TextTrack {
         readonly attribute DOMString kind;
         readonly attribute DOMString label;

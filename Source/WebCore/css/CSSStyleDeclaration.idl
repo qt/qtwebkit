@@ -22,24 +22,24 @@ module css {
 
     // Introduced in DOM Level 2:
     interface [
-        CustomMarkFunction,
-        GenerateIsReachable=ImplRoot,
-        DelegatingPutFunction,
-        HasNameGetter,
-        HasIndexGetter,
+        JSCustomMarkFunction,
+        JSGenerateIsReachable=ImplRoot,
+        CustomNamedSetter,
+        NamedGetter,
+        IndexedGetter,
         CustomGetPropertyNames,
         V8DependentLifetime
     ] CSSStyleDeclaration {
-                 attribute [ConvertNullStringTo=Null, TreatNullAs=EmptyString] DOMString        cssText
+                 attribute [ConvertNullStringTo=Null, TreatNullAs=NullString] DOMString        cssText
                      setter raises(DOMException);
 
         [ConvertNullStringTo=Null] DOMString          getPropertyValue(in [Optional=CallWithDefaultValue] DOMString propertyName);
-        [JSCCustom] CSSValue           getPropertyCSSValue(in [Optional=CallWithDefaultValue] DOMString propertyName);
+        [JSCustom] CSSValue           getPropertyCSSValue(in [Optional=CallWithDefaultValue] DOMString propertyName);
         [ConvertNullStringTo=Null] DOMString          removeProperty(in [Optional=CallWithDefaultValue] DOMString propertyName)
             raises(DOMException);
         [ConvertNullStringTo=Null] DOMString          getPropertyPriority(in [Optional=CallWithDefaultValue] DOMString propertyName);
-        [OldStyleObjC] void setProperty(in [Optional=CallWithDefaultValue] DOMString propertyName, 
-                                        in [TreatNullAs=EmptyString,Optional=CallWithDefaultValue] DOMString value, 
+        [ObjCLegacyUnnamedParameters] void setProperty(in [Optional=CallWithDefaultValue] DOMString propertyName, 
+                                        in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString value, 
                                         in [Optional=CallWithDefaultValue] DOMString priority)
             raises(DOMException);
 

@@ -543,6 +543,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSWebGLActiveInfo.h \
 	DerivedSources/WebCore/JSWebGLBuffer.cpp \
 	DerivedSources/WebCore/JSWebGLBuffer.h \
+	DerivedSources/WebCore/JSWebGLCompressedTextureS3TC.cpp \
+	DerivedSources/WebCore/JSWebGLCompressedTextureS3TC.h \
 	DerivedSources/WebCore/JSWebGLContextAttributes.cpp \
 	DerivedSources/WebCore/JSWebGLContextAttributes.h \
 	DerivedSources/WebCore/JSWebGLContextEvent.cpp \
@@ -847,6 +849,7 @@ dom_binding_idls += \
 	$(WebCore)/html/canvas/Uint8ClampedArray.idl \
 	$(WebCore)/html/canvas/WebGLActiveInfo.idl \
 	$(WebCore)/html/canvas/WebGLBuffer.idl \
+	$(WebCore)/html/canvas/WebGLCompressedTextureS3TC.idl \
 	$(WebCore)/html/canvas/WebGLContextAttributes.idl \
 	$(WebCore)/html/canvas/WebGLContextEvent.idl \
 	$(WebCore)/html/canvas/WebGLFramebuffer.idl \
@@ -1324,8 +1327,6 @@ webcore_sources += \
 	Source/WebCore/css/CSSLineBoxContainValue.h \
 	Source/WebCore/css/CSSMediaRule.cpp \
 	Source/WebCore/css/CSSMediaRule.h \
-	Source/WebCore/css/CSSMutableStyleDeclaration.cpp \
-	Source/WebCore/css/CSSMutableStyleDeclaration.h \
 	Source/WebCore/css/CSSNamespace.h \
 	Source/WebCore/css/CSSOMUtils.cpp \
 	Source/WebCore/css/CSSOMUtils.h \
@@ -1413,6 +1414,8 @@ webcore_sources += \
 	Source/WebCore/css/ShadowValue.h \
 	Source/WebCore/css/StyleMedia.cpp \
 	Source/WebCore/css/StyleMedia.h \
+	Source/WebCore/css/StylePropertySet.cpp \
+	Source/WebCore/css/StylePropertySet.h \
 	Source/WebCore/css/StyleSheet.cpp \
 	Source/WebCore/css/StyleSheet.h \
 	Source/WebCore/css/StyleSheetList.cpp \
@@ -1474,8 +1477,6 @@ webcore_sources += \
 	Source/WebCore/dom/ContainerNode.cpp \
 	Source/WebCore/dom/ContainerNode.h \
 	Source/WebCore/dom/CrossThreadTask.h \
-	Source/WebCore/dom/CSSMappedAttributeDeclaration.cpp \
-	Source/WebCore/dom/CSSMappedAttributeDeclaration.h \
 	Source/WebCore/dom/CustomEvent.cpp \
 	Source/WebCore/dom/CustomEvent.h \
 	Source/WebCore/dom/DatasetDOMStringMap.cpp \
@@ -1572,7 +1573,6 @@ webcore_sources += \
 	Source/WebCore/dom/HashChangeEvent.h \
 	Source/WebCore/dom/KeyboardEvent.cpp \
 	Source/WebCore/dom/KeyboardEvent.h \
-	Source/WebCore/dom/MappedAttributeEntry.h \
 	Source/WebCore/dom/MessageChannel.cpp \
 	Source/WebCore/dom/MessageChannel.h \
 	Source/WebCore/dom/MessageEvent.cpp \
@@ -2168,8 +2168,6 @@ webcore_sources += \
 	Source/WebCore/html/ImageInputType.h \
 	Source/WebCore/html/InputType.cpp \
 	Source/WebCore/html/InputType.h \
-	Source/WebCore/html/IsIndexInputType.cpp \
-	Source/WebCore/html/IsIndexInputType.h \
 	Source/WebCore/html/LabelsNodeList.cpp \
 	Source/WebCore/html/LabelsNodeList.h \
 	Source/WebCore/html/LinkRelAttribute.cpp \
@@ -2259,6 +2257,7 @@ webcore_sources += \
 	Source/WebCore/html/PasswordInputType.h \
 	Source/WebCore/html/PluginDocument.cpp \
 	Source/WebCore/html/PluginDocument.h \
+	Source/WebCore/html/PublicURLManager.h \
 	Source/WebCore/html/RadioInputType.cpp \
 	Source/WebCore/html/RadioInputType.h \
 	Source/WebCore/html/RangeInputType.cpp \
@@ -2393,6 +2392,8 @@ webcore_sources += \
 	Source/WebCore/inspector/InspectorFrontendClientLocal.h \
 	Source/WebCore/inspector/InspectorFrontendHost.cpp \
 	Source/WebCore/inspector/InspectorFrontendHost.h \
+	Source/WebCore/inspector/InspectorHistory.cpp \
+	Source/WebCore/inspector/InspectorHistory.h \
 	Source/WebCore/inspector/InspectorIndexedDBAgent.h \
 	Source/WebCore/inspector/InspectorIndexedDBAgent.cpp \
 	Source/WebCore/inspector/InspectorInstrumentation.cpp \
@@ -4568,12 +4569,13 @@ if TARGET_WIN32
 webcore_sources += \
 	Source/WebCore/platform/ScrollAnimatorWin.cpp \
 	Source/WebCore/platform/ScrollAnimatorWin.h \
-	Source/WebCore/platform/cairo/WidgetBackingStoreCairo.cpp \
 	Source/WebCore/platform/win/SystemInfo.cpp \
 	Source/WebCore/platform/win/SystemInfo.h \
 	Source/WebCore/plugins/win/PluginDatabaseWin.cpp \
 	Source/WebCore/plugins/win/PluginMessageThrottlerWin.cpp \
 	Source/WebCore/plugins/win/PluginMessageThrottlerWin.h
+webcoregtk_sources += \
+	Source/WebCore/platform/cairo/WidgetBackingStoreCairo.cpp
 endif
 
 # ----
@@ -5362,6 +5364,7 @@ webcore_sources += \
 	Source/WebCore/platform/audio/AudioResamplerKernel.cpp \
 	Source/WebCore/platform/audio/AudioResamplerKernel.h \
 	Source/WebCore/platform/audio/AudioSourceProvider.h \
+	Source/WebCore/platform/audio/AudioSourceProviderClient.h \
 	Source/WebCore/platform/audio/AudioUtilities.cpp \
 	Source/WebCore/platform/audio/AudioUtilities.h \
 	Source/WebCore/platform/audio/Biquad.cpp \
@@ -5612,8 +5615,8 @@ webcore_sources += \
 	Source/WebCore/html/canvas/WebGLActiveInfo.h \
 	Source/WebCore/html/canvas/WebGLBuffer.cpp \
 	Source/WebCore/html/canvas/WebGLBuffer.h \
-	Source/WebCore/html/canvas/WebGLCompressedTextures.cpp \
-	Source/WebCore/html/canvas/WebGLCompressedTextures.h \
+	Source/WebCore/html/canvas/WebGLCompressedTextureS3TC.cpp \
+	Source/WebCore/html/canvas/WebGLCompressedTextureS3TC.h \
 	Source/WebCore/html/canvas/WebGLContextAttributes.cpp \
 	Source/WebCore/html/canvas/WebGLContextAttributes.h \
 	Source/WebCore/html/canvas/WebGLContextEvent.cpp \
@@ -5732,9 +5735,11 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.h \
-	Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
-	Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
-	Source/WebCore/platform/graphics/texmap/TextureMapperPlatformLayer.h
+        Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.cpp \
+        Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.h \
+        Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
+        Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
+        Source/WebCore/platform/graphics/texmap/TextureMapperPlatformLayer.h
 webcoregtk_sources += \
 	Source/WebCore/platform/graphics/cairo/TextureMapperCairo.cpp \
 	Source/WebCore/platform/graphics/cairo/TextureMapperCairo.h
@@ -5752,11 +5757,28 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.h \
+	Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.cpp \
+	Source/WebCore/platform/graphics/texmap/TextureMapperImageBuffer.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperNode.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperNode.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperPlatformLayer.h
 webcoregtk_sources += \
-	Source/WebCore/platform/graphics/cairo/TextureMapperGLCairo.cpp \
-	Source/WebCore/platform/graphics/cairo/TextureMapperGLCairo.h
+	Source/WebCore/platform/graphics/gtk/WindowGLContextGLX.cpp \
+	Source/WebCore/platform/graphics/gtk/WindowGLContext.h
 endif  # END USE_TEXTURE_MAPPER_GL
 endif  # USE_ACCELERATED_COMPOSITING
+
+# ---
+# Shadow DOM support
+# ---
+if ENABLE_SHADOW_DOM
+webcore_sources += \
+	Source/WebCore/html/shadow/HTMLShadowElement.cpp \
+	Source/WebCore/html/shadow/HTMLShadowElement.h
+webcore_built_sources += \
+	DerivedSources/WebCore/JSHTMLShadowElement.cpp \
+	DerivedSources/WebCore/JSHTMLShadowElement.h
+dom_binding_idls += \
+	$(WebCore)/html/shadow/HTMLShadowElement.idl
+
+endif  # END ENABLE_SHADOW_DOM

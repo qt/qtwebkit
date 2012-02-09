@@ -53,6 +53,14 @@ public:
         SOUNDFIELD = 2,
     };
 
+    // These must be defined as in the .idl file and must match those
+    // in the DistanceEffect class.
+    enum {
+        LINEAR_DISTANCE = 0,
+        INVERSE_DISTANCE = 1,
+        EXPONENTIAL_DISTANCE = 2,
+    };
+    
     static PassRefPtr<AudioPannerNode> create(AudioContext* context, float sampleRate)
     {
         return adoptRef(new AudioPannerNode(context, sampleRate));
@@ -72,7 +80,7 @@ public:
 
     // Panning model
     unsigned short panningModel() const { return m_panningModel; }
-    void setPanningModel(unsigned short);
+    void setPanningModel(unsigned short, ExceptionCode&);
 
     // Position
     FloatPoint3D position() const { return m_position; }

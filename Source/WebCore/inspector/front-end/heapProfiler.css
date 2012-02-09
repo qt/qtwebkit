@@ -115,6 +115,16 @@ body.inactive .heap-snapshot-sidebar-tree-item.wait.selected .icon {
     text-align: right;
 }
 
+.detailed-heapshot-view .data-grid td.distanceToWindow-column {
+    text-align: right;
+}
+
+.detailed-heapshot-view .data-grid span.percent-column {
+    color: grey;
+    width: 42px;
+    float: left;
+}
+
 .detailed-heapshot-view .console-formatted-object, .console-formatted-node {
     display: inline;
     position: static;
@@ -126,6 +136,10 @@ body.inactive .heap-snapshot-sidebar-tree-item.wait.selected .icon {
 
 .detailed-heapshot-view .console-formatted-string {
     white-space: nowrap;
+}
+
+.detailed-heapshot-view .console-formatted-id {
+    color: grey;
 }
 
 .detailed-heapshot-view .data-grid tr.selected * {
@@ -202,6 +216,10 @@ body.inactive .heap-snapshot-sidebar-tree-item.wait.selected .icon {
     background-color: rgb(255, 255, 200);
 }
 
+.detailed-heapshot-view td.object-column span.grayed {
+    color: gray;
+}
+
 .heapshot-help-status-bar-item .glyph {
     -webkit-mask-position: -160px 0;
 }
@@ -214,3 +232,8 @@ div.retaining-paths-view td.path-column div:hover {
     text-decoration: underline;
     color: blue;
 }
+
+.cycled-ancessor-node {
+    opacity: 0.6;
+}
+

@@ -391,7 +391,7 @@
                 "description": "Represents function call argument. Either remote object id <code>objectId</code> or primitive <code>value</code> or neither of (for undefined) them should be specified.",
                 "properties": [
                     { "name": "value", "type": "any", "optional": true, "description": "Primitive value." },
-                    { "name": "objectId", "$ref": "RemoteObject", "optional": true, "description": "Remote object handle." }
+                    { "name": "objectId", "$ref": "RemoteObjectId", "optional": true, "description": "Remote object handle." }
                 ]
             }
         ],
@@ -1508,6 +1508,24 @@
                     { "name": "nodeId", "$ref": "NodeId", "description": "New id of the moved node." }
                 ],
                 "description": "Moves node into the new container, places it before the given anchor."
+            },
+            {
+                "name": "setTouchEmulationEnabled",
+                "parameters": [
+                    { "name": "enabled", "type": "boolean", "description": "Whether the touch event emulation should be enabled." }
+                ],
+                "description": "Toggles mouse event-based touch event emulation.",
+                "hidden": true
+            },
+            {
+                "name": "undo",
+                "description": "Undoes the last performed action.",
+                "hidden": true
+            },
+            {
+                "name": "markUndoableState",
+                "description": "Marks last undoable state.",
+                "hidden": true
             }
         ],
         "events": [
@@ -1784,7 +1802,7 @@
                 ],
                 "returns": [
                     { "name": "inlineStyle", "$ref": "CSSStyle", "optional": true, "description": "Inline style for the specified DOM node." },
-                    { "name": "styleAttributes", "type": "array", "items": { "$ref": "CSSStyleAttribute" }, "optional": true, "description": "Entries for style-related element attributes (e.g. width=20)."}
+                    { "name": "attributesStyle", "$ref": "CSSStyle", "optional": true, "description": "Attribute-defined element style (e.g. resulting from \"width=20 height=100%\")."}
                 ],
                 "description": "Returns the styles defined inline (explicitly in the \"style\" attribute and implicitly, using DOM attributes) for a DOM node identified by <code>nodeId</code>."
             },
@@ -2392,7 +2410,8 @@
             {
                 "name": "getObjectByHeapObjectId",
                 "parameters": [
-                    { "name": "objectId", "type": "integer" }
+                    { "name": "objectId", "type": "integer" },
+                    { "name": "objectGroup", "type": "string", "optional": true, "description": "Symbolic group name that can be used to release multiple objects." }
                 ],
                 "returns": [
                     { "name": "result", "$ref": "Runtime.RemoteObject", "description": "Evaluation result." }

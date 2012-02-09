@@ -42,6 +42,15 @@ def get_build_path():
     def is_valid_build_directory(path):
         return os.path.exists(os.path.join(path, 'GNUmakefile'))
 
+    # Debian and Ubuntu build both flavours of the library (with gtk2
+    # and with gtk3); they use directories build-2.0 and build-3.0 for
+    # that, which is not handled by the above cases; we check that the
+    # directory where we are called from is a valid build directory,
+    # which should handle pretty much all other non-standard cases.
+    build_dir = os.getcwd()
+    if is_valid_build_directory(build_dir):
+        return build_dir
+
     build_types = ['Release', 'Debug']
     if '--debug' in sys.argv:
         build_types.reverse()
@@ -76,3 +85,22 @@ def number_of_cpus():
     process = subprocess.Popen([script_path('num-cpus')], stdout=subprocess.PIPE)
     stdout = process.communicate()[0]
     return int(stdout)
+
+
+def prefix_of_pkg_config_file(package):
+    process = subprocess.Popen(['pkg-config', '--variable=prefix', package],
+                                   stdout=subprocess.PIPE)
+    stdout = process.communicate()[0]
+    if process.returncode != 0:
+        return None
+    return stdout.strip()
+
+
+def gtk_version_of_pkg_config_file(pkg_config_path):
+    process = subprocess.Popen(['pkg-config', pkg_config_path, '--print-requires'],
+                               stdout=subprocess.PIPE)
+    stdout = process.communicate()[0]
+
+    if 'gtk+-3.0' in stdout:
+        return 3
+    return 2

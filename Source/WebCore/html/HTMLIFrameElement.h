@@ -35,8 +35,7 @@ public:
 private:
     HTMLIFrameElement(const QualifiedName&, Document*);
 
-    virtual bool mapToEntry(const QualifiedName&, MappedAttributeEntry&) const;
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 
     virtual void insertedIntoDocument();
     virtual void removedFromDocument();

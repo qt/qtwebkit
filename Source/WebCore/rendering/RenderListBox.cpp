@@ -92,17 +92,17 @@ RenderListBox::RenderListBox(Element* element)
     ASSERT(element);
     ASSERT(element->isHTMLElement());
     ASSERT(element->hasTagName(HTMLNames::selectTag));
-    if (Page* page = frame()->page()) {
-        m_page = page;
-        m_page->addScrollableArea(this);
-    }
+
+    if (FrameView* frameView = frame()->view())
+        frameView->addScrollableArea(this);
 }
 
 RenderListBox::~RenderListBox()
 {
     setHasVerticalScrollbar(false);
-    if (m_page)
-        m_page->removeScrollableArea(this);
+
+    if (FrameView* frameView = frame()->view())
+        frameView->removeScrollableArea(this);
 }
 
 void RenderListBox::updateFromElement()
@@ -651,7 +651,7 @@ LayoutUnit RenderListBox::scrollWidth() const
 
 int RenderListBox::scrollHeight() const
 {
-    return max(clientHeight(), listHeight());
+    return max(pixelSnappedClientHeight(), listHeight());
 }
 
 int RenderListBox::scrollLeft() const
@@ -819,6 +819,11 @@ ScrollableArea* RenderListBox::enclosingScrollableArea() const
 {
     // FIXME: Return a RenderLayer that's scrollable.
     return 0;
+}
+
+IntRect RenderListBox::scrollableAreaBoundingBox() const
+{
+    return absoluteBoundingBoxRect();
 }
 
 PassRefPtr<Scrollbar> RenderListBox::createScrollbar()

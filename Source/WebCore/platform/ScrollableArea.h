@@ -155,13 +155,14 @@ public:
     // Note that this only returns scrollable areas that can actually be scrolled.
     virtual ScrollableArea* enclosingScrollableArea() const = 0;
 
+    // Returns the bounding box of this scrollable area, in the coordinate system of the enclosing scroll view.
+    virtual IntRect scrollableAreaBoundingBox() const { ASSERT_NOT_REACHED(); return IntRect(); }
+
     bool isPinnedInBothDirections(const IntSize&) const;
     bool isPinnedHorizontallyInDirection(int horizontalScrollDelta) const;
     bool isPinnedVerticallyInDirection(int verticalScrollDelta) const;
 
     virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
-
-    virtual void disconnectFromPage() { }
 
     virtual bool scrollAnimatorEnabled() const { return false; }
 

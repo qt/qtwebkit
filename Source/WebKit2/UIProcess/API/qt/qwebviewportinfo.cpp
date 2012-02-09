@@ -38,63 +38,63 @@ QWebViewportInfo::~QWebViewportInfo()
 
 QSize QWebViewportInfo::contentsSize() const
 {
-    return QSize(m_webViewPrivate->pageView->contentSize().toSize());
+    return QSize(m_webViewPrivate->pageView->contentsSize().toSize());
 }
 
 QVariant QWebViewportInfo::currentScale() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->currentCSSScale();
 
-    return m_webViewPrivate->interactionEngine->currentCSSScale();
+    return QtViewportInteractionEngine::Constraints().initialScale;
 }
 
 QVariant QWebViewportInfo::devicePixelRatio() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->constraints().devicePixelRatio;
 
-    return m_webViewPrivate->interactionEngine->constraints().devicePixelRatio;
+    return QtViewportInteractionEngine::Constraints().devicePixelRatio;
 }
 
 QVariant QWebViewportInfo::initialScale() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->constraints().initialScale;
 
-    return m_webViewPrivate->interactionEngine->constraints().initialScale;
+    return QtViewportInteractionEngine::Constraints().initialScale;
 }
 
 QVariant QWebViewportInfo::minimumScale() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->constraints().minimumScale;
 
-    return m_webViewPrivate->interactionEngine->constraints().minimumScale;
+    return QtViewportInteractionEngine::Constraints().minimumScale;
 }
 
 QVariant QWebViewportInfo::maximumScale() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->constraints().maximumScale;
 
-    return m_webViewPrivate->interactionEngine->constraints().maximumScale;
+    return QtViewportInteractionEngine::Constraints().maximumScale;
 }
 
 QVariant QWebViewportInfo::isScalable() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->constraints().isUserScalable;
 
-    return m_webViewPrivate->interactionEngine->constraints().isUserScalable;
+    return QtViewportInteractionEngine::Constraints().isUserScalable;
 }
 
 QVariant QWebViewportInfo::layoutSize() const
 {
-    if (!m_webViewPrivate->interactionEngine)
-        return QVariant();
+    if (QtViewportInteractionEngine* interactionEngine = m_webViewPrivate->viewportInteractionEngine())
+        return interactionEngine->constraints().layoutSize;
 
-    return m_webViewPrivate->interactionEngine->constraints().layoutSize;
+    return QVariant(QSize());
 }
 
 void QWebViewportInfo::didUpdateContentsSize()

@@ -29,12 +29,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Unit tests for run_webkit_tests."""
-
-from __future__ import with_statement
-
 import codecs
 import itertools
+import json
 import logging
 import Queue
 import re
@@ -46,20 +43,9 @@ import unittest
 
 from webkitpy.common.system import path
 
-try:
-    import multiprocessing
-except ImportError:
-    multiprocessing = None
-
-try:
-    import json
-except ImportError:
-    # python 2.5 compatibility
-    import webkitpy.thirdparty.simplejson as json
-
 # FIXME: remove this when we fix test-webkitpy to work properly on cygwin
 # (bug 63846).
-SHOULD_TEST_PROCESSES = multiprocessing and sys.platform not in ('cygwin', 'win32')
+SHOULD_TEST_PROCESSES = sys.platform not in ('cygwin', 'win32')
 
 from webkitpy.common import array_stream
 from webkitpy.common.system import outputcapture
@@ -385,10 +371,27 @@ class MainTest(unittest.TestCase):
         tests_run = get_tests_run(['--repeat-each', '2'] + tests_to_run, tests_included=True, flatten_batches=True)
         self.assertEquals(tests_run, ['passes/image.html', 'passes/image.html', 'passes/text.html', 'passes/text.html'])
 
+    def test_skip_pixel_test_if_no_baseline_option(self):
+        tests_to_run = ['passes/image.html', 'passes/text.html']
+        tests_run = get_tests_run(['--skip-pixel-test-if-no-baseline'] + tests_to_run, tests_included=True, flatten_batches=True)
+        self.assertEquals(tests_run, ['passes/image.html', 'passes/text.html'])
+
     def test_iterations(self):
         tests_to_run = ['passes/image.html', 'passes/text.html']
         tests_run = get_tests_run(['--iterations', '2'] + tests_to_run, tests_included=True, flatten_batches=True)
         self.assertEquals(tests_run, ['passes/image.html', 'passes/text.html', 'passes/image.html', 'passes/text.html'])
+
+    def test_repeat_each_iterations_num_tests(self):
+        # The total number of tests should be: number_of_tests *
+        # repeat_each * iterations
+        host = MockHost()
+        res, out, err, _ = logging_run(['--iterations', '2',
+                                        '--repeat-each', '4',
+                                        '--print', 'everything',
+                                        'passes/text.html', 'failures/expected/text.html'],
+                                       tests_included=True, host=host, record_results=True)
+        self.assertTrue("=> Results: 8/16 tests passed (50.0%)\n" in out.get())
+        self.assertTrue(err.get()[-2] == "All 16 tests ran as expected.\n")
 
     def test_run_chunk(self):
         # Test that we actually select the right chunk

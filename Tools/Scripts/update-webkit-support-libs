@@ -51,7 +51,7 @@ my $versionFile = $file . "Version";
 my $pathToVersionFile = File::Spec->catfile($webkitLibrariesDir, $versionFile);
 my $tmpRelativeDir = File::Temp::tempdir("webkitlibsXXXXXXX", TMPDIR => 1, CLEANUP => 1);
 my $tmpAbsDir = File::Spec->rel2abs($tmpRelativeDir);
-my $versionFileURL = "http://developer.apple.com/opensource/internet/$versionFile";
+my $versionFileURL = "https://developer.apple.com/opensource/internet/$versionFile";
 
 my $extractedVersion = extractedVersion();
 
@@ -114,7 +114,7 @@ sub extractedVersion
 
 sub downloadExpectedVersionNumber
 {
-    chomp(my $expectedVersion = `curl -s $versionFileURL`);
+    chomp(my $expectedVersion = `curl -s --sslv3 -k $versionFileURL`);
     return WEXITSTATUS($?) ? NOTAVERSION : $expectedVersion;
 }
 
@@ -135,7 +135,7 @@ sub dieAndInstructToDownload
 $message
 Please download $zipFile from:
 
-    http://developer.apple.com/opensource/internet/webkit_sptlib_agree.html
+    https://developer.apple.com/opensource/internet/webkit_sptlib_agree.html
 
 and place it in:
 

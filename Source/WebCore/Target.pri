@@ -158,8 +158,7 @@ v8 {
         bindings/v8/custom/V8InjectedScriptHostCustom.cpp \
         bindings/v8/custom/V8InjectedScriptManager.cpp \
         bindings/v8/custom/V8InspectorFrontendHostCustom.cpp \
-        bindings/v8/custom/V8DOMStringMapCustom.cpp \
-        bindings/v8/custom/V8DOMTokenListCustom.cpp
+        bindings/v8/custom/V8DOMStringMapCustom.cpp
 
     SOURCES += \
         bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp \
@@ -416,7 +415,6 @@ SOURCES += \
     css/CSSInitialValue.cpp \
     css/CSSLineBoxContainValue.cpp \
     css/CSSMediaRule.cpp \
-    css/CSSMutableStyleDeclaration.cpp \
     css/CSSOMUtils.cpp \
     css/CSSPageRule.cpp \
     css/CSSParser.cpp \
@@ -457,6 +455,7 @@ SOURCES += \
     css/SelectorChecker.cpp \
     css/ShadowValue.cpp \
     css/StyleMedia.cpp \
+    css/StylePropertySet.cpp \
     css/StyleSheet.cpp \
     css/StyleSheetList.cpp \
     css/WebKitCSSFilterValue.cpp \
@@ -484,7 +483,6 @@ SOURCES += \
     dom/Comment.cpp \
     dom/CompositionEvent.cpp \
     dom/ContainerNode.cpp \
-    dom/CSSMappedAttributeDeclaration.cpp \
     dom/CustomEvent.cpp \
     dom/DecodedDataDocumentParser.cpp \
     dom/DeviceMotionController.cpp \
@@ -793,7 +791,6 @@ SOURCES += \
     html/ImageDocument.cpp \
     html/ImageInputType.cpp \
     html/InputType.cpp \
-    html/IsIndexInputType.cpp \
     html/LabelsNodeList.cpp \
     html/LinkRelAttribute.cpp \
     html/MediaDocument.cpp \
@@ -847,6 +844,7 @@ SOURCES += \
     html/shadow/ContentInclusionSelector.cpp \
     html/shadow/DetailsMarkerControl.cpp \
     html/shadow/HTMLContentElement.cpp \
+    html/shadow/HTMLShadowElement.cpp \
     html/shadow/MediaControls.cpp \
     html/shadow/MediaControlRootElement.cpp \
     html/shadow/MeterShadowElement.cpp \
@@ -877,6 +875,7 @@ SOURCES += \
     inspector/InspectorDOMStorageResource.cpp \
     inspector/InspectorFrontendClientLocal.cpp \
     inspector/InspectorFrontendHost.cpp \
+    inspector/InspectorHistory.cpp \
     inspector/InspectorInstrumentation.cpp \
     inspector/InspectorMemoryAgent.cpp \
     inspector/InspectorPageAgent.cpp \
@@ -1530,7 +1529,6 @@ HEADERS += \
     css/CSSInheritedValue.h \
     css/CSSInitialValue.h \
     css/CSSMediaRule.h \
-    css/CSSMutableStyleDeclaration.h \
     css/CSSOMUtils.h \
     css/CSSPageRule.h \
     css/CSSParser.h \
@@ -1571,6 +1569,7 @@ HEADERS += \
     css/SelectorChecker.h \
     css/ShadowValue.h \
     css/StyleMedia.h \
+    css/StylePropertySet.h \
     css/StyleSheet.h \
     css/StyleSheetList.h \
     css/WebKitCSSFilterValue.h \
@@ -1596,7 +1595,6 @@ HEADERS += \
     dom/Clipboard.h \
     dom/Comment.h \
     dom/ContainerNode.h \
-    dom/CSSMappedAttributeDeclaration.h \
     dom/CustomEvent.h \
     dom/default/PlatformMessagePortChannel.h \
     dom/DeviceMotionClient.h \
@@ -1881,6 +1879,7 @@ HEADERS += \
     html/MediaFragmentURIParser.h \
     html/MicroDataItemValue.h \
     html/PluginDocument.h \
+    html/PublicURLManager.h \
     html/StepRange.h \
     html/TextDocument.h \
     html/TextTrack.h \
@@ -1908,6 +1907,7 @@ HEADERS += \
     html/shadow/ContentSelectorQuery.h \
     html/shadow/ContentInclusionSelector.h \
     html/shadow/HTMLContentElement.h \
+    html/shadow/HTMLShadowElement.h \
     html/shadow/MediaControlElements.h \
     html/shadow/DetailsMarkerControl.h \
     html/track/TextTrackList.h \
@@ -1943,6 +1943,7 @@ HEADERS += \
     inspector/InspectorFrontendClient.h \
     inspector/InspectorFrontendClientLocal.h \
     inspector/InspectorFrontendHost.h \
+    inspector/InspectorHistory.h \
     inspector/InspectorInstrumentation.h \
     inspector/InspectorMemoryAgent.h \
     inspector/InspectorPageAgent.h \
@@ -3691,7 +3692,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLObject.h \
         html/canvas/WebGLActiveInfo.h \
         html/canvas/WebGLBuffer.h \
-        html/canvas/WebGLCompressedTextures.h \
+        html/canvas/WebGLCompressedTextureS3TC.h \
         html/canvas/WebGLContextAttributes.h \
         html/canvas/WebGLContextEvent.h \
         html/canvas/WebGLContextGroup.h \
@@ -3731,7 +3732,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/CanvasContextAttributes.cpp \
         html/canvas/WebGLObject.cpp \
         html/canvas/WebGLBuffer.cpp \
-        html/canvas/WebGLCompressedTextures.cpp \
+        html/canvas/WebGLCompressedTextureS3TC.cpp \
         html/canvas/WebGLContextAttributes.cpp \
         html/canvas/WebGLContextEvent.cpp \
         html/canvas/WebGLContextGroup.cpp \
@@ -3939,19 +3940,19 @@ win32:!win32-g++*:contains(QMAKE_HOST.arch, x86_64):{
 
 contains(CONFIG, texmap) {
     HEADERS += \
-        platform/graphics/qt/TextureMapperQt.h \
         platform/graphics/texmap/GraphicsLayerTextureMapper.h \
         platform/graphics/texmap/LayerTransform.h \
         platform/graphics/texmap/TextureMapper.h \
         platform/graphics/texmap/TextureMapperAnimation.h \
+        platform/graphics/texmap/TextureMapperImageBuffer.h \
         platform/graphics/texmap/TextureMapperNode.h \
         platform/graphics/texmap/TextureMapperPlatformLayer.h
 
     SOURCES += \
-        platform/graphics/qt/TextureMapperQt.cpp \
         platform/graphics/texmap/LayerTransform.cpp \
         platform/graphics/texmap/TextureMapper.cpp \
         platform/graphics/texmap/TextureMapperAnimation.cpp \
+        platform/graphics/texmap/TextureMapperImageBuffer.cpp \
         platform/graphics/texmap/TextureMapperNode.cpp \
         platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
 
@@ -3959,6 +3960,7 @@ contains(CONFIG, texmap) {
         HEADERS += platform/graphics/opengl/TextureMapperGL.h
         SOURCES += platform/graphics/opengl/TextureMapperGL.cpp
         CONFIG += opengl-shims
+        DEFINES += WTF_USE_TEXTURE_MAPPER_GL
     }
 } else {
     HEADERS += platform/graphics/qt/GraphicsLayerQt.h

@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
 import logging
 import os
 import subprocess
@@ -35,12 +36,6 @@ import urllib2
 import xml.dom.minidom
 
 from webkitpy.common.net.file_uploader import FileUploader
-
-try:
-    import json
-except ImportError:
-    # python 2.5 compatibility
-    import webkitpy.thirdparty.simplejson as json
 
 # A JSON results generator for generic tests.
 # FIXME: move this code out of the layout_package directory.
@@ -528,6 +523,10 @@ class JSONResultsGeneratorBase(object):
 
         # Include SVN revisions for the given repositories.
         for (name, path) in self._svn_repositories:
+            # Note: for JSON file's backward-compatibility we use 'chrome' rather
+            # than 'chromium' here.
+            if name == 'chromium':
+                name = 'chrome'
             self._insert_item_into_raw_list(results_for_builder,
                 self._get_svn_revision(path),
                 name + 'Revision')

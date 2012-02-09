@@ -84,8 +84,9 @@ PassRefPtr<HTMLTextAreaElement> HTMLTextAreaElement::create(const QualifiedName&
 
 void HTMLTextAreaElement::createShadowSubtree()
 {
-    ExceptionCode ec = 0;
-    ensureShadowRoot()->appendChild(TextControlInnerTextElement::create(document()), ec);
+    ASSERT(!shadowRoot());
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
+    root->appendChild(TextControlInnerTextElement::create(document()), ASSERT_NO_EXCEPTION);
 }
 
 const AtomicString& HTMLTextAreaElement::formControlType() const
@@ -117,7 +118,7 @@ void HTMLTextAreaElement::childrenChanged(bool changedByParser, Node* beforeChan
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
     
-void HTMLTextAreaElement::parseMappedAttribute(Attribute* attr)
+void HTMLTextAreaElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == rowsAttr) {
         int rows = attr->value().toInt();
@@ -151,11 +152,11 @@ void HTMLTextAreaElement::parseMappedAttribute(Attribute* attr)
             m_wrap = wrap;
 
             if (shouldWrapText()) {
-                addCSSProperty(attr, CSSPropertyWhiteSpace, CSSValuePreWrap);
-                addCSSProperty(attr, CSSPropertyWordWrap, CSSValueBreakWord);
+                addCSSProperty(CSSPropertyWhiteSpace, CSSValuePreWrap);
+                addCSSProperty(CSSPropertyWordWrap, CSSValueBreakWord);
             } else {
-                addCSSProperty(attr, CSSPropertyWhiteSpace, CSSValuePre);
-                addCSSProperty(attr, CSSPropertyWordWrap, CSSValueNormal);
+                addCSSProperty(CSSPropertyWhiteSpace, CSSValuePre);
+                addCSSProperty(CSSPropertyWordWrap, CSSValueNormal);
             }
 
             if (renderer())
@@ -169,7 +170,7 @@ void HTMLTextAreaElement::parseMappedAttribute(Attribute* attr)
     } else if (attr->name() == maxlengthAttr)
         setNeedsValidityCheck();
     else
-        HTMLTextFormControlElement::parseMappedAttribute(attr);
+        HTMLTextFormControlElement::parseAttribute(attr);
 }
 
 RenderObject* HTMLTextAreaElement::createRenderer(RenderArena* arena, RenderStyle*)

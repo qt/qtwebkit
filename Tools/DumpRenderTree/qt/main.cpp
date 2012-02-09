@@ -73,6 +73,7 @@ bool isOption(const QString& str)
 {
     return str == QString("-v") || str == QString("--pixel-tests")
            || str == QString("--stdout") || str == QString("--stderr")
+           || str == QString("--timeout") || str == QString("--no-timeout")
            || str == QString("-");
 }
 
@@ -89,7 +90,7 @@ QString takeOptionValue(QStringList& arguments, int index)
 
 void printUsage()
 {
-    fprintf(stderr, "Usage: DumpRenderTree [-v|--pixel-tests] [--stdout output_filename] [-stderr error_filename] filename [filename2..n]\n");
+    fprintf(stderr, "Usage: DumpRenderTree [-v|--pixel-tests] [--stdout output_filename] [-stderr error_filename] [--no-timeout] [--timeout timeout_MS] filename [filename2..n]\n");
     fprintf(stderr, "Or folder containing test files: DumpRenderTree [-v|--pixel-tests] dirpath\n");
     fflush(stderr);
 }
@@ -149,6 +150,7 @@ int main(int argc, char* argv[])
     QApplication::setStyle(new QWindowsStyle);
 
     QApplication app(argc, argv);
+    app.setQuitOnLastWindowClosed(false);
 
 #if QT_VERSION <= QT_VERSION_CHECK(5, 0, 0) // FIXME: need a way to port this to Qt5.
 #ifdef Q_WS_X11
@@ -211,6 +213,19 @@ int main(int argc, char* argv[])
         }
     }
     QWebDatabase::removeAllDatabases();
+
+    index = args.indexOf(QLatin1String("--timeout"));
+    if (index != -1) {
+        int timeout = takeOptionValue(args, index).toInt();
+        dumper.setTimeout(timeout);
+        args.removeAt(index);
+    }
+
+    index = args.indexOf(QLatin1String("--no-timeout"));
+    if (index != -1) {
+        dumper.setShouldTimeout(false);
+        args.removeAt(index);
+    }
 
     index = args.indexOf(QLatin1String("-"));
     if (index != -1) {

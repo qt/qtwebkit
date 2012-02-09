@@ -27,11 +27,11 @@ module html {
 
     interface [
         Conditional=VIDEO_TRACK,
-        EnabledAtRuntime=webkitVideoTrack,
-        HasIndexGetter,
+        V8EnabledAtRuntime=webkitVideoTrack,
+        IndexedGetter,
         EventTarget,
-        CustomMarkFunction,
-        CustomIsReachable
+        JSCustomMarkFunction,
+        JSCustomIsReachable
     ] TextTrackList {
         readonly attribute unsigned long length;
         TextTrack item(in unsigned long index);

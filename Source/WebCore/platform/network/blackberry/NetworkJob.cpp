@@ -97,7 +97,9 @@ NetworkJob::NetworkJob()
     , m_isAbout(false)
     , m_isFTP(false)
     , m_isFTPDir(true)
+#ifndef NDEBUG
     , m_isRunning(true) // Always started immediately after creation.
+#endif
     , m_cancelled(false)
     , m_statusReceived(false)
     , m_dataReceived(false)
@@ -157,30 +159,9 @@ bool NetworkJob::initialize(int playerId,
     return true;
 }
 
-bool NetworkJob::loadAboutURL()
+void NetworkJob::loadAboutURL()
 {
-    // First 6 chars are "about:".
-    String aboutWhat(m_response.url().string().substring(6));
-
-    if (!aboutWhat.isEmpty()
-            && !equalIgnoringCase(aboutWhat, "blank")
-            && !equalIgnoringCase(aboutWhat, "credits")
-#if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
-            && !aboutWhat.startsWith("cache?query=", false)
-            && !equalIgnoringCase(aboutWhat, "cache")
-            && !equalIgnoringCase(aboutWhat, "cache/enable")
-            && !equalIgnoringCase(aboutWhat, "cache/disable")
-            && !equalIgnoringCase(aboutWhat, "version")
-            && (!BlackBerry::Platform::debugSetting()
-                || (!equalIgnoringCase(aboutWhat, "config")
-                    && !equalIgnoringCase(aboutWhat, "build")
-                    && !equalIgnoringCase(aboutWhat, "memory")))
-#endif
-            )
-        return false;
-
     m_loadAboutTimer.startOneShot(0);
-    return true;
 }
 
 int NetworkJob::cancelJob()
@@ -400,7 +381,7 @@ void NetworkJob::handleNotifyDataReceived(const char* buf, size_t len)
     if (shouldSendClientData()) {
         sendResponseIfNeeded();
         sendMultipartResponseIfNeeded();
-        if (clientIsOk()) {
+        if (isClientAvailable()) {
             RecursionGuard guard(m_callingClient);
             m_handle->client()->didReceiveData(m_handle.get(), buf, len, len);
         }
@@ -425,7 +406,7 @@ void NetworkJob::handleNotifyDataSent(unsigned long long bytesSent, unsigned lon
     // Protect against reentrancy.
     updateDeferLoadingCount(1);
 
-    if (clientIsOk()) {
+    if (isClientAvailable()) {
         RecursionGuard guard(m_callingClient);
         m_handle->client()->didSendData(m_handle.get(), bytesSent, totalBytesToBeSent);
     }
@@ -443,8 +424,9 @@ void NetworkJob::notifyClose(int status)
 
 void NetworkJob::handleNotifyClose(int status)
 {
+#ifndef NDEBUG
     m_isRunning = false;
-
+#endif
     if (!m_cancelled) {
         if (!m_statusReceived) {
             // Connection failed before sending notifyStatusReceived: use generic NetworkError.
@@ -464,7 +446,7 @@ void NetworkJob::handleNotifyClose(int status)
                 m_extendedStatusCode = BlackBerry::Platform::FilterStream::StatusTooManyRedirects;
 
             sendResponseIfNeeded();
-            if (clientIsOk()) {
+            if (isClientAvailable()) {
 
                 RecursionGuard guard(m_callingClient);
                 if (isError(m_extendedStatusCode) && !m_dataReceived) {
@@ -519,12 +501,13 @@ bool NetworkJob::retryAsFTPDirectory()
 
 bool NetworkJob::startNewJobWithRequest(ResourceRequest& newRequest, bool increasRedirectCount)
 {
-    if (clientIsOk()) {
+    if (isClientAvailable()) {
         RecursionGuard guard(m_callingClient);
         m_handle->client()->willSendRequest(m_handle.get(), newRequest, m_response);
 
         // m_cancelled can become true if the url fails the policy check.
-        if (m_cancelled)
+        // newRequest can be cleared when the redirect is rejected.
+        if (m_cancelled || newRequest.isEmpty())
             return false;
     }
 
@@ -610,12 +593,26 @@ void NetworkJob::sendResponseIfNeeded()
     if (!contentLength.isNull())
         m_response.setExpectedContentLength(contentLength.toInt64());
 
-    // Set suggested filename for downloads from the Content-Disposition header; if this fails, fill it in from the url
-    // skip this for data url's, because they have no Content-Disposition header and the format is wrong to be a filename.
+    // Set suggested filename for downloads from the Content-Disposition header; if this fails,
+    // fill it in from the url and sniffed mime type;Skip this for data and about URLs,
+    // because they have no Content-Disposition header and the format is wrong to be a filename.
     if (!m_isData && !m_isAbout) {
         String suggestedFilename = filenameFromHTTPContentDisposition(m_contentDisposition);
-        if (suggestedFilename.isNull())
-            suggestedFilename = urlFilename;
+        if (suggestedFilename.isEmpty()) {
+            // Check and see if an extension already exists.
+            String mimeExtension = MIMETypeRegistry::getPreferredExtensionForMIMEType(mimeType);
+            if (urlFilename.isEmpty()) {
+                if (mimeExtension.isEmpty()) // No extension found for the mimeType.
+                    suggestedFilename = String("Untitled");
+                else
+                    suggestedFilename = String("Untitled") + "." + mimeExtension;
+            } else {
+                if (urlFilename.reverseFind('.') == notFound && !mimeExtension.isEmpty())
+                   suggestedFilename = urlFilename + '.' + mimeExtension;
+                else
+                   suggestedFilename = urlFilename;
+            }
+        }
         m_response.setSuggestedFilename(suggestedFilename);
     }
 
@@ -623,7 +620,7 @@ void NetworkJob::sendResponseIfNeeded()
     if (m_isFile || m_isData || m_isAbout)
         m_response.setHTTPHeaderField("Cache-Control", "no-cache");
 
-    if (clientIsOk()) {
+    if (isClientAvailable()) {
         RecursionGuard guard(m_callingClient);
         m_handle->client()->didReceiveResponse(m_handle.get(), m_response);
     }
@@ -631,7 +628,7 @@ void NetworkJob::sendResponseIfNeeded()
 
 void NetworkJob::sendMultipartResponseIfNeeded()
 {
-    if (m_multipartResponse && clientIsOk()) {
+    if (m_multipartResponse && isClientAvailable()) {
         m_handle->client()->didReceiveResponse(m_handle.get(), *m_multipartResponse);
         m_multipartResponse = nullptr;
     }
@@ -965,13 +962,18 @@ void NetworkJob::handleAbout()
 #endif
     }
 
-    CString resultString = result.utf8();
-
-    notifyStatusReceived(handled ? 404 : 200, 0);
-    notifyStringHeaderReceived("Content-Length", String::number(resultString.length()));
-    notifyStringHeaderReceived("Content-Type", "text/html");
-    notifyDataReceivedPlain(resultString.data(), resultString.length());
-    notifyClose(BlackBerry::Platform::FilterStream::StatusSuccess);
+    if (handled) {
+        CString resultString = result.utf8();
+        notifyStatusReceived(404, 0);
+        notifyStringHeaderReceived("Content-Length", String::number(resultString.length()));
+        notifyStringHeaderReceived("Content-Type", "text/html");
+        notifyDataReceivedPlain(resultString.data(), resultString.length());
+        notifyClose(BlackBerry::Platform::FilterStream::StatusSuccess);
+    } else {
+        // If we can not handle it, we take it as an error of invalid URL.
+        notifyStatusReceived(BlackBerry::Platform::FilterStream::StatusErrorInvalidUrl, 0);
+        notifyClose(BlackBerry::Platform::FilterStream::StatusErrorInvalidUrl);
+    }
 }
 
 } // namespace WebCore

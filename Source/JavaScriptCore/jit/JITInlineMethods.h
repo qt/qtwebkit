@@ -264,6 +264,9 @@ ALWAYS_INLINE void JIT::restoreArgumentReference()
 
 ALWAYS_INLINE void JIT::updateTopCallFrame()
 {
+    ASSERT(static_cast<int>(m_bytecodeOffset) >= 0);
+    if (m_bytecodeOffset)
+        store32(Imm32(m_bytecodeOffset + 1), intTagFor(RegisterFile::ArgumentCount));
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
 }
 
@@ -401,13 +404,13 @@ ALWAYS_INLINE bool JIT::isOperandConstantImmediateChar(unsigned src)
 
 template <typename ClassType, typename StructureType> inline void JIT::emitAllocateBasicJSObject(StructureType structure, RegisterID result, RegisterID storagePtr)
 {
-    MarkedSpace::SizeClass* sizeClass = &m_globalData->heap.sizeClassForObject(sizeof(ClassType));
-    loadPtr(&sizeClass->firstFreeCell, result);
+    MarkedAllocator* allocator = &m_globalData->heap.allocatorForObject(sizeof(ClassType));
+    loadPtr(&allocator->m_firstFreeCell, result);
     addSlowCase(branchTestPtr(Zero, result));
 
     // remove the object from the free list
     loadPtr(Address(result), storagePtr);
-    storePtr(storagePtr, &sizeClass->firstFreeCell);
+    storePtr(storagePtr, &allocator->m_firstFreeCell);
 
     // initialize the object's structure
     storePtr(structure, Address(result, JSCell::structureOffset()));

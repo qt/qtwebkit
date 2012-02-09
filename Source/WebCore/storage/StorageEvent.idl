@@ -28,18 +28,18 @@ module storage {
     interface [
         ConstructorTemplate=Event
     ] StorageEvent : Event {
-        readonly attribute [InitializedByConstructor] DOMString key;
-        readonly attribute [InitializedByConstructor, ConvertNullStringTo=Null] DOMString oldValue;
-        readonly attribute [InitializedByConstructor, ConvertNullStringTo=Null] DOMString newValue;
-        readonly attribute [InitializedByConstructor] DOMString url;
-        readonly attribute [InitializedByConstructor] Storage storageArea;
+        readonly attribute [InitializedByEventConstructor] DOMString key;
+        readonly attribute [InitializedByEventConstructor, ConvertNullStringTo=Null] DOMString oldValue;
+        readonly attribute [InitializedByEventConstructor, ConvertNullStringTo=Null] DOMString newValue;
+        readonly attribute [InitializedByEventConstructor] DOMString url;
+        readonly attribute [InitializedByEventConstructor] Storage storageArea;
 
         void initStorageEvent(in [Optional=CallWithDefaultValue] DOMString typeArg, 
                               in [Optional=CallWithDefaultValue] boolean canBubbleArg, 
                               in [Optional=CallWithDefaultValue] boolean cancelableArg, 
                               in [Optional=CallWithDefaultValue] DOMString keyArg, 
-                              in [Optional=CallWithDefaultValue,TreatNullAs=EmptyString] DOMString oldValueArg, 
-                              in [Optional=CallWithDefaultValue,TreatNullAs=EmptyString] DOMString newValueArg, 
+                              in [Optional=CallWithDefaultValue,TreatNullAs=NullString] DOMString oldValueArg, 
+                              in [Optional=CallWithDefaultValue,TreatNullAs=NullString] DOMString newValueArg, 
                               in [Optional=CallWithDefaultValue] DOMString urlArg, 
                               in [Optional=CallWithDefaultValue] Storage storageAreaArg);
 

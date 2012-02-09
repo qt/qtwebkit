@@ -30,7 +30,6 @@
 #include "AXObjectCache.h"
 #include "ApplyStyleCommand.h"
 #include "CSSComputedStyleDeclaration.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSProperty.h"
 #include "CSSPropertyNames.h"
 #include "CSSStyleSelector.h"
@@ -78,6 +77,7 @@
 #include "Sound.h"
 #include "SpellChecker.h"
 #include "SpellingCorrectionCommand.h"
+#include "StylePropertySet.h"
 #include "Text.h"
 #include "TextCheckerClient.h"
 #include "TextCheckingHelper.h"
@@ -1346,9 +1346,9 @@ void Editor::setBaseWritingDirection(WritingDirection direction)
         return;
     }
 
-    RefPtr<CSSMutableStyleDeclaration> style = CSSMutableStyleDeclaration::create();
+    RefPtr<StylePropertySet> style = StylePropertySet::create();
     style->setProperty(CSSPropertyDirection, direction == LeftToRightWritingDirection ? "ltr" : direction == RightToLeftWritingDirection ? "rtl" : "inherit", false);
-    applyParagraphStyleToSelection(style.get(), EditActionSetWritingDirection);
+    applyParagraphStyleToSelection(style->ensureCSSStyleDeclaration(), EditActionSetWritingDirection);
 }
 
 void Editor::selectComposition()
@@ -2090,7 +2090,7 @@ void Editor::markAndReplaceFor(PassRefPtr<SpellCheckRequest> request, const Vect
             RefPtr<Range> misspellingRange = paragraph.subrange(resultLocation, resultLength);
             if (!m_spellingCorrector->isSpellingMarkerAllowed(misspellingRange))
                 continue;
-            misspellingRange->startContainer()->document()->markers()->addMarker(misspellingRange.get(), DocumentMarker::Spelling);
+            misspellingRange->startContainer()->document()->markers()->addMarker(misspellingRange.get(), DocumentMarker::Spelling, result->replacement);
         } else if (shouldMarkGrammar && result->type == TextCheckingTypeGrammar && paragraph.checkingRangeCovers(resultLocation, resultLength)) {
             ASSERT(resultLength > 0 && resultLocation >= 0);
             for (unsigned j = 0; j < result->details.size(); j++) {
@@ -2318,7 +2318,7 @@ void Editor::deletedAutocorrectionAtPosition(const Position& position, const Str
     m_spellingCorrector->deletedAutocorrectionAtPosition(position, originalString);
 }
 
-PassRefPtr<Range> Editor::rangeForPoint(const LayoutPoint& windowPoint)
+PassRefPtr<Range> Editor::rangeForPoint(const IntPoint& windowPoint)
 {
     Document* document = m_frame->documentAtPoint(windowPoint);
     if (!document)
@@ -2633,7 +2633,7 @@ String Editor::selectedText() const
 
 IntRect Editor::firstRectForRange(Range* range) const
 {
-    int extraWidthToEndOfLine = 0;
+    LayoutUnit extraWidthToEndOfLine = 0;
     ASSERT(range->startContainer());
     ASSERT(range->endContainer());
 
@@ -2745,7 +2745,7 @@ void Editor::applyEditingStyleToElement(Element* element) const
     ASSERT(element->isStyledElement());
     if (!element->isStyledElement())
         return;
-    CSSMutableStyleDeclaration* style = static_cast<StyledElement*>(element)->ensureInlineStyleDecl();
+    StylePropertySet* style = static_cast<StyledElement*>(element)->ensureInlineStyleDecl();
     style->setProperty(CSSPropertyWordWrap, "break-word", false);
     style->setProperty(CSSPropertyWebkitNbspMode, "space", false);
     style->setProperty(CSSPropertyWebkitLineBreak, "after-white-space", false);

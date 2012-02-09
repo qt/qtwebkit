@@ -27,12 +27,12 @@
 module html {
     interface [
         CustomConstructor,
-        HasNumericIndexGetter,
-        HasCustomIndexSetter,
-        GenerateNativeConverter,
-        NoStaticTables,
-        CustomToJS,
-        DontCheckEnums
+        NumericIndexedGetter,
+        CustomIndexedSetter,
+        JSGenerateToNativeObject,
+        JSNoStaticTables,
+        JSCustomToJS,
+        DoNotCheckConstants
     ] Float64Array : ArrayBufferView {
         Int32Array foo(in Float32Array array);
     };

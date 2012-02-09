@@ -191,8 +191,7 @@ sub ShouldSkipType
 {
     my $typeInfo = shift;
 
-    return 1 if $typeInfo->signature->extendedAttributes->{"Custom"}
-             and !$typeInfo->signature->extendedAttributes->{"NoCPPCustom"};
+    return 1 if $typeInfo->signature->extendedAttributes->{"Custom"};
 
     return 1 if $typeInfo->signature->extendedAttributes->{"CustomArgumentHandling"}
              or $typeInfo->signature->extendedAttributes->{"CustomGetter"}
@@ -297,7 +296,7 @@ sub AddIncludesForType
     }
 
     $implIncludes{"Node.h"} = 1 if $type eq "NodeList";
-    $implIncludes{"CSSMutableStyleDeclaration.h"} = 1 if $type eq "CSSStyleDeclaration";
+    $implIncludes{"StylePropertySet.h"} = 1 if $type eq "CSSStyleDeclaration";
 
     # Default, include the same named file (the implementation) and the same name prefixed with "WebDOM". 
     $implIncludes{"$type.h"} = 1 unless $type eq "DOMObject";
@@ -482,7 +481,7 @@ sub GenerateHeader
                 $parameterIndex++;
             }
             $functionSig .= ")";
-            if ($dataNode->extendedAttributes->{"PureInterface"}) {
+            if ($dataNode->extendedAttributes->{"CPPPureInterface"}) {
                 push(@interfaceFunctions, "    virtual " . $functionSig . " = 0;\n");
             }
             my $functionDeclaration = $functionSig;
@@ -514,9 +513,9 @@ sub GenerateHeader
 
     push(@headerContent, "};\n\n");
 
-    # for PureInterface classes also add the interface that the client code needs to
+    # for CPPPureInterface classes also add the interface that the client code needs to
     # implement
-    if ($dataNode->extendedAttributes->{"PureInterface"}) {
+    if ($dataNode->extendedAttributes->{"CPPPureInterface"}) {
         push(@headerContent, "class WebUser$interfaceName {\n");
         push(@headerContent, "public:\n");
         push(@headerContent, "    virtual void ref() = 0;\n");
@@ -530,7 +529,7 @@ sub GenerateHeader
     my $namespace = GetNamespaceForClass($implClassName);
     push(@headerContent, "$namespace" . "::$implClassName* toWebCore(const $className&);\n");
     push(@headerContent, "$className toWebKit($namespace" . "::$implClassName*);\n");
-    if ($dataNode->extendedAttributes->{"PureInterface"}) {
+    if ($dataNode->extendedAttributes->{"CPPPureInterface"}) {
         push(@headerContent, "$className toWebKit(WebUser$interfaceName*);\n");
     }
     push(@headerContent, "\n#endif\n");
@@ -749,11 +748,6 @@ sub GenerateImplementation
                 my $argName = "new" . ucfirst($attributeName);
                 my $arg = GetCPPTypeGetter($argName, $idlType);
 
-                # The definition of ConvertToString is flipped for the setter
-                if ($attribute->signature->extendedAttributes->{"ConvertToString"}) {
-                    $arg = "WTF::String($arg).toInt()";
-                }
-
                 my $attributeType = GetCPPType($attribute->signature->type, 1);
                 push(@implContent, "void $className\:\:$setterName($attributeType $argName)\n");
                 push(@implContent, "{\n");
@@ -784,8 +778,8 @@ sub GenerateImplementation
     # - Functions
     if ($numFunctions > 0) {
         foreach my $function (@{$dataNode->functions}) {
-            # Treat PureInterface as Custom as well, since the WebCore versions will take a script context as well
-            next if ShouldSkipType($function) || $dataNode->extendedAttributes->{"PureInterface"};
+            # Treat CPPPureInterface as Custom as well, since the WebCore versions will take a script context as well
+            next if ShouldSkipType($function) || $dataNode->extendedAttributes->{"CPPPureInterface"};
             AddIncludesForType($function->signature->type);
 
             my $functionName = $function->signature->name;

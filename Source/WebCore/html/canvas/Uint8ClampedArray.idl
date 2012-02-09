@@ -27,12 +27,12 @@
 module html {
     interface [
         CustomConstructor,
-        HasNumericIndexGetter,
-        HasCustomIndexSetter,
-        GenerateNativeConverter,
-        NoStaticTables,
-        CustomToJS,
-        DontCheckEnums
+        NumericIndexedGetter,
+        CustomIndexedSetter,
+        JSGenerateToNativeObject,
+        JSNoStaticTables,
+        JSCustomToJS,
+        DoNotCheckConstants
     ] Uint8ClampedArray : Uint8Array {
         const unsigned int BYTES_PER_ELEMENT = 1;
 

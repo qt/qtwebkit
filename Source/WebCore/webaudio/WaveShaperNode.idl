@@ -25,8 +25,8 @@
 module audio {
     interface [
         Conditional=WEB_AUDIO,
-        GenerateToJS
+        JSGenerateToJS
     ] WaveShaperNode : AudioNode {
-        attribute [JSCCustomSetter] Float32Array curve;
+        attribute [JSCustomSetter] Float32Array curve;
     };
 }

@@ -47,7 +47,7 @@ PassRefPtr<HTMLTableSectionElement> HTMLTableSectionElement::create(const Qualif
     return adoptRef(new HTMLTableSectionElement(tagName, document));
 }
 
-PassRefPtr<CSSMutableStyleDeclaration> HTMLTableSectionElement::additionalAttributeStyle()
+StylePropertySet* HTMLTableSectionElement::additionalAttributeStyle()
 {
     ContainerNode* p = parentNode();
     while (p && !p->hasTagName(tableTag))

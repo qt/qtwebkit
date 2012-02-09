@@ -452,7 +452,7 @@ void HTMLTreeBuilder::constructTreeFromToken(HTMLToken& rawToken)
     //
     // FIXME: Stop clearing the rawToken once we start running the parser off
     // the main thread or once we stop allowing synchronous JavaScript
-    // execution from parseMappedAttribute.
+    // execution from parseAttribute.
     if (rawToken.type() != HTMLTokenTypes::Character)
         rawToken.clear();
 
@@ -571,7 +571,7 @@ PassOwnPtr<NamedNodeMap> HTMLTreeBuilder::attributesForIsindexInput(AtomicHTMLTo
         attributes->removeAttribute(promptAttr);
     }
 
-    RefPtr<Attribute> mappedAttribute = Attribute::createMapped(nameAttr, isindexTag.localName());
+    RefPtr<Attribute> mappedAttribute = Attribute::create(nameAttr, isindexTag.localName());
     attributes->insertAttribute(mappedAttribute.release(), false);
     return attributes.release();
 }

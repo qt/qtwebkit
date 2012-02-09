@@ -22,8 +22,8 @@
 #ifndef CSSFontFaceRule_h
 #define CSSFontFaceRule_h
 
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSRule.h"
+#include "StylePropertySet.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
@@ -42,19 +42,19 @@ public:
 
     ~CSSFontFaceRule();
 
-    CSSStyleDeclaration* style() const { return m_style.get(); }
+    CSSStyleDeclaration* style() const { return m_style->ensureCSSStyleDeclaration(); }
 
     String cssText() const;
 
-    CSSMutableStyleDeclaration* declaration() const { return m_style.get(); }
-    void setDeclaration(PassRefPtr<CSSMutableStyleDeclaration> style) { m_style = style; }
+    StylePropertySet* declaration() const { return m_style.get(); }
+    void setDeclaration(PassRefPtr<StylePropertySet> style) { m_style = style; }
 
     void addSubresourceStyleURLs(ListHashSet<KURL>& urls);
 
 private:
     CSSFontFaceRule(CSSStyleSheet* parent);
 
-    RefPtr<CSSMutableStyleDeclaration> m_style;
+    RefPtr<StylePropertySet> m_style;
 };
 
 } // namespace WebCore

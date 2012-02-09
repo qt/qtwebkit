@@ -27,13 +27,13 @@
 module html {
 
     interface [
-        GenerateNativeConverter
+        JSGenerateToNativeObject
     ] HTMLCanvasElement : HTMLElement {
 
         attribute long width;
         attribute long height;
 
-        [Custom] DOMString toDataURL(in [ConvertUndefinedOrNullToNullString,Optional=CallWithDefaultValue] DOMString type)
+        [Custom] DOMString toDataURL(in [TreatNullAs=NullString, TreatUndefinedAs=NullString,Optional=CallWithDefaultValue] DOMString type)
             raises(DOMException);
 
 #if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP

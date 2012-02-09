@@ -21,8 +21,8 @@
 module html {
 
     interface [
-        DelegatingPutFunction,
-        DelegatingGetOwnPropertySlot,
+        CustomNamedSetter,
+        JSCustomGetOwnPropertySlotDelegate,
         CustomCall
     ] HTMLEmbedElement : HTMLElement {
     attribute [Reflect] DOMString align;

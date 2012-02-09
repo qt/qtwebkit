@@ -54,8 +54,6 @@ BrowserWindow::BrowserWindow(WindowOptions* options)
     setSource(QUrl("qrc:/qml/BrowserWindow.qml"));
     connect(rootObject(), SIGNAL(pageTitleChanged(QString)), this, SLOT(setWindowTitle(QString)));
     connect(rootObject(), SIGNAL(newWindow(QString)), this, SLOT(newWindow(QString)));
-    if (options->useTraditionalDesktopBehavior())
-        webView()->experimental()->setUseTraditionalDesktopBehaviour(true);
     if (options->startFullScreen())
         showFullScreen();
     else {
@@ -110,12 +108,14 @@ void BrowserWindow::updateVisualMockTouchPoints(const QList<QWindowSystemInterfa
             mockTouchPointItem->setParentItem(rootObject());
         }
 
-        QPointF position = touchPoint.area.topLeft();
+        QPointF position = touchPoint.area.center();
         position.rx() -= geometry().x();
         position.ry() -= geometry().y();
 
         mockTouchPointItem->setX(position.x());
         mockTouchPointItem->setY(position.y());
+        mockTouchPointItem->setWidth(touchPoint.area.width());
+        mockTouchPointItem->setHeight(touchPoint.area.height());
         mockTouchPointItem->setProperty("pressed", QVariant(touchPoint.state != Qt::TouchPointReleased));
     }
 }

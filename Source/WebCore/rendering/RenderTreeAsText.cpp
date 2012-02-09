@@ -26,7 +26,6 @@
 #include "config.h"
 #include "RenderTreeAsText.h"
 
-#include "CSSMutableStyleDeclaration.h"
 #include "Document.h"
 #include "Frame.h"
 #include "FrameSelection.h"
@@ -48,6 +47,7 @@
 #include "RenderTableCell.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "StylePropertySet.h"
 #include <wtf/HexNumber.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
@@ -183,7 +183,7 @@ static bool isEmptyOrUnstyledAppleStyleSpan(const Node* node)
     if (!node->hasChildNodes())
         return true;
 
-    CSSMutableStyleDeclaration* inlineStyleDecl = elem->inlineStyleDecl();
+    StylePropertySet* inlineStyleDecl = elem->inlineStyleDecl();
     return (!inlineStyleDecl || inlineStyleDecl->isEmpty());
 }
 
@@ -617,10 +617,10 @@ static void write(TextStream& ts, RenderLayer& l,
             ts << " scrollX " << l.scrollXOffset();
         if (l.scrollYOffset())
             ts << " scrollY " << l.scrollYOffset();
-        if (l.renderBox() && l.renderBox()->clientWidth() != l.scrollWidth())
-            ts << " scrollWidth " << l.scrollWidth();
-        if (l.renderBox() && l.renderBox()->clientHeight() != l.scrollHeight())
-            ts << " scrollHeight " << l.scrollHeight();
+        if (l.renderBox() && l.renderBox()->pixelSnappedClientWidth() != l.pixelSnappedScrollWidth())
+            ts << " scrollWidth " << l.pixelSnappedScrollWidth();
+        if (l.renderBox() && l.renderBox()->pixelSnappedClientHeight() != l.pixelSnappedScrollHeight())
+            ts << " scrollHeight " << l.pixelSnappedScrollHeight();
     }
 
     if (paintPhase == LayerPaintPhaseBackground)

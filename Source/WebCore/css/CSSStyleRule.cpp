@@ -22,12 +22,12 @@
 #include "config.h"
 #include "CSSStyleRule.h"
 
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPageRule.h"
 #include "CSSParser.h"
 #include "CSSSelector.h"
 #include "CSSStyleSheet.h"
 #include "Document.h"
+#include "StylePropertySet.h"
 #include "StyledElement.h"
 #include "StyleSheet.h"
 
@@ -98,7 +98,7 @@ String CSSStyleRule::selectorText() const
 void CSSStyleRule::setSelectorText(const String& selectorText)
 {
     Document* doc = 0;
-    if (CSSStyleSheet* styleSheet = m_style->parentStyleSheet())
+    if (CSSStyleSheet* styleSheet = parentStyleSheet())
         doc = styleSheet->findDocument();
     if (!doc)
         return;

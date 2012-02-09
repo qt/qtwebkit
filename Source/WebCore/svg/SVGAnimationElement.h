@@ -85,7 +85,7 @@ protected:
     SVGAnimationElement(const QualifiedName&, Document*);
 
     bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 
     enum AttributeType {
         AttributeTypeCSS,
@@ -107,7 +107,7 @@ protected:
     virtual void endedActiveInterval();
 
 private:
-    virtual void attributeChanged(Attribute*, bool preserveDecls);
+    virtual void attributeChanged(Attribute*) OVERRIDE;
 
     virtual bool calculateFromAndToValues(const String& fromString, const String& toString) = 0;
     virtual bool calculateFromAndByValues(const String& fromString, const String& byString) = 0;

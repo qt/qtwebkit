@@ -66,18 +66,17 @@ public:
 
     virtual void attach();
 
-    PassRefPtr<CSSMutableStyleDeclaration> additionalCellStyle();
-    PassRefPtr<CSSMutableStyleDeclaration> additionalGroupStyle(bool rows);
+    StylePropertySet* additionalCellStyle();
+    StylePropertySet* additionalGroupStyle(bool rows);
 
 private:
     HTMLTableElement(const QualifiedName&, Document*);
 
-    virtual bool mapToEntry(const QualifiedName&, MappedAttributeEntry&) const;
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual bool isURLAttribute(Attribute*) const;
 
     // Used to obtain either a solid or outset border decl and to deal with the frame and rules attributes.
-    virtual PassRefPtr<CSSMutableStyleDeclaration> additionalAttributeStyle() OVERRIDE;
+    virtual StylePropertySet* additionalAttributeStyle() OVERRIDE;
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
@@ -86,7 +85,7 @@ private:
 
     CellBorders cellBorders() const;
 
-    PassRefPtr<CSSMutableStyleDeclaration> createSharedCellStyle();
+    PassRefPtr<StylePropertySet> createSharedCellStyle();
 
     HTMLTableSectionElement* lastBody() const;
 
@@ -98,7 +97,7 @@ private:
 
     unsigned short m_padding;
     OwnPtr<HTMLTableRowsCollection> m_rowsCollection;
-    RefPtr<CSSMutableStyleDeclaration> m_sharedCellStyle;
+    RefPtr<StylePropertySet> m_sharedCellStyle;
 };
 
 } //namespace

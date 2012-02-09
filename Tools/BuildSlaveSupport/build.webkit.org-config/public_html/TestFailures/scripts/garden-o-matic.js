@@ -32,6 +32,7 @@ var g_updateTimerId = 0;
 var g_buildersFailing = null;
 
 var g_unexpectedFailuresController = null;
+var g_failuresController = null;
 
 var g_losingTestCoverageBuilders = null;
 
@@ -49,6 +50,8 @@ function update()
     builders.buildersFailingStepRequredForTestCoverage(g_losingTestCoverageBuilders.update.bind(g_losingTestCoverageBuilders));
 
     base.callInParallel([model.updateRecentCommits, model.updateResultsByBuilder], function() {
+        if (g_failuresController)
+            g_failuresController.update();
 
         updating.update('Analyzing test failures ...');
 
@@ -83,6 +86,7 @@ $(document).ready(function() {
         showResults: function(resultsView)
         {
             var resultsContainer = onebar.results();
+            console.log(resultsContainer);
             $(resultsContainer).empty().append(resultsView);
             onebar.select('results');
         }
@@ -99,10 +103,17 @@ $(document).ready(function() {
     updateButton.addEventListener("click", update);
     updateButton.textContent = 'update';
 
-    var summary = onebar.summary();
-    summary.appendChild(updateButton);
-    summary.appendChild(g_info);
-    summary.appendChild(unexpectedFailuresView);
+    var unexpected = onebar.unexpected();
+    unexpected.appendChild(updateButton);
+    unexpected.appendChild(g_info);
+    unexpected.appendChild(unexpectedFailuresView);
+
+    var failures = onebar.failures();
+    if (failures) {
+        var failuresView = new ui.failures.List();
+        g_failuresController = new controllers.ExpectedFailures(model.state, failuresView, onebarController);
+        failures.appendChild(failuresView);
+    }
 
     update();
 });

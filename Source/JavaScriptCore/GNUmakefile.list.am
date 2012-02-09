@@ -154,6 +154,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGJITCompiler.cpp \
 	Source/JavaScriptCore/dfg/DFGJITCompiler.h \
 	Source/JavaScriptCore/dfg/DFGNode.h \
+	Source/JavaScriptCore/dfg/DFGNodeReferenceBlob.h \
+	Source/JavaScriptCore/dfg/DFGNodeUse.h \
 	Source/JavaScriptCore/dfg/DFGOperands.h \
 	Source/JavaScriptCore/dfg/DFGOperations.cpp \
 	Source/JavaScriptCore/dfg/DFGOperations.h \
@@ -205,6 +207,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/heap/MarkStack.cpp \
 	Source/JavaScriptCore/heap/MarkStack.h \
 	Source/JavaScriptCore/heap/HeapRootVisitor.h \
+    Source/JavaScriptCore/heap/MarkedAllocator.cpp \
+    Source/JavaScriptCore/heap/MarkedAllocator.h \
 	Source/JavaScriptCore/heap/MarkedBlock.cpp \
 	Source/JavaScriptCore/heap/MarkedBlock.h \
 	Source/JavaScriptCore/heap/MarkedBlockSet.h \
@@ -756,7 +760,10 @@ javascriptcore_sources += \
 
 if TARGET_WIN32
 javascriptcore_sources += \
-	Source/JavaScriptCore/wtf/OSAllocatorWin.cpp
+	Source/JavaScriptCore/wtf/OSAllocatorWin.cpp \
+	Source/JavaScriptCore/wtf/ThreadFunctionInvocation.h \
+	Source/JavaScriptCore/wtf/ThreadingWin.cpp \
+	Source/JavaScriptCore/wtf/ThreadSpecificWin.cpp
 else
 javascriptcore_sources += \
 	Source/JavaScriptCore/jit/ExecutableAllocatorFixedVMPool.cpp \

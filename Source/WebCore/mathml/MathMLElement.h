@@ -42,8 +42,7 @@ protected:
 
 private:    
     virtual bool isMathMLElement() const { return true; }
-    virtual bool mapToEntry(const QualifiedName&, MappedAttributeEntry&) const;
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 };
     
 }

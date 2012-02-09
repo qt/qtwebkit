@@ -31,7 +31,6 @@
 #include "BeforeTextInsertedEvent.h"
 #include "BreakBlockquoteCommand.h"
 #include "CSSComputedStyleDeclaration.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "Document.h"
@@ -51,6 +50,7 @@
 #include "RenderObject.h"
 #include "RenderText.h"
 #include "SmartReplace.h"
+#include "StylePropertySet.h"
 #include "TextIterator.h"
 #include "htmlediting.h"
 #include "markup.h"
@@ -481,7 +481,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
 
         StyledElement* element = static_cast<StyledElement*>(node.get());
 
-        CSSMutableStyleDeclaration* inlineStyle = element->inlineStyleDecl();
+        StylePropertySet* inlineStyle = element->inlineStyleDecl();
         RefPtr<EditingStyle> newInlineStyle = EditingStyle::create(inlineStyle);
         if (inlineStyle) {
             ContainerNode* context = element->parentNode();

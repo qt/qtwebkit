@@ -27,7 +27,6 @@
 #include "ApplyStyleCommand.h"
 
 #include "CSSComputedStyleDeclaration.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSParser.h"
 #include "CSSProperty.h"
 #include "CSSPropertyNames.h"
@@ -45,6 +44,7 @@
 #include "Range.h"
 #include "RenderObject.h"
 #include "RenderText.h"
+#include "StylePropertySet.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "htmlediting.h"
@@ -73,8 +73,7 @@ bool isLegacyAppleStyleSpan(const Node *node)
 enum ShouldStyleAttributeBeEmpty { AllowNonEmptyStyleAttribute, StyleAttributeShouldBeEmpty };
 static bool hasNoAttributeOrOnlyStyleAttribute(const StyledElement* element, ShouldStyleAttributeBeEmpty shouldStyleAttributeBeEmpty)
 {
-    NamedNodeMap* map = element->updatedAttributes();
-    if (!map || map->isEmpty())
+    if (!element->hasAttributes())
         return true;
 
     unsigned matchedAttributes = 0;
@@ -84,8 +83,8 @@ static bool hasNoAttributeOrOnlyStyleAttribute(const StyledElement* element, Sho
         || !element->inlineStyleDecl() || element->inlineStyleDecl()->isEmpty()))
         matchedAttributes++;
 
-    ASSERT(matchedAttributes <= map->length());
-    return matchedAttributes == map->length();
+    ASSERT(matchedAttributes <= element->attributeCount());
+    return matchedAttributes == element->attributeCount();
 }
 
 bool isStyleSpanOrSpanWithOnlyStyleAttribute(const Element* element)
@@ -108,10 +107,9 @@ static bool isEmptyFontTag(const Node *node)
         return false;
 
     const Element *elem = static_cast<const Element *>(node);
-    NamedNodeMap* map = elem->updatedAttributes();
-    if (!map)
+    if (!elem->hasAttributes())
         return true;
-    return map->isEmpty() || (map->length() == 1 && elem->getAttribute(classAttr) == styleSpanClassString());
+    return elem->attributeCount() == 1 && elem->getAttribute(classAttr) == styleSpanClassString();
 }
 
 static PassRefPtr<Element> createFontElement(Document* document)
@@ -384,7 +382,7 @@ void ApplyStyleCommand::applyRelativeFontStyleChange(EditingStyle* style)
         }
         lastStyledNode = node;
 
-        CSSMutableStyleDeclaration* inlineStyleDecl = element->ensureInlineStyleDecl();
+        StylePropertySet* inlineStyleDecl = element->ensureInlineStyleDecl();
         float currentFontSize = computedFontSize(node);
         float desiredFontSize = max(MinimumFontSize, startingFontSizes.get(node) + style->fontSizeDelta());
         RefPtr<CSSValue> value = inlineStyleDecl->getPropertyCSSValue(CSSPropertyFontSize);
@@ -511,7 +509,7 @@ void ApplyStyleCommand::removeEmbeddingUpToEnclosingBlock(Node* node, Node* unsp
             // other attributes, like we (should) do with B and I elements.
             removeNodeAttribute(element, dirAttr);
         } else {
-            RefPtr<CSSMutableStyleDeclaration> inlineStyle = element->ensureInlineStyleDecl()->copy();
+            RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyleDecl()->copy();
             inlineStyle->setProperty(CSSPropertyUnicodeBidi, CSSValueNormal);
             inlineStyle->removeProperty(CSSPropertyDirection);
             setNodeAttribute(element, styleAttr, inlineStyle->asText());
@@ -725,7 +723,7 @@ void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, Node* n
                 break;
             // Add to this element's inline style and skip over its contents.
             HTMLElement* element = toHTMLElement(node);
-            RefPtr<CSSMutableStyleDeclaration> inlineStyle = element->ensureInlineStyleDecl()->copy();
+            RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyleDecl()->copy();
             inlineStyle->merge(style->style());
             setNodeAttribute(element, styleAttr, inlineStyle->asText());
             next = node->traverseNextSibling();
@@ -890,7 +888,7 @@ bool ApplyStyleCommand::removeCSSStyle(EditingStyle* style, HTMLElement* element
     if (!style->conflictsWithInlineStyleOfElement(element, extractedStyle, properties))
         return false;
 
-    CSSMutableStyleDeclaration* inlineStyle = element->inlineStyleDecl();
+    StylePropertySet* inlineStyle = element->inlineStyleDecl();
     ASSERT(inlineStyle);
     // FIXME: We should use a mass-removal function here but we don't have an undoable one yet.
     for (size_t i = 0; i < properties.size(); i++)
@@ -1310,7 +1308,7 @@ void ApplyStyleCommand::addBlockStyle(const StyleChange& styleChange, HTMLElemen
         return;
         
     String cssText = styleChange.cssStyle();
-    if (CSSMutableStyleDeclaration* decl = block->inlineStyleDecl())
+    if (StylePropertySet* decl = block->inlineStyleDecl())
         cssText += decl->asText();
     setNodeAttribute(block, styleAttr, cssText);
 }
@@ -1375,7 +1373,7 @@ void ApplyStyleCommand::addInlineStyleIfNeeded(EditingStyle* style, PassRefPtr<N
 
     if (styleChange.cssStyle().length()) {
         if (styleContainer) {
-            if (CSSMutableStyleDeclaration* existingStyle = styleContainer->inlineStyleDecl())
+            if (StylePropertySet* existingStyle = styleContainer->inlineStyleDecl())
                 setNodeAttribute(styleContainer, styleAttr, existingStyle->asText() + styleChange.cssStyle());
             else
                 setNodeAttribute(styleContainer, styleAttr, styleChange.cssStyle());

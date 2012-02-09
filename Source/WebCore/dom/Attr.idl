@@ -21,8 +21,8 @@
 module core {
 
     interface [
-        CustomMarkFunction,
-        GenerateNativeConverter
+        JSCustomMarkFunction,
+        JSGenerateToNativeObject
     ] Attr : Node {
 
         // DOM Level 1
@@ -31,7 +31,7 @@ module core {
 
         readonly attribute boolean specified;
 
-                 attribute [ConvertNullStringTo=Null, TreatNullAs=EmptyString] DOMString value 
+                 attribute [ConvertNullStringTo=Null, TreatNullAs=NullString] DOMString value 
                      setter raises(DOMException);
 
         // DOM Level 2

@@ -874,7 +874,7 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     // Give the embedder a chance to intercept this postMessage because this
     // DOMWindow might be a proxy for another in browsers that support
     // postMessage calls across WebKit instances.
-    if (isCurrentlyDisplayedInFrame() && m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), PassRefPtr<MessageEvent>(event).leakRef()))
+    if (isCurrentlyDisplayedInFrame() && m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), event.get()))
         return;
 
     if (timer->targetOrigin()) {
@@ -1550,8 +1550,11 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
     if (!EventTarget::addEventListener(eventType, listener, useCapture))
         return false;
 
-    if (Document* document = this->document())
+    if (Document* document = this->document()) {
         document->addListenerTypeIfNeeded(eventType);
+        if (eventType == eventNames().mousewheelEvent)
+            document->didAddWheelEventHandler();
+    }
 
     if (eventType == eventNames().unloadEvent)
         addUnloadEventListener(this);
@@ -1571,6 +1574,11 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
 {
     if (!EventTarget::removeEventListener(eventType, listener, useCapture))
         return false;
+
+    if (Document* document = this->document()) {
+        if (eventType == eventNames().mousewheelEvent)
+            document->didRemoveWheelEventHandler();
+    }
 
     if (eventType == eventNames().unloadEvent)
         removeUnloadEventListener(this);
@@ -1888,15 +1896,6 @@ void DOMWindow::showModalDialog(const String& urlString, const String& dialogFea
 
     dialogFrame->page()->chrome()->runModal();
 }
-
-#if ENABLE(BLOB)
-DOMURL* DOMWindow::webkitURL() const
-{
-    if (!m_domURL && isCurrentlyDisplayedInFrame())
-        m_domURL = DOMURL::create(this->scriptExecutionContext());
-    return m_domURL.get();
-}
-#endif
 
 #if ENABLE(QUOTA)
 StorageInfo* DOMWindow::webkitStorageInfo() const

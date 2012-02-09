@@ -31,8 +31,8 @@
 module storage {
     interface [
         Conditional=FILE_SYSTEM,
-        CustomToJS,
-        NoStaticTables
+        JSCustomToJS,
+        JSNoStaticTables
     ] Entry {
         readonly attribute boolean isFile;
         readonly attribute boolean isDirectory;
@@ -41,8 +41,8 @@ module storage {
         readonly attribute DOMFileSystem filesystem;
 
         void getMetadata(in [Callback] MetadataCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);
-        void moveTo(in DirectoryEntry parent, in [Optional, ConvertUndefinedOrNullToNullString] DOMString name, in [Optional, Callback] EntryCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);
-        void copyTo(in DirectoryEntry parent, in [Optional, ConvertUndefinedOrNullToNullString] DOMString name, in [Optional, Callback] EntryCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);
+        void moveTo(in DirectoryEntry parent, in [Optional, TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString name, in [Optional, Callback] EntryCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);
+        void copyTo(in DirectoryEntry parent, in [Optional, TreatNullAs=NullString, TreatUndefinedAs=NullString] DOMString name, in [Optional, Callback] EntryCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);
         DOMString toURL();
         void remove(in [Callback] VoidCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);
         void getParent(in [Optional, Callback] EntryCallback successCallback, in [Optional, Callback] ErrorCallback errorCallback);

@@ -51,6 +51,20 @@ PassRefPtr<SVGStyleElement> SVGStyleElement::create(const QualifiedName& tagName
     return adoptRef(new SVGStyleElement(tagName, document, createdByParser));
 }
 
+bool SVGStyleElement::disabled() const
+{
+    if (!m_sheet)
+        return false;
+    
+    return m_sheet->disabled();
+}
+
+void SVGStyleElement::setDisabled(bool setDisabled)
+{
+    if (CSSStyleSheet* styleSheet = sheet())
+        styleSheet->setDisabled(setDisabled);
+}
+
 const AtomicString& SVGStyleElement::type() const
 {
     DEFINE_STATIC_LOCAL(const AtomicString, defaultValue, ("text/css"));
@@ -95,10 +109,10 @@ bool SVGStyleElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGStyleElement::parseMappedAttribute(Attribute* attr)
+void SVGStyleElement::parseAttribute(Attribute* attr)
 {
     if (!isSupportedAttribute(attr->name())) {
-        SVGElement::parseMappedAttribute(attr);
+        SVGElement::parseAttribute(attr);
         return;
     }
 
@@ -108,7 +122,7 @@ void SVGStyleElement::parseMappedAttribute(Attribute* attr)
         return;
     }
 
-    if (SVGLangSpace::parseMappedAttribute(attr))
+    if (SVGLangSpace::parseAttribute(attr))
         return;
 
     ASSERT_NOT_REACHED();

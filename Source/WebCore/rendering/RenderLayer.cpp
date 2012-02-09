@@ -45,7 +45,6 @@
 #include "RenderLayer.h"
 
 #include "ColumnInfo.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSPropertyNames.h"
 #include "CSSStyleSelector.h"
 #include "Chrome.h"
@@ -67,6 +66,7 @@
 #include "FrameView.h"
 #include "Gradient.h"
 #include "GraphicsContext.h"
+#include "HTMLFrameElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
 #include "HitTestingTransformState.h"
@@ -90,6 +90,7 @@
 #include "ScrollbarTheme.h"
 #include "Settings.h"
 #include "SourceGraphic.h"
+#include "StylePropertySet.h"
 #include "TextStream.h"
 #include "TransformationMatrix.h"
 #include "TranslateTransformOperation.h"
@@ -184,7 +185,6 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_reflection(0)
     , m_scrollCorner(0)
     , m_resizer(0)
-    , m_scrollableAreaPage(0)
 {
     m_isNormalFlowOnly = shouldBeNormalFlowOnly();
 
@@ -203,8 +203,10 @@ RenderLayer::~RenderLayer()
             frame->eventHandler()->resizeLayerDestroyed();
     }
 
-    if (m_scrollableAreaPage)
-        m_scrollableAreaPage->removeScrollableArea(this);
+    if (Frame* frame = renderer()->frame()) {
+        if (FrameView* frameView = frame->view())
+            frameView->removeScrollableArea(this);
+    }
 
     destroyScrollbar(HorizontalScrollbar);
     destroyScrollbar(VerticalScrollbar);
@@ -884,6 +886,11 @@ RenderLayer* RenderLayer::enclosingScrollableLayer() const
     return 0;
 }
 
+IntRect RenderLayer::scrollableAreaBoundingBox() const
+{
+    return renderer()->absoluteBoundingBoxRect();
+}
+
 RenderLayer* RenderLayer::enclosingTransformedAncestor() const
 {
     RenderLayer* curr = parent();
@@ -1542,20 +1549,31 @@ void RenderLayer::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignm
         }
     } else if (!parentLayer && renderer()->isBox() && renderBox()->canBeProgramaticallyScrolled()) {
         if (frameView) {
-            if (renderer()->document() && renderer()->document()->ownerElement() && renderer()->document()->ownerElement()->renderer()) {
-                LayoutRect viewRect = frameView->visibleContentRect();
-                LayoutRect r = getRectToExpose(viewRect, rect, alignX, alignY);
-                
-                LayoutUnit xOffset = r.x();
-                LayoutUnit yOffset = r.y();
-                // Adjust offsets if they're outside of the allowable range.
-                xOffset = max<LayoutUnit>(0, min(frameView->contentsWidth(), xOffset));
-                yOffset = max<LayoutUnit>(0, min(frameView->contentsHeight(), yOffset));
+            Element* ownerElement = 0;
+            if (renderer()->document())
+                ownerElement = renderer()->document()->ownerElement();
 
-                frameView->setScrollPosition(IntPoint(xOffset, yOffset));
-                parentLayer = renderer()->document()->ownerElement()->renderer()->enclosingLayer();
-                newRect.setX(rect.x() - frameView->scrollX() + frameView->x());
-                newRect.setY(rect.y() - frameView->scrollY() + frameView->y());
+            if (ownerElement && ownerElement->renderer()) {
+                HTMLFrameElement* frameElement = 0;
+
+                if (ownerElement->hasTagName(frameTag) || ownerElement->hasTagName(iframeTag))
+                    frameElement = static_cast<HTMLFrameElement*>(ownerElement);
+
+                if (frameElement && frameElement->scrollingMode() != ScrollbarAlwaysOff) {
+                    LayoutRect viewRect = frameView->visibleContentRect();
+                    LayoutRect exposeRect = getRectToExpose(viewRect, rect, alignX, alignY);
+
+                    LayoutUnit xOffset = exposeRect.x();
+                    LayoutUnit yOffset = exposeRect.y();
+                    // Adjust offsets if they're outside of the allowable range.
+                    xOffset = max<LayoutUnit>(0, min(frameView->contentsWidth(), xOffset));
+                    yOffset = max<LayoutUnit>(0, min(frameView->contentsHeight(), yOffset));
+
+                    frameView->setScrollPosition(IntPoint(xOffset, yOffset));
+                    parentLayer = ownerElement->renderer()->enclosingLayer();
+                    newRect.setX(rect.x() - frameView->scrollX() + frameView->x());
+                    newRect.setY(rect.y() - frameView->scrollY() + frameView->y());
+                }
             } else {
                 LayoutRect viewRect = frameView->visibleContentRect();
                 LayoutRect r = getRectToExpose(viewRect, rect, alignX, alignY);
@@ -1707,7 +1725,7 @@ void RenderLayer::resize(const PlatformMouseEvent& evt, const LayoutSize& oldOff
     LayoutSize difference = (currentSize + newOffset - adjustedOldOffset).expandedTo(minimumSize) - currentSize;
 
     ASSERT(element->isStyledElement());
-    CSSMutableStyleDeclaration* styleDeclaration = static_cast<StyledElement*>(element)->ensureInlineStyleDecl();
+    StylePropertySet* styleDeclaration = static_cast<StyledElement*>(element)->ensureInlineStyleDecl();
     bool isBoxSizingBorder = renderer->style()->boxSizing() == BORDER_BOX;
 
     if (resize != RESIZE_VERTICAL && difference.width()) {
@@ -2043,19 +2061,6 @@ bool RenderLayer::allowsScrolling() const
     return (m_hBar && m_hBar->enabled()) || (m_vBar && m_vBar->enabled());
 }
 
-void RenderLayer::didAddHorizontalScrollbar(Scrollbar* scrollbar)
-{
-    m_renderer->document()->didAddWheelEventHandler();
-    ScrollableArea::didAddHorizontalScrollbar(scrollbar);
-}
-
-void RenderLayer::willRemoveHorizontalScrollbar(Scrollbar* scrollbar)
-{
-    ScrollableArea::willRemoveHorizontalScrollbar(scrollbar);
-    // FIXME: maybe need a separate ScrollableArea::didRemoveHorizontalScrollbar callback?
-    m_renderer->document()->didRemoveWheelEventHandler();
-}
-
 void RenderLayer::setHasHorizontalScrollbar(bool hasScrollbar)
 {
     if (hasScrollbar == (m_hBar != 0))
@@ -2208,6 +2213,16 @@ LayoutUnit RenderLayer::scrollHeight()
     return m_scrollSize.height();
 }
 
+int RenderLayer::pixelSnappedScrollWidth()
+{
+    return scrollWidth();
+}
+
+int RenderLayer::pixelSnappedScrollHeight()
+{
+    return scrollHeight();
+}
+
 LayoutUnit RenderLayer::overflowTop() const
 {
     RenderBox* box = renderBox();
@@ -2256,9 +2271,9 @@ void RenderLayer::computeScrollDimensions(bool* needHBar, bool* needVBar)
     setScrollOrigin(IntPoint(-m_scrollOverflow.width(), -m_scrollOverflow.height()));
 
     if (needHBar)
-        *needHBar = m_scrollSize.width() > box->clientWidth();
+        *needHBar = pixelSnappedScrollWidth() > box->pixelSnappedClientWidth();
     if (needVBar)
-        *needVBar = m_scrollSize.height() > box->clientHeight();
+        *needVBar = pixelSnappedScrollHeight() > box->pixelSnappedClientHeight();
 }
 
 void RenderLayer::updateOverflowStatus(bool horizontalOverflow, bool verticalOverflow)
@@ -2309,9 +2324,9 @@ void RenderLayer::updateScrollInfoAfterLayout()
     bool haveVerticalBar = m_vBar;
     
     // overflow:scroll should just enable/disable.
-    if (renderer()->style()->overflowX() == OSCROLL)
+    if (m_hBar && renderer()->style()->overflowX() == OSCROLL)
         m_hBar->setEnabled(horizontalOverflow);
-    if (renderer()->style()->overflowY() == OSCROLL)
+    if (m_vBar && renderer()->style()->overflowY() == OSCROLL)
         m_vBar->setEnabled(verticalOverflow);
 
     // A dynamic change from a scrolling overflow to overflow:hidden means we need to get rid of any
@@ -2363,14 +2378,14 @@ void RenderLayer::updateScrollInfoAfterLayout()
 
     // Set up the range (and page step/line step).
     if (m_hBar) {
-        LayoutUnit clientWidth = box->clientWidth();
-        LayoutUnit pageStep = max<LayoutUnit>(max<LayoutUnit>(clientWidth * Scrollbar::minFractionToStepWhenPaging(), clientWidth - Scrollbar::maxOverlapBetweenPages()), 1);
+        int clientWidth = box->pixelSnappedClientWidth();
+        int pageStep = max(max<int>(clientWidth * Scrollbar::minFractionToStepWhenPaging(), clientWidth - Scrollbar::maxOverlapBetweenPages()), 1);
         m_hBar->setSteps(Scrollbar::pixelsPerLineStep(), pageStep);
         m_hBar->setProportion(clientWidth, m_scrollSize.width());
     }
     if (m_vBar) {
-        LayoutUnit clientHeight = box->clientHeight();
-        LayoutUnit pageStep = max<LayoutUnit>(max<LayoutUnit>(clientHeight * Scrollbar::minFractionToStepWhenPaging(), clientHeight - Scrollbar::maxOverlapBetweenPages()), 1);
+        int clientHeight = box->pixelSnappedClientHeight();
+        int pageStep = max(max<int>(clientHeight * Scrollbar::minFractionToStepWhenPaging(), clientHeight - Scrollbar::maxOverlapBetweenPages()), 1);
         m_vBar->setSteps(Scrollbar::pixelsPerLineStep(), pageStep);
         m_vBar->setProportion(clientHeight, m_scrollSize.height());
     }
@@ -4334,19 +4349,14 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 #if ENABLE(CSS_FILTERS)
     updateOrRemoveFilterEffect();
 #endif
-    
-    if (scrollsOverflow()) {
-        if (!m_scrollableAreaPage) {
-            if (Frame* frame = renderer()->frame()) {
-                if (Page* page = frame->page()) {
-                    m_scrollableAreaPage = page;
-                    m_scrollableAreaPage->addScrollableArea(this);
-                }
-            }
+
+    if (Frame* frame = renderer()->frame()) {
+        if (FrameView* frameView = frame->view()) {
+            if (scrollsOverflow())
+                frameView->addScrollableArea(this);
+            else
+                frameView->removeScrollableArea(this);
         }
-    } else if (m_scrollableAreaPage) {
-        m_scrollableAreaPage->removeScrollableArea(this);
-        m_scrollableAreaPage = 0;
     }
     
     // FIXME: Need to detect a swap from custom to native scrollbars (and vice versa).

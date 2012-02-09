@@ -21,11 +21,11 @@
 module html {
 
     interface [
-        HasIndexGetter,
-        HasNameGetter,
-        CustomToJS,
-        GenerateIsReachable,
-        Polymorphic
+        IndexedGetter,
+        NamedGetter,
+        JSCustomToJS,
+        JSGenerateIsReachable,
+        ObjCPolymorphic
     ] HTMLCollection {
         readonly attribute unsigned long length;
         Node item(in [Optional=CallWithDefaultValue] unsigned long index);

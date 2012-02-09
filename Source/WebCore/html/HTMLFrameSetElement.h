@@ -67,8 +67,7 @@ public:
 private:
     HTMLFrameSetElement(const QualifiedName&, Document*);
 
-    virtual bool mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const;
-    virtual void parseMappedAttribute(Attribute*);
+    virtual void parseAttribute(Attribute*) OVERRIDE;
 
     virtual void attach();
     virtual bool rendererIsNeeded(const NodeRenderingContext&);

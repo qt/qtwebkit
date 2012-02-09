@@ -171,11 +171,11 @@ module test {
         static [Conditional=Condition1] void overloadedMethod1(in DOMString type);
 
 #if defined(TESTING_V8)
-        // 'EnabledAtRuntime' methods and attributes.
-        [EnabledAtRuntime] void enabledAtRuntimeMethod1(in int intArg);
-        [EnabledAtRuntime=FeatureName] void enabledAtRuntimeMethod2(in int intArg);
-        attribute [EnabledAtRuntime] long enabledAtRuntimeAttr1;
-        attribute [EnabledAtRuntime=FeatureName] long enabledAtRuntimeAttr2;
+        // 'V8EnabledAtRuntime' methods and attributes.
+        [V8EnabledAtRuntime] void enabledAtRuntimeMethod1(in int intArg);
+        [V8EnabledAtRuntime=FeatureName] void enabledAtRuntimeMethod2(in int intArg);
+        attribute [V8EnabledAtRuntime] long enabledAtRuntimeAttr1;
+        attribute [V8EnabledAtRuntime=FeatureName] long enabledAtRuntimeAttr2;
 #endif
 
 
@@ -191,15 +191,15 @@ module test {
         void convert1(in [ConvertNullStringTo=Null] a);
         void convert2(in [ConvertNullStringTo=Undefined] b);
         void convert3(in [ConvertNullStringTo=False] c);
-        void convert4(in [TreatNullAs=EmptyString] d);
-        void convert5(in [ConvertUndefinedOrNullToNullString] e);
+        void convert4(in [TreatNullAs=NullString] d);
+        void convert5(in [TreatNullAs=NullString, TreatUndefinedAs=NullString] e);
 
         attribute SVGPoint mutablePoint;
         attribute [Immutable] SVGPoint immutablePoint;
         SVGPoint mutablePointFunction();
         [Immutable] SVGPoint immutablePointFunction();
 
-        [ImplementationFunction=banana] void orange();
+        [ImplementedAs=banana] void orange();
 
         attribute [StrictTypeChecking] float strictFloat;
         [StrictTypeChecking] bool strictFunction(in DOMString str, in float a, in int b)

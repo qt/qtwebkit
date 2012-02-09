@@ -2,14 +2,14 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [7])
-m4_define([webkit_micro_version], [4])
+m4_define([webkit_micro_version], [5])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
 m4_define([webkit_user_agent_major_version], [535])
-m4_define([webkit_user_agent_minor_version], [18])
+m4_define([webkit_user_agent_minor_version], [20])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=11:4:11
+LIBWEBKITGTK_VERSION=12:0:12
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -77,8 +77,61 @@ case "$host_os" in
        ;;
 esac
 
-# initialize webkit options
-WEBKIT_INIT
+# If CFLAGS and CXXFLAGS are unset, default to empty.
+# This is to tell automake not to include '-g' if C{XX,}FLAGS is not set
+# For more info - http://www.gnu.org/software/automake/manual/autoconf.html#C_002b_002b-Compiler
+if test -z "$CXXFLAGS"; then
+   CXXFLAGS=""
+fi
+if test -z "$CFLAGS"; then
+   CFLAGS=""
+fi
+
+PKG_PROG_PKG_CONFIG
+
+AC_PATH_PROG(PERL, perl)
+if test -z "$PERL"; then
+   AC_MSG_ERROR([You need 'perl' to compile WebKit])
+fi
+
+AC_PATH_PROG(PYTHON, python)
+if test -z "$PYTHON"; then
+   AC_MSG_ERROR([You need 'python' to compile WebKit])
+fi
+
+AC_PATH_PROG(BISON, bison)
+if test -z "$BISON"; then
+   AC_MSG_ERROR([You need the 'bison' parser generator to compile WebKit])
+fi
+
+AC_PATH_PROG(MV, mv)
+if test -z "$MV"; then
+   AC_MSG_ERROR([You need 'mv' to compile WebKit])
+fi
+
+AC_PROG_CC
+AC_PROG_CXX
+AM_PROG_CC_STDC
+AM_PROG_CC_C_O
+AC_PROG_INSTALL
+AC_SYS_LARGEFILE
+
+# Check whether a C++ was found (AC_PROG_CXX sets $CXX to "g++" even when it
+# doesn't exist)
+AC_LANG_PUSH([C++])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],[],[AC_MSG_ERROR([No C++ compiler found])])
+AC_LANG_POP([C++])
+
+# C/C++ Language Features
+AC_C_CONST
+AC_C_INLINE
+AC_C_VOLATILE
+
+# C/C++ Headers
+AC_HEADER_STDC
+AC_HEADER_STDBOOL
+
+# Linker
 AC_DISABLE_STATIC
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
@@ -99,6 +152,18 @@ if test -z "$GPERF"; then
    AC_MSG_ERROR([You need the 'gperf' hash function generator to compile WebKit])
 fi
 
+# check for -fvisibility=hidden compiler support (GCC >= 4)
+saved_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"
+AC_MSG_CHECKING([if ${CXX} supports -fvisibility=hidden -fvisibility-inlines-hidden])
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([char foo;])],
+      [ AC_MSG_RESULT([yes])
+        SYMBOL_VISIBILITY="-fvisibility=hidden" SYMBOL_VISIBILITY_INLINES="-fvisibility-inlines-hidden" ],
+        AC_MSG_RESULT([no]))
+CFLAGS="$saved_CFLAGS"
+AC_SUBST(SYMBOL_VISIBILITY)
+AC_SUBST(SYMBOL_VISIBILITY_INLINES)
+
 # Disable C++0x compat warnings for GCC >= 4.6.0 until we build
 # cleanly with that.
 AC_LANG_PUSH(C++)
@@ -111,7 +176,14 @@ namespace std {
 }
 extern std::nullptr_t nullptr;
 ], [return 0;],
-CXXFLAGS="$TMPCXXFLAGS", CXXFLAGS="$TMPCXXFLAGS -Wno-c++0x-compat")
+disable_cxx0x_compat=no,
+disable_cxx0x_compat=yes)
+AC_MSG_RESULT($disable_cxx0x_compat)
+if test "$disable_cxx0x_compat" = yes; then
+  CXXFLAGS="$TMPCXXFLAGS -Wno-c++0x-compat"
+else
+  CXXFLAGS="$TMPCXXFLAGS"
+fi
 AC_LANG_POP(C++)
 
 # pthread (not needed on Windows)
@@ -302,31 +374,79 @@ AC_DEFINE([GST_API_VERSION_1],[1], [Using GStreamer 0.11])
 fi
 
 # minimum base dependencies
-LIBSOUP_REQUIRED_VERSION=2.37.2.1
 CAIRO_REQUIRED_VERSION=1.10
 FONTCONFIG_REQUIRED_VERSION=2.4
 FREETYPE2_REQUIRED_VERSION=9.0
+GLIB_REQUIRED_VERSION=2.31.2
+LIBSOUP_REQUIRED_VERSION=2.37.2.1
 LIBXML_REQUIRED_VERSION=2.6
-
-# minimum GTK+ base dependencies
-PANGO_REQUIRED_VERSION=1.12
+PANGO_REQUIRED_VERSION=1.21.0
 
 # optional modules
 LIBXSLT_REQUIRED_VERSION=1.1.7
 SQLITE_REQUIRED_VERSION=3.0
 ENCHANT_REQUIRED_VERSION=0.22
-LIBFFTW_REQUIRED_VERSION=3.2.2
 CLUTTER_REQUIRED_VERSION=1.8.2
 CLUTTER_GTK_REQUIRED_VERSION=1.0.2
 ATSPI2_REQUIRED_VERSION=2.2.1
 
-# Available modules
-#
-# glib - glib and includes gthread
-# unicode - check and identify which unicode backend to use
-#
-# todo: webcore gtk
-WEBKIT_CHECK_DEPENDENCIES([glib unicode])
+# Check for glib and required utilities
+AM_PATH_GLIB_2_0($GLIB_REQUIRED_VERSION, :, :, gmodule gobject gthread gio)
+if test -z "$GLIB_GENMARSHAL" || test -z "$GLIB_MKENUMS"; then
+   AC_MSG_ERROR([You need the GLib dev tools in your path])
+fi
+GLIB_GSETTINGS
+
+# Check and identify which unicode backend to use
+AC_MSG_CHECKING([which Unicode backend to use])
+AC_ARG_WITH(unicode_backend,
+            AC_HELP_STRING([--with-unicode-backend=@<:@icu/glib@:>@],
+                           [Select Unicode backend (WARNING: the glib-based backend is slow, and incomplete) [default=icu]]),
+            [],[with_unicode_backend="icu"])
+
+case "$with_unicode_backend" in
+     icu|glib) ;;
+     *) AC_MSG_ERROR([Invalid Unicode backend: must be icu or glib.]) ;;
+esac
+
+AC_MSG_RESULT([$with_unicode_backend])
+
+if test "$with_unicode_backend" = "icu"; then
+    # TODO: use pkg-config (after CFLAGS in their .pc files are cleaned up)
+    case "$host" in
+        *-*-darwin*)
+            UNICODE_CFLAGS="-I$srcdir/Source/JavaScriptCore/icu -I$srcdir/Source/WebCore/icu"
+            UNICODE_LIBS="-licucore"
+            ;;
+        *-*-mingw*)
+            UNICODE_CFLAGS=""
+            UNICODE_LIBS="-licui18n -licuuc"
+            ;;
+        *)
+            AC_PATH_PROG(icu_config, icu-config, no)
+            if test "$icu_config" = "no"; then
+                AC_MSG_ERROR([Cannot find icu-config. The ICU library is needed.])
+            fi
+
+            # We don't use --cflags as this gives us a lot of things that we don't
+            # necessarily want, like debugging and optimization flags
+            # See man (1) icu-config for more info.
+            UNICODE_CFLAGS=`$icu_config --cppflags`
+            UNICODE_LIBS=`$icu_config --ldflags-libsonly`
+            ;;
+    esac
+fi
+
+if test "$with_unicode_backend" = "glib"; then
+    PKG_CHECK_MODULES([UNICODE], [glib-2.0 pango >= $PANGO_REQUIRED_VERSION])
+fi
+
+AC_SUBST([UNICODE_CFLAGS])
+AC_SUBST([UNICODE_LIBS])
+
+PKG_CHECK_MODULES([ZLIB], [zlib])
+AC_SUBST([ZLIB_CFLAGS])
+AC_SUBST([ZLIB_LIBS])
 
 GETTEXT_PACKAGE=$PACKAGE-$GTK_API_VERSION
 AC_SUBST(GETTEXT_PACKAGE)
@@ -426,6 +546,10 @@ AC_ARG_WITH(accelerated_compositing,
                            [use accelerated compositing (experimental) [default=no]]),
             [], [with_accelerated_compositing="no"])
 AC_MSG_RESULT([$with_accelerated_compositing])
+
+if test "$with_accelerated_compositing" = "opengl" && test "$with_target" != "x11" ; then
+    AC_MSG_ERROR([OpenGL accelerated compositing is only available on X11 currently.])
+fi
 
 if test "$enable_webgl" = "yes" ||  test "$with_accelerated_compositing" = "opengl" ; then
     AC_CHECK_HEADERS([GL/gl.h], [], AC_MSG_ERROR([OpenGL header not found]))
@@ -731,7 +855,7 @@ AC_MSG_RESULT([$enable_file_system])
 
 # check whether to enable HTML5 <style scoped> support
 AC_MSG_CHECKING([whether to enable HTML5 <style scoped> support])
-AC_ARG_ENABLE(file_system,
+AC_ARG_ENABLE(style_scoped,
               AC_HELP_STRING([--enable-style-scoped],
                              [enable support for HTML5 <style scoped> [default=no]]),
               [], [enable_style_scoped="no"])

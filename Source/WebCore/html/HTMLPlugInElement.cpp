@@ -112,7 +112,11 @@ PassScriptInstance HTMLPlugInElement::getInstance()
 
 bool HTMLPlugInElement::guardedDispatchBeforeLoadEvent(const String& sourceURL)
 {
-    ASSERT(!m_inBeforeLoadEventHandler);
+    // FIXME: Our current plug-in loading design can't guarantee the following
+    // assertion is true, since plug-in loading can be initiated during layout,
+    // and synchronous layout can be initiated in a beforeload event handler!
+    // See <http://webkit.org/b/71264>.
+    // ASSERT(!m_inBeforeLoadEventHandler);
     m_inBeforeLoadEventHandler = true;
     // static_cast is used to avoid a compile error since dispatchBeforeLoadEvent
     // is intentionally undefined on this class.
@@ -136,40 +140,36 @@ Widget* HTMLPlugInElement::pluginWidget()
     return renderWidget->widget();
 }
 
-bool HTMLPlugInElement::mapToEntry(const QualifiedName& attrName, MappedAttributeEntry& result) const
-{
-    if (attrName == widthAttr ||
-        attrName == heightAttr ||
-        attrName == vspaceAttr ||
-        attrName == hspaceAttr) {
-            result = eUniversal;
-            return false;
-    }
-    
-    if (attrName == alignAttr) {
-        result = eReplaced; // Share with <img> since the alignment behavior is the same.
-        return false;
-    }
-    
-    return HTMLFrameOwnerElement::mapToEntry(attrName, result);
-}
-
-void HTMLPlugInElement::parseMappedAttribute(Attribute* attr)
+void HTMLPlugInElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == widthAttr)
-        addCSSLength(attr, CSSPropertyWidth, attr->value());
+        if (attr->isNull())
+            removeCSSProperty(CSSPropertyWidth);
+        else
+            addCSSLength(CSSPropertyWidth, attr->value());
     else if (attr->name() == heightAttr)
-        addCSSLength(attr, CSSPropertyHeight, attr->value());
+        if (attr->isNull())
+            removeCSSProperty(CSSPropertyHeight);
+        else
+            addCSSLength(CSSPropertyHeight, attr->value());
     else if (attr->name() == vspaceAttr) {
-        addCSSLength(attr, CSSPropertyMarginTop, attr->value());
-        addCSSLength(attr, CSSPropertyMarginBottom, attr->value());
+        if (attr->isNull())
+            removeCSSProperties(CSSPropertyMarginTop, CSSPropertyMarginBottom);
+        else {
+            addCSSLength(CSSPropertyMarginTop, attr->value());
+            addCSSLength(CSSPropertyMarginBottom, attr->value());
+        }
     } else if (attr->name() == hspaceAttr) {
-        addCSSLength(attr, CSSPropertyMarginLeft, attr->value());
-        addCSSLength(attr, CSSPropertyMarginRight, attr->value());
+        if (attr->isNull())
+            removeCSSProperties(CSSPropertyMarginLeft, CSSPropertyMarginRight);
+        else {
+            addCSSLength(CSSPropertyMarginLeft, attr->value());
+            addCSSLength(CSSPropertyMarginRight, attr->value());
+        }
     } else if (attr->name() == alignAttr)
         addHTMLAlignment(attr);
     else
-        HTMLFrameOwnerElement::parseMappedAttribute(attr);
+        HTMLFrameOwnerElement::parseAttribute(attr);
 }
 
 void HTMLPlugInElement::defaultEventHandler(Event* event)

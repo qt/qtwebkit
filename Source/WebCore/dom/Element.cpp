@@ -566,10 +566,10 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect()
     return ClientRect::create(result);
 }
     
-LayoutRect Element::screenRect() const
+IntRect Element::screenRect() const
 {
     if (!renderer())
-        return LayoutRect();
+        return IntRect();
     // FIXME: this should probably respect transforms
     return renderer()->view()->frameView()->contentsToScreen(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
 }
@@ -655,10 +655,13 @@ PassRefPtr<Attribute> Element::createAttribute(const QualifiedName& name, const 
     return Attribute::create(name, value);
 }
 
-void Element::attributeChanged(Attribute* attr, bool)
+void Element::attributeChanged(Attribute* attr)
 {
     if (isIdAttributeName(attr->name()))
         idAttributeChanged(attr);
+    else if (attr->name() == HTMLNames::nameAttr)
+        setHasName(!attr->isNull());
+
     recalcStyleIfNeededAfterAttributeChanged(attr);
     updateAfterAttributeChanged(attr);
 }
@@ -1196,10 +1199,7 @@ ShadowRoot* Element::ensureShadowRoot()
     if (ShadowRoot* existingRoot = shadowRoot())
         return existingRoot;
 
-    ExceptionCode ec = 0;
-    setShadowRoot(ShadowRoot::create(document()), ec);
-    ASSERT(!ec);
-    return shadowRoot();
+    return ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot).get();
 }
 
 void Element::removeShadowRoot()
@@ -1359,6 +1359,11 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
         checkForEmptyStyleChange(this, renderStyle());
     else
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
+
+    if (hasRareData()) {
+        if (ShadowRoot* root = shadowRoot())
+            root->hostChildrenChanged();
+    }
 }
 
 void Element::beginParsingChildren()
@@ -1732,22 +1737,6 @@ Element* Element::lastElementChild() const
     Node* n = lastChild();
     while (n && !n->isElementNode())
         n = n->previousSibling();
-    return static_cast<Element*>(n);
-}
-
-Element* Element::previousElementSibling() const
-{
-    Node* n = previousSibling();
-    while (n && !n->isElementNode())
-        n = n->previousSibling();
-    return static_cast<Element*>(n);
-}
-
-Element* Element::nextElementSibling() const
-{
-    Node* n = nextSibling();
-    while (n && !n->isElementNode())
-        n = n->nextSibling();
     return static_cast<Element*>(n);
 }
 

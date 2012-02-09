@@ -60,6 +60,7 @@
 #include "MouseEvent.h"
 #include "MouseEventWithHitTestResults.h"
 #include "Page.h"
+#include "PlatformEvent.h"
 #include "PlatformKeyboardEvent.h"
 #include "PlatformWheelEvent.h"
 #include "PluginDocument.h"
@@ -141,6 +142,73 @@ private:
     bool m_isCursorChange;
     Cursor m_cursor;
 };
+
+#if ENABLE(TOUCH_EVENTS)
+class SyntheticTouchPoint : public PlatformTouchPoint {
+public:
+
+    // The default values are based on http://dvcs.w3.org/hg/webevents/raw-file/tip/touchevents.html
+    explicit SyntheticTouchPoint(const PlatformMouseEvent& event)
+    {
+        const static int idDefaultValue = 0;
+        const static int radiusYDefaultValue = 1;
+        const static int radiusXDefaultValue = 1;
+        const static float rotationAngleDefaultValue = 0.0f;
+        const static float forceDefaultValue = 1.0f;
+
+        m_id = idDefaultValue; // There is only one active TouchPoint.
+        m_screenPos = event.globalPosition();
+        m_pos = event.position();
+        m_radiusY = radiusYDefaultValue;
+        m_radiusX = radiusXDefaultValue;
+        m_rotationAngle = rotationAngleDefaultValue;
+        m_force = forceDefaultValue;
+
+        PlatformEvent::Type type = event.type();
+        ASSERT(type == PlatformEvent::MouseMoved || type == PlatformEvent::MousePressed || type == PlatformEvent::MouseReleased);
+
+        switch (type) {
+        case PlatformEvent::MouseMoved:
+            m_state = TouchMoved;
+            break;
+        case PlatformEvent::MousePressed:
+            m_state = TouchPressed;
+            break;
+        case PlatformEvent::MouseReleased:
+            m_state = TouchReleased;
+            break;
+        default:
+            ASSERT_NOT_REACHED();
+            break;
+        }
+    }
+};
+
+class SyntheticSingleTouchEvent : public PlatformTouchEvent {
+public:
+    explicit SyntheticSingleTouchEvent(const PlatformMouseEvent& event)
+    {
+        switch (event.type()) {
+        case PlatformEvent::MouseMoved:
+            m_type = TouchMove;
+            break;
+        case PlatformEvent::MousePressed:
+            m_type = TouchStart;
+            break;
+        case PlatformEvent::MouseReleased:
+            m_type = TouchEnd;
+            break;
+        default:
+            ASSERT_NOT_REACHED();
+            m_type = NoType;
+            break;
+        }
+        m_timestamp = event.timestamp();
+        m_modifiers = event.modifiers();
+        m_touchPoints.append(SyntheticTouchPoint(event));
+    }
+};
+#endif
 
 static inline bool scrollNode(float delta, WheelEvent::Granularity granularity, ScrollDirection positiveDirection, ScrollDirection negativeDirection, Node* node, Node** stopNode)
 {
@@ -1375,6 +1443,12 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
 {
     RefPtr<FrameView> protector(m_frame->view());
 
+#if ENABLE(TOUCH_EVENTS)
+    bool defaultPrevented = dispatchSyntheticTouchEventIfEnabled(mouseEvent);
+    if (defaultPrevented)
+        return true;
+#endif
+
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
 
     // FIXME (bug 68185): this call should be made at another abstraction layer
@@ -1401,7 +1475,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     HitTestRequest request(HitTestRequest::Active);
     // Save the document point we generate in case the window coordinate is invalidated by what happens 
     // when we dispatch the event.
-    IntPoint documentPoint = documentPointForWindowPoint(m_frame, mouseEvent.position());
+    LayoutPoint documentPoint = documentPointForWindowPoint(m_frame, mouseEvent.position());
     MouseEventWithHitTestResults mev = m_frame->document()->prepareMouseEvent(request, documentPoint, mouseEvent);
 
     if (!targetNode(mev)) {
@@ -1561,6 +1635,13 @@ bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
 {
     RefPtr<FrameView> protector(m_frame->view());
 
+#if ENABLE(TOUCH_EVENTS)
+    // FIXME: this should be moved elsewhere to also be able to dispatch touchcancel events.
+    bool defaultPrevented = dispatchSyntheticTouchEventIfEnabled(event);
+    if (defaultPrevented)
+        return true;
+#endif
+
     HitTestResult hoveredNode = HitTestResult(LayoutPoint());
     bool result = handleMouseMoveEvent(event, &hoveredNode);
 
@@ -1569,8 +1650,10 @@ bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
         return result;
 
     if (RenderLayer* layer = layerForNode(hoveredNode.innerNode())) {
-        if (page->containsScrollableArea(layer))
-            layer->mouseMovedInContentArea();
+        if (FrameView* frameView = m_frame->view()) {
+            if (frameView->containsScrollableArea(layer))
+                layer->mouseMovedInContentArea();
+        }
     }
 
     if (FrameView* frameView = m_frame->view())
@@ -1698,7 +1781,13 @@ void EventHandler::invalidateClick()
 bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
 {
     RefPtr<FrameView> protector(m_frame->view());
-    
+
+#if ENABLE(TOUCH_EVENTS)
+    bool defaultPrevented = dispatchSyntheticTouchEventIfEnabled(mouseEvent);
+    if (defaultPrevented)
+        return true;
+#endif
+
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
 
 #if ENABLE(PAN_SCROLLING)
@@ -2030,10 +2119,14 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
         } else if (page && (layerForLastNode && (!layerForNodeUnderMouse || layerForNodeUnderMouse != layerForLastNode))) {
             // The mouse has moved between layers.
-            if (page->containsScrollableArea(layerForLastNode))
-                layerForLastNode->mouseExitedContentArea();
+            if (Frame* frame = m_lastNodeUnderMouse->document()->frame()) {
+                if (FrameView* frameView = frame->view()) {
+                    if (frameView->containsScrollableArea(layerForLastNode))
+                        layerForLastNode->mouseExitedContentArea();
+                }
+            }
         }
-        
+
         if (m_nodeUnderMouse && (!m_lastNodeUnderMouse || m_lastNodeUnderMouse->document() != m_frame->document())) {
             // The mouse has moved between frames.
             if (Frame* frame = m_nodeUnderMouse->document()->frame()) {
@@ -2042,10 +2135,14 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
         } else if (page && (layerForNodeUnderMouse && (!layerForLastNode || layerForNodeUnderMouse != layerForLastNode))) {
             // The mouse has moved between layers.
-            if (page->containsScrollableArea(layerForNodeUnderMouse))
-                layerForNodeUnderMouse->mouseEnteredContentArea();
+            if (Frame* frame = m_nodeUnderMouse->document()->frame()) {
+                if (FrameView* frameView = frame->view()) {
+                    if (frameView->containsScrollableArea(layerForNodeUnderMouse))
+                        layerForNodeUnderMouse->mouseEnteredContentArea();
+                }
+            }
         }
-        
+
         if (m_lastNodeUnderMouse && m_lastNodeUnderMouse->document() != m_frame->document()) {
             m_lastNodeUnderMouse = 0;
             m_lastScrollbarUnderMouse = 0;
@@ -3194,6 +3291,8 @@ static const AtomicString& eventNameForTouchPointState(PlatformTouchPoint::State
         return eventNames().touchstartEvent;
     case PlatformTouchPoint::TouchMoved:
         return eventNames().touchmoveEvent;
+    case PlatformTouchPoint::TouchStationary:
+        // TouchStationary state is not converted to touch events, so fall through to assert.
     default:
         ASSERT_NOT_REACHED();
         return emptyAtom;
@@ -3249,6 +3348,9 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         case PlatformTouchPoint::TouchCancelled:
             hitType |= HitTestRequest::Release;
             break;
+        case PlatformTouchPoint::TouchStationary:
+            hitType |= HitTestRequest::Active | HitTestRequest::ReadOnly;
+            break;
         default:
             ASSERT_NOT_REACHED();
             break;
@@ -3281,7 +3383,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             // we also remove it from the map.
             touchTarget = m_originatingTouchPointTargets.take(touchPointTargetKey);
         } else
-            // No hittest is performed on move, since the target is not allowed to change anyway.
+            // No hittest is performed on move or stationary, since the target is not allowed to change anyway.
             touchTarget = m_originatingTouchPointTargets.get(touchPointTargetKey);
 
         if (!touchTarget.get())
@@ -3362,7 +3464,21 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
     return defaultPrevented;
 }
 
+bool EventHandler::dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent& event)
+{
+    if (!m_frame || !m_frame->settings() || !m_frame->settings()->isTouchEventEmulationEnabled())
+        return false;
 
+    PlatformEvent::Type eventType = event.type();
+    if (eventType != PlatformEvent::MouseMoved && eventType != PlatformEvent::MousePressed && eventType != PlatformEvent::MouseReleased)
+        return false;
+
+    if (eventType == PlatformEvent::MouseMoved && !m_touchPressed)
+        return false;
+
+    SyntheticSingleTouchEvent touchEvent(event);
+    return handleTouchEvent(touchEvent);
+}
 
 #endif
 

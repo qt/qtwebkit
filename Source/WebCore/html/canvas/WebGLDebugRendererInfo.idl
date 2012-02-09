@@ -26,9 +26,9 @@
 module html {
     interface [
         Conditional=WEBGL,
-        GenerateIsReachable=ImplContext,
+        JSGenerateIsReachable=ImplContext,
         OmitConstructor,
-        DontCheckEnums
+        DoNotCheckConstants
     ] WebGLDebugRendererInfo {
         const unsigned int UNMASKED_VENDOR_WEBGL = 0x9245;
         const unsigned int UNMASKED_RENDERER_WEBGL = 0x9246;

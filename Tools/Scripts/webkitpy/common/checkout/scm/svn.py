@@ -36,7 +36,6 @@ import sys
 from webkitpy.common.memoized import memoized
 from webkitpy.common.system.deprecated_logging import log
 from webkitpy.common.system.executive import Executive, ScriptError
-from webkitpy.common.system import ospath
 
 from .scm import AuthenticationError, SCM, commit_error_handler
 
@@ -237,8 +236,8 @@ class SVN(SCM, SVNRepository):
     def display_name(self):
         return "svn"
 
-    def head_svn_revision(self):
-        return self.value_from_svn_info(self.checkout_root, 'Revision')
+    def svn_revision(self, path):
+        return self.value_from_svn_info(path, 'Revision')
 
     # FIXME: This method should be on Checkout.
     def create_patch(self, git_commit=None, changed_files=None):

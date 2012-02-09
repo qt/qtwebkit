@@ -23,7 +23,6 @@
 #define JSDOMBinding_h
 
 #include "CSSImportRule.h"
-#include "CSSMutableStyleDeclaration.h"
 #include "CSSStyleSheet.h"
 #include "JSDOMGlobalObject.h"
 #include "JSDOMWrapper.h"
@@ -31,6 +30,7 @@
 #include "Document.h"
 #include "Element.h"
 #include "MediaList.h"
+#include "StylePropertySet.h"
 #include "StyledElement.h"
 #include <heap/Weak.h>
 #include <runtime/FunctionPrototype.h>
@@ -281,9 +281,9 @@ enum ParameterMissingPolicy {
     JSC::JSObject* toJSSequence(JSC::ExecState*, JSC::JSValue, unsigned&);
 
     // FIXME: Implement allowAccessToContext(JSC::ExecState*, ScriptExecutionContext*);
-    bool allowAccessToNode(JSC::ExecState*, Node*);
-    bool allowAccessToFrame(JSC::ExecState*, Frame*);
-    bool allowAccessToFrame(JSC::ExecState*, Frame*, String& message);
+    bool shouldAllowAccessToNode(JSC::ExecState*, Node*);
+    bool shouldAllowAccessToFrame(JSC::ExecState*, Frame*);
+    bool shouldAllowAccessToFrame(JSC::ExecState*, Frame*, String& message);
     // FIXME: Implement allowAccessToDOMWindow(JSC::ExecState*, DOMWindow*);
 
     // FIXME: Remove these functions in favor of activeContext and

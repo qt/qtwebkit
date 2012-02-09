@@ -185,6 +185,11 @@ void InspectorDebuggerAgent::didClearMainFrameWindowObject()
         m_frontend->globalObjectCleared();
 }
 
+bool InspectorDebuggerAgent::isPaused()
+{
+    return scriptDebugServer().isPaused();
+}
+
 static PassRefPtr<InspectorObject> buildObjectForBreakpointCookie(const String& url, int lineNumber, int columnNumber, const String& condition, bool isRegex)
 {
     RefPtr<InspectorObject> breakpointObject = InspectorObject::create();
@@ -250,7 +255,7 @@ static bool parseLocation(ErrorString* errorString, RefPtr<InspectorObject> loca
     return true;
 }
 
-void InspectorDebuggerAgent::setBreakpoint(ErrorString* errorString, PassRefPtr<InspectorObject> location, const String* const optionalCondition, String* outBreakpointId, RefPtr<InspectorObject>& actualLocation)
+void InspectorDebuggerAgent::setBreakpoint(ErrorString* errorString, const RefPtr<InspectorObject>& location, const String* const optionalCondition, String* outBreakpointId, RefPtr<InspectorObject>& actualLocation)
 {
     String scriptId;
     int lineNumber;
@@ -286,7 +291,7 @@ void InspectorDebuggerAgent::removeBreakpoint(ErrorString*, const String& breakp
     m_breakpointIdToDebugServerBreakpointIds.remove(debugServerBreakpointIdsIterator);
 }
 
-void InspectorDebuggerAgent::continueToLocation(ErrorString* errorString, PassRefPtr<InspectorObject> location)
+void InspectorDebuggerAgent::continueToLocation(ErrorString* errorString, const RefPtr<InspectorObject>& location)
 {
     if (!m_continueToLocationBreakpointId.isEmpty()) {
         scriptDebugServer().removeBreakpoint(m_continueToLocationBreakpointId);

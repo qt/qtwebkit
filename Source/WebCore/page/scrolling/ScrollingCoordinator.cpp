@@ -34,7 +34,11 @@
 #include "IntRect.h"
 #include "Page.h"
 #include "PlatformWheelEvent.h"
+#include "Region.h"
 #include "ScrollAnimator.h"
+#include "ScrollingThread.h"
+#include "ScrollingTree.h"
+#include "ScrollingTreeState.h"
 #include <wtf/Functional.h>
 #include <wtf/MainThread.h>
 #include <wtf/PassRefPtr.h>
@@ -48,19 +52,31 @@ PassRefPtr<ScrollingCoordinator> ScrollingCoordinator::create(Page* page)
 
 ScrollingCoordinator::ScrollingCoordinator(Page* page)
     : m_page(page)
-    , m_didDispatchDidUpdateMainFrameScrollPosition(false)
+    , m_scrollingTree(ScrollingTree::create(this))
+    , m_scrollingTreeState(ScrollingTreeState::create())
+    , m_scrollingTreeStateCommitterTimer(this, &ScrollingCoordinator::scrollingTreeStateCommitterTimerFired)
 {
 }
 
 ScrollingCoordinator::~ScrollingCoordinator()
 {
     ASSERT(!m_page);
+    ASSERT(!m_scrollingTree);
 }
 
 void ScrollingCoordinator::pageDestroyed()
 {
     ASSERT(m_page);
     m_page = 0;
+
+    // Invalidating the scrolling tree will break the reference cycle between the ScrollingCoordinator and ScrollingTree objects.
+    ScrollingThread::dispatch(bind(&ScrollingTree::invalidate, m_scrollingTree.release()));
+}
+
+ScrollingTree* ScrollingCoordinator::scrollingTree() const
+{
+    ASSERT(m_scrollingTree);
+    return m_scrollingTree.get();
 }
 
 bool ScrollingCoordinator::coordinatesScrollingForFrameView(FrameView* frameView) const
@@ -75,78 +91,103 @@ bool ScrollingCoordinator::coordinatesScrollingForFrameView(FrameView* frameView
     return true;
 }
 
-void ScrollingCoordinator::syncFrameViewGeometry(FrameView* frameView)
+void ScrollingCoordinator::frameViewLayoutUpdated(FrameView* frameView)
 {
     ASSERT(isMainThread());
     ASSERT(m_page);
 
-    if (frameView->frame() != m_page->mainFrame())
+    if (!coordinatesScrollingForFrameView(frameView))
         return;
 
-    IntRect visibleContentRect = frameView->visibleContentRect();
-    IntSize contentsSize = frameView->contentsSize();
+    // Compute the region of the page that we can't do fast scrolling for. This currently includes
+    // all scrollable areas, such as subframes, overflow divs and list boxes.
+    Region nonScrollableRegion;
+    if (const FrameView::ScrollableAreaSet* scrollableAreas = frameView->scrollableAreas()) {
+        for (FrameView::ScrollableAreaSet::const_iterator it = scrollableAreas->begin(), end = scrollableAreas->end(); it != end; ++it) {
+            ScrollableArea* scrollableArea = *it;
 
-    MutexLocker locker(m_mainFrameGeometryMutex);
-    if (m_mainFrameVisibleContentRect == visibleContentRect && m_mainFrameContentsSize == contentsSize)
-        return;
+            // Check if this area can be scrolled at all.
+            if ((!scrollableArea->horizontalScrollbar() || !scrollableArea->horizontalScrollbar()->enabled())
+                && (!scrollableArea->verticalScrollbar() || !scrollableArea->verticalScrollbar()->enabled()))
+                continue;
 
-    m_mainFrameVisibleContentRect = visibleContentRect;
-    m_mainFrameContentsSize = contentsSize;
+            nonScrollableRegion.unite(scrollableArea->scrollableAreaBoundingBox());
+        }
+    }
 
-    // FIXME: Inform the scrolling thread that the frame geometry has changed.
+    m_scrollingTreeState->setViewportRect(IntRect(IntPoint(), frameView->visibleContentRect().size()));
+    m_scrollingTreeState->setContentsSize(frameView->contentsSize());
+    m_scrollingTreeState->setNonFastScrollableRegion(nonScrollableRegion);
+    scheduleTreeStateCommit();
 }
 
-bool ScrollingCoordinator::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
+void ScrollingCoordinator::frameViewWheelEventHandlerCountChanged(FrameView*)
 {
-    // FIXME: Check for wheel event handlers.
-    // FIXME: Check if we're over a subframe or overflow div.
-    // FIXME: As soon as we've determined that we can handle the wheel event, we should do the
-    // bulk of the work on the scrolling thread and return from this function.
-    // FIXME: Handle rubberbanding.
-    float deltaX = wheelEvent.deltaX();
-    float deltaY = wheelEvent.deltaY();
+    ASSERT(isMainThread());
+    ASSERT(m_page);
 
-    // Slightly prefer scrolling vertically by applying the = case to deltaY
-    if (fabsf(deltaY) >= fabsf(deltaX))
-        deltaX = 0;
-    else
-        deltaY = 0;
-
-    IntSize scrollOffset = IntSize(-deltaX, -deltaY);
-    dispatchOnScrollingThread(bind(&ScrollingCoordinator::scrollByOnScrollingThread, this, scrollOffset));
-    return true;
+    recomputeWheelEventHandlerCount();
 }
 
-#if ENABLE(GESTURE_EVENTS)
-bool ScrollingCoordinator::handleGestureEvent(const PlatformGestureEvent&)
-{
-    // FIXME: Implement.
-    return false;
-}
-#endif
-
-void ScrollingCoordinator::didUpdateMainFrameScrollPosition()
+void ScrollingCoordinator::updateMainFrameScrollPosition(const IntPoint& scrollPosition)
 {
     ASSERT(isMainThread());
 
     if (!m_page)
         return;
 
-    IntPoint scrollPosition;
+    FrameView* frameView = m_page->mainFrame()->view();
+    if (!frameView)
+        return;
 
-    {
-        MutexLocker locker(m_mainFrameGeometryMutex);
-        ASSERT(m_didDispatchDidUpdateMainFrameScrollPosition);
+    frameView->setConstrainsScrollingToContentEdge(false);
+    frameView->scrollToOffsetWithoutAnimation(scrollPosition);
+    frameView->setConstrainsScrollingToContentEdge(true);
+}
 
-        scrollPosition = m_mainFrameScrollPosition;
-        m_didDispatchDidUpdateMainFrameScrollPosition = false;
+void ScrollingCoordinator::recomputeWheelEventHandlerCount()
+{
+    unsigned wheelEventHandlerCount = 0;
+    for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        if (frame->document())
+            wheelEventHandlerCount += frame->document()->wheelEventHandlerCount();
     }
 
-    if (FrameView* frameView = m_page->mainFrame()->view()) {
-        frameView->setConstrainsScrollingToContentEdge(false);
-        frameView->scrollToOffsetWithoutAnimation(scrollPosition);
-        frameView->setConstrainsScrollingToContentEdge(true);
-    }
+    m_scrollingTreeState->setWheelEventHandlerCount(wheelEventHandlerCount);
+    scheduleTreeStateCommit();
+}
+
+void ScrollingCoordinator::scheduleTreeStateCommit()
+{
+    if (m_scrollingTreeStateCommitterTimer.isActive())
+        return;
+
+    if (!m_scrollingTreeState->hasChangedProperties())
+        return;
+
+    m_scrollingTreeStateCommitterTimer.startOneShot(0);
+}
+
+void ScrollingCoordinator::scrollingTreeStateCommitterTimerFired(Timer<ScrollingCoordinator>*)
+{
+    commitTreeState();
+}
+
+void ScrollingCoordinator::commitTreeStateIfNeeded()
+{
+    if (!m_scrollingTreeState->hasChangedProperties())
+        return;
+
+    commitTreeState();
+    m_scrollingTreeStateCommitterTimer.stop();
+}
+
+void ScrollingCoordinator::commitTreeState()
+{
+    ASSERT(m_scrollingTreeState->hasChangedProperties());
+
+    OwnPtr<ScrollingTreeState> treeState = m_scrollingTreeState->commit();
+    ScrollingThread::dispatch(bind(&ScrollingTree::commitNewTreeState, m_scrollingTree.get(), treeState.release()));
 }
 
 } // namespace WebCore
