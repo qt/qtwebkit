@@ -32,7 +32,7 @@
 
 vars = {
   'chromium_svn': 'http://src.chromium.org/svn/trunk/src',
-  'chromium_rev': '121041'
+  'chromium_rev': '123353'
 }
 
 deps = {
@@ -163,6 +163,8 @@ deps_os = {
     # Linux, actually.
     'tools/xdisplaycheck':
       Var('chromium_svn')+'/tools/xdisplaycheck@'+Var('chromium_rev'),
+    'third_party/gold':
+      From('chromium_deps', 'src/third_party/gold'),
     'third_party/openssl':
       From('chromium_deps', 'src/third_party/openssl'),
   },

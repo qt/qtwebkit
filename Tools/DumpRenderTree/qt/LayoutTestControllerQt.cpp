@@ -562,15 +562,6 @@ bool LayoutTestController::pauseTransitionAtTimeOnElementWithId(const QString& p
     return DumpRenderTreeSupportQt::pauseTransitionOfProperty(frame, propertyName, time, elementId);
 }
 
-bool LayoutTestController::sampleSVGAnimationForElementAtTime(const QString& animationId,
-                                                              double time,
-                                                              const QString& elementId)
-{
-    QWebFrame* frame = m_drt->webPage()->mainFrame();
-    Q_ASSERT(frame);
-    return DumpRenderTreeSupportQt::pauseSVGAnimation(frame, animationId, time, elementId);
-}
-
 unsigned LayoutTestController::numberOfActiveAnimations() const
 {
     QWebFrame* frame = m_drt->webPage()->mainFrame();
@@ -701,6 +692,8 @@ void LayoutTestController::overridePreference(const QString& name, const QVarian
         settings->setAttribute(QWebSettings::PluginsEnabled, value.toBool());
     else if (name == "WebKitWebGLEnabled")
         settings->setAttribute(QWebSettings::WebGLEnabled, value.toBool());
+    else if (name == "WebKitCSSRegionsEnabled")
+        settings->setAttribute(QWebSettings::CSSRegionsEnabled, value.toBool());
     else if (name == "WebKitHyperlinkAuditingEnabled")
         settings->setAttribute(QWebSettings::HyperlinkAuditingEnabled, value.toBool());
     else if (name == "WebKitHixie76WebSocketProtocolEnabled")

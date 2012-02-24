@@ -169,6 +169,13 @@ class Port(object):
     def default_worker_model(self):
         return 'processes'
 
+    def worker_startup_delay_secs(self):
+        # FIXME: If we start workers up too quickly, DumpRenderTree appears
+        # to thrash on something and time out its first few tests. Until
+        # we can figure out what's going on, sleep a bit in between
+        # workers. See https://bugs.webkit.org/show_bug.cgi?id=79147 .
+        return 0.1
+
     def baseline_path(self):
         """Return the absolute path to the directory to store new baselines in for this port."""
         baseline_search_paths = self.get_option('additional_platform_directory', []) + self.baseline_search_path()
@@ -248,17 +255,10 @@ class Port(object):
             _log.error("No httpd found. Cannot run http tests.")
             return False
 
-    def compare_text(self, expected_text, actual_text):
-        """Return whether or not the two strings are *not* equal. This
-        routine is used to diff text output.
-
-        While this is a generic routine, we include it in the Port
-        interface so that it can be overriden for testing purposes."""
+    def do_text_results_differ(self, expected_text, actual_text):
         return expected_text != actual_text
 
-    def compare_audio(self, expected_audio, actual_audio):
-        # FIXME: If we give this method a better name it won't need this docstring (e.g. are_audio_results_equal()).
-        """Return whether the two audio files are *not* equal."""
+    def do_audio_results_differ(self, expected_audio, actual_audio):
         return expected_audio != actual_audio
 
     def diff_image(self, expected_contents, actual_contents, tolerance=None):
@@ -269,14 +269,9 @@ class Port(object):
         """
         raise NotImplementedError('Port.diff_image')
 
-
-    def diff_text(self, expected_text, actual_text,
-                  expected_filename, actual_filename):
+    def diff_text(self, expected_text, actual_text, expected_filename, actual_filename):
         """Returns a string containing the diff of the two text strings
-        in 'unified diff' format.
-
-        While this is a generic routine, we include it in the Port
-        interface so that it can be overriden for testing purposes."""
+        in 'unified diff' format."""
 
         # The filenames show up in the diff output, make sure they're
         # raw bytes and not unicode, so that they don't trigger join()
@@ -309,10 +304,7 @@ class Port(object):
         pass
 
     def driver_name(self):
-        """Returns the name of the actual binary that is performing the test,
-        so that it can be referred to in log messages. In most cases this
-        will be DumpRenderTree, but if a port uses a binary with a different
-        name, it can be overridden here."""
+        # FIXME: Seems we should get this from the Port's Driver class.
         return "DumpRenderTree"
 
     def expected_baselines(self, test_name, suffix, all_baselines=False):
@@ -619,20 +611,11 @@ class Port(object):
                 return True
         return False
 
-    def maybe_make_directory(self, *comps):
-        """Creates the specified directory if it doesn't already exist."""
-        self._filesystem.maybe_make_directory(*comps)
-
     def name(self):
         """Returns a name that uniquely identifies this particular type of port
         (e.g., "mac-snowleopard" or "chromium-gpu-linux-x86_x64" and can be passed
         to factory.get() to instantiate the port."""
         return self._name
-
-    def real_name(self):
-        # FIXME: Seems this is only used for MockDRT and should be removed.
-        """Returns the name of the port as passed to the --platform command line argument."""
-        return self.name()
 
     def operating_system(self):
         # Subclasses should override this default implementation.
@@ -769,16 +752,16 @@ class Port(object):
         method."""
         pass
 
-    def start_http_server(self):
+    def start_http_server(self, additional_dirs=None):
         """Start a web server. Raise an error if it can't start or is already running.
 
         Ports can stub this out if they don't need a web server to be running."""
         assert not self._http_server, 'Already running an http server.'
 
         if self._uses_apache():
-            server = apache_http_server.LayoutTestApacheHttpd(self, self.results_directory())
+            server = apache_http_server.LayoutTestApacheHttpd(self, self.results_directory(), additional_dirs=additional_dirs)
         else:
-            server = http_server.Lighttpd(self, self.results_directory())
+            server = http_server.Lighttpd(self, self.results_directory(), additional_dirs=additional_dirs)
 
         server.start()
         self._http_server = server

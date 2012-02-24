@@ -91,9 +91,8 @@ class QueuesTest(unittest.TestCase):
         self.assert_outputs(queue.begin_work_queue, "begin_work_queue", [], expected_stdout, expected_stderr, expected_exceptions)
         self.assert_outputs(queue.should_continue_work_queue, "should_continue_work_queue", [], expected_stdout, expected_stderr, expected_exceptions)
         self.assert_outputs(queue.next_work_item, "next_work_item", [], expected_stdout, expected_stderr, expected_exceptions)
-        self.assert_outputs(queue.should_proceed_with_work_item, "should_proceed_with_work_item", [work_item], expected_stdout, expected_stderr, expected_exceptions)
         self.assert_outputs(queue.process_work_item, "process_work_item", [work_item], expected_stdout, expected_stderr, expected_exceptions)
         self.assert_outputs(queue.handle_unexpected_error, "handle_unexpected_error", [work_item, "Mock error message"], expected_stdout, expected_stderr, expected_exceptions)
         # Should we have a different function for testing StepSequenceErrorHandlers?
         if isinstance(queue, StepSequenceErrorHandler):
-            self.assert_outputs(queue.handle_script_error, "handle_script_error", [tool, {"patch": self.mock_work_item}, ScriptError(message="ScriptError error message", script_args="MockErrorCommand")], expected_stdout, expected_stderr, expected_exceptions)
+            self.assert_outputs(queue.handle_script_error, "handle_script_error", [tool, {"patch": self.mock_work_item}, ScriptError(message="ScriptError error message", script_args="MockErrorCommand", output="MOCK output")], expected_stdout, expected_stderr, expected_exceptions)

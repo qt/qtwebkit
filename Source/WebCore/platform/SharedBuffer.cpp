@@ -233,16 +233,19 @@ const Vector<char>& SharedBuffer::buffer() const
 
 unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) const
 {
-    if (hasPlatformData() || m_purgeableBuffer) {
-        someData = data() + position;
-        return size() - position;
-    }
-
-    if (position >= m_size) {
+    unsigned totalSize = size();
+    if (position >= totalSize) {
         someData = 0;
         return 0;
     }
 
+    if (hasPlatformData() || m_purgeableBuffer) {
+        ASSERT(position < size());
+        someData = data() + position;
+        return totalSize - position;
+    }
+
+    ASSERT(position < m_size);
     unsigned consecutiveSize = m_buffer.size();
     if (position < consecutiveSize) {
         someData = m_buffer.data() + position;
@@ -250,14 +253,25 @@ unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) con
     }
  
     position -= consecutiveSize;
-    unsigned segmentedSize = m_size - consecutiveSize;
     unsigned segments = m_segments.size();
+    unsigned maxSegmentedSize = segments * segmentSize;
     unsigned segment = segmentIndex(position);
-    ASSERT(segment < segments);
+    if (segment < segments) {
+        unsigned bytesLeft = totalSize - consecutiveSize;
+        unsigned segmentedSize = min(maxSegmentedSize, bytesLeft);
 
-    unsigned positionInSegment = offsetInSegment(position);
-    someData = m_segments[segment] + positionInSegment;
-    return segment == segments - 1 ? segmentedSize - position : segmentSize - positionInSegment;
+        unsigned positionInSegment = offsetInSegment(position);
+        someData = m_segments[segment] + positionInSegment;
+        return segment == segments - 1 ? segmentedSize - position : segmentSize - positionInSegment;
+    }
+#if HAVE(NETWORK_CFDATA_ARRAY_CALLBACK)
+    ASSERT(maxSegmentedSize <= position);
+    position -= maxSegmentedSize;
+    return copySomeDataFromDataArray(someData, position);
+#else
+    ASSERT_NOT_REACHED();
+    return 0;
+#endif
 }
 
 #if !USE(CF) || PLATFORM(QT)

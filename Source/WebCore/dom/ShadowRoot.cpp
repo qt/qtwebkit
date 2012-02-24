@@ -27,22 +27,28 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
-#include "ContentInclusionSelector.h"
 #include "Document.h"
 #include "Element.h"
 #include "HTMLContentElement.h"
+#include "HTMLContentSelector.h"
 #include "HTMLNames.h"
+#include "InsertionPoint.h"
 #include "NodeRareData.h"
+#include "ShadowRootList.h"
 #include "SVGNames.h"
-#include "Text.h"
+
+#if ENABLE(SHADOW_DOM)
+#include "RuntimeEnabledFeatures.h"
+#endif
 
 namespace WebCore {
 
 ShadowRoot::ShadowRoot(Document* document)
     : DocumentFragment(document, CreateShadowRoot)
     , TreeScope(this)
+    , m_prev(0)
+    , m_next(0)
     , m_applyAuthorSheets(false)
-    , m_needsRecalculateContent(false)
 {
     ASSERT(document);
     
@@ -55,6 +61,9 @@ ShadowRoot::ShadowRoot(Document* document)
 
 ShadowRoot::~ShadowRoot()
 {
+    ASSERT(!m_prev);
+    ASSERT(!m_next);
+
     // We must call clearRareData() here since a ShadowRoot class inherits TreeScope
     // as well as Node. See a comment on TreeScope.h for the reason.
     if (hasRareData())
@@ -92,7 +101,13 @@ PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ExceptionCode& ec)
 
 PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPurpose purpose, ExceptionCode& ec)
 {
-    if (!element || element->shadowRoot()) {
+#if ENABLE(SHADOW_DOM)
+    bool isMultipleShadowSubtreesEnabled = RuntimeEnabledFeatures::multipleShadowSubtreesEnabled();
+#else
+    bool isMultipleShadowSubtreesEnabled = false;
+#endif
+
+    if (!element || (!isMultipleShadowSubtreesEnabled && element->hasShadowRoot())) {
         ec = HIERARCHY_REQUEST_ERR;
         return 0;
     }
@@ -104,25 +119,21 @@ PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPu
         return 0;
     }
 
-    ASSERT(purpose != CreatingUserAgentShadowRoot || !element->shadowRoot());
-    RefPtr<ShadowRoot> shadowRoot = create(element->document());
+    ASSERT(purpose != CreatingUserAgentShadowRoot || !element->hasShadowRoot());
+    RefPtr<ShadowRoot> shadowRoot = adoptRef(new ShadowRoot(element->document()));
 
     ec = 0;
     element->setShadowRoot(shadowRoot, ec);
     if (ec)
         return 0;
-
+    ASSERT(element == shadowRoot->host());
+    ASSERT(element->hasShadowRoot());
     return shadowRoot.release();
 }
 
 String ShadowRoot::nodeName() const
 {
     return "#shadow-root";
-}
-
-Node::NodeType ShadowRoot::nodeType() const
-{
-    return SHADOW_ROOT_NODE;
 }
 
 PassRefPtr<Node> ShadowRoot::cloneNode(bool)
@@ -146,53 +157,11 @@ bool ShadowRoot::childTypeAllowed(NodeType type) const
     }
 }
 
-void ShadowRoot::recalcShadowTreeStyle(StyleChange change)
+ShadowRootList* ShadowRoot::list() const
 {
-    if (needsReattachHostChildrenAndShadow())
-        reattachHostChildrenAndShadow();
-    else {
-        for (Node* n = firstChild(); n; n = n->nextSibling()) {
-            if (n->isElementNode())
-                static_cast<Element*>(n)->recalcStyle(change);
-            else if (n->isTextNode())
-                static_cast<Text*>(n)->recalcTextStyle(change);
-        }
-    }
-
-    clearNeedsReattachHostChildrenAndShadow();
-    clearNeedsStyleRecalc();
-    clearChildNeedsStyleRecalc();
-}
-
-void ShadowRoot::setNeedsReattachHostChildrenAndShadow()
-{
-    m_needsRecalculateContent = true;
-    if (shadowHost())
-        shadowHost()->setNeedsStyleRecalc();
-}
-
-HTMLContentElement* ShadowRoot::includerFor(Node* node) const
-{
-    if (!m_inclusions)
-        return 0;
-    ShadowInclusion* found = m_inclusions->findFor(node);
-    if (!found)
-        return 0;
-    return found->includer();
-}
-
-void ShadowRoot::hostChildrenChanged()
-{
-    if (!hasContentElement())
-        return;
-
-    // This results in forced detaching/attaching of the shadow render tree. See ShadowRoot::recalcStyle().
-    setNeedsReattachHostChildrenAndShadow();
-}
-
-bool ShadowRoot::isInclusionSelectorActive() const
-{
-    return m_inclusions && m_inclusions->hasCandidates();
+    if (host())
+        return host()->shadowRootList();
+    return 0;
 }
 
 bool ShadowRoot::hasContentElement() const
@@ -217,46 +186,15 @@ void ShadowRoot::setApplyAuthorSheets(bool value)
 
 void ShadowRoot::attach()
 {
-    // Children of m_inclusions is populated lazily in
-    // ensureInclusions(), and here we just ensure that
+    // Children of m_selector is populated lazily in
+    // ensureSelector(), and here we just ensure that
     // it is in clean state.
-    ASSERT(!m_inclusions || !m_inclusions->hasCandidates());
+    // FIXME: This assertion breaks if multiple shadow roots are being attached.
+    // ShadowRootList should have responsibility of side effect of selector in attaching/detaching.
+    ASSERT(!host()->shadowRootList()->selector() || !host()->shadowRootList()->selector()->hasCandidates());
     DocumentFragment::attach();
-    if (m_inclusions)
-        m_inclusions->didSelect();
+    if (HTMLContentSelector* selector = host()->shadowRootList()->selector())
+        selector->didSelect();
 }
-
-void ShadowRoot::reattachHostChildrenAndShadow()
-{
-    Node* hostNode = host();
-    if (!hostNode)
-        return;
-
-    for (Node* child = hostNode->firstChild(); child; child = child->nextSibling()) {
-        if (child->attached())
-            child->detach();
-    }
-
-    reattach();
-
-    for (Node* child = hostNode->firstChild(); child; child = child->nextSibling()) {
-        if (!child->attached())
-            child->attach();
-    }
-}
-
-ContentInclusionSelector* ShadowRoot::inclusions() const
-{
-    return m_inclusions.get();
-}
-
-ContentInclusionSelector* ShadowRoot::ensureInclusions()
-{
-    if (!m_inclusions)
-        m_inclusions = adoptPtr(new ContentInclusionSelector());
-    m_inclusions->willSelectOver(this);
-    return m_inclusions.get();
-}
-
 
 }

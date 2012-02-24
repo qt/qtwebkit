@@ -51,6 +51,7 @@ class Database;
 class Element;
 class EventContext;
 class DocumentLoader;
+class GraphicsContext;
 class HitTestResult;
 class InspectorCSSAgent;
 class InspectorTimelineAgent;
@@ -85,7 +86,7 @@ public:
     static void willInsertDOMNode(Document*, Node*, Node* parent);
     static void didInsertDOMNode(Document*, Node*);
     static void willRemoveDOMNode(Document*, Node*);
-    static void willModifyDOMAttr(Document*, Element*);
+    static void willModifyDOMAttr(Document*, Element*, const AtomicString& oldValue, const AtomicString& newValue);
     static void didModifyDOMAttr(Document*, Element*, const AtomicString& name, const AtomicString& value);
     static void didRemoveDOMAttr(Document*, Element*, const AtomicString& name);
     static void characterDataModified(Document*, CharacterData*);
@@ -120,7 +121,7 @@ public:
     static void didLayout(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willLoadXHR(ScriptExecutionContext*, XMLHttpRequest*);
     static void didLoadXHR(const InspectorInstrumentationCookie&);
-    static InspectorInstrumentationCookie willPaint(Frame*, const LayoutRect&);
+    static InspectorInstrumentationCookie willPaint(Frame*, GraphicsContext*, const LayoutRect&);
     static void didPaint(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willRecalculateStyle(Document*);
     static void didRecalculateStyle(const InspectorInstrumentationCookie&);
@@ -173,10 +174,10 @@ public:
     static void stopConsoleTiming(Page*, const String& title, PassRefPtr<ScriptCallStack>);
     static void consoleTimeStamp(Page*, PassRefPtr<ScriptArguments>);
 
-    static void didRegisterAnimationFrameCallback(Document*, int callbackId);
-    static void didCancelAnimationFrameCallback(Document*, int callbackId);
-    static InspectorInstrumentationCookie willFireAnimationFrameEvent(Document*, int callbackId);
-    static void didFireAnimationFrameEvent(const InspectorInstrumentationCookie&);
+    static void didRequestAnimationFrame(Document*, int callbackId);
+    static void didCancelAnimationFrame(Document*, int callbackId);
+    static InspectorInstrumentationCookie willFireAnimationFrame(Document*, int callbackId);
+    static void didFireAnimationFrame(const InspectorInstrumentationCookie&);
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     static void addStartProfilingMessageToConsole(Page*, const String& title, unsigned lineNumber, const String& sourceURL);
@@ -235,7 +236,7 @@ private:
     static void didInsertDOMNodeImpl(InstrumentingAgents*, Node*);
     static void willRemoveDOMNodeImpl(InstrumentingAgents*, Node*);
     static void didRemoveDOMNodeImpl(InstrumentingAgents*, Node*);
-    static void willModifyDOMAttrImpl(InstrumentingAgents*, Element*);
+    static void willModifyDOMAttrImpl(InstrumentingAgents*, Element*, const AtomicString& oldValue, const AtomicString& newValue);
     static void didModifyDOMAttrImpl(InstrumentingAgents*, Element*, const AtomicString& name, const AtomicString& value);
     static void didRemoveDOMAttrImpl(InstrumentingAgents*, Element*, const AtomicString& name);
     static void characterDataModifiedImpl(InstrumentingAgents*, CharacterData*);
@@ -270,7 +271,7 @@ private:
     static void didLayoutImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willLoadXHRImpl(InstrumentingAgents*, XMLHttpRequest*);
     static void didLoadXHRImpl(const InspectorInstrumentationCookie&);
-    static InspectorInstrumentationCookie willPaintImpl(InstrumentingAgents*, const LayoutRect&);
+    static InspectorInstrumentationCookie willPaintImpl(InstrumentingAgents*, GraphicsContext*, const LayoutRect&);
     static void didPaintImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willRecalculateStyleImpl(InstrumentingAgents*);
     static void didRecalculateStyleImpl(const InspectorInstrumentationCookie&);
@@ -320,10 +321,10 @@ private:
     static void stopConsoleTimingImpl(InstrumentingAgents*, const String& title, PassRefPtr<ScriptCallStack>);
     static void consoleTimeStampImpl(InstrumentingAgents*, PassRefPtr<ScriptArguments>);
 
-    static void didRegisterAnimationFrameCallbackImpl(InstrumentingAgents*, int callbackId);
-    static void didCancelAnimationFrameCallbackImpl(InstrumentingAgents*, int callbackId);
-    static InspectorInstrumentationCookie willFireAnimationFrameEventImpl(InstrumentingAgents*, int callbackId);
-    static void didFireAnimationFrameEventImpl(const InspectorInstrumentationCookie&);
+    static void didRequestAnimationFrameImpl(InstrumentingAgents*, int callbackId);
+    static void didCancelAnimationFrameImpl(InstrumentingAgents*, int callbackId);
+    static InspectorInstrumentationCookie willFireAnimationFrameImpl(InstrumentingAgents*, int callbackId);
+    static void didFireAnimationFrameImpl(const InspectorInstrumentationCookie&);
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     static void addStartProfilingMessageToConsoleImpl(InstrumentingAgents*, const String& title, unsigned lineNumber, const String& sourceURL);
@@ -424,12 +425,12 @@ inline void InspectorInstrumentation::willRemoveDOMNode(Document* document, Node
 #endif
 }
 
-inline void InspectorInstrumentation::willModifyDOMAttr(Document* document, Element* element)
+inline void InspectorInstrumentation::willModifyDOMAttr(Document* document, Element* element, const AtomicString& oldValue, const AtomicString& newValue)
 {
 #if ENABLE(INSPECTOR)
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        willModifyDOMAttrImpl(instrumentingAgents, element);
+        willModifyDOMAttrImpl(instrumentingAgents, element, oldValue, newValue);
 #endif
 }
 
@@ -722,12 +723,12 @@ inline void InspectorInstrumentation::didLoadXHR(const InspectorInstrumentationC
 #endif
 }
 
-inline InspectorInstrumentationCookie InspectorInstrumentation::willPaint(Frame* frame, const LayoutRect& rect)
+inline InspectorInstrumentationCookie InspectorInstrumentation::willPaint(Frame* frame, GraphicsContext* context, const LayoutRect& rect)
 {
 #if ENABLE(INSPECTOR)
     FAST_RETURN_IF_NO_FRONTENDS(InspectorInstrumentationCookie());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        return willPaintImpl(instrumentingAgents, rect);
+        return willPaintImpl(instrumentingAgents, context, rect);
 #endif
     return InspectorInstrumentationCookie();
 }
@@ -1172,37 +1173,37 @@ inline void InspectorInstrumentation::updateApplicationCacheStatus(Frame* frame)
 #endif
 }
 
-inline void InspectorInstrumentation::didRegisterAnimationFrameCallback(Document* document, int callbackId)
+inline void InspectorInstrumentation::didRequestAnimationFrame(Document* document, int callbackId)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        didRegisterAnimationFrameCallbackImpl(instrumentingAgents, callbackId);
+        didRequestAnimationFrameImpl(instrumentingAgents, callbackId);
 #endif
 }
 
-inline void InspectorInstrumentation::didCancelAnimationFrameCallback(Document* document, int callbackId)
+inline void InspectorInstrumentation::didCancelAnimationFrame(Document* document, int callbackId)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        didCancelAnimationFrameCallbackImpl(instrumentingAgents, callbackId);
+        didCancelAnimationFrameImpl(instrumentingAgents, callbackId);
 #endif
 }
 
-inline InspectorInstrumentationCookie InspectorInstrumentation::willFireAnimationFrameEvent(Document* document, int callbackId)
+inline InspectorInstrumentationCookie InspectorInstrumentation::willFireAnimationFrame(Document* document, int callbackId)
 {
 #if ENABLE(INSPECTOR)
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        return willFireAnimationFrameEventImpl(instrumentingAgents, callbackId);
+        return willFireAnimationFrameImpl(instrumentingAgents, callbackId);
 #endif
     return InspectorInstrumentationCookie();
 }
 
-inline void InspectorInstrumentation::didFireAnimationFrameEvent(const InspectorInstrumentationCookie& cookie)
+inline void InspectorInstrumentation::didFireAnimationFrame(const InspectorInstrumentationCookie& cookie)
 {
 #if ENABLE(INSPECTOR)
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (cookie.first)
-        didFireAnimationFrameEventImpl(cookie);
+        didFireAnimationFrameImpl(cookie);
 #endif
 }
 

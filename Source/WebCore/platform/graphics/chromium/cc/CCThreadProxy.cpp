@@ -133,6 +133,19 @@ void CCThreadProxy::requestReadbackOnImplThread(ReadbackRequest* request)
     m_schedulerOnImplThread->setNeedsForcedRedraw();
 }
 
+void CCThreadProxy::startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double durationSec)
+{
+    ASSERT(CCProxy::isMainThread());
+    CCProxy::implThread()->postTask(createCCThreadTask(this, &CCThreadProxy::requestStartPageScaleAnimationOnImplThread, targetPosition, useAnchor, scale, durationSec));
+}
+
+void CCThreadProxy::requestStartPageScaleAnimationOnImplThread(IntSize targetPosition, bool useAnchor, float scale, double durationSec)
+{
+    ASSERT(CCProxy::isImplThread());
+    if (m_layerTreeHostImpl)
+        m_layerTreeHostImpl->startPageScaleAnimation(targetPosition, useAnchor, scale, monotonicallyIncreasingTime() * 1000.0, durationSec * 1000.0);
+}
+
 GraphicsContext3D* CCThreadProxy::context()
 {
     return 0;
@@ -246,10 +259,18 @@ void CCThreadProxy::setNeedsCommitOnImplThread()
     m_schedulerOnImplThread->setNeedsCommit();
 }
 
+void CCThreadProxy::postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector> events)
+{
+    ASSERT(isImplThread());
+    TRACE_EVENT("CCThreadProxy::postAnimationEventsToMainThreadOnImplThread", this, 0);
+    m_mainThreadProxy->postTask(createCCThreadTask(this, &CCThreadProxy::setAnimationEvents, events));
+}
+
 void CCThreadProxy::setNeedsRedraw()
 {
     ASSERT(isMainThread());
     TRACE_EVENT("CCThreadProxy::setNeedsRedraw", this, 0);
+    CCProxy::implThread()->postTask(createCCThreadTask(this, &CCThreadProxy::setFullRootLayerDamageOnImplThread));
     CCProxy::implThread()->postTask(createCCThreadTask(this, &CCThreadProxy::setNeedsRedrawOnImplThread));
 }
 
@@ -548,6 +569,14 @@ void CCThreadProxy::didCompleteSwapBuffers()
     m_layerTreeHost->didCompleteSwapBuffers();
 }
 
+void CCThreadProxy::setAnimationEvents(PassOwnPtr<CCAnimationEventsVector> events)
+{
+    ASSERT(isMainThread());
+    if (!m_layerTreeHost)
+        return;
+    m_layerTreeHost->setAnimationEvents(events);
+}
+
 void CCThreadProxy::initializeImplOnImplThread(CCCompletionEvent* completion)
 {
     TRACE_EVENT("CCThreadProxy::initializeImplOnImplThread", this, 0);
@@ -595,6 +624,12 @@ void CCThreadProxy::layerTreeHostClosedOnImplThread(CCCompletionEvent* completio
     m_inputHandlerOnImplThread.clear();
     m_schedulerOnImplThread.clear();
     completion->signal();
+}
+
+void CCThreadProxy::setFullRootLayerDamageOnImplThread()
+{
+    ASSERT(isImplThread());
+    m_layerTreeHostImpl->setFullRootLayerDamage();
 }
 
 size_t CCThreadProxy::maxPartialTextureUpdates() const

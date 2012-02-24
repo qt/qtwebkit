@@ -155,10 +155,12 @@ namespace WebKit {
         virtual bool supportsFullScreenForElement(const Element*, bool withKeyboard);
         virtual void enterFullScreenForElement(Element*);
         virtual void exitFullScreenForElement(Element*);
+        void cancelFullScreen();
 #endif
 
         virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
         virtual void numWheelEventHandlersChanged(unsigned) { }
+        virtual void numTouchEventHandlersChanged(unsigned) { }
 
 #if USE(ACCELERATED_COMPOSITING) 
         virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);
@@ -185,6 +187,9 @@ namespace WebKit {
         unsigned int m_repaintSoonSourceId;
 
         void invalidateWidgetRect(const IntRect&);
+#if ENABLE(FULLSCREEN_API)
+        RefPtr<Element> m_fullScreenElement;
+#endif
     };
 }
 

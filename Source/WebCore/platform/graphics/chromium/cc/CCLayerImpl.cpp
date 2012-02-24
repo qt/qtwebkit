@@ -33,6 +33,7 @@
 #include "LayerChromium.h"
 #include "LayerRendererChromium.h"
 #include "cc/CCDebugBorderDrawQuad.h"
+#include "cc/CCLayerAnimationControllerImpl.h"
 #include "cc/CCLayerSorter.h"
 #include "cc/CCSolidColorDrawQuad.h"
 #include <wtf/text/WTFString.h>
@@ -45,6 +46,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_anchorPoint(0.5, 0.5)
     , m_anchorPointZ(0)
     , m_scrollable(false)
+    , m_haveWheelEventHandlers(false)
     , m_backgroundCoversViewport(false)
     , m_doubleSided(true)
     , m_layerPropertyChanged(false)
@@ -61,6 +63,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_drawOpacity(0)
     , m_debugBorderColor(0, 0, 0, 0)
     , m_debugBorderWidth(0)
+    , m_layerAnimationController(CCLayerAnimationControllerImpl::create(this))
 {
     ASSERT(CCProxy::isImplThread());
 }
@@ -104,6 +107,7 @@ void CCLayerImpl::createRenderSurface()
 {
     ASSERT(!m_renderSurface);
     m_renderSurface = adoptPtr(new CCRenderSurface(this));
+    setTargetRenderSurface(m_renderSurface.get());
 }
 
 bool CCLayerImpl::descendantDrawsContent()
@@ -113,11 +117,6 @@ bool CCLayerImpl::descendantDrawsContent()
             return true;
     }
     return false;
-}
-
-void CCLayerImpl::draw(LayerRendererChromium*)
-{
-    ASSERT_NOT_REACHED();
 }
 
 PassOwnPtr<CCSharedQuadState> CCLayerImpl::createSharedQuadState() const
@@ -381,6 +380,15 @@ void CCLayerImpl::setBackgroundCoversViewport(bool backgroundCoversViewport)
 
     m_backgroundCoversViewport = backgroundCoversViewport;
     m_layerPropertyChanged = true;
+}
+
+void CCLayerImpl::setFilters(const FilterOperations& filters)
+{
+    if (m_filters == filters)
+        return;
+
+    m_filters = filters;
+    noteLayerPropertyChangedForSubtree();
 }
 
 void CCLayerImpl::setMasksToBounds(bool masksToBounds)

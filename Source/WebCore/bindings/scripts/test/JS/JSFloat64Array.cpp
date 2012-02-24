@@ -36,8 +36,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSFloat64Array);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSFloat64Array);
-
 /* Hash table */
 
 static const HashTableValue JSFloat64ArrayTableValues[] =
@@ -55,8 +53,6 @@ static const HashTableValue JSFloat64ArrayConstructorTableValues[] =
 };
 
 static const HashTable JSFloat64ArrayConstructorTable = { 1, 0, JSFloat64ArrayConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSFloat64ArrayConstructor);
-
 const ClassInfo JSFloat64ArrayConstructor::s_info = { "Float64ArrayConstructor", &Base::s_info, &JSFloat64ArrayConstructorTable, 0, CREATE_METHOD_TABLE(JSFloat64ArrayConstructor) };
 
 JSFloat64ArrayConstructor::JSFloat64ArrayConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -235,7 +231,7 @@ EncodedJSValue JSC_HOST_CALL jsFloat64ArrayPrototypeFunctionFoo(ExecState* exec)
     Float64Array* impl = static_cast<Float64Array*>(castedThis->impl());
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    Float32Array* array(toFloat32Array(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    Float32Array* array(toFloat32Array(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 

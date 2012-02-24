@@ -86,6 +86,12 @@ STYLESHEETS_EMBED = \
     $$PWD/css/mobileThemeQt.css
 
 IDL_BINDINGS += \
+    $$PWD/Modules/geolocation/Geolocation.idl \
+    $$PWD/Modules/geolocation/Geoposition.idl \
+    $$PWD/Modules/geolocation/NavigatorGeolocation.idl \
+    $$PWD/Modules/geolocation/PositionCallback.idl \
+    $$PWD/Modules/geolocation/PositionError.idl \
+    $$PWD/Modules/geolocation/PositionErrorCallback.idl \
     $$PWD/css/Counter.idl \
     $$PWD/css/CSSCharsetRule.idl \
     $$PWD/css/CSSFontFaceRule.idl \
@@ -183,6 +189,7 @@ IDL_BINDINGS += \
     $$PWD/fileapi/DirectoryReaderSync.idl \
     $$PWD/fileapi/DOMFileSystem.idl \
     $$PWD/fileapi/DOMFileSystemSync.idl \
+    $$PWD/fileapi/DOMWindowFileSystem.idl \
     $$PWD/fileapi/EntriesCallback.idl \
     $$PWD/fileapi/Entry.idl \
     $$PWD/fileapi/EntryArray.idl \
@@ -208,6 +215,7 @@ IDL_BINDINGS += \
     $$PWD/fileapi/WebKitBlobBuilder.idl \
     $$PWD/html/canvas/ArrayBufferView.idl \
     $$PWD/html/canvas/ArrayBuffer.idl \
+    $$PWD/html/canvas/DOMWindowWebGL.idl \
     $$PWD/html/canvas/DataView.idl \
     $$PWD/html/canvas/Int8Array.idl \
     $$PWD/html/canvas/Float32Array.idl \
@@ -245,6 +253,7 @@ IDL_BINDINGS += \
     $$PWD/html/DOMSettableTokenList.idl \
     $$PWD/html/DOMTokenList.idl \
     $$PWD/html/DOMURL.idl \
+    $$PWD/html/DOMWindowHTML.idl \
     $$PWD/html/HTMLAllCollection.idl \
     $$PWD/html/HTMLAudioElement.idl \
     $$PWD/html/HTMLAnchorElement.idl \
@@ -342,8 +351,6 @@ IDL_BINDINGS += \
     $$PWD/page/DOMSelection.idl \
     $$PWD/page/DOMWindow.idl \
     $$PWD/page/EventSource.idl \
-    $$PWD/page/Geolocation.idl \
-    $$PWD/page/Geoposition.idl \
     $$PWD/page/History.idl \
     $$PWD/page/Location.idl \
     $$PWD/page/MemoryInfo.idl \
@@ -351,9 +358,6 @@ IDL_BINDINGS += \
     $$PWD/page/Performance.idl \
     $$PWD/page/PerformanceNavigation.idl \
     $$PWD/page/PerformanceTiming.idl \
-    $$PWD/page/PositionCallback.idl \
-    $$PWD/page/PositionError.idl \
-    $$PWD/page/PositionErrorCallback.idl \
     $$PWD/page/Screen.idl \
     $$PWD/page/SpeechInputEvent.idl \
     $$PWD/page/SpeechInputResult.idl \
@@ -426,12 +430,14 @@ IDL_BINDINGS += \
     $$PWD/websockets/DOMWindowWebSocket.idl \
     $$PWD/websockets/WebSocket.idl \
     $$PWD/workers/AbstractWorker.idl \
+    $$PWD/workers/DOMWindowWorker.idl \
     $$PWD/workers/DedicatedWorkerContext.idl \
     $$PWD/workers/SharedWorker.idl \
     $$PWD/workers/SharedWorkerContext.idl \
     $$PWD/workers/Worker.idl \
     $$PWD/workers/WorkerContext.idl \
     $$PWD/workers/WorkerLocation.idl \
+    $$PWD/xml/DOMWindowXML.idl \
     $$PWD/xml/DOMParser.idl \
     $$PWD/xml/XMLHttpRequest.idl \
     $$PWD/xml/XMLHttpRequestException.idl \
@@ -454,6 +460,7 @@ v8 {
 
 contains(DEFINES, ENABLE_SVG=1) {
   IDL_BINDINGS += \
+    $$PWD/svg/DOMWindowSVG.idl \
     $$PWD/svg/SVGZoomEvent.idl \
     $$PWD/svg/SVGAElement.idl \
     $$PWD/svg/SVGAltGlyphDefElement.idl \
@@ -599,9 +606,9 @@ contains(DEFINES, ENABLE_SVG=1) {
 
 contains(DEFINES, ENABLE_VIDEO_TRACK=1) {
   IDL_BINDINGS += \
-    $$PWD/html/TextTrack.idl \
-    $$PWD/html/TextTrackCue.idl \
-    $$PWD/html/TextTrackCueList.idl \
+    $$PWD/html/track/TextTrack.idl \
+    $$PWD/html/track/TextTrackCue.idl \
+    $$PWD/html/track/TextTrackCueList.idl \
     $$PWD/html/track/TextTrackList.idl \
     $$PWD/html/track/TrackEvent.idl \
 }
@@ -659,8 +666,9 @@ GENERATORS += cssvalues
 SUPPLEMENTAL_DEPENDENCY_FILE = supplemental_dependency.tmp
 IDL_FILES_TMP = ${QMAKE_FUNC_FILE_OUT_PATH}/idl_files.tmp
 RESOLVE_SUPPLEMENTAL_SCRIPT = $$PWD/bindings/scripts/resolve-supplemental.pl
+IDL_ATTRIBUTES_FILE = $$PWD/bindings/scripts/IDLAttributes.txt
 
-resolveSupplemental.input = RESOLVE_SUPPLEMENTAL_SCRIPT # dummy input to fire this rule
+resolveSupplemental.input = IDL_ATTRIBUTES_FILE
 resolveSupplemental.script = $$RESOLVE_SUPPLEMENTAL_SCRIPT
 # FIXME : We need to use only perl at some point.
 resolveSupplemental.commands = echo $$IDL_BINDINGS | tr \' \' \'\\n\' > $$IDL_FILES_TMP && \
@@ -668,6 +676,7 @@ resolveSupplemental.commands = echo $$IDL_BINDINGS | tr \' \' \'\\n\' > $$IDL_FI
                                --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
                                --idlFilesList $$IDL_FILES_TMP \
                                --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \
+                               --idlAttributesFile $${IDL_ATTRIBUTES_FILE} \
                                --preprocessor \"$${QMAKE_MOC} -E\"
 resolveSupplemental.output = $$SUPPLEMENTAL_DEPENDENCY_FILE
 resolveSupplemental.add_output_to_sources = false
@@ -682,6 +691,7 @@ else: generator = JS
 generateBindings.commands = perl -I$$PWD/bindings/scripts $$generateBindings.script \
                             --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
                             --generator $$generator \
+                            --include $$PWD/Modules/geolocation \
                             --include $$PWD/dom \
                             --include $$PWD/fileapi \
                             --include $$PWD/html \

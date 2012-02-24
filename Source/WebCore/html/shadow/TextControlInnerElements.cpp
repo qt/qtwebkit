@@ -474,7 +474,7 @@ void InputFieldSpeechButtonElement::setState(SpeechInputState state)
 
 SpeechInput* InputFieldSpeechButtonElement::speechInput()
 {
-    return document()->page() ? document()->page()->speechInput() : 0;
+    return SpeechInput::from(document()->page());
 }
 
 void InputFieldSpeechButtonElement::didCompleteRecording(int)
@@ -520,7 +520,8 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
 void InputFieldSpeechButtonElement::attach()
 {
     ASSERT(!m_listenerId);
-    m_listenerId = document()->page()->speechInput()->registerListener(this);
+    if (SpeechInput* input = SpeechInput::from(document()->page()))
+        m_listenerId = input->registerListener(this);
     HTMLDivElement::attach();
 }
 
@@ -550,7 +551,7 @@ void InputFieldSpeechButtonElement::startSpeechInput()
     AtomicString language = input->computeInheritedLanguage();
     String grammar = input->getAttribute(webkitgrammarAttr);
     // FIXME: this should probably respect transforms
-    IntRect rect = renderer()->view()->frameView()->contentsToWindow(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
+    IntRect rect = pixelSnappedIntRect(renderer()->view()->frameView()->contentsToWindow(renderer()->absoluteBoundingBoxRectIgnoringTransforms()));
     if (speechInput()->startRecognition(m_listenerId, rect, language, grammar, document()->securityOrigin()))
         setState(Recording);
 }

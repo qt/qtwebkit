@@ -1,0 +1,390 @@
+2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
+
+        SpellCheckRequest needs to know the context where the spellcheck happened.
+        https://bugs.webkit.org/show_bug.cgi?id=79320
+
+        Reviewed by Hajime Morita.
+
+        * WebCoreSupport/EditorClientBlackBerry.cpp:
+        (WebCore::EditorClientBlackBerry::requestCheckingOfString):
+        * WebCoreSupport/EditorClientBlackBerry.h:
+        (EditorClientBlackBerry):
+
+2012-02-24  Charles Wei  <charles.wei@torchmobile.com.cn>
+
+        [BlackBerry] Anchor mailto: with target set won't launch Messaging application when clicked
+        https://bugs.webkit.org/show_bug.cgi?id=79318
+
+        Need to give the client a chance to decide how to handle the new window request.
+
+        Reviewed by Rob Buis.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDecidePolicyForNewWindowAction):
+
+2012-02-23  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Selection handler has compile failure with logs enabled.
+        https://bugs.webkit.org/show_bug.cgi?id=79392
+
+        Reviewed by Antonio Gomes.
+
+        Build Fix.  Update log to avoid usage of toString which was removed.
+
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::selectionPositionChanged):
+
+2012-02-19  Antonio Gomes  <agomes@rim.com>
+
+        Fat fingers - Add a clearer way to distinguish the node we want (shadow or non-shadow)
+        https://bugs.webkit.org/show_bug.cgi?id=79256
+        PR #127814 / MKS_2587410
+
+        Reviewed by Rob Buis.
+
+        Patch adds a cleaner way for call sites of FatFingersResult to
+        query for the appropriated target node: shadow or non-shadow DOM nodes.
+
+        It also renames FatFingersResults::validNode to ::node, assuming
+        that "invalid" nodes are not applicable in any context.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::clearDocumentData):
+        (BlackBerry::WebKit::WebPagePrivate::contextNode):
+        (BlackBerry::WebKit::WebPagePrivate::handleMouseEvent):
+        * WebKitSupport/FatFingers.h:
+        (FatFingersResult):
+        (BlackBerry::WebKit::FatFingersResult::node):
+        (BlackBerry::WebKit::FatFingersResult::nodeAsElementIfApplicable):
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::selectAtPoint):
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::touchHoldEvent):
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+
+2012-02-23  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Upstream BlackBerry API web page related files
+        https://bugs.webkit.org/show_bug.cgi?id=74380
+
+        Reviewed by Antonio Gomes.
+
+        Initial upstream, no new tests.
+
+        * Api/WebPage.cpp: Added.
+        * Api/WebPage.h: Added.
+        * Api/WebPage_p.h: Added.
+
+2012-02-23  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Remove unused ChromeClientBlackBerry::platformCompositingWindow(), platformWindow() and WebPageClient::compositingWindow()
+        https://bugs.webkit.org/show_bug.cgi?id=78681
+
+        Reviewed by Antonio Gomes.
+
+        * Api/WebPageClient.h:
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore):
+        * WebCoreSupport/ChromeClientBlackBerry.h:
+        (ChromeClientBlackBerry):
+
+2012-02-23  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Upstream GLES2Context.{h, cpp}
+        https://bugs.webkit.org/show_bug.cgi?id=79196
+
+        Reviewed by Rob Buis.
+
+        Initial upstream, no new tests.
+
+        * WebKitSupport/GLES2Context.cpp: Added.
+        * WebKitSupport/GLES2Context.h: Added.
+
+2012-02-23  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] InputHandler requires cleanup of Navigation Mode handling.
+        https://bugs.webkit.org/show_bug.cgi?id=79366
+
+        Reviewed by Rob Buis.
+
+        Cleanup InputHandler navigation based code.
+
+        1) Remove the concept of NavigationMode and replace it
+           with simple showKeyboard calls.
+
+        2) Remove navigation move events and replace with standard
+           key events.
+
+        3) Standardize function/variable names and remove obsolete
+           functions.
+
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::InputHandler):
+        (BlackBerry::WebKit::InputHandler::nodeFocused):
+        (BlackBerry::WebKit::InputHandler::setElementUnfocused):
+        (BlackBerry::WebKit::InputHandler::setElementFocused):
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+        (BlackBerry::WebKit::InputHandler::setDelayKeyboardVisibilityChange):
+        (BlackBerry::WebKit::InputHandler::processPendingKeyboardVisibilityChange):
+        (BlackBerry::WebKit::InputHandler::notifyClientOfKeyboardVisibilityChange):
+        * WebKitSupport/InputHandler.h:
+        (InputHandler):
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::setCaretPosition):
+        (BlackBerry::WebKit::SelectionHandler::updateOrHandleInputSelection):
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::touchEventCancel):
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+
+2012-02-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/EditorClientBlackBerry.cpp:
+        (WebCore::EditorClientBlackBerry::shouldApplyStyle):
+        * WebCoreSupport/EditorClientBlackBerry.h:
+        (EditorClientBlackBerry):
+
+2012-02-22  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] InputHandler has signed vs unsigned comparison.
+        https://bugs.webkit.org/show_bug.cgi?id=79261
+
+        Fix warning by casting the unsigned int to an int.
+
+        Reviewed by Rob Buis.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::rectForCaret):
+
+2012-02-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/EditorClientBlackBerry.cpp:
+        (WebCore::EditorClientBlackBerry::shouldApplyStyle):
+        * WebCoreSupport/EditorClientBlackBerry.h:
+        (EditorClientBlackBerry):
+
+2012-02-18  Antonio Gomes  <agomes@rim.com>
+
+        Fat fingers - cache the first rect-based hit test so we do not need to do it again
+        https://bugs.webkit.org/show_bug.cgi?id=79115
+
+        Reviewed by Adam Treat.
+
+        Our FatFingers implementation runs currently in two phases:
+        the first checks for the elements intrinsically clickable;
+        the second checks for elements made clickable by the page
+        (for example, a div with a onclick event listener attached to it).
+        For each phase, we perform a rect hittest, which is not needed since
+        the result of each is the same.
+
+        Patch introduces a caching mechanism so we avoid on rect hittest:
+        when the first phase runs, it caches each nodeset per document in
+        a hashmap. This second phase works with the cached results.
+
+        No behavioral change, but performance is better since we
+        avoid one (possibly expensive) rect hittest.
+
+        I measured the performance gain on https://www.kvd.se/, and we
+        save up to 0.04 seconds, by caching and re-using the results.
+
+        * WebKitSupport/FatFingers.cpp:
+        (BlackBerry::WebKit::dumpHitTestResult):
+        (BlackBerry::WebKit::FatFingers::findBestPoint):
+        (BlackBerry::WebKit::FatFingers::findIntersectingRegions):
+        (BlackBerry::WebKit::FatFingers::cachingStrategy):
+        (WebKit):
+        (BlackBerry::WebKit::FatFingers::getNodesFromRect):
+        * WebKitSupport/FatFingers.h:
+
+2012-02-20  Antonio Gomes  <agomes@rim.com>
+
+        All default video/audio control elements should be rect-hit testable (Part II)
+        PR #139518 / MKS_3005538
+
+        Reviewed by George Staikos.
+
+        Add HTMLInputElement::isMediaControlElement as a criteria
+        to consider a element as clickable.
+
+        Note that is should be only used while in the "ClickableByDefault"
+        phase of FatFingers.
+
+        * WebKitSupport/FatFingers.cpp:
+        (BlackBerry::WebKit::FatFingers::isElementClickable):
+
+2012-02-16  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Implemented a way to defer client navigation change client notifications
+        https://bugs.webkit.org/show_bug.cgi?id=78848
+
+        Reviewed by Rob Buis.
+
+        Currently we postpone touch_down till touch_up if user touches
+        the screen and an input field has the WebKit focus. This is done
+        so we can scroll the page without hidding the vkb needlessly.
+
+        However, it breaks the conversion of touch to mouse events
+        if an input field has the focus in the following scenario:
+        an <input type=text> is focused and an user grab and-drag
+        a <input type=range> knob/slide. It does not work until the
+        user unfocuses the currently focused edit field.
+
+        Patch introduces a way to unfocus a currently focused input field,
+        without requesting the client to show or hide the virtual keyboard
+        right way. Instead it gets a delayed notification of the vkb mode requested
+        at either touch_released/mouse_up or touch_cancel time.
+
+        For now, due to content side issues with major web sites,
+        only delay navigation mode notification changes if we are not dealing with
+        input modes.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::InputHandler):
+        (BlackBerry::WebKit::InputHandler::nodeFocused):
+        (BlackBerry::WebKit::InputHandler::setElementFocused):
+        (BlackBerry::WebKit::InputHandler::setNavigationMode):
+        (WebKit):
+        (BlackBerry::WebKit::InputHandler::setDelayClientNotificationOfNavigationModeChange):
+        (BlackBerry::WebKit::InputHandler::processPendingClientNavigationModeChangeNotification):
+        (BlackBerry::WebKit::InputHandler::notifyClientOfNavigationModeChange):
+        (BlackBerry::WebKit::InputHandler::willOpenPopupForNode):
+        (BlackBerry::WebKit::InputHandler::setPopupListIndexes):
+        (BlackBerry::WebKit::InputHandler::spannableTextInRange):
+        (BlackBerry::WebKit::InputHandler::removeComposedText):
+        (BlackBerry::WebKit::InputHandler::firstSpanInString):
+        (BlackBerry::WebKit::InputHandler::setText):
+        (BlackBerry::WebKit::InputHandler::setRelativeCursorPosition):
+        * WebKitSupport/InputHandler.h:
+        (InputHandler):
+
+2012-02-16  Antonio Gomes  <agomes@rim.com>
+
+        Crash @WebPagePrivate::enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling MKS_2986818
+        https://bugs.webkit.org/show_bug.cgi?id=78845
+
+        Reviewed by Rob Buis.
+
+        We were trying to operate on a cached Node when its page/frame/document
+        were gone to PageCache already. To avoid such problems, lets clean up
+        any document data we have cached when the Frame goes into the cache.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::didSaveToPageCache):
+        (WebCore):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.h:
+        (FrameLoaderClientBlackBerry):
+
+2012-02-16  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Upstream touch handling related classes
+        https://bugs.webkit.org/show_bug.cgi?id=78509
+
+        Reviewed by Adam Treat and Rob Buis.
+
+        FatFingers is the class responsible to the whole touch
+        accuracy of the BlackBerry port. Initial upstream.
+
+        * WebKitSupport/FatFingers.cpp: Added.
+        (WebKit):
+        (BlackBerry::WebKit::FatFingers::fingerRectForPoint):
+        (BlackBerry::WebKit::hasMousePressListener):
+        (BlackBerry::WebKit::FatFingers::isElementClickable):
+        (BlackBerry::WebKit::isFieldWithText):
+        (BlackBerry::WebKit::distanceBetweenPoints):
+        (BlackBerry::WebKit::compareDistanceBetweenPoints):
+        (BlackBerry::WebKit::isValidFrameOwner):
+        (BlackBerry::WebKit::FatFingers::FatFingers):
+        (BlackBerry::WebKit::FatFingers::~FatFingers):
+        (BlackBerry::WebKit::FatFingers::findBestPoint):
+        (BlackBerry::WebKit::FatFingers::checkFingerIntersection):
+        (BlackBerry::WebKit::FatFingers::findIntersectingRegions):
+        (BlackBerry::WebKit::FatFingers::checkForClickableElement):
+        (BlackBerry::WebKit::FatFingers::checkForText):
+        (BlackBerry::WebKit::FatFingers::getPaddings):
+        (BlackBerry::WebKit::FatFingers::nodesFromRect):
+        (BlackBerry::WebKit::FatFingers::getRelevantInfoFromPoint):
+        (BlackBerry::WebKit::FatFingers::setSuccessfulFatFingersResult):
+        * WebKitSupport/FatFingers.h: Added.
+        (WebCore):
+        (WebKit):
+        (FatFingersResult):
+        (BlackBerry::WebKit::FatFingersResult::FatFingersResult):
+        (BlackBerry::WebKit::FatFingersResult::reset):
+        (BlackBerry::WebKit::FatFingersResult::originPosition):
+        (BlackBerry::WebKit::FatFingersResult::adjustedPosition):
+        (BlackBerry::WebKit::FatFingersResult::positionWasAdjusted):
+        (BlackBerry::WebKit::FatFingersResult::isTextInput):
+        (BlackBerry::WebKit::FatFingersResult::isValid):
+        (BlackBerry::WebKit::FatFingersResult::validNode):
+        (BlackBerry::WebKit::FatFingersResult::nodeAsElementIfApplicable):
+        (FatFingers):
+
+2012-02-16  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Upstream touch handling related classes
+        https://bugs.webkit.org/show_bug.cgi?id=78509
+
+        Reviewed by Adam Treat.
+
+        Initial upstream of the Blackberry specific single touch event
+        handler class.
+
+        * blackberry/WebKitSupport/TouchEventHandler.cpp: Added.
+        (WebKit):
+        (BlackBerry::WebKit::hasMouseMoveListener):
+        (BlackBerry::WebKit::hasTouchListener):
+        (BlackBerry::WebKit::elementExpectsMouseEvents):
+        (BlackBerry::WebKit::shouldConvertTouchToMouse):
+        (BlackBerry::WebKit::TouchEventHandler::TouchEventHandler):
+        (BlackBerry::WebKit::TouchEventHandler::~TouchEventHandler):
+        (BlackBerry::WebKit::TouchEventHandler::shouldSuppressMouseDownOnTouchDown):
+        [BlackBerry] Upstream touch handling related classes
+        https://bugs.webkit.org/show_bug.cgi?id=78509
+
+        Reviewed by Rob Buis.
+
+        InRegionScrollableArea specializes the BlackBerry specific ScrollViewBase,
+        working as a read-only wrapper object for a scrollable areas in the page.
+        It is used in our client side to control in-region scrolling (scrollable boxes,
+        inner frames, etc).
+
+        Initial upstream.
+
+        * WebKitSupport/InRegionScrollableArea.cpp: Added.
+        (WebKit):
+        (BlackBerry::WebKit::InRegionScrollableArea::InRegionScrollableArea):
+        (BlackBerry::WebKit::InRegionScrollableArea::calculateMinimumScrollPosition):
+        (BlackBerry::WebKit::InRegionScrollableArea::calculateMaximumScrollPosition):
+        (BlackBerry::WebKit::InRegionScrollableArea::layer):
+        (BlackBerry):
+        * WebKitSupport/InRegionScrollableArea.h: Added.
+        (WebCore):
+        (WebKit):
+        (InRegionScrollableArea):
+
+2012-02-16  Antonio Gomes  <agomes@rim.com>
+
+        (BlackBerry::WebKit::TouchEventHandler::touchEventCancel):
+        (BlackBerry::WebKit::TouchEventHandler::touchHoldEvent):
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+        (BlackBerry::WebKit::TouchEventHandler::spellCheck):
+        (BlackBerry::WebKit::TouchEventHandler::handleFatFingerPressed):
+        (BlackBerry::WebKit::elementForTapHighlight):
+        (BlackBerry::WebKit::TouchEventHandler::drawTapHighlight):
+        * blackberry/WebKitSupport/TouchEventHandler.h: Added.
+        (WebCore):
+        (WebKit):
+        (TouchEventHandler):
+        (BlackBerry::WebKit::TouchEventHandler::lastFatFingersResult):
+        (BlackBerry::WebKit::TouchEventHandler::resetLastFatFingersResult):
+

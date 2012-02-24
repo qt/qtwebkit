@@ -501,7 +501,7 @@ row
 row-reverse
 column
 column-reverse
-// nowrap
+// none
 // wrap
 wrap-reverse
 
@@ -802,6 +802,12 @@ no-limit
 manual
 // auto
 
+#if defined(ENABLE_OVERFLOW_SCROLLING)
+// -webkit-overflow-scrolling
+// auto
+touch
+#endif
+
 // -webkit-writing-mode
 // SVG compatibility
 lr
@@ -881,6 +887,9 @@ maximum
 // -webkit-wrap-through
 wrap
 // none
+
+// -webkit-line-align
+edges
 
 #if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
 // -webkit-filter

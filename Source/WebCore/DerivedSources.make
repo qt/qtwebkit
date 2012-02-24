@@ -28,6 +28,7 @@
 
 VPATH = \
     $(WebCore) \
+    $(WebCore)/Modules/geolocation \
     $(WebCore)/bindings/generic \
     $(WebCore)/bindings/js \
     $(WebCore)/bindings/objc \
@@ -53,6 +54,12 @@ VPATH = \
 #
 
 BINDING_IDLS = \
+    $(WebCore)/Modules/geolocation/Geolocation.idl \
+    $(WebCore)/Modules/geolocation/Geoposition.idl \
+    $(WebCore)/Modules/geolocation/NavigatorGeolocation.idl \
+    $(WebCore)/Modules/geolocation/PositionCallback.idl \
+    $(WebCore)/Modules/geolocation/PositionError.idl \
+    $(WebCore)/Modules/geolocation/PositionErrorCallback.idl \
     $(WebCore)/css/CSSCharsetRule.idl \
     $(WebCore)/css/CSSFontFaceRule.idl \
     $(WebCore)/css/CSSImportRule.idl \
@@ -151,6 +158,7 @@ BINDING_IDLS = \
     $(WebCore)/fileapi/Blob.idl \
     $(WebCore)/fileapi/DOMFileSystem.idl \
     $(WebCore)/fileapi/DOMFileSystemSync.idl \
+    $(WebCore)/fileapi/DOMWindowFileSystem.idl \
     $(WebCore)/fileapi/DirectoryEntry.idl \
     $(WebCore)/fileapi/DirectoryEntrySync.idl \
     $(WebCore)/fileapi/DirectoryReader.idl \
@@ -183,6 +191,7 @@ BINDING_IDLS = \
     $(WebCore)/html/DOMSettableTokenList.idl \
     $(WebCore)/html/DOMTokenList.idl \
     $(WebCore)/html/DOMURL.idl \
+    $(WebCore)/html/DOMWindowHTML.idl \
     $(WebCore)/html/HTMLAllCollection.idl \
     $(WebCore)/html/HTMLAnchorElement.idl \
     $(WebCore)/html/HTMLAppletElement.idl \
@@ -260,9 +269,6 @@ BINDING_IDLS = \
     $(WebCore)/html/MediaController.idl \
     $(WebCore)/html/MediaError.idl \
     $(WebCore)/html/TextMetrics.idl \
-    $(WebCore)/html/TextTrack.idl \
-    $(WebCore)/html/TextTrackCue.idl \
-    $(WebCore)/html/TextTrackCueList.idl \
     $(WebCore)/html/TimeRanges.idl \
     $(WebCore)/html/ValidityState.idl \
     $(WebCore)/html/canvas/ArrayBuffer.idl \
@@ -271,6 +277,7 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/CanvasPattern.idl \
     $(WebCore)/html/canvas/CanvasRenderingContext.idl \
     $(WebCore)/html/canvas/CanvasRenderingContext2D.idl \
+    $(WebCore)/html/canvas/DOMWindowWebGL.idl \
     $(WebCore)/html/canvas/DataView.idl \
     $(WebCore)/html/canvas/Float32Array.idl \
     $(WebCore)/html/canvas/Float64Array.idl \
@@ -300,6 +307,9 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/WebGLVertexArrayObjectOES.idl \
     $(WebCore)/html/shadow/HTMLContentElement.idl \
     $(WebCore)/html/shadow/HTMLShadowElement.idl \
+    $(WebCore)/html/track/TextTrack.idl \
+    $(WebCore)/html/track/TextTrackCue.idl \
+    $(WebCore)/html/track/TextTrackCueList.idl \
     $(WebCore)/html/track/TextTrackList.idl \
     $(WebCore)/html/track/TrackEvent.idl \
     $(WebCore)/inspector/InjectedScriptHost.idl \
@@ -317,8 +327,6 @@ BINDING_IDLS = \
     $(WebCore)/page/DOMSelection.idl \
     $(WebCore)/page/DOMWindow.idl \
     $(WebCore)/page/EventSource.idl \
-    $(WebCore)/page/Geolocation.idl \
-    $(WebCore)/page/Geoposition.idl \
     $(WebCore)/page/History.idl \
     $(WebCore)/page/Location.idl \
     $(WebCore)/page/MemoryInfo.idl \
@@ -326,9 +334,6 @@ BINDING_IDLS = \
     $(WebCore)/page/Performance.idl \
     $(WebCore)/page/PerformanceNavigation.idl \
     $(WebCore)/page/PerformanceTiming.idl \
-    $(WebCore)/page/PositionCallback.idl \
-    $(WebCore)/page/PositionError.idl \
-    $(WebCore)/page/PositionErrorCallback.idl \
     $(WebCore)/page/Screen.idl \
     $(WebCore)/page/SpeechInputEvent.idl \
     $(WebCore)/page/SpeechInputResult.idl \
@@ -374,6 +379,7 @@ BINDING_IDLS = \
     $(WebCore)/storage/StorageInfoErrorCallback.idl \
     $(WebCore)/storage/StorageInfoQuotaCallback.idl \
     $(WebCore)/storage/StorageInfoUsageCallback.idl \
+    $(WebCore)/svg/DOMWindowSVG.idl \
     $(WebCore)/svg/ElementTimeControl.idl \
     $(WebCore)/svg/SVGAElement.idl \
     $(WebCore)/svg/SVGAltGlyphDefElement.idl \
@@ -559,12 +565,14 @@ BINDING_IDLS = \
     $(WebCore)/websockets/DOMWindowWebSocket.idl \
     $(WebCore)/websockets/WebSocket.idl \
     $(WebCore)/workers/AbstractWorker.idl \
+    $(WebCore)/workers/DOMWindowWorker.idl \
     $(WebCore)/workers/DedicatedWorkerContext.idl \
     $(WebCore)/workers/SharedWorker.idl \
     $(WebCore)/workers/SharedWorkerContext.idl \
     $(WebCore)/workers/Worker.idl \
     $(WebCore)/workers/WorkerContext.idl \
     $(WebCore)/workers/WorkerLocation.idl \
+    $(WebCore)/xml/DOMWindowXML.idl \
     $(WebCore)/xml/DOMParser.idl \
     $(WebCore)/xml/XMLHttpRequest.idl \
     $(WebCore)/xml/XMLHttpRequestException.idl \
@@ -911,15 +919,16 @@ JS_BINDINGS_SCRIPTS = $(GENERATE_SCRIPTS) bindings/scripts/CodeGeneratorJS.pm
 SUPPLEMENTAL_DEPENDENCY_FILE = ./supplemental_dependency.tmp
 IDL_FILES_TMP = ./idl_files.tmp
 ADDITIONAL_IDLS = $(WebCore)/inspector/JavaScriptCallFrame.idl
+IDL_ATTRIBUTES_FILE = $(WebCore)/bindings/scripts/IDLAttributes.txt
 
 # The following two lines get a space character stored in a variable.
 # See <http://blog.jgc.org/2007/06/escaping-comma-and-space-in-gnu-make.html>.
 space :=
 space +=
 
-$(SUPPLEMENTAL_DEPENDENCY_FILE) : $(RESOLVE_SUPPLEMENTAL_SCRIPTS) $(BINDING_IDLS) $(ADDITIONAL_IDLS)
+$(SUPPLEMENTAL_DEPENDENCY_FILE) : $(RESOLVE_SUPPLEMENTAL_SCRIPTS) $(BINDING_IDLS) $(ADDITIONAL_IDLS) $(IDL_ATTRIBUTES_FILE)
 	printf "$(subst $(space),,$(patsubst %,%\n,$(BINDING_IDLS) $(ADDITIONAL_IDLS)))" > $(IDL_FILES_TMP)
-	$(call resolve_supplemental_script, $(RESOLVE_SUPPLEMENTAL_SCRIPTS)) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --idlFilesList $(IDL_FILES_TMP) --supplementalDependencyFile $@
+	$(call resolve_supplemental_script, $(RESOLVE_SUPPLEMENTAL_SCRIPTS)) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --idlFilesList $(IDL_FILES_TMP) --supplementalDependencyFile $@ --idlAttributesFile $(IDL_ATTRIBUTES_FILE)
 	rm -f $(IDL_FILES_TMP)
 
 JS%.h : %.idl $(JS_BINDINGS_SCRIPTS) $(SUPPLEMENTAL_DEPENDENCY_FILE)

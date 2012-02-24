@@ -176,6 +176,7 @@ public:
     SpeculativeJIT(JITCompiler&);
 
     bool compile();
+    void createOSREntries();
     void linkOSREntries(LinkBuffer&);
 
     Node& at(NodeIndex nodeIndex)
@@ -462,7 +463,7 @@ private:
 
         if (registerFormat == DataFormatCell) {
             ASSERT(info.gpr() == target);
-            if (node.isConstant()) {
+            if (node.hasConstant()) {
                 JSValue value = valueOfJSConstant(nodeIndex);
                 ASSERT(value.isCell());
                 m_jit.move(ImmPtr(value.asCell()), target);
@@ -734,15 +735,15 @@ private:
     bool isKnownNotCell(NodeIndex);
     
     // Checks/accessors for constant values.
-    bool isConstant(NodeIndex nodeIndex) { return m_jit.isConstant(nodeIndex); }
-    bool isJSConstant(NodeIndex nodeIndex) { return m_jit.isJSConstant(nodeIndex); }
-    bool isInt32Constant(NodeIndex nodeIndex) { return m_jit.isInt32Constant(nodeIndex); }
-    bool isDoubleConstant(NodeIndex nodeIndex) { return m_jit.isDoubleConstant(nodeIndex); }
-    bool isNumberConstant(NodeIndex nodeIndex) { return m_jit.isNumberConstant(nodeIndex); }
-    bool isBooleanConstant(NodeIndex nodeIndex) { return m_jit.isBooleanConstant(nodeIndex); }
-    bool isFunctionConstant(NodeIndex nodeIndex) { return m_jit.isFunctionConstant(nodeIndex); }
-    int32_t valueOfInt32Constant(NodeIndex nodeIndex) { return m_jit.valueOfInt32Constant(nodeIndex); }
-    double valueOfNumberConstant(NodeIndex nodeIndex) { return m_jit.valueOfNumberConstant(nodeIndex); }
+    bool isConstant(NodeIndex nodeIndex) { return m_jit.graph().isConstant(nodeIndex); }
+    bool isJSConstant(NodeIndex nodeIndex) { return m_jit.graph().isJSConstant(nodeIndex); }
+    bool isInt32Constant(NodeIndex nodeIndex) { return m_jit.graph().isInt32Constant(nodeIndex); }
+    bool isDoubleConstant(NodeIndex nodeIndex) { return m_jit.graph().isDoubleConstant(nodeIndex); }
+    bool isNumberConstant(NodeIndex nodeIndex) { return m_jit.graph().isNumberConstant(nodeIndex); }
+    bool isBooleanConstant(NodeIndex nodeIndex) { return m_jit.graph().isBooleanConstant(nodeIndex); }
+    bool isFunctionConstant(NodeIndex nodeIndex) { return m_jit.graph().isFunctionConstant(nodeIndex); }
+    int32_t valueOfInt32Constant(NodeIndex nodeIndex) { return m_jit.graph().valueOfInt32Constant(nodeIndex); }
+    double valueOfNumberConstant(NodeIndex nodeIndex) { return m_jit.graph().valueOfNumberConstant(nodeIndex); }
     int32_t valueOfNumberConstantAsInt32(NodeIndex nodeIndex)
     {
         if (isInt32Constant(nodeIndex))
@@ -752,9 +753,9 @@ private:
 #if USE(JSVALUE32_64)
     void* addressOfDoubleConstant(NodeIndex nodeIndex) { return m_jit.addressOfDoubleConstant(nodeIndex); }
 #endif
-    JSValue valueOfJSConstant(NodeIndex nodeIndex) { return m_jit.valueOfJSConstant(nodeIndex); }
-    bool valueOfBooleanConstant(NodeIndex nodeIndex) { return m_jit.valueOfBooleanConstant(nodeIndex); }
-    JSFunction* valueOfFunctionConstant(NodeIndex nodeIndex) { return m_jit.valueOfFunctionConstant(nodeIndex); }
+    JSValue valueOfJSConstant(NodeIndex nodeIndex) { return m_jit.graph().valueOfJSConstant(nodeIndex); }
+    bool valueOfBooleanConstant(NodeIndex nodeIndex) { return m_jit.graph().valueOfBooleanConstant(nodeIndex); }
+    JSFunction* valueOfFunctionConstant(NodeIndex nodeIndex) { return m_jit.graph().valueOfFunctionConstant(nodeIndex); }
     bool isNullConstant(NodeIndex nodeIndex)
     {
         if (!isConstant(nodeIndex))
@@ -1407,7 +1408,7 @@ private:
     JITCompiler::Call appendCallWithExceptionCheck(const FunctionPtr& function)
     {
         CodeOrigin codeOrigin = at(m_compileIndex).codeOrigin;
-        CallBeginToken token = m_jit.beginCall(codeOrigin);
+        CallBeginToken token = m_jit.beginCall();
         JITCompiler::Call call = m_jit.appendCall(function);
         m_jit.addExceptionCheck(call, codeOrigin, token);
         return call;
@@ -1466,6 +1467,161 @@ private:
         return call;
     }
 #endif
+    
+    void branchDouble(JITCompiler::DoubleCondition cond, FPRReg left, FPRReg right, BlockIndex destination)
+    {
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchDouble(cond, left, right), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchDouble(JITCompiler::invert(cond), left, right);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    void branchDoubleNonZero(FPRReg value, FPRReg scratch, BlockIndex destination)
+    {
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchDoubleNonZero(value, scratch), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchDoubleZeroOrNaN(value, scratch);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T, typename U>
+    void branch32(JITCompiler::RelationalCondition cond, T left, U right, BlockIndex destination)
+    {
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branch32(cond, left, right), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branch32(JITCompiler::invert(cond), left, right);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T, typename U>
+    void branchTest32(JITCompiler::ResultCondition cond, T value, U mask, BlockIndex destination)
+    {
+        ASSERT(JITCompiler::isInvertible(cond));
+        
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchTest32(cond, value, mask), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchTest32(JITCompiler::invert(cond), value, mask);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T>
+    void branchTest32(JITCompiler::ResultCondition cond, T value, BlockIndex destination)
+    {
+        ASSERT(JITCompiler::isInvertible(cond));
+        
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchTest32(cond, value), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchTest32(JITCompiler::invert(cond), value);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T, typename U>
+    void branchPtr(JITCompiler::RelationalCondition cond, T left, U right, BlockIndex destination)
+    {
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchPtr(cond, left, right), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchPtr(JITCompiler::invert(cond), left, right);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T, typename U>
+    void branchTestPtr(JITCompiler::ResultCondition cond, T value, U mask, BlockIndex destination)
+    {
+        ASSERT(JITCompiler::isInvertible(cond));
+        
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchTestPtr(cond, value, mask), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchTestPtr(JITCompiler::invert(cond), value, mask);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T>
+    void branchTestPtr(JITCompiler::ResultCondition cond, T value, BlockIndex destination)
+    {
+        ASSERT(JITCompiler::isInvertible(cond));
+        
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchTestPtr(cond, value), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchTestPtr(JITCompiler::invert(cond), value);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T, typename U>
+    void branchTest8(JITCompiler::ResultCondition cond, T value, U mask, BlockIndex destination)
+    {
+        ASSERT(JITCompiler::isInvertible(cond));
+        
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchTest8(cond, value, mask), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchTest8(JITCompiler::invert(cond), value, mask);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    template<typename T>
+    void branchTest8(JITCompiler::ResultCondition cond, T value, BlockIndex destination)
+    {
+        ASSERT(JITCompiler::isInvertible(cond));
+        
+        if (!haveEdgeCodeToEmit(destination))
+            return addBranch(m_jit.branchTest8(cond, value), destination);
+        
+        JITCompiler::Jump notTaken = m_jit.branchTest8(JITCompiler::invert(cond), value);
+        emitEdgeCode(destination);
+        addBranch(m_jit.jump(), destination);
+        notTaken.link(&m_jit);
+    }
+    
+    enum FallThroughMode {
+        AtFallThroughPoint,
+        ForceJump
+    };
+    void jump(BlockIndex destination, FallThroughMode fallThroughMode = AtFallThroughPoint)
+    {
+        if (haveEdgeCodeToEmit(destination))
+            emitEdgeCode(destination);
+        if (destination == m_block + 1
+            && fallThroughMode == AtFallThroughPoint)
+            return;
+        addBranch(m_jit.jump(), destination);
+    }
+    
+    inline bool haveEdgeCodeToEmit(BlockIndex)
+    {
+        return DFG_ENABLE_EDGE_CODE_VERIFICATION;
+    }
+    void emitEdgeCode(BlockIndex destination)
+    {
+        if (!DFG_ENABLE_EDGE_CODE_VERIFICATION)
+            return;
+        m_jit.move(Imm32(destination), GPRInfo::regT0);
+    }
 
     void addBranch(const MacroAssembler::Jump& jump, BlockIndex destination)
     {
@@ -1565,7 +1721,7 @@ private:
     template<typename T>
     void emitAllocateJSFinalObject(T structure, GPRReg resultGPR, GPRReg scratchGPR, MacroAssembler::JumpList& slowPath)
     {
-        MarkedAllocator* allocator = &m_jit.globalData()->heap.allocatorForObject(sizeof(JSFinalObject));
+        MarkedAllocator* allocator = &m_jit.globalData()->heap.allocatorForObjectWithoutDestructor(sizeof(JSFinalObject));
         
         m_jit.loadPtr(&allocator->m_firstFreeCell, resultGPR);
         slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, resultGPR));
@@ -1603,7 +1759,7 @@ private:
     {
         if (!m_compileOkay)
             return;
-        m_jit.codeBlock()->appendOSRExit(OSRExit(kind, jsValueSource, m_jit.valueProfileFor(nodeIndex), jumpToFail, this));
+        m_jit.codeBlock()->appendOSRExit(OSRExit(kind, jsValueSource, m_jit.graph().methodOfGettingAValueProfileFor(nodeIndex), jumpToFail, this));
     }
     void speculationCheck(ExitKind kind, JSValueSource jsValueSource, NodeUse nodeUse, MacroAssembler::Jump jumpToFail)
     {
@@ -1626,7 +1782,7 @@ private:
         if (!m_compileOkay)
             return;
         m_jit.codeBlock()->appendSpeculationRecovery(recovery);
-        m_jit.codeBlock()->appendOSRExit(OSRExit(kind, jsValueSource, m_jit.valueProfileFor(nodeIndex), jumpToFail, this, m_jit.codeBlock()->numberOfSpeculationRecoveries()));
+        m_jit.codeBlock()->appendOSRExit(OSRExit(kind, jsValueSource, m_jit.graph().methodOfGettingAValueProfileFor(nodeIndex), jumpToFail, this, m_jit.codeBlock()->numberOfSpeculationRecoveries()));
     }
     void speculationCheck(ExitKind kind, JSValueSource jsValueSource, NodeUse nodeUse, MacroAssembler::Jump jumpToFail, const SpeculationRecovery& recovery)
     {
@@ -1637,7 +1793,7 @@ private:
     void terminateSpeculativeExecution(ExitKind kind, JSValueRegs jsValueRegs, NodeIndex nodeIndex)
     {
 #if DFG_ENABLE(DEBUG_VERBOSE)
-        fprintf(stderr, "SpeculativeJIT was terminated.\n");
+        dataLog("SpeculativeJIT was terminated.\n");
 #endif
         if (!m_compileOkay)
             return;
@@ -1699,6 +1855,8 @@ private:
     RegisterBank<FPRInfo> m_fprs;
 
     Vector<MacroAssembler::Label> m_blockHeads;
+    Vector<MacroAssembler::Label> m_osrEntryHeads;
+    
     struct BranchRecord {
         BranchRecord(MacroAssembler::Jump jump, BlockIndex destination)
             : jump(jump)
@@ -2329,7 +2487,7 @@ inline SpeculativeJIT::SpeculativeJIT(JITCompiler& jit)
     , m_arguments(jit.codeBlock()->numParameters())
     , m_variables(jit.graph().m_localVars)
     , m_lastSetOperand(std::numeric_limits<int>::max())
-    , m_state(m_jit.codeBlock(), m_jit.graph())
+    , m_state(m_jit.graph())
 {
 }
 

@@ -1288,8 +1288,8 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexWrap e)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
-    case FlexNoWrap:
-        m_value.ident = CSSValueNowrap;
+    case FlexWrapNone:
+        m_value.ident = CSSValueNone;
         break;
     case FlexWrap:
         m_value.ident = CSSValueWrap;
@@ -1303,15 +1303,15 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexWrap e)
 template<> inline CSSPrimitiveValue::operator EFlexWrap() const
 {
     switch (m_value.ident) {
-    case CSSValueNowrap:
-        return FlexNoWrap;
+    case CSSValueNone:
+        return FlexWrapNone;
     case CSSValueWrap:
         return FlexWrap;
     case CSSValueWrapReverse:
         return FlexWrapReverse;
     default:
         ASSERT_NOT_REACHED();
-        return FlexNoWrap;
+        return FlexWrapNone;
     }
 }
 
@@ -3158,35 +3158,62 @@ template<> inline CSSPrimitiveValue::operator Hyphens() const
     }
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineGridSnap gridSnap)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineSnap gridSnap)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (gridSnap) {
-    case LineGridSnapNone:
+    case LineSnapNone:
         m_value.ident = CSSValueNone;
         break;
-    case LineGridSnapBaseline:
+    case LineSnapBaseline:
         m_value.ident = CSSValueBaseline;
         break;
-    case LineGridSnapContain:
+    case LineSnapContain:
         m_value.ident = CSSValueContain;
         break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator LineGridSnap() const
+template<> inline CSSPrimitiveValue::operator LineSnap() const
 {
     switch (m_value.ident) {
     case CSSValueNone:
-        return LineGridSnapNone;
+        return LineSnapNone;
     case CSSValueBaseline:
-        return LineGridSnapBaseline;
+        return LineSnapBaseline;
     case CSSValueContain:
-        return LineGridSnapContain;
+        return LineSnapContain;
     default:
         ASSERT_NOT_REACHED();
-        return LineGridSnapNone;
+        return LineSnapNone;
+    }
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineAlign lineAlign)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (lineAlign) {
+    case LineAlignNone:
+        m_value.ident = CSSValueNone;
+        break;
+    case LineAlignEdges:
+        m_value.ident = CSSValueEdges;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator LineAlign() const
+{
+    switch (m_value.ident) {
+    case CSSValueNone:
+        return LineAlignNone;
+    case CSSValueEdges:
+        return LineAlignEdges;
+    default:
+        ASSERT_NOT_REACHED();
+        return LineAlignNone;
     }
 }
 

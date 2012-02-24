@@ -26,13 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from webkitpy.tool.bot.patchanalysistask import PatchAnalysisTask, PatchAnalysisTaskDelegate
-
-
-class UnableToApplyPatch(Exception):
-    def __init__(self, patch):
-        Exception.__init__(self)
-        self.patch = patch
+from webkitpy.tool.bot.patchanalysistask import PatchAnalysisTask, PatchAnalysisTaskDelegate, UnableToApplyPatch
 
 
 class EarlyWarningSystemTaskDelegate(PatchAnalysisTaskDelegate):

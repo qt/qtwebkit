@@ -26,7 +26,7 @@ module core {
         JSCustomPushEventHandlerScope,
         JSCustomIsReachable,
         JSCustomFinalize,
-        JSCustomToJS,
+        CustomToJSObject,
         EventTarget,
         JSGenerateToNativeObject,
         JSInlineGetOwnPropertySlot,
@@ -51,10 +51,10 @@ module core {
         const unsigned short      DOCUMENT_FRAGMENT_NODE         = 11;
         const unsigned short      NOTATION_NODE                  = 12;
 
-        readonly attribute [ConvertNullStringTo=Null] DOMString        nodeName;
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString        nodeName;
 
                  // FIXME: the spec says this can also raise on retrieval.
-                 attribute [ConvertNullStringTo=Null, TreatNullAs=NullString] DOMString        nodeValue
+                 attribute [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] DOMString        nodeValue
                      setter raises(DOMException);
 
         readonly attribute unsigned short   nodeType;
@@ -67,46 +67,46 @@ module core {
         readonly attribute NamedNodeMap     attributes;
         readonly attribute Document         ownerDocument;
 
-        [ObjCLegacyUnnamedParameters, Custom] Node insertBefore(in [Return] Node newChild,
-                                                 in Node refChild)
+        [ObjCLegacyUnnamedParameters, Custom] Node insertBefore(in [CustomReturn] Node newChild,
+                                                                in Node refChild)
             raises(DOMException);
         [ObjCLegacyUnnamedParameters, Custom] Node replaceChild(in Node newChild,
-                                                 in [Return] Node oldChild)
-            raises(DOMExceptionJSC);
-        [Custom] Node               removeChild(in [Return] Node oldChild)
+                                                                in [CustomReturn] Node oldChild)
             raises(DOMException);
-        [Custom] Node               appendChild(in [Return] Node newChild)
+        [Custom] Node               removeChild(in [CustomReturn] Node oldChild)
+            raises(DOMException);
+        [Custom] Node               appendChild(in [CustomReturn] Node newChild)
             raises(DOMException);
 
         boolean            hasChildNodes();
-        Node               cloneNode(in [Optional=CallWithDefaultValue] boolean deep);
+        Node               cloneNode(in [Optional=DefaultIsUndefined] boolean deep);
         void               normalize();
 
         // Introduced in DOM Level 2:
 
-        [ObjCLegacyUnnamedParameters] boolean isSupported(in [Optional=CallWithDefaultValue] DOMString feature, 
-                                           in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString version);
+        [ObjCLegacyUnnamedParameters] boolean isSupported(in [Optional=DefaultIsUndefined] DOMString feature, 
+                                           in [TreatNullAs=NullString,Optional=DefaultIsUndefined] DOMString version);
 
-        readonly attribute [ConvertNullStringTo=Null] DOMString        namespaceURI;
-                 attribute [ConvertNullStringTo=Null, TreatNullAs=NullString] DOMString        prefix
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString        namespaceURI;
+                 attribute [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] DOMString        prefix
                      setter raises(DOMException);
-        readonly attribute [ConvertNullStringTo=Null] DOMString        localName;
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString        localName;
 
         boolean            hasAttributes();
 
         // Introduced in DOM Level 3:
 
-        readonly attribute [ConvertNullStringTo=Null] DOMString       baseURI;
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString       baseURI;
 
                  // FIXME: the spec says this can also raise on retrieval.
-                 attribute [ConvertNullStringTo=Null, TreatNullAs=NullString] DOMString       textContent
+                 attribute [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] DOMString       textContent
                      setter raises(DOMException);
 
-        boolean            isSameNode(in [Optional=CallWithDefaultValue] Node other);
-        boolean            isEqualNode(in [Optional=CallWithDefaultValue] Node other);
-        [ConvertNullStringTo=Null] DOMString          lookupPrefix(in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString namespaceURI);
-        boolean            isDefaultNamespace(in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString namespaceURI);
-        [ConvertNullStringTo=Null] DOMString          lookupNamespaceURI(in [TreatNullAs=NullString,Optional=CallWithDefaultValue] DOMString prefix);
+        boolean            isSameNode(in [Optional=DefaultIsUndefined] Node other);
+        boolean            isEqualNode(in [Optional=DefaultIsUndefined] Node other);
+        [TreatReturnedNullStringAs=Null] DOMString          lookupPrefix(in [TreatNullAs=NullString,Optional=DefaultIsUndefined] DOMString namespaceURI);
+        boolean            isDefaultNamespace(in [TreatNullAs=NullString,Optional=DefaultIsUndefined] DOMString namespaceURI);
+        [TreatReturnedNullStringAs=Null] DOMString          lookupNamespaceURI(in [TreatNullAs=NullString,Optional=DefaultIsUndefined] DOMString prefix);
 
         // DocumentPosition
         const unsigned short      DOCUMENT_POSITION_DISCONNECTED = 0x01;
@@ -116,10 +116,10 @@ module core {
         const unsigned short      DOCUMENT_POSITION_CONTAINED_BY = 0x10;
         const unsigned short      DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
 
-        unsigned short     compareDocumentPosition(in [Optional=CallWithDefaultValue] Node other);
+        unsigned short     compareDocumentPosition(in [Optional=DefaultIsUndefined] Node other);
 
         // Introduced in DOM4
-        boolean contains(in [Optional=CallWithDefaultValue] Node other);
+        boolean contains(in [Optional=DefaultIsUndefined] Node other);
 
 #if 0
         DOMObject          getFeature(in DOMString feature, 

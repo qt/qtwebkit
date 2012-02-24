@@ -33,7 +33,7 @@
 
 namespace JSC { namespace DFG {
 
-OSRExit::OSRExit(ExitKind kind, JSValueSource jsValueSource, ValueProfile* valueProfile, MacroAssembler::Jump check, SpeculativeJIT* jit, unsigned recoveryIndex)
+OSRExit::OSRExit(ExitKind kind, JSValueSource jsValueSource, MethodOfGettingAValueProfile valueProfile, MacroAssembler::Jump check, SpeculativeJIT* jit, unsigned recoveryIndex)
     : m_jsValueSource(jsValueSource)
     , m_valueProfile(valueProfile)
     , m_check(check)
@@ -67,7 +67,7 @@ bool OSRExit::considerAddingAsFrequentExitSiteSlow(CodeBlock* dfgCodeBlock, Code
     if (static_cast<double>(m_count) / dfgCodeBlock->speculativeFailCounter() <= Options::osrExitProminenceForFrequentExitSite)
         return false;
     
-    return AssemblyHelpers::baselineCodeBlockForOriginAndBaselineCodeBlock(m_codeOrigin, profiledCodeBlock)->addFrequentExitSite(FrequentExitSite(m_codeOrigin.bytecodeIndex, m_kind));
+    return baselineCodeBlockForOriginAndBaselineCodeBlock(m_codeOrigin, profiledCodeBlock)->addFrequentExitSite(FrequentExitSite(m_codeOrigin.bytecodeIndex, m_kind));
 }
 
 } } // namespace JSC::DFG

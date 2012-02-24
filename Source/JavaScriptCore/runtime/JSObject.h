@@ -49,6 +49,7 @@ namespace JSC {
     class GetterSetter;
     class HashEntry;
     class InternalFunction;
+    class LLIntOffsetsExtractor;
     class MarkedBlock;
     class PropertyDescriptor;
     class PropertyNameArray;
@@ -84,8 +85,6 @@ namespace JSC {
     public:
         typedef JSCell Base;
 
-        JS_EXPORT_PRIVATE static void destroy(JSCell*);
-
         JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
         JS_EXPORT_PRIVATE static UString className(const JSObject*);
@@ -106,6 +105,8 @@ namespace JSC {
         static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier& propertyName, PropertySlot&);
         JS_EXPORT_PRIVATE static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
         JS_EXPORT_PRIVATE static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);
+
+        bool allowsAccessFrom(ExecState*);
 
         JS_EXPORT_PRIVATE static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
         JS_EXPORT_PRIVATE static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
@@ -264,6 +265,8 @@ namespace JSC {
         JSObject(JSGlobalData&, Structure*, PropertyStorage inlineStorage);
 
     private:
+        friend class LLIntOffsetsExtractor;
+        
         // Nobody should ever ask any of these questions on something already known to be a JSObject.
         using JSCell::isAPIValueWrapper;
         using JSCell::isGetterSetter;
@@ -323,8 +326,6 @@ COMPILE_ASSERT((JSFinalObject_inlineStorageCapacity >= JSNonFinalObject_inlineSt
             return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
         }
 
-        JS_EXPORT_PRIVATE static void destroy(JSCell*);
-
     protected:
         explicit JSNonFinalObject(JSGlobalData& globalData, Structure* structure)
             : JSObject(globalData, structure, m_inlineStorage)
@@ -343,6 +344,8 @@ COMPILE_ASSERT((JSFinalObject_inlineStorageCapacity >= JSNonFinalObject_inlineSt
         WriteBarrier<Unknown> m_inlineStorage[JSNonFinalObject_inlineStorageCapacity];
     };
 
+    class JSFinalObject;
+
     // JSFinalObject is a type of JSObject that contains sufficent internal
     // storage to fully make use of the colloctor cell containing it.
     class JSFinalObject : public JSObject {
@@ -351,13 +354,7 @@ COMPILE_ASSERT((JSFinalObject_inlineStorageCapacity >= JSNonFinalObject_inlineSt
     public:
         typedef JSObject Base;
 
-        static JSFinalObject* create(ExecState* exec, Structure* structure)
-        {
-            JSFinalObject* finalObject = new (NotNull, allocateCell<JSFinalObject>(*exec->heap())) JSFinalObject(exec->globalData(), structure);
-            finalObject->finishCreation(exec->globalData());
-            return finalObject;
-        }
-
+        static JSFinalObject* create(ExecState*, Structure*);
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
         {
             return Structure::create(globalData, globalObject, prototype, TypeInfo(FinalObjectType, StructureFlags), &s_info);
@@ -374,9 +371,9 @@ COMPILE_ASSERT((JSFinalObject_inlineStorageCapacity >= JSNonFinalObject_inlineSt
             ASSERT(classInfo());
         }
 
-        static void destroy(JSCell*);
-
     private:
+        friend class LLIntOffsetsExtractor;
+        
         explicit JSFinalObject(JSGlobalData& globalData, Structure* structure)
             : JSObject(globalData, structure, m_inlineStorage)
         {
@@ -386,6 +383,13 @@ COMPILE_ASSERT((JSFinalObject_inlineStorageCapacity >= JSNonFinalObject_inlineSt
 
         WriteBarrierBase<Unknown> m_inlineStorage[JSFinalObject_inlineStorageCapacity];
     };
+
+inline JSFinalObject* JSFinalObject::create(ExecState* exec, Structure* structure)
+{
+    JSFinalObject* finalObject = new (NotNull, allocateCell<JSFinalObject>(*exec->heap())) JSFinalObject(exec->globalData(), structure);
+    finalObject->finishCreation(exec->globalData());
+    return finalObject;
+}
 
 inline bool isJSFinalObject(JSCell* cell)
 {
@@ -489,19 +493,6 @@ inline JSValue JSObject::prototype() const
     return structure()->storedPrototype();
 }
 
-inline bool JSObject::setPrototypeWithCycleCheck(JSGlobalData& globalData, JSValue prototype)
-{
-    JSValue nextPrototypeValue = prototype;
-    while (nextPrototypeValue && nextPrototypeValue.isObject()) {
-        JSObject* nextPrototype = asObject(nextPrototypeValue)->unwrappedObject();
-        if (nextPrototype == this)
-            return false;
-        nextPrototypeValue = nextPrototype->prototype();
-    }
-    setPrototype(globalData, prototype);
-    return true;
-}
-
 inline void JSObject::setPrototype(JSGlobalData& globalData, JSValue prototype)
 {
     ASSERT(prototype);
@@ -550,12 +541,6 @@ ALWAYS_INLINE bool JSObject::inlineGetOwnPropertySlot(ExecState* exec, const Ide
             fillGetterPropertySlot(slot, location);
         else
             slot.setValue(this, location->get(), offsetForLocation(location));
-        return true;
-    }
-
-    // non-standard Netscape extension
-    if (propertyName == exec->propertyNames().underscoreProto) {
-        slot.setValue(prototype());
         return true;
     }
 
@@ -806,8 +791,6 @@ inline JSValue JSValue::get(ExecState* exec, const Identifier& propertyName, Pro
 {
     if (UNLIKELY(!isCell())) {
         JSObject* prototype = synthesizePrototype(exec);
-        if (propertyName == exec->propertyNames().underscoreProto)
-            return prototype;
         if (!prototype->getPropertySlot(exec, propertyName, slot))
             return jsUndefined();
         return slot.getValue(exec, propertyName);

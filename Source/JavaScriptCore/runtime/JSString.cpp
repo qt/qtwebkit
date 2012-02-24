@@ -189,7 +189,7 @@ void JSString::outOfMemory(ExecState* exec) const
 {
     for (size_t i = 0; i < s_maxInternalRopeLength && m_fibers[i]; ++i)
         m_fibers[i].clear();
-    ASSERT(!isRope());
+    ASSERT(isRope());
     ASSERT(m_value == UString());
     if (exec)
         throwOutOfMemoryError(exec);
@@ -253,10 +253,6 @@ bool JSString::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifie
     // This function should only be called by JSValue::get.
     if (thisObject->getStringPropertySlot(exec, propertyName, slot))
         return true;
-    if (propertyName == exec->propertyNames().underscoreProto) {
-        slot.setValue(exec->lexicalGlobalObject()->stringPrototype());
-        return true;
-    }
     slot.setBase(thisObject);
     JSObject* object;
     for (JSValue prototype = exec->lexicalGlobalObject()->stringPrototype(); !prototype.isNull(); prototype = object->prototype()) {

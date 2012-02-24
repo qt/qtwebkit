@@ -54,6 +54,8 @@ private:
     void recalculateItemCount();
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
 
     int m_start;
     unsigned m_itemCount;

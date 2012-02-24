@@ -27,8 +27,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-
 from webkitpy.tool import steps
 
 from webkitpy.common.checkout.changelog import ChangeLog
@@ -128,6 +126,14 @@ class LandCowboy(AbstractSequencedCommand):
 
     def _prepare_state(self, options, args, tool):
         options.check_style_filter = "-changelog"
+
+
+class CheckStyleLocal(AbstractSequencedCommand):
+    name = "check-style-local"
+    help_text = "Run check-webkit-style on the current working directory diff"
+    steps = [
+        steps.CheckStyle,
+    ]
 
 
 class AbstractPatchProcessingCommand(AbstractDeclarativeCommand):

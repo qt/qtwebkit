@@ -158,7 +158,7 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case RUN_IN:
     case COMPACT:
         // Only non-replaced block elements can become a region.
-        if (!style->regionThread().isEmpty() && doc->renderView())
+        if (doc->cssRegionsEnabled() && !style->regionThread().isEmpty() && doc->renderView())
             return new (arena) RenderRegion(node, doc->renderView()->ensureRenderFlowThreadWithName(style->regionThread()));
         return new (arena) RenderBlock(node);
     case LIST_ITEM:
@@ -266,6 +266,16 @@ static bool isBeforeAfterContentGeneratedByAncestor(RenderObject* renderer, Rend
     return false;
 }
 
+RenderTable* RenderObject::createAnonymousTable() const
+{
+    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyle(style());
+    newStyle->setDisplay(TABLE);
+
+    RenderTable* table = new (renderArena()) RenderTable(document() /* is anonymous */);
+    table->setStyle(newStyle.release());
+    return table;
+}
+
 void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
 {
     RenderObjectChildList* children = virtualChildren();
@@ -310,11 +320,7 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
         if (afterChild && afterChild->isAnonymous() && afterChild->isTable() && !afterChild->isBeforeContent())
             table = toRenderTable(afterChild);
         else {
-            table = new (renderArena()) RenderTable(document() /* is anonymous */);
-            RefPtr<RenderStyle> newStyle = RenderStyle::create();
-            newStyle->inheritFrom(style());
-            newStyle->setDisplay(TABLE);
-            table->setStyle(newStyle.release());
+            table = createAnonymousTable();
             addChild(table, beforeChild);
         }
         table->addChild(newChild);
@@ -328,6 +334,17 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
         if (textToTransform)
             toRenderText(newChild)->setText(textToTransform.release(), true);
     }
+
+    // SVG creates renderers for <g display="none">, as SVG requires children of hidden
+    // <g>s to have renderers - at least that's how our implementation works. Consider:
+    // <g display="none"><foreignObject><body style="position: relative">FOO...
+    // - requiresLayer() would return true for the <body>, creating a new RenderLayer
+    // - when the document is painted, both layers are painted. The <body> layer doesn't
+    //   know that it's inside a "hidden SVG subtree", and thus paints, even if it shouldn't.
+    // To avoid the problem alltogether, detect early if we're inside a hidden SVG subtree
+    // and stop creating layers at all for these cases - they're not used anyways.
+    if (newChild->hasLayer() && !layerCreationAllowedForSubtree())
+        toRenderBoxModelObject(newChild)->layer()->removeOnlyThisLayer();
 
     if (beforeChildHasBeforeAndAfterContent)
         children->updateBeforeAfterContent(this, BEFORE);
@@ -790,7 +807,7 @@ bool RenderObject::mustRepaintBackgroundOrBorder() const
     return false;
 }
 
-void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, LayoutUnit x1, LayoutUnit y1, LayoutUnit x2, LayoutUnit y2,
+void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, int y1, int x2, int y2,
                                       BoxSide side, Color color, EBorderStyle style,
                                       int adjacentWidth1, int adjacentWidth2, bool antialias)
 {
@@ -1110,7 +1127,7 @@ void RenderObject::addPDFURLRect(GraphicsContext* context, const LayoutRect& rec
     const AtomicString& href = static_cast<Element*>(n)->getAttribute(hrefAttr);
     if (href.isNull())
         return;
-    context->setURLForRect(n->document()->completeURL(href), rect);
+    context->setURLForRect(n->document()->completeURL(href), pixelSnappedIntRect(rect));
 }
 
 void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRect& paintRect)
@@ -1124,7 +1141,7 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRe
 
     Color outlineColor = styleToUse->visitedDependentColor(CSSPropertyOutlineColor);
 
-    LayoutUnit outlineOffset = styleToUse->outlineOffset();
+    int outlineOffset = styleToUse->outlineOffset();
 
     if (styleToUse->outlineStyleIsAuto() || hasOutlineAnnotation()) {
         if (!theme()->supportsFocusRing(styleToUse)) {
@@ -1136,10 +1153,10 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRe
     if (styleToUse->outlineStyleIsAuto() || styleToUse->outlineStyle() == BNONE)
         return;
 
-    LayoutRect inner = paintRect;
+    IntRect inner = pixelSnappedIntRect(paintRect);
     inner.inflate(outlineOffset);
 
-    LayoutRect outer = inner;
+    IntRect outer = pixelSnappedIntRect(inner);
     outer.inflate(outlineWidth);
 
     // FIXME: This prevents outlines from painting inside the object. See bug 12042
@@ -1161,14 +1178,14 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRe
         outlineColor = Color(outlineColor.red(), outlineColor.green(), outlineColor.blue());
     }
 
-    LayoutUnit leftOuter = outer.x();
-    LayoutUnit leftInner = inner.x();
-    LayoutUnit rightOuter = outer.maxX();
-    LayoutUnit rightInner = inner.maxX();
-    LayoutUnit topOuter = outer.y();
-    LayoutUnit topInner = inner.y();
-    LayoutUnit bottomOuter = outer.maxY();
-    LayoutUnit bottomInner = inner.maxY();
+    int leftOuter = outer.x();
+    int leftInner = inner.x();
+    int rightOuter = outer.maxX();
+    int rightInner = inner.maxX();
+    int topOuter = outer.y();
+    int topInner = inner.y();
+    int bottomOuter = outer.maxY();
+    int bottomInner = inner.maxY();
     
     drawLineForBoxSide(graphicsContext, leftOuter, topOuter, leftInner, bottomOuter, BSLeft, outlineColor, outlineStyle, outlineWidth, outlineWidth);
     drawLineForBoxSide(graphicsContext, leftOuter, topOuter, rightOuter, topInner, BSTop, outlineColor, outlineStyle, outlineWidth, outlineWidth);
@@ -1417,8 +1434,8 @@ bool RenderObject::repaintAfterLayoutIfNeeded(RenderBoxModelObject* repaintConta
         LayoutUnit shadowRight;
         style()->getBoxShadowHorizontalExtent(shadowLeft, shadowRight);
 
-        LayoutUnit borderRight = isBox() ? toRenderBox(this)->borderRight() : LayoutUnit(0);
-        LayoutUnit boxWidth = isBox() ? toRenderBox(this)->width() : LayoutUnit(0);
+        LayoutUnit borderRight = isBox() ? toRenderBox(this)->borderRight() : zeroLayoutUnit;
+        LayoutUnit boxWidth = isBox() ? toRenderBox(this)->width() : zeroLayoutUnit;
         LayoutUnit borderWidth = max<LayoutUnit>(-outlineStyle->outlineOffset(), max(borderRight, max<LayoutUnit>(style()->borderTopRightRadius().width().calcValue(boxWidth), style()->borderBottomRightRadius().width().calcValue(boxWidth)))) + max(ow, shadowRight);
         LayoutRect rightRect(newOutlineBox.x() + min(newOutlineBox.width(), oldOutlineBox.width()) - borderWidth,
             newOutlineBox.y(),
@@ -1436,8 +1453,8 @@ bool RenderObject::repaintAfterLayoutIfNeeded(RenderBoxModelObject* repaintConta
         LayoutUnit shadowBottom;
         style()->getBoxShadowVerticalExtent(shadowTop, shadowBottom);
 
-        LayoutUnit borderBottom = isBox() ? toRenderBox(this)->borderBottom() : LayoutUnit(0);
-        LayoutUnit boxHeight = isBox() ? toRenderBox(this)->height() : LayoutUnit(0);
+        LayoutUnit borderBottom = isBox() ? toRenderBox(this)->borderBottom() : zeroLayoutUnit;
+        LayoutUnit boxHeight = isBox() ? toRenderBox(this)->height() : zeroLayoutUnit;
         LayoutUnit borderHeight = max<LayoutUnit>(-outlineStyle->outlineOffset(), max(borderBottom, max<LayoutUnit>(style()->borderBottomLeftRadius().height().calcValue(boxHeight), style()->borderBottomRightRadius().height().calcValue(boxHeight)))) + max(ow, shadowBottom);
         LayoutRect bottomRect(newOutlineBox.x(),
             min(newOutlineBox.maxY(), oldOutlineBox.maxY()) - borderHeight,
@@ -1500,7 +1517,7 @@ void RenderObject::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
             RenderBox* boxParent = toRenderBox(o);
 
             LayoutRect repaintRect(rect);
-            repaintRect.move(-boxParent->layer()->scrolledContentOffset()); // For overflow:auto/scroll/hidden.
+            repaintRect.move(-boxParent->scrolledContentOffset()); // For overflow:auto/scroll/hidden.
 
             LayoutRect boxRect(LayoutPoint(), boxParent->layer()->size());
             rect = intersection(repaintRect, boxRect);
@@ -1931,6 +1948,12 @@ void RenderObject::propagateStyleToAnonymousChildren(bool blockChildrenOnly)
             if (child->style()->columnSpan())
                 newStyle->setColumnSpan(ColumnSpanAll);
         }
+
+        // Preserve the position style of anonymous block continuations as they can have relative position when
+        // they contain block descendants of relative positioned inlines.
+        if (child->isRelPositioned() && toRenderBlock(child)->isAnonymousBlockContinuation())
+            newStyle->setPosition(child->style()->position());
+
         newStyle->setDisplay(child->style()->display());
         child->setStyle(newStyle.release());
     }
@@ -2006,7 +2029,7 @@ void RenderObject::mapLocalToContainer(RenderBoxModelObject* repaintContainer, b
         transformState.move(columnOffset);
 
     if (o->hasOverflowClip())
-        transformState.move(-toRenderBox(o)->layer()->scrolledContentOffset());
+        transformState.move(-toRenderBox(o)->scrolledContentOffset());
 
     o->mapLocalToContainer(repaintContainer, fixed, useTransforms, transformState, wasFixed);
 }
@@ -2017,7 +2040,7 @@ void RenderObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, Trans
     if (o) {
         o->mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
         if (o->hasOverflowClip())
-            transformState.move(toRenderBox(o)->layer()->scrolledContentOffset());
+            transformState.move(toRenderBox(o)->scrolledContentOffset());
     }
 }
 
@@ -2079,7 +2102,7 @@ LayoutSize RenderObject::offsetFromContainer(RenderObject* o, const LayoutPoint&
     o->adjustForColumns(offset, point);
 
     if (o->hasOverflowClip())
-        offset -= toRenderBox(o)->layer()->scrolledContentOffset();
+        offset -= toRenderBox(o)->scrolledContentOffset();
 
     return offset;
 }
@@ -2231,6 +2254,18 @@ void RenderObject::willBeDestroyed()
 
     remove();
 
+#ifndef NDEBUG
+    if (!documentBeingDestroyed() && view() && view()->hasRenderFlowThreads()) {
+        // After remove, the object and the associated information should not be in any flow thread.
+        const RenderFlowThreadList* flowThreadList = view()->renderFlowThreadList();
+        for (RenderFlowThreadList::const_iterator iter = flowThreadList->begin(); iter != flowThreadList->end(); ++iter) {
+            const RenderFlowThread* renderFlowThread = *iter;
+            ASSERT(!renderFlowThread->hasChild(this));
+            ASSERT(!renderFlowThread->hasChildInfo(this));
+        }
+    }
+#endif
+
     // If this renderer had a parent, remove should have destroyed any counters
     // attached to this renderer and marked the affected other counters for
     // reevaluation. This apparently redundant check is here for the case when
@@ -2244,6 +2279,33 @@ void RenderObject::willBeDestroyed()
     if (hasLayer()) {
         setHasLayer(false);
         toRenderBoxModelObject(this)->destroyLayer();
+    }
+}
+
+void RenderObject::destroyAndCleanupAnonymousWrappers()
+{
+    RenderObject* parent = this->parent();
+
+    // If the tree is destroyed or our parent is not anonymous, there is no need for a clean-up phase.
+    if (documentBeingDestroyed() || !parent || !parent->isAnonymous()) {
+        destroy();
+        return;
+    }
+
+    bool parentIsLeftOverAnonymousWrapper = false;
+
+    // Currently we only remove anonymous cells' wrapper but we should remove all unneeded
+    // wrappers. See http://webkit.org/b/52123 as an example where this is needed.
+    if (parent->isTableCell())
+        parentIsLeftOverAnonymousWrapper = parent->firstChild() == this && parent->lastChild() == this;
+
+    destroy();
+
+    // WARNING: |this| is deleted here.
+
+    if (parentIsLeftOverAnonymousWrapper) {
+        ASSERT(!parent->firstChild());
+        parent->destroyAndCleanupAnonymousWrappers();
     }
 }
 
@@ -2487,7 +2549,7 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
                 linethrough = decorationColor(curr);
             }
         }
-        if (curr->isFloating() || curr->isPositioned())
+        if (curr->isFloating() || curr->isPositioned() || curr->isRubyText())
             return;
         curr = curr->parent();
         if (curr && curr->isAnonymousBlock() && toRenderBlock(curr)->continuation())

@@ -292,10 +292,6 @@ WebInspector.ElementsTreeOutline.prototype = {
         if (element) {
             element.hovered = true;
             this._previousHoveredElement = element;
-
-            // Lazily compute tag-specific tooltips.
-            if (element.representedObject && !element.tooltip)
-                element._createTooltipForNode();
         }
 
         WebInspector.domAgent.highlightDOMNode(element ? element.representedObject.id : 0);
@@ -705,48 +701,6 @@ WebInspector.ElementsTreeElement.prototype = {
         return this.expandedChildCount > index;
     },
 
-    _createTooltipForNode: function()
-    {
-        var node = /** @type {WebInspector.DOMNode} */ this.representedObject;
-        if (!node.nodeName() || node.nodeName().toLowerCase() !== "img")
-            return;
-
-        function setTooltip(result)
-        {
-            if (!result || result.type !== "string")
-                return;
-
-            try {
-                var properties = JSON.parse(result.description);
-                var offsetWidth = properties[0];
-                var offsetHeight = properties[1];
-                var naturalWidth = properties[2];
-                var naturalHeight = properties[3];
-                if (offsetHeight === naturalHeight && offsetWidth === naturalWidth)
-                    this.tooltip = WebInspector.UIString("%d \xd7 %d pixels", offsetWidth, offsetHeight);
-                else
-                    this.tooltip = WebInspector.UIString("%d \xd7 %d pixels (Natural: %d \xd7 %d pixels)", offsetWidth, offsetHeight, naturalWidth, naturalHeight);
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        function resolvedNode(object)
-        {
-            if (!object)
-                return;
-
-            function dimensions()
-            {
-                return "[" + this.offsetWidth + "," + this.offsetHeight + "," + this.naturalWidth + "," + this.naturalHeight + "]";
-            }
-
-            object.callFunction(dimensions, setTooltip.bind(this));
-            object.release();
-        }
-        WebInspector.RemoteObject.resolveNode(node, "", resolvedNode.bind(this));
-    },
-
     updateSelection: function()
     {
         var listItemElement = this.listItemElement;
@@ -778,8 +732,6 @@ WebInspector.ElementsTreeElement.prototype = {
         this.updateTitle();
         this._preventFollowingLinksOnDoubleClick();
         this.listItemElement.draggable = true;
-        this.listItemElement.addEventListener("click", this._mouseClick.bind(this));
-        this.listItemElement.addEventListener("mousedown", this._mouseDown.bind(this));
     },
 
     _preventFollowingLinksOnDoubleClick: function()
@@ -1052,20 +1004,6 @@ WebInspector.ElementsTreeElement.prototype = {
 
         if (this.hasChildren && !this.expanded)
             this.expand();
-    },
-
-    _mouseClick: function(event)
-    {
-        if (this._isSingleClickCandidate)
-            this._startEditingTarget(event.target);
-        this._isSingleClickCandidate = false;
-    },
-
-    _mouseDown: function(event)
-    {
-        if (event.handled || event.which !== 1 || this._editing || this._elementCloseTag || !this.selected)
-            return;
-        this._isSingleClickCandidate = true;
     },
 
     _insertInLastAttributePosition: function(tag, node)

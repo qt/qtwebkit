@@ -75,7 +75,6 @@ public:
     static guint getPendingUnloadEventCount(WebKitWebFrame*);
     static bool pauseAnimation(WebKitWebFrame*, const char* name, double time, const char* element);
     static bool pauseTransition(WebKitWebFrame*, const char* name, double time, const char* element);
-    static bool pauseSVGAnimation(WebKitWebFrame*, const char* animationId, double time, const char* elementId);
     static WTF::CString markerTextForListItem(WebKitWebFrame*, JSContextRef, JSValueRef nodeObject);
     static unsigned int numberOfActiveAnimations(WebKitWebFrame*);
     static void suspendAnimations(WebKitWebFrame*);
@@ -87,6 +86,7 @@ public:
     static void setAutofilled(JSContextRef, JSValueRef, bool);
     static void setValueForUser(JSContextRef, JSValueRef, JSStringRef);
     static bool shouldClose(WebKitWebFrame*);
+    static bool elementDoesAutoCompleteForElementWithId(WebKitWebFrame*, JSStringRef);
 
     // WebKitWebView
     static void executeCoreCommandByName(WebKitWebView*, const gchar* name, const gchar* value);
@@ -128,6 +128,8 @@ public:
     static int numberOfPendingGeolocationPermissionRequests(WebKitWebView*);
 
     static void setHixie76WebSocketProtocolEnabled(WebKitWebView*, bool enabled);
+
+    static void deliverAllMutationsIfNecessary();
 
 private:
     static bool s_drtRun;

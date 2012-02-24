@@ -38,27 +38,37 @@ using namespace MathMLNames;
     
 static const double gOverSpacingAdjustment = 0.5;
     
-RenderMathMLUnderOver::RenderMathMLUnderOver(Node* expression) 
-    : RenderMathMLBlock(expression) 
+RenderMathMLUnderOver::RenderMathMLUnderOver(Element* element)
+    : RenderMathMLBlock(element)
 {
-    Element* element = static_cast<Element*>(expression);
     // Determine what kind of under/over expression we have by element name
-    
     if (element->hasLocalName(MathMLNames::munderTag))
         m_kind = Under;
     else if (element->hasLocalName(MathMLNames::moverTag))
         m_kind = Over;
-    else if (element->hasLocalName(MathMLNames::munderoverTag))
+    else {
+        ASSERT(element->hasLocalName(MathMLNames::munderoverTag));
         m_kind = UnderOver;
-    else 
-        m_kind = Under;
-    
+    }
+}
+
+RenderBoxModelObject* RenderMathMLUnderOver::base() const
+{
+    RenderObject* baseWrapper = firstChild();
+    if ((m_kind == Over || m_kind == UnderOver) && baseWrapper)
+        baseWrapper = baseWrapper->nextSibling();
+    if (!baseWrapper)
+        return 0;
+    RenderObject* base = baseWrapper->firstChild();
+    if (!base || !base->isBoxModelObject())
+        return 0;
+    return toRenderBoxModelObject(base);
 }
 
 void RenderMathMLUnderOver::addChild(RenderObject* child, RenderObject* beforeChild)
 {    
     RenderMathMLBlock* row = new (renderArena()) RenderMathMLBlock(node());
-    RefPtr<RenderStyle> rowStyle = makeBlockStyle();
+    RefPtr<RenderStyle> rowStyle = createBlockStyle();
     row->setStyle(rowStyle.release());
     row->setIsAnonymous(true);
     
@@ -109,6 +119,14 @@ void RenderMathMLUnderOver::addChild(RenderObject* child, RenderObject* beforeCh
     row->addChild(child);    
 }
 
+RenderMathMLOperator* RenderMathMLUnderOver::unembellishedOperator()
+{
+    RenderBoxModelObject* base = this->base();
+    if (!base || !base->isRenderMathMLBlock())
+        return 0;
+    return toRenderMathMLBlock(base)->unembellishedOperator();
+}
+
 inline int getOffsetHeight(RenderObject* obj) 
 {
     if (obj->isBoxModelObject()) {
@@ -121,21 +139,7 @@ inline int getOffsetHeight(RenderObject* obj)
 
 void RenderMathMLUnderOver::stretchToHeight(int height)
 {
-
-    RenderObject* base = firstChild();
-    if (!base)
-        return;
-        
-    // For over or underover, the base is the sibling of the first child
-    if (m_kind != Under) 
-        base = base->nextSibling();
-        
-    if (!base)
-        return;
-        
-    // use the child of the row which is the actual base
-    base = base->firstChild();
-    
+    RenderBoxModelObject* base = this->base();
     if (base && base->isRenderMathMLBlock()) {
         RenderMathMLBlock* block = toRenderMathMLBlock(base);
         block->stretchToHeight(height);
@@ -273,21 +277,6 @@ LayoutUnit RenderMathMLUnderOver::baselinePosition(FontBaseline, bool firstLine,
     }
 
     return baseline;
-}
-
-
-int RenderMathMLUnderOver::nonOperatorHeight() const 
-{
-    int nonOperators = 0;
-    for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
-        if (current->firstChild() && current->firstChild()->isRenderMathMLBlock()) {
-            RenderMathMLBlock* block = toRenderMathMLBlock(current->firstChild());
-            if (!block->isRenderMathMLOperator()) 
-                nonOperators += getOffsetHeight(current);
-        } else
-            nonOperators += getOffsetHeight(current);
-    }
-    return nonOperators;
 }
 
 }

@@ -91,7 +91,11 @@ public:
     unsigned m_lineBoxContain: 7; // LineBoxContain
     // CSS Image Values Level 3
     unsigned m_imageRendering : 2; // EImageRendering
-    unsigned m_lineGridSnap : 2; // LineGridSnap
+    unsigned m_lineSnap : 2; // LineSnap
+    unsigned m_lineAlign : 1; // LineAlign
+#if ENABLE(OVERFLOW_SCROLLING)
+    unsigned useTouchOverflowScrolling: 1;
+#endif
 
     AtomicString hyphenationString;
     short hyphenationLimitBefore;

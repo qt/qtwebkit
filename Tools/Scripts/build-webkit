@@ -86,6 +86,7 @@ my (
     $downloadAttributeSupport,
     $fileSystemSupport,
     $filtersSupport,
+    $ftpDirSupport,
     $fullscreenAPISupport,
     $gamepadSupport,
     $geolocationSupport,
@@ -127,6 +128,7 @@ my (
     $tiledBackingStoreSupport,
     $touchEventsSupport,
     $touchIconLoadingSupport,
+    $vibrationSupport,
     $videoSupport,
     $videoTrackSupport,
     $webAudioSupport,
@@ -135,11 +137,12 @@ my (
     $webTimingSupport,
     $workersSupport,
     $xsltSupport,
+    $wtfURL,
 );
 
 my @features = (
     { option => "request-animation-frame", desc => "Toggle requestAnimationFrame support",
-      define => "ENABLE_REQUEST_ANIMATION_FRAME", default => (isAppleMacWebKit() || isGtk()), value => \$requestAnimationFrameSupport },
+      define => "ENABLE_REQUEST_ANIMATION_FRAME", default => (isAppleMacWebKit() || isGtk() || isBlackBerry()), value => \$requestAnimationFrameSupport },
 
     { option => "download-attribute", desc => "Toggle download attribute support",
       define => "ENABLE_DOWNLOAD_ATTRIBUTE", default => isBlackBerry(), value =>\$downloadAttributeSupport },
@@ -201,6 +204,9 @@ my @features = (
     { option => "filters", desc => "Toggle SVG Filters support",
       define => "ENABLE_FILTERS", default => (isAppleWebKit() || isGtk() || isQt() || isEfl() || isBlackBerry()), value => \$filtersSupport },
 
+    { option => "ftpdir", desc => "Toggle FTP directory support",
+      define => "ENABLE_FTPDIR", default => !isWinCE(), value => \$ftpDirSupport },
+
     { option => "fullscreen-api", desc => "Toggle Fullscreen API support",
       define => "ENABLE_FULLSCREEN_API", default => (isAppleMacWebKit() || isGtk()), value => \$fullscreenAPISupport },
 
@@ -241,7 +247,7 @@ my @features = (
       define => "ENABLE_INPUT_TYPE_WEEK", default => 0, value => \$inputTypeWeekSupport },
 
     { option => "inspector", desc => "Toggle Web Inspector support",
-      define => "ENABLE_INSPECTOR", default => 1, value => \$webInspectorSupport },
+      define => "ENABLE_INSPECTOR", default => !isWinCE(), value => \$webInspectorSupport },
 
     { option => "javascript-debugger", desc => "Toggle JavaScript Debugger/Profiler support",
       define => "ENABLE_JAVASCRIPT_DEBUGGER", default => 1, value => \$javaScriptDebuggerSupport },
@@ -271,7 +277,7 @@ my @features = (
       define => "ENABLE_MICRODATA", default => 0, value => \$microdataSupport },
 
     { option => "mutation-observers", desc => "Toggle DOM mutation observer support",
-      define => "ENABLE_MUTATION_OBSERVERS", default => 0, value => \$mutationObserversSupport },
+      define => "ENABLE_MUTATION_OBSERVERS", default => 1, value => \$mutationObserversSupport },
 
     { option => "netscape-plugin", desc => "Netscape Plugin support",
       define => "ENABLE_NETSCAPE_PLUGIN_API", default => !isEfl(), value => \$netscapePluginSupport },
@@ -283,7 +289,7 @@ my @features = (
       define => "ENABLE_ORIENTATION_EVENTS", default => isBlackBerry(), value => \$orientationEventsSupport },
 
     { option => "page-visibility-api", desc => "Page Visibility API support",
-      define => "ENABLE_PAGE_VISIBILITY_API", default => 0, value => \$pageVisibilityApiSupport },
+      define => "ENABLE_PAGE_VISIBILITY_API", default => isEfl(), value => \$pageVisibilityApiSupport },
 
     { option => "progress-tag", desc => "Progress Tag support",
       define => "ENABLE_PROGRESS_TAG", default => 1, value => \$progressTagSupport },
@@ -301,7 +307,7 @@ my @features = (
       define => "ENABLE_SHADOW_DOM", default => 0, value => \$shadowDomSupport },
 
     { option => "shared-workers", desc => "Toggle SharedWorkers support",
-      define => "ENABLE_SHARED_WORKERS", default => (isAppleWebKit() || isGtk() || isBlackBerry()), value => \$sharedWorkersSupport },
+      define => "ENABLE_SHARED_WORKERS", default => (isAppleWebKit() || isGtk() || isBlackBerry() || isEfl()), value => \$sharedWorkersSupport },
 
     { option => "style-scoped", desc => "Toggle <style scoped> support",
       define => "ENABLE_STYLE_SCOPED", default => 0, value => \$styleScopedSupport },
@@ -324,8 +330,11 @@ my @features = (
     { option => "touch-icon-loading", desc => "Toggle Touch Icon Loading Support",
       define => "ENABLE_TOUCH_ICON_LOADING", default => 0, value => \$touchIconLoadingSupport },
 
+    { option => "vibration", desc => "Toggle Video support",
+      define => "ENABLE_VIBRATION", default => isEfl(), value => \$vibrationSupport },
+
     { option => "video", desc => "Toggle Video support",
-      define => "ENABLE_VIDEO", default => (isAppleWebKit() || isGtk() || isBlackBerry()), value => \$videoSupport },
+      define => "ENABLE_VIDEO", default => (isAppleWebKit() || isGtk() || isBlackBerry() || isEfl()), value => \$videoSupport },
 
     { option => "video-track", desc => "Toggle Video Track support",
       define => "ENABLE_VIDEO_TRACK", default => (isAppleWebKit() || isGtk()), value => \$videoTrackSupport },
@@ -340,7 +349,10 @@ my @features = (
       define => "ENABLE_WEB_TIMING", default => 0, value=> \$webTimingSupport },
 
     { option => "workers", desc => "Toggle Web Workers support",
-      define => "ENABLE_WORKERS", default => (isAppleWebKit() || isGtk() || isBlackBerry()), value => \$workersSupport },
+      define => "ENABLE_WORKERS", default => (isAppleWebKit() || isGtk() || isBlackBerry() || isEfl()), value => \$workersSupport },
+
+    { option => "wtfurl", desc => "Toogle the use of WTFURL for URL parsing",
+      define => "WTF_USE_WTFURL", default => 0, value => \$wtfURL },
 
     { option => "xslt", desc => "Toggle XSLT support",
       define => "ENABLE_XSLT", default => 1, value => \$xsltSupport },
@@ -513,7 +525,7 @@ if (isGtk()) {
     }
 
     foreach (@features) {
-        if ($_->{option} ne "coverage") {
+        if ($_->{option} ne "coverage" && $_->{option} ne "wtfurl") {
             my $option = option($_->{define}, ${$_->{value}}, $_->{default});
             push @options, $option unless $option eq "";
         }
@@ -684,6 +696,7 @@ for my $dir (@projects) {
     } elsif (isAppleMacWebKit()) {
         my @local_options = @options;
         push @local_options, XcodeCoverageSupportOptions() if $coverageSupport && $project ne "ANGLE";
+        push @local_options, "OTHER_CFLAGS= \$(OTHER_CFLAGS) -DWTF_USE_WTFURL=1" if $wtfURL;
         my $useGYPProject = $useGYP && ($project =~ "WebCore|JavaScriptCore");
         my $projectPath = $useGYPProject ? "gyp/$project" : $project;
         $result = buildXCodeProject($projectPath, $clean, @local_options, @ARGV);

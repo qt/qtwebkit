@@ -20,6 +20,8 @@
 #include "config.h"
 #include "TextureMapperImageBuffer.h"
 
+#include "FilterEffectRenderer.h"
+
 #if USE(TEXTURE_MAPPER)
 namespace WebCore {
 
@@ -33,6 +35,11 @@ void BitmapTextureImageBuffer::updateContents(const void* data, const IntRect& t
     painter->drawImage(targetRect, image);
     painter->restore();
 #endif
+}
+
+void BitmapTextureImageBuffer::didReset()
+{
+    m_image = ImageBuffer::create(contentSize());
 }
 
 void BitmapTextureImageBuffer::updateContents(Image* image, const IntRect& targetRect, const IntRect& sourceRect, PixelFormat)
@@ -100,6 +107,22 @@ void TextureMapperImageBuffer::drawTexture(const BitmapTexture& texture, const F
     context->drawImageBuffer(image, ColorSpaceDeviceRGB, targetRect);
     context->restore();
 }
+
+#if ENABLE(CSS_FILTERS)
+void BitmapTextureImageBuffer::applyFilters(const BitmapTexture& contentTexture, const FilterOperations& filters)
+{
+    RefPtr<FilterEffectRenderer> renderer = FilterEffectRenderer::create(0);
+    renderer->setSourceImageRect(FloatRect(FloatPoint::zero(), contentTexture.size()));
+
+    // The document parameter is only needed for CSS shaders.
+    renderer->build(0 /*document */, filters);
+    renderer->prepare();
+    GraphicsContext* context = renderer->inputContext();
+    context->drawImageBuffer(static_cast<const BitmapTextureImageBuffer&>(contentTexture).m_image.get(), ColorSpaceDeviceRGB, IntPoint::zero());
+    renderer->apply();
+    m_image->context()->drawImageBuffer(renderer->output(), ColorSpaceDeviceRGB, renderer->outputRect());
+}
+#endif
 
 }
 #endif

@@ -31,7 +31,7 @@
 #ifndef ThreadableWebSocketChannelClientWrapper_h
 #define ThreadableWebSocketChannelClientWrapper_h
 
-#if ENABLE(WEB_SOCKETS)
+#if ENABLE(WEB_SOCKETS) && ENABLE(WORKERS)
 
 #include "PlatformString.h"
 #include "ScriptExecutionContext.h"
@@ -44,11 +44,12 @@
 
 namespace WebCore {
 
+class ScriptExecutionContext;
 class WebSocketChannelClient;
 
 class ThreadableWebSocketChannelClientWrapper : public ThreadSafeRefCounted<ThreadableWebSocketChannelClientWrapper> {
 public:
-    static PassRefPtr<ThreadableWebSocketChannelClientWrapper> create(WebSocketChannelClient*);
+    static PassRefPtr<ThreadableWebSocketChannelClientWrapper> create(ScriptExecutionContext*, WebSocketChannelClient*);
 
     void clearSyncMethodDone();
     void setSyncMethodDone();
@@ -59,9 +60,11 @@ public:
     bool useHixie76Protocol() const;
     void setUseHixie76Protocol(bool);
 
-    // Subprotocol is cached too. Will be available when didConnect() callback is invoked.
+    // Subprotocol and extensions are cached too. Will be available when didConnect() callback is invoked.
     String subprotocol() const;
     void setSubprotocol(const String&);
+    String extensions() const;
+    void setExtensions(const String&);
 
     bool sendRequestResult() const;
     void setSendRequestResult(bool);
@@ -81,21 +84,26 @@ public:
     void suspend();
     void resume();
 
-protected:
-    ThreadableWebSocketChannelClientWrapper(WebSocketChannelClient*);
+private:
+    ThreadableWebSocketChannelClientWrapper(ScriptExecutionContext*, WebSocketChannelClient*);
 
     void processPendingTasks();
+
     static void didConnectCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
     static void didReceiveMessageCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, const String& message);
     static void didReceiveBinaryDataCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, PassOwnPtr<Vector<char> >);
     static void didUpdateBufferedAmountCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, unsigned long bufferedAmount);
     static void didStartClosingHandshakeCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
     static void didCloseCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, unsigned long unhandledBufferedAmount, WebSocketChannelClient::ClosingHandshakeCompletionStatus, unsigned short code, const String& reason);
+    static void processPendingTasksCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
 
+    ScriptExecutionContext* m_context;
     WebSocketChannelClient* m_client;
     bool m_syncMethodDone;
     bool m_useHixie76Protocol;
-    Vector<UChar> m_subprotocol; // ThreadSafeRefCounted must not have a String member variable.
+    // ThreadSafeRefCounted must not have String member variables.
+    Vector<UChar> m_subprotocol;
+    Vector<UChar> m_extensions;
     bool m_sendRequestResult;
     unsigned long m_bufferedAmount;
     bool m_suspended;

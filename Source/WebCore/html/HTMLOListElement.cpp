@@ -54,22 +54,33 @@ PassRefPtr<HTMLOListElement> HTMLOListElement::create(const QualifiedName& tagNa
     return adoptRef(new HTMLOListElement(tagName, document));
 }
 
-void HTMLOListElement::parseAttribute(Attribute* attr)
+bool HTMLOListElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == typeAttr)
+        return true;
+    return HTMLElement::isPresentationAttribute(attr);
+}
+
+void HTMLOListElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
 {
     if (attr->name() == typeAttr) {
         if (attr->value() == "a")
-            addCSSProperty(CSSPropertyListStyleType, CSSValueLowerAlpha);
+            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueLowerAlpha);
         else if (attr->value() == "A")
-            addCSSProperty(CSSPropertyListStyleType, CSSValueUpperAlpha);
+            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueUpperAlpha);
         else if (attr->value() == "i")
-            addCSSProperty(CSSPropertyListStyleType, CSSValueLowerRoman);
+            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueLowerRoman);
         else if (attr->value() == "I")
-            addCSSProperty(CSSPropertyListStyleType, CSSValueUpperRoman);
+            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueUpperRoman);
         else if (attr->value() == "1")
-            addCSSProperty(CSSPropertyListStyleType, CSSValueDecimal);
-        else
-            removeCSSProperty(CSSPropertyListStyleType);
-    } else if (attr->name() == startAttr) {
+            addPropertyToAttributeStyle(style, CSSPropertyListStyleType, CSSValueDecimal);
+    } else
+        HTMLElement::collectStyleForAttribute(attr, style);
+}
+
+void HTMLOListElement::parseAttribute(Attribute* attr)
+{
+    if (attr->name() == startAttr) {
         int oldStart = start();
         bool canParse;
         int parsedStart = attr->value().toInt(&canParse);

@@ -122,8 +122,8 @@ public:
     void markPositionedObjectsForLayout();
     virtual void markForPaginationRelayoutIfNeeded();
     
-    bool containsFloats() { return m_floatingObjects && !m_floatingObjects->set().isEmpty(); }
-    bool containsFloat(RenderBox*);
+    bool containsFloats() const { return m_floatingObjects && !m_floatingObjects->set().isEmpty(); }
+    bool containsFloat(RenderBox*) const;
 
     // Versions that can compute line offsets with the region and page offset passed in. Used for speed to avoid having to
     // compute the region all over again when you already know it.
@@ -145,6 +145,11 @@ public:
         return style()->isLeftToRightDirection() ? logicalLeftOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage)
             : logicalWidth() - logicalRightOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage);
     }
+    LayoutUnit endOffsetForLine(LayoutUnit position, bool firstLine, RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage) const
+    {
+        return !style()->isLeftToRightDirection() ? logicalLeftOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage)
+            : logicalWidth() - logicalRightOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage);
+    }
 
     LayoutUnit availableLogicalWidthForLine(LayoutUnit position, bool firstLine) const
     {
@@ -161,6 +166,11 @@ public:
     LayoutUnit startOffsetForLine(LayoutUnit position, bool firstLine) const
     {
         return style()->isLeftToRightDirection() ? logicalLeftOffsetForLine(position, firstLine)
+            : logicalWidth() - logicalRightOffsetForLine(position, firstLine);
+    }
+    LayoutUnit endOffsetForLine(LayoutUnit position, bool firstLine) const
+    {
+        return !style()->isLeftToRightDirection() ? logicalLeftOffsetForLine(position, firstLine)
             : logicalWidth() - logicalRightOffsetForLine(position, firstLine);
     }
 
@@ -242,12 +252,12 @@ public:
     unsigned columnCount(ColumnInfo*) const;
     LayoutRect columnRectAt(ColumnInfo*, unsigned) const;
 
-    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : 0; }
+    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : zeroLayoutUnit; }
     void setPaginationStrut(LayoutUnit);
     
     // The page logical offset is the object's offset from the top of the page in the page progression
     // direction (so an x-offset in vertical text and a y-offset for horizontal text).
-    int pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : 0; }
+    LayoutUnit pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : zeroLayoutUnit; }
     void setPageLogicalOffset(int);
 
     RootInlineBox* lineGridBox() const { return m_rareData ? m_rareData->m_lineGridBox : 0; }
@@ -326,6 +336,11 @@ public:
         return style()->isLeftToRightDirection() ? logicalLeftOffsetForContent(region, offsetFromLogicalTopOfFirstPage)
             : logicalWidth() - logicalRightOffsetForContent(region, offsetFromLogicalTopOfFirstPage);
     }
+    LayoutUnit endOffsetForContent(RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage) const
+    {
+        return !style()->isLeftToRightDirection() ? logicalLeftOffsetForContent(region, offsetFromLogicalTopOfFirstPage)
+            : logicalWidth() - logicalRightOffsetForContent(region, offsetFromLogicalTopOfFirstPage);
+    }
     LayoutUnit logicalLeftOffsetForContent(LayoutUnit blockOffset) const
     {
         return logicalLeftOffsetForContent(regionAtBlockOffset(blockOffset), offsetFromLogicalTopOfFirstPage());
@@ -342,9 +357,14 @@ public:
     {
         return startOffsetForContent(regionAtBlockOffset(blockOffset), offsetFromLogicalTopOfFirstPage());
     }
+    LayoutUnit endOffsetForContent(LayoutUnit blockOffset) const
+    {
+        return endOffsetForContent(regionAtBlockOffset(blockOffset), offsetFromLogicalTopOfFirstPage());
+    }
     LayoutUnit logicalLeftOffsetForContent() const { return isHorizontalWritingMode() ? borderLeft() + paddingLeft() : borderTop() + paddingTop(); }
     LayoutUnit logicalRightOffsetForContent() const { return logicalLeftOffsetForContent() + availableLogicalWidth(); }
     LayoutUnit startOffsetForContent() const { return style()->isLeftToRightDirection() ? logicalLeftOffsetForContent() : logicalWidth() - logicalRightOffsetForContent(); }
+    LayoutUnit endOffsetForContent() const { return !style()->isLeftToRightDirection() ? logicalLeftOffsetForContent() : logicalWidth() - logicalRightOffsetForContent(); }
     
     void setStaticInlinePositionForChild(RenderBox*, LayoutUnit blockOffset, LayoutUnit inlinePosition);
 
@@ -365,23 +385,23 @@ protected:
     {
         return moveChildTo(to, child, 0, fullRemoveInsert);
     }
-    void moveChildTo(RenderBlock* to, RenderObject* child, RenderObject* beforeChild, bool fullRemoveInsert = false);
-    void moveAllChildrenTo(RenderBlock* to, bool fullRemoveInsert = false)
+    void moveChildTo(RenderBlock* toBlock, RenderObject* child, RenderObject* beforeChild, bool fullRemoveInsert = false);
+    void moveAllChildrenTo(RenderBlock* toBlock, bool fullRemoveInsert = false)
     {
-        return moveAllChildrenTo(to, 0, fullRemoveInsert);
+        return moveAllChildrenTo(toBlock, 0, fullRemoveInsert);
     }
-    void moveAllChildrenTo(RenderBlock* to, RenderObject* beforeChild, bool fullRemoveInsert = false)
+    void moveAllChildrenTo(RenderBlock* toBlock, RenderObject* beforeChild, bool fullRemoveInsert = false)
     {
-        return moveChildrenTo(to, firstChild(), 0, beforeChild, fullRemoveInsert);
+        return moveChildrenTo(toBlock, firstChild(), 0, beforeChild, fullRemoveInsert);
     }
     // Move all of the kids from |startChild| up to but excluding |endChild|.  0 can be passed as the endChild to denote
     // that all the kids from |startChild| onwards should be added.
-    void moveChildrenTo(RenderBlock* to, RenderObject* startChild, RenderObject* endChild, bool fullRemoveInsert = false)
+    void moveChildrenTo(RenderBlock* toBlock, RenderObject* startChild, RenderObject* endChild, bool fullRemoveInsert = false)
     {
-        return moveChildrenTo(to, startChild, endChild, 0, fullRemoveInsert);
+        return moveChildrenTo(toBlock, startChild, endChild, 0, fullRemoveInsert);
     }
-    void moveChildrenTo(RenderBlock* to, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
-    
+    void moveChildrenTo(RenderBlock* toBlock, RenderObject* startChild, RenderObject* endChild, RenderObject* beforeChild, bool fullRemoveInsert = false);
+
     LayoutUnit maxPositiveMarginBefore() const { return m_rareData ? m_rareData->m_margins.positiveMarginBefore() : RenderBlockRareData::positiveMarginBeforeDefault(this); }
     LayoutUnit maxNegativeMarginBefore() const { return m_rareData ? m_rareData->m_margins.negativeMarginBefore() : RenderBlockRareData::negativeMarginBeforeDefault(this); }
     LayoutUnit maxPositiveMarginAfter() const { return m_rareData ? m_rareData->m_margins.positiveMarginAfter() : RenderBlockRareData::positiveMarginAfterDefault(this); }
@@ -822,6 +842,7 @@ private:
     void updateScrollInfoAfterLayout();
 
     RenderObject* splitAnonymousBlocksAroundChild(RenderObject* beforeChild);
+    RenderObject* splitTablePartsAroundChild(RenderObject* beforeChild);
     void splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock, RenderBlock* middleBlock,
                      RenderObject* beforeChild, RenderBoxModelObject* oldCont);
     void splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,

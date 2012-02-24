@@ -64,8 +64,8 @@ const float gRadicalLineThickness = 0.02f;
 // Radical thick line thickness (%)
 const float gRadicalThickLineThickness = 0.1f;
     
-RenderMathMLRoot::RenderMathMLRoot(Node *expression) 
-: RenderMathMLBlock(expression) 
+RenderMathMLRoot::RenderMathMLRoot(Element* element)
+    : RenderMathMLBlock(element)
 {
 }
 
@@ -74,7 +74,7 @@ void RenderMathMLRoot::addChild(RenderObject* child, RenderObject* )
     if (isEmpty()) {
         // Add a block for the index
         RenderBlock* block = new (renderArena()) RenderBlock(node());
-        RefPtr<RenderStyle> indexStyle = makeBlockStyle();
+        RefPtr<RenderStyle> indexStyle = createBlockStyle();
         indexStyle->setDisplay(INLINE_BLOCK);
         block->setStyle(indexStyle.release());
         RenderBlock::addChild(block);
@@ -82,7 +82,7 @@ void RenderMathMLRoot::addChild(RenderObject* child, RenderObject* )
         // FIXME: the wrapping does not seem to be needed anymore.
         // this is the base, so wrap it so we can pad it
         block = new (renderArena()) RenderBlock(node());
-        RefPtr<RenderStyle> baseStyle = makeBlockStyle();
+        RefPtr<RenderStyle> baseStyle = createBlockStyle();
         baseStyle->setDisplay(INLINE_BLOCK);
         baseStyle->setPaddingLeft(Length(5 * gRadicalWidth , Percent));
         block->setStyle(baseStyle.release());
@@ -104,7 +104,7 @@ void RenderMathMLRoot::paint(PaintInfo& info, const LayoutPoint& paintOffset)
     if (!firstChild() || !lastChild())
         return;
 
-    LayoutPoint adjustedPaintOffset = paintOffset + location();
+    IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset + location());
     
     RenderBoxModelObject* indexBox = toRenderBoxModelObject(lastChild());
     
@@ -232,7 +232,8 @@ void RenderMathMLRoot::layout()
     
     LayoutUnit indexShift = indexBox->offsetWidth() + topStartShift;
     LayoutUnit radicalHeight = static_cast<LayoutUnit>((1 - gRadicalTopLeftPointYPos) * maxHeight);
-    LayoutUnit rootMarginTop = radicalHeight + style()->paddingBottom().value() + indexBox->offsetHeight() - (maxHeight + static_cast<LayoutUnit>(gRootPadding * style()->fontSize()));
+    LayoutUnit rootMarginTop = radicalHeight + style()->paddingBottom().value() + indexBox->offsetHeight()
+        - (maxHeight + static_cast<LayoutUnit>(gRootPadding * style()->fontSize()));
     
     style()->setPaddingLeft(Length(indexShift, Fixed));
     if (rootMarginTop > 0)

@@ -27,6 +27,7 @@
 #include "QtViewportInteractionEngine.h"
 #include "qquickwebpage_p.h"
 #include "qquickwebview_p.h"
+#include <QCursor>
 #include <QDrag>
 #include <QGraphicsSceneMouseEvent>
 #include <QGuiApplication>
@@ -142,6 +143,7 @@ bool QtWebPageEventHandler::handleEvent(QEvent* ev)
         return handleFocusOutEvent(static_cast<QFocusEvent*>(ev));
     case QEvent::TouchBegin:
     case QEvent::TouchEnd:
+    case QEvent::TouchCancel:
     case QEvent::TouchUpdate:
         touchEvent(static_cast<QTouchEvent*>(ev));
         return true;
@@ -461,8 +463,6 @@ void QtWebPageEventHandler::updateTextInputState()
 
     const EditorState& editor = m_webPageProxy->editorState();
 
-    m_webView->setInputMethodHints(Qt::InputMethodHints(editor.inputMethodHints));
-
     if (!m_webView->hasFocus())
         return;
 
@@ -507,8 +507,7 @@ void QtWebPageEventHandler::doneWithTouchEvent(const NativeWebTouchEvent& event,
         // The interaction engine might still be animating kinetic scrolling or a scale animation
         // such as double-tap to zoom or the bounce back effect. A touch stops the kinetic scrolling
         // where as it does not stop the scale animation.
-        if (m_interactionEngine->scrollAnimationActive())
-            m_interactionEngine->interruptScrollAnimation();
+        // Sending the event to the flickProvider will stop the kinetic scrolling animation.
         break;
     case QEvent::TouchUpdate:
         // The scale animation can only be interrupted by a pinch gesture, which will then take over.
@@ -524,15 +523,14 @@ void QtWebPageEventHandler::doneWithTouchEvent(const NativeWebTouchEvent& event,
     if (m_interactionEngine->scaleAnimationActive())
         return;
 
-    // Convert the event timestamp from second to millisecond.
-    qint64 eventTimestampMillis = static_cast<qint64>(event.timestamp() * 1000);
-    m_panGestureRecognizer.recognize(ev, eventTimestampMillis);
+    m_panGestureRecognizer.recognize(ev);
     m_pinchGestureRecognizer.recognize(ev);
 
     if (m_panGestureRecognizer.isRecognized() || m_pinchGestureRecognizer.isRecognized())
         m_tapGestureRecognizer.reset();
     else {
-        const QTouchEvent* ev = event.nativeEvent();
+        // Convert the event timestamp from second to millisecond.
+        qint64 eventTimestampMillis = static_cast<qint64>(event.timestamp() * 1000);
         m_tapGestureRecognizer.recognize(ev, eventTimestampMillis);
     }
 }

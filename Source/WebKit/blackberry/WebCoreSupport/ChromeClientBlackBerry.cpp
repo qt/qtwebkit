@@ -61,8 +61,10 @@
 #include "WebSettings.h"
 #include "WebString.h"
 #include "WindowFeatures.h"
+
 #include <BlackBerryPlatformLog.h>
 #include <BlackBerryPlatformSettings.h>
+#include <BlackBerryPlatformWindow.h>
 
 #define DEBUG_OVERFLOW_DETECTION 0
 
@@ -829,15 +831,5 @@ bool ChromeClientBlackBerry::allowsAcceleratedCompositing() const
     return true;
 }
 #endif
-
-void* ChromeClientBlackBerry::platformWindow() const
-{
-    return m_webPagePrivate->m_client->window();
-}
-
-void* ChromeClientBlackBerry::platformCompositingWindow() const
-{
-    return m_webPagePrivate->m_client->compositingWindow();
-}
 
 } // namespace WebCore

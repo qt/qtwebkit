@@ -114,6 +114,16 @@ void TiledCoreAnimationDrawingArea::setRootCompositingLayer(GraphicsLayer* graph
     setRootCompositingLayer(rootCompositingLayer);
 }
 
+void TiledCoreAnimationDrawingArea::forceRepaint()
+{
+    if (m_layerTreeStateIsFrozen)
+        return;
+
+    flushLayers();
+    [CATransaction flush];
+    [CATransaction synchronize];
+}
+
 void TiledCoreAnimationDrawingArea::setLayerTreeStateIsFrozen(bool layerTreeStateIsFrozen)
 {
     if (m_layerTreeStateIsFrozen == layerTreeStateIsFrozen)
@@ -161,6 +171,9 @@ void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
     m_webPage->setSize(viewSize);
     m_webPage->layoutIfNeeded();
 
+    if (!m_layerTreeStateIsFrozen)
+        flushLayers();
+
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
 
@@ -172,6 +185,11 @@ void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
     [CATransaction synchronize];
 
     m_webPage->send(Messages::DrawingAreaProxy::DidUpdateGeometry());
+}
+
+void TiledCoreAnimationDrawingArea::setDeviceScaleFactor(float deviceScaleFactor)
+{
+    m_webPage->setDeviceScaleFactor(deviceScaleFactor);
 }
 
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(CALayer *layer)

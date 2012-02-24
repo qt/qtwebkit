@@ -212,6 +212,8 @@ enum {
     RESOURCE_LOAD_FINISHED,
     RESOURCE_CONTENT_LENGTH_RECEIVED,
     RESOURCE_LOAD_FAILED,
+    ENTERING_FULLSCREEN,
+    LEAVING_FULLSCREEN,
 
     LAST_SIGNAL
 };
@@ -639,6 +641,9 @@ static gboolean webkit_web_view_expose_event(GtkWidget* widget, GdkEventExpose* 
         copyRectFromCairoSurfaceToContext(WEBKIT_WEB_VIEW(widget)->priv->backingStore->cairoSurface(),
                                           cr.get(), IntSize(), IntRect(rects.get()[i]));
     }
+
+    // Chaining up to the parent forces child widgets to be drawn.
+    GTK_WIDGET_CLASS(webkit_web_view_parent_class)->expose_event(widget, event);
     return FALSE;
 }
 #else
@@ -667,6 +672,8 @@ static gboolean webkit_web_view_draw(GtkWidget* widget, cairo_t* cr)
     }
     cairo_rectangle_list_destroy(rectList);
 
+    // Chaining up to the parent forces child widgets to be drawn.
+    GTK_WIDGET_CLASS(webkit_web_view_parent_class)->draw(widget, cr);
     return FALSE;
 }
 #endif // GTK_API_VERSION_2
@@ -1293,6 +1300,16 @@ static void webkit_web_view_real_paste_clipboard(WebKitWebView* webView)
 static gboolean webkit_web_view_real_should_allow_editing_action(WebKitWebView*)
 {
     return TRUE;
+}
+
+static gboolean webkit_web_view_real_entering_fullscreen(WebKitWebView* webView)
+{
+    return FALSE;
+}
+
+static gboolean webkit_web_view_real_leaving_fullscreen(WebKitWebView* webView)
+{
+    return FALSE;
 }
 
 static void webkit_web_view_dispose(GObject* object)
@@ -2650,6 +2667,59 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             G_TYPE_NONE, 1,
             WEBKIT_TYPE_VIEWPORT_ATTRIBUTES);
 
+    /**
+     * WebKitWebView::entering-fullscreen:
+     * @web_view: the #WebKitWebView on which the signal is emitted.
+     * @element: the #WebKitDOMHTMLElement which has requested full screen display.
+     *
+     * Emitted when JavaScript code calls
+     * <function>element.webkitRequestFullScreen</function>. If the
+     * signal is not handled the WebView will proceed to full screen
+     * its top level window. This signal can be used by client code to
+     * request permission to the user prior doing the full screen
+     * transition and eventually prepare the top-level window
+     * (e.g. hide some widgets that would otherwise be part of the
+     * full screen window).
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *    %FALSE to continue emission of the event.
+     *
+     * Since: 1.9.0
+     */
+    webkit_web_view_signals[ENTERING_FULLSCREEN] =
+            g_signal_new("entering-fullscreen",
+                         G_TYPE_FROM_CLASS(webViewClass),
+                         G_SIGNAL_RUN_LAST,
+                         G_STRUCT_OFFSET(WebKitWebViewClass, entering_fullscreen),
+                         g_signal_accumulator_true_handled, 0,
+                         webkit_marshal_BOOLEAN__OBJECT,
+                         G_TYPE_BOOLEAN, 1, WEBKIT_TYPE_DOM_HTML_ELEMENT);
+
+
+    /**
+     * WebKitWebView::leaving-fullscreen:
+     * @web_view: the #WebKitWebView on which the signal is emitted.
+     * @element: the #WebKitDOMHTMLElement which is currently displayed full screen.
+     *
+     * Emitted when the WebView is about to restore its top level
+     * window out of its full screen state. This signal can be used by
+     * client code to restore widgets hidden during the
+     * entering-fullscreen stage for instance.
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *    %FALSE to continue emission of the event.
+     *
+     * Since: 1.9.0
+     */
+    webkit_web_view_signals[LEAVING_FULLSCREEN] =
+            g_signal_new("leaving-fullscreen",
+                         G_TYPE_FROM_CLASS(webViewClass),
+                         G_SIGNAL_RUN_LAST,
+                         G_STRUCT_OFFSET(WebKitWebViewClass, leaving_fullscreen),
+                         g_signal_accumulator_true_handled, 0,
+                         webkit_marshal_BOOLEAN__OBJECT,
+                         G_TYPE_BOOLEAN, 1, WEBKIT_TYPE_DOM_HTML_ELEMENT);
+
     /*
      * WebKitWebView::resource-response-received
      * @webView: the object which received the signal
@@ -2758,6 +2828,8 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
     webViewClass->redo = webkit_web_view_real_redo;
     webViewClass->move_cursor = webkit_web_view_real_move_cursor;
     webViewClass->should_allow_editing_action = webkit_web_view_real_should_allow_editing_action;
+    webViewClass->entering_fullscreen = webkit_web_view_real_entering_fullscreen;
+    webViewClass->leaving_fullscreen = webkit_web_view_real_leaving_fullscreen;
 
     GObjectClass* objectClass = G_OBJECT_CLASS(webViewClass);
     objectClass->dispose = webkit_web_view_dispose;
@@ -3417,11 +3489,6 @@ static void webkit_web_view_init(WebKitWebView* webView)
     pageClients.dragClient = new WebKit::DragClient(webView);
     pageClients.inspectorClient = new WebKit::InspectorClient(webView);
 
-#if ENABLE(DEVICE_ORIENTATION)
-    pageClients.deviceMotionClient = static_cast<WebCore::DeviceMotionClient*>(new DeviceMotionClientGtk);
-    pageClients.deviceOrientationClient = static_cast<WebCore::DeviceOrientationClient*>(new DeviceOrientationClientGtk);
-#endif
-
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled())
         pageClients.geolocationClient = new GeolocationClientMock;
@@ -3430,6 +3497,11 @@ static void webkit_web_view_init(WebKitWebView* webView)
 #endif
 
     priv->corePage = new Page(pageClients);
+
+#if ENABLE(DEVICE_ORIENTATION)
+    WebCore::provideDeviceMotionTo(priv->corePage, new DeviceMotionClientGtk);
+    WebCore::provideDeviceOrientationTo(priv->corePage, new DeviceOrientationClientGtk);
+#endif
 
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled())

@@ -33,6 +33,7 @@
 #include "Attr.h"
 #include "Attribute.h"
 #include "CDATASection.h"
+#include "CSSStyleDeclaration.h"
 #include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
 #include "CSSValueKeywords.h"
@@ -78,6 +79,7 @@
 #include "GeolocationController.h"
 #include "HashChangeEvent.h"
 #include "HistogramSupport.h"
+#include "History.h"
 #include "HTMLAllCollection.h"
 #include "HTMLAnchorElement.h"
 #include "HTMLBodyElement.h"
@@ -100,6 +102,7 @@
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "ImageLoader.h"
+#include "InspectorCounters.h"
 #include "InspectorInstrumentation.h"
 #include "Logging.h"
 #include "MediaQueryList.h"
@@ -132,11 +135,13 @@
 #include "ScriptElement.h"
 #include "ScriptEventListener.h"
 #include "ScriptRunner.h"
+#include "ScrollingCoordinator.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "SegmentedString.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "StaticHashSetNodeList.h"
 #include "StyleSheetList.h"
 #include "TextResourceDecoder.h"
@@ -199,10 +204,6 @@
 #if ENABLE(MICRODATA)
 #include "MicroDataItemList.h"
 #include "NodeRareData.h"
-#endif
-
-#if ENABLE(THREADED_SCROLLING)
-#include "ScrollingCoordinator.h"
 #endif
 
 using namespace std;
@@ -436,6 +437,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_writeRecursionIsTooDeep(false)
     , m_writeRecursionDepth(0)
     , m_wheelEventHandlerCount(0)
+    , m_touchEventHandlerCount(0)
     , m_pendingTasksTimer(this, &Document::pendingTasksTimerFired)
 {
     m_document = this;
@@ -508,6 +510,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 #ifndef NDEBUG
     m_updatingStyleSelector = false;
 #endif
+    InspectorCounters::incrementCounter(InspectorCounters::DocumentCounter);
 }
 
 static void histogramMutationEventUsage(const unsigned short& listenerTypes)
@@ -545,7 +548,6 @@ Document::~Document()
     ASSERT(!m_parser || m_parser->refCount() == 1);
     detachParser();
     m_document = 0;
-    m_cachedResourceLoader.clear();
 
     m_renderArena.clear();
 
@@ -578,10 +580,15 @@ Document::~Document()
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
 
+    clearStyleSelector(); // We need to destory CSSFontSelector before destroying m_cachedResourceLoader.
+    m_cachedResourceLoader.clear();
+
     // We must call clearRareData() here since a Document class inherits TreeScope
     // as well as Node. See a comment on TreeScope.h for the reason.
     if (hasRareData())
         clearRareData();
+
+    InspectorCounters::decrementCounter(InspectorCounters::DocumentCounter);
 }
 
 void Document::removedLastRef()
@@ -664,8 +671,11 @@ void Document::buildAccessKeyMap(TreeScope* scope)
         const AtomicString& accessKey = element->getAttribute(accesskeyAttr);
         if (!accessKey.isEmpty())
             m_elementsByAccessKey.set(accessKey.impl(), element);
-        if (ShadowRoot* shadowRoot = element->shadowRoot())
-            buildAccessKeyMap(shadowRoot);
+
+        if (element->hasShadowRoot()) {
+            for (ShadowRoot* root = element->shadowRootList()->youngestShadowRoot(); root; root = root->olderShadowRoot())
+                buildAccessKeyMap(root);
+        }
     }
 }
 
@@ -874,6 +884,11 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
     case ATTRIBUTE_NODE:
         return Attr::create(0, this, static_cast<Attr*>(importedNode)->attr()->clone());
     case DOCUMENT_FRAGMENT_NODE: {
+        if (importedNode->isShadowRoot()) {
+            // ShadowRoot nodes should not be explicitly importable.
+            // Either they are imported along with their host node, or created implicitly.
+            break;
+        }
         DocumentFragment* oldFragment = static_cast<DocumentFragment*>(importedNode);
         RefPtr<DocumentFragment> newFragment = createDocumentFragment();
         if (deep) {
@@ -896,9 +911,6 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
     case DOCUMENT_NODE:
     case DOCUMENT_TYPE_NODE:
     case XPATH_NAMESPACE_NODE:
-    case SHADOW_ROOT_NODE:
-        // ShadowRoot nodes should not be explicitly importable.
-        // Either they are imported along with their host node, or created implicitly.
         break;
     }
     ec = NOT_SUPPORTED_ERR;
@@ -1011,8 +1023,15 @@ PassRefPtr<Element> Document::createElement(const QualifiedName& qName, bool cre
     return e.release();
 }
 
+bool Document::cssRegionsEnabled() const
+{
+    return settings() && settings()->cssRegionsEnabled(); 
+}
+
 PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName)
 {
+    if (!cssRegionsEnabled())
+        return 0;
     if (!renderer())
         return 0;
     if (RenderView* view = renderer()->view())
@@ -1944,10 +1963,11 @@ void Document::suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension why)
     if (!page())
         return;
 
-    if (page()->deviceMotionController())
-        page()->deviceMotionController()->suspendEventsForAllListeners(domWindow());
-    if (page()->deviceOrientationController())
-        page()->deviceOrientationController()->suspendEventsForAllListeners(domWindow());
+    if (DeviceMotionController* controller = DeviceMotionController::from(page()))
+        controller->suspendEventsForAllListeners(domWindow());
+    if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
+        controller->suspendEventsForAllListeners(domWindow());
+
 #endif
 }
 
@@ -1959,10 +1979,10 @@ void Document::resumeActiveDOMObjects()
     if (!page())
         return;
 
-    if (page()->deviceMotionController())
-        page()->deviceMotionController()->resumeEventsForAllListeners(domWindow());
-    if (page()->deviceOrientationController())
-        page()->deviceOrientationController()->resumeEventsForAllListeners(domWindow());
+    if (DeviceMotionController* controller = DeviceMotionController::from(page()))
+        controller->resumeEventsForAllListeners(domWindow());
+    if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
+        controller->resumeEventsForAllListeners(domWindow());
 #endif
 }
 
@@ -2311,7 +2331,7 @@ void Document::implicitClose()
     }
 
     // If painting and compositing layer updates were suppressed pending the load event, do these actions now.
-    if (renderer() && settings() && settings()->suppressIncrementalRendering()) {
+    if (renderer() && settings() && settings()->suppressesIncrementalRendering()) {
 #if USE(ACCELERATED_COMPOSITING)
         view()->updateCompositingLayers();
 #endif
@@ -2853,7 +2873,6 @@ bool Document::childTypeAllowed(NodeType type) const
     case NOTATION_NODE:
     case TEXT_NODE:
     case XPATH_NAMESPACE_NODE:
-    case SHADOW_ROOT_NODE:
         return false;
     case COMMENT_NODE:
     case PROCESSING_INSTRUCTION_NODE:
@@ -2923,9 +2942,6 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
             case ELEMENT_NODE:
                 numElements++;
                 break;
-            case SHADOW_ROOT_NODE:
-                ASSERT_NOT_REACHED();
-                return false;
             }
         }
     } else {
@@ -2939,7 +2955,6 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
         case NOTATION_NODE:
         case TEXT_NODE:
         case XPATH_NAMESPACE_NODE:
-        case SHADOW_ROOT_NODE:
             return false;
         case COMMENT_NODE:
         case PROCESSING_INSTRUCTION_NODE:
@@ -5013,7 +5028,7 @@ void Document::enqueueHashchangeEvent(const String& oldURL, const String& newURL
 void Document::enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject)
 {
     // FIXME: https://bugs.webkit.org/show_bug.cgi?id=36202 Popstate event needs to fire asynchronously
-    dispatchWindowEvent(PopStateEvent::create(stateObject));
+    dispatchWindowEvent(PopStateEvent::create(stateObject, domWindow() ? domWindow()->history() : 0));
 }
 
 void Document::addMediaCanStartListener(MediaCanStartListener* listener)
@@ -5366,7 +5381,6 @@ PassRefPtr<TouchList> Document::createTouchList(ExceptionCode&) const
 
 static void wheelEventHandlerCountChanged(Document* document)
 {
-#if ENABLE(THREADED_SCROLLING)
     Page* page = document->page();
     if (!page)
         return;
@@ -5380,9 +5394,6 @@ static void wheelEventHandlerCountChanged(Document* document)
         return;
 
     scrollingCoordinator->frameViewWheelEventHandlerCountChanged(frameView);
-#else
-    UNUSED_PARAM(document);
-#endif
 }
 
 void Document::didAddWheelEventHandler()
@@ -5406,10 +5417,27 @@ void Document::didRemoveWheelEventHandler()
     wheelEventHandlerCountChanged(this);
 }
 
+void Document::didAddTouchEventHandler()
+{
+    ++m_touchEventHandlerCount;
+    Frame* mainFrame = page() ? page()->mainFrame() : 0;
+    if (mainFrame)
+        mainFrame->notifyChromeClientTouchEventHandlerCountChanged();
+}
+
+void Document::didRemoveTouchEventHandler()
+{
+    ASSERT(m_touchEventHandlerCount > 0);
+    --m_touchEventHandlerCount;
+    Frame* mainFrame = page() ? page()->mainFrame() : 0;
+    if (mainFrame)
+        mainFrame->notifyChromeClientTouchEventHandlerCountChanged();
+}
+
 bool Document::visualUpdatesAllowed() const
 {
     return !settings()
-        || !settings()->suppressIncrementalRendering()
+        || !settings()->suppressesIncrementalRendering()
         || loadEventFinished();
 }
 

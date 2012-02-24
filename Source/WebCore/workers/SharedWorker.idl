@@ -36,12 +36,12 @@ module threads {
         ActiveDOMObject,
         JSCustomConstructor,
         ConstructorParameters=2,
-        Constructor(in DOMString scriptURL, in [Optional=CallWithNullValue] DOMString name),
+        Constructor(in DOMString scriptURL, in [Optional=DefaultIsNullString] DOMString name),
         CallWith=ScriptExecutionContext,
         ConstructorRaisesException,
         JSCustomMarkFunction,
         JSGenerateToNativeObject,
-        JSGenerateToJS
+        JSGenerateToJSObject
     ] SharedWorker : AbstractWorker {
         readonly attribute MessagePort port;
     };

@@ -23,18 +23,19 @@
 
 #include "CSSPrimitiveValue.h"
 #include "CSSProperty.h"
-#include "CSSStyleDeclaration.h"
-#include "KURLHash.h"
-#include "PlatformString.h"
 #include <wtf/ListHashSet.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
+class CSSRule;
+class CSSStyleDeclaration;
+class KURL;
 class PropertySetCSSStyleDeclaration;
 class StyledElement;
 
-class StylePropertySet : public WTF::RefCountedBase {
+class StylePropertySet : public RefCounted<StylePropertySet> {
 public:
     ~StylePropertySet();
 
@@ -42,32 +43,20 @@ public:
     {
         return adoptRef(new StylePropertySet);
     }
-    static PassRefPtr<StylePropertySet> create(CSSRule* parentRule)
+    static PassRefPtr<StylePropertySet> create(const CSSProperty* const* properties, int numProperties, bool useStrictParsing)
     {
-        return adoptRef(new StylePropertySet(parentRule));
-    }
-    static PassRefPtr<StylePropertySet> create(CSSRule* parentRule, const CSSProperty* const* properties, int numProperties)
-    {
-        return adoptRef(new StylePropertySet(parentRule, properties, numProperties));
+        return adoptRef(new StylePropertySet(properties, numProperties, useStrictParsing));
     }
     static PassRefPtr<StylePropertySet> create(const Vector<CSSProperty>& properties)
     {
-        return adoptRef(new StylePropertySet(0, properties));
+        return adoptRef(new StylePropertySet(properties));
     }
-    static PassRefPtr<StylePropertySet> createInline(StyledElement* element)
-    {
-        return adoptRef(new StylePropertySet(element, /*isInlineStyle*/ true));
-    }
-    static PassRefPtr<StylePropertySet> createAttributeStyle(StyledElement* element)
-    {
-        return adoptRef(new StylePropertySet(element, /*isInlineStyle*/ false));
-    }
-
-    void deref();
 
     unsigned propertyCount() const { return m_properties.size(); }
     bool isEmpty() const { return m_properties.isEmpty(); }
     const CSSProperty& propertyAt(unsigned index) const { return m_properties[index]; }
+
+    void shrinkToFit() { m_properties.shrinkToFit(); }
 
     PassRefPtr<CSSValue> getPropertyCSSValue(int propertyID) const;
     String getPropertyValue(int propertyID) const;
@@ -75,34 +64,31 @@ public:
     int getPropertyShorthand(int propertyID) const;
     bool isPropertyImplicit(int propertyID) const;
 
-    bool setProperty(int propertyID, int value, bool important = false) { return setProperty(propertyID, value, important, true); }
-    bool setProperty(int propertyId, double value, CSSPrimitiveValue::UnitTypes unit, bool important = false) { return setProperty(propertyId, value, unit, important, true); }
-    bool setProperty(int propertyID, const String& value, bool important = false) { return setProperty(propertyID, value, important, true); }
+    // These expand shorthand properties into multiple properties.
+    bool setProperty(int propertyID, const String& value, bool important = false, CSSStyleSheet* contextStyleSheet = 0);
+    void setProperty(int propertyID, PassRefPtr<CSSValue>, bool important = false);
+
+    // These do not. FIXME: This is too messy, we can do better.
+    bool setProperty(int propertyID, int value, bool important = false, CSSStyleSheet* contextStyleSheet = 0);
     void setProperty(const CSSProperty&, CSSProperty* slot = 0);
     
-    void removeProperty(int propertyID) { removeProperty(propertyID, true, false); }
-    String removeProperty(int propertyID, bool notifyChanged, bool returnText);
+    bool removeProperty(int propertyID, String* returnText = 0);
 
-    // The following parses an entire new style declaration.
-    void parseDeclaration(const String& styleDeclaration);
+    void parseDeclaration(const String& styleDeclaration, CSSStyleSheet* contextStyleSheet);
 
-    // Besides adding the properties, this also removes any existing properties with these IDs.
-    // It does no notification since it's called by the parser.
     void addParsedProperties(const CSSProperty* const *, int numProperties);
-    // This does no change notifications since it's only called by createMarkup.
     void addParsedProperty(const CSSProperty&);
 
     PassRefPtr<StylePropertySet> copyBlockProperties() const;
     void removeBlockProperties();
-    void removePropertiesInSet(const int* set, unsigned length) { removePropertiesInSet(set, length, true); }
+    bool removePropertiesInSet(const int* set, unsigned length);
 
     void merge(const StylePropertySet*, bool argOverridesOnConflict = true);
 
     void setStrictParsing(bool b) { m_strictParsing = b; }
     bool useStrictParsing() const { return m_strictParsing; }
-    bool isInlineStyleDeclaration() const { return m_isInlineStyleDeclaration; }
 
-    void addSubresourceStyleURLs(ListHashSet<KURL>&);
+    void addSubresourceStyleURLs(ListHashSet<KURL>&, CSSStyleSheet* contextStyleSheet);
 
     PassRefPtr<StylePropertySet> copy() const;
     // Used by StyledElement::copyNonAttributeProperties().
@@ -112,25 +98,20 @@ public:
     void removeEquivalentProperties(const CSSStyleDeclaration*);
 
     PassRefPtr<StylePropertySet> copyPropertiesInSet(const int* set, unsigned length) const;
-
-    CSSRule* parentRuleInternal() const { return m_parentIsElement ? 0 : m_parent.rule; }
-    void clearParentRule() { ASSERT(!m_parentIsElement); m_parent.rule = 0; }
-
-    StyledElement* parentElement() const { ASSERT(m_parentIsElement); return m_parent.element; }
-    void clearParentElement() { ASSERT(m_parentIsElement); m_parent.element = 0; }
-
-    CSSStyleSheet* contextStyleSheet() const;
     
     String asText() const;
     
+    void clearParentRule(CSSRule*);
+    void clearParentElement(StyledElement*);
+
     CSSStyleDeclaration* ensureCSSStyleDeclaration() const;
+    CSSStyleDeclaration* ensureRuleCSSStyleDeclaration(const CSSRule* parentRule) const;
+    CSSStyleDeclaration* ensureInlineCSSStyleDeclaration(const StyledElement* parentElement) const;
 
 private:
     StylePropertySet();
-    StylePropertySet(CSSRule* parentRule);
-    StylePropertySet(CSSRule* parentRule, const Vector<CSSProperty>&);
-    StylePropertySet(CSSRule* parentRule, const CSSProperty* const *, int numProperties);
-    StylePropertySet(StyledElement*, bool isInlineStyle);
+    StylePropertySet(const Vector<CSSProperty>&);
+    StylePropertySet(const CSSProperty* const *, int numProperties, bool useStrictParsing);
 
     void setNeedsStyleRecalc();
 
@@ -146,30 +127,16 @@ private:
     template<size_t size> String getCommonValue(const int (&properties)[size]) const { return getCommonValue(properties, size); }
     template<size_t size> String getLayeredShorthandValue(const int (&properties)[size]) const { return getLayeredShorthandValue(properties, size); }
 
-    bool setProperty(int propertyID, int value, bool important, bool notifyChanged);
-    bool setProperty(int propertyId, double value, CSSPrimitiveValue::UnitTypes, bool important, bool notifyChanged);
-    bool setProperty(int propertyID, const String& value, bool important, bool notifyChanged);
-    bool removeShorthandProperty(int propertyID, bool notifyChanged);
-    bool removePropertiesInSet(const int* set, unsigned length, bool notifyChanged);
+    bool removeShorthandProperty(int propertyID);
     bool propertyMatches(const CSSProperty*) const;
 
-    const CSSProperty* findPropertyWithId(int propertyId) const;
-    CSSProperty* findPropertyWithId(int propertyId);
+    const CSSProperty* findPropertyWithId(int propertyID) const;
+    CSSProperty* findPropertyWithId(int propertyID);
 
     Vector<CSSProperty, 4> m_properties;
 
     bool m_strictParsing : 1;
-    bool m_parentIsElement : 1;
-    bool m_isInlineStyleDeclaration : 1;
-
-    union Parent {
-        Parent(CSSRule* rule) : rule(rule) { }
-        Parent(StyledElement* element) : element(element) { }
-        CSSRule* rule;
-        StyledElement* element;
-    } m_parent;
-    
-    mutable RefPtr<PropertySetCSSStyleDeclaration> m_cssStyleDeclaration;
+    mutable bool m_hasCSSOMWrapper : 1;
     
     friend class PropertySetCSSStyleDeclaration;
 };

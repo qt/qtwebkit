@@ -33,12 +33,12 @@ module css {
         IndexedGetter
     ] WebKitCSSKeyframesRule : CSSRule {
 
-        attribute [ConvertNullStringTo=Null, TreatNullAs=NullString] DOMString name;
+        attribute [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] DOMString name;
         readonly attribute CSSRuleList cssRules;
         
-        void insertRule(in [Optional=CallWithDefaultValue] DOMString rule);
-        void deleteRule(in [Optional=CallWithDefaultValue] DOMString key);
-        WebKitCSSKeyframeRule findRule(in [Optional=CallWithDefaultValue] DOMString key);
+        void insertRule(in [Optional=DefaultIsUndefined] DOMString rule);
+        void deleteRule(in [Optional=DefaultIsUndefined] DOMString key);
+        WebKitCSSKeyframeRule findRule(in [Optional=DefaultIsUndefined] DOMString key);
     };
 
 }

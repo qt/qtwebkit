@@ -58,6 +58,7 @@ class RenderInline;
 class RenderBlock;
 class RenderFlowThread;
 class RenderLayer;
+class RenderTable;
 class RenderTheme;
 class TransformState;
 class VisiblePosition;
@@ -219,6 +220,8 @@ public:
     // normal flow object.
     void handleDynamicFloatPositionChange();
     
+    RenderTable* createAnonymousTable() const;
+    
     // RenderObject tree manipulation
     //////////////////////////////////////////
     virtual bool canHaveChildren() const { return virtualChildren(); }
@@ -352,22 +355,14 @@ public:
 
     bool isHTMLMarquee() const;
 
+    bool isTablePart() const { return isTableCell() || isTableCol() || isTableCaption() || isTableRow() || isTableSection(); }
+
     inline bool isBeforeContent() const;
     inline bool isAfterContent() const;
     inline bool isBeforeOrAfterContent() const;
     static inline bool isBeforeContent(const RenderObject* obj) { return obj && obj->isBeforeContent(); }
     static inline bool isAfterContent(const RenderObject* obj) { return obj && obj->isAfterContent(); }
     static inline bool isBeforeOrAfterContent(const RenderObject* obj) { return obj && obj->isBeforeOrAfterContent(); }
-
-    inline RenderObject* anonymousContainer(RenderObject* child)
-    {
-         RenderObject* container = child;
-         while (container->parent() != this)
-             container = container->parent();
-
-         ASSERT(container->isAnonymous());
-         return container;
-    }
 
     bool hasCounterNodeMap() const { return m_bitfields.hasCounterNodeMap(); }
     void setHasCounterNodeMap(bool hasCounterNodeMap) { m_bitfields.setHasCounterNodeMap(hasCounterNodeMap); }
@@ -392,7 +387,8 @@ public:
     // to add SVG renderer methods to RenderObject with an ASSERT_NOT_REACHED() default implementation.
     virtual bool isSVGRoot() const { return false; }
     virtual bool isSVGContainer() const { return false; }
-    virtual bool isSVGViewportContainer() const { return false; } 
+    virtual bool isSVGTransformableContainer() const { return false; }
+    virtual bool isSVGViewportContainer() const { return false; }
     virtual bool isSVGGradientStop() const { return false; }
     virtual bool isSVGHiddenContainer() const { return false; }
     virtual bool isSVGPath() const { return false; }
@@ -801,6 +797,7 @@ public:
     // as a hook to detect the case of document destruction and don't waste time doing unnecessary work.
     bool documentBeingDestroyed() const;
 
+    void destroyAndCleanupAnonymousWrappers();
     virtual void destroy();
 
     // Virtual function helpers for the deprecated Flexible Box Layout (display: -webkit-box).
@@ -856,13 +853,15 @@ public:
     RenderObject* rendererForRootBackground();
 
 protected:
+    inline bool layerCreationAllowedForSubtree() const;
+
     // Overrides should call the superclass at the end
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     // Overrides should call the superclass at the start
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
     void propagateStyleToAnonymousChildren(bool blockChildrenOnly = false);
 
-    void drawLineForBoxSide(GraphicsContext*, LayoutUnit x1, LayoutUnit y1, LayoutUnit x2, LayoutUnit y2, BoxSide,
+    void drawLineForBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2, BoxSide,
                             Color, EBorderStyle, int adjbw1, int adjbw2, bool antialias = false);
 
     void paintFocusRing(GraphicsContext*, const LayoutPoint&, RenderStyle*);
@@ -1105,6 +1104,20 @@ inline bool RenderObject::preservesNewline() const
 #endif
         
     return style()->preserveNewline();
+}
+
+inline bool RenderObject::layerCreationAllowedForSubtree() const
+{
+#if ENABLE(SVG)
+    RenderObject* parentRenderer = parent();
+    while (parentRenderer) {
+        if (parentRenderer->isSVGHiddenContainer())
+            return false;
+        parentRenderer = parentRenderer->parent();
+    }
+#endif
+
+    return true;
 }
 
 inline void makeMatrixRenderable(TransformationMatrix& matrix, bool has3DRendering)

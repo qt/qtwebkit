@@ -43,5 +43,7 @@ void webkitWebViewRunJavaScriptAlert(WebKitWebView*, const CString& message);
 bool webkitWebViewRunJavaScriptConfirm(WebKitWebView*, const CString& message);
 WKStringRef webkitWebViewRunJavaScriptPrompt(WebKitWebView*, const CString& message, const CString& defaultText);
 void webkitWebViewMakePolicyDecision(WebKitWebView*, WebKitPolicyDecisionType, WebKitPolicyDecision*);
+void webkitWebViewMouseTargetChanged(WebKitWebView*, WKHitTestResultRef, unsigned modifiers);
+void webkitWebViewPrintFrame(WebKitWebView*, WKFrameRef);
 
 #endif // WebKitWebViewPrivate_h

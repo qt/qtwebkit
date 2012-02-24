@@ -50,6 +50,7 @@ OBJC_CLASS WKWebInspectorWKView;
 
 namespace WebKit {
 
+class WebFrameProxy;
 class WebPageGroup;
 class WebPageProxy;
 struct WebPageCreationParameters;
@@ -91,6 +92,8 @@ public:
 #endif
 
     void showConsole();
+    void showResources();
+    void showMainResourceForFrame(WebFrameProxy*);
 
     bool isAttached() const { return m_isAttached; }
     void attach();
@@ -164,6 +167,8 @@ private:
 
     static const unsigned initialWindowWidth = 750;
     static const unsigned initialWindowHeight = 650;
+
+    // Keep this in sync with the value in InspectorFrontendClientLocal.
     static const unsigned minimumAttachedHeight = 250;
 
     WebPageProxy* m_page;

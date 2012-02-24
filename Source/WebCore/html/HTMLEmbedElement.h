@@ -35,6 +35,8 @@ private:
     HTMLEmbedElement(const QualifiedName&, Document*, bool createdByParser);
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     virtual void insertedIntoDocument();

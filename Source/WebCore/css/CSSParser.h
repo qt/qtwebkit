@@ -69,11 +69,12 @@ public:
     void parseSheet(CSSStyleSheet*, const String&, int startLineNumber = 0, StyleRuleRangeMap* ruleRangeMap = 0);
     PassRefPtr<CSSRule> parseRule(CSSStyleSheet*, const String&);
     PassRefPtr<WebKitCSSKeyframeRule> parseKeyframeRule(CSSStyleSheet*, const String&);
-    static bool parseValue(StylePropertySet*, int propId, const String&, bool important, bool strict);
+    static bool parseValue(StylePropertySet*, int propId, const String&, bool important, bool strict, CSSStyleSheet* contextStyleSheet);
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
+    static PassRefPtr<CSSValueList> parseFontFaceValue(const AtomicString&, CSSStyleSheet* contextStyleSheet);
     PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(int propId, CSSParserValue*);
-    bool parseDeclaration(StylePropertySet*, const String&, RefPtr<CSSStyleSourceData>* = 0, CSSStyleSheet* contextStyleSheet = 0);
+    bool parseDeclaration(StylePropertySet*, const String&, RefPtr<CSSStyleSourceData>*, CSSStyleSheet* contextStyleSheet);
     bool parseMediaQuery(MediaList*, const String&);
 
     Document* findDocument() const;
@@ -156,7 +157,6 @@ public:
 
     static bool fastParseColor(RGBA32&, const String&, bool strict);
 
-    bool parseFontStyle(bool important);
     bool parseFontVariant(bool important);
     bool parseFontWeight(bool important);
     bool parseFontFaceSrc();
@@ -209,11 +209,12 @@ public:
     bool parseTextEmphasisStyle(bool important);
 
     bool parseLineBoxContain(bool important);
-    bool parseCalculation(CSSParserValue*);
+    bool parseCalculation(CSSParserValue*, CalculationPermittedValueRange);
 
     bool parseFontFeatureTag(CSSValueList*);
     bool parseFontFeatureSettings(bool important);
 
+    bool cssRegionsEnabled() const;
     bool parseFlowThread(int propId, bool important);
     bool parseRegionThread(int propId, bool important);
 
@@ -355,7 +356,7 @@ private:
     bool isGeneratedImageValue(CSSParserValue*) const;
     bool parseGeneratedImage(CSSParserValueList*, RefPtr<CSSValue>&);
 
-    bool parseValue(StylePropertySet*, int propId, const String&, bool important, CSSStyleSheet* contextStyleSheet = 0);
+    bool parseValue(StylePropertySet*, int propId, const String&, bool important, CSSStyleSheet* contextStyleSheet);
 
     enum SizeParameterType {
         None,
@@ -449,6 +450,9 @@ private:
 int cssPropertyID(const CSSParserString&);
 int cssPropertyID(const String&);
 int cssValueKeywordID(const CSSParserString&);
+#if PLATFORM(IOS)
+void cssPropertyNameIOSAliasing(const char* propertyName, const char*& propertyNameAlias, unsigned& newLength);
+#endif
 
 class ShorthandScope {
     WTF_MAKE_FAST_ALLOCATED;

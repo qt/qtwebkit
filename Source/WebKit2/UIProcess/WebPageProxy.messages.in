@@ -76,6 +76,7 @@ messages -> WebPageProxy {
     DidFindZoomableArea(WebCore::IntPoint target, WebCore::IntRect area)
     AuthenticationRequiredRequest(WTF::String hostname, WTF::String realm, WTF::String prefilledUsername) -> (WTF::String username, WTF::String password)
     CertificateVerificationRequest(WTF::String hostname) -> (bool ignoreErrors)
+    ProxyAuthenticationRequiredRequest(WTF::String hostname, uint16_t port, WTF::String prefilledUsername) -> (WTF::String username, WTF::String password)
 #endif
 #if ENABLE(TOUCH_EVENTS)
     NeedTouchEvents(bool needTouchEvents)
@@ -156,12 +157,13 @@ messages -> WebPageProxy {
 
     # BackForward messages
     BackForwardAddItem(uint64_t itemID)
-    BackForwardGoToItem(uint64_t itemID)
+    BackForwardGoToItem(uint64_t itemID) -> (WebKit::SandboxExtension::Handle sandboxExtensionHandle)
     BackForwardItemAtIndex(int32_t itemIndex) -> (uint64_t itemID)
     BackForwardBackListCount() -> (int32_t count)
     BackForwardForwardListCount() -> (int32_t count)
     BackForwardClear()
     ShouldGoToBackForwardListItem(uint64_t itemID) -> (bool shouldGoToBackForwardListItem)
+    WillGoToBackForwardListItem(uint64_t itemID)
 
     # Undo/Redo messages
     RegisterEditCommandForUndo(uint64_t commandID, uint32_t editAction)

@@ -51,6 +51,7 @@
 #include <WebCore/IntPoint.h>
 #include <WebCore/IntRect.h>
 #include <WKOpenPanelResultListener.h>
+#include <wtf/Assertions.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -66,12 +67,16 @@ static QQuickWebViewPrivate* createPrivateObject(QQuickWebView* publicObject)
 
 QQuickWebViewPrivate::QQuickWebViewPrivate(QQuickWebView* viewport)
     : q_ptr(viewport)
+    , flickProvider(0)
     , alertDialog(0)
     , confirmDialog(0)
     , promptDialog(0)
     , authenticationDialog(0)
     , certificateVerificationDialog(0)
     , itemSelector(0)
+    , proxyAuthenticationDialog(0)
+    , userDidOverrideContentWidth(false)
+    , userDidOverrideContentHeight(false)
     , m_navigatorQtObjectEnabled(false)
     , m_renderToOffscreenBuffer(false)
 {
@@ -112,6 +117,7 @@ void QQuickWebViewPrivate::initialize(WKContextRef contextRef, WKPageGroupRef pa
     // Any page setting should preferrable be set before creating the page.
     webPageProxy->pageGroup()->preferences()->setAcceleratedCompositingEnabled(true);
     webPageProxy->pageGroup()->preferences()->setForceCompositingMode(true);
+    webPageProxy->pageGroup()->preferences()->setFrameFlatteningEnabled(true);
 
     pageClient.initialize(q_ptr, pageViewPrivate->eventHandler.data(), &undoController);
     webPageProxy->initializeWebPage();
@@ -129,6 +135,12 @@ void QQuickWebViewPrivate::disableMouseEvents()
     Q_Q(QQuickWebView);
     q->setAcceptedMouseButtons(Qt::NoButton);
     q->setAcceptHoverEvents(false);
+}
+
+QPointF QQuickWebViewPrivate::pageItemPos()
+{
+    ASSERT(pageView);
+    return pageView->pos();
 }
 
 void QQuickWebViewPrivate::loadDidSucceed()
@@ -198,14 +210,6 @@ void QQuickWebViewPrivate::handleDownloadRequest(DownloadProxy* download)
 
     q->connect(downloadItem->d, SIGNAL(receivedResponse(QWebDownloadItem*)), q, SLOT(_q_onReceivedResponseFromDownload(QWebDownloadItem*)));
     context->downloadManager()->addDownload(download, downloadItem);
-}
-
-void QQuickWebViewPrivate::_q_viewportTrajectoryVectorChanged(const QPointF& trajectoryVector)
-{
-    DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
-    if (!drawingArea)
-        return;
-    drawingArea->setVisibleContentRectTrajectoryVector(trajectoryVector);
 }
 
 void QQuickWebViewPrivate::_q_onVisibleChanged()
@@ -293,6 +297,25 @@ void QQuickWebViewPrivate::handleAuthenticationRequiredRequest(const QString& ho
 
     setViewInAttachedProperties(dialogRunner.dialog());
 
+    disableMouseEvents();
+    dialogRunner.exec();
+    enableMouseEvents();
+
+    username = dialogRunner.username();
+    password = dialogRunner.password();
+}
+
+void QQuickWebViewPrivate::handleProxyAuthenticationRequiredRequest(const QString& hostname, uint16_t port, const QString& prefilledUsername, QString& username, QString& password)
+{
+    if (!proxyAuthenticationDialog)
+        return;
+
+    Q_Q(QQuickWebView);
+    QtDialogRunner dialogRunner;
+    if (!dialogRunner.initForProxyAuthentication(proxyAuthenticationDialog, q, hostname, port, prefilledUsername))
+        return;
+
+    setViewInAttachedProperties(dialogRunner.dialog());
     disableMouseEvents();
     dialogRunner.exec();
     enableMouseEvents();
@@ -445,7 +468,7 @@ void QQuickWebViewLegacyPrivate::updateViewportSize()
     // The fixed layout is handled by the FrameView and the drawing area doesn't behave differently
     // whether its fixed or not. We still need to tell the drawing area which part of it
     // has to be rendered on tiles, and in desktop mode it's all of it.
-    webPageProxy->drawingArea()->setVisibleContentsRectAndScale(IntRect(IntPoint(), viewportSize), 1);
+    webPageProxy->drawingArea()->setVisibleContentsRectForScaling(IntRect(IntPoint(), viewportSize), 1);
 }
 
 QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate(QQuickWebView* viewport)
@@ -468,16 +491,52 @@ void QQuickWebViewFlickablePrivate::initialize(WKContextRef contextRef, WKPageGr
     webPageProxy->setUseFixedLayout(true);
 }
 
+QPointF QQuickWebViewFlickablePrivate::pageItemPos()
+{
+    // Flickable moves its contentItem so we need to take that position into account,
+    // as well as the potential displacement of the page on the contentItem because
+    // of additional QML items.
+    qreal xPos = flickProvider->contentItem()->x() + pageView->x();
+    qreal yPos = flickProvider->contentItem()->y() + pageView->y();
+    return QPointF(xPos, yPos);
+}
+
+void QQuickWebViewFlickablePrivate::updateContentsSize(const QSizeF& size)
+{
+    ASSERT(flickProvider);
+
+    // Make sure that the contentItem is sized to the page
+    // if the user did not add other flickable items in QML.
+    // If the user adds items in QML he has to make sure to
+    // also bind the contentWidth and contentHeight accordingly.
+    // This is in accordance with normal QML Flickable behaviour.
+    if (!userDidOverrideContentWidth)
+        flickProvider->setContentWidth(size.width());
+    if (!userDidOverrideContentHeight)
+        flickProvider->setContentHeight(size.height());
+}
+
 void QQuickWebViewFlickablePrivate::onComponentComplete()
 {
     Q_Q(QQuickWebView);
-    interactionEngine.reset(new QtViewportInteractionEngine(q, pageView.data()));
+
+    ASSERT(!flickProvider);
+    flickProvider = new QtFlickProvider(q, pageView.data());
+
+    // Propagate flickable signals.
+    const QQuickWebViewExperimental* experimental = q->experimental();
+    QObject::connect(flickProvider, SIGNAL(contentWidthChanged()), experimental, SIGNAL(contentWidthChanged()));
+    QObject::connect(flickProvider, SIGNAL(contentHeightChanged()), experimental, SIGNAL(contentHeightChanged()));
+    QObject::connect(flickProvider, SIGNAL(contentXChanged()), experimental, SIGNAL(contentXChanged()));
+    QObject::connect(flickProvider, SIGNAL(contentYChanged()), experimental, SIGNAL(contentYChanged()));
+
+    interactionEngine.reset(new QtViewportInteractionEngine(q, pageView.data(), flickProvider));
     pageView->eventHandler()->setViewportInteractionEngine(interactionEngine.data());
 
     QObject::connect(interactionEngine.data(), SIGNAL(contentSuspendRequested()), q, SLOT(_q_suspend()));
     QObject::connect(interactionEngine.data(), SIGNAL(contentResumeRequested()), q, SLOT(_q_resume()));
-    QObject::connect(interactionEngine.data(), SIGNAL(viewportTrajectoryVectorChanged(const QPointF&)), q, SLOT(_q_viewportTrajectoryVectorChanged(const QPointF&)));
-    QObject::connect(interactionEngine.data(), SIGNAL(visibleContentRectAndScaleChanged()), q, SLOT(_q_updateVisibleContentRectAndScale()));
+    QObject::connect(interactionEngine.data(), SIGNAL(contentWasMoved(const QPointF&)), q, SLOT(_q_commitPositionChange(const QPointF&)));
+    QObject::connect(interactionEngine.data(), SIGNAL(contentWasScaled()), q, SLOT(_q_commitScaleChange()));
 
     _q_resume();
 
@@ -533,15 +592,17 @@ void QQuickWebViewFlickablePrivate::updateViewportSize()
     if (viewportSize.isEmpty() || !interactionEngine)
         return;
 
+    flickProvider->setViewportSize(viewportSize);
+
     // Let the WebProcess know about the new viewport size, so that
     // it can resize the content accordingly.
     webPageProxy->setViewportSize(viewportSize);
 
     interactionEngine->applyConstraints(computeViewportConstraints());
-    _q_updateVisibleContentRectAndScale();
+    _q_commitScaleChange();
 }
 
-void QQuickWebViewFlickablePrivate::_q_updateVisibleContentRectAndScale()
+void QQuickWebViewFlickablePrivate::_q_commitScaleChange()
 {
     DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
     if (!drawingArea)
@@ -551,12 +612,31 @@ void QQuickWebViewFlickablePrivate::_q_updateVisibleContentRectAndScale()
     const QRectF visibleRectInCSSCoordinates = q->mapRectToWebContent(q->boundingRect()).intersected(pageView->boundingRect());
     float scale = pageView->contentsScale();
 
-    QRect alignedVisibleContentRect = visibleRectInCSSCoordinates.toAlignedRect();
-    drawingArea->setVisibleContentsRectAndScale(alignedVisibleContentRect, scale);
-
-    // FIXME: Once we support suspend and resume, this should be delayed until the page is active if the page is suspended.
-    webPageProxy->setFixedVisibleContentRect(alignedVisibleContentRect);
+    // This is only for our QML ViewportInfo debugging API.
     q->experimental()->viewportInfo()->didUpdateCurrentScale();
+
+    QRect alignedVisibleContentRect = visibleRectInCSSCoordinates.toAlignedRect();
+    drawingArea->setVisibleContentsRectForScaling(alignedVisibleContentRect, scale);
+
+    webPageProxy->setFixedVisibleContentRect(alignedVisibleContentRect);
+}
+
+void QQuickWebViewPrivate::_q_commitPositionChange(const QPointF& trajectoryVector)
+{
+    DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
+    if (!drawingArea)
+        return;
+
+    Q_Q(QQuickWebView);
+    const QRectF visibleRectInCSSCoordinates = q->mapRectToWebContent(q->boundingRect()).intersected(pageView->boundingRect());
+
+    QRect alignedVisibleContentRect = visibleRectInCSSCoordinates.toAlignedRect();
+    drawingArea->setVisibleContentsRectForPanning(alignedVisibleContentRect, trajectoryVector);
+
+    if (!trajectoryVector.isNull())
+        return;
+
+    webPageProxy->setFixedVisibleContentRect(alignedVisibleContentRect);
 }
 
 void QQuickWebViewFlickablePrivate::_q_suspend()
@@ -576,7 +656,8 @@ void QQuickWebViewFlickablePrivate::_q_resume()
         postTransitionState->apply();
     }
 
-    _q_updateVisibleContentRectAndScale();
+    // FIXME: Revise this.
+    _q_commitScaleChange();
 }
 
 void QQuickWebViewFlickablePrivate::pageDidRequestScroll(const QPoint& pos)
@@ -794,6 +875,20 @@ void QQuickWebViewExperimental::setAuthenticationDialog(QDeclarativeComponent* a
     emit authenticationDialogChanged();
 }
 
+QDeclarativeComponent* QQuickWebViewExperimental::proxyAuthenticationDialog() const
+{
+    Q_D(const QQuickWebView);
+    return d->proxyAuthenticationDialog;
+}
+
+void QQuickWebViewExperimental::setProxyAuthenticationDialog(QDeclarativeComponent* proxyAuthenticationDialog)
+{
+    Q_D(QQuickWebView);
+    if (d->proxyAuthenticationDialog == proxyAuthenticationDialog)
+        return;
+    d->proxyAuthenticationDialog = proxyAuthenticationDialog;
+    emit proxyAuthenticationDialogChanged();
+}
 QDeclarativeComponent* QQuickWebViewExperimental::certificateVerificationDialog() const
 {
     Q_D(const QQuickWebView);
@@ -908,6 +1003,78 @@ QWebViewportInfo* QQuickWebViewExperimental::viewportInfo()
 QQuickWebPage* QQuickWebViewExperimental::page()
 {
     return q_ptr->page();
+}
+
+QDeclarativeListProperty<QObject> QQuickWebViewExperimental::flickableData()
+{
+    Q_D(const QQuickWebView);
+    ASSERT(d->flickProvider);
+    return d->flickProvider->flickableData();
+}
+
+QQuickItem* QQuickWebViewExperimental::contentItem()
+{
+    Q_D(QQuickWebView);
+    ASSERT(d->flickProvider);
+    return d->flickProvider->contentItem();
+}
+
+qreal QQuickWebViewExperimental::contentWidth() const
+{
+    Q_D(const QQuickWebView);
+    ASSERT(d->flickProvider);
+    return d->flickProvider->contentWidth();
+}
+
+void QQuickWebViewExperimental::setContentWidth(qreal width)
+{
+    Q_D(QQuickWebView);
+    ASSERT(d->flickProvider);
+    d->userDidOverrideContentWidth = true;
+    d->flickProvider->setContentWidth(width);
+}
+
+qreal QQuickWebViewExperimental::contentHeight() const
+{
+    Q_D(const QQuickWebView);
+    ASSERT(d->flickProvider);
+    return d->flickProvider->contentHeight();
+}
+
+void QQuickWebViewExperimental::setContentHeight(qreal height)
+{
+    Q_D(QQuickWebView);
+    ASSERT(d->flickProvider);
+    d->userDidOverrideContentHeight = true;
+    d->flickProvider->setContentHeight(height);
+}
+
+qreal QQuickWebViewExperimental::contentX() const
+{
+    Q_D(const QQuickWebView);
+    ASSERT(d->flickProvider);
+    return d->flickProvider->contentX();
+}
+
+void QQuickWebViewExperimental::setContentX(qreal x)
+{
+    Q_D(QQuickWebView);
+    ASSERT(d->flickProvider);
+    d->flickProvider->setContentX(x);
+}
+
+qreal QQuickWebViewExperimental::contentY() const
+{
+    Q_D(const QQuickWebView);
+    ASSERT(d->flickProvider);
+    return d->flickProvider->contentY();
+}
+
+void QQuickWebViewExperimental::setContentY(qreal y)
+{
+    Q_D(QQuickWebView);
+    ASSERT(d->flickProvider);
+    d->flickProvider->setContentY(y);
 }
 
 QQuickWebView::QQuickWebView(QQuickItem* parent)
@@ -1071,6 +1238,8 @@ QVariant QQuickWebView::inputMethodQuery(Qt::InputMethodQuery property) const
         return QString(state.selectedText);
     case Qt::ImMaximumTextLength:
         return QVariant(); // No limit.
+    case Qt::ImHints:
+        return int(Qt::InputMethodHints(state.inputMethodHints));
     default:
         // Rely on the base implementation for ImEnabled, ImHints and ImPreferredLanguage.
         return QQuickItem::inputMethodQuery(property);
@@ -1225,6 +1394,7 @@ bool QQuickWebView::event(QEvent* ev)
     case QEvent::FocusOut:
     case QEvent::TouchBegin:
     case QEvent::TouchEnd:
+    case QEvent::TouchCancel:
     case QEvent::TouchUpdate:
         if (d->pageView->eventHandler()->handleEvent(ev))
             return true;
@@ -1254,6 +1424,18 @@ void QQuickWebView::loadHtml(const QString& html, const QUrl& baseUrl)
 {
     Q_D(QQuickWebView);
     d->webPageProxy->loadHTMLString(html, baseUrl.toString());
+}
+
+QPointF QQuickWebView::pageItemPos()
+{
+    Q_D(QQuickWebView);
+    return d->pageItemPos();
+}
+
+void QQuickWebView::updateContentsSize(const QSizeF& size)
+{
+    Q_D(QQuickWebView);
+    d->updateContentsSize(size);
 }
 
 #include "moc_qquickwebview_p.cpp"

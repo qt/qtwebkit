@@ -106,6 +106,8 @@ Color ColorInputType::valueAsColor() const
 
 void ColorInputType::createShadowSubtree()
 {
+    ASSERT(element()->hasShadowRoot());
+
     Document* document = element()->document();
     RefPtr<HTMLDivElement> wrapperElement = HTMLDivElement::create(document);
     wrapperElement->setShadowPseudoId("-webkit-color-swatch-wrapper");
@@ -114,15 +116,15 @@ void ColorInputType::createShadowSubtree()
     ExceptionCode ec = 0;
     wrapperElement->appendChild(colorSwatch.release(), ec);
     ASSERT(!ec);
-    element()->ensureShadowRoot()->appendChild(wrapperElement.release(), ec);
+    element()->shadowRootList()->oldestShadowRoot()->appendChild(wrapperElement.release(), ec);
     ASSERT(!ec);
     
     updateColorSwatch();
 }
 
-void ColorInputType::setValue(const String& value, bool valueChanged, bool sendChangeEvent)
+void ColorInputType::setValue(const String& value, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
-    InputType::setValue(value, valueChanged, sendChangeEvent);
+    InputType::setValue(value, valueChanged, eventBehavior);
 
     if (!valueChanged)
         return;
@@ -178,12 +180,12 @@ void ColorInputType::updateColorSwatch()
     if (!colorSwatch)
         return;
 
-    colorSwatch->ensureInlineStyleDecl()->setProperty(CSSPropertyBackgroundColor, element()->value(), false);
+    colorSwatch->setInlineStyleProperty(CSSPropertyBackgroundColor, element()->value(), false);
 }
 
 HTMLElement* ColorInputType::shadowColorSwatch() const
 {
-    ShadowRoot* shadow = element()->shadowRoot();
+    ShadowRoot* shadow = element()->shadowRootList()->oldestShadowRoot();
     return shadow ? toHTMLElement(shadow->firstChild()->firstChild()) : 0;
 }
 

@@ -9,6 +9,7 @@
         <file>icons/touch.png</file>
         <file>icons/touchpoint.png</file>
         <file>qml/AlertDialog.qml</file>
+        <file>qml/AuthenticationDialog.qml</file>
         <file>qml/BrowserWindow.qml</file>
         <file>qml/ConfirmDialog.qml</file>
         <file>qml/Dialog.qml</file>
@@ -17,6 +18,7 @@
         <file>qml/ItemSelector.qml</file>
         <file>qml/MockTouchPoint.qml</file>
         <file>qml/PromptDialog.qml</file>
+        <file>qml/ProxyAuthenticationDialog.qml</file>
         <file>qml/ViewportInfoItem.qml</file>
         <file>useragentlist.txt</file>
         <file>icons/favicon.png</file>

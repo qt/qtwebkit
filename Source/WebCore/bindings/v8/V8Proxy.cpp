@@ -71,6 +71,10 @@
 #include <wtf/UnusedParam.h>
 #include <wtf/text/WTFString.h>
 
+#if PLATFORM(CHROMIUM)
+#include "TraceEvent.h"
+#endif
+
 namespace WebCore {
 
 static V8Extensions& staticExtensionsList()
@@ -335,7 +339,7 @@ v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* nod
         // Compile the script.
         v8::Local<v8::String> code = v8ExternalString(source.source());
 #if PLATFORM(CHROMIUM)
-        PlatformSupport::traceEventBegin("v8.compile", node, "");
+        TRACE_EVENT_BEGIN0("v8", "v8.compile");
 #endif
         OwnPtr<v8::ScriptData> scriptData = precompileScript(code, source.cachedScript());
 
@@ -343,15 +347,11 @@ v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* nod
         // 1, whereas v8 starts at 0.
         v8::Handle<v8::Script> script = compileScript(code, source.url(), source.startPosition(), scriptData.get());
 #if PLATFORM(CHROMIUM)
-        PlatformSupport::traceEventEnd("v8.compile", node, "");
-
-        PlatformSupport::traceEventBegin("v8.run", node, "");
+        TRACE_EVENT_END0("v8", "v8.compile");
+        TRACE_EVENT0("v8", "v8.run");
 #endif
         result = runScript(script);
     }
-#if PLATFORM(CHROMIUM)
-    PlatformSupport::traceEventEnd("v8.run", node, "");
-#endif
 
     InspectorInstrumentation::didEvaluateScript(cookie);
 
@@ -428,6 +428,9 @@ v8::Local<v8::Value> V8Proxy::instrumentedCallFunction(Frame* frame, v8::Handle<
 
     v8::Local<v8::Value> result;
     {
+#if PLATFORM(CHROMIUM)
+        TRACE_EVENT0("v8", "v8.callFunction");
+#endif
         V8RecursionScope recursionScope(frame ? frame->document() : 0);
         result = function->Call(receiver, argc, args);
     }
@@ -442,6 +445,10 @@ v8::Local<v8::Value> V8Proxy::instrumentedCallFunction(Frame* frame, v8::Handle<
 
 v8::Local<v8::Value> V8Proxy::newInstance(v8::Handle<v8::Function> constructor, int argc, v8::Handle<v8::Value> args[])
 {
+#if PLATFORM(CHROMIUM)
+    TRACE_EVENT0("v8", "v8.newInstance");
+#endif
+
     // No artificial limitations on the depth of recursion, see comment in
     // V8Proxy::callFunction.
     v8::Local<v8::Value> result;

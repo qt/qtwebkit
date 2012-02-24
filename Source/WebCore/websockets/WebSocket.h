@@ -53,7 +53,7 @@ class WebSocket : public RefCounted<WebSocket>, public EventTarget, public Activ
 public:
     static void setIsAvailable(bool);
     static bool isAvailable();
-    static PassRefPtr<WebSocket> create(ScriptExecutionContext* context) { return adoptRef(new WebSocket(context)); }
+    static PassRefPtr<WebSocket> create(ScriptExecutionContext*);
     virtual ~WebSocket();
 
     enum State {
@@ -136,6 +136,7 @@ private:
     BinaryType m_binaryType;
     bool m_useHixie76Protocol;
     String m_subprotocol;
+    String m_extensions;
 };
 
 } // namespace WebCore

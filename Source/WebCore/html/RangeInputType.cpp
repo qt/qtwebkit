@@ -42,6 +42,7 @@
 #include "PlatformMouseEvent.h"
 #include "RenderSlider.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "SliderThumbElement.h"
 #include "StepRange.h"
 #include <limits>
@@ -78,9 +79,9 @@ double RangeInputType::valueAsNumber() const
     return parseToDouble(element()->value(), numeric_limits<double>::quiet_NaN());
 }
 
-void RangeInputType::setValueAsNumber(double newValue, bool sendChangeEvent, ExceptionCode&) const
+void RangeInputType::setValueAsNumber(double newValue, TextFieldEventBehavior eventBehavior, ExceptionCode&) const
 {
-    element()->setValue(serialize(newValue), sendChangeEvent);
+    element()->setValue(serialize(newValue), eventBehavior);
 }
 
 bool RangeInputType::supportsRequired() const
@@ -157,7 +158,10 @@ void RangeInputType::handleMouseDownEvent(MouseEvent* event)
         return;
 
     Node* targetNode = event->target()->toNode();
-    if (event->button() != LeftButton || !targetNode || (targetNode != element() && !targetNode->isDescendantOf(element()->shadowRoot())))
+    if (event->button() != LeftButton || !targetNode)
+        return;
+    ASSERT(element()->hasShadowRoot());
+    if (targetNode != element() && !targetNode->isDescendantOf(element()->shadowRootList()->oldestShadowRoot()))
         return;
     SliderThumbElement* thumb = sliderThumbElementOf(element());
     if (targetNode == thumb)
@@ -220,8 +224,8 @@ void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
 
     if (newValue != current) {
         ExceptionCode ec;
-        bool sendChangeEvent = true;
-        setValueAsNumber(newValue, sendChangeEvent, ec);
+        TextFieldEventBehavior eventBehavior = DispatchChangeEvent;
+        setValueAsNumber(newValue, eventBehavior, ec);
 
         if (AXObjectCache::accessibilityEnabled())
             element()->document()->axObjectCache()->postNotification(element()->renderer(), AXObjectCache::AXValueChanged, true);
@@ -233,6 +237,8 @@ void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
 
 void RangeInputType::createShadowSubtree()
 {
+    ASSERT(element()->hasShadowRoot());
+
     Document* document = element()->document();
     RefPtr<HTMLDivElement> track = HTMLDivElement::create(document);
     track->setShadowPseudoId("-webkit-slider-runnable-track");
@@ -241,7 +247,7 @@ void RangeInputType::createShadowSubtree()
     RefPtr<HTMLElement> container = SliderContainerElement::create(document);
     container->appendChild(track.release(), ec);
     container->appendChild(TrackLimiterElement::create(document), ec);
-    element()->ensureShadowRoot()->appendChild(container.release(), ec);
+    element()->shadowRootList()->oldestShadowRoot()->appendChild(container.release(), ec);
 }
 
 RenderObject* RangeInputType::createRenderer(RenderArena* arena, RenderStyle*) const
@@ -285,9 +291,9 @@ void RangeInputType::minOrMaxAttributeChanged()
     element()->setNeedsStyleRecalc();
 }
 
-void RangeInputType::setValue(const String& value, bool valueChanged, bool sendChangeEvent)
+void RangeInputType::setValue(const String& value, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
-    InputType::setValue(value, valueChanged, sendChangeEvent);
+    InputType::setValue(value, valueChanged, eventBehavior);
 
     if (!valueChanged)
         return;

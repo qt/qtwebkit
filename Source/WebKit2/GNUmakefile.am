@@ -88,8 +88,10 @@ libwebkit2gtkinclude_HEADERS = \
 	$(WebKit2)/UIProcess/API/gtk/WebKitDownload.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitEditingCommands.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitError.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitHitTestResult.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitNavigationPolicyDecision.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitPolicyDecision.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitPrintOperation.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitResponsePolicyDecision.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitSettings.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitURIRequest.h \
@@ -193,7 +195,7 @@ BUILT_SOURCES += $(webkit2_built_sources)
 nodist_libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOURCES = \
 	$(webkit2_built_sources)
 
-libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOURCES = \
+webkit2_sources += \
 	Source/WebKit2/config.h \
 	Source/WebKit2/Platform/CoreIPC/ArgumentCoder.h \
 	Source/WebKit2/Platform/CoreIPC/ArgumentCoders.cpp \
@@ -539,6 +541,9 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOU
 	Source/WebKit2/UIProcess/API/gtk/WebKitEditingCommands.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitError.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitError.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResult.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResult.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResultPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitLoaderClient.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitLoaderClient.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitNavigationPolicyDecision.cpp \
@@ -549,7 +554,11 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOU
 	Source/WebKit2/UIProcess/API/gtk/WebKitPolicyDecisionPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitPolicyClient.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitPolicyClient.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitPrintOperation.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitPrintOperation.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitPrintOperationPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitPrivate.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecision.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecision.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecisionPrivate.h \
@@ -950,6 +959,9 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOU
 	Source/WebKit2/WebProcess/WebProcess.cpp \
 	Source/WebKit2/WebProcess/WebProcess.h
 
+libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_SOURCES = \
+	$(webkit2_sources)
+
 libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPFLAGS = \
 	-fno-strict-aliasing \
 	$(global_cppflags) \
@@ -1038,9 +1050,11 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CXX
 libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CFLAGS = \
 	$(global_cflags)
 
+if ENABLE_WEBKIT2
 # Shared libraries
 lib_LTLIBRARIES += \
 	libwebkit2gtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la
+endif
 
 # Artificial dependency to make sure libwebkit2gtk and libwebkitgtk are not linked at the same time
 # The variable creation is to avoid having automake override the entire rule instead of adding the
@@ -1094,7 +1108,9 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_LIB
 	$(XRENDER_LIBS) \
 	$(XT_LIBS)
 
+if ENABLE_WEBKIT2
 pkgconfig_DATA += Source/WebKit2/webkit2gtk-@WEBKITGTK_API_VERSION@.pc
+endif
 
 # WebKit2 specific variables
 forwarding_headers := $(GENSOURCES_WEBKIT2)/include
@@ -1228,9 +1244,10 @@ CLEANFILES += \
 DISTCLEANFILES += \
 	$(top_builddir)/WebKit2/webkit2gtk-@WEBKITGTK_API_VERSION@.pc
 
-# WebKitWebProcess
+if ENABLE_WEBKIT2
 libexec_PROGRAMS += \
 	Programs/WebKitWebProcess
+endif
 
 Programs_WebKitWebProcess_CPPFLAGS = \
 	-I$(srcdir)/Source/WebKit2 \
@@ -1370,7 +1387,7 @@ webkit2_plugin_process_built_sources += \
 nodist_Programs_WebKitPluginProcess_SOURCES = $(webkit2_plugin_process_built_sources)
 BUILT_SOURCES += $(nodist_Programs_WebKitPluginProcess_SOURCES)
 
-Programs_WebKitPluginProcess_SOURCES = \
+webkit2_plugin_process_sources += \
 	Source/WebKit2/Platform/CoreIPC/ArgumentCoder.h \
 	Source/WebKit2/Platform/CoreIPC/ArgumentCoders.h \
 	Source/WebKit2/Platform/CoreIPC/ArgumentCoders.cpp \
@@ -1458,6 +1475,8 @@ Programs_WebKitPluginProcess_SOURCES = \
 	Source/WebKit2/WebProcess/Plugins/Netscape/NetscapePluginStream.h \
 	Source/WebKit2/WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp \
 	Source/WebKit2/gtk/PluginMainGtk.cpp
+Programs_WebKitPluginProcess_SOURCES = \
+	$(webkit2_plugin_process_sources)
 
 Programs_WebKitPluginProcess_LDADD = \
 	-lpthread \
@@ -1495,7 +1514,7 @@ Programs_WebKitPluginProcess_CXXFLAGS = \
 	$(SYMBOL_VISIBILITY_INLINES) \
 	$(global_cxxflags)
 
-endif
+endif # ENABLE_PLUGIN_PROCESS
 
 EXTRA_DIST += \
 	$(WebKit2)/UIProcess/API/gtk/docs/webkit2gtk-docs.sgml \

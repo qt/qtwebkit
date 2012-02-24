@@ -528,7 +528,7 @@ sub ContentAttributeName
     my $contentAttributeName = $attribute->signature->extendedAttributes->{"Reflect"};
     return undef if !$contentAttributeName;
 
-    $contentAttributeName = lc $generator->AttributeNameForGetterAndSetter($attribute) if $contentAttributeName eq "1";
+    $contentAttributeName = lc $generator->AttributeNameForGetterAndSetter($attribute) if $contentAttributeName eq "VALUE_IS_MISSING";
 
     my $namespace = $generator->NamespaceForAttributeName($interfaceName, $contentAttributeName);
 
@@ -627,7 +627,11 @@ sub GenerateCompileTimeCheckForEnumsIfNeeded
                 push(@checks, "#if ${conditionalString}\n");
             }
 
-            push(@checks, "COMPILE_ASSERT($value == ${interfaceName}::$name, ${interfaceName}Enum${name}IsWrongUseDoNotCheckConstants);\n");
+            if ($constant->extendedAttributes->{"ImplementedBy"}) {
+                push(@checks, "COMPILE_ASSERT($value == " . $constant->extendedAttributes->{"ImplementedBy"} . "::$name, ${interfaceName}Enum${name}IsWrongUseDoNotCheckConstants);\n");
+            } else {
+                push(@checks, "COMPILE_ASSERT($value == ${interfaceName}::$name, ${interfaceName}Enum${name}IsWrongUseDoNotCheckConstants);\n");
+            }
 
             if ($conditional) {
                 push(@checks, "#endif\n");
@@ -636,6 +640,27 @@ sub GenerateCompileTimeCheckForEnumsIfNeeded
         push(@checks, "\n");
     }
     return @checks;
+}
+
+sub ExtendedAttributeContains
+{
+    my $object = shift;
+    my $callWith = shift;
+    return 0 unless $callWith;
+    my $keyword = shift;
+
+    my @callWithKeywords = split /\s*\|\s*/, $callWith;
+    return grep { $_ eq $keyword } @callWithKeywords;
+}
+
+# FIXME: This is backwards. We currently name the interface and the IDL files with the implementation name. We
+# should use the real interface name in the IDL files and then use ImplementedAs to map this to the implementation name.
+sub GetVisibleInterfaceName
+{
+    my $object = shift;
+    my $dataNode = shift;
+    my $interfaceName = $dataNode->extendedAttributes->{"InterfaceName"};
+    return $interfaceName ? $interfaceName : $dataNode->name;
 }
 
 1;

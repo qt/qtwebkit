@@ -31,9 +31,11 @@
 #include "IDBDatabaseException.h"
 #include "IDBKey.h"
 #include "IDBKeyPath.h"
+#include "IDBTracing.h"
 #include "SerializedScriptValue.h"
 #include "V8Binding.h"
 #include "V8IDBKey.h"
+#include <wtf/MathExtras.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -46,7 +48,7 @@ static PassRefPtr<IDBKey> createIDBKeyFromValue(v8::Handle<v8::Value> value, Vec
         return IDBKey::createNumber(value->NumberValue());
     if (value->IsString())
         return IDBKey::createString(v8ValueToWebCoreString(value));
-    if (value->IsDate())
+    if (value->IsDate() && !isnan(value->NumberValue()))
         return IDBKey::createDate(value->NumberValue());
     if (value->IsArray()) {
         v8::Handle<v8::Array> array = v8::Handle<v8::Array>::Cast(value);
@@ -148,6 +150,7 @@ v8::Handle<v8::Value> ensureNthValueOnKeyPath(v8::Handle<v8::Value>& rootValue, 
 
 PassRefPtr<IDBKey> createIDBKeyFromSerializedValueAndKeyPath(PassRefPtr<SerializedScriptValue> value, const Vector<String>& keyPath)
 {
+    IDB_TRACE("createIDBKeyFromSerializedValueAndKeyPath");
     V8LocalContext localContext;
     v8::Handle<v8::Value> v8Value(value->deserialize());
     v8::Handle<v8::Value> v8Key(getNthValueOnKeyPath(v8Value, keyPath, keyPath.size()));
@@ -158,6 +161,7 @@ PassRefPtr<IDBKey> createIDBKeyFromSerializedValueAndKeyPath(PassRefPtr<Serializ
 
 PassRefPtr<SerializedScriptValue> injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey> key, PassRefPtr<SerializedScriptValue> value, const Vector<String>& keyPath)
 {
+    IDB_TRACE("injectIDBKeyIntoSerializedValue");
     V8LocalContext localContext;
     if (!keyPath.size())
         return 0;

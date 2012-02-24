@@ -26,10 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-
 from webkitpy.common.system.deprecated_logging import log
-from webkitpy.common.config.ports import WebKitPort
 from webkitpy.tool.bot.sheriff import Sheriff
 from webkitpy.tool.bot.sheriffircbot import SheriffIRCBot
 from webkitpy.tool.commands.queues import AbstractQueue
@@ -60,10 +57,6 @@ class SheriffBot(AbstractQueue, StepSequenceErrorHandler):
     def next_work_item(self):
         self._irc_bot.process_pending_messages()
         return
-
-    def should_proceed_with_work_item(self, failure_map):
-        # Currently, we don't have any reasons not to proceed with work items.
-        return True
 
     def process_work_item(self, failure_map):
         return True

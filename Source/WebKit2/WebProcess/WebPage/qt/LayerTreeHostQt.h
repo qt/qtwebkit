@@ -34,7 +34,7 @@ class WebPage;
 
 class LayerTreeHostQt : public LayerTreeHost, WebCore::GraphicsLayerClient
 #if USE(TILED_BACKING_STORE)
-                      , public WebLayerTreeTileClient
+                      , public WebGraphicsLayerClient
 #endif
 {
 public:
@@ -69,13 +69,15 @@ public:
     virtual void createTile(WebLayerID, int tileID, const UpdateInfo&);
     virtual void updateTile(WebLayerID, int tileID, const UpdateInfo&);
     virtual void removeTile(WebLayerID, int tileID);
+    virtual WebCore::IntRect visibleContentsRect() const;
     virtual void renderNextFrame();
     virtual void purgeBackingStores();
     virtual bool layerTreeTileUpdatesAllowed() const;
-    virtual void setVisibleContentRectAndScale(const WebCore::IntRect&, float scale);
-    virtual void setVisibleContentRectTrajectoryVector(const WebCore::FloatPoint&);
+    virtual void setVisibleContentsRectForScaling(const WebCore::IntRect&, float scale);
+    virtual void setVisibleContentsRectForPanning(const WebCore::IntRect&, const WebCore::FloatPoint&);
     virtual void didSyncCompositingStateForLayer(const WebLayerInfo&);
-    virtual void didDeleteLayer(WebLayerID);
+    virtual void attachLayer(WebCore::WebGraphicsLayer*);
+    virtual void detachLayer(WebCore::WebGraphicsLayer*);
 #endif
 
 protected:
@@ -96,7 +98,6 @@ private:
     void cancelPendingLayerFlush();
     void performScheduledLayerFlush();
     void sendLayersToUI();
-    void recreateBackingStoreIfNeeded();
 
     OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
 
@@ -106,6 +107,7 @@ private:
     // The page overlay layer. Will be null if there's no page overlay.
     OwnPtr<WebCore::GraphicsLayer> m_pageOverlayLayer;
 
+    HashSet<WebCore::WebGraphicsLayer*> m_registeredLayers;
     HashMap<int64_t, int> m_directlyCompositedImageRefCounts;
 
     bool m_notifyAfterScheduledLayerFlush;
@@ -113,6 +115,8 @@ private:
 #if USE(TILED_BACKING_STORE)
     bool m_waitingForUIProcess;
     bool m_isSuspended;
+    WebCore::IntRect m_visibleContentsRect;
+    float m_contentsScale;
 #endif
     LayerTreeContext m_layerTreeContext;
     bool m_shouldSyncFrame;
@@ -120,7 +124,6 @@ private:
     void layerFlushTimerFired(WebCore::Timer<LayerTreeHostQt>*);
     WebCore::Timer<LayerTreeHostQt> m_layerFlushTimer;
     bool m_layerFlushSchedulingEnabled;
-    bool m_shouldRecreateBackingStore;
 };
 
 }

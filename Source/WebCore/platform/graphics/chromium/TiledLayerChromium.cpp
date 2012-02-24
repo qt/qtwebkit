@@ -53,10 +53,9 @@ namespace WebCore {
 class UpdatableTile : public CCLayerTilingData::Tile {
     WTF_MAKE_NONCOPYABLE(UpdatableTile);
 public:
-    explicit UpdatableTile(PassOwnPtr<LayerTextureUpdater::Texture> texture)
-        : m_partialUpdate(false)
-        , m_texture(texture)
+    static PassOwnPtr<UpdatableTile> create(PassOwnPtr<LayerTextureUpdater::Texture> texture)
     {
+        return adoptPtr(new UpdatableTile(texture));
     }
 
     LayerTextureUpdater::Texture* texture() { return m_texture.get(); }
@@ -74,6 +73,12 @@ public:
     IntRect m_opaqueRect;
     bool m_partialUpdate;
 private:
+    explicit UpdatableTile(PassOwnPtr<LayerTextureUpdater::Texture> texture)
+        : m_partialUpdate(false)
+        , m_texture(texture)
+    {
+    }
+
     OwnPtr<LayerTextureUpdater::Texture> m_texture;
 };
 
@@ -292,16 +297,19 @@ UpdatableTile* TiledLayerChromium::tileAt(int i, int j) const
 
 UpdatableTile* TiledLayerChromium::createTile(int i, int j)
 {
-    RefPtr<UpdatableTile> tile = adoptRef(new UpdatableTile(textureUpdater()->createTexture(textureManager())));
-    m_tiler->addTile(tile, i, j);
-    tile->m_dirtyRect = m_tiler->tileRect(tile.get());
+    OwnPtr<UpdatableTile> tile(UpdatableTile::create(textureUpdater()->createTexture(textureManager())));
+    UpdatableTile* addedTile = tile.get();
+    m_tiler->addTile(tile.release(), i, j);
 
-    return tile.get();
+    addedTile->m_dirtyRect = m_tiler->tileRect(addedTile);
+    return addedTile;
 }
 
 void TiledLayerChromium::setNeedsDisplayRect(const FloatRect& dirtyRect)
 {
-    IntRect dirty = enclosingIntRect(dirtyRect);
+    FloatRect scaledDirtyRect(dirtyRect);
+    scaledDirtyRect.scale(contentsScale());
+    IntRect dirty = enclosingIntRect(scaledDirtyRect);
     invalidateRect(dirty);
     LayerChromium::setNeedsDisplayRect(dirtyRect);
 }
@@ -337,7 +345,7 @@ void TiledLayerChromium::invalidateRect(const IntRect& layerRect)
 
 void TiledLayerChromium::protectVisibleTileTextures()
 {
-    protectTileTextures(IntRect(IntPoint::zero(), contentBounds()));
+    protectTileTextures(visibleLayerRect());
 }
 
 void TiledLayerChromium::protectTileTextures(const IntRect& layerRect)
@@ -466,12 +474,18 @@ void TiledLayerChromium::prepareToUpdateTiles(bool idle, int left, int top, int 
 
             IntRect tileRect = m_tiler->tileBounds(i, j);
 
-            // Save what was painted opaque in the tile. If everything painted in the tile was opaque, and the area is a subset of an
-            // already opaque area, keep the old area.
+            // Save what was painted opaque in the tile. Keep the old area if the paint didn't touch it, and didn't paint some
+            // other part of the tile opaque.
             IntRect tilePaintedRect = intersection(tileRect, m_paintRect);
             IntRect tilePaintedOpaqueRect = intersection(tileRect, paintedOpaqueRect);
-            if (tilePaintedOpaqueRect != tilePaintedRect || !tile->m_opaqueRect.contains(tilePaintedOpaqueRect))
-                tile->m_opaqueRect = tilePaintedOpaqueRect;
+            if (!tilePaintedRect.isEmpty()) {
+                IntRect paintInsideTileOpaqueRect = intersection(tile->m_opaqueRect, tilePaintedRect);
+                bool paintInsideTileOpaqueRectIsNonOpaque = !tilePaintedOpaqueRect.contains(paintInsideTileOpaqueRect);
+                bool opaquePaintNotInsideTileOpaqueRect = !tilePaintedOpaqueRect.isEmpty() && !tile->m_opaqueRect.contains(tilePaintedOpaqueRect);
+
+                if (paintInsideTileOpaqueRectIsNonOpaque || opaquePaintNotInsideTileOpaqueRect)
+                    tile->m_opaqueRect = tilePaintedOpaqueRect;
+            }
 
             // Use m_updateRect as copyAndClearDirty above moved the existing dirty rect to m_updateRect.
             const IntRect& dirtyRect = tile->m_updateRect;
@@ -544,7 +558,9 @@ void TiledLayerChromium::addSelfToOccludedScreenSpace(Region& occludedScreenSpac
             if (tile) {
                 IntRect visibleTileOpaqueRect = intersection(visibleRect, tile->m_opaqueRect);
                 FloatRect screenRect = contentTransform.mapRect(FloatRect(visibleTileOpaqueRect));
-                occludedScreenSpace.unite(enclosedIntRect(screenRect));
+                IntRect screenIntRect = enclosedIntRect(screenRect);
+                if (!screenIntRect.isEmpty())
+                    occludedScreenSpace.unite(screenIntRect);
             }
         }
     }

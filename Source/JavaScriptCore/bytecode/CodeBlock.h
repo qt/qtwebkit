@@ -30,6 +30,7 @@
 #ifndef CodeBlock_h
 #define CodeBlock_h
 
+#include "BytecodeConventions.h"
 #include "CallLinkInfo.h"
 #include "CallReturnOffsetToBytecodeOffset.h"
 #include "CodeOrigin.h"
@@ -50,6 +51,8 @@
 #include "JITWriteBarrier.h"
 #include "JSGlobalObject.h"
 #include "JumpTable.h"
+#include "LLIntCallLinkInfo.h"
+#include "LazyOperandValueProfile.h"
 #include "LineInfo.h"
 #include "Nodes.h"
 #include "PredictionTracker.h"
@@ -65,16 +68,11 @@
 #include <wtf/Vector.h>
 #include "StructureStubInfo.h"
 
-// Register numbers used in bytecode operations have different meaning according to their ranges:
-//      0x80000000-0xFFFFFFFF  Negative indices from the CallFrame pointer are entries in the call frame, see RegisterFile.h.
-//      0x00000000-0x3FFFFFFF  Forwards indices from the CallFrame pointer are local vars and temporaries with the function's callframe.
-//      0x40000000-0x7FFFFFFF  Positive indices from 0x40000000 specify entries in the constant pool on the CodeBlock.
-static const int FirstConstantRegisterIndex = 0x40000000;
-
 namespace JSC {
 
-    class ExecState;
     class DFGCodeBlocks;
+    class ExecState;
+    class LLIntOffsetsExtractor;
 
     inline int unmodifiedArgumentsRegister(int argumentsRegister) { return argumentsRegister - 1; }
 
@@ -83,6 +81,7 @@ namespace JSC {
     class CodeBlock : public UnconditionalFinalizer, public WeakReferenceHarvester {
         WTF_MAKE_FAST_ALLOCATED;
         friend class JIT;
+        friend class LLIntOffsetsExtractor;
     public:
         enum CopyParsedBlockTag { CopyParsedBlock };
     protected:
@@ -123,7 +122,7 @@ namespace JSC {
             while (result->alternative())
                 result = result->alternative();
             ASSERT(result);
-            ASSERT(result->getJITType() == JITCode::BaselineJIT);
+            ASSERT(JITCode::isBaselineCode(result->getJITType()));
             return result;
         }
 #endif
@@ -192,15 +191,7 @@ namespace JSC {
             return *(binarySearch<MethodCallLinkInfo, unsigned, getMethodCallLinkInfoBytecodeIndex>(m_methodCallLinkInfos.begin(), m_methodCallLinkInfos.size(), bytecodeIndex));
         }
 
-        unsigned bytecodeOffset(ReturnAddressPtr returnAddress)
-        {
-            if (!m_rareData)
-                return 1;
-            Vector<CallReturnOffsetToBytecodeOffset>& callIndices = m_rareData->m_callReturnIndexVector;
-            if (!callIndices.size())
-                return 1;
-            return binarySearch<CallReturnOffsetToBytecodeOffset, unsigned, getCallReturnOffset>(callIndices.begin(), callIndices.size(), getJITCode().offsetOf(returnAddress.value()))->bytecodeOffset;
-        }
+        unsigned bytecodeOffset(ExecState*, ReturnAddressPtr);
 
         unsigned bytecodeOffsetForCallAtIndex(unsigned index)
         {
@@ -221,11 +212,17 @@ namespace JSC {
         {
             m_incomingCalls.push(incoming);
         }
+#if ENABLE(LLINT)
+        void linkIncomingCall(LLIntCallLinkInfo* incoming)
+        {
+            m_incomingLLIntCalls.push(incoming);
+        }
+#endif // ENABLE(LLINT)
         
         void unlinkIncomingCalls();
-#endif
+#endif // ENABLE(JIT)
 
-#if ENABLE(DFG_JIT)
+#if ENABLE(DFG_JIT) || ENABLE(LLINT)
         void setJITCodeMap(PassOwnPtr<CompactJITCodeMap> jitCodeMap)
         {
             m_jitCodeMap = jitCodeMap;
@@ -234,7 +231,9 @@ namespace JSC {
         {
             return m_jitCodeMap.get();
         }
+#endif
         
+#if ENABLE(DFG_JIT)
         void createDFGDataIfNecessary()
         {
             if (!!m_dfgData)
@@ -333,12 +332,11 @@ namespace JSC {
         }
 #endif
 
-#if ENABLE(INTERPRETER)
         unsigned bytecodeOffset(Instruction* returnAddress)
         {
+            ASSERT(returnAddress >= instructions().begin() && returnAddress < instructions().end());
             return static_cast<Instruction*>(returnAddress) - instructions().begin();
         }
-#endif
 
         void setIsNumericCompareFunction(bool isNumericCompareFunction) { m_isNumericCompareFunction = isNumericCompareFunction; }
         bool isNumericCompareFunction() { return m_isNumericCompareFunction; }
@@ -376,6 +374,20 @@ namespace JSC {
         ExecutableMemoryHandle* executableMemory() { return getJITCode().getExecutableMemory(); }
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
         virtual void jettison() = 0;
+        bool jitCompile(JSGlobalData& globalData)
+        {
+            if (getJITType() != JITCode::InterpreterThunk) {
+                ASSERT(getJITType() == JITCode::BaselineJIT);
+                return false;
+            }
+#if ENABLE(JIT)
+            jitCompileImpl(globalData);
+            return true;
+#else
+            UNUSED_PARAM(globalData);
+            return false;
+#endif
+        }
         virtual CodeBlock* replacement() = 0;
 
         enum CompileWithDFGState {
@@ -395,13 +407,13 @@ namespace JSC {
 
         bool hasOptimizedReplacement()
         {
-            ASSERT(getJITType() == JITCode::BaselineJIT);
+            ASSERT(JITCode::isBaselineCode(getJITType()));
             bool result = replacement()->getJITType() > getJITType();
 #if !ASSERT_DISABLED
             if (result)
                 ASSERT(replacement()->getJITType() == JITCode::DFGJIT);
             else {
-                ASSERT(replacement()->getJITType() == JITCode::BaselineJIT);
+                ASSERT(JITCode::isBaselineCode(replacement()->getJITType()));
                 ASSERT(replacement() == this);
             }
 #endif
@@ -460,18 +472,21 @@ namespace JSC {
 
         void clearEvalCache();
 
-#if ENABLE(INTERPRETER)
         void addPropertyAccessInstruction(unsigned propertyAccessInstruction)
         {
-            if (!m_globalData->canUseJIT())
-                m_propertyAccessInstructions.append(propertyAccessInstruction);
+            m_propertyAccessInstructions.append(propertyAccessInstruction);
         }
         void addGlobalResolveInstruction(unsigned globalResolveInstruction)
         {
-            if (!m_globalData->canUseJIT())
-                m_globalResolveInstructions.append(globalResolveInstruction);
+            m_globalResolveInstructions.append(globalResolveInstruction);
         }
         bool hasGlobalResolveInstructionAtBytecodeOffset(unsigned bytecodeOffset);
+#if ENABLE(LLINT)
+        LLIntCallLinkInfo* addLLIntCallLinkInfo()
+        {
+            m_llintCallLinkInfos.append(LLIntCallLinkInfo());
+            return &m_llintCallLinkInfos.last();
+        }
 #endif
 #if ENABLE(JIT)
         void setNumberOfStructureStubInfos(size_t size) { m_structureStubInfos.grow(size); }
@@ -480,8 +495,7 @@ namespace JSC {
 
         void addGlobalResolveInfo(unsigned globalResolveInstruction)
         {
-            if (m_globalData->canUseJIT())
-                m_globalResolveInfos.append(GlobalResolveInfo(globalResolveInstruction));
+            m_globalResolveInfos.append(GlobalResolveInfo(globalResolveInstruction));
         }
         GlobalResolveInfo& globalResolveInfo(int index) { return m_globalResolveInfos[index]; }
         bool hasGlobalResolveInfoAtBytecodeOffset(unsigned bytecodeOffset);
@@ -492,6 +506,7 @@ namespace JSC {
 
         void addMethodCallLinkInfos(unsigned n) { ASSERT(m_globalData->canUseJIT()); m_methodCallLinkInfos.grow(n); }
         MethodCallLinkInfo& methodCallLinkInfo(int index) { return m_methodCallLinkInfos[index]; }
+        size_t numberOfMethodCallLinkInfos() { return m_methodCallLinkInfos.size(); }
 #endif
         
 #if ENABLE(VALUE_PROFILER)
@@ -533,6 +548,10 @@ namespace JSC {
                                    bytecodeOffset].u.opcode)) - 1].u.profile == result);
             return result;
         }
+        PredictedType valueProfilePredictionForBytecodeOffset(int bytecodeOffset)
+        {
+            return valueProfileForBytecodeOffset(bytecodeOffset)->computeUpdatedPrediction();
+        }
         
         unsigned totalNumberOfValueProfiles()
         {
@@ -559,12 +578,16 @@ namespace JSC {
         
         bool likelyToTakeSlowCase(int bytecodeOffset)
         {
+            if (!numberOfRareCaseProfiles())
+                return false;
             unsigned value = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             return value >= Options::likelyToTakeSlowCaseMinimumCount && static_cast<double>(value) / m_executionEntryCount >= Options::likelyToTakeSlowCaseThreshold;
         }
         
         bool couldTakeSlowCase(int bytecodeOffset)
         {
+            if (!numberOfRareCaseProfiles())
+                return false;
             unsigned value = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             return value >= Options::couldTakeSlowCaseMinimumCount && static_cast<double>(value) / m_executionEntryCount >= Options::couldTakeSlowCaseThreshold;
         }
@@ -583,12 +606,16 @@ namespace JSC {
         
         bool likelyToTakeSpecialFastCase(int bytecodeOffset)
         {
+            if (!numberOfRareCaseProfiles())
+                return false;
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             return specialFastCaseCount >= Options::likelyToTakeSlowCaseMinimumCount && static_cast<double>(specialFastCaseCount) / m_executionEntryCount >= Options::likelyToTakeSlowCaseThreshold;
         }
         
         bool likelyToTakeDeepestSlowCase(int bytecodeOffset)
         {
+            if (!numberOfRareCaseProfiles())
+                return false;
             unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned value = slowCaseCount - specialFastCaseCount;
@@ -597,6 +624,8 @@ namespace JSC {
         
         bool likelyToTakeAnySlowCase(int bytecodeOffset)
         {
+            if (!numberOfRareCaseProfiles())
+                return false;
             unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
             unsigned value = slowCaseCount + specialFastCaseCount;
@@ -694,11 +723,16 @@ namespace JSC {
         
         bool addFrequentExitSite(const DFG::FrequentExitSite& site)
         {
-            ASSERT(getJITType() == JITCode::BaselineJIT);
+            ASSERT(JITCode::isBaselineCode(getJITType()));
             return m_exitProfile.add(site);
         }
 
         DFG::ExitProfile& exitProfile() { return m_exitProfile; }
+        
+        CompressedLazyOperandValueProfileHolder& lazyOperandValueProfiles()
+        {
+            return m_lazyOperandValueProfiles;
+        }
 #endif
 
         // Constant Pool
@@ -801,6 +835,29 @@ namespace JSC {
         
         void copyPostParseDataFrom(CodeBlock* alternative);
         void copyPostParseDataFromAlternative();
+        
+        // Functions for controlling when JITting kicks in, in a mixed mode
+        // execution world.
+        
+        void dontJITAnytimeSoon()
+        {
+            m_llintExecuteCounter = Options::executionCounterValueForDontJITAnytimeSoon;
+        }
+        
+        void jitAfterWarmUp()
+        {
+            m_llintExecuteCounter = Options::executionCounterValueForJITAfterWarmUp;
+        }
+        
+        void jitSoon()
+        {
+            m_llintExecuteCounter = Options::executionCounterValueForJITSoon;
+        }
+        
+        int32_t llintExecuteCounter() const
+        {
+            return m_llintExecuteCounter;
+        }
         
         // Functions for controlling when tiered compilation kicks in. This
         // controls both when the optimizing compiler is invoked and when OSR
@@ -994,6 +1051,9 @@ namespace JSC {
         bool m_shouldDiscardBytecode;
 
     protected:
+#if ENABLE(JIT)
+        virtual void jitCompileImpl(JSGlobalData&) = 0;
+#endif
         virtual void visitWeakReferences(SlotVisitor&);
         virtual void finalizeUnconditionally();
         
@@ -1075,9 +1135,11 @@ namespace JSC {
         RefPtr<SourceProvider> m_source;
         unsigned m_sourceOffset;
 
-#if ENABLE(INTERPRETER)
         Vector<unsigned> m_propertyAccessInstructions;
         Vector<unsigned> m_globalResolveInstructions;
+#if ENABLE(LLINT)
+        SegmentedVector<LLIntCallLinkInfo, 8> m_llintCallLinkInfos;
+        SentinelLinkedList<LLIntCallLinkInfo, BasicRawSentinelNode<LLIntCallLinkInfo> > m_incomingLLIntCalls;
 #endif
 #if ENABLE(JIT)
         Vector<StructureStubInfo> m_structureStubInfos;
@@ -1088,9 +1150,10 @@ namespace JSC {
         MacroAssemblerCodePtr m_jitCodeWithArityCheck;
         SentinelLinkedList<CallLinkInfo, BasicRawSentinelNode<CallLinkInfo> > m_incomingCalls;
 #endif
-#if ENABLE(DFG_JIT)
+#if ENABLE(DFG_JIT) || ENABLE(LLINT)
         OwnPtr<CompactJITCodeMap> m_jitCodeMap;
-        
+#endif
+#if ENABLE(DFG_JIT)
         struct WeakReferenceTransition {
             WeakReferenceTransition() { }
             
@@ -1130,6 +1193,7 @@ namespace JSC {
         // This is relevant to non-DFG code blocks that serve as the profiled code block
         // for DFG code blocks.
         DFG::ExitProfile m_exitProfile;
+        CompressedLazyOperandValueProfileHolder m_lazyOperandValueProfiles;
 #endif
 #if ENABLE(VALUE_PROFILER)
         Vector<ValueProfile> m_argumentValueProfiles;
@@ -1153,12 +1217,14 @@ namespace JSC {
 
         OwnPtr<CodeBlock> m_alternative;
         
+        int32_t m_llintExecuteCounter;
+        
         int32_t m_jitExecuteCounter;
         uint32_t m_speculativeSuccessCounter;
         uint32_t m_speculativeFailCounter;
         uint8_t m_optimizationDelayCounter;
         uint8_t m_reoptimizationRetryCounter;
-
+        
         struct RareData {
            WTF_MAKE_FAST_ALLOCATED;
         public:
@@ -1234,6 +1300,7 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
+        virtual void jitCompileImpl(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFGInternal();
 #endif
@@ -1268,6 +1335,7 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
+        virtual void jitCompileImpl(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFGInternal();
 #endif
@@ -1305,6 +1373,7 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
+        virtual void jitCompileImpl(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFGInternal();
 #endif
@@ -1330,6 +1399,17 @@ namespace JSC {
         CodeBlock* m_codeBlock;
         bool m_oldValueOfShouldDiscardBytecode;
     };
+
+    inline CodeBlock* baselineCodeBlockForOriginAndBaselineCodeBlock(const CodeOrigin& codeOrigin, CodeBlock* baselineCodeBlock)
+    {
+        if (codeOrigin.inlineCallFrame) {
+            ExecutableBase* executable = codeOrigin.inlineCallFrame->executable.get();
+            ASSERT(executable->structure()->classInfo() == &FunctionExecutable::s_info);
+            return static_cast<FunctionExecutable*>(executable)->baselineCodeBlockFor(codeOrigin.inlineCallFrame->isCall ? CodeForCall : CodeForConstruct);
+        }
+        return baselineCodeBlock;
+    }
+    
 
     inline Register& ExecState::r(int index)
     {

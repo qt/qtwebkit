@@ -62,25 +62,27 @@ WebInspector.HeapSnapshotGridNode.prototype = {
 
     _toPercentString: function(num)
     {
-        return num.toFixed(2) + "%";
+        return num.toFixed(0) + "\u2009%"; // \u2009 is a thin space.
     },
 
     _createValueCell: function(columnIdentifier)
     {
         var cell = document.createElement("td");
         cell.className = columnIdentifier + "-column";
-        var div = document.createElement("div");
-        var valueSpan = document.createElement("span");
-        valueSpan.textContent = this.data[columnIdentifier];
-        var percentColumn = columnIdentifier + "-percent";
-        if (percentColumn in this.data) {
-            var percentSpan = document.createElement("span");
-            percentSpan.className = "percent-column";
-            percentSpan.textContent = this.data[percentColumn];
-            div.appendChild(percentSpan);
+        if (this.dataGrid.snapshot.totalSize !== 0) {
+            var div = document.createElement("div");
+            var valueSpan = document.createElement("span");
+            valueSpan.textContent = this.data[columnIdentifier];
+            div.appendChild(valueSpan);
+            var percentColumn = columnIdentifier + "-percent";
+            if (percentColumn in this.data) {
+                var percentSpan = document.createElement("span");
+                percentSpan.className = "percent-column";
+                percentSpan.textContent = this.data[percentColumn];
+                div.appendChild(percentSpan);
+            }
+            cell.appendChild(div);
         }
-        div.appendChild(valueSpan);
-        cell.appendChild(div);
         return cell;
     },
 
@@ -207,7 +209,7 @@ WebInspector.HeapSnapshotGenericObjectNode = function(tree, node)
     this.snapshotNodeIndex = node.nodeIndex;
     if (this._type === "string")
         this.hasHoverMessage = true;
-    else if (this._type === "object" && this.isDOMWindow(this._name)) {
+    else if (this._type === "object" && this.isWindow(this._name)) {
         this._name = this.shortenWindowURL(this._name, false);
         this.hasHoverMessage = true;
     } else if (node.flags & tree.snapshot.nodeFlags.canBeQueried)
@@ -300,10 +302,8 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         var view = this.dataGrid.snapshotView;
         data["shallowSize"] = Number.withThousandsSeparator(this._shallowSize);
         data["retainedSize"] = Number.withThousandsSeparator(this._retainedSize);
-        if (view._showPercentage) {
-            data["shallowSize-percent"] = this._toPercentString(this._shallowSizePercent);
-            data["retainedSize-percent"] = this._toPercentString(this._retainedSizePercent);
-        }
+        data["shallowSize-percent"] = this._toPercentString(this._shallowSizePercent);
+        data["retainedSize-percent"] = this._toPercentString(this._retainedSizePercent);
 
         return this._enhanceData ? this._enhanceData(data) : data;
     },
@@ -343,9 +343,9 @@ WebInspector.HeapSnapshotGenericObjectNode.prototype = {
         this._provider.isEmpty(isEmptyCallback.bind(this));
     },
 
-    isDOMWindow: function(fullName)
+    isWindow: function(fullName)
     {
-        return fullName.substr(0, 9) === "DOMWindow";
+        return fullName.substr(0, 9) === "Window";
     },
 
     shortenWindowURL: function(fullName, hasObjectId)
@@ -381,16 +381,14 @@ WebInspector.HeapSnapshotObjectNode = function(tree, isFromBaseSnapshot, edge, p
 WebInspector.HeapSnapshotObjectNode.prototype = {
     updateHasChildren: function(parentGridNode)
     {
-        if (this.showRetainingEdges) {
-            this._parentGridNode = parentGridNode;
-            var ancestor = parentGridNode;
-            while (ancestor) {
-                if (ancestor.snapshotNodeId === this.snapshotNodeId) {
-                    this._cycledWithAncestorGridNode = ancestor;
-                    return;
-                }
-                ancestor = ancestor._parentGridNode;
+        this._parentGridNode = parentGridNode;
+        var ancestor = parentGridNode;
+        while (ancestor) {
+            if (ancestor.snapshotNodeId === this.snapshotNodeId) {
+                this._cycledWithAncestorGridNode = ancestor;
+                return;
             }
+            ancestor = ancestor._parentGridNode;
         }
         WebInspector.HeapSnapshotGenericObjectNode.prototype.updateHasChildren.call(this);
     },
@@ -470,7 +468,7 @@ WebInspector.HeapSnapshotObjectNode.prototype = {
 
     _prefixObjectCell: function(div, data)
     {
-        if (this.showRetainingEdges && this._cycledWithAncestorGridNode)
+        if (this._cycledWithAncestorGridNode)
             div.className += " cycled-ancessor-node";
 
         var nameSpan = document.createElement("span");
@@ -625,10 +623,9 @@ WebInspector.HeapSnapshotConstructorNode.prototype = {
         data["count"] =  Number.withThousandsSeparator(this._count);
         data["shallowSize"] = Number.withThousandsSeparator(this._shallowSize);
         data["retainedSize"] = Number.withThousandsSeparator(this._retainedSize);
-        if (view._showPercentage) {
-            data["shallowSize-percent"] = this._toPercentString(this._shallowSizePercent);
-            data["retainedSize-percent"] = this._toPercentString(this._retainedSizePercent);
-        }
+        data["count-percent"] =  this._toPercentString(this._countPercent);
+        data["shallowSize-percent"] = this._toPercentString(this._shallowSizePercent);
+        data["retainedSize-percent"] = this._toPercentString(this._retainedSizePercent);
         return data;
     },
 

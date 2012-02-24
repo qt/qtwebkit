@@ -51,11 +51,8 @@
 
 #if PLATFORM(MAC)
 #include <OpenGL/gl.h>
-#elif PLATFORM(GTK) || PLATFORM(EFL)
+#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT)
 #include "OpenGLShims.h"
-#elif PLATFORM(QT)
-#include <QtGlobal>
-#include <cairo/OpenGLShims.h>
 #endif
 
 namespace WebCore {
@@ -111,7 +108,6 @@ bool GraphicsContext3D::isResourceSafe()
     return false;
 }
 
-#if !PLATFORM(QT)
 void GraphicsContext3D::paintRenderingResultsToCanvas(CanvasRenderingContext* context, DrawingBuffer*)
 {
     HTMLCanvasElement* canvas = context->canvas();
@@ -138,7 +134,6 @@ void GraphicsContext3D::paintRenderingResultsToCanvas(CanvasRenderingContext* co
     paintToCanvas(pixels.get(), m_currentWidth, m_currentHeight,
                   canvas->width(), canvas->height(), imageBuffer->context()->platformContext());
 }
-#endif
 
 bool GraphicsContext3D::paintCompositedResultsToCanvas(CanvasRenderingContext*)
 {

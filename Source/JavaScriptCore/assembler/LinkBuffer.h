@@ -34,7 +34,8 @@
 #define GLOBAL_THUNK_ID reinterpret_cast<void*>(static_cast<intptr_t>(-1))
 #define REGEXP_CODE_ID reinterpret_cast<void*>(static_cast<intptr_t>(-2))
 
-#include <MacroAssembler.h>
+#include "MacroAssembler.h"
+#include <wtf/DataLog.h>
 #include <wtf/Noncopyable.h>
 
 namespace JSC {
@@ -74,6 +75,9 @@ class LinkBuffer {
 public:
     LinkBuffer(JSGlobalData& globalData, MacroAssembler* masm, void* ownerUID)
         : m_size(0)
+#if ENABLE(BRANCH_COMPACTION)
+        , m_initialSize(0)
+#endif
         , m_code(0)
         , m_assembler(masm)
         , m_globalData(&globalData)
@@ -225,13 +229,13 @@ private:
         m_size = m_assembler->m_assembler.codeSize();
         ASSERT(m_code);
 #else
-        size_t initialSize = m_assembler->m_assembler.codeSize();
-        m_executableMemory = m_globalData->executableAllocator.allocate(*m_globalData, initialSize, ownerUID);
+        m_initialSize = m_assembler->m_assembler.codeSize();
+        m_executableMemory = m_globalData->executableAllocator.allocate(*m_globalData, m_initialSize, ownerUID);
         if (!m_executableMemory)
             return;
         m_code = (uint8_t*)m_executableMemory->start();
         ASSERT(m_code);
-        ExecutableAllocator::makeWritable(m_code, initialSize);
+        ExecutableAllocator::makeWritable(m_code, m_initialSize);
         uint8_t* inData = (uint8_t*)m_assembler->unlinkedCode();
         uint8_t* outData = reinterpret_cast<uint8_t*>(m_code);
         int readPtr = 0;
@@ -277,8 +281,8 @@ private:
             jumpsToLink[i].setFrom(writePtr);
         }
         // Copy everything after the last jump
-        memcpy(outData + writePtr, inData + readPtr, initialSize - readPtr);
-        m_assembler->recordLinkOffsets(readPtr, initialSize, readPtr - writePtr);
+        memcpy(outData + writePtr, inData + readPtr, m_initialSize - readPtr);
+        m_assembler->recordLinkOffsets(readPtr, m_initialSize, readPtr - writePtr);
         
         for (unsigned i = 0; i < jumpCount; ++i) {
             uint8_t* location = outData + jumpsToLink[i].from();
@@ -287,11 +291,11 @@ private:
         }
 
         jumpsToLink.clear();
-        m_size = writePtr + initialSize - readPtr;
+        m_size = writePtr + m_initialSize - readPtr;
         m_executableMemory->shrink(m_size);
 
 #if DUMP_LINK_STATISTICS
-        dumpLinkStatistics(m_code, initialSize, m_size);
+        dumpLinkStatistics(m_code, m_initialSize, m_size);
 #endif
 #if DUMP_CODE
         dumpCode(m_code, m_size);
@@ -306,7 +310,11 @@ private:
         m_completed = true;
 #endif
 
+#if ENABLE(BRANCH_COMPACTION)
+        ExecutableAllocator::makeExecutable(code(), m_initialSize);
+#else
         ExecutableAllocator::makeExecutable(code(), m_size);
+#endif
         ExecutableAllocator::cacheFlush(code(), m_size);
     }
 
@@ -319,13 +327,13 @@ private:
         linkCount++;
         totalInitialSize += initialSize;
         totalFinalSize += finalSize;
-        printf("link %p: orig %u, compact %u (delta %u, %.2f%%)\n", 
-               code, static_cast<unsigned>(initialSize), static_cast<unsigned>(finalSize),
-               static_cast<unsigned>(initialSize - finalSize),
-               100.0 * (initialSize - finalSize) / initialSize);
-        printf("\ttotal %u: orig %u, compact %u (delta %u, %.2f%%)\n", 
-               linkCount, totalInitialSize, totalFinalSize, totalInitialSize - totalFinalSize,
-               100.0 * (totalInitialSize - totalFinalSize) / totalInitialSize);
+        dataLog("link %p: orig %u, compact %u (delta %u, %.2f%%)\n", 
+                    code, static_cast<unsigned>(initialSize), static_cast<unsigned>(finalSize),
+                    static_cast<unsigned>(initialSize - finalSize),
+                    100.0 * (initialSize - finalSize) / initialSize);
+        dataLog("\ttotal %u: orig %u, compact %u (delta %u, %.2f%%)\n", 
+                    linkCount, totalInitialSize, totalFinalSize, totalInitialSize - totalFinalSize,
+                    100.0 * (totalInitialSize - totalFinalSize) / totalInitialSize);
     }
 #endif
     
@@ -342,23 +350,26 @@ private:
         size_t tsize = size / sizeof(short);
         char nameBuf[128];
         snprintf(nameBuf, sizeof(nameBuf), "_jsc_jit%u", codeCount++);
-        printf("\t.syntax unified\n"
-               "\t.section\t__TEXT,__text,regular,pure_instructions\n"
-               "\t.globl\t%s\n"
-               "\t.align 2\n"
-               "\t.code 16\n"
-               "\t.thumb_func\t%s\n"
-               "# %p\n"
-               "%s:\n", nameBuf, nameBuf, code, nameBuf);
+        dataLog("\t.syntax unified\n"
+                    "\t.section\t__TEXT,__text,regular,pure_instructions\n"
+                    "\t.globl\t%s\n"
+                    "\t.align 2\n"
+                    "\t.code 16\n"
+                    "\t.thumb_func\t%s\n"
+                    "# %p\n"
+                    "%s:\n", nameBuf, nameBuf, code, nameBuf);
         
         for (unsigned i = 0; i < tsize; i++)
-            printf("\t.short\t0x%x\n", tcode[i]);
+            dataLog("\t.short\t0x%x\n", tcode[i]);
 #endif
     }
 #endif
     
     RefPtr<ExecutableMemoryHandle> m_executableMemory;
     size_t m_size;
+#if ENABLE(BRANCH_COMPACTION)
+    size_t m_initialSize;
+#endif
     void* m_code;
     MacroAssembler* m_assembler;
     JSGlobalData* m_globalData;

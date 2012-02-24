@@ -55,6 +55,10 @@ OBJC_CLASS WebGLLayer;
 QT_BEGIN_NAMESPACE
 class QPainter;
 class QRect;
+class QGLWidget;
+class QGLContext;
+class QOpenGLContext;
+class QSurface;
 QT_END_NAMESPACE
 #elif PLATFORM(GTK) || PLATFORM(EFL)
 typedef unsigned int GLuint;
@@ -62,6 +66,14 @@ typedef unsigned int GLuint;
 
 #if PLATFORM(MAC)
 typedef CGLContextObj PlatformGraphicsContext3D;
+#elif PLATFORM(QT)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+typedef QOpenGLContext* PlatformGraphicsContext3D;
+typedef QSurface* PlatformGraphicsSurface3D;
+#else
+typedef QGLContext* PlatformGraphicsContext3D;
+typedef QGLWidget* PlatformGraphicsSurface3D;
+#endif
 #else
 typedef void* PlatformGraphicsContext3D;
 #endif
@@ -789,6 +801,9 @@ public:
 #elif PLATFORM(GTK) || PLATFORM(EFL)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
+#elif PLATFORM(QT)
+    void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
+                       int canvasWidth, int canvasHeight, QPainter* context);
 #endif
 
     void markContextChanged();
@@ -798,18 +813,6 @@ public:
     void paintRenderingResultsToCanvas(CanvasRenderingContext*, DrawingBuffer*);
     PassRefPtr<ImageData> paintRenderingResultsToImageData(DrawingBuffer*);
     bool paintCompositedResultsToCanvas(CanvasRenderingContext*);
-
-#if PLATFORM(QT)
-    bool paintsIntoCanvasBuffer() const { return true; }
-#elif PLATFORM(CHROMIUM)
-    bool paintsIntoCanvasBuffer() const;
-#elif PLATFORM(GTK)
-    bool paintsIntoCanvasBuffer() const { return true; }
-#elif PLATFORM(EFL)
-    bool paintsIntoCanvasBuffer() const { return true; }
-#else
-    bool paintsIntoCanvasBuffer() const { return false; }
-#endif
 
     // Support for buffer creation and deletion
     Platform3DObject createBuffer();

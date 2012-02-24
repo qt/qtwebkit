@@ -47,6 +47,10 @@ WebInspector.SettingsScreen = function()
         if (Preferences.exposeDisableCache)
             p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Disable cache"), WebInspector.settings.cacheDisabled));
     }
+    
+    p = this._appendSection(WebInspector.UIString("Rendering"));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show paint rectangles"), WebInspector.settings.showPaintRects));
+    WebInspector.settings.showPaintRects.addChangeListener(this._showPaintRectsChanged, this);
 
     p = this._appendSection(WebInspector.UIString("Elements"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Word wrap"), WebInspector.settings.domWordWrap));
@@ -72,6 +76,7 @@ WebInspector.SettingsScreen = function()
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Emulate touch events"), WebInspector.settings.emulateTouchEvents));
 
     p = this._appendSection(WebInspector.UIString("Scripts"), true);
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Use file navigator and tabbed editor container in scripts panel"), WebInspector.settings.useScriptsNavigator));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show script folders"), WebInspector.settings.showScriptFolders));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Search in content scripts"), WebInspector.settings.searchInContentScripts));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable source maps"), WebInspector.settings.sourceMapsEnabled));
@@ -372,6 +377,11 @@ WebInspector.SettingsScreen.prototype = {
 
         selectionChanged.call(this);
         return fieldsetElement;
+    },
+
+    _showPaintRectsChanged: function()
+    {
+        PageAgent.setShowPaintRects(WebInspector.settings.showPaintRects.get());
     }
 }
 

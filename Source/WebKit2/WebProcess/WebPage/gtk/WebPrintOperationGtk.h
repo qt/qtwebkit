@@ -51,10 +51,23 @@ public:
 
     GtkPrintSettings* printSettings() const { return m_printSettings.get(); }
     GtkPageSetup* pageSetup() const { return m_pageSetup.get(); }
+    void setNumberOfPagesToPrint(size_t numberOfPages) { m_numberOfPagesToPrint = numberOfPages; }
     unsigned int pagesToPrint() const { return m_pagesToPrint; }
     int pageCount() const;
+    bool currentPageIsFirstPageOfSheet() const;
+    bool currentPageIsLastPageOfSheet() const;
+    size_t pagePosition() const { return m_pagePosition; }
+    void setPagePosition(size_t position) { m_pagePosition = position; }
     GtkPageRange* pageRanges() const { return m_pageRanges; }
     size_t pageRangesCount() const { return m_pageRangesCount; }
+
+    unsigned int numberUp() const { return m_numberUp; }
+    unsigned int numberUpLayout() const { return m_numberUpLayout; }
+    unsigned int pageSet() const { return m_pageSet; }
+    bool reverse() const { return m_reverse; }
+    unsigned int copies() const { return m_copies; }
+    bool collateCopies() const { return m_collateCopies; }
+    double scale() const { return m_scale; }
 
     virtual void startPrint(WebCore::PrintContext*, uint64_t callbackID) = 0;
 
@@ -70,7 +83,10 @@ protected:
 
     void print(cairo_surface_t*, double xDPI, double yDPI);
     void renderPage(int pageNumber);
-    void rotatePage();
+    void rotatePageIfNeeded();
+    void getRowsAndColumnsOfPagesPerSheet(size_t& rows, size_t& columns);
+    void getPositionOfPageInSheet(size_t rows, size_t columns, int& x, int&y);
+    void prepareContextToDraw();
     void printDone();
 
     WebPage* m_webPage;
@@ -83,10 +99,21 @@ protected:
     double m_yDPI;
 
     unsigned int m_printPagesIdleId;
+    size_t m_numberOfPagesToPrint;
     unsigned int m_pagesToPrint;
+    size_t m_pagePosition;
     GtkPageRange* m_pageRanges;
     size_t m_pageRangesCount;
     bool m_needsRotation;
+
+    // Manual capabilities.
+    unsigned int m_numberUp;
+    unsigned int m_numberUpLayout;
+    unsigned int m_pageSet;
+    bool m_reverse;
+    unsigned int m_copies;
+    bool m_collateCopies;
+    double m_scale;
 };
 
 }

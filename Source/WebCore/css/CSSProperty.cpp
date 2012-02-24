@@ -328,11 +328,15 @@ bool CSSProperty::isInheritedProperty(unsigned propertyID)
     case CSSPropertyWebkitHyphenateLimitBefore:
     case CSSPropertyWebkitHyphenateLimitLines:
     case CSSPropertyWebkitHyphens:
+    case CSSPropertyWebkitLineAlign:
     case CSSPropertyWebkitLineBoxContain:
     case CSSPropertyWebkitLineBreak:
     case CSSPropertyWebkitLineGrid:
-    case CSSPropertyWebkitLineGridSnap:
+    case CSSPropertyWebkitLineSnap:
     case CSSPropertyWebkitNbspMode:
+#if ENABLE(OVERFLOW_SCROLLING)
+    case CSSPropertyWebkitOverflowScrolling:
+#endif
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitTextCombine:

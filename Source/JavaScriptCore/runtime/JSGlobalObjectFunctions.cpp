@@ -297,7 +297,7 @@ static double parseInt(const UString& s, const CharType* data, int radix)
     }
     if (number >= mantissaOverflowLowerBound) {
         if (radix == 10)
-            number = WTF::strtod(s.substringSharingImpl(firstDigitPosition, p - firstDigitPosition).utf8().data(), 0);
+            number = WTF::strtod<WTF::AllowTrailingJunk>(s.substringSharingImpl(firstDigitPosition, p - firstDigitPosition).utf8().data(), 0);
         else if (radix == 2 || radix == 4 || radix == 8 || radix == 16 || radix == 32)
             number = parseIntOverflow(s.substringSharingImpl(firstDigitPosition, p - firstDigitPosition).utf8().data(), p - firstDigitPosition, radix);
     }
@@ -369,7 +369,7 @@ static double jsStrDecimalLiteral(const CharType*& data, const CharType* end)
     }
     byteBuffer.append(0);
     char* endOfNumber;
-    double number = WTF::strtod(byteBuffer.data(), &endOfNumber);
+    double number = WTF::strtod<WTF::AllowTrailingJunk>(byteBuffer.data(), &endOfNumber);
 
     // Check if strtod found a number; if so return it.
     ptrdiff_t consumed = endOfNumber - byteBuffer.data();
@@ -712,6 +712,42 @@ EncodedJSValue JSC_HOST_CALL globalFuncUnescape(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL globalFuncThrowTypeError(ExecState* exec)
 {
     return throwVMTypeError(exec);
+}
+
+EncodedJSValue JSC_HOST_CALL globalFuncProtoGetter(ExecState* exec)
+{
+    if (!exec->thisValue().isObject())
+        return JSValue::encode(exec->thisValue().synthesizePrototype(exec));
+
+    JSObject* thisObject = asObject(exec->thisValue());
+    if (!thisObject->allowsAccessFrom(exec->trueCallerFrame()))
+        return JSValue::encode(jsUndefined());
+
+    return JSValue::encode(thisObject->prototype());
+}
+
+EncodedJSValue JSC_HOST_CALL globalFuncProtoSetter(ExecState* exec)
+{
+    JSValue value = exec->argument(0);
+
+    // Setting __proto__ of a primitive should have no effect.
+    if (!exec->thisValue().isObject())
+        return JSValue::encode(jsUndefined());
+
+    JSObject* thisObject = asObject(exec->thisValue());
+    if (!thisObject->allowsAccessFrom(exec->trueCallerFrame()))
+        return JSValue::encode(jsUndefined());
+
+    // Setting __proto__ to a non-object, non-null value is silently ignored to match Mozilla.
+    if (!value.isObject() && !value.isNull())
+        return JSValue::encode(jsUndefined());
+
+    if (!thisObject->isExtensible())
+        return throwVMError(exec, createTypeError(exec, StrictModeReadonlyPropertyWriteError));
+
+    if (!thisObject->setPrototypeWithCycleCheck(exec->globalData(), value))
+        throwError(exec, createError(exec, "cyclic __proto__ value"));
+    return JSValue::encode(jsUndefined());
 }
 
 } // namespace JSC

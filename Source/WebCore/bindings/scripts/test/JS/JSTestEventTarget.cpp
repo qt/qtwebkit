@@ -39,8 +39,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSTestEventTarget);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestEventTarget);
-
 /* Hash table */
 
 static const HashTableValue JSTestEventTargetTableValues[] =
@@ -58,8 +56,6 @@ static const HashTableValue JSTestEventTargetConstructorTableValues[] =
 };
 
 static const HashTable JSTestEventTargetConstructorTable = { 1, 0, JSTestEventTargetConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestEventTargetConstructor);
-
 const ClassInfo JSTestEventTargetConstructor::s_info = { "TestEventTargetConstructor", &Base::s_info, &JSTestEventTargetConstructorTable, 0, CREATE_METHOD_TABLE(JSTestEventTargetConstructor) };
 
 JSTestEventTargetConstructor::JSTestEventTargetConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -137,7 +133,12 @@ JSObject* JSTestEventTarget::createPrototype(ExecState* exec, JSGlobalObject* gl
 void JSTestEventTarget::destroy(JSC::JSCell* cell)
 {
     JSTestEventTarget* thisObject = jsCast<JSTestEventTarget*>(cell);
-    thisObject->releaseImplIfNotNull();
+    thisObject->JSTestEventTarget::~JSTestEventTarget();
+}
+
+JSTestEventTarget::~JSTestEventTarget()
+{
+    releaseImplIfNotNull();
 }
 
 bool JSTestEventTarget::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -231,7 +232,7 @@ EncodedJSValue JSC_HOST_CALL jsTestEventTargetPrototypeFunctionItem(ExecState* e
     TestEventTarget* impl = static_cast<TestEventTarget*>(castedThis->impl());
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    int index(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toUInt32(exec));
+    int index(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).toUInt32(exec));
     if (index < 0) {
         setDOMException(exec, INDEX_SIZE_ERR);
         return JSValue::encode(jsUndefined());
@@ -288,7 +289,7 @@ EncodedJSValue JSC_HOST_CALL jsTestEventTargetPrototypeFunctionDispatchEvent(Exe
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
     ExceptionCode ec = 0;
-    Event* evt(toEvent(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    Event* evt(toEvent(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 

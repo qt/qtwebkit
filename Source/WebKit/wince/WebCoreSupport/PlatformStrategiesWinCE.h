@@ -26,7 +26,6 @@
 #define PlatformStrategiesWinCE_h
 
 #include "CookiesStrategy.h"
-#include "LocalizationStrategy.h"
 #include "PlatformStrategies.h"
 #include "PluginStrategy.h"
 #include "VisitedLinkStrategy.h"
@@ -42,6 +41,7 @@ private:
     virtual WebCore::CookiesStrategy* createCookiesStrategy();
     virtual WebCore::PluginStrategy* createPluginStrategy();
     virtual WebCore::VisitedLinkStrategy* createVisitedLinkStrategy();
+    virtual WebCore::PasteboardStrategy* createPasteboardStrategy();
 
     // WebCore::CookiesStrategy
     virtual void notifyCookiesChanged();

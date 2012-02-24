@@ -57,7 +57,7 @@ public:
 
     bool isPreloaded(Document*, const String& url);
 
-    size_t numberOfScopedHTMLStyleChildren(const Element*, ExceptionCode&) const;
+    size_t numberOfScopedHTMLStyleChildren(const Node*, ExceptionCode&) const;
 
 #if ENABLE(SHADOW_DOM)
     typedef ShadowRoot ShadowRootIfShadowDOMEnabledOrNode;
@@ -66,12 +66,17 @@ public:
 #endif
     ShadowRootIfShadowDOMEnabledOrNode* ensureShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* shadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* youngestShadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
     void removeShadowRoot(Element* host, ExceptionCode&);
+    void setMultipleShadowSubtreesEnabled(bool);
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
     Element* getElementByIdInShadowRoot(Node* shadowRoot, const String& id, ExceptionCode&);
     bool isValidContentSelect(Element* contentElement, ExceptionCode&);
+
+    bool attached(Node*, ExceptionCode&);
 
 #if ENABLE(INPUT_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);

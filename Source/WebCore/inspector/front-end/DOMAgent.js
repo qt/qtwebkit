@@ -660,9 +660,6 @@ WebInspector.DOMAgent = function() {
     this._document = null;
     this._attributeLoadNodeIds = {};
     InspectorBackend.registerDOMDispatcher(new WebInspector.DOMDispatcher(this));
-    if (WebInspector.experimentsSettings.freeFlowDOMEditing.isEnabled())
-        new WebInspector.DOMModelResourceBinding(this);
-
     if (WebInspector.settings.emulateTouchEvents.get())
         this._emulateTouchEventsChanged();
     WebInspector.settings.emulateTouchEvents.addChangeListener(this._emulateTouchEventsChanged, this);
@@ -677,7 +674,9 @@ WebInspector.DOMAgent.Events = {
     DocumentUpdated: "DocumentUpdated",
     ChildNodeCountUpdated: "ChildNodeCountUpdated",
     InspectElementRequested: "InspectElementRequested",
-    StyleInvalidated: "StyleInvalidated"
+    StyleInvalidated: "StyleInvalidated",
+    UndoRedoRequested: "UndoRedoRequested",
+    UndoRedoCompleted: "UndoRedoCompleted"
 }
 
 WebInspector.DOMAgent.prototype = {
@@ -1115,50 +1114,53 @@ WebInspector.DOMAgent.prototype = {
     {
         function wrapperFunction(error)
         {
+            if (!error)
+                this.markUndoableState();
+
             if (callback)
                 callback.apply(this, arguments);
-            if (error || !WebInspector.experimentsSettings.freeFlowDOMEditing.isEnabled())
-                return;
-            if (this._captureDOMTimer)
-               clearTimeout(this._captureDOMTimer);
-            this._captureDOMTimer = setTimeout(this._captureDOM.bind(this, node), 500);
         }
         return wrapperFunction.bind(this);
-    },
-
-    /**
-     * @param {WebInspector.DOMNode} node
-     */
-    _captureDOM: function(node)
-    {
-        delete this._captureDOMTimer;
-        if (!node.ownerDocument)
-            return;
-
-        function callback(error, text)
-        {
-            if (error) {
-                console.error(error);
-                return;
-            }
-
-            var url = node.ownerDocument.documentURL;
-            if (!url)
-                return;
-
-            var resource = WebInspector.resourceForURL(url);
-            if (!resource)
-                return;
-
-            resource.addRevision(text);
-        }
-        DOMAgent.getOuterHTML(node.ownerDocument.id, callback);
-        
     },
 
     _emulateTouchEventsChanged: function()
     {
         DOMAgent.setTouchEmulationEnabled(WebInspector.settings.emulateTouchEvents.get());
+    },
+
+    markUndoableState: function()
+    {
+        DOMAgent.markUndoableState();
+    },
+
+    /**
+     * @param {function(?Protocol.Error)=} callback
+     */
+    undo: function(callback)
+    {
+        function mycallback(error)
+        {
+            this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoCompleted);
+            callback(error);
+        }
+
+        this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoRequested);
+        DOMAgent.undo(callback);
+    },
+
+    /**
+     * @param {function(?Protocol.Error)=} callback
+     */
+    redo: function(callback)
+    {
+        function mycallback(error)
+        {
+            this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoCompleted);
+            callback(error);
+        }
+
+        this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoRequested);
+        DOMAgent.redo(callback);
     }
 }
 
@@ -1258,39 +1260,3 @@ WebInspector.DOMDispatcher.prototype = {
  * @type {?WebInspector.DOMAgent}
  */
 WebInspector.domAgent = null;
-
-/**
- * @constructor
- * @implements {WebInspector.ResourceDomainModelBinding}
- */
-WebInspector.DOMModelResourceBinding = function(domAgent)
-{
-    this._domAgent = domAgent;
-    WebInspector.Resource.registerDomainModelBinding(WebInspector.Resource.Type.Document, this);
-}
-
-WebInspector.DOMModelResourceBinding.prototype = {
-    setContent: function(resource, content, majorChange, userCallback)
-    {
-        var frameId = resource.frameId;
-        if (!frameId)
-            return;
-
-        PageAgent.setDocumentContent(frameId, content, callbackWrapper);
-
-        function callbackWrapper(error)
-        {
-            if (majorChange)
-                resource.addRevision(content);
-            if (userCallback)
-                userCallback(error);
-        }
-    },
-
-    canSetContent: function()
-    {
-        return true;
-    }
-}
-
-WebInspector.DOMModelResourceBinding.prototype.__proto__ = WebInspector.ResourceDomainModelBinding.prototype;

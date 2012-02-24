@@ -515,6 +515,7 @@ TEST_F(LayerChromiumTest, checkPropertyChangeCausesCorrectBehavior)
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setReplicaLayer(dummyLayer.get()));
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setSublayerTransform(TransformationMatrix(0, 0, 0, 0, 0, 0)));
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setScrollable(true));
+    EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setHaveWheelEventHandlers(true));
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setScrollPosition(IntPoint(10, 10)));
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setTransform(TransformationMatrix(0, 0, 0, 0, 0, 0)));
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setDoubleSided(false));
@@ -539,10 +540,21 @@ public:
         return true;
     }
 
+    virtual void setNeedsDisplayRect(const FloatRect& dirtyRect)
+    {
+        m_lastNeedsDisplayRect = dirtyRect;
+        LayerChromium::setNeedsDisplayRect(dirtyRect);
+    }
+
     void resetNeedsDisplay()
     {
         m_needsDisplay = false;
     }
+
+    const FloatRect& lastNeedsDisplayRect() const { return m_lastNeedsDisplayRect; }
+
+private:
+    FloatRect m_lastNeedsDisplayRect;
 };
 
 TEST_F(LayerChromiumTest, checkContentsScaleChangeTriggersNeedsDisplay)
@@ -558,6 +570,7 @@ TEST_F(LayerChromiumTest, checkContentsScaleChangeTriggersNeedsDisplay)
 
     EXECUTE_AND_VERIFY_SET_NEEDS_COMMIT_BEHAVIOR(1, testLayer->setContentsScale(testLayer->contentsScale() + 1.f));
     EXPECT_TRUE(testLayer->needsDisplay());
+    EXPECT_FLOAT_RECT_EQ(FloatRect(0, 0, 320, 240), testLayer->lastNeedsDisplayRect());
 }
 
 class FakeCCLayerTreeHost : public CCLayerTreeHost {

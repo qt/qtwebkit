@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -76,10 +76,20 @@ String CSSCalcValue::customCssText() const
 {
     return "";
 }
-
+    
+double CSSCalcValue::clampToPermittedRange(double value) const
+{
+    return m_nonNegative && value < 0 ? 0 : value;
+}    
+    
 double CSSCalcValue::doubleValue() const 
 { 
-    return m_expression->doubleValue();
+    return clampToPermittedRange(m_expression->doubleValue());
+}
+
+double CSSCalcValue::computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier, bool computingFontSize) const
+{
+    return clampToPermittedRange(m_expression->computeLengthPx(currentStyle, rootStyle, multiplier, computingFontSize));
 }
     
 CSSCalcExpressionNode::~CSSCalcExpressionNode() 
@@ -94,6 +104,11 @@ public:
         return adoptRef(new CSSCalcPrimitiveValue(value, isInteger));
     }
     
+    virtual bool isZero() const
+    {
+        return !m_value->getDoubleValue();
+    }
+
     virtual String cssText() const
     {
         return m_value->cssText();
@@ -113,7 +128,25 @@ public:
             break;
         }
         return 0;
-    }    
+    }
+    
+    virtual double computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier, bool computingFontSize) const
+    {
+        switch (m_category) {
+        case CalcLength:
+            return m_value->computeLength<double>(currentStyle, rootStyle, multiplier, computingFontSize);
+        case CalcPercent:
+        case CalcNumber:
+            return m_value->getDoubleValue();
+        case CalcPercentLength:
+        case CalcPercentNumber:
+        case CalcOther:
+            ASSERT_NOT_REACHED();
+            break;
+        }
+        return 0;        
+    }
+    
 private:
     explicit CSSCalcPrimitiveValue(CSSPrimitiveValue* value, bool isInteger)
         : CSSCalcExpressionNode(unitCategory((CSSPrimitiveValue::UnitTypes)value->primitiveType()), isInteger)
@@ -158,7 +191,6 @@ public:
             break;
                 
         case CalcDivide:
-        case CalcMod:
             if (rightCategory != CalcNumber || rightSide->isZero())
                 return 0;
             newCategory = leftCategory;
@@ -171,9 +203,21 @@ public:
         return adoptRef(new CSSCalcBinaryOperation(leftSide, rightSide, op, newCategory));
     }
     
+    virtual bool isZero() const
+    {
+        return !doubleValue();
+    }
+
     virtual double doubleValue() const 
     {
         return evaluate(m_leftSide->doubleValue(), m_rightSide->doubleValue());
+    }
+    
+    virtual double computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier, bool computingFontSize) const
+    {
+        const double leftValue = m_leftSide->computeLengthPx(currentStyle, rootStyle, multiplier, computingFontSize);
+        const double rightValue = m_rightSide->computeLengthPx(currentStyle, rootStyle, multiplier, computingFontSize);
+        return evaluate(leftValue, rightValue);
     }
 
 private:
@@ -198,10 +242,6 @@ private:
             if (rightValue)
                 return leftValue / rightValue;
             return std::numeric_limits<double>::quiet_NaN();
-        case CalcMod:
-            // FIXME calc() : mod has been removed from the spec, need to remove
-            // this enum value
-            return 0;
         }
         return 0;
     }
@@ -296,7 +336,7 @@ private:
 
         while (*index < tokens->size() - 1) {
             char operatorCharacter = operatorValue(tokens, *index);
-            if (operatorCharacter != CalcMultiply && operatorCharacter != CalcDivide && operatorCharacter != CalcMod)
+            if (operatorCharacter != CalcMultiply && operatorCharacter != CalcDivide)
                 break;
             ++*index;
 
@@ -346,7 +386,7 @@ private:
     }
 };
 
-PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserValueList* parserValueList)
+PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserValueList* parserValueList, CalculationPermittedValueRange range)
 {    
     CSSCalcExpressionNodeParser parser;    
     RefPtr<CSSCalcExpressionNode> expression;
@@ -355,7 +395,7 @@ PassRefPtr<CSSCalcValue> CSSCalcValue::create(CSSParserString name, CSSParserVal
         expression = parser.parseCalc(parserValueList);    
     // FIXME calc (http://webkit.org/b/16662) Add parsing for min and max here
 
-    return expression ? adoptRef(new CSSCalcValue(expression)) : 0;
+    return expression ? adoptRef(new CSSCalcValue(expression, range)) : 0;
 }
 
 } // namespace WebCore

@@ -233,7 +233,8 @@ public:
     virtual void needTouchEvents(bool) { }
 #endif
     
-    virtual void numWheelEventHandlersChanged(unsigned) { }
+    virtual void numWheelEventHandlersChanged(unsigned) OVERRIDE { }
+    virtual void numTouchEventHandlersChanged(unsigned) OVERRIDE { }
     
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const { return false; }
 };
@@ -431,7 +432,7 @@ public:
 #endif
 
     virtual void getGuessesForWord(const String&, const String&, Vector<String>&) { }
-    virtual void requestCheckingOfString(SpellChecker*, int, TextCheckingTypeMask, const String&) { }
+    virtual void requestCheckingOfString(SpellChecker*, const TextCheckingRequest&) { }
 };
 
 class EmptyEditorClient : public EditorClient {
@@ -460,7 +461,7 @@ public:
     virtual bool shouldInsertText(const String&, Range*, EditorInsertAction) { return false; }
     virtual bool shouldChangeSelectedRange(Range*, Range*, EAffinity, bool) { return false; }
 
-    virtual bool shouldApplyStyle(CSSStyleDeclaration*, Range*) { return false; }
+    virtual bool shouldApplyStyle(StylePropertySet*, Range*) { return false; }
     virtual bool shouldMoveRangeAfterDelete(Range*, Range*) { return false; }
 
     virtual void didBeginEditing() { }

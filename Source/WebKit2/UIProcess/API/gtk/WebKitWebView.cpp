@@ -24,9 +24,11 @@
 #include "WebKitBackForwardListPrivate.h"
 #include "WebKitEnumTypes.h"
 #include "WebKitError.h"
+#include "WebKitHitTestResultPrivate.h"
 #include "WebKitLoaderClient.h"
 #include "WebKitMarshal.h"
 #include "WebKitPolicyClient.h"
+#include "WebKitPrintOperationPrivate.h"
 #include "WebKitPrivate.h"
 #include "WebKitSettingsPrivate.h"
 #include "WebKitUIClient.h"
@@ -59,6 +61,10 @@ enum {
 
     DECIDE_POLICY,
 
+    MOUSE_TARGET_CHANGED,
+
+    PRINT_REQUESTED,
+
     LAST_SIGNAL
 };
 
@@ -83,6 +89,9 @@ struct _WebKitWebViewPrivate {
     GRefPtr<WebKitBackForwardList> backForwardList;
     GRefPtr<WebKitSettings> settings;
     GRefPtr<WebKitWindowProperties> windowProperties;
+
+    GRefPtr<WebKitHitTestResult> mouseTargetHitTestResult;
+    unsigned mouseTargetModifiers;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
@@ -615,6 +624,59 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
                      G_TYPE_BOOLEAN, 2, /* number of parameters */
                      WEBKIT_TYPE_POLICY_DECISION,
                      WEBKIT_TYPE_POLICY_DECISION_TYPE);
+
+    /**
+     * WebKitWebView::mouse-target-changed:
+     * @web_view: the #WebKitWebView on which the signal is emitted
+     * @hit_test_result: a #WebKitHitTestResult
+     * @modifiers: a bitmask of #GdkModifierType
+     *
+     * This signal is emitted when the mouse cursor moves over an
+     * element such as a link, image or a media element. To determine
+     * what type of element the mouse cursor is over, a Hit Test is performed
+     * on the current mouse coordinates and the result is passed in the
+     * @hit_test_result argument. The @modifiers argument is a bitmask of
+     * #GdkModifierType flags indicating the state of modifier keys.
+     * The signal is emitted again when the mouse is moved out of the
+     * current element with a new @hit_test_result.
+     */
+     signals[MOUSE_TARGET_CHANGED] =
+         g_signal_new("mouse-target-changed",
+                      G_TYPE_FROM_CLASS(webViewClass),
+                      G_SIGNAL_RUN_LAST,
+                      G_STRUCT_OFFSET(WebKitWebViewClass, mouse_target_changed),
+                      0, 0,
+                      webkit_marshal_VOID__OBJECT_UINT,
+                      G_TYPE_NONE, 2,
+                      WEBKIT_TYPE_HIT_TEST_RESULT,
+                      G_TYPE_UINT);
+    /**
+     * WebKitWebView::print-requested:
+     * @web_view: the #WebKitWebView on which the signal is emitted
+     * @print_operation: the #WebKitPrintOperation that will handle the print request
+     *
+     * Emitted when printing is requested on @web_view, usually by a javascript call,
+     * before the print dialog is shown. This signal can be used to set the initial
+     * print settings and page setup of @print_operation to be used as default values in
+     * the print dialog. You can call webkit_print_operation_set_print_settings() and
+     * webkit_print_operation_set_page_setup() and then return %FALSE to propagate the
+     * event so that the print dialog is shown.
+     *
+     * You can connect to this signal and return %TRUE to cancel the print operation
+     * or implement your own print dialog.
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *    %FALSE to propagate the event further.
+     */
+    signals[PRINT_REQUESTED] =
+        g_signal_new("print-requested",
+                     G_TYPE_FROM_CLASS(webViewClass),
+                     G_SIGNAL_RUN_LAST,
+                     G_STRUCT_OFFSET(WebKitWebViewClass, print_requested),
+                     g_signal_accumulator_true_handled, 0,
+                     webkit_marshal_BOOLEAN__OBJECT,
+                     G_TYPE_BOOLEAN, 1,
+                     WEBKIT_TYPE_PRINT_OPERATION);
 }
 
 void webkitWebViewLoadChanged(WebKitWebView* webView, WebKitLoadEvent loadEvent)
@@ -726,6 +788,33 @@ void webkitWebViewMakePolicyDecision(WebKitWebView* webView, WebKitPolicyDecisio
     g_signal_emit(webView, signals[DECIDE_POLICY], 0, decision, type, &returnValue);
 }
 
+void webkitWebViewMouseTargetChanged(WebKitWebView* webView, WKHitTestResultRef wkHitTestResult, unsigned modifiers)
+{
+    WebKitWebViewPrivate* priv = webView->priv;
+    if (priv->mouseTargetHitTestResult
+        && priv->mouseTargetModifiers == modifiers
+        && webkitHitTestResultCompare(priv->mouseTargetHitTestResult.get(), wkHitTestResult))
+        return;
+
+    priv->mouseTargetModifiers = modifiers;
+    priv->mouseTargetHitTestResult = adoptGRef(webkitHitTestResultCreate(wkHitTestResult));
+    g_signal_emit(webView, signals[MOUSE_TARGET_CHANGED], 0, priv->mouseTargetHitTestResult.get(), modifiers);
+}
+
+void webkitWebViewPrintFrame(WebKitWebView* webView, WKFrameRef wkFrame)
+{
+    GRefPtr<WebKitPrintOperation> printOperation = adoptGRef(webkit_print_operation_new(webView));
+    gboolean returnValue;
+    g_signal_emit(webView, signals[PRINT_REQUESTED], 0, printOperation.get(), &returnValue);
+    if (returnValue)
+        return;
+
+    WebKitPrintOperationResponse response = webkitPrintOperationRunDialogForFrame(printOperation.get(), 0, toImpl(wkFrame));
+    if (response == WEBKIT_PRINT_OPERATION_RESPONSE_CANCEL)
+        return;
+    g_signal_connect(printOperation.leakRef(), "finished", G_CALLBACK(g_object_unref), 0);
+}
+
 /**
  * webkit_web_view_new:
  *
@@ -796,10 +885,14 @@ void webkit_web_view_load_uri(WebKitWebView* webView, const gchar* uri)
  * @base_uri: (allow-none): The base URI for relative locations or %NULL
  *
  * Load the given @content string with the specified @base_uri.
- * Relative URLs in the @content will be resolved against @base_uri.
- * When @base_uri is %NULL, it defaults to "about:blank". The mime type
- * of the document will be "text/html". You can monitor the load operation
- * by connecting to #WebKitWebView::load-changed signal.
+ * If @base_uri is not %NULL, relative URLs in the @content will be
+ * resolved against @base_uri and absolute local paths must be children of the @base_uri.
+ * For security reasons absolute local paths that are not children of @base_uri
+ * will cause the web process to terminate.
+ * If you need to include URLs in @content that are local paths in a different
+ * directory than @base_uri you can build a data URI for them. When @base_uri is %NULL,
+ * it defaults to "about:blank". The mime type of the document will be "text/html".
+ * You can monitor the load operation by connecting to #WebKitWebView::load-changed signal.
  */
 void webkit_web_view_load_html(WebKitWebView* webView, const gchar* content, const gchar* baseURI)
 {

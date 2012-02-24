@@ -78,6 +78,35 @@ PassRefPtr<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document* 
     return image.release();
 }
 
+bool HTMLImageElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == widthAttr || attr->name() == heightAttr || attr->name() == borderAttr || attr->name() == vspaceAttr || attr->name() == hspaceAttr || attr->name() == alignAttr || attr->name() == valignAttr)
+        return true;
+    return HTMLElement::isPresentationAttribute(attr);
+}
+
+void HTMLImageElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    if (attr->name() == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
+    else if (attr->name() == heightAttr)
+        addHTMLLengthToStyle(style, CSSPropertyHeight, attr->value());
+    else if (attr->name() == borderAttr)
+        applyBorderAttributeToStyle(attr, style);
+    else if (attr->name() == vspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginTop, attr->value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginBottom, attr->value());
+    } else if (attr->name() == hspaceAttr) {
+        addHTMLLengthToStyle(style, CSSPropertyMarginLeft, attr->value());
+        addHTMLLengthToStyle(style, CSSPropertyMarginRight, attr->value());
+    } else if (attr->name() == alignAttr)
+        applyAlignmentAttributeToStyle(attr, style);
+    else if (attr->name() == valignAttr)
+        addPropertyToAttributeStyle(style, CSSPropertyVerticalAlign, attr->value());
+    else
+        HTMLElement::collectStyleForAttribute(attr, style);
+}
+
 void HTMLImageElement::parseAttribute(Attribute* attr)
 {
     const QualifiedName& attrName = attr->name();
@@ -86,40 +115,6 @@ void HTMLImageElement::parseAttribute(Attribute* attr)
             toRenderImage(renderer())->updateAltText();
     } else if (attrName == srcAttr)
         m_imageLoader.updateFromElementIgnoringPreviousError();
-    else if (attrName == widthAttr)
-        if (attr->value().isNull())
-            removeCSSProperty(CSSPropertyWidth);
-        else
-            addCSSLength(CSSPropertyWidth, attr->value());
-    else if (attrName == heightAttr)
-        if (attr->value().isNull())
-            removeCSSProperty(CSSPropertyHeight);
-        else
-            addCSSLength(CSSPropertyHeight, attr->value());
-    else if (attrName == borderAttr) {
-        // border="noborder" -> border="0"
-        applyBorderAttribute(attr);
-    } else if (attrName == vspaceAttr) {
-        if (attr->value().isNull())
-            removeCSSProperties(CSSPropertyMarginTop, CSSPropertyMarginBottom);
-        else {
-            addCSSLength(CSSPropertyMarginTop, attr->value());
-            addCSSLength(CSSPropertyMarginBottom, attr->value());
-        }
-    } else if (attrName == hspaceAttr) {
-        if (attr->value().isNull())
-            removeCSSProperties(CSSPropertyMarginLeft, CSSPropertyMarginRight);
-        else {
-            addCSSLength(CSSPropertyMarginLeft, attr->value());
-            addCSSLength(CSSPropertyMarginRight, attr->value());
-        }
-    } else if (attrName == alignAttr)
-        addHTMLAlignment(attr);
-    else if (attrName == valignAttr)
-        if (attr->value().isNull())
-            removeCSSProperty(CSSPropertyVerticalAlign);
-        else
-            addCSSProperty(CSSPropertyVerticalAlign, attr->value());
     else if (attrName == usemapAttr)
         setIsLink(!attr->isNull());
     else if (attrName == onabortAttr)

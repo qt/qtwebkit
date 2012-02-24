@@ -120,15 +120,6 @@ public:
     void setStringAttrWithGetterException(const WebDOMString&);
     WebDOMString stringAttrWithSetterException() const;
     void setStringAttrWithSetterException(const WebDOMString&);
-    int withScriptStateAttribute() const;
-    void setWithScriptStateAttribute(int);
-    WebDOMTestObj withScriptExecutionContextAttribute() const;
-    void setWithScriptExecutionContextAttribute(const WebDOMTestObj&);
-    WebDOMTestObj withScriptStateAttributeRaises() const;
-    void setWithScriptStateAttributeRaises(const WebDOMTestObj&);
-    WebDOMTestObj withScriptExecutionContextAttributeRaises() const;
-    void setWithScriptExecutionContextAttributeRaises(const WebDOMTestObj&);
-    WebDOMString scriptStringAttr() const;
 #if ENABLE(Condition1)
     int conditionalAttr1() const;
     void setConditionalAttr1(int);
@@ -178,14 +169,12 @@ public:
     void methodWithException();
     void addEventListener(const WebDOMString& type, const WebDOMEventListener& listener, bool useCapture);
     void removeEventListener(const WebDOMString& type, const WebDOMEventListener& listener, bool useCapture);
-    void withScriptStateVoid();
-    WebDOMTestObj withScriptStateObj();
-    void withScriptStateVoidException();
-    WebDOMTestObj withScriptStateObjException();
-    void withScriptExecutionContext();
     void methodWithOptionalArg(int opt);
     void methodWithNonOptionalArgAndOptionalArg(int nonOpt, int opt);
     void methodWithNonOptionalArgAndTwoOptionalArgs(int nonOpt, int opt1, int opt2);
+    void methodWithOptionalString(const WebDOMString& str);
+    void methodWithOptionalStringIsUndefined(const WebDOMString& str);
+    void methodWithOptionalStringIsNullString(const WebDOMString& str);
     WebDOMString conditionalMethod1();
     void conditionalMethod2();
     void conditionalMethod3();
@@ -200,7 +189,7 @@ public:
     void convert5(const WebDOMe& );
     WebDOMSVGPoint mutablePointFunction();
     WebDOMSVGPoint immutablePointFunction();
-    void orange();
+    void banana();
     WebDOMbool strictFunction(const WebDOMString& str, float a, int b);
 
     WebCore::TestObj* impl() const;

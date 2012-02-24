@@ -32,8 +32,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSTestNamedConstructor);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestNamedConstructor);
-
 /* Hash table for constructor */
 
 static const HashTableValue JSTestNamedConstructorTableValues[] =
@@ -51,8 +49,6 @@ static const HashTableValue JSTestNamedConstructorConstructorTableValues[] =
 };
 
 static const HashTable JSTestNamedConstructorConstructorTable = { 1, 0, JSTestNamedConstructorConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestNamedConstructorConstructor);
-
 const ClassInfo JSTestNamedConstructorConstructor::s_info = { "TestNamedConstructorConstructor", &Base::s_info, &JSTestNamedConstructorConstructorTable, 0, CREATE_METHOD_TABLE(JSTestNamedConstructorConstructor) };
 
 JSTestNamedConstructorConstructor::JSTestNamedConstructorConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -97,13 +93,13 @@ EncodedJSValue JSC_HOST_CALL JSTestNamedConstructorNamedConstructor::constructJS
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
     ExceptionCode ec = 0;
-    const String& str1(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toString(exec)->value(exec)));
+    const String& str1(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).toString(exec)->value(exec)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
-    const String& str2(ustringToString(MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined).toString(exec)->value(exec)));
+    const String& str2(ustringToString(MAYBE_MISSING_PARAMETER(exec, 1, DefaultIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 1, DefaultIsUndefined).toString(exec)->value(exec)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
-    const String& str3(ustringToString(MAYBE_MISSING_PARAMETER(exec, 2, MissingIsEmpty).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 2, MissingIsEmpty).toString(exec)->value(exec)));
+    const String& str3(ustringToString(MAYBE_MISSING_PARAMETER(exec, 2, DefaultIsNullString).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 2, DefaultIsNullString).toString(exec)->value(exec)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     RefPtr<TestNamedConstructor> object = TestNamedConstructor::createForJSConstructor(jsConstructor->document(), str1, str2, str3, ec);
@@ -157,7 +153,12 @@ JSObject* JSTestNamedConstructor::createPrototype(ExecState* exec, JSGlobalObjec
 void JSTestNamedConstructor::destroy(JSC::JSCell* cell)
 {
     JSTestNamedConstructor* thisObject = jsCast<JSTestNamedConstructor*>(cell);
-    thisObject->releaseImplIfNotNull();
+    thisObject->JSTestNamedConstructor::~JSTestNamedConstructor();
+}
+
+JSTestNamedConstructor::~JSTestNamedConstructor()
+{
+    releaseImplIfNotNull();
 }
 
 bool JSTestNamedConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)

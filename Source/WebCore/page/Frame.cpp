@@ -229,6 +229,15 @@ Frame::~Frame()
     }
 }
 
+bool Frame::inScope(TreeScope* scope) const
+{
+    ASSERT(scope);
+    HTMLFrameOwnerElement* owner = document()->ownerElement();
+    // Scoping test should be done only for child frames.
+    ASSERT(owner);
+    return owner->treeScope() == scope;
+}
+
 void Frame::addDestructionObserver(FrameDestructionObserver* observer)
 {
     m_destructionObservers.add(observer);
@@ -293,8 +302,10 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     if (m_doc)
         m_doc->updateViewportArguments();
 
-    if (m_page && m_page->mainFrame() == this)
+    if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
+        notifyChromeClientTouchEventHandlerCountChanged();
+    }
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -481,7 +492,7 @@ String Frame::matchLabelsAgainstElement(const Vector<String>& labels, Element* e
     // See 7538330 for one popular site that benefits from the id element check.
     // FIXME: This code is mirrored in FrameMac.mm. It would be nice to make the Mac code call the platform-agnostic
     // code, which would require converting the NSArray of NSStrings to a Vector of Strings somewhere along the way.
-    String resultFromNameAttribute = matchLabelsAgainstString(labels, element->getAttribute(nameAttr));
+    String resultFromNameAttribute = matchLabelsAgainstString(labels, element->getNameAttribute());
     if (!resultFromNameAttribute.isEmpty())
         return resultFromNameAttribute;
     
@@ -658,21 +669,19 @@ DOMWindow* Frame::domWindow() const
     return m_domWindow.get();
 }
 
-void Frame::pageDestroyed()
+void Frame::willDetachPage()
 {
-    // FIXME: Rename this function, since it's called not only from Page destructor, but in several other cases.
-    // This cleanup is needed whenever we remove a frame from page.
-
     if (Frame* parent = tree()->parent())
         parent->loader()->checkLoadComplete();
 
-    if (m_domWindow) {
-        m_domWindow->resetGeolocation();
 #if ENABLE(NOTIFICATIONS)
+    if (m_domWindow)
         m_domWindow->resetNotifications();
 #endif
-        m_domWindow->pageDestroyed();
-    }
+
+    HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
+    for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
+        (*it)->willDetachPage();
 
     // FIXME: It's unclear as to why this is called more than once, but it is,
     // so page() could be NULL.
@@ -681,8 +690,6 @@ void Frame::pageDestroyed()
 
     script()->clearScriptObjects();
     script()->updatePlatformScriptObjects();
-
-    detachFromPage();
 }
 
 void Frame::disconnectOwnerElement()
@@ -716,16 +723,15 @@ void Frame::transferChildFrameToNewDocument()
              m_page->decrementFrameCount();
         }
 
-        // FIXME: We should ideally allow existing Geolocation activities to continue
-        // when the Geolocation's iframe is reparented.
-        // See https://bugs.webkit.org/show_bug.cgi?id=55577
-        // and https://bugs.webkit.org/show_bug.cgi?id=52877
         if (m_domWindow) {
-            m_domWindow->resetGeolocation();
 #if ENABLE(NOTIFICATIONS)
             m_domWindow->resetNotifications();
 #endif
         }
+
+        HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
+        for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
+            (*it)->willDetachPage();
 
         m_page = newPage;
 
@@ -1020,14 +1026,28 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
 {
     // Ensure that this method is being called on the main frame of the page.
     ASSERT(m_page && m_page->mainFrame() == this);
-    
+
     unsigned count = 0;
     for (const Frame* frame = this; frame; frame = frame->tree()->traverseNext()) {
         if (frame->document())
             count += frame->document()->wheelEventHandlerCount();
     }
-    
+
     m_page->chrome()->client()->numWheelEventHandlersChanged(count);
+}
+
+void Frame::notifyChromeClientTouchEventHandlerCountChanged() const
+{
+    // Ensure that this method is being called on the main frame of the page.
+    ASSERT(m_page && m_page->mainFrame() == this);
+
+    unsigned count = 0;
+    for (const Frame* frame = this; frame; frame = frame->tree()->traverseNext()) {
+        if (frame->document())
+            count += frame->document()->touchEventHandlerCount();
+    }
+
+    m_page->chrome()->client()->numTouchEventHandlersChanged(count);
 }
 
 #if !PLATFORM(MAC) && !PLATFORM(WIN)
@@ -1072,7 +1092,7 @@ DragImageRef Frame::nodeImage(Node* node)
     m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
 
     LayoutRect topLevelRect;
-    IntRect paintingRect = renderer->paintingRootRect(topLevelRect);
+    IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
 
     OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
     if (!buffer)

@@ -759,6 +759,14 @@ class CppStyleTest(CppStyleTestBase):
         self.assert_language_rules_check('foo.cpp', statement, error_message)
         self.assert_language_rules_check('foo.h', statement, error_message)
 
+    # Test for static_cast readability.
+    def test_static_cast_readability(self):
+        self.assert_lint(
+            'Text* x = static_cast<Text*>(foo);',
+            'Consider using toText helper function in WebCore/dom/Text.h '
+            'instead of static_cast<Text*>'
+            '  [readability/check] [4]')
+
     # We cannot test this functionality because of difference of
     # function definitions.  Anyway, we may never enable this.
     #
@@ -775,7 +783,7 @@ class CppStyleTest(CppStyleTestBase):
     #   self.assert_lint('void Method(char* /*x*/);', message)
     #   self.assert_lint('typedef void (*Method)(int32);', message)
     #   self.assert_lint('static void operator delete[](void*) throw();', message)
-    # 
+    #
     #   self.assert_lint('virtual void D(int* p);', '')
     #   self.assert_lint('void operator delete(void* x) throw();', '')
     #   self.assert_lint('void Method(char* x)\n{', '')
@@ -784,7 +792,7 @@ class CppStyleTest(CppStyleTestBase):
     #   self.assert_lint('typedef void (*Method)(int32 x);', '')
     #   self.assert_lint('static void operator delete[](void* x) throw();', '')
     #   self.assert_lint('static void operator delete[](void* /*x*/) throw();', '')
-    # 
+    #
     #   # This one should technically warn, but doesn't because the function
     #   # pointer is confusing.
     #   self.assert_lint('virtual void E(void (*fn)(int* p));', '')
@@ -3064,7 +3072,7 @@ class CheckForFunctionLengthsTest(CppStyleTestBase):
 
     def test_function_length_check_definition_huge_lines(self):
         # 5 is the limit
-        self.assert_function_length_check_definition(self.trigger_lines(10), 5)
+        self.assert_function_length_check_definition(self.trigger_lines(6), 5)
 
     def test_function_length_not_determinable(self):
         # Macro invocation without terminating semicolon.
@@ -4338,6 +4346,13 @@ class WebKitStyleTest(CppStyleTestBase):
             'Use std::min() or std::min<type>() instead of the MIN() macro.'
             '  [runtime/max_min_macros] [4]',
             'foo.h')
+
+    def test_ctype_fucntion(self):
+        self.assert_lint(
+            'int i = isascii(8);',
+            'Use equivelent function in <wtf/ASCIICType.h> instead of the '
+            'isascii() function.  [runtime/ctype_function] [4]',
+            'foo.cpp')
 
     def test_names(self):
         name_underscore_error_message = " is incorrectly named. Don't use underscores in your identifier names.  [readability/naming] [4]"

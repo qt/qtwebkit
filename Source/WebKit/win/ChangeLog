@@ -1,3 +1,138 @@
+2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
+
+        SpellCheckRequest needs to know the context where the spellcheck happened.
+        https://bugs.webkit.org/show_bug.cgi?id=79320
+
+        Reviewed by Hajime Morita.
+
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient::requestCheckingOfString):
+        (WebEditorClient):
+
+2012-02-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/WebEditorClient.cpp:
+        (WebEditorClient::shouldApplyStyle):
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient):
+
+2012-02-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/WebEditorClient.cpp:
+        (WebEditorClient::shouldApplyStyle):
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient):
+
+2012-02-17  Kalev Lember  <kalevlember@gmail.com>
+
+        Remove unused parameters from WTF threading API
+        https://bugs.webkit.org/show_bug.cgi?id=78389
+
+        Reviewed by Adam Roben.
+
+        waitForThreadCompletion() had an out param 'void **result' to get the
+        'void *' returned by ThreadFunction. However, the implementation in
+        ThreadingWin.cpp ignored the out param, not filling it in. This had
+        led to a situation where none of the client code made use of the param
+        and just ignored it.
+
+        To clean this up, the patch changes the signature of ThreadFunction to
+        return void instead of void* and drops the the unused 'void **result'
+        parameter from waitForThreadCompletion. Also, all client code is
+        updated for the API change.
+
+        As mentioned in https://bugs.webkit.org/show_bug.cgi?id=78389 , even
+        though the change only affects internal API, Safari is using it
+        directly and we'll need to keep the old versions around for ABI
+        compatibility. For this, the patch adds compatibility wrappers with
+        the old ABI.
+
+        * WebKit.vcproj/WebKit_Cairo.def: Add the new functions.
+        * WebKit.vcproj/WebKit_Cairo_debug.def: Ditto.
+
+2012-02-15  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        Notify ChromeClient when touch-event handlers are installed/removed.
+        https://bugs.webkit.org/show_bug.cgi?id=77440
+
+        Reviewed by Darin Fisher and Ryosuke Niwa.
+
+        * WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient::numTouchEventHandlersChanged):
+
+2012-02-14  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac][Win][WK2] Switch to RFC 6455 protocol for WebSockets
+        https://bugs.webkit.org/show_bug.cgi?id=78541
+        <rdar://problem/10036695>
+
+        Reviewed by Kent Tamura.
+
+        * WebPreferences.cpp: (WebPreferences::initializeDefaultSettings): Changed default value of
+        the preference
+
+2012-02-11  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        Convert svg/animations to use SMIL methods for driving the timeline
+        https://bugs.webkit.org/show_bug.cgi?id=78422
+
+        Reviewed by Dirk Schulze.
+
+        Remove SVG animation sampling functionality provided for DRT, which no longer uses it.
+        Instead we switched the svg/animations tests to use SVGSVGElement.setCurrentTime.
+
+        * Interfaces/IWebFramePrivate.idl:
+        * WebFrame.cpp:
+        * WebFrame.h:
+
+2012-02-13  Andy Estes  <aestes@apple.com>
+
+        Fix the Windows build.
+
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::createPasteboardStrategy):
+        * WebCoreSupport/WebPlatformStrategies.h:
+        (WebPlatformStrategies):
+
+2012-02-12  Andy Estes  <aestes@apple.com>
+
+        [Windows] Add API to enable inverted color drawing on a WebView
+        https://bugs.webkit.org/show_bug.cgi?id=77382
+
+        Reviewed by Adam Roben.
+
+        Add a new private WebPreference key called "WebKitShouldInvertColors"
+        and add private cover methods to get and set the preference. When this
+        preference changes on a WebPreference object, all WebViews listening to
+        that object will repaint to reflect the new value.
+
+        * Interfaces/IWebPreferencesPrivate.idl: Add [setS|s]houldInvertColors()
+        cover methods for WebKitShouldInvertColorsPreferenceKey.
+        * WebPreferenceKeysPrivate.h: Add WebKitShouldInvertColorsPreferenceKey.
+        * WebPreferences.cpp:
+        (WebPreferences::shouldInvertColors):
+        (WebPreferences::setShouldInvertColors):
+        * WebPreferences.h:
+        (WebPreferences):
+        * WebView.cpp:
+        (WebView::setShouldInvertColors): If m_shouldInvertColors changes,
+        update the value on the WebView and in m_layerTreeHost, then repaint
+        the view.
+        (WebView::notifyPreferencesChanged):
+        (WebView::setAcceleratedCompositing): When creating a new layer tree
+        host, tell it whether it should be inverting colors.
+        * WebView.h:
+
 2012-02-07  MORITA Hajime  <morrita@google.com>
 
         Replacement text should be available from the marker.

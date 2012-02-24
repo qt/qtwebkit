@@ -34,7 +34,7 @@ CSSFontFaceRule::CSSFontFaceRule(CSSStyleSheet* parent)
 CSSFontFaceRule::~CSSFontFaceRule()
 {
     if (m_style)
-        m_style->clearParentRule();
+        m_style->clearParentRule(this);
 }
 
 String CSSFontFaceRule::cssText() const
@@ -49,7 +49,7 @@ String CSSFontFaceRule::cssText() const
 void CSSFontFaceRule::addSubresourceStyleURLs(ListHashSet<KURL>& urls)
 {
     if (m_style)
-        m_style->addSubresourceStyleURLs(urls);
+        m_style->addSubresourceStyleURLs(urls, parentStyleSheet());
 }
 
 } // namespace WebCore

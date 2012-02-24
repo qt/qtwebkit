@@ -22,6 +22,7 @@
 #define qquickwebview_p_p_h
 
 #include "DrawingAreaProxy.h"
+#include "QtFlickProvider.h"
 #include "QtPageClient.h"
 #include "QtViewportInteractionEngine.h"
 #include "QtWebPageLoadClient.h"
@@ -68,6 +69,9 @@ public:
     void enableMouseEvents();
     void disableMouseEvents();
 
+    virtual QPointF pageItemPos();
+    virtual void updateContentsSize(const QSizeF&) { }
+
     virtual void loadDidSucceed();
     virtual void onComponentComplete() { }
     virtual void loadDidCommit() { }
@@ -80,11 +84,13 @@ public:
     virtual QtViewportInteractionEngine* viewportInteractionEngine() { return 0; }
     virtual void updateViewportSize() { }
     void updateTouchViewportSize();
-    virtual void _q_updateVisibleContentRectAndScale() { }
 
     virtual void _q_suspend() { }
     virtual void _q_resume() { }
-    void _q_viewportTrajectoryVectorChanged(const QPointF&);
+
+    virtual void _q_commitScaleChange() { }
+    void _q_commitPositionChange(const QPointF&);
+
     void _q_onOpenPanelFilesSelected();
     void _q_onOpenPanelFinished(int result);
     void _q_onVisibleChanged();
@@ -98,6 +104,7 @@ public:
 
     void handleAuthenticationRequiredRequest(const QString& hostname, const QString& realm, const QString& prefilledUsername, QString& username, QString& password);
     bool handleCertificateVerificationRequest(const QString& hostname);
+    void handleProxyAuthenticationRequiredRequest(const QString& hostname, uint16_t port, const QString& prefilledUsername, QString& username, QString& password);
 
     void setRenderToOffscreenBuffer(bool enable) { m_renderToOffscreenBuffer = enable; }
     void setViewInAttachedProperties(QObject*);
@@ -133,6 +140,7 @@ protected:
 
     QScopedPointer<QQuickWebPage> pageView;
     QQuickWebView* q_ptr;
+    QtFlickProvider* flickProvider;
 
     QDeclarativeComponent* alertDialog;
     QDeclarativeComponent* confirmDialog;
@@ -140,11 +148,14 @@ protected:
     QDeclarativeComponent* authenticationDialog;
     QDeclarativeComponent* certificateVerificationDialog;
     QDeclarativeComponent* itemSelector;
+    QDeclarativeComponent* proxyAuthenticationDialog;
 
     WebCore::ViewportArguments viewportArguments;
     QFileDialog* fileDialog;
     WKOpenPanelResultListenerRef openPanelResultListener;
 
+    bool userDidOverrideContentWidth;
+    bool userDidOverrideContentHeight;
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
     QUrl m_iconURL;
@@ -166,6 +177,9 @@ public:
     virtual ~QQuickWebViewFlickablePrivate();
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
+    virtual QPointF pageItemPos();
+    virtual void updateContentsSize(const QSizeF&);
+
     virtual void loadDidSucceed();
     virtual void onComponentComplete();
     virtual void loadDidCommit();
@@ -173,9 +187,10 @@ public:
     virtual void didChangeViewportProperties(const WebCore::ViewportArguments& args);
     virtual QtViewportInteractionEngine* viewportInteractionEngine() { return interactionEngine.data(); }
     virtual void updateViewportSize();
-    virtual void _q_updateVisibleContentRectAndScale();
+
     virtual void _q_suspend();
     virtual void _q_resume();
+    virtual void _q_commitScaleChange();
 
     virtual void pageDidRequestScroll(const QPoint& pos);
     virtual void didChangeContentsSize(const QSize& newSize);

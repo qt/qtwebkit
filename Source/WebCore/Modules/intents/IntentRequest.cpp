@@ -41,7 +41,9 @@ PassRefPtr<IntentRequest> IntentRequest::create(ScriptExecutionContext* context,
                                                 PassRefPtr<IntentResultCallback> successCallback,
                                                 PassRefPtr<IntentResultCallback> errorCallback)
 {
-    return adoptRef(new IntentRequest(context, intent, successCallback, errorCallback));
+    RefPtr<IntentRequest> intentRequest(adoptRef(new IntentRequest(context, intent, successCallback, errorCallback)));
+    intentRequest->suspendIfNeeded();
+    return intentRequest.release();
 }
 
 IntentRequest::IntentRequest(ScriptExecutionContext* context,
@@ -52,24 +54,26 @@ IntentRequest::IntentRequest(ScriptExecutionContext* context,
     , m_intent(intent)
     , m_successCallback(successCallback)
     , m_errorCallback(errorCallback)
+    , m_stopped(false)
 {
 }
 
 void IntentRequest::contextDestroyed()
 {
     ContextDestructionObserver::contextDestroyed();
-    m_successCallback.clear();
-    m_errorCallback.clear();
+    m_stopped = true;
 }
 
 void IntentRequest::stop()
 {
-    m_successCallback.clear();
-    m_errorCallback.clear();
+    m_stopped = true;
 }
 
 void IntentRequest::postResult(SerializedScriptValue* data)
 {
+    if (m_stopped)
+        return;
+
     // Callback could lead to deletion of this.
     RefPtr<IntentRequest> protector(this);
 
@@ -84,6 +88,9 @@ void IntentRequest::postResult(SerializedScriptValue* data)
 
 void IntentRequest::postFailure(SerializedScriptValue* data)
 {
+    if (m_stopped)
+        return;
+
     // Callback could lead to deletion of this.
     RefPtr<IntentRequest> protector(this);
 

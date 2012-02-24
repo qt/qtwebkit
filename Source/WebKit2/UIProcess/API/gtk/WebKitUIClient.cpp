@@ -126,6 +126,16 @@ static void setWindowFrame(WKPageRef page, WKRect frame, const void* clientInfo)
     webkitWindowPropertiesSetGeometry(windowProperties, &geometry);
 }
 
+static void mouseDidMoveOverElement(WKPageRef page, WKHitTestResultRef hitTestResult, WKEventModifiers modifiers, WKTypeRef userData, const void* clientInfo)
+{
+    webkitWebViewMouseTargetChanged(WEBKIT_WEB_VIEW(clientInfo), hitTestResult, wkEventModifiersToGdkModifiers(modifiers));
+}
+
+static void printFrame(WKPageRef page, WKFrameRef frame, const void*)
+{
+    webkitWebViewPrintFrame(WEBKIT_WEB_VIEW(toImpl(page)->viewWidget()), frame);
+}
+
 void attachUIClientToView(WebKitWebView* webView)
 {
     WKPageUIClient wkUIClient = {
@@ -165,13 +175,13 @@ void attachUIClientToView(WebKitWebView* webView)
         0, // footerHeight
         0, // drawHeader
         0, // drawFooter
-        0, // printFrame
+        printFrame,
         0, // runModal
         0, // didCompleteRubberBandForMainFrame
         0, // saveDataToFileInDownloadsFolder
         0, // shouldInterruptJavaScript
         createNewPage,
-        0, // mouseDidMoveOverElement
+        mouseDidMoveOverElement,
         0, // decidePolicyForNotificationPermissionRequest
     };
     WKPageRef wkPage = toAPI(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView)));

@@ -1,3 +1,70 @@
+2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
+
+        SpellCheckRequest needs to know the context where the spellcheck happened.
+        https://bugs.webkit.org/show_bug.cgi?id=79320
+
+        Reviewed by Hajime Morita.
+
+        * WebCoreSupport/EditorClientWinCE.h:
+        (WebKit::EditorClientWinCE::requestCheckingOfString):
+
+2012-02-23  Patrick Gansterer  <paroga@webkit.org>
+
+        Unreviewed WinCE build fix after r108462.
+
+        * WebCoreSupport/EditorClientWinCE.h:
+        (EditorClientWinCE):
+
+2012-02-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/EditorClientWinCE.cpp:
+        (WebKit::EditorClientWinCE::shouldApplyStyle):
+
+2012-02-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/EditorClientWinCE.cpp:
+        (WebKit::EditorClientWinCE::shouldApplyStyle):
+
+2012-02-20  Benjamin Poulain  <benjamin@webkit.org>
+
+        Get rid of the LocalizationStrategy
+        https://bugs.webkit.org/show_bug.cgi?id=78324
+
+        Reviewed by Sam Weinig.
+
+        Remove a useless #include of LocalizationStrategy.h.
+
+        * WebCoreSupport/PlatformStrategiesWinCE.h:
+
+2012-02-15  Patrick Gansterer  <paroga@webkit.org>
+
+        Unreviewed WinCE build fix after r107606.
+
+        * WebCoreSupport/PlatformStrategiesWinCE.cpp:
+        (PlatformStrategiesWinCE::createPasteboardStrategy):
+        * WebCoreSupport/PlatformStrategiesWinCE.h:
+        (PlatformStrategiesWinCE):
+
+2012-02-15  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        Notify ChromeClient when touch-event handlers are installed/removed.
+        https://bugs.webkit.org/show_bug.cgi?id=77440
+
+        Reviewed by Darin Fisher and Ryosuke Niwa.
+
+        * WebCoreSupport/ChromeClientWinCE.h:
+        (WebKit::ChromeClientWinCE::numTouchEventHandlersChanged):
+
 2011-12-19  Sam Weinig  <sam@webkit.org>
 
         More PlatformEvent cleanup

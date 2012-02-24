@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import unittest
+import os
 
 from webkitpy.common.system.executive_mock import MockExecutive, MockExecutive2
 from webkitpy.common.system.outputcapture import OutputCapture
@@ -67,9 +68,9 @@ class QtPortTest(port_testcase.PortTestCase):
         self._assert_search_path(['qt-win', 'qt-4.8', 'qt'], 'win')
         self._assert_search_path(['qt-linux', 'qt-4.8', 'qt'], 'linux')
 
-        self._assert_search_path(['qt-wk2', 'qt-mac', 'qt-5.0', 'qt'], 'mac', use_webkit2=True, qt_version='5.0')
-        self._assert_search_path(['qt-wk2', 'qt-win', 'qt-5.0', 'qt'], 'win', use_webkit2=True, qt_version='5.0')
-        self._assert_search_path(['qt-wk2', 'qt-linux', 'qt-5.0', 'qt'], 'linux', use_webkit2=True, qt_version='5.0')
+        self._assert_search_path(['qt-5.0-wk2', 'qt-mac', 'qt-5.0', 'qt'], 'mac', use_webkit2=True, qt_version='5.0')
+        self._assert_search_path(['qt-5.0-wk2', 'qt-win', 'qt-5.0', 'qt'], 'win', use_webkit2=True, qt_version='5.0')
+        self._assert_search_path(['qt-5.0-wk2', 'qt-linux', 'qt-5.0', 'qt'], 'linux', use_webkit2=True, qt_version='5.0')
 
     def test_show_results_html_file(self):
         port = self.make_port()
@@ -86,3 +87,17 @@ class QtPortTest(port_testcase.PortTestCase):
         self.assertEqual('linux', self.make_port(port_name='qt-linux', os_name='linux').operating_system())
         self.assertEqual('mac', self.make_port(os_name='mac').operating_system())
         self.assertEqual('win', self.make_port(port_name='qt-win', os_name='win').operating_system())
+
+    def test_check_sys_deps(self):
+        port = self.make_port()
+
+        # Success
+        os.environ['WEBKIT_TESTFONTS'] = '/tmp/foo'
+        port._executive = MockExecutive2(exit_code=0)
+        self.assertTrue(port.check_sys_deps(needs_http=False))
+
+        # Failure
+        del os.environ['WEBKIT_TESTFONTS']
+        port._executive = MockExecutive2(exit_code=1,
+            output='testing output failure')
+        self.assertFalse(port.check_sys_deps(needs_http=False))

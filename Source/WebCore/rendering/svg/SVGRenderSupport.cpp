@@ -39,6 +39,7 @@
 #include "RenderSVGResourceMarker.h"
 #include "RenderSVGResourceMasker.h"
 #include "RenderSVGRoot.h"
+#include "RenderSVGText.h"
 #include "RenderSVGViewportContainer.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
@@ -79,6 +80,13 @@ void SVGRenderSupport::mapLocalToContainer(const RenderObject* object, RenderBox
     object->parent()->mapLocalToContainer(repaintContainer, false, true, transformState, wasFixed);
 }
 
+static inline bool isRenderingMaskImage(RenderObject* object)
+{
+    if (object->frame() && object->frame()->view())
+        return object->frame()->view()->paintBehavior() & PaintBehaviorRenderingSVGMask;
+    return false;
+}
+
 bool SVGRenderSupport::prepareToRenderSVGContent(RenderObject* object, PaintInfo& paintInfo)
 {
     ASSERT(object);
@@ -89,11 +97,8 @@ bool SVGRenderSupport::prepareToRenderSVGContent(RenderObject* object, PaintInfo
     const SVGRenderStyle* svgStyle = style->svgStyle();
     ASSERT(svgStyle);
 
-    bool isRenderingMask = false;
-    if (object->frame() && object->frame()->view())
-        isRenderingMask = object->frame()->view()->paintBehavior() & PaintBehaviorRenderingSVGMask;
-
     // Setup transparency layers before setting up SVG resources!
+    bool isRenderingMask = isRenderingMaskImage(object);
     float opacity = isRenderingMask ? 1 : style->opacity();
     const ShadowData* shadow = svgStyle->shadow();
     if (opacity < 1 || shadow) {
@@ -168,7 +173,7 @@ void SVGRenderSupport::finishRenderSVGContent(RenderObject* object, PaintInfo& p
     }
 #endif
 
-    if (style->opacity() < 1)
+    if (style->opacity() < 1 && !isRenderingMaskImage(object))
         paintInfo.context->endTransparencyLayer();
 
     if (svgStyle->shadow())
@@ -245,13 +250,34 @@ static inline bool layoutSizeOfNearestViewportChanged(const RenderObject* start)
     return toRenderSVGRoot(start)->isLayoutSizeChanged();
 }
 
+bool SVGRenderSupport::transformToRootChanged(RenderObject* ancestor)
+{
+    while (ancestor && !ancestor->isSVGRoot()) {
+        if (ancestor->isSVGTransformableContainer())
+            return toRenderSVGContainer(ancestor)->didTransformToRootUpdate();
+        if (ancestor->isSVGViewportContainer())
+            return toRenderSVGViewportContainer(ancestor)->didTransformToRootUpdate();
+        ancestor = ancestor->parent();
+    }
+
+    return false;
+}
+
 void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
 {
     bool layoutSizeChanged = layoutSizeOfNearestViewportChanged(start);
+    bool transformChanged = transformToRootChanged(start);
     HashSet<RenderObject*> notlayoutedObjects;
 
     for (RenderObject* child = start->firstChild(); child; child = child->nextSibling()) {
         bool needsLayout = selfNeedsLayout;
+
+        if (transformChanged) {
+            // If the transform changed we need to update the text metrics (note: this also happens for layoutSizeChanged=true).
+            if (child->isSVGText())
+                toRenderSVGText(child)->setNeedsTextMetricsUpdate();
+            needsLayout = true;
+        }
 
         if (layoutSizeChanged) {
             // When selfNeedsLayout is false and the layout size changed, we have to check whether this child uses relative lengths
@@ -260,6 +286,8 @@ void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
                     // When the layout size changed and when using relative values tell the RenderSVGShape to update its shape object
                     if (child->isSVGShape())
                         toRenderSVGShape(child)->setNeedsShapeUpdate();
+                    else if (child->isSVGText())
+                        toRenderSVGText(child)->setNeedsPositioningValuesUpdate();
 
                     needsLayout = true;
                 }

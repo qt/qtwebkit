@@ -37,6 +37,8 @@
 #import "FrameView.h"
 #import "HTMLNames.h"
 #import "Pasteboard.h"
+#import "PasteboardStrategy.h"
+#import "PlatformStrategies.h"
 #import "RenderBlock.h"
 #import "RuntimeApplicationChecks.h"
 #import "Sound.h"
@@ -49,7 +51,7 @@ using namespace HTMLNames;
 PassRefPtr<Clipboard> Editor::newGeneralClipboard(ClipboardAccessPolicy policy, Frame* frame)
 {
     return ClipboardMac::create(Clipboard::CopyAndPaste,
-        policy == ClipboardWritable ? [NSPasteboard pasteboardWithUniqueName] : [NSPasteboard generalPasteboard], policy, frame);
+        policy == ClipboardWritable ? platformStrategies()->pasteboardStrategy()->uniqueName() : String(NSGeneralPboard), policy, frame);
 }
 
 void Editor::showFontPanel()
@@ -289,11 +291,8 @@ void Editor::takeFindStringFromSelection()
 
 void Editor::writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes)
 {
-    RetainPtr<NSMutableArray> types(AdoptNS, [[NSMutableArray alloc] init]);    
-    for (size_t i = 0; i < pasteboardTypes.size(); ++i)
-        [types.get() addObject:pasteboardTypes[i]];
     Pasteboard pasteboard(pasteboardName);
-    pasteboard.writeSelectionForTypes(types.get(), selectedRange().get(), true, m_frame);
+    pasteboard.writeSelectionForTypes(pasteboardTypes, selectedRange().get(), true, m_frame);
 }
     
 void Editor::readSelectionFromPasteboard(const String& pasteboardName)

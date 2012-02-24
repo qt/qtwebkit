@@ -33,8 +33,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSTestMediaQueryListListener);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestMediaQueryListListener);
-
 /* Hash table */
 
 static const HashTableValue JSTestMediaQueryListListenerTableValues[] =
@@ -52,8 +50,6 @@ static const HashTableValue JSTestMediaQueryListListenerConstructorTableValues[]
 };
 
 static const HashTable JSTestMediaQueryListListenerConstructorTable = { 1, 0, JSTestMediaQueryListListenerConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestMediaQueryListListenerConstructor);
-
 const ClassInfo JSTestMediaQueryListListenerConstructor::s_info = { "TestMediaQueryListListenerConstructor", &Base::s_info, &JSTestMediaQueryListListenerConstructorTable, 0, CREATE_METHOD_TABLE(JSTestMediaQueryListListenerConstructor) };
 
 JSTestMediaQueryListListenerConstructor::JSTestMediaQueryListListenerConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -128,7 +124,12 @@ JSObject* JSTestMediaQueryListListener::createPrototype(ExecState* exec, JSGloba
 void JSTestMediaQueryListListener::destroy(JSC::JSCell* cell)
 {
     JSTestMediaQueryListListener* thisObject = jsCast<JSTestMediaQueryListListener*>(cell);
-    thisObject->releaseImplIfNotNull();
+    thisObject->JSTestMediaQueryListListener::~JSTestMediaQueryListListener();
+}
+
+JSTestMediaQueryListListener::~JSTestMediaQueryListListener()
+{
+    releaseImplIfNotNull();
 }
 
 bool JSTestMediaQueryListListener::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -166,7 +167,7 @@ EncodedJSValue JSC_HOST_CALL jsTestMediaQueryListListenerPrototypeFunctionMethod
     TestMediaQueryListListener* impl = static_cast<TestMediaQueryListListener*>(castedThis->impl());
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    RefPtr<MediaQueryListListener> listener(MediaQueryListListener::create(ScriptValue(exec->globalData(), MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined))));
+    RefPtr<MediaQueryListListener> listener(MediaQueryListListener::create(ScriptValue(exec->globalData(), MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined))));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     impl->method(listener);

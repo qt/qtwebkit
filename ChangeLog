@@ -1,3 +1,697 @@
+2012-02-23  Konrad Piascik  <kpiascik@rim.com>
+
+        Upstream BlackBerry Cookie Management Classes
+        https://bugs.webkit.org/show_bug.cgi?id=73654
+
+        Reviewed by Rob Buis.
+
+        Manual test to see in milliseconds how quickly 100 writes followed by 100 reads take.
+        This test is ran twice and the average read and write for each of the 2 runs is shown.
+
+        * ManualTests/cookieSpeedTest.html: Added.
+
+2012-02-23  Dave Tu  <dtu@chromium.org>
+
+        Add Chromium gpu_tests to the flakiness dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=79300
+
+        Reviewed by Ojan Vafai.
+
+        * Tools/TestResultServer/static-dashboards/builders.js:
+        * Tools/TestResultServer/static-dashboards/dashboard_base.js:
+
+2012-02-23  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Add WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS macro
+        https://bugs.webkit.org/show_bug.cgi?id=79371
+
+        Reviewed by Daniel Bates.
+
+        Add a new macro to handle the inclusion of the platform specific *.cmake files.
+        In the future this macro should get expanded to also handle feature specifc
+        files, like the UseJSC.cmake in WebCore we already have.
+
+        * Source/cmake/WebKitMacros.cmake:
+
+2012-02-23  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Add FindDirectX
+        https://bugs.webkit.org/show_bug.cgi?id=79344
+
+        Reviewed by Adam Roben.
+
+        * Source/cmake/FindDirectX.cmake: Added.
+
+2012-02-23  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Add FindQuickTimeSDK
+        https://bugs.webkit.org/show_bug.cgi?id=79345
+
+        Reviewed by Adam Roben.
+
+        * Source/cmake/FindQuickTimeSDK.cmake: Added.
+
+2012-02-22  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Remove FindGDK.cmake and FindGDK-PixBuf.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=79292
+
+        Reviewed by Daniel Bates.
+
+        These files were committed when the EFL port's buildsystem code
+        was upstreamed, but are currently not being used anywhere, as the EFL
+        port has not depended on GDK for a long time.
+
+        * Source/cmake/FindGDK-PixBuf.cmake: Removed.
+        * Source/cmake/FindGDK.cmake: Removed.
+
+2012-02-22  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Clean build is broken when using make -j
+        https://bugs.webkit.org/show_bug.cgi?id=76388
+
+        * GNUmakefile.am: Add new global source list variables.
+
+2012-02-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        perf-o-matic: Extract logic to generate JSON responses as classes to unit test
+        https://bugs.webkit.org/show_bug.cgi?id=79018
+
+        Rubber-stamped by Adam Barth.
+
+        Extracted DashboardJSONGenerator, ManifestJSONGenerator, and RunsJSONGenerator
+        into json_generators.py from DashboardHandler, ManifestHandler, and RunsHandler
+        and added unit tests for the former three classes.
+
+        Merged the latter three classes into controler.py since they have become too trivial
+        to have their own files.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (ManifestUpdateHandler):
+        (ManifestUpdateHandler.get):
+        (ManifestUpdateHandler.post):
+        (DashboardUpdateHandler):
+        (DashboardUpdateHandler.get):
+        (DashboardUpdateHandler.post):
+        (_get_test_branch_platform_ids):
+        (RunsUpdateHandler):
+        (RunsUpdateHandler.get):
+        (CachedRunsHandler.get):
+        * Websites/webkit-perf.appspot.com/dashboard_handler.py: Removed.
+        * Websites/webkit-perf.appspot.com/json_generators.py: Added.
+        (JSONGeneratorBase):
+        (JSONGeneratorBase.to_json):
+        (DashboardJSONGenerator):
+        (DashboardJSONGenerator.__init__):
+        (DashboardJSONGenerator.value):
+        (ManifestJSONGenerator):
+        (ManifestJSONGenerator.__init__):
+        (ManifestJSONGenerator.value):
+        (RunsJSONGenerator):
+        (RunsJSONGenerator.__init__):
+        (RunsJSONGenerator._generate_runs):
+        (RunsJSONGenerator._entry_from_build_and_result):
+        (RunsJSONGenerator.value):
+        * Websites/webkit-perf.appspot.com/json_generators_unittest.py: Added.
+        (_create_results):
+        (JSONGeneratorBaseTest):
+        (JSONGeneratorBaseTest.test_to_json):
+        (JSONGeneratorBaseTest.test_to_json.AJSONGenerator):
+        (JSONGeneratorBaseTest.test_to_json.AJSONGenerator.value):
+        (DashboardJSONGeneratorTest):
+        (DashboardJSONGeneratorTest.test_value_no_branch):
+        (DashboardJSONGeneratorTest.test_value_no_plaforms):
+        (DashboardJSONGeneratorTest.test_value_single_platform):
+        (DashboardJSONGeneratorTest.test_value_two_platforms):
+        (ManifestJSONGeneratorTest):
+        (ManifestJSONGeneratorTest.test_value_no_branch):
+        (ManifestJSONGeneratorTest.test_value_no_plaforms):
+        (ManifestJSONGeneratorTest._assert_single_test):
+        (ManifestJSONGeneratorTest.test_value_single_platform):
+        (ManifestJSONGeneratorTest.test_value_two_platforms):
+        (ManifestJSONGeneratorTest.test_value_two_tests):
+        (RunsJSONGeneratorTest):
+        (RunsJSONGeneratorTest._create_results):
+        (RunsJSONGeneratorTest.test_generate_runs):
+        (RunsJSONGeneratorTest.test_value_without_results):
+        (RunsJSONGeneratorTest.test_value_with_results):
+        (RunsJSONGeneratorTest._assert_entry):
+        (RunsJSONGeneratorTest.test_run_from_build_and_result):
+        (RunsJSONGeneratorTest.test_run_from_build_and_result.create_build):
+        * Websites/webkit-perf.appspot.com/main.py:
+        * Websites/webkit-perf.appspot.com/manifest_handler.py: Removed.
+        * Websites/webkit-perf.appspot.com/models.py:
+        (Test.update_or_insert.execute):
+        (Test):
+        (TestResult.get_or_insert_from_parsed_json):
+        * Websites/webkit-perf.appspot.com/models_unittest.py:
+        (TestModelTests.test_update_or_insert_to_update):
+        (TestResultTests.test_get_or_insert_stat_value):
+        * Websites/webkit-perf.appspot.com/runs_handler.py: Removed.
+
+2012-02-20  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Turn on requestAnimationFrame for release builds
+        https://bugs.webkit.org/show_bug.cgi?id=79038
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Turn on requestAnimationFrame by default.
+
+2012-02-20  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Geolocation support should be on by default
+        https://bugs.webkit.org/show_bug.cgi?id=79037
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Turn on geolocation support in release builds.
+
+2012-02-20  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Add a new API for the Vibration API(W3C).
+        https://bugs.webkit.org/show_bug.cgi?id=72010
+
+        Reviewed by Hajime Morita.
+
+        Add Implementation for the Vibration API to the WebKit-EFL port.
+        http://dev.w3.org/2009/dap/vibration/
+
+        * Source/cmake/OptionsEfl.cmake: Add ENABLE_VIBRATION feature.
+        * Source/cmakeconfig.h.cmake:
+
+2012-02-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Move more logic from handler classes to model classes and add unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=78989
+
+        Reviewed by Hajime Morita.
+
+        Extracted various functions from CreateHandler, ReportHanlder, and RunsHanlder to model classes
+        in order to unit-test them, added DataStoreTestsBase to reduce the code duplication in tests,
+        and added a whole bunch of unit tests in models_unittest.py.
+
+        * Websites/webkit-perf.appspot.com/create_handler.py:
+        (CreateHandler._create_branch):
+        (CreateHandler._create_platform):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (_create_if_possible):
+        (_create_if_possible.execute):
+        (Branch):
+        (Branch.create_if_possible):
+        (Platform):
+        (Platform.create_if_possible):
+        (Build):
+        (Build.get_or_insert_from_log):
+        (Test):
+        (Test.update_or_insert):
+        (Test.update_or_insert.execute):
+        (TestResult):
+        (TestResult.get_or_insert_from_parsed_json):
+        (TestResult.get_or_insert_from_parsed_json._float_or_none):
+        (TestResult.generate_runs):
+        * Websites/webkit-perf.appspot.com/models_unittest.py:
+        (DataStoreTestsBase):
+        (DataStoreTestsBase.assertThereIsNoInstanceOf):
+        (DataStoreTestsBase.assertOnlyInstance):
+        (DataStoreTestsBase.assertEqualUnorderedList):
+        (HelperTests):
+        (HelperTests.test_create_in_transaction_with_numeric_id_holder):
+        (HelperTests.test_failing_in_create_in_transaction_with_numeric_id_holder):
+        (HelperTests.test_raising_in_create_in_transaction_with_numeric_id_holder):
+        (HelperTests.test_delete_model_with_numeric_id_holder):
+        (BranchTests):
+        (BranchTests.test_create_if_possible):
+        (PlatformTests):
+        (PlatformTests.test_create_if_possible):
+        (BuilderTests):
+        (_create_some_builder):
+        (BuildTests):
+        (BuildTests.test_get_or_insert_from_log):
+        (TestModelTests):
+        (TestModelTests.test_update_or_insert):
+        (TestModelTests.test_update_or_insert_to_update):
+        (TestResultTests):
+        (TestResultTests._create_build):
+        (TestResultTests.test_get_or_insert_value):
+        (TestResultTests.test_get_or_insert_stat_value):
+        (TestResultTests._create_results):
+        (TestResultTests.test_generate_runs):
+        (ReportLogTests):
+        (ReportLogTests.test_branch):
+        (ReportLogTests.test_platform):
+        (PersistentCacheTests):
+        (PersistentCacheTests.setUp):
+        (PersistentCacheTests.test_set):
+        * Websites/webkit-perf.appspot.com/report_process_handler.py:
+        (ReportProcessHandler.post):
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.get):
+        (RunsHandler.post):
+
+2012-02-20  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Fix PLATFORM() define for Windows.
+
+        Define WTF_PLATFORM_WIN instead of WTF_PLATFORM_WINDOWS.
+
+        * Source/cmake/OptionsWindows.cmake:
+
+2012-02-20  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix WebKit2GTK+ for 'make distcheck'.
+
+        Instead of conditionally including WebKit2 GNUmakefiles, always
+        include them and conditionally activate the final targets.
+
+        * GNUmakefile.am:
+
+2012-02-19  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Check gstreamer minimum required version.
+        https://bugs.webkit.org/show_bug.cgi?id=79005
+
+        Reviewed by Daniel Bates.
+
+        To enable video, Gstreamer version requires to be above 0.10.30.
+        This patch checks whether Gstreamer version is greater than 0.10.30.
+
+        * Source/cmake/FindGStreamer-App.cmake:
+        * Source/cmake/FindGStreamer-Base.cmake:
+        * Source/cmake/FindGStreamer-Interfaces.cmake:
+        * Source/cmake/FindGStreamer-Pbutils.cmake:
+        * Source/cmake/FindGStreamer-Plugins-Base.cmake:
+        * Source/cmake/FindGStreamer-Video.cmake:
+        * Source/cmake/FindGStreamer.cmake:
+
+2012-02-19  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Remove unused GSettings stuff
+        https://bugs.webkit.org/show_bug.cgi?id=78995
+
+        Reviewed by Martin Robinson.
+
+        * configure.ac: remove gsettings schema file creation.
+
+2012-02-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic should show both WebKit and Chromium revisions
+        https://bugs.webkit.org/show_bug.cgi?id=78955
+
+        Reviewed by Andreas Kling.
+
+        Include Chromium revision numbers in runs responses when available.
+
+        * Websites/webkit-perf.appspot.com/js/config.js:
+        (urlForChangeset):
+        (urlForChangesetList):
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.post):
+
+2012-02-18  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Exclude a couple unused bindings files from the build
+        as they do not compile currently.
+
+        * wscript:
+
+2012-02-17  Ryosuke Niwa  <rniwa@webkit.org>
+
+        perf-o-matic needs model unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=78885
+
+        Reviewed by Adam Barth.
+
+        Added unit tests for models.py.
+
+        Also renamed modelFromNumericId to model_from_numeric_id and moved set_persitent_cache and get_persistent_cache
+        from controller to PersistentCache.set_cache and PersistentCahce.set_cache respectively.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (cache_manifest):
+        (CachedManifestHandler.get):
+        (cache_dashboard):
+        (CachedDashboardHandler.get):
+        (cache_runs):
+        (CachedRunsHandler.get):
+        * Websites/webkit-perf.appspot.com/create_handler.py:
+        (CreateHandler._create_builder):
+        (CreateHandler._create_builder.execute):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (create_in_transaction_with_numeric_id_holder):
+        (model_from_numeric_id):
+        (Builder):
+        (Builder.create):
+        (Builder.update_password):
+        (Builder._hashed_password):
+        (TestResult.key_name):
+        (ReportLog.get_value):
+        (ReportLog._integer_in_payload):
+        (ReportLog):
+        (ReportLog.timestamp):
+        (PersistentCache):
+        (PersistentCache.set_cache):
+        (PersistentCache.set_cache.execute):
+        (PersistentCache.get_cache):
+        * Websites/webkit-perf.appspot.com/models_unittest.py: Added.
+        (HelperTests):
+        (HelperTests.setUp):
+        (HelperTests.tearDown):
+        (HelperTests._assert_there_is_exactly_one_id_holder_and_matches):
+        (HelperTests.test_create_in_transaction_with_numeric_id_holder):
+        (HelperTests.test_create_in_transaction_with_numeric_id_holder.execute):
+        (HelperTests.test_failing_in_create_in_transaction_with_numeric_id_holder):
+        (HelperTests.test_failing_in_create_in_transaction_with_numeric_id_holder.execute):
+        (HelperTests.test_raising_in_create_in_transaction_with_numeric_id_holder):
+        (HelperTests.test_raising_in_create_in_transaction_with_numeric_id_holder.execute):
+        (HelperTests.test_delete_model_with_numeric_id_holder):
+        (HelperTests.test_delete_model_with_numeric_id_holder.execute):
+        (HelperTests.test_model_from_numeric_id):
+        (HelperTests.test_model_from_numeric_id.execute):
+        (BuilderTests):
+        (BuilderTests.setUp):
+        (BuilderTests.tearDown):
+        (BuilderTests.test_create):
+        (BuilderTests.test_update_password):
+        (BuilderTests.test_hashed_password):
+        (BuilderTests.test_authenticate):
+        (ReportLog):
+        (ReportLog.setUp):
+        (ReportLog.tearDown):
+        (ReportLog._create_log_with_payload):
+        (ReportLog.test_parsed_payload):
+        (ReportLog.test_get_value):
+        (ReportLog.test_results):
+        (ReportLog.test_builder):
+        (ReportLog.test_build_number):
+        (ReportLog.test_webkit_revision):
+        (ReportLog.chromium_revision):
+        (PersistentCacheTests):
+        (PersistentCacheTests.setUp):
+        (PersistentCacheTests.tearDown):
+        (PersistentCacheTests._assert_persistent_cache):
+        (PersistentCacheTests.test_set):
+        (PersistentCacheTests.test_get):
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.post):
+
+2012-02-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ build after r108003.
+
+        * Source/autotools/symbols.filter: Add missing symbol.
+
+2012-02-16  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Move event conversion functions from WebCore to WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=78788
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Source/api.pri: Add new files to the build.
+
+2012-02-14  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Remove unused PkgConfig module import from FindCFLite.cmake.
+        https://bugs.webkit.org/show_bug.cgi?id=78600
+
+        Reviewed by Adam Roben.
+
+        * Source/cmake/FindCFLite.cmake:
+
+2012-02-15  Roland Steiner  <rolandsteiner@chromium.org>
+
+        <style scoped>: Allow <style scoped> as a direct child of a ShadowRoot
+        https://bugs.webkit.org/show_bug.cgi?id=77853
+
+        numberOfScopedHTMLStyleChildren got moved from Element into Node.
+
+        Reviewed by Dimitri Glazkov.
+
+        * Source/autotools/symbols.filter:
+
+2012-02-13  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Merge WebKitEfl.cmake into FindEFL.cmake.
+        https://bugs.webkit.org/show_bug.cgi?id=78566
+
+        Reviewed by Daniel Bates.
+
+        * Source/cmake/FindEFL.cmake: Move the code to find edje_cc here from
+        WebKitEfl.cmake.
+        * Source/cmake/WebKitEfl.cmake: Removed.
+
+2012-02-14  Shinya Kawanaka  <shinyak@google.com>
+
+        Use youngestShadowRoot and oldestShadowRoot instead of Element::shadowRoot().
+        https://bugs.webkit.org/show_bug.cgi?id=78455
+
+        Reviewed by Hajime Morita.
+
+        Exports necessary symbols.
+
+        * Source/autotools/symbols.filter:
+
+2012-02-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Yet another perf-o-matic build fix. It turns out that a task of the same name can't be
+        queued for days after the first task is completed. So don't use it. Updating persistent
+        caches more often than necessary is better than never updating them.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (schedule_manifest_update):
+        (schedule_dashboard_update):
+        (schedule_runs_update):
+
+2012-02-13  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK] Revise configuration for MHTML
+        https://bugs.webkit.org/show_bug.cgi?id=78364
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Added some lines to show checking messages, whether mhtml is enabled or not
+        during configuration and the configuration result for mhtml.
+        MHTML is a web page archive format used to combine resources
+        that are typically represented by external links (such as images, Flash animations,
+        Java applets, audio files) together with HTML code into a single file.
+        http://en.wikipedia.org/wiki/MHTML
+
+        * configure.ac:
+
+2012-02-06  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Drop support for the Curl network backend.
+        https://bugs.webkit.org/show_bug.cgi?id=77874
+
+        Reviewed by Eric Seidel.
+
+        Nobody seems to be maintaining the Curl backend in WebCore, the
+        EFL port developers all seem to be using the Soup backend and the
+        port itself has many features which are only implemented for the
+        latter.
+
+        * Source/cmake/OptionsEfl.cmake: Remove network backend selection
+        checks and unconditionally require Glib and Libsoup, bump the
+        required LibSoup version to the same one the GTK+ port looks for,
+        since we share the same network backend.
+
+2012-02-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Another perf-o-matic build fix.
+
+        * Websites/webkit-perf.appspot.com/report_process_handler.py:
+        (ReportProcessHandler._create_build_if_possible):
+
+2012-02-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic build fix.
+
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+
+2012-02-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION: Perf-o-matic adds duplicated test results
+        https://bugs.webkit.org/show_bug.cgi?id=78373
+
+        Reviewed by Hajime Morita.
+
+        Add TestResult inside a transaction. We use high replication databsae but this should prevent
+        the duplication in the most of the time.
+
+        Also fixed random bugs in Controller and ReportHandler.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (get_persistent_cache):
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+        * Websites/webkit-perf.appspot.com/report_process_handler.py:
+        (ReportProcessHandler.post):
+        (ReportProcessHandler._add_test_if_needed):
+        (ReportProcessHandler):
+        (ReportProcessHandler._add_test_result_if_needed):
+        (ReportProcessHandler._add_test_result_if_needed._float_or_none):
+        (ReportProcessHandler._add_test_result_if_needed.execute):
+
+2012-02-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ build after r107454.
+
+        * configure.ac: Disable Mutation observers build on GTK+ until it
+        can actually build.
+
+2012-02-10  Adam Klein  <adamk@chromium.org>
+
+        Enable MUTATION_OBSERVERS by default on all platforms
+        https://bugs.webkit.org/show_bug.cgi?id=78196
+
+        Reviewed by Ojan Vafai.
+
+        * configure.ac:
+
+2012-02-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic build fix after r107386.
+
+        * Websites/webkit-perf.appspot.com/app.yaml:
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (schedule_manifest_update):
+        (schedule_dashboard_update):
+        (schedule_runs_update):
+        * Websites/webkit-perf.appspot.com/merge_tests_handler.py:
+        (MergeTestsHandler.get):
+        * Websites/webkit-perf.appspot.com/report_logs_handler.py:
+        (ReportLogsHandler.get):
+        (ReportLogsHandler.post):
+
+2012-02-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic should process reports in background
+        https://bugs.webkit.org/show_bug.cgi?id=78309
+
+        Reviewed by Hajime Morita.
+
+        Split the logic to create Build, Test, and TestResult objects from ReportHandler into ReportProcessHandler.
+        ReportHandler now merely creates ReportLog and schedules a task to process it.
+
+        Also added ReportLogHandler to manage stale ReportLogs.
+
+        * Websites/webkit-perf.appspot.com/app.yaml:
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (schedule_manifest_update):
+        (schedule_dashboard_update):
+        (schedule_runs_update):
+        (CachedRunsHandler.get):
+        (schedule_report_process):
+        * Websites/webkit-perf.appspot.com/main.py:
+        * Websites/webkit-perf.appspot.com/merge_tests.html: Renamed from Websites/webkit-perf.appspot.com/merge_tests.yaml.
+        * Websites/webkit-perf.appspot.com/models.py:
+        (ReportLog):
+        (ReportLog._parsed_payload):
+        (ReportLog.get_value):
+        (ReportLog.results):
+        (ReportLog.builder):
+        (ReportLog.branch):
+        (ReportLog.platform):
+        (ReportLog.build_number):
+        (ReportLog.webkit_revision):
+        (ReportLog.chromium_revision):
+        (ReportLog._model_by_key_name_in_payload):
+        (ReportLog._integer_in_payload):
+        (ReportLog.timestamp):
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+        (ReportHandler._output):
+        (ReportHandler._results_are_valid):
+        (ReportHandler._results_are_valid._is_float_convertible):
+        (ReportHandler):
+        * Websites/webkit-perf.appspot.com/report_logs.html: Added.
+        * Websites/webkit-perf.appspot.com/report_logs_handler.py: Added.
+        (ReportLogsHandler):
+        (ReportLogsHandler.get):
+        (ReportLogsHandler.post):
+        (ReportLogsHandler._error):
+        * Websites/webkit-perf.appspot.com/report_process_handler.py: Copied from Websites/webkit-perf.appspot.com/report_handler.py.
+        (ReportProcessHandler):
+        (ReportProcessHandler.post):
+        (ReportProcessHandler._create_build_if_possible):
+        (ReportProcessHandler._create_build_if_possible.execute):
+        (ReportProcessHandler._add_test_if_needed):
+
+2012-02-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic shouldn't rely on memcache to store cached JSON responses
+        https://bugs.webkit.org/show_bug.cgi?id=78306
+
+        Reviewed by Adam Barth.
+
+        Added PersistentCache model that stores the generated JSON responses.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (set_persistent_cache):
+        (set_persistent_cache.execute):
+        (get_persistent_cache):
+        (cache_manifest):
+        (CachedManifestHandler.get):
+        (cache_dashboard):
+        (CachedDashboardHandler.get):
+        (cache_runs):
+        (CachedRunsHandler.get):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (TestResult):
+        (ReportLog):
+        (PersistentCache):
+
+2012-02-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Perf-o-matic should update memcache in taskqueue
+        https://bugs.webkit.org/show_bug.cgi?id=78209
+
+        Reviewed by Adam Barth.
+
+        Update dashboard, manifest, and runs memcaches in taskqueue.
+        Also centralized the management of caches in controller.py.
+
+        * Websites/webkit-perf.appspot.com/app.yaml:
+        * Websites/webkit-perf.appspot.com/controller.py: Added.
+        (cache_manifest):
+        (schedule_manifest_update):
+        (CachedManifestHandler):
+        (CachedManifestHandler.get):
+        (cache_dashboard):
+        (schedule_dashboard_update):
+        (CachedDashboardHandler):
+        (CachedDashboardHandler.get):
+        (cache_runs):
+        (schedule_runs_update):
+        (CachedRunsHandler):
+        (CachedRunsHandler.get):
+        * Websites/webkit-perf.appspot.com/create_handler.py:
+        (CreateHandler.post):
+        * Websites/webkit-perf.appspot.com/dashboard_handler.py:
+        (DashboardHandler.post):
+        * Websites/webkit-perf.appspot.com/main.py:
+        * Websites/webkit-perf.appspot.com/manifest_handler.py:
+        (ManifestHandler.post):
+        * Websites/webkit-perf.appspot.com/merge_tests_handler.py:
+        (MergeTestsHandler.post):
+        * Websites/webkit-perf.appspot.com/report_handler.py:
+        (ReportHandler.post):
+        * Websites/webkit-perf.appspot.com/runs_handler.py:
+        (RunsHandler.post):
+
+2012-02-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add WebKitWebView::mouse-target-changed signal to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=78097
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/symbols.filter: Add freeOwnedGPtr<_GdkEvent>
+        symbol to be able to use GOwnPtr<GdkEvent> in WebKit2 GTK+ unit
+        tests.
+
 2012-02-09  Kent Tamura  <tkent@chromium.org>
 
         Do not localize numbers in scientific notation

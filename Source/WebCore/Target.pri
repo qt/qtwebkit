@@ -34,6 +34,10 @@ include_webinspector {
 }
 
 SOURCES += \
+    Modules/geolocation/Geolocation.cpp \
+    Modules/geolocation/GeolocationController.cpp \
+    Modules/geolocation/NavigatorGeolocation.cpp \
+    \
     accessibility/AccessibilityImageMapLink.cpp \
     accessibility/AccessibilityMediaControls.cpp \
     accessibility/AccessibilityMenuList.cpp \
@@ -158,7 +162,8 @@ v8 {
         bindings/v8/custom/V8InjectedScriptHostCustom.cpp \
         bindings/v8/custom/V8InjectedScriptManager.cpp \
         bindings/v8/custom/V8InspectorFrontendHostCustom.cpp \
-        bindings/v8/custom/V8DOMStringMapCustom.cpp
+        bindings/v8/custom/V8DOMStringMapCustom.cpp \
+        bindings/v8/custom/V8DOMTokenListCustom.cpp
 
     SOURCES += \
         bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp \
@@ -440,7 +445,6 @@ SOURCES += \
     css/CSSValueList.cpp \
     css/CSSValuePool.cpp \
     css/CSSWrapShapes.cpp \
-    css/FontFamilyValue.cpp \
     css/FontFeatureValue.cpp \
     css/FontValue.cpp \
     css/MediaFeatureNames.cpp \
@@ -451,6 +455,7 @@ SOURCES += \
     css/MediaQueryList.cpp \
     css/MediaQueryListListener.cpp \
     css/MediaQueryMatcher.cpp \
+    css/PropertySetCSSStyleDeclaration.cpp \
     css/RGBColor.cpp \
     css/SelectorChecker.cpp \
     css/ShadowValue.cpp \
@@ -565,6 +570,7 @@ SOURCES += \
     dom/SecurityContext.cpp \
     dom/SelectorQuery.cpp \
     dom/ShadowRoot.cpp \
+    dom/ShadowRootList.cpp \
     dom/SpaceSplitString.cpp \
     dom/StaticNodeList.cpp \
     dom/StyledElement.cpp \
@@ -650,6 +656,7 @@ SOURCES += \
     fileapi/DOMFileSystem.cpp \
     fileapi/DOMFileSystemBase.cpp \
     fileapi/DOMFileSystemSync.cpp \
+    fileapi/DOMWindowFileSystem.cpp \
     fileapi/DirectoryEntry.cpp \
     fileapi/DirectoryEntrySync.cpp \
     fileapi/DirectoryReader.cpp \
@@ -841,10 +848,11 @@ SOURCES += \
     html/parser/TextViewSourceParser.cpp \
     html/parser/XSSAuditor.cpp \
     html/shadow/ContentSelectorQuery.cpp \
-    html/shadow/ContentInclusionSelector.cpp \
     html/shadow/DetailsMarkerControl.cpp \
     html/shadow/HTMLContentElement.cpp \
+    html/shadow/HTMLContentSelector.cpp \
     html/shadow/HTMLShadowElement.cpp \
+    html/shadow/InsertionPoint.cpp \
     html/shadow/MediaControls.cpp \
     html/shadow/MediaControlRootElement.cpp \
     html/shadow/MeterShadowElement.cpp \
@@ -855,6 +863,7 @@ SOURCES += \
     inspector/ContentSearchUtils.cpp \
     inspector/DOMEditor.cpp \
     inspector/DOMNodeHighlighter.cpp \
+    inspector/DOMPatchSupport.cpp \
     inspector/IdentifiersFactory.cpp \
     inspector/InjectedScript.cpp \
     inspector/InjectedScriptHost.cpp \
@@ -866,6 +875,7 @@ SOURCES += \
     inspector/InspectorClient.cpp \
     inspector/InspectorConsoleAgent.cpp \
     inspector/InspectorController.cpp \
+    inspector/InspectorCounters.cpp \
     inspector/InspectorDatabaseAgent.cpp \
     inspector/InspectorDatabaseResource.cpp \
     inspector/InspectorDebuggerAgent.cpp \
@@ -919,6 +929,8 @@ SOURCES += \
     loader/cache/CachedResource.cpp \
     loader/cache/CachedScript.cpp \
     loader/cache/CachedShader.cpp \
+    loader/cache/CachedSVGDocument.cpp \
+    loader/cache/CachedSVGDocument.h \
     loader/cache/CachedXSLStyleSheet.cpp \
     loader/CrossOriginAccessControl.cpp \
     loader/CrossOriginPreflightResultCache.cpp \
@@ -984,8 +996,6 @@ SOURCES += \
     page/FrameDestructionObserver.cpp \
     page/FrameTree.cpp \
     page/FrameView.cpp \
-    page/Geolocation.cpp \
-    page/GeolocationController.cpp \
     page/GestureTapHighlighter.cpp \
     page/GroupSettings.cpp \
     page/History.cpp \
@@ -994,16 +1004,21 @@ SOURCES += \
     page/MouseEventWithHitTestResults.cpp \
     page/Navigator.cpp \
     page/NavigatorBase.cpp \
+    page/NavigatorRegisterProtocolHandler.cpp \
+    page/NavigatorSupplement.cpp \
     page/OriginAccessEntry.cpp \
     page/Page.cpp \
     page/PageGroup.cpp \
     page/PageGroupLoadDeferrer.cpp \
+    page/PageSupplement.cpp \
     page/PageVisibilityState.cpp \
     page/Performance.cpp \
     page/PerformanceNavigation.cpp \
     page/PerformanceTiming.cpp \
     page/PrintContext.cpp \
     page/Screen.cpp \
+    page/scrolling/ScrollingCoordinator.cpp \
+    page/scrolling/ScrollingCoordinatorNone.cpp \
     page/SecurityOrigin.cpp \
     page/SecurityPolicy.cpp \
     page/Settings.cpp \
@@ -1033,7 +1048,6 @@ SOURCES += \
     platform/ContentType.cpp \
     platform/CrossThreadCopier.cpp \
     platform/DateComponents.cpp \
-    platform/DefaultLocalizationStrategy.cpp \
     platform/DragData.cpp \
     platform/DragImage.cpp \
     platform/FileChooser.cpp \
@@ -1167,7 +1181,6 @@ SOURCES += \
     platform/UUID.cpp \
     platform/Widget.cpp \
     platform/PlatformStrategies.cpp \
-    platform/LocalizedStrings.cpp \
     plugins/IFrameShimSupport.cpp \
     plugins/PluginDatabase.cpp \
     plugins/PluginDebug.cpp \
@@ -1290,8 +1303,8 @@ SOURCES += \
     storage/Database.cpp \
     storage/DatabaseAuthorizer.cpp \
     storage/DatabaseSync.cpp \
-    storage/LocalStorageTask.cpp \
-    storage/LocalStorageThread.cpp \
+    storage/StorageTask.cpp \
+    storage/StorageThread.cpp \
     storage/Storage.cpp \
     storage/StorageAreaImpl.cpp \
     storage/StorageAreaSync.cpp \
@@ -1505,6 +1518,16 @@ v8 {
 }
 
 HEADERS += \
+    Modules/geolocation/Geolocation.h \
+    Modules/geolocation/GeolocationController.h \
+    Modules/geolocation/GeolocationError.h \
+    Modules/geolocation/GeolocationPosition.h \
+    Modules/geolocation/Geoposition.h \
+    Modules/geolocation/PositionCallback.h \
+    Modules/geolocation/PositionError.h \
+    Modules/geolocation/PositionErrorCallback.h \
+    Modules/geolocation/PositionOptions.h \
+    \
     css/CSSAspectRatioValue.h \
     css/CSSBorderImageSliceValue.h \
     css/CSSBorderImage.h \
@@ -1554,7 +1577,6 @@ HEADERS += \
     css/CSSValueList.h \
     css/CSSValuePool.h \
     css/CSSWrapShapes.h \
-    css/FontFamilyValue.h \
     css/FontFeatureValue.h \
     css/FontValue.h \
     css/MediaFeatureNames.h \
@@ -1627,6 +1649,7 @@ HEADERS += \
     dom/EventListenerMap.h \
     dom/EventNames.h \
     dom/EventQueue.h \
+    dom/EventSender.h \
     dom/EventTarget.h \
     dom/ExceptionBase.h \
     dom/ExceptionCode.h \
@@ -1667,6 +1690,7 @@ HEADERS += \
     dom/ScriptExecutionContext.h \
     dom/SelectorQuery.h \
     dom/ShadowRoot.h \
+    dom/ShadowRootList.h \
     dom/SpaceSplitString.h \
     dom/StaticNodeList.h \
     dom/StyledElement.h \
@@ -1873,7 +1897,6 @@ HEADERS += \
     html/ImageDocument.h \
     html/LabelsNodeList.h \
     html/LinkRelAttribute.h \
-    html/LoadableTextTrack.h \
     html/MediaController.h \
     html/MediaDocument.h \
     html/MediaFragmentURIParser.h \
@@ -1882,9 +1905,6 @@ HEADERS += \
     html/PublicURLManager.h \
     html/StepRange.h \
     html/TextDocument.h \
-    html/TextTrack.h \
-    html/TextTrackCue.h \
-    html/TextTrackCueList.h \
     html/TimeRanges.h \
     html/ValidityState.h \
     html/parser/CSSPreloadScanner.h \
@@ -1905,11 +1925,15 @@ HEADERS += \
     html/parser/HTMLViewSourceParser.h \
     html/parser/XSSAuditor.h \
     html/shadow/ContentSelectorQuery.h \
-    html/shadow/ContentInclusionSelector.h \
     html/shadow/HTMLContentElement.h \
+    html/shadow/HTMLContentSelector.h \
     html/shadow/HTMLShadowElement.h \
     html/shadow/MediaControlElements.h \
     html/shadow/DetailsMarkerControl.h \
+    html/track/LoadableTextTrack.h \
+    html/track/TextTrack.h \
+    html/track/TextTrackCue.h \
+    html/track/TextTrackCueList.h \
     html/track/TextTrackList.h \
     html/track/TrackBase.h \
     html/track/TrackEvent.h \
@@ -1920,6 +1944,7 @@ HEADERS += \
     inspector/ContentSearchUtils.h \
     inspector/DOMEditor.h \
     inspector/DOMNodeHighlighter.h \
+    inspector/DOMPatchSupport.h \
     inspector/DOMWrapperVisitor.h \
     inspector/IdentifiersFactory.h \
     inspector/InjectedScript.h \
@@ -1931,6 +1956,7 @@ HEADERS += \
     inspector/InspectorConsoleAgent.h \
     inspector/InspectorConsoleInstrumentation.h \
     inspector/InspectorController.h \
+    inspector/InspectorCounters.h \
     inspector/InspectorCSSAgent.h \
     inspector/InspectorDatabaseAgent.h \
     inspector/InspectorDatabaseInstrumentation.h \
@@ -1982,6 +2008,7 @@ HEADERS += \
     loader/cache/CachedResourceHandle.h \
     loader/cache/CachedScript.h \
     loader/cache/CachedShader.h \
+    loader/cache/CachedSVGDocument.h \
     loader/cache/CachedXSLStyleSheet.h \
     loader/cache/MemoryCache.h \
     loader/CrossOriginAccessControl.h \
@@ -2047,8 +2074,6 @@ HEADERS += \
     page/Frame.h \
     page/FrameTree.h \
     page/FrameView.h \
-    page/Geolocation.h \
-    page/Geoposition.h \
     page/GestureTapHighlighter.h\
     page/GroupSettings.h \
     page/History.h \
@@ -2059,6 +2084,7 @@ HEADERS += \
     page/PageGroup.h \
     page/PageGroupLoadDeferrer.h \
     page/Page.h \
+    page/PageSupplement.h \
     page/PageVisibilityState.h \
     page/PrintContext.h \
     page/Screen.h \
@@ -2087,7 +2113,6 @@ HEADERS += \
     platform/ContextMenu.h \
     platform/CrossThreadCopier.h \
     platform/DateComponents.h \
-    platform/DefaultLocalizationStrategy.h \
     platform/DragData.h \
     platform/DragImage.h \
     platform/FileChooser.h \
@@ -2498,8 +2523,8 @@ HEADERS += \
     storage/DatabaseTask.h \
     storage/DatabaseThread.h \
     storage/DatabaseTracker.h \
-    storage/LocalStorageTask.h \
-    storage/LocalStorageThread.h \
+    storage/StorageTask.h \
+    storage/StorageThread.h \
     storage/OriginQuotaManager.h \
     storage/OriginUsageRecord.h \
     storage/SQLCallbackWrapper.h \
@@ -2820,7 +2845,6 @@ SOURCES += \
     platform/qt/MIMETypeRegistryQt.cpp \
     platform/qt/PasteboardQt.cpp \
     platform/qt/PlatformKeyboardEventQt.cpp \
-    platform/qt/PlatformMouseEventQt.cpp \
     platform/qt/PlatformScreenQt.cpp \
     platform/qt/PlatformTouchEventQt.cpp \
     platform/qt/PlatformTouchPointQt.cpp \
@@ -2832,11 +2856,11 @@ SOURCES += \
     platform/qt/SoundQt.cpp \
     platform/qt/LoggingQt.cpp \
     platform/qt/LanguageQt.cpp \
+    platform/qt/LocalizedStringsQt.cpp \
     platform/qt/TemporaryLinkStubsQt.cpp \
     platform/text/qt/TextBoundariesQt.cpp \
     platform/text/qt/TextBreakIteratorInternalICUQt.cpp \
     platform/text/qt/TextCodecQt.cpp \
-    platform/qt/WheelEventQt.cpp \
     platform/qt/WidgetQt.cpp
 
 !contains(DEFINES, WTF_USE_LIBXML2=1) {
@@ -2847,8 +2871,7 @@ contains(DEFINES, HAVE_QSTYLE=1) {
     HEADERS += platform/qt/QtStyleOptionWebComboBox.h \
                platform/qt/RenderThemeQStyle.h \
                platform/qt/ScrollbarThemeQt.h
-    SOURCES += platform/qt/RenderThemeQStyle.cpp \
-               platform/qt/ScrollbarQt.cpp
+    SOURCES += platform/qt/RenderThemeQStyle.cpp
 }
 
 contains(DEFINES, ENABLE_SMOOTH_SCROLLING=1) {
@@ -3655,6 +3678,9 @@ contains(DEFINES, ENABLE_WEB_SOCKETS=1) {
         websockets/WebSocket.h \
         websockets/WebSocketChannel.h \
         websockets/WebSocketChannelClient.h \
+        websockets/WebSocketExtensionDispatcher.h \
+        websockets/WebSocketExtensionProcessor.h \
+        websockets/WebSocketFrame.h \
         websockets/WebSocketHandshake.h \
         websockets/WebSocketHandshakeRequest.h \
         websockets/WebSocketHandshakeResponse.h \
@@ -3663,6 +3689,7 @@ contains(DEFINES, ENABLE_WEB_SOCKETS=1) {
     SOURCES += \
         websockets/WebSocket.cpp \
         websockets/WebSocketChannel.cpp \
+        websockets/WebSocketExtensionDispatcher.cpp \
         websockets/WebSocketHandshake.cpp \
         websockets/WebSocketHandshakeRequest.cpp \
         websockets/WebSocketHandshakeResponse.cpp \
@@ -3944,21 +3971,29 @@ contains(CONFIG, texmap) {
         platform/graphics/texmap/LayerTransform.h \
         platform/graphics/texmap/TextureMapper.h \
         platform/graphics/texmap/TextureMapperAnimation.h \
+        platform/graphics/texmap/TextureMapperBackingStore.h \
         platform/graphics/texmap/TextureMapperImageBuffer.h \
-        platform/graphics/texmap/TextureMapperNode.h \
+        platform/graphics/texmap/TextureMapperLayer.h \
         platform/graphics/texmap/TextureMapperPlatformLayer.h
 
     SOURCES += \
         platform/graphics/texmap/LayerTransform.cpp \
         platform/graphics/texmap/TextureMapper.cpp \
         platform/graphics/texmap/TextureMapperAnimation.cpp \
+        platform/graphics/texmap/TextureMapperBackingStore.cpp \
         platform/graphics/texmap/TextureMapperImageBuffer.cpp \
-        platform/graphics/texmap/TextureMapperNode.cpp \
+        platform/graphics/texmap/TextureMapperLayer.cpp \
         platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
 
     !win32-*:contains(QT_CONFIG, opengl) {
-        HEADERS += platform/graphics/opengl/TextureMapperGL.h
-        SOURCES += platform/graphics/opengl/TextureMapperGL.cpp
+        HEADERS += \
+            platform/graphics/texmap/TextureMapperGL.h \
+            platform/graphics/texmap/TextureMapperShaderManager.h
+
+        SOURCES += \
+            platform/graphics/texmap/TextureMapperGL.cpp \
+            platform/graphics/texmap/TextureMapperShaderManager.cpp
+
         CONFIG += opengl-shims
         DEFINES += WTF_USE_TEXTURE_MAPPER_GL
     }
@@ -3968,8 +4003,8 @@ contains(CONFIG, texmap) {
 }
 
 contains(CONFIG, opengl-shims) {
-    HEADERS += platform/graphics/cairo/OpenGLShims.h
-    SOURCES += platform/graphics/cairo/OpenGLShims.cpp
+    HEADERS += platform/graphics/OpenGLShims.h
+    SOURCES += platform/graphics/OpenGLShims.cpp
     DEFINES += QT_OPENGL_SHIMS=1
 }
 

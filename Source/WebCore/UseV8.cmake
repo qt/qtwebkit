@@ -81,6 +81,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8CustomXPathNSResolver.cpp
     bindings/v8/custom/V8DOMFormDataCustom.cpp
     bindings/v8/custom/V8DOMStringMapCustom.cpp
+    bindings/v8/custom/V8DOMTokenListCustom.cpp
     bindings/v8/custom/V8DOMWindowCustom.cpp
     bindings/v8/custom/V8DataViewCustom.cpp
     bindings/v8/custom/V8DedicatedWorkerContextCustom.cpp
@@ -128,9 +129,9 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8MessageChannelConstructor.cpp
     bindings/v8/custom/V8MessageEventCustom.cpp
     bindings/v8/custom/V8MessagePortCustom.cpp
+    bindings/v8/custom/V8MutationCallbackCustom.cpp
     bindings/v8/custom/V8NamedNodeMapCustom.cpp
     bindings/v8/custom/V8NamedNodesCollection.cpp
-    bindings/v8/custom/V8NavigatorCustom.cpp
     bindings/v8/custom/V8NodeCustom.cpp
     bindings/v8/custom/V8NodeListCustom.cpp
     bindings/v8/custom/V8NotificationCenterCustom.cpp
@@ -147,6 +148,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8Uint8ArrayCustom.cpp
     bindings/v8/custom/V8WebGLRenderingContextCustom.cpp
     bindings/v8/custom/V8WebKitAnimationCustom.cpp
+    bindings/v8/custom/V8WebKitMutationObserverCustom.cpp
     bindings/v8/custom/V8WebKitPointConstructor.cpp
     bindings/v8/custom/V8WebSocketCustom.cpp
     bindings/v8/custom/V8WorkerContextCustom.cpp
@@ -251,8 +253,8 @@ FILE(WRITE ${IDL_FILES_TMP} ${IDL_FILES_LIST})
 
 ADD_CUSTOM_COMMAND(
     OUTPUT ${SUPPLEMENTAL_DEPENDENCY_FILE}
-    DEPENDS ${WEBCORE_DIR}/bindings/scripts/resolve-supplemental.pl ${SCRIPTS_RESOLVE_SUPPLEMENTAL} ${WebCore_IDL_FILES}
-    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/resolve-supplemental.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --idlFilesList ${IDL_FILES_TMP} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE}
+    DEPENDS ${WEBCORE_DIR}/bindings/scripts/resolve-supplemental.pl ${SCRIPTS_RESOLVE_SUPPLEMENTAL} ${WebCore_IDL_FILES} ${IDL_ATTRIBUTES_FILE}
+    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/resolve-supplemental.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --idlFilesList ${IDL_FILES_TMP} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE} --idlAttributesFile ${IDL_ATTRIBUTES_FILE}
     VERBATIM)
 
 FOREACH (_file ${WebCore_IDL_FILES})

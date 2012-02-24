@@ -91,6 +91,25 @@ void RenderTableCell::colSpanOrRowSpanChanged()
         section()->setNeedsCellRecalc();
 }
 
+LayoutUnit RenderTableCell::logicalHeightForRowSizing() const
+{
+    LayoutUnit adjustedLogicalHeight = logicalHeight() - (intrinsicPaddingBefore() + intrinsicPaddingAfter());
+
+    LayoutUnit styleLogicalHeight = style()->logicalHeight().calcValue(0);
+    if (document()->inQuirksMode() || style()->boxSizing() == BORDER_BOX) {
+        // Explicit heights use the border box in quirks mode.
+        // Don't adjust height.
+    } else {
+        // In strict mode, box-sizing: content-box do the right
+        // thing and actually add in the border and padding.
+        LayoutUnit adjustedPaddingBefore = paddingBefore() - intrinsicPaddingBefore();
+        LayoutUnit adjustedPaddingAfter = paddingAfter() - intrinsicPaddingAfter();
+        styleLogicalHeight += adjustedPaddingBefore + adjustedPaddingAfter + borderBefore() + borderAfter();
+    }
+
+    return max(styleLogicalHeight, adjustedLogicalHeight);
+}
+
 Length RenderTableCell::styleOrColLogicalWidth() const
 {
     Length w = style()->logicalWidth();
@@ -1066,6 +1085,11 @@ void RenderTableCell::paintMask(PaintInfo& paintInfo, const LayoutPoint& paintOf
         return;
    
     paintMaskImages(paintInfo, LayoutRect(paintOffset, size()));
+}
+
+bool RenderTableCell::boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const
+{
+    return false;
 }
 
 void RenderTableCell::scrollbarsChanged(bool horizontalScrollbarChanged, bool verticalScrollbarChanged)

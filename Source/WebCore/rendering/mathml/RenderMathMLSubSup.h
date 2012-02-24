@@ -34,10 +34,10 @@ namespace WebCore {
     
 class RenderMathMLSubSup : public RenderMathMLBlock {
 public:
-    RenderMathMLSubSup(Element* fraction);
+    RenderMathMLSubSup(Element*);
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
-    virtual bool hasBase() const { return true; }
-    virtual int nonOperatorHeight() const;
+    
+    virtual RenderMathMLOperator* unembellishedOperator();
     virtual void stretchToHeight(int pixelHeight);
     virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
@@ -47,6 +47,10 @@ protected:
 private:
     virtual const char* renderName() const { return "RenderMathMLSubSup"; }
 
+    // Omit our subscript and/or superscript. This may return 0 for a non-MathML base (which
+    // won't occur in valid MathML).
+    RenderBoxModelObject* base() const;
+    
     enum SubSupType { Sub, Sup, SubSup };
     SubSupType m_kind;
     RenderBlock* m_scripts;
@@ -57,4 +61,3 @@ private:
 #endif // ENABLE(MATHML)
 
 #endif // RenderMathMLSubSup_h
-

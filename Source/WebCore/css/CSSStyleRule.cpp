@@ -35,8 +35,8 @@
 
 namespace WebCore {
 
-CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int line, CSSRule::Type type)
-    : CSSRule(parent, type)
+CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int line)
+    : CSSRule(parent, CSSRule::STYLE_RULE)
 {
     setSourceLine(line);
 
@@ -47,7 +47,7 @@ CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int line, CSSRule::Type type)
 CSSStyleRule::~CSSStyleRule()
 {
     if (m_style)
-        m_style->clearParentRule();
+        m_style->clearParentRule(this);
     cleanup();
 }
 
@@ -68,17 +68,13 @@ inline void CSSStyleRule::cleanup()
 
 String CSSStyleRule::generateSelectorText() const
 {
-    if (isPageRule())
-        return static_cast<const CSSPageRule*>(this)->pageSelectorText();
-    else {
-        StringBuilder builder;
-        for (CSSSelector* s = selectorList().first(); s; s = CSSSelectorList::next(s)) {
-            if (s != selectorList().first())
-                builder.append(", ");
-            builder.append(s->selectorText());
-        }
-        return builder.toString();
+    StringBuilder builder;
+    for (CSSSelector* s = selectorList().first(); s; s = CSSSelectorList::next(s)) {
+        if (s != selectorList().first())
+            builder.append(", ");
+        builder.append(s->selectorText());
     }
+    return builder.toString();
 }
 
 String CSSStyleRule::selectorText() const
@@ -137,7 +133,7 @@ String CSSStyleRule::cssText() const
 void CSSStyleRule::addSubresourceStyleURLs(ListHashSet<KURL>& urls)
 {
     if (m_style)
-        m_style->addSubresourceStyleURLs(urls);
+        m_style->addSubresourceStyleURLs(urls, parentStyleSheet());
 }
 
 } // namespace WebCore

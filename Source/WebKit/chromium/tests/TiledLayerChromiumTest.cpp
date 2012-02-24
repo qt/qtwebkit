@@ -162,6 +162,14 @@ public:
         return TiledLayerChromium::skipsDraw();
     }
 
+    virtual void setNeedsDisplayRect(const FloatRect& rect)
+    {
+        m_lastNeedsDisplayRect = rect;
+        TiledLayerChromium::setNeedsDisplayRect(rect);
+    }
+
+    const FloatRect& lastNeedsDisplayRect() const { return m_lastNeedsDisplayRect; }
+
     FakeLayerTextureUpdater* fakeLayerTextureUpdater() { return m_fakeTextureUpdater.get(); }
 
     virtual TextureManager* textureManager() const { return m_textureManager; }
@@ -181,6 +189,7 @@ private:
 
     RefPtr<FakeLayerTextureUpdater> m_fakeTextureUpdater;
     TextureManager* m_textureManager;
+    FloatRect m_lastNeedsDisplayRect;
 };
 
 class FakeTiledLayerWithScaledBounds : public FakeTiledLayerChromium {
@@ -434,6 +443,57 @@ TEST(TiledLayerChromiumTest, verifyUpdateRectWhenContentBoundsAreScaled)
     EXPECT_FLOAT_RECT_EQ(FloatRect(45, 80, 15, 8), layer->updateRect());
 }
 
+TEST(TiledLayerChromiumTest, verifyInvalidationWhenContentsScaleChanges)
+{
+    OwnPtr<TextureManager> textureManager = TextureManager::create(4*1024*1024, 2*1024*1024, 1024);
+    RefPtr<FakeTiledLayerChromium> layer = adoptRef(new FakeTiledLayerChromium(textureManager.get()));
+    DebugScopedSetImplThread implThread;
+    RefPtr<FakeCCTiledLayerImpl> layerImpl = adoptRef(new FakeCCTiledLayerImpl(0));
+
+    FakeTextureAllocator textureAllocator;
+    CCTextureUpdater updater(&textureAllocator);
+
+    // Create a layer with one tile.
+    layer->setBounds(IntSize(100, 100));
+
+    // Invalidate the entire layer.
+    layer->setNeedsDisplay();
+    EXPECT_FLOAT_RECT_EQ(FloatRect(0, 0, 100, 100), layer->lastNeedsDisplayRect());
+
+    // Push the tiles to the impl side and check that there is exactly one.
+    layer->prepareToUpdate(IntRect(0, 0, 100, 100));
+    layer->updateCompositorResources(0, updater);
+    layer->pushPropertiesTo(layerImpl.get());
+    EXPECT_TRUE(layerImpl->hasTileAt(0, 0));
+    EXPECT_FALSE(layerImpl->hasTileAt(0, 1));
+    EXPECT_FALSE(layerImpl->hasTileAt(1, 0));
+    EXPECT_FALSE(layerImpl->hasTileAt(1, 1));
+
+    // Change the contents scale and verify that the content rectangle requiring painting
+    // is not scaled.
+    layer->setContentsScale(2);
+    EXPECT_FLOAT_RECT_EQ(FloatRect(0, 0, 100, 100), layer->lastNeedsDisplayRect());
+
+    // The impl side should get 2x2 tiles now.
+    layer->prepareToUpdate(IntRect(0, 0, 200, 200));
+    layer->updateCompositorResources(0, updater);
+    layer->pushPropertiesTo(layerImpl.get());
+    EXPECT_TRUE(layerImpl->hasTileAt(0, 0));
+    EXPECT_TRUE(layerImpl->hasTileAt(0, 1));
+    EXPECT_TRUE(layerImpl->hasTileAt(1, 0));
+    EXPECT_TRUE(layerImpl->hasTileAt(1, 1));
+
+    // Invalidate the entire layer again, but do not paint. All tiles should be gone now from the
+    // impl side.
+    layer->setNeedsDisplay();
+    layer->updateCompositorResources(0, updater);
+    layer->pushPropertiesTo(layerImpl.get());
+    EXPECT_FALSE(layerImpl->hasTileAt(0, 0));
+    EXPECT_FALSE(layerImpl->hasTileAt(0, 1));
+    EXPECT_FALSE(layerImpl->hasTileAt(1, 0));
+    EXPECT_FALSE(layerImpl->hasTileAt(1, 1));
+}
+
 TEST(TiledLayerChromiumTest, skipsDrawGetsReset)
 {
     // Initialize without threading support.
@@ -524,7 +584,7 @@ TEST(TiledLayerChromiumTest, layerAddsSelfToOccludedRegion)
     occluded = Region();
     layer->addSelfToOccludedScreenSpace(occluded);
     EXPECT_EQ_RECT(IntRect(), occluded.bounds());
-    EXPECT_EQ(1u, occluded.rects().size());
+    EXPECT_EQ(0u, occluded.rects().size());
 
     // If the layer paints opaque content, then the occluded region should match the visible opaque content.
     IntRect opaquePaintRect = IntRect(10, 10, 90, 190);
@@ -546,6 +606,28 @@ TEST(TiledLayerChromiumTest, layerAddsSelfToOccludedRegion)
     EXPECT_EQ_RECT(intersection(opaquePaintRect, visibleBounds), occluded.bounds());
     EXPECT_EQ(1u, occluded.rects().size());
 
+    // If we repaint a non-opaque part of the tile, then it shouldn't lose its opaque-ness. And other tiles should
+    // not be affected.
+    layer->fakeLayerTextureUpdater()->setOpaquePaintRect(IntRect());
+    layer->invalidateRect(IntRect(0, 0, 1, 1));
+    layer->prepareToUpdate(contentBounds);
+
+    occluded = Region();
+    layer->addSelfToOccludedScreenSpace(occluded);
+    EXPECT_EQ_RECT(intersection(opaquePaintRect, visibleBounds), occluded.bounds());
+    EXPECT_EQ(1u, occluded.rects().size());
+
+    // If we repaint an opaque part of the tile, then it should lose its opaque-ness. But other tiles should still
+    // not be affected.
+    layer->fakeLayerTextureUpdater()->setOpaquePaintRect(IntRect());
+    layer->invalidateRect(IntRect(10, 10, 1, 1));
+    layer->prepareToUpdate(contentBounds);
+
+    occluded = Region();
+    layer->addSelfToOccludedScreenSpace(occluded);
+    EXPECT_EQ_RECT(intersection(IntRect(10, 100, 90, 100), visibleBounds), occluded.bounds());
+    EXPECT_EQ(1u, occluded.rects().size());
+
     // If the layer is transformed then the resulting occluded area needs to be transformed to its target space.
     TransformationMatrix transform;
     transform.translate(contentBounds.width() / 2.0, contentBounds.height() / 2.0);
@@ -556,6 +638,8 @@ TEST(TiledLayerChromiumTest, layerAddsSelfToOccludedRegion)
     screenSpaceTransform *= transform;
     screenSpaceTransform.translate(-contentBounds.width() / 2.0, -contentBounds.height() / 2.0);
     layer->setScreenSpaceTransform(screenSpaceTransform);
+    layer->fakeLayerTextureUpdater()->setOpaquePaintRect(opaquePaintRect);
+    layer->invalidateRect(opaquePaintRect);
     layer->prepareToUpdate(contentBounds);
 
     occluded = Region();

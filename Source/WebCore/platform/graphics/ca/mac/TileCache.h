@@ -27,7 +27,7 @@
 #define TileCache_h
 
 #include "IntPointHash.h"
-#include "IntSize.h"
+#include "IntRect.h"
 #include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
@@ -49,12 +49,14 @@ class TileCache {
 
 public:
     static PassOwnPtr<TileCache> create(WebTileCacheLayer*, const IntSize& tileSize);
+    ~TileCache();
 
     void tileCacheLayerBoundsChanged();
 
     void setNeedsDisplay();
     void setNeedsDisplayInRect(const IntRect&);
     void drawLayer(WebTileLayer*, CGContextRef);
+    void setContentsScale(CGFloat);
 
     bool acceleratesDrawing() const { return m_acceleratesDrawing; }
     void setAcceleratesDrawing(bool);
@@ -95,6 +97,7 @@ private:
     typedef HashMap<TileIndex, RetainPtr<WebTileLayer> > TileMap;
     TileMap m_tiles;
     Timer<TileCache> m_tileRevalidationTimer;
+    IntRect m_tileCoverageRect;
 
     bool m_acceleratesDrawing;
 

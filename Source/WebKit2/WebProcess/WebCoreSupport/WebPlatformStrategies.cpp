@@ -33,7 +33,9 @@
 #include "WebCookieManager.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
+#include <WebCore/Color.h>
 #include <WebCore/Page.h>
+#include <WebCore/PlatformPasteboard.h>
 
 #if USE(CF)
 #include <wtf/RetainPtr.h>
@@ -66,6 +68,11 @@ PluginStrategy* WebPlatformStrategies::createPluginStrategy()
 }
 
 VisitedLinkStrategy* WebPlatformStrategies::createVisitedLinkStrategy()
+{
+    return this;
+}
+
+PasteboardStrategy* WebPlatformStrategies::createPasteboardStrategy()
 {
     return this;
 }
@@ -124,6 +131,70 @@ void WebPlatformStrategies::addVisitedLink(Page*, LinkHash linkHash)
 {
     WebProcess::shared().addVisitedLink(linkHash);
 }
+
+#if PLATFORM(MAC)
+// PasteboardStrategy
+
+void WebPlatformStrategies::getTypes(Vector<String>& types, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).getTypes(types);
+}
+
+PassRefPtr<WebCore::SharedBuffer> WebPlatformStrategies::bufferForType(const String& pasteboardType, const String& pasteboardName)
+{
+    return PlatformPasteboard(pasteboardName).bufferForType(pasteboardType);
+}
+
+void WebPlatformStrategies::getPathnamesForType(Vector<String>& pathnames, const String& pasteboardType, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).getPathnamesForType(pathnames, pasteboardType);
+}
+
+String WebPlatformStrategies::stringForType(const String& pasteboardType, const String& pasteboardName)
+{
+    return PlatformPasteboard(pasteboardName).stringForType(pasteboardType);
+}
+
+void WebPlatformStrategies::copy(const String& fromPasteboard, const String& toPasteboard)
+{
+    PlatformPasteboard(toPasteboard).copy(fromPasteboard);
+}
+
+int WebPlatformStrategies::changeCount(const WTF::String &pasteboardName)
+{
+    return PlatformPasteboard(pasteboardName).changeCount();
+}
+
+String WebPlatformStrategies::uniqueName()
+{
+    return PlatformPasteboard::uniqueName();
+}
+
+Color WebPlatformStrategies::color(const String& pasteboardName)
+{
+    return PlatformPasteboard(pasteboardName).color();    
+}
+
+void WebPlatformStrategies::setTypes(const Vector<String>& pasteboardTypes, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).setTypes(pasteboardTypes);
+}
+
+void WebPlatformStrategies::setBufferForType(PassRefPtr<SharedBuffer> buffer, const String& pasteboardType, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).setBufferForType(buffer, pasteboardType);
+}
+
+void WebPlatformStrategies::setPathnamesForType(const Vector<String>& pathnames, const String& pasteboardType, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).setPathnamesForType(pathnames, pasteboardType);
+}
+
+void WebPlatformStrategies::setStringForType(const String& string, const String& pasteboardType, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).setStringForType(string, pasteboardType);    
+}
+#endif
 
 } // namespace WebKit
 

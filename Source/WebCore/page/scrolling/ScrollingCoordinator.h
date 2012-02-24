@@ -26,14 +26,16 @@
 #ifndef ScrollingCoordinator_h
 #define ScrollingCoordinator_h
 
-#if ENABLE(THREADED_SCROLLING)
-
 #include "GraphicsLayer.h"
 #include "IntRect.h"
+#include "ScrollTypes.h"
 #include "Timer.h"
 #include <wtf/Forward.h>
+
+#if ENABLE(THREADED_SCROLLING)
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/Threading.h>
+#endif
 
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
@@ -45,11 +47,12 @@ class FrameView;
 class GraphicsLayer;
 class Page;
 class PlatformWheelEvent;
-class ScrollingTree;
+class Region;
+class ScrollingCoordinatorPrivate;
 class ScrollingTreeState;
 
-#if ENABLE(GESTURE_EVENTS)
-class PlatformGestureEvent;
+#if ENABLE(THREADED_SCROLLING)
+class ScrollingTree;
 #endif
 
 class ScrollingCoordinator : public ThreadSafeRefCounted<ScrollingCoordinator> {
@@ -59,7 +62,9 @@ public:
 
     void pageDestroyed();
 
+#if ENABLE(THREADED_SCROLLING)
     ScrollingTree* scrollingTree() const;
+#endif
 
     // Return whether this scrolling coordinator handles scrolling for the given frame view.
     bool coordinatesScrollingForFrameView(FrameView*) const;
@@ -71,37 +76,68 @@ public:
     // frame view's underlying document.
     void frameViewWheelEventHandlerCountChanged(FrameView*);
 
-    // Should be called whenever the scroll layer for the given frame view changes.
-    void frameViewScrollLayerDidChange(FrameView*, const GraphicsLayer*);
+    // Should be called whenever the slow repaint objects counter changes between zero and one.
+    void frameViewHasSlowRepaintObjectsDidChange(FrameView*);
+
+    // Should be called whenever the fixed objects counter changes between zero and one.
+    // FIXME: This is a temporary workaround so that we'll fall into main thread scrolling mode
+    // if a page has fixed elements. The scrolling tree should know about the fixed elements
+    // so it can make sure they stay fixed even when we scroll on the scrolling thread.
+    void frameViewHasFixedObjectsDidChange(FrameView*);
+
+    // Should be called whenever the root layer for the given frame view changes.
+    void frameViewRootLayerDidChange(FrameView*);
 
     // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
     void frameViewHorizontalScrollbarLayerDidChange(FrameView*, GraphicsLayer* horizontalScrollbarLayer);
 
-    // Should be called whenever the horizontal scrollbar layer for the given frame view changes.
+    // Should be called whenever the vertical scrollbar layer for the given frame view changes.
     void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer* verticalScrollbarLayer);
+
+    // Requests that the scrolling coordinator updates the scroll position of the given frame view. If this function returns true, it means that the
+    // position will be updated asynchronously. If it returns false, the caller should update the scrolling position itself.
+    bool requestScrollPositionUpdate(FrameView*, const IntPoint&);
+
+    // Handle the wheel event on the scrolling thread. Returns whether the event was handled or not.
+    bool handleWheelEvent(FrameView*, const PlatformWheelEvent&);
 
     // Dispatched by the scrolling tree whenever the main frame scroll position changes.
     void updateMainFrameScrollPosition(const IntPoint&);
+
+    // Dispatched by the scrolling tree whenever the main frame scroll position changes and the scroll layer position needs to be updated as well.
+    void updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint&);
 
 private:
     explicit ScrollingCoordinator(Page*);
 
     void recomputeWheelEventHandlerCount();
+    void updateShouldUpdateScrollLayerPositionOnMainThread();
 
+    void setScrollLayer(GraphicsLayer*);
+    void setNonFastScrollableRegion(const Region&);
+    void setScrollParameters(ScrollElasticity horizontalScrollElasticity, ScrollElasticity verticalScrollElasticity,
+                             bool hasEnabledHorizontalScrollbar, bool hasEnabledVerticalScrollbar,
+                             const IntRect& viewportRect, const IntSize& contentsSize);
+    void setWheelEventHandlerCount(unsigned);
+    void setShouldUpdateScrollLayerPositionOnMainThread(bool);
+
+    Page* m_page;
+
+#if ENABLE(THREADED_SCROLLING)
     void scheduleTreeStateCommit();
+
     void scrollingTreeStateCommitterTimerFired(Timer<ScrollingCoordinator>*);
     void commitTreeStateIfNeeded();
     void commitTreeState();
 
-    Page* m_page;
-    RefPtr<ScrollingTree> m_scrollingTree;
-
     OwnPtr<ScrollingTreeState> m_scrollingTreeState;
+    RefPtr<ScrollingTree> m_scrollingTree;
     Timer<ScrollingCoordinator> m_scrollingTreeStateCommitterTimer;
+#endif
+
+    ScrollingCoordinatorPrivate* m_private;
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(THREADED_SCROLLING)
 
 #endif // ScrollingCoordinator_h

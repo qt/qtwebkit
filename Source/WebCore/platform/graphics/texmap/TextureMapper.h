@@ -27,6 +27,7 @@
     #endif
 #endif
 
+#include "FilterOperations.h"
 #include "GraphicsContext.h"
 #include "IntRect.h"
 #include "IntSize.h"
@@ -47,8 +48,14 @@ class TextureMapper;
 class BitmapTexture  : public RefCounted<BitmapTexture> {
 public:
     enum PixelFormat { BGRAFormat, RGBAFormat, BGRFormat, RGBFormat };
+    enum Flag {
+        SupportsAlpha = 0x01
+    };
+
+    typedef unsigned Flags;
+
     BitmapTexture()
-        : m_isOpaque(true)
+        : m_flags(0)
     {
     }
 
@@ -59,21 +66,30 @@ public:
     virtual void updateContents(Image*, const IntRect&, const IntRect&, BitmapTexture::PixelFormat) = 0;
     virtual void updateContents(const void*, const IntRect&) = 0;
     virtual bool isValid() const = 0;
+    inline Flags flags() const { return m_flags; }
 
     virtual int bpp() const { return 32; }
-    virtual void reset(const IntSize& size, bool opaque = false)
+    virtual void didReset() { }
+    void reset(const IntSize& size, Flags flags)
     {
-        m_isOpaque = opaque;
+        m_flags = flags;
         m_contentSize = size;
+        didReset();
     }
 
     inline IntSize contentSize() const { return m_contentSize; }
     inline int numberOfBytes() const { return size().width() * size().height() * bpp() >> 3; }
-    inline bool isOpaque() const { return m_isOpaque; }
+    inline bool isOpaque() const { return !(m_flags & SupportsAlpha); }
+
+#if ENABLE(CSS_FILTERS)
+    virtual void applyFilters(const BitmapTexture& contentTexture, const FilterOperations&) { }
+#endif
 
 protected:
     IntSize m_contentSize;
-    bool m_isOpaque;
+
+private:
+    Flags m_flags;
 };
 
 // A "context" class used to encapsulate accelerated texture mapping functions: i.e. drawing a texture
@@ -105,6 +121,8 @@ public:
 
     virtual void beginPainting() { }
     virtual void endPainting() { }
+
+    virtual IntSize maxTextureSize() const { return IntSize(INT_MAX, INT_MAX); }
 
     // A surface is released implicitly when dereferenced.
     virtual PassRefPtr<BitmapTexture> acquireTextureFromPool(const IntSize&);

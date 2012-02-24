@@ -49,20 +49,12 @@ bool RenderMathMLBlock::isChildAllowed(RenderObject* child, RenderStyle*) const
     return child->node() && child->node()->nodeType() == Node::ELEMENT_NODE;
 }
 
-PassRefPtr<RenderStyle> RenderMathMLBlock::makeBlockStyle()
+PassRefPtr<RenderStyle> RenderMathMLBlock::createBlockStyle()
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::create();
     newStyle->inheritFrom(style());
     newStyle->setDisplay(BLOCK);
     return newStyle;
-}
-
-int RenderMathMLBlock::nonOperatorHeight() const
-{
-    if (!isRenderMathMLOperator())
-        return offsetHeight();
-        
-    return 0;
 }
 
 void RenderMathMLBlock::stretchToHeight(int height) 
@@ -82,7 +74,7 @@ void RenderMathMLBlock::paint(PaintInfo& info, const LayoutPoint& paintOffset)
     if (info.context->paintingDisabled() || info.phase != PaintPhaseForeground)
         return;
 
-    LayoutPoint adjustedPaintOffset = paintOffset + location();
+    IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset + location());
 
     GraphicsContextStateSaver stateSaver(*info.context);
     

@@ -55,7 +55,7 @@ static v8::Handle<v8::Value> excitingFunctionCallback(const v8::Arguments& args)
     TestActiveDOMObject* imp = V8TestActiveDOMObject::toNative(args.Holder());
     if (!V8BindingSecurity::canAccessFrame(V8BindingState::Only(), imp->frame(), true))
         return v8::Handle<v8::Value>();
-    EXCEPTION_BLOCK(Node*, nextChild, V8Node::HasInstance(MAYBE_MISSING_PARAMETER(args, 0, MissingIsUndefined)) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(MAYBE_MISSING_PARAMETER(args, 0, MissingIsUndefined))) : 0);
+    EXCEPTION_BLOCK(Node*, nextChild, V8Node::HasInstance(MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined)) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined))) : 0);
     imp->excitingFunction(nextChild);
     return v8::Handle<v8::Value>();
 }
@@ -66,7 +66,7 @@ static v8::Handle<v8::Value> postMessageCallback(const v8::Arguments& args)
     if (args.Length() < 1)
         return throwError("Not enough arguments", V8Proxy::TypeError);
     TestActiveDOMObject* imp = V8TestActiveDOMObject::toNative(args.Holder());
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, message, MAYBE_MISSING_PARAMETER(args, 0, MissingIsUndefined));
+    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, message, MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined));
     imp->postMessage(message);
     return v8::Handle<v8::Value>();
 }
@@ -117,7 +117,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestActiveDOMObjectTempla
     v8::Handle<v8::Signature> excitingFunctionSignature = v8::Signature::New(desc, excitingFunctionArgc, excitingFunctionArgv);
     proto->Set(v8::String::New("excitingFunction"), v8::FunctionTemplate::New(TestActiveDOMObjectInternal::excitingFunctionCallback, v8::Handle<v8::Value>(), excitingFunctionSignature));
 
-    // Function 'postMessage' (ExtAttr: 'DoNotCheckDomainSecurity')
+    // Function 'postMessage' (ExtAttr: 'DoNotCheckSecurity')
     proto->SetAccessor(v8::String::New("postMessage"), TestActiveDOMObjectInternal::postMessageAttrGetter, 0, v8::Handle<v8::Value>(), v8::ALL_CAN_READ, static_cast<v8::PropertyAttribute>(v8::DontDelete | v8::ReadOnly));
 
     // Custom toString template

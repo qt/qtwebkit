@@ -148,7 +148,8 @@ def build(bld):
             'Source/WebCore/bindings/cpp/WebDOMEventTarget.cpp',
             'Source/WebCore/platform/KillRingNone.cpp',
             'Source/WebCore/platform/text/LocalizedDateNone.cpp',
-            'Source/WebCore/platform/text/LocalizedNumberNone.cpp'
+            'Source/WebCore/platform/text/LocalizedNumberNone.cpp',
+            'Source/WebCore/page/scrolling/ScrollingCoordinatorNone.cpp',
         ]  
     
         if building_on_win32:
@@ -325,6 +326,8 @@ def build(bld):
         excludes.append('WebDOMNodeCustom.cpp')
         excludes.append('WebDOMHTMLDocumentCustom.cpp')
         excludes.append('WebDOMHTMLCollectionCustom.cpp')
+        excludes.append('WebNativeNodeFilterCondition.cpp')
+        excludes.append('WebDOMNodeFilterCustom.cpp')
         
         # this file is unused by any port, not sure why it was
         # left in the tree

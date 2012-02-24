@@ -35,8 +35,8 @@
 
 #include "Event.h"
 #include "IdentifiersFactory.h"
+#include "InspectorCounters.h"
 #include "InspectorFrontend.h"
-#include "InspectorMemoryAgent.h"
 #include "InspectorState.h"
 #include "InstrumentingAgents.h"
 #include "IntRect.h"
@@ -85,9 +85,9 @@ static const char XHRLoad[] = "XHRLoad";
 static const char FunctionCall[] = "FunctionCall";
 static const char GCEvent[] = "GCEvent";
 
-static const char RegisterAnimationFrameCallback[] = "RegisterAnimationFrameCallback";
-static const char CancelAnimationFrameCallback[] = "CancelAnimationFrameCallback";
-static const char FireAnimationFrameEvent[] = "FireAnimationFrameEvent";
+static const char RequestAnimationFrame[] = "RequestAnimationFrame";
+static const char CancelAnimationFrame[] = "CancelAnimationFrame";
+static const char FireAnimationFrame[] = "FireAnimationFrame";
 }
 
 void InspectorTimelineAgent::pushGCEventRecords()
@@ -177,7 +177,6 @@ void InspectorTimelineAgent::willCallFunction(const String& scriptName, int scri
 
 void InspectorTimelineAgent::didCallFunction()
 {
-    collectDomCounters();
     didCompleteCurrentRecord(TimelineRecordType::FunctionCall);
 }
 
@@ -188,7 +187,6 @@ void InspectorTimelineAgent::willDispatchEvent(const Event& event)
 
 void InspectorTimelineAgent::didDispatchEvent()
 {
-    collectDomCounters();
     didCompleteCurrentRecord(TimelineRecordType::EventDispatch);
 }
 
@@ -232,7 +230,6 @@ void InspectorTimelineAgent::didWriteHTML(unsigned int endLine)
     if (!m_recordStack.isEmpty()) {
         TimelineRecordEntry entry = m_recordStack.last();
         entry.data->setNumber("endLine", endLine);
-        collectDomCounters();
         didCompleteCurrentRecord(TimelineRecordType::ParseHTML);
     }
 }
@@ -254,7 +251,6 @@ void InspectorTimelineAgent::willFireTimer(int timerId)
 
 void InspectorTimelineAgent::didFireTimer()
 {
-    collectDomCounters();
     didCompleteCurrentRecord(TimelineRecordType::TimerFire);
 }
 
@@ -285,7 +281,6 @@ void InspectorTimelineAgent::willEvaluateScript(const String& url, int lineNumbe
     
 void InspectorTimelineAgent::didEvaluateScript()
 {
-    collectDomCounters();
     didCompleteCurrentRecord(TimelineRecordType::EvaluateScript);
 }
 
@@ -352,24 +347,24 @@ void InspectorTimelineAgent::didCommitLoad()
     clearRecordStack();
 }
 
-void InspectorTimelineAgent::didRegisterAnimationFrameCallback(int callbackId)
+void InspectorTimelineAgent::didRequestAnimationFrame(int callbackId)
 {
-    appendRecord(TimelineRecordFactory::createAnimationFrameCallbackData(callbackId), TimelineRecordType::RegisterAnimationFrameCallback, true);
+    appendRecord(TimelineRecordFactory::createAnimationFrameData(callbackId), TimelineRecordType::RequestAnimationFrame, true);
 }
 
-void InspectorTimelineAgent::didCancelAnimationFrameCallback(int callbackId)
+void InspectorTimelineAgent::didCancelAnimationFrame(int callbackId)
 {
-    appendRecord(TimelineRecordFactory::createAnimationFrameCallbackData(callbackId), TimelineRecordType::CancelAnimationFrameCallback, true);
+    appendRecord(TimelineRecordFactory::createAnimationFrameData(callbackId), TimelineRecordType::CancelAnimationFrame, true);
 }
 
-void InspectorTimelineAgent::willFireAnimationFrameEvent(int callbackId)
+void InspectorTimelineAgent::willFireAnimationFrame(int callbackId)
 {
-    pushCurrentRecord(TimelineRecordFactory::createAnimationFrameCallbackData(callbackId), TimelineRecordType::FireAnimationFrameEvent, false);
+    pushCurrentRecord(TimelineRecordFactory::createAnimationFrameData(callbackId), TimelineRecordType::FireAnimationFrame, false);
 }
 
-void InspectorTimelineAgent::didFireAnimationFrameEvent()
+void InspectorTimelineAgent::didFireAnimationFrame()
 {
-    didCompleteCurrentRecord(TimelineRecordType::FireAnimationFrameEvent);
+    didCompleteCurrentRecord(TimelineRecordType::FireAnimationFrame);
 }
 
 void InspectorTimelineAgent::addRecordToTimeline(PassRefPtr<InspectorObject> prpRecord, const String& type)
@@ -394,22 +389,13 @@ void InspectorTimelineAgent::setHeapSizeStatistic(InspectorObject* record)
     record->setNumber("usedHeapSize", usedHeapSize);
     record->setNumber("totalHeapSize", totalHeapSize);
 
-}
-
-void InspectorTimelineAgent::collectDomCounters()
-{
-    if (!m_state->getBoolean(TimelineAgentState::includeMemoryDetails))
-        return;
-    if (m_recordStack.isEmpty())
-        return;
-
-    String error;
-    RefPtr<InspectorArray> domGroups;
-    RefPtr<InspectorObject> strings;
-    m_memoryAgent->getDOMNodeCount(&error, domGroups, strings);
-
-    if (domGroups)
-        m_recordStack.last().record->setArray("domGroups", domGroups.release());
+    if (m_state->getBoolean(TimelineAgentState::includeMemoryDetails)) {
+        RefPtr<InspectorObject> counters = InspectorObject::create();
+        counters->setNumber("nodes", InspectorCounters::counterValue(InspectorCounters::NodeCounter));
+        counters->setNumber("documents", InspectorCounters::counterValue(InspectorCounters::DocumentCounter));
+        counters->setNumber("jsEventListeners", InspectorCounters::counterValue(InspectorCounters::JSEventListenerCounter));
+        record->setObject("counters", counters.release());
+    }
 }
 
 void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
@@ -428,12 +414,11 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
     }
 }
 
-InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorMemoryAgent* memoryAgent)
+InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state)
     : InspectorBaseAgent<InspectorTimelineAgent>("Timeline", instrumentingAgents, state)
     , m_frontend(0)
     , m_id(1)
     , m_maxCallStackDepth(5)
-    , m_memoryAgent(memoryAgent)
 {
 }
 

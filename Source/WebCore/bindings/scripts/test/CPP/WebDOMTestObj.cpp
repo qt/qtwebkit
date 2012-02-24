@@ -487,88 +487,6 @@ void WebDOMTestObj::setStringAttrWithSetterException(const WebDOMString& newStri
     webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
 }
 
-int WebDOMTestObj::withScriptStateAttribute() const
-{
-    if (!impl())
-        return 0;
-
-    return impl()->withScriptStateAttribute();
-}
-
-void WebDOMTestObj::setWithScriptStateAttribute(int newWithScriptStateAttribute)
-{
-    if (!impl())
-        return;
-
-    impl()->setWithScriptStateAttribute(newWithScriptStateAttribute);
-}
-
-WebDOMTestObj WebDOMTestObj::withScriptExecutionContextAttribute() const
-{
-    if (!impl())
-        return WebDOMTestObj();
-
-    return toWebKit(WTF::getPtr(impl()->withScriptExecutionContextAttribute()));
-}
-
-void WebDOMTestObj::setWithScriptExecutionContextAttribute(const WebDOMTestObj& newWithScriptExecutionContextAttribute)
-{
-    if (!impl())
-        return;
-
-    impl()->setWithScriptExecutionContextAttribute(toWebCore(newWithScriptExecutionContextAttribute));
-}
-
-WebDOMTestObj WebDOMTestObj::withScriptStateAttributeRaises() const
-{
-    if (!impl())
-        return WebDOMTestObj();
-
-    WebCore::ExceptionCode ec = 0;
-    WebDOMTestObj result = toWebKit(WTF::getPtr(impl()->withScriptStateAttributeRaises(ec)));
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-    return result;
-}
-
-void WebDOMTestObj::setWithScriptStateAttributeRaises(const WebDOMTestObj& newWithScriptStateAttributeRaises)
-{
-    if (!impl())
-        return;
-
-    WebCore::ExceptionCode ec = 0;
-    impl()->setWithScriptStateAttributeRaises(toWebCore(newWithScriptStateAttributeRaises), ec);
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-}
-
-WebDOMTestObj WebDOMTestObj::withScriptExecutionContextAttributeRaises() const
-{
-    if (!impl())
-        return WebDOMTestObj();
-
-    WebCore::ExceptionCode ec = 0;
-    WebDOMTestObj result = toWebKit(WTF::getPtr(impl()->withScriptExecutionContextAttributeRaises(ec)));
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-    return result;
-}
-
-void WebDOMTestObj::setWithScriptExecutionContextAttributeRaises(const WebDOMTestObj& newWithScriptExecutionContextAttributeRaises)
-{
-    if (!impl())
-        return;
-
-    WebCore::ExceptionCode ec = 0;
-    impl()->setWithScriptExecutionContextAttributeRaises(toWebCore(newWithScriptExecutionContextAttributeRaises), ec);
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-}
-
-WebDOMString WebDOMTestObj::scriptStringAttr() const
-{
-    if (!impl())
-        return WebDOMString();
-
-    return static_cast<const WTF::String&>(impl()->scriptStringAttr());
-}
-
 #if ENABLE(Condition1)
 int WebDOMTestObj::conditionalAttr1() const
 {
@@ -874,51 +792,6 @@ void WebDOMTestObj::removeEventListener(const WebDOMString& type, const WebDOMEv
     impl()->removeEventListener(type, toWebCore(listener), useCapture);
 }
 
-void WebDOMTestObj::withScriptStateVoid()
-{
-    if (!impl())
-        return;
-
-    impl()->withScriptStateVoid();
-}
-
-WebDOMTestObj WebDOMTestObj::withScriptStateObj()
-{
-    if (!impl())
-        return WebDOMTestObj();
-
-    return toWebKit(WTF::getPtr(impl()->withScriptStateObj()));
-}
-
-void WebDOMTestObj::withScriptStateVoidException()
-{
-    if (!impl())
-        return;
-
-    WebCore::ExceptionCode ec = 0;
-    impl()->withScriptStateVoidException(ec);
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-}
-
-WebDOMTestObj WebDOMTestObj::withScriptStateObjException()
-{
-    if (!impl())
-        return WebDOMTestObj();
-
-    WebCore::ExceptionCode ec = 0;
-    WebDOMTestObj result = toWebKit(WTF::getPtr(impl()->withScriptStateObjException(ec)));
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-    return result;
-}
-
-void WebDOMTestObj::withScriptExecutionContext()
-{
-    if (!impl())
-        return;
-
-    impl()->withScriptExecutionContext();
-}
-
 void WebDOMTestObj::methodWithOptionalArg(int opt)
 {
     if (!impl())
@@ -941,6 +814,30 @@ void WebDOMTestObj::methodWithNonOptionalArgAndTwoOptionalArgs(int nonOpt, int o
         return;
 
     impl()->methodWithNonOptionalArgAndTwoOptionalArgs(nonOpt, opt1, opt2);
+}
+
+void WebDOMTestObj::methodWithOptionalString(const WebDOMString& str)
+{
+    if (!impl())
+        return;
+
+    impl()->methodWithOptionalString(str);
+}
+
+void WebDOMTestObj::methodWithOptionalStringIsUndefined(const WebDOMString& str)
+{
+    if (!impl())
+        return;
+
+    impl()->methodWithOptionalStringIsUndefined(str);
+}
+
+void WebDOMTestObj::methodWithOptionalStringIsNullString(const WebDOMString& str)
+{
+    if (!impl())
+        return;
+
+    impl()->methodWithOptionalStringIsNullString(str);
 }
 
 

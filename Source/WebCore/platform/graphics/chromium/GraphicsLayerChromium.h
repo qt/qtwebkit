@@ -82,6 +82,9 @@ public:
 
     virtual void setOpacity(float);
 
+    // Returns true if filter can be rendered by the compositor
+    virtual bool setFilters(const FilterOperations&);
+
     virtual void setNeedsDisplay();
     virtual void setNeedsDisplayInRect(const FloatRect&);
     virtual void setContentsNeedsDisplay();
@@ -91,6 +94,12 @@ public:
     virtual void setContentsToImage(Image*);
     virtual void setContentsToMedia(PlatformLayer*);
     virtual void setContentsToCanvas(PlatformLayer*);
+
+    virtual bool addAnimation(const KeyframeValueList&, const IntSize& boxSize, const Animation*, const String&, double timeOffset);
+    virtual void pauseAnimation(const String& animationName, double timeOffset);
+    virtual void removeAnimation(const String& animationName);
+    virtual void suspendAnimations(double time);
+    virtual void resumeAnimations();
 
     virtual PlatformLayer* platformLayer() const;
 
@@ -128,6 +137,8 @@ private:
 
     void setupContentsLayer(LayerChromium*);
     float contentsScale() const;
+
+    int mapAnimationNameToId(const String& animationName);
 
     String m_nameBase;
 

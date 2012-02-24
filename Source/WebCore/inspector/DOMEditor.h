@@ -33,45 +33,53 @@
 
 #include "ExceptionCode.h"
 
-#include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class ContainerNode;
-class Document;
-class NamedNodeMap;
+class Element;
+class InspectorHistory;
 class Node;
+class Text;
 
 #if ENABLE(INSPECTOR)
 
-class DOMEditor {
-public:
-    explicit DOMEditor(Document*);
-    virtual ~DOMEditor();
+typedef String ErrorString;
 
-    void patchDocument(const String& markup);
-    Node* patchNode(Node*, const String& markup, ExceptionCode&);
+class DOMEditor {
+    WTF_MAKE_NONCOPYABLE(DOMEditor);
+public:
+    explicit DOMEditor(InspectorHistory*);
+    ~DOMEditor();
+
+    bool insertBefore(Node* parentNode, PassRefPtr<Node>, Node* anchorNode, ExceptionCode&);
+    bool removeChild(Node* parentNode, Node*, ExceptionCode&);
+    bool setAttribute(Element*, const String& name, const String& value, ExceptionCode&);
+    bool removeAttribute(Element*, const String& name, ExceptionCode&);
+    bool setOuterHTML(Node*, const String& html, Node** newNode, ExceptionCode&);
+    bool replaceWholeText(Text*, const String& text, ExceptionCode&);
+    bool replaceChild(Node* parentNode, PassRefPtr<Node> newNode, Node* oldNode, ExceptionCode&);
+    bool setNodeValue(Node* parentNode, const String& value, ExceptionCode&);
+
+    bool insertBefore(Node* parentNode, PassRefPtr<Node>, Node* anchorNode, ErrorString*);
+    bool removeChild(Node* parentNode, Node*, ErrorString*);
+    bool setAttribute(Element*, const String& name, const String& value, ErrorString*);
+    bool removeAttribute(Element*, const String& name, ErrorString*);
+    bool setOuterHTML(Node*, const String& html, Node** newNode, ErrorString*);
+    bool replaceWholeText(Text*, const String& text, ErrorString*);
 
 private:
-    struct Digest;
-    typedef Vector<pair<Digest*, size_t> > ResultMap;
-    typedef HashMap<String, Digest*> UnusedNodesMap;
+    class DOMAction;
+    class RemoveChildAction;
+    class InsertBeforeAction;
+    class RemoveAttributeAction;
+    class SetAttributeAction;
+    class SetOuterHTMLAction;
+    class ReplaceWholeTextAction;
+    class ReplaceChildNodeAction;
+    class SetNodeValueAction;
 
-    void innerPatchNode(Digest* oldNode, Digest* newNode, ExceptionCode&);
-    std::pair<ResultMap, ResultMap> diff(const Vector<OwnPtr<Digest> >& oldChildren, const Vector<OwnPtr<Digest> >& newChildren);
-    void innerPatchChildren(ContainerNode*, const Vector<OwnPtr<Digest> >& oldChildren, const Vector<OwnPtr<Digest> >& newChildren, ExceptionCode&);
-    PassOwnPtr<Digest> createDigest(Node*, UnusedNodesMap*);
-    void insertBefore(ContainerNode*, Digest*, Node* anchor, ExceptionCode&);
-    void removeChild(Digest*, ExceptionCode&);
-    void markNodeAsUsed(Digest*);
-
-    Document* m_document;
-
-    UnusedNodesMap m_unusedNodesMap;
+    InspectorHistory* m_history;
 };
 
 #endif // ENABLE(INSPECTOR)

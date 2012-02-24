@@ -46,8 +46,8 @@ static const float gLineThick = 3.f;
 static const float gFractionBarWidth = 0.05f;
 static const float gDenominatorPad = 0.1f;
 
-RenderMathMLFraction::RenderMathMLFraction(Element* fraction) 
-    : RenderMathMLBlock(fraction)
+RenderMathMLFraction::RenderMathMLFraction(Element* element)
+    : RenderMathMLBlock(element)
     , m_lineThickness(gLineMedium)
 {
     setChildrenInline(false);
@@ -101,7 +101,7 @@ void RenderMathMLFraction::updateFromElement()
 void RenderMathMLFraction::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderBlock* row = new (renderArena()) RenderMathMLBlock(node());
-    RefPtr<RenderStyle> rowStyle = makeBlockStyle();
+    RefPtr<RenderStyle> rowStyle = createBlockStyle();
     
     rowStyle->setTextAlign(CENTER);
     Length pad(static_cast<int>(rowStyle->fontSize() * gHorizontalPad), Fixed);
@@ -117,6 +117,17 @@ void RenderMathMLFraction::addChild(RenderObject* child, RenderObject* beforeChi
     RenderBlock::addChild(row, beforeChild);
     row->addChild(child);
     updateFromElement();
+}
+
+RenderMathMLOperator* RenderMathMLFraction::unembellishedOperator()
+{
+    RenderObject* numeratorWrapper = firstChild();
+    if (!numeratorWrapper)
+        return 0;
+    RenderObject* numerator = numeratorWrapper->firstChild();
+    if (!numerator || !numerator->isRenderMathMLBlock())
+        return 0;
+    return toRenderMathMLBlock(numerator)->unembellishedOperator();
 }
 
 void RenderMathMLFraction::layout()
@@ -153,7 +164,7 @@ void RenderMathMLFraction::paint(PaintInfo& info, const LayoutPoint& paintOffset
             verticalOffset = numerator->offsetHeight();        
     }
     
-    LayoutPoint adjustedPaintOffset = paintOffset + location();
+    IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset + location());
     adjustedPaintOffset.setY(adjustedPaintOffset.y() + verticalOffset);
     
     GraphicsContextStateSaver stateSaver(*info.context);

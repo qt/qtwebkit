@@ -408,6 +408,16 @@ bool WKPreferencesGetWebGLEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->webGLEnabled();
 }
 
+void WKPreferencesSetCSSRegionsEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCSSRegionsEnabled(flag);
+}
+
+bool WKPreferencesGetCSSRegionsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->cssRegionsEnabled();
+}
+
 void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setNeedsSiteSpecificQuirks(flag);
@@ -668,14 +678,14 @@ bool WKPreferencesGetApplicationChromeModeEnabled(WKPreferencesRef preferencesRe
     return toImpl(preferencesRef)->applicationChromeMode();
 }
 
-void WKPreferencesSetSuppressIncrementalRendering(WKPreferencesRef preferencesRef, bool enabled)
+void WKPreferencesSetSuppressesIncrementalRendering(WKPreferencesRef preferencesRef, bool enabled)
 {
-    toImpl(preferencesRef)->setSuppressIncrementalRendering(enabled);
+    toImpl(preferencesRef)->setSuppressesIncrementalRendering(enabled);
 }
 
-bool WKPreferencesGetSuppressIncrementalRendering(WKPreferencesRef preferencesRef)
+bool WKPreferencesGetSuppressesIncrementalRendering(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->suppressIncrementalRendering();
+    return toImpl(preferencesRef)->suppressesIncrementalRendering();
 }
 
 void WKPreferencesSetBackspaceKeyNavigationEnabled(WKPreferencesRef preferencesRef, bool enabled)

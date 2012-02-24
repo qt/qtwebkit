@@ -55,6 +55,9 @@ namespace JSC {
         class SpeculativeJIT;
     }
 #endif
+    namespace LLInt {
+        class Data;
+    }
 
     struct ClassInfo;
     struct Instruction;
@@ -118,6 +121,7 @@ namespace JSC {
         friend class DFG::OSRExitCompiler;
         friend class DFG::SpeculativeJIT;
 #endif
+        friend class LLInt::Data;
 
     public:
         static EncodedJSValue encode(JSValue);
@@ -234,6 +238,8 @@ namespace JSC {
 
         char* description();
 
+        JS_EXPORT_PRIVATE JSObject* synthesizePrototype(ExecState*) const;
+
     private:
         template <class T> JSValue(WriteBarrierBase<T>);
 
@@ -246,7 +252,6 @@ namespace JSC {
         JS_EXPORT_PRIVATE JSObject* toObjectSlowCase(ExecState*, JSGlobalObject*) const;
         JS_EXPORT_PRIVATE JSObject* toThisObjectSlowCase(ExecState*) const;
 
-        JS_EXPORT_PRIVATE JSObject* synthesizePrototype(ExecState*) const;
         JSObject* synthesizeObject(ExecState*) const;
 
 #if USE(JSVALUE32_64)

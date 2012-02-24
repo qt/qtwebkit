@@ -37,12 +37,15 @@
 #include "IDBObjectStore.h"
 #include "IDBObjectStoreBackendInterface.h"
 #include "IDBPendingTransactionMonitor.h"
+#include "IDBTracing.h"
 
 namespace WebCore {
 
 PassRefPtr<IDBTransaction> IDBTransaction::create(ScriptExecutionContext* context, PassRefPtr<IDBTransactionBackendInterface> backend, IDBDatabase* db)
 {
-    return adoptRef(new IDBTransaction(context, backend, db));
+    RefPtr<IDBTransaction> transaction(adoptRef(new IDBTransaction(context, backend, db)));
+    transaction->suspendIfNeeded();
+    return transaction.release();
 }
 
 IDBTransaction::IDBTransaction(ScriptExecutionContext* context, PassRefPtr<IDBTransactionBackendInterface> backend, IDBDatabase* db)
@@ -184,6 +187,7 @@ ScriptExecutionContext* IDBTransaction::scriptExecutionContext() const
 
 bool IDBTransaction::dispatchEvent(PassRefPtr<Event> event)
 {
+    IDB_TRACE("IDBTransaction::dispatchEvent");
     ASSERT(!m_transactionFinished);
     ASSERT(scriptExecutionContext());
     ASSERT(event->target() == this);

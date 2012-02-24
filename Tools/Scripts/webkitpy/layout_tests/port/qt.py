@@ -31,6 +31,7 @@
 import logging
 import re
 import sys
+import os
 
 import webkit
 
@@ -45,6 +46,9 @@ _log = logging.getLogger(__name__)
 class QtPort(WebKitPort):
     ALL_VERSIONS = ['linux', 'win', 'mac']
     port_name = "qt"
+
+    def _wk2_port_name(self):
+        return "qt-5.0-wk2"
 
     def _port_flag_for_scripts(self):
         return "--qt"
@@ -122,10 +126,10 @@ class QtPort(WebKitPort):
             search_paths.add('qt-4.8')
         elif version:
             search_paths.add('qt-5.0')
-        if self.get_option('webkit_test_runner'):
-            search_paths.update(['qt-wk2', 'wk2'])
-        else:
-            search_paths.add('qt-wk1')
+            if self.get_option('webkit_test_runner'):
+                search_paths.update(['qt-5.0-wk2', 'wk2'])
+            else:
+                search_paths.add('qt-5.0-wk1')
         return search_paths
 
     def _runtime_feature_list(self):
@@ -148,3 +152,12 @@ class QtPort(WebKitPort):
 
     def operating_system(self):
         return self._operating_system
+
+    def check_sys_deps(self, needs_http):
+        result = super(QtPort, self).check_sys_deps(needs_http)
+        if not 'WEBKIT_TESTFONTS' in os.environ:
+            _log.error('\nThe WEBKIT_TESTFONTS environment variable is not defined or not set properly.')
+            _log.error('You must set it before running the tests.')
+            _log.error('Use git to grab the actual fonts from http://gitorious.org/qtwebkit/testfonts')
+            return False
+        return result

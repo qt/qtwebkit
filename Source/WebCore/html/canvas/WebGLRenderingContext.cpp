@@ -719,11 +719,6 @@ PassRefPtr<ImageData> WebGLRenderingContext::paintRenderingResultsToImageData()
     return imageData;
 }
 
-bool WebGLRenderingContext::paintsIntoCanvasBuffer() const
-{
-    return m_context->paintsIntoCanvasBuffer();
-}
-
 void WebGLRenderingContext::reshape(int width, int height)
 {
     // This is an approximation because at WebGLRenderingContext level we don't
@@ -4890,7 +4885,21 @@ bool WebGLRenderingContext::validateStencilFunc(const char* functionName, GC3Den
 
 void WebGLRenderingContext::printWarningToConsole(const String& message)
 {
-    canvas()->document()->frame()->domWindow()->console()->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, canvas()->document()->url().string());
+    if (!canvas())
+        return;
+    Document* document = canvas()->document();
+    if (!document)
+        return;
+    Frame* frame = document->frame();
+    if (!frame)
+        return;
+    DOMWindow* window = frame->domWindow();
+    if (!window)
+        return;
+    Console* console = window->console();
+    if (!console)
+        return;
+    console->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, document->url().string());
 }
 
 bool WebGLRenderingContext::validateFramebufferFuncParameters(const char* functionName, GC3Denum target, GC3Denum attachment)

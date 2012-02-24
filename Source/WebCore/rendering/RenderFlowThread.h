@@ -74,7 +74,12 @@ public:
     
     void addFlowChild(RenderObject* newChild, RenderObject* beforeChild = 0);
     void removeFlowChild(RenderObject*);
+    void removeFlowChildInfo(RenderObject*);
     bool hasChildren() const { return !m_flowThreadChildList.isEmpty(); }
+#ifndef NDEBUG
+    bool hasChild(RenderObject* child) const { return m_flowThreadChildList.contains(child); }
+    bool hasChildInfo(RenderObject* child) const { return child && child->isBox() && m_regionRangeMap.contains(toRenderBox(child)); }
+#endif
 
     void addRegionToThread(RenderRegion*);
     void removeRegionFromThread(RenderRegion*);
@@ -128,7 +133,9 @@ public:
                                       const RenderRegion* oldStartRegion = 0, const RenderRegion* oldEndRegion = 0,
                                       const RenderRegion* newStartRegion = 0, const RenderRegion* newEndRegion = 0);
     WebKitNamedFlow* ensureNamedFlow();
+    void computeOverflowStateForRegions(LayoutUnit oldClientAfterEdge);
 
+    bool overflow() const { return m_overflow; }
 private:
     virtual const char* renderName() const { return "RenderFlowThread"; }
 
@@ -189,6 +196,7 @@ private:
     bool m_regionsInvalidated;
     bool m_regionsHaveUniformLogicalWidth;
     bool m_regionsHaveUniformLogicalHeight;
+    bool m_overflow;
     RefPtr<WebKitNamedFlow> m_namedFlow;
 };
 

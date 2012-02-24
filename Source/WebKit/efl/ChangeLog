@@ -1,3 +1,245 @@
+2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
+
+        SpellCheckRequest needs to know the context where the spellcheck happened.
+        https://bugs.webkit.org/show_bug.cgi?id=79320
+
+        Reviewed by Hajime Morita.
+
+        * WebCoreSupport/EditorClientEfl.h:
+        (WebCore::EditorClientEfl::requestCheckingOfString):
+
+2012-02-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/EditorClientEfl.cpp:
+        (WebCore::EditorClientEfl::shouldApplyStyle):
+        * WebCoreSupport/EditorClientEfl.h:
+        (EditorClientEfl):
+
+2012-02-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/EditorClientEfl.cpp:
+        (WebCore::EditorClientEfl::shouldApplyStyle):
+        * WebCoreSupport/EditorClientEfl.h:
+        (EditorClientEfl):
+
+2012-02-20  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Add a new API for the Vibration API(W3C).
+        https://bugs.webkit.org/show_bug.cgi?id=72010
+
+        Reviewed by Hajime Morita.
+
+        Implementation for the Vibration API feature to the EFL-port layer.
+        http://dev.w3.org/2009/dap/vibration/
+        There are two methods for vibration API.
+        - vibrate : Vibrate device for receiving as a parameter.
+        - cancelVibrate : Cancel current vibration.
+
+        * CMakeListsEfl.txt:
+        * WebCoreSupport/VibrationClientEfl.cpp: Added.
+        (WebCore):
+        (WebCore::VibrationClientEfl::VibrationClientEfl):
+        (WebCore::VibrationClientEfl::vibrate):
+        (WebCore::VibrationClientEfl::cancelVibration):
+        (WebCore::VibrationClientEfl::vibrationDestroyed):
+        * WebCoreSupport/VibrationClientEfl.h: Added.
+        (WebCore):
+        (VibrationClientEfl):
+        (WebCore::VibrationClientEfl::~VibrationClientEfl):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+
+2012-02-17  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Unreviewed, adapt to the changes introduced in r107973.
+
+        SVN r107973 moved some libsoup feature initialization code to
+        WebCore, but only changed the GTK+ bits in WebKit.
+
+        * ewk/ewk_main.cpp:
+        (_ewk_init_body): Do not initialize the content sniffer and the
+        decoder here, the initialization is now done in WebCore.
+
+2012-02-17  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        Unreviewed, fix the build with ENABLE(DEVICE_ORIENTATION) after
+        r107518. The EFL EWS bot doesn't enable that flag, so the breakage
+        was not spotted earlier.
+
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+
+2012-01-31  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [soup] Add support for multiple SoupSessions.
+        https://bugs.webkit.org/show_bug.cgi?id=77341
+
+        Add the necessary infrastructure to support multiple SoupSessions. Each
+        WebView now has a "session" property, which defaults to
+        ResourceHandle::defaultSession() and can be changed to another
+        SoupSession by the user.
+
+        Some API in ewk_network and ewk_view which required SoupSession to be a
+        valid type in the headers has now been moved inside #if USE(SOUP)
+        ifdefs so we can actually the required Soup header and avoid build
+        problems with duplicate typedefs.
+
+        * CMakeListsEfl.txt:
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::createNetworkingContext):
+        * WebCoreSupport/FrameNetworkingContextEfl.cpp: Copied from Source/WebKit/efl/WebCoreSupport/FrameNetworkingContextEfl.h.
+        (WebCore):
+        (WebCore::FrameNetworkingContextEfl::create):
+        (WebCore::FrameNetworkingContextEfl::FrameNetworkingContextEfl):
+        (WebCore::FrameNetworkingContextEfl::soupSession):
+        * WebCoreSupport/FrameNetworkingContextEfl.h:
+        (FrameNetworkingContextEfl):
+        * ewk/ewk_cookies.h: Mention this API is only valid with the
+        default SoupSession.
+        * ewk/ewk_network.cpp:
+        (ewk_network_default_soup_session_get): Define only if USE(SOUP) is set.
+        * ewk/ewk_network.h: Ditto, and mention this API is only valid with the
+        default SoupSession.
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (ewk_view_soup_session_get):
+        (ewk_view_soup_session_set):
+        * ewk/ewk_view.h:
+        ():
+
+2012-02-15  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        Notify ChromeClient when touch-event handlers are installed/removed.
+        https://bugs.webkit.org/show_bug.cgi?id=77440
+
+        Reviewed by Darin Fisher and Ryosuke Niwa.
+
+        * WebCoreSupport/ChromeClientEfl.h:
+        (WebCore::ChromeClientEfl::numTouchEventHandlersChanged):
+
+2012-02-15  Gustavo Lima Chaves  <glima@profusion.mobi>
+
+        [EFL] Add missing libsoup to (pkgconfig) dependency requirements
+        https://bugs.webkit.org/show_bug.cgi?id=78702
+
+        Unreviewed build fix.
+
+        * ewebkit.pc.in: Now that bug 77874 had its patch landed, we
+        always require libsoup as a dependency for the EFL port. The
+        'Require' session of this file has to contemplate that, otherwise
+        code linking with ewebkit will fail to lookup to libsoup's header
+        files.
+
+2012-02-13  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Merge WebKitEfl.cmake into FindEFL.cmake.
+        https://bugs.webkit.org/show_bug.cgi?id=78566
+
+        Reviewed by Daniel Bates.
+
+        * CMakeListsEfl.txt: Do not include WebKitEfl.cmake.
+
+2012-02-11  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        Convert svg/animations to use SMIL methods for driving the timeline
+        https://bugs.webkit.org/show_bug.cgi?id=78422
+
+        Reviewed by Dirk Schulze.
+
+        Remove SVG animation sampling functionality provided for DRT, which no longer uses it.
+        Instead we switched the svg/animations tests to use SVGSVGElement.setCurrentTime.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-02-06  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Drop support for the Curl network backend.
+        https://bugs.webkit.org/show_bug.cgi?id=77874
+
+        Reviewed by Eric Seidel.
+
+        Nobody seems to be maintaining the Curl backend in WebCore, the
+        EFL port developers all seem to be using the Soup backend and the
+        port itself has many features which are only implemented for the
+        latter.
+
+        * CMakeListsEfl.txt: Unconditionally build soup-dependent files
+        and always add the glib/soup include directories and libraries.
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidReceiveResponse):
+        Remove USE(SOUP) checks.
+        * ewk/ewk_auth.cpp:
+        (ewk_auth_show_dialog_callback_set): Ditto.
+        (ewk_auth_credentials_set): Ditto.
+        * ewk/ewk_cookies.cpp:
+        (ewk_cookies_file_set): Ditto.
+        (ewk_cookies_clear): Ditto.
+        (ewk_cookies_get_all): Ditto.
+        (ewk_cookies_cookie_del): Ditto.
+        (ewk_cookies_cookie_free): Ditto.
+        (ewk_cookies_policy_set): Ditto.
+        (ewk_cookies_policy_get): Ditto.
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_certificate_status_get): Ditto.
+        * ewk/ewk_main.cpp:
+        (_ewk_init_body): Ditto.
+        * ewk/ewk_network.cpp:
+        (ewk_network_proxy_uri_set): Ditto.
+        (ewk_network_proxy_uri_get): Ditto.
+        (ewk_network_tls_certificate_check_get): Ditto.
+        (ewk_network_tls_certificate_check_set): Ditto.
+        (ewk_network_tls_ca_certificates_path_get): Ditto.
+        (ewk_network_tls_ca_certificates_path_set): Ditto.
+        (ewk_network_default_soup_session_get): Ditto.
+        * ewk/ewk_network.h: Update apidox for
+        ewk_network_default_soup_session_get() now that libsoup is the
+        only available backend.
+
+2012-02-09  Gustavo Lima Chaves  <glima@profusion.mobi>
+
+        [EFL] Introducing functions to set local storage db path and clear
+        those dbs.
+        https://bugs.webkit.org/show_bug.cgi?id=77107
+
+        This patch exposes the web local storage tracker database path
+        setting cabability, introduced on bug 77006, to the EFL port of
+        WebKit. Particularly, we have our own storage tracker client
+        object, to initialize the storage tracker backend on ewk_init().
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * CMakeListsEfl.txt:
+        * WebCoreSupport/StorageTrackerClientEfl.cpp: Added.
+        (WebCore):
+        (WebCore::StorageTrackerClientEfl::dispatchDidModifyOrigin):
+        (WebCore::StorageTrackerClientEfl::didFinishLoadingOrigins):
+        * WebCoreSupport/StorageTrackerClientEfl.h: Added.
+        (WebCore):
+        (StorageTrackerClientEfl):
+        * ewk/ewk_main.cpp:
+        (trackerClient):
+        (_ewk_init_body):
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_local_storage_path_set):
+        (ewk_settings_local_storage_path_get):
+        (ewk_settings_local_storage_database_clear):
+        (ewk_settings_local_storage_database_origin_clear):
+        * ewk/ewk_settings.h:
+
 2012-02-07  Krzysztof Czech  <k.czech@samsung.com>
 
         [EFL] Add missing initialization of editable variable.

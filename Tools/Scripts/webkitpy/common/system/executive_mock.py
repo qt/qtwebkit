@@ -32,8 +32,16 @@ from webkitpy.common.system.deprecated_logging import log
 from webkitpy.common.system.executive import ScriptError
 
 
+class MockProcess(object):
+    def __init__(self):
+        self.pid = 42
+
+
 # FIXME: This should be unified with MockExecutive2
 class MockExecutive(object):
+    PIPE = "MOCK PIPE"
+    STDOUT = "MOCK STDOUT"
+
     @staticmethod
     def ignore_error(error):
         pass
@@ -55,7 +63,7 @@ class MockExecutive(object):
                 env_string = ", env=%s" % env
             log("MOCK run_and_throw_if_fail: %s, cwd=%s%s" % (args, cwd, env_string))
         if self._should_throw_when_run.intersection(args):
-            raise ScriptError("Exception for %s" % args)
+            raise ScriptError("Exception for %s" % args, output="MOCK command output")
         return "MOCK output of child process"
 
     def run_command(self,
@@ -80,6 +88,10 @@ class MockExecutive(object):
 
     def cpu_count(self):
         return 2
+
+    def popen(self, *args, **kwargs):
+        # FIXME: Implement logging when self._should_log is set.
+        return MockProcess()
 
 
 class MockExecutive2(object):

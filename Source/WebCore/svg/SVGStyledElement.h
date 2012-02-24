@@ -66,6 +66,8 @@ protected:
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
 
     virtual void attach();

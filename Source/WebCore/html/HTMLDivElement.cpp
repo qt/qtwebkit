@@ -48,21 +48,26 @@ PassRefPtr<HTMLDivElement> HTMLDivElement::create(const QualifiedName& tagName, 
     return adoptRef(new HTMLDivElement(tagName, document));
 }
 
-void HTMLDivElement::parseAttribute(Attribute* attr)
+bool HTMLDivElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == alignAttr)
+        return true;
+    return HTMLElement::isPresentationAttribute(attr);
+}
+
+void HTMLDivElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
 {
     if (attr->name() == alignAttr) {
-        if (attr->value().isNull())
-            removeCSSProperty(CSSPropertyTextAlign);
         if (equalIgnoringCase(attr->value(), "middle") || equalIgnoringCase(attr->value(), "center"))
-           addCSSProperty(CSSPropertyTextAlign, CSSValueWebkitCenter);
+            addPropertyToAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitCenter);
         else if (equalIgnoringCase(attr->value(), "left"))
-            addCSSProperty(CSSPropertyTextAlign, CSSValueWebkitLeft);
+            addPropertyToAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitLeft);
         else if (equalIgnoringCase(attr->value(), "right"))
-            addCSSProperty(CSSPropertyTextAlign, CSSValueWebkitRight);
+            addPropertyToAttributeStyle(style, CSSPropertyTextAlign, CSSValueWebkitRight);
         else
-            addCSSProperty(CSSPropertyTextAlign, attr->value());
+            addPropertyToAttributeStyle(style, CSSPropertyTextAlign, attr->value());
     } else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::collectStyleForAttribute(attr, style);
 }
 
 }

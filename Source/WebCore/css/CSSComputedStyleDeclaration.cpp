@@ -239,11 +239,12 @@ static const int computedProperties[] = {
     CSSPropertyWebkitHyphenateLimitBefore,
     CSSPropertyWebkitHyphenateLimitLines,
     CSSPropertyWebkitHyphens,
+    CSSPropertyWebkitLineAlign,
     CSSPropertyWebkitLineBoxContain,
     CSSPropertyWebkitLineBreak,
     CSSPropertyWebkitLineClamp,
     CSSPropertyWebkitLineGrid,
-    CSSPropertyWebkitLineGridSnap,
+    CSSPropertyWebkitLineSnap,
     CSSPropertyWebkitLocale,
     CSSPropertyWebkitMarginBeforeCollapse,
     CSSPropertyWebkitMarginAfterCollapse,
@@ -266,6 +267,9 @@ static const int computedProperties[] = {
     CSSPropertyWebkitMaskRepeat,
     CSSPropertyWebkitMaskSize,
     CSSPropertyWebkitNbspMode,
+#if ENABLE(OVERFLOW_SCROLLING)
+    CSSPropertyWebkitOverflowScrolling,
+#endif
     CSSPropertyWebkitPerspective,
     CSSPropertyWebkitPerspectiveOrigin,
     CSSPropertyWebkitPrintColorAdjust,
@@ -979,6 +983,7 @@ static PassRefPtr<CSSValue> createLineBoxContainValue(CSSValuePool* cssValuePool
 CSSComputedStyleDeclaration::CSSComputedStyleDeclaration(PassRefPtr<Node> n, bool allowVisitedStyle, const String& pseudoElementName)
     : m_node(n)
     , m_allowVisitedStyle(allowVisitedStyle)
+    , m_refCount(1)
 {
     unsigned nameWithoutColonsStart = pseudoElementName[0] == ':' ? (pseudoElementName[1] == ':' ? 2 : 1) : 0;
     m_pseudoElementSpecifier = CSSSelector::pseudoId(CSSSelector::parsePseudoType(
@@ -987,6 +992,18 @@ CSSComputedStyleDeclaration::CSSComputedStyleDeclaration(PassRefPtr<Node> n, boo
 
 CSSComputedStyleDeclaration::~CSSComputedStyleDeclaration()
 {
+}
+
+void CSSComputedStyleDeclaration::ref()
+{
+    ++m_refCount;
+}
+
+void CSSComputedStyleDeclaration::deref()
+{
+    ASSERT(m_refCount);
+    if (!--m_refCount)
+        delete this;
 }
 
 String CSSComputedStyleDeclaration::cssText() const
@@ -1133,7 +1150,7 @@ static PassRefPtr<CSSValue> fillRepeatToCSSValue(EFillRepeat xRepeat, EFillRepea
     return list.release();
 }
 
-static PassRefPtr<CSSValue> fillSizeToCSSValue(const FillSize& fillSize, CSSValuePool* cssValuePool)
+static PassRefPtr<CSSValue> fillSizeToCSSValue(const FillSize& fillSize, const RenderStyle* style, CSSValuePool* cssValuePool)
 {
     if (fillSize.type == Contain)
         return cssValuePool->createIdentifierValue(CSSValueContain);
@@ -1142,11 +1159,11 @@ static PassRefPtr<CSSValue> fillSizeToCSSValue(const FillSize& fillSize, CSSValu
         return cssValuePool->createIdentifierValue(CSSValueCover);
 
     if (fillSize.size.height().isAuto())
-        return cssValuePool->createValue(fillSize.size.width());
+        return zoomAdjustedPixelValueForLength(fillSize.size.width(), style, cssValuePool);
 
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-    list->append(cssValuePool->createValue(fillSize.size.width()));
-    list->append(cssValuePool->createValue(fillSize.size.height()));
+    list->append(zoomAdjustedPixelValueForLength(fillSize.size.width(), style, cssValuePool));
+    list->append(zoomAdjustedPixelValueForLength(fillSize.size.height(), style, cssValuePool));
     return list.release();
 }
 
@@ -1324,11 +1341,11 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyWebkitMaskSize: {
             const FillLayer* layers = propertyID == CSSPropertyWebkitMaskSize ? style->maskLayers() : style->backgroundLayers();
             if (!layers->next())
-                return fillSizeToCSSValue(layers->size(), cssValuePool);
+                return fillSizeToCSSValue(layers->size(), style.get(), cssValuePool);
 
             RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
             for (const FillLayer* currLayer = layers; currLayer; currLayer = currLayer->next())
-                list->append(fillSizeToCSSValue(currLayer->size(), cssValuePool));
+                list->append(fillSizeToCSSValue(currLayer->size(), style.get(), cssValuePool));
 
             return list.release();
         }
@@ -1394,16 +1411,16 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             const FillLayer* layers = propertyID == CSSPropertyWebkitMaskPosition ? style->maskLayers() : style->backgroundLayers();
             if (!layers->next()) {
                 RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-                list->append(cssValuePool->createValue(layers->xPosition()));
-                list->append(cssValuePool->createValue(layers->yPosition()));
+                list->append(zoomAdjustedPixelValueForLength(layers->xPosition(), style.get(), cssValuePool));
+                list->append(zoomAdjustedPixelValueForLength(layers->yPosition(), style.get(), cssValuePool));
                 return list.release();
             }
 
             RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
             for (const FillLayer* currLayer = layers; currLayer; currLayer = currLayer->next()) {
                 RefPtr<CSSValueList> positionList = CSSValueList::createSpaceSeparated();
-                positionList->append(cssValuePool->createValue(currLayer->xPosition()));
-                positionList->append(cssValuePool->createValue(currLayer->yPosition()));
+                positionList->append(zoomAdjustedPixelValueForLength(currLayer->xPosition(), style.get(), cssValuePool));
+                positionList->append(zoomAdjustedPixelValueForLength(currLayer->yPosition(), style.get(), cssValuePool));
                 list->append(positionList);
             }
 
@@ -1571,8 +1588,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyWebkitFlexAlign:
             return cssValuePool->createValue(style->flexAlign());
         case CSSPropertyWebkitFlexItemAlign:
-            // FIXME: If flex-item-align:auto, then we should return the parent's flex-align.
-            // http://webkit.org/b/76326
+            if (style->flexItemAlign() == AlignAuto && m_node && m_node->parentNode() && m_node->parentNode()->computedStyle())
+                return cssValuePool->createValue(m_node->parentNode()->computedStyle()->flexAlign());
             return cssValuePool->createValue(style->flexItemAlign());
         case CSSPropertyWebkitFlexDirection:
             return cssValuePool->createValue(style->flexDirection());
@@ -1741,18 +1758,18 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             const Length& maxHeight = style->maxHeight();
             if (maxHeight.isUndefined())
                 return cssValuePool->createIdentifierValue(CSSValueNone);
-            return cssValuePool->createValue(maxHeight);
+            return zoomAdjustedPixelValueForLength(maxHeight, style.get(), cssValuePool);
         }
         case CSSPropertyMaxWidth: {
             const Length& maxWidth = style->maxWidth();
             if (maxWidth.isUndefined())
                 return cssValuePool->createIdentifierValue(CSSValueNone);
-            return cssValuePool->createValue(maxWidth);
+            return zoomAdjustedPixelValueForLength(maxWidth, style.get(), cssValuePool);
         }
         case CSSPropertyMinHeight:
-            return cssValuePool->createValue(style->minHeight());
+            return zoomAdjustedPixelValueForLength(style->minHeight(), style.get(), cssValuePool);
         case CSSPropertyMinWidth:
-            return cssValuePool->createValue(style->minWidth());
+            return zoomAdjustedPixelValueForLength(style->minWidth(), style.get(), cssValuePool);
         case CSSPropertyOpacity:
             return cssValuePool->createValue(style->opacity(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyOrphans:
@@ -1776,19 +1793,19 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyPaddingTop:
             if (renderer && renderer->isBox())
                 return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingTop(false), style.get(), cssValuePool);
-            return cssValuePool->createValue(style->paddingTop());
+            return zoomAdjustedPixelValueForLength(style->paddingTop(), style.get(), cssValuePool);
         case CSSPropertyPaddingRight:
             if (renderer && renderer->isBox())
                 return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingRight(false), style.get(), cssValuePool);
-            return cssValuePool->createValue(style->paddingRight());
+            return zoomAdjustedPixelValueForLength(style->paddingRight(), style.get(), cssValuePool);
         case CSSPropertyPaddingBottom:
             if (renderer && renderer->isBox())
                 return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingBottom(false), style.get(), cssValuePool);
-            return cssValuePool->createValue(style->paddingBottom());
+            return zoomAdjustedPixelValueForLength(style->paddingBottom(), style.get(), cssValuePool);
         case CSSPropertyPaddingLeft:
             if (renderer && renderer->isBox())
                 return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingLeft(false), style.get(), cssValuePool);
-            return cssValuePool->createValue(style->paddingLeft());
+            return zoomAdjustedPixelValueForLength(style->paddingLeft(), style.get(), cssValuePool);
         case CSSPropertyPageBreakAfter:
             return cssValuePool->createValue(style->pageBreakAfter());
         case CSSPropertyPageBreakBefore:
@@ -1839,7 +1856,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             }
             }
         case CSSPropertyTextIndent:
-            return cssValuePool->createValue(style->textIndent());
+            return zoomAdjustedPixelValueForLength(style->textIndent(), style.get(), cssValuePool);
         case CSSPropertyTextShadow:
             return valueForShadow(style->textShadow(), propertyID, style.get());
         case CSSPropertyTextRendering:
@@ -2106,6 +2123,12 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyWebkitMarginTopCollapse:
         case CSSPropertyWebkitMarginBeforeCollapse:
             return cssValuePool->createValue(style->marginBeforeCollapse());
+#if ENABLE(OVERFLOW_SCROLLING)
+        case CSSPropertyWebkitOverflowScrolling:
+            if (!style->useTouchOverflowScrolling())
+                return cssValuePool->createIdentifierValue(CSSValueAuto);
+            return cssValuePool->createIdentifierValue(CSSValueTouch);
+#endif
         case CSSPropertyWebkitPerspective:
             if (!style->hasPerspective())
                 return cssValuePool->createIdentifierValue(CSSValueNone);
@@ -2207,8 +2230,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             if (style->lineGrid().isNull())
                 return cssValuePool->createIdentifierValue(CSSValueNone);
             return cssValuePool->createValue(style->lineGrid(), CSSPrimitiveValue::CSS_STRING);
-        case CSSPropertyWebkitLineGridSnap:
-            return CSSPrimitiveValue::create(style->lineGridSnap());
+        case CSSPropertyWebkitLineSnap:
+            return CSSPrimitiveValue::create(style->lineSnap());
+        case CSSPropertyWebkitLineAlign:
+            return CSSPrimitiveValue::create(style->lineAlign());
         case CSSPropertyWebkitWritingMode:
             return cssValuePool->createValue(style->writingMode());
         case CSSPropertyWebkitTextCombine:

@@ -35,6 +35,12 @@ class HTMLFormElement;
 class MicroDataItemValue;
 #endif
 
+enum TranslateAttributeMode {
+    TranslateAttributeYes,
+    TranslateAttributeNo,
+    TranslateAttributeInherit
+};
+
 class HTMLElement : public StyledElement {
 public:
     static PassRefPtr<HTMLElement> create(const QualifiedName& tagName, Document*);
@@ -68,6 +74,9 @@ public:
     bool spellcheck() const;
     void setSpellcheck(bool);
 
+    bool translate() const;
+    void setTranslate(bool);
+
     void click();
 
     virtual void accessKeyAction(bool sendMouseEvents);
@@ -78,8 +87,6 @@ public:
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 
     HTMLFormElement* form() const { return virtualForm(); }
-
-    static void addHTMLAlignmentToStyledElement(StyledElement*, Attribute*);
 
     HTMLFormElement* findFormAncestor() const;
 
@@ -93,11 +100,15 @@ public:
 protected:
     HTMLElement(const QualifiedName& tagName, Document*);
 
-    void addHTMLAlignment(Attribute*);
-    void removeHTMLAlignment();
+    void addHTMLLengthToStyle(StylePropertySet*, int propertyID, const String& value);
+    void addHTMLColorToStyle(StylePropertySet*, int propertyID, const String& color);
+
+    void applyAlignmentAttributeToStyle(Attribute*, StylePropertySet*);
+    void applyBorderAttributeToStyle(Attribute*, StylePropertySet*);
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    void applyBorderAttribute(Attribute*);
+    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
 
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     void calculateAndAdjustDirectionality();
@@ -107,9 +118,7 @@ protected:
 private:
     virtual String nodeName() const;
 
-    void mapLanguageAttributeToLocale(Attribute*);
-
-    void setContentEditable(Attribute*);
+    void mapLanguageAttributeToLocale(Attribute*, StylePropertySet*);
 
     virtual HTMLFormElement* virtualForm() const;
 
@@ -120,6 +129,8 @@ private:
     void adjustDirectionalityIfNeededAfterChildAttributeChanged(Element* child);
     void adjustDirectionalityIfNeededAfterChildrenChanged(Node* beforeChange, int childCountDelta);
     TextDirection directionality(Node** strongDirectionalityTextNode= 0) const;
+
+    TranslateAttributeMode translateAttributeMode() const;
 
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const;

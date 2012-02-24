@@ -34,6 +34,7 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
+#include "FilterOperations.h"
 #include "FloatPoint.h"
 #include "GraphicsContext.h"
 #include "PlatformString.h"
@@ -51,6 +52,7 @@
 
 namespace WebCore {
 
+class CCLayerAnimationController;
 class CCLayerImpl;
 class CCLayerTreeHost;
 class CCTextureUpdater;
@@ -60,7 +62,6 @@ class Region;
 // Base class for composited layers. Special layer types are derived from
 // this class.
 class LayerChromium : public RefCounted<LayerChromium> {
-    friend class LayerTilerChromium;
 public:
     static PassRefPtr<LayerChromium> create();
 
@@ -102,11 +103,14 @@ public:
     LayerChromium* maskLayer() const { return m_maskLayer.get(); }
 
     virtual void setNeedsDisplayRect(const FloatRect& dirtyRect);
-    void setNeedsDisplay() { setNeedsDisplayRect(FloatRect(FloatPoint(), contentBounds())); }
+    void setNeedsDisplay() { setNeedsDisplayRect(FloatRect(FloatPoint(), bounds())); }
     virtual bool needsDisplay() const { return m_needsDisplay; }
 
     void setOpacity(float);
     float opacity() const { return m_opacity; }
+
+    void setFilters(const FilterOperations&);
+    const FilterOperations& filters() const { return m_filters; }
 
     virtual void setOpaque(bool);
     bool opaque() const { return m_opaque; }
@@ -127,7 +131,7 @@ public:
     const IntPoint& scrollPosition() const { return m_scrollPosition; }
 
     void setScrollable(bool);
-    bool scrollable() const { return m_scrollable; }
+    void setHaveWheelEventHandlers(bool);
 
     IntSize scrollDelta() const { return IntSize(); }
 
@@ -211,7 +215,22 @@ public:
     void setAlwaysReserveTextures(bool alwaysReserveTextures) { m_alwaysReserveTextures = alwaysReserveTextures; }
     bool alwaysReserveTextures() const { return m_alwaysReserveTextures; }
 
+    bool addAnimation(const KeyframeValueList&, const IntSize& boxSize, const Animation*, int animationId, int groupId, double timeOffset);
+    void pauseAnimation(int animationId, double timeOffset);
+    void removeAnimation(int animationId);
+
+    void suspendAnimations(double time);
+    void resumeAnimations();
+
+    CCLayerAnimationController* layerAnimationController() { return m_layerAnimationController.get(); }
+    void setLayerAnimationController(PassOwnPtr<CCLayerAnimationController>);
+    bool hasActiveAnimation() const;
+
 protected:
+    friend class CCLayerImpl;
+    friend class LayerTilerChromium;
+    friend class TreeSynchronizer;
+
     LayerChromium();
 
     bool isPaintedAxisAlignedInScreen() const;
@@ -229,8 +248,6 @@ protected:
 
     RefPtr<LayerChromium> m_maskLayer;
 
-    friend class TreeSynchronizer;
-    friend class CCLayerImpl;
     // Constructs a CCLayerImpl of the correct runtime type for this LayerChromium type.
     virtual PassRefPtr<CCLayerImpl> createCCLayerImpl();
     int m_layerId;
@@ -239,10 +256,7 @@ private:
     void setParent(LayerChromium*);
     bool hasAncestor(LayerChromium*) const;
 
-    size_t numChildren() const
-    {
-        return m_children.size();
-    }
+    size_t numChildren() const { return m_children.size(); }
 
     // Returns the index of the child or -1 if not found.
     int indexOfChild(const LayerChromium*);
@@ -255,11 +269,14 @@ private:
 
     RefPtr<CCLayerTreeHost> m_layerTreeHost;
 
+    OwnPtr<CCLayerAnimationController> m_layerAnimationController;
+
     // Layer properties.
     IntSize m_bounds;
     IntRect m_visibleLayerRect;
     IntPoint m_scrollPosition;
     bool m_scrollable;
+    bool m_haveWheelEventHandlers;
     FloatPoint m_position;
     FloatPoint m_anchorPoint;
     Color m_backgroundColor;
@@ -267,6 +284,7 @@ private:
     Color m_debugBorderColor;
     float m_debugBorderWidth;
     float m_opacity;
+    FilterOperations m_filters;
     float m_anchorPointZ;
     bool m_isDrawable;
     bool m_masksToBounds;

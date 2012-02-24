@@ -102,17 +102,6 @@
 #include <wtf/MathExtras.h>
 #include <wtf/text/WTFString.h>
 
-#if ENABLE(FILE_SYSTEM)
-#include "AsyncFileSystem.h"
-#include "DOMFileSystem.h"
-#include "EntryCallback.h"
-#include "ErrorCallback.h"
-#include "FileError.h"
-#include "FileSystemCallback.h"
-#include "FileSystemCallbacks.h"
-#include "LocalFileSystem.h"
-#endif
-
 #if ENABLE(REQUEST_ANIMATION_FRAME)
 #include "RequestAnimationFrameCallback.h"
 #endif
@@ -480,6 +469,21 @@ void DOMWindow::frameDestroyed()
     clear();
 }
 
+void DOMWindow::willDetachPage()
+{
+    InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
+
+#if ENABLE(NOTIFICATIONS)
+    // Clearing Notifications requests involves accessing the client so it must be done
+    // before the frame is detached.
+    resetNotifications();
+#endif
+
+    HashSet<DOMWindowProperty*>::iterator stop = m_properties.end();
+    for (HashSet<DOMWindowProperty*>::iterator it = m_properties.begin(); it != stop; ++it)
+        (*it)->willDetachPage();
+}
+
 void DOMWindow::registerProperty(DOMWindowProperty* property)
 {
     m_properties.add(property);
@@ -715,7 +719,7 @@ NotificationCenter* DOMWindow::webkitNotifications() const
     if (!page)
         return 0;
 
-    NotificationPresenter* provider = page->notificationController()->client();
+    NotificationPresenter* provider = NotificationController::clientFrom(page);
     if (provider) 
         m_notifications = NotificationCenter::create(document, provider);    
       
@@ -731,83 +735,11 @@ void DOMWindow::resetNotifications()
 }
 #endif
 
-void DOMWindow::pageDestroyed()
-{
-    InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
-#if ENABLE(NOTIFICATIONS)
-    // Clearing Notifications requests involves accessing the client so it must be done
-    // before the frame is detached.
-    resetNotifications();
-#endif
-}
-
-void DOMWindow::resetGeolocation()
-{
-    // Geolocation should cancel activities and permission requests when the page is detached.
-    if (m_navigator)
-        m_navigator->resetGeolocation();
-}
-
 #if ENABLE(INDEXED_DATABASE)
 void DOMWindow::setIDBFactory(PassRefPtr<IDBFactory> idbFactory)
 {
     m_idbFactory = idbFactory;
 }
-#endif
-
-#if ENABLE(FILE_SYSTEM)
-void DOMWindow::webkitRequestFileSystem(int type, long long size, PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
-{
-    if (!isCurrentlyDisplayedInFrame())
-        return;
-
-    Document* document = this->document();
-    if (!document)
-        return;
-
-    if (!AsyncFileSystem::isAvailable() || !document->securityOrigin()->canAccessFileSystem()) {
-        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::SECURITY_ERR));
-        return;
-    }
-
-    AsyncFileSystem::Type fileSystemType = static_cast<AsyncFileSystem::Type>(type);
-    if (!AsyncFileSystem::isValidType(fileSystemType)) {
-        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::INVALID_MODIFICATION_ERR));
-        return;
-    }
-
-    LocalFileSystem::localFileSystem().requestFileSystem(document, fileSystemType, size, FileSystemCallbacks::create(successCallback, errorCallback, document), false);
-}
-
-void DOMWindow::webkitResolveLocalFileSystemURL(const String& url, PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback> errorCallback)
-{
-    if (!isCurrentlyDisplayedInFrame())
-        return;
-
-    Document* document = this->document();
-    if (!document)
-        return;
-
-    SecurityOrigin* securityOrigin = document->securityOrigin();
-    KURL completedURL = document->completeURL(url);
-    if (!AsyncFileSystem::isAvailable() || !securityOrigin->canAccessFileSystem() || !securityOrigin->canRequest(completedURL)) {
-        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::SECURITY_ERR));
-        return;
-    }
-
-    AsyncFileSystem::Type type;
-    String filePath;
-    if (!completedURL.isValid() || !AsyncFileSystem::crackFileSystemURL(completedURL, type, filePath)) {
-        DOMFileSystem::scheduleCallback(document, errorCallback, FileError::create(FileError::ENCODING_ERR));
-        return;
-    }
-
-    LocalFileSystem::localFileSystem().readFileSystem(document, type, ResolveURICallbacks::create(successCallback, errorCallback, document, filePath));
-}
-
-COMPILE_ASSERT(static_cast<int>(DOMWindow::TEMPORARY) == static_cast<int>(AsyncFileSystem::Temporary), enum_mismatch);
-COMPILE_ASSERT(static_cast<int>(DOMWindow::PERSISTENT) == static_cast<int>(AsyncFileSystem::Persistent), enum_mismatch);
-
 #endif
 
 void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort* port, const String& targetOrigin, DOMWindow* source, ExceptionCode& ec)
@@ -1206,7 +1138,7 @@ unsigned DOMWindow::length() const
     if (!isCurrentlyDisplayedInFrame())
         return 0;
 
-    return m_frame->tree()->childCount();
+    return m_frame->tree()->scopedChildCount();
 }
 
 String DOMWindow::name() const
@@ -1321,7 +1253,7 @@ PassRefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Element* elt, const 
     if (!elt)
         return 0;
 
-    return computedStyle(elt, false, pseudoElt);
+    return CSSComputedStyleDeclaration::create(elt, false, pseudoElt);
 }
 
 PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const String& pseudoElement, bool authorOnly) const
@@ -1561,10 +1493,13 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
     else if (eventType == eventNames().beforeunloadEvent && allowsBeforeUnloadListeners(this))
         addBeforeUnloadEventListener(this);
 #if ENABLE(DEVICE_ORIENTATION)
-    else if (eventType == eventNames().devicemotionEvent && frame() && frame()->page() && frame()->page()->deviceMotionController())
-        frame()->page()->deviceMotionController()->addListener(this);
-    else if (eventType == eventNames().deviceorientationEvent && frame() && frame()->page() && frame()->page()->deviceOrientationController())
-        frame()->page()->deviceOrientationController()->addListener(this);
+    else if (eventType == eventNames().devicemotionEvent) {
+        if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+            controller->addListener(this);
+    } else if (eventType == eventNames().deviceorientationEvent) {
+        if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+            controller->addListener(this);
+    }
 #endif
 
     return true;
@@ -1585,10 +1520,13 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
     else if (eventType == eventNames().beforeunloadEvent && allowsBeforeUnloadListeners(this))
         removeBeforeUnloadEventListener(this);
 #if ENABLE(DEVICE_ORIENTATION)
-    else if (eventType == eventNames().devicemotionEvent && frame() && frame()->page() && frame()->page()->deviceMotionController())
-        frame()->page()->deviceMotionController()->removeListener(this);
-    else if (eventType == eventNames().deviceorientationEvent && frame() && frame()->page() && frame()->page()->deviceOrientationController())
-        frame()->page()->deviceOrientationController()->removeListener(this);
+    else if (eventType == eventNames().devicemotionEvent) {
+        if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+            controller->removeListener(this);
+    } else if (eventType == eventNames().deviceorientationEvent) {
+        if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+            controller->removeListener(this);
+    }
 #endif
 
     return true;
@@ -1641,10 +1579,10 @@ void DOMWindow::removeAllEventListeners()
     EventTarget::removeAllEventListeners();
 
 #if ENABLE(DEVICE_ORIENTATION)
-    if (frame() && frame()->page() && frame()->page()->deviceMotionController())
-        frame()->page()->deviceMotionController()->removeAllListeners(this);
-    if (frame() && frame()->page() && frame()->page()->deviceOrientationController())
-        frame()->page()->deviceOrientationController()->removeAllListeners(this);
+    if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+        controller->removeAllListeners(this);
+    if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+        controller->removeAllListeners(this);
 #endif
 
     removeAllUnloadEventListeners(this);

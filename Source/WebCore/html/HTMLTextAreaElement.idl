@@ -40,6 +40,9 @@ module html {
         attribute [TreatNullAs=NullString] DOMString value;
         readonly attribute unsigned long textLength;
 
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
+        attribute [Reflect] DOMString accessKey;
+#endif
         void select();
 
         readonly attribute boolean willValidate;
@@ -54,8 +57,8 @@ module html {
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
         void setSelectionRange(in long start, in long end);
 #else
-        void setSelectionRange(in [Optional=CallWithDefaultValue] long start, 
-                               in [Optional=CallWithDefaultValue] long end, 
+        void setSelectionRange(in [Optional=DefaultIsUndefined] long start, 
+                               in [Optional=DefaultIsUndefined] long end, 
                                in [Optional] DOMString direction);
 #endif
         readonly attribute NodeList labels;

@@ -61,6 +61,7 @@
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "ScrollAnimator.h"
+#include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include "TextResourceDecoder.h"
 
@@ -70,9 +71,6 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
-#if PLATFORM(CHROMIUM)
-#include "TraceEvent.h"
-#endif
 #endif
 
 #if ENABLE(SVG)
@@ -83,10 +81,6 @@
 
 #if USE(TILED_BACKING_STORE)
 #include "TiledBackingStore.h"
-#endif
-
-#if ENABLE(THREADED_SCROLLING)
-#include "ScrollingCoordinator.h"
 #endif
 
 namespace WebCore {
@@ -296,8 +290,6 @@ void FrameView::init()
             setCanHaveScrollbars(false);
         LayoutUnit marginWidth = frameElt->marginWidth();
         LayoutUnit marginHeight = frameElt->marginHeight();
-        // FIXME: Change to roughlyEquals or >= 0 when we move to floats. 
-        // See https://bugs.webkit.org/show_bug.cgi?id=66148
         if (marginWidth != -1)
             setMarginWidth(marginWidth);
         if (marginHeight != -1)
@@ -327,6 +319,13 @@ void FrameView::recalculateScrollbarOverlayStyle()
     ScrollbarOverlayStyle overlayStyle = ScrollbarOverlayStyleDefault;
 
     Color backgroundColor = documentBackgroundColor();
+#if USE(ACCELERATED_COMPOSITING)
+    if (RenderView* root = rootRenderer(this)) {
+        RenderLayerCompositor* compositor = root->compositor();
+        compositor->documentBackgroundColorDidChange();
+    }
+#endif
+
     if (backgroundColor.isValid()) {
         // Reduce the background color from RGB to a lightness value
         // and determine which scrollbar style to use based on a lightness
@@ -1222,26 +1221,6 @@ void FrameView::removeWidgetToUpdate(RenderEmbeddedObject* object)
     m_widgetUpdateSet->remove(object);
 }
 
-void FrameView::zoomAnimatorTransformChanged(float scale, float x, float y, ZoomAnimationState state)
-{
-    if (state == ZoomAnimationFinishing) {
-        if (Page* page = m_frame->page())
-            page->setPageScaleFactor(page->pageScaleFactor() * scale, IntPoint(scale * scrollX() - x, scale * scrollY() - y));
-        scrollAnimator()->resetZoom();
-    }
-
-#if USE(ACCELERATED_COMPOSITING)
-    if (RenderView* root = rootRenderer(this)) {
-        if (root->usesCompositing()) {
-            root->compositor()->scheduleLayerFlush();
-#if PLATFORM(CHROMIUM)
-            TRACE_EVENT("FrameView::zoomAnimatorTransformChanged", this, 0);
-#endif
-        }
-    }
-#endif
-}
-
 void FrameView::setMediaType(const String& mediaType)
 {
     m_mediaType = mediaType;
@@ -1328,32 +1307,58 @@ void FrameView::setCannotBlitToWindow()
 
 void FrameView::addSlowRepaintObject()
 {
-    if (!m_slowRepaintObjectCount)
+    if (!m_slowRepaintObjectCount++) {
         updateCanBlitOnScrollRecursively();
-    m_slowRepaintObjectCount++;
+
+        if (Page* page = m_frame->page()) {
+            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+                scrollingCoordinator->frameViewHasSlowRepaintObjectsDidChange(this);
+        }
+    }
 }
 
 void FrameView::removeSlowRepaintObject()
 {
     ASSERT(m_slowRepaintObjectCount > 0);
     m_slowRepaintObjectCount--;
-    if (!m_slowRepaintObjectCount)
+    if (!m_slowRepaintObjectCount) {
         updateCanBlitOnScrollRecursively();
+
+        if (Page* page = m_frame->page()) {
+            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+                scrollingCoordinator->frameViewHasSlowRepaintObjectsDidChange(this);
+        }
+    }
 }
 
 void FrameView::addFixedObject()
 {
-    if (!m_fixedObjectCount && platformWidget())
-        updateCanBlitOnScrollRecursively();
-    ++m_fixedObjectCount;
+    if (!m_fixedObjectCount++) {
+        if (platformWidget())
+            updateCanBlitOnScrollRecursively();
+
+        if (Page* page = m_frame->page()) {
+            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+                scrollingCoordinator->frameViewHasFixedObjectsDidChange(this);
+        }
+    }
 }
 
 void FrameView::removeFixedObject()
 {
     ASSERT(m_fixedObjectCount > 0);
     --m_fixedObjectCount;
-    if (!m_fixedObjectCount)
+
+    if (!m_fixedObjectCount) {
+        if (Page* page = m_frame->page()) {
+            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+                scrollingCoordinator->frameViewHasFixedObjectsDidChange(this);
+        }
+
+        // FIXME: In addFixedObject() we only call this if there's a platform widget,
+        // why isn't the same check being made here?
         updateCanBlitOnScrollRecursively();
+    }
 }
 
 int FrameView::scrollXForFixedPosition() const
@@ -1463,6 +1468,10 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
         RenderBox* renderBox = *it;
         if (renderBox->style()->position() != FixedPosition)
             continue;
+#if USE(ACCELERATED_COMPOSITING)
+        if (renderBox->layer()->isComposited())
+            continue;
+#endif
         IntRect updateRect = renderBox->layer()->repaintRectIncludingDescendants();
         updateRect = contentsToRootView(updateRect);
         if (!isCompositedContentLayer && clipsRepaints())
@@ -1740,6 +1749,20 @@ bool FrameView::shouldRubberBandInDirection(ScrollDirection direction) const
     return page->chrome()->client()->shouldRubberBandInDirection(direction);
 }
 
+bool FrameView::requestScrollPositionUpdate(const IntPoint& position)
+{
+#if ENABLE(THREADED_SCROLLING)
+    if (Page* page = m_frame->page()) {
+        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
+            return scrollingCoordinator->requestScrollPositionUpdate(this, position);
+    }
+#else
+    UNUSED_PARAM(position);
+#endif
+
+    return false;
+}
+
 HostWindow* FrameView::hostWindow() const
 {
     Page* page = frame() ? frame()->page() : 0;
@@ -1770,7 +1793,7 @@ void FrameView::repaintContentRectangle(const IntRect& r, bool immediate)
         if (m_repaintCount == cRepaintRectUnionThreshold) {
             IntRect unionedRect;
             for (unsigned i = 0; i < cRepaintRectUnionThreshold; ++i)
-                unionedRect.unite(m_repaintRects[i]);
+                unionedRect.unite(pixelSnappedIntRect(m_repaintRects[i]));
             m_repaintRects.clear();
             m_repaintRects.append(unionedRect);
         }
@@ -1885,11 +1908,11 @@ void FrameView::doDeferredRepaints()
     for (unsigned i = 0; i < size; i++) {
 #if USE(TILED_BACKING_STORE)
         if (frame()->tiledBackingStore()) {
-            frame()->tiledBackingStore()->invalidate(m_repaintRects[i]);
+            frame()->tiledBackingStore()->invalidate(pixelSnappedIntRect(m_repaintRects[i]));
             continue;
         }
 #endif
-        ScrollView::repaintContentRectangle(m_repaintRects[i], false);
+        ScrollView::repaintContentRectangle(pixelSnappedIntRect(m_repaintRects[i]), false);
     }
     m_repaintRects.clear();
     m_repaintCount = 0;
@@ -2080,8 +2103,11 @@ void FrameView::unscheduleRelayout()
 #if ENABLE(REQUEST_ANIMATION_FRAME)
 void FrameView::serviceScriptedAnimations(DOMTimeStamp time)
 {
-    Vector<RefPtr<Document> > documents;
+    Vector<AnimationController*> animations;
+    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext())
+        frame->animation()->serviceAnimations();
 
+    Vector<RefPtr<Document> > documents;
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext())
         documents.append(frame->document());
 
@@ -2290,12 +2316,10 @@ void FrameView::performPostLayoutTasks()
             break;
     }
 
-#if ENABLE(THREADED_SCROLLING)
     if (Page* page = m_frame->page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
             scrollingCoordinator->frameViewLayoutUpdated(this);
     }
-#endif
 
     scrollToAnchor();
 
@@ -2464,9 +2488,9 @@ IntRect FrameView::windowClipRectForLayer(const RenderLayer* layer, bool clipToL
     // Apply the clip from the layer.
     IntRect clipRect;
     if (clipToLayerContents)
-        clipRect = layer->childrenClipRect();
+        clipRect = pixelSnappedIntRect(layer->childrenClipRect());
     else
-        clipRect = layer->selfClipRect();
+        clipRect = pixelSnappedIntRect(layer->selfClipRect());
     clipRect = contentsToWindow(clipRect); 
     return intersection(clipRect, windowClipRect());
 }
@@ -2817,7 +2841,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     if (!frame())
         return;
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willPaint(m_frame.get(), rect);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willPaint(m_frame.get(), p, rect);
 
     Document* document = m_frame->document();
 
@@ -3292,6 +3316,30 @@ void FrameView::removeChild(Widget* widget)
 
     ScrollView::removeChild(widget);
 }
+
+bool FrameView::wheelEvent(const PlatformWheelEvent& wheelEvent)
+{
+    // We don't allow mouse wheeling to happen in a ScrollView that has had its scrollbars explicitly disabled.
+    if (!canHaveScrollbars())
+        return false;
+
+#if !PLATFORM(WX)
+    if (platformWidget())
+        return false;
+#endif
+
+#if ENABLE(THREADED_SCROLLING)
+    if (Page* page = m_frame->page()) {
+        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator()) {
+            if (scrollingCoordinator->coordinatesScrollingForFrameView(this))
+                return scrollingCoordinator->handleWheelEvent(this, wheelEvent);
+        }
+    }
+#endif
+
+    return ScrollableArea::handleWheelEvent(wheelEvent);
+}
+
 
 bool FrameView::isVerticalDocument() const
 {

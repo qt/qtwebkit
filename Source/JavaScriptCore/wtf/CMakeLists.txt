@@ -3,8 +3,6 @@ SET(WTF_HEADERS
     AVLTree.h
     Alignment.h
     AlwaysInline.h
-    ArrayBuffer.cpp
-    ArrayBufferView.cpp
     Assertions.h
     Atomics.h
     BitVector.h
@@ -17,6 +15,7 @@ SET(WTF_HEADERS
     CryptographicallyRandomNumber.h
     CurrentTime.h
     DateMath.h
+    DataLog.h
     DecimalNumber.h
     Decoder.h
     Deque.h
@@ -45,7 +44,6 @@ SET(WTF_HEADERS
     MallocZoneSupport.h
     MathExtras.h
     MessageQueue.h
-    MetaAllocator.cpp
     MetaAllocator.h
     MetaAllocatorHandle.h
     NonCopyingSort.h
@@ -134,18 +132,22 @@ SET(WTF_HEADERS
 )
 
 SET(WTF_SOURCES
+    ArrayBuffer.cpp
+    ArrayBufferView.cpp
     Assertions.cpp
     BitVector.cpp
     ByteArray.cpp
     CryptographicallyRandomNumber.cpp
     CurrentTime.cpp
     DateMath.cpp
+    DataLog.cpp
     DecimalNumber.cpp
     DynamicAnnotations.cpp
     FastMalloc.cpp
     HashTable.cpp
-    MainThread.cpp
     MD5.cpp
+    MainThread.cpp
+    MetaAllocator.cpp
     OSRandomSource.cpp
     NumberOfCores.cpp
     PageAllocationAligned.cpp
@@ -191,9 +193,6 @@ SET(WTF_INCLUDE_DIRECTORIES
     "${THIRDPARTY_DIR}"
 )
 
-SET(WTF_LIBRARIES
-)
-
 IF (ENABLE_FAST_MALLOC)
     LIST(APPEND WTF_SOURCES
         TCSystemAlloc.cpp
@@ -202,7 +201,7 @@ ELSE ()
     ADD_DEFINITIONS(-DUSE_SYSTEM_MALLOC=1)
 ENDIF()
 
-INCLUDE_IF_EXISTS(${JAVASCRIPTCORE_DIR}/wtf/Platform${PORT}.cmake)
+WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 WEBKIT_WRAP_SOURCELIST(${WTF_SOURCES})
 INCLUDE_DIRECTORIES(${WTF_INCLUDE_DIRECTORIES})

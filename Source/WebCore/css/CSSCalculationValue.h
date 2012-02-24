@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -59,11 +59,12 @@ class CSSCalcExpressionNode : public RefCounted<CSSCalcExpressionNode> {
 public:
     
     virtual ~CSSCalcExpressionNode() = 0;  
-    virtual double doubleValue() const = 0;  
+    virtual bool isZero() const = 0;
+    virtual double doubleValue() const = 0;
+    virtual double computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const = 0;
     
     CalculationCategory category() const { return m_category; }    
     bool isInteger() const { return m_isInteger; }
-    bool isZero() const { return false; }
     
 protected:
     CSSCalcExpressionNode(CalculationCategory category, bool isInteger)
@@ -78,22 +79,28 @@ protected:
         
 class CSSCalcValue : public CSSValue {
 public:
-    static PassRefPtr<CSSCalcValue> create(CSSParserString name, CSSParserValueList*);
+    static PassRefPtr<CSSCalcValue> create(CSSParserString name, CSSParserValueList*, CalculationPermittedValueRange);
 
     CalculationCategory category() const { return m_expression->category(); }
     bool isInt() const { return m_expression->isInteger(); }    
     double doubleValue() const;
+    bool isNegative() const { return m_expression->doubleValue() < 0; }
+    double computeLengthPx(RenderStyle* currentStyle, RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const;
         
     String customCssText() const;
     
 private:    
-    CSSCalcValue(PassRefPtr<CSSCalcExpressionNode> expression)
+    CSSCalcValue(PassRefPtr<CSSCalcExpressionNode> expression, CalculationPermittedValueRange range)
         : CSSValue(CalculationClass)
         , m_expression(expression)
+        , m_nonNegative(range == CalculationRangeNonNegative)
     {
     }
     
+    double clampToPermittedRange(double) const;
+
     const RefPtr<CSSCalcExpressionNode> m_expression;
+    const bool m_nonNegative;
 };
     
 } // namespace WebCore

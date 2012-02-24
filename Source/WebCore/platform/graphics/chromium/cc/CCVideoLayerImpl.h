@@ -35,6 +35,9 @@
 
 namespace WebCore {
 
+class CCLayerTreeHostImpl;
+class CCVideoLayerImpl;
+
 template<class VertexShader, class FragmentShader> class ProgramBinding;
 
 class CCVideoLayerImpl : public CCLayerImpl
@@ -46,48 +49,55 @@ public:
     }
     virtual ~CCVideoLayerImpl();
 
+    virtual void willDraw(LayerRendererChromium*);
     virtual void appendQuads(CCQuadList&, const CCSharedQuadState*);
+    virtual void didDraw();
 
     typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexFlipAlpha> RGBAProgram;
     typedef ProgramBinding<VertexShaderPosTexYUVStretch, FragmentShaderYUVVideo> YUVProgram;
     typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexFlipAlpha> NativeTextureProgram;
-
-    virtual void draw(LayerRendererChromium*);
+    typedef ProgramBinding<VertexShaderVideoTransform, FragmentShaderOESImageExternal> StreamTextureProgram;
 
     virtual void dumpLayerProperties(TextStream&, int indent) const;
 
-    // VideoFrameProvider::Client implementation (callable on any thread).
-    virtual void stopUsingProvider();
+    Mutex& providerMutex() { return m_providerMutex; }
+    VideoFrameProvider* provider() const { return m_provider; }
 
-private:
-    explicit CCVideoLayerImpl(int, VideoFrameProvider*);
+    // VideoFrameProvider::Client implementation.
+    virtual void stopUsingProvider(); // Callable on any thread.
+    virtual void didReceiveFrame(); // Callable on impl thread.
+    virtual void didUpdateMatrix(const float*); // Callable on impl thread.
 
-    virtual const char* layerTypeAsString() const { return "VideoLayer"; }
-
-    bool copyFrameToTextures(const VideoFrameChromium*, GC3Denum format, LayerRendererChromium*);
-    void copyPlaneToTexture(LayerRendererChromium*, const void* plane, int index);
-    bool reserveTextures(const VideoFrameChromium*, GC3Denum format, LayerRendererChromium*);
-    void drawYUV(LayerRendererChromium*) const;
-    void drawRGBA(LayerRendererChromium*) const;
-    void drawNativeTexture(LayerRendererChromium*) const;
-    template<class Program> void drawCommon(LayerRendererChromium*, Program*, float widthScaleFactor, Platform3DObject textureId) const;
-
-    Mutex m_providerMutex; // Guards m_provider below.
-    VideoFrameProvider* m_provider;
+    void setNeedsRedraw();
 
     static const float yuv2RGB[9];
     static const float yuvAdjust[3];
+    static const float flipTransform[16];
 
     struct Texture {
         OwnPtr<ManagedTexture> m_texture;
         IntSize m_visibleSize;
     };
     enum { MaxPlanes = 3 };
-    Texture m_textures[MaxPlanes];
-    int m_planes;
 
-    Platform3DObject m_nativeTextureId;
-    IntSize m_nativeTextureSize;
+private:
+    explicit CCVideoLayerImpl(int, VideoFrameProvider*);
+
+    static IntSize computeVisibleSize(const VideoFrameChromium*, unsigned plane);
+    virtual const char* layerTypeAsString() const { return "VideoLayer"; }
+
+    bool reserveTextures(const VideoFrameChromium*, GC3Denum format, LayerRendererChromium*);
+
+    Mutex m_providerMutex; // Guards m_provider below.
+    VideoFrameProvider* m_provider;
+
+    Texture m_textures[MaxPlanes];
+
+    float m_streamTextureMatrix[16];
+    CCLayerTreeHostImpl* m_layerTreeHostImpl;
+
+    VideoFrameChromium* m_frame;
+    GC3Denum m_format;
 };
 
 }

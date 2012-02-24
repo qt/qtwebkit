@@ -116,6 +116,7 @@ TestShell::TestShell(bool testShellMode)
     , m_stressOpt(false)
     , m_stressDeopt(false)
     , m_dumpWhenFinished(true)
+    , m_isDisplayingModalDialog(false)
 {
     WebRuntimeFeatures::enableDataTransferItems(true);
     WebRuntimeFeatures::enableGeolocation(true);
@@ -128,6 +129,7 @@ TestShell::TestShell(bool testShellMode)
     WebRuntimeFeatures::enableVideoTrack(true);
     WebRuntimeFeatures::enableGamepad(true);
     WebRuntimeFeatures::enableShadowDOM(true);
+    WebRuntimeFeatures::enableStyleScoped(true);
 
     m_webPermissions = adoptPtr(new WebPermissions(this));
     m_accessibilityController = adoptPtr(new AccessibilityController(this));
@@ -240,6 +242,7 @@ void TestShell::runFileTest(const TestParams& params)
         m_prefs.acceleratedCompositingForVideoEnabled = true;
         m_prefs.accelerated2dCanvasEnabled = true;
         m_prefs.deferred2dCanvasEnabled = true;
+        m_prefs.mockScrollbarsEnabled = true;
         m_prefs.applyTo(m_webView);
     }
 

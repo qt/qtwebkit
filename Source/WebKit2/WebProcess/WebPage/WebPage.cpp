@@ -210,6 +210,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_numWheelEventHandlers(0)
     , m_cachedPageCount(0)
     , m_isShowingContextMenu(false)
+    , m_willGoToBackForwardItemCallbackEnabled(true)
 #if PLATFORM(WIN)
     , m_gestureReachedScrollingLimit(false)
 #endif
@@ -231,11 +232,12 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #if ENABLE(INSPECTOR)
     pageClients.inspectorClient = new WebInspectorClient(this);
 #endif
-#if ENABLE(NOTIFICATIONS)
-    pageClients.notificationClient = new WebNotificationClient(this);
-#endif
     
     m_page = adoptPtr(new Page(pageClients));
+
+#if ENABLE(NOTIFICATIONS)
+    WebCore::provideNotification(m_page.get(), new WebNotificationClient(this));
+#endif
 
     // Qt does not yet call setIsInWindow. Until it does, just leave
     // this line out so plug-ins and video will work. Eventually all platforms
@@ -713,14 +715,15 @@ void WebPage::setDefersLoading(bool defersLoading)
     m_page->setDefersLoading(defersLoading);
 }
 
-void WebPage::reload(bool reloadFromOrigin)
+void WebPage::reload(bool reloadFromOrigin, const SandboxExtension::Handle& sandboxExtensionHandle)
 {
     SendStopResponsivenessTimer stopper(this);
 
+    m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
     m_mainFrame->coreFrame()->loader()->reload(reloadFromOrigin);
 }
 
-void WebPage::goForward(uint64_t backForwardItemID, const SandboxExtension::Handle& sandboxExtensionHandle)
+void WebPage::goForward(uint64_t backForwardItemID)
 {
     SendStopResponsivenessTimer stopper(this);
 
@@ -729,11 +732,10 @@ void WebPage::goForward(uint64_t backForwardItemID, const SandboxExtension::Hand
     if (!item)
         return;
 
-    m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
     m_page->goToItem(item, FrameLoadTypeForward);
 }
 
-void WebPage::goBack(uint64_t backForwardItemID, const SandboxExtension::Handle& sandboxExtensionHandle)
+void WebPage::goBack(uint64_t backForwardItemID)
 {
     SendStopResponsivenessTimer stopper(this);
 
@@ -742,11 +744,10 @@ void WebPage::goBack(uint64_t backForwardItemID, const SandboxExtension::Handle&
     if (!item)
         return;
 
-    m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
     m_page->goToItem(item, FrameLoadTypeBack);
 }
 
-void WebPage::goToBackForwardItem(uint64_t backForwardItemID, const SandboxExtension::Handle& sandboxExtensionHandle)
+void WebPage::goToBackForwardItem(uint64_t backForwardItemID)
 {
     SendStopResponsivenessTimer stopper(this);
 
@@ -755,7 +756,6 @@ void WebPage::goToBackForwardItem(uint64_t backForwardItemID, const SandboxExten
     if (!item)
         return;
 
-    m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
     m_page->goToItem(item, FrameLoadTypeIndexedBackForward);
 }
 
@@ -1439,10 +1439,10 @@ uint64_t WebPage::restoreSession(const SessionState& sessionState)
     return currentItemID;
 }
 
-void WebPage::restoreSessionAndNavigateToCurrentItem(const SessionState& sessionState, const SandboxExtension::Handle& sandboxExtensionHandle)
+void WebPage::restoreSessionAndNavigateToCurrentItem(const SessionState& sessionState)
 {
     if (uint64_t currentItemID = restoreSession(sessionState))
-        goToBackForwardItem(currentItemID, sandboxExtensionHandle);
+        goToBackForwardItem(currentItemID);
 }
 
 #if ENABLE(TOUCH_EVENTS)
@@ -1888,6 +1888,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setShowDebugBorders(store.getBoolValueForKey(WebPreferencesKey::compositingBordersVisibleKey()));
     settings->setShowRepaintCounter(store.getBoolValueForKey(WebPreferencesKey::compositingRepaintCountersVisibleKey()));
     settings->setCSSCustomFilterEnabled(store.getBoolValueForKey(WebPreferencesKey::cssCustomFilterEnabledKey()));
+    settings->setCSSRegionsEnabled(store.getBoolValueForKey(WebPreferencesKey::cssRegionsEnabledKey()));
     settings->setWebGLEnabled(store.getBoolValueForKey(WebPreferencesKey::webGLEnabledKey()));
     settings->setMediaPlaybackRequiresUserGesture(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackRequiresUserGestureKey()));
     settings->setMediaPlaybackAllowsInline(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackAllowsInlineKey()));
@@ -1925,7 +1926,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
 
     settings->setApplicationChromeMode(store.getBoolValueForKey(WebPreferencesKey::applicationChromeModeKey()));    
-    settings->setSuppressIncrementalRendering(store.getBoolValueForKey(WebPreferencesKey::suppressIncrementalRenderingKey()));
+    settings->setSuppressesIncrementalRendering(store.getBoolValueForKey(WebPreferencesKey::suppressesIncrementalRenderingKey()));
     settings->setBackspaceKeyNavigationEnabled(store.getBoolValueForKey(WebPreferencesKey::backspaceKeyNavigationEnabledKey()));
     settings->setCaretBrowsingEnabled(store.getBoolValueForKey(WebPreferencesKey::caretBrowsingEnabledKey()));
 

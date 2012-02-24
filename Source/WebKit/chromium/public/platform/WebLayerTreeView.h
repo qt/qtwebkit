@@ -49,14 +49,18 @@ public:
             , showFPSCounter(false)
             , showPlatformLayerTree(false)
             , refreshRate(0)
-            , partialSwapEnabled(false) { }
+            , perTilePainting(false)
+            , partialSwapEnabled(false)
+            , threadedAnimationEnabled(false) { }
 
         bool acceleratePainting;
         bool compositeOffscreen;
         bool showFPSCounter;
         bool showPlatformLayerTree;
         double refreshRate;
+        bool perTilePainting;
         bool partialSwapEnabled;
+        bool threadedAnimationEnabled;
 #if WEBKIT_IMPLEMENTATION
         operator WebCore::CCSettings() const;
 #endif
@@ -106,6 +110,8 @@ public:
     WebLayerTreeView& operator=(const WTF::PassRefPtr<WebCore::CCLayerTreeHost>&);
     operator WTF::PassRefPtr<WebCore::CCLayerTreeHost>() const;
 #endif
+
+    WEBKIT_EXPORT void setNeedsRedraw();
 
 protected:
     WebPrivatePtr<WebCore::CCLayerTreeHost> m_private;

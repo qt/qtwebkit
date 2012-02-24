@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc.  All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -37,6 +37,7 @@
 #include "SocketStreamHandleClient.h"
 #include "ThreadableWebSocketChannel.h"
 #include "Timer.h"
+#include "WebSocketFrame.h"
 #include "WebSocketHandshake.h"
 #include <wtf/Deque.h>
 #include <wtf/Forward.h>
@@ -46,8 +47,8 @@
 namespace WebCore {
 
 class Blob;
+class Document;
 class FileReaderLoader;
-class ScriptExecutionContext;
 class SocketStreamHandle;
 class SocketStreamError;
 class WebSocketChannelClient;
@@ -59,7 +60,7 @@ class WebSocketChannel : public RefCounted<WebSocketChannel>, public SocketStrea
 {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<WebSocketChannel> create(ScriptExecutionContext* context, WebSocketChannelClient* client) { return adoptRef(new WebSocketChannel(context, client)); }
+    static PassRefPtr<WebSocketChannel> create(Document* document, WebSocketChannelClient* client) { return adoptRef(new WebSocketChannel(document, client)); }
     virtual ~WebSocketChannel();
 
     bool send(const char* data, int length);
@@ -68,6 +69,7 @@ public:
     virtual bool useHixie76Protocol() OVERRIDE;
     virtual void connect(const KURL&, const String& protocol) OVERRIDE;
     virtual String subprotocol() OVERRIDE;
+    virtual String extensions() OVERRIDE;
     virtual bool send(const String& message) OVERRIDE;
     virtual bool send(const ArrayBuffer&) OVERRIDE;
     virtual bool send(const Blob&) OVERRIDE;
@@ -118,7 +120,7 @@ protected:
     virtual void derefThreadableWebSocketChannel() { deref(); }
 
 private:
-    WebSocketChannel(ScriptExecutionContext*, WebSocketChannelClient*);
+    WebSocketChannel(Document*, WebSocketChannelClient*);
 
     bool appendToBuffer(const char* data, size_t len);
     void skipBuffer(size_t len);
@@ -127,38 +129,13 @@ private:
     void startClosingHandshake(int code, const String& reason);
     void closingTimerFired(Timer<WebSocketChannel>*);
 
-    // Hybi-10 opcodes.
-    typedef unsigned int OpCode;
-    static const OpCode OpCodeContinuation;
-    static const OpCode OpCodeText;
-    static const OpCode OpCodeBinary;
-    static const OpCode OpCodeClose;
-    static const OpCode OpCodePing;
-    static const OpCode OpCodePong;
-
-    static bool isNonControlOpCode(OpCode opCode) { return opCode == OpCodeContinuation || opCode == OpCodeText || opCode == OpCodeBinary; }
-    static bool isControlOpCode(OpCode opCode) { return opCode == OpCodeClose || opCode == OpCodePing || opCode == OpCodePong; }
-    static bool isReservedOpCode(OpCode opCode) { return !isNonControlOpCode(opCode) && !isControlOpCode(opCode); }
-
     enum ParseFrameResult {
         FrameOK,
         FrameIncomplete,
         FrameError
     };
 
-    struct FrameData {
-        OpCode opCode;
-        bool final;
-        bool reserved1;
-        bool reserved2;
-        bool reserved3;
-        bool masked;
-        const char* payload;
-        size_t payloadLength;
-        const char* frameEnd;
-    };
-
-    ParseFrameResult parseFrame(FrameData&); // May modify part of m_buffer to unmask the frame.
+    ParseFrameResult parseFrame(WebSocketFrame&, const char*& frameEnd); // May modify part of m_buffer to unmask the frame.
 
     bool processFrame();
     bool processFrameHixie76();
@@ -179,7 +156,7 @@ private:
         QueuedFrameTypeBlob
     };
     struct QueuedFrame {
-        OpCode opCode;
+        WebSocketFrame::OpCode opCode;
         QueuedFrameType frameType;
         // Only one of the following items is used, according to the value of frameType.
         String stringData;
@@ -187,8 +164,8 @@ private:
         RefPtr<Blob> blobData;
     };
     void enqueueTextFrame(const String&);
-    void enqueueRawFrame(OpCode, const char* data, size_t dataLength);
-    void enqueueBlobFrame(OpCode, const Blob&);
+    void enqueueRawFrame(WebSocketFrame::OpCode, const char* data, size_t dataLength);
+    void enqueueBlobFrame(WebSocketFrame::OpCode, const Blob&);
 
     void processOutgoingFrameQueue();
     void abortOutgoingFrameQueue();
@@ -207,7 +184,7 @@ private:
 
     // If you are going to send a hybi-10 frame, you need to use the outgoing frame queue
     // instead of call sendFrame() directly.
-    bool sendFrame(OpCode, const char* data, size_t dataLength);
+    bool sendFrame(WebSocketFrame::OpCode, const char* data, size_t dataLength);
     bool sendFrameHixie76(const char* data, size_t dataLength);
 
 #if ENABLE(BLOB)
@@ -219,7 +196,7 @@ private:
     };
 #endif
 
-    ScriptExecutionContext* m_context;
+    Document* m_document;
     WebSocketChannelClient* m_client;
     OwnPtr<WebSocketHandshake> m_handshake;
     RefPtr<SocketStreamHandle> m_handle;
@@ -241,7 +218,7 @@ private:
 
     // Private members only for hybi-10 protocol.
     bool m_hasContinuousFrame;
-    OpCode m_continuousFrameOpCode;
+    WebSocketFrame::OpCode m_continuousFrameOpCode;
     Vector<char> m_continuousFrameData;
     unsigned short m_closeEventCode;
     String m_closeEventReason;

@@ -1437,14 +1437,20 @@ li.editing .swatch, li.editing .enabled-button,  li.editing-sub-part .delete-but
 }
 
 .swatch {
-    display: inline-block;
-    vertical-align: baseline;
     margin-left: 1px;
     margin-right: 2px;
     margin-bottom: -1px;
     width: 1em;
     height: 1em;
     border: 1px solid rgba(128, 128, 128, 0.6);
+    background-image: url(Images/checker.png);
+    display: inline-block;
+}
+
+.swatch-inner {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 .swatch:hover {

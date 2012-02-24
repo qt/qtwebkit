@@ -31,6 +31,7 @@ Rectangle {
     id: dialogLineInput
 
     property alias text: input.text
+    property alias echoMode: input.echoMode
     signal accepted()
 
     height: 20

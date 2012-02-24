@@ -60,7 +60,7 @@ VisiblePosition RenderTextControlInnerBlock::positionForPoint(const LayoutPoint&
     if (m_multiLine) {
         RenderTextControl* renderer = toRenderTextControl(node()->shadowAncestorNode()->renderer());
         if (renderer->hasOverflowClip())
-            contentsPoint += renderer->layer()->scrolledContentOffset();
+            contentsPoint += renderer->scrolledContentOffset();
     }
 
     return RenderBlock::positionForPoint(contentsPoint);
@@ -175,7 +175,7 @@ void RenderTextControlSingleLine::showPopup()
         m_searchPopup->saveRecentSearches(name, m_recentSearches);
     }
 
-    m_searchPopup->popupMenu()->show(absoluteBoundingBoxRect(), document()->view(), -1);
+    m_searchPopup->popupMenu()->show(pixelSnappedIntRect(absoluteBoundingBoxRect()), document()->view(), -1);
 }
 
 void RenderTextControlSingleLine::hidePopup()
@@ -196,7 +196,7 @@ void RenderTextControlSingleLine::paint(PaintInfo& paintInfo, const LayoutPoint&
 
         // Convert the rect into the coords used for painting the content
         contentsRect.moveBy(paintOffset + location());
-        theme()->paintCapsLockIndicator(this, paintInfo, contentsRect);
+        theme()->paintCapsLockIndicator(this, paintInfo, pixelSnappedIntRect(contentsRect));
     }
 }
 
@@ -332,7 +332,7 @@ void RenderTextControlSingleLine::styleDidChange(StyleDifference diff, const Ren
         containerRenderer->style()->setWidth(Length());
     }
     if (HTMLElement* placeholder = inputElement()->placeholderElement())
-        placeholder->ensureInlineStyleDecl()->setProperty(CSSPropertyTextOverflow, textShouldBeTruncated() ? CSSValueEllipsis : CSSValueClip);
+        placeholder->setInlineStyleProperty(CSSPropertyTextOverflow, textShouldBeTruncated() ? CSSValueEllipsis : CSSValueClip);
     setHasOverflowClip(false);
 }
 

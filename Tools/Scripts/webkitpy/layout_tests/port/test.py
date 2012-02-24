@@ -100,8 +100,6 @@ class TestList(object):
 
 def unit_test_list():
     tests = TestList()
-    tests.add('failures/expected/checksum.html',
-              actual_checksum='checksum_fail-checksum')
     tests.add('failures/expected/crash.html', crash=True)
     tests.add('failures/expected/exception.html', exception=True)
     tests.add('failures/expected/timeout.html', timeout=True)
@@ -135,6 +133,7 @@ def unit_test_list():
     tests.add('failures/expected/newlines_with_excess_CR.html',
               expected_text="foo\r\r\r\n", actual_text="foo\n")
     tests.add('failures/expected/text.html', actual_text='text_fail-png')
+    tests.add('failures/expected/skip_text.html', actual_text='text diff')
     tests.add('failures/unexpected/missing_text.html', expected_text=None)
     tests.add('failures/unexpected/missing_image.html', expected_image=None)
     tests.add('failures/unexpected/missing_render_tree_dump.html', actual_text="""layer at (0,0) size 800x600
@@ -155,6 +154,7 @@ layer at (0,0) size 800x34
               actual_checksum='text-image-checksum_fail-checksum')
     tests.add('failures/unexpected/checksum-with-matching-image.html',
               actual_checksum='text-image-checksum_fail-checksum')
+    tests.add('failures/unexpected/skip_pass.html')
     tests.add('failures/unexpected/timeout.html', timeout=True)
     tests.add('http/tests/passes/text.html')
     tests.add('http/tests/passes/image.html')
@@ -170,6 +170,10 @@ layer at (0,0) size 800x34
     tests.add('passes/checksum_in_image.html',
               expected_checksum=None,
               expected_image='tEXtchecksum\x00checksum_in_image-checksum')
+
+    # Note that here the checksums don't match but the images do, so this test passes "unexpectedly".
+    # See https://bugs.webkit.org/show_bug.cgi?id=69444 .
+    tests.add('failures/unexpected/checksum.html', actual_checksum='checksum_fail-checksum')
 
     # Text output files contain "\r\n" on Windows.  This may be
     # helpfully filtered to "\r\r\n" by our Python/Cygwin tooling.
@@ -237,7 +241,6 @@ def add_unit_tests_to_mock_filesystem(filesystem):
     filesystem.maybe_make_directory(LAYOUT_TEST_DIR + '/platform/test')
     if not filesystem.exists(LAYOUT_TEST_DIR + '/platform/test/test_expectations.txt'):
         filesystem.write_text_file(LAYOUT_TEST_DIR + '/platform/test/test_expectations.txt', """
-WONTFIX : failures/expected/checksum.html = IMAGE
 WONTFIX : failures/expected/crash.html = CRASH
 WONTFIX : failures/expected/image.html = IMAGE
 WONTFIX : failures/expected/audio.html = AUDIO
@@ -368,6 +371,9 @@ class TestPort(Port):
     def default_worker_model(self):
         return 'inline'
 
+    def worker_startup_delay_secs(self):
+        return 0
+
     def check_build(self, needs_http):
         return True
 
@@ -391,6 +397,12 @@ class TestPort(Port):
 
     def webkit_base(self):
         return '/test.checkout'
+
+    def skipped_tests(self, test_list):
+        # This allows us to test the handling Skipped files, both with a test
+        # that actually passes, and a test that does fail.
+        return set(['failures/expected/skip_text.html',
+                    'failures/unexpected/skip_pass.html'])
 
     def name(self):
         return self._name
@@ -427,6 +439,15 @@ class TestPort(Port):
 
     def release_http_lock(self):
         pass
+
+    def _path_to_lighttpd(self):
+        return "/usr/sbin/lighttpd"
+
+    def _path_to_lighttpd_modules(self):
+        return "/usr/lib/lighttpd"
+
+    def _path_to_lighttpd_php(self):
+        return "/usr/bin/php-cgi"
 
     def path_to_test_expectations_file(self):
         return self._expectations_path
@@ -498,6 +519,9 @@ class TestDriver(Driver):
             test.actual_checksum, audio, crash=test.crash or test.web_process_crash,
             crashed_process_name=crashed_process_name,
             test_time=time.time() - start_time, timeout=test.timeout, error=test.error)
+
+    def start(self):
+        pass
 
     def stop(self):
         pass

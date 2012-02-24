@@ -22,6 +22,7 @@ SET(WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform"
     "${WEBCORE_DIR}/platform/animation"
     "${WEBCORE_DIR}/platform/graphics"
+    "${WEBCORE_DIR}/platform/graphics/filters"
     "${WEBCORE_DIR}/platform/graphics/transforms"
     "${WEBCORE_DIR}/platform/network"
     "${WEBCORE_DIR}/platform/sql"
@@ -44,6 +45,7 @@ SET(WebKit_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/debugger"
     "${JAVASCRIPTCORE_DIR}/interpreter"
     "${JAVASCRIPTCORE_DIR}/jit"
+    "${JAVASCRIPTCORE_DIR}/llint"
     "${JAVASCRIPTCORE_DIR}/parser"
     "${JAVASCRIPTCORE_DIR}/profiler"
     "${JAVASCRIPTCORE_DIR}/runtime"
@@ -65,7 +67,7 @@ SET(WebKit_LIBRARIES
     ${WebCore_LIBRARY_NAME}
 )
 
-INCLUDE_IF_EXISTS(${WEBKIT_DIR}/${WEBKIT_PORT_DIR}/CMakeLists${PORT}.txt)
+WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 ADD_DEFINITIONS(-DBUILDING_WebKit)
 INCLUDE_DIRECTORIES(${WebKit_INCLUDE_DIRECTORIES})

@@ -89,6 +89,7 @@ WebInspector.Settings = function()
     this.showScriptFolders = this.createSetting("showScriptFolders", true);
     this.dockToRight = this.createSetting("dockToRight", false);
     this.emulateTouchEvents = this.createSetting("emulateTouchEvents", false);
+    this.showPaintRects = this.createSetting("showPaintRects", false);
 
     // If there are too many breakpoints in a storage, it is likely due to a recent bug that caused
     // periodical breakpoints duplication leading to inspector slowness.
@@ -134,19 +135,23 @@ WebInspector.Setting.prototype = {
 
     get: function()
     {
-        var value = this._defaultValue;
+        if (typeof this._value !== "undefined")
+            return this._value;
+
+        this._value = this._defaultValue;
         if (window.localStorage != null && this._name in window.localStorage) {
             try {
-                value = JSON.parse(window.localStorage[this._name]);
+                this._value = JSON.parse(window.localStorage[this._name]);
             } catch(e) {
                 window.localStorage.removeItem(this._name);
             }
         }
-        return value;
+        return this._value;
     },
 
     set: function(value)
     {
+        this._value = value;
         if (window.localStorage != null) {
             try {
                 window.localStorage[this._name] = JSON.stringify(value);
@@ -168,12 +173,12 @@ WebInspector.ExperimentsSettings = function()
     this._enabledForTest = {};
     
     // Add currently running experiments here.
-    // FIXME: Move out from experiments once navigator is production-ready.
-    this.useScriptsNavigator = this._createExperiment("useScriptsNavigator", "Use file navigator and tabbed editor container in scripts panel");
     this.sourceFrameAlwaysEditable = this._createExperiment("sourceFrameAlwaysEditable", "Make resources always editable");
-    this.freeFlowDOMEditing = this._createExperiment("freeFlowDOMEditing", "Enable free flow DOM editing");
     this.showMemoryCounters = this._createExperiment("showMemoryCounters", "Show memory counters in Timeline panel");
-    this.singleClickEditing = this._createExperiment("singleClickEditing", "Single click CSS editing");
+    this.timelineStartAtZero = this._createExperiment("timelineStartAtZero", "Enable start at zero mode in Timeline panel");
+    // FIXME: Enable http/tests/inspector/indexeddb/resources-panel.html when removed from experiments.
+    this.showIndexedDB = this._createExperiment("showIndexedDB", "Show IndexedDB in Resources panel");
+    this.debugCSS = this._createExperiment("debugCSS", "Load CSS via link tags for debugging");
 
     this._cleanUpSetting();
 }

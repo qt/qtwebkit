@@ -83,8 +83,9 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     m_inspectorAgent = inspectorAgentPtr.get();
     m_agents.append(inspectorAgentPtr.release());
 
-    OwnPtr<InspectorPageAgent> pageAgentPtr(InspectorPageAgent::create(m_instrumentingAgents.get(), page, m_state.get(), m_injectedScriptManager.get()));
+    OwnPtr<InspectorPageAgent> pageAgentPtr(InspectorPageAgent::create(m_instrumentingAgents.get(), page, m_state.get(), m_injectedScriptManager.get(), inspectorClient));
     InspectorPageAgent* pageAgent = pageAgentPtr.get();
+    m_pageAgent = pageAgentPtr.get();
     m_agents.append(pageAgentPtr.release());
 
     OwnPtr<InspectorDOMAgent> domAgentPtr(InspectorDOMAgent::create(m_instrumentingAgents.get(), pageAgent, inspectorClient, m_state.get(), m_injectedScriptManager.get()));
@@ -100,7 +101,7 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
 #endif
 
 #if ENABLE(INDEXED_DATABASE)
-    m_agents.append(InspectorIndexedDBAgent::create(m_instrumentingAgents.get(), m_state.get(), pageAgent));
+    m_agents.append(InspectorIndexedDBAgent::create(m_instrumentingAgents.get(), m_state.get(), m_injectedScriptManager.get(), pageAgent));
 #endif
 
 #if ENABLE(FILE_SYSTEM)
@@ -109,13 +110,8 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     OwnPtr<InspectorDOMStorageAgent> domStorageAgentPtr(InspectorDOMStorageAgent::create(m_instrumentingAgents.get(), m_state.get()));
     InspectorDOMStorageAgent* domStorageAgent = domStorageAgentPtr.get();
     m_agents.append(domStorageAgentPtr.release());
-
-
-    OwnPtr<InspectorMemoryAgent>memoryAgentPtr = InspectorMemoryAgent::create(m_instrumentingAgents.get(), m_state.get(), m_page, m_domAgent);
-    InspectorMemoryAgent* memoryAgent = memoryAgentPtr.get();
-    m_agents.append(memoryAgentPtr.release());
-
-    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), m_state.get(), memoryAgent));
+    m_agents.append(InspectorMemoryAgent::create(m_instrumentingAgents.get(), m_state.get(), m_page, m_domAgent));
+    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), m_state.get()));
     m_agents.append(InspectorApplicationCacheAgent::create(m_instrumentingAgents.get(), m_state.get(), pageAgent));
 
     OwnPtr<InspectorResourceAgent> resourceAgentPtr(InspectorResourceAgent::create(m_instrumentingAgents.get(), pageAgent, inspectorClient, m_state.get()));

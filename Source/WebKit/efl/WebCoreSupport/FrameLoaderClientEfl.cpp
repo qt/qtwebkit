@@ -241,13 +241,9 @@ void FrameLoaderClientEfl::frameLoaderDestroyed()
 
 void FrameLoaderClientEfl::dispatchDidReceiveResponse(DocumentLoader* loader, unsigned long, const ResourceResponse& response)
 {
-#if USE(SOUP)
     // Update our knowledge of request soup flags - some are only set
     // after the request is done.
     loader->request().setSoupMessageFlags(response.soupMessageFlags());
-#else
-    UNUSED_PARAM(loader);
-#endif
 
     m_response = response;
 }
@@ -951,7 +947,7 @@ void FrameLoaderClientEfl::dispatchDidBecomeFrameset(bool)
 
 PassRefPtr<FrameNetworkingContext> FrameLoaderClientEfl::createNetworkingContext()
 {
-    return FrameNetworkingContextEfl::create(EWKPrivate::coreFrame(m_frame));
+    return FrameNetworkingContextEfl::create(EWKPrivate::coreFrame(m_frame), m_frame);
 }
 
 }

@@ -62,10 +62,21 @@ const float CCVideoLayerImpl::yuvAdjust[3] = {
     -0.5f,
 };
 
+// This matrix is the default transformation for stream textures.
+const float CCVideoLayerImpl::flipTransform[16] = {
+    1, 0, 0, 0,
+    0, -1, 0, 0,
+    0, 0, 1, 0,
+    0, 1, 0, 1,
+};
+
 CCVideoLayerImpl::CCVideoLayerImpl(int id, VideoFrameProvider* provider)
     : CCLayerImpl(id)
     , m_provider(provider)
+    , m_layerTreeHostImpl(0)
+    , m_frame(0)
 {
+    memcpy(m_streamTextureMatrix, flipTransform, sizeof(m_streamTextureMatrix));
     provider->setVideoFrameProviderClient(this);
 }
 
@@ -88,16 +99,16 @@ void CCVideoLayerImpl::stopUsingProvider()
 }
 
 // Convert VideoFrameChromium::Format to GraphicsContext3D's format enum values.
-static GC3Denum convertVFCFormatToGC3DFormat(VideoFrameChromium::Format format)
+static GC3Denum convertVFCFormatToGC3DFormat(const VideoFrameChromium* frame)
 {
-    switch (format) {
+    switch (frame->format()) {
     case VideoFrameChromium::YV12:
     case VideoFrameChromium::YV16:
         return GraphicsContext3D::LUMINANCE;
     case VideoFrameChromium::RGBA:
         return GraphicsContext3D::RGBA;
     case VideoFrameChromium::NativeTexture:
-        return GraphicsContext3D::TEXTURE_2D;
+        return frame->textureTarget();
     case VideoFrameChromium::Invalid:
     case VideoFrameChromium::RGB555:
     case VideoFrameChromium::RGB565:
@@ -112,101 +123,63 @@ static GC3Denum convertVFCFormatToGC3DFormat(VideoFrameChromium::Format format)
     return GraphicsContext3D::INVALID_VALUE;
 }
 
-void CCVideoLayerImpl::draw(LayerRendererChromium* layerRenderer)
+void CCVideoLayerImpl::willDraw(LayerRendererChromium* layerRenderer)
 {
     ASSERT(CCProxy::isImplThread());
 
     MutexLocker locker(m_providerMutex);
 
-    if (!m_provider)
-        return;
-
-    VideoFrameChromium* frame = m_provider->getCurrentFrame();
-    if (!frame)
-        return;
-    GC3Denum format = convertVFCFormatToGC3DFormat(frame->format());
-
-    if (format == GraphicsContext3D::INVALID_VALUE) {
-        m_provider->putCurrentFrame(frame);
+    if (!m_provider) {
+        m_frame = 0;
         return;
     }
 
-    if (!copyFrameToTextures(frame, format, layerRenderer)) {
-        m_provider->putCurrentFrame(frame);
+    m_frame = m_provider->getCurrentFrame();
+
+    if (!m_frame)
+        return;
+
+    m_format = convertVFCFormatToGC3DFormat(m_frame);
+
+    if (m_format == GraphicsContext3D::INVALID_VALUE) {
+        m_provider->putCurrentFrame(m_frame);
+        m_frame = 0;
         return;
     }
 
-    switch (format) {
-    case GraphicsContext3D::LUMINANCE:
-        drawYUV(layerRenderer);
-        break;
-    case GraphicsContext3D::RGBA:
-        drawRGBA(layerRenderer);
-        break;
-    case GraphicsContext3D::TEXTURE_2D:
-        drawNativeTexture(layerRenderer);
-        break;
-    default:
-        CRASH(); // Someone updated convertVFCFormatToGC3DFormat above but update this!
+    if (!reserveTextures(m_frame, m_format, layerRenderer)) {
+        m_provider->putCurrentFrame(m_frame);
+        m_frame = 0;
     }
-
-    for (unsigned plane = 0; plane < frame->planes(); ++plane)
-        m_textures[plane].m_texture->unreserve();
-    m_provider->putCurrentFrame(frame);
 }
 
 void CCVideoLayerImpl::appendQuads(CCQuadList& quadList, const CCSharedQuadState* sharedQuadState)
 {
     IntRect quadRect(IntPoint(), bounds());
-    quadList.append(CCVideoDrawQuad::create(sharedQuadState, quadRect, this));
+    OwnPtr<CCVideoDrawQuad> videoQuad = CCVideoDrawQuad::create(sharedQuadState, quadRect, m_textures, m_frame, m_format);
+
+    if (m_format == Extensions3DChromium::GL_TEXTURE_EXTERNAL_OES)
+        videoQuad->setMatrix(m_streamTextureMatrix);
+
+    quadList.append(videoQuad.release());
 }
 
-bool CCVideoLayerImpl::copyFrameToTextures(const VideoFrameChromium* frame, GC3Denum format, LayerRendererChromium* layerRenderer)
+void CCVideoLayerImpl::didDraw()
 {
-    if (frame->format() == VideoFrameChromium::NativeTexture) {
-        m_nativeTextureId = frame->textureId();
-        m_nativeTextureSize = IntSize(frame->width(), frame->height());
-        return true;
-    }
+    ASSERT(CCProxy::isImplThread());
 
-    if (!reserveTextures(frame, format, layerRenderer))
-        return false;
+    MutexLocker locker(m_providerMutex);
 
-    for (unsigned plane = 0; plane < frame->planes(); ++plane) {
-        ASSERT(frame->requiredTextureSize(plane) == m_textures[plane].m_texture->size());
-        copyPlaneToTexture(layerRenderer, frame->data(plane), plane);
-    }
-    for (unsigned plane = frame->planes(); plane < MaxPlanes; ++plane) {
-        Texture& texture = m_textures[plane];
-        texture.m_texture.clear();
-        texture.m_visibleSize = IntSize();
-    }
-    m_planes = frame->planes();
-    return true;
+    if (!m_provider || !m_frame)
+        return;
+
+    for (unsigned plane = 0; plane < m_frame->planes(); ++plane)
+        m_textures[plane].m_texture->unreserve();
+    m_provider->putCurrentFrame(m_frame);
+    m_frame = 0;
 }
 
-void CCVideoLayerImpl::copyPlaneToTexture(LayerRendererChromium* layerRenderer, const void* plane, int index)
-{
-    Texture& texture = m_textures[index];
-    GraphicsContext3D* context = layerRenderer->context();
-    TextureAllocator* allocator = layerRenderer->renderSurfaceTextureAllocator();
-    texture.m_texture->bindTexture(context, allocator);
-    GC3Denum format = texture.m_texture->format();
-    IntSize dimensions = texture.m_texture->size();
-
-    void* mem = static_cast<Extensions3DChromium*>(context->getExtensions())->mapTexSubImage2DCHROMIUM(GraphicsContext3D::TEXTURE_2D, 0, 0, 0, dimensions.width(), dimensions.height(), format, GraphicsContext3D::UNSIGNED_BYTE, Extensions3DChromium::WRITE_ONLY);
-    if (mem) {
-        memcpy(mem, plane, dimensions.width() * dimensions.height());
-        GLC(context, static_cast<Extensions3DChromium*>(context->getExtensions())->unmapTexSubImage2DCHROMIUM(mem));
-    } else {
-        // If mapTexSubImage2DCHROMIUM fails, then do the slower texSubImage2D
-        // upload. This does twice the copies as mapTexSubImage2DCHROMIUM, one
-        // in the command buffer and another to the texture.
-        GLC(context, context->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, 0, 0, dimensions.width(), dimensions.height(), format, GraphicsContext3D::UNSIGNED_BYTE, plane));
-    }
-}
-
-static IntSize computeVisibleSize(const VideoFrameChromium* frame, unsigned plane)
+IntSize CCVideoLayerImpl::computeVisibleSize(const VideoFrameChromium* frame, unsigned plane)
 {
     int visibleWidth = frame->width(plane);
     int visibleHeight = frame->height(plane);
@@ -259,79 +232,21 @@ bool CCVideoLayerImpl::reserveTextures(const VideoFrameChromium* frame, GC3Denum
     return true;
 }
 
-void CCVideoLayerImpl::drawYUV(LayerRendererChromium* layerRenderer) const
+void CCVideoLayerImpl::didReceiveFrame()
 {
-    const YUVProgram* program = layerRenderer->videoLayerYUVProgram();
-    ASSERT(program && program->initialized());
-
-    GraphicsContext3D* context = layerRenderer->context();
-    const Texture& yTexture = m_textures[VideoFrameChromium::yPlane];
-    const Texture& uTexture = m_textures[VideoFrameChromium::uPlane];
-    const Texture& vTexture = m_textures[VideoFrameChromium::vPlane];
-
-    GLC(context, context->activeTexture(GraphicsContext3D::TEXTURE1));
-    GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, yTexture.m_texture->textureId()));
-    GLC(context, context->activeTexture(GraphicsContext3D::TEXTURE2));
-    GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, uTexture.m_texture->textureId()));
-    GLC(context, context->activeTexture(GraphicsContext3D::TEXTURE3));
-    GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, vTexture.m_texture->textureId()));
-
-    GLC(context, context->useProgram(program->program()));
-
-    float yWidthScaleFactor = static_cast<float>(yTexture.m_visibleSize.width()) / yTexture.m_texture->size().width();
-    // Arbitrarily take the u sizes because u and v dimensions are identical.
-    float uvWidthScaleFactor = static_cast<float>(uTexture.m_visibleSize.width()) / uTexture.m_texture->size().width();
-    GLC(context, context->uniform1f(program->vertexShader().yWidthScaleFactorLocation(), yWidthScaleFactor));
-    GLC(context, context->uniform1f(program->vertexShader().uvWidthScaleFactorLocation(), uvWidthScaleFactor));
-
-    GLC(context, context->uniform1i(program->fragmentShader().yTextureLocation(), 1));
-    GLC(context, context->uniform1i(program->fragmentShader().uTextureLocation(), 2));
-    GLC(context, context->uniform1i(program->fragmentShader().vTextureLocation(), 3));
-
-    GLC(context, context->uniformMatrix3fv(program->fragmentShader().ccMatrixLocation(), 0, const_cast<float*>(yuv2RGB), 1));
-    GLC(context, context->uniform3fv(program->fragmentShader().yuvAdjLocation(), const_cast<float*>(yuvAdjust), 1));
-
-    layerRenderer->drawTexturedQuad(drawTransform(), bounds().width(), bounds().height(), drawOpacity(), FloatQuad(),
-                                    program->vertexShader().matrixLocation(),
-                                    program->fragmentShader().alphaLocation(),
-                                    -1);
-
-    // Reset active texture back to texture 0.
-    GLC(context, context->activeTexture(GraphicsContext3D::TEXTURE0));
+    setNeedsRedraw();
 }
 
-template<class Program>
-void CCVideoLayerImpl::drawCommon(LayerRendererChromium* layerRenderer, Program* program, float widthScaleFactor, Platform3DObject textureId) const
+void CCVideoLayerImpl::didUpdateMatrix(const float matrix[16])
 {
-    ASSERT(program && program->initialized());
-
-    GraphicsContext3D* context = layerRenderer->context();
-
-    GLC(context, context->activeTexture(GraphicsContext3D::TEXTURE0));
-    GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, textureId));
-
-    GLC(context, context->useProgram(program->program()));
-    GLC(context, context->uniform4f(program->vertexShader().texTransformLocation(), 0, 0, widthScaleFactor, 1));
-    GLC(context, context->uniform1i(program->fragmentShader().samplerLocation(), 0));
-
-    layerRenderer->drawTexturedQuad(drawTransform(), bounds().width(), bounds().height(), drawOpacity(), layerRenderer->sharedGeometryQuad(),
-                                    program->vertexShader().matrixLocation(),
-                                    program->fragmentShader().alphaLocation(),
-                                    -1);
+    memcpy(m_streamTextureMatrix, matrix, sizeof(m_streamTextureMatrix));
+    setNeedsRedraw();
 }
 
-void CCVideoLayerImpl::drawRGBA(LayerRendererChromium* layerRenderer) const
+void CCVideoLayerImpl::setNeedsRedraw()
 {
-    const RGBAProgram* program = layerRenderer->videoLayerRGBAProgram();
-    const Texture& texture = m_textures[VideoFrameChromium::rgbPlane];
-    float widthScaleFactor = static_cast<float>(texture.m_visibleSize.width()) / texture.m_texture->size().width();
-    drawCommon(layerRenderer, program, widthScaleFactor, texture.m_texture->textureId());
-}
-
-void CCVideoLayerImpl::drawNativeTexture(LayerRendererChromium* layerRenderer) const
-{
-    const NativeTextureProgram* program = layerRenderer->videoLayerNativeTextureProgram();
-    drawCommon(layerRenderer, program, 1, m_nativeTextureId);
+    if (m_layerTreeHostImpl)
+        m_layerTreeHostImpl->setNeedsRedraw();
 }
 
 void CCVideoLayerImpl::dumpLayerProperties(TextStream& ts, int indent) const

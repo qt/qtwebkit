@@ -74,6 +74,24 @@ RenderWidget* HTMLEmbedElement::renderWidgetForJSBindings()
     return findWidgetRenderer(this);
 }
 
+bool HTMLEmbedElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == hiddenAttr)
+        return true;
+    return HTMLPlugInImageElement::isPresentationAttribute(attr);
+}
+
+void HTMLEmbedElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    if (attr->name() == hiddenAttr) {
+        if (equalIgnoringCase(attr->value(), "yes") || equalIgnoringCase(attr->value(), "true")) {
+            addPropertyToAttributeStyle(style, CSSPropertyWidth, 0, CSSPrimitiveValue::CSS_PX);
+            addPropertyToAttributeStyle(style, CSSPropertyHeight, 0, CSSPrimitiveValue::CSS_PX);
+        }
+    } else
+        HTMLPlugInImageElement::collectStyleForAttribute(attr, style);
+}
+
 void HTMLEmbedElement::parseAttribute(Attribute* attr)
 {
     const AtomicString& value = attr->value();
@@ -94,14 +112,6 @@ void HTMLEmbedElement::parseAttribute(Attribute* attr)
                 m_imageLoader = adoptPtr(new HTMLImageLoader(this));
             m_imageLoader->updateFromElementIgnoringPreviousError();
         }
-    } else if (attr->name() == hiddenAttr) {
-        if (equalIgnoringCase(value.string(), "yes") || equalIgnoringCase(value.string(), "true")) {
-            // FIXME: Not dynamic, since we add this but don't remove it, but it may be OK for now
-            // that this rarely-used attribute won't work properly if you remove it.
-            addCSSLength(CSSPropertyWidth, "0");
-            addCSSLength(CSSPropertyHeight, "0");
-        } else
-            removeCSSProperties(CSSPropertyWidth, CSSPropertyHeight);
     } else
         HTMLPlugInImageElement::parseAttribute(attr);
 }
@@ -164,7 +174,7 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
 
     SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
     // FIXME: beforeLoad could have detached the renderer!  Just like in the <object> case above.
-    loader->requestObject(this, m_url, getAttribute(nameAttr), m_serviceType, paramNames, paramValues);
+    loader->requestObject(this, m_url, getNameAttribute(), m_serviceType, paramNames, paramValues);
 }
 
 bool HTMLEmbedElement::rendererIsNeeded(const NodeRenderingContext& context)

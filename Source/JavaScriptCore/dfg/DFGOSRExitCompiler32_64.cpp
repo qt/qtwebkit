@@ -36,15 +36,15 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
 {
     // 1) Pro-forma stuff.
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "OSR exit for Node @%d (", (int)exit.m_nodeIndex);
+    dataLog("OSR exit for Node @%d (", (int)exit.m_nodeIndex);
     for (CodeOrigin codeOrigin = exit.m_codeOrigin; ; codeOrigin = codeOrigin.inlineCallFrame->caller) {
-        fprintf(stderr, "bc#%u", codeOrigin.bytecodeIndex);
+        dataLog("bc#%u", codeOrigin.bytecodeIndex);
         if (!codeOrigin.inlineCallFrame)
             break;
-        fprintf(stderr, " -> %p ", codeOrigin.inlineCallFrame->executable.get());
+        dataLog(" -> %p ", codeOrigin.inlineCallFrame->executable.get());
     }
-    fprintf(stderr, ") at JIT offset 0x%x  ", m_jit.debugOffset());
-    exit.dump(stderr);
+    dataLog(") at JIT offset 0x%x  ", m_jit.debugOffset());
+    exit.dump(WTF::dataFile());
 #endif
 #if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
     SpeculationFailureDebugInfo* debugInfo = new SpeculationFailureDebugInfo;
@@ -83,6 +83,8 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
     // 3) Refine some value profile, if appropriate.
     
     if (!!exit.m_jsValueSource && !!exit.m_valueProfile) {
+        EncodedJSValue* bucket = exit.m_valueProfile.getSpecFailBucket(0);
+        
         if (exit.m_jsValueSource.isAddress()) {
             // Save a register so we can use it.
             GPRReg scratch = GPRInfo::regT0;
@@ -91,16 +93,16 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
             EncodedJSValue* scratchBuffer = static_cast<EncodedJSValue*>(m_jit.globalData()->scratchBufferForSize(sizeof(uint32_t)));
             m_jit.store32(scratch, scratchBuffer);
             m_jit.load32(exit.m_jsValueSource.asAddress(OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)), scratch);
-            m_jit.store32(scratch, &bitwise_cast<EncodedValueDescriptor*>(exit.m_valueProfile->specFailBucket(0))->asBits.tag);
+            m_jit.store32(scratch, &bitwise_cast<EncodedValueDescriptor*>(bucket)->asBits.tag);
             m_jit.load32(exit.m_jsValueSource.asAddress(OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)), scratch);
-            m_jit.store32(scratch, &bitwise_cast<EncodedValueDescriptor*>(exit.m_valueProfile->specFailBucket(0))->asBits.payload);
+            m_jit.store32(scratch, &bitwise_cast<EncodedValueDescriptor*>(bucket)->asBits.payload);
             m_jit.load32(scratchBuffer, scratch);
         } else if (exit.m_jsValueSource.hasKnownTag()) {
-            m_jit.store32(AssemblyHelpers::Imm32(exit.m_jsValueSource.tag()), &bitwise_cast<EncodedValueDescriptor*>(exit.m_valueProfile->specFailBucket(0))->asBits.tag);
-            m_jit.store32(exit.m_jsValueSource.payloadGPR(), &bitwise_cast<EncodedValueDescriptor*>(exit.m_valueProfile->specFailBucket(0))->asBits.payload);
+            m_jit.store32(AssemblyHelpers::Imm32(exit.m_jsValueSource.tag()), &bitwise_cast<EncodedValueDescriptor*>(bucket)->asBits.tag);
+            m_jit.store32(exit.m_jsValueSource.payloadGPR(), &bitwise_cast<EncodedValueDescriptor*>(bucket)->asBits.payload);
         } else {
-            m_jit.store32(exit.m_jsValueSource.tagGPR(), &bitwise_cast<EncodedValueDescriptor*>(exit.m_valueProfile->specFailBucket(0))->asBits.tag);
-            m_jit.store32(exit.m_jsValueSource.payloadGPR(), &bitwise_cast<EncodedValueDescriptor*>(exit.m_valueProfile->specFailBucket(0))->asBits.payload);
+            m_jit.store32(exit.m_jsValueSource.tagGPR(), &bitwise_cast<EncodedValueDescriptor*>(bucket)->asBits.tag);
+            m_jit.store32(exit.m_jsValueSource.payloadGPR(), &bitwise_cast<EncodedValueDescriptor*>(bucket)->asBits.payload);
         }
     }
     
@@ -653,7 +655,7 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
     m_jit.jump(GPRInfo::regT2);
 
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "   -> %p\n", jumpTarget);
+    dataLog("   -> %p\n", jumpTarget);
 #endif
 }
 

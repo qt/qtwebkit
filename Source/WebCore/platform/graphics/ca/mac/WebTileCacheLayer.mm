@@ -28,6 +28,7 @@
 
 #import "IntRect.h"
 #import "TileCache.h"
+#import <wtf/MainThread.h>
 
 using namespace WebCore;
 
@@ -43,6 +44,18 @@ using namespace WebCore;
     _tileCache = TileCache::create(self, IntSize(512, 512));
 
     return self;
+}
+
+- (void)dealloc
+{
+    if (!isMainThread()) {
+        TileCache* tileCache = _tileCache.leakPtr();
+        dispatch_async(dispatch_get_main_queue(), ^{
+            delete tileCache;
+        });
+    }
+
+    [super dealloc];
 }
 
 - (void)setBounds:(CGRect)bounds
@@ -70,6 +83,20 @@ using namespace WebCore;
 - (BOOL)acceleratesDrawing
 {
     return _tileCache->acceleratesDrawing();
+}
+
+- (void)setContentsScale:(CGFloat)contentsScale
+{
+#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+    CGFloat oldContentsScale = [self contentsScale];
+
+    [super setContentsScale:contentsScale];
+
+    if (contentsScale != oldContentsScale)
+        _tileCache->setContentsScale(contentsScale);
+#else
+    UNUSED_PARAM(contentsScale);
+#endif
 }
 
 - (CALayer *)tileContainerLayer

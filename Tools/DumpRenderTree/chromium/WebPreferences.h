@@ -82,6 +82,7 @@ struct WebPreferences {
     WebKit::WebString defaultTextEncodingName;
     bool developerExtrasEnabled;
     bool experimentalWebGLEnabled;
+    bool experimentalCSSRegionsEnabled;
     bool javaEnabled;
     bool javaScriptCanAccessClipboard;
     bool javaScriptCanOpenWindowsAutomatically;
@@ -110,6 +111,7 @@ struct WebPreferences {
     bool acceleratedPaintingEnabled;
     bool hixie76WebSocketProtocolEnabled;
     bool perTilePaintingEnabled;
+    bool mockScrollbarsEnabled;
 
     WebPreferences() { reset(); }
     void reset();

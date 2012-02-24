@@ -466,7 +466,8 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             || rareInheritedData->textEmphasisCustomMark != other->rareInheritedData->textEmphasisCustomMark
             || rareInheritedData->m_lineBoxContain != other->rareInheritedData->m_lineBoxContain
             || rareInheritedData->m_lineGrid != other->rareInheritedData->m_lineGrid
-            || rareInheritedData->m_lineGridSnap != other->rareInheritedData->m_lineGridSnap)
+            || rareInheritedData->m_lineSnap != other->rareInheritedData->m_lineSnap
+            || rareInheritedData->m_lineAlign != other->rareInheritedData->m_lineAlign)
             return StyleDifferenceLayout;
 
         if (!rareInheritedData->shadowDataEquivalent(*other->rareInheritedData.get()))
@@ -886,7 +887,7 @@ static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radi
 
 RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
-    RoundedRect roundedRect(borderRect);
+    RoundedRect roundedRect(pixelSnappedIntRect(borderRect));
     if (hasBorderRadius()) {
         RoundedRect::Radii radii = calcRadiiFor(surround->border, borderRect.size());
         radii.scale(calcConstraintScaleFor(borderRect, radii));
@@ -915,7 +916,7 @@ RoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect,
                borderRect.width() - leftWidth - rightWidth, 
                borderRect.height() - topWidth - bottomWidth);
 
-    RoundedRect roundedRect(innerRect);
+    RoundedRect roundedRect(pixelSnappedIntRect(innerRect));
 
     if (hasBorderRadius()) {
         RoundedRect::Radii radii = getRoundedBorderFor(borderRect).radii();

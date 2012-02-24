@@ -29,6 +29,7 @@
 #if ENABLE(THREADED_SCROLLING)
 
 #include "Region.h"
+#include <wtf/Functional.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
@@ -52,18 +53,37 @@ public:
     static PassRefPtr<ScrollingTree> create(ScrollingCoordinator*);
     ~ScrollingTree();
 
+    enum EventResult {
+        DidNotHandleEvent,
+        DidHandleEvent,
+        SendToMainThread
+    };
+
     // Can be called from any thread. Will try to handle the wheel event on the scrolling thread.
     // Returns true if the wheel event can be handled on the scrolling thread and false if the
     // event must be sent again to the WebCore event handler.
-    bool tryToHandleWheelEvent(const PlatformWheelEvent&);
+    EventResult tryToHandleWheelEvent(const PlatformWheelEvent&);
+
+    // Can be called from any thread. Will update the back forward state of the page, used for rubber-banding.
+    void updateBackForwardState(bool canGoBack, bool canGoForward);
 
     // Must be called from the scrolling thread. Handles the wheel event.
     void handleWheelEvent(const PlatformWheelEvent&);
 
+    void setMainFrameScrollPosition(const IntPoint&);
+
     void invalidate();
     void commitNewTreeState(PassOwnPtr<ScrollingTreeState>);
 
+    void setMainFramePinState(bool pinnedToTheLeft, bool pinnedToTheRight);
+
     void updateMainFrameScrollPosition(const IntPoint& scrollPosition);
+    void updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint& scrollPosition);
+
+    bool canGoBack();
+    bool canGoForward();
+
+    bool willWheelEventStartSwipeGesture(const PlatformWheelEvent&);
 
 private:
     explicit ScrollingTree(ScrollingCoordinator*);
@@ -75,6 +95,12 @@ private:
     Region m_nonFastScrollableRegion;
     IntPoint m_mainFrameScrollPosition;
     bool m_hasWheelEventHandlers;
+
+    Mutex m_swipeStateMutex;
+    bool m_canGoBack;
+    bool m_canGoForward;
+    bool m_mainFramePinnedToTheLeft;
+    bool m_mainFramePinnedToTheRight;
 };
 
 } // namespace WebCore

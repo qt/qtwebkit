@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2011, 2012 Apple Inc. All rights reserved.
  *           (C) 2006 Graham Dennis (graham.dennis@gmail.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -369,6 +369,7 @@ static WebCacheModel cacheModelForMainBundle(void)
         [NSNumber numberWithBool:YES],  WebKitAcceleratedCompositingEnabledPreferenceKey,
         // CSS Shaders also need WebGL enabled (which is disabled by default), so we can keep it enabled for now.
         [NSNumber numberWithBool:YES], WebKitCSSCustomFilterEnabledPreferenceKey,
+        [NSNumber numberWithBool:YES], WebKitCSSRegionsEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitAcceleratedDrawingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitCanvasUsesAcceleratedDrawingPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShowDebugBordersPreferenceKey,
@@ -384,15 +385,16 @@ static WebCacheModel cacheModelForMainBundle(void)
         [NSNumber numberWithBool:YES],  WebKitHyperlinkAuditingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitUsePreHTML5ParserQuirksKey,
         [NSNumber numberWithBool:YES],  WebKitAVFoundationEnabledKey,
-        [NSNumber numberWithBool:YES],  WebKitHixie76WebSocketProtocolEnabledKey,
+        [NSNumber numberWithBool:NO],  WebKitHixie76WebSocketProtocolEnabledKey,
         [NSNumber numberWithBool:NO],   WebKitMediaPlaybackRequiresUserGesturePreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitMediaPlaybackAllowsInlinePreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitWebAudioEnabledPreferenceKey,
-        [NSNumber numberWithBool:NO],   WebKitSuppressIncrementalRenderingKey,
+        [NSNumber numberWithBool:NO],   WebKitSuppressesIncrementalRenderingKey,
         [NSNumber numberWithBool:YES],  WebKitBackspaceKeyNavigationEnabledKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplaySubtitlesPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplayCaptionsPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitShouldDisplayTextDescriptionsPreferenceKey,
+        [NSNumber numberWithBool:YES],  WebKitNotificationsEnabledKey,
 
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheTotalQuota,
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheDefaultOriginQuota,
@@ -804,6 +806,17 @@ static WebCacheModel cacheModelForMainBundle(void)
 - (WebCacheModel)cacheModel
 {
     return [self _integerValueForKey:WebKitCacheModelPreferenceKey];
+}
+
+
+- (void)setSuppressesIncrementalRendering:(BOOL)suppressesIncrementalRendering
+{
+    [self _setBoolValue:suppressesIncrementalRendering forKey:WebKitSuppressesIncrementalRenderingKey];
+}
+
+- (BOOL)suppressesIncrementalRendering
+{
+    return [self _boolValueForKey:WebKitSuppressesIncrementalRenderingKey];
 }
 
 @end
@@ -1335,6 +1348,16 @@ static NSString *classIBCreatorID = nil;
     [self _setBoolValue:enabled forKey:WebKitCSSCustomFilterEnabledPreferenceKey];
 }
 
+- (BOOL)cssRegionsEnabled
+{
+    return [self _boolValueForKey:WebKitCSSRegionsEnabledPreferenceKey];
+}
+
+- (void)setCSSRegionsEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitCSSRegionsEnabledPreferenceKey];
+}
+
 - (BOOL)showDebugBorders
 {
     return [self _boolValueForKey:WebKitShowDebugBordersPreferenceKey];
@@ -1583,12 +1606,12 @@ static NSString *classIBCreatorID = nil;
 
 - (void)setSuppressIncrementalRendering:(BOOL)flag
 {
-    [self _setBoolValue:flag forKey:WebKitSuppressIncrementalRenderingKey];
+    [self _setBoolValue:flag forKey:WebKitSuppressesIncrementalRenderingKey];
 }
 
 - (BOOL)suppressIncrementalRendering
 {
-    return [self _boolValueForKey:WebKitSuppressIncrementalRenderingKey];
+    return [self _boolValueForKey:WebKitSuppressesIncrementalRenderingKey];
 }
 
 - (void)setBackspaceKeyNavigationEnabled:(BOOL)flag
@@ -1629,6 +1652,16 @@ static NSString *classIBCreatorID = nil;
 - (BOOL)shouldDisplayTextDescriptions
 {
     return [self _boolValueForKey:WebKitShouldDisplayTextDescriptionsPreferenceKey];
+}
+
+- (void)setNotificationsEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitNotificationsEnabledKey];
+}
+
+- (BOOL)notificationsEnabled
+{
+    return [self _boolValueForKey:WebKitNotificationsEnabledKey];
 }
 
 @end

@@ -55,21 +55,15 @@ public:
 
     static gboolean enumeratePrintersFunction(GtkPrinter* printer, WebPrintOperationGtkUnix* printOperation)
     {
-        GtkPrinter* selectedPrinter = 0;
         const char* printerName = gtk_print_settings_get_printer(printOperation->printSettings());
-        if (printerName) {
-            if (!strcmp(printerName, gtk_printer_get_name(printer)))
-                selectedPrinter = printer;
-        } else if (gtk_printer_is_default(printer))
-            selectedPrinter = printer;
-
-        if (!selectedPrinter)
+        if ((printerName && strcmp(printerName, gtk_printer_get_name(printer)))
+            || (!printerName && !gtk_printer_is_default(printer)))
             return FALSE;
 
         static int jobNumber = 0;
         const char* applicationName = g_get_application_name();
         GOwnPtr<char>jobName(g_strdup_printf("%s job #%d", applicationName ? applicationName : "WebKit", ++jobNumber));
-        printOperation->m_printJob = adoptGRef(gtk_print_job_new(jobName.get(), selectedPrinter,
+        printOperation->m_printJob = adoptGRef(gtk_print_job_new(jobName.get(), printer,
                                                                  printOperation->printSettings(),
                                                                  printOperation->pageSetup()));
         return TRUE;
@@ -94,6 +88,15 @@ public:
         printOperation->m_pagesToPrint = gtk_print_job_get_pages(printOperation->m_printJob.get());
         printOperation->m_needsRotation = gtk_print_job_get_rotate(printOperation->m_printJob.get());
 
+        // Manual capabilities.
+        printOperation->m_numberUp = gtk_print_job_get_n_up(printOperation->m_printJob.get());
+        printOperation->m_numberUpLayout = gtk_print_job_get_n_up_layout(printOperation->m_printJob.get());
+        printOperation->m_pageSet = gtk_print_job_get_page_set(printOperation->m_printJob.get());
+        printOperation->m_reverse = gtk_print_job_get_reverse(printOperation->m_printJob.get());
+        printOperation->m_copies = gtk_print_job_get_num_copies(printOperation->m_printJob.get());
+        printOperation->m_collateCopies = gtk_print_job_get_collate(printOperation->m_printJob.get());
+        printOperation->m_scale = gtk_print_job_get_scale(printOperation->m_printJob.get());
+
         printOperation->print(surface, 72, 72);
     }
 
@@ -107,6 +110,9 @@ public:
 
     void startPage(cairo_t* cr)
     {
+        if (!currentPageIsFirstPageOfSheet())
+          return;
+
         GtkPaperSize* paperSize = gtk_page_setup_get_paper_size(m_pageSetup.get());
         double width = gtk_paper_size_get_width(paperSize, GTK_UNIT_POINTS);
         double height = gtk_paper_size_get_height(paperSize, GTK_UNIT_POINTS);
@@ -133,7 +139,8 @@ public:
 
     void endPage(cairo_t* cr)
     {
-        cairo_show_page(cr);
+        if (currentPageIsLastPageOfSheet())
+            cairo_show_page(cr);
     }
 
     static void printJobComplete(GtkPrintJob* printJob, WebPrintOperationGtkUnix* printOperation, const GError*)
@@ -196,9 +203,22 @@ struct PrintPagesData {
         : printOperation(printOperation)
         , totalPrinted(-1)
         , pageNumber(0)
-        , pagePosition(0)
+        , sheetNumber(0)
+        , firstSheetNumber(0)
+        , numberOfSheets(0)
+        , firstPagePosition(0)
+        , collated(0)
+        , uncollated(0)
         , isDone(false)
     {
+        if (printOperation->collateCopies()) {
+            collatedCopies = printOperation->copies();
+            uncollatedCopies = 1;
+        } else {
+            collatedCopies = 1;
+            uncollatedCopies = printOperation->copies();
+        }
+
         if (printOperation->pagesToPrint() == GTK_PRINT_PAGES_RANGES) {
             Vector<GtkPageRange> pageRanges;
             GtkPageRange* ranges = printOperation->pageRanges();
@@ -227,8 +247,63 @@ struct PrintPagesData {
             for (int i = 0; i < printOperation->pageCount(); ++i)
                 pages.append(i);
         }
+        printOperation->setNumberOfPagesToPrint(pages.size());
 
-        pageNumber = pages[pagePosition];
+        size_t numberUp = printOperation->numberUp();
+        if (numberUp > 1)
+            numberOfSheets = (pages.size() % numberUp) ? pages.size() / numberUp + 1 : pages.size() / numberUp;
+        else
+            numberOfSheets = pages.size();
+
+        bool reverse = printOperation->reverse();
+        switch (printOperation->pageSet()) {
+        case GTK_PAGE_SET_ODD:
+            if (reverse) {
+                lastPagePosition = std::min(numberUp - 1, pages.size() - 1);
+                sheetNumber = (numberOfSheets - 1) - (numberOfSheets - 1) % 2;
+            } else
+                lastPagePosition = std::min(((numberOfSheets - 1) - ((numberOfSheets - 1) % 2)) * numberUp - 1, pages.size() - 1);
+            break;
+        case GTK_PAGE_SET_EVEN:
+            if (reverse) {
+                lastPagePosition = std::min(2 * numberUp - 1, pages.size() - 1);
+                sheetNumber = (numberOfSheets - 1) - (1 - (numberOfSheets - 1) % 2);
+            } else {
+                lastPagePosition = std::min(((numberOfSheets - 1) - (1 - (numberOfSheets - 1) % 2)) * numberUp - 1, pages.size() - 1);
+                sheetNumber = numberOfSheets > 1 ? 1 : -1;
+            }
+            break;
+        case GTK_PAGE_SET_ALL:
+            if (reverse) {
+                lastPagePosition = std::min(numberUp - 1, pages.size() - 1);
+                sheetNumber = pages.size() - 1;
+            } else
+                lastPagePosition = pages.size() - 1;
+            break;
+        }
+
+        // FIXME: check pagePostion is between [0..pages.size() - 1]
+        // and cancel the operation otherwise when error reporting
+        // is implemented.
+        printOperation->setPagePosition(sheetNumber * numberUp);
+        pageNumber = pages[printOperation->pagePosition()];
+        firstPagePosition = printOperation->pagePosition();
+        firstSheetNumber = sheetNumber;
+    }
+
+    size_t collatedCopiesLeft()
+    {
+        return collatedCopies > 1 ? collatedCopies - collated - 1 : 0;
+    }
+
+    size_t uncollatedCopiesLeft()
+    {
+        return uncollatedCopies > 1 ? uncollatedCopies - uncollated - 1 : 0;
+    }
+
+    size_t copiesLeft()
+    {
+        return collatedCopiesLeft() + uncollatedCopiesLeft();
     }
 
     void incrementPageSequence()
@@ -238,8 +313,30 @@ struct PrintPagesData {
             return;
         }
 
-        pagePosition++;
-        if (pagePosition >= pages.size()) {
+        size_t pagePosition = printOperation->pagePosition();
+        if (pagePosition == lastPagePosition && !copiesLeft()) {
+            isDone = true;
+            return;
+        }
+
+        if (pagePosition == lastPagePosition && uncollatedCopiesLeft()) {
+            pagePosition = firstPagePosition;
+            sheetNumber = firstSheetNumber;
+            uncollated++;
+        } else if (printOperation->currentPageIsLastPageOfSheet()) {
+            if (!collatedCopiesLeft()) {
+                int step = printOperation->pageSet() == GTK_PAGE_SET_ALL ? 1 : 2;
+                step *= printOperation->reverse() ? -1 : 1;
+                sheetNumber += step;
+                collated = 0;
+            } else
+                collated++;
+            pagePosition = sheetNumber * printOperation->numberUp();
+        } else
+            pagePosition++;
+        printOperation->setPagePosition(pagePosition);
+
+        if (pagePosition >= pages.size() || sheetNumber >= numberOfSheets) {
             isDone = true;
             return;
         }
@@ -252,8 +349,16 @@ struct PrintPagesData {
     int totalPrinted;
     size_t totalToPrint;
     int pageNumber;
-    size_t pagePosition;
     Vector<size_t> pages;
+    size_t sheetNumber;
+    size_t firstSheetNumber;
+    size_t numberOfSheets;
+    size_t firstPagePosition;
+    size_t lastPagePosition;
+    size_t collated;
+    size_t uncollated;
+    size_t collatedCopies;
+    size_t uncollatedCopies;
 
     bool isDone : 1;
 };
@@ -262,9 +367,10 @@ PassRefPtr<WebPrintOperationGtk> WebPrintOperationGtk::create(WebPage* page, con
 {
 #ifdef HAVE_GTK_UNIX_PRINTING
     return adoptRef(new WebPrintOperationGtkUnix(page, printInfo));
-#endif
-#ifdef G_OS_WIN32
+#elif defined(G_OS_WIN32)
     return adoptRef(new WebPrintOperationGtkWin32(page, printInfo));
+#else
+    return 0;
 #endif
 }
 
@@ -277,10 +383,19 @@ WebPrintOperationGtk::WebPrintOperationGtk(WebPage* page, const PrintInfo& print
     , m_xDPI(1)
     , m_yDPI(1)
     , m_printPagesIdleId(0)
+    , m_numberOfPagesToPrint(0)
     , m_pagesToPrint(GTK_PRINT_PAGES_ALL)
+    , m_pagePosition(0)
     , m_pageRanges(0)
     , m_pageRangesCount(0)
     , m_needsRotation(false)
+    , m_numberUp(1)
+    , m_numberUpLayout(0)
+    , m_pageSet(GTK_PAGE_SET_ALL)
+    , m_reverse(false)
+    , m_copies(1)
+    , m_collateCopies(false)
+    , m_scale(1)
 {
 }
 
@@ -295,8 +410,21 @@ int WebPrintOperationGtk::pageCount() const
     return m_printContext ? m_printContext->pageCount() : 0;
 }
 
-void WebPrintOperationGtk::rotatePage()
+bool WebPrintOperationGtk::currentPageIsFirstPageOfSheet() const
 {
+    return (m_numberUp < 2 || !((m_pagePosition) % m_numberUp));
+}
+
+bool WebPrintOperationGtk::currentPageIsLastPageOfSheet() const
+{
+    return (m_numberUp < 2 || !((m_pagePosition + 1) % m_numberUp) || m_pagePosition == m_numberOfPagesToPrint - 1);
+}
+
+void WebPrintOperationGtk::rotatePageIfNeeded()
+{
+    if (!m_needsRotation)
+        return;
+
     GtkPaperSize* paperSize = gtk_page_setup_get_paper_size(m_pageSetup.get());
     double width = gtk_paper_size_get_width(paperSize, GTK_UNIT_INCH) * m_xDPI;
     double height = gtk_paper_size_get_height(paperSize, GTK_UNIT_INCH) * m_yDPI;
@@ -324,22 +452,191 @@ void WebPrintOperationGtk::rotatePage()
     }
 }
 
+void WebPrintOperationGtk::getRowsAndColumnsOfPagesPerSheet(size_t& rows, size_t& columns)
+{
+    switch (m_numberUp) {
+    default:
+        columns = 1;
+        rows = 1;
+        break;
+    case 2:
+        columns = 2;
+        rows = 1;
+        break;
+    case 4:
+        columns = 2;
+        rows = 2;
+        break;
+    case 6:
+        columns = 3;
+        rows = 2;
+        break;
+    case 9:
+        columns = 3;
+        rows = 3;
+        break;
+    case 16:
+        columns = 4;
+        rows = 4;
+        break;
+    }
+}
+
+void WebPrintOperationGtk::getPositionOfPageInSheet(size_t rows, size_t columns, int& x, int&y)
+{
+    switch (m_numberUpLayout) {
+    case GTK_NUMBER_UP_LAYOUT_LEFT_TO_RIGHT_TOP_TO_BOTTOM:
+        x = m_pagePosition % columns;
+        y = (m_pagePosition / columns) % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_LEFT_TO_RIGHT_BOTTOM_TO_TOP:
+        x = m_pagePosition % columns;
+        y = rows - 1 - (m_pagePosition / columns) % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_RIGHT_TO_LEFT_TOP_TO_BOTTOM:
+        x = columns - 1 - m_pagePosition % columns;
+        y = (m_pagePosition / columns) % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_RIGHT_TO_LEFT_BOTTOM_TO_TOP:
+        x = columns - 1 - m_pagePosition % columns;
+        y = rows - 1 - (m_pagePosition / columns) % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_TOP_TO_BOTTOM_LEFT_TO_RIGHT:
+        x = (m_pagePosition / rows) % columns;
+        y = m_pagePosition % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_TOP_TO_BOTTOM_RIGHT_TO_LEFT:
+        x = columns - 1 - (m_pagePosition / rows) % columns;
+        y = m_pagePosition % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_BOTTOM_TO_TOP_LEFT_TO_RIGHT:
+        x = (m_pagePosition / rows) % columns;
+        y = rows - 1 - m_pagePosition % rows;
+        break;
+    case GTK_NUMBER_UP_LAYOUT_BOTTOM_TO_TOP_RIGHT_TO_LEFT:
+        x = columns - 1 - (m_pagePosition / rows) % columns;
+        y = rows - 1 - m_pagePosition % rows;
+        break;
+    }
+}
+
+void WebPrintOperationGtk::prepareContextToDraw()
+{
+    if (m_numberUp < 2) {
+        double left = gtk_page_setup_get_left_margin(m_pageSetup.get(), GTK_UNIT_INCH);
+        double top = gtk_page_setup_get_top_margin(m_pageSetup.get(), GTK_UNIT_INCH);
+        if (m_scale != 1.0)
+            cairo_scale(m_cairoContext.get(), m_scale, m_scale);
+        rotatePageIfNeeded();
+        cairo_translate(m_cairoContext.get(), left * m_xDPI, top * m_yDPI);
+
+        return;
+    }
+
+    rotatePageIfNeeded();
+
+    // Multiple pages per sheet.
+    double marginLeft = gtk_page_setup_get_left_margin(m_pageSetup.get(), GTK_UNIT_POINTS);
+    double marginRight = gtk_page_setup_get_right_margin(m_pageSetup.get(), GTK_UNIT_POINTS);
+    double marginTop = gtk_page_setup_get_top_margin(m_pageSetup.get(), GTK_UNIT_POINTS);
+    double marginBottom = gtk_page_setup_get_bottom_margin(m_pageSetup.get(), GTK_UNIT_POINTS);
+
+    double paperWidth = gtk_page_setup_get_paper_width(m_pageSetup.get(), GTK_UNIT_POINTS);
+    double paperHeight = gtk_page_setup_get_paper_height(m_pageSetup.get(), GTK_UNIT_POINTS);
+
+    size_t rows, columns;
+    getRowsAndColumnsOfPagesPerSheet(rows, columns);
+
+    GtkPageOrientation orientation = gtk_page_setup_get_orientation(m_pageSetup.get());
+    double pageWidth = 0, pageHeight = 0;
+    switch (orientation) {
+    case GTK_PAGE_ORIENTATION_PORTRAIT:
+    case GTK_PAGE_ORIENTATION_REVERSE_PORTRAIT:
+        pageWidth = paperWidth - (marginLeft + marginRight);
+        pageHeight = paperHeight - (marginTop + marginBottom);
+        cairo_translate(m_cairoContext.get(), marginLeft, marginTop);
+        break;
+    case GTK_PAGE_ORIENTATION_LANDSCAPE:
+    case GTK_PAGE_ORIENTATION_REVERSE_LANDSCAPE:
+        pageWidth = paperWidth - (marginTop + marginBottom);
+        pageHeight = paperHeight - (marginLeft + marginRight);
+        cairo_translate(m_cairoContext.get(), marginTop, marginLeft);
+
+        size_t tmp = columns;
+        columns = rows;
+        rows = tmp;
+        break;
+    }
+
+    int x, y;
+    getPositionOfPageInSheet(rows, columns, x, y);
+
+    switch (m_numberUp) {
+    case 4:
+    case 9:
+    case 16: {
+        double scaleX = pageWidth / (columns * paperWidth);
+        double scaleY = pageHeight / (rows * paperHeight);
+        double scale = std::min(scaleX, scaleY);
+
+        double stepX = paperWidth * (scaleX / scale);
+        double stepY = paperHeight * (scaleY / scale);
+
+        double width = gtk_page_setup_get_page_width(m_pageSetup.get(), GTK_UNIT_INCH) * m_xDPI;
+        double height = gtk_page_setup_get_page_height(m_pageSetup.get(), GTK_UNIT_INCH) * m_yDPI;
+
+        double offsetX, offsetY;
+        if (marginLeft + marginRight > 0) {
+            offsetX = marginLeft * (stepX - width) / (marginLeft + marginRight);
+            offsetY = marginTop * (stepY - height) / (marginTop + marginBottom);
+        } else {
+            offsetX = (stepX - width) / 2.0;
+            offsetY = (stepY - height) / 2.0;
+        }
+
+        cairo_scale(m_cairoContext.get(), scale, scale);
+        cairo_translate(m_cairoContext.get(), x * stepX + offsetX, y * stepY + offsetY);
+        if (m_scale != 1.0)
+            cairo_scale(m_cairoContext.get(), m_scale, m_scale);
+        break;
+    }
+    case 2:
+    case 6: {
+        double scaleX = pageHeight / (columns * paperWidth);
+        double scaleY = pageWidth / (rows * paperHeight);
+        double scale = std::min(scaleX, scaleY);
+
+        double stepX = paperWidth * (scaleX / scale);
+        double stepY = paperHeight * (scaleY / scale);
+
+        double offsetX = ((stepX - paperWidth) / 2.0 * columns) - marginRight;
+        double offsetY = ((stepY - paperHeight) / 2.0 * rows) + marginTop;
+
+        cairo_scale(m_cairoContext.get(), scale, scale);
+        cairo_translate(m_cairoContext.get(), y * paperHeight + offsetY, (columns - x) * paperWidth + offsetX);
+        if (m_scale != 1.0)
+            cairo_scale(m_cairoContext.get(), m_scale, m_scale);
+        cairo_rotate(m_cairoContext.get(), -G_PI / 2);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 void WebPrintOperationGtk::renderPage(int pageNumber)
 {
     startPage(m_cairoContext.get());
+    cairo_save(m_cairoContext.get());
 
-    if (m_needsRotation)
-        rotatePage();
-
-    double left = gtk_page_setup_get_left_margin(m_pageSetup.get(), GTK_UNIT_INCH);
-    double top = gtk_page_setup_get_top_margin(m_pageSetup.get(), GTK_UNIT_INCH);
-    cairo_translate(m_cairoContext.get(), left * m_xDPI, top * m_yDPI);
+    prepareContextToDraw();
 
     double pageWidth = gtk_page_setup_get_page_width(m_pageSetup.get(), GTK_UNIT_INCH) * m_xDPI;
     WebCore::PlatformContextCairo platformContext(m_cairoContext.get());
     WebCore::GraphicsContext graphicsContext(&platformContext);
-    m_printContext->spoolPage(graphicsContext, pageNumber, pageWidth);
+    m_printContext->spoolPage(graphicsContext, pageNumber, pageWidth / m_scale);
 
+    cairo_restore(m_cairoContext.get());
     endPage(m_cairoContext.get());
 }
 

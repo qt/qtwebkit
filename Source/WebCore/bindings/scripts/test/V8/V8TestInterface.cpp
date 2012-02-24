@@ -31,6 +31,7 @@
 #include "V8BindingState.h"
 #include "V8DOMWrapper.h"
 #include "V8IsolatedContext.h"
+#include "V8Node.h"
 #include "V8Proxy.h"
 #include "V8TestObj.h"
 #include <wtf/GetPtr.h>
@@ -83,6 +84,30 @@ static void supplementalStr2AttrSetter(v8::Local<v8::String> name, v8::Local<v8:
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
 
+static v8::Handle<v8::Value> supplementalNodeAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestInterface.supplementalNode._get");
+    TestInterface* imp = V8TestInterface::toNative(info.Holder());
+    return toV8(TestSupplemental::supplementalNode(imp));
+}
+
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+
+static void supplementalNodeAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    INC_STATS("DOM.TestInterface.supplementalNode._set");
+    TestInterface* imp = V8TestInterface::toNative(info.Holder());
+    Node* v = V8Node::HasInstance(value) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(value)) : 0;
+    TestSupplemental::setSupplementalNode(imp, WTF::getPtr(v));
+    return;
+}
+
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+
 static v8::Handle<v8::Value> supplementalMethod1Callback(const v8::Arguments& args)
 {
     INC_STATS("DOM.TestInterface.supplementalMethod1");
@@ -103,8 +128,8 @@ static v8::Handle<v8::Value> supplementalMethod2Callback(const v8::Arguments& ar
     TestInterface* imp = V8TestInterface::toNative(args.Holder());
     ExceptionCode ec = 0;
     {
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, strArg, MAYBE_MISSING_PARAMETER(args, 0, MissingIsUndefined));
-    EXCEPTION_BLOCK(TestObj*, objArg, V8TestObj::HasInstance(MAYBE_MISSING_PARAMETER(args, 1, MissingIsUndefined)) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(MAYBE_MISSING_PARAMETER(args, 1, MissingIsUndefined))) : 0);
+    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, strArg, MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined));
+    EXCEPTION_BLOCK(TestObj*, objArg, V8TestObj::HasInstance(MAYBE_MISSING_PARAMETER(args, 1, DefaultIsUndefined)) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(MAYBE_MISSING_PARAMETER(args, 1, DefaultIsUndefined))) : 0);
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
     if (!scriptContext)
         return v8::Undefined();
@@ -115,6 +140,17 @@ static v8::Handle<v8::Value> supplementalMethod2Callback(const v8::Arguments& ar
     }
     fail:
     V8Proxy::setDOMException(ec);
+    return v8::Handle<v8::Value>();
+}
+
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+
+#if ENABLE(Condition11) || ENABLE(Condition12)
+
+static v8::Handle<v8::Value> supplementalMethod4Callback(const v8::Arguments& args)
+{
+    INC_STATS("DOM.TestInterface.supplementalMethod4");
+    TestSupplemental::supplementalMethod4();
     return v8::Handle<v8::Value>();
 }
 
@@ -134,6 +170,10 @@ static const BatchedAttribute TestInterfaceAttrs[] = {
 #if ENABLE(Condition11) || ENABLE(Condition12)
     // Attribute 'supplementalStr3' (Type: 'attribute' ExtAttr: 'CustomSetter CustomGetter Conditional ImplementedBy')
     {"supplementalStr3", V8TestInterface::supplementalStr3AccessorGetter, V8TestInterface::supplementalStr3AccessorSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    // Attribute 'supplementalNode' (Type: 'attribute' ExtAttr: 'Conditional ImplementedBy')
+    {"supplementalNode", TestInterfaceInternal::supplementalNodeAttrGetter, TestInterfaceInternal::supplementalNodeAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 };
 
@@ -157,10 +197,10 @@ static const BatchedConstant TestInterfaceConsts[] = {
 
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
-COMPILE_ASSERT(1 == TestInterface::SUPPLEMENTALCONSTANT1, TestInterfaceEnumSUPPLEMENTALCONSTANT1IsWrongUseDoNotCheckConstants);
+COMPILE_ASSERT(1 == TestSupplemental::SUPPLEMENTALCONSTANT1, TestInterfaceEnumSUPPLEMENTALCONSTANT1IsWrongUseDoNotCheckConstants);
 #endif
 #if ENABLE(Condition11) || ENABLE(Condition12)
-COMPILE_ASSERT(2 == TestInterface::CONST_IMPL, TestInterfaceEnumCONST_IMPLIsWrongUseDoNotCheckConstants);
+COMPILE_ASSERT(2 == TestSupplemental::CONST_IMPL, TestInterfaceEnumCONST_IMPLIsWrongUseDoNotCheckConstants);
 #endif
 
 v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& args)
@@ -176,8 +216,8 @@ v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& 
         return throwError("Not enough arguments", V8Proxy::TypeError);
 
     ExceptionCode ec = 0;
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, str1, MAYBE_MISSING_PARAMETER(args, 0, MissingIsUndefined));
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, str2, MAYBE_MISSING_PARAMETER(args, 1, MissingIsUndefined));
+    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, str1, MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined));
+    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, str2, MAYBE_MISSING_PARAMETER(args, 1, DefaultIsUndefined));
 
     ScriptExecutionContext* context = getScriptExecutionContext();
     if (!context)
@@ -218,6 +258,9 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceTemplate(v8:
     v8::Handle<v8::Signature> supplementalMethod2Signature = v8::Signature::New(desc, supplementalMethod2Argc, supplementalMethod2Argv);
 #if ENABLE(Condition11) || ENABLE(Condition12)
     proto->Set(v8::String::New("supplementalMethod2"), v8::FunctionTemplate::New(TestInterfaceInternal::supplementalMethod2Callback, v8::Handle<v8::Value>(), supplementalMethod2Signature));
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    desc->Set(v8::String::New("supplementalMethod4"), v8::FunctionTemplate::New(TestInterfaceInternal::supplementalMethod4Callback, v8::Handle<v8::Value>(), v8::Local<v8::Signature>()));
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
     batchConfigureConstants(desc, proto, TestInterfaceConsts, WTF_ARRAY_LENGTH(TestInterfaceConsts));
 

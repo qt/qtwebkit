@@ -46,10 +46,7 @@ namespace WebCore {
     class DatabaseCallback;
     class Document;
     class Element;
-    class EntryCallback;
-    class ErrorCallback;
     class EventListener;
-    class FileSystemCallback;
     class FloatRect;
     class Frame;
     class History;
@@ -91,8 +88,6 @@ namespace WebCore {
         virtual ScriptExecutionContext* scriptExecutionContext() const;
 
         virtual DOMWindow* toDOMWindow();
-
-        virtual void frameDestroyed() OVERRIDE;
 
         void registerProperty(DOMWindowProperty*);
         void unregisterProperty(DOMWindowProperty*);
@@ -231,9 +226,6 @@ namespace WebCore {
         void printErrorMessage(const String&);
         String crossDomainAccessErrorMessage(DOMWindow* activeWindow);
 
-        void pageDestroyed();
-        void resetGeolocation();
-
         void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
         // FIXME: remove this when we update the ObjC bindings (bug #28774).
         void postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
@@ -360,17 +352,6 @@ namespace WebCore {
         Storage* sessionStorage(ExceptionCode&) const;
         Storage* localStorage(ExceptionCode&) const;
 
-#if ENABLE(FILE_SYSTEM)
-        // They are placed here and in all capital letters so they can be checked against the constants in the
-        // IDL at compile time.
-        enum FileSystemType {
-            TEMPORARY,
-            PERSISTENT,
-        };
-        void webkitRequestFileSystem(int type, long long size, PassRefPtr<FileSystemCallback>, PassRefPtr<ErrorCallback>);
-        void webkitResolveLocalFileSystemURL(const String&, PassRefPtr<EntryCallback>, PassRefPtr<ErrorCallback>);
-#endif
-
 #if ENABLE(NOTIFICATIONS)
         NotificationCenter* webkitNotifications() const;
         // Renders webkitNotifications object safely inoperable, disconnects
@@ -418,6 +399,9 @@ namespace WebCore {
 
     private:
         explicit DOMWindow(Frame*);
+
+        virtual void frameDestroyed() OVERRIDE;
+        virtual void willDetachPage() OVERRIDE;
 
         virtual void refEventTarget() { ref(); }
         virtual void derefEventTarget() { deref(); }

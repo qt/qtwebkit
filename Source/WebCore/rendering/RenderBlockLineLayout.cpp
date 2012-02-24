@@ -491,6 +491,9 @@ RootInlineBox* RenderBlock::constructLine(BidiRunList<BidiRun>& bidiRuns, const 
         if (runCount == 2 && !r->m_object->isListMarker())
             isOnlyRun = (!style()->isLeftToRightDirection() ? bidiRuns.lastRun() : bidiRuns.firstRun())->m_object->isListMarker();
 
+        if (lineInfo.isEmpty())
+            continue;
+
         InlineBox* box = createInlineBoxForRenderer(r->m_object, false, isOnlyRun);
         r->m_box = box;
 
@@ -1093,8 +1096,8 @@ public:
     void updateRepaintRangeFromBox(RootInlineBox* box, LayoutUnit paginationDelta = 0)
     {
         m_usesRepaintBounds = true;
-        m_repaintLogicalTop = min(m_repaintLogicalTop, box->logicalTopVisualOverflow() + min(paginationDelta, 0));
-        m_repaintLogicalBottom = max(m_repaintLogicalBottom, box->logicalBottomVisualOverflow() + max(paginationDelta, 0));
+        m_repaintLogicalTop = min(m_repaintLogicalTop, box->logicalTopVisualOverflow() + min(paginationDelta, zeroLayoutUnit));
+        m_repaintLogicalBottom = max(m_repaintLogicalBottom, box->logicalBottomVisualOverflow() + max(paginationDelta, zeroLayoutUnit));
     }
     
     bool endLineMatched() const { return m_endLineMatched; }
@@ -1459,7 +1462,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
     LineLayoutState layoutState(isFullLayout, repaintLogicalTop, repaintLogicalBottom);
 
     if (isFullLayout)
-        lineBoxes()->deleteLineBoxes(renderArena());
+        deleteLineBoxTree();
 
     // Text truncation only kicks in if your overflow isn't visible and your text-overflow-mode isn't
     // clip.
@@ -1831,14 +1834,22 @@ static inline bool shouldCollapseWhiteSpace(const RenderStyle* style, const Line
         || (whitespacePosition == TrailingWhitespace && style->whiteSpace() == PRE_WRAP && (!lineInfo.isEmpty() || !lineInfo.previousLineBrokeCleanly()));
 }
 
-static bool inlineFlowRequiresLineBox(RenderInline* flow, const LineInfo& lineInfo)
+static bool requiresLineBoxForContent(RenderInline* flow, const LineInfo& lineInfo)
+{
+    RenderObject* parent = flow->parent();
+    if (flow->document()->inNoQuirksMode() 
+        && (flow->style(lineInfo.isFirstLine())->lineHeight() != parent->style(lineInfo.isFirstLine())->lineHeight()
+        || flow->style()->verticalAlign() != parent->style()->verticalAlign()
+        || !parent->style()->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(flow->style()->font().fontMetrics())))
+        return true;
+    return false;
+}
+
+static bool alwaysRequiresLineBox(RenderInline* flow)
 {
     // FIXME: Right now, we only allow line boxes for inlines that are truly empty.
     // We need to fix this, though, because at the very least, inlines containing only
     // ignorable whitespace should should also have line boxes.
-    if (!flow->document()->inQuirksMode() && flow->style(lineInfo.isFirstLine())->lineHeight() != flow->parent()->style(lineInfo.isFirstLine())->lineHeight())
-        return true;
-
     return !flow->firstChild() && flow->hasInlineDirectionBordersPaddingOrMargin();
 }
 
@@ -1847,7 +1858,7 @@ static bool requiresLineBox(const InlineIterator& it, const LineInfo& lineInfo =
     if (it.m_obj->isFloatingOrPositioned())
         return false;
 
-    if (it.m_obj->isRenderInline() && !inlineFlowRequiresLineBox(toRenderInline(it.m_obj), lineInfo))
+    if (it.m_obj->isRenderInline() && !alwaysRequiresLineBox(toRenderInline(it.m_obj)) && !requiresLineBoxForContent(toRenderInline(it.m_obj), lineInfo))
         return false;
 
     if (!shouldCollapseWhiteSpace(it.m_obj->style(), lineInfo, whitespacePosition) || it.m_obj->isBR())
@@ -2235,8 +2246,12 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             // to make sure that we stop to include this object and then start ignoring spaces again.
             // If this object is at the start of the line, we need to behave like list markers and
             // start ignoring spaces.
-            if (inlineFlowRequiresLineBox(flowBox, lineInfo)) {
-                lineInfo.setEmpty(false, m_block, &width);
+            bool requiresLineBox = alwaysRequiresLineBox(flowBox);
+            if (requiresLineBox || requiresLineBoxForContent(flowBox, lineInfo)) {
+                // An empty inline that only has line-height, vertical-align or font-metrics will only get a
+                // line box to affect the height of the line if the rest of the line is not empty.
+                if (requiresLineBox)
+                    lineInfo.setEmpty(false, m_block, &width);
                 if (ignoringSpaces) {
                     trailingObjects.clear();
                     addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, 0)); // Stop ignoring spaces.
@@ -2354,7 +2369,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                     midWordBreak = width.committedWidth() + wrapW + charWidth > width.availableWidth();
                 }
 
-                if (lineBreakIteratorInfo.first != t) {
+                if ((lineBreakIteratorInfo.first != t) || (lineBreakIteratorInfo.second.string() != t->characters())) {
                     lineBreakIteratorInfo.first = t;
                     lineBreakIteratorInfo.second.reset(t->characters(), t->textLength(), style->locale());
                 }
@@ -2651,7 +2666,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
 
 void RenderBlock::addOverflowFromInlineChildren()
 {
-    LayoutUnit endPadding = hasOverflowClip() ? paddingEnd() : 0;
+    LayoutUnit endPadding = hasOverflowClip() ? paddingEnd() : zeroLayoutUnit;
     // FIXME: Need to find another way to do this, since scrollbars could show when we don't want them to.
     if (hasOverflowClip() && !endPadding && node() && node()->rendererIsEditable() && node() == node()->rootEditableElement() && style()->isLeftToRightDirection())
         endPadding = 1;

@@ -85,6 +85,8 @@ public:
 
     Length styleOrColLogicalWidth() const;
 
+    LayoutUnit logicalHeightForRowSizing() const;
+
     virtual void computePreferredLogicalWidths();
 
     void updateLogicalWidth(LayoutUnit);
@@ -150,6 +152,8 @@ private:
 
     virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
     virtual void paintMask(PaintInfo&, const LayoutPoint&);
+
+    virtual bool boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance, InlineFlowBox*) const OVERRIDE;
 
     virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&) const;
     virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;

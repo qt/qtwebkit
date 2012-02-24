@@ -35,7 +35,6 @@
 #include "InjectedScriptManager.h"
 #include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
-#include "InspectorHistory.h"
 #include "InspectorValues.h"
 #include "Timer.h"
 
@@ -52,13 +51,14 @@
 namespace WebCore {
 class ContainerNode;
 class CharacterData;
+class DOMEditor;
 class Document;
 class Element;
 class Event;
 class GraphicsContext;
 class InspectorClient;
-class InspectorDOMAgent;
 class InspectorFrontend;
+class InspectorHistory;
 class InspectorPageAgent;
 class IntRect;
 class HitTestResult;
@@ -107,6 +107,8 @@ public:
         return adoptPtr(new InspectorDOMAgent(instrumentingAgents, pageAgent, client, inspectorState, injectedScriptManager));
     }
 
+    static String toErrorString(const ExceptionCode&);
+
     ~InspectorDOMAgent();
 
     virtual void setFrontend(InspectorFrontend*);
@@ -145,6 +147,7 @@ public:
     virtual void moveTo(ErrorString*, int nodeId, int targetNodeId, const int* anchorNodeId, int* newNodeId);
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
     virtual void undo(ErrorString*);
+    virtual void redo(ErrorString*);
     virtual void markUndoableState(ErrorString*);
 
     Node* highlightedNode() const;
@@ -158,6 +161,7 @@ public:
 
     void didInsertDOMNode(Node*);
     void didRemoveDOMNode(Node*);
+    void willModifyDOMAttr(Element*, const AtomicString& oldValue, const AtomicString& newValue);
     void didModifyDOMAttr(Element*, const AtomicString& name, const AtomicString& value);
     void didRemoveDOMAttr(Element*, const AtomicString& name);
     void styleAttributeInvalidated(const Vector<Element*>& elements);
@@ -193,14 +197,6 @@ public:
     Node* assertNode(ErrorString*, int nodeId);
 
 private:
-    class DOMAction;
-    class RemoveChildAction;
-    class InsertBeforeAction;
-    class RemoveAttributeAction;
-    class SetAttributeAction;
-    class SetOuterHTMLAction;
-    class ReplaceWholeTextAction;
-
     InspectorDOMAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*, InspectorState*, InjectedScriptManager*);
 
     void setSearchingForNode(bool enabled, InspectorObject* highlightConfig);
@@ -254,6 +250,8 @@ private:
     RefPtr<Node> m_nodeToFocus;
     bool m_searchingForNode;
     OwnPtr<InspectorHistory> m_history;
+    OwnPtr<DOMEditor> m_domEditor;
+    bool m_suppressAttributeModifiedEvent;
 };
 
 #endif // ENABLE(INSPECTOR)

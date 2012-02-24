@@ -707,7 +707,7 @@ bool AccessibilityRenderObject::isReadOnly() const
 bool AccessibilityRenderObject::isOffScreen() const
 {
     ASSERT(m_renderer);
-    LayoutRect contentRect = m_renderer->absoluteClippedOverflowRect();
+    IntRect contentRect = pixelSnappedIntRect(m_renderer->absoluteClippedOverflowRect());
     FrameView* view = m_renderer->frame()->view();
     IntRect viewRect = view->visibleContentRect();
     viewRect.intersect(contentRect);
@@ -1212,7 +1212,7 @@ String AccessibilityRenderObject::stringValue() const
 static String accessibleNameForNode(Node* node)
 {
     if (node->isTextNode())
-        return static_cast<Text*>(node)->data();
+        return toText(node)->data();
 
     if (node->hasTagName(inputTag))
         return static_cast<HTMLInputElement*>(node)->value();
@@ -1428,14 +1428,14 @@ String AccessibilityRenderObject::accessibilityDescription() const
                 const AtomicString& title = static_cast<HTMLFrameElementBase*>(owner)->getAttribute(titleAttr);
                 if (!title.isEmpty())
                     return title;
-                return static_cast<HTMLFrameElementBase*>(owner)->getAttribute(nameAttr);
+                return static_cast<HTMLFrameElementBase*>(owner)->getNameAttribute();
             }
             if (owner->isHTMLElement())
-                return toHTMLElement(owner)->getAttribute(nameAttr);
+                return toHTMLElement(owner)->getNameAttribute();
         }
         owner = document->body();
         if (owner && owner->isHTMLElement())
-            return toHTMLElement(owner)->getAttribute(nameAttr);
+            return toHTMLElement(owner)->getNameAttribute();
     }
 
     return String();
@@ -2630,9 +2630,9 @@ IntRect AccessibilityRenderObject::boundsForVisiblePositionRange(const VisiblePo
     }
     
 #if PLATFORM(MAC)
-    return m_renderer->document()->view()->contentsToScreen(ourrect);
+    return m_renderer->document()->view()->contentsToScreen(pixelSnappedIntRect(ourrect));
 #else
-    return ourrect;
+    return pixelSnappedIntRect(ourrect);
 #endif
 }
     
@@ -2675,7 +2675,7 @@ VisiblePosition AccessibilityRenderObject::visiblePositionForPoint(const LayoutP
     while (1) {
         LayoutPoint ourpoint;
 #if PLATFORM(MAC)
-        ourpoint = frameView->screenToContents(point);
+        ourpoint = frameView->screenToContents(roundedIntPoint(point));
 #else
         ourpoint = point;
 #endif
@@ -2854,7 +2854,7 @@ AccessibilityObject* AccessibilityRenderObject::accessibilityHitTest(const IntPo
     Node* node = hitTestResult.innerNode()->shadowAncestorNode();
 
     if (node->hasTagName(areaTag)) 
-        return accessibilityImageMapHitTest(static_cast<HTMLAreaElement*>(node), point);
+        return accessibilityImageMapHitTest(static_cast<HTMLAreaElement*>(node), roundedIntPoint(point));
     
     if (node->hasTagName(optionTag))
         node = static_cast<HTMLOptionElement*>(node)->ownerSelectElement();
@@ -3348,6 +3348,9 @@ bool AccessibilityRenderObject::canSetFocusAttribute() const
 {
     Node* node = this->node();
 
+    if (isWebArea())
+        return true;
+    
     // NOTE: It would be more accurate to ask the document whether setFocusedNode() would
     // do anything.  For example, setFocusedNode() will do nothing if the current focused
     // node will not relinquish the focus.

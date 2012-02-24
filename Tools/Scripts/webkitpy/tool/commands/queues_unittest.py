@@ -132,7 +132,6 @@ class FeederQueueTest(QueuesTest):
         tool = MockTool(log_executive=True)
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("feeder-queue"),
-            "should_proceed_with_work_item": "",
             "next_work_item": "",
             "process_work_item": """Warning, attachment 10001 on bug 50000 has invalid committer (non-committer@example.com)
 Warning, attachment 10001 on bug 50000 has invalid committer (non-committer@example.com)
@@ -235,7 +234,6 @@ class CommitQueueTest(QueuesTest):
         tool.filesystem.write_text_file('/mock-results/full_results.json', '')  # Otherwise the commit-queue will hit a KeyError trying to read the results from the MockFileSystem.
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("commit-queue"),
-            "should_proceed_with_work_item": "MOCK: update_status: commit-queue Processing patch\n",
             "next_work_item": "",
             "process_work_item": """MOCK: update_status: commit-queue Cleaned working directory
 MOCK: update_status: commit-queue Updated working directory
@@ -248,14 +246,13 @@ MOCK: update_status: commit-queue Pass
 MOCK: release_work_item: commit-queue 10000
 """,
             "handle_unexpected_error": "MOCK setting flag 'commit-queue' to '-' on attachment '10000' with comment 'Rejecting attachment 10000 from commit-queue.' and additional comment 'Mock error message'\n",
-            "handle_script_error": "ScriptError error message\n",
+            "handle_script_error": "ScriptError error message\n\nMOCK output\n",
         }
         self.assert_queue_outputs(CommitQueue(), tool=tool, expected_stderr=expected_stderr)
 
     def test_commit_queue_failure(self):
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("commit-queue"),
-            "should_proceed_with_work_item": "MOCK: update_status: commit-queue Processing patch\n",
             "next_work_item": "",
             "process_work_item": """MOCK: update_status: commit-queue Cleaned working directory
 MOCK: update_status: commit-queue Updated working directory
@@ -266,7 +263,7 @@ MOCK: update_status: commit-queue Fail
 MOCK: release_work_item: commit-queue 10000
 """,
             "handle_unexpected_error": "MOCK setting flag 'commit-queue' to '-' on attachment '10000' with comment 'Rejecting attachment 10000 from commit-queue.' and additional comment 'Mock error message'\n",
-            "handle_script_error": "ScriptError error message\n",
+            "handle_script_error": "ScriptError error message\n\nMOCK output\n",
         }
         queue = CommitQueue()
 
@@ -283,7 +280,6 @@ MOCK: release_work_item: commit-queue 10000
     def test_commit_queue_failure_with_failing_tests(self):
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("commit-queue"),
-            "should_proceed_with_work_item": "MOCK: update_status: commit-queue Processing patch\n",
             "next_work_item": "",
             "process_work_item": """MOCK: update_status: commit-queue Cleaned working directory
 MOCK: update_status: commit-queue Updated working directory
@@ -296,7 +292,7 @@ MOCK: update_status: commit-queue Fail
 MOCK: release_work_item: commit-queue 10000
 """,
             "handle_unexpected_error": "MOCK setting flag 'commit-queue' to '-' on attachment '10000' with comment 'Rejecting attachment 10000 from commit-queue.' and additional comment 'Mock error message'\n",
-            "handle_script_error": "ScriptError error message\n",
+            "handle_script_error": "ScriptError error message\n\nMOCK output\n",
         }
         queue = CommitQueue()
 
@@ -317,7 +313,6 @@ MOCK: release_work_item: commit-queue 10000
         tool.buildbot.light_tree_on_fire()
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("commit-queue"),
-            "should_proceed_with_work_item": "MOCK: update_status: commit-queue Processing patch\n",
             "next_work_item": "",
             "process_work_item": """MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'clean'], cwd=/mock-checkout
 MOCK: update_status: commit-queue Cleaned working directory
@@ -337,7 +332,7 @@ MOCK: update_status: commit-queue Pass
 MOCK: release_work_item: commit-queue 10000
 """,
             "handle_unexpected_error": "MOCK setting flag 'commit-queue' to '-' on attachment '10000' with comment 'Rejecting attachment 10000 from commit-queue.' and additional comment 'Mock error message'\n",
-            "handle_script_error": "ScriptError error message\n",
+            "handle_script_error": "ScriptError error message\n\nMOCK output\n",
         }
         self.assert_queue_outputs(CommitQueue(), tool=tool, expected_stderr=expected_stderr)
 
@@ -348,7 +343,6 @@ MOCK: release_work_item: commit-queue 10000
         assert(rollout_patch.is_rollout())
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("commit-queue"),
-            "should_proceed_with_work_item": "MOCK: update_status: commit-queue Processing rollout patch\n",
             "next_work_item": "",
             "process_work_item": """MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'clean'], cwd=/mock-checkout
 MOCK: update_status: commit-queue Cleaned working directory
@@ -364,7 +358,7 @@ MOCK: update_status: commit-queue Pass
 MOCK: release_work_item: commit-queue 10005
 """,
             "handle_unexpected_error": "MOCK setting flag 'commit-queue' to '-' on attachment '10005' with comment 'Rejecting attachment 10005 from commit-queue.' and additional comment 'Mock error message'\n",
-            "handle_script_error": "ScriptError error message\n",
+            "handle_script_error": "ScriptError error message\n\nMOCK output\n",
         }
         self.assert_queue_outputs(CommitQueue(), tool=tool, work_item=rollout_patch, expected_stderr=expected_stderr)
 
@@ -448,35 +442,44 @@ class StyleQueueTest(QueuesTest):
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("style-queue"),
             "next_work_item": "",
-            "should_proceed_with_work_item": "MOCK: update_status: style-queue Checking style\n",
-            "process_work_item": """MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'check-style', '--force-clean', '--non-interactive', '--parent-command=style-queue', 10000], cwd=/mock-checkout
+            "process_work_item": """MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'clean'], cwd=/mock-checkout
+MOCK: update_status: style-queue Cleaned working directory
+MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'update'], cwd=/mock-checkout
+MOCK: update_status: style-queue Updated working directory
+MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'apply-attachment', '--no-update', '--non-interactive', 10000], cwd=/mock-checkout
+MOCK: update_status: style-queue Applied patch
 MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'apply-watchlist-local', 50000], cwd=/mock-checkout
-MOCK: update_status: style-queue Fail
-MOCK: release_work_item: style-queue 10000\n""",
+MOCK: update_status: style-queue Watchlist applied
+MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'check-style-local', '--non-interactive', '--quiet'], cwd=/mock-checkout
+MOCK: update_status: style-queue Style checked
+MOCK: update_status: style-queue Pass
+MOCK: release_work_item: style-queue 10000
+""",
             "handle_unexpected_error": "Mock error message\n",
-            "handle_script_error": "MOCK: update_status: style-queue ScriptError error message\nMOCK bug comment: bug_id=50000, cc=[]\n--- Begin comment ---\nAttachment 10000 did not pass style-queue:\n\nScriptError error message\n\nIf any of these errors are false positives, please file a bug against check-webkit-style.\n--- End comment ---\n\n",
-        }
-        expected_exceptions = {
-            "process_work_item": ScriptError,
-            "handle_script_error": SystemExit,
+            "handle_script_error": "MOCK output\n",
         }
         tool = MockTool(log_executive=True, executive_throws_when_run=set(['check-style']))
-        self.assert_queue_outputs(StyleQueue(), expected_stderr=expected_stderr, expected_exceptions=expected_exceptions, tool=tool)
+        self.assert_queue_outputs(StyleQueue(), expected_stderr=expected_stderr, tool=tool)
 
     def test_style_queue_with_watch_list_exception(self):
         expected_stderr = {
             "begin_work_queue": self._default_begin_work_queue_stderr("style-queue"),
             "next_work_item": "",
-            "should_proceed_with_work_item": "MOCK: update_status: style-queue Checking style\n",
-            "process_work_item": """MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'check-style', '--force-clean', '--non-interactive', '--parent-command=style-queue', 10000], cwd=/mock-checkout
+            "process_work_item": """MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'clean'], cwd=/mock-checkout
+MOCK: update_status: style-queue Cleaned working directory
+MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'update'], cwd=/mock-checkout
+MOCK: update_status: style-queue Updated working directory
+MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'apply-attachment', '--no-update', '--non-interactive', 10000], cwd=/mock-checkout
+MOCK: update_status: style-queue Applied patch
 MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'apply-watchlist-local', 50000], cwd=/mock-checkout
+MOCK: update_status: style-queue Unabled to apply watchlist
+MOCK run_and_throw_if_fail: ['echo', '--status-host=example.com', 'check-style-local', '--non-interactive', '--quiet'], cwd=/mock-checkout
+MOCK: update_status: style-queue Style checked
 MOCK: update_status: style-queue Pass
-MOCK: release_work_item: style-queue 10000\n""",
+MOCK: release_work_item: style-queue 10000
+""",
             "handle_unexpected_error": "Mock error message\n",
-            "handle_script_error": "MOCK: update_status: style-queue ScriptError error message\nMOCK bug comment: bug_id=50000, cc=[]\n--- Begin comment ---\nAttachment 10000 did not pass style-queue:\n\nScriptError error message\n\nIf any of these errors are false positives, please file a bug against check-webkit-style.\n--- End comment ---\n\n",
-        }
-        expected_exceptions = {
-            "handle_script_error": SystemExit,
+            "handle_script_error": "MOCK output\n",
         }
         tool = MockTool(log_executive=True, executive_throws_when_run=set(['apply-watchlist-local']))
-        self.assert_queue_outputs(StyleQueue(), expected_stderr=expected_stderr, expected_exceptions=expected_exceptions, tool=tool)
+        self.assert_queue_outputs(StyleQueue(), expected_stderr=expected_stderr, tool=tool)

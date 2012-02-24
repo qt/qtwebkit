@@ -46,9 +46,11 @@ from webkitpy.tool.bot.botinfo import BotInfo
 from webkitpy.tool.bot.commitqueuetask import CommitQueueTask, CommitQueueTaskDelegate
 from webkitpy.tool.bot.expectedfailures import ExpectedFailures
 from webkitpy.tool.bot.feeders import CommitQueueFeeder, EWSFeeder
-from webkitpy.tool.bot.layouttestresultsreader import LayoutTestResultsReader
-from webkitpy.tool.bot.queueengine import QueueEngine, QueueEngineDelegate
 from webkitpy.tool.bot.flakytestreporter import FlakyTestReporter
+from webkitpy.tool.bot.layouttestresultsreader import LayoutTestResultsReader
+from webkitpy.tool.bot.patchanalysistask import UnableToApplyPatch
+from webkitpy.tool.bot.queueengine import QueueEngine, QueueEngineDelegate
+from webkitpy.tool.bot.stylequeuetask import StyleQueueTask, StyleQueueTaskDelegate
 from webkitpy.tool.commands.stepsequence import StepSequenceErrorHandler
 from webkitpy.tool.multicommandtool import Command, TryAgain
 
@@ -126,9 +128,6 @@ class AbstractQueue(Command, QueueEngineDelegate):
     def next_work_item(self):
         raise NotImplementedError, "subclasses must implement"
 
-    def should_proceed_with_work_item(self, work_item):
-        raise NotImplementedError, "subclasses must implement"
-
     def process_work_item(self, work_item):
         raise NotImplementedError, "subclasses must implement"
 
@@ -182,9 +181,6 @@ class FeederQueue(AbstractQueue):
         # understand work items, but the base class in the heirarchy currently
         # understands work items.
         return "synthetic-work-item"
-
-    def should_proceed_with_work_item(self, work_item):
-        return True
 
     def process_work_item(self, work_item):
         for feeder in self.feeders:
@@ -272,11 +268,6 @@ class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskD
 
     def next_work_item(self):
         return self._next_patch()
-
-    def should_proceed_with_work_item(self, patch):
-        patch_text = "rollout patch" if patch.is_rollout() else "patch"
-        self._update_status("Processing %s" % patch_text, patch)
-        return True
 
     def process_work_item(self, patch):
         self._cc_watchers(patch.bug_id())
@@ -380,9 +371,6 @@ class AbstractReviewQueue(AbstractPatchQueue, StepSequenceErrorHandler):
     def next_work_item(self):
         return self._next_patch()
 
-    def should_proceed_with_work_item(self, patch):
-        raise NotImplementedError("subclasses must implement")
-
     def process_work_item(self, patch):
         try:
             if not self.review_patch(patch):
@@ -405,38 +393,46 @@ class AbstractReviewQueue(AbstractPatchQueue, StepSequenceErrorHandler):
 
     @classmethod
     def handle_script_error(cls, tool, state, script_error):
-        log(script_error.message_with_output())
+        log(script_error.output)
 
 
-class StyleQueue(AbstractReviewQueue):
+class StyleQueue(AbstractReviewQueue, StyleQueueTaskDelegate):
     name = "style-queue"
+
     def __init__(self):
         AbstractReviewQueue.__init__(self)
 
-    def should_proceed_with_work_item(self, patch):
-        self._update_status("Checking style", patch)
-        return True
-
     def review_patch(self, patch):
+        task = StyleQueueTask(self, patch)
+        if not task.validate():
+            self._did_error(patch, "%s did not process patch." % self.name)
+            return False
         try:
-            # Run the style checks.
-            self.run_webkit_patch(["check-style", "--force-clean", "--non-interactive", "--parent-command=style-queue", patch.id()])
-        finally:
-            # Apply the watch list.
-            try:
-                self.run_webkit_patch(["apply-watchlist-local", patch.bug_id()])
-            except ScriptError, e:
-                # Don't turn the style bot block red due to watchlist errors.
-                pass
-
+            return task.run()
+        except UnableToApplyPatch, e:
+            self._did_error(patch, "%s unable to apply patch." % self.name)
+            return False
+        except ScriptError, e:
+            message = "Attachment %s did not pass %s:\n\n%s\n\nIf any of these errors are false positives, please file a bug against check-webkit-style." % (patch.id(), self.name, e.output)
+            self._tool.bugs.post_comment_to_bug(patch.bug_id(), message, cc=self.watchers)
+            self._did_fail(patch)
+            return False
         return True
 
-    @classmethod
-    def handle_script_error(cls, tool, state, script_error):
-        is_svn_apply = script_error.command_name() == "svn-apply"
-        status_id = cls._update_status_for_script_error(tool, state, script_error, is_error=is_svn_apply)
-        if is_svn_apply:
-            QueueEngine.exit_after_handled_error(script_error)
-        message = "Attachment %s did not pass %s:\n\n%s\n\nIf any of these errors are false positives, please file a bug against check-webkit-style." % (state["patch"].id(), cls.name, script_error.message_with_output(output_limit=3*1024))
-        tool.bugs.post_comment_to_bug(state["patch"].bug_id(), message, cc=cls.watchers)
-        sys.exit(1)
+    # StyleQueueTaskDelegate methods
+
+    def run_command(self, command):
+        self.run_webkit_patch(command)
+
+    def command_passed(self, message, patch):
+        self._update_status(message, patch=patch)
+
+    def command_failed(self, message, script_error, patch):
+        failure_log = self._log_from_script_error_for_upload(script_error)
+        return self._update_status(message, patch=patch, results_file=failure_log)
+
+    def expected_failures(self):
+        return None
+
+    def refetch_patch(self, patch):
+        return self._tool.bugs.fetch_attachment(patch.id())

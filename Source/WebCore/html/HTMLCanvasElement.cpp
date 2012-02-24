@@ -45,6 +45,7 @@
 #include "MIMETypeRegistry.h"
 #include "Page.h"
 #include "RenderHTMLCanvas.h"
+#include "RenderLayer.h"
 #include "Settings.h"
 #include <math.h>
 #include <stdio.h>
@@ -79,7 +80,12 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     , m_size(DefaultWidth, DefaultHeight)
     , m_rendererIsCanvas(false)
     , m_ignoreReset(false)
+#if ENABLE(HIGH_DPI_CANVAS)
+      // FIXME: Make this the default once https://bugs.webkit.org/show_bug.cgi?id=73645 has been fixed.
     , m_deviceScaleFactor(document->frame() ? document->frame()->page()->deviceScaleFactor() : 1)
+#else
+    , m_deviceScaleFactor(1)
+#endif
     , m_originClean(true)
     , m_hasCreatedImageBuffer(false)
 {
@@ -264,6 +270,25 @@ void HTMLCanvasElement::reset()
         (*it)->canvasResized(this);
 }
 
+bool HTMLCanvasElement::paintsIntoCanvasBuffer() const
+{
+    ASSERT(m_context);
+#if USE(IOSURFACE_CANVAS_BACKING_STORE)
+    if (m_context->is2d())
+        return true;
+#endif
+
+#if USE(ACCELERATED_COMPOSITING)
+    if (!m_context->isAccelerated())
+        return true;
+
+    if (renderBox() && renderBox()->hasLayer() && renderBox()->layer()->hasAcceleratedCompositing())
+        return false;
+#endif
+    return true;
+}
+
+
 void HTMLCanvasElement::paint(GraphicsContext* context, const LayoutRect& r, bool useLowQualityScale)
 {
     // Clear the dirty rect
@@ -273,7 +298,7 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const LayoutRect& r, boo
         return;
     
     if (m_context) {
-        if (!m_context->paintsIntoCanvasBuffer() && !document()->printing())
+        if (!paintsIntoCanvasBuffer() && !document()->printing())
             return;
         m_context->paintRenderingResultsToCanvas();
     }
@@ -282,9 +307,9 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const LayoutRect& r, boo
         ImageBuffer* imageBuffer = buffer();
         if (imageBuffer) {
             if (m_presentedImage)
-                context->drawImage(m_presentedImage.get(), ColorSpaceDeviceRGB, r, CompositeSourceOver, useLowQualityScale);
+                context->drawImage(m_presentedImage.get(), ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, useLowQualityScale);
             else
-                context->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, r, CompositeSourceOver, useLowQualityScale);
+                context->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, useLowQualityScale);
         }
     }
 

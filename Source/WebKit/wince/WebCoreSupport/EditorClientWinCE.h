@@ -55,7 +55,7 @@ public:
     virtual bool shouldInsertText(const WTF::String&, WebCore::Range*, WebCore::EditorInsertAction);
     virtual bool shouldChangeSelectedRange(WebCore::Range*, WebCore::Range*, WebCore::EAffinity, bool);
 
-    virtual bool shouldApplyStyle(WebCore::CSSStyleDeclaration*, WebCore::Range*);
+    virtual bool shouldApplyStyle(WebCore::StylePropertySet*, WebCore::Range*);
     virtual bool shouldMoveRangeAfterDelete(WebCore::Range*, WebCore::Range*);
 
     virtual void didBeginEditing();
@@ -101,7 +101,7 @@ public:
     virtual void getGuessesForWord(const WTF::String& word, const WTF::String& context, WTF::Vector<WTF::String>& guesses);
     virtual void willSetInputMethodState();
     virtual void setInputMethodState(bool);
-    virtual void requestCheckingOfString(WebCore::SpellChecker*, int, WebCore::TextCheckingTypeMask, const WTF::String&) {}
+    virtual void requestCheckingOfString(WebCore::SpellChecker*, const WebCore::TextCheckingRequest&) { }
     virtual WebCore::TextCheckerClient* textChecker() { return this; }
 
 private:

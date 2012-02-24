@@ -292,15 +292,22 @@ bool SVGStyledElement::isAnimatableCSSProperty(const QualifiedName& attrName)
     return cssPropertyToTypeMap().contains(attrName);
 }
 
+bool SVGStyledElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name()) > 0)
+        return true;
+    return SVGElement::isPresentationAttribute(attr);
+}
+
+void SVGStyledElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    int propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
+    if (propertyID > 0)
+        addPropertyToAttributeStyle(style, propertyID, attr->value());
+}
+
 void SVGStyledElement::parseAttribute(Attribute* attr)
 {
-    int propId = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
-    if (propId > 0) {
-        addCSSProperty(propId, attr->value());
-        setNeedsStyleRecalc();
-        return;
-    }
-    
     // SVG animation has currently requires special storage of values so we set
     // the className here.  svgAttributeChanged actually causes the resulting
     // style updates (instead of StyledElement::parseAttribute). We don't

@@ -379,6 +379,10 @@ class YarrGenerator : private MacroAssembler {
         Label m_reentry;
         JumpList m_jumps;
 
+        // Used for backtracking when the prior alternative did not consume any
+        // characters but matched.
+        Jump m_zeroLengthMatch;
+
         // This flag is used to null out the second pattern character, when
         // two are fused to match a pair together.
         bool m_isDeadCode;
@@ -728,10 +732,13 @@ class YarrGenerator : private MacroAssembler {
                 break;
             }
             case 3: {
-                BaseIndex address(input, index, TimesOne, (startTermPosition - m_checked) * sizeof(LChar));
-                load32WithUnalignedHalfWords(address, character);
-                and32(Imm32(0xffffff), character);
-                break;
+                BaseIndex highAddress(input, index, TimesOne, (startTermPosition - m_checked) * sizeof(LChar));
+                load16(highAddress, character);
+                if (ignoreCaseMask)
+                    or32(Imm32(ignoreCaseMask), character);
+                op.m_jumps.append(branch32(NotEqual, character, Imm32((allCharacters & 0xffff) | ignoreCaseMask)));
+                op.m_jumps.append(jumpIfCharNotEquals(allCharacters >> 16, startTermPosition + 2 - m_checked, character));
+                return;
             }
             case 4: {
                 BaseIndex address(input, index, TimesOne, (startTermPosition - m_checked) * sizeof(LChar));
@@ -809,10 +816,8 @@ class YarrGenerator : private MacroAssembler {
 
         move(TrustedImm32(0), countRegister);
 
-        if ((ch > 0xff) && (m_charSize == Char8)) {
-            // Have a 16 bit pattern character and an 8 bit string - short circuit
-            op.m_jumps.append(jump());
-        } else {
+        // Unless have a 16 bit pattern character and an 8 bit string - short circuit
+        if (!((ch > 0xff) && (m_charSize == Char8))) {
             JumpList failures;
             Label loop(this);
             failures.append(atEndOfInput());
@@ -830,7 +835,6 @@ class YarrGenerator : private MacroAssembler {
         op.m_reentry = label();
 
         storeToFrame(countRegister, term->frameLocation);
-
     }
     void backtrackPatternCharacterGreedy(size_t opIndex)
     {
@@ -868,16 +872,13 @@ class YarrGenerator : private MacroAssembler {
         const RegisterID character = regT0;
         const RegisterID countRegister = regT1;
 
-        JumpList nonGreedyFailures;
-
         m_backtrackingState.link(this);
 
         loadFromFrame(term->frameLocation, countRegister);
 
-        if ((ch > 0xff) && (m_charSize == Char8)) {
-            // Have a 16 bit pattern character and an 8 bit string - short circuit
-            nonGreedyFailures.append(jump());
-        } else {
+        // Unless have a 16 bit pattern character and an 8 bit string - short circuit
+        if (!((ch > 0xff) && (m_charSize == Char8))) {
+            JumpList nonGreedyFailures;
             nonGreedyFailures.append(atEndOfInput());
             if (term->quantityCount != quantifyInfinite)
                 nonGreedyFailures.append(branch32(Equal, countRegister, Imm32(term->quantityCount.unsafeGet())));
@@ -887,8 +888,8 @@ class YarrGenerator : private MacroAssembler {
             add32(TrustedImm32(1), index);
 
             jump(op.m_reentry);
+            nonGreedyFailures.link(this);
         }
-        nonGreedyFailures.link(this);
 
         sub32(countRegister, index);
         m_backtrackingState.fallthrough();
@@ -1385,7 +1386,7 @@ class YarrGenerator : private MacroAssembler {
                     op.m_checkAdjust -= disjunction->m_minimumSize;
                 if (op.m_checkAdjust)
                     op.m_jumps.append(jumpIfNoAvailableInput(op.m_checkAdjust));
- 
+
                 m_checked += op.m_checkAdjust;
                 break;
             }
@@ -1402,6 +1403,12 @@ class YarrGenerator : private MacroAssembler {
                     if (term->quantityType != QuantifierFixedCount)
                         alternativeFrameLocation += YarrStackSpaceForBackTrackInfoParenthesesOnce;
                     op.m_returnAddress = storeToFrameWithPatch(alternativeFrameLocation);
+                }
+
+                if (term->quantityType != QuantifierFixedCount && !m_ops[op.m_previousOp].m_alternative->m_minimumSize) {
+                    // If the previous alternative matched without consuming characters then
+                    // backtrack to try to match while consumming some input.
+                    op.m_zeroLengthMatch = branch32(Equal, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
                 }
 
                 // If we reach here then the last alternative has matched - jump to the
@@ -1446,6 +1453,12 @@ class YarrGenerator : private MacroAssembler {
                     if (term->quantityType != QuantifierFixedCount)
                         alternativeFrameLocation += YarrStackSpaceForBackTrackInfoParenthesesOnce;
                     op.m_returnAddress = storeToFrameWithPatch(alternativeFrameLocation);
+                }
+
+                if (term->quantityType != QuantifierFixedCount && !m_ops[op.m_previousOp].m_alternative->m_minimumSize) {
+                    // If the previous alternative matched without consuming characters then
+                    // backtrack to try to match while consumming some input.
+                    op.m_zeroLengthMatch = branch32(Equal, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
                 }
 
                 // If this set of alternatives contains more than one alternative,
@@ -1514,14 +1527,19 @@ class YarrGenerator : private MacroAssembler {
             }
             case OpParenthesesSubpatternOnceEnd: {
                 PatternTerm* term = op.m_term;
-                unsigned parenthesesFrameLocation = term->frameLocation;
                 const RegisterID indexTemporary = regT0;
                 ASSERT(term->quantityCount == 1);
 
-                // For Greedy/NonGreedy quantified parentheses, we must reject zero length
-                // matches. If the minimum size is know to be non-zero we need not check.
-                if (term->quantityType != QuantifierFixedCount && !term->parentheses.disjunction->m_minimumSize)
-                    op.m_jumps.append(branch32(Equal, index, Address(stackPointerRegister, parenthesesFrameLocation * sizeof(void*))));
+#ifndef NDEBUG
+                // Runtime ASSERT to make sure that the nested alternative handled the
+                // "no input consumed" check.
+                if (term->quantityType != QuantifierFixedCount && !term->parentheses.disjunction->m_minimumSize) {
+                    Jump pastBreakpoint;
+                    pastBreakpoint = branch32(NotEqual, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
+                    breakpoint();
+                    pastBreakpoint.link(this);
+                }
+#endif
 
                 // If the parenthese are capturing, store the ending index value to the
                 // captures array, offsetting as necessary.
@@ -1568,15 +1586,21 @@ class YarrGenerator : private MacroAssembler {
                 break;
             }
             case OpParenthesesSubpatternTerminalEnd: {
+                YarrOp& beginOp = m_ops[op.m_previousOp];
+#ifndef NDEBUG
                 PatternTerm* term = op.m_term;
 
-                // Check for zero length matches - if the match is non-zero, then we
-                // can accept it & loop back up to the head of the subpattern.
-                YarrOp& beginOp = m_ops[op.m_previousOp];
-                branch32(NotEqual, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)), beginOp.m_reentry);
+                // Runtime ASSERT to make sure that the nested alternative handled the
+                // "no input consumed" check.
+                Jump pastBreakpoint;
+                pastBreakpoint = branch32(NotEqual, index, Address(stackPointerRegister, term->frameLocation * sizeof(void*)));
+                breakpoint();
+                pastBreakpoint.link(this);
+#endif
 
-                // Reject the match - backtrack back into the subpattern.
-                op.m_jumps.append(jump());
+                // We know that the match is non-zero, we can accept it  and
+                // loop back up to the head of the subpattern.
+                jump(beginOp.m_reentry);
 
                 // This is the entry point to jump to when we stop matching - we will
                 // do so once the subpattern cannot match any more.
@@ -1928,7 +1952,7 @@ class YarrGenerator : private MacroAssembler {
                         // An alternative that is not the last should jump to its successor.
                         jump(nextOp.m_reentry);
                     } else if (!isBegin) {
-                        // The last of more than one alternatives must jump back to the begnning.
+                        // The last of more than one alternatives must jump back to the beginning.
                         nextOp.m_jumps.append(jump());
                     } else {
                         // A single alternative on its own can fall through.
@@ -1940,11 +1964,15 @@ class YarrGenerator : private MacroAssembler {
                         // An alternative that is not the last should jump to its successor.
                         m_backtrackingState.linkTo(nextOp.m_reentry, this);
                     } else if (!isBegin) {
-                        // The last of more than one alternatives must jump back to the begnning.
+                        // The last of more than one alternatives must jump back to the beginning.
                         m_backtrackingState.takeBacktracksToJumpList(nextOp.m_jumps, this);
                     }
                     // In the case of a single alternative on its own do nothing - it can fall through.
                 }
+
+                // If there is a backtrack jump from a zero length match link it here.
+                if (op.m_zeroLengthMatch.isSet())
+                    m_backtrackingState.append(op.m_zeroLengthMatch);
 
                 // At this point we've handled the backtracking back into this node.
                 // Now link any backtracks that need to jump to here.
@@ -1977,6 +2005,10 @@ class YarrGenerator : private MacroAssembler {
             case OpSimpleNestedAlternativeEnd:
             case OpNestedAlternativeEnd: {
                 PatternTerm* term = op.m_term;
+
+                // If there is a backtrack jump from a zero length match link it here.
+                if (op.m_zeroLengthMatch.isSet())
+                    m_backtrackingState.append(op.m_zeroLengthMatch);
 
                 // If we backtrack into the end of a simple subpattern do nothing;
                 // just continue through into the last alternative. If we backtrack

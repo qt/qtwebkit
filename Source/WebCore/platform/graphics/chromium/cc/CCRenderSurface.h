@@ -29,10 +29,12 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
+#include "FilterOperations.h"
 #include "FloatRect.h"
 #include "IntRect.h"
 #include "ProgramBinding.h"
 #include "ShaderChromium.h"
+#include "SkBitmap.h"
 #include "TextureManager.h"
 #include "TransformationMatrix.h"
 #include "cc/CCLayerQuad.h"
@@ -70,6 +72,13 @@ public:
     void setDrawTransform(const TransformationMatrix& drawTransform) { m_drawTransform = drawTransform; }
     const TransformationMatrix& drawTransform() const { return m_drawTransform; }
 
+    void setFilters(const FilterOperations& filters) { m_filters = filters; }
+    const FilterOperations& filters() const { return m_filters; }
+    SkBitmap applyFilters(LayerRendererChromium*);
+
+    void setNearestAncestorThatMovesPixels(CCRenderSurface* surface) { m_nearestAncestorThatMovesPixels = surface; }
+    const CCRenderSurface* nearestAncestorThatMovesPixels() const { return m_nearestAncestorThatMovesPixels; }
+
     void setReplicaDrawTransform(const TransformationMatrix& replicaDrawTransform) { m_replicaDrawTransform = replicaDrawTransform; }
     const TransformationMatrix& replicaDrawTransform() const { return m_replicaDrawTransform; }
 
@@ -106,9 +115,9 @@ public:
     CCDamageTracker* damageTracker() const { return m_damageTracker.get(); }
 
 private:
-    void drawLayer(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix&);
+    void drawLayer(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix&, const SkBitmap& filterBitmap);
     template <class T>
-    void drawSurface(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad&, const T* program, int shaderMaskSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation);
+    void drawSurface(LayerRendererChromium*, CCLayerImpl*, const TransformationMatrix& drawTransform, const TransformationMatrix& deviceTransform, const CCLayerQuad& deviceRect, const CCLayerQuad&, const T* program, int shaderMaskSamplerLocation, int shaderQuadLocation, int shaderEdgeLocation, const SkBitmap& filterBitmap);
 
     CCLayerImpl* m_owningLayer;
     CCLayerImpl* m_maskLayer;
@@ -122,8 +131,13 @@ private:
     TransformationMatrix m_drawTransform;
     TransformationMatrix m_replicaDrawTransform;
     TransformationMatrix m_originTransform;
+    FilterOperations m_filters;
     IntRect m_clipRect;
     Vector<RefPtr<CCLayerImpl> > m_layerList;
+
+    // The nearest ancestor target surface that will contain the contents of this surface, and that is going
+    // to move pixels within the surface (such as with a blur). This can point to itself.
+    CCRenderSurface* m_nearestAncestorThatMovesPixels;
 
     OwnPtr<CCDamageTracker> m_damageTracker;
 

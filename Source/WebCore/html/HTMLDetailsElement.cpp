@@ -28,8 +28,10 @@
 #include "HTMLSummaryElement.h"
 #include "LocalizedStrings.h"
 #include "MouseEvent.h"
+#include "NodeRenderingContext.h"
 #include "RenderDetails.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "Text.h"
 
 namespace WebCore {
@@ -108,7 +110,7 @@ RenderObject* HTMLDetailsElement::createRenderer(RenderArena* arena, RenderStyle
 
 void HTMLDetailsElement::createShadowSubtree()
 {
-    ASSERT(!shadowRoot());
+    ASSERT(!hasShadowRoot());
 
     RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
     root->appendChild(DetailsSummaryElement::create(document()), ASSERT_NO_EXCEPTION, true);
@@ -122,7 +124,7 @@ Element* HTMLDetailsElement::findMainSummary() const
             return toElement(child);
     }
 
-    return static_cast<DetailsSummaryElement*>(shadowRoot()->firstChild())->fallbackSummary();
+    return static_cast<DetailsSummaryElement*>(shadowRootList()->oldestShadowRoot()->firstChild())->fallbackSummary();
 }
 
 void HTMLDetailsElement::parseAttribute(Attribute* attr)
@@ -136,15 +138,18 @@ void HTMLDetailsElement::parseAttribute(Attribute* attr)
         HTMLElement::parseAttribute(attr);
 }
 
-bool HTMLDetailsElement::childShouldCreateRenderer(Node* child) const
+bool HTMLDetailsElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
-    if (m_isOpen)
-        return true;
-
-    if (!child->hasTagName(summaryTag))
+    if (!childContext.isOnEncapsulationBoundary())
         return false;
 
-    return child == findMainSummary();
+    if (m_isOpen)
+        return HTMLElement::childShouldCreateRenderer(childContext);
+
+    if (!childContext.node()->hasTagName(summaryTag))
+        return false;
+
+    return childContext.node() == findMainSummary() && HTMLElement::childShouldCreateRenderer(childContext);
 }
 
 void HTMLDetailsElement::toggleOpen()

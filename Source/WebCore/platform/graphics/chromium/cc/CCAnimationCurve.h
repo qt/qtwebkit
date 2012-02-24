@@ -25,6 +25,10 @@
 #ifndef CCAnimationCurve_h
 #define CCAnimationCurve_h
 
+#include "TransformationMatrix.h"
+
+#include <wtf/PassOwnPtr.h>
+
 namespace WebCore {
 
 class CCFloatAnimationCurve;
@@ -41,6 +45,7 @@ public:
 
     virtual double duration() const = 0;
     virtual Type type() const = 0;
+    virtual PassOwnPtr<CCAnimationCurve> clone() const = 0;
 
     const CCFloatAnimationCurve* toFloatAnimationCurve() const;
     const CCTransformAnimationCurve* toTransformAnimationCurve() const;
@@ -60,7 +65,7 @@ class CCTransformAnimationCurve : public CCAnimationCurve {
 public:
     virtual ~CCTransformAnimationCurve() { }
 
-    virtual TransformOperations getValue(double t) const = 0;
+    virtual TransformationMatrix getValue(double t, const IntSize& layerSize) const = 0;
 
     // Partial CCAnimation implementation.
     virtual Type type() const { return Transform; }

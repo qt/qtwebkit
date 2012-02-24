@@ -35,7 +35,6 @@ import base64
 import itertools
 import logging
 import operator
-import os
 import re
 import sys
 import time
@@ -341,7 +340,8 @@ class WebKitPort(Port):
         return []
 
     def _wk2_port_name(self):
-        # By current convention, the WebKit2 name is always mac-wk2, win-wk2, not mac-leopard-wk2, etc.
+        # By current convention, the WebKit2 name is always mac-wk2, win-wk2, not mac-leopard-wk2, etc,
+        # except for Qt because WebKit2 is only supported by Qt 5.0 (therefore: qt-5.0-wk2).
         return "%s-wk2" % self.port_name
 
     def _skipped_file_search_paths(self):
@@ -644,6 +644,10 @@ class WebKitDriver(Driver):
 
         block.decode_content()
         return block
+
+    def start(self):
+        if not self._server_process:
+            self._start()
 
     def stop(self):
         if self._server_process:

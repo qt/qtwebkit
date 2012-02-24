@@ -43,9 +43,11 @@ class UndoableStateMark : public InspectorHistory::Action {
 public:
     UndoableStateMark() : InspectorHistory::Action("[UndoableState]") { }
 
-    virtual bool perform(ErrorString*) { return true; }
+    virtual bool perform(ExceptionCode&) { return true; }
 
-    virtual bool undo(ErrorString*) { return true; }
+    virtual bool undo(ExceptionCode&) { return true; }
+
+    virtual bool redo(ExceptionCode&) { return true; }
 
     virtual bool isUndoableStateMark() { return true; }
 };
@@ -79,49 +81,71 @@ void InspectorHistory::Action::merge(PassOwnPtr<Action>)
 {
 }
 
-InspectorHistory::InspectorHistory() { }
+InspectorHistory::InspectorHistory() : m_afterLastActionIndex(0) { }
 
 InspectorHistory::~InspectorHistory() { }
 
-bool InspectorHistory::perform(PassOwnPtr<Action> action, ErrorString* errorString)
+bool InspectorHistory::perform(PassOwnPtr<Action> action, ExceptionCode& ec)
 {
-    if (!action->perform(errorString))
+    if (!action->perform(ec))
         return false;
 
-    if (!m_history.isEmpty() && !action->mergeId().isEmpty() && action->mergeId() == m_history.first()->mergeId())
-        m_history.first()->merge(action);
-    else
-        m_history.prepend(action);
-
+    if (!action->mergeId().isEmpty() && m_afterLastActionIndex > 0 && action->mergeId() == m_history[m_afterLastActionIndex - 1]->mergeId())
+        m_history[m_afterLastActionIndex - 1]->merge(action);
+    else {
+        m_history.resize(m_afterLastActionIndex);
+        m_history.append(action);
+        ++m_afterLastActionIndex;
+    }
     return true;
 }
 
 void InspectorHistory::markUndoableState()
 {
-    m_history.prepend(adoptPtr(new UndoableStateMark()));
+    ExceptionCode ec;
+    perform(adoptPtr(new UndoableStateMark()), ec);
 }
 
-bool InspectorHistory::undo(ErrorString* errorString)
+bool InspectorHistory::undo(ExceptionCode& ec)
 {
-    while (!m_history.isEmpty() && m_history.first()->isUndoableStateMark())
-        m_history.removeFirst();
+    while (m_afterLastActionIndex > 0 && m_history[m_afterLastActionIndex - 1]->isUndoableStateMark())
+        --m_afterLastActionIndex;
 
-    while (!m_history.isEmpty()) {
-        OwnPtr<Action> first = m_history.takeFirst();
-        if (!first->undo(errorString)) {
-            m_history.clear();
+    while (m_afterLastActionIndex > 0) {
+        Action* action = m_history[m_afterLastActionIndex - 1].get();
+        if (!action->undo(ec)) {
+            reset();
             return false;
         }
-
-        if (first->isUndoableStateMark())
+        --m_afterLastActionIndex;
+        if (action->isUndoableStateMark())
             break;
     }
 
     return true;
 }
 
+bool InspectorHistory::redo(ExceptionCode& ec)
+{
+    while (m_afterLastActionIndex < m_history.size() && m_history[m_afterLastActionIndex]->isUndoableStateMark())
+        ++m_afterLastActionIndex;
+
+    while (m_afterLastActionIndex < m_history.size()) {
+        Action* action = m_history[m_afterLastActionIndex].get();
+        if (!action->redo(ec)) {
+            reset();
+            return false;
+        }
+        ++m_afterLastActionIndex;
+        if (action->isUndoableStateMark())
+            break;
+    }
+    return true;
+}
+
 void InspectorHistory::reset()
 {
+    m_afterLastActionIndex = 0;
     m_history.clear();
 }
 

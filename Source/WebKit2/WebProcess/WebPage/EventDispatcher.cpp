@@ -37,6 +37,7 @@
 
 #if ENABLE(THREADED_SCROLLING)
 #include <WebCore/ScrollingCoordinator.h>
+#include <WebCore/ScrollingThread.h>
 #include <WebCore/ScrollingTree.h>
 #endif
 
@@ -79,18 +80,29 @@ void EventDispatcher::didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection
     }
 }
 
-void EventDispatcher::wheelEvent(CoreIPC::Connection*, uint64_t pageID, const WebWheelEvent& wheelEvent)
+void EventDispatcher::wheelEvent(CoreIPC::Connection*, uint64_t pageID, const WebWheelEvent& wheelEvent, bool canGoBack, bool canGoForward)
 {
 #if ENABLE(THREADED_SCROLLING)
     MutexLocker locker(m_scrollingTreesMutex);
     if (ScrollingTree* scrollingTree = m_scrollingTrees.get(pageID).get()) {
         PlatformWheelEvent platformWheelEvent = platform(wheelEvent);
 
-        if (scrollingTree->tryToHandleWheelEvent(platformWheelEvent)) {
-            sendDidHandleEvent(pageID, wheelEvent);
+        // FIXME: It's pretty horrible that we're updating the back/forward state here.
+        // WebCore should always know the current state and know when it changes so the
+        // scrolling tree can be notified.
+        // We only need to do this at the beginning of the gesture.
+        if (platformWheelEvent.phase() == PlatformWheelEventPhaseBegan)
+            ScrollingThread::dispatch(bind(&ScrollingTree::updateBackForwardState, scrollingTree, canGoBack, canGoForward));
+
+        ScrollingTree::EventResult result = scrollingTree->tryToHandleWheelEvent(platformWheelEvent);
+        if (result == ScrollingTree::DidHandleEvent || result == ScrollingTree::DidNotHandleEvent) {
+            sendDidReceiveEvent(pageID, wheelEvent, result == ScrollingTree::DidHandleEvent);
             return;
         }
     }
+#else
+    UNUSED_PARAM(canGoBack);
+    UNUSED_PARAM(canGoForward);
 #endif
 
     RunLoop::main()->dispatch(bind(&EventDispatcher::dispatchWheelEvent, this, pageID, wheelEvent));
@@ -128,9 +140,9 @@ void EventDispatcher::dispatchGestureEvent(uint64_t pageID, const WebGestureEven
 #endif
 
 #if ENABLE(THREADED_SCROLLING)
-void EventDispatcher::sendDidHandleEvent(uint64_t pageID, const WebEvent& event)
+void EventDispatcher::sendDidReceiveEvent(uint64_t pageID, const WebEvent& event, bool didHandleEvent)
 {
-    WebProcess::shared().connection()->send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(event.type()), true), pageID);
+    WebProcess::shared().connection()->send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(event.type()), didHandleEvent), pageID);
 }
 #endif
 

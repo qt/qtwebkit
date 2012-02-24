@@ -41,6 +41,7 @@ PassRefPtr<PeerConnection> PeerConnection::create(ScriptExecutionContext* contex
     RefPtr<PeerConnection> connection = adoptRef(new PeerConnection(context, serverConfiguration, signalingCallback));
     connection->setPendingActivity(connection.get());
     connection->scheduleInitialNegotiation();
+    connection->suspendIfNeeded();
 
     return connection.release();
 }
@@ -55,7 +56,7 @@ PeerConnection::PeerConnection(ScriptExecutionContext* context, const String& se
     , m_initialNegotiationTimer(this, &PeerConnection::initialNegotiationTimerFired)
     , m_streamChangeTimer(this, &PeerConnection::streamChangeTimerFired)
     , m_readyStateChangeTimer(this, &PeerConnection::readyStateChangeTimerFired)
-    , m_peerHandler(PeerConnectionHandler::create(this, serverConfiguration, context->securityOrigin()))
+    , m_peerHandler(PeerConnectionHandler::create(this, serverConfiguration, context->securityOrigin()->toString()))
 {
 }
 

@@ -76,7 +76,7 @@ java -jar ~/closure/compiler.jar --summary_detail_level 3 --compilation_level SI
         --js Source/WebCore/inspector/front-end/ResourceUtils.js \
         --js Source/WebCore/inspector/front-end/NetworkManager.js \
         --js Source/WebCore/inspector/front-end/UISourceCode.js \
-    --module jsmodule_ui:34:jsmodule_common \
+    --module jsmodule_ui:36:jsmodule_common \
         --js Source/WebCore/inspector/front-end/AdvancedSearchController.js \
         --js Source/WebCore/inspector/front-end/Checkbox.js \
         --js Source/WebCore/inspector/front-end/ContextMenu.js \
@@ -99,8 +99,10 @@ java -jar ~/closure/compiler.jar --summary_detail_level 3 --compilation_level SI
         --js Source/WebCore/inspector/front-end/SidebarTreeElement.js \
         --js Source/WebCore/inspector/front-end/ShortcutsScreen.js \
         --js Source/WebCore/inspector/front-end/ShowMoreDataGridNode.js \
+        --js Source/WebCore/inspector/front-end/SidebarOverlay.js \
         --js Source/WebCore/inspector/front-end/SoftContextMenu.js \
         --js Source/WebCore/inspector/front-end/SourceTokenizer.js \
+        --js Source/WebCore/inspector/front-end/Spectrum.js \
         --js Source/WebCore/inspector/front-end/SplitView.js \
         --js Source/WebCore/inspector/front-end/StatusBarButton.js \
         --js Source/WebCore/inspector/front-end/TabbedPane.js \
@@ -145,12 +147,13 @@ java -jar ~/closure/compiler.jar --summary_detail_level 3 --compilation_level SI
         --js Source/WebCore/inspector/front-end/ResourceTimingView.js \
         --js Source/WebCore/inspector/front-end/ResourceView.js \
         --js Source/WebCore/inspector/front-end/NetworkPanel.js \
-    --module jsmodule_resources:6:jsmodule_components \
+    --module jsmodule_resources:7:jsmodule_components \
         --js Source/WebCore/inspector/front-end/ApplicationCacheItemsView.js \
         --js Source/WebCore/inspector/front-end/CookieItemsView.js \
         --js Source/WebCore/inspector/front-end/DatabaseQueryView.js \
         --js Source/WebCore/inspector/front-end/DatabaseTableView.js \
         --js Source/WebCore/inspector/front-end/DOMStorageItemsView.js \
+        --js Source/WebCore/inspector/front-end/IndexedDBViews.js \
         --js Source/WebCore/inspector/front-end/ResourcesPanel.js \
     --module jsmodule_scripts:10:jsmodule_components \
         --js Source/WebCore/inspector/front-end/CallStackSidebarPane.js \

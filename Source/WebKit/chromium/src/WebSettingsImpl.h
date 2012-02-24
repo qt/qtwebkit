@@ -88,6 +88,7 @@ public:
     virtual void setOfflineWebApplicationCacheEnabled(bool);
     virtual void setWebAudioEnabled(bool);
     virtual void setExperimentalWebGLEnabled(bool);
+    virtual void setExperimentalCSSRegionsEnabled(bool);
     virtual void setOpenGLMultisamplingEnabled(bool);
     virtual void setPrivilegedWebGLExtensionsEnabled(bool);
     virtual void setWebGLErrorsToConsoleEnabled(bool);
@@ -124,6 +125,8 @@ public:
     virtual void setFullScreenEnabled(bool);
     virtual void setAllowDisplayOfInsecureContent(bool);
     virtual void setAllowRunningOfInsecureContent(bool);
+    virtual void setPasswordEchoEnabled(bool);
+    virtual void setPasswordEchoDurationInSeconds(double);
     virtual void setShouldPrintBackgrounds(bool);
     virtual void setEnableScrollAnimator(bool);
     virtual void setHixie76WebSocketProtocolEnabled(bool);
@@ -134,6 +137,7 @@ public:
     virtual void setAcceleratedPaintingEnabled(bool);
     virtual void setPerTilePaintingEnabled(bool);
     virtual void setPartialSwapEnabled(bool);
+    virtual void setThreadedAnimationEnabled(bool);
 
 private:
     WebCore::Settings* m_settings;

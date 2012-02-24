@@ -30,15 +30,17 @@
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
 #include <WebCore/RunLoop.h>
+#include <WebCore/Timer.h>
 #include <wtf/HashSet.h>
 
 #if USE(TEXTURE_MAPPER)
 #include "TextureMapper.h"
-#include "TextureMapperNode.h"
+#include "TextureMapperBackingStore.h"
 #endif
 
 namespace WebKit {
 
+class LayerBackingStore;
 class WebLayerInfo;
 class WebLayerUpdateInfo;
 
@@ -55,8 +57,8 @@ public:
     void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&);
     void paintToGraphicsContext(BackingStore::PlatformGraphicsContext);
     void purgeGLResources();
-    void setVisibleContentsRectAndScale(const WebCore::IntRect&, float);
-    void setVisibleContentRectTrajectoryVector(const WebCore::FloatPoint&);
+    void setVisibleContentsRectForScaling(const WebCore::IntRect&, float);
+    void setVisibleContentsRectForPanning(const WebCore::IntRect&, const WebCore::FloatPoint&);
 #if USE(TILED_BACKING_STORE)
     void syncRemoteContent();
     void swapContentBuffers();
@@ -83,7 +85,6 @@ protected:
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const { return false; }
     void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect&) { }
 
-    WebCore::RunLoop::Timer<LayerTreeHostProxy> m_animationTimer;
     DrawingAreaProxy* m_drawingAreaProxy;
 
     typedef HashMap<WebLayerID, WebCore::GraphicsLayer*> LayerMap;
@@ -98,12 +99,6 @@ protected:
 #endif
 
 #if PLATFORM(QT)
-    typedef HashMap<WebCore::IntPoint, RefPtr<WebCore::BitmapTexture> > TiledImage;
-    WebCore::TextureMapperNode::NodeRectMap m_nodeVisualContentsRectMap;
-    HashMap<int, int> m_tileToNodeTile;
-    int remoteTileIDToNodeTileID(int tileID) const;
-    HashMap<int64_t, TiledImage> m_directlyCompositedImages;
-
     void scheduleWebViewUpdate();
     void synchronizeViewport();
     void deleteLayer(WebLayerID);
@@ -118,16 +113,15 @@ protected:
     void flushLayerChanges();
     void ensureRootLayer();
     void ensureLayer(WebLayerID);
-
+    PassRefPtr<LayerBackingStore> getBackingStore(WebLayerID);
+    void swapBuffers();
+    void syncAnimations();
 #endif
 
     OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
     Vector<WebLayerID> m_layersToDelete;
-
-#if PLATFORM(QT)
-    void didFireViewportUpdateTimer(WebCore::Timer<LayerTreeHostProxy>*);
-    WebCore::Timer<LayerTreeHostProxy> m_viewportUpdateTimer;
-#endif
+    HashMap<int64_t, RefPtr<WebCore::TextureMapperBackingStore> > m_directlyCompositedImages;
+    HashSet<RefPtr<LayerBackingStore> > m_backingStoresWithPendingBuffers;
 
     LayerMap m_layers;
     WebLayerID m_rootLayerID;

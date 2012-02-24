@@ -33,8 +33,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSTestEventConstructor);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestEventConstructor);
-
 /* Hash table for constructor */
 
 static const HashTableValue JSTestEventConstructorTableValues[] =
@@ -54,8 +52,6 @@ static const HashTableValue JSTestEventConstructorConstructorTableValues[] =
 };
 
 static const HashTable JSTestEventConstructorConstructorTable = { 1, 0, JSTestEventConstructorConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestEventConstructorConstructor);
-
 const ClassInfo JSTestEventConstructorConstructor::s_info = { "TestEventConstructorConstructor", &Base::s_info, &JSTestEventConstructorConstructorTable, 0, CREATE_METHOD_TABLE(JSTestEventConstructorConstructor) };
 
 JSTestEventConstructorConstructor::JSTestEventConstructorConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -68,6 +64,7 @@ void JSTestEventConstructorConstructor::finishCreation(ExecState* exec, JSDOMGlo
     Base::finishCreation(exec->globalData());
     ASSERT(inherits(&s_info));
     putDirect(exec->globalData(), exec->propertyNames().prototype, JSTestEventConstructorPrototype::self(exec, globalObject), DontDelete | ReadOnly);
+    putDirect(exec->globalData(), exec->propertyNames().length, jsNumber(2), ReadOnly | DontDelete | DontEnum);
 }
 
 bool JSTestEventConstructorConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -161,7 +158,12 @@ JSObject* JSTestEventConstructor::createPrototype(ExecState* exec, JSGlobalObjec
 void JSTestEventConstructor::destroy(JSC::JSCell* cell)
 {
     JSTestEventConstructor* thisObject = jsCast<JSTestEventConstructor*>(cell);
-    thisObject->releaseImplIfNotNull();
+    thisObject->JSTestEventConstructor::~JSTestEventConstructor();
+}
+
+JSTestEventConstructor::~JSTestEventConstructor()
+{
+    releaseImplIfNotNull();
 }
 
 bool JSTestEventConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)

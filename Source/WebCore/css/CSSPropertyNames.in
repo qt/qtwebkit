@@ -271,10 +271,11 @@ z-index
 -webkit-hyphens
 -epub-hyphens = -webkit-hyphens
 -webkit-line-box-contain
+-webkit-line-align
 -webkit-line-break
 -webkit-line-clamp
 -webkit-line-grid
--webkit-line-grid-snap
+-webkit-line-snap
 -webkit-logical-width
 -webkit-logical-height
 -webkit-margin-after-collapse
@@ -378,4 +379,7 @@ z-index
 #endif
 #if defined(ENABLE_DASHBOARD_SUPPORT) && ENABLE_DASHBOARD_SUPPORT
 -webkit-dashboard-region
+#endif
+#if defined(ENABLE_OVERFLOW_SCROLLING)
+-webkit-overflow-scrolling
 #endif

@@ -63,6 +63,9 @@ public:
     virtual String getTranslatedShaderSourceANGLE(Platform3DObject);
 
     enum {
+        // GL_OES_EGL_image_external
+        GL_TEXTURE_EXTERNAL_OES = 0x8D65,
+
         // GL_CHROMIUM_map_sub (enums inherited from GL_ARB_vertex_buffer_object)
         READ_ONLY = 0x88B8,
         WRITE_ONLY = 0x88B9,
@@ -86,6 +89,14 @@ public:
 
     // GL_CHROMIUM_set_visibility
     void setVisibilityCHROMIUM(bool);
+
+    // GL_CHROMIUM_gpu_memory_manager
+    class GpuMemoryAllocationChangedCallbackCHROMIUM {
+    public:
+        virtual void onGpuMemoryAllocationChanged(size_t gpuResourceSizeInBytes) = 0;
+        virtual ~GpuMemoryAllocationChangedCallbackCHROMIUM() { }
+    };
+    void setGpuMemoryAllocationChangedCallbackCHROMIUM(PassOwnPtr<GpuMemoryAllocationChangedCallbackCHROMIUM>);
 
     // GL_CHROMIUM_swapbuffers_complete_callback
     class SwapBuffersCompleteCallbackCHROMIUM {

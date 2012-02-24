@@ -122,7 +122,9 @@ private:
     virtual void restoreFormControlState(const String&);
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
 
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle *);
     virtual bool appendFormData(FormDataList&, bool);
 

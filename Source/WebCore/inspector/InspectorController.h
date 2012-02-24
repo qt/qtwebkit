@@ -51,6 +51,7 @@ class InspectorDOMAgent;
 class InspectorDebuggerAgent;
 class InspectorFrontend;
 class InspectorFrontendClient;
+class InspectorPageAgent;
 class InspectorProfilerAgent;
 class InspectorResourceAgent;
 class InspectorState;
@@ -68,7 +69,6 @@ public:
     ~InspectorController();
 
     static PassOwnPtr<InspectorController> create(Page*, InspectorClient*);
-
     void inspectedPageDestroyed();
 
     bool enabled() const;
@@ -108,6 +108,8 @@ public:
 
     void setResourcesDataSizeLimitsFromInternals(int maximumResourcesContentSize, int maximumSingleResourceContentSize);
 
+    InspectorPageAgent* pageAgent() const { return m_pageAgent; }
+
 private:
     InspectorController(Page*, InspectorClient*);
 
@@ -121,6 +123,7 @@ private:
     InspectorAgent* m_inspectorAgent;
     InspectorDOMAgent* m_domAgent;
     InspectorResourceAgent* m_resourceAgent;
+    InspectorPageAgent* m_pageAgent;
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     InspectorDebuggerAgent* m_debuggerAgent;
     InspectorProfilerAgent* m_profilerAgent;

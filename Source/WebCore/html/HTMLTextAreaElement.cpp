@@ -38,6 +38,7 @@
 #include "HTMLNames.h"
 #include "RenderTextControlMultiLine.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "Text.h"
 #include "TextControlInnerElements.h"
 #include "TextIterator.h"
@@ -84,7 +85,7 @@ PassRefPtr<HTMLTextAreaElement> HTMLTextAreaElement::create(const QualifiedName&
 
 void HTMLTextAreaElement::createShadowSubtree()
 {
-    ASSERT(!shadowRoot());
+    ASSERT(!hasShadowRoot());
     RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
     root->appendChild(TextControlInnerTextElement::create(document()), ASSERT_NO_EXCEPTION);
 }
@@ -117,7 +118,34 @@ void HTMLTextAreaElement::childrenChanged(bool changedByParser, Node* beforeChan
     setInnerTextValue(value());
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
-    
+
+bool HTMLTextAreaElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == alignAttr) {
+        // Don't map 'align' attribute.  This matches what Firefox, Opera and IE do.
+        // See http://bugs.webkit.org/show_bug.cgi?id=7075
+        return false;
+    }
+
+    if (attr->name() == wrapAttr)
+        return true;
+    return HTMLTextFormControlElement::isPresentationAttribute(attr);
+}
+
+void HTMLTextAreaElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    if (attr->name() == wrapAttr) {
+        if (shouldWrapText()) {
+            addPropertyToAttributeStyle(style, CSSPropertyWhiteSpace, CSSValuePreWrap);
+            addPropertyToAttributeStyle(style, CSSPropertyWordWrap, CSSValueBreakWord);
+        } else {
+            addPropertyToAttributeStyle(style, CSSPropertyWhiteSpace, CSSValuePre);
+            addPropertyToAttributeStyle(style, CSSPropertyWordWrap, CSSValueNormal);
+        }
+    } else
+        HTMLTextFormControlElement::collectStyleForAttribute(attr, style);
+}
+
 void HTMLTextAreaElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == rowsAttr) {
@@ -150,23 +178,11 @@ void HTMLTextAreaElement::parseAttribute(Attribute* attr)
             wrap = SoftWrap;
         if (wrap != m_wrap) {
             m_wrap = wrap;
-
-            if (shouldWrapText()) {
-                addCSSProperty(CSSPropertyWhiteSpace, CSSValuePreWrap);
-                addCSSProperty(CSSPropertyWordWrap, CSSValueBreakWord);
-            } else {
-                addCSSProperty(CSSPropertyWhiteSpace, CSSValuePre);
-                addCSSProperty(CSSPropertyWordWrap, CSSValueNormal);
-            }
-
             if (renderer())
                 renderer()->setNeedsLayoutAndPrefWidthsRecalc();
         }
     } else if (attr->name() == accesskeyAttr) {
         // ignore for the moment
-    } else if (attr->name() == alignAttr) {
-        // Don't map 'align' attribute.  This matches what Firefox, Opera and IE do.
-        // See http://bugs.webkit.org/show_bug.cgi?id=7075
     } else if (attr->name() == maxlengthAttr)
         setNeedsValidityCheck();
     else
@@ -278,7 +294,7 @@ String HTMLTextAreaElement::sanitizeUserInputValue(const String& proposedValue, 
 
 HTMLElement* HTMLTextAreaElement::innerTextElement() const
 {
-    Node* node = shadowRoot()->firstChild();
+    Node* node = shadowRootList()->oldestShadowRoot()->firstChild();
     ASSERT(!node || node->hasTagName(divTag));
     return toHTMLElement(node);
 }
@@ -360,7 +376,7 @@ String HTMLTextAreaElement::defaultValue() const
     // Since there may be comments, ignore nodes other than text nodes.
     for (Node* n = firstChild(); n; n = n->nextSibling()) {
         if (n->isTextNode())
-            value += static_cast<Text*>(n)->data();
+            value += toText(n)->data();
     }
 
     return value;
@@ -455,7 +471,7 @@ void HTMLTextAreaElement::updatePlaceholderText()
     String placeholderText = strippedPlaceholder();
     if (placeholderText.isEmpty()) {
         if (m_placeholder) {
-            shadowRoot()->removeChild(m_placeholder.get(), ec);
+            shadowRootList()->oldestShadowRoot()->removeChild(m_placeholder.get(), ec);
             ASSERT(!ec);
             m_placeholder.clear();
         }
@@ -464,7 +480,7 @@ void HTMLTextAreaElement::updatePlaceholderText()
     if (!m_placeholder) {
         m_placeholder = HTMLDivElement::create(document());
         m_placeholder->setShadowPseudoId("-webkit-input-placeholder");
-        shadowRoot()->insertBefore(m_placeholder, shadowRoot()->firstChild()->nextSibling(), ec);
+        shadowRootList()->oldestShadowRoot()->insertBefore(m_placeholder, shadowRootList()->oldestShadowRoot()->firstChild()->nextSibling(), ec);
         ASSERT(!ec);
     }
     m_placeholder->setInnerText(placeholderText, ec);

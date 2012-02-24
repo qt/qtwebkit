@@ -191,16 +191,18 @@ sub ShouldSkipType
 {
     my $typeInfo = shift;
 
-    return 1 if $typeInfo->signature->extendedAttributes->{"Custom"};
-
-    return 1 if $typeInfo->signature->extendedAttributes->{"CustomArgumentHandling"}
-             or $typeInfo->signature->extendedAttributes->{"CustomGetter"}
-             or $typeInfo->signature->extendedAttributes->{"CPPCustom"};
+    return 1 if $typeInfo->signature->extendedAttributes->{"Custom"}
+                or $typeInfo->signature->extendedAttributes->{"CustomGetter"};
 
     # FIXME: We don't generate bindings for SVG related interfaces yet
     return 1 if $typeInfo->signature->name =~ /getSVGDocument/;
 
     return 1 if $typeInfo->signature->name =~ /Constructor/;
+    
+    # FIXME: This is typically used to add script execution state arguments to the method.
+    # These functions will not compile with the C++ bindings as is, so disable them
+    # to restore compilation until a proper implementation can be developed.
+    return 1 if $typeInfo->signature->extendedAttributes->{"CallWith"};
     return 0;
 }
 
@@ -462,7 +464,7 @@ sub GenerateHeader
     if ($numFunctions > 0) {
         foreach my $function (@{$dataNode->functions}) {
             next if ShouldSkipType($function);
-            my $functionName = $function->signature->name;
+            my $functionName = $function->signature->extendedAttributes->{"ImplementedAs"} || $function->signature->name;
 
             my $returnType = GetCPPType($function->signature->type, 0);
             my $numberOfParameters = @{$function->parameters};
@@ -807,7 +809,7 @@ sub GenerateImplementation
                 my $implGetter = GetCPPTypeGetter($paramName, $idlType);
 
                 push(@parameterNames, $implGetter);
-                $needsCustom{"NodeToReturn"} = $paramName if $param->extendedAttributes->{"Return"};
+                $needsCustom{"NodeToReturn"} = $paramName if $param->extendedAttributes->{"CustomReturn"};
 
                 unless ($codeGenerator->IsPrimitiveType($idlType) or $codeGenerator->IsStringType($idlType)) {
                     push(@needsAssert, "    ASSERT($paramName);\n");

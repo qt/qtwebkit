@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2009-2010 ProFUSION embedded systems
-    Copyright (C) 2009-2011 Samsung Electronics
+    Copyright (C) 2009-2012 Samsung Electronics
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -50,6 +50,7 @@
 #include "ProgressTracker.h"
 #include "RefPtrCairo.h"
 #include "RenderTheme.h"
+#include "ResourceHandle.h"
 #include "Settings.h"
 #include "c_instance.h"
 #include "ewk_logging.h"
@@ -59,6 +60,7 @@
 #include <Evas.h>
 #include <eina_safety_checks.h>
 #include <inttypes.h>
+#include <libsoup/soup-session.h>
 #include <limits>
 #include <math.h>
 #include <sys/time.h>
@@ -66,6 +68,10 @@
 #if ENABLE(DEVICE_ORIENTATION)
 #include "DeviceMotionClientEfl.h"
 #include "DeviceOrientationClientEfl.h"
+#endif
+
+#if ENABLE(VIBRATION)
+#include "VibrationClientEfl.h"
 #endif
 
 static const float zoomMinimum = 0.05;
@@ -211,6 +217,7 @@ struct _Ewk_View_Private_Data {
         } center;
         Ecore_Animator* animator;
     } animatedZoom;
+    SoupSession* soupSession;
 };
 
 #ifndef EWK_TYPE_CHECK
@@ -604,15 +611,19 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
     pageClients.editorClient = new WebCore::EditorClientEfl(smartData->self);
     pageClients.dragClient = new WebCore::DragClientEfl;
     pageClients.inspectorClient = new WebCore::InspectorClientEfl;
-#if ENABLE(DEVICE_ORIENTATION)
-    pageClients.deviceMotionClient = new WebCore::DeviceMotionClientEfl;
-    pageClients.deviceOrientationClient = new WebCore::DeviceOrientationClientEfl;
-#endif
     priv->page = new WebCore::Page(pageClients);
     if (!priv->page) {
         CRITICAL("Could not create WebKit Page");
         goto error_page;
     }
+#if ENABLE(DEVICE_ORIENTATION)
+    WebCore::provideDeviceMotionTo(priv->page, new WebCore::DeviceMotionClientEfl);
+    WebCore::provideDeviceOrientationTo(priv->page, new WebCore::DeviceOrientationClientEfl);
+#endif
+
+#if ENABLE(VIBRATION)
+    WebCore::provideVibrationTo(priv->page, new WebCore::VibrationClientEfl(smartData->self));
+#endif
 
     priv->pageSettings = priv->page->settings();
     if (!priv->pageSettings) {
@@ -713,6 +724,8 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
         CRITICAL("Could not create history instance for view.");
         goto error_history;
     }
+
+    priv->soupSession = WebCore::ResourceHandle::defaultSession();
 
     return priv;
 
@@ -3911,6 +3924,25 @@ Ewk_Page_Visibility_State ewk_view_visibility_state_get(const Evas_Object* ewkVi
     DBG("PAGE_VISIBILITY_API is disabled.");
     return EWK_PAGE_VISIBILITY_STATE_VISIBLE;
 #endif
+}
+
+SoupSession* ewk_view_soup_session_get(const Evas_Object* ewkView)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, 0);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, 0);
+    return priv->soupSession;
+}
+
+void ewk_view_soup_session_set(Evas_Object* ewkView, SoupSession* session)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv);
+    if (!SOUP_IS_SESSION_ASYNC(session)) {
+        ERR("WebKit requires an SoupSessionAsync to work properly, but "
+            "a SoupSessionSync was provided.");
+        return;
+    }
+    priv->soupSession = session;
 }
 
 namespace EWKPrivate {

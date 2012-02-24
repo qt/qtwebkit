@@ -33,6 +33,7 @@
 #if USE(ACCELERATED_COMPOSITING)
 #include "LayerChromium.h"
 
+#include "cc/CCLayerAnimationController.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerTreeHost.h"
 #if USE(SKIA)
@@ -59,7 +60,9 @@ LayerChromium::LayerChromium()
     : m_needsDisplay(false)
     , m_layerId(s_nextLayerId++)
     , m_parent(0)
+    , m_layerAnimationController(CCLayerAnimationController::create())
     , m_scrollable(false)
+    , m_haveWheelEventHandlers(false)
     , m_anchorPoint(0.5, 0.5)
     , m_backgroundColor(0, 0, 0, 0)
     , m_backgroundCoversViewport(false)
@@ -90,6 +93,52 @@ LayerChromium::~LayerChromium()
 
     // Remove the parent reference from all children.
     removeAllChildren();
+}
+
+bool LayerChromium::addAnimation(const KeyframeValueList& values, const IntSize& boxSize, const Animation* animation, int animationId, int groupId, double timeOffset)
+{
+    if (!m_layerTreeHost || !m_layerTreeHost->settings().threadedAnimationEnabled)
+        return false;
+
+    bool addedAnimation = m_layerAnimationController->addAnimation(values, boxSize, animation, animationId, groupId, timeOffset);
+    if (addedAnimation)
+        setNeedsCommit();
+    return addedAnimation;
+}
+
+void LayerChromium::pauseAnimation(int animationId, double timeOffset)
+{
+    m_layerAnimationController->pauseAnimation(animationId, timeOffset);
+    setNeedsCommit();
+}
+
+void LayerChromium::removeAnimation(int animationId)
+{
+    m_layerAnimationController->removeAnimation(animationId);
+    setNeedsCommit();
+}
+
+void LayerChromium::suspendAnimations(double time)
+{
+    m_layerAnimationController->suspendAnimations(time);
+    setNeedsCommit();
+}
+
+void LayerChromium::resumeAnimations()
+{
+    m_layerAnimationController->resumeAnimations();
+    setNeedsCommit();
+}
+
+void LayerChromium::setLayerAnimationController(PassOwnPtr<CCLayerAnimationController> layerAnimationController)
+{
+    m_layerAnimationController = layerAnimationController;
+    setNeedsCommit();
+}
+
+bool LayerChromium::hasActiveAnimation() const
+{
+    return m_layerAnimationController->hasActiveAnimation();
 }
 
 void LayerChromium::setIsNonCompositedContent(bool isNonCompositedContent)
@@ -305,6 +354,14 @@ void LayerChromium::setReplicaLayer(LayerChromium* layer)
     setNeedsCommit();
 }
 
+void LayerChromium::setFilters(const FilterOperations& filters)
+{
+    if (m_filters == filters)
+        return;
+    m_filters = filters;
+    setNeedsCommit();
+}
+
 void LayerChromium::setOpacity(float opacity)
 {
     if (m_opacity == opacity)
@@ -361,6 +418,14 @@ void LayerChromium::setScrollable(bool scrollable)
     setNeedsCommit();
 }
 
+void LayerChromium::setHaveWheelEventHandlers(bool haveWheelEventHandlers)
+{
+    if (m_haveWheelEventHandlers == haveWheelEventHandlers)
+        return;
+    m_haveWheelEventHandlers = haveWheelEventHandlers;
+    setNeedsCommit();
+}
+
 void LayerChromium::setDoubleSided(bool doubleSided)
 {
     if (m_doubleSided == doubleSided)
@@ -411,9 +476,11 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
     layer->setDebugBorderWidth(m_debugBorderWidth);
     layer->setDoubleSided(m_doubleSided);
     layer->setDrawsContent(drawsContent());
+    layer->setFilters(filters());
     layer->setIsNonCompositedContent(m_isNonCompositedContent);
     layer->setMasksToBounds(m_masksToBounds);
     layer->setScrollable(m_scrollable);
+    layer->setHaveWheelEventHandlers(m_haveWheelEventHandlers);
     layer->setName(m_name);
     layer->setOpaque(m_opaque);
     layer->setOpacity(m_opacity);
@@ -431,6 +498,8 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
         maskLayer()->pushPropertiesTo(layer->maskLayer());
     if (replicaLayer())
         replicaLayer()->pushPropertiesTo(layer->replicaLayer());
+
+    m_layerAnimationController->synchronizeAnimations(layer->layerAnimationController());
 
     // Reset any state that should be cleared for the next update.
     m_updateRect = FloatRect();
@@ -494,6 +563,7 @@ void LayerChromium::createRenderSurface()
 {
     ASSERT(!m_renderSurface);
     m_renderSurface = adoptPtr(new RenderSurfaceChromium(this));
+    setTargetRenderSurface(m_renderSurface.get());
 }
 
 bool LayerChromium::descendantDrawsContent()

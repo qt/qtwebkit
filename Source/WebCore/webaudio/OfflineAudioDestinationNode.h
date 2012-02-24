@@ -48,8 +48,7 @@ public:
     // AudioNode   
     virtual void initialize();
     virtual void uninitialize();
-    
-    float sampleRate() const { return m_renderTarget->sampleRate(); }
+    virtual float sampleRate() const { return m_renderTarget->sampleRate(); }
 
     void startRendering();
     
@@ -65,7 +64,7 @@ private:
     // Rendering thread.
     volatile ThreadIdentifier m_renderThread;
     bool m_startedRendering;
-    static void* renderEntry(void* threadData);
+    static void renderEntry(void* threadData);
     void render();
     
     // For completion callback on main thread.

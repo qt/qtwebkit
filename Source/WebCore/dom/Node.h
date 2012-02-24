@@ -90,7 +90,7 @@ class HTMLPropertiesCollection;
 
 typedef int ExceptionCode;
 
-const int nodeStyleChangeShift = 25;
+const int nodeStyleChangeShift = 23;
 
 // SyntheticStyleChange means that we need to go through the entire style change logic even though
 // no style property has actually changed. It is used to restructure the tree when, for instance,
@@ -122,7 +122,6 @@ public:
         DOCUMENT_FRAGMENT_NODE = 11,
         NOTATION_NODE = 12,
         XPATH_NAMESPACE_NODE = 13,
-        SHADOW_ROOT_NODE = 14
     };
     enum DocumentPosition {
         DOCUMENT_POSITION_EQUIVALENT = 0x00,
@@ -224,6 +223,9 @@ public:
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootOrSVGShadowRootFlag) && !isSVGElement(); }
     virtual bool isContentElement() const { return false; }
+#if ENABLE(SHADOW_DOM)
+    virtual bool isShadowElement() const { return false; }
+#endif
 
     Node* shadowAncestorNode() const;
     // Returns 0, a ShadowRoot, or a legacy shadow root.
@@ -297,9 +299,11 @@ public:
     virtual bool sheetLoaded() { return true; }
     virtual void startLoadingDynamicSheet() { ASSERT_NOT_REACHED(); }
 
+    bool attributeStyleDirty() const { return getFlag(AttributeStyleDirtyFlag); }
     bool hasName() const { return getFlag(HasNameFlag); }
-    bool hasID() const { return getFlag(HasIDFlag); }
-    bool hasClass() const { return getFlag(HasClassFlag); }
+    bool hasID() const;
+    bool hasClass() const;
+    
     bool active() const { return getFlag(IsActiveFlag); }
     bool inActiveChain() const { return getFlag(InActiveChainFlag); }
     bool inDetach() const { return getFlag(InDetachFlag); }
@@ -312,9 +316,10 @@ public:
     bool childNeedsStyleRecalc() const { return getFlag(ChildNeedsStyleRecalcFlag); }
     bool isLink() const { return getFlag(IsLinkFlag); }
 
+    void setAttributeStyleDirty() { setFlag(AttributeStyleDirtyFlag); }
+    void clearAttributeStyleDirty() { clearFlag(AttributeStyleDirtyFlag); }
+
     void setHasName(bool f) { setFlag(f, HasNameFlag); }
-    void setHasID(bool f) { setFlag(f, HasIDFlag); }
-    void setHasClass(bool f) { setFlag(f, HasClassFlag); }
     void setChildNeedsStyleRecalc() { setFlag(ChildNeedsStyleRecalcFlag); }
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
     void setInDocument() { setFlag(InDocumentFlag); }
@@ -492,7 +497,7 @@ public:
     virtual void willRemove();
     void createRendererIfNeeded();
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    virtual bool childShouldCreateRenderer(Node*) const { return true; }
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const { return true; }
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     ContainerNode* parentNodeForRenderingAndStyle();
     
@@ -632,6 +637,13 @@ public:
     void notifyMutationObserversNodeWillDetach();
 #endif // ENABLE(MUTATION_OBSERVERS)
 
+#if ENABLE(STYLE_SCOPED)
+    void registerScopedHTMLStyleChild();
+    void unregisterScopedHTMLStyleChild();
+#endif
+    bool hasScopedHTMLStyleChild() const;
+    size_t numberOfScopedHTMLStyleChildren() const;
+
 private:
     enum NodeFlags {
         IsTextFlag = 1,
@@ -641,37 +653,37 @@ private:
         IsStyledElementFlag = 1 << 4,
         IsHTMLFlag = 1 << 5,
         IsSVGFlag = 1 << 6,
-        HasIDFlag = 1 << 7,
-        HasClassFlag = 1 << 8,
-        IsAttachedFlag = 1 << 9,
-        ChildNeedsStyleRecalcFlag = 1 << 10,
-        InDocumentFlag = 1 << 11,
-        IsLinkFlag = 1 << 12,
-        IsActiveFlag = 1 << 13,
-        IsHoveredFlag = 1 << 14,
-        InActiveChainFlag = 1 << 15,
-        InDetachFlag = 1 << 16,
-        HasRareDataFlag = 1 << 17,
-        IsShadowRootOrSVGShadowRootFlag = 1 << 18,
+        IsAttachedFlag = 1 << 7,
+        ChildNeedsStyleRecalcFlag = 1 << 8,
+        InDocumentFlag = 1 << 9,
+        IsLinkFlag = 1 << 10,
+        IsActiveFlag = 1 << 11,
+        IsHoveredFlag = 1 << 12,
+        InActiveChainFlag = 1 << 13,
+        InDetachFlag = 1 << 14,
+        HasRareDataFlag = 1 << 15,
+        IsShadowRootOrSVGShadowRootFlag = 1 << 16,
 
         // These bits are used by derived classes, pulled up here so they can
         // be stored in the same memory word as the Node bits above.
-        IsParsingChildrenFinishedFlag = 1 << 19, // Element
-        IsStyleAttributeValidFlag = 1 << 20, // StyledElement
-        IsSynchronizingStyleAttributeFlag = 1 << 21, // StyledElement
+        IsParsingChildrenFinishedFlag = 1 << 17, // Element
+        IsStyleAttributeValidFlag = 1 << 18, // StyledElement
+        IsSynchronizingStyleAttributeFlag = 1 << 19, // StyledElement
 #if ENABLE(SVG)
-        AreSVGAttributesValidFlag = 1 << 22, // Element
-        IsSynchronizingSVGAttributesFlag = 1 << 23, // SVGElement
-        HasSVGRareDataFlag = 1 << 24, // SVGElement
+        AreSVGAttributesValidFlag = 1 << 20, // Element
+        IsSynchronizingSVGAttributesFlag = 1 << 21, // SVGElement
+        HasSVGRareDataFlag = 1 << 22, // SVGElement
 #endif
 
         StyleChangeMask = 1 << nodeStyleChangeShift | 1 << (nodeStyleChangeShift + 1),
 
-        SelfOrAncestorHasDirAutoFlag = 1 << 27,
-        HasCustomWillOrDidRecalcStyleFlag = 1 << 28,
-        HasCustomStyleForRendererFlag = 1 << 29,
+        SelfOrAncestorHasDirAutoFlag = 1 << 25,
+        HasCustomWillOrDidRecalcStyleFlag = 1 << 26,
+        HasCustomStyleForRendererFlag = 1 << 27,
 
-        HasNameFlag = 1 << 30,
+        HasNameFlag = 1 << 28,
+
+        AttributeStyleDirtyFlag = 1 << 31,
 
 #if ENABLE(SVG)
         DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag | AreSVGAttributesValidFlag
@@ -680,7 +692,7 @@ private:
 #endif
     };
 
-    // 1 bit remaining
+    // 3 bits remaining
 
     bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
     void setFlag(bool f, NodeFlags mask) const { m_nodeFlags = (m_nodeFlags & ~mask) | (-(int32_t)f & mask); } 

@@ -218,6 +218,8 @@ webkit_settings_get_print_backgrounds
 webkit_settings_set_print_backgrounds
 webkit_settings_get_enable_webaudio
 webkit_settings_set_enable_webaudio
+webkit_settings_get_enable_webgl
+webkit_settings_set_enable_webgl
 
 <SUBSECTION Standard>
 WebKitSettingsClass
@@ -387,6 +389,60 @@ WEBKIT_RESPONSE_POLICY_DECISION_GET_CLASS
 <SUBSECTION Private>
 WebKitResponsePolicyDecisionPrivate
 webkit_response_policy_decision_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitHitTestResult</FILE>
+WebKitHitTestResult
+WebKitHitTestResultContext
+webkit_hit_test_result_get_context
+webkit_hit_test_result_context_is_link
+webkit_hit_test_result_context_is_image
+webkit_hit_test_result_context_is_media
+webkit_hit_test_result_get_link_uri
+webkit_hit_test_result_get_link_title
+webkit_hit_test_result_get_link_label
+webkit_hit_test_result_get_image_uri
+webkit_hit_test_result_get_media_uri
+
+<SUBSECTION Standard>
+WebKitHitTestResultClass
+WEBKIT_TYPE_HIT_TEST_RESULT
+WEBKIT_HIT_TEST_RESULT
+WEBKIT_IS_HIT_TEST_RESULT
+WEBKIT_HIT_TEST_RESULT_CLASS
+WEBKIT_IS_HIT_TEST_RESULT_CLASS
+WEBKIT_HIT_TEST_RESULT_GET_CLASS
+
+<SUBSECTION Private>
+WebKitHitTestResultPrivate
+webkit_hit_test_result_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitPrintOperation</FILE>
+WebKitPrintOperation
+WebKitPrintOperationResponse
+webkit_print_operation_new
+webkit_print_operation_get_print_settings
+webkit_print_operation_set_print_settings
+webkit_print_operation_get_page_setup
+webkit_print_operation_set_page_setup
+webkit_print_operation_run_dialog
+webkit_print_operation_print
+
+<SUBSECTION Standard>
+WebKitPrintOperationClass
+WEBKIT_TYPE_PRINT_OPERATION
+WEBKIT_PRINT_OPERATION
+WEBKIT_IS_PRINT_OPERATION
+WEBKIT_PRINT_OPERATION_CLASS
+WEBKIT_IS_PRINT_OPERATION_CLASS
+WEBKIT_PRINT_OPERATION_GET_CLASS
+
+<SUBSECTION Private>
+WebKitPrintOperationPrivate
+webkit_print_operation_get_type
 </SECTION>
 
 <SECTION>

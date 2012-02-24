@@ -18,6 +18,7 @@ WEBCORE_GENERATED_SOURCES_DIR = $${ROOT_BUILD_DIR}/Source/WebCore/$${GENERATED_S
 
 INCLUDEPATH += \
     $$SOURCE_DIR \
+    $$SOURCE_DIR/Modules/geolocation \
     $$SOURCE_DIR/accessibility \
     $$SOURCE_DIR/bindings \
     $$SOURCE_DIR/bindings/generic \
@@ -43,8 +44,9 @@ INCLUDEPATH += \
     $$SOURCE_DIR/mathml \
     $$SOURCE_DIR/notifications \
     $$SOURCE_DIR/page \
-    $$SOURCE_DIR/page/qt \
     $$SOURCE_DIR/page/animation \
+    $$SOURCE_DIR/page/qt \
+    $$SOURCE_DIR/page/scrolling \
     $$SOURCE_DIR/platform \
     $$SOURCE_DIR/platform/animation \
     $$SOURCE_DIR/platform/audio \

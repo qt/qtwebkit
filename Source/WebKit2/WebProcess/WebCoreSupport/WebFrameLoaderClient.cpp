@@ -537,7 +537,7 @@ void WebFrameLoaderClient::dispatchDidFirstLayout()
     // Notify the UIProcess.
     webPage->send(Messages::WebPageProxy::DidFirstLayoutForFrame(m_frame->frameID(), InjectedBundleUserMessageEncoder(userData.get())));
 
-    if (m_frame == m_frame->page()->mainWebFrame() && !webPage->corePage()->settings()->suppressIncrementalRendering())
+    if (m_frame == m_frame->page()->mainWebFrame() && !webPage->corePage()->settings()->suppressesIncrementalRendering())
         webPage->drawingArea()->setLayerTreeStateIsFrozen(false);
 }
 
@@ -930,6 +930,11 @@ bool WebFrameLoaderClient::shouldGoToHistoryItem(HistoryItem* item) const
         // We should never be considering navigating to an item that is not actually in the back/forward list.
         ASSERT_NOT_REACHED();
         return false;
+    }
+    
+    if (webPage->willGoToBackForwardItemCallbackEnabled()) {
+        webPage->send(Messages::WebPageProxy::WillGoToBackForwardListItem(itemID));
+        return true;
     }
     
     bool shouldGoToBackForwardListItem;

@@ -142,17 +142,17 @@ void Structure::dumpStatistics()
         }
     }
 
-    printf("Number of live Structures: %d\n", liveStructureSet.size());
-    printf("Number of Structures using the single item optimization for transition map: %d\n", numberUsingSingleSlot);
-    printf("Number of Structures that are leaf nodes: %d\n", numberLeaf);
-    printf("Number of Structures that singletons: %d\n", numberSingletons);
-    printf("Number of Structures with PropertyMaps: %d\n", numberWithPropertyMaps);
+    dataLog("Number of live Structures: %d\n", liveStructureSet.size());
+    dataLog("Number of Structures using the single item optimization for transition map: %d\n", numberUsingSingleSlot);
+    dataLog("Number of Structures that are leaf nodes: %d\n", numberLeaf);
+    dataLog("Number of Structures that singletons: %d\n", numberSingletons);
+    dataLog("Number of Structures with PropertyMaps: %d\n", numberWithPropertyMaps);
 
-    printf("Size of a single Structures: %d\n", static_cast<unsigned>(sizeof(Structure)));
-    printf("Size of sum of all property maps: %d\n", totalPropertyMapsSize);
-    printf("Size of average of all property maps: %f\n", static_cast<double>(totalPropertyMapsSize) / static_cast<double>(liveStructureSet.size()));
+    dataLog("Size of a single Structures: %d\n", static_cast<unsigned>(sizeof(Structure)));
+    dataLog("Size of sum of all property maps: %d\n", totalPropertyMapsSize);
+    dataLog("Size of average of all property maps: %f\n", static_cast<double>(totalPropertyMapsSize) / static_cast<double>(liveStructureSet.size()));
 #else
-    printf("Dumping Structure statistics is not enabled.\n");
+    dataLog("Dumping Structure statistics is not enabled.\n");
 #endif
 }
 
@@ -167,6 +167,7 @@ Structure::Structure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSV
     , m_dictionaryKind(NoneDictionaryKind)
     , m_isPinnedPropertyTable(false)
     , m_hasGetterSetterProperties(false)
+    , m_hasReadOnlyOrGetterSetterPropertiesExcludingProto(false)
     , m_hasNonEnumerableProperties(false)
     , m_attributesInPrevious(0)
     , m_specificFunctionThrashCount(0)
@@ -188,6 +189,7 @@ Structure::Structure(JSGlobalData& globalData)
     , m_dictionaryKind(NoneDictionaryKind)
     , m_isPinnedPropertyTable(false)
     , m_hasGetterSetterProperties(false)
+    , m_hasReadOnlyOrGetterSetterPropertiesExcludingProto(false)
     , m_hasNonEnumerableProperties(false)
     , m_attributesInPrevious(0)
     , m_specificFunctionThrashCount(0)
@@ -207,6 +209,7 @@ Structure::Structure(JSGlobalData& globalData, const Structure* previous)
     , m_dictionaryKind(previous->m_dictionaryKind)
     , m_isPinnedPropertyTable(false)
     , m_hasGetterSetterProperties(previous->m_hasGetterSetterProperties)
+    , m_hasReadOnlyOrGetterSetterPropertiesExcludingProto(previous->m_hasReadOnlyOrGetterSetterPropertiesExcludingProto)
     , m_hasNonEnumerableProperties(previous->m_hasNonEnumerableProperties)
     , m_attributesInPrevious(0)
     , m_specificFunctionThrashCount(previous->m_specificFunctionThrashCount)
@@ -322,7 +325,7 @@ Structure* Structure::addPropertyTransition(JSGlobalData& globalData, Structure*
             transition->growPropertyStorageCapacity();
         return transition;
     }
-
+    
     Structure* transition = create(globalData, structure);
 
     transition->m_cachedPrototypeChain.setMayBeNull(globalData, transition, structure->m_cachedPrototypeChain.get());
@@ -467,9 +470,12 @@ Structure* Structure::freezeTransition(JSGlobalData& globalData, Structure* stru
     Structure* transition = preventExtensionsTransition(globalData, structure);
 
     if (transition->m_propertyTable) {
+        PropertyTable::iterator iter = transition->m_propertyTable->begin();
         PropertyTable::iterator end = transition->m_propertyTable->end();
-        for (PropertyTable::iterator iter = transition->m_propertyTable->begin(); iter != end; ++iter)
-            iter->attributes |= (DontDelete | ReadOnly);
+        if (iter != end)
+            transition->m_hasReadOnlyOrGetterSetterPropertiesExcludingProto = true;
+        for (; iter != end; ++iter)
+            iter->attributes |= iter->attributes & Accessor ? DontDelete : (DontDelete | ReadOnly);
     }
 
     return transition;
@@ -520,7 +526,9 @@ bool Structure::isFrozen(JSGlobalData& globalData)
 
     PropertyTable::iterator end = m_propertyTable->end();
     for (PropertyTable::iterator iter = m_propertyTable->begin(); iter != end; ++iter) {
-        if ((iter->attributes & (DontDelete | ReadOnly)) != (DontDelete | ReadOnly))
+        if (!(iter->attributes & DontDelete))
+            return false;
+        if (!(iter->attributes & (ReadOnly | Accessor)))
             return false;
     }
     return true;
@@ -601,11 +609,11 @@ static PropertyMapStatisticsExitLogger logger;
 
 PropertyMapStatisticsExitLogger::~PropertyMapStatisticsExitLogger()
 {
-    printf("\nJSC::PropertyMap statistics\n\n");
-    printf("%d probes\n", numProbes);
-    printf("%d collisions (%.1f%%)\n", numCollisions, 100.0 * numCollisions / numProbes);
-    printf("%d rehashes\n", numRehashes);
-    printf("%d removes\n", numRemoves);
+    dataLog("\nJSC::PropertyMap statistics\n\n");
+    dataLog("%d probes\n", numProbes);
+    dataLog("%d collisions (%.1f%%)\n", numCollisions, 100.0 * numCollisions / numProbes);
+    dataLog("%d rehashes\n", numRehashes);
+    dataLog("%d removes\n", numRemoves);
 }
 
 #endif

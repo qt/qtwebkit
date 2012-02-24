@@ -30,6 +30,8 @@
 
 namespace WebCore {
 
+class HTMLTableElement;
+
 class HTMLTablePartElement : public HTMLElement {
 protected:
     HTMLTablePartElement(const QualifiedName& tagName, Document* document)
@@ -37,7 +39,10 @@ protected:
     {
     }
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+
+    HTMLTableElement* findParentTable() const;
 };
 
 } //namespace

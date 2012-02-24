@@ -32,7 +32,7 @@ namespace WebCore {
 class TestInterface;
 };
 
-class WebDOMTestObj;
+class WebDOMNode;
 
 class WebDOMTestInterface : public WebDOMObject {
 public:
@@ -59,9 +59,13 @@ public:
     WebDOMString supplementalStr2() const;
     void setSupplementalStr2(const WebDOMString&);
 #endif
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    WebDOMNode supplementalNode() const;
+    void setSupplementalNode(const WebDOMNode&);
+#endif
 
     void supplementalMethod1();
-    WebDOMTestObj supplementalMethod2(const WebDOMString& strArg, const WebDOMTestObj& objArg);
+    void supplementalMethod4();
 
     WebCore::TestInterface* impl() const;
 

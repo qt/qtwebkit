@@ -28,12 +28,13 @@
 #include "Document.h"
 #include "NodeRareData.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 
 namespace WebCore {
 
 static inline ShadowRoot* shadowRootFor(Node* node)
 {
-    return node->isElementNode() ? toElement(node)->shadowRoot() : 0;
+    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadowRootList()->youngestShadowRoot() : 0;
 }
 
 void TreeScopeAdopter::moveTreeToNewScope(Node* root) const
@@ -96,10 +97,8 @@ inline void TreeScopeAdopter::moveNodeToNewDocument(Node* node, Document* oldDoc
     ASSERT(!node->inDocument() || oldDocument != newDocument);
 
     newDocument->guardRef();
-    if (oldDocument) {
+    if (oldDocument)
         oldDocument->moveNodeIteratorsToNewDocument(node, newDocument);
-        oldDocument->guardDeref();
-    }
 
     node->setDocument(newDocument);
 
@@ -110,6 +109,9 @@ inline void TreeScopeAdopter::moveNodeToNewDocument(Node* node, Document* oldDoc
 
     node->didMoveToNewDocument(oldDocument);
     ASSERT(didMoveToNewDocumentWasCalled);
+    
+    if (oldDocument)
+        oldDocument->guardDeref();
 }
 
 }

@@ -74,6 +74,13 @@ public:
 
     virtual OperationType getOperationType() const { return m_type; }
     virtual bool isSameType(const FilterOperation& o) const { return o.getOperationType() == m_type; }
+    
+    virtual bool isDefault() const { return false; }
+
+    // True if the alpha channel of any pixel can change under this operation.
+    virtual bool affectsOpacity() const { return false; }
+    // True if the the value of one pixel can affect the value of another pixel under this operation, such as blur.
+    virtual bool movesPixels() const { return false; }
 
 protected:
     FilterOperation(OperationType type)
@@ -82,6 +89,28 @@ protected:
     }
 
     OperationType m_type;
+};
+
+class DefaultFilterOperation : public FilterOperation {
+public:
+    static PassRefPtr<DefaultFilterOperation> create(OperationType type)
+    {
+        return adoptRef(new DefaultFilterOperation(type));
+    }
+
+private:
+
+    virtual bool operator==(const FilterOperation& o) const
+    {
+        return isSameType(o);
+    }
+
+    virtual bool isDefault() const { return true; }
+
+    DefaultFilterOperation(OperationType type)
+        : FilterOperation(type)
+    {
+    }
 };
 
 class PassthroughFilterOperation : public FilterOperation {
@@ -110,6 +139,9 @@ public:
     {
         return adoptRef(new ReferenceFilterOperation(reference, type));
     }
+
+    virtual bool affectsOpacity() const { return true; }
+    virtual bool movesPixels() const { return true; }
 
     const AtomicString& reference() const { return m_reference; }
 
@@ -174,6 +206,8 @@ public:
     }
 
     double amount() const { return m_amount; }
+
+    virtual bool affectsOpacity() const { return m_type == OPACITY; }
 
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
 
@@ -241,6 +275,9 @@ public:
 
     Length stdDeviation() const { return m_stdDeviation; }
 
+    virtual bool affectsOpacity() const { return true; }
+    virtual bool movesPixels() const { return true; }
+
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
 
 private:
@@ -272,6 +309,9 @@ public:
     int y() const { return m_y; }
     int stdDeviation() const { return m_stdDeviation; }
     Color color() const { return m_color; }
+
+    virtual bool affectsOpacity() const { return true; }
+    virtual bool movesPixels() const { return true; }
 
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* from, double progress, bool blendToPassthrough = false);
 

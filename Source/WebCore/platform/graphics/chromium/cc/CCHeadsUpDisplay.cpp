@@ -32,6 +32,7 @@
 #include "FontCache.h"
 #include "FontDescription.h"
 #include "GraphicsContext3D.h"
+#include "InspectorController.h"
 #include "LayerChromium.h"
 #include "LayerRendererChromium.h"
 #include "ManagedTexture.h"

@@ -27,6 +27,7 @@
 #define Executable_h
 
 #include "CallData.h"
+#include "CodeSpecializationKind.h"
 #include "JSFunction.h"
 #include "Interpreter.h"
 #include "Nodes.h"
@@ -39,12 +40,12 @@ namespace JSC {
     class Debugger;
     class EvalCodeBlock;
     class FunctionCodeBlock;
+    class LLIntOffsetsExtractor;
     class ProgramCodeBlock;
     class ScopeChainNode;
 
     struct ExceptionInfo;
     
-    enum CodeSpecializationKind { CodeForCall, CodeForConstruct };
     enum CompilationKind { FirstCompilation, OptimizingCompilation };
 
     inline bool isCall(CodeSpecializationKind kind)
@@ -77,7 +78,9 @@ namespace JSC {
     public:
         typedef JSCell Base;
 
+#if ENABLE(JIT)
         static void destroy(JSCell*);
+#endif
 
         bool isHostFunction() const
         {
@@ -197,7 +200,7 @@ namespace JSC {
         }
 #endif
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         static NativeExecutable* create(JSGlobalData& globalData, NativeFunction function, NativeFunction constructor)
         {
             ASSERT(!globalData.canUseJIT());
@@ -208,7 +211,9 @@ namespace JSC {
         }
 #endif
 
+#if ENABLE(JIT)
         static void destroy(JSCell*);
+#endif
 
         NativeFunction function() { return m_function; }
         NativeFunction constructor() { return m_constructor; }
@@ -233,7 +238,7 @@ namespace JSC {
         }
 #endif
 
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
         void finishCreation(JSGlobalData& globalData)
         {
             ASSERT(!globalData.canUseJIT());
@@ -276,7 +281,9 @@ namespace JSC {
         {
         }
 
+#if ENABLE(JIT)
         static void destroy(JSCell*);
+#endif
 
         const SourceCode& source() { return m_source; }
         intptr_t sourceID() const { return m_source.provider()->asID(); }
@@ -319,6 +326,7 @@ namespace JSC {
     };
 
     class EvalExecutable : public ScriptExecutable {
+        friend class LLIntOffsetsExtractor;
     public:
         typedef ScriptExecutable Base;
 
@@ -338,6 +346,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
         void jettisonOptimizedCode(JSGlobalData&);
+        void jitCompile(JSGlobalData&);
 #endif
 
         EvalCodeBlock& generatedBytecode()
@@ -384,6 +393,7 @@ namespace JSC {
     };
 
     class ProgramExecutable : public ScriptExecutable {
+        friend class LLIntOffsetsExtractor;
     public:
         typedef ScriptExecutable Base;
 
@@ -411,6 +421,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
         void jettisonOptimizedCode(JSGlobalData&);
+        void jitCompile(JSGlobalData&);
 #endif
 
         ProgramCodeBlock& generatedBytecode()
@@ -453,6 +464,7 @@ namespace JSC {
 
     class FunctionExecutable : public ScriptExecutable {
         friend class JIT;
+        friend class LLIntOffsetsExtractor;
     public:
         typedef ScriptExecutable Base;
 
@@ -508,6 +520,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
         void jettisonOptimizedCodeForCall(JSGlobalData&);
+        void jitCompileForCall(JSGlobalData&);
 #endif
 
         bool isGeneratedForCall() const
@@ -535,6 +548,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
         void jettisonOptimizedCodeForConstruct(JSGlobalData&);
+        void jitCompileForConstruct(JSGlobalData&);
 #endif
 
         bool isGeneratedForConstruct() const
@@ -581,6 +595,16 @@ namespace JSC {
                 ASSERT(kind == CodeForConstruct);
                 jettisonOptimizedCodeForConstruct(globalData);
             }
+        }
+        
+        void jitCompileFor(JSGlobalData& globalData, CodeSpecializationKind kind)
+        {
+            if (kind == CodeForCall) {
+                jitCompileForCall(globalData);
+                return;
+            }
+            ASSERT(kind == CodeForConstruct);
+            jitCompileForConstruct(globalData);
         }
 #endif
         

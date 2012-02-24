@@ -238,13 +238,11 @@ bool EditorClientImpl::shouldChangeSelectedRange(Range* fromRange,
     return true;
 }
 
-bool EditorClientImpl::shouldApplyStyle(CSSStyleDeclaration* style,
-                                        Range* range)
+bool EditorClientImpl::shouldApplyStyle(StylePropertySet* style, Range* range)
 {
     if (m_webView->client()) {
         // FIXME: Pass a reference to the CSSStyleDeclaration somehow.
-        return m_webView->client()->shouldApplyStyle(WebString(),
-                                                     WebRange(range));
+        return m_webView->client()->shouldApplyStyle(WebString(), WebRange(range));
     }
     return true;
 }
@@ -731,10 +729,10 @@ void EditorClientImpl::checkSpellingOfString(const UChar* text, int length,
         *misspellingLength = spellLength;
 }
 
-void EditorClientImpl::requestCheckingOfString(SpellChecker* sender, int identifier, TextCheckingTypeMask, const String& text)
+void EditorClientImpl::requestCheckingOfString(SpellChecker* sender, const WebCore::TextCheckingRequest& request)
 {
     if (m_webView->spellCheckClient())
-        m_webView->spellCheckClient()->requestCheckingOfText(text, new WebTextCheckingCompletionImpl(identifier, sender));
+        m_webView->spellCheckClient()->requestCheckingOfText(request.text(), new WebTextCheckingCompletionImpl(request.sequence(), sender));
 }
 
 String EditorClientImpl::getAutoCorrectSuggestionForMisspelledWord(const String& misspelledWord)

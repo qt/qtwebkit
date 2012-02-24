@@ -21,7 +21,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -276,6 +276,7 @@ void WorkerMessagingProxy::startWorkerContext(const KURL& scriptURL, const Strin
                                                                          m_scriptExecutionContext->contentSecurityPolicy()->headerType());
     workerThreadCreated(thread);
     thread->start();
+    InspectorInstrumentation::didStartWorkerContext(m_scriptExecutionContext.get(), this, scriptURL);
 }
 
 void WorkerMessagingProxy::postMessageToWorkerObject(PassRefPtr<SerializedScriptValue> message, PassOwnPtr<MessagePortChannelArray> channels)
@@ -315,7 +316,7 @@ void WorkerMessagingProxy::postExceptionToWorkerObject(const String& errorMessag
 {
     m_scriptExecutionContext->postTask(WorkerExceptionTask::create(errorMessage, lineNumber, sourceURL, this));
 }
-    
+
 static void postConsoleMessageTask(ScriptExecutionContext* context, WorkerMessagingProxy* messagingProxy, MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL)
 {
     if (messagingProxy->askedToTerminate())
@@ -410,6 +411,7 @@ void WorkerMessagingProxy::sendMessageToInspector(const String& message)
         return;
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     m_workerThread->runLoop().postTaskForMode(createCallbackTask(dispatchOnInspectorBackendTask, String(message)), WorkerDebuggerAgent::debuggerTaskMode);
+    WorkerDebuggerAgent::interruptAndDispatchInspectorCommands(m_workerThread.get());
 #endif
 }
 #endif

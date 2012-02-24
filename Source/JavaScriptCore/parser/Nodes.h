@@ -51,17 +51,14 @@ namespace JSC {
 
     const CodeFeatures NoFeatures = 0;
     const CodeFeatures EvalFeature = 1 << 0;
-    const CodeFeatures ClosureFeature = 1 << 1;
-    const CodeFeatures AssignFeature = 1 << 2;
-    const CodeFeatures ArgumentsFeature = 1 << 3;
-    const CodeFeatures WithFeature = 1 << 4;
-    const CodeFeatures CatchFeature = 1 << 5;
-    const CodeFeatures ThisFeature = 1 << 6;
-    const CodeFeatures StrictModeFeature = 1 << 7;
-    const CodeFeatures ShadowsArgumentsFeature = 1 << 8;
+    const CodeFeatures ArgumentsFeature = 1 << 1;
+    const CodeFeatures WithFeature = 1 << 2;
+    const CodeFeatures CatchFeature = 1 << 3;
+    const CodeFeatures ThisFeature = 1 << 4;
+    const CodeFeatures StrictModeFeature = 1 << 5;
+    const CodeFeatures ShadowsArgumentsFeature = 1 << 6;
     
-    
-    const CodeFeatures AllFeatures = EvalFeature | ClosureFeature | AssignFeature | ArgumentsFeature | WithFeature | CatchFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature;
+    const CodeFeatures AllFeatures = EvalFeature | ArgumentsFeature | WithFeature | CatchFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature;
 
     enum Operator {
         OpEqual,
@@ -1493,7 +1490,7 @@ namespace JSC {
         void finishParsing(PassRefPtr<FunctionParameters>, const Identifier&);
         
         const Identifier& ident() { return m_ident; }
-        void setInferredName(const Identifier& inferredName) { m_inferredName = inferredName; }
+        void setInferredName(const Identifier& inferredName) { ASSERT(!inferredName.isNull()); m_inferredName = inferredName; }
         const Identifier& inferredName() { return m_inferredName.isEmpty() ? m_ident : m_inferredName; }
 
         static const bool scopeIsFunction = true;

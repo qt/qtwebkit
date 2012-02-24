@@ -148,9 +148,9 @@ bool WebEditorClient::shouldChangeSelectedRange(Range* fromRange, Range* toRange
     return result;
 }
     
-bool WebEditorClient::shouldApplyStyle(CSSStyleDeclaration* style, Range* range)
+bool WebEditorClient::shouldApplyStyle(StylePropertySet* style, Range* range)
 {
-    bool result = m_page->injectedBundleEditorClient().shouldApplyStyle(m_page, style, range);
+    bool result = m_page->injectedBundleEditorClient().shouldApplyStyle(m_page, style->ensureCSSStyleDeclaration(), range);
     notImplemented();
     return result;
 }
@@ -447,7 +447,7 @@ void WebEditorClient::setInputMethodState(bool)
     notImplemented();
 }
 
-void WebEditorClient::requestCheckingOfString(WebCore::SpellChecker*, int, WebCore::TextCheckingTypeMask, const WTF::String&)
+void WebEditorClient::requestCheckingOfString(WebCore::SpellChecker*, const WebCore::TextCheckingRequest&)
 {
     notImplemented();
 }

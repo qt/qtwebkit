@@ -793,8 +793,8 @@ AC_MSG_RESULT([$enable_xslt])
 AC_MSG_CHECKING([whether to enable geolocation support])
 AC_ARG_ENABLE(geolocation,
               AC_HELP_STRING([--enable-geolocation],
-                             [enable support for geolocation [default=no]]),
-              [],[enable_geolocation="no"])
+                             [enable support for geolocation [default=yes]]),
+              [],[enable_geolocation="yes"])
 AC_MSG_RESULT([$enable_geolocation])
 
 # check whether to enable MathML support
@@ -804,6 +804,14 @@ AC_ARG_ENABLE(mathml,
                              [enable support for MathML [default=yes]]),
               [],[enable_mathml="yes"])
 AC_MSG_RESULT([$enable_mathml])
+
+# check whether to enable MHTML support
+AC_MSG_CHECKING([whether to enable MHTML support])
+AC_ARG_ENABLE(mhtml,
+              AC_HELP_STRING([--enable-mhtml],
+                             [enable support for MHTML [default=no]]),
+              [],[enable_mhtml="no"])
+AC_MSG_RESULT([$enable_mhtml])
 
 # check whether to enable SVG support
 AC_MSG_CHECKING([whether to enable SVG support])
@@ -1027,8 +1035,8 @@ AC_MSG_RESULT([$enable_animation_api])
 AC_MSG_CHECKING([whether to enable requestAnimationFrame support])
 AC_ARG_ENABLE(request_animation_frame,
               AC_HELP_STRING([--enable-request-animation-frame],
-                             [enable support for requestAnimationFrame (experimental) [default=no]]),
-              [],[enable_request_animation_frame="no"])
+                             [enable support for requestAnimationFrame (experimental) [default=yes]]),
+              [],[enable_request_animation_frame="yes"])
 AC_MSG_RESULT([$enable_request_animation_frame])
 
 # check whether to enable touch icon loading 
@@ -1381,7 +1389,6 @@ Source/WebKit/gtk/webkit/webkitversion.h
 AC_CONFIG_FILES([
 Source/WebKit/gtk/${WEBKITGTK_PC_NAME}-${WEBKITGTK_API_VERSION}.pc:Source/WebKit/gtk/webkit.pc.in
 Source/WebKit/gtk/JSCore-${WEBKITGTK_API_VERSION}.gir:Source/WebKit/gtk/JSCore.gir.in
-Source/WebKit/gtk/org.webkitgtk-${WEBKITGTK_API_VERSION}.gschema.xml:Source/WebKit/gtk/org.webkitgtk.gschema.xml.in
 Source/JavaScriptCore/javascriptcoregtk-${WEBKITGTK_API_VERSION}.pc:Source/JavaScriptCore/javascriptcoregtk.pc.in
 ]
 ,[WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME]
@@ -1427,6 +1434,7 @@ Features:
  MathML support                                           : $enable_mathml
  Media source                                             : $enable_media_source
  Media statistics                                         : $enable_media_statistics
+ MHTML support                                            : $enable_mhtml
  HTML5 channel messaging support                          : $enable_channel_messaging
  HTML5 meter element support                              : $enable_meter_tag
  HTML5 microdata support                                  : $enable_microdata

@@ -25,6 +25,7 @@
 #ifndef CCThreadProxy_h
 #define CCThreadProxy_h
 
+#include "cc/CCAnimationEvents.h"
 #include "cc/CCCompletionEvent.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCProxy.h"
@@ -49,6 +50,7 @@ public:
 
     // CCProxy implementation
     virtual bool compositeAndReadback(void *pixels, const IntRect&);
+    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double durationSec);
     virtual GraphicsContext3D* context();
     virtual void finishAllRendering();
     virtual bool isStarted() const;
@@ -69,6 +71,7 @@ public:
     virtual void onSwapBuffersCompleteOnImplThread();
     virtual void setNeedsRedrawOnImplThread();
     virtual void setNeedsCommitOnImplThread();
+    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>);
 
     // CCSchedulerClient implementation
     virtual bool canDraw();
@@ -85,6 +88,7 @@ private:
     void beginFrameAndCommit(int sequenceNumber, double frameBeginTime, PassOwnPtr<CCScrollAndScaleSet>);
     void didCommitAndDrawFrame();
     void didCompleteSwapBuffers();
+    void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>);
 
     // Called on impl thread
     struct ReadbackRequest {
@@ -97,12 +101,14 @@ private:
     void obtainBeginFrameAndCommitTaskFromCCThread(CCCompletionEvent*, CCThread::Task**);
     void beginFrameCompleteOnImplThread(CCCompletionEvent*);
     void requestReadbackOnImplThread(ReadbackRequest*);
+    void requestStartPageScaleAnimationOnImplThread(IntSize targetPosition, bool useAnchor, float scale, double durationSec);
     void finishAllRenderingOnImplThread(CCCompletionEvent*);
     void initializeImplOnImplThread(CCCompletionEvent*);
     void initializeContextOnImplThread(GraphicsContext3D*);
     void initializeLayerRendererOnImplThread(CCCompletionEvent*, bool* initializeSucceeded, LayerRendererCapabilities*);
     void setVisibleOnImplThread(CCCompletionEvent*, bool visible);
     void layerTreeHostClosedOnImplThread(CCCompletionEvent*);
+    void setFullRootLayerDamageOnImplThread();
 
     // Accessed on main thread only.
     bool m_animateRequested;

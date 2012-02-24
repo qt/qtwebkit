@@ -29,8 +29,6 @@
 #include "ContextMenuClient.h"
 #include "ContextMenuController.h"
 #include "DOMWindow.h"
-#include "DeviceMotionController.h"
-#include "DeviceOrientationController.h"
 #include "DocumentMarkerController.h"
 #include "DragController.h"
 #include "EditorClient.h"
@@ -53,8 +51,6 @@
 #include "MediaCanStartListener.h"
 #include "Navigator.h"
 #include "NetworkStateNotifier.h"
-#include "NotificationController.h"
-#include "NotificationPresenter.h"
 #include "PageGroup.h"
 #include "PluginData.h"
 #include "PluginView.h"
@@ -66,13 +62,13 @@
 #include "RenderWidget.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
+#include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
-#include "SpeechInput.h"
-#include "SpeechInputClient.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
 #include "TextResourceDecoder.h"
+#include "VoidCallback.h"
 #include "Widget.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -81,14 +77,6 @@
 
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
 #include "GeolocationController.h"
-#endif
-
-#if ENABLE(MEDIA_STREAM)
-#include "UserMediaClient.h"
-#endif
-
-#if ENABLE(THREADED_SCROLLING)
-#include "ScrollingCoordinator.h"
 #endif
 
 namespace WebCore {
@@ -140,21 +128,8 @@ Page::Page(PageClients& pageClients)
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
     , m_geolocationController(GeolocationController::create(this, pageClients.geolocationClient))
 #endif
-#if ENABLE(DEVICE_ORIENTATION)
-    , m_deviceMotionController(RuntimeEnabledFeatures::deviceMotionEnabled() ? DeviceMotionController::create(pageClients.deviceMotionClient) : nullptr)
-    , m_deviceOrientationController(RuntimeEnabledFeatures::deviceOrientationEnabled() ? DeviceOrientationController::create(this, pageClients.deviceOrientationClient) : nullptr)
-#endif
-#if ENABLE(NOTIFICATIONS)
-    , m_notificationController(NotificationController::create(this, pageClients.notificationClient))
-#endif
 #if ENABLE(POINTER_LOCK)
     , m_pointerLockController(PointerLockController::create(this))
-#endif
-#if ENABLE(INPUT_SPEECH)
-    , m_speechInputClient(pageClients.speechInputClient)
-#endif
-#if ENABLE(MEDIA_STREAM)
-    , m_userMediaClient(pageClients.userMediaClient)
 #endif
     , m_settings(Settings::create(this))
     , m_progress(ProgressTracker::create())
@@ -208,8 +183,10 @@ Page::~Page()
     setGroupName(String());
     allPages->remove(this);
     
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
-        frame->pageDestroyed();
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        frame->willDetachPage();
+        frame->detachFromPage();
+    }
 
     m_editorClient->pageDestroyed();
 
@@ -217,21 +194,15 @@ Page::~Page()
     m_inspectorController->inspectedPageDestroyed();
 #endif
 
-#if ENABLE(MEDIA_STREAM)
-    if (m_userMediaClient)
-        m_userMediaClient->pageDestroyed();
-#endif
-
-#if ENABLE(THREADED_SCROLLING)
     if (m_scrollingCoordinator)
         m_scrollingCoordinator->pageDestroyed();
-#endif
 
     backForward()->close();
 
 #ifndef NDEBUG
     pageCounter.decrement();
 #endif
+
 }
 
 ViewportArguments Page::viewportArguments() const
@@ -239,7 +210,6 @@ ViewportArguments Page::viewportArguments() const
     return mainFrame() && mainFrame()->document() ? mainFrame()->document()->viewportArguments() : ViewportArguments();
 }
 
-#if ENABLE(THREADED_SCROLLING)
 ScrollingCoordinator* Page::scrollingCoordinator()
 {
     if (!m_scrollingCoordinator && m_settings->scrollingCoordinatorEnabled())
@@ -247,7 +217,6 @@ ScrollingCoordinator* Page::scrollingCoordinator()
 
     return m_scrollingCoordinator.get();
 }
-#endif
 
 struct ViewModeInfo {
     const char* name;
@@ -974,16 +943,6 @@ double Page::minimumTimerInterval() const
     return m_minimumTimerInterval;
 }
 
-#if ENABLE(INPUT_SPEECH)
-SpeechInput* Page::speechInput()
-{
-    ASSERT(m_speechInputClient);
-    if (!m_speechInput.get())
-        m_speechInput = SpeechInput::create(m_speechInputClient);
-    return m_speechInput.get();
-}
-#endif
-
 void Page::dnsPrefetchingStateChanged()
 {
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
@@ -1076,7 +1035,7 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const IntRect& objec
 
     // The objects are only relevant if they are being painted within the viewRect().
     if (RenderView* view = object->view()) {
-        if (!objectPaintRect.intersects(view->viewRect()))
+        if (!objectPaintRect.intersects(pixelSnappedIntRect(view->viewRect())))
             return;
     }
 
@@ -1090,6 +1049,17 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const IntRect& objec
     }
 }
 
+void Page::provideSupplement(const AtomicString& name, PassOwnPtr<PageSupplement> supplement)
+{
+    ASSERT(!m_supplements.get(name.impl()));
+    m_supplements.set(name.impl(), supplement);
+}
+
+PageSupplement* Page::requireSupplement(const AtomicString& name)
+{
+    return m_supplements.get(name.impl());
+}
+
 Page::PageClients::PageClients()
     : chromeClient(0)
     , contextMenuClient(0)
@@ -1097,11 +1067,6 @@ Page::PageClients::PageClients()
     , dragClient(0)
     , inspectorClient(0)
     , geolocationClient(0)
-    , deviceMotionClient(0)
-    , deviceOrientationClient(0)
-    , speechInputClient(0)
-    , notificationClient(0)
-    , userMediaClient(0)
 {
 }
 

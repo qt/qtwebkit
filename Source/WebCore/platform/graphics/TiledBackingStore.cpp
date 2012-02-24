@@ -27,8 +27,7 @@
 
 namespace WebCore {
     
-static const int defaultTileWidth = 512;
-static const int defaultTileHeight = 512;
+static const int defaultTileDimension = 512;
 
 static IntPoint innerBottomRight(const IntRect& rect)
 {
@@ -41,15 +40,14 @@ TiledBackingStore::TiledBackingStore(TiledBackingStoreClient* client, PassOwnPtr
     , m_backend(backend)
     , m_tileBufferUpdateTimer(new TileTimer(this, &TiledBackingStore::tileBufferUpdateTimerFired))
     , m_tileCreationTimer(new TileTimer(this, &TiledBackingStore::tileCreationTimerFired))
-    , m_tileSize(defaultTileWidth, defaultTileHeight)
+    , m_tileSize(defaultTileDimension, defaultTileDimension)
     , m_tileCreationDelay(0.01)
-    , m_keepAreaMultiplier(3.5f)
-    , m_coverAreaMultiplier(2.5f)
+    , m_coverAreaMultiplier(2.0f)
     , m_contentsScale(1.f)
     , m_pendingScale(0)
     , m_contentsFrozen(false)
+    , m_supportsAlpha(false)
 {
-    ASSERT(m_coverAreaMultiplier <= m_keepAreaMultiplier);
 }
 
 TiledBackingStore::~TiledBackingStore()
@@ -57,7 +55,7 @@ TiledBackingStore::~TiledBackingStore()
     delete m_tileBufferUpdateTimer;
     delete m_tileCreationTimer;
 }
-    
+
 void TiledBackingStore::setTileSize(const IntSize& size)
 {
     m_tileSize = size;
@@ -70,20 +68,15 @@ void TiledBackingStore::setTileCreationDelay(double delay)
     m_tileCreationDelay = delay;
 }
 
-void TiledBackingStore::setKeepAndCoverAreaMultipliers(float keepMultiplier, float coverMultiplier)
+void TiledBackingStore::coverWithTilesIfNeeded(const FloatPoint& panningTrajectoryVector)
 {
-    ASSERT(coverMultiplier <= keepMultiplier);
-    m_keepAreaMultiplier = keepMultiplier;
-    m_coverAreaMultiplier = coverMultiplier;
-    startTileCreationTimer();
-}
-
-void TiledBackingStore::setVisibleRectTrajectoryVector(const FloatPoint& vector)
-{
-    if (m_visibleRectTrajectoryVector == vector)
+    IntRect visibleRect = visibleContentsRect();
+    if (m_visibleRectTrajectoryVector == panningTrajectoryVector && m_previousVisibleRect == visibleRect)
         return;
 
-    m_visibleRectTrajectoryVector = vector;
+    m_visibleRectTrajectoryVector = panningTrajectoryVector;
+    m_previousVisibleRect = visibleRect;
+
     startTileCreationTimer();
 }
 
@@ -171,17 +164,7 @@ void TiledBackingStore::paint(GraphicsContext* context, const IntRect& rect)
     context->restore();
 }
 
-void TiledBackingStore::adjustVisibleRect()
-{
-    IntRect visibleRect = visibleContentsRect();
-    if (m_previousVisibleRect == visibleRect)
-        return;
-    m_previousVisibleRect = visibleRect;
-
-    startTileCreationTimer();
-}
-
-IntRect TiledBackingStore::visibleContentsRect()
+IntRect TiledBackingStore::visibleContentsRect() const
 {
     return mapFromContents(intersection(m_client->tiledBackingStoreVisibleRect(), m_client->tiledBackingStoreContentsRect()));
 }
@@ -220,7 +203,7 @@ double TiledBackingStore::tileDistance(const IntRect& viewport, const Tile::Coor
 }
 
 // Returns a ratio between 0.0f and 1.0f of the surface of contentsRect covered by rendered tiles.
-float TiledBackingStore::coverageRatio(const WebCore::IntRect& contentsRect)
+float TiledBackingStore::coverageRatio(const WebCore::IntRect& contentsRect) const
 {
     IntRect dirtyRect = mapFromContents(contentsRect);
     float rectArea = dirtyRect.width() * dirtyRect.height();
@@ -242,6 +225,11 @@ float TiledBackingStore::coverageRatio(const WebCore::IntRect& contentsRect)
     return coverArea / rectArea;
 }
 
+bool TiledBackingStore::visibleAreaIsCovered() const
+{
+    return coverageRatio(visibleContentsRect()) == 1.0f;
+}
+
 void TiledBackingStore::createTiles()
 {
     if (m_contentsFrozen)
@@ -256,18 +244,18 @@ void TiledBackingStore::createTiles()
     // Resize tiles on edges in case the contents size has changed.
     bool didResizeTiles = resizeEdgeTiles();
 
-    IntRect keepRect = computeKeepRect(visibleRect);
-    
+    IntRect keepRect;
+    IntRect coverRect;
+    computeCoverAndKeepRect(visibleRect, coverRect, keepRect);
+
     dropTilesOutsideRect(keepRect);
-    
-    IntRect coverRect = computeCoverRect(visibleRect);
-    ASSERT(keepRect.contains(coverRect));
     
     // Search for the tile position closest to the viewport center that does not yet contain a tile. 
     // Which position is considered the closest depends on the tileDistance function.
     double shortestDistance = std::numeric_limits<double>::infinity();
     Vector<Tile::Coordinate> tilesToCreate;
     unsigned requiredTileCount = 0;
+
     Tile::Coordinate topLeft = tileCoordinateForPoint(coverRect.location());
     Tile::Coordinate bottomRight = tileCoordinateForPoint(innerBottomRight(coverRect));
     for (unsigned yCoordinate = topLeft.y(); yCoordinate <= bottomRight.y(); ++yCoordinate) {
@@ -276,7 +264,7 @@ void TiledBackingStore::createTiles()
             if (tileAt(currentCoordinate))
                 continue;
             ++requiredTileCount;
-            // Distance is 0 for all currently visible tiles.
+            // Distance is 0 for all tiles inside the visibleRect.
             double distance = tileDistance(visibleRect, currentCoordinate);
             if (distance > shortestDistance)
                 continue;
@@ -287,60 +275,96 @@ void TiledBackingStore::createTiles()
             tilesToCreate.append(currentCoordinate);
         }
     }
-    
-    // Now construct the tile(s)
+
+    // Now construct the tile(s) within the shortest distance.
     unsigned tilesToCreateCount = tilesToCreate.size();
     for (unsigned n = 0; n < tilesToCreateCount; ++n) {
         Tile::Coordinate coordinate = tilesToCreate[n];
         setTile(coordinate, m_backend->createTile(this, coordinate));
     }
     requiredTileCount -= tilesToCreateCount;
-    
-    // Paint the content of the newly created tiles
+
+    // Paint the content of the newly created tiles.
     if (tilesToCreateCount || didResizeTiles)
         updateTileBuffers();
 
-    // Keep creating tiles until the whole coverRect is covered.
+    // Re-call createTiles on a timer to cover the visible area with the newest shortest distance.
     if (requiredTileCount)
         m_tileCreationTimer->startOneShot(m_tileCreationDelay);
 }
 
-IntRect TiledBackingStore::computeKeepRect(const IntRect& visibleRect) const
+void TiledBackingStore::adjustForContentsRect(IntRect& rect) const
 {
-    IntRect result = visibleRect;
-    // Inflates to both sides, so divide the inflate delta by 2.
-    result.inflateX(visibleRect.width() * (m_keepAreaMultiplier - 1) / 2);
-    result.inflateY(visibleRect.height() * (m_keepAreaMultiplier - 1) / 2);
-    result.intersect(contentsRect());
+    IntRect bounds = contentsRect();
+    IntSize candidateSize = rect.size();
 
-    return result;
+    // We will try to keep the cover and keep rect the same size at all time, which
+    // might not be the case when at the content edges.
+
+    // We start by moving when at the edges.
+    rect.move(std::max(0, bounds.x() - rect.x()), std::max(0, bounds.y() - rect.y()));
+    rect.move(std::min(0, bounds.maxX() - rect.maxX()), std::min(0, bounds.maxY() - rect.maxY()));
+
+    rect.intersect(bounds);
+
+    if (rect.size() == candidateSize)
+        return;
+
+    // Even now we might cover more than the content area so let's inflate in the
+    // opposite directions.
+    int pixelsCovered = candidateSize.width() * candidateSize.height();
+
+    if (rect.width() != candidateSize.width())
+        rect.inflateY(((pixelsCovered / rect.width()) - rect.height()) / 2);
+    if (rect.height() != candidateSize.height())
+        rect.inflateX(((pixelsCovered / rect.height()) - rect.width()) / 2);
+
+    rect.intersect(bounds);
 }
 
-// A null trajectory vector means that tiles intersecting all the coverArea (i.e. visibleRect * coverMultiplier) will be created.
-// A non-null trajectory vector will shrink the intersection rect to visibleRect plus its expansion from its
-// center toward the cover area edges in the direction of the given vector.
-// E.g. if visibleRect == (10,10)5x5 and coverMultiplier == 3.0:
-// a (0,0) trajectory vector will create tiles intersecting (5,5)15x15,
-// a (1,0) trajectory vector will create tiles intersecting (10,10)10x5,
-// and a (1,1) trajectory vector will create tiles intersecting (10,10)10x10.
-IntRect TiledBackingStore::computeCoverRect(const IntRect& visibleRect) const
+void TiledBackingStore::computeCoverAndKeepRect(const IntRect& visibleRect, IntRect& coverRect, IntRect& keepRect) const
 {
-    IntRect result = visibleRect;
-    float trajectoryVectorNorm = sqrt(pow(m_visibleRectTrajectoryVector.x(), 2) + pow(m_visibleRectTrajectoryVector.y(), 2));
-    if (trajectoryVectorNorm > 0) {
-        // Multiply the vector by the distance to the edge of the cover area.
-        float trajectoryVectorMultiplier = (m_coverAreaMultiplier - 1) / 2;
-        // Unite the visible rect with a "ghost" of the visible rect moved in the direction of the trajectory vector.
-        result.move(result.width() * m_visibleRectTrajectoryVector.x() / trajectoryVectorNorm * trajectoryVectorMultiplier,
-                    result.height() * m_visibleRectTrajectoryVector.y() / trajectoryVectorNorm * trajectoryVectorMultiplier);
-        result.unite(visibleRect);
-    } else {
-        result.inflateX(visibleRect.width() * (m_coverAreaMultiplier - 1) / 2);
-        result.inflateY(visibleRect.height() * (m_coverAreaMultiplier - 1) / 2);
-    }
-    result.intersect(contentsRect());
+    coverRect = visibleRect;
+    keepRect = visibleRect;
 
-    return result;
+    // If we cover more that the actual viewport we can be smart about which tiles we choose to render.
+    if (m_coverAreaMultiplier > 1) {
+        // The initial cover area covers equally in each direction, according to the coverAreaMultiplier.
+        coverRect.inflateX(visibleRect.width() * (m_coverAreaMultiplier - 1) / 2);
+        coverRect.inflateY(visibleRect.height() * (m_coverAreaMultiplier - 1) / 2);
+        keepRect = coverRect;
+
+        float trajectoryVectorNorm = sqrt(pow(m_visibleRectTrajectoryVector.x(), 2) + pow(m_visibleRectTrajectoryVector.y(), 2));
+        if (trajectoryVectorNorm) {
+            // A null trajectory vector (no motion) means that tiles for the coverArea will be created.
+            // A non-null trajectory vector will shrink the covered rect to visibleRect plus its expansion from its
+            // center toward the cover area edges in the direction of the given vector.
+
+            // E.g. if visibleRect == (10,10)5x5 and coverAreaMultiplier == 3.0:
+            // a (0,0) trajectory vector will create tiles intersecting (5,5)15x15,
+            // a (1,0) trajectory vector will create tiles intersecting (10,10)10x5,
+            // and a (1,1) trajectory vector will create tiles intersecting (10,10)10x10.
+
+            // Multiply the vector by the distance to the edge of the cover area.
+            float trajectoryVectorMultiplier = (m_coverAreaMultiplier - 1) / 2;
+
+            // Unite the visible rect with a "ghost" of the visible rect moved in the direction of the trajectory vector.
+            coverRect = visibleRect;
+            coverRect.move(coverRect.width() * m_visibleRectTrajectoryVector.x() / trajectoryVectorNorm * trajectoryVectorMultiplier,
+                           coverRect.height() * m_visibleRectTrajectoryVector.y() / trajectoryVectorNorm * trajectoryVectorMultiplier);
+
+            coverRect.unite(visibleRect);
+        }
+    }
+
+    ASSERT(keepRect.contains(coverRect));
+
+    // The keep rect is an inflated version of the cover rect, inflated in tile dimensions.
+    keepRect.inflateX(m_tileSize.width() / 2);
+    keepRect.inflateY(m_tileSize.height() / 2);
+
+    adjustForContentsRect(coverRect);
+    adjustForContentsRect(keepRect);
 }
 
 bool TiledBackingStore::resizeEdgeTiles()
@@ -383,6 +407,11 @@ void TiledBackingStore::dropTilesOutsideRect(const IntRect& keepRect)
         removeTile(toRemove[n]);
 }
 
+void TiledBackingStore::removeAllNonVisibleTiles()
+{
+    dropTilesOutsideRect(visibleContentsRect());
+}
+
 PassRefPtr<Tile> TiledBackingStore::tileAt(const Tile::Coordinate& coordinate) const
 {
     return m_tiles.get(coordinate);
@@ -422,9 +451,9 @@ IntRect TiledBackingStore::contentsRect() const
 IntRect TiledBackingStore::tileRectForCoordinate(const Tile::Coordinate& coordinate) const
 {
     IntRect rect(coordinate.x() * m_tileSize.width(),
-        coordinate.y() * m_tileSize.height(),
-        m_tileSize.width(),
-        m_tileSize.height());
+                 coordinate.y() * m_tileSize.height(),
+                 m_tileSize.width(),
+                 m_tileSize.height());
 
     rect.intersect(contentsRect());
     return rect;
@@ -480,6 +509,14 @@ void TiledBackingStore::setContentsFrozen(bool freeze)
         startTileCreationTimer();
         startTileBufferUpdateTimer();
     }
+}
+
+void TiledBackingStore::setSupportsAlpha(bool a)
+{
+    if (a == supportsAlpha())
+        return;
+    m_supportsAlpha = a;
+    invalidate(contentsRect());
 }
 
 }

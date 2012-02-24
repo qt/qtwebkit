@@ -30,8 +30,8 @@
 #include "ApplyStyleCommand.h"
 #include "BeforeTextInsertedEvent.h"
 #include "BreakBlockquoteCommand.h"
-#include "CSSComputedStyleDeclaration.h"
 #include "CSSPropertyNames.h"
+#include "CSSStyleDeclaration.h"
 #include "CSSValueKeywords.h"
 #include "Document.h"
 #include "DocumentFragment.h"
@@ -293,6 +293,9 @@ void ReplacementFragment::removeUnrenderedNodes(Node* holder)
 
 void ReplacementFragment::removeInterchangeNodes(Node* container)
 {
+    m_hasInterchangeNewlineAtStart = false;
+    m_hasInterchangeNewlineAtEnd = false;
+
     // Interchange newlines at the "start" of the incoming fragment must be
     // either the first node in the fragment or the first leaf in the fragment.
     Node* node = container->firstChild();
@@ -531,10 +534,13 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
             // FIXME: Hyatt is concerned that selectively using display:inline will give inconsistent
             // results. We already know one issue because td elements ignore their display property
             // in quirks mode (which Mail.app is always in). We should look for an alternative.
+            
+            // Mutate using the CSSOM wrapper so we get the same event behavior as a script.
+            ExceptionCode ec;
             if (isBlock(element))
-                element->ensureInlineStyleDecl()->setProperty(CSSPropertyDisplay, CSSValueInline);
+                element->style()->setPropertyInternal(CSSPropertyDisplay, "inline", false, ec);
             if (element->renderer() && element->renderer()->style()->isFloating())
-                element->ensureInlineStyleDecl()->setProperty(CSSPropertyFloat, CSSValueNone);
+                element->style()->setPropertyInternal(CSSPropertyFloat, "none", false, ec);
         }
     }
 }
@@ -597,7 +603,7 @@ void ReplaceSelectionCommand::removeUnrenderedTextNodesAtEnds(InsertedNodes& ins
     document()->updateLayoutIgnorePendingStylesheets();
 
     Node* lastLeafInserted = insertedNodes.lastLeafInserted();
-    if (lastLeafInserted && lastLeafInserted->isTextNode() && !nodeHasVisibleRenderText(static_cast<Text*>(lastLeafInserted))
+    if (lastLeafInserted && lastLeafInserted->isTextNode() && !nodeHasVisibleRenderText(toText(lastLeafInserted))
         && !enclosingNodeWithTag(firstPositionInOrBeforeNode(lastLeafInserted), selectTag)
         && !enclosingNodeWithTag(firstPositionInOrBeforeNode(lastLeafInserted), scriptTag)) {
         insertedNodes.willRemoveNode(lastLeafInserted);
@@ -608,7 +614,7 @@ void ReplaceSelectionCommand::removeUnrenderedTextNodesAtEnds(InsertedNodes& ins
     // it is a top level node in the fragment and the user can't insert into those elements.
     Node* firstNodeInserted = insertedNodes.firstNodeInserted();
     lastLeafInserted = insertedNodes.lastLeafInserted();
-    if (firstNodeInserted && firstNodeInserted->isTextNode() && !nodeHasVisibleRenderText(static_cast<Text*>(firstNodeInserted))) {
+    if (firstNodeInserted && firstNodeInserted->isTextNode() && !nodeHasVisibleRenderText(toText(firstNodeInserted))) {
         insertedNodes.willRemoveNode(firstNodeInserted);
         removeNode(firstNodeInserted);
     }
@@ -1189,7 +1195,7 @@ void ReplaceSelectionCommand::addSpacesForSmartReplace()
     if (needsTrailingSpace && endNode) {
         bool collapseWhiteSpace = !endNode->renderer() || endNode->renderer()->style()->collapseWhiteSpace();
         if (endNode->isTextNode()) {
-            Text* text = static_cast<Text*>(endNode);
+            Text* text = toText(endNode);
             // FIXME: we shouldn't always be inserting the space at the end
             insertTextIntoNode(text, text->length(), collapseWhiteSpace ? nonBreakingSpaceString() : " ");
             if (m_endOfInsertedContent.containerNode() == text)
@@ -1213,7 +1219,7 @@ void ReplaceSelectionCommand::addSpacesForSmartReplace()
     if (needsLeadingSpace && startNode) {
         bool collapseWhiteSpace = !startNode->renderer() || startNode->renderer()->style()->collapseWhiteSpace();
         if (startNode->isTextNode()) {
-            insertTextIntoNode(static_cast<Text*>(startNode), startOffset, collapseWhiteSpace ? nonBreakingSpaceString() : " ");
+            insertTextIntoNode(toText(startNode), startOffset, collapseWhiteSpace ? nonBreakingSpaceString() : " ");
             if (m_endOfInsertedContent.containerNode() == startNode && m_endOfInsertedContent.offsetInContainerNode())
                 m_endOfInsertedContent.moveToOffset(m_endOfInsertedContent.offsetInContainerNode() + 1);
         } else {
@@ -1279,7 +1285,7 @@ Node* ReplaceSelectionCommand::insertAsListItems(PassRefPtr<Node> prpListElement
     if (isMiddle) {
         int textNodeOffset = insertPos.offsetInContainerNode();
         if (insertPos.deprecatedNode()->isTextNode() && textNodeOffset > 0)
-            splitTextNode(static_cast<Text*>(insertPos.deprecatedNode()), textNodeOffset);
+            splitTextNode(toText(insertPos.deprecatedNode()), textNodeOffset);
         splitTreeToNode(insertPos.deprecatedNode(), lastNode, true);
     }
 
@@ -1333,7 +1339,7 @@ bool ReplaceSelectionCommand::performTrivialReplace(const ReplacementFragment& f
         return false;
 
     Node* nodeAfterInsertionPos = endingSelection().end().downstream().anchorNode();
-    Text* textNode = static_cast<Text*>(fragment.firstChild());
+    Text* textNode = toText(fragment.firstChild());
     // Our fragment creation code handles tabs, spaces, and newlines, so we don't have to worry about those here.
 
     Position start = endingSelection().start();

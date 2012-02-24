@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2005-2012 Apple Inc. All rights reserved.
  * Copyright (C) 2006 David Smith (catfish.man@gmail.com)
  * Copyright (C) 2010 Igalia S.L
  *
@@ -742,13 +742,13 @@ static NSString *leakOutlookQuirksUserScriptContents()
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
     pageClients.geolocationClient = new WebGeolocationClient(self);
 #endif
+    _private->page = new Page(pageClients);
 #if ENABLE(NOTIFICATIONS)
-    pageClients.notificationClient = new WebNotificationClient(self);
+    WebCore::provideNotification(_private->page, new WebNotificationClient(self));
 #endif
 #if ENABLE(DEVICE_ORIENTATION)
-    pageClients.deviceOrientationClient = new WebDeviceOrientationClient(self);
+    WebCore::provideDeviceOrientationTo(_private->page, new WebDeviceOrientationClient(self));
 #endif
-    _private->page = new Page(pageClients);
 
     _private->page->setCanStartMedia([self window]);
     _private->page->settings()->setLocalStorageDatabasePath([[self preferences] _localStorageDatabasePath]);
@@ -1322,6 +1322,13 @@ static bool fastDocumentTeardownEnabled()
     return needsQuirk;
 }
 
+- (BOOL)_needsIsLoadingInAPISenseQuirk
+{
+    static BOOL needsQuirk = WKAppVersionCheckLessThan(@"com.apple.iAdProducer", -1, 2.1);
+    
+    return needsQuirk;
+}
+
 - (BOOL)_needsKeyboardEventDisambiguationQuirks
 {
     static BOOL needsQuirks = !WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_IE_COMPATIBLE_KEYBOARD_EVENT_DISPATCH) && !applicationIsSafari();
@@ -1474,6 +1481,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
 #if ENABLE(CSS_SHADERS)
     settings->setCSSCustomFilterEnabled([preferences cssCustomFilterEnabled]);
 #endif
+    settings->setCSSRegionsEnabled([preferences cssRegionsEnabled]);
 #if ENABLE(FULLSCREEN_API)
     settings->setFullScreenEnabled([preferences fullScreenEnabled]);
 #endif
@@ -1499,7 +1507,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
 #endif
     settings->setMediaPlaybackRequiresUserGesture([preferences mediaPlaybackRequiresUserGesture]);
     settings->setMediaPlaybackAllowsInline([preferences mediaPlaybackAllowsInline]);
-    settings->setSuppressIncrementalRendering([preferences suppressIncrementalRendering]);
+    settings->setSuppressesIncrementalRendering([preferences suppressesIncrementalRendering]);
     settings->setBackspaceKeyNavigationEnabled([preferences backspaceKeyNavigationEnabled]);
     settings->setMockScrollbarsEnabled([preferences mockScrollbarsEnabled]);
 
@@ -1508,6 +1516,8 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings->setShouldDisplayCaptions([preferences shouldDisplayCaptions]);
     settings->setShouldDisplayTextDescriptions([preferences shouldDisplayTextDescriptions]);
 #endif
+
+    settings->setNeedsIsLoadingInAPISenseQuirk([self _needsIsLoadingInAPISenseQuirk]);
 
     // Application Cache Preferences are stored on the global cache storage manager, not in Settings.
     [WebApplicationCache setDefaultOriginQuota:[preferences applicationCacheDefaultOriginQuota]];
@@ -5516,8 +5526,9 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSValue jsValu
     // change the API to allow this.
     WebFrame *webFrame = [self _selectedOrMainFrame];
     Frame* coreFrame = core(webFrame);
+    // FIXME: We shouldn't have to make a copy here.
     if (coreFrame)
-        coreFrame->editor()->applyStyle(core(style));
+        coreFrame->editor()->applyStyle(core(style)->copy().get());
 }
 
 @end
@@ -6401,6 +6412,43 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
 
 @end
 
+@implementation WebView (WebViewNotification)
+- (void)_setNotificationProvider:(id<WebNotificationProvider>)notificationProvider
+{
+    if (_private) {
+        _private->_notificationProvider = notificationProvider;
+        [_private->_notificationProvider registerWebView:self];
+    }
+}
+
+- (void)_notificationControllerDestroyed
+{
+    [[self _notificationProvider] unregisterWebView:self];
+}
+
+- (id<WebNotificationProvider>)_notificationProvider
+{
+    if (_private)
+        return _private->_notificationProvider;
+    return nil;
+}
+
+- (void)_notificationDidShow:(uint64_t)notificationID
+{
+    [[self _notificationProvider] webView:self didShowNotification:notificationID];
+}
+
+- (void)_notificationDidClick:(uint64_t)notificationID
+{
+    [[self _notificationProvider] webView:self didClickNotification:notificationID];
+}
+
+- (void)_notificationsDidClose:(NSArray *)notificationIDs
+{
+    [[self _notificationProvider] webView:self didCloseNotifications:notificationIDs];
+}
+@end
+
 @implementation WebView (WebViewPrivateStyleInfo)
 
 - (JSValueRef)_computedStyleIncludingVisitedInfo:(JSContextRef)context forElement:(JSValueRef)value
@@ -6414,7 +6462,7 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
         return JSValueMakeUndefined(context);
     JSElement* jsElement = static_cast<JSElement*>(asObject(jsValue));
     Element* element = jsElement->impl();
-    RefPtr<CSSComputedStyleDeclaration> style = computedStyle(element, true);
+    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(element, true);
     return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
 }
 

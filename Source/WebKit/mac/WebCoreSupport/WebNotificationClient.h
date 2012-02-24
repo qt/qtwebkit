@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,11 +25,20 @@
 
 #import <WebCore/NotificationPresenter.h>
 
+#if ENABLE(NOTIFICATIONS)
+#import <WebCore/Notification.h>
+#import <wtf/HashMap.h>
+#import <wtf/RefPtr.h>
+#import <wtf/RetainPtr.h>
+#endif
+
 namespace WebCore {
+class Notification;
 class ScriptExecutionContext;
 class VoidCallback;
 }
 
+@class WebNotification;
 @class WebView;
 
 class WebNotificationClient : public WebCore::NotificationPresenter {
@@ -40,11 +49,18 @@ public:
 private:
     virtual bool show(WebCore::Notification*) OVERRIDE;
     virtual void cancel(WebCore::Notification*) OVERRIDE;
+    virtual void clearNotifications(WebCore::ScriptExecutionContext*) OVERRIDE;
     virtual void notificationObjectDestroyed(WebCore::Notification*) OVERRIDE;
     virtual void notificationControllerDestroyed() OVERRIDE;
     virtual void requestPermission(WebCore::ScriptExecutionContext*, PassRefPtr<WebCore::VoidCallback>) OVERRIDE;
-    virtual void cancelRequestsForPermission(WebCore::ScriptExecutionContext*) OVERRIDE;
+    virtual void cancelRequestsForPermission(WebCore::ScriptExecutionContext*) OVERRIDE { }
     virtual WebCore::NotificationPresenter::Permission checkPermission(WebCore::ScriptExecutionContext*) OVERRIDE;
 
     WebView *m_webView;
+#if ENABLE(NOTIFICATIONS)
+    HashMap<RefPtr<WebCore::Notification>, RetainPtr<WebNotification> > m_notificationMap;
+    
+    typedef HashMap<RefPtr<WebCore::ScriptExecutionContext>, Vector<RetainPtr<WebNotification> > > NotificationContextMap;
+    NotificationContextMap m_notificationContextMap;
+#endif
 };

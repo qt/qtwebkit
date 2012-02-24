@@ -35,6 +35,7 @@
 #include "DebuggerActivation.h"
 #include "FunctionConstructor.h"
 #include "GetterSetter.h"
+#include "HostCallReturnValue.h"
 #include "Interpreter.h"
 #include "JSActivation.h"
 #include "JSAPIValueWrapper.h"
@@ -141,6 +142,8 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , keywords(adoptPtr(new Keywords(this)))
     , interpreter(0)
     , heap(this, heapSize)
+    , jsArrayClassInfo(&JSArray::s_info)
+    , jsFinalObjectClassInfo(&JSFinalObject::s_info)
 #if ENABLE(DFG_JIT)
     , sizeOfLastScratchBuffer(0)
 #endif
@@ -160,6 +163,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
 #if ENABLE(GC_VALIDATION)
     , m_isInitializingObject(false)
 #endif
+    , m_inDefineOwnProperty(false)
 {
     interpreter = new Interpreter;
 
@@ -189,7 +193,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
 
     wtfThreadData().setCurrentIdentifierTable(existingEntryIdentifierTable);
 
-#if ENABLE(JIT) && ENABLE(INTERPRETER)
+#if ENABLE(JIT) && ENABLE(CLASSIC_INTERPRETER)
 #if USE(CF)
     CFStringRef canUseJITKey = CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman);
     CFBooleanRef canUseJIT = (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey, kCFPreferencesCurrentApplication);
@@ -209,16 +213,20 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
 #endif
 #endif
 #if ENABLE(JIT)
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
     if (m_canUseJIT)
         m_canUseJIT = executableAllocator.isValid();
 #endif
     jitStubs = adoptPtr(new JITThunks(this));
 #endif
 
-    interpreter->initialize(this->canUseJIT());
+    interpreter->initialize(&llintData, this->canUseJIT());
+    
+    initializeHostCallReturnValue(); // This is needed to convince the linker not to drop host call return support.
 
     heap.notifyIsSafeToCollect();
+    
+    llintData.performAssertions(*this);
 }
 
 void JSGlobalData::clearBuiltinStructures()
@@ -383,7 +391,7 @@ static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
 
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
-#if ENABLE(INTERPRETER)
+#if ENABLE(CLASSIC_INTERPRETER)
     if (!canUseJIT())
         return NativeExecutable::create(*this, function, constructor);
 #endif
@@ -502,17 +510,17 @@ void JSGlobalData::dumpRegExpTrace()
     RTTraceList::iterator iter = ++m_rtTraceList->begin();
     
     if (iter != m_rtTraceList->end()) {
-        printf("\nRegExp Tracing\n");
-        printf("                                                            match()    matches\n");
-        printf("Regular Expression                          JIT Address      calls      found\n");
-        printf("----------------------------------------+----------------+----------+----------\n");
+        dataLog("\nRegExp Tracing\n");
+        dataLog("                                                            match()    matches\n");
+        dataLog("Regular Expression                          JIT Address      calls      found\n");
+        dataLog("----------------------------------------+----------------+----------+----------\n");
     
         unsigned reCount = 0;
     
         for (; iter != m_rtTraceList->end(); ++iter, ++reCount)
             (*iter)->printTraceData();
 
-        printf("%d Regular Expressions\n", reCount);
+        dataLog("%d Regular Expressions\n", reCount);
     }
     
     m_rtTraceList->clear();

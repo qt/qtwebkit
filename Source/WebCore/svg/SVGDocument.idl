@@ -22,12 +22,13 @@
 module svg {
 
     interface [
-        Conditional=SVG
+        Conditional=SVG,
+        V8CustomToJSObject
     ] SVGDocument : Document {
         readonly attribute SVGSVGElement        rootElement;
 
         // Overwrite the one in events::DocumentEvent
-        Event createEvent(in [Optional=CallWithDefaultValue] DOMString eventType)
+        Event createEvent(in [Optional=DefaultIsUndefined] DOMString eventType)
             raises(DOMException);
     };
 

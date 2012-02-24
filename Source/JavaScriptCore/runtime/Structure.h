@@ -45,6 +45,7 @@
 
 namespace JSC {
 
+    class LLIntOffsetsExtractor;
     class PropertyNameArray;
     class PropertyNameArrayData;
     class StructureChain;
@@ -145,7 +146,17 @@ namespace JSC {
         }
 
         bool hasGetterSetterProperties() const { return m_hasGetterSetterProperties; }
-        void setHasGetterSetterProperties(bool hasGetterSetterProperties) { m_hasGetterSetterProperties = hasGetterSetterProperties; }
+        bool hasReadOnlyOrGetterSetterPropertiesExcludingProto() const { return m_hasReadOnlyOrGetterSetterPropertiesExcludingProto; }
+        void setHasGetterSetterProperties(bool is__proto__)
+        {
+            m_hasGetterSetterProperties = true;
+            if (!is__proto__)
+                m_hasReadOnlyOrGetterSetterPropertiesExcludingProto = true;
+        }
+        void setContainsReadOnlyProperties()
+        {
+            m_hasReadOnlyOrGetterSetterPropertiesExcludingProto = true;
+        }
 
         bool hasNonEnumerableProperties() const { return m_hasNonEnumerableProperties; }
         
@@ -196,6 +207,8 @@ namespace JSC {
         static JS_EXPORTDATA const ClassInfo s_info;
 
     private:
+        friend class LLIntOffsetsExtractor;
+        
         JS_EXPORT_PRIVATE Structure(JSGlobalData&, JSGlobalObject*, JSValue prototype, const TypeInfo&, const ClassInfo*);
         Structure(JSGlobalData&);
         Structure(JSGlobalData&, const Structure*);
@@ -282,6 +295,7 @@ namespace JSC {
         unsigned m_dictionaryKind : 2;
         bool m_isPinnedPropertyTable : 1;
         bool m_hasGetterSetterProperties : 1;
+        bool m_hasReadOnlyOrGetterSetterPropertiesExcludingProto : 1;
         bool m_hasNonEnumerableProperties : 1;
         unsigned m_attributesInPrevious : 7;
         unsigned m_specificFunctionThrashCount : 2;

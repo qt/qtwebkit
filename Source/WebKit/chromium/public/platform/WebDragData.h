@@ -32,7 +32,9 @@
 #define WebDragData_h
 
 #include "WebCommon.h"
+#include "WebData.h"
 #include "WebString.h"
+#include "WebURL.h"
 
 #if WEBKIT_IMPLEMENTATION
 namespace WebCore { class ChromiumDataObject; }
@@ -41,15 +43,45 @@ namespace WTF { template <typename T> class PassRefPtr; }
 
 namespace WebKit {
 
-class WebData;
 class WebDragDataPrivate;
-class WebURL;
 template <typename T> class WebVector;
 
 // Holds data that may be exchanged through a drag-n-drop operation.  It is
 // inexpensive to copy a WebDragData object.
 class WebDragData {
 public:
+    struct Item {
+        enum StorageType {
+            // String data with an associated MIME type. Depending on the MIME type, there may be
+            // optional metadata attributes as well.
+            StorageTypeString,
+            // Stores the name of one file being dragged into the renderer.
+            StorageTypeFilename,
+            // An image being dragged out of the renderer. Contains a buffer holding the image data
+            // as well as the suggested name for saving the image to.
+            StorageTypeBinaryData,
+        };
+
+        StorageType storageType;
+
+        // Only valid when storageType == StorageTypeString.
+        WebString stringType;
+        WebString stringData;
+
+        // Only valid when storageType == StorageTypeFilename.
+        WebString filenameData;
+
+        // Only valid when storageType == StorageTypeBinaryData.
+        WebData binaryData;
+
+        // Title associated with a link when stringType == "text/uri-list".
+        // Filename when storageType == StorageTypeBinaryData.
+        WebString title;
+
+        // Only valid when stringType == "text/html".
+        WebURL baseURL;
+    };
+
     ~WebDragData() { reset(); }
 
     WebDragData() : m_private(0) { }
@@ -66,44 +98,9 @@ public:
 
     bool isNull() const { return !m_private; }
 
-    WEBKIT_EXPORT WebString url() const;
-    WEBKIT_EXPORT void setURL(const WebURL&);
-
-    WEBKIT_EXPORT WebString urlTitle() const;
-    WEBKIT_EXPORT void setURLTitle(const WebString&);
-
-    WEBKIT_EXPORT WebString downloadMetadata() const;
-    WEBKIT_EXPORT void setDownloadMetadata(const WebString&);
-
-    WEBKIT_EXPORT WebString fileExtension() const;
-    WEBKIT_EXPORT void setFileExtension(const WebString&);
-
-    WEBKIT_EXPORT bool containsFilenames() const;
-    WEBKIT_EXPORT void filenames(WebVector<WebString>&) const;
-    WEBKIT_EXPORT void setFilenames(const WebVector<WebString>&);
-    WEBKIT_EXPORT void appendToFilenames(const WebString&);
-
-    WEBKIT_EXPORT WebString plainText() const;
-    WEBKIT_EXPORT void setPlainText(const WebString&);
-
-    WEBKIT_EXPORT WebString htmlText() const;
-    WEBKIT_EXPORT void setHTMLText(const WebString&);
-
-    WEBKIT_EXPORT WebURL htmlBaseURL() const;
-    WEBKIT_EXPORT void setHTMLBaseURL(const WebURL&);
-
-    WEBKIT_EXPORT WebString fileContentFilename() const;
-    WEBKIT_EXPORT void setFileContentFilename(const WebString&);
-
-    WEBKIT_EXPORT WebData fileContent() const;
-    WEBKIT_EXPORT void setFileContent(const WebData&);
-
-    struct CustomData {
-        WebString type;
-        WebString data;
-    };
-    WEBKIT_EXPORT WebVector<CustomData> customData() const;
-    WEBKIT_EXPORT void setCustomData(const WebVector<CustomData>&);
+    WEBKIT_EXPORT WebVector<Item> items() const;
+    WEBKIT_EXPORT void setItems(const WebVector<Item>&);
+    WEBKIT_EXPORT void addItem(const Item&);
 
 #if WEBKIT_IMPLEMENTATION
     WebDragData(const WTF::PassRefPtr<WebCore::ChromiumDataObject>&);

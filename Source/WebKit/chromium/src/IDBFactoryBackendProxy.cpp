@@ -157,6 +157,12 @@ private:
 
 bool IDBFactoryBackendProxy::allowIDBFromWorkerThread(WorkerContext* workerContext, const String& name, const WebSecurityOrigin&)
 {
+    // FIXME: Bypass checking for permission so as not to block shared worker
+    // testing until a permissions check is implemented. This has to be fixed
+    // before m19 goes to beta. http://crbug.com/112855
+    if (workerContext->isSharedWorkerContext())
+        return true;
+
     WebWorkerClientImpl* webWorkerClientImpl = static_cast<WebWorkerClientImpl*>(&workerContext->thread()->workerLoaderProxy());
     WorkerRunLoop& runLoop = workerContext->thread()->runLoop();
 
@@ -181,15 +187,7 @@ void IDBFactoryBackendProxy::openFromWorker(const String& name, IDBCallbacks* ca
         callbacks->onError(WebIDBDatabaseError(0, "The user denied permission to access the database."));
         return;
     }
-    WorkerLoaderProxy* workerLoaderProxy = &context->thread()->workerLoaderProxy();
-    WebWorkerBase* webWorker = static_cast<WebWorkerBase*>(workerLoaderProxy);
-    WebView* webView = webWorker->view();
-    if (!webView) {
-        // Frame is closed, worker is terminaring.
-        return;
-    }
-    WebFrame* webFrame = webView->mainFrame();
-    m_webIDBFactory->open(name, new WebIDBCallbacksImpl(callbacks), origin, webFrame, dataDir);
+    m_webIDBFactory->open(name, new WebIDBCallbacksImpl(callbacks), origin, /*webFrame*/0, dataDir);
 #endif
 }
 

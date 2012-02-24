@@ -52,9 +52,6 @@ ScrollAnimator::ScrollAnimator(ScrollableArea* scrollableArea)
     : m_scrollableArea(scrollableArea)
     , m_currentPosX(0)
     , m_currentPosY(0)
-    , m_currentZoomScale(1)
-    , m_currentZoomTransX(0)
-    , m_currentZoomTransY(0)
 {
 }
 
@@ -125,12 +122,6 @@ bool ScrollAnimator::handleWheelEvent(const PlatformWheelEvent& e)
     return handled;
 }
 
-#if ENABLE(GESTURE_EVENTS)
-void ScrollAnimator::handleGestureEvent(const PlatformGestureEvent&)
-{
-}
-#endif
-
 FloatPoint ScrollAnimator::currentPosition() const
 {
     return FloatPoint(m_currentPosX, m_currentPosY);
@@ -139,33 +130,6 @@ FloatPoint ScrollAnimator::currentPosition() const
 void ScrollAnimator::notifyPositionChanged()
 {
     m_scrollableArea->setScrollOffsetFromAnimation(IntPoint(m_currentPosX, m_currentPosY));
-}
-
-void ScrollAnimator::notifyZoomChanged(ZoomAnimationState state)
-{
-    m_scrollableArea->zoomAnimatorTransformChanged(m_currentZoomScale, m_currentZoomTransX, m_currentZoomTransY,
-                                                   state == ZoomAnimationContinuing ? ScrollableArea::ZoomAnimationContinuing
-                                                                                    : ScrollableArea::ZoomAnimationFinishing);
-}
-
-FloatPoint ScrollAnimator::zoomTranslation() const
-{
-    return FloatPoint(m_currentZoomTransX, m_currentZoomTransY);
-}
-
-void ScrollAnimator::resetZoom()
-{
-    m_currentZoomScale = 1;
-    m_currentZoomTransX = 0;
-    m_currentZoomTransY = 0;
-}
-
-void ScrollAnimator::setZoomParametersForTest(float scale, float x, float y)
-{
-    m_currentZoomScale = scale;
-    m_currentZoomTransX = (1 - scale) * x;
-    m_currentZoomTransY = (1 - scale) * y;
-    notifyZoomChanged(ZoomAnimationContinuing); // Don't let page re-scale.
 }
 
 } // namespace WebCore

@@ -155,6 +155,7 @@ WebSocket::WebSocket(ScriptExecutionContext* context)
     , m_binaryType(BinaryTypeBlob)
     , m_useHixie76Protocol(true)
     , m_subprotocol("")
+    , m_extensions("")
 {
 }
 
@@ -162,6 +163,13 @@ WebSocket::~WebSocket()
 {
     if (m_channel)
         m_channel->disconnect();
+}
+
+PassRefPtr<WebSocket> WebSocket::create(ScriptExecutionContext* context)
+{
+    RefPtr<WebSocket> webSocket(adoptRef(new WebSocket(context)));
+    webSocket->suspendIfNeeded();
+    return webSocket.release();
 }
 
 void WebSocket::connect(const String& url, ExceptionCode& ec)
@@ -380,8 +388,7 @@ String WebSocket::extensions() const
 {
     if (m_useHixie76Protocol)
         return String();
-    // WebSocket protocol extension is not supported yet.
-    return "";
+    return m_extensions;
 }
 
 String WebSocket::binaryType() const

@@ -322,7 +322,11 @@ while (0)
 
 /* COMPILE_ASSERT */
 #ifndef COMPILE_ASSERT
+#if COMPILER_SUPPORTS(C_STATIC_ASSERT)
+#define COMPILE_ASSERT(exp, name) _Static_assert((exp), #name)
+#else
 #define COMPILE_ASSERT(exp, name) typedef int dummy##name [(exp) ? 1 : -1]
+#endif
 #endif
 
 /* FATAL */
@@ -368,31 +372,6 @@ while (0)
 #define LOG_VERBOSE(channel, ...) ((void)0)
 #else
 #define LOG_VERBOSE(channel, ...) WTFLogVerbose(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, &JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, channel), __VA_ARGS__)
-#endif
-
-#if ENABLE(GC_VALIDATION)
-#define ASSERT_GC_OBJECT_LOOKS_VALID(cell) do { \
-    if (!(cell))\
-        CRASH();\
-    if (cell->unvalidatedStructure()->unvalidatedStructure() != cell->unvalidatedStructure()->unvalidatedStructure()->unvalidatedStructure())\
-        CRASH();\
-} while (0)
-
-#define ASSERT_GC_OBJECT_INHERITS(object, classInfo) do {\
-    ASSERT_GC_OBJECT_LOOKS_VALID(object); \
-    if (!object->inherits(classInfo)) \
-        CRASH();\
-} while (0)
-
-#else
-#define ASSERT_GC_OBJECT_LOOKS_VALID(cell) do { (void)cell; } while (0)
-#define ASSERT_GC_OBJECT_INHERITS(object, classInfo) do { (void)object; (void)classInfo; } while (0)
-#endif
-
-#if COMPILER(CLANG)
-#define ASSERT_HAS_TRIVIAL_DESTRUCTOR(klass) COMPILE_ASSERT(__has_trivial_destructor(klass), klass##_has_trivial_destructor_check)
-#else
-#define ASSERT_HAS_TRIVIAL_DESTRUCTOR(klass)
 #endif
 
 #endif /* WTF_Assertions_h */

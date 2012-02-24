@@ -12,7 +12,7 @@ load(features)
 include(WebKit2.pri)
 
 WEBKIT += wtf javascriptcore webcore
-QT += declarative quick widgets
+QT += declarative quick quick-private
 
 CONFIG += staticlib
 
@@ -173,6 +173,7 @@ HEADERS += \
     UIProcess/API/qt/qwebdownloaditem_p.h \
     UIProcess/API/qt/qwebdownloaditem_p_p.h \
     UIProcess/API/qt/qwebpermissionrequest_p.h \
+    UIProcess/API/qt/qtwebsecurityorigin_p.h \
     UIProcess/API/qt/qwebnavigationrequest_p.h \
     UIProcess/API/qt/qquickwebpage_p.h \
     UIProcess/API/qt/qquickwebpage_p_p.h \
@@ -253,6 +254,7 @@ HEADERS += \
     UIProcess/WebResourceCacheManagerProxy.h \
     UIProcess/WebResourceLoadClient.h \
     UIProcess/WebUIClient.h \
+    UIProcess/qt/LayerBackingStore.h \
     UIProcess/qt/QtWebContext.h \
     UIProcess/qt/QtWebPageEventHandler.h \
     UIProcess/qt/QtGestureRecognizer.h \
@@ -266,6 +268,7 @@ HEADERS += \
     UIProcess/qt/QtWebPageLoadClient.h \
     UIProcess/qt/QtWebPagePolicyClient.h \
     UIProcess/qt/QtWebPageUIClient.h \
+    UIProcess/qt/QtFlickProvider.h \
     UIProcess/qt/QtViewportInteractionEngine.h \
     UIProcess/qt/QtWebUndoController.h \
     UIProcess/qt/QtWebIconDatabaseClient.h \
@@ -499,6 +502,7 @@ SOURCES += \
     UIProcess/API/cpp/qt/WKURLQt.cpp \
     UIProcess/API/qt/qwebdownloaditem.cpp \
     UIProcess/API/qt/qwebpermissionrequest.cpp \
+    UIProcess/API/qt/qtwebsecurityorigin.cpp \
     UIProcess/API/qt/qwebnavigationrequest.cpp \
     UIProcess/API/qt/qquickwebpage.cpp \
     UIProcess/API/qt/qwebnavigationhistory.cpp \
@@ -580,6 +584,7 @@ SOURCES += \
     UIProcess/WebResourceLoadClient.cpp \
     UIProcess/WebUIClient.cpp \
     UIProcess/qt/QtWebContext.cpp \
+    UIProcess/qt/LayerBackingStore.cpp \
     UIProcess/qt/LayerTreeHostProxyQt.cpp \
     UIProcess/qt/QtWebPageEventHandler.cpp \
     UIProcess/qt/QtGestureRecognizer.cpp \
@@ -594,6 +599,7 @@ SOURCES += \
     UIProcess/qt/QtWebPagePolicyClient.cpp \
     UIProcess/qt/QtWebPageUIClient.cpp \
     UIProcess/qt/TextCheckerQt.cpp \
+    UIProcess/qt/QtFlickProvider.cpp \
     UIProcess/qt/QtViewportInteractionEngine.cpp \
     UIProcess/qt/WebContextMenuProxyQt.cpp \
     UIProcess/qt/WebContextQt.cpp \

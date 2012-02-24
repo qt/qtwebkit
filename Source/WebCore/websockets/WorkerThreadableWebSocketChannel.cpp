@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc.  All rights reserved.
+ * Copyright (C) 2011, 2012 Google Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,6 +36,7 @@
 
 #include "Blob.h"
 #include "CrossThreadTask.h"
+#include "Document.h"
 #include "PlatformString.h"
 #include "ScriptExecutionContext.h"
 #include "ThreadableWebSocketChannelClientWrapper.h"
@@ -53,7 +54,7 @@ namespace WebCore {
 
 WorkerThreadableWebSocketChannel::WorkerThreadableWebSocketChannel(WorkerContext* context, WebSocketChannelClient* client, const String& taskMode)
     : m_workerContext(context)
-    , m_workerClientWrapper(ThreadableWebSocketChannelClientWrapper::create(client))
+    , m_workerClientWrapper(ThreadableWebSocketChannelClientWrapper::create(context, client))
     , m_bridge(Bridge::create(m_workerClientWrapper, m_workerContext, taskMode))
 {
 }
@@ -80,6 +81,12 @@ String WorkerThreadableWebSocketChannel::subprotocol()
 {
     ASSERT(m_workerClientWrapper);
     return m_workerClientWrapper->subprotocol();
+}
+
+String WorkerThreadableWebSocketChannel::extensions()
+{
+    ASSERT(m_workerClientWrapper);
+    return m_workerClientWrapper->extensions();
 }
 
 bool WorkerThreadableWebSocketChannel::send(const String& message)
@@ -145,7 +152,7 @@ void WorkerThreadableWebSocketChannel::resume()
 WorkerThreadableWebSocketChannel::Peer::Peer(PassRefPtr<ThreadableWebSocketChannelClientWrapper> clientWrapper, WorkerLoaderProxy& loaderProxy, ScriptExecutionContext* context, const String& taskMode)
     : m_workerClientWrapper(clientWrapper)
     , m_loaderProxy(loaderProxy)
-    , m_mainWebSocketChannel(WebSocketChannel::create(context, this))
+    , m_mainWebSocketChannel(WebSocketChannel::create(static_cast<Document*>(context), this))
     , m_taskMode(taskMode)
 {
     ASSERT(isMainThread());
@@ -262,17 +269,18 @@ void WorkerThreadableWebSocketChannel::Peer::resume()
     m_mainWebSocketChannel->resume();
 }
 
-static void workerContextDidConnect(ScriptExecutionContext* context, PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper, const String& subprotocol)
+static void workerContextDidConnect(ScriptExecutionContext* context, PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper, const String& subprotocol, const String& extensions)
 {
     ASSERT_UNUSED(context, context->isWorkerContext());
     workerClientWrapper->setSubprotocol(subprotocol);
+    workerClientWrapper->setExtensions(extensions);
     workerClientWrapper->didConnect();
 }
 
 void WorkerThreadableWebSocketChannel::Peer::didConnect()
 {
     ASSERT(isMainThread());
-    m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidConnect, m_workerClientWrapper, m_mainWebSocketChannel->subprotocol()), m_taskMode);
+    m_loaderProxy.postTaskForModeToWorkerContext(createCallbackTask(&workerContextDidConnect, m_workerClientWrapper, m_mainWebSocketChannel->subprotocol(), m_mainWebSocketChannel->extensions()), m_taskMode);
 }
 
 static void workerContextDidReceiveMessage(ScriptExecutionContext* context, PassRefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper, const String& message)

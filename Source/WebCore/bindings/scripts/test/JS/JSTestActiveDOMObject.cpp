@@ -33,8 +33,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSTestActiveDOMObject);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestActiveDOMObject);
-
 /* Hash table */
 
 static const HashTableValue JSTestActiveDOMObjectTableValues[] =
@@ -53,8 +51,6 @@ static const HashTableValue JSTestActiveDOMObjectConstructorTableValues[] =
 };
 
 static const HashTable JSTestActiveDOMObjectConstructorTable = { 1, 0, JSTestActiveDOMObjectConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestActiveDOMObjectConstructor);
-
 const ClassInfo JSTestActiveDOMObjectConstructor::s_info = { "TestActiveDOMObjectConstructor", &Base::s_info, &JSTestActiveDOMObjectConstructorTable, 0, CREATE_METHOD_TABLE(JSTestActiveDOMObjectConstructor) };
 
 JSTestActiveDOMObjectConstructor::JSTestActiveDOMObjectConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -130,7 +126,12 @@ JSObject* JSTestActiveDOMObject::createPrototype(ExecState* exec, JSGlobalObject
 void JSTestActiveDOMObject::destroy(JSC::JSCell* cell)
 {
     JSTestActiveDOMObject* thisObject = jsCast<JSTestActiveDOMObject*>(cell);
-    thisObject->releaseImplIfNotNull();
+    thisObject->JSTestActiveDOMObject::~JSTestActiveDOMObject();
+}
+
+JSTestActiveDOMObject::~JSTestActiveDOMObject()
+{
+    releaseImplIfNotNull();
 }
 
 bool JSTestActiveDOMObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -186,7 +187,7 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionExcitingFunct
     TestActiveDOMObject* impl = static_cast<TestActiveDOMObject*>(castedThis->impl());
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    Node* nextChild(toNode(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined)));
+    Node* nextChild(toNode(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     impl->excitingFunction(nextChild);
@@ -203,7 +204,7 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionPostMessage(E
     TestActiveDOMObject* impl = static_cast<TestActiveDOMObject*>(castedThis->impl());
     if (exec->argumentCount() < 1)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    const String& message(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toString(exec)->value(exec)));
+    const String& message(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).toString(exec)->value(exec)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     impl->postMessage(message);

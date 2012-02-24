@@ -56,6 +56,7 @@
 #include "ResetInputType.h"
 #include "SearchInputType.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "SubmitInputType.h"
 #include "TelephoneInputType.h"
 #include "TextInputType.h"
@@ -192,7 +193,7 @@ double InputType::valueAsNumber() const
     return numeric_limits<double>::quiet_NaN();
 }
 
-void InputType::setValueAsNumber(double, bool, ExceptionCode& ec) const
+void InputType::setValueAsNumber(double, TextFieldEventBehavior, ExceptionCode& ec) const
 {
     ec = INVALID_STATE_ERR;
 }
@@ -378,7 +379,11 @@ void InputType::createShadowSubtree()
 
 void InputType::destroyShadowSubtree()
 {
-    element()->removeShadowRoot();
+    if (!element()->hasShadowRoot())
+        return;
+
+    if (ShadowRoot* root = element()->shadowRootList()->oldestShadowRoot())
+        root->removeAllChildren();
 }
 
 double InputType::parseToDouble(const String&, double defaultValue) const
@@ -535,15 +540,12 @@ bool InputType::storesValueSeparateFromAttribute()
     return true;
 }
 
-void InputType::setValue(const String& sanitizedValue, bool, bool sendChangeEvent)
+void InputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
 {
-    element()->setValueInternal(sanitizedValue, sendChangeEvent);
+    element()->setValueInternal(sanitizedValue, eventBehavior);
     element()->setNeedsStyleRecalc();
-}
-
-void InputType::dispatchChangeEventInResponseToSetValue()
-{
-    element()->dispatchFormControlChangeEvent();
+    if (valueChanged && eventBehavior != DispatchNoEvent)
+        element()->dispatchFormControlChangeEvent();
 }
 
 bool InputType::canSetValue(const String&)

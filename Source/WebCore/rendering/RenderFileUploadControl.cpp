@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2012 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -32,6 +32,7 @@
 #include "RenderText.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "TextRun.h"
 #include "VisiblePosition.h"
 #include <math.h>
@@ -85,7 +86,7 @@ void RenderFileUploadControl::updateFromElement()
 
 static int nodeWidth(Node* node)
 {
-    return node ? node->renderBox()->width() : 0;
+    return node ? node->renderBox()->width() : zeroLayoutUnit;
 }
 
 int RenderFileUploadControl::maxFilenameWidth() const
@@ -177,10 +178,15 @@ void RenderFileUploadControl::computePreferredLogicalWidths()
     else {
         // Figure out how big the filename space needs to be for a given number of characters
         // (using "0" as the nominal character).
-        const UChar ch = '0';
-        const String str = String(&ch, 1);
-        float charWidth = font.width(constructTextRun(this, font, str, style, TextRun::AllowTrailingExpansion));
-        m_maxPreferredLogicalWidth = (int)ceilf(charWidth * defaultWidthNumChars);
+        const UChar character = '0';
+        const String characterAsString = String(&character, 1);
+        float minDefaultLabelWidth = defaultWidthNumChars * font.width(constructTextRun(this, font, characterAsString, style, TextRun::AllowTrailingExpansion));
+
+        const String label = theme()->fileListDefaultLabel(node()->toInputElement()->multiple());
+        float defaultLabelWidth = font.width(constructTextRun(this, font, label, style, TextRun::AllowTrailingExpansion));
+        if (HTMLInputElement* button = uploadButton())
+            defaultLabelWidth += button->renderer()->maxPreferredLogicalWidth() + afterButtonSpacing;
+        m_maxPreferredLogicalWidth = static_cast<int>(ceilf(max(minDefaultLabelWidth, defaultLabelWidth)));
     }
 
     if (style->minWidth().isFixed() && style->minWidth().value() > 0) {
@@ -212,9 +218,9 @@ HTMLInputElement* RenderFileUploadControl::uploadButton() const
 {
     HTMLInputElement* input = static_cast<HTMLInputElement*>(node());
 
-    ASSERT(input->shadowRoot());
+    ASSERT(input->hasShadowRoot());
 
-    Node* buttonNode = input->shadowRoot()->firstChild();
+    Node* buttonNode = input->shadowRootList()->oldestShadowRoot()->firstChild();
     return buttonNode && buttonNode->isHTMLElement() && buttonNode->hasTagName(inputTag) ? static_cast<HTMLInputElement*>(buttonNode) : 0;
 }
 

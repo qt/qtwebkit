@@ -21,7 +21,6 @@
 #include "GraphicsContext3D.h"
 
 #include "WebGLObject.h"
-#include <cairo/OpenGLShims.h>
 #include "CanvasRenderingContext.h"
 #if defined(QT_OPENGL_ES_2)
 #include "Extensions3DQt.h"
@@ -34,17 +33,14 @@
 #include "ImageBuffer.h"
 #include "ImageData.h"
 #include "NotImplemented.h"
+#include "OpenGLShims.h"
 #include "QWebPageClient.h"
 #include "SharedBuffer.h"
-#include <QAbstractScrollArea>
-#include <QGraphicsObject>
-#include <QGLContext>
-#include <QStyleOptionGraphicsItem>
 #include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER) && USE(TEXTURE_MAPPER_GL)
-#include <opengl/TextureMapperGL.h>
+#include <texmap/TextureMapperGL.h>
 #endif
 
 #if ENABLE(WEBGL)
@@ -60,24 +56,18 @@ typedef char GLchar;
 #endif
 
 class GraphicsContext3DPrivate
-#if USE(ACCELERATED_COMPOSITING)
-#if USE(TEXTURE_MAPPER)
+#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
         : public TextureMapperPlatformLayer
-#else
-        : public QGraphicsObject
-#endif
 #endif
 {
 public:
     GraphicsContext3DPrivate(GraphicsContext3D*, HostWindow*);
     ~GraphicsContext3DPrivate();
 
-    QGLWidget* getViewportGLWidget();
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect& target, const TransformationMatrix&, float opacity, BitmapTexture* mask) const;
+    virtual void paintToTextureMapper(TextureMapper*, const FloatRect& target, const TransformationMatrix&, float opacity, BitmapTexture* mask);
 #endif
 
-    void paint(QPainter*, const QStyleOptionGraphicsItem*, QWidget*);
     QRectF boundingRect() const;
     void blitMultisampleFramebuffer() const;
     void blitMultisampleFramebufferAndRestoreContext() const;
@@ -85,8 +75,8 @@ public:
 
     GraphicsContext3D* m_context;
     HostWindow* m_hostWindow;
-    QGLWidget* m_glWidget;
-    QGLWidget* m_viewportGLWidget;
+    PlatformGraphicsSurface3D m_surface;
+    PlatformGraphicsContext3D m_platformContext;
 };
 
 bool GraphicsContext3D::isGLES2Compliant() const
@@ -101,39 +91,24 @@ bool GraphicsContext3D::isGLES2Compliant() const
 GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context, HostWindow* hostWindow)
     : m_context(context)
     , m_hostWindow(hostWindow)
-    , m_glWidget(0)
-    , m_viewportGLWidget(0)
+    , m_surface(0)
+    , m_platformContext(0)
 {
-    m_viewportGLWidget = getViewportGLWidget();
-
-    if (m_viewportGLWidget)
-        m_glWidget = new QGLWidget(0, m_viewportGLWidget);
-    else
-        m_glWidget = new QGLWidget();
-
-    // Geometry can be set to zero because m_glWidget is used only for its QGLContext.
-    m_glWidget->setGeometry(0, 0, 0, 0);
-
+    QWebPageClient* webPageClient = m_hostWindow->platformPageClient();
+    if (!webPageClient)
+        return;
+    webPageClient->createPlatformGraphicsContext3D(&m_platformContext, &m_surface);
+    if (!m_surface)
+        return;
     makeCurrentIfNeeded();
 }
 
 GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 {
-    delete m_glWidget;
-    m_glWidget = 0;
-}
-
-QGLWidget* GraphicsContext3DPrivate::getViewportGLWidget()
-{
-    QWebPageClient* webPageClient = m_hostWindow->platformPageClient();
-    if (!webPageClient)
-        return 0;
-
-    QAbstractScrollArea* scrollArea = qobject_cast<QAbstractScrollArea*>(webPageClient->ownerWidget());
-    if (scrollArea)
-        return qobject_cast<QGLWidget*>(scrollArea->viewport());
-
-    return 0;
+    delete m_surface;
+    m_surface = 0;
+    // Platform context is assumed to be owned by surface.
+    m_platformContext = 0;
 }
 
 static inline quint32 swapBgrToRgb(quint32 pixel)
@@ -142,13 +117,14 @@ static inline quint32 swapBgrToRgb(quint32 pixel)
 }
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
-void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, BitmapTexture* mask) const
+void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity, BitmapTexture* mask)
 {
     blitMultisampleFramebufferAndRestoreContext();
 
     if (textureMapper->accelerationMode() == TextureMapper::OpenGLMode) {
         TextureMapperGL* texmapGL = static_cast<TextureMapperGL*>(textureMapper);
-        texmapGL->drawTexture(m_context->m_texture, !m_context->m_attrs.alpha, FloatSize(1, 1), targetRect, matrix, opacity, mask, true /* flip */);
+        TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::SupportsBlending : 0);
+        texmapGL->drawTexture(m_context->m_texture, flags, FloatSize(1, 1), targetRect, matrix, opacity, mask);
         return;
     }
 
@@ -202,58 +178,6 @@ QRectF GraphicsContext3DPrivate::boundingRect() const
     return QRectF(QPointF(0, 0), QSizeF(m_context->m_currentWidth, m_context->m_currentHeight));
 }
 
-void GraphicsContext3DPrivate::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
-{
-    Q_UNUSED(widget);
-
-    QRectF rect = option ? option->rect : boundingRect();
-
-    makeCurrentIfNeeded();
-    blitMultisampleFramebuffer();
-
-    // Use direct texture mapping if WebGL canvas has a shared OpenGL context
-    // with browsers OpenGL context.
-    QGLWidget* viewportGLWidget = getViewportGLWidget();
-    if (viewportGLWidget && viewportGLWidget == m_viewportGLWidget && viewportGLWidget == painter->device()) {
-        viewportGLWidget->drawTexture(rect, m_context->m_texture);
-        return;
-    }
-
-    // Alternatively read pixels to a memory buffer.
-    QImage offscreenImage(rect.width(), rect.height(), QImage::Format_ARGB32);
-    quint32* imagePixels = reinterpret_cast<quint32*>(offscreenImage.bits());
-
-    glBindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_context->m_fbo);
-    glReadPixels(/* x */ 0, /* y */ 0, rect.width(), rect.height(), GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, imagePixels);
-    glBindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_context->m_boundFBO);
-
-    // OpenGL gives us ABGR on 32 bits, and with the origin at the bottom left
-    // We need RGB32 or ARGB32_PM, with the origin at the top left.
-    quint32* pixelsSrc = imagePixels;
-    const int height = static_cast<int>(rect.height());
-    const int width = static_cast<int>(rect.width());
-    const int halfHeight = height / 2;
-    for (int row = 0; row < halfHeight; ++row) {
-        const int targetIdx = (height - 1 - row) * width;
-        quint32* pixelsDst = imagePixels + targetIdx;
-        for (int column = 0; column < width; ++column) {
-            quint32 tempPixel = *pixelsSrc;
-            *pixelsSrc = swapBgrToRgb(*pixelsDst);
-            *pixelsDst = swapBgrToRgb(tempPixel);
-            ++pixelsSrc;
-            ++pixelsDst;
-        }
-    }
-    if (static_cast<int>(height) % 2) {
-        for (int column = 0; column < width; ++column) {
-            *pixelsSrc = swapBgrToRgb(*pixelsSrc);
-            ++pixelsSrc;
-        }
-    }
-
-    painter->drawImage(/* x */ 0, /* y */ 0, offscreenImage);
-}
-
 void GraphicsContext3DPrivate::blitMultisampleFramebuffer() const
 {
     if (!m_context->m_attrs.antialias)
@@ -269,26 +193,45 @@ void GraphicsContext3DPrivate::blitMultisampleFramebufferAndRestoreContext() con
     if (!m_context->m_attrs.antialias)
         return;
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+    const QOpenGLContext* currentContext = QOpenGLContext::currentContext();
+    QSurface* currentSurface = 0;
+    if (currentContext != m_platformContext) {
+        currentSurface = currentContext->surface();
+        m_platformContext->makeCurrent(m_surface);
+    }
+    blitMultisampleFramebuffer();
+    if (currentSurface)
+        const_cast<QOpenGLContext*>(currentContext)->makeCurrent(currentSurface);
+#else
     const QGLContext* currentContext = QGLContext::currentContext();
-    const QGLContext* widgetContext = m_glWidget->context();
+    const QGLContext* widgetContext = m_surface->context();
     if (currentContext != widgetContext)
-        m_glWidget->makeCurrent();
+        m_surface->makeCurrent();
     blitMultisampleFramebuffer();
     if (currentContext) {
         if (currentContext != widgetContext)
             const_cast<QGLContext*>(currentContext)->makeCurrent();
     } else
-        m_glWidget->doneCurrent();
+        m_surface->doneCurrent();
+#endif
 }
 
 bool GraphicsContext3DPrivate::makeCurrentIfNeeded() const
 {
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+    const QOpenGLContext* currentContext = QOpenGLContext::currentContext();
+    if (currentContext == m_platformContext)
+        return true;
+    return m_platformContext->makeCurrent(m_surface);
+#else
     const QGLContext* currentContext = QGLContext::currentContext();
-    const QGLContext* widgetContext = m_glWidget->context();
+    const QGLContext* widgetContext = m_surface->context();
     if (currentContext != widgetContext)
-        m_glWidget->makeCurrent();
+        m_surface->makeCurrent();
 
     return QGLContext::currentContext() == widgetContext;
+#endif
 }
 
 PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attributes attrs, HostWindow* hostWindow, GraphicsContext3D::RenderStyle renderStyle)
@@ -327,7 +270,7 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     validateAttributes();
 #endif
 
-    if (!m_private->m_glWidget->isValid()) {
+    if (!m_private->m_surface) {
         LOG_ERROR("GraphicsContext3D: QGLWidget initialization failed.");
         m_private = nullptr;
         return;
@@ -405,8 +348,6 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
 GraphicsContext3D::~GraphicsContext3D()
 {
     makeContextCurrent();
-    if (!m_private->m_glWidget->isValid())
-        return;
     glDeleteTextures(1, &m_texture);
     glDeleteFramebuffers(1, &m_fbo);
     if (m_attrs.antialias) {
@@ -428,7 +369,7 @@ GraphicsContext3D::~GraphicsContext3D()
 
 PlatformGraphicsContext3D GraphicsContext3D::platformGraphicsContext3D()
 {
-    return m_private->m_glWidget;
+    return m_private->m_platformContext;
 }
 
 Platform3DObject GraphicsContext3D::platformTexture() const
@@ -448,13 +389,16 @@ bool GraphicsContext3D::makeContextCurrent()
     return m_private->makeCurrentIfNeeded();
 }
 
-void GraphicsContext3D::paintRenderingResultsToCanvas(CanvasRenderingContext* context, DrawingBuffer*)
+void GraphicsContext3D::paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
+                                      int canvasWidth, int canvasHeight, QPainter* context)
 {
-    makeContextCurrent();
-    HTMLCanvasElement* canvas = context->canvas();
-    ImageBuffer* imageBuffer = canvas->buffer();
-    QPainter* painter = imageBuffer->context()->platformContext();
-    m_private->paint(painter, 0, 0);
+    QImage image(imagePixels, imageWidth, imageHeight, QImage::Format_ARGB32_Premultiplied);
+    context->save();
+    context->translate(0, imageHeight);
+    context->scale(1, -1);
+    context->setCompositionMode(QPainter::CompositionMode_Source);
+    context->drawImage(QRect(0, 0, canvasWidth, -canvasHeight), image);
+    context->restore();
 }
 
 #if defined(QT_OPENGL_ES_2)

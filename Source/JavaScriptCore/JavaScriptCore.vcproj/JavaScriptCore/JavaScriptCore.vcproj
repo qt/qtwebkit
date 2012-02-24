@@ -1478,6 +1478,22 @@
 			Name="bytecode"
 			>
 			<File
+				RelativePath="..\..\bytecode\MethodOfGettingAValueProfile.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\MethodOfGettingAValueProfile.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\LazyOperandValueProfile.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\LazyOperandValueProfile.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\GetByIdStatus.h"
 				>
 			</File>
@@ -1586,6 +1602,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\bytecode\PolymorphicPutByIdList.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\PredictedType.cpp"
 				>
 			</File>
@@ -1607,10 +1627,6 @@
 			</File>
 			<File
 				RelativePath="..\..\bytecode\StructureStubInfo.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\bytecode\ValueProfile.cpp"
 				>
 			</File>
 			<File
@@ -1758,6 +1774,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\jit\HostCallReturnValue.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\jit\JIT.cpp"
 				>
 			</File>
@@ -1839,6 +1859,14 @@
 			</File>
 			<File
 				RelativePath="..\..\jit\ThunkGenerators.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="llint"
+			>
+			<File
+				RelativePath="..\..\llint\LLIntData.h"
 				>
 			</File>
 		</Filter>
@@ -2034,19 +2062,23 @@
 			Name="heap"
 			>
                             <File
-                                    RelativePath="..\..\heap\BumpBlock.h"
+                                    RelativePath="..\..\heap\CopiedAllocator.h"
                                     >
                             </File>
                             <File
-                                    RelativePath="..\..\heap\BumpSpace.cpp"
+                                    RelativePath="..\..\heap\CopiedBlock.h"
                                     >
                             </File>
                             <File
-                                    RelativePath="..\..\heap\BumpSpace.h"
+                                    RelativePath="..\..\heap\CopiedSpace.cpp"
                                     >
                             </File>
                             <File
-                                    RelativePath="..\..\heap\BumpSpaceInlineMethods.h"
+                                    RelativePath="..\..\heap\CopiedSpace.h"
+                                    >
+                            </File>
+                            <File
+                                    RelativePath="..\..\heap\CopiedSpaceInlineMethods.h"
                                     >
                             </File>
                             <File
@@ -2055,6 +2087,10 @@
                             </File>
                             <File
                                     RelativePath="..\..\heap\ConservativeRoots.h"
+                                    >
+                            </File>
+                            <File
+                                    RelativePath="..\..\heap\GCAssertions.h"
                                     >
                             </File>
                             <File

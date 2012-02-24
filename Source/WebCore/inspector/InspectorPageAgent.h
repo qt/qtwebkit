@@ -50,6 +50,7 @@ class Frame;
 class Frontend;
 class InjectedScriptManager;
 class InspectorArray;
+class InspectorClient;
 class InspectorObject;
 class InspectorState;
 class InstrumentingAgents;
@@ -57,6 +58,7 @@ class KURL;
 class Page;
 class RegularExpression;
 class SharedBuffer;
+class TextResourceDecoder;
 
 typedef String ErrorString;
 
@@ -74,8 +76,9 @@ public:
         OtherResource
     };
 
-    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*);
+    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*, InspectorClient*);
 
+    static PassRefPtr<TextResourceDecoder> createDecoder(const String& mimeType, const String& textEncodingName);
     static bool cachedResourceContent(CachedResource*, String* result, bool* base64Encoded);
     static bool sharedBufferContent(PassRefPtr<SharedBuffer>, const String& textEncodingName, bool withBase64Encode, String* result);
     static void resourceContent(ErrorString*, Frame*, const KURL&, String* result, bool* base64Encoded);
@@ -101,6 +104,7 @@ public:
     virtual void searchInResources(ErrorString*, const String&, const bool* caseSensitive, const bool* isRegex, RefPtr<InspectorArray>&);
     virtual void setDocumentContent(ErrorString*, const String& frameId, const String& html);
     virtual void setScreenSizeOverride(ErrorString*, int width, int height);
+    virtual void setShowPaintRects(ErrorString*, bool show);
 
     // InspectorInstrumentation API
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
@@ -111,6 +115,8 @@ public:
     void loaderDetachedFromFrame(DocumentLoader*);
     void applyScreenWidthOverride(long*);
     void applyScreenHeightOverride(long*);
+    void willPaint(GraphicsContext*, const LayoutRect&);
+    void didPaint();
 
     // Inspector Controller API
     virtual void setFrontend(InspectorFrontend*);
@@ -127,7 +133,7 @@ public:
     static DocumentLoader* assertDocumentLoader(ErrorString*, Frame*);
 
 private:
-    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*);
+    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorState*, InjectedScriptManager*, InspectorClient*);
     void updateFrameViewFixedLayout(int, int);
     void setFrameViewFixedLayout(int, int);
     void clearFrameViewFixedLayout();
@@ -136,6 +142,7 @@ private:
     PassRefPtr<InspectorObject> buildObjectForFrameTree(Frame*);
     Page* m_page;
     InjectedScriptManager* m_injectedScriptManager;
+    InspectorClient* m_client;
     InspectorFrontend::Page* m_frontend;
     long m_lastScriptIdentifier;
     String m_pendingScriptToEvaluateOnLoadOnce;
@@ -145,6 +152,8 @@ private:
     HashMap<DocumentLoader*, String> m_loaderToIdentifier;
     OwnPtr<IntSize> m_originalFixedLayoutSize;
     bool m_originalUseFixedLayout;
+    GraphicsContext* m_lastPaintContext;
+    LayoutRect m_lastPaintRect;
 };
 
 

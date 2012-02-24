@@ -33,6 +33,7 @@
 #include "DocumentLoader.h"
 #include "DocumentLoaderGtk.h"
 #include "ErrorsGtk.h"
+#include "FileSystem.h"
 #include "FormState.h"
 #include "FrameLoader.h"
 #include "FrameNetworkingContextGtk.h"
@@ -482,8 +483,10 @@ PassRefPtr<Widget> FrameLoaderClient::createPlugin(const IntSize& pluginSize, HT
     GtkWidget* gtkWidget = 0;
     g_signal_emit_by_name(getViewFromFrame(m_frame), "create-plugin-widget",
                           mimeTypeString.data(), urlString.data(), hash.get(), &gtkWidget);
-    if (gtkWidget)
+    if (gtkWidget) {
+        gtk_container_add(GTK_CONTAINER(getViewFromFrame(m_frame)), gtkWidget);
         return adoptRef(new GtkPluginWidget(gtkWidget));
+    }
 
     RefPtr<PluginView> pluginView = PluginView::create(core(m_frame), pluginSize, element, url, paramNames, paramValues, mimeType, loadManually);
 
@@ -1103,7 +1106,9 @@ void FrameLoaderClient::dispatchDidFailLoad(const ResourceError& error)
 
     String content;
     gchar* fileContent = 0;
-    gchar* errorURI = g_filename_to_uri(DATA_DIR"/webkit-1.0/resources/error.html", NULL, NULL);
+    GOwnPtr<gchar> errorPath(g_build_filename(sharedResourcesPath().data(), "resources", "error.html", NULL));
+    gchar* errorURI = g_filename_to_uri(errorPath.get(), 0, 0);
+
     GFile* errorFile = g_file_new_for_uri(errorURI);
     g_free(errorURI);
 

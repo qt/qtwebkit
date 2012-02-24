@@ -75,6 +75,7 @@ public:
     virtual const IntSize requiredTextureSize(unsigned plane) const = 0;
     virtual bool hasPaddingBytes(unsigned plane) const = 0;
     virtual unsigned textureId() const = 0;
+    virtual unsigned textureTarget() const = 0;
 };
 
 } // namespace WebCore

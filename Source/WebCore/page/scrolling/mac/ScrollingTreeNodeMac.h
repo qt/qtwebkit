@@ -28,6 +28,7 @@
 
 #if ENABLE(THREADED_SCROLLING)
 
+#include "ScrollElasticityController.h"
 #include "ScrollingTreeNode.h"
 #include <wtf/RetainPtr.h>
 
@@ -35,18 +36,44 @@ OBJC_CLASS CALayer;
 
 namespace WebCore {
 
-class ScrollingTreeNodeMac : public ScrollingTreeNode {
+class ScrollingTreeNodeMac : public ScrollingTreeNode, private ScrollElasticityControllerClient {
 public:
     explicit ScrollingTreeNodeMac(ScrollingTree*);
+    virtual ~ScrollingTreeNodeMac();
 
 private:
+    // ScrollingTreeNode member functions.
     virtual void update(ScrollingTreeState*) OVERRIDE;
     virtual void handleWheelEvent(const PlatformWheelEvent&) OVERRIDE;
+    virtual void setScrollPosition(const IntPoint&) OVERRIDE;
+
+    // ScrollElasticityController member functions.
+    virtual bool allowsHorizontalStretching() OVERRIDE;
+    virtual bool allowsVerticalStretching() OVERRIDE;
+    virtual IntSize stretchAmount() OVERRIDE;
+    virtual bool pinnedInDirection(const FloatSize&) OVERRIDE;
+    virtual bool canScrollHorizontally() OVERRIDE;
+    virtual bool canScrollVertically() OVERRIDE;
+    virtual bool shouldRubberBandInDirection(ScrollDirection) OVERRIDE;
+    virtual IntPoint absoluteScrollPosition() OVERRIDE;
+    virtual void immediateScrollBy(const FloatSize&) OVERRIDE;
+    virtual void immediateScrollByWithoutContentEdgeConstraints(const FloatSize&) OVERRIDE;
+    virtual void startSnapRubberbandTimer() OVERRIDE;
+    virtual void stopSnapRubberbandTimer() OVERRIDE;
 
     IntPoint scrollPosition() const;
-    void setScrollPosition(const IntPoint&);
+    void setScrollLayerPosition(const IntPoint&);
+
+    IntPoint minimumScrollPosition() const;
+    IntPoint maximumScrollPosition() const;
 
     void scrollBy(const IntSize&);
+    void scrollByWithoutContentEdgeConstraints(const IntSize&);
+
+    void updateMainFramePinState(const IntPoint& scrollPosition);
+
+    ScrollElasticityController m_scrollElasticityController;
+    RetainPtr<CFRunLoopTimerRef> m_snapRubberbandTimer;
 
     RetainPtr<CALayer> m_scrollLayer;
 };

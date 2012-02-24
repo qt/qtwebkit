@@ -47,6 +47,21 @@ PassRefPtr<HTMLTableColElement> HTMLTableColElement::create(const QualifiedName&
     return adoptRef(new HTMLTableColElement(tagName, document));
 }
 
+bool HTMLTableColElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == widthAttr)
+        return true;
+    return HTMLTablePartElement::isPresentationAttribute(attr);
+}
+
+void HTMLTableColElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    if (attr->name() == widthAttr)
+        addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
+    else
+        HTMLTablePartElement::collectStyleForAttribute(attr, style);
+}
+
 void HTMLTableColElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == spanAttr) {
@@ -55,15 +70,13 @@ void HTMLTableColElement::parseAttribute(Attribute* attr)
             renderer()->updateFromElement();
     } else if (attr->name() == widthAttr) {
         if (!attr->value().isEmpty()) {
-            addCSSLength(CSSPropertyWidth, attr->value());
             if (renderer() && renderer()->isTableCol()) {
                 RenderTableCol* col = toRenderTableCol(renderer());
                 int newWidth = width().toInt();
                 if (newWidth != col->width())
                     col->setNeedsLayoutAndPrefWidthsRecalc();
             }
-        } else
-            removeCSSProperty(CSSPropertyWidth);
+        }
     } else
         HTMLTablePartElement::parseAttribute(attr);
 }
@@ -72,12 +85,9 @@ StylePropertySet* HTMLTableColElement::additionalAttributeStyle()
 {
     if (!hasLocalName(colgroupTag))
         return 0;
-    ContainerNode* p = parentNode();
-    while (p && !p->hasTagName(tableTag))
-        p = p->parentNode();
-    if (!p)
-        return 0;
-    return static_cast<HTMLTableElement*>(p)->additionalGroupStyle(false);
+    if (HTMLTableElement* table = findParentTable())
+        return table->additionalGroupStyle(false);
+    return 0;
 }
 
 void HTMLTableColElement::setSpan(int n)

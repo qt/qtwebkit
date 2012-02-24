@@ -29,7 +29,8 @@
 
 module core {
     interface [
-        JSGenerateToJS
+        JSGenerateToJSObject
     ] WebKitNamedFlow {
+        readonly attribute boolean overflow;
     };
 }

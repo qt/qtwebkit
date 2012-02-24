@@ -52,6 +52,7 @@
       '../',
       '../..',
       '../Modules/gamepad',
+      '../Modules/geolocation',
       '../Modules/intents',
       '../Modules/indexeddb',
       '../accessibility',
@@ -89,6 +90,7 @@
       '../page',
       '../page/animation',
       '../page/chromium',
+      '../page/scrolling',
       '../platform',
       '../platform/animation',
       '../platform/audio',
@@ -310,18 +312,11 @@
           # static library and rebuilds it with these global symbols
           # transformed to private_extern.
           'target_name': 'webkit_system_interface',
-          'type': 'static_library',
+          'type': 'none',
           'variables': {
             'adjusted_library_path':
                 '<(PRODUCT_DIR)/libWebKitSystemInterfaceLeopardPrivateExtern.a',
           },
-          'sources': [
-            # An empty source file is needed to convince Xcode to produce
-            # output for this target.  The resulting library won't actually
-            # contain anything.  The library at adjusted_library_path will,
-            # and that library is pushed to dependents of this target below.
-            'mac/Empty.cpp',
-          ],
           'actions': [
             {
               'action_name': 'Adjust Visibility',
@@ -484,6 +479,7 @@
           'inputs': [
             '../bindings/scripts/resolve-supplemental.pl',
             '../bindings/scripts/IDLParser.pm',
+            '../bindings/scripts/IDLAttributes.txt',
             '<(idl_files_list)',
             '<!@(cat <(idl_files_list))',
           ],
@@ -501,6 +497,8 @@
             '<(idl_files_list)',
             '--supplementalDependencyFile',
             '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
+            '--idlAttributesFile',
+            '../bindings/scripts/IDLAttributes.txt',
           ],
           'message': 'Resolving [Supplemental=XXX] dependencies in all IDL files',
         }
@@ -820,6 +818,7 @@
               '../css/quirks.css',
               '../css/view-source.css',
               '../css/themeChromium.css', # Chromium only.
+              '../css/themeChromiumAndroid.css', # Chromium only.
               '../css/themeChromiumLinux.css', # Chromium only.
               '../css/themeChromiumSkia.css',  # Chromium only.
               '../css/themeWin.css',
@@ -1177,6 +1176,7 @@
         '<(chromium_src_dir)/third_party/ots/ots.gyp:ots',
         '<(chromium_src_dir)/third_party/sqlite/sqlite.gyp:sqlite',
         '<(chromium_src_dir)/third_party/angle/src/build_angle.gyp:translator_glsl',
+        '<(chromium_src_dir)/third_party/zlib/zlib.gyp:zlib',
         '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
         '<(libjpeg_gyp_path):libjpeg',
       ],
@@ -1484,6 +1484,7 @@
             ['include', 'platform/graphics/harfbuzz/FontHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
+            ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
             ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
           ],
         }, { # use_x11==0

@@ -45,6 +45,7 @@
 #include "GraphicsContext3D.h"
 #include "GraphicsLayer.h"
 #include "InspectorClientImpl.h"
+#include "IntPoint.h"
 #include "IntRect.h"
 #include "NotificationPresenterImpl.h"
 #include "PageOverlayList.h"
@@ -95,6 +96,11 @@ class WebTouchEvent;
 
 class WebViewImpl : public WebView, public WebCore::CCLayerTreeHostClient, public RefCounted<WebViewImpl> {
 public:
+    enum AutoZoomType {
+        DoubleTap,
+        FindInPage,
+    };
+
     // WebWidget methods:
     virtual void close();
     virtual WebSize size() { return m_size; }
@@ -110,6 +116,7 @@ public:
     virtual void paint(WebCanvas*, const WebRect&);
     virtual void themeChanged();
     virtual void composite(bool finish);
+    virtual void setNeedsRedraw();
     virtual bool handleInputEvent(const WebInputEvent&);
     virtual void mouseCaptureLost();
     virtual void setFocus(bool enable);
@@ -314,11 +321,13 @@ public:
     void mouseDoubleClick(const WebMouseEvent&);
     bool mouseWheel(const WebMouseWheelEvent&);
     bool gestureEvent(const WebGestureEvent&);
+    void startPageScaleAnimation(const WebCore::IntPoint& targetPosition, bool useAnchor, float newScale, double durationSec);
     bool keyEvent(const WebKeyboardEvent&);
     bool charEvent(const WebKeyboardEvent&);
     bool touchEvent(const WebTouchEvent&);
 
     void numberOfWheelEventHandlersChanged(unsigned);
+    void numberOfTouchEventHandlersChanged(unsigned);
 
     // Handles context menu events orignated via the the keyboard. These
     // include the VK_APPS virtual key and the Shift+F10 combine. Code is
@@ -437,8 +446,11 @@ public:
     // Returns the onscreen 3D context used by the compositor. This is
     // used by the renderer's code to set up resource sharing between
     // the compositor's context and subordinate contexts for APIs like
-    // WebGL. Returns 0 if compositing support is not compiled in.
+    // WebGL. Returns 0 if compositing support is not compiled in or
+    // we could not successfully instantiate a context.
     virtual WebGraphicsContext3D* graphicsContext3D();
+
+    PassRefPtr<WebCore::GraphicsContext3D> createCompositorGraphicsContext3D();
 
     virtual void setVisibilityState(WebPageVisibilityState, bool);
 
@@ -454,6 +466,10 @@ public:
     // if the zoom change was triggered by the browser, it's only needed in case
     // a plugin can update its own zoom, say because of its own UI.
     void fullFramePluginZoomLevelChanged(double zoomLevel);
+
+#if ENABLE(GESTURE_EVENTS)
+    void computeScaleAndScrollForHitRect(const WebRect& hitRect, AutoZoomType, float& scale, WebPoint& scroll);
+#endif
 
     void loseCompositorContext(int numTimes);
 
@@ -523,6 +539,15 @@ private:
     void doPixelReadbackToCanvas(WebCanvas*, const WebCore::IntRect&);
     void reallocateRenderer();
     void updateLayerTreeViewport();
+#endif
+
+#if ENABLE(GESTURE_EVENTS)
+    // Returns the bounding box of the block type node touched by the WebRect.
+    WebRect computeBlockBounds(const WebRect&, AutoZoomType);
+
+    // Helper function: Widens the width of |source| by the specified margins
+    // while keeping it smaller than page width.
+    WebRect widenRectWithinPageBounds(const WebRect& source, int targetMargin, int minimumMargin);
 #endif
 
 #if ENABLE(POINTER_LOCK)
@@ -670,7 +695,6 @@ private:
     // If true, the graphics context is being restored.
     bool m_recreatingGraphicsContext;
 #endif
-    bool m_haveWheelEventHandlers;
     static const WebInputEvent* m_currentInputEvent;
 
 #if ENABLE(INPUT_SPEECH)

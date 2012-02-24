@@ -33,16 +33,15 @@ public:
     ~BitmapTextureImageBuffer() { destroy(); }
     virtual void destroy() { m_image.clear(); }
     virtual IntSize size() const { return m_image->size(); }
-    virtual void reset(const IntSize& size, bool opaque)
-    {
-        BitmapTexture::reset(size, opaque);
-        m_image = ImageBuffer::create(size);
-    }
-
+    virtual void didReset();
     virtual bool isValid() const { return m_image; }
     inline GraphicsContext* graphicsContext() { return m_image ? m_image->context() : 0; }
     virtual void updateContents(Image*, const IntRect&, const IntRect&, PixelFormat);
     void updateContents(const void* data, const IntRect& targetRect);
+#if ENABLE(CSS_FILTERS)
+    void applyFilters(const BitmapTexture&, const FilterOperations&);
+#endif
+
 private:
     BitmapTextureImageBuffer() { }
     OwnPtr<ImageBuffer> m_image;

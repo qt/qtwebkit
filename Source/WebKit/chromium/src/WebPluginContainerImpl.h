@@ -104,6 +104,7 @@ public:
     virtual WebString executeScriptURL(const WebURL&, bool popupsAllowed);
     virtual void loadFrameRequest(const WebURLRequest&, const WebString& target, bool notifyNeeded, void* notifyData);
     virtual void zoomLevelChanged(double zoomLevel);    
+    virtual bool isRectTopmost(const WebRect&);
 
     // This cannot be null.
     WebPlugin* plugin() { return m_webPlugin; }
@@ -149,10 +150,6 @@ public:
     void willEndLiveResize();
 
     bool paintCustomOverhangArea(WebCore::GraphicsContext*, const WebCore::IntRect&, const WebCore::IntRect&, const WebCore::IntRect&);
-
-#if ENABLE(GESTURE_EVENTS)
-    bool handleGestureEvent(const WebCore::PlatformGestureEvent&);
-#endif
 
 private:
     WebPluginContainerImpl(WebCore::HTMLPlugInElement* element, WebPlugin* webPlugin);

@@ -28,7 +28,7 @@
 #include "FrameView.h"
 #include "PlatformContextCairo.h"
 #include "TextureMapperGL.h"
-#include "TextureMapperNode.h"
+#include "TextureMapperLayer.h"
 #include "webkitwebviewprivate.h"
 #include <GL/gl.h>
 #include <cairo.h>
@@ -41,15 +41,16 @@ namespace WebKit {
 
 AcceleratedCompositingContext::AcceleratedCompositingContext(WebKitWebView* webView)
     : m_webView(webView)
-    , m_syncTimer(this, &AcceleratedCompositingContext::syncLayersTimeout)
+    , m_syncTimerCallbackId(0)
     , m_initialized(false)
-    , m_rootTextureMapperNode(0)
+    , m_rootTextureMapperLayer(0)
 {
 }
 
 AcceleratedCompositingContext::~AcceleratedCompositingContext()
 {
-
+    if (m_syncTimerCallbackId)
+        g_source_remove(m_syncTimerCallbackId);
 }
 
 void AcceleratedCompositingContext::initializeIfNecessary()
@@ -69,7 +70,7 @@ void AcceleratedCompositingContext::initializeIfNecessary()
 
 bool AcceleratedCompositingContext::enabled()
 {
-    return m_rootTextureMapperNode && m_textureMapper;
+    return m_rootTextureMapperLayer && m_textureMapper;
 }
 
 
@@ -90,7 +91,7 @@ bool AcceleratedCompositingContext::renderLayersToWindow(const IntRect& clipRect
     glViewport(0, 0, allocation.width, allocation.height);
 
     m_textureMapper->beginPainting();
-    m_rootTextureMapperNode->paint();
+    m_rootTextureMapperLayer->paint();
     m_textureMapper->endPainting();
 
     m_context->finishDrawing();
@@ -101,12 +102,12 @@ void AcceleratedCompositingContext::attachRootGraphicsLayer(GraphicsLayer* graph
 {
     if (!graphicsLayer) {
         m_rootGraphicsLayer.clear();
-        m_rootTextureMapperNode = 0;
+        m_rootTextureMapperLayer = 0;
         return;
     }
 
     m_rootGraphicsLayer = GraphicsLayer::create(this);
-    m_rootTextureMapperNode = toTextureMapperNode(m_rootGraphicsLayer.get());
+    m_rootTextureMapperLayer = toTextureMapperLayer(m_rootGraphicsLayer.get());
     m_rootGraphicsLayer->addChild(graphicsLayer);
     m_rootGraphicsLayer->setDrawsContent(true);
     m_rootGraphicsLayer->setMasksToBounds(false);
@@ -127,7 +128,7 @@ void AcceleratedCompositingContext::attachRootGraphicsLayer(GraphicsLayer* graph
     glViewport(0, 0, allocation.width, allocation.height);
 
     m_textureMapper = TextureMapperGL::create();
-    m_rootTextureMapperNode->setTextureMapper(m_textureMapper.get());
+    m_rootTextureMapperLayer->setTextureMapper(m_textureMapper.get());
     m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 }
 
@@ -150,11 +151,20 @@ void AcceleratedCompositingContext::resizeRootLayer(const IntSize& size)
     m_rootGraphicsLayer->setNeedsDisplay();
 }
 
+static gboolean syncLayersTimeoutCallback(AcceleratedCompositingContext* context)
+{
+    context->syncLayersTimeout();
+    return FALSE;
+}
+
 void AcceleratedCompositingContext::markForSync()
 {
-    if (m_syncTimer.isActive())
+    if (m_syncTimerCallbackId)
         return;
-    m_syncTimer.startOneShot(0);
+
+    // We use a GLib timer because otherwise GTK+ event handling during
+    // dragging can starve WebCore timers, which have a lower priority.
+    m_syncTimerCallbackId = g_timeout_add_full(GDK_PRIORITY_EVENTS, 0, reinterpret_cast<GSourceFunc>(syncLayersTimeoutCallback), this, 0);
 }
 
 void AcceleratedCompositingContext::syncLayersNow()
@@ -165,16 +175,17 @@ void AcceleratedCompositingContext::syncLayersNow()
     core(m_webView)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 }
 
-void AcceleratedCompositingContext::syncLayersTimeout(Timer<AcceleratedCompositingContext>*)
+void AcceleratedCompositingContext::syncLayersTimeout()
 {
+    m_syncTimerCallbackId = 0;
     syncLayersNow();
     if (!m_rootGraphicsLayer)
         return;
 
     renderLayersToWindow(IntRect());
 
-    if (toTextureMapperNode(m_rootGraphicsLayer.get())->descendantsOrSelfHaveRunningAnimations())
-        m_syncTimer.startOneShot(1.0 / 60.0);
+    if (toTextureMapperLayer(m_rootGraphicsLayer.get())->descendantsOrSelfHaveRunningAnimations())
+        m_syncTimerCallbackId = g_timeout_add_full(GDK_PRIORITY_EVENTS, 1000.0 / 60.0, reinterpret_cast<GSourceFunc>(syncLayersTimeoutCallback), this, 0);
 }
 
 void AcceleratedCompositingContext::notifyAnimationStarted(const WebCore::GraphicsLayer*, double time)

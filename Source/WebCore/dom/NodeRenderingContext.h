@@ -34,12 +34,12 @@ namespace WebCore {
 
 class ContainerNode;
 class Document;
+class InsertionPoint;
 class Node;
 class RenderFlowThread;
 class RenderObject;
 class RenderStyle;
-class HTMLContentElement;
-class ShadowRoot;
+class ShadowRootList;
 
 class NodeRenderingContext {
 public:
@@ -52,7 +52,7 @@ public:
     RenderObject* parentRenderer() const;
     RenderObject* nextRenderer() const;
     RenderObject* previousRenderer() const;
-    HTMLContentElement* includer() const;
+    InsertionPoint* insertionPoint() const;
 
     RenderStyle* style() const;
     void setStyle(PassRefPtr<RenderStyle>);
@@ -62,32 +62,28 @@ public:
 
     void hostChildrenChanged();
 
+    bool isOnEncapsulationBoundary() const;
     bool hasFlowThreadParent() const { return m_parentFlowRenderer; }
     RenderFlowThread* parentFlowRenderer() const { return m_parentFlowRenderer; }
     void moveToFlowThreadIfNeeded();
 
 private:
-
-    enum TreeLocation {
-        LocationUndetermined,
-        LocationNotInTree,
-        LocationLightChild,
-        LocationShadowChild,
+    enum AttachingPhase {
+        Calculating,
+        AttachingStraight,
+        AttachingNotInTree,
+        AttachingDistributed,
+        AttachingNotDistributed,
+        AttachingFallbacked,
+        AttachingNotFallbacked,
+        AttachingShadowChild,
     };
 
-    enum AttachPhase {
-        AttachStraight,
-        AttachContentLight,
-        AttachContentForwarded,
-        AttachContentFallback,
-    };
-
-    TreeLocation m_location;
-    AttachPhase m_phase;
+    AttachingPhase m_phase;
     Node* m_node;
     ContainerNode* m_parentNodeForRenderingAndStyle;
-    ShadowRoot* m_visualParentShadowRoot;
-    HTMLContentElement* m_includer;
+    ShadowRootList* m_visualParentShadowRootList;
+    InsertionPoint* m_insertionPoint;
     RefPtr<RenderStyle> m_style;
     RenderFlowThread* m_parentFlowRenderer;
     AtomicString m_flowThread;
@@ -100,7 +96,7 @@ inline Node* NodeRenderingContext::node() const
 
 inline ContainerNode* NodeRenderingContext::parentNodeForRenderingAndStyle() const
 {
-    ASSERT(m_location != LocationUndetermined);
+    ASSERT(m_phase != Calculating);
     return m_parentNodeForRenderingAndStyle;
 }
 
@@ -109,9 +105,16 @@ inline RenderStyle* NodeRenderingContext::style() const
     return m_style.get();
 }
 
-inline HTMLContentElement* NodeRenderingContext::includer() const
+inline InsertionPoint* NodeRenderingContext::insertionPoint() const
 {
-    return m_includer;
+    return m_insertionPoint;
+}
+
+inline bool NodeRenderingContext::isOnEncapsulationBoundary() const
+{
+    return (m_phase == AttachingDistributed
+            || m_phase == AttachingShadowChild
+            || m_phase == AttachingFallbacked);
 }
 
 class NodeRendererFactory {

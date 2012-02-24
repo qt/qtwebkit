@@ -189,6 +189,9 @@ extern NSString *WebPreferencesChangedInternalNotification;
 - (BOOL)cssCustomFilterEnabled;
 - (void)setCSSCustomFilterEnabled:(BOOL)enabled;
 
+- (BOOL)cssRegionsEnabled;
+- (void)setCSSRegionsEnabled:(BOOL)enabled;
+
 - (BOOL)showDebugBorders;
 - (void)setShowDebugBorders:(BOOL)show;
 
@@ -271,6 +274,7 @@ extern NSString *WebPreferencesChangedInternalNotification;
 - (void)setHixie76WebSocketProtocolEnabled:(BOOL)flag;
 - (BOOL)isHixie76WebSocketProtocolEnabled;
 
+// Deprecated. You should use [setS|s]uppressesIncrementalRendering in WebPreferences.h instead.
 - (void)setSuppressIncrementalRendering:(BOOL)flag;
 - (BOOL)suppressIncrementalRendering;
 
@@ -285,5 +289,8 @@ extern NSString *WebPreferencesChangedInternalNotification;
 
 - (void)setShouldDisplayTextDescriptions:(BOOL)flag;
 - (BOOL)shouldDisplayTextDescriptions;
+
+- (void)setNotificationsEnabled:(BOOL)flag;
+- (BOOL)notificationsEnabled;
 
 @end

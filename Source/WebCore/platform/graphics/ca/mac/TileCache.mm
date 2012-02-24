@@ -31,6 +31,7 @@
 #import "WebLayer.h"
 #import "WebTileCacheLayer.h"
 #import "WebTileLayer.h"
+#import <wtf/MainThread.h>
 #import <utility>
 
 using namespace std;
@@ -62,6 +63,11 @@ TileCache::TileCache(WebTileCacheLayer* tileCacheLayer, const IntSize& tileSize)
     [CATransaction commit];
 }
 
+TileCache::~TileCache()
+{
+    ASSERT(isMainThread());
+}
+
 void TileCache::tileCacheLayerBoundsChanged()
 {
     if (m_tiles.isEmpty()) {
@@ -87,7 +93,7 @@ void TileCache::setNeedsDisplayInRect(const IntRect& rect)
     // Find the tiles that need to be invalidated.
     TileIndex topLeft;
     TileIndex bottomRight;
-    getTileIndexRangeForRect(rect, topLeft, bottomRight);
+    getTileIndexRangeForRect(intersection(rect, m_tileCoverageRect), topLeft, bottomRight);
 
     for (int y = topLeft.y(); y <= bottomRight.y(); ++y) {
         for (int x = topLeft.x(); x <= bottomRight.x(); ++x) {
@@ -154,6 +160,22 @@ void TileCache::drawLayer(WebTileLayer* layer, CGContextRef context)
 
     CGContextEndTransparencyLayer(context);
     CGContextRestoreGState(context);
+}
+
+void TileCache::setContentsScale(CGFloat contentsScale)
+{
+#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+    for (TileMap::const_iterator it = m_tiles.begin(), end = m_tiles.end(); it != end; ++it) {
+        [it->second.get() setContentsScale:contentsScale];
+        [it->second.get() setNeedsDisplay];
+    }
+
+    PlatformCALayer* platformLayer = PlatformCALayer::platformCALayer(m_tileCacheLayer);
+    platformLayer->owner()->platformCALayerDidCreateTiles();
+    revalidateTiles();
+#else
+    UNUSED_PARAM(contentsScale);
+#endif
 }
 
 void TileCache::setAcceleratesDrawing(bool acceleratesDrawing)
@@ -311,6 +333,13 @@ void TileCache::revalidateTiles()
         }
     }
 
+    m_tileCoverageRect = IntRect();
+    for (TileMap::iterator it = m_tiles.begin(), end = m_tiles.end(); it != end; ++it) {
+        const TileIndex& tileIndex = it->first;
+
+        m_tileCoverageRect.unite(rectForTileIndex(tileIndex));
+    }
+
     if (!didCreateNewTiles)
         return;
 
@@ -331,8 +360,10 @@ RetainPtr<WebTileLayer> TileCache::createTileLayer()
     [layer.get() setTileCache:this];
     [layer.get() setBorderColor:m_tileDebugBorderColor.get()];
     [layer.get() setBorderWidth:m_tileDebugBorderWidth];
+    [layer.get() setEdgeAntialiasingMask:0];
 
 #if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+    [layer.get() setContentsScale:[m_tileCacheLayer contentsScale]];
     [layer.get() setAcceleratesDrawing:m_acceleratesDrawing];
 #endif
 

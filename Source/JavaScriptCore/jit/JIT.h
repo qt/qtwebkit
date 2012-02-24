@@ -335,7 +335,7 @@ namespace JSC {
         void emitWriteBarrier(RegisterID owner, RegisterID valueTag, RegisterID scratch, RegisterID scratch2, WriteBarrierMode, WriteBarrierUseKind);
         void emitWriteBarrier(JSCell* owner, RegisterID value, RegisterID scratch, WriteBarrierMode, WriteBarrierUseKind);
 
-        template<typename ClassType, typename StructureType> void emitAllocateBasicJSObject(StructureType, RegisterID result, RegisterID storagePtr);
+        template<typename ClassType, bool destructor, typename StructureType> void emitAllocateBasicJSObject(StructureType, RegisterID result, RegisterID storagePtr);
         template<typename T> void emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID storagePtr);
         void emitAllocateJSFunction(FunctionExecutable*, RegisterID scopeChain, RegisterID result, RegisterID storagePtr);
         
@@ -500,7 +500,7 @@ namespace JSC {
 #if ENABLE(OPCODE_SAMPLING)
         #error "OPCODE_SAMPLING is not yet supported"
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 56;
+        static const int patchOffsetGetByIdSlowCaseCall = 64;
 #endif
         static const int patchOffsetOpCallCompareToJump = 32;
         static const int patchOffsetMethodCheckProtoObj = 32;
@@ -518,7 +518,7 @@ namespace JSC {
 #if ENABLE(OPCODE_SAMPLING)
         #error "OPCODE_SAMPLING is not yet supported"
 #else
-        static const int patchOffsetGetByIdSlowCaseCall = 56;
+        static const int patchOffsetGetByIdSlowCaseCall = 64;
 #endif
         static const int patchOffsetOpCallCompareToJump = 32;
         static const int patchOffsetMethodCheckProtoObj = 32;

@@ -42,20 +42,20 @@ class GraphicsLayer;
 
 class ScrollableArea {
 public:
-    enum ZoomAnimationState { ZoomAnimationContinuing, ZoomAnimationFinishing };
-
     bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1);
     void scrollToOffsetWithoutAnimation(const FloatPoint&);
     void scrollToOffsetWithoutAnimation(ScrollbarOrientation, float offset);
-    void scrollToXOffsetWithoutAnimation(float x);
-    void scrollToYOffsetWithoutAnimation(float x);
 
-    virtual void zoomAnimatorTransformChanged(float, float, float, ZoomAnimationState);
+    // Should be called when the scroll position changes externally, for example if the scroll layer position
+    // is updated on the scrolling thread and we need to notify the main thread.
+    void notifyScrollPositionChanged(const IntPoint&);
+
+    // Allows subclasses to handle scroll position updates themselves. If this member function
+    // returns true, the scrollable area won't actually update the scroll position and instead
+    // expect it to happen sometime in the future.
+    virtual bool requestScrollPositionUpdate(const IntPoint&) { return false; }
 
     bool handleWheelEvent(const PlatformWheelEvent&);
-#if ENABLE(GESTURE_EVENTS)
-    void handleGestureEvent(const PlatformGestureEvent&);
-#endif
 
     // Functions for controlling if you can scroll past the end of the document.
     bool constrainsScrollingToContentEdge() const { return m_constrainsScrollingToContentEdge; }
@@ -104,10 +104,6 @@ public:
     void invalidateScrollCorner(const IntRect&);
     virtual void getTickmarks(Vector<IntRect>&) const { }
 
-    // This function should be overriden by subclasses to perform the actual
-    // scroll of the content.
-    virtual void setScrollOffset(const IntPoint&) = 0;
-
     // Convert points and rects between the scrollbar and its containing view.
     // The client needs to implement these in order to be aware of layout effects
     // like CSS transforms.
@@ -147,20 +143,11 @@ public:
 
     virtual bool isOnActivePage() const { ASSERT_NOT_REACHED(); return true; }
     
-    bool isHorizontalScrollerPinnedToMinimumPosition() const { return !horizontalScrollbar() || scrollPosition(horizontalScrollbar()) <= minimumScrollPosition().x(); }
-    bool isHorizontalScrollerPinnedToMaximumPosition() const { return !horizontalScrollbar() || scrollPosition(horizontalScrollbar()) >= maximumScrollPosition().x(); }
-    bool isVerticalScrollerPinnedToMinimumPosition() const { return !verticalScrollbar() || scrollPosition(verticalScrollbar()) <= minimumScrollPosition().y(); }
-    bool isVerticalScrollerPinnedToMaximumPosition() const { return !verticalScrollbar() || scrollPosition(verticalScrollbar()) >= maximumScrollPosition().y(); }
-
     // Note that this only returns scrollable areas that can actually be scrolled.
     virtual ScrollableArea* enclosingScrollableArea() const = 0;
 
     // Returns the bounding box of this scrollable area, in the coordinate system of the enclosing scroll view.
     virtual IntRect scrollableAreaBoundingBox() const { ASSERT_NOT_REACHED(); return IntRect(); }
-
-    bool isPinnedInBothDirections(const IntSize&) const;
-    bool isPinnedHorizontallyInDirection(int horizontalScrollDelta) const;
-    bool isPinnedVerticallyInDirection(int verticalScrollDelta) const;
 
     virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
 
@@ -174,8 +161,6 @@ protected:
     virtual ~ScrollableArea();
 
     void setScrollOrigin(const IntPoint&);
-    void setScrollOriginX(int);
-    void setScrollOriginY(int);
     void resetScrollOriginChanged() { m_scrollOriginChanged = false; }
 
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) = 0;
@@ -197,6 +182,10 @@ private:
     // NOTE: Only called from the ScrollAnimator.
     friend class ScrollAnimator;
     void setScrollOffsetFromAnimation(const IntPoint&);
+
+    // This function should be overriden by subclasses to perform the actual
+    // scroll of the content.
+    virtual void setScrollOffset(const IntPoint&) = 0;
 
     mutable OwnPtr<ScrollAnimator> m_scrollAnimator;
     bool m_constrainsScrollingToContentEdge : 1;

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Mathias Bynens (mathias@qiwi.be)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -294,7 +295,7 @@ ALWAYS_INLINE TokenType LiteralParser<LChar>::Lexer::lexIdentifier(LiteralParser
 template <>
 ALWAYS_INLINE TokenType LiteralParser<UChar>::Lexer::lexIdentifier(LiteralParserToken<UChar>& token)
 {
-    while (m_ptr < m_end && (isASCIIAlphanumeric(*m_ptr) || *m_ptr == '_' || *m_ptr == '$'))
+    while (m_ptr < m_end && (isASCIIAlphanumeric(*m_ptr) || *m_ptr == '_' || *m_ptr == '$' || *m_ptr == 0x200C || *m_ptr == 0x200D))
         m_ptr++;
     token.stringIs8Bit = 0;
     token.stringToken16 = token.start;
@@ -536,7 +537,7 @@ TokenType LiteralParser<CharType>::Lexer::lexNumber(LiteralParserToken<CharType>
     }
     buffer[i] = 0;
     char* end;
-    token.numberToken = WTF::strtod(buffer.data(), &end);
+    token.numberToken = WTF::strtod<WTF::AllowTrailingJunk>(buffer.data(), &end);
     ASSERT(buffer.data() + (token.end - token.start) == end);
     return TokNumber;
 }

@@ -1,3 +1,458 @@
+2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
+
+        SpellCheckRequest needs to know the context where the spellcheck happened.
+        https://bugs.webkit.org/show_bug.cgi?id=79320
+
+        Reviewed by Hajime Morita.
+
+        * WebCoreSupport/WebEditorClient.h:
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::requestCheckingOfString):
+
+2012-02-23  Andy Estes  <aestes@apple.com>
+
+        Rename [setS|s]uppressIncrementalRendering to [setS|s]uppressesIncrementalRendering and make it WebPreferences API.
+        https://bugs.webkit.org/show_bug.cgi?id=79433
+
+        Reviewed by Dan Bernstein.
+
+        * WebCoreSupport/WebInspectorClient.mm:
+        (-[WebInspectorWindowController init]):
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]):
+        (-[WebPreferences setSuppressesIncrementalRendering:]):
+        (-[WebPreferences suppressesIncrementalRendering]):
+        (-[WebPreferences setSuppressIncrementalRendering:]):
+        (-[WebPreferences suppressIncrementalRendering]):
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+
+2012-02-22  Hajime Morrita  <morrita@chromium.org>
+
+        NOTIFICATIONS should be implemented as PageSupplement
+        https://bugs.webkit.org/show_bug.cgi?id=79052
+
+        Reviewed by Adam Barth.
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+
+2012-02-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient):
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::shouldApplyStyle):
+        * WebView/WebFrame.mm:
+        (-[WebFrame _setTypingStyle:withUndoAction:]):
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _applyStyleToSelection:withUndoAction:]):
+        (-[WebHTMLView _changeCSSColorUsingSelector:inRange:]):
+        * WebView/WebView.mm:
+        (-[WebView applyStyle:]):
+
+2012-02-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the remaining uses of CSSStyleDeclaration in Editor
+        https://bugs.webkit.org/show_bug.cgi?id=78939
+
+        Reviewed by Enrica Casucci.
+
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient):
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::shouldApplyStyle):
+        * WebView/WebFrame.mm:
+        (-[WebFrame _setTypingStyle:withUndoAction:]):
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _applyStyleToSelection:withUndoAction:]):
+        (-[WebHTMLView _changeCSSColorUsingSelector:inRange:]):
+        * WebView/WebView.mm:
+        (-[WebView applyStyle:]):
+
+2012-02-22  Jon Lee  <jonlee@apple.com>
+
+        Part of r108409 was incorrect, and incorporated an older version of a sub-patch.
+        This is the actual sub-patch that should have been submitted.
+
+        * WebCoreSupport/WebNotificationClient.h:
+        * WebCoreSupport/WebNotificationClient.mm:
+        (WebNotificationClient::show):
+        (WebNotificationClient::cancel):
+        (WebNotificationClient::clearNotifications):
+        (WebNotificationClient::notificationObjectDestroyed):
+        (WebNotificationClient::notificationControllerDestroyed):
+
+2012-02-21  Jon Lee  <jonlee@apple.com>
+
+        Build fix. Push ENABLE_NOTIFICATIONS into .mm file.
+
+        * WebCoreSupport/WebNotificationClient.h:
+        * WebView/WebNotification.h:
+        * WebView/WebNotification.mm:
+        (-[WebNotification title]):
+        (-[WebNotification body]):
+        (-[WebNotification origin]):
+        (-[WebNotification notificationID]):
+        (-[WebNotification dispatchShowEvent]):
+        (-[WebNotification dispatchCloseEvent]):
+        (-[WebNotification dispatchClickEvent]):
+        (-[WebNotification dispatchErrorEvent]):
+
+2012-02-21  John Sullivan  <sullivan@apple.com>
+
+        Build fix.
+
+        * WebView/WebUIDelegatePrivate.h:
+        Added @class declarations for DOMNode and DOMElement.
+
+2012-02-21  Jon Lee  <jonlee@apple.com>
+
+        Build fix for r108409.
+
+        * WebCoreSupport/WebNotificationClient.h:
+        (WebCore):
+        * WebCoreSupport/WebNotificationClient.mm:
+        * WebView/WebNotification.h:
+        (WebSecurityOrigin):
+        * WebView/WebNotification.mm:
+        (core):
+        (-[WebNotification initWithCoreNotification:notificationID:]):
+
+2012-02-21  Jon Lee  <jonlee@apple.com>
+
+        Bring notifications support to WK1 mac: permission requests
+        https://bugs.webkit.org/show_bug.cgi?id=78783
+        <rdar://problem/10610578>
+
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/WebNotificationClient.h:
+        * WebCoreSupport/WebNotificationClient.mm: Create policy listener, which conforms to the
+        WebAllowDenyPolicyListener protocol, similar to geolocation.
+        (WebNotificationClient::requestPermission):
+        (WebNotificationClient::checkPermission):
+        (-[WebNotificationPolicyListener initWithCallback:]):
+        (-[WebNotificationPolicyListener allow]): Call the callback.
+        (-[WebNotificationPolicyListener deny]): Call the callback.
+        * WebView/WebUIDelegatePrivate.h: Define new UI delegate method to ask the user to decide a
+        policy for navigations.
+
+        ====
+        Bring notifications support to WK1 mac: showing, canceling, removing notifications
+
+        Create a WebKit wrapper object for WebCore::Notification, which also keeps track of an assigned
+        ID.
+        * WebView/WebNotification.h: Added.
+        (WebSecurityOrigin):
+        * WebView/WebNotification.mm: Added.
+        (core):
+        (-[WebNotification initWithCoreNotification:notificationID:]):
+        (-[WebNotification init]):
+        (-[WebNotification dealloc]):
+        (-[WebNotification title]):
+        (-[WebNotification body]):
+        (-[WebNotification origin]):
+        (-[WebNotification notificationID]):
+        (-[WebNotification dispatchShowEvent]):
+        (-[WebNotification dispatchCloseEvent]):
+        (-[WebNotification dispatchClickEvent]):
+        (-[WebNotification dispatchErrorEvent]):
+        * WebView/WebNotificationInternal.h: Added.
+        (WebCore): Internal category to allow creating instances with WebCore objects.
+
+        Extend WebView to include a WebNotificationProvider, which clients implement.
+        * WebView/WebViewData.h: Add a private member for the provider.
+        * WebView/WebViewPrivate.h:
+            * Define an enum WebNotificationPermission that mirrors WebCore::NotificationPresenter::Permission
+            that client which implement the provider can use to return policy decisions.
+            * Define WebNotificationProvider.
+            * Category WebViewNotification extends WebView with methods that set and manager the
+            notification provider, and handle events from the platform notifications.
+        * WebView/WebView.mm:
+        (-[WebView _setNotificationProvider:]): Sets the provider when initializing the WebView.
+        (-[WebView _notificationControllerDestroyed]):
+        (-[WebView _notificationProvider]):
+        (-[WebView _notificationDidShow:]):
+        (-[WebView _notificationDidClick:]):
+        (-[WebView _notificationsDidClose:]):
+
+        * WebCoreSupport/WebNotificationClient.h: Add variables that map between WebCore::Notification
+        instances, their assigned IDs, their contexts, and corresponding WebKit wrapper objects.
+        * WebCoreSupport/WebNotificationClient.mm:
+        (generateNotificationID): Created unique IDs for each shown notification.
+        (WebNotificationClient::show): Create wrapper object for notification, assign ID, cache the
+        mappings between the objects, and forward it to the provider.
+        (WebNotificationClient::cancel):
+        (WebNotificationClient::clearNotifications): Clear all notifications associated with the
+        provided context.
+        (WebNotificationClient::notificationObjectDestroyed): Remove the notification from the maps.
+        (WebNotificationClient::notificationControllerDestroyed): If the controller is destroyed, tell
+        the provider to clear of the notifications related to this web view.
+
+        ====
+        (Prep work for) Bring notifications support to WK1 mac
+
+        Rename WebGeolocationPolicyListener. The interface is generic enough to be reused for
+        notification requests. To avoid having to create a new listener type, instead rename it
+        to WebAllowDenyPolicyListener.
+        * WebView/WebUIDelegatePrivate.h: Rename the protocol.
+        * WebCoreSupport/WebGeolocationClient.mm: Refactor geolocation request listener to use
+        new name.
+
+        Add preference to keep track of whether notifications are enabled in general.
+        * WebView/WebPreferenceKeysPrivate.h: Add WebNotificationsEnabledKey for storing the
+        preference.
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]): By default have them enabled.
+        (-[WebPreferences setNotificationsEnabled:]):
+        (-[WebPreferences notificationsEnabled]):
+        * WebView/WebPreferencesPrivate.h:
+
+        Add a stringValue method that exposes WebCore::SecurityOrigin::toString() for storing the
+        notification policy for a given origin.
+        * WebCoreSupport/WebSecurityOrigin.mm:
+        (-[WebSecurityOrigin stringValue]):
+        * WebCoreSupport/WebSecurityOriginPrivate.h:
+
+2012-02-21  Sam Weinig  <sam@webkit.org>
+
+        Attempt to fix the Snow Leopard build.
+
+        * Configurations/Base.xcconfig:
+
+2012-02-21  Sam Weinig  <sam@webkit.org>
+
+        Use libc++ when building with Clang on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=78981
+
+        Reviewed by Dan Bernstein.
+
+        * Configurations/Base.xcconfig:
+
+2012-02-17  Mihnea Ovidenie  <mihnea@adobe.com>
+
+        CSS regions enabled by default
+        https://bugs.webkit.org/show_bug.cgi?id=78525
+
+        Reviewed by David Hyatt.
+
+        Add a runtime preference to enable/disable regions functionality at runtime(WebKitCSSRegionsEnabled).
+        CSSRegions are still enabled by default.
+        In DRT, use layoutTestController.overridePreference("WebKitCSSRegionsEnabled", "0") to disable the css regions functionality.
+
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]):
+        (-[WebPreferences cssRegionsEnabled]):
+        (-[WebPreferences setCSSRegionsEnabled:]):
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+
+2012-02-17  Enrica Casucci  <enrica@apple.com>
+
+        Refactor DragData class to use PlatformStrategies in the Mac implementation.
+        https://bugs.webkit.org/show_bug.cgi?id=78768
+
+        Reviewed by Darin Adler.
+
+        * WebCoreSupport/WebPlatformStrategies.h: Added color() method.
+        * WebCoreSupport/WebPlatformStrategies.mm:
+        (WebPlatformStrategies::color):
+
+2012-02-16  Brady Eidson  <beidson@apple.com>
+
+        <rdar://problem/10616280> and https://bugs.webkit.org/show_bug.cgi?id=78767
+        REGRESSION (r90471) - iAd Producer 2.0.1 produces blank pages
+
+        Reviewed by Sam Weinig.
+
+        * WebView/WebView.mm:
+        (-[WebView _needsIsLoadingInAPISenseQuirk]):
+        (-[WebView _preferencesChanged:]):
+
+2012-02-15  Enrica Casucci  <enrica@apple.com>
+
+        Refactor ClipboardMac class to use PlatformStrategies.
+        https://bugs.webkit.org/show_bug.cgi?id=78554
+
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/WebDragClient.h: Changed methods signature to use name based pasteboard.
+        * WebCoreSupport/WebDragClient.mm: Ditto.
+        (WebDragClient::willPerformDragSourceAction):
+        (WebDragClient::startDrag):
+        (WebDragClient::declareAndWriteDragImage):
+        * WebCoreSupport/WebPlatformStrategies.h: Added new methods.
+        * WebCoreSupport/WebPlatformStrategies.mm:
+        (WebPlatformStrategies::changeCount):
+        (WebPlatformStrategies::uniqueName):
+
+2012-02-15  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        Notify ChromeClient when touch-event handlers are installed/removed.
+        https://bugs.webkit.org/show_bug.cgi?id=77440
+
+        Reviewed by Darin Fisher and Ryosuke Niwa.
+
+        * WebCoreSupport/WebChromeClient.h:
+
+2012-02-14  Matt Lilek  <mrl@apple.com>
+
+        Don't ENABLE_DASHBOARD_SUPPORT unconditionally on all Mac platforms
+        https://bugs.webkit.org/show_bug.cgi?id=78629
+
+        Reviewed by David Kilzer.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-02-14  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac][Win][WK2] Switch to RFC 6455 protocol for WebSockets
+        https://bugs.webkit.org/show_bug.cgi?id=78541
+        <rdar://problem/10036695>
+
+        Reviewed by Kent Tamura.
+
+        * WebView/WebPreferences.mm: (+[WebPreferences initialize]): Changed default value of the
+        preference.
+
+2012-02-11  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        Convert svg/animations to use SMIL methods for driving the timeline
+        https://bugs.webkit.org/show_bug.cgi?id=78422
+
+        Reviewed by Dirk Schulze.
+
+        Remove SVG animation sampling functionality provided for DRT, which no longer uses it.
+        Instead we switched the svg/animations tests to use SVGSVGElement.setCurrentTime.
+
+        * WebKit.order:
+        * WebView/WebFrame.mm:
+        * WebView/WebFramePrivate.h:
+
+2012-02-13  Enrica Casucci  <enrica@apple.com>
+
+         Refactor Mac platform implementation of the Pasteboard class to use Platform Strategies.
+         https://bugs.webkit.org/show_bug.cgi?id=78282
+ 
+         This patch removes any accesss to the NSPasteboard object from the Pasteboard class which
+         now makes use of a new pasteboardStrategy object that is implemented both in WebKit and
+         WebKit2. The actual access to NSPasteboard is now performed inside the PlatformPasteboard
+         class. Currently both WebKit and WebKit2 use the same implementation of the PasteboardStrategy
+         interface but this one more step in the direction of removing access to NSPasteboard from
+         the WebProcess.
+         As part of the refactoring the I've reduced to a minimum the use of OBJ-C classes.
+         
+         Reviewed by Anders Carlsson.
+ 
+         * WebCoreSupport/WebPlatformStrategies.h: Added PasteboardStrategy.
+         * WebCoreSupport/WebPlatformStrategies.mm: Added implementation of PasteboardStrategy interface.
+         (WebPlatformStrategies::createPasteboardStrategy):
+         (WebPlatformStrategies::getTypes):
+         (WebPlatformStrategies::bufferForType):
+         (WebPlatformStrategies::getPathnamesForType):
+         (WebPlatformStrategies::stringForType):
+         (WebPlatformStrategies::copy):
+         (WebPlatformStrategies::setTypes):
+         (WebPlatformStrategies::setBufferForType):
+         (WebPlatformStrategies::setPathnamesForType):
+         (WebPlatformStrategies::setStringForType):
+
+2012-02-12  Hajime Morrita  <morrita@chromium.org>
+
+        Page should have less intrusive way to associate API implementation objects.
+        https://bugs.webkit.org/show_bug.cgi?id=78085
+
+        Reviewed by Adam Barth.
+
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+
+2012-02-11  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r107435.
+        http://trac.webkit.org/changeset/107435
+        https://bugs.webkit.org/show_bug.cgi?id=78410
+
+        It broke the Qt build (Requested by Ossy on #webkit).
+
+        * WebCoreSupport/WebPlatformStrategies.h:
+        (WebPlatformStrategies):
+        * WebCoreSupport/WebPlatformStrategies.mm:
+        (WebPlatformStrategies::addVisitedLink):
+
+2012-02-10  Adam Klein  <adamk@chromium.org>
+
+        Enable MUTATION_OBSERVERS by default on all platforms
+        https://bugs.webkit.org/show_bug.cgi?id=78196
+
+        Reviewed by Ojan Vafai.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-02-10  Enrica Casucci  <enrica@apple.com>
+
+        Refactor Mac platform implementation of the Pasteboard class to use Platform Strategies.
+        https://bugs.webkit.org/show_bug.cgi?id=78282
+
+        This patch removes any accesss to the NSPasteboard object from the Pasteboard class which
+        now makes use of a new pasteboardStrategy object that is implemented both in WebKit and
+        WebKit2. The actual access to NSPasteboard is now performed inside the PlatformPasteboard
+        class. Currently both WebKit and WebKit2 use the same implementation of the PasteboardStrategy
+        interface but this one more step in the direction of removing access to NSPasteboard from
+        the WebProcess.
+        As part of the refactoring the I've reduced to a minimum the use of OBJ-C classes.
+        
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/WebPlatformStrategies.h: Added PasteboardStrategy.
+        * WebCoreSupport/WebPlatformStrategies.mm: Added implementation of PasteboardStrategy interface.
+        (WebPlatformStrategies::createPasteboardStrategy):
+        (WebPlatformStrategies::getTypes):
+        (WebPlatformStrategies::bufferForType):
+        (WebPlatformStrategies::getPathnamesForType):
+        (WebPlatformStrategies::stringForType):
+        (WebPlatformStrategies::copy):
+        (WebPlatformStrategies::setTypes):
+        (WebPlatformStrategies::setBufferForType):
+        (WebPlatformStrategies::setPathnamesForType):
+        (WebPlatformStrategies::setStringForType):
+
+2012-02-10  Benjamin Poulain  <bpoulain@apple.com>
+
+        [Mac] DYLIB_INSTALL_NAME_BASE should not be prefixed by the SDKROOT
+        https://bugs.webkit.org/show_bug.cgi?id=78320
+
+        Reviewed by Joseph Pecoraro.
+
+        <rdar://problem/10839750>
+
+        * Configurations/WebKit.xcconfig:
+
+2012-02-09  Alexey Proskuryakov  <ap@apple.com>
+
+        REGRESSION (r104885): Articles not displayed in Vienna RSS reader
+        https://bugs.webkit.org/show_bug.cgi?id=78280
+        <rdar://problem/10762545>
+
+        Reviewed by Oliver Hunt.
+
+        * Misc/WebNSURLExtras.h:
+        * Misc/WebNSURLExtras.mm: (-[NSURL _webkit_URLFromURLOrPath]):
+        Added a method to create a URL from a path, similarly to what KURL used to do.
+
+        * WebView/WebFrame.mm: (-[WebFrame loadData:MIMEType:textEncodingName:baseURL:]):
+        Use it in an API where a known regression occurred.
+
 2012-02-07  Antti Koivisto  <antti@apple.com>
 
         REGRESSION (r106681): Null check missing in [WebFrame(WebInternal) _typingStyle]

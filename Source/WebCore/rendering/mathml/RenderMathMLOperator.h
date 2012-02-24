@@ -35,9 +35,10 @@ namespace WebCore {
     
 class RenderMathMLOperator : public RenderMathMLBlock {
 public:
-    RenderMathMLOperator(Node* container);
-    RenderMathMLOperator(Node* container, UChar operatorChar);
+    RenderMathMLOperator(Element*);
+    RenderMathMLOperator(Node*, UChar operatorChar);
     virtual bool isRenderMathMLOperator() const { return true; }
+    virtual RenderMathMLOperator* unembellishedOperator() { return this; }
     virtual void stretchToHeight(int pixelHeight);
     virtual void updateFromElement(); 
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
@@ -45,7 +46,7 @@ public:
         
 protected:
     virtual void layout();
-    virtual RefPtr<RenderStyle> createStackableStyle(int size, int topRelative);
+    virtual PassRefPtr<RenderStyle> createStackableStyle(int size, int topRelative);
     virtual RenderBlock* createGlyph(UChar glyph, int size = 0, int charRelative = 0, int topRelative = 0);
     
 private:

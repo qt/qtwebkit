@@ -11,6 +11,7 @@ SET(JavaScriptCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/debugger"
     "${JAVASCRIPTCORE_DIR}/interpreter"
     "${JAVASCRIPTCORE_DIR}/jit"
+    "${JAVASCRIPTCORE_DIR}/llint"
     "${JAVASCRIPTCORE_DIR}/parser"
     "${JAVASCRIPTCORE_DIR}/profiler"
     "${JAVASCRIPTCORE_DIR}/runtime"
@@ -41,23 +42,28 @@ SET(JavaScriptCore_SOURCES
     bytecode/DFGExitProfile.cpp
     bytecode/GetByIdStatus.cpp
     bytecode/JumpTable.cpp
+    bytecode/LazyOperandValueProfile.cpp
     bytecode/MethodCallLinkInfo.cpp
     bytecode/MethodCallLinkStatus.cpp
+    bytecode/MethodOfGettingAValueProfile.cpp
     bytecode/Opcode.cpp
+    bytecode/PolymorphicPutByIdList.cpp
     bytecode/PredictedType.cpp
     bytecode/PutByIdStatus.cpp
     bytecode/SamplingTool.cpp
     bytecode/StructureStubInfo.cpp
-    bytecode/ValueProfile.cpp
 
     bytecompiler/BytecodeGenerator.cpp
     bytecompiler/NodesCodegen.cpp
 
     dfg/DFGAbstractState.cpp
+    dfg/DFGArithNodeFlagsInferencePhase.cpp
     dfg/DFGAssemblyHelpers.cpp
     dfg/DFGByteCodeParser.cpp
     dfg/DFGCapabilities.cpp
+    dfg/DFGCFAPhase.cpp
     dfg/DFGCorrectableJumpPoint.cpp
+    dfg/DFGCSEPhase.cpp
     dfg/DFGDriver.cpp
     dfg/DFGGraph.cpp
     dfg/DFGJITCompiler.cpp
@@ -67,14 +73,16 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGOSRExitCompiler32_64.cpp
     dfg/DFGOSRExitCompiler64.cpp
     dfg/DFGOperations.cpp
-    dfg/DFGPropagator.cpp
+    dfg/DFGPhase.cpp
+    dfg/DFGPredictionPropagationPhase.cpp
     dfg/DFGRepatch.cpp
     dfg/DFGSpeculativeJIT.cpp
     dfg/DFGSpeculativeJIT32_64.cpp
     dfg/DFGSpeculativeJIT64.cpp
     dfg/DFGThunks.cpp
+    dfg/DFGVirtualRegisterAllocationPhase.cpp
 
-    heap/BumpSpace.cpp
+    heap/CopiedSpace.cpp
     heap/DFGCodeBlocks.cpp
     heap/Heap.cpp
     heap/HandleHeap.cpp
@@ -96,6 +104,7 @@ SET(JavaScriptCore_SOURCES
     interpreter/RegisterFile.cpp
 
     jit/ExecutableAllocator.cpp
+    jit/HostCallReturnValue.cpp
     jit/JITArithmetic32_64.cpp
     jit/JITArithmetic.cpp
     jit/JITCall32_64.cpp
@@ -210,7 +219,6 @@ SET(JavaScriptCore_SOURCES
     yarr/YarrJIT.cpp
     yarr/YarrSyntaxChecker.cpp
 )
-SET(JavaScriptCore_HEADERS )
 
 SET(JavaScriptCore_LUT_FILES
     runtime/ArrayConstructor.cpp
@@ -281,7 +289,7 @@ ELSE ()
 ENDIF ()
 
 
-INCLUDE_IF_EXISTS(${JAVASCRIPTCORE_DIR}/Platform${PORT}.cmake)
+WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 
 ADD_SUBDIRECTORY(wtf)

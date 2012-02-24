@@ -28,6 +28,7 @@
 #include "CachedResourceLoader.h"
 
 #include "CachedCSSStyleSheet.h"
+#include "CachedSVGDocument.h"
 #include "CachedFont.h"
 #include "CachedImage.h"
 #include "CachedRawResource.h"
@@ -72,6 +73,10 @@ static CachedResource* createResource(CachedResource::Type type, ResourceRequest
         return new CachedCSSStyleSheet(request, charset);
     case CachedResource::Script:
         return new CachedScript(request, charset);
+#if ENABLE(SVG)
+    case CachedResource::SVGDocumentResource:
+        return new CachedSVGDocument(request);
+#endif
     case CachedResource::FontResource:
         return new CachedFont(request);
     case CachedResource::RawResource:
@@ -246,6 +251,9 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
 #if ENABLE(XSLT)
     case CachedResource::XSLStyleSheet:
 #endif
+#if ENABLE(SVG)
+    case CachedResource::SVGDocumentResource:
+#endif
     case CachedResource::CSSStyleSheet:
         // These resource can inject script into the current document (Script,
         // XSL) or exfiltrate the content of the current document (CSS).
@@ -313,6 +321,9 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
         // These types of resources can be loaded from any origin.
         // FIXME: Are we sure about CachedResource::FontResource?
         break;
+#if ENABLE(SVG)
+    case CachedResource::SVGDocumentResource:
+#endif
 #if ENABLE(XSLT)
     case CachedResource::XSLStyleSheet:
         if (!m_document->securityOrigin()->canRequest(url)) {
@@ -347,6 +358,9 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
         if (!m_document->contentSecurityPolicy()->allowStyleFromSource(url))
             return false;
         break;
+#if ENABLE(SVG)
+    case CachedResource::SVGDocumentResource:
+#endif
     case CachedResource::ImageResource:
         if (!m_document->contentSecurityPolicy()->allowImageFromSource(url))
             return false;
@@ -523,8 +537,18 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         return Reload;
     }
 
-    // FIXME: Currently, all CachedRawResources are always reloaded. Some of them should be cacheable.
-    if (existingResource->type() == CachedResource::RawResource)
+    if (existingResource->type() == CachedResource::RawResource && !static_cast<CachedRawResource*>(existingResource)->canReuse())
+         return Reload;
+
+    // Certain requests (e.g., XHRs) might have manually set headers that require revalidation.
+    // FIXME: In theory, this should be a Revalidate case. In practice, the MemoryCache revalidation path assumes a whole bunch
+    // of things about how revalidation works that manual headers violate, so punt to Reload instead.
+    if (request.isConditional())
+        return Reload;
+
+    // Re-using resources in the case of a Range header is very simple if the headers are identical and
+    // much tougher if they aren't.
+    if (existingResource->resourceRequest().httpHeaderField("Range") != request.httpHeaderField("Range"))
         return Reload;
     
     // Don't reload resources while pasting.

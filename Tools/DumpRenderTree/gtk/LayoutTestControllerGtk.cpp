@@ -585,8 +585,7 @@ void LayoutTestController::setPluginsEnabled(bool flag)
 
 bool LayoutTestController::elementDoesAutoCompleteForElementWithId(JSStringRef id) 
 {
-    // FIXME: implement
-    return false;
+    return DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(mainFrame, id);
 }
 
 void LayoutTestController::execCommand(JSStringRef name, JSStringRef value)
@@ -783,16 +782,6 @@ bool LayoutTestController::pauseTransitionAtTimeOnElementWithId(JSStringRef prop
     gchar* name = JSStringCopyUTF8CString(propertyName);
     gchar* element = JSStringCopyUTF8CString(elementId);
     bool returnValue = DumpRenderTreeSupportGtk::pauseTransition(mainFrame, name, time, element);
-    g_free(name);
-    g_free(element);
-    return returnValue;
-}
-
-bool LayoutTestController::sampleSVGAnimationForElementAtTime(JSStringRef animationId, double time, JSStringRef elementId)
-{    
-    gchar* name = JSStringCopyUTF8CString(animationId);
-    gchar* element = JSStringCopyUTF8CString(elementId);
-    bool returnValue = DumpRenderTreeSupportGtk::pauseSVGAnimation(mainFrame, name, time, element);
     g_free(name);
     g_free(element);
     return returnValue;

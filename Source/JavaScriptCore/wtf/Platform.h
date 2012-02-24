@@ -351,6 +351,11 @@
 #define WTF_OS_FREEBSD 1
 #endif
 
+/* OS(HURD) - GNU/Hurd */
+#ifdef __GNU__
+#define WTF_OS_HURD 1
+#endif
+
 /* OS(LINUX) - Linux */
 #ifdef __linux__
 #define WTF_OS_LINUX 1
@@ -394,6 +399,7 @@
     || OS(ANDROID)          \
     || OS(DARWIN)           \
     || OS(FREEBSD)          \
+    || OS(HURD)             \
     || OS(LINUX)            \
     || OS(NETBSD)           \
     || OS(OPENBSD)          \
@@ -459,7 +465,7 @@
 #define WTF_USE_CA 1
 #endif
 
-/* USE(SKIA) for Win/Linux, CG for Mac, unless enabled */
+/* USE(SKIA) for Win/Linux/Mac/Android */
 #if PLATFORM(CHROMIUM)
 #if OS(DARWIN)
 #if USE(SKIA_ON_MAC_CHROMIUM)
@@ -470,6 +476,9 @@
 #define WTF_USE_ATSUI 1
 #define WTF_USE_CORE_TEXT 1
 #define WTF_USE_ICCJPEG 1
+#elif OS(ANDROID)
+#define WTF_USE_SKIA 1
+#define WTF_USE_GLES2_RENDERING 0
 #else
 #define WTF_USE_SKIA 1
 #define WTF_USE_CHROMIUM_NET 1
@@ -594,11 +603,11 @@
 #define WTF_USE_PTHREADS 1
 
 #if PLATFORM(IOS_SIMULATOR)
-    #define ENABLE_INTERPRETER 1
+    #define ENABLE_CLASSIC_INTERPRETER 1
     #define ENABLE_JIT 0
     #define ENABLE_YARR_JIT 0
 #else
-    #define ENABLE_INTERPRETER 1
+    #define ENABLE_CLASSIC_INTERPRETER 1
     #define ENABLE_JIT 1
     #define ENABLE_YARR_JIT 1
 #endif
@@ -633,6 +642,7 @@
 #define ENABLE_JIT 1
 #endif
 #define ENABLE_GLOBAL_FASTMALLOC_NEW 0
+#define ENABLE_LLINT 0
 #if OS(DARWIN)
 #define WTF_USE_CF 1
 #define WTF_USE_CORE_TEXT 1
@@ -919,6 +929,12 @@
 #define ENABLE_JIT 1
 #endif
 
+/* On some of the platforms where we have a JIT, we want to also have the 
+   low-level interpreter. */
+#if !defined(ENABLE_LLINT) && ENABLE(JIT) && OS(DARWIN) && (CPU(X86) || CPU(ARM_THUMB2)) && USE(JSVALUE32_64)
+#define ENABLE_LLINT 1
+#endif
+
 #if !defined(ENABLE_DFG_JIT) && ENABLE(JIT)
 /* Enable the DFG JIT on X86 and X86_64.  Only tested on Mac and GNU/Linux. */
 #if (CPU(X86) || CPU(X86_64)) && (PLATFORM(MAC) || OS(LINUX))
@@ -953,10 +969,10 @@
 #endif
 
 /* Ensure that either the JIT or the interpreter has been enabled. */
-#if !defined(ENABLE_INTERPRETER) && !ENABLE(JIT)
-#define ENABLE_INTERPRETER 1
+#if !defined(ENABLE_CLASSIC_INTERPRETER) && !ENABLE(JIT)
+#define ENABLE_CLASSIC_INTERPRETER 1
 #endif
-#if !(ENABLE(JIT) || ENABLE(INTERPRETER))
+#if !(ENABLE(JIT) || ENABLE(CLASSIC_INTERPRETER))
 #error You have to have at least one execution model enabled to build JSC
 #endif
 
@@ -989,8 +1005,8 @@
 #if COMPILER(GCC) || (RVCT_VERSION_AT_LEAST(4, 0, 0, 0) && defined(__GNUC__))
 #define HAVE_COMPUTED_GOTO 1
 #endif
-#if HAVE(COMPUTED_GOTO) && ENABLE(INTERPRETER)
-#define ENABLE_COMPUTED_GOTO_INTERPRETER 1
+#if HAVE(COMPUTED_GOTO) && ENABLE(CLASSIC_INTERPRETER)
+#define ENABLE_COMPUTED_GOTO_CLASSIC_INTERPRETER 1
 #endif
 
 /* Regular Expression Tracing - Set to 1 to trace RegExp's in jsc.  Results dumped at exit */
@@ -1123,7 +1139,7 @@
 #define ENABLE_COMPARE_AND_SWAP 1
 #endif
 
-#if !defined(ENABLE_PARALLEL_GC) && (PLATFORM(MAC) || PLATFORM(IOS)) && ENABLE(COMPARE_AND_SWAP)
+#if !defined(ENABLE_PARALLEL_GC) && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(QT)) && ENABLE(COMPARE_AND_SWAP)
 #define ENABLE_PARALLEL_GC 1
 #endif
 
@@ -1141,7 +1157,7 @@
 #define WTF_USE_COREMEDIA 1
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || (PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(WIN_CAIRO)) || PLATFORM(QT)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || (PLATFORM(WIN) && !OS(WINCE) && !PLATFORM(WIN_CAIRO)) || PLATFORM(QT) || PLATFORM(BLACKBERRY)
 #define WTF_USE_REQUEST_ANIMATION_FRAME_TIMER 1
 #endif
 
@@ -1172,6 +1188,10 @@
 
 #if ENABLE(NOTIFICATIONS) && PLATFORM(MAC)
 #define ENABLE_TEXT_NOTIFICATIONS_ONLY 1
+#endif
+
+#if !defined(WTF_USE_WTFURL)
+#define WTF_USE_WTFURL 0
 #endif
 
 #endif /* WTF_Platform_h */

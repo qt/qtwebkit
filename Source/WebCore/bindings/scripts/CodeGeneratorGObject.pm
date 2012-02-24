@@ -188,10 +188,11 @@ sub SkipFunction {
     my $prefix = shift;
 
     my $functionName = "webkit_dom_" . $decamelize . "_" . $prefix . decamelize($function->signature->name);
-    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"} ||
-        $function->signature->extendedAttributes->{"CustomArgumentHandling"};
+    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"};
+    my $callWith = $function->signature->extendedAttributes->{"CallWith"};
+    my $isUnsupportedCallWith = $codeGenerator->ExtendedAttributeContains($callWith, "ScriptArguments") || $codeGenerator->ExtendedAttributeContains($callWith, "CallStack");
 
-    if ($isCustomFunction &&
+    if (($isCustomFunction || $isUnsupportedCallWith) &&
         $functionName ne "webkit_dom_node_replace_child" &&
         $functionName ne "webkit_dom_node_insert_before" &&
         $functionName ne "webkit_dom_node_remove_child" &&
@@ -388,8 +389,8 @@ sub GenerateProperty {
         push(@setterArguments, "${convertFunction}(g_value_get_$gtype(value))");
         unshift(@getterArguments, "coreSelf");
         unshift(@setterArguments, "coreSelf");
-        $getterFunctionName = "${implementedBy}::$getterFunctionName";
-        $setterFunctionName = "${implementedBy}::$setterFunctionName";
+        $getterFunctionName = "WebCore::${implementedBy}::$getterFunctionName";
+        $setterFunctionName = "WebCore::${implementedBy}::$setterFunctionName";
     } else {
         push(@setterArguments, "${convertFunction}(g_value_get_$gtype(value))");
         $getterFunctionName = "coreSelf->$getterFunctionName";
@@ -417,7 +418,7 @@ sub GenerateProperty {
         push(@txtGetProps, "        g_value_take_string(value, convertToUTF8String(${getterFunctionName}(" . join(", ", @getterArguments) . ")));\n");
         $done = 1;
     } elsif ($gtype eq "object") {
-        push(@txtGetProps, "        RefPtr<WebCore::${propType}> ptr = coreSelf->${getPropNameFunction}(" . (@{$attribute->getterExceptions} ? "ec" : "") . ");\n");
+        push(@txtGetProps, "        RefPtr<WebCore::${propType}> ptr = ${getterFunctionName}(" . join(", ", @getterArguments) . ");\n");
         push(@txtGetProps, "        g_value_set_object(value, WebKit::kit(ptr.get()));\n");
         $done = 1;
     }
@@ -738,10 +739,6 @@ sub GenerateFunction {
 
     my @callImplParams;
 
-    # skip some custom functions for now
-    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"} ||
-                       $function->signature->extendedAttributes->{"CustomArgumentHandling"};
-
     foreach my $param (@{$function->parameters}) {
         my $paramIDLType = $param->type;
         if ($paramIDLType eq "EventListener" || $paramIDLType eq "MediaQueryListListener") {
@@ -868,7 +865,7 @@ sub GenerateFunction {
 
             push(@cBody, "    }\n");
         }
-        $returnParamName = "converted_".$paramName if $param->extendedAttributes->{"Return"};
+        $returnParamName = "converted_".$paramName if $param->extendedAttributes->{"CustomReturn"};
     }
 
     my $assign = "";
@@ -929,7 +926,7 @@ EOF
                 my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
-                $functionName = "${implementedBy}::${functionName}";
+                $functionName = "WebCore::${implementedBy}::${functionName}";
             } else {
                 $functionName = "item->${functionName}";
             }
@@ -940,7 +937,7 @@ EOF
                 my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
-                $getterContentHead = "${assign}convertToUTF8String(${implementedBy}::${functionSigName}(" . join(", ", @arguments) . "));\n";
+                $getterContentHead = "${assign}convertToUTF8String(WebCore::${implementedBy}::${functionSigName}(" . join(", ", @arguments) . "));\n";
             } else {
                 $getterContentHead = "${assign}convertToUTF8String(item->${functionSigName}(" . join(", ", @arguments) . "));\n";
             }
@@ -955,7 +952,7 @@ EOF
                 my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
-                $functionName = "${implementedBy}::${functionName}";
+                $functionName = "WebCore::${implementedBy}::${functionName}";
             } else {
                 $functionName = "item->${functionName}";
             }
@@ -967,7 +964,7 @@ EOF
                 my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
-                $functionName = "${implementedBy}::${functionName}";
+                $functionName = "WebCore::${implementedBy}::${functionName}";
                 $contentHead = "${assign}${assignPre}${functionName}(" . join(", ", @arguments) . "${assignPost});\n";
             } else {
                 $functionName = "item->${functionName}";
@@ -979,7 +976,7 @@ EOF
                 my $implementedBy = $function->signature->extendedAttributes->{"ImplementedBy"};
                 $implIncludes{"${implementedBy}.h"} = 1;
                 unshift(@arguments, "item");
-                $contentHead = "${assign}${assignPre}${implementedBy}::${functionSigName}(" . join(", ", @arguments) . "${assignPost});\n";
+                $contentHead = "${assign}${assignPre}WebCore::${implementedBy}::${functionSigName}(" . join(", ", @arguments) . "${assignPost});\n";
             } else {
                 $contentHead = "${assign}${assignPre}item->${functionSigName}(" . join(", ", @arguments) . "${assignPost});\n";
             }

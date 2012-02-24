@@ -29,6 +29,7 @@
 #if ENABLE(THREADED_SCROLLING)
 
 #include "IntRect.h"
+#include "ScrollTypes.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
@@ -44,19 +45,37 @@ public:
 
     virtual void update(ScrollingTreeState*);
     virtual void handleWheelEvent(const PlatformWheelEvent&) = 0;
+    virtual void setScrollPosition(const IntPoint&) = 0;
 
 protected:
     explicit ScrollingTreeNode(ScrollingTree*);
 
     ScrollingTree* scrollingTree() const { return m_scrollingTree; }
+
     const IntRect& viewportRect() const { return m_viewportRect; }
     const IntSize& contentsSize() const { return m_contentsSize; }
+
+    bool shouldUpdateScrollLayerPositionOnMainThread() const { return m_shouldUpdateScrollLayerPositionOnMainThread; }
+
+    ScrollElasticity horizontalScrollElasticity() const { return m_horizontalScrollElasticity; }
+    ScrollElasticity verticalScrollElasticity() const { return m_verticalScrollElasticity; }
+
+    bool hasEnabledHorizontalScrollbar() const { return m_hasEnabledHorizontalScrollbar; }
+    bool hasEnabledVerticalScrollbar() const { return m_hasEnabledVerticalScrollbar; }
 
 private:
     ScrollingTree* m_scrollingTree;
 
     IntRect m_viewportRect;
     IntSize m_contentsSize;
+
+    bool m_shouldUpdateScrollLayerPositionOnMainThread;
+
+    ScrollElasticity m_horizontalScrollElasticity;
+    ScrollElasticity m_verticalScrollElasticity;
+    
+    bool m_hasEnabledHorizontalScrollbar;
+    bool m_hasEnabledVerticalScrollbar;
 };
 
 } // namespace WebCore

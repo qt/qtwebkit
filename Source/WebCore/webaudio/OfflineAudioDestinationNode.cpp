@@ -47,8 +47,6 @@ OfflineAudioDestinationNode::OfflineAudioDestinationNode(AudioContext* context, 
     , m_startedRendering(false)
 {
     m_renderBus = adoptPtr(new AudioBus(renderTarget->numberOfChannels(), renderQuantumSize));
-    
-    initialize();
 }
 
 OfflineAudioDestinationNode::~OfflineAudioDestinationNode()
@@ -70,7 +68,7 @@ void OfflineAudioDestinationNode::uninitialize()
         return;
 
     if (m_renderThread) {
-        waitForThreadCompletion(m_renderThread, 0);
+        waitForThreadCompletion(m_renderThread);
         m_renderThread = 0;
     }
 
@@ -92,13 +90,11 @@ void OfflineAudioDestinationNode::startRendering()
 }
 
 // Do offline rendering in this thread.
-void* OfflineAudioDestinationNode::renderEntry(void* threadData)
+void OfflineAudioDestinationNode::renderEntry(void* threadData)
 {
     OfflineAudioDestinationNode* destinationNode = reinterpret_cast<OfflineAudioDestinationNode*>(threadData);
     ASSERT(destinationNode);
     destinationNode->render();
-    
-    return 0;
 }
 
 void OfflineAudioDestinationNode::render()

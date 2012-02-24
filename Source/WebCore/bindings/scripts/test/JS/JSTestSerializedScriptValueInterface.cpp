@@ -36,8 +36,6 @@ using namespace JSC;
 namespace WebCore {
 
 ASSERT_CLASS_FITS_IN_CELL(JSTestSerializedScriptValueInterface);
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestSerializedScriptValueInterface);
-
 /* Hash table */
 
 static const HashTableValue JSTestSerializedScriptValueInterfaceTableValues[] =
@@ -59,8 +57,6 @@ static const HashTableValue JSTestSerializedScriptValueInterfaceConstructorTable
 };
 
 static const HashTable JSTestSerializedScriptValueInterfaceConstructorTable = { 1, 0, JSTestSerializedScriptValueInterfaceConstructorTableValues, 0 };
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSTestSerializedScriptValueInterfaceConstructor);
-
 const ClassInfo JSTestSerializedScriptValueInterfaceConstructor::s_info = { "TestSerializedScriptValueInterfaceConstructor", &Base::s_info, &JSTestSerializedScriptValueInterfaceConstructorTable, 0, CREATE_METHOD_TABLE(JSTestSerializedScriptValueInterfaceConstructor) };
 
 JSTestSerializedScriptValueInterfaceConstructor::JSTestSerializedScriptValueInterfaceConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
@@ -73,6 +69,7 @@ void JSTestSerializedScriptValueInterfaceConstructor::finishCreation(ExecState* 
     Base::finishCreation(exec->globalData());
     ASSERT(inherits(&s_info));
     putDirect(exec->globalData(), exec->propertyNames().prototype, JSTestSerializedScriptValueInterfacePrototype::self(exec, globalObject), DontDelete | ReadOnly);
+    putDirect(exec->globalData(), exec->propertyNames().length, jsNumber(2), ReadOnly | DontDelete | DontEnum);
 }
 
 bool JSTestSerializedScriptValueInterfaceConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -90,10 +87,10 @@ EncodedJSValue JSC_HOST_CALL JSTestSerializedScriptValueInterfaceConstructor::co
     JSTestSerializedScriptValueInterfaceConstructor* jsConstructor = static_cast<JSTestSerializedScriptValueInterfaceConstructor*>(exec->callee());
     if (exec->argumentCount() < 2)
         return throwVMError(exec, createTypeError(exec, "Not enough arguments"));
-    const String& hello(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, MissingIsUndefined).toString(exec)->value(exec)));
+    const String& hello(ustringToString(MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).isEmpty() ? UString() : MAYBE_MISSING_PARAMETER(exec, 0, DefaultIsUndefined).toString(exec)->value(exec)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
-    RefPtr<SerializedScriptValue> value(SerializedScriptValue::create(exec, MAYBE_MISSING_PARAMETER(exec, 1, MissingIsUndefined)));
+    RefPtr<SerializedScriptValue> value(SerializedScriptValue::create(exec, MAYBE_MISSING_PARAMETER(exec, 1, DefaultIsUndefined)));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     RefPtr<TestSerializedScriptValueInterface> object = TestSerializedScriptValueInterface::create(hello, value);
@@ -143,7 +140,12 @@ JSObject* JSTestSerializedScriptValueInterface::createPrototype(ExecState* exec,
 void JSTestSerializedScriptValueInterface::destroy(JSC::JSCell* cell)
 {
     JSTestSerializedScriptValueInterface* thisObject = jsCast<JSTestSerializedScriptValueInterface*>(cell);
-    thisObject->releaseImplIfNotNull();
+    thisObject->JSTestSerializedScriptValueInterface::~JSTestSerializedScriptValueInterface();
+}
+
+JSTestSerializedScriptValueInterface::~JSTestSerializedScriptValueInterface()
+{
+    releaseImplIfNotNull();
 }
 
 bool JSTestSerializedScriptValueInterface::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -238,6 +240,19 @@ void setJSTestSerializedScriptValueInterfaceCachedValue(ExecState* exec, JSObjec
 JSValue JSTestSerializedScriptValueInterface::getConstructor(ExecState* exec, JSGlobalObject* globalObject)
 {
     return getDOMConstructor<JSTestSerializedScriptValueInterfaceConstructor>(exec, static_cast<JSDOMGlobalObject*>(globalObject));
+}
+
+void JSTestSerializedScriptValueInterface::visitChildren(JSCell* cell, SlotVisitor& visitor)
+{
+    JSTestSerializedScriptValueInterface* thisObject = jsCast<JSTestSerializedScriptValueInterface*>(cell);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
+    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+    Base::visitChildren(thisObject, visitor);
+    if (thisObject->m_cachedValue)
+        visitor.append(&thisObject->m_cachedValue);
+    if (thisObject->m_cachedReadonlyValue)
+        visitor.append(&thisObject->m_cachedReadonlyValue);
 }
 
 static inline bool isObservable(JSTestSerializedScriptValueInterface* jsTestSerializedScriptValueInterface)

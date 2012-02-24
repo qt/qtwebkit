@@ -63,19 +63,23 @@
 #include "MediaQueryEvaluator.h"
 #include "MouseEvent.h"
 #include "MIMETypeRegistry.h"
+#include "NodeRenderingContext.h"
 #include "Page.h"
 #include "RenderVideo.h"
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "ScriptEventListener.h"
 #include "SecurityOrigin.h"
+#include "SecurityPolicy.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include "TimeRanges.h"
 #include "UUID.h"
 #include <limits>
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
+#include <wtf/NonCopyingSort.h>
 #include <wtf/Uint8Array.h>
 #include <wtf/text/CString.h>
 
@@ -235,6 +239,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* docum
 #if ENABLE(VIDEO_TRACK)
     , m_tracksAreReady(true)
     , m_haveVisibleTextTrack(false)
+    , m_lastTextTrackUpdateTime(-1)
     , m_textTracks(0)
     , m_ignoreTrackDisplayUpdate(0)
 #endif
@@ -320,14 +325,13 @@ bool HTMLMediaElement::isMouseFocusable() const
     return false;
 }
 
-void HTMLMediaElement::attributeChanged(Attribute* attr)
+void HTMLMediaElement::parseAttribute(Attribute* attr)
 {
-    HTMLElement::attributeChanged(attr);
-
     const QualifiedName& attrName = attr->name();
+
     if (attrName == srcAttr) {
         // Trigger a reload, as long as the 'src' attribute is present.
-        if (!getAttribute(srcAttr).isEmpty())
+        if (fastHasAttribute(srcAttr))
             scheduleLoad(MediaResource);
     } else if (attrName == controlsAttr)
         configureMediaControls();
@@ -335,13 +339,7 @@ void HTMLMediaElement::attributeChanged(Attribute* attr)
     else if (attrName == loopAttr)
         updateDisableSleep();
 #endif
-}
-
-void HTMLMediaElement::parseAttribute(Attribute* attr)
-{
-    const QualifiedName& attrName = attr->name();
-
-    if (attrName == preloadAttr) {
+    else if (attrName == preloadAttr) {
         String value = attr->value();
 
         if (equalIgnoringCase(value, "none"))
@@ -467,7 +465,12 @@ RenderObject* HTMLMediaElement::createRenderer(RenderArena* arena, RenderStyle*)
     return new (arena) RenderMedia(this);
 #endif
 }
- 
+
+bool HTMLMediaElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
+{
+    return childContext.isOnEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext);
+}
+
 void HTMLMediaElement::insertedIntoDocument()
 {
     LOG(Media, "HTMLMediaElement::insertedIntoDocument");
@@ -554,17 +557,17 @@ void HTMLMediaElement::scheduleEvent(const AtomicString& eventName)
 
 void HTMLMediaElement::loadTimerFired(Timer<HTMLMediaElement>*)
 {
+#if ENABLE(VIDEO_TRACK)
+    if (m_pendingLoadFlags & TextTrackResource)
+        configureNewTextTracks();
+#endif
+
     if (m_pendingLoadFlags & MediaResource) {
         if (m_loadState == LoadingFromSourceElement)
             loadNextSourceChild();
         else
             loadInternal();
     }
-
-#if ENABLE(VIDEO_TRACK)
-    if (m_pendingLoadFlags & TextTrackResource)
-        configureNewTextTracks();
-#endif
 
     m_pendingLoadFlags = 0;
 }
@@ -674,6 +677,9 @@ void HTMLMediaElement::prepareForLoad()
         invalidateCachedTime();
         scheduleEvent(eventNames().emptiedEvent);
         updateMediaController();
+#if ENABLE(VIDEO_TRACK)
+        updateActiveTextTrackCues(0);
+#endif
     }
 
     // 5 - Set the playbackRate attribute to the value of the defaultPlaybackRate attribute.
@@ -702,19 +708,6 @@ void HTMLMediaElement::prepareForLoad()
     // event may have already fired by then.
     setShouldDelayLoadEvent(true);
 
-#if ENABLE(VIDEO_TRACK)
-    // HTMLMediaElement::textTracksAreReady will need "... the text tracks whose mode was not in the
-    // disabled state when the element's resource selection algorithm last started".
-    m_textTracksWhenResourceSelectionBegan.clear();
-    if (m_textTracks) {
-        for (unsigned i = 0; i < m_textTracks->length(); ++i) {
-            TextTrack* track = m_textTracks->item(i);
-            if (track->mode() != TextTrack::DISABLED)
-                m_textTracksWhenResourceSelectionBegan.append(track);
-        }
-    }
-#endif
-
     configureMediaControls();
 }
 
@@ -734,6 +727,19 @@ void HTMLMediaElement::loadInternal()
     // playlist that starts in a foreground tab to continue automatically if the tab is subsequently 
     // put in the the background.
     removeBehaviorRestriction(RequirePageConsentToLoadMediaRestriction);
+
+#if ENABLE(VIDEO_TRACK)
+    // HTMLMediaElement::textTracksAreReady will need "... the text tracks whose mode was not in the
+    // disabled state when the element's resource selection algorithm last started".
+    m_textTracksWhenResourceSelectionBegan.clear();
+    if (m_textTracks) {
+        for (unsigned i = 0; i < m_textTracks->length(); ++i) {
+            TextTrack* track = m_textTracks->item(i);
+            if (track->mode() != TextTrack::DISABLED)
+                m_textTracksWhenResourceSelectionBegan.append(track);
+        }
+    }
+#endif
 
     selectMediaResource();
 }
@@ -937,33 +943,237 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
 }
 
 #if ENABLE(VIDEO_TRACK)
+static bool trackIndexCompare(TextTrack* a,
+                              TextTrack* b)
+{
+    return a->trackIndex() - b->trackIndex() < 0;
+}
+
+static bool eventTimeCueCompare(const std::pair<double, TextTrackCue*>& a,
+                                const std::pair<double, TextTrackCue*>& b)
+{
+    // 12 - Sort the tasks in events in ascending time order (tasks with earlier
+    // times first).
+    if (a.first != b.first)
+        return a.first - b.first < 0;
+
+    // If the cues belong to different text tracks, it doesn't make sense to
+    // compare the two tracks by the relative cue order, so return the relative
+    // track order.
+    if (a.second->track() != b.second->track())
+        return trackIndexCompare(a.second->track(), b.second->track());
+
+    // 12 - Further sort tasks in events that have the same time by the
+    // relative text track cue order of the text track cues associated
+    // with these tasks.
+    return a.second->cueIndex() - b.second->cueIndex() < 0;
+}
+
+
 void HTMLMediaElement::updateActiveTextTrackCues(float movieTime)
 {
+    LOG(Media, "HTMLMediaElement::updateActiveTextTracks");
+
+    // 4.8.10.8 Playing the media resource
+
+    //  If the current playback position changes while the steps are running,
+    //  then the user agent must wait for the steps to complete, and then must
+    //  immediately rerun the steps.
     if (ignoreTrackDisplayUpdateRequests())
         return;
-    
-    CueList previouslyActiveCues = m_currentlyActiveCues;
-    bool activeSetChanged = false;
 
-    m_currentlyActiveCues = m_cueTree.allOverlaps(m_cueTree.createInterval(movieTime, movieTime));
-    
-    // FIXME(72171): Events need to be sorted and filtered before dispatching.
+    // 1 - Let current cues be a list of cues, initialized to contain all the
+    // cues of all the hidden, showing, or showing by default text tracks of the
+    // media element (not the disabled ones) whose start times are less than or
+    // equal to the current playback position and whose end times are greater
+    // than the current playback position.
+    Vector<CueIntervalTree::IntervalType> currentCues;
 
-    for (size_t i = 0; i < previouslyActiveCues.size(); ++i) {
-        if (!m_currentlyActiveCues.contains(previouslyActiveCues[i])) {
-            previouslyActiveCues[i].data()->setIsActive(false);
-            activeSetChanged = true;
+    // The user agent must synchronously unset [the text track cue active] flag
+    // whenever ... the media element's readyState is changed back to HAVE_NOTHING.
+    if (m_readyState != HAVE_NOTHING && m_player)
+        currentCues = m_cueTree.allOverlaps(m_cueTree.createInterval(movieTime, movieTime));
+
+    Vector<CueIntervalTree::IntervalType> affectedCues;
+    Vector<CueIntervalTree::IntervalType> previousCues;
+    Vector<CueIntervalTree::IntervalType> missedCues;
+
+    // 2 - Let other cues be a list of cues, initialized to contain all the cues
+    // of hidden, showing, and showing by default text tracks of the media
+    // element that are not present in current cues.
+    previousCues = m_currentlyActiveCues;
+
+    // 3 - Let last time be the current playback position at the time this
+    // algorithm was last run for this media element, if this is not the first
+    // time it has run.
+    float lastTime = m_lastTextTrackUpdateTime;
+
+    // 4 - If the current playback position has, since the last time this
+    // algorithm was run, only changed through its usual monotonic increase
+    // during normal playback, then let missed cues be the list of cues in other
+    // cues whose start times are greater than or equal to last time and whose
+    // end times are less than or equal to the current playback position.
+    // Otherwise, let missed cues be an empty list.
+    if (lastTime >= 0 && m_lastSeekTime < movieTime) {
+        Vector<CueIntervalTree::IntervalType> potentiallySkippedCues =
+            m_cueTree.allOverlaps(m_cueTree.createInterval(lastTime, movieTime));
+
+        for (size_t i = 0; i < potentiallySkippedCues.size(); ++i) {
+            float cueStartTime = potentiallySkippedCues[i].low();
+            float cueEndTime = potentiallySkippedCues[i].high();
+
+            // Consider cues that may have been missed since the last seek time.
+            if (cueStartTime > max(m_lastSeekTime, lastTime) && cueEndTime < movieTime)
+                missedCues.append(potentiallySkippedCues[i]);
         }
     }
-    for (size_t i = 0; i < m_currentlyActiveCues.size(); ++i) {
-        if (!previouslyActiveCues.contains(m_currentlyActiveCues[i])) {
-            m_currentlyActiveCues[i].data()->setIsActive(true);
+
+    m_lastTextTrackUpdateTime = movieTime;
+
+    // 5 - If the time was reached through the usual monotonic increase of the
+    // current playback position during normal playback, and if the user agent
+    // has not fired a timeupdate event at the element in the past 15 to 250ms
+    // and is not still running event handlers for such an event, then the user
+    // agent must queue a task to fire a simple event named timeupdate at the
+    // element. (In the other cases, such as explicit seeks, relevant events get
+    // fired as part of the overall process of changing the current playback
+    // position.)
+    if (m_lastSeekTime <= lastTime)
+        scheduleTimeupdateEvent(false);
+
+    // Explicitly cache vector sizes, as their content is constant from here.
+    size_t currentCuesSize = currentCues.size();
+    size_t missedCuesSize = missedCues.size();
+    size_t previousCuesSize = previousCues.size();
+
+    // 6 - If all of the cues in current cues have their text track cue active
+    // flag set, none of the cues in other cues have their text track cue active
+    // flag set, and missed cues is empty, then abort these steps.
+    bool activeSetChanged = missedCuesSize;
+
+    for (size_t i = 0; !activeSetChanged && i < previousCuesSize; ++i)
+        if (!currentCues.contains(previousCues[i]) && previousCues[i].data()->isActive())
             activeSetChanged = true;
-        }
+
+    for (size_t i = 0; !activeSetChanged && i < currentCuesSize; ++i) {
+        if (!currentCues[i].data()->isActive())
+            activeSetChanged = true;
     }
-    
-    // FIXME(72173): Pause the media element for cues going past their endTime
-    // during a monotonic time increase.
+
+    if (!activeSetChanged)
+        return;
+
+    // 7 - If the time was reached through the usual monotonic increase of the
+    // current playback position during normal playback, and there are cues in
+    // other cues that have their text track cue pause-on-exi flag set and that
+    // either have their text track cue active flag set or are also in missed
+    // cues, then immediately pause the media element.
+    for (size_t i = 0; !m_paused && i < previousCuesSize; ++i) {
+        if (previousCues[i].data()->pauseOnExit()
+            && previousCues[i].data()->isActive()
+            && !currentCues.contains(previousCues[i]))
+            pause();
+    }
+
+    for (size_t i = 0; !m_paused && i < missedCuesSize; ++i) {
+        if (missedCues[i].data()->pauseOnExit())
+            pause();
+    }
+
+    // 8 - Let events be a list of tasks, initially empty. Each task in this
+    // list will be associated with a text track, a text track cue, and a time,
+    // which are used to sort the list before the tasks are queued.
+    Vector<std::pair<double, TextTrackCue*> > eventTasks;
+
+    // 8 - Let affected tracks be a list of text tracks, initially empty.
+    Vector<TextTrack*> affectedTracks;
+
+    for (size_t i = 0; i < missedCuesSize; ++i) {
+        // 9 - For each text track cue in missed cues, prepare an event named enter
+        // for the TextTrackCue object with the text track cue start time.
+        eventTasks.append(std::make_pair(missedCues[i].data()->startTime(),
+                                         missedCues[i].data()));
+
+        // 10 - For each text track in missed cues, prepare an event
+        // named exit for the TextTrackCue object with the text track cue end
+        // time.
+        eventTasks.append(std::make_pair(missedCues[i].data()->endTime(),
+                                         missedCues[i].data()));
+    }
+
+    for (size_t i = 0; i < previousCuesSize; ++i) {
+        // 10 - For each text track cue in other cues that has its text
+        // track cue active flag set prepare an event named exit for the
+        // TextTrackCue object with the text track cue end time.
+        if (!currentCues.contains(previousCues[i]))
+            eventTasks.append(std::make_pair(previousCues[i].data()->endTime(),
+                                             previousCues[i].data()));
+    }
+
+    for (size_t i = 0; i < currentCuesSize; ++i) {
+        // 11 - For each text track cue in current cues that does not have its
+        // text track cue active flag set, prepare an event named enter for the
+        // TextTrackCue object with the text track cue start time.
+        if (!previousCues.contains(currentCues[i]))
+            eventTasks.append(std::make_pair(currentCues[i].data()->startTime(),
+                                             currentCues[i].data()));
+    }
+
+    // 12 - Sort the tasks in events in ascending time order (tasks with earlier
+    // times first).
+    nonCopyingSort(eventTasks.begin(), eventTasks.end(), eventTimeCueCompare);
+
+    for (size_t i = 0; i < eventTasks.size(); ++i) {
+        if (!affectedTracks.contains(eventTasks[i].second->track()))
+            affectedTracks.append(eventTasks[i].second->track());
+
+        // 13 - Queue each task in events, in list order.
+        RefPtr<Event> event;
+
+        // Each event in eventTasks may be either an enterEvent or an exitEvent,
+        // depending on the time that is associated with the event. This
+        // correctly identifies the type of the event, since the startTime is
+        // always less than the endTime.
+        if (eventTasks[i].first == eventTasks[i].second->startTime())
+            event = Event::create(eventNames().enterEvent, false, false);
+        else
+            event = Event::create(eventNames().exitEvent, false, false);
+
+        event->setTarget(eventTasks[i].second);
+        m_asyncEventQueue.enqueueEvent(event.release());
+    }
+
+    // 14 - Sort affected tracks in the same order as the text tracks appear in
+    // the media element's list of text tracks, and remove duplicates.
+    nonCopyingSort(affectedTracks.begin(), affectedTracks.end(), trackIndexCompare);
+
+    // 15 - For each text track in affected tracks, in the list order, queue a
+    // task to fire a simple event named cuechange at the TextTrack object, and,
+    // if the text track has a corresponding track element, to then fire a
+    // simple event named cuechange at the track element as well.
+    for (size_t i = 0; i < affectedTracks.size(); ++i) {
+        RefPtr<Event> event = Event::create(eventNames().cuechangeEvent, false, false);
+        event->setTarget(affectedTracks[i]);
+
+        m_asyncEventQueue.enqueueEvent(event.release());
+
+        // Fire syncronous cue change event for track elements.
+        if (affectedTracks[i]->trackType() == TextTrack::TrackElement)
+            affectedTracks[i]->fireCueChangeEvent();
+    }
+
+    // 16 - Set the text track cue active flag of all the cues in the current
+    // cues, and unset the text track cue active flag of all the cues in the
+    // other cues.
+    for (size_t i = 0; i < currentCuesSize; ++i)
+        currentCues[i].data()->setIsActive(true);
+
+    for (size_t i = 0; i < previousCuesSize; ++i)
+        if (!currentCues.contains(previousCues[i]))
+            previousCues[i].data()->setIsActive(false);
+
+    // Update the current active cues.
+    m_currentlyActiveCues = currentCues;
 
     if (activeSetChanged && hasMediaControls())
         mediaControls()->updateTextTrackDisplay();
@@ -1313,20 +1523,31 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
     bool wasPotentiallyPlaying = potentiallyPlaying();
 
     ReadyState oldState = m_readyState;
-    m_readyState = static_cast<ReadyState>(state);
+    ReadyState newState = static_cast<ReadyState>(state);
 
 #if ENABLE(VIDEO_TRACK)
     bool tracksAreReady = textTracksAreReady();
 
-    if (m_readyState == oldState && m_tracksAreReady == tracksAreReady)
+    if (newState == oldState && m_tracksAreReady == tracksAreReady)
         return;
 
     m_tracksAreReady = tracksAreReady;
 #else
-    if (m_readyState == oldState)
+    if (newState == oldState)
         return;
     bool tracksAreReady = true;
 #endif
+    
+    if (tracksAreReady)
+        m_readyState = newState;
+    else {
+        // If a media file has text tracks the readyState may not progress beyond HAVE_FUTURE_DATA until
+        // the text tracks are ready, regardless of the state of the media file.
+        if (newState <= HAVE_METADATA)
+            m_readyState = newState;
+        else
+            m_readyState = HAVE_CURRENT_DATA;
+    }
     
     if (oldState > m_readyStateMaximum)
         m_readyStateMaximum = oldState;
@@ -1350,7 +1571,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
         }
     }
 
-    if (m_readyState >= HAVE_METADATA && oldState < HAVE_METADATA && tracksAreReady) {
+    if (m_readyState >= HAVE_METADATA && oldState < HAVE_METADATA) {
         prepareMediaFragmentURI();
         scheduleEvent(eventNames().durationchangeEvent);
         scheduleEvent(eventNames().loadedmetadataEvent);
@@ -1362,7 +1583,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
 
     bool shouldUpdateDisplayState = false;
 
-    if (m_readyState >= HAVE_CURRENT_DATA && oldState < HAVE_CURRENT_DATA && !m_haveFiredLoadedData && tracksAreReady) {
+    if (m_readyState >= HAVE_CURRENT_DATA && oldState < HAVE_CURRENT_DATA && !m_haveFiredLoadedData) {
         m_haveFiredLoadedData = true;
         shouldUpdateDisplayState = true;
         scheduleEvent(eventNames().loadeddataEvent);
@@ -1405,6 +1626,9 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
 
     updatePlayState();
     updateMediaController();
+#if ENABLE(VIDEO_TRACK)
+    updateActiveTextTrackCues(currentTime());
+#endif
 }
 
 #if ENABLE(MEDIA_SOURCE)
@@ -2680,6 +2904,10 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerTimeChanged");
 
+#if ENABLE(VIDEO_TRACK)
+    updateActiveTextTrackCues(currentTime());
+#endif
+
     beginProcessingMediaPlayerCallback();
 
     invalidateCachedTime();
@@ -2728,9 +2956,6 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
         m_sentEndEvent = false;
 
     updatePlayState();
-#if ENABLE(VIDEO_TRACK)
-    updateActiveTextTrackCues(now);
-#endif
     endProcessingMediaPlayerCallback();
 }
 
@@ -3143,6 +3368,9 @@ void HTMLMediaElement::userCancelledLoad()
     // Reset m_readyState since m_player is gone.
     m_readyState = HAVE_NOTHING;
     updateMediaController();
+#if ENABLE(VIDEO_TRACK)
+    updateActiveTextTrackCues(0);
+#endif
 }
 
 bool HTMLMediaElement::canSuspend() const
@@ -3519,15 +3747,15 @@ void HTMLMediaElement::privateBrowsingStateDidChange()
 
 MediaControls* HTMLMediaElement::mediaControls()
 {
-    return toMediaControls(shadowRoot()->firstChild());
+    return toMediaControls(shadowRootList()->oldestShadowRoot()->firstChild());
 }
 
 bool HTMLMediaElement::hasMediaControls()
 {
-    if (!shadowRoot())
+    if (!hasShadowRoot())
         return false;
 
-    Node* node = shadowRoot()->firstChild();
+    Node* node = shadowRootList()->oldestShadowRoot()->firstChild();
     return node && node->isMediaControls();
 }
 
@@ -3816,6 +4044,14 @@ bool HTMLMediaElement::shouldDisableSleep() const
 }
 #endif
 
+String HTMLMediaElement::mediaPlayerReferrer() const
+{
+    Frame* frame = document()->frame();
+    if (!frame)
+        return String();
+
+    return SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), m_currentSrc, frame->loader()->outgoingReferrer());
 }
 
+}
 #endif

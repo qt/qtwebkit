@@ -46,14 +46,36 @@ typedef IntPoint LayoutPoint;
 typedef IntSize LayoutSize;
 typedef IntRect LayoutRect;
 
+const LayoutUnit zeroLayoutUnit = 0;
+
 inline LayoutRect enclosingLayoutRect(const FloatRect& rect)
 {
     return enclosingIntRect(rect);
 }
 
+inline IntRect pixelSnappedIntRect(const LayoutRect& rect)
+{
+    return rect;
+}
+
+inline IntRect pixelSnappedIntRectFromEdges(LayoutUnit left, LayoutUnit top, LayoutUnit right, LayoutUnit bottom)
+{
+    return IntRect(left, top, right - left, bottom - top);
+}
+
+inline IntSize roundedIntSize(const LayoutSize& s)
+{
+    return s;
+}
+
 inline LayoutSize roundedLayoutSize(const FloatSize& s)
 {
     return roundedIntSize(s);
+}
+
+inline IntPoint roundedIntPoint(const LayoutPoint& p)
+{
+    return p;
 }
 
 inline LayoutPoint roundedLayoutPoint(const FloatPoint& p)

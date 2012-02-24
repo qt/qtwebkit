@@ -78,10 +78,6 @@
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
-#if ENABLE(SVG)
-#include "SVGDocumentExtensions.h"
-#include "SVGSMILElement.h"
-#endif
 #include "TextIterator.h"
 #include "ThirdPartyCookiesQt.h"
 #include "WebCoreTestSupport.h"
@@ -101,6 +97,9 @@
 #include "HTMLVideoElement.h"
 #include "MediaPlayerPrivateQt.h"
 #endif
+
+#include <QAction>
+#include <QMenu>
 
 using namespace WebCore;
 
@@ -370,31 +369,6 @@ bool DumpRenderTreeSupportQt::pauseTransitionOfProperty(QWebFrame *frame, const 
     return controller->pauseTransitionAtTime(coreNode->renderer(), propertyName, time);
 }
 
-// Pause a given SVG animation on the target node at a specific time.
-// This method is only intended to be used for testing the SVG animation system.
-bool DumpRenderTreeSupportQt::pauseSVGAnimation(QWebFrame *frame, const QString &animationId, double time, const QString &elementId)
-{
-#if !ENABLE(SVG)
-    return false;
-#else
-    Frame* coreFrame = QWebFramePrivate::core(frame);
-    if (!coreFrame)
-        return false;
-
-    Document* doc = coreFrame->document();
-    Q_ASSERT(doc);
-
-    if (!doc->svgExtensions())
-        return false;
-
-    Node* coreNode = doc->getElementById(animationId);
-    if (!coreNode || !SVGSMILElement::isSMILElement(coreNode))
-        return false;
-
-    return doc->accessSVGExtensions()->sampleAnimationAtTime(elementId, static_cast<SVGSMILElement*>(coreNode), time);
-#endif
-}
-
 // Returns the total number of currently running animations (includes both CSS transitions and CSS animations).
 int DumpRenderTreeSupportQt::numberOfActiveAnimations(QWebFrame *frame)
 {
@@ -635,7 +609,7 @@ QVariantMap DumpRenderTreeSupportQt::computedStyleIncludingVisitedInfo(const QWe
     if (!webElement)
         return res;
 
-    RefPtr<WebCore::CSSComputedStyleDeclaration> computedStyleDeclaration = computedStyle(webElement, true);
+    RefPtr<WebCore::CSSComputedStyleDeclaration> computedStyleDeclaration = CSSComputedStyleDeclaration::create(webElement, true);
     CSSStyleDeclaration* style = static_cast<WebCore::CSSStyleDeclaration*>(computedStyleDeclaration.get());
     for (unsigned i = 0; i < style->length(); i++) {
         QString name = style->item(i);
@@ -857,7 +831,7 @@ void DumpRenderTreeSupportQt::setMockDeviceOrientation(QWebPage* page, bool canP
 {
 #if ENABLE(DEVICE_ORIENTATION)
     Page* corePage = QWebPagePrivate::core(page);
-    DeviceOrientationClientMock* mockClient = toDeviceOrientationClientMock(corePage->deviceOrientationController()->client());
+    DeviceOrientationClientMock* mockClient = toDeviceOrientationClientMock(DeviceOrientationController::from(corePage)->client());
     mockClient->setOrientation(DeviceOrientation::create(canProvideAlpha, alpha, canProvideBeta, beta, canProvideGamma, gamma));
 #endif
 }

@@ -61,6 +61,7 @@
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
 #include "WebKitDOMRangePrivate.h"
+#include "WebKitMutationObserver.h"
 #include "WorkerThread.h"
 #include "webkitglobalsprivate.h"
 #include "webkitwebframe.h"
@@ -68,11 +69,6 @@
 #include "webkitwebview.h"
 #include "webkitwebviewprivate.h"
 #include <JavaScriptCore/APICast.h>
-
-#if ENABLE(SVG)
-#include "SVGDocumentExtensions.h"
-#include "SVGSMILElement.h"
-#endif
 
 using namespace JSC;
 using namespace WebCore;
@@ -393,22 +389,6 @@ bool DumpRenderTreeSupportGtk::pauseTransition(WebKitWebFrame* frame, const char
     if (!coreElement || !coreElement->renderer())
         return false;
     return core(frame)->animation()->pauseTransitionAtTime(coreElement->renderer(), AtomicString(name), time);
-}
-
-bool DumpRenderTreeSupportGtk::pauseSVGAnimation(WebKitWebFrame* frame, const char* animationId, double time, const char* elementId)
-{
-    ASSERT(core(frame));
-#if ENABLE(SVG)
-    Document* document = core(frame)->document();
-    if (!document || !document->svgExtensions())
-        return false;
-    Element* coreElement = document->getElementById(AtomicString(animationId));
-    if (!coreElement || !SVGSMILElement::isSMILElement(coreElement))
-        return false;
-    return document->accessSVGExtensions()->sampleAnimationAtTime(elementId, static_cast<SVGSMILElement*>(coreElement), time);
-#else
-    return false;
-#endif
 }
 
 CString DumpRenderTreeSupportGtk::markerTextForListItem(WebKitWebFrame* frame, JSContextRef context, JSValueRef nodeObject)
@@ -911,5 +891,35 @@ void DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(WebKitWebView*
 #else
     UNUSED_PARAM(webView);
     UNUSED_PARAM(enabled);
+#endif
+}
+
+bool DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(WebKitWebFrame* frame, JSStringRef id)
+{
+    Frame* coreFrame = core(frame);
+    if (!coreFrame)
+        return false;
+
+    Document* document = coreFrame->document();
+    ASSERT(document);
+
+    size_t bufferSize = JSStringGetMaximumUTF8CStringSize(id);
+    GOwnPtr<gchar> idBuffer(static_cast<gchar*>(g_malloc(bufferSize)));
+    JSStringGetUTF8CString(id, idBuffer.get(), bufferSize);
+    Node* coreNode = document->getElementById(String::fromUTF8(idBuffer.get()));
+    if (!coreNode || !coreNode->renderer())
+        return false;
+
+    HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(coreNode);
+    if (!inputElement)
+        return false;
+
+    return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
+}
+
+void DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary()
+{
+#if ENABLE(MUTATION_OBSERVERS)
+    WebKitMutationObserver::deliverAllMutations();
 #endif
 }

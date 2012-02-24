@@ -36,30 +36,9 @@ namespace WebCore {
 
 using namespace MathMLNames;
 
-RenderMathMLRow::RenderMathMLRow(Node* row)
-    : RenderMathMLBlock(row)
+RenderMathMLRow::RenderMathMLRow(Element* element)
+    : RenderMathMLBlock(element)
 {
-}
-
-int RenderMathMLRow::nonOperatorHeight() const
-{
-    int maxHeight = 0;
-    for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
-        if (current->isRenderMathMLBlock()) {
-            RenderMathMLBlock* block = toRenderMathMLBlock(current);
-            int blockHeight = block->nonOperatorHeight();
-            // Check to see if this box has a larger height
-            if (blockHeight > maxHeight)
-                maxHeight = blockHeight;
-        } else if (current->isBoxModelObject()) {
-            RenderBoxModelObject* box = toRenderBoxModelObject(current);
-            // Check to see if this box has a larger height
-            if (box->offsetHeight() > maxHeight)
-                maxHeight = box->offsetHeight();
-        }
-        
-    }
-    return maxHeight;
 }
 
 void RenderMathMLRow::layout() 
@@ -67,26 +46,13 @@ void RenderMathMLRow::layout()
     RenderBlock::layout();
     
     LayoutUnit maxHeight = 0;
-    int childCount = 0;
-    int operatorCount = 0;
 
     // Calculate the non-operator max height of the row.
-    LayoutUnit operatorHeight = 0;
     for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
-        childCount++;
         if (current->isRenderMathMLBlock()) {
             RenderMathMLBlock* block = toRenderMathMLBlock(current);
-            // Check to see if the non-operator block has a greater height.
-            if (!block->hasBase() && !block->isRenderMathMLOperator() && block->offsetHeight() > maxHeight)
+            if (!block->unembellishedOperator() && block->offsetHeight() > maxHeight)
                 maxHeight = block->offsetHeight();
-            if (block->hasBase() && block->nonOperatorHeight() > maxHeight) 
-                maxHeight = block->nonOperatorHeight();
-            // If the block is an operator, capture the maximum height and increment the count.
-            if (block->isRenderMathMLOperator()) {
-                if (block->offsetHeight() > operatorHeight)
-                    operatorHeight = block->offsetHeight();
-                operatorCount++;
-            }
         } else if (current->isBoxModelObject()) {
             RenderBoxModelObject* box = toRenderBoxModelObject(current);
             // Check to see if this box has a larger height.
@@ -95,10 +61,8 @@ void RenderMathMLRow::layout()
         }
     }
     
-    if (childCount > 0 && childCount == operatorCount) {
-        // We have only operators and so set the max height to the operator height.
-        maxHeight = operatorHeight;
-    }
+    if (!maxHeight)
+        maxHeight = style()->fontSize();
     
     // Stretch everything to the same height (blocks can ignore the request).
     if (maxHeight > 0) {
@@ -118,17 +82,6 @@ void RenderMathMLRow::layout()
     }
     
 }    
-
-LayoutUnit RenderMathMLRow::baselinePosition(FontBaseline, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
-{
-    if (firstChild() && firstChild()->isRenderMathMLBlock()) {
-        RenderMathMLBlock* block = toRenderMathMLBlock(firstChild());
-        if (block->isRenderMathMLOperator())
-            return block->y() + block->baselinePosition(AlphabeticBaseline, firstLine, direction, linePositionMode);
-    }
-    
-    return RenderBlock::baselinePosition(AlphabeticBaseline, firstLine, direction, linePositionMode);
-}
     
 }
 

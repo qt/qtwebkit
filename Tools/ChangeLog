@@ -1,3 +1,2492 @@
+2012-02-24  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] Add Qt5 way to force 96 DPI for tests
+        https://bugs.webkit.org/show_bug.cgi?id=79364
+
+        Reviewed by Simon Hausmann.
+
+        * DumpRenderTree/qt/main.cpp:
+        (main):
+        * WebKitTestRunner/InjectedBundle/qt/ActivateFontsQt.cpp:
+        (WTR::activateFonts):
+
+2012-02-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] MiniBrowser should reload the view then the reload button is clicked
+        https://bugs.webkit.org/show_bug.cgi?id=79472
+
+        Reviewed by Philippe Normand.
+
+        * MiniBrowser/gtk/BrowserWindow.c:
+        (reloadCallback): Call webkit_web_view_reload().
+        (browser_window_init): Connect reload item clicked even to
+        reloadCallback instead of activateUriEntryCallback.
+
+2012-02-24  Kentaro Hara  <haraken@chromium.org>
+
+        Add performance tests for DOM attribute getters and setters
+        https://bugs.webkit.org/show_bug.cgi?id=79208
+
+        Reviewed by Ryosuke Niwa.
+
+        We want to allow perf tests to output info messages
+        that do not affect the test results. To accomplish this,
+        this patch modifies perftestsrunner.py so that it ignores
+        a line that starts from "Info:".
+
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner):
+
+2012-02-24  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] Enable requestAnimationFrame
+        https://bugs.webkit.org/show_bug.cgi?id=79408
+
+        Enable requestAnimationFrame for BlackBerry.
+
+        Reviewed by Rob Buis.
+
+        * Scripts/build-webkit:
+
+2012-02-24  Adam Barth  <abarth@webkit.org>
+
+        style-queue tries to apply the patch twice
+        https://bugs.webkit.org/show_bug.cgi?id=79459
+
+        Reviewed by Eric Seidel.
+
+        Previously, we applied the patch using both apply-patch and
+        check-style.  This patch introduces a check-style-local to mirror the
+        apply-watchlist-local, which operates on the current working diff.
+
+        This patch also cleans up some other bugs I found by running the queue
+        locally for a while.  The queue still prints out a slightly
+        less-than-ideal message on the bugs when it find an error, but it's ok
+        for now.  We'll need to iterate a bit.
+
+        * Scripts/webkitpy/tool/bot/stylequeuetask.py:
+        (StyleQueueTask.validate):
+        (StyleQueueTask._check_style):
+        * Scripts/webkitpy/tool/commands/download.py:
+        (CheckStyleLocal):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+        (EarlyWarningSytemTest._default_expected_stderr):
+        (EarlyWarningSytemTest._test_testing_ews):
+        * Scripts/webkitpy/tool/commands/queues.py:
+        (AbstractReviewQueue.handle_script_error):
+        (StyleQueue.review_patch):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+        * Scripts/webkitpy/tool/commands/queuestest.py:
+        (QueuesTest.assert_queue_outputs):
+
+2012-02-23  Adam Barth  <abarth@webkit.org>
+
+        should_proceed_with_work_item is unused and can be removed
+        https://bugs.webkit.org/show_bug.cgi?id=79416
+
+        Reviewed by Eric Seidel.
+
+        We used to use this function to check whether the tree is red.  Now, we
+        don't use external measures of whether to proceed with work items.
+        Instead, we analyze them with the idea in mind that the tree might be
+        red.
+
+        * Scripts/webkitpy/tool/bot/queueengine.py:
+        (QueueEngineDelegate.next_work_item):
+        (QueueEngine.run):
+        * Scripts/webkitpy/tool/bot/queueengine_unittest.py:
+        (LoggingDelegate):
+        (LoggingDelegate.next_work_item):
+        (RaisingDelegate.process_work_item):
+        (QueueEngineTest.test_terminating_error):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (AbstractEarlyWarningSystem.__init__):
+        * Scripts/webkitpy/tool/commands/queues.py:
+        (AbstractQueue.next_work_item):
+        (FeederQueue.next_work_item):
+        (CommitQueue.next_work_item):
+        (AbstractReviewQueue.next_work_item):
+        (StyleQueue.__init__):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+        (FeederQueueTest.test_feeder_queue):
+        (CommitQueueTest.test_commit_queue):
+        (test_commit_queue_failure):
+        (test_commit_queue_failure_with_failing_tests):
+        (test_rollout):
+        (test_rollout_lands):
+        (StyleQueueTest.test_style_queue_with_style_exception):
+        (test_style_queue_with_watch_list_exception):
+        * Scripts/webkitpy/tool/commands/queuestest.py:
+        (QueuesTest.assert_queue_outputs):
+        * Scripts/webkitpy/tool/commands/sheriffbot.py:
+        (SheriffBot.next_work_item):
+
+2012-02-23  Adrienne Walker  <enne@google.com>
+
+        Unreviewed, add Stephen Chenney to committers.py as a contributor.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-02-23  Adam Barth  <abarth@webkit.org>
+
+        style-queue logs bogus messages to the QueueStatusServer
+        https://bugs.webkit.org/show_bug.cgi?id=79424
+
+        Reviewed by Eric Seidel.
+
+        Copy/paste error.
+
+        * Scripts/webkitpy/tool/bot/stylequeuetask.py:
+        (StyleQueueTask._check_style):
+        (StyleQueueTask._apply_watch_list):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+
+2012-02-23  Eric Seidel  <eric@webkit.org>
+
+        Use self._filesystem in more places in the SCM classes
+        https://bugs.webkit.org/show_bug.cgi?id=79415
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/checkout/scm/detection_unittest.py:
+        (SCMDetectorTest.test_detect_scm_system):
+        * Scripts/webkitpy/common/checkout/scm/git.py:
+        (Git.find_checkout_root):
+        (Git.to_object_name):
+        * Scripts/webkitpy/common/checkout/scm/scm.py:
+        (SCM.__init__):
+        (SCM.in_working_directory):
+        * Scripts/webkitpy/common/checkout/scm/svn.py:
+        (SVN.find_uuid):
+        (SVN.find_checkout_root):
+
+2012-02-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r108685.
+        http://trac.webkit.org/changeset/108685
+        https://bugs.webkit.org/show_bug.cgi?id=79414
+
+        Broke Chromium builds (Requested by enne on #webkit).
+
+        * qmake/mkspecs/features/features.prf:
+
+2012-02-23  Adam Barth  <abarth@webkit.org>
+
+        style-queue shouldn't spam bugs if it fails to update its working copy
+        https://bugs.webkit.org/show_bug.cgi?id=79412
+
+        Reviewed by Eric Seidel.
+
+        This patch moves style-queue over to the new PatchAnalysisTask
+        infrastructure, which is smarter about retrying patches when update
+        fails.
+
+        * Scripts/webkitpy/common/system/executive_mock.py:
+        (MockExecutive.run_and_throw_if_fail):
+        * Scripts/webkitpy/tool/bot/earlywarningsystemtask.py:
+        * Scripts/webkitpy/tool/bot/patchanalysistask.py:
+        (UnableToApplyPatch):
+        (UnableToApplyPatch.__init__):
+        (PatchAnalysisTask.__init__):
+        * Scripts/webkitpy/tool/bot/stylequeuetask.py: Added.
+        (StyleQueueTaskDelegate):
+        (StyleQueueTaskDelegate.parent_command):
+        (StyleQueueTask):
+        (StyleQueueTask.validate):
+        (StyleQueueTask._check_style):
+        (StyleQueueTask._apply_watch_list):
+        (StyleQueueTask.run):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        * Scripts/webkitpy/tool/commands/queues.py:
+        (StyleQueue):
+        (StyleQueue.should_proceed_with_work_item):
+        (StyleQueue.review_patch):
+        (StyleQueue.run_command):
+        (StyleQueue.command_passed):
+        (StyleQueue.command_failed):
+        (StyleQueue.expected_failures):
+        (StyleQueue.refetch_patch):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+        (StyleQueueTest.test_style_queue_with_style_exception):
+        (test_style_queue_with_watch_list_exception):
+
+2012-02-23  Zoltan Horvath  <zoltan@webkit.org>
+
+        [Qt] Allow to use WebCore imagedecoders
+        https://bugs.webkit.org/show_bug.cgi?id=32410
+
+        Add ENABLE_QT_IMAGE_DECODER macro, it's enabled by default.
+
+        Reviewed by Simon Hausmann.
+
+        * qmake/mkspecs/features/features.prf:
+
+2012-02-23  Eric Seidel  <eric@webkit.org>
+
+        Remove old broken find_checkout_root tests now that find_checkout_root is gone
+        https://bugs.webkit.org/show_bug.cgi?id=79405
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/checkout/scm/detection_unittest.py: Added.
+        (SCMDetectorTest):
+        (SCMDetectorTest.test_find_checkout_root):
+        * Scripts/webkitpy/common/checkout/scm/scm_unittest.py:
+        (SVNTestRepository.tear_down):
+
+2012-02-23  Michael Brüning  <michael.bruning@nokia.com>
+
+        [Qt][WK2] Implement proxy authentication dialog.
+        https://bugs.webkit.org/show_bug.cgi?id=79350
+
+        Reviewed by Simon Hausmann.
+
+        * MiniBrowser/qt/MiniBrowser.qrc:
+        * MiniBrowser/qt/qml/BrowserWindow.qml:
+        * MiniBrowser/qt/qml/ProxyAuthenticationDialog.qml: Added.
+
+2012-02-23  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Build fix, add recently added source dirs.
+
+        * waf/build/settings.py:
+
+2012-02-23  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Add support for touch cancellation
+        https://bugs.webkit.org/show_bug.cgi?id=79348
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added straight-forward touch cancellation event sending to Qt WK1 DRT
+        and WK2 WTR.
+
+        * DumpRenderTree/qt/EventSenderQt.cpp:
+        (EventSender::touchCancel):
+        (EventSender::cancelTouchPoint):
+        * DumpRenderTree/qt/EventSenderQt.h:
+        (EventSender):
+        * WebKitTestRunner/EventSenderProxy.h:
+        (EventSenderProxy):
+        * WebKitTestRunner/InjectedBundle/Bindings/EventSendingController.idl:
+        * WebKitTestRunner/InjectedBundle/EventSendingController.cpp:
+        (WTR::EventSendingController::touchCancel):
+        (WTR):
+        (WTR::EventSendingController::cancelTouchPoint):
+        * WebKitTestRunner/InjectedBundle/EventSendingController.h:
+        (EventSendingController):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::didReceiveSynchronousMessageFromInjectedBundle):
+        * WebKitTestRunner/qt/EventSenderProxyQt.cpp:
+        (WTR::EventSenderProxy::touchCancel):
+        (WTR):
+        (WTR::EventSenderProxy::cancelTouchPoint):
+
+2012-02-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r108626.
+        http://trac.webkit.org/changeset/108626
+        https://bugs.webkit.org/show_bug.cgi?id=79370
+
+        broke qt-wk2 bot, somehow the workaround does not work on the
+        bot (Requested by Ossy on #webkit).
+
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+        (WTR::WrapperWindow::handleStatusChanged):
+        (WTR::PlatformWebView::resizeTo):
+
+2012-02-23  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK] DRT doesn't support scheduleAsynchronousKeyDown.
+        https://bugs.webkit.org/show_bug.cgi?id=78481
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Extracted shareable code from keyDownCallback and then added createKeyPressEvent
+        to create gdk press key event.
+        Added sendKeyDown and sendAsynchronousKeyDown to evaluate keyDown event directly
+        and asynchronously. Eventually, sendAsynchronousKeyDown calls sendKeyDown.
+
+        * DumpRenderTree/gtk/EventSender.cpp:
+        (scheduleAsynchronousClickCallback):
+        (createKeyPressEvent):
+        (sendKeyDown):
+        (keyDownCallback):
+        (sendAsynchronousKeyDown):
+        (scheduleAsynchronousKeyDownCallback):
+
+2012-02-23  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt][WK2] WebKitTestRunner should use 480x360 sized view for W3C SVG tests
+        https://bugs.webkit.org/show_bug.cgi?id=76546
+
+        Reviewed by Simon Hausmann.
+
+        Co-authored with Simon Hausmann.
+
+        Revert the workaround introduced in r107868 and reintroduce
+        the qml binding so we can test the code path that we are more
+        interested in. The reason that it did not work before is that
+        we don't have an active platform window which we now workaround
+        by propagating the resize through QWindowSystemInterface.
+
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+        (WTR::WrapperWindow::handleStatusChanged):
+        (WTR::PlatformWebView::resizeTo):
+
+2012-02-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r108577.
+        http://trac.webkit.org/changeset/108577
+        https://bugs.webkit.org/show_bug.cgi?id=79359
+
+        It doesn't work as expected (Requested by Ossy on #webkit).
+
+        * DumpRenderTree/qt/EventSenderQt.cpp:
+        (EventSender::postEvent):
+        * DumpRenderTree/qt/EventSenderQt.h:
+        (EventSender):
+
+2012-02-23  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] FullScreen signals
+        https://bugs.webkit.org/show_bug.cgi?id=76181
+
+        Reviewed by Martin Robinson.
+
+        Use the two new entering/leaving fullscreen signals to hide/show
+        the tool bar, the status bar and ask the user's permission before
+        entering fullscreen.
+
+        * GtkLauncher/main.c:
+        (webViewFullscreenMessageWindowClose):
+        (webViewWindowStateEvent):
+        (hide_widget):
+        (show_widget):
+        (webViewEnteringFullScreen):
+        (webViewLeavingFullScreen):
+        (createBrowser):
+        (createWindow):
+
+2012-02-22  Dongwoo Im  <dw.im@samsung.com>
+
+        [EFL] Fix to launch the EWebLauncher using the script, run-launcher.
+        https://bugs.webkit.org/show_bug.cgi?id=79076
+
+        Reviewed by Andreas Kling.
+
+        * Scripts/webkitdirs.pm: Fix the path of libewebkit.so.
+        (builtDylibPathForName):
+
+2012-02-22  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        [Qt] Add eventSender.gestureTap
+        https://bugs.webkit.org/show_bug.cgi?id=66173
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * DumpRenderTree/qt/EventSenderQt.cpp:
+        (EventSender::gestureTap):
+        * DumpRenderTree/qt/EventSenderQt.h:
+
+2012-02-22  Brady Eidson  <beidson@apple.com>
+
+        <rdar://problem/10406044> and https://bugs.webkit.org/show_bug.cgi?id=79279
+        Synchronous ShouldGoToBackForwardListItem causes lots of WebProcess hangs
+
+        Reviewed by Anders Carlsson.
+
+        Update our tools to the new form of the PageLoadClient.
+
+        * MiniBrowser/mac/BrowserWindowController.m:
+        (-[BrowserWindowController awakeFromNib]): 
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::initialize):
+
+2012-02-22  Daniel Bates  <dbates@webkit.org>
+
+        new-run-webkit-tests shouldn't restore Safari state on Lion when showing results
+        https://bugs.webkit.org/show_bug.cgi?id=79277
+
+        Reviewed by Adam Barth.
+
+        Pass command line argument no-saved-state to run-safari to disable Safari
+        state restoration for the session on OS 10.7.
+
+        * Scripts/webkitpy/layout_tests/port/mac.py:
+        (MacPort.show_results_html_file):
+        * Scripts/webkitpy/layout_tests/port/mac_unittest.py:
+        (test_show_results_html_file):
+
+2012-02-22  Kalev Lember  <kalevlember@gmail.com>
+
+        Explicitly include unistd.h in TestNetscapePlugIn for GCC 4.7
+        https://bugs.webkit.org/show_bug.cgi?id=77759
+
+        Reviewed by Tony Chang.
+
+        Fixes build with gcc 4.7.
+
+        r100432 added the include only for ANDROID; this changes the ifdef to
+        also cover other unix platforms. On Fedora 17 the gcc 4.7 compiler no
+        longer implicitly includes unistd.h from standard headers and other
+        unix platforms are likely to get gcc 4.7 as well in the future.
+
+        * DumpRenderTree/TestNetscapePlugIn/PluginTest.cpp:
+
+2012-02-22  Philippe Normand  <pnormand@igalia.com>
+
+        Unreviewed, rolling out r108522.
+        http://trac.webkit.org/changeset/108522
+        https://bugs.webkit.org/show_bug.cgi?id=76181
+
+        Broke 4 fullscreen tests on GTK.
+
+        * GtkLauncher/main.c:
+        (createBrowser):
+        (createWindow):
+
+2012-02-20  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] FullScreen signals
+        https://bugs.webkit.org/show_bug.cgi?id=76181
+
+        Reviewed by Martin Robinson.
+
+        Use the two new entering/leaving fullscreen signals to hide/show
+        the tool bar, the status bar and ask the user's permission before
+        entering fullscreen.
+
+        * GtkLauncher/main.c:
+        (webViewFullscreenMessageWindowClose):
+        (webViewWindowStateEvent):
+        (hide_widget):
+        (show_widget):
+        (webViewEnteringFullScreen):
+        (webViewLeavingFullScreen):
+        (createBrowser):
+        (createWindow):
+
+2012-02-22  Rob Flack  <flackr@chromium.org>
+
+        Update Linux ChromiumOS builders in flakiness dashboard.
+        https://bugs.webkit.org/show_bug.cgi?id=79238
+
+        Reviewed by Ojan Vafai.
+
+        * TestResultServer/static-dashboards/builders.js:
+
+2012-02-22  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: test_function_length_check_definition_huge_lines is slow
+        https://bugs.webkit.org/show_bug.cgi?id=79185
+
+        Reviewed by Adam Barth.
+
+        This test takes ~3 seconds to run, apparently because we're
+        running a test on a 10,000 line function :). Dropping the
+        function length to 640 still exercises the code path and
+        provides a 10x speedup.
+
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (CppStyleTest):
+        (CheckForFunctionLengthsTest.test_function_length_check_definition_huge_lines):
+
+2012-02-22  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: speed up FileLockTest.test_lock_lifecycle
+        https://bugs.webkit.org/show_bug.cgi?id=79189
+
+        Reviewed by Adam Barth.
+
+        The unit test had a second lock trying to acquire a
+        lock already held, and a hard-coded timeout of one second.
+        I have changed the timeouts to a tenth of a second (which
+        is probably still fine) and changed the hard-spin on
+        the lock to a slow-spin every hundredth of a second.
+
+        * Scripts/webkitpy/common/system/file_lock.py:
+        (FileLock.acquire_lock):
+        * Scripts/webkitpy/common/system/file_lock_integrationtest.py:
+        (FileLockTest.setUp):
+        (FileLockTest.test_stuck_lock):
+
+2012-02-22  Gabor Rapcsanyi  <rgabor@webkit.org>
+
+        build-webkit should use environment variable at number of CPU
+        detection on all platform
+        https://bugs.webkit.org/show_bug.cgi?id=79227
+
+        Reviewed by Martin Robinson.
+
+        * Scripts/webkitdirs.pm:
+        (determineNumberOfCPUs):
+
+2012-02-22  Mihnea Ovidenie  <mihnea@adobe.com>
+
+        [Qt] REGRESSION(r108108): It made 3 fast/repaint tests fail
+        https://bugs.webkit.org/show_bug.cgi?id=78960
+
+        Reviewed by Csaba Osztrogonác.
+
+        * DumpRenderTree/qt/LayoutTestControllerQt.cpp:
+        (LayoutTestController::overridePreference):
+
+2012-02-22  Hao Zheng  <zhenghao@chromium.org>
+
+        [chromium] Build WebKit with MEDIA_STREAM disabled.
+        https://bugs.webkit.org/show_bug.cgi?id=79214
+
+        Reviewed by Kent Tamura.
+
+        * DumpRenderTree/chromium/WebUserMediaClientMock.cpp:
+        * DumpRenderTree/chromium/WebUserMediaClientMock.h:
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::createMediaPlayer):
+        * DumpRenderTree/chromium/WebViewHost.h:
+        (WebViewHost):
+
+2012-02-22  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt][WK2][Mac] WebKitTestRunner does not build with clang.
+        https://bugs.webkit.org/show_bug.cgi?id=79124
+
+        WebKitTestRunnerPrefix.h should also be included
+        when building with clang.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * WebKitTestRunner/Target.pri:
+
+2012-02-20  Roland Steiner  <rolandsteiner@chromium.org>
+
+        <style scoped>: Add runtime-flag
+        https://bugs.webkit.org/show_bug.cgi?id=79074
+
+        Enable the runtime-flag for DRT. 
+
+        Reviewed by Dimitri Glazkov.
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::TestShell):
+
+2012-02-22  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed, rolling out r107351.
+        http://trac.webkit.org/changeset/107351
+        https://bugs.webkit.org/show_bug.cgi?id=53600
+
+        Several issues introduced in WebKitGTK+ API
+
+        * DumpRenderTree/gtk/DumpRenderTree.cpp:
+        (createWebView):
+        * GtkLauncher/main.c:
+        (createWebViewCb):
+        (createBrowser):
+        (createWindow):
+        (main):
+
+2012-02-21  Filip Pizlo  <fpizlo@apple.com>
+
+        JSC should be a triple-tier VM
+        https://bugs.webkit.org/show_bug.cgi?id=75812
+        <rdar://problem/10079694>
+
+        Reviewed by Gavin Barraclough.
+
+        Changed EFL's build system to include a new directory in JavaScriptCore.
+
+        * DumpRenderTree/efl/CMakeLists.txt:
+
+2012-02-21  Daniel Cheng  <dcheng@chromium.org>
+
+        [chromium] Fix image drag out on Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=79158
+
+        Reviewed by Tony Chang.
+
+        * DumpRenderTree/chromium/EventSender.cpp:
+        (EventSender::dumpFilenameBeingDragged):
+        (EventSender::beginDragWithFiles):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (addDRTFakeFileToDataObject):
+
+2012-02-21  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: speed up hot filesystem_mock functions
+        https://bugs.webkit.org/show_bug.cgi?id=79159
+
+        Reviewed by Adam Barth.
+
+        Profiling run_webkit_tests_integrationtest.py revealed that
+        isdir(), normpath(), and join() are called a lot and were very
+        slow.This patch speeds them up substantially, shaving 20 seconds
+        off of the execution time.
+
+        * Scripts/webkitpy/common/system/filesystem_mock.py:
+        (MockFileSystem.isdir):
+        (MockFileSystem._slow_but_correct_join):
+        (MockFileSystem.join):
+        (MockFileSystem.listdir):
+        (MockFileSystem._slow_but_correct_normpath):
+        (MockFileSystem.normpath):
+        (MockFileSystem.write_binary_file):
+        * Scripts/webkitpy/common/system/filesystem_mock_unittest.py:
+        (MockFileSystemTest.quick_check):
+        (MockFileSystemTest):
+        (MockFileSystemTest.test_join):
+        (MockFileSystemTest.test_normpath):
+        * Scripts/webkitpy/tool/servers/rebaselineserver_unittest.py:
+        (get_test_config): Call write_binary_file() instead of updating
+          filesystem.files directly, so that we create directories as
+          needed.
+
+2012-02-21  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: make the delay between starting workers configurable per-port
+        https://bugs.webkit.org/show_bug.cgi?id=79148
+
+        Reviewed by Eric Seidel.
+
+        Because of bug 79147, we have to sleep a bit in between starting
+        DRTs; however, doing so across the board slows down the Test
+        port. Making this configurable shaves 10 seconds off of
+        run_webkit_tests_integrationtest.py
+        
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (Manager._run_tests):
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.worker_startup_delay_secs):
+        * Scripts/webkitpy/layout_tests/port/test.py:
+        (TestPort.worker_startup_delay_secs):
+
+2012-02-21  Jon Lee  <jonlee@apple.com>
+
+        Bring notifications support to WK1 mac
+        https://bugs.webkit.org/show_bug.cgi?id=78783
+        <rdar://problem/10610578>
+
+        Reviewed by Anders Carlsson.
+
+        * DumpRenderTree/mac/UIDelegate.mm: Refactor WebGeolocationPolicyListener to WebAllowDenyPolicyListener.
+        (-[UIDelegate webView:decidePolicyForGeolocationRequestFromOrigin:frame:listener:]):
+        (-[UIDelegate timerFired]):
+
+2012-02-21  Kentaro Hara  <haraken@chromium.org>
+
+        Enable the IDL attribute checker in run-bindings-tests
+        https://bugs.webkit.org/show_bug.cgi?id=79091
+
+        Reviewed by Adam Barth.
+
+        We have enabled the IDL attribute checker in Chromium in r108322.
+        This patch enables the IDL attribute checker in run-bindings-tests.
+
+        No tests. I manually checked that [Custommm], [CallWith=],
+        [CallWith=ScriptExecutionContext|Foo] in TestObj.idl cause
+        run-bindings-tests failures.
+
+        * Scripts/webkitpy/bindings/main.py:
+        (BindingsTests.generate_supplemental_dependency):
+
+2012-02-21  Rafael Weinstein  <rafaelw@chromium.org>
+
+        Add rafaelw as a committer.
+
+        Unreviewed.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-02-21  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: update names after deleting message_broker
+        https://bugs.webkit.org/show_bug.cgi?id=79000
+
+        Reviewed by Eric Seidel.
+
+        Part 3 of 3 in deleting message_broker.py; this change just
+        adjusts the names for the newly merged symbols so that they are
+        private as appropriate.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (get):
+        (_Broker):
+        (_BrokerConnection):
+        (_BrokerConnection.__init__):
+        (AbstractWorker.__init__):
+        (_ManagerConnection):
+        (_ManagerConnection.__init__):
+        (_WorkerConnection):
+        (_WorkerConnection.__init__):
+
+2012-02-21  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: merge message_broker.py into manager_worker_broker.py
+        https://bugs.webkit.org/show_bug.cgi?id=78999
+
+        Reviewed by Tony Chang.
+
+        This is pretty much a straight cut-and-paste of one file into
+        another (broken up so that docstrings and imports are in the
+        right place).
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (BrokerClient):
+        (BrokerClient.is_done):
+        (BrokerClient.name):
+        (Broker):
+        (Broker.__init__):
+        (Broker.add_topic):
+        (Broker._get_queue_for_topic):
+        (Broker.post_message):
+        (Broker.run_message_loop):
+        (Broker.run_all_pending):
+        (Broker._run_loop):
+        (Broker._dispatch_message):
+        (_Message):
+        (_Message.loads):
+        (_Message.__init__):
+        (_Message.dumps):
+        (_Message.__repr__):
+        (BrokerConnection):
+        (BrokerConnection.__init__):
+        (BrokerConnection.run_message_loop):
+        (BrokerConnection.post_message):
+        (BrokerConnection.raise_exception):
+        * Scripts/webkitpy/layout_tests/controllers/message_broker.py: Removed.
+
+2012-02-21  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: prepare to delete message_broker.py
+        https://bugs.webkit.org/show_bug.cgi?id=78997
+
+        Reviewed by Eric Seidel.
+
+        This is part 1 of 3 changes to fix bug 78187. This change
+        prepares the code for merging message_broker.py into
+        manager_worker_broker.py; the tests in message_broker_unittest
+        are merged into manager_worker_broker_unittest, the symbols
+        needed by the tests are exported from manager_worker_broker.py,
+        and manager_worker_broker itself is updated to refer to the
+        symbols directly (without the module prefix).
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (get):
+        (AbstractWorker):
+        (AbstractWorker.__init__):
+        (_ManagerConnection):
+        (_ManagerConnection.__init__):
+        (_WorkerConnection):
+        (_WorkerConnection.__init__):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker_unittest.py:
+        (InterfaceTest.test_brokerclient_is_abstract):
+        (InterfaceTest.test_brokerclient_is_abstract.methods):
+        (MessageTest):
+        (MessageTest.test__no_body):
+        (MessageTest.test__body):
+        * Scripts/webkitpy/layout_tests/controllers/message_broker_unittest.py: Removed.
+
+2012-02-21  Sam Weinig  <sam@webkit.org>
+
+        Attempt to fix the Snow Leopard build.
+
+        * DumpRenderTree/mac/Configurations/Base.xcconfig:
+        * MiniBrowser/Configurations/Base.xcconfig:
+        * TestWebKitAPI/Configurations/Base.xcconfig:
+        * WebKitTestRunner/Configurations/Base.xcconfig:
+
+2012-02-21  Sam Weinig  <sam@webkit.org>
+
+        Use libc++ when building with Clang on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=78981
+
+        Reviewed by Dan Bernstein.
+
+        * DumpRenderTree/mac/Configurations/Base.xcconfig:
+        * MiniBrowser/Configurations/Base.xcconfig:
+        * TestWebKitAPI/Configurations/Base.xcconfig:
+        * WebKitTestRunner/Configurations/Base.xcconfig:
+
+2012-02-21  Adam Roben  <aroben@apple.com>
+
+        Roll out r108309, r108323, and r108326
+
+        They broke the 32-bit Lion build.
+
+        Original bugs is <http://webkit.org/b/75812> <rdar://problem/10079694>.
+
+        * DumpRenderTree/efl/CMakeLists.txt:
+
+2012-02-21  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt][WK2] Get rid of the dependency to QtWidgets
+        https://bugs.webkit.org/show_bug.cgi?id=76276
+
+        Reviewed by Simon Hausmann.
+
+        * MiniBrowser/qt/MiniBrowser.pro:
+        * MiniBrowser/qt/MiniBrowserApplication.cpp:
+        (MiniBrowserApplication::MiniBrowserApplication):
+        (MiniBrowserApplication::notify):
+        (MiniBrowserApplication::sendTouchEvent):
+        * MiniBrowser/qt/MiniBrowserApplication.h:
+        (MiniBrowserApplication):
+        * QtTestBrowser/locationedit.h:
+        * WebKitTestRunner/InjectedBundle/qt/ActivateFontsQt.cpp:
+        (WTR::activateFonts):
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+
+2012-02-20  Adam Barth  <abarth@webkit.org>
+
+        mastercfg_unittest.py fails without simplejson
+        https://bugs.webkit.org/show_bug.cgi?id=79070
+
+        Reviewed by Csaba Osztrogonác.
+
+        Now that we require Python 2.6 (and higher) we can import json rather
+        than simplejson.  We still need to use the simplejson name because
+        that's what the master.cfg script expects.
+
+        * BuildSlaveSupport/build.webkit.org-config/mastercfg_unittest.py:
+        (BuildBotConfigLoader._add_dependant_modules_to_sys_modules):
+
+2012-02-20  Filip Pizlo  <fpizlo@apple.com>
+
+        JSC should be a triple-tier VM
+        https://bugs.webkit.org/show_bug.cgi?id=75812
+        <rdar://problem/10079694>
+
+        Reviewed by Gavin Barraclough.
+
+        Changed EFL's build system to include a new directory in JavaScriptCore.
+
+        * DumpRenderTree/efl/CMakeLists.txt:
+
+2012-02-20  Kenichi Ishibashi  <bashi@chromium.org>
+
+        Update pywebsocket to 0.7.2
+        https://bugs.webkit.org/show_bug.cgi?id=79066
+
+        This version includes vendor-prefixed deflate-frame extension support.
+
+        Reviewed by Kent Tamura.
+
+        * Scripts/webkitpy/thirdparty/__init__.py:
+        (AutoinstallImportHook._install_pywebsocket):
+
+2012-02-20  Martin Robinson  <mrobinson@igalia.com>
+
+        [UNIX] Plugin information fields are not interpreted as UTF-8
+        https://bugs.webkit.org/show_bug.cgi?id=78635
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Interpret plugin metadata as UTF8 aways. This matches the behavior
+        of Chromium and the Totem plugin.
+
+        * DumpRenderTree/TestNetscapePlugIn/main.cpp:
+        (NPP_GetValue): Include a UTF-8 character in the description string for testing purposes.
+
+2012-02-20  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [Qt] Move the unix forwarding headers for TestNetscapePlugin to the TestNetscapePlugin directory
+        https://bugs.webkit.org/show_bug.cgi?id=78935
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Move the TestNetscapePlugin headers to a more appropriate directory and update
+        the build files to match.
+
+        * DumpRenderTree/TestNetscapePlugIn/unix/ForwardingHeaders/WebKit/npapi.h: Renamed from Tools/DumpRenderTree/unix/TestNetscapePlugin/ForwardingHeaders/WebKit/npapi.h.
+        * DumpRenderTree/TestNetscapePlugIn/unix/ForwardingHeaders/WebKit/npfunctions.h: Renamed from Tools/DumpRenderTree/unix/TestNetscapePlugin/ForwardingHeaders/WebKit/npfunctions.h.
+        * DumpRenderTree/TestNetscapePlugIn/unix/ForwardingHeaders/WebKit/npruntime.h: Renamed from Tools/DumpRenderTree/unix/TestNetscapePlugin/ForwardingHeaders/WebKit/npruntime.h.
+        * DumpRenderTree/qt/TestNetscapePlugin/TestNetscapePlugin.pro: Update build.
+        * GNUmakefile.am: Ditto.
+
+2012-02-20  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Add a new API for the Vibration API(W3C).
+        https://bugs.webkit.org/show_bug.cgi?id=72010
+
+        Reviewed by Hajime Morita.
+
+        * Scripts/build-webkit: Enable ENABLE_VIBRATION feature.
+
+2012-02-20  János Badics  <dicska@gmail.com>
+
+        [Qt] run-qtwebkit-tests doesn't consider timeouts as failures
+        https://bugs.webkit.org/show_bug.cgi?id=71816
+
+        RunQtAPITests will notify if a timeout occurs during testing.
+        Added unittest to the master.cfg
+
+        Reviewed by Csaba Osztrogonác.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (RunQtAPITests.evaluateCommand):
+        * BuildSlaveSupport/build.webkit.org-config/mastercfg_unittest.py:
+        (RunQtAPITestsTest):
+        (RunQtAPITestsTest.assertResults):
+        (RunQtAPITestsTest.test_timeout):
+        (test_success):
+        (test_failure):
+        (test_timeout_and_failure):
+
+2012-02-20  Andy Wingo  <wingo@igalia.com>
+
+        Add wingo as a committer.
+
+        Unreviewed.
+
+        * Scripts/webkitpy/common/config/committers.py: Add myself to the
+        committers list.
+
+2012-02-20  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] check that we're not running multiple modal dialogs at the same time
+        https://bugs.webkit.org/show_bug.cgi?id=78486
+
+        Reviewed by Kent Tamura.
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::TestShell):
+        * DumpRenderTree/chromium/TestShell.h:
+        (TestShell::setIsDisplayingModalDialog):
+        (TestShell::isDisplayingModalDialog):
+        (TestShell):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::runModal):
+
+2012-02-20  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix WebKit2GTK+ for 'make distcheck'.
+
+        Instead of conditionally including WebKit2 GNUmakefiles, always
+        include them and conditionally activate the final targets.
+
+        * MiniBrowser/gtk/GNUmakefile.am:
+        * WebKitTestRunner/GNUmakefile.am:
+
+2012-02-20  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Enable video option for EFL port in build-webkit.
+        https://bugs.webkit.org/show_bug.cgi?id=79006
+
+        Reviewed by Daniel Bates.
+
+        * Scripts/build-webkit:
+
+2012-02-19  JungJik Lee  <jungjik.lee@samsung.com>
+
+        [EFL] Use modifier keys to execute pre-rendering.
+        https://bugs.webkit.org/show_bug.cgi?id=77933
+
+        Reviewed by Chang Shu.
+
+        Use modifier key to execute pre-rendering instead of using reserved function keys.
+
+        * EWebLauncher/main.c:
+        (on_key_down):
+
+2012-02-18  Dirk Pranke  <dpranke@chromium.org>
+
+        Fix one more dangling reference to worker_connection.name, delete unused code.
+
+        Unreviewed, build fix.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (Manager.update):
+        (_WorkerState.__init__):
+
+2012-02-18  Dirk Pranke  <dpranke@chromium.org>
+
+        Add a change that should've been in r108005.
+
+        Unreviewed, build fix.
+
+        In the refactoring/cleanup in r108005 I should've changed the
+        implementation of WorkerConnection to make it match BrokerClient
+        (and everything else) so that objects had a name() method
+        instead of a name property.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (Manager._run_tests):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (_WorkerConnection.__init__):
+        (_WorkerConnection.name):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker_unittest.py:
+        (_TestWorker.__init__):
+        (_TestsMixin.name):
+        (_TestsMixin.test_name):
+        (_TestsMixin.test_cancel):
+        (_TestsMixin.test_unknown_message):
+
+2012-02-18  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: remove webkitpy.common.array_stream
+        https://bugs.webkit.org/show_bug.cgi?id=78952
+
+        Reviewed by Eric Seidel.
+
+        Turns out array_stream didn't really do anything that StringIO
+        didn't do (at least as of Python 2.6). This change removes it
+        and updates all of the callers. Where possible, I changed the
+        test assertions in order to capture the intent more clearly,
+        e.g., instead of calling self.assertTrue('foo' in stream.get()),
+        we have self.assertContainsLine(stream, 'foo'), and instead of
+        self.assertTrue(stream.empty()), we have self.assertEmpty(stream) -
+        the latter isn't that much more readable, but StringIO doesn't
+        export an empty() method.
+
+        * Scripts/webkitpy/common/array_stream.py: Removed.
+        * Scripts/webkitpy/common/array_stream_unittest.py: Removed.
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (passing_run):
+        (run_and_capture):
+        (StreamTestingMixin):
+        (StreamTestingMixin.assertContains):
+        (StreamTestingMixin.assertContainsLine):
+        (StreamTestingMixin.assertEmpty):
+        (StreamTestingMixin.assertNotEmpty):
+        (LintTest):
+        (LintTest.test_lint_test_files):
+        (LintTest.test_lint_test_files__errors):
+        (MainTest):
+        (MainTest.test_child_process_1):
+        (MainTest.test_child_processes_2):
+        (MainTest.test_child_processes_min):
+        (MainTest.test_help_printing):
+        (MainTest.test_hung_thread):
+        (MainTest.test_no_tests_found):
+        (MainTest.test_no_tests_found_2):
+        (MainTest.test_repeat_each_iterations_num_tests):
+        (MainTest.test_test_list):
+        (MainTest.test_unexpected_failures):
+        (MainTest.test_worker_model__inline_with_child_processes):
+        (MainTest.test_additional_platform_directory):
+        (RebaselineTest):
+        (RebaselineTest.assertBaselines):
+        (RebaselineTest.test_reset_results):
+        (RebaselineTest.test_missing_results):
+        (RebaselineTest.test_new_baseline):
+        * Scripts/webkitpy/layout_tests/views/metered_stream.py:
+        (MeteredStream.update):
+        * Scripts/webkitpy/layout_tests/views/metered_stream_unittest.py:
+        (TestMeteredStream.test_regular):
+        * Scripts/webkitpy/layout_tests/views/printing_unittest.py:
+        (TestUtilityFunctions.assertEmpty):
+        (TestUtilityFunctions):
+        (TestUtilityFunctions.assertNotEmpty):
+        (TestUtilityFunctions.assertWritten):
+        (TestUtilityFunctions.test_configure_logging):
+        (Testprinter.assertEmpty):
+        (Testprinter):
+        (Testprinter.assertNotEmpty):
+        (Testprinter.assertWritten):
+        (Testprinter.reset):
+        (Testprinter.get_printer):
+        (Testprinter.test_help_printer):
+        (Testprinter.do_switch_tests.do_helper):
+        (Testprinter.test_print_one_line_summary):
+        (Testprinter.test_print_test_result):
+        (Testprinter.test_print_progress):
+        (Testprinter.test_write_nothing):
+        (Testprinter.test_write_misc):
+        (Testprinter.test_write_everything):
+        (Testprinter.test_write_verbose):
+        (Testprinter.test_print_unexpected_results):
+        * Scripts/webkitpy/performance_tests/perftestsrunner_unittest.py:
+        (MainTest.assertWritten):
+        (create_runner):
+        (test_run_test_set):
+        (test_run_test_set_kills_drt_per_run):
+        (test_run_test_set_for_parser_tests):
+        (test_run_test_set_with_json_output):
+        (test_run_test_set_with_json_source):
+        (test_run_test_set_with_multiple_repositories):
+        (test_upload_json):
+
+2012-02-18  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Add the WebCore/page/scrolling directory to the build dirs.
+
+        * waf/build/settings.py:
+
+2012-02-18  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed build fix. Don't error out or hang if we have
+        downloaded dependencies but server update check fails.
+
+        * waf/build/build_utils.py:
+        (download_if_newer):
+
+2012-02-17  Dirk Pranke  <dpranke@chromium.org>
+
+        The new run-webkit-tests needs to dump out pixel hash failures even if the pixel test passes.
+        https://bugs.webkit.org/show_bug.cgi?id=69444
+
+        Reviewed by Tony Chang.
+
+        Currently if a test's image checksum doesn't match the checksum
+        in the baseline, but the images themselves match according to
+        ImageDiff, new-run-webkit-tests ignores the problem. This is
+        probably bad, but it's not yet clear what the right thing to do
+        is. This patch will log a warning to stderr, at least (but the
+        test will still pass).
+
+        * Scripts/webkitpy/layout_tests/controllers/single_test_runner.py:
+        (SingleTestRunner._compare_image):
+        (SingleTestRunner._run_reftest):
+        * Scripts/webkitpy/layout_tests/port/test.py:
+        (unit_test_list):
+        * Scripts/webkitpy/layout_tests/port/mock_drt_unittest.py:
+
+2012-02-17  Dirk Pranke  <dpranke@chromium.org>
+
+        NRWT does not report failure for a skipped test
+        https://bugs.webkit.org/show_bug.cgi?id=78750
+
+        Reviewed by Eric Seidel.
+
+        If a test is listed in a Skipped file and you run it anyway
+        with --force, and the test fails, currently NRWT will print
+        "test ran as expected"; this is confusing, because you probably
+        expect the test to fail and yet this might lead you to think the
+        test passed. This patch changes the expected behavior to "PASS",
+        so tests that fail will be reported.
+
+        * Scripts/webkitpy/layout_tests/models/test_expectations.py:
+        (result_was_expected):
+        (TestExpectationParser):
+        (TestExpectationParser.expectation_for_skipped_test):
+        (TestExpectations):
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (test_add_skipped_tests):
+        * Scripts/webkitpy/layout_tests/port/test.py:
+        (unit_test_list): Add some tests that are expected to be in a Skipped file.
+        (TestPort.skipped_tests): This adds actual integration test coverage of Skipped files.
+
+2012-02-17  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: fix test code after bug 78181
+        https://bugs.webkit.org/show_bug.cgi?id=78870
+
+        Reviewed by Adam Barth.
+
+        I forgot to update the test code as per Tony's suggestion in
+        bug 78181 (r108005). This change does that, and in doing so
+        it revealed a subtle bug in _InlineWorkerConnection.run() that
+        I am fixing as part of this (_alive would not be cleared if an
+        exception was thrown).
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (_InlineWorkerConnection.run):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker_unittest.py:
+        (_TestWorker.__init__):
+        (_TestWorker.handle_stop):
+        (_TestWorker.handle_test):
+        (_TestWorker.run):
+        (_TestsMixin.handle_exception):
+        (_TestsMixin.test_unknown_message):
+
+2012-02-17  Adam Roben  <aroben@apple.com>
+
+        Mac build fix after r108119
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (runThread):
+        (runPthread):
+        (testThreadIdentifierMap):
+        Updated to match current WTF threading APIs.
+
+2012-02-17  Dirk Pranke  <dpranke@chromium.org>
+
+        revert r107147 - breaks webkit-patch on Mac SL
+        https://bugs.webkit.org/show_bug.cgi?id=78866
+
+        Reviewed by Adam Barth.
+
+        It appears that zipfile.ExtractAll is broken on Python 2.6.1,
+        which is the version that ships on Mac SL. Reverting this
+        change until we no longer have to worry about that version.
+
+        * Scripts/webkitpy/common/system/autoinstall.py:
+        (AutoInstaller):
+        (AutoInstaller._extract_all): Added a comment about SL.
+        (AutoInstaller._unzip):
+
+2012-02-17  Mihnea Ovidenie  <mihnea@adobe.com>
+
+        CSS regions enabled by default
+        https://bugs.webkit.org/show_bug.cgi?id=78525
+
+        Reviewed by David Hyatt.
+
+        Add a runtime preference to enable/disable regions functionality at runtime(WebKitCSSRegionsEnabled).
+        CSSRegions are still enabled by default.
+        In DRT, use layoutTestController.overridePreference("WebKitCSSRegionsEnabled", "0") to disable the css regions functionality.
+
+        * DumpRenderTree/chromium/LayoutTestController.cpp:
+        (LayoutTestController::overridePreference):
+        * DumpRenderTree/chromium/WebPreferences.cpp:
+        (WebPreferences::reset):
+        (WebPreferences::applyTo):
+        * DumpRenderTree/chromium/WebPreferences.h:
+        (WebPreferences):
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (resetDefaultsToConsistentValues):
+
+2012-02-17  Maciej Stachowiak  <mjs@apple.com>
+
+        Some API tests erroneously use = instead of == (causing build failures)
+        https://bugs.webkit.org/show_bug.cgi?id=78915
+
+        Reviewed by Sam Weinig.
+
+        * TestWebKitAPI/Tests/WebKit2/PageLoadBasic.cpp:
+        (TestWebKitAPI::decidePolicyForNavigationAction): Replace an = with an ==
+        (TestWebKitAPI::decidePolicyForNewWindowAction): ditto
+
+2012-02-17  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Include TestShellLinux.cpp in the build for Android
+        https://bugs.webkit.org/show_bug.cgi?id=78865
+
+        Reviewed by Eric Seidel.
+
+        Android will be re-using the TestShellLinux.cpp file. I already
+        added this r104033, but it seems to have gotten lost in the
+        recent refactorings.
+
+        * DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:
+
+2012-02-17  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Unreviewed, disable video build on EFL until it can be
+        supported by EFL build bot.
+
+        * Scripts/build-webkit:
+
+2012-02-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Implement zoom in/out in MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=75253
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * MiniBrowser/gtk/BrowserWindow.c:
+        (browserWindowCanZoomIn):
+        (browserWindowCanZoomOut):
+        (browserWindowUpdateZoomActions):
+        (webViewZoomLevelChanged):
+        (zoomInCallback):
+        (zoomOutCallback):
+        (browser_window_init):
+        (browserWindowConstructed):
+
+2012-02-17  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        layoutTestController.display() is flaky for SVG tests
+        https://bugs.webkit.org/show_bug.cgi?id=78021
+
+        Reviewed by Adam Roben.
+
+        Apply the same fix to DRT/Win, as previously applied to DRT/Mac.
+        Size the web view before running the test, not when dumping.
+        All platforms handle this correctly now.
+
+        * DumpRenderTree/win/DumpRenderTree.cpp:
+        (dump):
+        (sizeWebViewForCurrentTest):
+        (runTest):
+
+2012-02-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Make install is broken when building without --enable-gtk-doc
+        https://bugs.webkit.org/show_bug.cgi?id=78828
+
+        Reviewed by Martin Robinson.
+
+        * gtk/generate-gtkdoc:
+        (rebase_installed_docs): Check documentation has been generated
+        before trying to rebase it.
+
+2012-02-16  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: simplify worker interface
+        https://bugs.webkit.org/show_bug.cgi?id=78181
+
+        Reviewed by Tony Chang.
+
+        This change moves code in name(), is_done(), run(), and cancel()
+        from Worker to AbstractWorker, since the logic is pretty much
+        boilerplate code that any implementation would want to use.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (get.should):
+        (AbstractWorker.__init__):
+        (AbstractWorker):
+        (AbstractWorker.name):
+        (AbstractWorker.stop_handling_messages):
+        (AbstractWorker.run):
+        (AbstractWorker.is_done):
+        (AbstractWorker.cancel):
+        * Scripts/webkitpy/layout_tests/controllers/worker.py:
+        (Worker.__init__):
+        (Worker.run):
+        (Worker.handle_stop):
+
+2012-02-16  Michael Saboff  <msaboff@apple.com>
+
+        ENH: Add ability to run subset of JavaScript layout tests with JSC
+        https://bugs.webkit.org/show_bug.cgi?id=78764
+
+        Reviewed by Gavin Barraclough.
+
+        New simple test drive shell script that runs a defined
+        list of javascript tests using jsc and the standalone-{pre,post}.js
+        wrappers.
+
+        * Scripts/run-fast-jsc: Added.
+
+2012-02-16  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Add new Qt performance tester bot to build.webkit.org
+        https://bugs.webkit.org/show_bug.cgi?id=78795
+
+        Reviewed by Adam Roben.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+
+2012-02-16  Patrick Gansterer  <paroga@webkit.org>
+
+        Disable inspector on WinCE.
+
+        Avoid compiling InspectorBackendDispatcher.cpp, which causes an internal compiler error.
+
+        * Scripts/build-webkit:
+
+2012-02-16  Patrick Gansterer  <paroga@webkit.org>
+
+        WinCE build fix after r107656.
+
+        Disable FTPDIR on WinCE, since it does not compile there.
+
+        * Scripts/build-webkit:
+
+2012-02-15  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        Build fix after r107863.
+
+        * DumpRenderTree/blackberry/PixelDumpSupportBlackBerry.cpp:
+
+2012-02-15  Tony Chang  <tony@chromium.org>
+
+        [chromium] add linux dbg back to garden-o-matic
+        https://bugs.webkit.org/show_bug.cgi?id=78752
+
+        Reviewed by Adam Barth.
+
+        This reflects the current linux debug bot name (there's only one bot).
+        I'm also remove the mac clang builder since it doesn't exist (mac
+        always uses clang now).
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/config.js:
+        * Scripts/webkitpy/layout_tests/port/builders.py:
+
+2012-02-15  Sam Weinig  <sam@webkit.org>
+
+        Add style check for ctype functions that are generally frowned upon in WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=78748
+
+        Reviewed by Anders Carlsson.
+
+        Not every platform has DisallowCType.h to check for uses of the ctype.h
+        functions, so add a style check for them as well.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (check_ctype_functions):
+        (check_style):
+        (CppChecker):
+        Add check.
+
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (WebKitStyleTest.test_ctype_fucntion):
+        Add checker.
+
+2012-02-15  Szilard Ledan  <Ledan-Muntean.Szilard@stud.u-szeged.hu>
+
+        [Qt][WK2] WebKitTestRunner should use 480x360 sized view for W3C SVG tests
+        https://bugs.webkit.org/show_bug.cgi?id=76546
+
+        Reviewed by Simon Hausmann.
+
+        Resize the web view programatically because the declarative property binding
+        does not work. Seems like our qml environment is not initialized fully but it
+        needs more investigation.
+
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+        (WTR::WrapperWindow::handleStatusChanged):
+        (WTR::PlatformWebView::resizeTo):
+
+2012-02-15  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: add a worker_args concept to start_worker()
+        https://bugs.webkit.org/show_bug.cgi?id=78572
+
+        Reviewed by Tony Chang.
+
+        This change replaces the three NRWT-specific arguments passed
+        through the broker to the worker with a generic WorkerArguments
+        wrapper class and a separate set_inline_arguments() call that can
+        be used to pass additional data to the worker when it is running
+        in the same process as the manager (this is needed for testing).
+        With the addition of set_inline_arguments() we also no longer
+        need to pass an optional argument to the worker.run() call.
+
+        Note that this method is *only* implemented on inline workers,
+        so calling this on a regular (child process) worker will result
+        in a runtime error.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (Manager._run_tests):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (AbstractWorker.__init__):
+        (AbstractWorker.run):
+        (_ManagerConnection.start_worker):
+        (_InlineManager.start_worker):
+        (_InlineManager.set_inline_arguments):
+        (_InlineManager.run_message_loop):
+        (_MultiProcessManager.start_worker): Reworked signature.
+        (_WorkerConnection.__init__):
+        (_InlineWorkerConnection.__init__):
+        (_InlineWorkerConnection.set_inline_arguments): New method.
+        (_InlineWorkerConnection):
+        (_InlineWorkerConnection.run):
+        (_Process.run):
+        (_MultiProcessWorkerConnection.__init__):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker_unittest.py:
+        (_TestWorker.__init__):
+        (_TestWorker.set_inline_arguments):
+        (_TestWorker.handle_test):
+        (_TestWorker.run):
+        (_TestsMixin.test_cancel):
+        (_TestsMixin.test_done):
+        (_TestsMixin.test_unknown_message):
+        (InlineBrokerTests): New class for more testing.
+        (InlineBrokerTests.setUp):
+        (InlineBrokerTests.test_inline_arguments): New test.
+        (InterfaceTest.test_managerconnection_is_abstract):
+        (InterfaceTest.test_workerconnection_is_abstract):
+        * Scripts/webkitpy/layout_tests/controllers/worker.py:
+        (WorkerArguments):
+        (WorkerArguments.__init__):
+        (Worker.__init__):
+        (Worker.set_inline_arguments):
+        (Worker):
+        (Worker.run):
+        * Scripts/webkitpy/layout_tests/controllers/worker_unittest.py:
+        (WorkerTest.test_default_platform_in_worker):
+
+2012-02-15  Adam Klein  <adamk@chromium.org>
+
+        Unreviewed, rolling out r107704.
+        http://trac.webkit.org/changeset/107704
+        https://bugs.webkit.org/show_bug.cgi?id=78486
+
+        Caused layout test crashes in debug builds.
+
+        Specific crashing tests:
+
+        fast/events/show-modal-dialog-onblur-onfocus.html
+        fast/harness/show-modal-dialog.html
+        inspector/console/console-long-eval-crash.html
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::TestShell):
+        * DumpRenderTree/chromium/TestShell.h:
+        (TestShell):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::runModal):
+
+2012-02-15  Michael Brüning  <michael.bruning@nokia.com>
+
+        [Qt] Add UI for HTTP authentication in the Qt MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=76347
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * MiniBrowser/qt/MiniBrowser.qrc:
+        * MiniBrowser/qt/qml/AuthenticationDialog.qml: Added. 
+        * MiniBrowser/qt/qml/BrowserWindow.qml:
+        * MiniBrowser/qt/qml/DialogLineInput.qml:
+
+2012-02-15  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix WebGL in QtTestBrowser
+
+        Reviewed by Tor Arne Vestbø.
+
+        * QtTestBrowser/QtTestBrowser.pro: Set the OpenGL define so that when passing
+        the options for enabling GL we also pass them on properly.
+
+2012-02-14  Sam Weinig  <sam@webkit.org>
+
+        Add #include of unistd.h on the mac for getcwd. 
+
+        Reviewed by Anders Carlsson.
+
+        This is necessary when building with libc++.
+
+        * WebKitTestRunner/TestInvocation.cpp:
+
+2012-02-14  Sam Weinig  <sam@webkit.org>
+
+        In DRT, don't #define min or max on non-Windows platforms, it just isn't needed
+        https://bugs.webkit.org/show_bug.cgi?id=78663
+
+        Reviewed by Anders Carlsson.
+
+        * DumpRenderTree/DumpRenderTreePrefix.h:
+        * DumpRenderTree/cg/ImageDiffCG.cpp:
+
+2012-02-14  Adam Barth  <abarth@webkit.org>
+
+        Implement an adb-based driver for the ChromiumAndroidPort
+        https://bugs.webkit.org/show_bug.cgi?id=78627
+
+        Reviewed by Eric Seidel.
+
+        This driver mostly just wires up the ChromiumDriver through adb.  In
+        some cases, it translates protocol elements, such as URIs, so that the
+        rest of webkitpy is insulated from the "remoteness" of the target device.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.start_helper):
+        (ChromiumAndroidPort._driver_class):
+        (ChromiumAndroidPort._update_version):
+        (ChromiumAndroidPort._get_stderr):
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort._get_last_stacktrace):
+        (ChromiumAndroidPort._teardown_performance):
+        (ChromiumAndroidDriver):
+        (ChromiumAndroidDriver.__init__):
+        (ChromiumAndroidDriver._start):
+        (ChromiumAndroidDriver.run_test):
+        (ChromiumAndroidDriver.stop):
+        (ChromiumAndroidDriver._test_shell_command):
+        (ChromiumAndroidDriver._write_command_and_read_line):
+        (ChromiumAndroidDriver._output_image):
+        (ChromiumAndroidDriver._has_crash_hint):
+
+2012-02-14  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: the real_name() method in the Port class is no longer needed
+        https://bugs.webkit.org/show_bug.cgi?id=78651
+
+        Reviewed by Eric Seidel.
+
+        The change in bug 78565 / r107718 made it no longer necessary
+        (we can use options.platform instead).
+
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.name):
+        * Scripts/webkitpy/layout_tests/port/mock_drt.py:
+        (MockDRTPort.__init__):
+
+2012-02-14  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: clean up options, port handling in manager_worker_broker
+        https://bugs.webkit.org/show_bug.cgi?id=78568
+
+        Reviewed by Tony Chang.
+
+        manager_worker_broker no longer needs options or port objects
+        directly, so we make them only be passed in start_worker().
+
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (Manager._run_tests):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (get):
+        (_ManagerConnection.__init__):
+        (_ManagerConnection.start_worker):
+        (_InlineManager.__init__):
+        (_InlineManager.start_worker):
+        (_InlineManager.run_message_loop):
+        (_MultiProcessManager.__init__):
+        (_MultiProcessManager):
+        (_MultiProcessManager.start_worker):
+        (_InlineWorkerConnection.__init__):
+        (_InlineWorkerConnection.run):
+        (_Process.__init__):
+        (_MultiProcessWorkerConnection.__init__):
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker_unittest.py:
+        (make_broker):
+        (_TestWorker.run):
+        (_TestsMixin.test_cancel):
+        (_TestsMixin.test_done):
+        (_TestsMixin.test_unknown_message):
+        (MultiProcessBrokerTests.setUp):
+        (InterfaceTest.test_managerconnection_is_abstract):
+        * Scripts/webkitpy/layout_tests/controllers/message_broker.py:
+        (Broker.__init__):
+
+2012-02-14  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: add a unit test for regression introduced in bug 78565
+        https://bugs.webkit.org/show_bug.cgi?id=78646
+
+        Reviewed by Tony Chang.
+
+        * Scripts/webkitpy/layout_tests/controllers/worker_unittest.py: Added.
+        (FakeConnection):
+        (FakeConnection.run_message_loop):
+        (FakeConnection.post_message):
+        (WorkerTest):
+        (WorkerTest.test_default_platform_in_worker):
+
+2012-02-14  Dirk Pranke  <dpranke@chromium.org>
+
+        NRWT is broken for the default port
+        https://bugs.webkit.org/show_bug.cgi?id=78640
+    
+        Reviewed by Tony Chang.
+
+        The change in r107718 (bug 78565) broke NRWT if you didn't
+        specify any sort of --platform flag or equivalent. I didn't
+        catch this because it's a full integration test (which we don't
+        have an automated test for) and I missed this command line
+        variant when testing interactively.
+
+        * Scripts/webkitpy/layout_tests/controllers/worker.py:
+        (Worker.run):
+
+2012-02-14  Ramya Chandrasekaran  <cramya@google.com>
+
+        Last character display for passwords in Android.
+        https://bugs.webkit.org/show_bug.cgi?id=78532
+
+        Reviewed by Adam Barth.
+
+        * DumpRenderTree/chromium/WebPreferences.cpp:
+        (WebPreferences::applyTo):
+
+2012-02-14  Adam Barth  <abarth@webkit.org>
+
+        Finish implementing start_helper for ChromiumAndroidPort
+        https://bugs.webkit.org/show_bug.cgi?id=78582
+
+        Reviewed by Eric Seidel.
+
+        This patch contains the remaining odds and ends for the start_helper function.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.start_helper):
+        (ChromiumAndroidPort._synchronize_datetime):
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort._check_version):
+        (ChromiumAndroidPort._run_adb_command):
+        (ChromiumAndroidPort._copy_device_file):
+
+2012-02-14  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: create ports in Workers, not in manager_worker_broker
+        https://bugs.webkit.org/show_bug.cgi?id=78565
+
+        Reviewed by Tony Chang.
+
+        We will now create the Port object (if necessary) in the Worker
+        directly, so that the manager_worker_broker module doesn't need
+        all of this layout_test-specific logic. Part of the fixes for
+        bug 78171.
+
+        These changes are all well-tested by the existing tests in
+        run_webkit_tests_integrationtest.py.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_worker_broker.py:
+        (_Process.run):
+        * Scripts/webkitpy/layout_tests/controllers/worker.py:
+        (Worker.__init__):
+        (Worker.safe_init):
+        (Worker.run):
+        (Worker.cleanup):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        (parse_args):
+        (main): Fix a minor bug where running the 'mock-test' port didn't work right.
+
+2012-02-14  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] check that we're not running multiple modal dialogs at the same time
+        https://bugs.webkit.org/show_bug.cgi?id=78486
+
+        Reviewed by Kent Tamura.
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::TestShell):
+        * DumpRenderTree/chromium/TestShell.h:
+        (TestShell::setIsDisplayingModalDialog):
+        (TestShell::isDisplayingModalDialog):
+        (TestShell):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::runModal):
+
+2012-02-14  Adam Barth  <abarth@webkit.org>
+
+        Enable the GPU codepath in the chromium-android port
+        https://bugs.webkit.org/show_bug.cgi?id=78580
+
+        Reviewed by James Robinson.
+
+        Suprise!  There is no ChromiumGpuAndroidPort!  Instead, Chromium
+        Android always uses the GPU codepath, so we set the GPU flags on the
+        main chromium-android port instead.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.__init__):
+
+2012-02-14  Adam Barth  <abarth@webkit.org>
+
+        NRWT should expose --adb-args flag for Android
+        https://bugs.webkit.org/show_bug.cgi?id=78579
+
+        Reviewed by Eric Seidel.
+
+        This flag is already wired up to the ChromiumAndroidPort.
+
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        (parse_args):
+
+2012-02-14  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac][Win][WK2] Switch to RFC 6455 protocol for WebSockets
+        https://bugs.webkit.org/show_bug.cgi?id=78541
+        <rdar://problem/10036695>
+
+        Reviewed by Kent Tamura.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm: (resetDefaultsToConsistentValues):
+        * DumpRenderTree/win/DumpRenderTree.cpp: (resetDefaultsToConsistentValues):
+        After each test, reset to using new protocol.
+
+2012-02-11  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        Convert svg/animations to use SMIL methods for driving the timeline
+        https://bugs.webkit.org/show_bug.cgi?id=78422
+
+        Reviewed by Dirk Schulze.
+
+        Remove no longer needed SVG specific animation sampling functionality from DRT.
+        Instead we switched the svg/animations tests to use SVGSVGElement.setCurrentTime.
+
+        * DumpRenderTree/LayoutTestController.cpp:
+        (LayoutTestController::staticFunctions):
+        * DumpRenderTree/LayoutTestController.h:
+        (LayoutTestController):
+        * DumpRenderTree/blackberry/LayoutTestControllerBlackBerry.cpp:
+        * DumpRenderTree/chromium/LayoutTestController.cpp:
+        (LayoutTestController::LayoutTestController):
+        * DumpRenderTree/chromium/LayoutTestController.h:
+        (LayoutTestController):
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        * DumpRenderTree/gtk/LayoutTestControllerGtk.cpp:
+        * DumpRenderTree/mac/LayoutTestControllerMac.mm:
+        * DumpRenderTree/qt/LayoutTestControllerQt.cpp:
+        * DumpRenderTree/qt/LayoutTestControllerQt.h:
+        (LayoutTestController):
+        * DumpRenderTree/win/LayoutTestControllerWin.cpp:
+        * DumpRenderTree/wx/LayoutTestControllerWx.cpp:
+
+2012-02-13  Rob Flack  <flackr@chromium.org>
+
+        Add Linux ChromiumOS test results to flakiness dashboard.
+        https://bugs.webkit.org/show_bug.cgi?id=78495
+
+        Reviewed by Ojan Vafai.
+
+        * TestResultServer/static-dashboards/builders.js:
+        * TestResultServer/static-dashboards/dashboard_base.js:
+
+2012-02-13  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK] Mutation Observers build is broken
+        https://bugs.webkit.org/show_bug.cgi?id=78433
+
+        Reviewed by Martin Robinson.
+
+        Enabled mutation observers as a default feature for GTK port, too.
+
+        * Scripts/build-webkit:
+
+2012-02-13  Loïc Yhuel  <loic.yhuel_ext@softathome.com>
+
+        Allow to configure ENABLE_FTPDIR in build-webkit
+        https://bugs.webkit.org/show_bug.cgi?id=65098
+
+        Reviewed by Eric Seidel.
+
+        Allow to disable ENABLE_FTPDIR by command line.
+        Remove ENABLE_FTPDIR from --minimal build
+
+        * Scripts/build-webkit: Add entries for ENABLE_FTPDIR (enabled by default)
+        * qmake/mkspecs/features/features.prf: ENABLE_FTPDIR must be set to match Platform.h,
+        as, for Qt platform, build-webkit does not add on command line what it thinks to be default values
+
+2012-02-13  Shinya Kawanaka  <shinyak@chromium.org>
+
+        Add shinyak as committer.
+
+        Unreviewed.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-02-13  Adam Barth  <abarth@webkit.org>
+
+        Implement start/stop_helper for ChromiumAndroidPort
+        https://bugs.webkit.org/show_bug.cgi?id=78558
+
+        Reviewed by Dirk Pranke.
+
+        These functions (and their dependencies) set up the Android device for
+        testing.
+
+        This patch also includes a few tweaks on the previous patch recommended
+        by dpranke.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.__init__):
+        (ChromiumAndroidPort.start_helper):
+        (ChromiumAndroidPort.stop_helper):
+        (ChromiumAndroidPort._shut_down_http_server):
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort._push_executable):
+        (ChromiumAndroidPort._push_fonts):
+        (ChromiumAndroidPort._restore_system_font):
+        (ChromiumAndroidPort._push_test_resources):
+        (ChromiumAndroidPort._push_to_device):
+        (ChromiumAndroidPort._pull_from_device):
+        (ChromiumAndroidPort._kill_device_process):
+        (ChromiumAndroidPort._setup_performance):
+        (ChromiumAndroidPort._teardown_performance):
+        * Scripts/webkitpy/layout_tests/port/chromium_android_unittest.py:
+        (ChromiumAndroidPortTest):
+        * Scripts/webkitpy/layout_tests/port/port_testcase.py:
+        (PortTestCase):
+        (PortTestCase.make_port):
+        (PortTestCase.test_default_worker_model):
+
+2012-02-13  Adam Barth  <abarth@webkit.org>
+
+        Implement enough of ChromiumAndroidPort to make ChromiumAndroidPortTest pass
+        https://bugs.webkit.org/show_bug.cgi?id=78550
+
+        Reviewed by Eric Seidel.
+
+        Much of this code just forwards to the "host" port, which seems like a
+        reasonable thing to do.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.__init__):
+        (ChromiumAndroidPort.stop_helper):
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort._build_path):
+        (ChromiumAndroidPort._path_to_apache):
+        (ChromiumAndroidPort._path_to_apache_config_file):
+        (ChromiumAndroidPort._path_to_driver):
+        (ChromiumAndroidPort._path_to_helper):
+        (ChromiumAndroidPort._path_to_image_diff):
+        (ChromiumAndroidPort._path_to_lighttpd):
+        (ChromiumAndroidPort._path_to_lighttpd_modules):
+        (ChromiumAndroidPort._path_to_lighttpd_php):
+        (ChromiumAndroidPort._path_to_wdiff):
+        (ChromiumAndroidPort._shut_down_http_server):
+        * Scripts/webkitpy/layout_tests/port/chromium_android_unittest.py:
+        (ChromiumAndroidPortTest):
+        * Scripts/webkitpy/layout_tests/port/port_testcase.py:
+        (PortTestCase):
+        (PortTestCase.make_port):
+        (PortTestCase.test_default_worker_model):
+
+2012-02-13  Adam Barth  <abarth@webkit.org>
+
+        chromium_android.py should implement "virtual" methods from ChromiumPort
+        https://bugs.webkit.org/show_bug.cgi?id=78545
+
+        Reviewed by Dirk Pranke.
+
+        This patch adds basic implementations that specialize a bunch of
+        functions from ChromiumPort.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort.__init__):
+        (ChromiumAndroidPort.default_child_processes):
+        (ChromiumAndroidPort.baseline_search_path):
+        (ChromiumAndroidPort.check_build):
+        (ChromiumAndroidPort.check_sys_deps):
+        (ChromiumAndroidPort.default_worker_model):
+        (ChromiumAndroidPort.test_expectations):
+        (ChromiumAndroidPort.start_http_server):
+        (ChromiumAndroidPort.stop_http_server):
+        (ChromiumAndroidPort.start_helper):
+        (ChromiumAndroidPort.stop_helper):
+
+2012-02-13  Adam Barth  <abarth@webkit.org>
+
+        Add a skeleton ChromiumAndroid port to webkitpy
+        https://bugs.webkit.org/show_bug.cgi?id=78543
+
+        Reviewed by Eric Seidel.
+
+        This patch just adds an empty ChromiumAndroid port object to webkitpy
+        and wires it up to the factory objects.  An actual implementation will
+        follow.
+
+        * Scripts/webkitpy/layout_tests/port/chromium.py:
+        (ChromiumPort):
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py: Added.
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort.__init__):
+        * Scripts/webkitpy/layout_tests/port/chromium_unittest.py:
+        (ChromiumPortTest.test_all_test_configurations):
+        * Scripts/webkitpy/layout_tests/port/factory.py:
+        (PortFactory):
+
+2012-02-13  Adam Barth  <abarth@webkit.org>
+
+        NRWT's HTTP servers should support additional directories for resources
+        https://bugs.webkit.org/show_bug.cgi?id=78528
+
+        Reviewed by Eric Seidel.
+
+        This functionality will be used by the Chromium-Android port.
+
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.to.start_http_server):
+        * Scripts/webkitpy/layout_tests/servers/apache_http_server.py:
+        (LayoutTestApacheHttpd.__init__):
+        * Scripts/webkitpy/layout_tests/servers/http_server.py:
+        (Lighttpd.__init__):
+        (Lighttpd._prepare_config):
+
+2012-02-13  Ami Fischman  <fischman@chromium.org>
+
+        Add fischman as committer.
+
+        Unreviewed
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-02-06  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Drop support for the Curl network backend.
+        https://bugs.webkit.org/show_bug.cgi?id=77874
+
+        Reviewed by Eric Seidel.
+
+        Nobody seems to be maintaining the Curl backend in WebCore, the
+        EFL port developers all seem to be using the Soup backend and the
+        port itself has many features which are only implemented for the
+        latter.
+
+        * DumpRenderTree/efl/CMakeLists.txt: Always link to glib/libsoup
+        and always add the required include directories.
+        * EWebLauncher/CMakeLists.txt: Add the required glib/libsoup
+        include directories and link to them.
+
+2012-02-13  Kenichi Ishibashi  <bashi@chromium.org>
+
+        [WebSocket] Update pywebsocket to 0.7.1
+        https://bugs.webkit.org/show_bug.cgi?id=78484
+
+        pywebsocket-0.7.1 follow the current draft of WebSocket deflate-frame extension.
+
+        Reviewed by Kent Tamura.
+
+        * Scripts/webkitpy/thirdparty/__init__.py:
+        (AutoinstallImportHook._install_pywebsocket):
+
+2012-02-12  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL][DRT] Implement zoomPage{In,Out} and textZoom{In,Out} events.
+        https://bugs.webkit.org/show_bug.cgi?id=78091
+
+        Reviewed by Hajime Morita.
+
+        Implemented zoomPageIn, zoomPageOut, textZoomIn and textZoomOut events on EFL DRT.
+        This patch will activate around 1,900 test cases from skipped list in EFL port.
+
+        * DumpRenderTree/efl/EventSender.cpp:
+        (textZoom):
+        (pageZoom):
+        (textZoomInCallback):
+        (textZoomOutCallback):
+        (zoomPageInCallback):
+        (zoomPageOutCallback):
+
+2012-02-12  Ashod Nakashian  <ashodnakashian@yahoo.com>
+
+        KeywordLookupGenerator.py script fails in some cases
+        https://bugs.webkit.org/show_bug.cgi?id=77886
+
+        Reviewed by Benjamin Poulain.
+
+        * Scripts/webkitpy/style/checker.py: New rule for Keywords.table to not have CR.
+        * Scripts/webkitpy/style/checker_unittest.py: New UT for Keywords.table rule.
+        (GlobalVariablesTest.test_path_rules_specifier):
+
+2012-02-12  Joe Thomas  <joethomas@motorola.com>
+
+        Add toText and isTextNode helpers in Text class.
+        https://bugs.webkit.org/show_bug.cgi?id=78140
+
+        Unit test case for the new style checker introduced.
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (CppStyleTest):
+        (CppStyleTest.test_static_cast_readability): Added a unit test case.
+
+2012-02-12  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Enable features supported by EFL port in build-webkit.
+        https://bugs.webkit.org/show_bug.cgi?id=78348
+
+        Reviewed by Ryosuke Niwa.
+
+        Sync build-webkit with OptionEfl.cmake, as some features enabled in
+        OptionEfl.cmake are not enabled in build-webkit.
+
+        * Scripts/build-webkit:
+
+2012-02-12  Joe Thomas  <joethomas@motorola.com>
+
+        Add toText and isTextNode helpers in Text class.
+        https://bugs.webkit.org/show_bug.cgi?id=78140
+
+        Added a style checker to use toText rather than static_cast<Text*>.
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (check_language): Style checker for static_cast<Text*>.
+
+2012-02-12  Philippe Normand  <pnormand@igalia.com>
+
+        Unreviewed, disable Mutation observers build on GTK until it can
+        actually build.
+
+        * Scripts/build-webkit:
+
+2012-02-11  Benjamin Poulain  <benjamin@webkit.org>
+
+        Add back WTFURL to WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=77291
+
+        Reviewed by Adam Barth.
+
+        Add a flag to build-webkit to easily build WebKit with WTFURL.
+
+        * Scripts/build-webkit:
+
+2012-02-10  Adam Klein  <adamk@chromium.org>
+
+        Enable MUTATION_OBSERVERS by default on all platforms
+        https://bugs.webkit.org/show_bug.cgi?id=78196
+
+        Reviewed by Ojan Vafai.
+
+        * Scripts/build-webkit:
+
+2012-02-10  Adam Barth  <abarth@webkit.org>
+
+        Move garden-o-matic's All Failures out of experimental
+        https://bugs.webkit.org/show_bug.cgi?id=78395
+
+        Reviewed by Dimitri Glazkov.
+
+        Several folks have tried this feature and found it useful.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui.js:
+
+2012-02-10  Tim Horton  <timothy_horton@apple.com>
+
+        NRWT should categorize options in --help
+        https://bugs.webkit.org/show_bug.cgi?id=76221
+
+        Reviewed by Eric Seidel.
+        
+        Use optparse's OptionGroup mechanism to logically group NRWT's options,
+        providing a better experience when scanning all the options.
+
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        (parse_args):
+
+2012-02-10  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        [Qt][WK2] Refactor on Qt5 Layout tests' structure
+        https://bugs.webkit.org/show_bug.cgi?id=77450
+
+        Reviewed by Csaba Osztrogonác.
+
+        Fix the scripts and related unittest due to the rename of qt-wk2 and qt-wk1
+        to qt-5.0-wk2 and qt-5.0-wk1.
+
+        * Scripts/old-run-webkit-tests:
+        (buildPlatformResultHierarchy):
+        (readSkippedFiles):
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort._wk2_port_name):
+        (QtPort._skipped_file_search_paths):
+        * Scripts/webkitpy/layout_tests/port/qt_unittest.py:
+        (QtPortTest.test_baseline_search_path):
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        (WebKitPort._wk2_port_name):
+
+2012-02-09  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK] EWS command-line option to run the tests
+        https://bugs.webkit.org/show_bug.cgi?id=78211
+
+        Reviewed by Adam Barth.
+
+        New --run-tests option (defaults to False) for the EWS commands.
+
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (AbstractEarlyWarningSystem):
+        (AbstractEarlyWarningSystem.__init__):
+        (AbstractEarlyWarningSystem.review_patch):
+        (ChromiumLinuxEWS):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+        (EarlyWarningSytemTest._test_builder_ews):
+
+2012-02-09  Eric Seidel  <eric@webkit.org>
+
+        Rename compare_text and compare_audio to make it clear that they're !=
+        https://bugs.webkit.org/show_bug.cgi?id=78301
+
+        Reviewed by Adam Barth.
+
+        I also removed the maybe_create_directory function which was redundant.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (Manager.set_up_run):
+        * Scripts/webkitpy/layout_tests/controllers/test_result_writer.py:
+        (TestResultWriter._make_output_directory):
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.do_text_results_differ):
+        (Port.do_audio_results_differ):
+        (Port.diff_text):
+        (Port.driver_name):
+        (Port.skips_perf_test):
+        * Scripts/webkitpy/layout_tests/port/win.py:
+        (WinPort.do_text_results_differ):
+        * Scripts/webkitpy/layout_tests/port/win_unittest.py:
+        (WinPortTest.test_do_text_results_differ):
+        * Scripts/webkitpy/layout_tests/servers/apache_http_server.py:
+        (LayoutTestApacheHttpd.__init__):
+        * Scripts/webkitpy/layout_tests/servers/http_server_base.py:
+        (HttpServerBase.__init__):
+        * Scripts/webkitpy/to_be_moved/rebaseline_chromium_webkit_tests.py:
+        (Rebaseliner._diff_baselines):
+
+2012-02-09  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GTK] Add DRT support for modal dialogs
+        https://bugs.webkit.org/show_bug.cgi?id=53600
+
+        Reviewed by Martin Robinson.
+
+        Implement the modal dialogs handling in DumpRenderTree and GtkLauncher.
+        Most significantly, when creating a new web view in GtkLauncher, the window
+        of the web view opener is passed around. In DumpRenderTree, the window of
+        the main web view is always considered as the opener. This is required so
+        the modal dialog's toplevel can be made transient for the opener's toplevel.
+
+        * DumpRenderTree/gtk/DumpRenderTree.cpp:
+        (webViewRunModalDialog):
+        (createWebView):
+        * GtkLauncher/main.c:
+        (createWebViewCb):
+        (runModalDialogCb):
+        (createBrowser):
+        (createWindow):
+        (main):
+
+2012-02-09  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] security/set-form-autocomplete-attribute.html fails
+        https://bugs.webkit.org/show_bug.cgi?id=78261
+
+        Reviewed by Martin Robinson.
+
+        Use the new helper in DumpRenderTreeSupportGtk to properly
+        test whether an element performs autocompletion.
+
+        * DumpRenderTree/gtk/LayoutTestControllerGtk.cpp:
+        (LayoutTestController::elementDoesAutoCompleteForElementWithId):
+
+2012-02-09  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Enable mock scrollbars for compositing layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=78299
+
+        Reviewed by Dirk Pranke.
+
+        This enables mock scrollbars by default for compositing tests. These pixel tests are intended to test the
+        compositor behavior, not native theming, and having real scrollbars causes us to have to maintain significantly
+        more pngs than we should and expose weird alpha bugs in our theming that doesn't impact real users.
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::runFileTest):
+        * DumpRenderTree/chromium/WebPreferences.cpp:
+        (WebPreferences::reset):
+        (WebPreferences::applyTo):
+        * DumpRenderTree/chromium/WebPreferences.h:
+        (WebPreferences):
+
+2012-02-09  Eric Seidel  <eric@webkit.org>
+
+        Remove more uses of "os" from our webkitpy code
+        https://bugs.webkit.org/show_bug.cgi?id=78292
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/checkout/checkout_mock.py:
+        (MockCheckout.__init__):
+        (MockCheckout.is_path_to_changelog):
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla.py:
+        * Scripts/webkitpy/common/system/filesystem_mock.py:
+        (MockFileSystem._split):
+        * Scripts/webkitpy/common/system/zipfileset_unittest.py:
+        * Scripts/webkitpy/layout_tests/controllers/test_result_writer.py:
+        * Scripts/webkitpy/layout_tests/layout_package/json_results_generator.py:
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        * Scripts/webkitpy/tool/bot/queueengine.py:
+        * Scripts/webkitpy/tool/bot/sheriff_unittest.py:
+        * Scripts/webkitpy/tool/commands/download.py:
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+        * Scripts/webkitpy/tool/commands/rebaselineserver.py:
+        * Scripts/webkitpy/tool/commands/sheriffbot.py:
+        * Scripts/webkitpy/tool/commands/sheriffbot_unittest.py:
+        * Scripts/webkitpy/tool/commands/upload.py:
+        (CreateBug.prompt_for_bug_title_and_comment):
+        * Scripts/webkitpy/tool/servers/reflectionhandler.py:
+        * Scripts/webkitpy/tool/steps/attachtobug.py:
+        (AttachToBug.run):
+        * Scripts/webkitpy/tool/steps/checkstyle.py:
+        * Scripts/webkitpy/tool/steps/cleanworkingdirectory.py:
+        * Scripts/webkitpy/tool/steps/commit_unittest.py:
+        * Scripts/webkitpy/tool/steps/editchangelog.py:
+        * Scripts/webkitpy/tool/steps/preparechangelog.py:
+        * Scripts/webkitpy/tool/steps/preparechangelog_unittest.py:
+        (PrepareChangeLogTest.test_ensure_bug_url):
+        * Scripts/webkitpy/tool/steps/preparechangelogfordepsroll.py:
+        * Scripts/webkitpy/tool/steps/preparechangelogforrevert.py:
+        * Scripts/webkitpy/tool/steps/updatechangelogswithreviewer.py:
+        * Scripts/webkitpy/tool/steps/validatereviewer.py:
+
+2012-02-09  Eric Seidel  <eric@webkit.org>
+
+        Remove the cr-mac-ews (it's long been dead)
+        https://bugs.webkit.org/show_bug.cgi?id=78267
+
+        Reviewed by Adam Barth.
+
+        * QueueStatusServer/model/queues.py:
+        (Queue):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (ChromiumWindowsEWS):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+        (EarlyWarningSytemTest._test_builder_ews):
+        (EarlyWarningSytemTest._test_testing_ews):
+
+2012-02-09  Dirk Pranke  <dpranke@chromium.org>
+
+        some tests in webkitpy are being run three times
+        https://bugs.webkit.org/show_bug.cgi?id=78283
+
+        Reviewed by Ryosuke Niwa.
+
+        It turns out that if you import a class derived from
+        unittest.TestCase as a base name (e.g., from ... import ChangeLogTest),
+        the unittest framework treats it as if the class was defined in
+        the file (as well in the original file). This led us to running
+        the tests in ChangeLogTest three times.
+
+        * Scripts/webkitpy/tool/steps/preparechangelog_unittest.py:
+        (PrepareChangeLogTest):
+        * Scripts/webkitpy/tool/steps/preparechangelogforrevert_unittest.py:
+        (_assert_message_for_revert_output):
+
+2012-02-09  Adam Barth  <abarth@webkit.org>
+
+        Remove extraneous line in previous patch.  I forgot to remove this
+        before landing.
+
+        * Scripts/webkitpy/layout_tests/port/driver.py:
+        (DriverProxy.start):
+
+2012-02-09  Adam Barth  <abarth@webkit.org>
+
+        run-perf-tests should have an option to pause before running tests so we can attach Instruments
+        https://bugs.webkit.org/show_bug.cgi?id=78271
+
+        Reviewed by Ryosuke Niwa.
+
+        This lets me attach instruments to profile the performance of the test.
+
+        * Scripts/webkitpy/layout_tests/port/chromium.py:
+        (ChromiumDriver.start):
+        * Scripts/webkitpy/layout_tests/port/driver.py:
+        (Driver.start):
+        (DriverProxy.start):
+        * Scripts/webkitpy/layout_tests/port/server_process.py:
+        (ServerProcess.start):
+        * Scripts/webkitpy/layout_tests/port/test.py:
+        (TestDriver.start):
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        (WebKitDriver.start):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (get_tests_run.RecordingTestDriver.start):
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner._parse_args):
+        (PerfTestsRunner._run_tests_set):
+        * Scripts/webkitpy/performance_tests/perftestsrunner_unittest.py:
+        (start):
+        (test_run_test_set_kills_drt_per_run.TestDriverWithStopCount):
+        (test_run_test_set_kills_drt_per_run):
+        (test_run_test_set_kills_drt_per_run.TestDriverWithStartCount):
+        (test_run_test_set_kills_drt_per_run.TestDriverWithStartCount.start):
+
+2012-02-09  Adam Barth  <abarth@webkit.org>
+
+        run-perf-tests --chromium should run the chromium port
+        https://bugs.webkit.org/show_bug.cgi?id=78266
+
+        Reviewed by Ryosuke Niwa.
+
+        This patch makes run-perf-tests work more like run-webkit-tests.
+
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner._parse_args):
+
+2012-02-09  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        [Qt][WK2] run-webkit-tests --qt  crashes if WEBKIT_TESTFONTS is not set
+        https://bugs.webkit.org/show_bug.cgi?id=77466
+
+        Reviewed by Dirk Pranke.
+
+        Replicate the behavior of old-run-webkit-tests and check if WEBKIT_TESTFONTS
+        is set or if we should raise an error. A unit test was added.
+
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort.operating_system):
+        (QtPort):
+        (QtPort.check_sys_deps):
+        * Scripts/webkitpy/layout_tests/port/qt_unittest.py:
+        (QtPortTest.test_operating_system):
+        (QtPortTest):
+        (QtPortTest.test_check_sys_deps):
+
+2012-02-09  Eric Seidel  <eric@webkit.org>
+
+        Rename ports.WebKitPort to DeprecatedPort and make it stop being all class methods
+        https://bugs.webkit.org/show_bug.cgi?id=78263
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/config/ports.py:
+        (DeprecatedPort):
+        (DeprecatedPort.name):
+        (DeprecatedPort.flag):
+        (DeprecatedPort.script_path):
+        (DeprecatedPort.script_shell_command):
+        (DeprecatedPort.port):
+        (DeprecatedPort.makeArgs):
+        (DeprecatedPort.update_webkit_command):
+        (DeprecatedPort.check_webkit_style_command):
+        (DeprecatedPort.prepare_changelog_command):
+        (DeprecatedPort.build_webkit_command):
+        (DeprecatedPort.run_javascriptcore_tests_command):
+        (DeprecatedPort.run_webkit_unit_tests_command):
+        (DeprecatedPort.run_webkit_tests_command):
+        (DeprecatedPort.run_python_unittests_command):
+        (DeprecatedPort.run_perl_unittests_command):
+        (DeprecatedPort.layout_tests_results_path):
+        (MacPort):
+        (WinPort):
+        (GtkPort):
+        (GtkPort.build_webkit_command):
+        (GtkPort.run_webkit_tests_command):
+        (QtPort):
+        (QtPort.build_webkit_command):
+        (EflPort):
+        (EflPort.build_webkit_command):
+        (ChromiumPort):
+        (ChromiumPort.update_webkit_command):
+        (ChromiumPort.build_webkit_command):
+        (ChromiumPort.run_webkit_tests_command):
+        (ChromiumPort.run_javascriptcore_tests_command):
+        (ChromiumXVFBPort):
+        (ChromiumXVFBPort.run_webkit_tests_command):
+        * Scripts/webkitpy/common/config/ports_unittest.py:
+        (DeprecatedPortTest):
+        (DeprecatedPortTest.test_mac_port):
+        (DeprecatedPortTest.test_gtk_port):
+        (DeprecatedPortTest.test_qt_port):
+        (DeprecatedPortTest.test_chromium_port):
+        (DeprecatedPortTest.test_chromium_xvfb_port):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (AbstractEarlyWarningSystem.__init__):
+        * Scripts/webkitpy/tool/commands/sheriffbot.py:
+        * Scripts/webkitpy/tool/main.py:
+        (WebKitPatch):
+        (WebKitPatch.handle_global_options):
+        * Scripts/webkitpy/tool/steps/abstractstep.py:
+        * Scripts/webkitpy/tool/steps/steps_unittest.py:
+        (StepsTest.test_runtests_args):
+
+2012-02-09  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] always initialize makeArgs in buildChromiumNinja
+        https://bugs.webkit.org/show_bug.cgi?id=78231
+
+        Reviewed by Tony Gentilcore.
+
+        * Scripts/webkitdirs.pm:
+        (buildChromiumNinja):
+
+2012-02-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Show url of current hovered link in MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=78098
+
+        Reviewed by Martin Robinson.
+
+        * MiniBrowser/gtk/BrowserWindow.c:
+        (webViewMouseTargetChanged): Check whether hit test result is a
+        link and use the url to update the status bar text.
+        (browserWindowConstructed): Connect to
+        WebKitWebView::mouse-target-changed signal.
+
+2012-02-09  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Upstream DumpRenderTreeBlackBerry
+        https://bugs.webkit.org/show_bug.cgi?id=78042
+
+        Reviewed by Antonio Gomes.
+
+        Upstream final part of our DRT implementation.
+
+        * DumpRenderTree/blackberry/LayoutTestControllerBlackBerry.cpp: Added.
+        * DumpRenderTree/blackberry/PNGImageEncoder.cpp: Added.
+        * DumpRenderTree/blackberry/PNGImageEncoder.h: Added.
+        * DumpRenderTree/blackberry/PixelDumpSupportBlackBerry.cpp: Added.
+        * DumpRenderTree/blackberry/PixelDumpSupportBlackBerry.h: Added.
+
 2012-02-09  Ryosuke Niwa  <rniwa@webkit.org>
 
         kill-old-processes should kill gcc and clang
@@ -2290,7 +4779,7 @@
         run-perf-test should include relative file paths in test names
         https://bugs.webkit.org/show_bug.cgi?id=77144
 
-        Reviewed by Adam Birth.
+        Reviewed by Adam Barth.
 
         Include all directory names in the test name separated by "/".
         e.g. Bindings/event-target-wrapper.html translates to Bindings/event-target-wrapper

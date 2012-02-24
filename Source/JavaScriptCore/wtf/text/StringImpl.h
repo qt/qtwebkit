@@ -43,6 +43,8 @@ typedef const struct __CFString * CFStringRef;
 // Landing the file moves in one patch, will follow on with patches to change the namespaces.
 namespace JSC {
 struct IdentifierCStringTranslator;
+namespace LLInt { class Data; }
+class LLIntOffsetsExtractor;
 template <typename T> struct IdentifierCharBufferTranslator;
 struct IdentifierLCharFromUCharTranslator;
 }
@@ -72,7 +74,9 @@ class StringImpl {
     friend struct WTF::SubstringTranslator;
     friend struct WTF::UCharBufferTranslator;
     friend class AtomicStringImpl;
-
+    friend class JSC::LLInt::Data;
+    friend class JSC::LLIntOffsetsExtractor;
+    
 private:
     enum BufferOwnership {
         BufferInternal,
@@ -735,7 +739,7 @@ bool equalIgnoringNullity(const Vector<UChar, inlineCapacity>& a, StringImpl* b)
         return !a.size();
     if (a.size() != b->length())
         return false;
-    return !memcmp(a.data(), b->characters(), b->length());
+    return !memcmp(a.data(), b->characters(), b->length() * sizeof(UChar));
 }
 
 WTF_EXPORT_PRIVATE int codePointCompare(const StringImpl*, const StringImpl*);

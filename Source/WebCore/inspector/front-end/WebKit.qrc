@@ -68,6 +68,7 @@
     <file>HelpScreen.js</file>
     <file>ImageView.js</file>
     <file>IndexedDBModel.js</file>
+    <file>IndexedDBViews.js</file>
     <file>InjectedFakeWorker.js</file>
     <file>inspector.js</file>
     <file>InspectorBackend.js</file>
@@ -126,6 +127,7 @@
     <file>SettingsScreen.js</file>
     <file>ShortcutsScreen.js</file>
     <file>ShowMoreDataGridNode.js</file>
+    <file>SidebarOverlay.js</file>
     <file>SidebarPane.js</file>
     <file>SidebarTreeElement.js</file>
     <file>SoftContextMenu.js</file>
@@ -134,6 +136,7 @@
     <file>SourceHTMLTokenizer.js</file>
     <file>SourceJavaScriptTokenizer.js</file>
     <file>SourceTokenizer.js</file>
+    <file>Spectrum.js</file>
     <file>SplitView.js</file>
     <file>StatusBarButton.js</file>
     <file>StylesSidebarPane.js</file>
@@ -168,6 +171,7 @@
     <file>filteredItemSelectionDialog.css</file>
     <file>heapProfiler.css</file>
     <file>helpScreen.css</file>
+    <file>indexedDBViews.css</file>
     <file>inspector.css</file>
     <file>inspectorCommon.css</file>
     <file>inspectorSyntaxHighlight.css</file>
@@ -223,7 +227,12 @@
     <file>Images/goArrow.png</file>
     <file>Images/graphLabelCalloutLeft.png</file>
     <file>Images/graphLabelCalloutRight.png</file>
+    <file>Images/indexedDB.png</file>
+    <file>Images/indexedDBObjectStore.png</file>
+    <file>Images/indexedDBIndex.png</file>
     <file>Images/localStorage.png</file>
+    <file>Images/navigatorShowHideButton.png</file>
+    <file>Images/navigatorPinButton.png</file>
     <file>Images/paneAddButtons.png</file>
     <file>Images/paneBottomGrow.png</file>
     <file>Images/paneBottomGrowActive.png</file>

@@ -36,15 +36,15 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
 {
     // 1) Pro-forma stuff.
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "OSR exit for Node @%d (", (int)exit.m_nodeIndex);
+    dataLog("OSR exit for Node @%d (", (int)exit.m_nodeIndex);
     for (CodeOrigin codeOrigin = exit.m_codeOrigin; ; codeOrigin = codeOrigin.inlineCallFrame->caller) {
-        fprintf(stderr, "bc#%u", codeOrigin.bytecodeIndex);
+        dataLog("bc#%u", codeOrigin.bytecodeIndex);
         if (!codeOrigin.inlineCallFrame)
             break;
-        fprintf(stderr, " -> %p ", codeOrigin.inlineCallFrame->executable.get());
+        dataLog(" -> %p ", codeOrigin.inlineCallFrame->executable.get());
     }
-    fprintf(stderr, ")  ");
-    exit.dump(stderr);
+    dataLog(")  ");
+    exit.dump(WTF::dataFile());
 #endif
 #if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
     SpeculationFailureDebugInfo* debugInfo = new SpeculationFailureDebugInfo;
@@ -88,14 +88,20 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
     // 3) Refine some value profile, if appropriate.
     
     if (!!exit.m_jsValueSource && !!exit.m_valueProfile) {
+        EncodedJSValue* bucket = exit.m_valueProfile.getSpecFailBucket(0);
+        
+#if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
+        dataLog("  (have exit profile, bucket %p)  ", bucket);
+#endif
+            
         if (exit.m_jsValueSource.isAddress()) {
             // We can't be sure that we have a spare register. So use the tagTypeNumberRegister,
             // since we know how to restore it.
             m_jit.loadPtr(AssemblyHelpers::Address(exit.m_jsValueSource.asAddress()), GPRInfo::tagTypeNumberRegister);
-            m_jit.storePtr(GPRInfo::tagTypeNumberRegister, exit.m_valueProfile->specFailBucket(0));
+            m_jit.storePtr(GPRInfo::tagTypeNumberRegister, bucket);
             m_jit.move(AssemblyHelpers::TrustedImmPtr(bitwise_cast<void*>(TagTypeNumber)), GPRInfo::tagTypeNumberRegister);
         } else
-            m_jit.storePtr(exit.m_jsValueSource.gpr(), exit.m_valueProfile->specFailBucket(0));
+            m_jit.storePtr(exit.m_jsValueSource.gpr(), bucket);
     }
 
     // 4) Figure out how many scratch slots we'll need. We need one for every GPR/FPR
@@ -184,24 +190,24 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
     }
     
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "  ");
+    dataLog("  ");
     if (numberOfPoisonedVirtualRegisters)
-        fprintf(stderr, "Poisoned=%u ", numberOfPoisonedVirtualRegisters);
+        dataLog("Poisoned=%u ", numberOfPoisonedVirtualRegisters);
     if (numberOfDisplacedVirtualRegisters)
-        fprintf(stderr, "Displaced=%u ", numberOfDisplacedVirtualRegisters);
+        dataLog("Displaced=%u ", numberOfDisplacedVirtualRegisters);
     if (haveUnboxedInt32s)
-        fprintf(stderr, "UnboxedInt32 ");
+        dataLog("UnboxedInt32 ");
     if (haveUnboxedDoubles)
-        fprintf(stderr, "UnboxedDoubles ");
+        dataLog("UnboxedDoubles ");
     if (haveUInt32s)
-        fprintf(stderr, "UInt32 ");
+        dataLog("UInt32 ");
     if (haveFPRs)
-        fprintf(stderr, "FPR ");
+        dataLog("FPR ");
     if (haveConstants)
-        fprintf(stderr, "Constants ");
+        dataLog("Constants ");
     if (haveUndefined)
-        fprintf(stderr, "Undefined ");
-    fprintf(stderr, " ");
+        dataLog("Undefined ");
+    dataLog(" ");
 #endif
     
     EncodedJSValue* scratchBuffer = static_cast<EncodedJSValue*>(m_jit.globalData()->scratchBufferForSize(sizeof(EncodedJSValue) * std::max(haveUInt32s ? 2u : 0u, numberOfPoisonedVirtualRegisters + (numberOfDisplacedVirtualRegisters <= GPRInfo::numberOfRegisters ? 0 : numberOfDisplacedVirtualRegisters))));
@@ -624,7 +630,7 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, SpeculationRecovery* reco
     m_jit.jump(GPRInfo::regT1);
 
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    fprintf(stderr, "-> %p\n", jumpTarget);
+    dataLog("-> %p\n", jumpTarget);
 #endif
 }
 

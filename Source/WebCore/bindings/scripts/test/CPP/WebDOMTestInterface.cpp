@@ -25,11 +25,11 @@
 #include "WebDOMTestInterface.h"
 
 #include "KURL.h"
+#include "Node.h"
 #include "TestInterface.h"
-#include "TestObj.h"
 #include "TestSupplemental.h"
+#include "WebDOMNode.h"
 #include "WebDOMString.h"
-#include "WebDOMTestObj.h"
 #include "WebExceptionHandler.h"
 #include "wtf/text/AtomicString.h"
 #include <wtf/GetPtr.h>
@@ -108,6 +108,24 @@ void WebDOMTestInterface::setSupplementalStr2(const WebDOMString& newSupplementa
 }
 
 #endif
+#if ENABLE(Condition11) || ENABLE(Condition12)
+WebDOMNode WebDOMTestInterface::supplementalNode() const
+{
+    if (!impl())
+        return WebDOMNode();
+
+    return toWebKit(WTF::getPtr(TestSupplemental::supplementalNode(impl())));
+}
+
+void WebDOMTestInterface::setSupplementalNode(const WebDOMNode& newSupplementalNode)
+{
+    if (!impl())
+        return;
+
+    TestSupplemental::setSupplementalNode(impl(), toWebCore(newSupplementalNode));
+}
+
+#endif
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
 void WebDOMTestInterface::supplementalMethod1()
@@ -122,15 +140,12 @@ void WebDOMTestInterface::supplementalMethod1()
 
 
 #if ENABLE(Condition11) || ENABLE(Condition12)
-WebDOMTestObj WebDOMTestInterface::supplementalMethod2(const WebDOMString& strArg, const WebDOMTestObj& objArg)
+void WebDOMTestInterface::supplementalMethod4()
 {
     if (!impl())
-        return WebDOMTestObj();
+        return;
 
-    WebCore::ExceptionCode ec = 0;
-    WebDOMTestObj result = toWebKit(WTF::getPtr(WebCore::TestSupplemental::supplementalMethod2(impl(), strArg, toWebCore(objArg), ec)));
-    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
-    return result;
+    WebCore::TestSupplemental::supplementalMethod4(impl());
 }
 
 #endif

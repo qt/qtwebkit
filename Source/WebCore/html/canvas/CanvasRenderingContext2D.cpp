@@ -155,20 +155,6 @@ bool CanvasRenderingContext2D::isAccelerated() const
 #endif
 }
 
-bool CanvasRenderingContext2D::paintsIntoCanvasBuffer() const
-{
-#if ENABLE(ACCELERATED_2D_CANVAS) && USE(ACCELERATED_COMPOSITING)
-    if (!isAccelerated())
-        return true;
-
-    RenderBox* renderBox = canvas()->renderBox();
-    if (renderBox && renderBox->hasLayer() && renderBox->layer()->hasAcceleratedCompositing())
-        return false;
-#endif
-    return true;
-}
-
-
 void CanvasRenderingContext2D::reset()
 {
     unwindStateStack();
@@ -669,9 +655,8 @@ void CanvasRenderingContext2D::setTransform(float m11, float m12, float m21, flo
     AffineTransform ctm = state().m_transform;
     if (!ctm.isInvertible())
         return;
-    c->concatCTM(c->getCTM().inverse());
-    c->concatCTM(canvas()->baseTransform());
-    state().m_transform = ctm.inverse() * state().m_transform;
+    c->setCTM(canvas()->baseTransform());
+    state().m_transform = AffineTransform();
     m_path.transform(ctm);
 
     state().m_invertibleCTM = true;
@@ -1920,7 +1905,7 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
 
     String declarationText("font: ");
     declarationText += newFont;
-    parser.parseDeclaration(tempDecl.get(), declarationText);
+    parser.parseDeclaration(tempDecl.get(), declarationText, 0, 0);
     if (tempDecl->isEmpty())
         return;
 

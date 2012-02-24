@@ -23,11 +23,12 @@ module window {
     interface [
         JSGenerateIsReachable=ImplFrame,
         NamedGetter,
-        IndexedGetter
+        IndexedGetter,
+        InterfaceName=MimeTypeArray
     ] DOMMimeTypeArray {
         readonly attribute unsigned long length;
-        DOMMimeType item(in [Optional=CallWithDefaultValue] unsigned long index);
-        DOMMimeType namedItem(in [Optional=CallWithDefaultValue] DOMString name);
+        DOMMimeType item(in [Optional=DefaultIsUndefined] unsigned long index);
+        DOMMimeType namedItem(in [Optional=DefaultIsUndefined] DOMString name);
     };
 
 }

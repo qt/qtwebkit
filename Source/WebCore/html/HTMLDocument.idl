@@ -21,12 +21,13 @@
 module html {
 
     interface [
-        CustomNamedGetter
+        CustomNamedGetter,
+        V8CustomToJSObject
     ] HTMLDocument : Document {
         [JSCustom, V8Custom] void open();
         void close();
-        [Custom] void write(in [Optional=CallWithDefaultValue] DOMString text);
-        [Custom] void writeln(in [Optional=CallWithDefaultValue] DOMString text);
+        [Custom] void write(in [Optional=DefaultIsUndefined] DOMString text);
+        [Custom] void writeln(in [Optional=DefaultIsUndefined] DOMString text);
 
         readonly attribute HTMLCollection embeds;
         readonly attribute HTMLCollection plugins;

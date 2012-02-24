@@ -1,5 +1,6 @@
 SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}"
+    "${WEBCORE_DIR}/Modules/geolocation"
     "${WEBCORE_DIR}/accessibility"
     "${WEBCORE_DIR}/bindings"
     "${WEBCORE_DIR}/bindings/generic"
@@ -27,6 +28,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/notifications"
     "${WEBCORE_DIR}/page"
     "${WEBCORE_DIR}/page/animation"
+    "${WEBCORE_DIR}/page/scrolling"
     "${WEBCORE_DIR}/platform"
     "${WEBCORE_DIR}/platform/animation"
     "${WEBCORE_DIR}/platform/audio"
@@ -74,6 +76,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/debugger"
     "${JAVASCRIPTCORE_DIR}/interpreter"
     "${JAVASCRIPTCORE_DIR}/jit"
+    "${JAVASCRIPTCORE_DIR}/llint"
     "${JAVASCRIPTCORE_DIR}/parser"
     "${JAVASCRIPTCORE_DIR}/profiler"
     "${JAVASCRIPTCORE_DIR}/runtime"
@@ -86,6 +89,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
 )
 
 SET(WebCore_IDL_INCLUDES
+    Modules/geolocation
     bindings/generic
     css
     dom
@@ -104,6 +108,13 @@ SET(WebCore_IDL_INCLUDES
 )
 
 SET(WebCore_IDL_FILES
+    Modules/geolocation/Geolocation.idl
+    Modules/geolocation/Geoposition.idl
+    Modules/geolocation/NavigatorGeolocation.idl
+    Modules/geolocation/PositionCallback.idl
+    Modules/geolocation/PositionError.idl
+    Modules/geolocation/PositionErrorCallback.idl
+
     css/Counter.idl
     css/CSSCharsetRule.idl
     css/CSSFontFaceRule.idl
@@ -205,6 +216,7 @@ SET(WebCore_IDL_FILES
     html/DOMSettableTokenList.idl
     html/DOMTokenList.idl
     html/DOMURL.idl
+    html/DOMWindowHTML.idl
     html/HTMLAllCollection.idl
     html/HTMLAnchorElement.idl
     html/HTMLAppletElement.idl
@@ -282,9 +294,6 @@ SET(WebCore_IDL_FILES
     html/MediaController.idl
     html/MediaError.idl
     html/TextMetrics.idl
-    html/TextTrack.idl
-    html/TextTrackCue.idl
-    html/TextTrackCueList.idl
     html/TimeRanges.idl
     html/ValidityState.idl
     html/VoidCallback.idl
@@ -309,6 +318,9 @@ SET(WebCore_IDL_FILES
     html/shadow/HTMLContentElement.idl
     html/shadow/HTMLShadowElement.idl
 
+    html/track/TextTrack.idl
+    html/track/TextTrackCue.idl
+    html/track/TextTrackCueList.idl
     html/track/TextTrackList.idl
     html/track/TrackEvent.idl
 
@@ -327,8 +339,6 @@ SET(WebCore_IDL_FILES
     page/DOMSelection.idl
     page/DOMWindow.idl
     page/EventSource.idl
-    page/Geolocation.idl
-    page/Geoposition.idl
     page/History.idl
     page/Location.idl
     page/MemoryInfo.idl
@@ -336,9 +346,6 @@ SET(WebCore_IDL_FILES
     page/Performance.idl
     page/PerformanceNavigation.idl
     page/PerformanceTiming.idl
-    page/PositionCallback.idl
-    page/PositionError.idl
-    page/PositionErrorCallback.idl
     page/Screen.idl
     page/SpeechInputEvent.idl
     page/SpeechInputResult.idl
@@ -384,6 +391,7 @@ SET(WebCore_IDL_FILES
     websockets/CloseEvent.idl
     websockets/DOMWindowWebSocket.idl
 
+    xml/DOMWindowXML.idl
     xml/DOMParser.idl
     xml/XMLHttpRequest.idl
     xml/XMLHttpRequestException.idl
@@ -399,6 +407,10 @@ SET(WebCore_IDL_FILES
 )
 
 SET(WebCore_SOURCES
+    Modules/geolocation/Geolocation.cpp
+    Modules/geolocation/GeolocationController.cpp
+    Modules/geolocation/NavigatorGeolocation.cpp
+
     accessibility/AXObjectCache.cpp
     accessibility/AccessibilityARIAGrid.cpp
     accessibility/AccessibilityARIAGridCell.cpp
@@ -478,7 +490,6 @@ SET(WebCore_SOURCES
     css/CSSValueList.cpp
     css/CSSValuePool.cpp
     css/CSSWrapShapes.cpp
-    css/FontFamilyValue.cpp
     css/FontFeatureValue.cpp
     css/FontValue.cpp
     css/MediaFeatureNames.cpp
@@ -489,6 +500,7 @@ SET(WebCore_SOURCES
     css/MediaQueryList.cpp
     css/MediaQueryListListener.cpp
     css/MediaQueryMatcher.cpp
+    css/PropertySetCSSStyleDeclaration.cpp
     css/RGBColor.cpp
     css/SelectorChecker.cpp
     css/ShadowValue.cpp
@@ -600,6 +612,7 @@ SET(WebCore_SOURCES
     dom/SecurityContext.cpp
     dom/SelectorQuery.cpp
     dom/ShadowRoot.cpp
+    dom/ShadowRootList.cpp
     dom/SpaceSplitString.cpp
     dom/StaticHashSetNodeList.cpp
     dom/StaticNodeList.cpp
@@ -863,10 +876,11 @@ SET(WebCore_SOURCES
     html/parser/XSSAuditor.cpp
 
     html/shadow/ContentSelectorQuery.cpp
-    html/shadow/ContentInclusionSelector.cpp
     html/shadow/DetailsMarkerControl.cpp
     html/shadow/HTMLContentElement.cpp
+    html/shadow/HTMLContentSelector.cpp
     html/shadow/HTMLShadowElement.cpp
+    html/shadow/InsertionPoint.cpp
     html/shadow/MediaControls.cpp
     html/shadow/MediaControlRootElement.cpp
     html/shadow/MeterShadowElement.cpp
@@ -878,6 +892,7 @@ SET(WebCore_SOURCES
     inspector/ContentSearchUtils.cpp
     inspector/DOMEditor.cpp
     inspector/DOMNodeHighlighter.cpp
+    inspector/DOMPatchSupport.cpp
     inspector/IdentifiersFactory.cpp
     inspector/InjectedScript.cpp
     inspector/InjectedScriptHost.cpp
@@ -890,6 +905,7 @@ SET(WebCore_SOURCES
     inspector/InspectorClient.cpp
     inspector/InspectorConsoleAgent.cpp
     inspector/InspectorController.cpp
+    inspector/InspectorCounters.cpp
     inspector/InspectorDOMAgent.cpp
     inspector/InspectorDOMDebuggerAgent.cpp
     inspector/InspectorDOMStorageAgent.cpp
@@ -980,6 +996,7 @@ SET(WebCore_SOURCES
     loader/cache/CachedResourceHandle.cpp
     loader/cache/CachedResourceLoader.cpp
     loader/cache/CachedScript.cpp
+    loader/cache/CachedSVGDocument.cpp
     loader/cache/CachedXSLStyleSheet.cpp
     loader/cache/MemoryCache.cpp
 
@@ -1009,8 +1026,6 @@ SET(WebCore_SOURCES
     page/FrameDestructionObserver.cpp
     page/FrameTree.cpp
     page/FrameView.cpp
-    page/Geolocation.cpp
-    page/GeolocationController.cpp
     page/GroupSettings.cpp
     page/History.cpp
     page/Location.cpp
@@ -1018,11 +1033,14 @@ SET(WebCore_SOURCES
     page/MouseEventWithHitTestResults.cpp
     page/Navigator.cpp
     page/NavigatorBase.cpp
+    page/NavigatorRegisterProtocolHandler.cpp
+    page/NavigatorSupplement.cpp
     page/OriginAccessEntry.cpp
     page/Page.cpp
     page/PageGroup.cpp
     page/PageGroupLoadDeferrer.cpp
     page/PageSerializer.cpp
+    page/PageSupplement.cpp
     page/PageVisibilityState.cpp
     page/Performance.cpp
     page/PerformanceNavigation.cpp
@@ -1045,6 +1063,9 @@ SET(WebCore_SOURCES
     page/animation/ImplicitAnimation.cpp
     page/animation/KeyframeAnimation.cpp
 
+    page/scrolling/ScrollingCoordinator.cpp
+    page/scrolling/ScrollingCoordinatorNone.cpp
+
     platform/Arena.cpp
     platform/CalculationValue.cpp
     platform/Clock.cpp
@@ -1053,7 +1074,6 @@ SET(WebCore_SOURCES
     platform/ContentType.cpp
     platform/CrossThreadCopier.cpp
     platform/DateComponents.cpp
-    platform/DefaultLocalizationStrategy.cpp
     platform/DragData.cpp
     platform/DragImage.cpp
     platform/FileChooser.cpp
@@ -1093,6 +1113,7 @@ SET(WebCore_SOURCES
     platform/graphics/BitmapImage.cpp
     platform/graphics/Color.cpp
     platform/graphics/CrossfadeGeneratedImage.cpp
+    platform/graphics/FractionalLayoutSize.cpp
     platform/graphics/FloatPoint.cpp
     platform/graphics/FloatPoint3D.cpp
     platform/graphics/FloatQuad.cpp
@@ -1383,8 +1404,8 @@ SET(WebCore_SOURCES
     storage/IDBFactory.cpp
     storage/IDBFactoryBackendInterface.cpp
     storage/IDBFactoryBackendImpl.cpp
-    storage/LocalStorageTask.cpp
-    storage/LocalStorageThread.cpp
+    storage/StorageTask.cpp
+    storage/StorageThread.cpp
     storage/OriginQuotaManager.cpp
     storage/OriginUsageRecord.cpp
     storage/SQLException.cpp
@@ -1583,6 +1604,7 @@ if (ENABLE_FILE_SYSTEM)
         fileapi/DOMFileSystem.cpp
         fileapi/DOMFileSystemBase.cpp
         fileapi/DOMFileSystemSync.cpp
+        fileapi/DOMWindowFileSystem.cpp
         fileapi/Entry.cpp
         fileapi/EntryArray.cpp
         fileapi/EntryArraySync.cpp
@@ -1604,6 +1626,7 @@ if (ENABLE_FILE_SYSTEM)
         fileapi/DirectoryReaderSync.idl
         fileapi/DOMFileSystem.idl
         fileapi/DOMFileSystemSync.idl
+        fileapi/DOMWindowFileSystem.idl
         fileapi/EntriesCallback.idl
         fileapi/Entry.idl
         fileapi/EntrySync.idl
@@ -1694,6 +1717,7 @@ IF (ENABLE_SVG)
         rendering/svg/SVGTextMetricsBuilder.cpp
         rendering/svg/SVGTextQuery.cpp
         svg/ColorDistance.cpp
+        svg/DOMWindowSVG.idl
         svg/SVGAElement.cpp
         svg/SVGAltGlyphDefElement.cpp
         svg/SVGAltGlyphElement.cpp
@@ -2038,6 +2062,7 @@ IF (ENABLE_WEB_SOCKETS)
         websockets/ThreadableWebSocketChannelClientWrapper.cpp
         websockets/WebSocket.cpp
         websockets/WebSocketChannel.cpp
+        websockets/WebSocketExtensionDispatcher.cpp
         websockets/WebSocketHandshake.cpp
         websockets/WebSocketHandshakeRequest.cpp
         websockets/WebSocketHandshakeResponse.cpp
@@ -2098,13 +2123,19 @@ IF (ENABLE_SHARED_WORKERS)
     )
 ENDIF ()
 
+IF (ENABLE_WORKERS OR ENABLE_SHARED_WORKERS)
+    LIST(APPEND WebCore_IDL_FILES
+        workers/DOMWindowWorker.idl
+    )
+ENDIF ()
+
 IF (ENABLE_VIDEO_TRACK)
     LIST(APPEND WebCore_SOURCES
         html/HTMLTrackElement.cpp
-        html/LoadableTextTrack.cpp
-        html/TextTrack.cpp
-        html/TextTrackCue.cpp
-        html/TextTrackCueList.cpp
+        html/track/LoadableTextTrack.cpp
+        html/track/TextTrack.cpp
+        html/track/TextTrackCue.cpp
+        html/track/TextTrackCueList.cpp
         html/track/TextTrackList.cpp
         html/track/TrackBase.cpp
         html/track/TrackEvent.cpp
@@ -2240,6 +2271,19 @@ IF (ENABLE_REQUEST_ANIMATION_FRAME)
     )
 ENDIF ()
 
+IF (ENABLE_VIBRATION)
+    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${WEBCORE_DIR}/Modules/vibration
+    )
+    LIST(APPEND WebCore_IDL_FILES
+        Modules/vibration/NavigatorVibration.idl
+    )
+    LIST(APPEND WebCore_SOURCES
+        Modules/vibration/NavigatorVibration.cpp
+        Modules/vibration/Vibration.cpp
+    )
+ENDIF ()
+
 # Modules that the bindings generator scripts may use
 SET(SCRIPTS_RESOLVE_SUPPLEMENTAL
     ${WEBCORE_DIR}/bindings/scripts/IDLParser.pm
@@ -2252,12 +2296,13 @@ SET(SCRIPTS_BINDINGS
 )
 SET(IDL_FILES_TMP ${DERIVED_SOURCES_WEBCORE_DIR}/idl_files.tmp)
 SET(SUPPLEMENTAL_DEPENDENCY_FILE ${DERIVED_SOURCES_WEBCORE_DIR}/supplemental_dependency.tmp)
+SET(IDL_ATTRIBUTES_FILE ${WEBCORE_DIR}/bindings/scripts/IDLAttributes.txt)
 
 INCLUDE(${WEBCORE_DIR}/UseJSC.cmake)
 
 SET(WebCore_LIBRARIES ${JavaScriptCore_LIBRARY_NAME})
 SET(WebCore_LINK_FLAGS "")
-INCLUDE_IF_EXISTS(${WEBCORE_DIR}/Platform${PORT}.cmake)
+WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 # ANGLE tokenizer & parser
 ADD_CUSTOM_COMMAND(

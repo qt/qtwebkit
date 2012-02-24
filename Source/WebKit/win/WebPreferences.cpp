@@ -268,7 +268,7 @@ void WebPreferences::initializeDefaultSettings()
 
     CFDictionaryAddValue(defaults, CFSTR(WebKitMemoryInfoEnabledPreferenceKey), kCFBooleanFalse);
     CFDictionaryAddValue(defaults, CFSTR(WebKitHyperlinkAuditingEnabledPreferenceKey), kCFBooleanTrue);
-    CFDictionaryAddValue(defaults, CFSTR(WebKitHixie76WebSocketProtocolEnabledPreferenceKey), kCFBooleanTrue);
+    CFDictionaryAddValue(defaults, CFSTR(WebKitHixie76WebSocketProtocolEnabledPreferenceKey), kCFBooleanFalse);
 
     CFDictionaryAddValue(defaults, CFSTR(WebKitMediaPlaybackRequiresUserGesturePreferenceKey), kCFBooleanFalse);
     CFDictionaryAddValue(defaults, CFSTR(WebKitMediaPlaybackAllowsInlinePreferenceKey), kCFBooleanTrue);
@@ -1636,6 +1636,21 @@ HRESULT WebPreferences::showsToolTipOverTruncatedText(BOOL* showsToolTip)
 HRESULT WebPreferences::setShowsToolTipOverTruncatedText(BOOL showsToolTip)
 {
     setBoolValue(CFSTR(WebKitShowsToolTipOverTruncatedTextPreferenceKey), showsToolTip);
+    return S_OK;
+}
+
+HRESULT WebPreferences::shouldInvertColors(BOOL* shouldInvertColors)
+{
+    if (!shouldInvertColors)
+        return E_POINTER;
+
+    *shouldInvertColors = boolValueForKey(CFSTR(WebKitShouldInvertColorsPreferenceKey));
+    return S_OK;
+}
+
+HRESULT WebPreferences::setShouldInvertColors(BOOL shouldInvertColors)
+{
+    setBoolValue(CFSTR(WebKitShouldInvertColorsPreferenceKey), shouldInvertColors);
     return S_OK;
 }
 

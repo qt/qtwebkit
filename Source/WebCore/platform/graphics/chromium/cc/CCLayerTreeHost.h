@@ -30,6 +30,7 @@
 #include "LayerChromium.h"
 #include "RateLimiter.h"
 #include "TransformationMatrix.h"
+#include "cc/CCAnimationEvents.h"
 #include "cc/CCLayerTreeHostCommon.h"
 #include "cc/CCProxy.h"
 
@@ -75,6 +76,7 @@ struct CCSettings {
             , refreshRate(0)
             , perTilePainting(false)
             , partialSwapEnabled(false)
+            , threadedAnimationEnabled(false)
             , maxPartialTextureUpdates(std::numeric_limits<size_t>::max()) { }
 
     bool acceleratePainting;
@@ -84,6 +86,7 @@ struct CCSettings {
     double refreshRate;
     bool perTilePainting;
     bool partialSwapEnabled;
+    bool threadedAnimationEnabled;
     size_t maxPartialTextureUpdates;
 };
 
@@ -163,6 +166,8 @@ public:
     virtual void setNeedsCommit();
     void setNeedsRedraw();
 
+    void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>);
+
     LayerChromium* rootLayer() { return m_rootLayer.get(); }
     const LayerChromium* rootLayer() const { return m_rootLayer.get(); }
     void setRootLayer(PassRefPtr<LayerChromium>);
@@ -173,20 +178,17 @@ public:
 
     const IntSize& viewportSize() const { return m_viewportSize; }
 
-    void setPageScale(float);
-    float pageScale() const { return m_pageScale; }
-
-    void setPageScaleFactorLimits(float minScale, float maxScale);
+    void setPageScaleFactorAndLimits(float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor);
 
     TextureManager* contentsTextureManager() const;
 
     bool visible() const { return m_visible; }
     void setVisible(bool);
 
-    void setHaveWheelEventHandlers(bool);
-
     // Returns false if we should abort this frame due to initialization failure.
     bool updateLayers();
+
+    void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double durationSec);
 
     void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
     void applyScrollAndScale(const CCScrollAndScaleSet&);
@@ -236,12 +238,11 @@ private:
 
     IntSize m_viewportSize;
     bool m_visible;
-    bool m_haveWheelEventHandlers;
     typedef HashMap<GraphicsContext3D*, RefPtr<RateLimiter> > RateLimiterMap;
     RateLimiterMap m_rateLimiters;
 
-    float m_pageScale;
-    float m_minPageScale, m_maxPageScale;
+    float m_pageScaleFactor;
+    float m_minPageScaleFactor, m_maxPageScaleFactor;
     bool m_triggerIdlePaints;
 
     TextureList m_deleteTextureAfterCommitList;

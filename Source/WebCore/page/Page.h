@@ -24,11 +24,13 @@
 #include "FrameLoaderTypes.h"
 #include "FindOptions.h"
 #include "LayoutTypes.h"
+#include "PageSupplement.h"
 #include "PageVisibilityState.h"
 #include "PlatformScreen.h"
 #include "PlatformString.h"
 #include "ViewportArguments.h"
 #include <wtf/Forward.h>
+#include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
 
@@ -52,10 +54,6 @@ namespace WebCore {
     class ChromeClient;
     class ContextMenuClient;
     class ContextMenuController;
-    class DeviceMotionClient;
-    class DeviceMotionController;
-    class DeviceOrientationClient;
-    class DeviceOrientationController;
     class Document;
     class DragCaretController;
     class DragClient;
@@ -72,8 +70,6 @@ namespace WebCore {
     class InspectorController;
     class MediaCanStartListener;
     class Node;
-    class NotificationController;
-    class NotificationPresenter;
     class PageGroup;
     class PluginData;
     class PointerLockController;
@@ -85,13 +81,7 @@ namespace WebCore {
     class ScrollableArea;
     class ScrollingCoordinator;
     class Settings;
-    class SpeechInput;
-    class SpeechInputClient;
-    class UserMediaClient;
     class StorageNamespace;
-#if ENABLE(NOTIFICATIONS)
-    class NotificationPresenter;
-#endif
 
     typedef uint64_t LinkHash;
 
@@ -118,12 +108,7 @@ namespace WebCore {
             DragClient* dragClient;
             InspectorClient* inspectorClient;
             GeolocationClient* geolocationClient;
-            DeviceMotionClient* deviceMotionClient;
-            DeviceOrientationClient* deviceOrientationClient;
             RefPtr<BackForwardList> backForwardClient;
-            SpeechInputClient* speechInputClient;
-            NotificationPresenter* notificationClient;
-            UserMediaClient* userMediaClient;
         };
 
         Page(PageClients&);
@@ -184,25 +169,11 @@ namespace WebCore {
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
         GeolocationController* geolocationController() const { return m_geolocationController.get(); }
 #endif
-#if ENABLE(DEVICE_ORIENTATION)
-        DeviceMotionController* deviceMotionController() const { return m_deviceMotionController.get(); }
-        DeviceOrientationController* deviceOrientationController() const { return m_deviceOrientationController.get(); }
-#endif
-#if ENABLE(NOTIFICATIONS)
-        NotificationController* notificationController() const { return m_notificationController.get(); }
-#endif
 #if ENABLE(POINTER_LOCK)
         PointerLockController* pointerLockController() const { return m_pointerLockController.get(); }
 #endif
-#if ENABLE(INPUT_SPEECH)
-        SpeechInput* speechInput();
-#endif
-#if ENABLE(MEDIA_STREAM)
-        UserMediaClient* userMediaClient() const { return m_userMediaClient; }
-#endif
-#if ENABLE(THREADED_SCROLLING)
+
         ScrollingCoordinator* scrollingCoordinator();
-#endif
 
         Settings* settings() const { return m_settings.get(); }
         ProgressTracker* progress() const { return m_progress.get(); }
@@ -352,9 +323,15 @@ namespace WebCore {
         void setRelevantRepaintedObjectsCounterThreshold(uint64_t);
         void startCountingRelevantRepaintedObjects();
         void addRelevantRepaintedObject(RenderObject*, const IntRect& objectPaintRect);
-        
+
+        void provideSupplement(const AtomicString&, PassOwnPtr<PageSupplement>);
+        PageSupplement* requireSupplement(const AtomicString&);
+
     private:
         void initGroup();
+
+        typedef HashMap<AtomicStringImpl*, OwnPtr<PageSupplement> > PageSupplementMap;
+        PageSupplementMap m_supplements;
 
 #if ASSERT_DISABLED
         void checkFrameCountConsistency() const { }
@@ -383,26 +360,11 @@ namespace WebCore {
 #if ENABLE(CLIENT_BASED_GEOLOCATION)
         OwnPtr<GeolocationController> m_geolocationController;
 #endif
-#if ENABLE(DEVICE_ORIENTATION)
-        OwnPtr<DeviceMotionController> m_deviceMotionController;
-        OwnPtr<DeviceOrientationController> m_deviceOrientationController;
-#endif
-#if ENABLE(NOTIFICATIONS)
-        OwnPtr<NotificationController> m_notificationController;
-#endif
 #if ENABLE(POINTER_LOCK)
         OwnPtr<PointerLockController> m_pointerLockController;
 #endif
-#if ENABLE(INPUT_SPEECH)
-        SpeechInputClient* m_speechInputClient;
-        OwnPtr<SpeechInput> m_speechInput;
-#endif
-#if ENABLE(MEDIA_STREAM)
-        UserMediaClient* m_userMediaClient;
-#endif
-#if ENABLE(THREADED_SCROLLING)
         RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
-#endif
+
         OwnPtr<Settings> m_settings;
         OwnPtr<ProgressTracker> m_progress;
         
@@ -450,10 +412,6 @@ namespace WebCore {
         bool m_canStartMedia;
 
         RefPtr<StorageNamespace> m_sessionStorage;
-
-#if ENABLE(NOTIFICATIONS)
-        NotificationPresenter* m_notificationPresenter;
-#endif
 
         ViewMode m_viewMode;
 

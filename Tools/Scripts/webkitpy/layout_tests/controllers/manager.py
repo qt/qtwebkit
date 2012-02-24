@@ -752,22 +752,29 @@ class Manager(object):
         num_workers = min(int(self._options.child_processes), len(all_shards))
         self._log_num_workers(num_workers, len(all_shards), len(locked_shards))
 
-        manager_connection = manager_worker_broker.get(self._port, self._options, self, worker.Worker)
+        manager_connection = manager_worker_broker.get(self._options.worker_model, self, worker.Worker)
 
         if self._options.dry_run:
             return (keyboard_interrupted, interrupted, thread_timings, self._group_stats, self._all_results)
 
         self._printer.print_update('Starting %s ...' % grammar.pluralize('worker', num_workers))
         for worker_number in xrange(num_workers):
-            worker_connection = manager_connection.start_worker(worker_number, self.results_directory())
-            worker_state = _WorkerState(worker_number, worker_connection)
-            self._worker_states[worker_connection.name] = worker_state
+            worker_arguments = worker.WorkerArguments(worker_number, self.results_directory(), self._options)
+            worker_connection = manager_connection.start_worker(worker_arguments)
+            if self._options.worker_model == 'inline':
+                # FIXME: We need to be able to share a port with the work so
+                # that some of the tests can query state on the port; ideally
+                # we'd rewrite the tests so that this wasn't necessary.
+                #
+                # Note that this only works because in the inline case
+                # the worker hasn't really started yet and won't start
+                # running until we call run_message_loop(), below.
+                worker_connection.set_inline_arguments(self._port)
 
-            # FIXME: If we start workers up too quickly, DumpRenderTree appears
-            # to thrash on something and time out its first few tests. Until
-            # we can figure out what's going on, sleep a bit in between
-            # workers. This needs a bug filed.
-            time.sleep(0.1)
+            worker_state = _WorkerState(worker_number, worker_connection)
+            self._worker_states[worker_connection.name()] = worker_state
+
+            time.sleep(self._port.worker_startup_delay_secs())
 
         self._printer.print_update("Starting testing ...")
         for shard in all_shards:
@@ -827,20 +834,6 @@ class Manager(object):
     def update(self):
         self.update_summary(self._current_result_summary)
 
-    def _collect_timing_info(self, threads):
-        test_timings = {}
-        individual_test_timings = []
-        thread_timings = []
-
-        for thread in threads:
-            thread_timings.append({'name': thread.getName(),
-                                   'num_tests': thread.get_num_tests(),
-                                   'total_time': thread.get_total_time()})
-            test_timings.update(thread.get_test_group_timing_stats())
-            individual_test_timings.extend(thread.get_test_results())
-
-        return (thread_timings, test_timings, individual_test_timings)
-
     def needs_servers(self):
         return any(self._test_requires_lock(test_name) for test_name in self._test_files) and self._options.http
 
@@ -867,7 +860,7 @@ class Manager(object):
             self._clobber_old_results()
 
         # Create the output directory if it doesn't already exist.
-        self._port.maybe_make_directory(self._results_directory)
+        self._port.host.filesystem.maybe_make_directory(self._results_directory)
 
         self._port.setup_test_run()
 
@@ -1519,7 +1512,7 @@ class _WorkerState(object):
         self.current_test_name = None
         self.next_timeout = None
         self.stats = {}
-        self.stats['name'] = worker_connection.name
+        self.stats['name'] = worker_connection.name()
         self.stats['num_tests'] = 0
         self.stats['total_time'] = 0
 

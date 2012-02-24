@@ -64,6 +64,21 @@ PassRefPtr<HTMLFrameSetElement> HTMLFrameSetElement::create(const QualifiedName&
     return adoptRef(new HTMLFrameSetElement(tagName, document));
 }
 
+bool HTMLFrameSetElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == bordercolorAttr)
+        return true;
+    return HTMLElement::isPresentationAttribute(attr);
+}
+
+void HTMLFrameSetElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    if (attr->name() == bordercolorAttr)
+        addHTMLColorToStyle(style, CSSPropertyBorderColor, attr->value());
+    else
+        HTMLElement::collectStyleForAttribute(attr, style);
+}
+
 void HTMLFrameSetElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == rowsAttr) {
@@ -98,13 +113,9 @@ void HTMLFrameSetElement::parseAttribute(Attribute* attr)
             m_borderSet = true;
         } else
             m_borderSet = false;
-    } else if (attr->name() == bordercolorAttr) {
+    } else if (attr->name() == bordercolorAttr)
         m_borderColorSet = !attr->isEmpty();
-        if (attr->value().isNull())
-            removeCSSProperty(CSSPropertyBorderColor);
-        else
-            addCSSColor(CSSPropertyBorderColor, attr->value());
-    } else if (attr->name() == onloadAttr)
+    else if (attr->name() == onloadAttr)
         document()->setWindowAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(document()->frame(), attr));
     else if (attr->name() == onbeforeunloadAttr)
         document()->setWindowAttributeEventListener(eventNames().beforeunloadEvent, createAttributeEventListener(document()->frame(), attr));

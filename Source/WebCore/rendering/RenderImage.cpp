@@ -273,7 +273,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
             context->setStrokeStyle(SolidStroke);
             context->setStrokeColor(Color::lightGray, style()->colorSpace());
             context->setFillColor(Color::transparent, style()->colorSpace());
-            context->drawRect(LayoutRect(paintOffset.x() + leftBorder + leftPad, paintOffset.y() + topBorder + topPad, cWidth, cHeight));
+            context->drawRect(pixelSnappedIntRect(LayoutRect(paintOffset.x() + leftBorder + leftPad, paintOffset.y() + topBorder + topPad, cWidth, cHeight)));
 
             bool errorPictureDrawn = false;
             LayoutSize imageOffset;
@@ -299,7 +299,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
                 if (centerY < 0)
                     centerY = 0;
                 imageOffset = LayoutSize(leftBorder + leftPad + centerX + 1, topBorder + topPad + centerY + 1);
-                context->drawImage(image.get(), style()->colorSpace(), IntRect(paintOffset + imageOffset, imageSize));
+                context->drawImage(image.get(), style()->colorSpace(), IntRect(roundedIntPoint(paintOffset + imageOffset), imageSize));
                 errorPictureDrawn = true;
             }
 

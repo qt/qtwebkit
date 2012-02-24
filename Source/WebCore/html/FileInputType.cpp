@@ -36,6 +36,7 @@
 #include "RenderFileUploadControl.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
+#include "ShadowRootList.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
@@ -217,7 +218,7 @@ bool FileInputType::storesValueSeparateFromAttribute()
     return true;
 }
 
-void FileInputType::setValue(const String&, bool, bool)
+void FileInputType::setValue(const String&, bool, TextFieldEventBehavior)
 {
     m_fileList->clear();
     m_icon.clear();
@@ -265,13 +266,15 @@ bool FileInputType::isFileUpload() const
 
 void FileInputType::createShadowSubtree()
 {
+    ASSERT(element()->hasShadowRoot());
     ExceptionCode ec = 0;
-    element()->ensureShadowRoot()->appendChild(element()->multiple() ? UploadButtonElement::createForMultiple(element()->document()): UploadButtonElement::create(element()->document()), ec);
+    element()->shadowRootList()->oldestShadowRoot()->appendChild(element()->multiple() ? UploadButtonElement::createForMultiple(element()->document()): UploadButtonElement::create(element()->document()), ec);
 }
 
 void FileInputType::multipleAttributeChanged()
 {
-    UploadButtonElement* button = static_cast<UploadButtonElement*>(element()->ensureShadowRoot()->firstChild());
+    ASSERT(element()->hasShadowRoot());
+    UploadButtonElement* button = static_cast<UploadButtonElement*>(element()->shadowRootList()->oldestShadowRoot()->firstChild());
     if (button)
         button->setValue(element()->multiple() ? fileButtonChooseMultipleFilesLabel() : fileButtonChooseFileLabel());
 }

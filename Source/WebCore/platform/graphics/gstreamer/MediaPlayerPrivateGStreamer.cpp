@@ -283,9 +283,17 @@ MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
 
 void MediaPlayerPrivateGStreamer::load(const String& url)
 {
-    g_object_set(m_playBin, "uri", url.utf8().data(), NULL);
 
-    LOG_VERBOSE(Media, "Load %s", url.utf8().data());
+    KURL kurl(KURL(), url);
+    String cleanUrl(url);
+
+    // Clean out everything after file:// url path.
+    if (kurl.isLocalFile())
+        cleanUrl = cleanUrl.substring(0, kurl.pathEnd());
+
+    g_object_set(m_playBin, "uri", cleanUrl.utf8().data(), NULL);
+
+    LOG_VERBOSE(Media, "Load %s", cleanUrl.utf8().data());
 
     if (m_preload == MediaPlayer::None) {
         LOG_VERBOSE(Media, "Delaying load.");
@@ -1026,15 +1034,8 @@ void MediaPlayerPrivateGStreamer::sourceChanged()
     gst_object_replace(reinterpret_cast<GstObject**>(&m_source),
                        reinterpret_cast<GstObject*>(element.get()));
 
-    if (WEBKIT_IS_WEB_SRC(element.get())) {
-        Frame* frame = 0;
-        Document* document = m_player->mediaPlayerClient()->mediaPlayerOwningDocument();
-        if (document)
-            frame = document->frame();
-
-        if (frame)
-            webKitWebSrcSetFrame(WEBKIT_WEB_SRC(element.get()), frame);
-    }
+    if (WEBKIT_IS_WEB_SRC(element.get()))
+        webKitWebSrcSetMediaPlayer(WEBKIT_WEB_SRC(element.get()), m_player);
 }
 
 void MediaPlayerPrivateGStreamer::cancelLoad()
@@ -1494,8 +1495,10 @@ static HashSet<String> mimeTypeCache()
                 const gchar* name = gst_structure_get_name(structure);
                 bool cached = false;
 
-                // These formats are supported by GStreamer, but not
-                // correctly advertised.
+                // There isn't a one-to-one correspondance of caps to supported mime types in
+                // GStreamer, so we need to manually map between them. At some point in the future,
+                // GStreamer may reduce the differences between caps and mime types and we can
+                // remove mappings.
                 if (g_str_equal(name, "video/x-h264")) {
                     cache.add(String("video/mp4"));
                     cached = true;
@@ -1523,6 +1526,7 @@ static HashSet<String> mimeTypeCache()
                 if (g_str_equal(name, "audio/x-vorbis")) {
                     cache.add(String("audio/ogg"));
                     cache.add(String("audio/x-vorbis+ogg"));
+                    cache.add(String("audio/webm"));
                     cached = true;
                 }
 

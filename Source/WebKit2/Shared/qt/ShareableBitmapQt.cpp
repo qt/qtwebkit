@@ -38,8 +38,15 @@ namespace WebKit {
 
 QImage ShareableBitmap::createQImage()
 {
+    ref(); // Balanced by deref in releaseSharedMemoryData
     return QImage(reinterpret_cast<uchar*>(data()), m_size.width(), m_size.height(), m_size.width() * 4,
-                  m_flags & SupportsAlpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32);
+                  m_flags & SupportsAlpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_RGB32,
+                  releaseSharedMemoryData, this);
+}
+
+void ShareableBitmap::releaseSharedMemoryData(void* typelessBitmap)
+{
+    static_cast<ShareableBitmap*>(typelessBitmap)->deref(); // Balanced by ref in createQImage.
 }
 
 PassRefPtr<Image> ShareableBitmap::createImage()
@@ -68,18 +75,6 @@ void ShareableBitmap::paint(GraphicsContext& /*context*/, float /*scaleFactor*/,
 {
     // See <https://bugs.webkit.org/show_bug.cgi?id=64663>.
     notImplemented();
-}
-
-void ShareableBitmap::swizzleRGB()
-{
-    uint32_t* data = reinterpret_cast<uint32_t*>(this->data());
-    int width = size().width();
-    int height = size().height();
-    for (int y = 0; y < height; ++y) {
-        uint32_t* p = data + y * width;
-        for (int x = 0; x < width; ++x)
-            p[x] = ((p[x] << 16) & 0xff0000) | ((p[x] >> 16) & 0xff) | (p[x] & 0xff00ff00);
-    }
 }
 
 }

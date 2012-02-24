@@ -87,8 +87,6 @@
 #import <WebCore/ScriptValue.h>
 #import <WebCore/SecurityOrigin.h>
 #import <WebCore/SmartReplace.h>
-#import <WebCore/SVGDocumentExtensions.h>
-#import <WebCore/SVGSMILElement.h>
 #import <WebCore/TextIterator.h>
 #import <WebCore/ThreadCheck.h>
 #import <WebCore/TypingCommand.h>
@@ -801,7 +799,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 {
     if (!_private->coreFrame)
         return;
-    _private->coreFrame->editor()->computeAndSetTypingStyle(core(style), undoAction);
+    // FIXME: We shouldn't have to create a copy here.
+    _private->coreFrame->editor()->computeAndSetTypingStyle(core(style)->copy().get(), undoAction);
 }
 
 - (void)_dragSourceEndedAt:(NSPoint)windowLoc operation:(NSDragOperation)operation
@@ -990,29 +989,6 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         return false;
 
     return controller->pauseTransitionAtTime(coreNode->renderer(), name, time);
-}
-
-// Pause a given SVG animation on the target node at a specific time.
-// This method is only intended to be used for testing the SVG animation system.
-- (BOOL)_pauseSVGAnimation:(NSString*)elementId onSMILNode:(DOMNode *)node atTime:(NSTimeInterval)time
-{
-#if ENABLE(SVG)
-    Frame* frame = core(self);
-    if (!frame)
-        return false;
- 
-    Document* document = frame->document();
-    if (!document || !document->svgExtensions())
-        return false;
-
-    Node* coreNode = core(node);
-    if (!coreNode || !SVGSMILElement::isSMILElement(coreNode))
-        return false;
-
-    return document->accessSVGExtensions()->sampleAnimationAtTime(elementId, static_cast<SVGSMILElement*>(coreNode), time);
-#else
-    return false;
-#endif
 }
 
 - (unsigned) _numberOfActiveAnimations
@@ -1484,7 +1460,7 @@ static NSURL *createUniqueWebDataURL()
     
     if (!MIMEType)
         MIMEType = @"text/html";
-    [self _loadData:data MIMEType:MIMEType textEncodingName:encodingName baseURL:baseURL unreachableURL:nil];
+    [self _loadData:data MIMEType:MIMEType textEncodingName:encodingName baseURL:[baseURL _webkit_URLFromURLOrPath] unreachableURL:nil];
 }
 
 - (void)_loadHTMLString:(NSString *)string baseURL:(NSURL *)baseURL unreachableURL:(NSURL *)unreachableURL

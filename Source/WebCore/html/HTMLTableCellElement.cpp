@@ -75,6 +75,33 @@ int HTMLTableCellElement::cellIndex() const
     return index;
 }
 
+bool HTMLTableCellElement::isPresentationAttribute(Attribute* attr) const
+{
+    if (attr->name() == nowrapAttr || attr->name() == widthAttr || attr->name() == heightAttr)
+        return true;
+    return HTMLTablePartElement::isPresentationAttribute(attr);
+}
+
+void HTMLTableCellElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
+{
+    if (attr->name() == nowrapAttr) {
+        addPropertyToAttributeStyle(style, CSSPropertyWhiteSpace, CSSValueWebkitNowrap);
+    } else if (attr->name() == widthAttr) {
+        if (!attr->value().isEmpty()) {
+            int widthInt = attr->value().toInt();
+            if (widthInt > 0) // width="0" is ignored for compatibility with WinIE.
+                addHTMLLengthToStyle(style, CSSPropertyWidth, attr->value());
+        }
+    } else if (attr->name() == heightAttr) {
+        if (!attr->value().isEmpty()) {
+            int heightInt = attr->value().toInt();
+            if (heightInt > 0) // height="0" is ignored for compatibility with WinIE.
+                addHTMLLengthToStyle(style, CSSPropertyHeight, attr->value());
+        }
+    } else
+        HTMLTablePartElement::collectStyleForAttribute(attr, style);
+}
+
 void HTMLTableCellElement::parseAttribute(Attribute* attr)
 {
     if (attr->name() == rowspanAttr) {
@@ -83,38 +110,15 @@ void HTMLTableCellElement::parseAttribute(Attribute* attr)
     } else if (attr->name() == colspanAttr) {
         if (renderer() && renderer()->isTableCell())
             toRenderTableCell(renderer())->colSpanOrRowSpanChanged();
-    } else if (attr->name() == nowrapAttr) {
-        if (attr->isNull())
-            removeCSSProperty(CSSPropertyWhiteSpace);
-        else
-            addCSSProperty(CSSPropertyWhiteSpace, CSSValueWebkitNowrap);
-
-    } else if (attr->name() == widthAttr) {
-        if (!attr->value().isEmpty()) {
-            int widthInt = attr->value().toInt();
-            if (widthInt > 0) // width="0" is ignored for compatibility with WinIE.
-                addCSSLength(CSSPropertyWidth, attr->value());
-        } else
-            removeCSSProperty(CSSPropertyWidth);
-    } else if (attr->name() == heightAttr) {
-        if (!attr->value().isEmpty()) {
-            int heightInt = attr->value().toInt();
-            if (heightInt > 0) // height="0" is ignored for compatibility with WinIE.
-                addCSSLength(CSSPropertyHeight, attr->value());
-        } else
-            removeCSSProperty(CSSPropertyHeight);
     } else
         HTMLTablePartElement::parseAttribute(attr);
 }
 
 StylePropertySet* HTMLTableCellElement::additionalAttributeStyle()
 {
-    ContainerNode* p = parentNode();
-    while (p && !p->hasTagName(tableTag))
-        p = p->parentNode();
-    if (!p)
-        return 0;
-    return static_cast<HTMLTableElement*>(p)->additionalCellStyle();
+    if (HTMLTableElement* table = findParentTable())
+        return table->additionalCellStyle();
+    return 0;
 }
 
 bool HTMLTableCellElement::isURLAttribute(Attribute *attr) const

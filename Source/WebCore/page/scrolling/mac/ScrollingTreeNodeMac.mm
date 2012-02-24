@@ -41,7 +41,14 @@ PassOwnPtr<ScrollingTreeNode> ScrollingTreeNode::create(ScrollingTree* scrolling
 
 ScrollingTreeNodeMac::ScrollingTreeNodeMac(ScrollingTree* scrollingTree)
     : ScrollingTreeNode(scrollingTree)
+    , m_scrollElasticityController(this)
 {
+}
+
+ScrollingTreeNodeMac::~ScrollingTreeNodeMac()
+{
+    if (m_snapRubberbandTimer)
+        CFRunLoopTimerInvalidate(m_snapRubberbandTimer.get());
 }
 
 void ScrollingTreeNodeMac::update(ScrollingTreeState* state)
@@ -50,12 +57,159 @@ void ScrollingTreeNodeMac::update(ScrollingTreeState* state)
 
     if (state->changedProperties() & ScrollingTreeState::ScrollLayer)
         m_scrollLayer = state->platformScrollLayer();
+
+    if (state->changedProperties() & (ScrollingTreeState::ScrollLayer | ScrollingTreeState::ContentsSize | ScrollingTreeState::ViewportRect))
+        updateMainFramePinState(scrollPosition());
 }
 
 void ScrollingTreeNodeMac::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
 {
-    // FXIME: This needs to handle rubberbanding.
-    scrollBy(IntSize(-wheelEvent.deltaX(), -wheelEvent.deltaY()));
+    m_scrollElasticityController.handleWheelEvent(wheelEvent);
+}
+
+void ScrollingTreeNodeMac::setScrollPosition(const IntPoint& scrollPosition)
+{
+    updateMainFramePinState(scrollPosition);
+
+    if (shouldUpdateScrollLayerPositionOnMainThread()) {
+        scrollingTree()->updateMainFrameScrollPositionAndScrollLayerPosition(scrollPosition);
+        return;
+    }
+
+    setScrollLayerPosition(scrollPosition);
+    scrollingTree()->updateMainFrameScrollPosition(scrollPosition);
+}
+
+bool ScrollingTreeNodeMac::allowsHorizontalStretching()
+{
+    switch (horizontalScrollElasticity()) {
+    case ScrollElasticityAutomatic:
+        return hasEnabledHorizontalScrollbar() || !hasEnabledVerticalScrollbar();
+    case ScrollElasticityNone:
+        return false;
+    case ScrollElasticityAllowed:
+        return true;
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+bool ScrollingTreeNodeMac::allowsVerticalStretching()
+{
+    switch (verticalScrollElasticity()) {
+    case ScrollElasticityAutomatic:
+        return hasEnabledVerticalScrollbar() || !hasEnabledHorizontalScrollbar();
+    case ScrollElasticityNone:
+        return false;
+    case ScrollElasticityAllowed:
+        return true;
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+IntSize ScrollingTreeNodeMac::stretchAmount()
+{
+    IntSize stretch;
+
+    if (scrollPosition().y() < minimumScrollPosition().y())
+        stretch.setHeight(scrollPosition().y() - minimumScrollPosition().y());
+    else if (scrollPosition().y() > maximumScrollPosition().y())
+        stretch.setHeight(scrollPosition().y() - maximumScrollPosition().y());
+
+    if (scrollPosition().x() < minimumScrollPosition().x())
+        stretch.setWidth(scrollPosition().x() - minimumScrollPosition().x());
+    else if (scrollPosition().x() > maximumScrollPosition().x())
+        stretch.setWidth(scrollPosition().x() - maximumScrollPosition().x());
+
+    return stretch;
+}
+
+bool ScrollingTreeNodeMac::pinnedInDirection(const FloatSize& delta)
+{
+    FloatSize limitDelta;
+
+    if (fabsf(delta.height()) >= fabsf(delta.width())) {
+        if (delta.height() < 0) {
+            // We are trying to scroll up.  Make sure we are not pinned to the top
+            limitDelta.setHeight(scrollPosition().y() - minimumScrollPosition().y());
+        } else {
+            // We are trying to scroll down.  Make sure we are not pinned to the bottom
+            limitDelta.setHeight(maximumScrollPosition().y() - scrollPosition().y());
+        }
+    } else if (delta.width()) {
+        if (delta.width() < 0) {
+            // We are trying to scroll left.  Make sure we are not pinned to the left
+            limitDelta.setHeight(scrollPosition().x() - minimumScrollPosition().x());
+        } else {
+            // We are trying to scroll right.  Make sure we are not pinned to the right
+            limitDelta.setHeight(maximumScrollPosition().x() - scrollPosition().x());
+        }
+    }
+
+    if ((delta.width() || delta.height()) && (limitDelta.width() < 1 && limitDelta.height() < 1))        
+        return true;
+
+    return false;
+}
+
+bool ScrollingTreeNodeMac::canScrollHorizontally()
+{
+    return hasEnabledHorizontalScrollbar();
+}
+
+bool ScrollingTreeNodeMac::canScrollVertically()
+{
+    return hasEnabledVerticalScrollbar();
+}
+
+bool ScrollingTreeNodeMac::shouldRubberBandInDirection(ScrollDirection direction)
+{
+    if (direction == ScrollLeft)
+        return !scrollingTree()->canGoBack();
+    if (direction == ScrollRight)
+        return !scrollingTree()->canGoForward();
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+IntPoint ScrollingTreeNodeMac::absoluteScrollPosition()
+{
+    return scrollPosition();
+}
+
+void ScrollingTreeNodeMac::immediateScrollBy(const FloatSize& offset)
+{
+    scrollBy(roundedIntSize(offset));
+}
+
+void ScrollingTreeNodeMac::immediateScrollByWithoutContentEdgeConstraints(const FloatSize& offset)
+{
+    scrollByWithoutContentEdgeConstraints(roundedIntSize(offset));
+}
+
+void ScrollingTreeNodeMac::startSnapRubberbandTimer()
+{
+    ASSERT(!m_snapRubberbandTimer);
+
+    CFTimeInterval timerInterval = 1.0 / 60.0;
+
+    m_snapRubberbandTimer = adoptCF(CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent() + timerInterval, timerInterval, 0, 0, ^(CFRunLoopTimerRef) {
+        m_scrollElasticityController.snapRubberBandTimerFired();
+    }));
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), m_snapRubberbandTimer.get(), kCFRunLoopDefaultMode);
+}
+
+void ScrollingTreeNodeMac::stopSnapRubberbandTimer()
+{
+    if (!m_snapRubberbandTimer)
+        return;
+
+    CFRunLoopTimerInvalidate(m_snapRubberbandTimer.get());
+    m_snapRubberbandTimer = nullptr;
 }
 
 IntPoint ScrollingTreeNodeMac::scrollPosition() const
@@ -64,16 +218,49 @@ IntPoint ScrollingTreeNodeMac::scrollPosition() const
     return IntPoint(-scrollLayerPosition.x, -scrollLayerPosition.y);
 }
 
-void ScrollingTreeNodeMac::setScrollPosition(const IntPoint& position)
+void ScrollingTreeNodeMac::setScrollLayerPosition(const IntPoint& position)
 {
+    ASSERT(!shouldUpdateScrollLayerPositionOnMainThread());
     m_scrollLayer.get().position = CGPointMake(-position.x(), -position.y());
 }
 
-void ScrollingTreeNodeMac::scrollBy(const IntSize &offset)
+IntPoint ScrollingTreeNodeMac::minimumScrollPosition() const
+{
+    // FIXME: This should take the scroll origin into account.
+    return IntPoint(0, 0);
+}
+
+IntPoint ScrollingTreeNodeMac::maximumScrollPosition() const
+{
+    // FIXME: This should take the scroll origin into account.
+    IntPoint position(contentsSize().width() - viewportRect().width(),
+                      contentsSize().height() - viewportRect().height());
+
+    position.clampNegativeToZero();
+
+    return position;
+}
+
+void ScrollingTreeNodeMac::scrollBy(const IntSize& offset)
+{
+    IntPoint newScrollPosition = scrollPosition() + offset;
+    newScrollPosition = newScrollPosition.shrunkTo(maximumScrollPosition());
+    newScrollPosition = newScrollPosition.expandedTo(minimumScrollPosition());
+
+    setScrollPosition(newScrollPosition);
+}
+
+void ScrollingTreeNodeMac::scrollByWithoutContentEdgeConstraints(const IntSize& offset)
 {
     setScrollPosition(scrollPosition() + offset);
+}
 
-    scrollingTree()->updateMainFrameScrollPosition(scrollPosition());
+void ScrollingTreeNodeMac::updateMainFramePinState(const IntPoint& scrollPosition)
+{
+    bool pinnedToTheLeft = scrollPosition.x() <= minimumScrollPosition().x();
+    bool pinnedToTheRight = scrollPosition.x() >= maximumScrollPosition().x();
+
+    scrollingTree()->setMainFramePinState(pinnedToTheLeft, pinnedToTheRight);
 }
 
 } // namespace WebCore

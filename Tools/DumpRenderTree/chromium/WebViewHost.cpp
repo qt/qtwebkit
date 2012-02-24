@@ -47,6 +47,7 @@
 #include "WebFrame.h"
 #include "WebGeolocationClientMock.h"
 #include "WebHistoryItem.h"
+#include "WebIntent.h"
 #include "WebKit.h"
 #include "WebNode.h"
 #include "WebPluginParams.h"
@@ -137,7 +138,10 @@ static string descriptionSuitableForTestResult(const string& url)
 // dragging a file.
 static void addDRTFakeFileToDataObject(WebDragData* dragData)
 {
-    dragData->appendToFilenames(WebString::fromUTF8("DRTFakeFile"));
+    WebDragData::Item item;
+    item.storageType = WebDragData::Item::StorageTypeFilename;
+    item.filenameData = WebString::fromUTF8("DRTFakeFile");
+    dragData->addItem(item);
 }
 
 // Get a debugging string from a WebNavigationType.
@@ -709,6 +713,7 @@ WebDeviceOrientationClient* WebViewHost::deviceOrientationClient()
     return deviceOrientationClientMock();
 }
 
+#if ENABLE(MEDIA_STREAM)
 WebUserMediaClient* WebViewHost::userMediaClient()
 {
     return userMediaClientMock();
@@ -720,6 +725,7 @@ WebUserMediaClientMock* WebViewHost::userMediaClientMock()
         m_userMediaClientMock = WebUserMediaClientMock::create();
     return m_userMediaClientMock.get();
 }
+#endif
 
 // WebWidgetClient -----------------------------------------------------------
 
@@ -893,11 +899,21 @@ WebRect WebViewHost::windowResizerRect()
 
 void WebViewHost::runModal()
 {
+    if (m_shell->isDisplayingModalDialog()) {
+        // DumpRenderTree doesn't support real modal dialogs, so a test shouldn't try to start two modal dialogs at the same time.
+        ASSERT_NOT_REACHED();
+        return;
+    }
+    // This WebViewHost might get deleted before RunMessageLoop() returns, so keep a copy of the m_shell member variable around.
+    ASSERT(m_shell->webViewHost() != this);
+    TestShell* shell = m_shell;
+    shell->setIsDisplayingModalDialog(true);
     bool oldState = webkit_support::MessageLoopNestableTasksAllowed();
     webkit_support::MessageLoopSetNestableTasksAllowed(true);
     m_inModalLoop = true;
     webkit_support::RunMessageLoop();
     webkit_support::MessageLoopSetNestableTasksAllowed(oldState);
+    shell->setIsDisplayingModalDialog(false);
 }
 
 bool WebViewHost::enterFullScreen()
@@ -923,7 +939,11 @@ WebPlugin* WebViewHost::createPlugin(WebFrame* frame, const WebPluginParams& par
 
 WebMediaPlayer* WebViewHost::createMediaPlayer(WebFrame* frame, WebMediaPlayerClient* client)
 {
+#if ENABLE(MEDIA_STREAM)
     return webkit_support::CreateMediaPlayer(frame, client, testMediaStreamClient());
+#else
+    return webkit_support::CreateMediaPlayer(frame, client);
+#endif
 }
 
 WebApplicationCacheHost* WebViewHost::createApplicationCacheHost(WebFrame* frame, WebApplicationCacheHostClient* client)
@@ -1294,6 +1314,14 @@ bool WebViewHost::willCheckAndDispatchMessageEvent(WebFrame* source, WebSecurity
     return false;
 }
 
+void WebViewHost::dispatchIntent(WebFrame* source, const WebIntentRequest& request)
+{
+    printf("Received Web Intent: action=%s type=%s\n",
+           request.intent().action().utf8().data(),
+           request.intent().type().utf8().data());
+    m_currentRequest = request;
+}
+
 // Public functions -----------------------------------------------------------
 
 WebViewHost::WebViewHost(TestShell* shell)
@@ -1636,6 +1664,7 @@ void WebViewHost::exitFullScreenNow()
     webView()->didExitFullScreen();
 }
 
+#if ENABLE(MEDIA_STREAM)
 webkit_support::MediaStreamUtil* WebViewHost::mediaStreamUtil()
 {
     return userMediaClientMock();
@@ -1647,6 +1676,7 @@ webkit_support::TestMediaStreamClient* WebViewHost::testMediaStreamClient()
         m_testMediaStreamClient = adoptPtr(new webkit_support::TestMediaStreamClient(mediaStreamUtil()));
     return m_testMediaStreamClient.get();
 }
+#endif
 
 // Painting functions ---------------------------------------------------------
 

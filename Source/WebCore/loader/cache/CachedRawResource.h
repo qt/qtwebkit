@@ -27,6 +27,8 @@
 #include "CachedResourceClient.h"
 
 namespace WebCore {
+class CachedRawResourceCallback;
+class CachedRawResourceClient;
 
 class CachedRawResource : public CachedResource {
 public:
@@ -38,7 +40,9 @@ public:
     virtual void setDefersLoading(bool);
     
     // FIXME: This is exposed for the InpsectorInstrumentation for preflights in DocumentThreadableLoader. It's also really lame.
-    unsigned long identifier() const;
+    unsigned long identifier() const { return m_identifier; }
+
+    bool canReuse() const;
 
 private:
     virtual void didAddClient(CachedResourceClient*);
@@ -54,7 +58,7 @@ private:
     virtual void didDownloadData(int);
 #endif
 
-    size_t m_dataLength;
+    unsigned long m_identifier;
 };
 
 
