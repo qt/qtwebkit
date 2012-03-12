@@ -119,11 +119,6 @@ bool JSObject::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned
     return thisObject->methodTable()->getOwnPropertySlot(thisObject, exec, Identifier::from(exec, propertyName), slot);
 }
 
-static void throwSetterError(ExecState* exec)
-{
-    throwError(exec, createTypeError(exec, "setting a property that has only a getter"));
-}
-
 // ECMA 8.6.2.2
 void JSObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
 {
@@ -161,7 +156,7 @@ void JSObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName
                 JSObject* setterFunc = asGetterSetter(gs)->setter();        
                 if (!setterFunc) {
                     if (slot.isStrictMode())
-                        throwSetterError(exec);
+                        throwError(exec, createTypeError(exec, "setting a property that has only a getter"));
                     return;
                 }
                 
@@ -190,9 +185,9 @@ void JSObject::put(JSCell* cell, ExecState* exec, const Identifier& propertyName
     return;
 }
 
-void JSObject::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, JSValue value)
+void JSObject::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, JSValue value, bool shouldThrow)
 {
-    PutPropertySlot slot;
+    PutPropertySlot slot(shouldThrow);
     JSObject* thisObject = jsCast<JSObject*>(cell);
     thisObject->methodTable()->put(thisObject, exec, Identifier::from(exec, propertyName), value, slot);
 }
@@ -707,7 +702,7 @@ bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, const Identi
     if (descriptor.isGenericDescriptor()) {
         if (!current.attributesEqual(descriptor)) {
             object->methodTable()->deleteProperty(object, exec, propertyName);
-            return putDescriptor(exec, object, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
+            return putDescriptor(exec, object, propertyName, descriptor, descriptor.attributesOverridingCurrent(current), current);
         }
         return true;
     }
@@ -720,7 +715,7 @@ bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, const Identi
             return false;
         }
         object->methodTable()->deleteProperty(object, exec, propertyName);
-        return putDescriptor(exec, object, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
+        return putDescriptor(exec, object, propertyName, descriptor, descriptor.attributesOverridingCurrent(current), current);
     }
 
     // Changing the value and attributes of an existing property
@@ -742,7 +737,7 @@ bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, const Identi
         if (current.attributesEqual(descriptor) && !descriptor.value())
             return true;
         object->methodTable()->deleteProperty(object, exec, propertyName);
-        return putDescriptor(exec, object, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
+        return putDescriptor(exec, object, propertyName, descriptor, descriptor.attributesOverridingCurrent(current), current);
     }
 
     // Changing the accessor functions of an existing accessor property

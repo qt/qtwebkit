@@ -490,7 +490,7 @@ void HTMLCanvasElement::createImageBuffer() const
 
     m_hasCreatedImageBuffer = true;
 
-    FloatSize logicalSize(width(), height());
+    FloatSize logicalSize = size();
     FloatSize deviceSize = convertLogicalToDevice(logicalSize);
     if (!deviceSize.isExpressibleAsIntSize())
         return;
@@ -513,7 +513,7 @@ void HTMLCanvasElement::createImageBuffer() const
         Unaccelerated;
 #endif
     DeferralMode deferralMode = shouldDefer() ? Deferred : NonDeferred;
-    m_imageBuffer = ImageBuffer::create(bufferSize, ColorSpaceDeviceRGB, renderingMode, deferralMode);
+    m_imageBuffer = ImageBuffer::create(bufferSize, 1, ColorSpaceDeviceRGB, renderingMode, deferralMode);
     if (!m_imageBuffer)
         return;
     m_imageBuffer->context()->scale(FloatSize(bufferSize.width() / logicalSize.width(), bufferSize.height() / logicalSize.height()));
@@ -523,7 +523,8 @@ void HTMLCanvasElement::createImageBuffer() const
 
 #if USE(JSC)
     JSC::JSLock lock(JSC::SilenceAssertionsOnly);
-    scriptExecutionContext()->globalData()->heap.reportExtraMemoryCost(m_imageBuffer->dataSize());
+    size_t numBytes = 4 * m_imageBuffer->internalSize().width() * m_imageBuffer->internalSize().height();
+    scriptExecutionContext()->globalData()->heap.reportExtraMemoryCost(numBytes);
 #endif
 
 #if USE(IOSURFACE_CANVAS_BACKING_STORE) || (ENABLE(ACCELERATED_2D_CANVAS) && USE(ACCELERATED_COMPOSITING))
@@ -571,7 +572,7 @@ void HTMLCanvasElement::clearCopiedImage()
 AffineTransform HTMLCanvasElement::baseTransform() const
 {
     ASSERT(m_hasCreatedImageBuffer);
-    FloatSize unscaledSize(width(), height());
+    FloatSize unscaledSize = size();
     FloatSize deviceSize = convertLogicalToDevice(unscaledSize);
     IntSize size(deviceSize.width(), deviceSize.height());
     AffineTransform transform;

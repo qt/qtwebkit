@@ -65,8 +65,6 @@
 #include "FrameView.h"
 #include "HTMLFrameOwnerElement.h"
 #include "History.h"
-#include "IDBFactory.h"
-#include "IDBFactoryBackendInterface.h"
 #include "InspectorInstrumentation.h"
 #include "KURL.h"
 #include "Location.h"
@@ -420,9 +418,6 @@ DOMWindow::~DOMWindow()
 #if ENABLE(NOTIFICATIONS)
     ASSERT(!m_notifications);
 #endif
-#if ENABLE(INDEXED_DATABASE)
-    ASSERT(!m_idbFactory);
-#endif
 #if ENABLE(BLOB)
     ASSERT(!m_domURL);
 #endif
@@ -461,6 +456,11 @@ PassRefPtr<MediaQueryList> DOMWindow::matchMedia(const String& media)
 void DOMWindow::setSecurityOrigin(SecurityOrigin* securityOrigin)
 {
     m_securityOrigin = securityOrigin;
+}
+
+Page* DOMWindow::page()
+{
+    return frame() ? frame()->page() : 0;
 }
 
 void DOMWindow::frameDestroyed()
@@ -525,9 +525,6 @@ void DOMWindow::clear()
     // FIXME: Notifications shouldn't have different disconnection logic than
     // the rest of the DOMWindowProperties.
     resetNotifications();
-#endif
-#if ENABLE(INDEXED_DATABASE)
-    m_idbFactory = 0;
 #endif
 #if ENABLE(BLOB)
     m_domURL = 0;
@@ -719,7 +716,7 @@ NotificationCenter* DOMWindow::webkitNotifications() const
     if (!page)
         return 0;
 
-    NotificationPresenter* provider = NotificationController::clientFrom(page);
+    NotificationClient* provider = NotificationController::clientFrom(page);
     if (provider) 
         m_notifications = NotificationCenter::create(document, provider);    
       
@@ -732,13 +729,6 @@ void DOMWindow::resetNotifications()
         return;
     m_notifications->disconnectFrame();
     m_notifications = 0;
-}
-#endif
-
-#if ENABLE(INDEXED_DATABASE)
-void DOMWindow::setIDBFactory(PassRefPtr<IDBFactory> idbFactory)
-{
-    m_idbFactory = idbFactory;
 }
 #endif
 
@@ -1494,10 +1484,10 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
         addBeforeUnloadEventListener(this);
 #if ENABLE(DEVICE_ORIENTATION)
     else if (eventType == eventNames().devicemotionEvent) {
-        if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+        if (DeviceMotionController* controller = DeviceMotionController::from(page()))
             controller->addListener(this);
     } else if (eventType == eventNames().deviceorientationEvent) {
-        if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+        if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
             controller->addListener(this);
     }
 #endif
@@ -1521,10 +1511,10 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
         removeBeforeUnloadEventListener(this);
 #if ENABLE(DEVICE_ORIENTATION)
     else if (eventType == eventNames().devicemotionEvent) {
-        if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+        if (DeviceMotionController* controller = DeviceMotionController::from(page()))
             controller->removeListener(this);
     } else if (eventType == eventNames().deviceorientationEvent) {
-        if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+        if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
             controller->removeListener(this);
     }
 #endif
@@ -1579,9 +1569,9 @@ void DOMWindow::removeAllEventListeners()
     EventTarget::removeAllEventListeners();
 
 #if ENABLE(DEVICE_ORIENTATION)
-    if (DeviceMotionController* controller = DeviceMotionController::from(frame()))
+    if (DeviceMotionController* controller = DeviceMotionController::from(page()))
         controller->removeAllListeners(this);
-    if (DeviceOrientationController* controller = DeviceOrientationController::from(frame()))
+    if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
         controller->removeAllListeners(this);
 #endif
 

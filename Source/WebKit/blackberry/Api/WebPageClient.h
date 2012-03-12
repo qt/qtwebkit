@@ -66,42 +66,6 @@ public:
         FlagWindowDefault = 0xFFFFFFFF,
     };
 
-    enum FocusType {
-        FocusUnknown = 0,
-        FocusNone,
-        FocusCanvas,
-        FocusImage,
-        FocusInputButton,
-        FocusInputCheckBox,
-        FocusInputColor,
-        FocusInputDate,
-        FocusInputDateTime,
-        FocusInputDateTimeLocal,
-        FocusInputEmail,
-        FocusInputFile,
-        FocusInputImage,
-        FocusInputMonth,
-        FocusInputNumber,
-        FocusInputPassword,
-        FocusInputRadio,
-        FocusInputRange,
-        FocusInputReset,
-        FocusInputSearch,
-        FocusInputSubmit,
-        FocusInputTelephone,
-        FocusInputText,
-        FocusInputTime,
-        FocusInputURL,
-        FocusInputWeek,
-        FocusInputUnknown,
-        FocusLink,
-        FocusObject,
-        FocusSelect,
-        FocusSVGElement,
-        FocusTextArea,
-        FocusVideo,
-    };
-
     enum AlertType {
         MediaOK = 0,
         MediaDecodeError,
@@ -165,7 +129,6 @@ public:
     virtual void drawTapHighlight(const Platform::IntRectRegion&, int red, int green, int blue, int alpha, bool hideAfterScroll) = 0;
     virtual void hideTapHighlight() = 0;
 
-    virtual void focusChanged(FocusType, int elementId) = 0;
     virtual void inputFocusGained(Platform::BlackBerryInputType, int inputStyle, bool waitForExplicitKeyboardShowCall) = 0;
     virtual void inputFocusLost() = 0;
     virtual void inputTextChanged() = 0;
@@ -261,7 +224,6 @@ public:
     virtual void touchEventModeChanged(Platform::TouchEventMode) = 0;
 
     virtual bool downloadAllowed(const char* url) = 0;
-    virtual void downloadRequested(const Platform::NetworkRequest&) = 0;
     virtual void downloadRequested(Platform::FilterStream*, const WebString& suggestedFilename) = 0;
 
     virtual int fullscreenStart(const char* contextName, Platform::Graphics::Window*, unsigned x, unsigned y, unsigned width, unsigned height) = 0;

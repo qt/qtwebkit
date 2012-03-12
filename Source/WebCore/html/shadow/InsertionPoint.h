@@ -33,6 +33,8 @@
 
 #include "HTMLContentSelector.h"
 #include "HTMLElement.h"
+#include "HTMLNames.h"
+#include <wtf/Forward.h>
 
 namespace WebCore {
 
@@ -42,17 +44,39 @@ public:
 
     const HTMLContentSelectionList* selections() const { return &m_selections; }
     bool hasSelection() const { return m_selections.first(); }
+    bool isShadowBoundary() const;
+
+    virtual const AtomicString& select() const = 0;
+    virtual bool isSelectValid() const = 0;
+    virtual bool doesSelectFromHostChildren() const = 0;
+
+    virtual void attach();
+    virtual void detach();
+
+    virtual bool isInsertionPoint() const OVERRIDE { return true; }
+    ShadowRoot* assignedFrom() const;
 
 protected:
     InsertionPoint(const QualifiedName&, Document*);
+    virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
+
+private:
+    void distributeHostChildren(ShadowTree*);
+    void clearDistribution(ShadowTree*);
+    void attachDistributedNode();
+
+    void assignShadowRoot(ShadowRoot*);
+    void clearAssignment(ShadowRoot*);
+
     HTMLContentSelectionList m_selections;
 };
 
 inline bool isInsertionPoint(Node* node)
 {
-    // FIXME: <shadow> should also be InsertionPoint.
-    // https://bugs.webkit.org/show_bug.cgi?id=78596
-    if (!node || node->isContentElement())
+    if (!node)
+        return true;
+
+    if (node->isHTMLElement() && toHTMLElement(node)->isInsertionPoint())
         return true;
 
     return false;
@@ -62,6 +86,13 @@ inline InsertionPoint* toInsertionPoint(Node* node)
 {
     ASSERT(isInsertionPoint(node));
     return static_cast<InsertionPoint*>(node);
+}
+
+inline bool isShadowBoundary(Node* node)
+{
+    if (!isInsertionPoint(node))
+        return false;
+    return toInsertionPoint(node)->isShadowBoundary();
 }
 
 } // namespace WebCore

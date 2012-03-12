@@ -30,7 +30,9 @@
 
 #include <webkit2/WebKitBackForwardList.h>
 #include <webkit2/WebKitDefines.h>
+#include <webkit2/WebKitFindController.h>
 #include <webkit2/WebKitHitTestResult.h>
+#include <webkit2/WebKitScriptDialog.h>
 #include <webkit2/WebKitSettings.h>
 #include <webkit2/WebKitURIRequest.h>
 #include <webkit2/WebKitWebContext.h>
@@ -47,7 +49,6 @@ G_BEGIN_DECLS
 #define WEBKIT_IS_WEB_VIEW_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass),  WEBKIT_TYPE_WEB_VIEW))
 #define WEBKIT_WEB_VIEW_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj),  WEBKIT_TYPE_WEB_VIEW, WebKitWebViewClass))
 
-typedef struct _WebKitWebView WebKitWebView;
 typedef struct _WebKitWebViewClass WebKitWebViewClass;
 typedef struct _WebKitWebViewPrivate WebKitWebViewPrivate;
 
@@ -77,7 +78,7 @@ typedef struct _WebKitWebViewPrivate WebKitWebViewPrivate;
  *   or to block the transfer of resources entirely.
  *
  * Enum values used for determining the type of a policy decision during
- * WebKitWebView::decide-policy.
+ * #WebKitWebView::decide-policy.
  */
 typedef enum {
     WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION,
@@ -86,7 +87,7 @@ typedef enum {
 } WebKitPolicyDecisionType;
 
 /**
- * WebKitLoadEvent
+ * WebKitLoadEvent:
  * @WEBKIT_LOAD_STARTED: A new load request has been made.
  * No data has been received yet, empty structures have
  * been allocated to perform the load; the load may still
@@ -99,6 +100,9 @@ typedef enum {
  * load is being performed.
  * @WEBKIT_LOAD_FINISHED: Load completed. All resources are done loading
  * or there was an error during the load operation.
+ *
+ * Enum values used to denote the different events that happen during a
+ * #WebKitWebView load operation.
  */
 typedef enum {
     WEBKIT_LOAD_STARTED,
@@ -128,15 +132,9 @@ struct _WebKitWebViewClass {
     void       (* ready_to_show)        (WebKitWebView             *web_view);
     void       (* close)                (WebKitWebView             *web_view);
 
-    gboolean   (* script_alert)         (WebKitWebView             *web_view,
-                                         const gchar               *message);
-    gboolean   (* script_confirm)       (WebKitWebView             *web_view,
-                                         const gchar               *message,
-                                         gboolean                  *confirmed);
-    gboolean   (* script_prompt)        (WebKitWebView             *web_view,
-                                         const gchar               *message,
-                                         const gchar               *default_text,
-                                         gchar                    **text);
+    gboolean   (* script_dialog)        (WebKitWebView             *web_view,
+                                         WebKitScriptDialog        *dialog);
+
     gboolean   (* decide_policy)        (WebKitWebView             *web_view,
                                          WebKitPolicyDecision      *decision,
                                          WebKitPolicyDecisionType   type);
@@ -265,6 +263,10 @@ webkit_web_view_can_execute_editing_command_finish (WebKitWebView             *w
 WEBKIT_API void
 webkit_web_view_execute_editing_command            (WebKitWebView             *web_view,
                                                     const gchar               *command);
+
+WEBKIT_API WebKitFindController *
+webkit_web_view_get_find_controller                (WebKitWebView             *web_view);
+
 G_END_DECLS
 
 #endif

@@ -448,31 +448,6 @@ void JIT::emitSlow_op_bitxor(Instruction* currentInstruction, Vector<SlowCaseEnt
     stubCall.call(dst);
 }
 
-// BitNot (~)
-
-void JIT::emit_op_bitnot(Instruction* currentInstruction)
-{
-    unsigned dst = currentInstruction[1].u.operand;
-    unsigned src = currentInstruction[2].u.operand;
-
-    emitLoad(src, regT1, regT0);
-    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(JSValue::Int32Tag)));
-
-    not32(regT0);
-    emitStoreAndMapInt32(dst, regT1, regT0, dst == src, OPCODE_LENGTH(op_bitnot));
-}
-
-void JIT::emitSlow_op_bitnot(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    unsigned dst = currentInstruction[1].u.operand;
-
-    linkSlowCase(iter); // int32 check
-
-    JITStubCall stubCall(this, cti_op_bitnot);
-    stubCall.addArgument(regT1, regT0);
-    stubCall.call(dst);
-}
-
 // PostInc (i++)
 
 void JIT::emit_op_post_inc(Instruction* currentInstruction)
@@ -504,7 +479,7 @@ void JIT::emitSlow_op_post_inc(Instruction* currentInstruction, Vector<SlowCaseE
 
     JITStubCall stubCall(this, cti_op_post_inc);
     stubCall.addArgument(srcDst);
-    stubCall.addArgument(Imm32(srcDst));
+    stubCall.addArgument(TrustedImm32(srcDst));
     stubCall.call(dst);
 }
 
@@ -644,9 +619,9 @@ void JIT::emit_op_add(Instruction* currentInstruction)
 void JIT::emitAdd32Constant(unsigned dst, unsigned op, int32_t constant, ResultType opType)
 {
     // Int32 case.
-    emitLoad(op, regT1, regT0);
+    emitLoad(op, regT1, regT2);
     Jump notInt32 = branch32(NotEqual, regT1, TrustedImm32(JSValue::Int32Tag));
-    addSlowCase(branchAdd32(Overflow, Imm32(constant), regT0));
+    addSlowCase(branchAdd32(Overflow, regT2, Imm32(constant), regT0));
     emitStoreInt32(dst, regT0, (op == dst));
 
     // Double case.
@@ -757,8 +732,13 @@ void JIT::emitSub32Constant(unsigned dst, unsigned op, int32_t constant, ResultT
     // Int32 case.
     emitLoad(op, regT1, regT0);
     Jump notInt32 = branch32(NotEqual, regT1, TrustedImm32(JSValue::Int32Tag));
-    addSlowCase(branchSub32(Overflow, Imm32(constant), regT0));
-    emitStoreInt32(dst, regT0, (op == dst));
+#if ENABLE(JIT_CONSTANT_BLINDING)
+    addSlowCase(branchSub32(Overflow, regT0, Imm32(constant), regT2, regT3));
+#else
+    addSlowCase(branchSub32(Overflow, regT0, Imm32(constant), regT2));
+#endif
+    
+    emitStoreInt32(dst, regT2, (op == dst));
 
     // Double case.
     if (!supportsFloatingPoint()) {
@@ -886,7 +866,7 @@ void JIT::emitBinaryDoubleOp(OpcodeID opcodeID, unsigned dst, unsigned op1, unsi
                 emitStoreInt32(dst, regT2);
                 Jump isInteger = jump();
                 notInteger.link(this);
-                add32(Imm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
+                add32(TrustedImm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
                 emitStoreDouble(dst, fpRegT1);
                 isInteger.link(this);
 #else
@@ -990,7 +970,7 @@ void JIT::emitBinaryDoubleOp(OpcodeID opcodeID, unsigned dst, unsigned op1, unsi
                 emitStoreInt32(dst, regT2);
                 Jump isInteger = jump();
                 notInteger.link(this);
-                add32(Imm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
+                add32(TrustedImm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
                 emitStoreDouble(dst, fpRegT0);
                 isInteger.link(this);
 #else
@@ -1096,7 +1076,7 @@ void JIT::emitSlow_op_mul(Instruction* currentInstruction, Vector<SlowCaseEntry>
     // We only get here if we have a genuine negative zero. Record this,
     // so that the speculative JIT knows that we failed speculation
     // because of a negative zero.
-    add32(Imm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
+    add32(TrustedImm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
 #endif
     overflow.link(this);
 
@@ -1175,7 +1155,7 @@ void JIT::emit_op_div(Instruction* currentInstruction)
     emitStoreInt32(dst, regT2);
     end.append(jump());
     notInteger.link(this);
-    add32(Imm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
+    add32(TrustedImm32(1), AbsoluteAddress(&m_codeBlock->specialFastCaseProfileForBytecodeOffset(m_bytecodeOffset)->m_counter));
     emitStoreDouble(dst, fpRegT0);
 #else
     emitStoreDouble(dst, fpRegT0);

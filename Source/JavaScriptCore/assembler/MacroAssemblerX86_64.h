@@ -35,9 +35,6 @@
 namespace JSC {
 
 class MacroAssemblerX86_64 : public MacroAssemblerX86Common {
-protected:
-    static const X86Registers::RegisterID scratchRegister = X86Registers::r11;
-
 public:
     static const Scale ScalePtr = TimesEight;
 
@@ -88,12 +85,6 @@ public:
         }
     }
 
-    void loadDouble(const void* address, FPRegisterID dest)
-    {
-        move(TrustedImmPtr(address), scratchRegister);
-        loadDouble(scratchRegister, dest);
-    }
-
     void addDouble(AbsoluteAddress address, FPRegisterID dest)
     {
         move(TrustedImmPtr(address.m_ptr), scratchRegister);
@@ -104,14 +95,6 @@ public:
     {
         move(imm, scratchRegister);
         m_assembler.cvtsi2sd_rr(scratchRegister, dest);
-    }
-
-    void absDouble(FPRegisterID src, FPRegisterID dst)
-    {
-        ASSERT(src != dst);
-        static const double negativeZeroConstant = -0.0;
-        loadDouble(&negativeZeroConstant, dst);
-        m_assembler.andnpd_rr(src, dst);
     }
 
     void store32(TrustedImm32 imm, void* address)
@@ -233,6 +216,11 @@ public:
         move(src, dest);
         orPtr(imm, dest);
     }
+    
+    void rotateRightPtr(TrustedImm32 imm, RegisterID srcDst)
+    {
+        m_assembler.rorq_i8r(imm.m_value, srcDst);
+    }
 
     void subPtr(RegisterID src, RegisterID dest)
     {
@@ -254,12 +242,16 @@ public:
     {
         m_assembler.xorq_rr(src, dest);
     }
+    
+    void xorPtr(RegisterID src, Address dest)
+    {
+        m_assembler.xorq_rm(src, dest.offset, dest.base);
+    }
 
     void xorPtr(TrustedImm32 imm, RegisterID srcDest)
     {
         m_assembler.xorq_ir(imm.m_value, srcDest);
     }
-
 
     void loadPtr(ImplicitAddress address, RegisterID dest)
     {
@@ -347,6 +339,13 @@ public:
             m_assembler.testq_rr(left, left);
         else
             m_assembler.cmpq_ir(right.m_value, left);
+        m_assembler.setCC_r(x86Condition(cond), dest);
+        m_assembler.movzbl_rr(dest, dest);
+    }
+    
+    void comparePtr(RelationalCondition cond, RegisterID left, RegisterID right, RegisterID dest)
+    {
+        m_assembler.cmpq_rr(right, left);
         m_assembler.setCC_r(x86Condition(cond), dest);
         m_assembler.movzbl_rr(dest, dest);
     }
@@ -459,6 +458,12 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
+    Jump branchSubPtr(ResultCondition cond, RegisterID src1, TrustedImm32 src2, RegisterID dest)
+    {
+        move(src1, dest);
+        return branchSubPtr(cond, src2, dest);
+    }
+
     DataLabelPtr moveWithPatch(TrustedImmPtr initialValue, RegisterID dest)
     {
         m_assembler.movq_i64r(initialValue.asIntptr(), dest);
@@ -502,6 +507,8 @@ public:
     {
         return FunctionPtr(X86Assembler::readPointer(call.dataLabelPtrAtOffset(-REPTACH_OFFSET_CALL_R11).dataLocation()));
     }
+
+    static RegisterID scratchRegisterForBlinding() { return scratchRegister; }
 
 private:
     friend class LinkBuffer;

@@ -50,12 +50,6 @@ module threads {
         // WorkerUtils
         [Custom] void importScripts(/*[Variadic] in DOMString urls */);
                  attribute [Replaceable] WorkerNavigator navigator;
-#if defined(ENABLE_SQL_DATABASE) && ENABLE_SQL_DATABASE
-        [V8EnabledAtRuntime] Database openDatabase(in DOMString name, in DOMString version, in DOMString displayName, in unsigned long estimatedSize, in [Callback, Optional] DatabaseCallback creationCallback)
-            raises(DOMException);
-        [V8EnabledAtRuntime] DatabaseSync openDatabaseSync(in DOMString name, in DOMString version, in DOMString displayName, in unsigned long estimatedSize, in [Callback, Optional] DatabaseCallback creationCallback)
-            raises(DOMException);
-#endif
 
         // Timers
         [Custom] long setTimeout(in TimeoutHandler handler, in long timeout);
@@ -104,18 +98,6 @@ module threads {
 
         attribute [Conditional=BLOB] DOMURLConstructor webkitURL;
 
-#if defined(ENABLE_FILE_SYSTEM) && ENABLE_FILE_SYSTEM
-        const unsigned short TEMPORARY = 0;
-        const unsigned short PERSISTENT = 1;
-        [V8EnabledAtRuntime=FileSystem] void webkitRequestFileSystem(in unsigned short type, in long long size, in [Callback, Optional] FileSystemCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
-        [V8EnabledAtRuntime=FileSystem] DOMFileSystemSync webkitRequestFileSystemSync(in unsigned short type, in long long size) raises (FileException);
-        [V8EnabledAtRuntime=FileSystem] void webkitResolveLocalFileSystemURL(in DOMString url, in [Callback, Optional] EntryCallback successCallback, in [Callback, Optional] ErrorCallback errorCallback);
-        [V8EnabledAtRuntime=FileSystem] EntrySync webkitResolveLocalFileSystemSyncURL(in DOMString url) raises (FileException);
-
-                 attribute [V8EnabledAtRuntime=FileSystem] FileErrorConstructor FileError;
-                 attribute [V8EnabledAtRuntime=FileSystem] FileExceptionConstructor FileException;
-#endif
-
         attribute ArrayBufferConstructor ArrayBuffer; // Usable with new operator
         attribute Int8ArrayConstructor Int8Array; // Usable with new operator
         attribute Uint8ArrayConstructor Uint8Array; // Usable with new operator
@@ -127,20 +109,6 @@ module threads {
         attribute Float32ArrayConstructor Float32Array; // Usable with new operator
         attribute Float64ArrayConstructor Float64Array; // Usable with new operator
         attribute DataViewConstructor DataView; // Usable with new operator
-#if defined(ENABLE_INDEXED_DATABASE) && ENABLE_INDEXED_DATABASE
-        readonly attribute [V8EnabledAtRuntime] IDBFactory webkitIndexedDB;
-
-        attribute [V8EnabledAtRuntime] IDBCursorConstructor webkitIDBCursor;
-        attribute [V8EnabledAtRuntime] IDBDatabaseConstructor webkitIDBDatabase;
-        attribute [V8EnabledAtRuntime] IDBDatabaseErrorConstructor webkitIDBDatabaseError;
-        attribute [V8EnabledAtRuntime] IDBDatabaseExceptionConstructor webkitIDBDatabaseException;
-        attribute [V8EnabledAtRuntime] IDBFactoryConstructor webkitIDBFactory;
-        attribute [V8EnabledAtRuntime] IDBIndexConstructor webkitIDBIndex;
-        attribute [V8EnabledAtRuntime] IDBKeyRangeConstructor webkitIDBKeyRange;
-        attribute [V8EnabledAtRuntime] IDBObjectStoreConstructor webkitIDBObjectStore;
-        attribute [V8EnabledAtRuntime] IDBRequestConstructor webkitIDBRequest;
-        attribute [V8EnabledAtRuntime] IDBTransactionConstructor webkitIDBTransaction;
-#endif
     };
 
 }

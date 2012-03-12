@@ -93,10 +93,13 @@ public:
     // WebStorage specification.
     // The request parameter is only for the client to check if the request
     // could be fulfilled.  The client should not load the request.
+    // The policy parameter indicates how the new view will be displayed in
+    // WebWidgetClient::show.
     virtual WebView* createView(WebFrame* creator,
                                 const WebURLRequest& request,
                                 const WebWindowFeatures& features,
-                                const WebString& name) {
+                                const WebString& name,
+                                WebNavigationPolicy policy) {
         return 0;
     }
 
@@ -110,10 +113,10 @@ public:
     // Create a session storage namespace object associated with this WebView.
     virtual WebStorageNamespace* createSessionStorageNamespace(unsigned quota) { return 0; }
 
-    // Creates a graphics context associated with the client's WebView.
-    // renderDirectlyToWebView means whether the context should be setup to
-    // render directly to the WebView (e.g. compositor context), or to an
-    // offscreen surface (e.g. WebGL context).
+    // Creates a graphics context that renders to the client's WebView.
+    virtual WebGraphicsContext3D* createGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
+
+    // Deprecated, use the first version of this function. If you want an offscreen context, use WebKitPlatformSupport::createOffscreenGraphicsContext3D().
     virtual WebGraphicsContext3D* createGraphicsContext3D(const WebGraphicsContext3D::Attributes&, bool renderDirectlyToWebView) { return 0; }
 
     // Misc ----------------------------------------------------------------

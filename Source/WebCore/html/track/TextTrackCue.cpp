@@ -35,8 +35,12 @@
 
 #include "TextTrackCue.h"
 
-#include "Event.h"
+#include "CSSPropertyNames.h"
+#include "CSSValueKeywords.h"
 #include "DocumentFragment.h"
+#include "Event.h"
+#include "HTMLDivElement.h"
+#include "Text.h"
 #include "TextTrack.h"
 #include "TextTrackCueList.h"
 #include "WebVTTParser.h"
@@ -46,57 +50,75 @@ namespace WebCore {
 
 static const int invalidCueIndex = -1;
 
-static const AtomicString& startKeyword()
+static const String& startKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, start, ("start"));
+    DEFINE_STATIC_LOCAL(const String, start, ("start"));
     return start;
 }
 
-static const AtomicString& middleKeyword()
+static const String& middleKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, middle, ("middle"));
+    DEFINE_STATIC_LOCAL(const String, middle, ("middle"));
     return middle;
 }
 
-static const AtomicString& endKeyword()
+static const String& endKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, end, ("end"));
+    DEFINE_STATIC_LOCAL(const String, end, ("end"));
     return end;
 }
 
-static const AtomicString& horizontalKeyword()
+static const String& horizontalKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, horizontal, ("horizontal"));
-    return horizontal;
+    return emptyString();
 }
 
-static const AtomicString& verticalKeyword()
+static const String& verticalGrowingLeftKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, vertical, ("vertical"));
+    DEFINE_STATIC_LOCAL(const String, vertical, ("rl"));
     return vertical;
 }
-static const AtomicString& verticallrKeyword()
+
+static const String& verticalGrowingRightKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, verticallr, ("vertical-lr"));
+    DEFINE_STATIC_LOCAL(const String, verticallr, ("lr"));
+    return verticallr;
+}
+
+// FIXME: remove this once https://bugs.webkit.org/show_bug.cgi?id=78706 has been fixed.
+static const String& verticalKeywordOLD()
+{
+    DEFINE_STATIC_LOCAL(const String, vertical, ("vertical"));
+    return vertical;
+}
+
+// FIXME: remove this once https://bugs.webkit.org/show_bug.cgi?id=78706 has been fixed.
+static const String& verticallrKeywordOLD()
+{
+    DEFINE_STATIC_LOCAL(const String, verticallr, ("vertical-lr"));
     return verticallr;
 }
     
+
 TextTrackCue::TextTrackCue(ScriptExecutionContext* context, const String& id, double start, double end, const String& content, const String& settings, bool pauseOnExit)
     : m_id(id)
     , m_startTime(start)
     , m_endTime(end)
     , m_content(content)
-    , m_writingDirection(Horizontal)
     , m_linePosition(-1)
     , m_textPosition(50)
     , m_cueSize(100)
     , m_cueIndex(invalidCueIndex)
+    , m_writingDirection(Horizontal)
     , m_cueAlignment(Middle)
     , m_scriptExecutionContext(context)
     , m_isActive(false)
     , m_pauseOnExit(pauseOnExit)
     , m_snapToLines(true)
+    , m_displayTreeShouldChange(true)
+    , m_displayTree(HTMLDivElement::create(static_cast<Document*>(context)))
 {
+    ASSERT(m_scriptExecutionContext->isDocument());
     parseSettings(settings);
 }
 
@@ -114,6 +136,8 @@ void TextTrackCue::cueDidChange()
 {
     if (m_track)
         m_track->cueDidChange(this);
+
+    m_displayTreeShouldChange = true;
 }
 
 TextTrack* TextTrackCue::track() const
@@ -166,35 +190,35 @@ void TextTrackCue::setPauseOnExit(bool value)
     cueDidChange();
 }
 
-const String& TextTrackCue::direction() const
+const String& TextTrackCue::vertical() const
 {
     switch (m_writingDirection) {
     case Horizontal: 
         return horizontalKeyword();
     case VerticalGrowingLeft:
-        return verticalKeyword();
+        return verticalGrowingLeftKeyword();
     case VerticalGrowingRight:
-        return verticallrKeyword();
+        return verticalGrowingRightKeyword();
     default:
         ASSERT_NOT_REACHED();
         return emptyString();
     }
 }
 
-void TextTrackCue::setDirection(const String& value, ExceptionCode& ec)
+void TextTrackCue::setVertical(const String& value, ExceptionCode& ec)
 {
-    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-direction
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-vertical
     // On setting, the text track cue writing direction must be set to the value given 
     // in the first cell of the row in the table above whose second cell is a 
     // case-sensitive match for the new value, if any. If none of the values match, then
     // the user agent must instead throw a SyntaxError exception.
     
-    Direction direction = m_writingDirection;
+    WritingDirection direction = m_writingDirection;
     if (value == horizontalKeyword())
         direction = Horizontal;
-    else if (value == verticalKeyword())
+    else if (value == verticalGrowingLeftKeyword())
         direction = VerticalGrowingLeft;
-    else if (value == verticallrKeyword())
+    else if (value == verticalGrowingRightKeyword())
         direction = VerticalGrowingRight;
     else
         ec = SYNTAX_ERR;
@@ -217,9 +241,9 @@ void TextTrackCue::setSnapToLines(bool value)
     cueDidChange();
 }
 
-void TextTrackCue::setLinePosition(int position, ExceptionCode& ec)
+void TextTrackCue::setLine(int position, ExceptionCode& ec)
 {
-    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-lineposition
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-line
     // On setting, if the text track cue snap-to-lines flag is not set, and the new
     // value is negative or greater than 100, then throw an IndexSizeError exception.
     if (!m_snapToLines && (position < 0 || position > 100)) {
@@ -236,9 +260,9 @@ void TextTrackCue::setLinePosition(int position, ExceptionCode& ec)
     cueDidChange();
 }
 
-void TextTrackCue::setTextPosition(int position, ExceptionCode& ec)
+void TextTrackCue::setPosition(int position, ExceptionCode& ec)
 {
-    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-lineposition
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-position
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError exception.
     // Otherwise, set the text track cue text position to the new value.
     if (position < 0 || position > 100) {
@@ -274,7 +298,7 @@ void TextTrackCue::setSize(int size, ExceptionCode& ec)
     cueDidChange();
 }
 
-const String& TextTrackCue::alignment() const
+const String& TextTrackCue::align() const
 {
     switch (m_cueAlignment) {
     case Start:
@@ -289,9 +313,9 @@ const String& TextTrackCue::alignment() const
     }
 }
 
-void TextTrackCue::setAlignment(const String& value, ExceptionCode& ec)
+void TextTrackCue::setAlign(const String& value, ExceptionCode& ec)
 {
-    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-alignment
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#dom-texttrackcue-align
     // On setting, the text track cue alignment must be set to the value given in the 
     // first cell of the row in the table above whose second cell is a case-sensitive
     // match for the new value, if any. If none of the values match, then the user
@@ -343,15 +367,18 @@ void TextTrackCue::invalidateCueIndex()
 
 PassRefPtr<DocumentFragment> TextTrackCue::getCueAsHTML()
 {
+    RefPtr<DocumentFragment> clonedFragment;
+    Document* document;
+
     if (!m_documentFragment)
         m_documentFragment = WebVTTParser::create(0, m_scriptExecutionContext)->createDocumentFragmentFromCueText(m_content);
 
-    return m_documentFragment;
-}
+    document = static_cast<Document*>(m_scriptExecutionContext);
 
-void TextTrackCue::setCueHTML(PassRefPtr<DocumentFragment> fragment)
-{
-    m_documentFragment = fragment;
+    clonedFragment = DocumentFragment::create(document);
+    m_documentFragment->cloneChildNodes(clonedFragment.get());
+
+    return clonedFragment.release();
 }
 
 bool TextTrackCue::dispatchEvent(PassRefPtr<Event> event)
@@ -376,6 +403,63 @@ bool TextTrackCue::isActive()
 void TextTrackCue::setIsActive(bool active)
 {
     m_isActive = active;
+
+    if (!active) {
+        // Remove the display tree as soon as the cue becomes inactive.
+        ExceptionCode ec;
+        m_displayTree->remove(ec);
+    }
+}
+
+void TextTrackCue::determineDisplayParameters()
+{
+    // FIXME(BUG 79749): Determine the text direction using the BIDI algorithm.
+    // Steps 10.2, 10.3
+
+    // FIXME(BUG 79747): Determine the display parameters from the rules.
+    // Steps 10.1, 10.4 - 10.10
+}
+
+PassRefPtr<HTMLDivElement> TextTrackCue::getDisplayTree()
+{
+    if (!m_displayTreeShouldChange)
+        return m_displayTree;
+
+    // 10.1 - 10.10
+    determineDisplayParameters();
+
+    // 10.11. Apply the terms of the CSS specifications to nodes within the
+    // following constraints, thus obtaining a set of CSS boxes positioned
+    // relative to an initial containing block:
+    m_displayTree->removeChildren();
+
+    // The document tree is the tree of WebVTT Node Objects rooted at nodes.
+
+    // The children of the nodes must be wrapped in an anonymous box whose
+    // 'display' property has the value 'inline'. This is the WebVTT cue
+    // background box.
+    m_displayTree->setShadowPseudoId(AtomicString("-webkit-media-text-track-display"), ASSERT_NO_EXCEPTION);
+    m_displayTree->appendChild(getCueAsHTML(), ASSERT_NO_EXCEPTION, true);
+
+    // FIXME(BUG 79916): Runs of children of WebVTT Ruby Objects that are not
+    // WebVTT Ruby Text Objects must be wrapped in anonymous boxes whose
+    // 'display' property has the value 'ruby-base'.
+
+    // FIXME(BUG 79916): Text runs must be wrapped according to the CSS
+    // line-wrapping rules, except that additionally, regardless of the value of
+    // the 'white-space' property, lines must be wrapped at the edge of their
+    // containing blocks, even if doing so requires splitting a word where there
+    // is no line breaking opportunity. (Thus, normally text wraps as needed,
+    // but if there is a particularly long word, it does not overflow as it
+    // normally would in CSS, it is instead forcibly wrapped at the box's edge.)
+
+    // FIXME(BUG 79750, 79751): Steps 10.12 - 10.14
+
+    m_displayTreeShouldChange = false;
+
+    // 10.15. Let cue's text track cue display state have the CSS boxes in
+    // boxes.
+    return m_displayTree;
 }
 
 void TextTrackCue::parseSettings(const String& input)
@@ -405,9 +489,9 @@ void TextTrackCue::parseSettings(const String& input)
             {
             // 1-3 - Collect the next word and set the writing direction accordingly.
             String writingDirection = WebVTTParser::collectWord(input, &position);
-            if (writingDirection == verticalKeyword())
+            if (writingDirection == verticalKeywordOLD())
                 m_writingDirection = VerticalGrowingLeft;
-            else if (writingDirection == verticallrKeyword())
+            else if (writingDirection == verticallrKeywordOLD())
                 m_writingDirection = VerticalGrowingRight;
             }
             break;

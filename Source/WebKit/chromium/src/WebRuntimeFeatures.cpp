@@ -34,7 +34,7 @@
 #include "AbstractDatabase.h"
 #include "RuntimeEnabledFeatures.h"
 #include "WebMediaPlayerClientImpl.h"
-#include "websockets/WebSocket.h"
+#include "Modules/websockets/WebSocket.h"
 
 #include <wtf/UnusedParam.h>
 
@@ -258,6 +258,22 @@ void WebRuntimeFeatures::enableSpeechInput(bool enable)
 bool WebRuntimeFeatures::isSpeechInputEnabled()
 {
     return RuntimeEnabledFeatures::speechInputEnabled();
+}
+
+void WebRuntimeFeatures::enableScriptedSpeech(bool enable)
+{
+#if ENABLE(SCRIPTED_SPEECH)
+    RuntimeEnabledFeatures::setScriptedSpeechEnabled(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::isScriptedSpeechEnabled()
+{
+#if ENABLE(SCRIPTED_SPEECH)
+    return RuntimeEnabledFeatures::scriptedSpeechEnabled();
+#else
+    return false;
+#endif
 }
 
 void WebRuntimeFeatures::enableXHRResponseBlob(bool enable)

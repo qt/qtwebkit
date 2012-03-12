@@ -1,8 +1,8 @@
 AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
-m4_define([webkit_minor_version], [7])
-m4_define([webkit_micro_version], [5])
+m4_define([webkit_minor_version], [9])
+m4_define([webkit_micro_version], [0])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
@@ -576,6 +576,14 @@ AC_ARG_ENABLE(channel_messaging,
               [],[enable_channel_messaging="yes"])
 AC_MSG_RESULT([$enable_channel_messaging])
 
+# check whether to enable legacy notifications
+AC_MSG_CHECKING([whether to enable legacy notifications])
+AC_ARG_ENABLE(legacy_notifications,
+              AC_HELP_STRING([--enable-legacy-notifications],
+                             [enable legacy notifications [default=no]]),
+              [],[enable_legacy_notifications="no"])
+AC_MSG_RESULT([$enable_legacy_notifications])
+
 # check whether to enable notifications
 AC_MSG_CHECKING([whether to enable notifications])
 AC_ARG_ENABLE(notifications,
@@ -687,6 +695,14 @@ AC_ARG_ENABLE(input_speech,
                              [enable the speech input API [default=no]]),
               [],[enable_input_speech="no"])
 AC_MSG_RESULT([$enable_input_speech])
+
+# check whether to enable the scripted speech API
+AC_MSG_CHECKING([whether to enable the scripted speech API])
+AC_ARG_ENABLE(scripted_speech,
+              AC_HELP_STRING([--enable-scripted-speech],
+                             [enable the scripted speech API [default=no]]),
+              [],[enable_scripted_speech="no"])
+AC_MSG_RESULT([$enable_scripted_speech])
 
 # check whether to build with SQL database support
 AC_MSG_CHECKING([whether to enable SQL client-side database storage support])
@@ -1338,6 +1354,7 @@ AM_CONDITIONAL([ENABLE_IMAGE_RESIZER],[test "$enable_image_resizer" = "yes"])
 AM_CONDITIONAL([ENABLE_INDEXED_DATABASE],[test "$enable_indexed_database" = "yes"])
 AM_CONDITIONAL([ENABLE_INPUT_COLOR],[test "$enable_input_color" = "yes"])
 AM_CONDITIONAL([ENABLE_INPUT_SPEECH],[test "$enable_input_speech" = "yes"])
+AM_CONDITIONAL([ENABLE_SCRIPTED_SPEECH],[test "$enable_scripted_speech" = "yes"])
 AM_CONDITIONAL([ENABLE_XSLT],[test "$enable_xslt" = "yes"])
 AM_CONDITIONAL([ENABLE_FILTERS],[test "$enable_filters" = "yes"])
 AM_CONDITIONAL([ENABLE_GEOLOCATION], [test "$enable_geolocation" = "yes"])
@@ -1349,6 +1366,7 @@ AM_CONDITIONAL([ENABLE_MEDIA_STATISTICS],[test "$enable_media_statistics" = "yes
 AM_CONDITIONAL([ENABLE_VIDEO_TRACK],[test "$enable_video_track" = "yes"])
 AM_CONDITIONAL([ENABLE_FULLSCREEN_API],[test "$enable_fullscreen_api" = "yes"])
 AM_CONDITIONAL([ENABLE_MEDIA_STREAM],[test "$enable_media_stream" = "yes"])
+AM_CONDITIONAL([ENABLE_LEGACY_NOTIFICATIONS],[test "$enable_legacy_notifications" = "yes"])
 AM_CONDITIONAL([ENABLE_NOTIFICATIONS],[test "$enable_notifications" = "yes"])
 AM_CONDITIONAL([ENABLE_ORIENTATION_EVENTS],[test "$enable_orientation_events" = "yes"])
 AM_CONDITIONAL([ENABLE_SVG],[test "$enable_svg" = "yes"])
@@ -1459,6 +1477,7 @@ Features:
  SharedWorkers support                                    : $enable_shared_workers
  Color input support                                      : $enable_input_color
  Speech input support                                     : $enable_input_speech
+ Scripted speech support                                  : $enable_scripted_speech
  SVG support                                              : $enable_svg
  SVG fonts support                                        : $enable_svg_fonts
  Web Audio support                                        : $enable_web_audio

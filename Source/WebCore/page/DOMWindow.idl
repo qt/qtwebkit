@@ -45,7 +45,7 @@ module window {
     ] DOMWindow {
         // DOM Level 0
         attribute [Replaceable] Screen screen;
-        attribute [Replaceable, DoNotCheckSecurityOnGetter, JSCustomGetter] History history;
+        attribute [Replaceable, DoNotCheckSecurityOnGetter] History history;
         attribute [Replaceable] BarInfo locationbar;
         attribute [Replaceable] BarInfo menubar;
         attribute [Replaceable] BarInfo personalbar;
@@ -56,7 +56,7 @@ module window {
         attribute [Replaceable] Navigator clientInformation;
         readonly attribute Crypto crypto;
 #if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP
-        attribute [DoNotCheckSecurity, JSCustom, V8CustomSetter, V8Unforgeable] Location location;
+        attribute [DoNotCheckSecurity, CustomSetter, V8Unforgeable] Location location;
 #endif
         attribute [Replaceable, CustomGetter, V8CustomSetter] Event event;
 
@@ -393,15 +393,115 @@ module window {
         attribute ProcessingInstructionConstructor ProcessingInstruction;
         attribute [Conditional=SHADOW_DOM, V8EnabledAtRuntime=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
 
+        attribute DOMSelectionConstructor Selection;
         attribute DOMWindowConstructor Window;
 
-        // FIXME: Should these Canvas constructors move to html/DOMWindowHTML with the rest of canvas?
+        attribute HTMLDocumentConstructor HTMLDocument;
+        attribute HTMLElementConstructor HTMLElement;
+        attribute HTMLAnchorElementConstructor HTMLAnchorElement;
+        attribute HTMLAppletElementConstructor HTMLAppletElement;
+        attribute HTMLAreaElementConstructor HTMLAreaElement;
+        attribute HTMLBRElementConstructor HTMLBRElement;
+        attribute HTMLBaseElementConstructor HTMLBaseElement;
+        attribute HTMLBaseFontElementConstructor HTMLBaseFontElement;
+        attribute HTMLBodyElementConstructor HTMLBodyElement;
+        attribute HTMLButtonElementConstructor HTMLButtonElement;
+        attribute HTMLCanvasElementConstructor HTMLCanvasElement;
+        attribute HTMLDListElementConstructor HTMLDListElement;
+        attribute HTMLDirectoryElementConstructor HTMLDirectoryElement;
+        attribute HTMLDivElementConstructor HTMLDivElement;
+        attribute HTMLEmbedElementConstructor HTMLEmbedElement;
+        attribute HTMLFieldSetElementConstructor HTMLFieldSetElement;
+        attribute HTMLFontElementConstructor HTMLFontElement;
+        attribute HTMLFormElementConstructor HTMLFormElement;
+        attribute HTMLFrameElementConstructor HTMLFrameElement;
+        attribute HTMLFrameSetElementConstructor HTMLFrameSetElement;
+        attribute HTMLHRElementConstructor HTMLHRElement;
+        attribute HTMLHeadElementConstructor HTMLHeadElement;
+        attribute HTMLHeadingElementConstructor HTMLHeadingElement;
+        attribute HTMLHtmlElementConstructor HTMLHtmlElement;
+        attribute HTMLIFrameElementConstructor HTMLIFrameElement;
+        attribute HTMLImageElementConstructor HTMLImageElement;
+        attribute HTMLInputElementConstructor HTMLInputElement;
+        attribute HTMLKeygenElementConstructor HTMLKeygenElement;
+        attribute HTMLLIElementConstructor HTMLLIElement;
+        attribute HTMLLabelElementConstructor HTMLLabelElement;
+        attribute HTMLLegendElementConstructor HTMLLegendElement;
+        attribute HTMLLinkElementConstructor HTMLLinkElement;
+        attribute HTMLMapElementConstructor HTMLMapElement;
+        attribute HTMLMarqueeElementConstructor HTMLMarqueeElement;
+        attribute HTMLMenuElementConstructor HTMLMenuElement;
+        attribute HTMLMetaElementConstructor HTMLMetaElement;
+#if defined(ENABLE_METER_TAG) && ENABLE_METER_TAG
+        attribute HTMLMeterElementConstructor HTMLMeterElement;
+#endif
+        attribute HTMLModElementConstructor HTMLModElement;
+        attribute HTMLOListElementConstructor HTMLOListElement;
+        attribute HTMLObjectElementConstructor HTMLObjectElement;
+        attribute HTMLOptGroupElementConstructor HTMLOptGroupElement;
+        attribute HTMLOptionElementConstructor HTMLOptionElement;
+        attribute HTMLOutputElementConstructor HTMLOutputElement;
+        attribute HTMLParagraphElementConstructor HTMLParagraphElement;
+        attribute HTMLParamElementConstructor HTMLParamElement;
+        attribute HTMLPreElementConstructor HTMLPreElement;
+#if defined(ENABLE_PROGRESS_TAG) && ENABLE_PROGRESS_TAG
+        attribute HTMLProgressElementConstructor HTMLProgressElement;
+#endif
+        attribute HTMLQuoteElementConstructor HTMLQuoteElement;
+        attribute HTMLScriptElementConstructor HTMLScriptElement;
+        attribute HTMLSelectElementConstructor HTMLSelectElement;
+        attribute HTMLSpanElementConstructor HTMLSpanElement;
+        attribute HTMLStyleElementConstructor HTMLStyleElement;
+        attribute HTMLTableCaptionElementConstructor HTMLTableCaptionElement;
+        attribute HTMLTableCellElementConstructor HTMLTableCellElement;
+        attribute HTMLTableColElementConstructor HTMLTableColElement;
+        attribute HTMLTableElementConstructor HTMLTableElement;
+        attribute HTMLTableRowElementConstructor HTMLTableRowElement;
+        attribute HTMLTableSectionElementConstructor HTMLTableSectionElement;
+        attribute HTMLTextAreaElementConstructor HTMLTextAreaElement;
+        attribute HTMLTitleElementConstructor HTMLTitleElement;
+        attribute HTMLUListElementConstructor HTMLUListElement;
+
+        attribute HTMLCollectionConstructor HTMLCollection;
+        attribute HTMLAllCollectionConstructor HTMLAllCollection;
+        attribute [Conditional=MICRODATA] HTMLPropertiesCollectionConstructor HTMLPropertiesCollection;
+        attribute HTMLUnknownElementConstructor HTMLUnknownElement;
+
+        attribute [JSCustomGetter, CustomConstructor] HTMLImageElementConstructorConstructor Image; // Usable with new operator
+        attribute [JSCustomGetter] HTMLOptionElementConstructorConstructor Option; // Usable with new operator
+
+        attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] HTMLTrackElementConstructor HTMLTrackElement;
+        attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TextTrackConstructor TextTrack;
+        attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TextTrackCueConstructor TextTrackCue; // Usable with the new operator
+        attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TextTrackCueListConstructor TextTrackCueList;
+        attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TextTrackListConstructor TextTrackList;
+        attribute [Conditional=VIDEO_TRACK, V8EnabledAtRuntime=webkitVideoTrack] TrackEventConstructor TrackEvent;
+
+        attribute [JSCustomGetter, Conditional=VIDEO, V8EnabledAtRuntime] HTMLAudioElementConstructorConstructor Audio; // Usable with the new operator
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLAudioElementConstructor HTMLAudioElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLMediaElementConstructor HTMLMediaElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLVideoElementConstructor HTMLVideoElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] MediaErrorConstructor MediaError;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] TimeRangesConstructor TimeRanges;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] HTMLSourceElementConstructor HTMLSourceElement;
+        attribute [Conditional=VIDEO, V8EnabledAtRuntime] MediaControllerConstructor MediaController;
+
         attribute CanvasPatternConstructor CanvasPattern;
         attribute CanvasGradientConstructor CanvasGradient;
         attribute CanvasRenderingContext2DConstructor CanvasRenderingContext2D;
 
         attribute ImageDataConstructor ImageData;
         attribute TextMetricsConstructor TextMetrics;
+
+        attribute [Conditional=WEBGL] WebGLActiveInfoConstructor WebGLActiveInfo;
+        attribute [Conditional=WEBGL] WebGLBufferConstructor WebGLBuffer;
+        attribute [Conditional=WEBGL] WebGLFramebufferConstructor WebGLFramebuffer;
+        attribute [Conditional=WEBGL] WebGLProgramConstructor WebGLProgram;
+        attribute [Conditional=WEBGL] WebGLRenderbufferConstructor WebGLRenderbuffer;
+        attribute [Conditional=WEBGL] WebGLRenderingContextConstructor WebGLRenderingContext;
+        attribute [Conditional=WEBGL] WebGLShaderConstructor WebGLShader;
+        attribute [Conditional=WEBGL] WebGLTextureConstructor WebGLTexture;
+        attribute [Conditional=WEBGL] WebGLUniformLocationConstructor WebGLUniformLocation;
 
         attribute DOMStringMapConstructor DOMStringMap;
 
@@ -437,6 +537,7 @@ module window {
         attribute WebKitAnimationEventConstructor WebKitAnimationEvent;
         attribute WebKitTransitionEventConstructor WebKitTransitionEvent;
         attribute WheelEventConstructor WheelEvent;
+        attribute XMLHttpRequestProgressEventConstructor XMLHttpRequestProgressEvent;
         attribute [Conditional=DEVICE_ORIENTATION, V8EnabledAtRuntime] DeviceMotionEventConstructor DeviceMotionEvent;
         attribute [Conditional=DEVICE_ORIENTATION, V8EnabledAtRuntime] DeviceOrientationEventConstructor DeviceOrientationEvent;
         attribute [Conditional=TOUCH_EVENTS] TouchEventConstructor TouchEvent;
@@ -456,6 +557,9 @@ module window {
 
         attribute ClipboardConstructor Clipboard;
 
+        attribute [Conditional=WORKERS] WorkerConstructor Worker; // Usable with the new operator
+        attribute [Conditional=SHARED_WORKERS, JSCustomGetter, V8EnabledAtRuntime] SharedWorkerConstructor SharedWorker; // Usable with the new operator
+
         attribute FileConstructor File;
         attribute FileListConstructor FileList;
         attribute BlobConstructor Blob;
@@ -465,6 +569,16 @@ module window {
         attribute RangeExceptionConstructor RangeException;
 
         attribute EventSourceConstructor EventSource; // Usable with new the operator
+
+        // Mozilla has a separate XMLDocument object for XML documents. 
+        // We just use Document for this.
+        attribute DocumentConstructor XMLDocument;
+        attribute DOMParserConstructor DOMParser;
+        attribute XMLSerializerConstructor XMLSerializer;
+        attribute XMLHttpRequestConstructor XMLHttpRequest; // Usable with the new operator
+        attribute XMLHttpRequestUploadConstructor XMLHttpRequestUpload;
+        attribute XMLHttpRequestExceptionConstructor XMLHttpRequestException;
+        attribute [Conditional=XSLT] XSLTProcessorConstructor XSLTProcessor; // Usable with the new operator
 
 #if defined(ENABLE_CHANNEL_MESSAGING) && ENABLE_CHANNEL_MESSAGING
         attribute MessagePortConstructor MessagePort;
@@ -490,6 +604,164 @@ module window {
         attribute XPathEvaluatorConstructor XPathEvaluator;
         attribute XPathResultConstructor XPathResult;
         attribute XPathExceptionConstructor XPathException;
+
+        attribute [Conditional=SVG] SVGZoomEventConstructor SVGZoomEvent;
+
+#if defined(ENABLE_SVG) && ENABLE_SVG
+        // Expose all implemented SVG 1.1 interfaces, excluding the SVG MI interfaces:
+        // SVGAnimatedPathData, SVGAnimatedPoints, SVGExternalResourcesRequired,
+        // SVGFilterPrimitiveStandardAttributes, SVGFitToViewBox, SVGLangSpace, SVGLocatable
+        // SVGStylable, SVGTests, SVGTransformable, SVGURIReference, SVGZoomAndPan
+        attribute SVGAElementConstructor SVGAElement;
+        attribute SVGAngleConstructor SVGAngle;
+        attribute SVGAnimatedAngleConstructor SVGAnimatedAngle;
+        attribute SVGAnimatedBooleanConstructor SVGAnimatedBoolean;
+        attribute SVGAnimatedEnumerationConstructor SVGAnimatedEnumeration;
+        attribute SVGAnimatedIntegerConstructor SVGAnimatedInteger;
+        attribute SVGAnimatedLengthConstructor SVGAnimatedLength;
+        attribute SVGAnimatedLengthListConstructor SVGAnimatedLengthList;
+        attribute SVGAnimatedNumberConstructor SVGAnimatedNumber;
+        attribute SVGAnimatedNumberListConstructor SVGAnimatedNumberList;
+        attribute SVGAnimatedPreserveAspectRatioConstructor SVGAnimatedPreserveAspectRatio;
+        attribute SVGAnimatedRectConstructor SVGAnimatedRect;
+        attribute SVGAnimatedStringConstructor SVGAnimatedString;
+        attribute SVGAnimatedTransformListConstructor SVGAnimatedTransformList;
+        attribute SVGCircleElementConstructor SVGCircleElement;
+        attribute SVGClipPathElementConstructor SVGClipPathElement;
+        attribute SVGColorConstructor SVGColor;
+        attribute SVGCursorElementConstructor SVGCursorElement;
+//      attribute SVGCSSRuleConstructor SVGCSSRule;
+        attribute SVGDefsElementConstructor SVGDefsElement;
+        attribute SVGDescElementConstructor SVGDescElement;
+        attribute SVGDocumentConstructor SVGDocument;
+        attribute SVGElementConstructor SVGElement;
+        attribute SVGElementInstanceConstructor SVGElementInstance;
+        attribute SVGElementInstanceListConstructor SVGElementInstanceList;
+        attribute SVGEllipseElementConstructor SVGEllipseElement;
+        attribute SVGForeignObjectElementConstructor SVGForeignObjectElement;
+        attribute SVGExceptionConstructor SVGException;
+        attribute SVGGElementConstructor SVGGElement;
+        attribute SVGGradientElementConstructor SVGGradientElement;
+        attribute SVGImageElementConstructor SVGImageElement;
+        attribute SVGLengthConstructor SVGLength;
+        attribute SVGLengthListConstructor SVGLengthList;
+        attribute SVGLinearGradientElementConstructor SVGLinearGradientElement;
+        attribute SVGLineElementConstructor SVGLineElement;
+        attribute SVGMarkerElementConstructor SVGMarkerElement;
+        attribute SVGMaskElementConstructor SVGMaskElement;
+        attribute SVGMatrixConstructor SVGMatrix;
+        attribute SVGMetadataElementConstructor SVGMetadataElement;
+        attribute SVGNumberConstructor SVGNumber;
+        attribute SVGNumberListConstructor SVGNumberList;
+        attribute SVGPaintConstructor SVGPaint;
+        attribute SVGPathElementConstructor SVGPathElement;
+        attribute SVGPathSegConstructor SVGPathSeg;
+        attribute SVGPathSegArcAbsConstructor SVGPathSegArcAbs;
+        attribute SVGPathSegArcRelConstructor SVGPathSegArcRel;
+        attribute SVGPathSegClosePathConstructor SVGPathSegClosePath;
+        attribute SVGPathSegCurvetoCubicAbsConstructor SVGPathSegCurvetoCubicAbs;
+        attribute SVGPathSegCurvetoCubicRelConstructor SVGPathSegCurvetoCubicRel;
+        attribute SVGPathSegCurvetoCubicSmoothAbsConstructor SVGPathSegCurvetoCubicSmoothAbs;
+        attribute SVGPathSegCurvetoCubicSmoothRelConstructor SVGPathSegCurvetoCubicSmoothRel;
+        attribute SVGPathSegCurvetoQuadraticAbsConstructor SVGPathSegCurvetoQuadraticAbs;
+        attribute SVGPathSegCurvetoQuadraticRelConstructor SVGPathSegCurvetoQuadraticRel;
+        attribute SVGPathSegCurvetoQuadraticSmoothAbsConstructor SVGPathSegCurvetoQuadraticSmoothAbs;
+        attribute SVGPathSegCurvetoQuadraticSmoothRelConstructor SVGPathSegCurvetoQuadraticSmoothRel;
+        attribute SVGPathSegLinetoAbsConstructor SVGPathSegLinetoAbs;
+        attribute SVGPathSegLinetoHorizontalAbsConstructor SVGPathSegLinetoHorizontalAbs;
+        attribute SVGPathSegLinetoHorizontalRelConstructor SVGPathSegLinetoHorizontalRel;
+        attribute SVGPathSegLinetoRelConstructor SVGPathSegLinetoRel;
+        attribute SVGPathSegLinetoVerticalAbsConstructor SVGPathSegLinetoVerticalAbs;
+        attribute SVGPathSegLinetoVerticalRelConstructor SVGPathSegLinetoVerticalRel;
+        attribute SVGPathSegListConstructor SVGPathSegList;
+        attribute SVGPathSegMovetoAbsConstructor SVGPathSegMovetoAbs;
+        attribute SVGPathSegMovetoRelConstructor SVGPathSegMovetoRel;
+        attribute SVGPatternElementConstructor SVGPatternElement;
+        attribute SVGPointConstructor SVGPoint;
+        attribute SVGPointListConstructor SVGPointList;
+        attribute SVGPolygonElementConstructor SVGPolygonElement;
+        attribute SVGPolylineElementConstructor SVGPolylineElement;
+        attribute SVGPreserveAspectRatioConstructor SVGPreserveAspectRatio;
+        attribute SVGRadialGradientElementConstructor SVGRadialGradientElement;
+        attribute SVGRectConstructor SVGRect;
+        attribute SVGRectElementConstructor SVGRectElement;
+        attribute SVGRenderingIntentConstructor SVGRenderingIntent;
+        attribute SVGScriptElementConstructor SVGScriptElement;
+        attribute SVGStopElementConstructor SVGStopElement;
+        attribute SVGStringListConstructor SVGStringList;
+        attribute SVGStyleElementConstructor SVGStyleElement;
+        attribute SVGSVGElementConstructor SVGSVGElement;
+        attribute SVGSwitchElementConstructor SVGSwitchElement;
+        attribute SVGSymbolElementConstructor SVGSymbolElement;
+        attribute SVGTextContentElementConstructor SVGTextContentElement;
+        attribute SVGTextElementConstructor SVGTextElement;
+        attribute SVGTextPathElementConstructor SVGTextPathElement;
+        attribute SVGTextPositioningElementConstructor SVGTextPositioningElement;
+        attribute SVGTitleElementConstructor SVGTitleElement;
+        attribute SVGTransformConstructor SVGTransform;
+        attribute SVGTransformListConstructor SVGTransformList;
+        attribute SVGTRefElementConstructor SVGTRefElement;
+        attribute SVGTSpanElementConstructor SVGTSpanElement;
+        attribute SVGUnitTypesConstructor SVGUnitTypes;
+        attribute SVGUseElementConstructor SVGUseElement;
+        attribute SVGViewElementConstructor SVGViewElement;
+//      attribute SVGViewSpecConstructor SVGViewSpec;
+
+        attribute SVGAnimateColorElementConstructor SVGAnimateColorElement;
+        attribute SVGAnimateElementConstructor SVGAnimateElement;
+        attribute SVGAnimateMotionElementConstructor SVGAnimateMotionElement;
+        attribute SVGAnimateTransformElementConstructor SVGAnimateTransformElement;
+        attribute SVGMPathElementConstructor SVGMPathElement;
+        attribute SVGSetElementConstructor SVGSetElement;
+
+#if defined(ENABLE_SVG_FONTS) && ENABLE_SVG_FONTS
+        attribute SVGAltGlyphDefElementConstructor SVGAltGlyphDefElement;
+        attribute SVGAltGlyphElementConstructor SVGAltGlyphElement;
+        attribute SVGAltGlyphItemElementConstructor SVGAltGlyphItemElement;
+//      attribute SVGDefinitionSrcElementConstructor SVGDefinitionSrcElement;
+        attribute SVGFontElementConstructor SVGFontElement;
+        attribute SVGFontFaceElementConstructor SVGFontFaceElement;
+        attribute SVGFontFaceFormatElementConstructor SVGFontFaceFormatElement;
+        attribute SVGFontFaceNameElementConstructor SVGFontFaceNameElement;
+        attribute SVGFontFaceSrcElementConstructor SVGFontFaceSrcElement;
+        attribute SVGFontFaceUriElementConstructor SVGFontFaceUriElement;
+        attribute SVGGlyphElementConstructor SVGGlyphElement;
+        attribute SVGGlyphRefElementConstructor SVGGlyphRefElement;
+        attribute SVGHKernElementConstructor SVGHKernElement;
+        attribute SVGMissingGlyphElementConstructor SVGMissingGlyphElement;
+        attribute SVGVKernElementConstructor SVGVKernElement;
+#endif
+
+#if defined(ENABLE_FILTERS) && ENABLE_FILTERS
+        attribute SVGComponentTransferFunctionElementConstructor SVGComponentTransferFunctionElement;
+        attribute SVGFEBlendElementConstructor SVGFEBlendElement;
+        attribute SVGFEColorMatrixElementConstructor SVGFEColorMatrixElement;
+        attribute SVGFEComponentTransferElementConstructor SVGFEComponentTransferElement;
+        attribute SVGFECompositeElementConstructor SVGFECompositeElement;
+        attribute SVGFEConvolveMatrixElementConstructor SVGFEConvolveMatrixElement;
+        attribute SVGFEDiffuseLightingElementConstructor SVGFEDiffuseLightingElement;
+        attribute SVGFEDisplacementMapElementConstructor SVGFEDisplacementMapElement;
+        attribute SVGFEDistantLightElementConstructor SVGFEDistantLightElement;
+        attribute SVGFEDropShadowElementConstructor SVGFEDropShadowElement;
+        attribute SVGFEFloodElementConstructor SVGFEFloodElement;
+        attribute SVGFEFuncAElementConstructor SVGFEFuncAElement;
+        attribute SVGFEFuncBElementConstructor SVGFEFuncBElement;
+        attribute SVGFEFuncGElementConstructor SVGFEFuncGElement;
+        attribute SVGFEFuncRElementConstructor SVGFEFuncRElement;
+        attribute SVGFEGaussianBlurElementConstructor SVGFEGaussianBlurElement;
+        attribute SVGFEImageElementConstructor SVGFEImageElement;
+        attribute SVGFEMergeElementConstructor SVGFEMergeElement;
+        attribute SVGFEMergeNodeElementConstructor SVGFEMergeNodeElement;
+        attribute SVGFEMorphologyElementConstructor SVGFEMorphologyElement;
+        attribute SVGFEOffsetElementConstructor SVGFEOffsetElement;
+        attribute SVGFEPointLightElementConstructor SVGFEPointLightElement;
+        attribute SVGFESpecularLightingElementConstructor SVGFESpecularLightingElement;
+        attribute SVGFESpotLightElementConstructor SVGFESpotLightElement;
+        attribute SVGFETileElementConstructor SVGFETileElement;
+        attribute SVGFETurbulenceElementConstructor SVGFETurbulenceElement;
+        attribute SVGFilterElementConstructor SVGFilterElement;
+#endif
+#endif
 
         attribute DOMFormDataConstructor FormData;
 

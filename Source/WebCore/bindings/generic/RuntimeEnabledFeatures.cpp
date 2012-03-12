@@ -56,6 +56,10 @@ bool RuntimeEnabledFeatures::isDeviceMotionEnabled = true;
 bool RuntimeEnabledFeatures::isDeviceOrientationEnabled = true;
 bool RuntimeEnabledFeatures::isSpeechInputEnabled = true;
 
+#if ENABLE(SCRIPTED_SPEECH)
+bool RuntimeEnabledFeatures::isScriptedSpeechEnabled = false;
+#endif
+
 #if ENABLE(MEDIA_STREAM)
 bool RuntimeEnabledFeatures::isMediaStreamEnabled = true;
 #endif
@@ -181,6 +185,11 @@ bool RuntimeEnabledFeatures::isMediaSourceEnabled = false;
 #endif
 
 #if ENABLE(SHADOW_DOM)
+void RuntimeEnabledFeatures::setMultipleShadowSubtreesEnabled(bool isEnabled)
+{
+    isMultipleShadowSubtreesEnabled = isEnabled;
+}
+
 bool RuntimeEnabledFeatures::isShadowDOMEnabled = false;
 bool RuntimeEnabledFeatures::isMultipleShadowSubtreesEnabled = false;
 #endif

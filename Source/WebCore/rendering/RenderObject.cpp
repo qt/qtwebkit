@@ -644,8 +644,9 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
         if (!container && !object->isRenderView())
             return;
         if (!last->isText() && last->style()->isPositioned()) {
-            bool willSkipRelativelyPositionedInlines = !object->isRenderBlock();
-            while (object && !object->isRenderBlock()) // Skip relatively positioned inlines and get to the enclosing RenderBlock.
+            bool willSkipRelativelyPositionedInlines = !object->isRenderBlock() || object->isAnonymousBlock();
+            // Skip relatively positioned inlines and anonymous blocks to get to the enclosing RenderBlock.
+            while (object && (!object->isRenderBlock() || object->isAnonymousBlock()))
                 object = object->container();
             if (!object || object->posChildNeedsLayout())
                 return;
@@ -1109,7 +1110,7 @@ void RenderObject::drawArcForBoxSide(GraphicsContext* graphicsContext, int x, in
     
 void RenderObject::paintFocusRing(GraphicsContext* context, const LayoutPoint& paintOffset, RenderStyle* style)
 {
-    Vector<LayoutRect> focusRingRects;
+    Vector<IntRect> focusRingRects;
     addFocusRingRects(focusRingRects, paintOffset);
     if (style->outlineStyleIsAuto())
         context->drawFocusRing(focusRingRects, style->outlineWidth(), style->outlineOffset(), style->visitedDependentColor(CSSPropertyOutlineColor));
@@ -1196,7 +1197,7 @@ void RenderObject::paintOutline(GraphicsContext* graphicsContext, const LayoutRe
         graphicsContext->endTransparencyLayer();
 }
 
-LayoutRect RenderObject::absoluteBoundingBoxRect(bool useTransforms) const
+IntRect RenderObject::absoluteBoundingBoxRect(bool useTransforms) const
 {
     if (useTransforms) {
         Vector<FloatQuad> quads;
@@ -1206,29 +1207,29 @@ LayoutRect RenderObject::absoluteBoundingBoxRect(bool useTransforms) const
         if (!n)
             return IntRect();
     
-        LayoutRect result = quads[0].enclosingBoundingBox();
+        IntRect result = quads[0].enclosingBoundingBox();
         for (size_t i = 1; i < n; ++i)
             result.unite(quads[i].enclosingBoundingBox());
         return result;
     }
 
     FloatPoint absPos = localToAbsolute();
-    Vector<LayoutRect> rects;
+    Vector<IntRect> rects;
     absoluteRects(rects, flooredLayoutPoint(absPos));
 
     size_t n = rects.size();
     if (!n)
-        return LayoutRect();
+        return IntRect();
 
     LayoutRect result = rects[0];
     for (size_t i = 1; i < n; ++i)
         result.unite(rects[i]);
-    return result;
+    return pixelSnappedIntRect(result);
 }
 
 void RenderObject::absoluteFocusRingQuads(Vector<FloatQuad>& quads)
 {
-    Vector<LayoutRect> rects;
+    Vector<IntRect> rects;
     // FIXME: addFocusRingRects() needs to be passed this transform-unaware
     // localToAbsolute() offset here because RenderInline::addFocusRingRects()
     // implicitly assumes that. This doesn't work correctly with transformed
@@ -1237,7 +1238,7 @@ void RenderObject::absoluteFocusRingQuads(Vector<FloatQuad>& quads)
     addFocusRingRects(rects, flooredLayoutPoint(absolutePoint));
     size_t count = rects.size(); 
     for (size_t i = 0; i < count; ++i) {
-        LayoutRect rect = rects[i];
+        IntRect rect = rects[i];
         rect.move(-absolutePoint.x(), -absolutePoint.y());
         quads.append(localToAbsoluteQuad(FloatQuad(rect)));
     }
@@ -1519,7 +1520,7 @@ void RenderObject::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
             LayoutRect repaintRect(rect);
             repaintRect.move(-boxParent->scrolledContentOffset()); // For overflow:auto/scroll/hidden.
 
-            LayoutRect boxRect(LayoutPoint(), boxParent->layer()->size());
+            LayoutRect boxRect(LayoutPoint(), boxParent->cachedSizeForOverflowClip());
             rect = intersection(repaintRect, boxRect);
             if (rect.isEmpty())
                 return;
@@ -2093,6 +2094,15 @@ FloatQuad RenderObject::localToContainerQuad(const FloatQuad& localQuad, RenderB
     return transformState.lastPlanarQuad();
 }
 
+FloatPoint RenderObject::localToContainerPoint(const FloatPoint& localPoint, RenderBoxModelObject* repaintContainer, bool fixed, bool* wasFixed) const
+{
+    TransformState transformState(TransformState::ApplyTransformDirection, localPoint);
+    mapLocalToContainer(repaintContainer, fixed, true, transformState, wasFixed);
+    transformState.flatten();
+
+    return transformState.lastPlanarPoint();
+}
+
 LayoutSize RenderObject::offsetFromContainer(RenderObject* o, const LayoutPoint& point) const
 {
     ASSERT(o == container());
@@ -2230,6 +2240,21 @@ bool RenderObject::isSelectionBorder() const
     return st == SelectionStart || st == SelectionEnd || st == SelectionBoth;
 }
 
+inline void RenderObject::clearLayoutRootIfNeeded() const
+{
+    if (node() && !documentBeingDestroyed() && frame()) {
+        if (FrameView* view = frame()->view()) {
+            if (view->layoutRoot() == this) {
+                ASSERT_NOT_REACHED();
+                // This indicates a failure to layout the child, which is why
+                // the layout root is still set to |this|. Make sure to clear it
+                // since we are getting destroyed.
+                view->clearLayoutRoot();
+            }
+        }
+    }
+}
+
 void RenderObject::willBeDestroyed()
 {
     // Destroy any leftover anonymous children.
@@ -2280,6 +2305,8 @@ void RenderObject::willBeDestroyed()
         setHasLayer(false);
         toRenderBoxModelObject(this)->destroyLayer();
     }
+
+    clearLayoutRootIfNeeded();
 }
 
 void RenderObject::destroyAndCleanupAnonymousWrappers()
@@ -2604,14 +2631,6 @@ void RenderObject::addDashboardRegions(Vector<DashboardRegionValue>& regions)
         region.bounds.setX(absPos.x() + styleRegion.offset.left().value());
         region.bounds.setY(absPos.y() + styleRegion.offset.top().value());
 
-        if (frame()) {
-            float deviceScaleFactor = frame()->page()->deviceScaleFactor();
-            if (deviceScaleFactor != 1.0f) {
-                region.bounds.scale(deviceScaleFactor);
-                region.clip.scale(deviceScaleFactor);
-            }
-        }
-
         regions.append(region);
     }
 }
@@ -2633,6 +2652,10 @@ bool RenderObject::willRenderImage(CachedImage*)
 {
     // Without visibility we won't render (and therefore don't care about animation).
     if (style()->visibility() != VISIBLE)
+        return false;
+
+    // We will not render a new image when Active DOM is suspended
+    if (document()->activeDOMObjectsAreSuspended())
         return false;
 
     // If we're not in a window (i.e., we're dormant from being put in the b/f cache or in a background tab)
@@ -2801,6 +2824,12 @@ VisiblePosition RenderObject::createVisiblePosition(const Position& position)
 CursorDirective RenderObject::getCursor(const LayoutPoint&, Cursor&) const
 {
     return SetCursorBasedOnStyle;
+}
+
+bool RenderObject::canUpdateSelectionOnRootLineBoxes()
+{
+    RenderBlock* containingBlock = this->containingBlock();
+    return containingBlock ? !containingBlock->needsLayout() : true;
 }
 
 #if ENABLE(SVG)

@@ -23,7 +23,6 @@
 
 #include "DownloadProxy.h"
 #include "DrawingAreaProxyImpl.h"
-#include "QtDialogRunner.h"
 #include "QtDownloadManager.h"
 #include "QtWebContext.h"
 #include "QtWebIconDatabaseClient.h"
@@ -38,6 +37,7 @@
 #include "qquickwebpage_p_p.h"
 #include "qquickwebview_p_p.h"
 #include "qwebdownloaditem_p_p.h"
+#include "qwebloadrequest_p.h"
 #include "qwebnavigationhistory_p.h"
 #include "qwebnavigationhistory_p_p.h"
 #include "qwebpreferences_p.h"
@@ -79,9 +79,12 @@ QQuickWebViewPrivate::QQuickWebViewPrivate(QQuickWebView* viewport)
     , userDidOverrideContentHeight(false)
     , m_navigatorQtObjectEnabled(false)
     , m_renderToOffscreenBuffer(false)
+    , m_loadStartedSignalSent(false)
+    , m_dialogRunnerActive(false)
 {
     viewport->setFlags(QQuickItem::ItemClipsChildrenToShape);
     QObject::connect(viewport, SIGNAL(visibleChanged()), viewport, SLOT(_q_onVisibleChanged()));
+    QObject::connect(viewport, SIGNAL(urlChanged()), viewport, SLOT(_q_onUrlChanged()));
     pageView.reset(new QQuickWebPage(viewport));
 }
 
@@ -112,7 +115,6 @@ void QQuickWebViewPrivate::initialize(WKContextRef contextRef, WKPageGroupRef pa
 
     QtWebIconDatabaseClient* iconDatabase = context->iconDatabase();
     QObject::connect(iconDatabase, SIGNAL(iconChangedForPageURL(QUrl, QUrl)), q_ptr, SLOT(_q_onIconChangedForPageURL(QUrl, QUrl)));
-    QObject::connect(q_ptr, SIGNAL(urlChanged(QUrl)), iconDatabase, SLOT(requestIconForPageURL(QUrl)));
 
     // Any page setting should preferrable be set before creating the page.
     webPageProxy->pageGroup()->preferences()->setAcceleratedCompositingEnabled(true);
@@ -121,6 +123,16 @@ void QQuickWebViewPrivate::initialize(WKContextRef contextRef, WKPageGroupRef pa
 
     pageClient.initialize(q_ptr, pageViewPrivate->eventHandler.data(), &undoController);
     webPageProxy->initializeWebPage();
+}
+
+void QQuickWebViewPrivate::setTransparentBackground(bool enable)
+{
+    webPageProxy->setDrawsTransparentBackground(enable);
+}
+
+bool QQuickWebViewPrivate::transparentBackground() const
+{
+    return webPageProxy->drawsTransparentBackground();
 }
 
 void QQuickWebViewPrivate::enableMouseEvents()
@@ -146,8 +158,17 @@ QPointF QQuickWebViewPrivate::pageItemPos()
 void QQuickWebViewPrivate::loadDidSucceed()
 {
     Q_Q(QQuickWebView);
-    emit q->navigationStateChanged();
-    emit q->loadSucceeded();
+    ASSERT(!q->loading());
+    QWebLoadRequest loadRequest(q->url(), QQuickWebView::LoadSucceededStatus);
+    emit q->loadingChanged(&loadRequest);
+}
+
+void QQuickWebViewPrivate::onComponentComplete()
+{
+    if (m_deferedUrlToLoad.isEmpty())
+        return;
+
+    q_ptr->setUrl(m_deferedUrlToLoad);
 }
 
 void QQuickWebViewPrivate::setNeedsDisplay()
@@ -173,6 +194,14 @@ void QQuickWebViewPrivate::_q_onIconChangedForPageURL(const QUrl& pageURL, const
     setIcon(iconURL);
 }
 
+void QQuickWebViewPrivate::didChangeLoadingState(QWebLoadRequest* loadRequest)
+{
+    Q_Q(QQuickWebView);
+    ASSERT(q->loading() == (loadRequest->status() == QQuickWebView::LoadStartedStatus));
+    emit q->loadingChanged(loadRequest);
+    m_loadStartedSignalSent = loadRequest->status() == QQuickWebView::LoadStartedStatus;
+}
+
 void QQuickWebViewPrivate::didChangeBackForwardList()
 {
     navigationHistory->d->reset();
@@ -180,15 +209,17 @@ void QQuickWebViewPrivate::didChangeBackForwardList()
 
 void QQuickWebViewPrivate::processDidCrash()
 {
-    emit q_ptr->navigationStateChanged();
     pageView->eventHandler()->resetGestureRecognizers();
-    WebCore::KURL url(WebCore::ParsedURLString, webPageProxy->urlAtProcessExit());
-    qWarning("WARNING: The web process experienced a crash on '%s'.", qPrintable(QUrl(url).toString(QUrl::RemoveUserInfo)));
+    QUrl url(KURL(WebCore::ParsedURLString, webPageProxy->urlAtProcessExit()));
+    if (m_loadStartedSignalSent) {
+        QWebLoadRequest loadRequest(url, QQuickWebView::LoadFailedStatus, QLatin1String("The web process crashed."), QQuickWebView::InternalErrorDomain, 0);
+        didChangeLoadingState(&loadRequest);
+    }
+    qWarning("WARNING: The web process experienced a crash on '%s'.", qPrintable(url.toString(QUrl::RemoveUserInfo)));
 }
 
 void QQuickWebViewPrivate::didRelaunchProcess()
 {
-    emit q_ptr->navigationStateChanged();
     qWarning("WARNING: The web process has been successfully restarted.");
     pageView->d->setDrawingAreaSize(viewSize());
 }
@@ -217,6 +248,12 @@ void QQuickWebViewPrivate::_q_onVisibleChanged()
     webPageProxy->viewStateDidChange(WebPageProxy::ViewIsVisible);
 }
 
+void QQuickWebViewPrivate::_q_onUrlChanged()
+{
+    Q_Q(QQuickWebView);
+    context->iconDatabase()->requestIconForPageURL(q->url());
+}
+
 void QQuickWebViewPrivate::_q_onReceivedResponseFromDownload(QWebDownloadItem* downloadItem)
 {
     // Now that our downloadItem has everything we need we can emit downloadRequested.
@@ -237,11 +274,8 @@ void QQuickWebViewPrivate::runJavaScriptAlert(const QString& alertText)
     QtDialogRunner dialogRunner;
     if (!dialogRunner.initForAlert(alertDialog, q, alertText))
         return;
-    setViewInAttachedProperties(dialogRunner.dialog());
 
-    disableMouseEvents();
-    dialogRunner.exec();
-    enableMouseEvents();
+    execDialogRunner(dialogRunner);
 }
 
 bool QQuickWebViewPrivate::runJavaScriptConfirm(const QString& message)
@@ -253,11 +287,8 @@ bool QQuickWebViewPrivate::runJavaScriptConfirm(const QString& message)
     QtDialogRunner dialogRunner;
     if (!dialogRunner.initForConfirm(confirmDialog, q, message))
         return true;
-    setViewInAttachedProperties(dialogRunner.dialog());
 
-    disableMouseEvents();
-    dialogRunner.exec();
-    enableMouseEvents();
+    execDialogRunner(dialogRunner);
 
     return dialogRunner.wasAccepted();
 }
@@ -275,11 +306,8 @@ QString QQuickWebViewPrivate::runJavaScriptPrompt(const QString& message, const 
         ok = true;
         return defaultValue;
     }
-    setViewInAttachedProperties(dialogRunner.dialog());
 
-    disableMouseEvents();
-    dialogRunner.exec();
-    enableMouseEvents();
+    execDialogRunner(dialogRunner);
 
     ok = dialogRunner.wasAccepted();
     return dialogRunner.result();
@@ -295,11 +323,7 @@ void QQuickWebViewPrivate::handleAuthenticationRequiredRequest(const QString& ho
     if (!dialogRunner.initForAuthentication(authenticationDialog, q, hostname, realm, prefilledUsername))
         return;
 
-    setViewInAttachedProperties(dialogRunner.dialog());
-
-    disableMouseEvents();
-    dialogRunner.exec();
-    enableMouseEvents();
+    execDialogRunner(dialogRunner);
 
     username = dialogRunner.username();
     password = dialogRunner.password();
@@ -315,10 +339,7 @@ void QQuickWebViewPrivate::handleProxyAuthenticationRequiredRequest(const QStrin
     if (!dialogRunner.initForProxyAuthentication(proxyAuthenticationDialog, q, hostname, port, prefilledUsername))
         return;
 
-    setViewInAttachedProperties(dialogRunner.dialog());
-    disableMouseEvents();
-    dialogRunner.exec();
-    enableMouseEvents();
+    execDialogRunner(dialogRunner);
 
     username = dialogRunner.username();
     password = dialogRunner.password();
@@ -334,13 +355,21 @@ bool QQuickWebViewPrivate::handleCertificateVerificationRequest(const QString& h
     if (!dialogRunner.initForCertificateVerification(certificateVerificationDialog, q, hostname))
         return false;
 
+    execDialogRunner(dialogRunner);
+
+    return dialogRunner.wasAccepted();
+}
+
+void QQuickWebViewPrivate::execDialogRunner(QtDialogRunner& dialogRunner)
+{
     setViewInAttachedProperties(dialogRunner.dialog());
 
     disableMouseEvents();
-    dialogRunner.exec();
-    enableMouseEvents();
+    m_dialogRunnerActive = true;
 
-    return dialogRunner.wasAccepted();
+    dialogRunner.exec();
+    m_dialogRunnerActive = false;
+    enableMouseEvents();
 }
 
 void QQuickWebViewPrivate::chooseFiles(WKOpenPanelResultListenerRef listenerRef, const QStringList& selectedFileNames, QtWebPageUIClient::FileChooserType type)
@@ -417,7 +446,7 @@ void QQuickWebViewPrivate::setIcon(const QUrl& iconURL)
     }
 
     m_iconURL = iconURL;
-    emit q->iconChanged(m_iconURL);
+    emit q->iconChanged();
 }
 
 bool QQuickWebViewPrivate::navigatorQtObjectEnabled() const
@@ -431,6 +460,14 @@ void QQuickWebViewPrivate::setNavigatorQtObjectEnabled(bool enabled)
     // FIXME: Currently we have to keep this information in both processes and the setting is asynchronous.
     m_navigatorQtObjectEnabled = enabled;
     context->setNavigatorQtObjectEnabled(webPageProxy.get(), enabled);
+}
+
+QRect QQuickWebViewPrivate::visibleContentsRect() const
+{
+    Q_Q(const QQuickWebView);
+    const QRectF visibleRect(q->boundingRect().intersected(pageView->boundingRect()));
+
+    return q->mapRectToWebContent(visibleRect).toAlignedRect();
 }
 
 WebCore::IntSize QQuickWebViewPrivate::viewSize() const
@@ -547,6 +584,8 @@ void QQuickWebViewFlickablePrivate::onComponentComplete()
 
     // Trigger setting of correct visibility flags after everything was allocated and initialized.
     _q_onVisibleChanged();
+
+    QQuickWebViewPrivate::onComponentComplete();
 }
 
 void QQuickWebViewFlickablePrivate::loadDidSucceed()
@@ -609,16 +648,14 @@ void QQuickWebViewFlickablePrivate::_q_commitScaleChange()
         return;
 
     Q_Q(QQuickWebView);
-    const QRectF visibleRectInCSSCoordinates = q->mapRectToWebContent(q->boundingRect()).intersected(pageView->boundingRect());
-    float scale = pageView->contentsScale();
-
     // This is only for our QML ViewportInfo debugging API.
     q->experimental()->viewportInfo()->didUpdateCurrentScale();
 
-    QRect alignedVisibleContentRect = visibleRectInCSSCoordinates.toAlignedRect();
-    drawingArea->setVisibleContentsRectForScaling(alignedVisibleContentRect, scale);
+    const QRect visibleRect(visibleContentsRect());
+    float scale = pageView->contentsScale();
 
-    webPageProxy->setFixedVisibleContentRect(alignedVisibleContentRect);
+    drawingArea->setVisibleContentsRectForScaling(visibleRect, scale);
+    webPageProxy->setFixedVisibleContentRect(visibleRect);
 }
 
 void QQuickWebViewPrivate::_q_commitPositionChange(const QPointF& trajectoryVector)
@@ -627,21 +664,19 @@ void QQuickWebViewPrivate::_q_commitPositionChange(const QPointF& trajectoryVect
     if (!drawingArea)
         return;
 
-    Q_Q(QQuickWebView);
-    const QRectF visibleRectInCSSCoordinates = q->mapRectToWebContent(q->boundingRect()).intersected(pageView->boundingRect());
-
-    QRect alignedVisibleContentRect = visibleRectInCSSCoordinates.toAlignedRect();
-    drawingArea->setVisibleContentsRectForPanning(alignedVisibleContentRect, trajectoryVector);
+    const QRect visibleRect(visibleContentsRect());
+    drawingArea->setVisibleContentsRectForPanning(visibleRect, trajectoryVector);
 
     if (!trajectoryVector.isNull())
         return;
 
-    webPageProxy->setFixedVisibleContentRect(alignedVisibleContentRect);
+    webPageProxy->setFixedVisibleContentRect(visibleRect);
 }
 
 void QQuickWebViewFlickablePrivate::_q_suspend()
 {
     pageIsSuspended = true;
+    webPageProxy->suspendActiveDOMObjectsAndAnimations();
 }
 
 void QQuickWebViewFlickablePrivate::_q_resume()
@@ -650,6 +685,7 @@ void QQuickWebViewFlickablePrivate::_q_resume()
         return;
 
     pageIsSuspended = false;
+    webPageProxy->resumeActiveDOMObjectsAndAnimations();
 
     if (isTransitioningToNewPage) {
         isTransitioningToNewPage = false;
@@ -784,6 +820,17 @@ bool QQuickWebViewExperimental::renderToOffscreenBuffer() const
 {
     Q_D(const QQuickWebView);
     return d->renderToOffscreenBuffer();
+}
+
+bool QQuickWebViewExperimental::transparentBackground() const
+{
+    Q_D(const QQuickWebView);
+    return d->transparentBackground();
+}
+void QQuickWebViewExperimental::setTransparentBackground(bool enable)
+{
+    Q_D(QQuickWebView);
+    d->setTransparentBackground(enable);
 }
 
 void QQuickWebViewExperimental::setFlickableViewportEnabled(bool enable)
@@ -1093,6 +1140,7 @@ QQuickWebView::QQuickWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRe
 {
     Q_D(QQuickWebView);
     d->initialize(contextRef, pageGroupRef);
+    setClip(true);
 }
 
 QQuickWebView::~QQuickWebView()
@@ -1103,15 +1151,6 @@ QQuickWebPage* QQuickWebView::page()
 {
     Q_D(QQuickWebView);
     return d->pageView.data();
-}
-
-void QQuickWebView::load(const QUrl& url)
-{
-    if (url.isEmpty())
-        return;
-
-    Q_D(QQuickWebView);
-    d->webPageProxy->loadURL(url.toString());
 }
 
 void QQuickWebView::goBack()
@@ -1148,6 +1187,21 @@ QUrl QQuickWebView::url() const
     return QUrl(QString(mainFrame->url()));
 }
 
+void QQuickWebView::setUrl(const QUrl& url)
+{
+    Q_D(QQuickWebView);
+
+    if (url.isEmpty())
+        return;
+
+    if (!isComponentComplete()) {
+        d->m_deferedUrlToLoad = url;
+        return;
+    }
+
+    d->webPageProxy->loadURL(url.toString());
+}
+
 QUrl QQuickWebView::icon() const
 {
     Q_D(const QQuickWebView);
@@ -1177,15 +1231,6 @@ bool QQuickWebView::loading() const
     Q_D(const QQuickWebView);
     RefPtr<WebKit::WebFrameProxy> mainFrame = d->webPageProxy->mainFrame();
     return mainFrame && !(WebFrameProxy::LoadStateFinished == mainFrame->loadState());
-}
-
-bool QQuickWebView::canReload() const
-{
-    Q_D(const QQuickWebView);
-    RefPtr<WebKit::WebFrameProxy> mainFrame = d->webPageProxy->mainFrame();
-    if (mainFrame)
-        return (WebFrameProxy::LoadStateFinished == mainFrame->loadState());
-    return d->webPageProxy->backForwardList()->currentItem();
 }
 
 QPointF QQuickWebView::mapToWebContent(const QPointF& pointInViewCoordinates) const
@@ -1281,128 +1326,125 @@ void QQuickWebView::componentComplete()
 
 void QQuickWebView::keyPressEvent(QKeyEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleKeyPressEvent(event);
 }
 
 void QQuickWebView::keyReleaseEvent(QKeyEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleKeyReleaseEvent(event);
 }
 
 void QQuickWebView::inputMethodEvent(QInputMethodEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleInputMethodEvent(event);
 }
 
 void QQuickWebView::focusInEvent(QFocusEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleFocusInEvent(event);
 }
 
 void QQuickWebView::focusOutEvent(QFocusEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleFocusOutEvent(event);
 }
 
 void QQuickWebView::touchEvent(QTouchEvent* event)
 {
+    Q_D(QQuickWebView);
+    if (d->m_dialogRunnerActive) {
+        event->ignore();
+        return;
+    }
+
     forceActiveFocus();
-    this->event(event);
+    d->pageView->eventHandler()->handleTouchEvent(event);
 }
 
 void QQuickWebView::mousePressEvent(QMouseEvent* event)
 {
+    Q_D(QQuickWebView);
     forceActiveFocus();
-    this->event(event);
+    d->pageView->eventHandler()->handleMousePressEvent(event);
 }
 
 void QQuickWebView::mouseMoveEvent(QMouseEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleMouseMoveEvent(event);
 }
 
 void QQuickWebView::mouseReleaseEvent(QMouseEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleMouseReleaseEvent(event);
 }
 
 void QQuickWebView::mouseDoubleClickEvent(QMouseEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    // If a MouseButtonDblClick was received then we got a MouseButtonPress before
+    // handleMousePressEvent will take care of double clicks.
+    d->pageView->eventHandler()->handleMousePressEvent(event);
 }
 
 void QQuickWebView::wheelEvent(QWheelEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleWheelEvent(event);
 }
 
 void QQuickWebView::hoverEnterEvent(QHoverEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    // Map HoverEnter to Move, for WebKit the distinction doesn't matter.
+    d->pageView->eventHandler()->handleHoverMoveEvent(event);
 }
 
 void QQuickWebView::hoverMoveEvent(QHoverEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleHoverMoveEvent(event);
 }
 
 void QQuickWebView::hoverLeaveEvent(QHoverEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleHoverLeaveEvent(event);
 }
 
 void QQuickWebView::dragMoveEvent(QDragMoveEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleDragMoveEvent(event);
 }
 
 void QQuickWebView::dragEnterEvent(QDragEnterEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleDragEnterEvent(event);
 }
 
 void QQuickWebView::dragLeaveEvent(QDragLeaveEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleDragLeaveEvent(event);
 }
 
 void QQuickWebView::dropEvent(QDropEvent* event)
 {
-    this->event(event);
+    Q_D(QQuickWebView);
+    d->pageView->eventHandler()->handleDropEvent(event);
 }
 
 bool QQuickWebView::event(QEvent* ev)
 {
-    Q_D(QQuickWebView);
-
-    switch (ev->type()) {
-    case QEvent::MouseMove:
-    case QEvent::MouseButtonPress:
-    case QEvent::MouseButtonRelease:
-    case QEvent::MouseButtonDblClick:
-    case QEvent::Wheel:
-    case QEvent::HoverLeave:
-    case QEvent::HoverEnter:
-    case QEvent::HoverMove:
-    case QEvent::DragEnter:
-    case QEvent::DragLeave:
-    case QEvent::DragMove:
-    case QEvent::Drop:
-    case QEvent::KeyPress:
-    case QEvent::KeyRelease:
-    case QEvent::FocusIn:
-    case QEvent::FocusOut:
-    case QEvent::TouchBegin:
-    case QEvent::TouchEnd:
-    case QEvent::TouchCancel:
-    case QEvent::TouchUpdate:
-        if (d->pageView->eventHandler()->handleEvent(ev))
-            return true;
-    }
-
-    if (ev->type() == QEvent::InputMethod)
-        return false; // This is necessary to avoid an endless loop in connection with QQuickItem::event().
-
+    // Re-implemented for possible future use without breaking binary compatibility.
     return QQuickItem::event(ev);
 }
 

@@ -159,18 +159,18 @@ void HTMLElement::mapLanguageAttributeToLocale(Attribute* attribute, StyleProper
     }
 }
 
-bool HTMLElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == alignAttr || attr->name() == contenteditableAttr || attr->name() == hiddenAttr || attr->name() == langAttr || attr->name().matches(XMLNames::langAttr) || attr->name() == draggableAttr || attr->name() == dirAttr)
+    if (name == alignAttr || name == contenteditableAttr || name == hiddenAttr || name == langAttr || name.matches(XMLNames::langAttr) || name == draggableAttr || name == dirAttr)
         return true;
-    return StyledElement::isPresentationAttribute(attr);
+    return StyledElement::isPresentationAttribute(name);
 }
 
 void HTMLElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
 {
     if (attr->name() == alignAttr) {
         if (equalIgnoringCase(attr->value(), "middle"))
-            addPropertyToAttributeStyle(style, CSSPropertyTextAlign, "center");
+            addPropertyToAttributeStyle(style, CSSPropertyTextAlign, CSSValueCenter);
         else
             addPropertyToAttributeStyle(style, CSSPropertyTextAlign, attr->value());
     } else if (attr->name() == contenteditableAttr) {
@@ -234,7 +234,6 @@ void HTMLElement::parseAttribute(Attribute* attr)
         setItemRef(attr->value());
     } else if (attr->name() == itemtypeAttr) {
         setItemType(attr->value());
-        itemTypeAttributeChanged();
 #endif
     }
 // standard events
@@ -341,84 +340,6 @@ String HTMLElement::innerHTML() const
 String HTMLElement::outerHTML() const
 {
     return createMarkup(this);
-}
-
-static inline bool hasOneChild(ContainerNode* node)
-{
-    Node* firstChild = node->firstChild();
-    return firstChild && !firstChild->nextSibling();
-}
-
-static inline bool hasOneTextChild(ContainerNode* node)
-{
-    return hasOneChild(node) && node->firstChild()->isTextNode();
-}
-
-static void replaceChildrenWithFragment(HTMLElement* element, PassRefPtr<DocumentFragment> fragment, ExceptionCode& ec)
-{
-#if ENABLE(MUTATION_OBSERVERS)
-    ChildListMutationScope mutation(element);
-#endif
-
-    if (!fragment->firstChild()) {
-        element->removeChildren();
-        return;
-    }
-
-    if (hasOneTextChild(element) && hasOneTextChild(fragment.get())) {
-        toText(element->firstChild())->setData(toText(fragment->firstChild())->data(), ec);
-        return;
-    }
-
-    if (hasOneChild(element)) {
-        element->replaceChild(fragment, element->firstChild(), ec);
-        return;
-    }
-
-    element->removeChildren();
-    element->appendChild(fragment, ec);
-}
-
-static void replaceChildrenWithText(HTMLElement* element, const String& text, ExceptionCode& ec)
-{
-#if ENABLE(MUTATION_OBSERVERS)
-    ChildListMutationScope mutation(element);
-#endif
-
-    if (hasOneTextChild(element)) {
-        toText(element->firstChild())->setData(text, ec);
-        return;
-    }
-
-    RefPtr<Text> textNode = Text::create(element->document(), text);
-
-    if (hasOneChild(element)) {
-        element->replaceChild(textNode.release(), element->firstChild(), ec);
-        return;
-    }
-
-    element->removeChildren();
-    element->appendChild(textNode.release(), ec);
-}
-
-// We may want to move a version of this function into DocumentFragment.h/cpp
-static PassRefPtr<DocumentFragment> createFragmentFromSource(const String& markup, Element* contextElement, ExceptionCode& ec)
-{
-    Document* document = contextElement->document();
-    RefPtr<DocumentFragment> fragment;
-
-    fragment = DocumentFragment::create(document);
-    if (document->isHTMLDocument()) {
-        fragment->parseHTML(markup, contextElement);
-        return fragment;
-    }
-
-    bool wasValid = fragment->parseXML(markup, contextElement);
-    if (!wasValid) {
-        ec = INVALID_STATE_ERR;
-        return 0;
-    }
-    return fragment;
 }
 
 void HTMLElement::setInnerHTML(const String& html, ExceptionCode& ec)
@@ -1184,16 +1105,15 @@ void StyledElement::copyNonAttributeProperties(const Element* sourceElement)
     ASSERT(sourceElement->isStyledElement());
 
     const StyledElement* source = static_cast<const StyledElement*>(sourceElement);
-    if (!source->inlineStyleDecl())
+    if (!source->inlineStyle())
         return;
 
-    StylePropertySet* inlineStyle = ensureInlineStyleDecl();
-    inlineStyle->copyPropertiesFrom(*source->inlineStyleDecl());
-    inlineStyle->setStrictParsing(source->inlineStyleDecl()->useStrictParsing());
+    StylePropertySet* inlineStyle = ensureAttributeData()->ensureMutableInlineStyle(this);
+    inlineStyle->copyPropertiesFrom(*source->inlineStyle());
+    inlineStyle->setStrictParsing(source->inlineStyle()->useStrictParsing());
 
     setIsStyleAttributeValid(source->isStyleAttributeValid());
-    setIsSynchronizingStyleAttribute(source->isSynchronizingStyleAttribute());
-    
+
     Element::copyNonAttributeProperties(sourceElement);
 }
 

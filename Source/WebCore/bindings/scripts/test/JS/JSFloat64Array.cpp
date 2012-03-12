@@ -65,6 +65,7 @@ void JSFloat64ArrayConstructor::finishCreation(ExecState* exec, JSDOMGlobalObjec
     Base::finishCreation(exec->globalData());
     ASSERT(inherits(&s_info));
     putDirect(exec->globalData(), exec->propertyNames().prototype, JSFloat64ArrayPrototype::self(exec, globalObject), DontDelete | ReadOnly);
+    putDirect(exec->globalData(), exec->propertyNames().length, jsNumber(123), ReadOnly | DontDelete | DontEnum);
 }
 
 bool JSFloat64ArrayConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -199,7 +200,7 @@ void JSFloat64Array::put(JSCell* cell, ExecState* exec, const Identifier& proper
     Base::put(thisObject, exec, propertyName, value, slot);
 }
 
-void JSFloat64Array::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, JSValue value)
+void JSFloat64Array::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, JSValue value, bool)
 {
     JSFloat64Array* thisObject = jsCast<JSFloat64Array*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);

@@ -38,6 +38,7 @@
 #include "WebKit.h"
 #include "cc/CCActiveAnimation.h"
 #include "cc/CCLayerAnimationController.h"
+#include "cc/CCLayerAnimationDelegate.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCScopedThreadProxy.h"
@@ -59,15 +60,21 @@ using namespace WTF;
 namespace {
 
 // Used by test stubs to notify the test when something interesting happens.
-class TestHooks {
+class TestHooks : public CCLayerAnimationDelegate {
 public:
     virtual void beginCommitOnCCThread(CCLayerTreeHostImpl*) { }
     virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl*) { }
     virtual void drawLayersOnCCThread(CCLayerTreeHostImpl*) { }
-    virtual void animateLayers(CCLayerTreeHostImpl*) { }
+    virtual void animateLayers(CCLayerTreeHostImpl*, double monotonicTime) { }
     virtual void applyScrollAndScale(const IntSize&, float) { }
-    virtual void updateAnimations(double frameBeginTime) { }
+    virtual void updateAnimations(double monotonicTime) { }
     virtual void layout() { }
+    virtual void didRecreateContext(bool succeded) { }
+    virtual void didCommitAndDrawFrame() { }
+
+    // Implementation of CCLayerAnimationDelegate
+    virtual void notifyAnimationStarted(double time) { }
+    virtual void notifyAnimationFinished(int animationId) { }
 };
 
 // Adapts CCLayerTreeHostImpl for test. Runs real code, then invokes test hooks.
@@ -97,10 +104,10 @@ public:
     }
 
 protected:
-    virtual void animateLayers(double frameBeginTimeMs)
+    virtual void animateLayers(double monotonicTime, double wallClockTime)
     {
-        CCLayerTreeHostImpl::animateLayers(frameBeginTimeMs);
-        m_testHooks->animateLayers(this);
+        CCLayerTreeHostImpl::animateLayers(monotonicTime, wallClockTime);
+        m_testHooks->animateLayers(this, monotonicTime);
     }
 
 private:
@@ -129,6 +136,8 @@ public:
 
         // LayerTreeHostImpl won't draw if it has 1x1 viewport.
         layerTreeHost->setViewportSize(IntSize(1, 1));
+
+        layerTreeHost->rootLayer()->setLayerAnimationDelegate(testHooks);
 
         return layerTreeHost.release();
     }
@@ -205,9 +214,9 @@ public:
         return adoptPtr(new MockLayerTreeHostClient(testHooks));
     }
 
-    virtual void updateAnimations(double frameBeginTime)
+    virtual void updateAnimations(double monotonicTime)
     {
-        m_testHooks->updateAnimations(frameBeginTime);
+        m_testHooks->updateAnimations(monotonicTime);
     }
 
     virtual void layout()
@@ -220,7 +229,7 @@ public:
         m_testHooks->applyScrollAndScale(scrollDelta, scale);
     }
 
-    virtual PassRefPtr<GraphicsContext3D> createLayerTreeHostContext3D()
+    virtual PassRefPtr<GraphicsContext3D> createContext()
     {
         GraphicsContext3D::Attributes attrs;
         WebGraphicsContext3D::Attributes webAttrs;
@@ -232,14 +241,16 @@ public:
 
     virtual void didCommitAndDrawFrame()
     {
+        m_testHooks->didCommitAndDrawFrame();
     }
 
     virtual void didCompleteSwapBuffers()
     {
     }
 
-    virtual void didRecreateGraphicsContext(bool)
+    virtual void didRecreateContext(bool succeeded)
     {
+        m_testHooks->didRecreateContext(succeeded);
     }
 
     virtual void scheduleComposite()
@@ -277,6 +288,11 @@ public:
     void postAddAnimationToMainThread()
     {
         callOnMainThread(CCLayerTreeHostTest::dispatchAddAnimation, this);
+    }
+
+    void postAddInstantAnimationToMainThread()
+    {
+        callOnMainThread(CCLayerTreeHostTest::dispatchAddInstantAnimation, this);
     }
 
     void postSetNeedsCommitToMainThread()
@@ -329,67 +345,76 @@ protected:
 
     static void dispatchSetNeedsAnimate(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT(test);
-      if (test->m_layerTreeHost)
-          test->m_layerTreeHost->setNeedsAnimate();
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT(test);
+        if (test->m_layerTreeHost)
+            test->m_layerTreeHost->setNeedsAnimate();
+    }
+
+    static void dispatchAddInstantAnimation(void* self)
+    {
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT(test);
+        if (test->m_layerTreeHost && test->m_layerTreeHost->rootLayer())
+            addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 0, 0, 1);
     }
 
     static void dispatchAddAnimation(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT(test);
-      if (test->m_layerTreeHost && test->m_layerTreeHost->rootLayer())
-          addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 0, 0, 1);
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT(test);
+        if (test->m_layerTreeHost && test->m_layerTreeHost->rootLayer())
+            addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 10, 0, 1);
     }
 
     static void dispatchSetNeedsAnimateAndCommit(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT(test);
-      if (test->m_layerTreeHost) {
-          test->m_layerTreeHost->setNeedsAnimate();
-          test->m_layerTreeHost->setNeedsCommit();
-      }
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT(test);
+        if (test->m_layerTreeHost) {
+            test->m_layerTreeHost->setNeedsAnimate();
+            test->m_layerTreeHost->setNeedsCommit();
+        }
     }
 
     static void dispatchSetNeedsCommit(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT_TRUE(test);
-      if (test->m_layerTreeHost)
-          test->m_layerTreeHost->setNeedsCommit();
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT_TRUE(test);
+        if (test->m_layerTreeHost)
+            test->m_layerTreeHost->setNeedsCommit();
     }
 
     static void dispatchSetNeedsRedraw(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT_TRUE(test);
-      if (test->m_layerTreeHost)
-          test->m_layerTreeHost->setNeedsRedraw();
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT_TRUE(test);
+        if (test->m_layerTreeHost)
+            test->m_layerTreeHost->setNeedsRedraw();
     }
 
     static void dispatchSetVisible(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT(test);
-      if (test->m_layerTreeHost)
-          test->m_layerTreeHost->setVisible(true);
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT(test);
+        if (test->m_layerTreeHost)
+            test->m_layerTreeHost->setVisible(true);
     }
 
     static void dispatchSetInvisible(void* self)
     {
-      ASSERT(isMainThread());
-      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
-      ASSERT(test);
-      if (test->m_layerTreeHost)
-          test->m_layerTreeHost->setVisible(false);
+        ASSERT(isMainThread());
+        CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+        ASSERT(test);
+        if (test->m_layerTreeHost)
+            test->m_layerTreeHost->setVisible(false);
     }
 
     class TimeoutTask : public WebThread::Task {
@@ -827,7 +852,69 @@ class CCLayerTreeHostTestAddAnimation : public CCLayerTreeHostTestThreadOnly {
 public:
     CCLayerTreeHostTestAddAnimation()
         : m_numAnimates(0)
-        , m_layerTreeHostImpl(0)
+        , m_receivedAnimationStartedNotification(false)
+        , m_receivedAnimationFinishedNotification(false)
+        , m_startTime(0)
+        , m_firstMonotonicTime(0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postAddInstantAnimationToMainThread();
+    }
+
+    virtual void animateLayers(CCLayerTreeHostImpl* layerTreeHostImpl, double monotonicTime)
+    {
+        if (!m_numAnimates) {
+            // The animation had zero duration so layerTreeHostImpl should no
+            // longer need to animate its layers.
+            EXPECT_FALSE(layerTreeHostImpl->needsAnimateLayers());
+            m_numAnimates++;
+            m_firstMonotonicTime = monotonicTime;
+            return;
+        }
+        EXPECT_LT(0, m_startTime);
+        EXPECT_LT(0, m_firstMonotonicTime);
+        EXPECT_NE(m_startTime, m_firstMonotonicTime);
+        EXPECT_TRUE(m_receivedAnimationStartedNotification);
+        EXPECT_TRUE(m_receivedAnimationFinishedNotification);
+        endTest();
+    }
+
+    virtual void notifyAnimationStarted(double wallClockTime)
+    {
+        m_receivedAnimationStartedNotification = true;
+        m_startTime = wallClockTime;
+    }
+
+    virtual void notifyAnimationFinished(int)
+    {
+        m_receivedAnimationFinishedNotification = true;
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+    int m_numAnimates;
+    bool m_receivedAnimationStartedNotification;
+    bool m_receivedAnimationFinishedNotification;
+    double m_startTime;
+    double m_firstMonotonicTime;
+};
+
+TEST_F(CCLayerTreeHostTestAddAnimation, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// Ensures that animations continue to be ticked when we are backgrounded.
+class CCLayerTreeHostTestTickAnimationWhileBackgrounded : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestTickAnimationWhileBackgrounded()
+        : m_numAnimates(0)
     {
     }
 
@@ -836,12 +923,11 @@ public:
         postAddAnimationToMainThread();
     }
 
-    virtual void animateLayers(CCLayerTreeHostImpl* layerTreeHostImpl)
+    virtual void animateLayers(CCLayerTreeHostImpl* layerTreeHostImpl, double monotonicTime)
     {
         if (!m_numAnimates) {
-            // The animation had zero duration so layerTreeHostImpl should no
-            // longer need to animate its layers.
-            EXPECT_FALSE(layerTreeHostImpl->needsAnimateLayers());
+            // We have a long animation running. It should continue to tick even if we are not visible.
+            postSetVisibleToMainThread(false);
             m_numAnimates++;
             return;
         }
@@ -854,10 +940,9 @@ public:
 
 private:
     int m_numAnimates;
-    CCLayerTreeHostImpl* m_layerTreeHostImpl;
 };
 
-TEST_F(CCLayerTreeHostTestAddAnimation, runMultiThread)
+TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded, runMultiThread)
 {
     runTestThreaded();
 }
@@ -1154,9 +1239,9 @@ public:
         m_paintContentsCount++;
     }
 
-    virtual void idlePaintContentsIfDirty()
+    virtual void idlePaintContentsIfDirty(const Region& occluded)
     {
-        ContentLayerChromium::idlePaintContentsIfDirty();
+        ContentLayerChromium::idlePaintContentsIfDirty(occluded);
         m_idlePaintContentsCount++;
     }
 
@@ -1882,5 +1967,73 @@ public:
 };
 
 SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestManySurfaces)
+
+// A loseContext(1) should lead to a didRecreateContext(true)
+class CCLayerTreeHostTestSetSingleLostContext : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestSetSingleLostContext()
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postSetNeedsCommitToMainThread();
+    }
+
+    virtual void didCommitAndDrawFrame()
+    {
+        m_layerTreeHost->loseContext(1);
+    }
+
+    virtual void didRecreateContext(bool succeeded)
+    {
+        EXPECT_TRUE(succeeded);
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+    }
+};
+
+TEST_F(CCLayerTreeHostTestSetSingleLostContext, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// A loseContext(10) should lead to a didRecreateContext(false), and
+// a finishAllRendering() should not hang.
+class CCLayerTreeHostTestSetRepeatedLostContext : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestSetRepeatedLostContext()
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postSetNeedsCommitToMainThread();
+    }
+
+    virtual void didCommitAndDrawFrame()
+    {
+        m_layerTreeHost->loseContext(10);
+    }
+
+    virtual void didRecreateContext(bool succeeded)
+    {
+        EXPECT_FALSE(succeeded);
+        m_layerTreeHost->finishAllRendering();
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+    }
+};
+
+TEST_F(CCLayerTreeHostTestSetRepeatedLostContext, runMultiThread)
+{
+    runTestThreaded();
+}
 
 } // namespace

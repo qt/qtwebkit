@@ -19,6 +19,8 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_HEA
 	$(WebKit2)/Shared/API/c/WKMutableDictionary.h \
 	$(WebKit2)/Shared/API/c/WKNumber.h \
 	$(WebKit2)/Shared/API/c/WKPageLoadTypes.h \
+	$(WebKit2)/Shared/API/c/WKRenderLayer.h \
+	$(WebKit2)/Shared/API/c/WKRenderObject.h \
 	$(WebKit2)/Shared/API/c/WKSecurityOrigin.h \
 	$(WebKit2)/Shared/API/c/WKSerializedScriptValue.h \
 	$(WebKit2)/Shared/API/c/WKSerializedScriptValuePrivate.h \
@@ -88,11 +90,13 @@ libwebkit2gtkinclude_HEADERS = \
 	$(WebKit2)/UIProcess/API/gtk/WebKitDownload.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitEditingCommands.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitError.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitFindController.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitHitTestResult.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitNavigationPolicyDecision.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitPolicyDecision.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitPrintOperation.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitResponsePolicyDecision.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitScriptDialog.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitSettings.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitURIRequest.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitURIResponse.h \
@@ -242,7 +246,6 @@ webkit2_sources += \
 	Source/WebKit2/PluginProcess/WebProcessConnection.h \
 	Source/WebKit2/PluginProcess/gtk/PluginControllerProxyGtk.cpp \
 	Source/WebKit2/PluginProcess/gtk/PluginProcessGtk.cpp \
-	Source/WebKit2/Shared/ContextMenuState.h \
 	Source/WebKit2/Shared/DragControllerAction.h \
 	Source/WebKit2/Shared/FontInfo.h \
 	Source/WebKit2/Shared/HTTPCookieAcceptPolicy.h \
@@ -287,6 +290,10 @@ webkit2_sources += \
 	Source/WebKit2/Shared/API/c/WKNumber.cpp \
 	Source/WebKit2/Shared/API/c/WKNumber.h \
 	Source/WebKit2/Shared/API/c/WKPageLoadTypes.h \
+	Source/WebKit2/Shared/API/c/WKRenderLayer.cpp \
+	Source/WebKit2/Shared/API/c/WKRenderLayer.h \
+	Source/WebKit2/Shared/API/c/WKRenderObject.cpp \
+	Source/WebKit2/Shared/API/c/WKRenderObject.h \
 	Source/WebKit2/Shared/API/c/WKSecurityOrigin.cpp \
 	Source/WebKit2/Shared/API/c/WKSecurityOrigin.h \
 	Source/WebKit2/Shared/API/c/WKSerializedScriptValue.cpp \
@@ -434,6 +441,10 @@ webkit2_sources += \
 	Source/WebKit2/Shared/WebPreferencesStore.h \
 	Source/WebKit2/Shared/WebProcessCreationParameters.cpp \
 	Source/WebKit2/Shared/WebProcessCreationParameters.h \
+	Source/WebKit2/Shared/WebRenderLayer.cpp \
+	Source/WebKit2/Shared/WebRenderLayer.h \
+	Source/WebKit2/Shared/WebRenderObject.cpp \
+	Source/WebKit2/Shared/WebRenderObject.h \
 	Source/WebKit2/Shared/WebSecurityOrigin.h \
 	Source/WebKit2/Shared/WebSerializedScriptValue.h \
 	Source/WebKit2/Shared/WebString.h \
@@ -546,6 +557,8 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitHitTestResultPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitLoaderClient.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitLoaderClient.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFindController.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFindController.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitNavigationPolicyDecision.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitNavigationPolicyDecision.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitNavigationPolicyDecisionPrivate.h \
@@ -562,6 +575,9 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecision.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecision.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitResponsePolicyDecisionPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitScriptDialog.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitScriptDialog.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitScriptDialogPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitSettings.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitSettings.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitSettingsPrivate.h \
@@ -760,8 +776,6 @@ webkit2_sources += \
 	Source/WebKit2/WebProcess/Downloads/soup/DownloadSoup.cpp \
 	Source/WebKit2/WebProcess/FullScreen/WebFullScreenManager.cpp \
 	Source/WebKit2/WebProcess/FullScreen/WebFullScreenManager.h \
-	Source/WebKit2/WebProcess/FullScreen/gtk/WebFullScreenManagerGtk.cpp \
-	Source/WebKit2/WebProcess/FullScreen/gtk/WebFullScreenManagerGtk.h \
 	Source/WebKit2/WebProcess/Geolocation/GeolocationPermissionRequestManager.cpp \
 	Source/WebKit2/WebProcess/Geolocation/GeolocationPermissionRequestManager.h \
 	Source/WebKit2/WebProcess/Geolocation/WebGeolocationManager.cpp \
@@ -1106,7 +1120,8 @@ libwebkit2gtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_LIB
 	$(SQLITE3_LIBS) \
 	$(UNICODE_LIBS) \
 	$(XRENDER_LIBS) \
-	$(XT_LIBS)
+	$(XT_LIBS) \
+	$(ZLIB_LIBS)
 
 if ENABLE_WEBKIT2
 pkgconfig_DATA += Source/WebKit2/webkit2gtk-@WEBKITGTK_API_VERSION@.pc
@@ -1276,8 +1291,7 @@ Programs_WebKitWebProcess_LDADD = \
 	$(GLIB_LIBS) \
 	$(GTK_LIBS) \
 	$(GTK_UNIX_PRINTING_LIBS) \
-	$(LIBSOUP_LIBS) \
-	$(ZLIB_CFLAGS)
+	$(LIBSOUP_LIBS)
 
 Programs_WebKitWebProcess_LDFLAGS = \
 	-no-fast-install \
@@ -1322,8 +1336,7 @@ libWebCoreGtk2_la_CPPFLAGS = \
 	$(SQLITE3_CFLAGS) \
 	$(UNICODE_CFLAGS) \
 	$(XRENDER_CFLAGS) \
-	$(XT_CFLAGS) \
-	$(ZLIB_LIBS)
+	$(XT_CFLAGS)
 
 libexec_PROGRAMS += \
 	Programs/WebKitPluginProcess

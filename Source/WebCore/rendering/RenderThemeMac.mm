@@ -990,7 +990,7 @@ bool RenderThemeMac::paintProgressBar(RenderObject* renderObject, const PaintInf
     trackInfo.reserved = 0;
     trackInfo.filler1 = 0;
 
-    OwnPtr<ImageBuffer> imageBuffer = ImageBuffer::create(inflatedRect.size());
+    OwnPtr<ImageBuffer> imageBuffer = ImageBuffer::create(inflatedRect.size(), 1);
     if (!imageBuffer)
         return true;
 
@@ -1720,24 +1720,34 @@ void RenderThemeMac::adjustSliderThumbSize(RenderStyle* style) const
 
 void RenderThemeMac::adjustMediaSliderThumbSize(RenderStyle* style) const
 {
-    ControlPart part = style->appearance();
-
-    if (part == MediaSliderThumbPart || part == MediaVolumeSliderThumbPart) {
-        int width = mediaSliderThumbWidth;
-        int height = mediaSliderThumbHeight;
-        
-        if (mediaControllerTheme() == MediaControllerThemeQuickTime) {
-            CGSize size;
-            
-            wkMeasureMediaUIPart(part == MediaSliderThumbPart ? MediaSliderThumb : MediaVolumeSliderThumb, MediaControllerThemeQuickTime, NULL, &size);
-            width = size.width;
-            height = size.height;
-        }
-
-        float zoomLevel = style->effectiveZoom();
-        style->setWidth(Length(static_cast<int>(width * zoomLevel), Fixed));
-        style->setHeight(Length(static_cast<int>(height * zoomLevel), Fixed));
+    int wkPart;
+    switch (style->appearance()) {
+    case MediaSliderThumbPart:
+        wkPart = MediaSliderThumb;
+        break;
+    case MediaVolumeSliderThumbPart:
+        wkPart = MediaVolumeSliderThumb;
+        break;
+    case MediaFullScreenVolumeSliderThumbPart:
+        wkPart = MediaFullScreenVolumeSliderThumb;
+        break;
+    default:
+        return;
     }
+
+    int width = mediaSliderThumbWidth;
+    int height = mediaSliderThumbHeight;
+
+    if (mediaControllerTheme() == MediaControllerThemeQuickTime) {
+        CGSize size;
+        wkMeasureMediaUIPart(wkPart, MediaControllerThemeQuickTime, NULL, &size);
+        width = size.width;
+        height = size.height;
+    }
+
+    float zoomLevel = style->effectiveZoom();
+    style->setWidth(Length(static_cast<int>(width * zoomLevel), Fixed));
+    style->setHeight(Length(static_cast<int>(height * zoomLevel), Fixed));
 }
 
 enum WKMediaControllerThemeState { 
@@ -1977,7 +1987,29 @@ bool RenderThemeMac::paintMediaVolumeSliderThumb(RenderObject* o, const PaintInf
     wkDrawMediaUIPart(MediaVolumeSliderThumb, mediaControllerTheme(), localContext.cgContext(), r, getMediaUIPartStateFlags(node));
     return false;
 }
+
+bool RenderThemeMac::paintMediaFullScreenVolumeSliderTrack(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
+{
+    Node* node = o->node();
+    if (!node)
+        return false;
     
+    LocalCurrentGraphicsContext localContext(paintInfo.context);
+    wkDrawMediaUIPart(MediaFullScreenVolumeSlider, mediaControllerTheme(), localContext.cgContext(), r, getMediaUIPartStateFlags(node));
+    return false;
+}
+
+bool RenderThemeMac::paintMediaFullScreenVolumeSliderThumb(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
+{
+    Node* node = o->node();
+    if (!node)
+        return false;
+    
+    LocalCurrentGraphicsContext localContext(paintInfo.context);
+    wkDrawMediaUIPart(MediaFullScreenVolumeSliderThumb, mediaControllerTheme(), localContext.cgContext(), r, getMediaUIPartStateFlags(node));
+    return false;
+}
+
 String RenderThemeMac::extraMediaControlsStyleSheet()
 {
 #if PLATFORM(MAC)

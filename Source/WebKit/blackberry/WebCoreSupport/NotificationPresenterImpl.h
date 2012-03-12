@@ -21,7 +21,7 @@
 
 #if ENABLE(NOTIFICATIONS)
 #include <NotificationAckListener.h>
-#include <NotificationPresenter.h>
+#include <NotificationClient.h>
 #include <NotificationPresenterBlackBerry.h>
 #include <string>
 #include <wtf/HashMap.h>
@@ -29,11 +29,11 @@
 #include <wtf/OwnPtr.h>
 #include <wtf/text/StringHash.h>
 
-namespace WebKit {
+namespace WebCore {
 
-class NotificationPresenterImpl : public WebCore::NotificationPresenter, public BlackBerry::Platform::NotificationAckListener {
+class NotificationPresenterImpl : public WebCore::NotificationClient, public BlackBerry::Platform::NotificationAckListener {
 public:
-    static NotificationPresenter* instance();
+    static NotificationClient* instance();
     virtual ~NotificationPresenterImpl();
 
     // Requests that a notification be shown.

@@ -128,10 +128,6 @@ public:
     virtual void requestWebGLPermission(Frame*);
 #endif
 
-#if ENABLE(NOTIFICATIONS)
-    virtual NotificationPresenter* notificationPresenter() const;
-#endif
-
 #if ENABLE(SVG)
     virtual void didSetSVGZoomAndPan(Frame*, unsigned short zoomAndPan);
 #endif
@@ -139,7 +135,6 @@ public:
     virtual bool selectItemAlignmentFollowsMenuWritingDirection();
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
     virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const;
-    virtual void showContextMenu() { }
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);

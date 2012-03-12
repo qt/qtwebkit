@@ -39,11 +39,13 @@
 #include "GraphicsContext.h"
 #include "PlatformString.h"
 #include "ProgramBinding.h"
+#include "Region.h"
 #include "RenderSurfaceChromium.h"
 #include "ShaderChromium.h"
 #include "TransformationMatrix.h"
 
 #include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
@@ -52,12 +54,14 @@
 
 namespace WebCore {
 
+class CCAnimationEvent;
 class CCLayerAnimationController;
+class CCLayerAnimationDelegate;
 class CCLayerImpl;
 class CCLayerTreeHost;
 class CCTextureUpdater;
 class GraphicsContext3D;
-class Region;
+class ScrollbarLayerChromium;
 
 // Base class for composited layers. Special layer types are derived from
 // this class.
@@ -96,9 +100,6 @@ public:
     void setMasksToBounds(bool);
     bool masksToBounds() const { return m_masksToBounds; }
 
-    void setName(const String&);
-    const String& name() const { return m_name; }
-
     void setMaskLayer(LayerChromium*);
     LayerChromium* maskLayer() const { return m_maskLayer.get(); }
 
@@ -131,7 +132,9 @@ public:
     const IntPoint& scrollPosition() const { return m_scrollPosition; }
 
     void setScrollable(bool);
+    void setShouldScrollOnMainThread(bool);
     void setHaveWheelEventHandlers(bool);
+    void setNonFastScrollableRegion(const Region&);
 
     IntSize scrollDelta() const { return IntSize(); }
 
@@ -159,17 +162,17 @@ public:
     // These methods typically need to be overwritten by derived classes.
     virtual bool drawsContent() const { return m_isDrawable; }
     virtual void paintContentsIfDirty(const Region& /* occludedScreenSpace */) { }
-    virtual void idlePaintContentsIfDirty() { }
+    virtual void idlePaintContentsIfDirty(const Region& /* occludedScreenSpace */) { }
     virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&) { }
     virtual void setIsMask(bool) { }
     virtual void unreserveContentsTexture() { }
     virtual void bindContentsTexture() { }
-    virtual void pageScaleChanged() { m_pageScaleDirty = true; }
     virtual void protectVisibleTileTextures() { }
     virtual bool needsContentsScale() const { return false; }
 
     void setDebugBorderColor(const Color&);
     void setDebugBorderWidth(float);
+    void setDebugName(const String&);
 
     virtual void pushPropertiesTo(CCLayerImpl*);
 
@@ -198,14 +201,8 @@ public:
     float contentsScale() const { return m_contentsScale; }
     void setContentsScale(float);
 
-    TransformationMatrix contentToScreenSpaceTransform() const;
-
-    // Adds any opaque visible pixels to the occluded region.
-    virtual void addSelfToOccludedScreenSpace(Region& occludedScreenSpace);
-
     // Returns true if any of the layer's descendants has content to draw.
     bool descendantDrawsContent();
-    virtual void contentChanged() { }
 
     CCLayerTreeHost* layerTreeHost() const { return m_layerTreeHost.get(); }
 
@@ -224,7 +221,16 @@ public:
 
     CCLayerAnimationController* layerAnimationController() { return m_layerAnimationController.get(); }
     void setLayerAnimationController(PassOwnPtr<CCLayerAnimationController>);
+
+    void setLayerAnimationDelegate(CCLayerAnimationDelegate* layerAnimationDelegate) { m_layerAnimationDelegate = layerAnimationDelegate; }
+
     bool hasActiveAnimation() const;
+
+    void setAnimationEvent(const CCAnimationEvent&, double wallClockTime);
+
+    virtual Region opaqueContentsRegion() const { return Region(); };
+
+    virtual ScrollbarLayerChromium* toScrollbarLayerChromium() { return 0; }
 
 protected:
     friend class CCLayerImpl;
@@ -232,8 +238,6 @@ protected:
     friend class TreeSynchronizer;
 
     LayerChromium();
-
-    bool isPaintedAxisAlignedInScreen() const;
 
     void setNeedsCommit();
 
@@ -249,7 +253,7 @@ protected:
     RefPtr<LayerChromium> m_maskLayer;
 
     // Constructs a CCLayerImpl of the correct runtime type for this LayerChromium type.
-    virtual PassRefPtr<CCLayerImpl> createCCLayerImpl();
+    virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl();
     int m_layerId;
 
 private:
@@ -276,13 +280,17 @@ private:
     IntRect m_visibleLayerRect;
     IntPoint m_scrollPosition;
     bool m_scrollable;
+    bool m_shouldScrollOnMainThread;
     bool m_haveWheelEventHandlers;
+    Region m_nonFastScrollableRegion;
+    bool m_nonFastScrollableRegionChanged;
     FloatPoint m_position;
     FloatPoint m_anchorPoint;
     Color m_backgroundColor;
     bool m_backgroundCoversViewport;
     Color m_debugBorderColor;
     float m_debugBorderWidth;
+    String m_debugName;
     float m_opacity;
     FilterOperations m_filters;
     float m_anchorPointZ;
@@ -311,9 +319,9 @@ private:
     IntRect m_drawableContentRect;
     float m_contentsScale;
 
-    String m_name;
-
     bool m_pageScaleDirty;
+
+    CCLayerAnimationDelegate* m_layerAnimationDelegate;
 };
 
 void sortLayers(Vector<RefPtr<LayerChromium> >::iterator, Vector<RefPtr<LayerChromium> >::iterator, void*);

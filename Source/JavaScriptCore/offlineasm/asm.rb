@@ -128,11 +128,15 @@ outputFlnm = ARGV.shift
 
 $stderr.puts "offlineasm: Parsing #{asmFile} and #{offsetsFile} and creating assembly file #{outputFlnm}."
 
-configurationList = offsetsAndConfigurationIndex(offsetsFile)
-inputData = IO::read(asmFile)
+begin
+    configurationList = offsetsAndConfigurationIndex(offsetsFile)
+rescue MissingMagicValuesException
+    $stderr.puts "offlineasm: No magic values found. Skipping assembly file generation assuming the classic interpreter is enabled."
+    exit 0
+end
 
 inputHash =
-    "// offlineasm input hash: " + Digest::SHA1.hexdigest(inputData) +
+    "// offlineasm input hash: " + parseHash(asmFile) +
     " " + Digest::SHA1.hexdigest(configurationList.map{|v| (v[0] + [v[1]]).join(' ')}.join(' ')) +
     " " + selfHash
 
@@ -154,7 +158,7 @@ File.open(outputFlnm, "w") {
     
     $asm = Assembler.new($output)
     
-    ast = parse(lex(inputData))
+    ast = parse(asmFile)
     
     configurationList.each {
         | configuration |
@@ -163,6 +167,7 @@ File.open(outputFlnm, "w") {
         forSettings(computeSettingsCombinations(ast)[configIndex], ast) {
             | concreteSettings, lowLevelAST, backend |
             lowLevelAST = lowLevelAST.resolve(*buildOffsetsMap(lowLevelAST, offsetsList))
+            lowLevelAST.validate
             emitCodeInConfiguration(concreteSettings, lowLevelAST, backend) {
                 $asm.inAsm {
                     lowLevelAST.lower(backend)

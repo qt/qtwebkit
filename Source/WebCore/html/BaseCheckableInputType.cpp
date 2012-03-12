@@ -48,7 +48,7 @@ bool BaseCheckableInputType::saveFormControlState(String& result) const
     return true;
 }
 
-void BaseCheckableInputType::restoreFormControlState(const String& state) const
+void BaseCheckableInputType::restoreFormControlState(const String& state)
 {
     element()->setChecked(state == "on");
 }
@@ -84,7 +84,7 @@ bool BaseCheckableInputType::canSetStringValue() const
     return false;
 }
 
-// FIXME: Could share this with BaseButtonInputType and RangeInputType if we had a common base class.
+// FIXME: Could share this with BaseClickableWithKeyInputType and RangeInputType if we had a common base class.
 void BaseCheckableInputType::accessKeyAction(bool sendMouseEvents)
 {
     InputType::accessKeyAction(sendMouseEvents);

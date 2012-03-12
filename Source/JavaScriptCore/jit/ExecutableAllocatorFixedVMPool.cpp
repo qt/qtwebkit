@@ -104,6 +104,10 @@ ExecutableAllocator::ExecutableAllocator(JSGlobalData&)
     ASSERT(allocator);
 }
 
+ExecutableAllocator::~ExecutableAllocator()
+{
+}
+
 bool ExecutableAllocator::isValid() const
 {
     return !!allocator->bytesReserved();
@@ -115,10 +119,23 @@ bool ExecutableAllocator::underMemoryPressure()
     return statistics.bytesAllocated > statistics.bytesReserved / 2;
 }
 
-PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(JSGlobalData& globalData, size_t sizeInBytes, void* ownerUID)
+double ExecutableAllocator::memoryPressureMultiplier(size_t addedMemoryUsage)
+{
+    MetaAllocator::Statistics statistics = allocator->currentStatistics();
+    ASSERT(statistics.bytesAllocated <= statistics.bytesReserved);
+    size_t bytesAllocated = statistics.bytesAllocated + addedMemoryUsage;
+    if (bytesAllocated >= statistics.bytesReserved)
+        bytesAllocated = statistics.bytesReserved;
+    return static_cast<double>(statistics.bytesReserved) /
+        (statistics.bytesReserved - bytesAllocated);
+}
+
+PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(JSGlobalData& globalData, size_t sizeInBytes, void* ownerUID, JITCompilationEffort effort)
 {
     RefPtr<ExecutableMemoryHandle> result = allocator->allocate(sizeInBytes, ownerUID);
     if (!result) {
+        if (effort == JITCompilationCanFail)
+            return result;
         releaseExecutableMemory(globalData);
         result = allocator->allocate(sizeInBytes, ownerUID);
         if (!result)

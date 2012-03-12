@@ -55,6 +55,8 @@ public:
 
     String elementRenderTreeAsText(Element*, ExceptionCode&);
 
+    String address(Node*);
+
     bool isPreloaded(Document*, const String& url);
 
     size_t numberOfScopedHTMLStyleChildren(const Node*, ExceptionCode&) const;
@@ -68,13 +70,15 @@ public:
     ShadowRootIfShadowDOMEnabledOrNode* shadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* youngestShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* youngerShadowRoot(Node* shadow, ExceptionCode&);
+    ShadowRootIfShadowDOMEnabledOrNode* olderShadowRoot(Node* shadow, ExceptionCode&);
     void removeShadowRoot(Element* host, ExceptionCode&);
     void setMultipleShadowSubtreesEnabled(bool);
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
     Element* getElementByIdInShadowRoot(Node* shadowRoot, const String& id, ExceptionCode&);
-    bool isValidContentSelect(Element* contentElement, ExceptionCode&);
+    bool isValidContentSelect(Element* insertionPoint, ExceptionCode&);
 
     bool attached(Node*, ExceptionCode&);
 
@@ -102,10 +106,13 @@ public:
     PassRefPtr<Range> rangeFromLocationAndLength(Element* scope, int rangeLocation, int rangeLength, ExceptionCode&);
     unsigned locationFromRange(Element* scope, const Range*, ExceptionCode&);
     unsigned lengthFromRange(Element* scope, const Range*, ExceptionCode&);
+    String rangeAsText(const Range*, ExceptionCode&);
 
     int lastSpellCheckRequestSequence(Document*, ExceptionCode&);
     int lastSpellCheckProcessedSequence(Document*, ExceptionCode&);
     
+    void setMediaPlaybackRequiresUserGesture(Document*, bool enabled, ExceptionCode&);
+
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
 

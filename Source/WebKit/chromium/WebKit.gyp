@@ -112,6 +112,7 @@
                 'public/WebCache.h',
                 'public/WebColorChooser.h',
                 'public/WebColorChooserClient.h',
+                'public/WebColorName.h',
                 'public/WebCommonWorkerClient.h',
                 'public/WebCompositionUnderline.h',
                 'public/WebCompositor.h',
@@ -214,6 +215,7 @@
                 'public/WebNotificationPresenter.h',
                 'public/WebOptionElement.h',
                 'public/WebPageOverlay.h',
+                'public/WebPagePopup.h',
                 'public/WebPageSerializer.h',
                 'public/WebPageSerializerClient.h',
                 'public/WebPageVisibilityState.h',
@@ -292,7 +294,6 @@
                 'public/platform/WebCanvas.h',
                 'public/platform/WebClipboard.h',
                 'public/platform/WebColor.h',
-                'public/platform/WebColorName.h',
                 'public/platform/WebCommon.h',
                 'public/platform/WebContentLayer.h',
                 'public/platform/WebContentLayerClient.h',
@@ -494,9 +495,9 @@
                 'src/WebBlob.cpp',
                 'src/WebBlobData.cpp',
                 'src/WebCache.cpp',
-                'src/WebColor.cpp',
                 'src/WebColorChooserClientImpl.cpp',
                 'src/WebColorChooserClientImpl.h',
+                'src/WebColorName.cpp',
                 'src/WebCommon.cpp',
                 'src/WebCompositorImpl.cpp',
                 'src/WebCompositorImpl.h',
@@ -615,6 +616,7 @@
                 'src/WebNodeList.cpp',
                 'src/WebNotification.cpp',
                 'src/WebOptionElement.cpp',
+                'src/WebPagePopupImpl.cpp',
                 'src/WebPageSerializer.cpp',
                 'src/WebPageSerializerImpl.cpp',
                 'src/WebPageSerializerImpl.h',
@@ -824,20 +826,13 @@
                         ['exclude', '/android/'],
                     ],
                 }],
+                # TODO: we exclude CG.cpp on both sides of the below conditional. Move elsewhere?
                 ['OS=="mac"', {
                     'include_dirs': [
                         'public/mac',
                     ],
-                    'conditions': [
-                        ['use_skia==0', {
-                            'sources/': [
-                                ['exclude', 'Skia\\.cpp$'],
-                            ],
-                        },{ # use_skia
-                            'sources/': [
-                                ['exclude', 'CG\\.cpp$'],
-                            ],
-                        }],
+                    'sources/': [
+                        ['exclude', 'CG\\.cpp$'],
                     ],
                 }, { # else: OS!="mac"
                     'sources/': [

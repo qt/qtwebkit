@@ -28,7 +28,6 @@
 
 #include "APIObject.h"
 #include "Connection.h"
-#include "ContextMenuState.h"
 #include "DragControllerAction.h"
 #include "DrawingAreaProxy.h"
 #include "EditorState.h"
@@ -39,6 +38,7 @@
 #if PLATFORM(QT)
 #include "QtNetworkRequestData.h"
 #endif
+#include "LayerTreeContext.h"
 #include "NotificationPermissionRequestManagerProxy.h"
 #include "PlatformProcessIdentifier.h"
 #include "SandboxExtension.h"
@@ -46,6 +46,7 @@
 #include "WKBase.h"
 #include "WKPagePrivate.h"
 #include "WebContextMenuItemData.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebFindClient.h"
 #include "WebFormClient.h"
 #include "WebFrameProxy.h"
@@ -407,6 +408,9 @@ public:
     void setCustomTextEncodingName(const String&);
     String customTextEncodingName() const { return m_customTextEncodingName; }
 
+    void resumeActiveDOMObjectsAndAnimations();
+    void suspendActiveDOMObjectsAndAnimations();
+
     double estimatedProgress() const;
 
     void terminateProcess();
@@ -429,7 +433,9 @@ public:
     void setIntrinsicDeviceScaleFactor(float);
     void setCustomDeviceScaleFactor(float);
     void windowScreenDidChange(PlatformDisplayID);
-    
+
+    LayerHostingMode layerHostingMode() const { return m_layerHostingMode; }
+
     void setUseFixedLayout(bool);
     void setFixedLayoutSize(const WebCore::IntSize&);
     bool useFixedLayout() const { return m_useFixedLayout; };
@@ -528,6 +534,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&);
     virtual void exitAcceleratedCompositingMode();
+    virtual void updateAcceleratedCompositingMode(const LayerTreeContext&);
 #endif
     
     void didDraw();
@@ -727,7 +734,7 @@ private:
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
     void requestNotificationPermission(uint64_t notificationID, const String& originString);
-    void showNotification(const String& title, const String& body, const String& iconURL, const String& originString, uint64_t notificationID);
+    void showNotification(const String& title, const String& body, const String& iconURL, const String& replaceID, const String& originString, uint64_t notificationID);
     
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
@@ -779,8 +786,8 @@ private:
 #endif
 
     // Context Menu.
-    void showContextMenu(const WebCore::IntPoint& menuLocation, const ContextMenuState&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
-    void internalShowContextMenu(const WebCore::IntPoint& menuLocation, const ContextMenuState&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
+    void showContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
+    void internalShowContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
 
     // Search popup results
     void saveRecentSearches(const String&, const Vector<String>&);
@@ -910,7 +917,7 @@ private:
 
     RefPtr<WebPopupMenuProxy> m_activePopupMenu;
     RefPtr<WebContextMenuProxy> m_activeContextMenu;
-    ContextMenuState m_activeContextMenuState;
+    WebHitTestResult::Data m_activeContextMenuHitTestResultData;
     RefPtr<WebOpenPanelResultListenerProxy> m_openPanelResultListener;
     GeolocationPermissionRequestManagerProxy m_geolocationPermissionRequestManager;
     NotificationPermissionRequestManagerProxy m_notificationPermissionRequestManager;
@@ -941,6 +948,8 @@ private:
     double m_pageScaleFactor;
     float m_intrinsicDeviceScaleFactor;
     float m_customDeviceScaleFactor;
+
+    LayerHostingMode m_layerHostingMode;
 
     bool m_drawsBackground;
     bool m_drawsTransparentBackground;
@@ -991,6 +1000,8 @@ private:
 #endif
 
     uint64_t m_pageID;
+
+    bool m_isPageSuspended;
 
 #if PLATFORM(MAC)
     bool m_isSmartInsertDeleteEnabled;

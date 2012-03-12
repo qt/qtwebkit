@@ -22,6 +22,7 @@
 #define qquickwebview_p_p_h
 
 #include "DrawingAreaProxy.h"
+#include "QtDialogRunner.h"
 #include "QtFlickProvider.h"
 #include "QtPageClient.h"
 #include "QtViewportInteractionEngine.h"
@@ -73,10 +74,11 @@ public:
     virtual void updateContentsSize(const QSizeF&) { }
 
     virtual void loadDidSucceed();
-    virtual void onComponentComplete() { }
+    virtual void onComponentComplete();
     virtual void loadDidCommit() { }
     virtual void didFinishFirstNonEmptyLayout() { }
     virtual void didChangeViewportProperties(const WebCore::ViewportArguments& args) { }
+    void didChangeLoadingState(QWebLoadRequest* loadRequest);
     void didChangeBackForwardList();
 
     void setNeedsDisplay();
@@ -94,6 +96,7 @@ public:
     void _q_onOpenPanelFilesSelected();
     void _q_onOpenPanelFinished(int result);
     void _q_onVisibleChanged();
+    void _q_onUrlChanged();
     void _q_onReceivedResponseFromDownload(QWebDownloadItem*);
     void _q_onIconChangedForPageURL(const QUrl& pageURL, const QUrl& iconURLString);
 
@@ -106,13 +109,19 @@ public:
     bool handleCertificateVerificationRequest(const QString& hostname);
     void handleProxyAuthenticationRequiredRequest(const QString& hostname, uint16_t port, const QString& prefilledUsername, QString& username, QString& password);
 
+    void execDialogRunner(QtDialogRunner&);
+
     void setRenderToOffscreenBuffer(bool enable) { m_renderToOffscreenBuffer = enable; }
+    void setTransparentBackground(bool);
     void setViewInAttachedProperties(QObject*);
     void setIcon(const QUrl&);
 
     bool navigatorQtObjectEnabled() const;
     bool renderToOffscreenBuffer() const { return m_renderToOffscreenBuffer; }
+    bool transparentBackground() const;
     void setNavigatorQtObjectEnabled(bool);
+
+    QRect visibleContentsRect() const;
 
     // PageClient.
     WebCore::IntSize viewSize() const;
@@ -158,7 +167,10 @@ protected:
     bool userDidOverrideContentHeight;
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
+    bool m_loadStartedSignalSent;
+    bool m_dialogRunnerActive;
     QUrl m_iconURL;
+    QUrl m_deferedUrlToLoad;
 };
 
 class QQuickWebViewLegacyPrivate : public QQuickWebViewPrivate {

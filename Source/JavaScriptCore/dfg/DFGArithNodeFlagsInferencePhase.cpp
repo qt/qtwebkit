@@ -80,11 +80,8 @@ private:
         if (!node.shouldGenerate())
             return;
         
-        NodeType op = node.op;
-        ArithNodeFlags flags = 0;
-        
-        if (node.hasArithNodeFlags())
-            flags = node.rawArithNodeFlags();
+        NodeType op = static_cast<NodeType>(node.op);
+        NodeFlags flags = node.flags;
         
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLog("   %s @%u: %s ", Graph::opName(op), m_compileIndex, arithNodeFlagsAsString(flags));
@@ -131,6 +128,11 @@ private:
             break;
         }
             
+        case ArithNegate: {
+            changed |= m_graph[node.child1()].mergeArithNodeFlags(flags);
+            break;
+        }
+            
         case ArithMul:
         case ArithDiv: {
             // As soon as a multiply happens, we can easily end up in the part
@@ -173,7 +175,7 @@ private:
             
         default:
             flags |= NodeUsedAsNumber | NodeNeedsNegZero;
-            if (op & NodeHasVarArgs) {
+            if (node.flags & NodeHasVarArgs) {
                 for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
                     changed |= m_graph[m_graph.m_varArgChildren[childIdx]].mergeArithNodeFlags(flags);
             } else {
@@ -217,6 +219,9 @@ private:
     
     NodeIndex m_compileIndex;
     bool m_changed;
+#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+    unsigned m_count;
+#endif
 };
 
 void performArithNodeFlagsInference(Graph& graph)

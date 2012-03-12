@@ -90,18 +90,18 @@ void WebNotificationManager::didRemoveNotificationDecisions(const Vector<String>
 #endif
 }
 
-NotificationPresenter::Permission WebNotificationManager::policyForOrigin(WebCore::SecurityOrigin *origin) const
+NotificationClient::Permission WebNotificationManager::policyForOrigin(WebCore::SecurityOrigin *origin) const
 {
 #if ENABLE(NOTIFICATIONS)
     if (!origin)
-        return NotificationPresenter::PermissionNotAllowed;
+        return NotificationClient::PermissionNotAllowed;
     
     HashMap<String, bool>::const_iterator it = m_permissionsMap.find(origin->toString());
     if (it != m_permissionsMap.end())
-        return it->second ? NotificationPresenter::PermissionAllowed : NotificationPresenter::PermissionDenied;
+        return it->second ? NotificationClient::PermissionAllowed : NotificationClient::PermissionDenied;
 #endif
     
-    return NotificationPresenter::PermissionNotAllowed;
+    return NotificationClient::PermissionNotAllowed;
 }
 
 bool WebNotificationManager::show(Notification* notification, WebPage* page)
@@ -117,7 +117,7 @@ bool WebNotificationManager::show(Notification* notification, WebPage* page)
     NotificationContextMap::iterator it = m_notificationContextMap.add(notification->scriptExecutionContext(), Vector<uint64_t>()).first;
     it->second.append(notificationID);
     
-    m_process->connection()->send(Messages::WebPageProxy::ShowNotification(notification->contents().title, notification->contents().body, notification->iconURL().string(), notification->scriptExecutionContext()->securityOrigin()->toString(), notificationID), page->pageID());
+    m_process->connection()->send(Messages::WebPageProxy::ShowNotification(notification->contents().title, notification->contents().body, notification->iconURL().string(), notification->replaceId(), notification->scriptExecutionContext()->securityOrigin()->toString(), notificationID), page->pageID());
     return true;
 #else
     return false;

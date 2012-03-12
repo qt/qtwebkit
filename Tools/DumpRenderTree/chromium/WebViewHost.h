@@ -126,11 +126,11 @@ class WebViewHost : public WebKit::WebSpellCheckClient, public WebKit::WebViewCl
     virtual WebKit::WebString autoCorrectWord(const WebKit::WebString&);
 
     // WebKit::WebViewClient
-    virtual WebKit::WebView* createView(WebKit::WebFrame*, const WebKit::WebURLRequest&, const WebKit::WebWindowFeatures&, const WebKit::WebString&);
+    virtual WebKit::WebView* createView(WebKit::WebFrame*, const WebKit::WebURLRequest&, const WebKit::WebWindowFeatures&, const WebKit::WebString&, WebKit::WebNavigationPolicy);
     virtual WebKit::WebWidget* createPopupMenu(WebKit::WebPopupType);
     virtual WebKit::WebWidget* createPopupMenu(const WebKit::WebPopupMenuInfo&);
     virtual WebKit::WebStorageNamespace* createSessionStorageNamespace(unsigned quota);
-    virtual WebKit::WebGraphicsContext3D* createGraphicsContext3D(const WebKit::WebGraphicsContext3D::Attributes&, bool direct);
+    virtual WebKit::WebGraphicsContext3D* createGraphicsContext3D(const WebKit::WebGraphicsContext3D::Attributes&);
     virtual void didAddMessageToConsole(const WebKit::WebConsoleMessage&, const WebKit::WebString& sourceName, unsigned sourceLine);
     virtual void didStartLoading();
     virtual void didStopLoading();
@@ -251,6 +251,9 @@ class WebViewHost : public WebKit::WebSpellCheckClient, public WebKit::WebViewCl
 
     // Pending task list, Note taht the method is referred from MethodTask class.
     TaskList* taskList() { return &m_taskList; }
+
+    // The current web intents request.
+    WebKit::WebIntentRequest* currentIntentRequest() { return &m_currentRequest; }
 
 private:
 

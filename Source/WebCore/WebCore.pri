@@ -19,6 +19,9 @@ WEBCORE_GENERATED_SOURCES_DIR = $${ROOT_BUILD_DIR}/Source/WebCore/$${GENERATED_S
 INCLUDEPATH += \
     $$SOURCE_DIR \
     $$SOURCE_DIR/Modules/geolocation \
+    $$SOURCE_DIR/Modules/indexeddb \
+    $$SOURCE_DIR/Modules/webdatabase \
+    $$SOURCE_DIR/Modules/websockets \
     $$SOURCE_DIR/accessibility \
     $$SOURCE_DIR/bindings \
     $$SOURCE_DIR/bindings/generic \
@@ -182,16 +185,19 @@ contains(DEFINES, ENABLE_WEBGL=1) {
     !contains(QT_CONFIG, opengl) {
         error( "This configuration needs an OpenGL enabled Qt. Your Qt is missing OpenGL.")
     }
-    QT *= opengl
 }
 
 contains(CONFIG, texmap) {
     DEFINES += WTF_USE_TEXTURE_MAPPER=1
     !win32-*:contains(QT_CONFIG, opengl) {
-        DEFINES += WTF_USE_TEXTURE_MAPPER_GL
-        QT *= opengl
+        DEFINES += WTF_USE_TEXTURE_MAPPER_GL=1
         contains(QT_CONFIG, opengles2): LIBS += -lEGL
     }
+}
+
+contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1)|contains(DEFINES, ENABLE_WEBGL=1) {
+    # Only Qt 4 needs the opengl module, for Qt 5 everything we need is part of QtGui.
+    haveQt(4): QT *= opengl
 }
 
 !system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {
@@ -201,6 +207,28 @@ contains(CONFIG, texmap) {
 } else {
     INCLUDEPATH += $${SQLITE3SRCDIR}
     LIBS += -lsqlite3
+}
+
+contains(DEFINES, WTF_USE_QT_IMAGE_DECODER=0) {
+    INCLUDEPATH += \
+        $$SOURCE_DIR/platform/image-decoders/bmp \
+        $$SOURCE_DIR/platform/image-decoders/gif \
+        $$SOURCE_DIR/platform/image-decoders/ico \
+        $$SOURCE_DIR/platform/image-decoders/jpeg \
+        $$SOURCE_DIR/platform/image-decoders/png
+
+    haveQt(5) {
+        # Qt5 allows us to use config tests to check for the presence of these libraries
+        !contains(config_test_libjpeg, yes): error("JPEG library not found!")
+        !contains(config_test_libpng, yes): error("PNG 1.2 library not found!")
+    }
+
+    LIBS += -ljpeg -lpng12
+
+    contains(DEFINES, WTF_USE_WEBP=1) {
+        INCLUDEPATH += $$SOURCE_DIR/platform/image-decoders/webp
+        LIBS += -lwebp
+    }
 }
 
 win32-*|wince* {

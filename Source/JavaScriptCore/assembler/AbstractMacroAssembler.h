@@ -28,10 +28,20 @@
 
 #include "CodeLocation.h"
 #include "MacroAssemblerCodeRef.h"
+#include <wtf/CryptographicallyRandomNumber.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/UnusedParam.h>
 
 #if ENABLE(ASSEMBLER)
+
+
+#if PLATFORM(QT)
+#define ENABLE_JIT_CONSTANT_BLINDING 0
+#endif
+
+#ifndef ENABLE_JIT_CONSTANT_BLINDING
+#define ENABLE_JIT_CONSTANT_BLINDING 1
+#endif
 
 namespace JSC {
 
@@ -186,11 +196,19 @@ public:
         const void* m_value;
     };
 
-    struct ImmPtr : public TrustedImmPtr {
+    struct ImmPtr : 
+#if ENABLE(JIT_CONSTANT_BLINDING)
+        private TrustedImmPtr 
+#else
+        public TrustedImmPtr
+#endif
+    {
         explicit ImmPtr(const void* value)
             : TrustedImmPtr(value)
         {
         }
+
+        TrustedImmPtr asTrustedImmPtr() { return *this; }
     };
 
     // TrustedImm32:
@@ -232,7 +250,13 @@ public:
     };
 
 
-    struct Imm32 : public TrustedImm32 {
+    struct Imm32 : 
+#if ENABLE(JIT_CONSTANT_BLINDING)
+        private TrustedImm32 
+#else
+        public TrustedImm32
+#endif
+    {
         explicit Imm32(int32_t value)
             : TrustedImm32(value)
         {
@@ -243,6 +267,8 @@ public:
         {
         }
 #endif
+        const TrustedImm32& asTrustedImm32() const { return *this; }
+
     };
     
     // Section 2: MacroAssembler code buffer handles
@@ -535,13 +561,40 @@ public:
         return reinterpret_cast<ptrdiff_t>(b.executableAddress()) - reinterpret_cast<ptrdiff_t>(a.executableAddress());
     }
 
-    void beginUninterruptedSequence() { }
-    void endUninterruptedSequence() { }
+    void beginUninterruptedSequence() { m_inUninterruptedSequence = true; }
+    void endUninterruptedSequence() { m_inUninterruptedSequence = false; }
 
     unsigned debugOffset() { return m_assembler.debugOffset(); }
 
 protected:
+    AbstractMacroAssembler()
+        : m_inUninterruptedSequence(false)
+        , m_randomSource(cryptographicallyRandomNumber())
+    {
+    }
+
     AssemblerType m_assembler;
+
+    bool inUninterruptedSequence()
+    {
+        return m_inUninterruptedSequence;
+    }
+
+    bool m_inUninterruptedSequence;
+    
+    
+    uint32_t random()
+    {
+        return m_randomSource.getUint32();
+    }
+
+    WeakRandom m_randomSource;
+
+#if ENABLE(JIT_CONSTANT_BLINDING)
+    static bool scratchRegisterForBlinding() { return false; }
+    static bool shouldBlindForSpecificArch(uint32_t) { return true; }
+    static bool shouldBlindForSpecificArch(uint64_t) { return true; }
+#endif
 
     friend class LinkBuffer;
     friend class RepatchBuffer;

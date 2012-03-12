@@ -109,7 +109,7 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
 
         if (authType != BlackBerry::Platform::NetworkRequest::AuthNone)
             platformRequest.setCredentials(username.utf8().data(), password.utf8().data(), authType);
-    } else if (url.protocolInHTTPFamily()) {
+    } else if (url.protocolIsInHTTPFamily()) {
         // For URLs that match the paths of those previously challenged for HTTP Basic authentication,
         // try and reuse the credential preemptively, as allowed by RFC 2617.
         Credential credential = CredentialStorage::get(url);
@@ -122,9 +122,8 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
         // Prepare a cookie header if there are cookies related to this url.
         String cookiePairs = cookieManager().getCookie(url, WithHttpOnlyCookies);
         if (!cookiePairs.isEmpty()) {
-            // We encode the cookie header data using utf8 to support unicode characters.
-            // For more information, look at RFC5987 - 4.1 (http://tools.ietf.org/html/rfc5987#ref-ISO-8859-1).
-            platformRequest.setCookieData(cookiePairs.utf8().data());
+            // We need to check the encoding and encode the cookie header data using latin1 or utf8 to support unicode characters.
+            platformRequest.setCookieData(cookiePairs.containsOnlyLatin1() ? cookiePairs.latin1().data() : cookiePairs.utf8().data());
         }
     }
 

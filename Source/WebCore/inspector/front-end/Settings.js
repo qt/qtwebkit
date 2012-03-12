@@ -90,11 +90,12 @@ WebInspector.Settings = function()
     this.dockToRight = this.createSetting("dockToRight", false);
     this.emulateTouchEvents = this.createSetting("emulateTouchEvents", false);
     this.showPaintRects = this.createSetting("showPaintRects", false);
+    this.zoomLevel = this.createSetting("zoomLevel", 0);
 
     // If there are too many breakpoints in a storage, it is likely due to a recent bug that caused
     // periodical breakpoints duplication leading to inspector slowness.
-    if (window.localStorage.breakpoints && window.localStorage.breakpoints.length > 500000)
-        delete window.localStorage.breakpoints;
+    if (this.breakpoints.get().length > 500000)
+        this.breakpoints.set([]);
 }
 
 WebInspector.Settings.prototype = {
@@ -174,11 +175,11 @@ WebInspector.ExperimentsSettings = function()
     
     // Add currently running experiments here.
     this.sourceFrameAlwaysEditable = this._createExperiment("sourceFrameAlwaysEditable", "Make resources always editable");
-    this.showMemoryCounters = this._createExperiment("showMemoryCounters", "Show memory counters in Timeline panel");
-    this.timelineStartAtZero = this._createExperiment("timelineStartAtZero", "Enable start at zero mode in Timeline panel");
+    this.timelineVerticalOverview = this._createExperiment("timelineStartAtZero", "Enable vertical overview mode in the Timeline panel");
     // FIXME: Enable http/tests/inspector/indexeddb/resources-panel.html when removed from experiments.
     this.showIndexedDB = this._createExperiment("showIndexedDB", "Show IndexedDB in Resources panel");
     this.debugCSS = this._createExperiment("debugCSS", "Load CSS via link tags for debugging");
+    this.showShadowDOM = this._createExperiment("showShadowDOM", "Show shadow DOM");
 
     this._cleanUpSetting();
 }

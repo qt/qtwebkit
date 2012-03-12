@@ -404,30 +404,6 @@ bool JSDOMWindow::defineOwnProperty(JSC::JSObject* object, JSC::ExecState* exec,
 
 // Custom Attributes
 
-JSValue JSDOMWindow::history(ExecState* exec) const
-{
-    History* history = impl()->history();
-    if (JSDOMWrapper* wrapper = getCachedWrapper(currentWorld(exec), history))
-        return wrapper;
-
-    JSDOMWindow* window = const_cast<JSDOMWindow*>(this);
-    JSHistory* jsHistory = JSHistory::create(getDOMStructure<JSHistory>(exec, window), window, history);
-    cacheWrapper(currentWorld(exec), history, jsHistory);
-    return jsHistory;
-}
-
-JSValue JSDOMWindow::location(ExecState* exec) const
-{
-    Location* location = impl()->location();
-    if (JSDOMWrapper* wrapper = getCachedWrapper(currentWorld(exec), location))
-        return wrapper;
-
-    JSDOMWindow* window = const_cast<JSDOMWindow*>(this);
-    JSLocation* jsLocation = JSLocation::create(getDOMStructure<JSLocation>(exec, window), window, location);
-    cacheWrapper(currentWorld(exec), location, jsLocation);
-    return jsLocation;
-}
-
 void JSDOMWindow::setLocation(ExecState* exec, JSValue value)
 {
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -568,6 +544,7 @@ JSValue JSDOMWindow::showModalDialog(ExecState* exec)
 static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransfer)
 {
     MessagePortArray messagePorts;
+    ArrayBufferArray arrayBuffers;
 
     // This function has variable arguments and can be:
     // Per current spec:
@@ -582,13 +559,14 @@ static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransf
             targetOriginArgIndex = 2;
             transferablesArgIndex = 1;
         }
-        fillMessagePortArray(exec, exec->argument(transferablesArgIndex), messagePorts);
+        fillMessagePortArray(exec, exec->argument(transferablesArgIndex), messagePorts, arrayBuffers);
     }
     if (exec->hadException())
         return jsUndefined();
 
-    RefPtr<SerializedScriptValue> message = SerializedScriptValue::create(exec, exec->argument(0), 
-                                                                         doTransfer ? &messagePorts : 0);
+    RefPtr<SerializedScriptValue> message = SerializedScriptValue::create(exec, exec->argument(0),
+                                                                         doTransfer ? &messagePorts : 0,
+                                                                         doTransfer ? &arrayBuffers : 0);
 
     if (exec->hadException())
         return jsUndefined();

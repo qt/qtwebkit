@@ -39,10 +39,12 @@
 #include "CSSStyleSelector.h"
 #include "CSSValue.h"
 #include "CSSValueKeywords.h"
+#include "ChildListMutationScope.h"
 #include "DeleteButtonController.h"
 #include "DocumentFragment.h"
 #include "DocumentType.h"
 #include "Editor.h"
+#include "ExceptionCode.h"
 #include "Frame.h"
 #include "HTMLBodyElement.h"
 #include "HTMLElement.h"
@@ -308,8 +310,8 @@ void StyledMarkupAccumulator::appendElement(StringBuilder& out, Element* element
         } else
             newInlineStyle = EditingStyle::create();
 
-        if (element->isStyledElement() && static_cast<StyledElement*>(element)->inlineStyleDecl())
-            newInlineStyle->overrideWithStyle(static_cast<StyledElement*>(element)->inlineStyleDecl());
+        if (element->isStyledElement() && static_cast<StyledElement*>(element)->inlineStyle())
+            newInlineStyle->overrideWithStyle(static_cast<StyledElement*>(element)->inlineStyle());
 
         if (shouldAnnotateOrForceInline) {
             if (shouldAnnotate())
@@ -493,7 +495,7 @@ static PassRefPtr<EditingStyle> styleFromMatchedRulesAndInlineDecl(const Node* n
     // FIXME: Having to const_cast here is ugly, but it is quite a bit of work to untangle
     // the non-const-ness of styleFromMatchedRulesForElement.
     HTMLElement* element = const_cast<HTMLElement*>(static_cast<const HTMLElement*>(node));
-    RefPtr<EditingStyle> style = EditingStyle::create(element->inlineStyleDecl());
+    RefPtr<EditingStyle> style = EditingStyle::create(element->inlineStyle());
     style->mergeStyleFromRules(element);
     return style.release();
 }
@@ -691,7 +693,7 @@ static bool findNodesSurroundingContext(Document* document, RefPtr<Node>& nodeBe
 static void trimFragment(DocumentFragment* fragment, Node* nodeBeforeContext, Node* nodeAfterContext)
 {
     ExceptionCode ec = 0;
-    Node* next;
+    RefPtr<Node> next;
     for (RefPtr<Node> node = fragment->firstChild(); node; node = next) {
         if (nodeBeforeContext->isDescendantOf(node.get())) {
             next = node->traverseNextNode();
@@ -705,9 +707,9 @@ static void trimFragment(DocumentFragment* fragment, Node* nodeBeforeContext, No
     }
 
     ASSERT(nodeAfterContext->parentNode());
-    for (Node* node = nodeAfterContext; node; node = next) {
+    for (RefPtr<Node> node = nodeAfterContext; node; node = next) {
         next = node->traverseNextSibling();
-        node->parentNode()->removeChild(node, ec);
+        node->parentNode()->removeChild(node.get(), ec);
         ASSERT(!ec);
     }
 }
@@ -988,6 +990,86 @@ String urlToMarkup(const KURL& url, const String& title)
     appendCharactersReplacingEntities(markup, title.characters(), title.length(), EntityMaskInPCDATA);
     markup.append("</a>");
     return markup.toString();
+}
+
+PassRefPtr<DocumentFragment> createFragmentFromSource(const String& markup, Element* contextElement, ExceptionCode& ec)
+{
+    Document* document = contextElement->document();
+    RefPtr<DocumentFragment> fragment = DocumentFragment::create(document);
+
+    if (document->isHTMLDocument()) {
+        fragment->parseHTML(markup, contextElement);
+        return fragment;
+    }
+
+    bool wasValid = fragment->parseXML(markup, contextElement);
+    if (!wasValid) {
+        ec = INVALID_STATE_ERR;
+        return 0;
+    }
+    return fragment.release();
+}
+
+static inline bool hasOneChild(ContainerNode* node)
+{
+    Node* firstChild = node->firstChild();
+    return firstChild && !firstChild->nextSibling();
+}
+
+static inline bool hasOneTextChild(ContainerNode* node)
+{
+    return hasOneChild(node) && node->firstChild()->isTextNode();
+}
+
+void replaceChildrenWithFragment(ContainerNode* container, PassRefPtr<DocumentFragment> fragment, ExceptionCode& ec)
+{
+    RefPtr<ContainerNode> containerNode(container);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    ChildListMutationScope mutation(containerNode.get());
+#endif
+
+    if (!fragment->firstChild()) {
+        containerNode->removeChildren();
+        return;
+    }
+
+    if (hasOneTextChild(containerNode.get()) && hasOneTextChild(fragment.get())) {
+        toText(containerNode->firstChild())->setData(toText(fragment->firstChild())->data(), ec);
+        return;
+    }
+
+    if (hasOneChild(containerNode.get())) {
+        containerNode->replaceChild(fragment, containerNode->firstChild(), ec);
+        return;
+    }
+
+    containerNode->removeChildren();
+    containerNode->appendChild(fragment, ec);
+}
+
+void replaceChildrenWithText(ContainerNode* container, const String& text, ExceptionCode& ec)
+{
+    RefPtr<ContainerNode> containerNode(container);
+
+#if ENABLE(MUTATION_OBSERVERS)
+    ChildListMutationScope mutation(containerNode.get());
+#endif
+
+    if (hasOneTextChild(containerNode.get())) {
+        toText(containerNode->firstChild())->setData(text, ec);
+        return;
+    }
+
+    RefPtr<Text> textNode = Text::create(containerNode->document(), text);
+
+    if (hasOneChild(containerNode.get())) {
+        containerNode->replaceChild(textNode.release(), containerNode->firstChild(), ec);
+        return;
+    }
+
+    containerNode->removeChildren();
+    containerNode->appendChild(textNode.release(), ec);
 }
 
 }

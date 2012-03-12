@@ -69,7 +69,7 @@ static inline void collectNodes(Node* node, NodeVector& nodes)
 
 static void collectTargetNodes(Node* node, NodeVector& nodes)
 {
-    if (node->nodeType() != Node::DOCUMENT_FRAGMENT_NODE || node->isShadowRoot()) {
+    if (node->nodeType() != Node::DOCUMENT_FRAGMENT_NODE) {
         nodes.append(node);
         return;
     }
@@ -240,10 +240,6 @@ void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChil
     for (NodeVector::const_iterator it = targets.begin(); it != targets.end(); ++it) {
         Node* child = it->get();
 
-#if ENABLE(INSPECTOR)
-        InspectorInstrumentation::willInsertDOMNode(document(), child, this);
-#endif
-
         insertBeforeCommon(next.get(), child);
 
         childrenChanged(true, nextChildPreviousSibling.get(), nextChild, 1);
@@ -375,11 +371,14 @@ void ContainerNode::willRemove()
 {
     RefPtr<Node> protect(this);
 
-    for (RefPtr<Node> child = firstChild(); child; child = child->nextSibling()) {
-        if (child->parentNode() != this) // Check for child being removed from subtree while removing.
-            break;
-        child->willRemove();
+    NodeVector children;
+    collectNodes(this, children);
+    for (size_t i = 0; i < children.size(); ++i) {
+        if (children[i]->parentNode() != this) // Check for child being removed from subtree while removing.
+            continue;
+        children[i]->willRemove();
     }
+
     Node::willRemove();
 }
 
@@ -387,7 +386,6 @@ static void willRemoveChild(Node* child)
 {
     // update auxiliary doc info (e.g. iterators) to note that node is being removed
     child->document()->nodeWillBeRemoved(child);
-    child->document()->incDOMTreeVersion();
 
     // fire removed from document mutation events.
     dispatchChildRemovalEvents(child);
@@ -397,7 +395,6 @@ static void willRemoveChild(Node* child)
 static void willRemoveChildren(ContainerNode* container)
 {
     container->document()->nodeChildrenWillBeRemoved(container);
-    container->document()->incDOMTreeVersion();
 
     NodeVector children;
     collectNodes(container, children);
@@ -451,7 +448,6 @@ bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
     document()->removeFullScreenElementOfSubtree(child.get());
 #endif
 
-
     // Events fired when blurring currently focused node might have moved this
     // child into a different parent.
     if (child->parentNode() != this) {
@@ -467,8 +463,8 @@ bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
 
     if (child->inDocument())
         child->removedFromDocument();
-    else
-        child->removedFromTree(true);
+    else if (child->isContainerNode())
+        toContainerNode(child.get())->removedFromTree(true);
 
     dispatchSubtreeModifiedEvent();
 
@@ -517,8 +513,8 @@ void ContainerNode::parserRemoveChild(Node* oldChild)
     childrenChanged(true, prev, next, -1);
     if (oldChild->inDocument())
         oldChild->removedFromDocument();
-    else
-        oldChild->removedFromTree(true);
+    else if (oldChild->isContainerNode())
+        toContainerNode(oldChild)->removedFromTree(true);
 }
 
 // this differs from other remove functions because it forcibly removes all the children,
@@ -577,20 +573,17 @@ void ContainerNode::removeChildren()
             removedChild->detach();
     }
 
-    // FIXME: This should be just above dispatchSubtreeModifiedEvent();
-    allowEventDispatch();
-
     childrenChanged(false, 0, 0, -static_cast<int>(removedChildrenCount));
 
     for (i = 0; i < removedChildrenCount; ++i) {
         Node* removedChild = removedChildren[i].get();
         if (removedChild->inDocument())
             removedChild->removedFromDocument();
-        // removeChild() calls removedFromTree(true) if the child was not in the
-        // document. There is no explanation for this discrepancy between removeChild()
-        // and its optimized version removeChildren().
+        else if (removedChild->isContainerNode())
+            toContainerNode(removedChild)->removedFromTree(true);
     }
 
+    allowEventDispatch();
     dispatchSubtreeModifiedEvent();
 }
 
@@ -682,10 +675,6 @@ void ContainerNode::parserAddChild(PassRefPtr<Node> newChild)
     ASSERT(newChild);
     ASSERT(!newChild->parentNode()); // Use appendChild if you need to handle reparenting (and want DOM mutation events).
 
-#if ENABLE(INSPECTOR)
-    InspectorInstrumentation::willInsertDOMNode(document(), newChild.get(), this);
-#endif
-
     forbidEventDispatch();
     Node* last = m_lastChild;
     // FIXME: This method should take a PassRefPtr.
@@ -695,7 +684,6 @@ void ContainerNode::parserAddChild(PassRefPtr<Node> newChild)
     allowEventDispatch();
 
     // FIXME: Why doesn't this use notifyChildInserted(newChild) instead?
-    document()->incDOMTreeVersion();
     if (inDocument())
         newChild->insertedIntoDocument();
     childrenChanged(true, last, 0, 1);
@@ -775,15 +763,13 @@ void ContainerNode::scheduleSetNeedsStyleRecalc(StyleChangeType changeType)
 
 void ContainerNode::attach()
 {
-    for (Node* child = m_firstChild; child; child = child->nextSibling())
-        child->attach();
+    attachChildren();
     Node::attach();
 }
 
 void ContainerNode::detach()
 {
-    for (Node* child = m_firstChild; child; child = child->nextSibling())
-        child->detach();
+    detachChildren();
     clearChildNeedsStyleRecalc();
     Node::detach();
 }
@@ -795,13 +781,17 @@ void ContainerNode::insertedIntoDocument()
     Node::insertedIntoDocument();
     insertedIntoTree(false);
 
-    for (RefPtr<Node> child = m_firstChild; child; child = child->nextSibling()) {
-        // Guard against mutation during re-parenting.
-        if (!inDocument()) // Check for self being removed from document while reparenting.
+    NodeVector children;
+    collectNodes(this, children);
+    for (size_t i = 0; i < children.size(); ++i) {
+        // If we have been removed from the document during this loop, then
+        // we don't want to tell the rest of our children that they've been
+        // inserted into the document because they haven't.
+        if (!inDocument())
             break;
-        if (child->parentNode() != this) // Check for child being removed from subtree while reparenting.
-            break;
-        child->insertedIntoDocument();
+        if (children[i]->parentNode() != this)
+            continue;
+        children[i]->insertedIntoDocument();
     }
 }
 
@@ -810,31 +800,45 @@ void ContainerNode::removedFromDocument()
     Node::removedFromDocument();
     if (document()->cssTarget() == this) 
         document()->setCSSTarget(0); 
-    clearInDocument();
     removedFromTree(false);
-    for (Node* child = m_firstChild; child; child = child->nextSibling())
-        child->removedFromDocument();
+
+    NodeVector children;
+    collectNodes(this, children);
+    for (size_t i = 0; i < children.size(); ++i) {
+        // If we have been added to the document during this loop, then we
+        // don't want to tell the rest of our children that they've been
+        // removed from the document because they haven't.
+        if (inDocument())
+            break;
+        if (children[i]->parentNode() != this)
+            continue;
+        children[i]->removedFromDocument();
+    }
 }
 
 void ContainerNode::insertedIntoTree(bool deep)
 {
     if (!deep)
         return;
-    for (Node* child = m_firstChild; child; child = child->nextSibling())
-        child->insertedIntoTree(true);
+    for (Node* child = m_firstChild; child; child = child->nextSibling()) {
+        if (child->isContainerNode())
+            toContainerNode(child)->insertedIntoTree(true);
+    }
 }
 
 void ContainerNode::removedFromTree(bool deep)
 {
     if (!deep)
         return;
-    for (Node* child = m_firstChild; child; child = child->nextSibling())
-        child->removedFromTree(true);
+    for (Node* child = m_firstChild; child; child = child->nextSibling()) {
+        if (child->isContainerNode())
+            toContainerNode(child)->removedFromTree(true);
+    }
 }
 
-void ContainerNode::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void ContainerNode::childrenChanged(bool changedByParser, Node*, Node*, int childCountDelta)
 {
-    Node::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    document()->incDOMTreeVersion();
     if (!changedByParser && childCountDelta)
         document()->updateRangesAfterChildrenChanged(this);
     invalidateNodeListsCacheAfterChildrenChanged();
@@ -1093,14 +1097,15 @@ static void notifyChildInserted(Node* child)
     Node* parentOrHostNode = c->parentOrHostNode();
     if (parentOrHostNode && parentOrHostNode->inDocument())
         c->insertedIntoDocument();
-    else
-        c->insertedIntoTree(true);
-
-    document->incDOMTreeVersion();
+    else if (c->isContainerNode())
+        toContainerNode(c.get())->insertedIntoTree(true);
 }
 
 static void dispatchChildInsertionEvents(Node* child)
 {
+    if (child->isInShadowTree())
+        return;
+
     ASSERT(!eventDispatchForbidden());
 
     RefPtr<Node> c = child;
@@ -1125,6 +1130,9 @@ static void dispatchChildInsertionEvents(Node* child)
 
 static void dispatchChildRemovalEvents(Node* child)
 {
+    if (child->isInShadowTree())
+        return;
+
     ASSERT(!eventDispatchForbidden());
 
 #if ENABLE(INSPECTOR)

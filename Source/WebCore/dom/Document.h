@@ -1028,16 +1028,8 @@ public:
     bool processingLoadEvent() const { return m_processingLoadEvent; }
     bool loadEventFinished() const { return m_loadEventFinished; }
 
-#if ENABLE(SQL_DATABASE)
-    virtual bool allowDatabaseAccess() const;
-    virtual void databaseExceededQuota(const String& name);
-#endif
-
     virtual bool isContextThread() const;
     virtual bool isJSExecutionForbidden() const { return false; }
-
-    void setUsingGeolocation(bool f) { m_usingGeolocation = f; }
-    bool usingGeolocation() const { return m_usingGeolocation; };
 
     bool containsValidityStyleRules() const { return m_containsValidityStyleRules; }
     void setContainsValidityStyleRules() { m_containsValidityStyleRules = true; }
@@ -1417,8 +1409,6 @@ private:
     bool m_isViewSource;
     bool m_sawElementsInKnownNamespaces;
 
-    bool m_usingGeolocation;
-
     RefPtr<DocumentEventQueue> m_eventQueue;
 
     RefPtr<DocumentWeakReference> m_weakReference;
@@ -1462,11 +1452,7 @@ private:
 #endif
 
     Timer<Document> m_pendingTasksTimer;
-    Vector<OwnPtr<Task> > m_pendingTasks;
-    
-#ifndef NDEBUG
-    bool m_updatingStyleSelector;
-#endif
+    Vector<OwnPtr<Task> > m_pendingTasks;    
 };
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.

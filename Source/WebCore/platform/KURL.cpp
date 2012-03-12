@@ -30,7 +30,9 @@
 #include "TextEncoding.h"
 #include <stdio.h>
 #include <wtf/HashMap.h>
+#if !USE(WTFURL)
 #include <wtf/HexNumber.h>
+#endif
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -66,7 +68,7 @@ static inline bool isLetterMatchIgnoringCase(UChar character, char lowercaseLett
     return (character | 0x20) == lowercaseLetter;
 }
 
-#if !USE(GOOGLEURL)
+#if !USE(GOOGLEURL) && !USE(WTFURL)
 
 static const char wsScheme[] = {'w', 's'};
 static const char ftpScheme[] = {'f', 't', 'p'};
@@ -634,33 +636,6 @@ bool KURL::hasFragmentIdentifier() const
     return m_fragmentEnd != m_queryEnd;
 }
 
-void KURL::copyParsedQueryTo(ParsedURLParameters& parameters) const
-{
-    const UChar* pos = m_string.characters() + m_pathEnd + 1;
-    const UChar* end = m_string.characters() + m_queryEnd;
-    while (pos < end) {
-        const UChar* parameterStart = pos;
-        while (pos < end && *pos != '&')
-            ++pos;
-        const UChar* parameterEnd = pos;
-        if (pos < end) {
-            ASSERT(*pos == '&');
-            ++pos;
-        }
-        if (parameterStart == parameterEnd)
-            continue;
-        const UChar* nameStart = parameterStart;
-        const UChar* equalSign = parameterStart;
-        while (equalSign < parameterEnd && *equalSign != '=')
-            ++equalSign;
-        if (equalSign == nameStart)
-            continue;
-        String name(nameStart, equalSign - nameStart);
-        String value = equalSign == parameterEnd ? String() : String(equalSign + 1, parameterEnd - equalSign - 1);
-        parameters.set(name, value);
-    }
-}
-
 String KURL::baseAsString() const
 {
     return m_string.left(m_pathAfterLastSlash);
@@ -870,54 +845,6 @@ void KURL::setPath(const String& s)
         path = "/" + path;
 
     parse(m_string.left(m_portEnd) + encodeWithURLEscapeSequences(path) + m_string.substring(m_pathEnd));
-}
-
-String KURL::deprecatedString() const
-{
-    if (!m_isValid)
-        return m_string;
-
-    StringBuilder result;
-
-    result.append(protocol());
-    result.append(':');
-
-    StringBuilder authority;
-
-    if (m_hostEnd != m_passwordEnd) {
-        if (m_userEnd != m_userStart) {
-            authority.append(user());
-            authority.append('@');
-        }
-        authority.append(host());
-        if (hasPort()) {
-            authority.append(':');
-            authority.append(String::number(port()));
-        }
-    }
-
-    if (!authority.isEmpty()) {
-        result.append('/');
-        result.append('/');
-        result.append(authority.characters(), authority.length());
-    } else if (protocolIs("file")) {
-        result.append('/');
-        result.append('/');
-    }
-
-    result.append(path());
-
-    if (m_pathEnd != m_queryEnd) {
-        result.append('?');
-        result.append(query());
-    }
-
-    if (m_fragmentEnd != m_queryEnd) {
-        result.append('#');
-        result.append(fragmentIdentifier());
-    }
-
-    return result.toString();
 }
 
 String decodeURLEscapeSequences(const String& string)
@@ -1796,7 +1723,7 @@ void KURL::print() const
 }
 #endif
 
-#endif // !USE(GOOGLEURL)
+#endif // !USE(GOOGLEURL) && !USE(WTFURL)
 
 String KURL::strippedForUseAsReferrer() const
 {
@@ -1959,19 +1886,6 @@ String mimeTypeFromDataURL(const String& url)
         return "text/plain"; // Data URLs with no MIME type are considered text/plain.
     }
     return "";
-}
-
-bool protocolIsInHTTPFamily(const String& url)
-{
-    unsigned length = url.length();
-    const UChar* characters = url.characters();
-    return length > 4
-        && isLetterMatchIgnoringCase(characters[0], 'h')
-        && isLetterMatchIgnoringCase(characters[1], 't')
-        && isLetterMatchIgnoringCase(characters[2], 't')
-        && isLetterMatchIgnoringCase(characters[3], 'p')
-        && (characters[4] == ':'
-            || (isLetterMatchIgnoringCase(characters[4], 's') && length > 5 && characters[5] == ':'));
 }
 
 }

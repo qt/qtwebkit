@@ -31,9 +31,9 @@
 #include "MouseEvent.h"
 #include "NodeRenderingContext.h"
 #include "PlatformMouseEvent.h"
-#include "RenderSummary.h"
+#include "RenderBlock.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 
 namespace WebCore {
 
@@ -45,7 +45,7 @@ public:
 
 private:
     SummaryContentElement(Document* document)
-        : HTMLContentElement(HTMLNames::divTag, document)
+        : HTMLContentElement(HTMLNames::webkitShadowContentTag, document)
     {
     }
 };
@@ -70,7 +70,7 @@ HTMLSummaryElement::HTMLSummaryElement(const QualifiedName& tagName, Document* d
 
 RenderObject* HTMLSummaryElement::createRenderer(RenderArena* arena, RenderStyle*)
 {
-    return new (arena) RenderSummary(this);
+    return new (arena) RenderBlock(this);
 }
 
 bool HTMLSummaryElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -120,7 +120,7 @@ bool HTMLSummaryElement::supportsFocus() const
 
 void HTMLSummaryElement::defaultEventHandler(Event* event)
 {
-    if (isMainSummary() && renderer() && renderer()->isSummary()) {
+    if (isMainSummary() && renderer()) {
         if (event->type() == eventNames().DOMActivateEvent && !isClickableControl(event->target()->toNode())) {
             if (HTMLDetailsElement* details = detailsElement())
                 details->toggleOpen();

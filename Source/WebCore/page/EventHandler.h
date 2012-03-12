@@ -31,6 +31,7 @@
 #include "FocusDirection.h"
 #include "HitTestRequest.h"
 #include "PlatformMouseEvent.h"
+#include "PlatformWheelEvent.h"
 #include "ScrollTypes.h"
 #include "TextEventInputType.h"
 #include "TextGranularity.h"
@@ -162,6 +163,8 @@ public:
 
 #if ENABLE(GESTURE_EVENTS)
     bool handleGestureEvent(const PlatformGestureEvent&);
+    bool handleGestureTap(const PlatformGestureEvent&);
+    bool handleGestureScrollUpdate(const PlatformGestureEvent&);
 #endif
 
 #if ENABLE(CONTEXT_MENUS)
@@ -345,6 +348,10 @@ private:
     bool isKeyEventAllowedInFullScreen(const PlatformKeyboardEvent&) const;
 #endif
 
+#if ENABLE(GESTURE_EVENTS)
+    bool handleGestureScrollCore(const PlatformGestureEvent&, PlatformWheelEventGranularity, bool latchedWheel);
+#endif
+
     Frame* m_frame;
 
     bool m_mousePressed;
@@ -429,6 +436,8 @@ private:
     TouchTargetMap m_originatingTouchPointTargets;
     bool m_touchPressed;
 #endif
+    double m_maxMouseMovedDuration;
+    PlatformEvent::Type m_baseEventType;
 };
 
 } // namespace WebCore

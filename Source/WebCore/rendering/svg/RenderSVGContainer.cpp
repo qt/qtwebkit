@@ -31,7 +31,7 @@
 #include "RenderSVGResource.h"
 #include "RenderSVGResourceFilter.h"
 #include "RenderView.h"
-#include "SVGRenderSupport.h"
+#include "SVGRenderingContext.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
 #include "SVGStyledElement.h"
@@ -114,18 +114,18 @@ void RenderSVGContainer::paint(PaintInfo& paintInfo, const LayoutPoint&)
 
         childPaintInfo.applyTransform(localToParentTransform());
 
+        SVGRenderingContext renderingContext;
         bool continueRendering = true;
-        if (childPaintInfo.phase == PaintPhaseForeground)
-            continueRendering = SVGRenderSupport::prepareToRenderSVGContent(this, childPaintInfo);
+        if (childPaintInfo.phase == PaintPhaseForeground) {
+            renderingContext.prepareToRenderSVGContent(this, childPaintInfo);
+            continueRendering = renderingContext.isRenderingPrepared();
+        }
 
         if (continueRendering) {
             childPaintInfo.updatePaintingRootForChildren(this);
             for (RenderObject* child = firstChild(); child; child = child->nextSibling())
                 child->paint(childPaintInfo, IntPoint());
         }
-
-        if (paintInfo.phase == PaintPhaseForeground)
-            SVGRenderSupport::finishRenderSVGContent(this, childPaintInfo, paintInfo.context);
     }
     
     // FIXME: This really should be drawn from local coordinates, but currently we hack it
@@ -140,9 +140,9 @@ void RenderSVGContainer::paint(PaintInfo& paintInfo, const LayoutPoint&)
 }
 
 // addFocusRingRects is called from paintOutline and needs to be in the same coordinates as the paintOuline call
-void RenderSVGContainer::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint&)
+void RenderSVGContainer::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&)
 {
-    LayoutRect paintRectInParent = enclosingLayoutRect(localToParentTransform().mapRect(repaintRectInLocalCoordinates()));
+    IntRect paintRectInParent = enclosingIntRect(localToParentTransform().mapRect(repaintRectInLocalCoordinates()));
     if (!paintRectInParent.isEmpty())
         rects.append(paintRectInParent);
 }

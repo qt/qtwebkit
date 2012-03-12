@@ -83,8 +83,7 @@ void JIT::compileLoadVarargs(Instruction* instruction)
         slowCase.append(branchPtr(Below, AbsoluteAddress(m_globalData->interpreter->registerFile().addressOfEnd()), regT1));
 
         // Initialize ArgumentCount.
-        emitFastArithReTagImmediate(regT0, regT2);
-        storePtr(regT2, Address(regT1, RegisterFile::ArgumentCount * static_cast<int>(sizeof(Register))));
+        store32(regT0, Address(regT1, RegisterFile::ArgumentCount * static_cast<int>(sizeof(Register)) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)));
 
         // Initialize 'this'.
         emitGetVirtualRegister(thisValue, regT2);
@@ -93,13 +92,13 @@ void JIT::compileLoadVarargs(Instruction* instruction)
         // Copy arguments.
         neg32(regT0);
         signExtend32ToPtr(regT0, regT0);
-        end.append(branchAddPtr(Zero, Imm32(1), regT0));
+        end.append(branchAddPtr(Zero, TrustedImm32(1), regT0));
         // regT0: -argumentCount
 
         Label copyLoop = label();
         loadPtr(BaseIndex(callFrameRegister, regT0, TimesEight, CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT2);
         storePtr(regT2, BaseIndex(regT1, regT0, TimesEight, CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))));
-        branchAddPtr(NonZero, Imm32(1), regT0).linkTo(copyLoop, this);
+        branchAddPtr(NonZero, TrustedImm32(1), regT0).linkTo(copyLoop, this);
 
         end.append(jump());
     }

@@ -213,11 +213,6 @@ void InlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, Layo
     if (!paintInfo.shouldPaintWithinRoot(renderer()) || (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection))
         return;
 
-    if (Frame* frame = renderer()->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(renderer(), paintInfo.rect);
-    }
-
     LayoutPoint childPoint = paintOffset;
     if (parent()->renderer()->style()->isFlippedBlocksWritingMode()) // Faster than calling containingBlock().
         childPoint = renderer()->containingBlock()->flipForWritingModeForChild(toRenderBox(renderer()), childPoint);
@@ -299,7 +294,23 @@ InlineBox* InlineBox::prevLeafChild() const
         leaf = parent()->prevLeafChild();
     return leaf;
 }
-    
+
+InlineBox* InlineBox::nextLeafChildIgnoringLineBreak() const
+{
+    InlineBox* leaf = nextLeafChild();
+    if (leaf && leaf->isLineBreak())
+        return 0;
+    return leaf;
+}
+
+InlineBox* InlineBox::prevLeafChildIgnoringLineBreak() const
+{
+    InlineBox* leaf = prevLeafChild();
+    if (leaf && leaf->isLineBreak())
+        return 0;
+    return leaf;
+}
+
 RenderObject::SelectionState InlineBox::selectionState()
 {
     return renderer()->selectionState();
@@ -354,14 +365,14 @@ FloatPoint InlineBox::flipForWritingMode(const FloatPoint& point)
     return root()->block()->flipForWritingMode(point);
 }
 
-void InlineBox::flipForWritingMode(IntRect& rect)
+void InlineBox::flipForWritingMode(LayoutRect& rect)
 {
     if (!renderer()->style()->isFlippedBlocksWritingMode())
         return;
     root()->block()->flipForWritingMode(rect);
 }
 
-IntPoint InlineBox::flipForWritingMode(const IntPoint& point)
+LayoutPoint InlineBox::flipForWritingMode(const LayoutPoint& point)
 {
     if (!renderer()->style()->isFlippedBlocksWritingMode())
         return point;

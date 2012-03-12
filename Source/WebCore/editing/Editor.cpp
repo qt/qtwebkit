@@ -846,6 +846,7 @@ Editor::Editor(Frame* frame)
     , m_spellChecker(adoptPtr(new SpellChecker(frame)))
     , m_spellingCorrector(adoptPtr(new SpellingCorrectionController(frame)))
     , m_areMarkedTextMatchesHighlighted(false)
+    , m_defaultParagraphSeparator(EditorParagraphSeparatorIsDiv)
 {
 }
 
@@ -858,6 +859,7 @@ void Editor::clear()
     m_compositionNode = 0;
     m_customCompositionUnderlines.clear();
     m_shouldStyleWithCSS = false;
+    m_defaultParagraphSeparator = EditorParagraphSeparatorIsDiv;
 }
 
 bool Editor::insertText(const String& text, Event* triggeringEvent)

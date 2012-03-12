@@ -151,9 +151,9 @@ public:
     virtual bool hasOpenedPopup() const OVERRIDE { return false; }
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const { return adoptRef(new EmptyPopupMenu()); }
     virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const { return adoptRef(new EmptySearchPopupMenu()); }
-
-#if ENABLE(CONTEXT_MENUS)
-    virtual void showContextMenu() { }
+#if ENABLE(PAGE_POPUP)
+    virtual PagePopup* openPagePopup(PagePopupClient*, const IntRect&) OVERRIDE { return 0; }
+    virtual void closePagePopup(PagePopup*) OVERRIDE { }
 #endif
 
 #if ENABLE(REGISTER_PROTOCOL_HANDLER)
@@ -398,7 +398,7 @@ public:
     virtual void registerForIconNotification(bool) { }
 
 #if USE(V8)
-    virtual void didCreateScriptContext(v8::Handle<v8::Context>, int worldId) { }
+    virtual void didCreateScriptContext(v8::Handle<v8::Context>, int extensionGroup, int worldId) { }
     virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int worldId) { }
     virtual bool allowScriptExtension(const String& extensionName, int extensionGroup, int worldId) { return false; }
 #endif
@@ -498,7 +498,7 @@ public:
 
     virtual NSString* userVisibleString(NSURL*) { return 0; }
     virtual DocumentFragment* documentFragmentFromAttributedString(NSAttributedString*, Vector<RefPtr<ArchiveResource> >&) { return 0; };
-    virtual void setInsertionPasteboard(NSPasteboard*) { };
+    virtual void setInsertionPasteboard(const String&) { };
     virtual NSURL* canonicalizeURL(NSURL*) { return 0; }
     virtual NSURL* canonicalizeURLString(NSString*) { return 0; }
 #endif
@@ -565,6 +565,10 @@ public:
 
 #if PLATFORM(MAC)
     virtual void searchWithSpotlight() { }
+#endif
+
+#if USE(ACCESSIBILITY_CONTEXT_MENUS)
+    virtual void showContextMenu() { }
 #endif
 };
 #endif // ENABLE(CONTEXT_MENUS)

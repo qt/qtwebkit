@@ -286,8 +286,8 @@ public:
     virtual bool isBoxModelObject() const { return false; }
     virtual bool isCounter() const { return false; }
     virtual bool isQuote() const { return false; }
+
 #if ENABLE(DETAILS)
-    virtual bool isDetails() const { return false; }
     virtual bool isDetailsMarker() const { return false; }
 #endif
     virtual bool isEmbeddedObject() const { return false; }
@@ -325,9 +325,6 @@ public:
 
     virtual bool isSlider() const { return false; }
     virtual bool isSliderThumb() const { return false; }
-#if ENABLE(DETAILS)
-    virtual bool isSummary() const { return false; }
-#endif
     virtual bool isTable() const { return false; }
     virtual bool isTableCell() const { return false; }
     virtual bool isTableCol() const { return false; }
@@ -403,7 +400,6 @@ public:
     virtual bool isSVGResourceContainer() const { return false; }
     virtual bool isSVGResourceFilter() const { return false; }
     virtual bool isSVGResourceFilterPrimitive() const { return false; }
-    virtual bool isSVGShadowTreeRootContainer() const { return false; }
 
     virtual RenderSVGResourceContainer* toRenderSVGResourceContainer();
 
@@ -644,8 +640,10 @@ public:
     {
         return localToContainerQuad(quad, 0, fixed, wasFixed);
     }
+
     // Convert a local quad into the coordinate system of container, taking transforms into account.
     FloatQuad localToContainerQuad(const FloatQuad&, RenderBoxModelObject* repaintContainer, bool fixed = false, bool* wasFixed = 0) const;
+    FloatPoint localToContainerPoint(const FloatPoint&, RenderBoxModelObject* repaintContainer, bool fixed = false, bool* wasFixed = 0) const;
 
     // Return the offset from the container() renderer (excluding transforms). In multi-column layout,
     // different offsets apply at different points, so return the offset that applies to the given point.
@@ -653,11 +651,11 @@ public:
     // Return the offset from an object up the container() chain. Asserts that none of the intermediate objects have transforms.
     LayoutSize offsetFromAncestorContainer(RenderObject*) const;
     
-    virtual void absoluteRects(Vector<LayoutRect>&, const LayoutPoint&) const { }
+    virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint&) const { }
 
     // FIXME: useTransforms should go away eventually
-    LayoutRect absoluteBoundingBoxRect(bool useTransform = true) const;
-    LayoutRect absoluteBoundingBoxRectIgnoringTransforms() const { return absoluteBoundingBoxRect(false); }
+    IntRect absoluteBoundingBoxRect(bool useTransform = true) const;
+    IntRect absoluteBoundingBoxRectIgnoringTransforms() const { return absoluteBoundingBoxRect(false); }
 
     // Build an array of quads in absolute coords for line boxes
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* /*wasFixed*/ = 0) const { }
@@ -748,9 +746,6 @@ public:
     // Applied as a "slop" to dirty rect checks during the outline painting phase's dirty-rect checks.
     LayoutUnit maximalOutlineSize(PaintPhase) const;
 
-    void setHasMarkupTruncation(bool b = true) { m_bitfields.setHasMarkupTruncation(b); }
-    bool hasMarkupTruncation() const { return m_bitfields.hasMarkupTruncation(); }
-
     enum SelectionState {
         SelectionNone, // The object is not selected.
         SelectionStart, // The object either contains the start of a selection run or is the start of a run
@@ -763,6 +758,8 @@ public:
     // descendants (as described above in the SelectionState enum declaration).
     SelectionState selectionState() const { return m_bitfields.selectionState(); }
     virtual void setSelectionState(SelectionState state) { m_bitfields.setSelectionState(state); }
+    inline void setSelectionStateIfNeeded(SelectionState);
+    bool canUpdateSelectionOnRootLineBoxes();
 
     // A single rectangle that encompasses all of the selected objects within this object.  Used to determine the tightest
     // possible bounding box for the selection.
@@ -842,7 +839,7 @@ public:
     bool shouldUseTransformFromContainer(const RenderObject* container) const;
     void getTransformFromContainer(const RenderObject* container, const LayoutSize& offsetInContainer, TransformationMatrix&) const;
     
-    virtual void addFocusRingRects(Vector<LayoutRect>&, const LayoutPoint&) { };
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&) { };
 
     LayoutRect absoluteOutlineBounds() const
     {
@@ -872,6 +869,7 @@ protected:
 
     void adjustRectForOutlineAndShadow(LayoutRect&) const;
 
+    void clearLayoutRootIfNeeded() const;
     virtual void willBeDestroyed();
     void arenaDelete(RenderArena*, void* objectBase);
 
@@ -933,7 +931,6 @@ private:
             , m_childrenInline(false)
             , m_marginBeforeQuirk(false) 
             , m_marginAfterQuirk(false)
-            , m_hasMarkupTruncation(false)
             , m_hasColumns(false)
             , m_selectionState(SelectionNone)
         {
@@ -977,7 +974,6 @@ private:
         ADD_BOOLEAN_BITFIELD(childrenInline, ChildrenInline);
         ADD_BOOLEAN_BITFIELD(marginBeforeQuirk, MarginBeforeQuirk);
         ADD_BOOLEAN_BITFIELD(marginAfterQuirk, MarginAfterQuirk);
-        ADD_BOOLEAN_BITFIELD(hasMarkupTruncation, HasMarkupTruncation);
         ADD_BOOLEAN_BITFIELD(hasColumns, HasColumns);
 
     private:
@@ -1118,6 +1114,14 @@ inline bool RenderObject::layerCreationAllowedForSubtree() const
 #endif
 
     return true;
+}
+
+inline void RenderObject::setSelectionStateIfNeeded(SelectionState state)
+{
+    if (selectionState() == state)
+        return;
+
+    setSelectionState(state);
 }
 
 inline void makeMatrixRenderable(TransformationMatrix& matrix, bool has3DRendering)

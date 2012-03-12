@@ -241,7 +241,7 @@ void PlatformContextSkia::beginLayerClippedToImage(const FloatRect& rect,
 
     canvas()->clipRect(bounds);
 
-    if (imageBuffer->size().isEmpty())
+    if (imageBuffer->internalSize().isEmpty())
         return;
 
     canvas()->saveLayerAlpha(&bounds, 255,
@@ -265,11 +265,6 @@ void PlatformContextSkia::beginLayerClippedToImage(const FloatRect& rect,
 void PlatformContextSkia::clipPathAntiAliased(const SkPath& clipPath)
 {
     canvas()->clipPath(clipPath, SkRegion::kIntersect_Op, true);
-}
-
-const SkBitmap& PlatformContextSkia::clippedToImage() const
-{
-    return m_state->m_imageBufferClip;
 }
 
 void PlatformContextSkia::restore()

@@ -66,6 +66,7 @@ public:
     // FIXME: These should be pure virtual.
     virtual void pageBackgroundTransparencyChanged() { }
     virtual void forceRepaint() { }
+    virtual bool forceRepaintAsync(uint64_t callbackID) { return false; }
     virtual void setLayerTreeStateIsFrozen(bool) { }
     virtual bool layerTreeStateIsFrozen() const { return false; }
 
@@ -79,9 +80,10 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) = 0;
     virtual void scheduleCompositingLayerSync() = 0;
-#if USE(TEXTURE_MAPPER) && USE(TILED_BACKING_STORE)
-    virtual void didReceiveLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) = 0;
 #endif
+
+#if USE(UI_SIDE_COMPOSITING)
+    virtual void didReceiveLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) = 0;
 #endif
 
 #if PLATFORM(WIN)
@@ -105,7 +107,8 @@ private:
 #if PLATFORM(MAC)
     // Used by TiledCoreAnimationDrawingArea.
     virtual void updateGeometry(const WebCore::IntSize& viewSize) { }
-    virtual void setDeviceScaleFactor(float deviceScaleFactor) { }
+    virtual void setDeviceScaleFactor(float) { }
+    virtual void setLayerHostingMode(uint32_t) { }
 #endif
 };
 

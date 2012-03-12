@@ -65,42 +65,6 @@ FileSystemCallbacksBase::~FileSystemCallbacksBase()
 {
 }
 
-void FileSystemCallbacksBase::didSucceed()
-{
-    // Each subclass must implement an appropriate one.
-    ASSERT_NOT_REACHED();
-}
-
-void FileSystemCallbacksBase::didOpenFileSystem(const String&, PassOwnPtr<AsyncFileSystem>)
-{
-    // Each subclass must implement an appropriate one.
-    ASSERT_NOT_REACHED();
-}
-
-void FileSystemCallbacksBase::didReadMetadata(const FileMetadata&)
-{
-    // Each subclass must implement an appropriate one.
-    ASSERT_NOT_REACHED();
-}
-
-void FileSystemCallbacksBase::didReadDirectoryEntries(bool)
-{
-    // Each subclass must implement an appropriate one.
-    ASSERT_NOT_REACHED();
-}
-
-void FileSystemCallbacksBase::didReadDirectoryEntry(const String&, bool)
-{
-    // Each subclass must implement an appropriate one.
-    ASSERT_NOT_REACHED();
-}
-
-void FileSystemCallbacksBase::didCreateFileWriter(PassOwnPtr<AsyncFileWriter>, long long)
-{
-    // Each subclass must implement an appropriate one.
-    ASSERT_NOT_REACHED();
-}
-
 void FileSystemCallbacksBase::didFail(int code)
 {
     if (m_errorCallback) {
@@ -268,7 +232,7 @@ MetadataCallbacks::MetadataCallbacks(PassRefPtr<MetadataCallback> successCallbac
 void MetadataCallbacks::didReadMetadata(const FileMetadata& metadata)
 {
     if (m_successCallback)
-        m_successCallback->handleEvent(Metadata::create(metadata.modificationTime).get());
+        m_successCallback->handleEvent(Metadata::create(metadata).get());
     m_successCallback.clear();
 }
 

@@ -43,6 +43,7 @@ namespace WebCore {
 class DocumentFragment;
 class ScriptExecutionContext;
 class TextTrack;
+class HTMLDivElement;
 
 class TextTrackCue : public RefCounted<TextTrackCue>, public EventTarget {
 public:
@@ -50,9 +51,6 @@ public:
     {
         return adoptRef(new TextTrackCue(context, id, start, end, content, settings, pauseOnExit));
     }
-
-    enum Direction { Horizontal, VerticalGrowingLeft, VerticalGrowingRight };
-    enum Alignment { Start, Middle, End };
 
     virtual ~TextTrackCue();
 
@@ -71,23 +69,23 @@ public:
     bool pauseOnExit() const { return m_pauseOnExit; }
     void setPauseOnExit(bool);
 
-    const String& direction() const;
-    void setDirection(const String&, ExceptionCode&);
+    const String& vertical() const;
+    void setVertical(const String&, ExceptionCode&);
 
     bool snapToLines() const { return m_snapToLines; }
     void setSnapToLines(bool);
 
-    int linePosition() const { return m_linePosition; }
-    void setLinePosition(int, ExceptionCode&);
+    int line() const { return m_linePosition; }
+    void setLine(int, ExceptionCode&);
 
-    int textPosition() const { return m_textPosition; }
-    void setTextPosition(int, ExceptionCode&);
+    int position() const { return m_textPosition; }
+    void setPosition(int, ExceptionCode&);
 
     int size() const { return m_cueSize; }
     void setSize(int, ExceptionCode&);
 
-    const String& alignment() const;
-    void setAlignment(const String&, ExceptionCode&);
+    const String& align() const;
+    void setAlign(const String&, ExceptionCode&);
 
     const String& text() const { return m_content; }
     void setText(const String&);
@@ -96,13 +94,14 @@ public:
     void invalidateCueIndex();
 
     PassRefPtr<DocumentFragment> getCueAsHTML();
-    void setCueHTML(PassRefPtr<DocumentFragment>);
 
     virtual bool dispatchEvent(PassRefPtr<Event>);
     bool dispatchEvent(PassRefPtr<Event>, ExceptionCode&);
 
     bool isActive();
     void setIsActive(bool);
+
+    PassRefPtr<HTMLDivElement> getDisplayTree();
 
     virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
@@ -114,7 +113,6 @@ public:
     using RefCounted<TextTrackCue>::deref;
 
 protected:
-
     virtual EventTargetData* eventTargetData();
     virtual EventTargetData* ensureEventTargetData();
 
@@ -122,6 +120,8 @@ private:
     TextTrackCue(ScriptExecutionContext*, const String& id, double start, double end, const String& content, const String& settings, bool pauseOnExit);
 
     void parseSettings(const String&);
+    void determineDisplayParameters();
+
     void cueWillChange();
     void cueDidChange();
 
@@ -132,13 +132,17 @@ private:
     double m_startTime;
     double m_endTime;
     String m_content;
-    Direction m_writingDirection;
     int m_linePosition;
     int m_textPosition;
     int m_cueSize;
     int m_cueIndex;
 
+    enum WritingDirection { Horizontal, VerticalGrowingLeft, VerticalGrowingRight };
+    WritingDirection m_writingDirection;
+
+    enum Alignment { Start, Middle, End };
     Alignment m_cueAlignment;
+
     RefPtr<DocumentFragment> m_documentFragment;
     RefPtr<TextTrack> m_track;
 
@@ -148,6 +152,9 @@ private:
     bool m_isActive;
     bool m_pauseOnExit;
     bool m_snapToLines;
+
+    bool m_displayTreeShouldChange;
+    RefPtr<HTMLDivElement> m_displayTree;
 };
 
 } // namespace WebCore

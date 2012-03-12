@@ -58,15 +58,6 @@ CCRenderSurface::CCRenderSurface(CCLayerImpl* owningLayer)
 
 CCRenderSurface::~CCRenderSurface()
 {
-    cleanupResources();
-}
-
-void CCRenderSurface::cleanupResources()
-{
-    if (!m_contentsTexture)
-        return;
-
-    m_contentsTexture.clear();
 }
 
 FloatRect CCRenderSurface::drawableContentRect() const
@@ -216,7 +207,7 @@ void CCRenderSurface::drawSurface(LayerRendererChromium* layerRenderer, CCLayerI
         float edge[24];
         layerQuad.toFloatArray(edge);
         deviceRect.toFloatArray(&edge[12]);
-        GLC(context3D, context3D->uniform3fv(shaderEdgeLocation, edge, 8));
+        GLC(context3D, context3D->uniform3fv(shaderEdgeLocation, 8, edge));
     }
 
     // Map device space quad to layer space.
@@ -239,7 +230,7 @@ SkBitmap CCRenderSurface::applyFilters(LayerRendererChromium* layerRenderer)
 
 String CCRenderSurface::name() const
 {
-    return String::format("RenderSurface(id=%i,owner=%s)", m_owningLayer->id(), m_owningLayer->name().utf8().data());
+    return String::format("RenderSurface(id=%i,owner=%s)", m_owningLayer->id(), m_owningLayer->debugName().utf8().data());
 }
 
 static void writeIndent(TextStream& ts, int indent)

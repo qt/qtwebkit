@@ -33,6 +33,7 @@
 #include "Attr.h"
 #include "Attribute.h"
 #include "CDATASection.h"
+#include "CSSParser.h"
 #include "CSSStyleDeclaration.h"
 #include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
@@ -141,7 +142,7 @@
 #include "SegmentedString.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "StaticHashSetNodeList.h"
 #include "StyleSheetList.h"
 #include "TextResourceDecoder.h"
@@ -379,7 +380,7 @@ private:
 uint64_t Document::s_globalTreeVersion = 0;
 
 Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
-    : ContainerNode(0)
+    : ContainerNode(0, CreateDocument)
     , TreeScope(this)
     , m_guardRefCount(0)
     , m_compatibilityMode(NoQuirksMode)
@@ -419,7 +420,6 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_isHTML(isHTML)
     , m_isViewSource(false)
     , m_sawElementsInKnownNamespaces(false)
-    , m_usingGeolocation(false)
     , m_eventQueue(DocumentEventQueue::create(this))
     , m_weakReference(DocumentWeakReference::create(this))
     , m_idAttributeName(idAttr)
@@ -471,7 +471,6 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 
     m_textColor = Color::black;
     m_listenerTypes = 0;
-    setInDocument();
     m_inStyleRecalc = false;
     m_closeAfterStyleRecalc = false;
 
@@ -507,9 +506,6 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     static int docID = 0;
     m_docID = docID++;
     
-#ifndef NDEBUG
-    m_updatingStyleSelector = false;
-#endif
     InspectorCounters::incrementCounter(InspectorCounters::DocumentCounter);
 }
 
@@ -673,7 +669,7 @@ void Document::buildAccessKeyMap(TreeScope* scope)
             m_elementsByAccessKey.set(accessKey.impl(), element);
 
         if (element->hasShadowRoot()) {
-            for (ShadowRoot* root = element->shadowRootList()->youngestShadowRoot(); root; root = root->olderShadowRoot())
+            for (ShadowRoot* root = element->shadowTree()->youngestShadowRoot(); root; root = root->olderShadowRoot())
                 buildAccessKeyMap(root);
         }
     }
@@ -833,11 +829,7 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
 {
     ec = 0;
     
-    if (!importedNode
-#if ENABLE(SVG) && ENABLE(DASHBOARD_SUPPORT)
-        || (importedNode->isSVGElement() && page() && page()->settings()->usesDashboardBackwardCompatibilityMode())
-#endif
-        ) {
+    if (!importedNode) {
         ec = NOT_SUPPORTED_ERR;
         return 0;
     }
@@ -1028,12 +1020,27 @@ bool Document::cssRegionsEnabled() const
     return settings() && settings()->cssRegionsEnabled(); 
 }
 
+static bool validFlowName(const String& flowName)
+{
+    if (equalIgnoringCase(flowName, "auto")
+        || equalIgnoringCase(flowName, "default")
+        || equalIgnoringCase(flowName, "inherit")
+        || equalIgnoringCase(flowName, "initial")
+        || equalIgnoringCase(flowName, "none"))
+        return false;
+    return true;
+}
+
 PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName)
 {
-    if (!cssRegionsEnabled())
+    if (!cssRegionsEnabled() || flowName.isEmpty() || !validFlowName(flowName) || !renderer())
         return 0;
-    if (!renderer())
+
+    // Make a slower check for invalid flow name
+    CSSParser p(true);
+    if (!p.parseFlowThread(flowName, this))
         return 0;
+
     if (RenderView* view = renderer()->view())
         return view->ensureRenderFlowThreadWithName(flowName)->ensureNamedFlow();
     return 0;
@@ -1851,7 +1858,6 @@ void Document::createStyleSelector()
     
 inline void Document::clearStyleSelector()
 {
-    ASSERT(!m_updatingStyleSelector);
     m_styleSelector.clear();
 }
 
@@ -2278,6 +2284,9 @@ void Document::implicitClose()
 
     ImageLoader::dispatchPendingBeforeLoadEvents();
     ImageLoader::dispatchPendingLoadEvents();
+
+    HTMLLinkElement::dispatchPendingLoadEvents();
+    HTMLStyleElement::dispatchPendingLoadEvents();
 
 #if ENABLE(SVG)
     // To align the HTML load event and the SVGLoad event for the outermost <svg> element, fire it from
@@ -3042,19 +3051,20 @@ void Document::styleSelectorChanged(StyleSelectorUpdateFlag updateFlag)
 #endif
 
     bool stylesheetChangeRequiresStyleRecalc = updateActiveStylesheets(updateFlag);
-    if (!stylesheetChangeRequiresStyleRecalc)
-        return;
 
     if (updateFlag == DeferRecalcStyle) {
         scheduleForcedStyleRecalc();
         return;
     }
-    
+
     if (didLayoutWithPendingStylesheets() && m_pendingStylesheets <= 0) {
         m_pendingSheetLayout = IgnoreLayoutWithPendingSheets;
         if (renderer())
             renderer()->repaint();
     }
+
+    if (!stylesheetChangeRequiresStyleRecalc)
+        return;
 
     // This recalcStyle initiates a new recalc cycle. We need to bracket it to
     // make sure animations get the correct update time
@@ -3290,8 +3300,6 @@ void Document::analyzeStylesheetChange(StyleSelectorUpdateFlag updateFlag, const
 
 bool Document::updateActiveStylesheets(StyleSelectorUpdateFlag updateFlag)
 {
-    ASSERT(!m_updatingStyleSelector);
-
     if (m_inStyleRecalc) {
         // SVG <use> element may manage to invalidate style selector in the middle of a style recalc.
         // https://bugs.webkit.org/show_bug.cgi?id=54344
@@ -3313,16 +3321,7 @@ bool Document::updateActiveStylesheets(StyleSelectorUpdateFlag updateFlag)
     if (requiresStyleSelectorReset)
         clearStyleSelector();
     else {
-#ifndef NDEBUG
-        m_updatingStyleSelector = true;
-#endif
-        // Detach the style selector temporarily so it can't get deleted during appendAuthorStylesheets
-        OwnPtr<CSSStyleSelector> detachedStyleSelector = m_styleSelector.release();
-        detachedStyleSelector->appendAuthorStylesheets(m_styleSheets->length(), newStylesheets);
-        m_styleSelector = detachedStyleSelector.release();
-#ifndef NDEBUG
-        m_updatingStyleSelector = false;
-#endif
+        m_styleSelector->appendAuthorStylesheets(m_styleSheets->length(), newStylesheets);
         resetCSSFeatureFlags();
     }
     m_styleSheets->swap(newStylesheets);
@@ -4751,24 +4750,6 @@ void Document::setSecurityOrigin(PassRefPtr<SecurityOrigin> origin)
     SecurityContext::setSecurityOrigin(origin);
 }
 
-#if ENABLE(SQL_DATABASE)
-
-bool Document::allowDatabaseAccess() const
-{
-    if (!page() || (page()->settings()->privateBrowsingEnabled() && !SchemeRegistry::allowsDatabaseAccessInPrivateBrowsing(securityOrigin()->protocol())))
-        return false;
-    return true;
-}
-
-void Document::databaseExceededQuota(const String& name)
-{
-    Page* currentPage = page();
-    if (currentPage)
-        currentPage->chrome()->client()->exceededDatabaseQuota(document()->frame(), name);
-}
-
-#endif
-
 bool Document::isContextThread() const
 {
     return isMainThread();
@@ -5130,28 +5111,12 @@ void Document::webkitWillEnterFullScreenForElement(Element* element)
     m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
     
     recalcStyle(Force);
-    
-    if (m_fullScreenRenderer) {
-        setAnimatingFullScreen(true);
-#if USE(ACCELERATED_COMPOSITING)
-        view()->updateCompositingLayers();
-        if (m_fullScreenRenderer->layer() && m_fullScreenRenderer->layer()->isComposited())
-            page()->chrome()->client()->setRootFullScreenLayer(m_fullScreenRenderer->layer()->backing()->graphicsLayer());
-#endif
-    }
 }
     
 void Document::webkitDidEnterFullScreenForElement(Element*)
 {
     m_fullScreenElement->didBecomeFullscreenElement();
 
-    if (m_fullScreenRenderer) {
-        setAnimatingFullScreen(false);
-#if USE(ACCELERATED_COMPOSITING)
-        view()->updateCompositingLayers();
-        page()->chrome()->client()->setRootFullScreenLayer(0);
-#endif
-    }
     m_fullScreenChangeEventTargetQueue.append(m_fullScreenElement);
     m_fullScreenChangeDelayTimer.startOneShot(0);
 }
@@ -5161,29 +5126,16 @@ void Document::webkitWillExitFullScreenForElement(Element*)
     m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
     
     m_fullScreenElement->willStopBeingFullscreenElement();
-
-    if (m_fullScreenRenderer) {
-        setAnimatingFullScreen(true);
-#if USE(ACCELERATED_COMPOSITING)
-        view()->updateCompositingLayers();
-        if (m_fullScreenRenderer->layer() && m_fullScreenRenderer->layer()->isComposited())
-            page()->chrome()->client()->setRootFullScreenLayer(m_fullScreenRenderer->layer()->backing()->graphicsLayer());
-#endif
-    }
 }
 
 void Document::webkitDidExitFullScreenForElement(Element*)
 {
     m_areKeysEnabledInFullScreen = false;
-    setAnimatingFullScreen(false);
     
     if (m_fullScreenRenderer)
         m_fullScreenRenderer->unwrapRenderer();
 
     m_fullScreenChangeEventTargetQueue.append(m_fullScreenElement.release());
-#if USE(ACCELERATED_COMPOSITING)
-    page()->chrome()->client()->setRootFullScreenLayer(0);
-#endif
     scheduleForcedStyleRecalc();
     
     m_fullScreenChangeDelayTimer.startOneShot(0);
@@ -5310,15 +5262,6 @@ void Document::setAnimatingFullScreen(bool flag)
         m_fullScreenElement->setNeedsStyleRecalc();
         scheduleForcedStyleRecalc();
     }
-
-#if USE(ACCELERATED_COMPOSITING)
-    if (m_fullScreenRenderer && m_fullScreenRenderer->layer()) {
-        m_fullScreenRenderer->layer()->contentChanged(RenderLayer::FullScreenChanged);
-        // Clearing the layer's backing will force the compositor to reparent
-        // the layer the next time layers are synchronized.
-        m_fullScreenRenderer->layer()->clearBacking();
-    }
-#endif
 }
 #endif
 
@@ -5478,7 +5421,6 @@ void Document::removeCachedMicroDataItemList(MicroDataItemList* list, const Stri
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
 
     NodeListsNodeData* data = rareData()->nodeLists();
 

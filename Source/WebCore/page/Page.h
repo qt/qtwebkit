@@ -24,10 +24,11 @@
 #include "FrameLoaderTypes.h"
 #include "FindOptions.h"
 #include "LayoutTypes.h"
-#include "PageSupplement.h"
 #include "PageVisibilityState.h"
 #include "PlatformScreen.h"
 #include "PlatformString.h"
+#include "Region.h"
+#include "Supplementable.h"
 #include "ViewportArguments.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -89,7 +90,7 @@ namespace WebCore {
 
     float deviceScaleFactor(Frame*);
 
-    class Page {
+    class Page : public Supplementable<Page> {
         WTF_MAKE_NONCOPYABLE(Page);
         friend class Settings;
     public:
@@ -320,18 +321,18 @@ namespace WebCore {
 
         PlatformDisplayID displayID() const { return m_displayID; }
 
+        bool isCountingRelevantRepaintedObjects() const;
         void setRelevantRepaintedObjectsCounterThreshold(uint64_t);
         void startCountingRelevantRepaintedObjects();
+        void resetRelevantPaintedObjectCounter();
         void addRelevantRepaintedObject(RenderObject*, const IntRect& objectPaintRect);
+        void addRelevantUnpaintedObject(RenderObject*, const IntRect& objectPaintRect);
 
-        void provideSupplement(const AtomicString&, PassOwnPtr<PageSupplement>);
-        PageSupplement* requireSupplement(const AtomicString&);
+        void suspendActiveDOMObjectsAndAnimations();
+        void resumeActiveDOMObjectsAndAnimations();
 
     private:
         void initGroup();
-
-        typedef HashMap<AtomicStringImpl*, OwnPtr<PageSupplement> > PageSupplementMap;
-        PageSupplementMap m_supplements;
 
 #if ASSERT_DISABLED
         void checkFrameCountConsistency() const { }
@@ -424,7 +425,9 @@ namespace WebCore {
 #endif
         PlatformDisplayID m_displayID;
 
-        HashSet<RenderObject*> m_relevantPaintedRenderObjects;
+        HashSet<RenderObject*> m_relevantUnpaintedRenderObjects;
+        Region m_relevantPaintedRegion;
+        Region m_relevantUnpaintedRegion;
         bool m_isCountingRelevantRepaintedObjects;
     };
 

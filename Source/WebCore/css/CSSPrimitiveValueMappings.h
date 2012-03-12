@@ -417,6 +417,12 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
         case MediaControlsFullscreenBackgroundPart:
             m_value.ident = CSSValueMediaControlsFullscreenBackground;
             break;
+        case MediaFullScreenVolumeSliderPart:
+            m_value.ident = CSSValueMediaFullscreenVolumeSlider;
+            break;
+        case MediaFullScreenVolumeSliderThumbPart:
+            m_value.ident = CSSValueMediaFullscreenVolumeSliderThumb;
+            break;
         case MediaCurrentTimePart:
             m_value.ident = CSSValueMediaCurrentTimeDisplay;
             break;
@@ -2197,29 +2203,6 @@ template<> inline CSSPrimitiveValue::operator ETextTransform() const
         default:
             ASSERT_NOT_REACHED();
             return TTNONE;
-    }
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EUnicodeBidi e)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_IDENT;
-    switch (e) {
-    case UBNormal:
-        m_value.ident = CSSValueNormal;
-        break;
-    case Embed:
-        m_value.ident = CSSValueEmbed;
-        break;
-    case Override:
-        m_value.ident = CSSValueBidiOverride;
-        break;
-    case Isolate:
-        m_value.ident = CSSValueWebkitIsolate;
-        break;
-    case Plaintext:
-        m_value.ident = CSSValueWebkitPlaintext;
-        break;
     }
 }
 

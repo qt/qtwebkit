@@ -92,6 +92,8 @@ int main(int argc, char** argv)
             qputenv("QT_WEBKIT_SUPPRESS_WEB_PROCESS_OUTPUT", "1");
     }
 
+    qputenv("QT_WEBKIT_THEME_NAME", "qstyle");
+
     QQuickWebViewExperimental::setFlickableViewportEnabled(false);
     QApplication app(argc, argv);
     Launcher launcher(argc, argv);

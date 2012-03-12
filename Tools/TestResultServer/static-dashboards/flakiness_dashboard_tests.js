@@ -393,7 +393,7 @@ function testHtmlForTestTypeSwitcherGroup()
     assertEquals(selects.length, 3);
     var group = selects[2];
     assertEquals(group.parentNode.textContent.indexOf('Group:'), 0);
-    assertEquals(group.children.length, 2);
+    assertEquals(group.children.length, 3);
 
     g_currentState.testType = 'layout-tests';
     container.innerHTML = htmlForTestTypeSwitcher();
@@ -402,6 +402,19 @@ function testHtmlForTestTypeSwitcherGroup()
     var group = selects[2];
     assertEquals(group.parentNode.textContent.indexOf('Group:'), 0);
     assertEquals(group.children.length, 4);
+}
+
+function testLookupVirtualTestSuite()
+{
+    self.assertEquals(lookupVirtualTestSuite('fast/canvas/foo.html'), '');
+    self.assertEquals(lookupVirtualTestSuite('platform/chromium/virtual/gpu/fast/canvas/foo.html'),
+                      'platform/chromium/virtual/gpu/fast/canvas');
+}
+
+function testBaseTest()
+{
+    self.assertEquals(baseTest('fast/canvas/foo.html', ''), 'fast/canvas/foo.html');
+    self.assertEquals(baseTest('platform/chromium/virtual/gpu/fast/canvas/foo.html', 'platform/chromium/virtual/gpu/fast/canvas'), 'fast/canvas/foo.html');
 }
 
 function runTests()

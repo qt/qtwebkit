@@ -63,6 +63,7 @@
 #include "ScriptArguments.h"
 #include "ScriptCallStack.h"
 #include "ScriptProfile.h"
+#include "StyleRule.h"
 #include "WorkerContext.h"
 #include "WorkerThread.h"
 #include "XMLHttpRequest.h"
@@ -199,6 +200,18 @@ void InspectorInstrumentation::mediaQueryResultChangedImpl(InstrumentingAgents* 
 {
     if (InspectorCSSAgent* cssAgent = instrumentingAgents->inspectorCSSAgent())
         cssAgent->mediaQueryResultChanged();
+}
+
+void InspectorInstrumentation::didPushShadowRootImpl(InstrumentingAgents* instrumentingAgents, Element* host, ShadowRoot* root)
+{
+    if (InspectorDOMAgent* domAgent = instrumentingAgents->inspectorDOMAgent())
+        domAgent->didPushShadowRoot(host, root);
+}
+
+void InspectorInstrumentation::willPopShadowRootImpl(InstrumentingAgents* instrumentingAgents, Element* host, ShadowRoot* root)
+{
+    if (InspectorDOMAgent* domAgent = instrumentingAgents->inspectorDOMAgent())
+        domAgent->willPopShadowRoot(host, root);
 }
 
 void InspectorInstrumentation::mouseDidMoveOverElementImpl(InstrumentingAgents* instrumentingAgents, const HitTestResult& result, unsigned modifierFlags)
@@ -369,6 +382,12 @@ void InspectorInstrumentation::didFireTimerImpl(const InspectorInstrumentationCo
         timelineAgent->didFireTimer();
 }
 
+void InspectorInstrumentation::didBeginFrameImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->didBeginFrame();
+}
+
 InspectorInstrumentationCookie InspectorInstrumentation::willLayoutImpl(InstrumentingAgents* instrumentingAgents)
 {
     int timelineAgentId = 0;
@@ -452,11 +471,11 @@ void InspectorInstrumentation::didScheduleStyleRecalculationImpl(InstrumentingAg
         resourceAgent->didScheduleStyleRecalculation(document);
 }
 
-InspectorInstrumentationCookie InspectorInstrumentation::willMatchRuleImpl(InstrumentingAgents* instrumentingAgents, const CSSStyleRule* rule)
+InspectorInstrumentationCookie InspectorInstrumentation::willMatchRuleImpl(InstrumentingAgents* instrumentingAgents, const StyleRule* rule)
 {
     InspectorCSSAgent* cssAgent = instrumentingAgents->inspectorCSSAgent();
     if (cssAgent) {
-        cssAgent->willMatchRule(rule);
+        cssAgent->willMatchRule(rule->ensureCSSStyleRule());
         return InspectorInstrumentationCookie(instrumentingAgents, 1);
     }
 
@@ -470,14 +489,11 @@ void InspectorInstrumentation::didMatchRuleImpl(const InspectorInstrumentationCo
         cssAgent->didMatchRule(matched);
 }
 
-InspectorInstrumentationCookie InspectorInstrumentation::willProcessRuleImpl(InstrumentingAgents* instrumentingAgents, const CSSRule* rule)
+InspectorInstrumentationCookie InspectorInstrumentation::willProcessRuleImpl(InstrumentingAgents* instrumentingAgents, const StyleRule* rule)
 {
-    if (!rule->isStyleRule())
-        return InspectorInstrumentationCookie();
-
     InspectorCSSAgent* cssAgent = instrumentingAgents->inspectorCSSAgent();
     if (cssAgent) {
-        cssAgent->willProcessRule(static_cast<const CSSStyleRule*>(rule));
+        cssAgent->willProcessRule(rule->ensureCSSStyleRule());
         return InspectorInstrumentationCookie(instrumentingAgents, 1);
     }
 
@@ -1050,6 +1066,13 @@ InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForWorkerConte
     if (!workerContext)
         return 0;
     return instrumentationForWorkerContext(workerContext);
+}
+
+InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForNonDocumentContext(ScriptExecutionContext* context)
+{
+    if (context->isWorkerContext())
+        return instrumentationForWorkerContext(static_cast<WorkerContext*>(context));
+    return 0;
 }
 #endif
 

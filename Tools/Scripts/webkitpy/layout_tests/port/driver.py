@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import copy
 import re
 import shlex
 
@@ -33,11 +34,12 @@ from webkitpy.common.system import path
 
 
 class DriverInput(object):
-    def __init__(self, test_name, timeout, image_hash, is_reftest):
+    def __init__(self, test_name, timeout, image_hash, is_reftest, args=None):
         self.test_name = test_name
         self.timeout = timeout  # in ms
         self.image_hash = image_hash
         self.is_reftest = is_reftest
+        self.args = args or []
 
 
 class DriverOutput(object):
@@ -162,7 +164,7 @@ class Driver(object):
     def stop(self):
         raise NotImplementedError('Driver.stop')
 
-    def cmd_line(self):
+    def cmd_line(self, pixel_tests, per_test_args):
         raise NotImplementedError('Driver.cmd_line')
 
 
@@ -172,38 +174,67 @@ class DriverProxy(object):
     single driver."""
 
     def __init__(self, port, worker_number, driver_instance_constructor, pixel_tests, no_timeout):
-        self._driver = driver_instance_constructor(port, worker_number, pixel_tests, no_timeout)
-        if pixel_tests:
-            self._reftest_driver = self._driver
-        else:
-            self._reftest_driver = driver_instance_constructor(port, worker_number, True, no_timeout)
+        self._port = port
+        self._worker_number = worker_number
+        self._driver_instance_constructor = driver_instance_constructor
+        self._no_timeout = no_timeout
+        self._pixel_tests = pixel_tests
 
+        # FIXME: We shouldn't need to create a driver until we actually run a test.
+        self._driver = self._make_driver(pixel_tests)
+        self._running_drivers = {}
+        self._running_drivers[self._cmd_line_as_key(pixel_tests, [])] = self._driver
+
+    def _make_driver(self, pixel_tests):
+        return self._driver_instance_constructor(self._port, self._worker_number, pixel_tests, self._no_timeout)
+
+    # FIXME: this should be a @classmethod (or implemented on Port instead).
     def is_http_test(self, test_name):
         return self._driver.is_http_test(test_name)
 
+    # FIXME: this should be a @classmethod (or implemented on Port instead).
     def test_to_uri(self, test_name):
         return self._driver.test_to_uri(test_name)
 
+    # FIXME: this should be a @classmethod (or implemented on Port instead).
     def uri_to_test(self, uri):
         return self._driver.uri_to_test(uri)
 
     def run_test(self, driver_input):
-        if driver_input.is_reftest:
-            return self._reftest_driver.run_test(driver_input)
-        return self._driver.run_test(driver_input)
+        base = self._port.lookup_virtual_test_base(driver_input.test_name)
+        if base:
+            virtual_driver_input = copy.copy(driver_input)
+            virtual_driver_input.test_name = base
+            virtual_driver_input.args = self._port.lookup_virtual_test_args(driver_input.test_name)
+            return self.run_test(virtual_driver_input)
 
-    def has_crashed(self):
-        return self._driver.has_crashed() or self._reftest_driver.has_crashed()
+        pixel_tests_needed = self._pixel_tests or driver_input.is_reftest
+        cmd_line_key = self._cmd_line_as_key(pixel_tests_needed, driver_input.args)
+        if not cmd_line_key in self._running_drivers:
+            self._running_drivers[cmd_line_key] = self._make_driver(pixel_tests_needed)
+
+        return self._running_drivers[cmd_line_key].run_test(driver_input)
 
     def start(self):
-        self._driver.start()
+        # FIXME: Callers shouldn't normally call this, since this routine
+        # may not be specifying the correct combination of pixel test and
+        # per_test args.
+        #
+        # The only reason we have this routine at all is so the perftestrunner
+        # can pause before running a test; it might be better to push that
+        # into run_test() directly.
+        self._driver.start(self._pixel_tests, [])
+
+    def has_crashed(self):
+        return any(driver.has_crashed() for driver in self._running_drivers.values())
 
     def stop(self):
-        self._driver.stop()
-        self._reftest_driver.stop()
+        for driver in self._running_drivers.values():
+            driver.stop()
 
-    def cmd_line(self):
-        cmd_line = self._driver.cmd_line()
-        if self._driver != self._reftest_driver:
-            cmd_line += ['; '] + self._reftest_driver.cmd_line()
-        return cmd_line
+    # FIXME: this should be a @classmethod (or implemented on Port instead).
+    def cmd_line(self, pixel_tests=None, per_test_args=None):
+        return self._driver.cmd_line(pixel_tests or self._pixel_tests, per_test_args or [])
+
+    def _cmd_line_as_key(self, pixel_tests, per_test_args):
+        return ' '.join(self.cmd_line(pixel_tests, per_test_args))

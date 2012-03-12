@@ -59,7 +59,10 @@ using namespace SVGNames;
 
 void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, int>* propertyNameToIdMap, const QualifiedName& attrName)
 {
+    // FIXME: when CSS supports "transform-origin" the special case for transform_originAttr can be removed.
     int propertyId = cssPropertyID(attrName.localName());
+    if (!propertyId && attrName == transform_originAttr)
+        propertyId = CSSPropertyWebkitTransformOrigin; // cssPropertyID("-webkit-transform-origin")
     ASSERT(propertyId > 0);
     propertyNameToIdMap->set(attrName.localName().impl(), propertyId);
 }
@@ -82,33 +85,26 @@ String SVGStyledElement::title() const
 {
     // According to spec, we should not return titles when hovering over root <svg> elements (those
     // <title> elements are the title of the document, not a tooltip) so we instantly return.
-    if (hasTagName(SVGNames::svgTag)) {
-        const SVGSVGElement* svg = static_cast<const SVGSVGElement*>(this);
-        if (svg->isOutermostSVGSVGElement())
-            return String();
-    }
-    
+    if (isOutermostSVGSVGElement())
+        return String();
+
     // Walk up the tree, to find out whether we're inside a <use> shadow tree, to find the right title.
-    Node* parent = const_cast<SVGStyledElement*>(this);
-    while (parent) {
-        if (!parent->isSVGShadowRoot()) {
-            parent = parent->parentNodeGuaranteedHostFree();
-            continue;
-        }
-        
-        // Get the <use> element.
-        Element* shadowParent = parent->svgShadowHost();
-        if (shadowParent && shadowParent->isSVGElement() && shadowParent->hasTagName(SVGNames::useTag)) {
-            SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowParent);
+    if (isInShadowTree()) {
+        Element* shadowHostElement = treeScope()->rootNode()->shadowHost();
+        // At this time, SVG nodes are not allowed in non-<use> shadow trees, so any shadow root we do
+        // have should be a use. The assert and following test is here to catch future shadow DOM changes
+        // that do enable SVG in a shadow tree.
+        ASSERT(!shadowHostElement || shadowHostElement->hasTagName(SVGNames::useTag));
+        if (shadowHostElement && shadowHostElement->hasTagName(SVGNames::useTag)) {
+            SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowHostElement);
+ 
             // If the <use> title is not empty we found the title to use.
             String useTitle(useElement->title());
-            if (useTitle.isEmpty())
-                break;
-            return useTitle;
+            if (!useTitle.isEmpty())
+               return useTitle;
         }
-        parent = parent->parentNode();
     }
-    
+
     // If we aren't an instance in a <use> or the <use> title was not found, then find the first
     // <title> child of this element.
     Element* titleElement = firstElementChild();
@@ -132,7 +128,7 @@ bool SVGStyledElement::rendererIsNeeded(const NodeRenderingContext& context)
     // Spec: SVG allows inclusion of elements from foreign namespaces anywhere
     // with the SVG content. In general, the SVG user agent will include the unknown
     // elements in the DOM but will otherwise ignore unknown elements. 
-    if (!parentNode() || parentNode()->isSVGElement())
+    if (!parentOrHostElement() || parentOrHostElement()->isSVGElement())
         return StyledElement::rendererIsNeeded(context);
 
     return false;
@@ -201,6 +197,7 @@ int SVGStyledElement::cssPropertyIdForSVGAttributeName(const QualifiedName& attr
         mapAttributeToCSSProperty(propertyNameToIdMap, text_anchorAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, text_decorationAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, text_renderingAttr);
+        mapAttributeToCSSProperty(propertyNameToIdMap, transform_originAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, unicode_bidiAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, vector_effectAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, visibilityAttr);
@@ -292,11 +289,11 @@ bool SVGStyledElement::isAnimatableCSSProperty(const QualifiedName& attrName)
     return cssPropertyToTypeMap().contains(attrName);
 }
 
-bool SVGStyledElement::isPresentationAttribute(Attribute* attr) const
+bool SVGStyledElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name()) > 0)
+    if (SVGStyledElement::cssPropertyIdForSVGAttributeName(name) > 0)
         return true;
-    return SVGElement::isPresentationAttribute(attr);
+    return SVGElement::isPresentationAttribute(name);
 }
 
 void SVGStyledElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)

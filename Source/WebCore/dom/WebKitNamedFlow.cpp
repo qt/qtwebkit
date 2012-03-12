@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Adobe Systems Incorporated. All Rights Reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,8 @@
 #include "config.h"
 #include "WebKitNamedFlow.h"
 
+#include "Node.h"
+#include "NodeList.h"
 #include "RenderFlowThread.h"
 
 namespace WebCore {
@@ -49,4 +51,13 @@ bool WebKitNamedFlow::overflow() const
     return m_parentFlowThread->overflow();
 }
 
+PassRefPtr<NodeList> WebKitNamedFlow::getRegionsByContentNode(Node* contentNode)
+{
+    if (!contentNode)
+        return 0;
+    m_parentFlowThread->document()->updateLayoutIgnorePendingStylesheets(); 
+    return contentNode->getRegionsByContentNode(m_parentFlowThread->flowThread());
+}
+
 } // namespace WebCore
+

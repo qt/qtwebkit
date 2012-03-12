@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
+ Copyright (C) 2010-2012 Nokia Corporation and/or its subsidiary(-ies)
  
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Library General Public
@@ -80,27 +80,27 @@ public:
 
 private:
     void startTileBufferUpdateTimer();
-    void startTileCreationTimer();
+    void startBackingStoreUpdateTimer();
 
-    typedef Timer<TiledBackingStore> TileTimer;
-
-    void tileBufferUpdateTimerFired(TileTimer*);
-    void tileCreationTimerFired(TileTimer*);
+    void tileBufferUpdateTimerFired(Timer<TiledBackingStore>*);
+    void backingStoreUpdateTimerFired(Timer<TiledBackingStore>*);
 
     void createTiles();
     void computeCoverAndKeepRect(const IntRect& visibleRect, IntRect& coverRect, IntRect& keepRect) const;
 
+    bool isBackingStoreUpdatesSuspended() const;
+    bool isTileBufferUpdatesSuspended() const;
+
     void commitScaleChange();
 
     bool resizeEdgeTiles();
-    void dropTilesOutsideRect(const IntRect&);
+    void setKeepRect(const IntRect&);
 
     PassRefPtr<Tile> tileAt(const Tile::Coordinate&) const;
     void setTile(const Tile::Coordinate& coordinate, PassRefPtr<Tile> tile);
     void removeTile(const Tile::Coordinate& coordinate);
 
-    IntRect contentsRect() const;
-    IntRect visibleContentsRect() const;
+    IntRect visibleRect() const;
 
     float coverageRatio(const IntRect&) const;
     void adjustForContentsRect(IntRect&) const;
@@ -114,15 +114,19 @@ private:
     typedef HashMap<Tile::Coordinate, RefPtr<Tile> > TileMap;
     TileMap m_tiles;
 
-    TileTimer* m_tileBufferUpdateTimer;
-    TileTimer* m_tileCreationTimer;
+    Timer<TiledBackingStore> m_tileBufferUpdateTimer;
+    Timer<TiledBackingStore> m_backingStoreUpdateTimer;
 
     IntSize m_tileSize;
     double m_tileCreationDelay;
     float m_coverAreaMultiplier;
-    FloatPoint m_visibleRectTrajectoryVector;
-    
-    IntRect m_previousVisibleRect;
+
+    FloatPoint m_trajectoryVector;
+    IntRect m_visibleRect;
+
+    IntRect m_keepRect;
+    IntRect m_rect;
+
     float m_contentsScale;
     float m_pendingScale;
 

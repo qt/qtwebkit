@@ -137,11 +137,6 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
         drawSelectionTint = false;
     }
 
-    if (Frame* frame = this->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(this, paintInfo.rect);
-    }
-
     bool completelyClippedOut = false;
     if (style()->hasBorderRadius()) {
         LayoutRect borderRect = LayoutRect(adjustedPaintOffset, size());
@@ -196,10 +191,12 @@ bool RenderReplaced::shouldPaint(PaintInfo& paintInfo, const LayoutPoint& paintO
         bottom = max(selBottom, bottom);
     }
     
-    LayoutUnit os = 2 * maximalOutlineSize(paintInfo.phase);
-    if (adjustedPaintOffset.x() + minXVisualOverflow() >= paintInfo.rect.maxX() + os || adjustedPaintOffset.x() + maxXVisualOverflow() <= paintInfo.rect.x() - os)
+    LayoutRect localRepaintRect = paintInfo.rect;
+    localRepaintRect.inflate(maximalOutlineSize(paintInfo.phase));
+    if (adjustedPaintOffset.x() + minXVisualOverflow() >= localRepaintRect.maxX() || adjustedPaintOffset.x() + maxXVisualOverflow() <= localRepaintRect.x())
         return false;
-    if (top >= paintInfo.rect.maxY() + os || bottom <= paintInfo.rect.y() - os)
+
+    if (top >= localRepaintRect.maxY() || bottom <= localRepaintRect.y())
         return false;
 
     return true;
@@ -440,9 +437,7 @@ void RenderReplaced::computePreferredLogicalWidths()
     if (style()->maxWidth().isFixed())
         m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, style()->maxWidth().value() + (style()->boxSizing() == CONTENT_BOX ? borderAndPadding : zeroLayoutUnit));
 
-    if (style()->width().isPercent() || style()->height().isPercent()
-        || style()->maxWidth().isPercent() || style()->maxHeight().isPercent()
-        || style()->minWidth().isPercent() || style()->minHeight().isPercent())
+    if (hasRelativeDimensions())
         m_minPreferredLogicalWidth = 0;
     else
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth;
@@ -500,7 +495,7 @@ IntRect RenderReplaced::localSelectionRect(bool checkWhetherSelected) const
 
     if (!m_inlineBoxWrapper)
         // We're a block-level replaced element.  Just return our own dimensions.
-        return IntRect(0, 0, width(), height());
+        return IntRect(IntPoint(), size());
     
     RootInlineBox* root = m_inlineBoxWrapper->root();
     int newLogicalTop = root->block()->style()->isFlippedBlocksWritingMode() ? m_inlineBoxWrapper->logicalBottom() - root->selectionBottom() : root->selectionTop() - m_inlineBoxWrapper->logicalTop();
@@ -509,14 +504,14 @@ IntRect RenderReplaced::localSelectionRect(bool checkWhetherSelected) const
     return IntRect(newLogicalTop, 0, root->selectionHeight(), height());
 }
 
-void RenderReplaced::setSelectionState(SelectionState s)
+void RenderReplaced::setSelectionState(SelectionState state)
 {
-    RenderBox::setSelectionState(s); // The selection state for our containing block hierarchy is updated by the base class call.
-    if (m_inlineBoxWrapper) {
-        RootInlineBox* line = m_inlineBoxWrapper->root();
-        if (line)
-            line->setHasSelectedChildren(isSelected());
-    }
+    // The selection state for our containing block hierarchy is updated by the base class call.
+    RenderBox::setSelectionState(state);
+
+    if (m_inlineBoxWrapper && canUpdateSelectionOnRootLineBoxes())
+        if (RootInlineBox* root = m_inlineBoxWrapper->root())
+            root->setHasSelectedChildren(isSelected());
 }
 
 bool RenderReplaced::isSelected() const

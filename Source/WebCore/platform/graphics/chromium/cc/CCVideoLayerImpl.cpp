@@ -34,6 +34,7 @@
 #include "LayerRendererChromium.h"
 #include "NotImplemented.h"
 #include "ProgramBinding.h"
+#include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCProxy.h"
 #include "cc/CCVideoDrawQuad.h"
 #include <wtf/text/WTFString.h>
@@ -89,7 +90,6 @@ CCVideoLayerImpl::~CCVideoLayerImpl()
     }
     for (unsigned i = 0; i < MaxPlanes; ++i)
         m_textures[i].m_texture.clear();
-    cleanupResources();
 }
 
 void CCVideoLayerImpl::stopUsingProvider()

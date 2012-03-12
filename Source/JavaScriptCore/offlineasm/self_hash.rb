@@ -25,6 +25,25 @@ require "digest/sha1"
 require "pathname"
 
 #
+# dirHash(directory, regexp) -> SHA1 hexdigest
+#
+# Returns a hash of all files in the given directory that fit the given
+# pattern.
+#
+
+def dirHash(directory, regexp)
+    directory = Pathname.new(directory)
+    contents = ""
+    Dir.foreach(directory) {
+        | entry |
+        if entry =~ regexp
+            contents += IO::read(directory + entry)
+        end
+    }
+    return Digest::SHA1.hexdigest(contents)
+end
+
+#
 # selfHash -> SHA1 hexdigest
 #
 # Returns a hash of the offlineasm source code. This allows dependency
@@ -33,14 +52,6 @@ require "pathname"
 #
 
 def selfHash
-    contents = ""
-    myPath = Pathname.new(__FILE__).dirname
-    Dir.foreach(myPath) {
-        | entry |
-        if entry =~ /\.rb$/
-            contents += IO::read(myPath + entry)
-        end
-    }
-    return Digest::SHA1.hexdigest(contents)
+    dirHash(Pathname.new(__FILE__).dirname, /\.rb$/)
 end
 

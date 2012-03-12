@@ -43,7 +43,8 @@ class Settings;
 class InternalSettings : public RefCounted<InternalSettings>,
                          public FrameDestructionObserver {
 public:
-    static PassRefPtr<InternalSettings> create(Frame*, InternalSettings* old);
+    static PassRefPtr<InternalSettings> create(Frame*);
+
     virtual ~InternalSettings();
 
     void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
@@ -61,18 +62,22 @@ public:
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
     void setPerTileDrawingEnabled(bool enabled, ExceptionCode&);
     void setTouchEventEmulationEnabled(bool enabled, ExceptionCode&);
+    void setShadowDOMEnabled(bool enabled, ExceptionCode&);
+
+    void restoreTo(Settings*);
 
 private:
-    InternalSettings(Frame*, InternalSettings* old);
+    InternalSettings(Frame*);
 
     Settings* settings() const;
     Document* document() const;
     Page* page() const;
 
-    double m_passwordEchoDurationInSecondsBackup;
-    bool m_passwordEchoEnabledBackup : 1;
-    bool m_passwordEchoDurationInSecondsBackedUp : 1;
-    bool m_passwordEchoEnabledBackedUp : 1;
+    double m_originalPasswordEchoDurationInSeconds;
+    bool m_originalPasswordEchoEnabled;
+#if ENABLE(SHADOW_DOM)
+    bool m_originalShadowDOMEnabled;
+#endif
 };
 
 } // namespace WebCore

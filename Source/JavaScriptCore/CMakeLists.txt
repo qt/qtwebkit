@@ -40,6 +40,7 @@ SET(JavaScriptCore_SOURCES
     bytecode/CallLinkStatus.cpp
     bytecode/CodeBlock.cpp
     bytecode/DFGExitProfile.cpp
+    bytecode/ExecutionCounter.cpp
     bytecode/GetByIdStatus.cpp
     bytecode/JumpTable.cpp
     bytecode/LazyOperandValueProfile.cpp
@@ -67,6 +68,7 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGDriver.cpp
     dfg/DFGGraph.cpp
     dfg/DFGJITCompiler.cpp
+    dfg/DFGNode.cpp
     dfg/DFGOSREntry.cpp
     dfg/DFGOSRExit.cpp
     dfg/DFGOSRExitCompiler.cpp
@@ -75,6 +77,7 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGOperations.cpp
     dfg/DFGPhase.cpp
     dfg/DFGPredictionPropagationPhase.cpp
+    dfg/DFGRedundantPhiEliminationPhase.cpp
     dfg/DFGRepatch.cpp
     dfg/DFGSpeculativeJIT.cpp
     dfg/DFGSpeculativeJIT32_64.cpp
@@ -300,6 +303,7 @@ INCLUDE_DIRECTORIES(${JavaScriptCore_INCLUDE_DIRECTORIES})
 ADD_DEFINITIONS(-DBUILDING_JavaScriptCore)
 ADD_LIBRARY(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARY_TYPE} ${JavaScriptCore_HEADERS} ${JavaScriptCore_SOURCES})
 TARGET_LINK_LIBRARIES(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARIES})
+SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
 
 IF (JavaScriptCore_LINK_FLAGS)
     ADD_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} LINK_FLAGS "${JavaScriptCore_LINK_FLAGS}")
@@ -307,5 +311,5 @@ ENDIF ()
 
 IF (SHARED_CORE)
     SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
-    INSTALL(TARGETS ${JavaScriptCore_LIBRARY_NAME} DESTINATION lib)
+    INSTALL(TARGETS ${JavaScriptCore_LIBRARY_NAME} DESTINATION "${LIB_INSTALL_DIR}")
 ENDIF ()

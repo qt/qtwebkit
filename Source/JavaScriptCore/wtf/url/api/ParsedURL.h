@@ -28,27 +28,35 @@
 
 #if USE(WTFURL)
 
-#include "URLSegments.h"
-#include "URLString.h"
+#include <wtf/url/api/URLString.h>
+#include <wtf/url/src/URLSegments.h>
 
 namespace WTF {
 
 class URLComponent;
 
+// ParsedURL represents a valid URL decomposed by components.
 class ParsedURL {
 public:
-    explicit ParsedURL(const URLString&);
-
     // FIXME: Add a method for parsing non-canonicalized URLs.
+    ParsedURL() { };
+    WTF_EXPORT_PRIVATE explicit ParsedURL(const String&);
 
-    String scheme() const;
-    String username() const;
-    String password() const;
-    String host() const;
-    String port() const;
-    String path() const;
-    String query() const;
-    String fragment() const;
+    WTF_EXPORT_PRIVATE ParsedURL isolatedCopy() const;
+
+    bool isValid() const { return !m_spec.string().isEmpty(); }
+
+    // Return a URL component or a null String if the component is undefined for the URL.
+    WTF_EXPORT_PRIVATE String scheme() const;
+    WTF_EXPORT_PRIVATE String username() const;
+    WTF_EXPORT_PRIVATE String password() const;
+    WTF_EXPORT_PRIVATE String host() const;
+    WTF_EXPORT_PRIVATE String port() const;
+    WTF_EXPORT_PRIVATE String path() const;
+    WTF_EXPORT_PRIVATE String query() const;
+    WTF_EXPORT_PRIVATE String fragment() const;
+
+    WTF_EXPORT_PRIVATE String baseAsString() const;
 
     URLString spec() { return m_spec; }
 

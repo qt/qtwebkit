@@ -1,3 +1,29 @@
+2012-03-09  Ashod Nakashian  <ashodnakashian@yahoo.com>
+
+        Bash scripts should support LF endings only
+        https://bugs.webkit.org/show_bug.cgi?id=79509
+
+        Reviewed by David Kilzer.
+
+        * gtest/xcode/Samples/FrameworkSample/runtests.sh: Added property svn:executable.
+        * gtest/xcode/Scripts/runtests.sh: Added property svn:executable.
+
+2012-03-08  Jessie Berlin  <jberlin@apple.com>
+
+        More Windows build fixing.
+
+        * gtest/msvc/gtest-md.vcproj:
+
+2012-03-07  Jessie Berlin  <jberlin@apple.com>
+
+        Clean Windows build fails after r110033
+        https://bugs.webkit.org/show_bug.cgi?id=80553
+
+        Rubber-stamped by Jon Honeycutt and Eric Seidel.
+
+        * gtest/msvc/gtest-md.vcproj:
+        Add the new JavaScriptCore include directory to the include path.
+
 2012-02-21  Sam Weinig  <sam@webkit.org>
 
         Attempt to fix the Snow Leopard build.

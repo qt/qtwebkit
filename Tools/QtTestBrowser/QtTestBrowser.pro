@@ -39,13 +39,11 @@ HEADERS += \
     cookiejar.h
 
 
-WEBKIT += webcore
-
-CONFIG += qtwebkit
+WEBKIT += wtf webcore
 
 DESTDIR = $$ROOT_BUILD_DIR/bin
 
-QT += network
+QT += network webkit
 
 macx:QT += xml
 haveQt(5): QT += printsupport widgets

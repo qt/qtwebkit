@@ -43,15 +43,16 @@ public:
 
     // CCProxy implementation
     virtual bool compositeAndReadback(void *pixels, const IntRect&);
-    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double durationSec);
+    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double duration);
     virtual GraphicsContext3D* context();
     virtual void finishAllRendering();
     virtual bool isStarted() const;
     virtual bool initializeContext();
     virtual bool initializeLayerRenderer();
+    virtual bool recreateContext();
     virtual int compositorIdentifier() const { return m_compositorIdentifier; }
     virtual const LayerRendererCapabilities& layerRendererCapabilities() const;
-    virtual void loseCompositorContext(int numTimes);
+    virtual void loseContext();
     virtual void setNeedsAnimate();
     virtual void setNeedsCommit();
     virtual void setNeedsRedraw();
@@ -61,23 +62,26 @@ public:
     virtual size_t maxPartialTextureUpdates() const { return std::numeric_limits<size_t>::max(); }
 
     // CCLayerTreeHostImplClient implementation
+    virtual void didLoseContextOnImplThread() { }
     virtual void onSwapBuffersCompleteOnImplThread() { ASSERT_NOT_REACHED(); }
     virtual void setNeedsRedrawOnImplThread() { m_layerTreeHost->setNeedsCommit(); }
     virtual void setNeedsCommitOnImplThread() { m_layerTreeHost->setNeedsCommit(); }
-    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>);
+    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime);
 
     // Called by the legacy path where RenderWidget does the scheduling.
     void compositeImmediately();
 
 private:
     explicit CCSingleThreadProxy(CCLayerTreeHost*);
-    bool recreateContextIfNeeded();
+
     bool commitIfNeeded();
     void doCommit();
     bool doComposite();
+    void didSwapFrame();
 
     // Accessed on main thread only.
     CCLayerTreeHost* m_layerTreeHost;
+    bool m_contextLost;
     int m_compositorIdentifier;
 
     // Holds on to the context between initializeContext() and initializeLayerRenderer() calls. Shouldn't
@@ -89,9 +93,6 @@ private:
     bool m_layerRendererInitialized;
     LayerRendererCapabilities m_layerRendererCapabilitiesForMainThread;
 
-    int m_numFailedRecreateAttempts;
-    bool m_graphicsContextLost;
-    int m_timesRecreateShouldFail; // Used during testing.
     bool m_nextFrameIsNewlyCommittedFrame;
 };
 

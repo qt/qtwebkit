@@ -10,7 +10,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY GOOGLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS BE LIABLE
@@ -28,18 +28,30 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "DOMWindowProperty.h"
+#include "Supplementable.h"
+
 namespace WebCore {
 
 class IDBFactory;
 class DOMWindow;
 
-class DOMWindowIndexedDatabase {
+class DOMWindowIndexedDatabase : public DOMWindowProperty, public Supplement<DOMWindow> {
 public:
+    virtual ~DOMWindowIndexedDatabase();
+    static DOMWindowIndexedDatabase* from(DOMWindow*);
+
     static IDBFactory* webkitIndexedDB(DOMWindow*);
 
+    virtual void disconnectFrame() OVERRIDE;
+
 private:
-    DOMWindowIndexedDatabase();
-    ~DOMWindowIndexedDatabase();
+    explicit DOMWindowIndexedDatabase(DOMWindow*);
+
+    IDBFactory* webkitIndexedDB();
+
+    DOMWindow* m_window;
+    RefPtr<IDBFactory> m_idbFactory;
 };
 
 } // namespace WebCore

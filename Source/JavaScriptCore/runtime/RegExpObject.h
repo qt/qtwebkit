@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2003, 2007, 2008 Apple Inc. All Rights Reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2012 Apple Inc. All Rights Reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -44,20 +44,27 @@ namespace JSC {
             return object;
         }
 
-        void setRegExp(JSGlobalData& globalData, RegExp* r) { d->regExp.set(globalData, this, r); }
-        RegExp* regExp() const { return d->regExp.get(); }
+        void setRegExp(JSGlobalData& globalData, RegExp* r) { m_regExp.set(globalData, this, r); }
+        RegExp* regExp() const { return m_regExp.get(); }
 
-        void setLastIndex(size_t lastIndex)
+        void setLastIndex(ExecState* exec, size_t lastIndex)
         {
-            d->lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
+            m_lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
+            if (LIKELY(m_lastIndexIsWritable))
+                m_lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
+            else
+                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
         }
-        void setLastIndex(JSGlobalData& globalData, JSValue lastIndex)
+        void setLastIndex(ExecState* exec, JSValue lastIndex, bool shouldThrow)
         {
-            d->lastIndex.set(globalData, this, lastIndex);
+            if (LIKELY(m_lastIndexIsWritable))
+                m_lastIndex.set(exec->globalData(), this, lastIndex);
+            else if (shouldThrow)
+                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
         }
         JSValue getLastIndex() const
         {
-            return d->lastIndex.get();
+            return m_lastIndex.get();
         }
 
         JSValue test(ExecState*);
@@ -77,31 +84,22 @@ namespace JSC {
     protected:
         JS_EXPORT_PRIVATE RegExpObject(JSGlobalObject*, Structure*, RegExp*);
         JS_EXPORT_PRIVATE void finishCreation(JSGlobalObject*);
-        static void destroy(JSCell*);
 
         static const unsigned StructureFlags = OverridesVisitChildren | OverridesGetOwnPropertySlot | Base::StructureFlags;
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
+        JS_EXPORT_PRIVATE static bool deleteProperty(JSCell*, ExecState*, const Identifier& propertyName);
+        JS_EXPORT_PRIVATE static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        JS_EXPORT_PRIVATE static void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, const Identifier& propertyName, PropertyDescriptor&, bool shouldThrow);
+
     private:
         bool match(ExecState*);
 
-        struct RegExpObjectData {
-            WTF_MAKE_FAST_ALLOCATED;
-        public:
-            RegExpObjectData(JSGlobalData& globalData, RegExpObject* owner, RegExp* regExp)
-                : regExp(globalData, owner, regExp)
-            {
-                lastIndex.setWithoutWriteBarrier(jsNumber(0));
-            }
-
-            WriteBarrier<RegExp> regExp;
-            WriteBarrier<Unknown> lastIndex;
-        };
-#if COMPILER(MSVC)
-        friend void WTF::deleteOwnedPtr<RegExpObjectData>(RegExpObjectData*);
-#endif
-        OwnPtr<RegExpObjectData> d;
+        WriteBarrier<RegExp> m_regExp;
+        WriteBarrier<Unknown> m_lastIndex;
+        bool m_lastIndexIsWritable;
     };
 
     RegExpObject* asRegExpObject(JSValue);

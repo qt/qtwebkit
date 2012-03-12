@@ -2011,6 +2011,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestObjTemplate(v8::Persi
     proto->Set(v8::String::New("methodThatRequiresAllArgsAndThrows"), v8::FunctionTemplate::New(TestObjInternal::methodThatRequiresAllArgsAndThrowsCallback, v8::Handle<v8::Value>(), methodThatRequiresAllArgsAndThrowsSignature));
     desc->Set(v8::String::New("classMethod"), v8::FunctionTemplate::New(TestObjInternal::classMethodCallback, v8::Handle<v8::Value>(), v8::Local<v8::Signature>()));
     desc->Set(v8::String::New("classMethodWithOptional"), v8::FunctionTemplate::New(TestObjInternal::classMethodWithOptionalCallback, v8::Handle<v8::Value>(), v8::Local<v8::Signature>()));
+    desc->Set(v8::String::New("classMethod2"), v8::FunctionTemplate::New(V8TestObj::classMethod2Callback, v8::Handle<v8::Value>(), v8::Local<v8::Signature>()));
 #if ENABLE(Condition1)
     desc->Set(v8::String::New("overloadedMethod1"), v8::FunctionTemplate::New(TestObjInternal::overloadedMethod1Callback, v8::Handle<v8::Value>(), v8::Local<v8::Signature>()));
 #endif // ENABLE(Condition1)
@@ -2093,7 +2094,7 @@ v8::Handle<v8::Object> V8TestObj::wrapSlow(TestObj* impl)
     v8::Handle<v8::Object> wrapper;
     V8Proxy* proxy = 0;
     wrapper = V8DOMWrapper::instantiateV8Object(proxy, &info, impl);
-    if (wrapper.IsEmpty())
+    if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     impl->ref();

@@ -37,7 +37,6 @@ namespace WebCore {
 class DOMWrapperWorld;
 class Document;
 class Frame;
-class FrameView;
 class GeolocationControllerClientBlackBerry;
 class JavaScriptDebuggerBlackBerry;
 class KURL;
@@ -60,7 +59,6 @@ class BackingStoreTile;
 class DumpRenderTreeClient;
 class InPageSearchManager;
 class InputHandler;
-class InRegionScrollableArea;
 class SelectionHandler;
 class TouchEventHandler;
 class WebPageClient;
@@ -81,6 +79,8 @@ public:
 
     WebPagePrivate(WebPage*, WebPageClient*, const WebCore::IntRect&);
     virtual ~WebPagePrivate();
+
+    static WebCore::Page* core(const WebPage*);
 
     void init(const WebString& pageGroupName);
     bool handleMouseEvent(WebCore::PlatformMouseEvent&);
@@ -373,6 +373,7 @@ public:
     void setRootLayerCompositingThread(WebCore::LayerCompositingThread*);
     void commitRootLayer(const WebCore::IntRect&, const WebCore::IntSize&);
     void setIsAcceleratedCompositingActive(bool);
+    bool isAcceleratedCompositingActive() const { return m_isAcceleratedCompositingActive; }
     void destroyCompositor();
     void syncDestroyCompositorOnCompositingThread();
     void destroyLayerResources();
@@ -391,6 +392,8 @@ public:
 
     // Clean up any document related data we might be holding.
     void clearDocumentData(const WebCore::Document*);
+
+    void frameUnloaded(const WebCore::Frame*);
 
     static WebCore::RenderLayer* enclosingPositionedAncestorOrSelfIfPositioned(WebCore::RenderLayer*);
     static WebCore::RenderLayer* enclosingFixedPositionedAncestorOrSelfIfFixedPositioned(WebCore::RenderLayer*);

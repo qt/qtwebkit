@@ -56,13 +56,14 @@ public:
     void setNeedsDisplay();
     void setNeedsDisplayInRect(const IntRect&);
     void drawLayer(WebTileLayer*, CGContextRef);
-    void setContentsScale(CGFloat);
+
+    void setScale(CGFloat);
 
     bool acceleratesDrawing() const { return m_acceleratesDrawing; }
     void setAcceleratesDrawing(bool);
 
     CALayer *tileContainerLayer() const { return m_tileContainerLayer.get(); }
-    void visibleRectChanged();
+    void visibleRectChanged(const IntRect&);
 
     float tileDebugBorderWidth() const { return m_tileDebugBorderWidth; }
     void setTileDebugBorderWidth(float);
@@ -75,7 +76,6 @@ private:
 
     TileCache(WebTileCacheLayer*, const IntSize& tileSize);
 
-    FloatRect visibleRect() const;
     IntRect bounds() const;
 
     IntRect rectForTileIndex(const TileIndex&) const;
@@ -93,11 +93,14 @@ private:
     WebTileCacheLayer* m_tileCacheLayer;
     RetainPtr<CALayer> m_tileContainerLayer;
     const IntSize m_tileSize;
+    IntRect m_visibleRect;
 
     typedef HashMap<TileIndex, RetainPtr<WebTileLayer> > TileMap;
     TileMap m_tiles;
     Timer<TileCache> m_tileRevalidationTimer;
     IntRect m_tileCoverageRect;
+
+    CGFloat m_scale;
 
     bool m_acceleratesDrawing;
 

@@ -166,7 +166,7 @@ static void createWindowsKeyMap()
     }
 }
 
-String keyIdentifierForEvasKeyName(String& keyName)
+String keyIdentifierForEvasKeyName(const String& keyName)
 {
     if (keyMap().isEmpty())
         createKeyMap();
@@ -177,7 +177,18 @@ String keyIdentifierForEvasKeyName(String& keyName)
     return keyName;
 }
 
-int windowsKeyCodeForEvasKeyName(String& keyName)
+String singleCharacterString(const String& keyName)
+{
+    if (keyName == "Return")
+        return String("\r");
+    if (keyName == "BackSpace")
+        return String("\x8");
+    if (keyName == "Tab")
+        return String("\t");
+    return keyName;
+}
+
+int windowsKeyCodeForEvasKeyName(const String& keyName)
 {
     if (windowsKeyMap().isEmpty())
         createWindowsKeyMap();

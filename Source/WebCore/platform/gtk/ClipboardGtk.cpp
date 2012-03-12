@@ -18,7 +18,6 @@
 #include "ClipboardGtk.h"
 
 #include "CachedImage.h"
-#include "DOMStringList.h"
 #include "DragData.h"
 #include "Editor.h"
 #include "Element.h"
@@ -143,13 +142,8 @@ void ClipboardGtk::clearAllData()
         PasteboardHelper::defaultPasteboardHelper()->writeClipboardContents(m_clipboard);
 }
 
-String ClipboardGtk::getData(const String& typeString, bool& success) const
+String ClipboardGtk::getData(const String& typeString) const
 {
-    success = true; // According to http://www.whatwg.org/specs/web-apps/current-work/multipage/dnd.html
-    // "The getData(format) method must return the data that is associated with the type format converted
-    // to ASCII lowercase, if any, and must return the empty string otherwise." Since success == false 
-    // results in an 'undefined' return value, we always want to return success == true. This parameter
-    // should eventually be removed.
     if (policy() != ClipboardReadable || !m_dataObject)
         return String();
 
@@ -190,33 +184,33 @@ bool ClipboardGtk::setData(const String& typeString, const String& data)
     return success;
 }
 
-PassRefPtr<DOMStringList> ClipboardGtk::types() const
+HashSet<String> ClipboardGtk::types() const
 {
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
-        return DOMStringList::create();
+        return HashSet<String>();
 
     if (m_clipboard)
         PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_clipboard);
 
-    RefPtr<DOMStringList> types = DOMStringList::create();
+    HashSet<String> types;
     if (m_dataObject->hasText()) {
-        types->append("text/plain");
-        types->append("Text");
-        types->append("text");
+        types.add("text/plain");
+        types.add("Text");
+        types.add("text");
     }
 
     if (m_dataObject->hasMarkup())
-        types->append("text/html");
+        types.add("text/html");
 
     if (m_dataObject->hasURIList()) {
-        types->append("text/uri-list");
-        types->append("URL");
+        types.add("text/uri-list");
+        types.add("URL");
     }
 
     if (m_dataObject->hasFilenames())
-        types->append("Files");
+        types.add("Files");
 
-    return types.release();
+    return types;
 }
 
 PassRefPtr<FileList> ClipboardGtk::files() const

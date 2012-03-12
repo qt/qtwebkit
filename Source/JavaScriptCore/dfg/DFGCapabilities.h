@@ -57,11 +57,13 @@ inline bool mightCompileFunctionForConstruct(CodeBlock* codeBlock)
 
 inline bool mightInlineFunctionForCall(CodeBlock* codeBlock)
 {
-    return codeBlock->instructionCount() <= Options::maximumFunctionForCallInlineCandidateInstructionCount;
+    return codeBlock->instructionCount() <= Options::maximumFunctionForCallInlineCandidateInstructionCount
+        && !codeBlock->ownerExecutable()->needsActivation();
 }
 inline bool mightInlineFunctionForConstruct(CodeBlock* codeBlock)
 {
-    return codeBlock->instructionCount() <= Options::maximumFunctionForConstructInlineCandidateInstructionCount;
+    return codeBlock->instructionCount() <= Options::maximumFunctionForConstructInlineCandidateInstructionCount
+        && !codeBlock->ownerExecutable()->needsActivation();
 }
 
 // Opcode checking.
@@ -84,6 +86,7 @@ inline bool canCompileOpcode(OpcodeID opcodeID)
     case op_post_dec:
     case op_add:
     case op_sub:
+    case op_negate:
     case op_mul:
     case op_mod:
     case op_div:
@@ -151,21 +154,14 @@ inline bool canCompileOpcode(OpcodeID opcodeID)
     case op_throw_reference_error:
     case op_call:
     case op_construct:
-        return true;
-        
-    // Opcodes we support conditionally. Enabling these opcodes currently results in
-    // performance regressions. Each node that we disable under restrictions has a
-    // comment describing what we know about the regression so far.
-        
-    // Regresses string-validate-input, probably because it uses comparisons (< and >)
-    // on strings, which currently will cause speculation failures in some cases.
     case op_new_regexp: 
-#if DFG_ENABLE(RESTRICTIONS)
-        return false;
-#else
+    case op_init_lazy_reg:
+    case op_create_activation:
+    case op_tear_off_activation:
+    case op_new_func:
+    case op_new_func_exp:
         return true;
-#endif
-      
+        
     default:
         return false;
     }
@@ -189,6 +185,14 @@ inline bool canInlineOpcode(OpcodeID opcodeID)
         
     // Inlining doesn't correctly remap regular expression operands.
     case op_new_regexp:
+        return false;
+        
+    // We don't support inlining code that creates activations or has nested functions.
+    case op_init_lazy_reg:
+    case op_create_activation:
+    case op_tear_off_activation:
+    case op_new_func:
+    case op_new_func_exp:
         return false;
         
     default:

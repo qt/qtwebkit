@@ -107,6 +107,9 @@ public:
     static bool isAnimatableAttribute(const QualifiedName&);
 #endif
 
+    StylePropertySet* animatedSMILStyleProperties() const;
+    StylePropertySet* ensureAnimatedSMILStyleProperties();
+
 protected:
     SVGElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
 
@@ -144,6 +147,12 @@ struct SVGAttributeHashTranslator {
     }
     static bool equal(QualifiedName a, QualifiedName b) { return a.matches(b); }
 };
+
+inline SVGElement* toSVGElement(Element* element)
+{
+    ASSERT(!element || element->isSVGElement());
+    return static_cast<SVGElement*>(element);
+}
 
 }
 

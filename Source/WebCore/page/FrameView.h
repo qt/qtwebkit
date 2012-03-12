@@ -69,7 +69,7 @@ public:
     virtual void setFrameRect(const IntRect&);
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    void scheduleAnimation();
+    virtual bool scheduleAnimation();
 #endif
 
     Frame* frame() const { return m_frame.get(); }
@@ -99,6 +99,7 @@ public:
     bool isInLayout() const { return m_inLayout; }
 
     RenderObject* layoutRoot(bool onlyDuringLayout = false) const;
+    void clearLayoutRoot() { m_layoutRoot = 0; }
     int layoutCount() const { return m_layoutCount; }
 
     bool needsLayout() const;
@@ -229,6 +230,7 @@ public:
 
     virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
     virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect);
+    virtual void paintScrollbar(GraphicsContext*, Scrollbar*, const IntRect&) OVERRIDE;
 
     Color documentBackgroundColor() const;
 

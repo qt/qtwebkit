@@ -33,6 +33,7 @@
 #include "GraphicsContext.h"
 #include "HTMLElement.h"
 #include "StylePropertySet.h"
+#include "StyleRule.h"
 #if USE(JSC)
 #include "Completion.h"
 #include "JSGlobalObject.h"
@@ -843,7 +844,7 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (!propID)
         return QString();
 
-    StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
+    const StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureInlineStyle();
 
     if (strategy == InlineStyle)
         return style->getPropertyValue(propID);
@@ -865,11 +866,11 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
             for (int i = rules->length(); i > 0; --i) {
                 CSSStyleRule* rule = static_cast<CSSStyleRule*>(rules->item(i - 1));
 
-                if (rule->declaration()->propertyIsImportant(propID))
-                    return rule->declaration()->getPropertyValue(propID);
+                if (rule->styleRule()->properties()->propertyIsImportant(propID))
+                    return rule->styleRule()->properties()->getPropertyValue(propID);
 
                 if (style->getPropertyValue(propID).isEmpty())
-                    style = rule->declaration();
+                    style = rule->styleRule()->properties();
             }
         }
 
@@ -908,11 +909,7 @@ void QWebElement::setStyleProperty(const QString &name, const QString &value)
         return;
 
     int propID = cssPropertyID(name);
-    StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureInlineStyleDecl();
-    if (!propID || !style)
-        return;
-
-    style->setProperty(propID, value);
+    static_cast<StyledElement*>(m_element)->setInlineStyleProperty(propID, value);
 }
 
 /*!

@@ -54,6 +54,7 @@ WebGLLayerChromium::WebGLLayerChromium()
     , m_textureId(0)
     , m_textureChanged(true)
     , m_textureUpdated(false)
+    , m_contextLost(false)
     , m_drawingBuffer(0)
 {
 }
@@ -66,17 +67,23 @@ WebGLLayerChromium::~WebGLLayerChromium()
 
 bool WebGLLayerChromium::drawsContent() const
 {
-    return LayerChromium::drawsContent() && context() && (context()->getExtensions()->getGraphicsResetStatusARB() == GraphicsContext3D::NO_ERROR);
+    return LayerChromium::drawsContent() && !m_contextLost;
+}
+
+void WebGLLayerChromium::paintContentsIfDirty(const Region&)
+{
+    if (!drawsContent() || !m_needsDisplay || !m_textureUpdated)
+        return;
+
+    drawingBuffer()->publishToPlatformLayer();
+    context()->markLayerComposited();
+    m_needsDisplay = false;
+    m_textureUpdated = false;
+    m_contextLost = context()->getExtensions()->getGraphicsResetStatusARB() != GraphicsContext3D::NO_ERROR;
 }
 
 void WebGLLayerChromium::updateCompositorResources(GraphicsContext3D* rendererContext, CCTextureUpdater&)
 {
-    if (!drawsContent())
-        return;
-
-    if (!m_needsDisplay)
-        return;
-
     if (m_textureChanged) {
         rendererContext->bindTexture(GraphicsContext3D::TEXTURE_2D, m_textureId);
         // Set the min-mag filters to linear and wrap modes to GL_CLAMP_TO_EDGE
@@ -86,15 +93,6 @@ void WebGLLayerChromium::updateCompositorResources(GraphicsContext3D* rendererCo
         rendererContext->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE);
         rendererContext->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE);
         m_textureChanged = false;
-    }
-    // Update the contents of the texture used by the compositor.
-    if (m_needsDisplay && m_textureUpdated) {
-        // publishToPlatformLayer prepares the contents of the off-screen render target for use by the compositor.
-        drawingBuffer()->publishToPlatformLayer();
-        context()->markLayerComposited();
-        m_updateRect = FloatRect(FloatPoint(), bounds());
-        m_needsDisplay = false;
-        m_textureUpdated = false;
     }
 }
 
@@ -110,26 +108,35 @@ void WebGLLayerChromium::pushPropertiesTo(CCLayerImpl* layer)
 
 bool WebGLLayerChromium::paintRenderedResultsToCanvas(ImageBuffer* imageBuffer)
 {
-    if (m_textureUpdated || !layerRendererContext() || !drawsContent())
+    if (m_textureUpdated || !m_drawingBuffer || !drawsContent())
         return false;
 
     IntSize framebufferSize = context()->getInternalFramebufferSize();
-    ASSERT(layerRendererContext());
 
-    // This would ideally be done in the webgl context, but that isn't possible yet.
-    Platform3DObject framebuffer = layerRendererContext()->createFramebuffer();
-    layerRendererContext()->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, framebuffer);
-    layerRendererContext()->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, m_textureId, 0);
+    // Since we're using the same context as WebGL, we have to restore any state we change (in this case, just the framebuffer binding).
+    // FIXME: The WebGLRenderingContext tracks the current framebuffer binding, it would be slightly more efficient to use this value
+    // rather than querying it off of the context.
+    GC3Dint previousFramebuffer = 0;
+    context()->getIntegerv(GraphicsContext3D::FRAMEBUFFER_BINDING, &previousFramebuffer);
 
-    Extensions3DChromium* extensions = static_cast<Extensions3DChromium*>(layerRendererContext()->getExtensions());
+    Platform3DObject framebuffer = context()->createFramebuffer();
+    context()->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, framebuffer);
+    context()->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, m_textureId, 0);
+
+    Extensions3DChromium* extensions = static_cast<Extensions3DChromium*>(context()->getExtensions());
     extensions->paintFramebufferToCanvas(framebuffer, framebufferSize.width(), framebufferSize.height(), !context()->getContextAttributes().premultipliedAlpha, imageBuffer);
-    layerRendererContext()->deleteFramebuffer(framebuffer);
+    context()->deleteFramebuffer(framebuffer);
+
+    context()->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, previousFramebuffer);
     return true;
 }
 
-void WebGLLayerChromium::contentChanged()
+void WebGLLayerChromium::setNeedsDisplayRect(const FloatRect& dirtyRect)
 {
+    LayerChromium::setNeedsDisplayRect(dirtyRect);
+
     m_textureUpdated = true;
+
     // If WebGL commands are issued outside of a the animation callbacks, then use
     // call rateLimitOffscreenContextCHROMIUM() to keep the context from getting too far ahead.
     if (layerTreeHost())
@@ -161,6 +168,7 @@ void WebGLLayerChromium::setDrawingBuffer(DrawingBuffer* drawingBuffer)
     GraphicsContext3D::Attributes attributes = context()->getContextAttributes();
     m_hasAlpha = attributes.alpha;
     m_premultipliedAlpha = attributes.premultipliedAlpha;
+    m_contextLost = context()->getExtensions()->getGraphicsResetStatusARB() != GraphicsContext3D::NO_ERROR;
 }
 
 GraphicsContext3D* WebGLLayerChromium::context() const
@@ -169,15 +177,6 @@ GraphicsContext3D* WebGLLayerChromium::context() const
         return drawingBuffer()->graphicsContext3D().get();
 
     return 0;
-}
-
-GraphicsContext3D* WebGLLayerChromium::layerRendererContext()
-{
-    // FIXME: In the threaded case, paintRenderedResultsToCanvas must be
-    // refactored to be asynchronous. Currently this is unimplemented.
-    if (!layerTreeHost() || CCProxy::hasImplThread())
-        return 0;
-    return layerTreeHost()->context();
 }
 
 }

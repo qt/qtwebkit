@@ -38,6 +38,7 @@
 
 #include "FloatRect.h"
 #include "IntRect.h"
+#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -58,9 +59,25 @@ inline IntRect pixelSnappedIntRect(const LayoutRect& rect)
     return rect;
 }
 
+inline IntRect pixelSnappedIntRect(LayoutUnit left, LayoutUnit top, LayoutUnit width, LayoutUnit height)
+{
+    return IntRect(left, top, width, height);
+}
+
+inline IntRect pixelSnappedIntRect(const LayoutPoint& location, const LayoutSize& size)
+{
+    return IntRect(location, size);
+}
+
 inline IntRect pixelSnappedIntRectFromEdges(LayoutUnit left, LayoutUnit top, LayoutUnit right, LayoutUnit bottom)
 {
     return IntRect(left, top, right - left, bottom - top);
+}
+
+inline int snapSizeToPixel(LayoutUnit size, LayoutUnit location) 
+{
+    UNUSED_PARAM(location);
+    return size;
 }
 
 inline IntSize roundedIntSize(const LayoutSize& s)
@@ -98,6 +115,11 @@ inline LayoutSize flooredLayoutSize(const FloatPoint& p)
     return LayoutSize(static_cast<int>(p.x()), static_cast<int>(p.y()));
 }
 
+inline int roundToInt(LayoutUnit value)
+{
+    return value;
+}
+
 inline LayoutUnit roundedLayoutUnit(float value)
 {
     return lroundf(value);
@@ -121,6 +143,11 @@ inline LayoutPoint toLayoutPoint(const LayoutSize& p)
 inline LayoutUnit layoutMod(const LayoutUnit& numerator, const LayoutUnit& denominator)
 {
     return numerator % denominator;
+}
+
+inline LayoutUnit clampToLayoutUnit(double value)
+{
+    return clampToInteger(value);
 }
 
 } // namespace WebCore

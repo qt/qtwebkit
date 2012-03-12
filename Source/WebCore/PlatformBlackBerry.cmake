@@ -77,6 +77,7 @@ LIST(APPEND WebCore_SOURCES
     platform/image-decoders/png/PNGImageDecoder.cpp
     platform/image-decoders/webp/WEBPImageDecoder.cpp
     platform/image-encoders/JPEGImageEncoder.cpp
+    platform/image-encoders/skia/JPEGImageEncoder.cpp
     platform/posix/FileSystemPOSIX.cpp
     platform/posix/SharedBufferPOSIX.cpp
     platform/text/TextBreakIteratorICU.cpp
@@ -87,6 +88,7 @@ LIST(APPEND WebCore_SOURCES
 
 # Networking sources
 LIST(APPEND WebCore_SOURCES
+    platform/network/MIMESniffing.cpp
     platform/network/ProxyServer.cpp
     platform/network/blackberry/DeferredData.cpp
     platform/network/blackberry/NetworkJob.cpp
@@ -132,7 +134,6 @@ LIST(APPEND WebCore_SOURCES
     page/blackberry/AccessibilityObjectBlackBerry.cpp
     page/blackberry/DragControllerBlackBerry.cpp
     page/blackberry/EventHandlerBlackBerry.cpp
-    page/blackberry/FrameBlackBerry.cpp
     platform/blackberry/ClipboardBlackBerry.cpp
     platform/blackberry/ContextMenuBlackBerry.cpp
     platform/blackberry/ContextMenuItemBlackBerry.cpp
@@ -153,6 +154,7 @@ LIST(APPEND WebCore_SOURCES
     platform/blackberry/PlatformTouchPointBlackBerry.cpp
     platform/blackberry/PopupMenuBlackBerry.cpp
     platform/blackberry/RenderThemeBlackBerry.cpp
+    platform/blackberry/RunLoopBlackBerry.cpp
     platform/blackberry/SSLKeyGeneratorBlackBerry.cpp
     platform/blackberry/ScrollbarThemeBlackBerry.cpp
     platform/blackberry/SearchPopupMenuBlackBerry.cpp
@@ -169,8 +171,7 @@ LIST(APPEND WebCore_SOURCES
     platform/graphics/blackberry/IntPointBlackBerry.cpp
     platform/graphics/blackberry/IntRectBlackBerry.cpp
     platform/graphics/blackberry/IntSizeBlackBerry.cpp
-    platform/graphics/blackberry/MMrenderer.cpp
-    platform/graphics/blackberry/MediaPlayerPrivateMMrenderer.cpp
+    platform/graphics/blackberry/MediaPlayerPrivateBlackBerry.cpp
     platform/text/blackberry/StringBlackBerry.cpp
 )
 
@@ -238,6 +239,7 @@ IF (WTF_USE_ACCELERATED_COMPOSITING)
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerAnimation.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerCompositingThread.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerRenderer.cpp
+        ${WEBCORE_DIR}/platform/graphics/blackberry/LayerRendererSurface.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerTile.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerTiler.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerWebKitThread.cpp

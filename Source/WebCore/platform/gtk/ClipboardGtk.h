@@ -54,10 +54,10 @@ namespace WebCore {
 
         void clearData(const String&);
         void clearAllData();
-        String getData(const String&, bool&) const;
+        String getData(const String&) const;
         bool setData(const String&, const String&);
 
-        virtual PassRefPtr<DOMStringList> types() const;
+        virtual HashSet<String> types() const;
         virtual PassRefPtr<FileList> files() const;
 
         void setDragImage(CachedImage*, const IntPoint&);

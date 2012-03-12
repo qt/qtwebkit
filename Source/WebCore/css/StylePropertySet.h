@@ -43,7 +43,7 @@ public:
     {
         return adoptRef(new StylePropertySet);
     }
-    static PassRefPtr<StylePropertySet> create(const CSSProperty* const* properties, int numProperties, bool useStrictParsing)
+    static PassRefPtr<StylePropertySet> create(const CSSProperty* properties, int numProperties, bool useStrictParsing)
     {
         return adoptRef(new StylePropertySet(properties, numProperties, useStrictParsing));
     }
@@ -76,7 +76,7 @@ public:
 
     void parseDeclaration(const String& styleDeclaration, CSSStyleSheet* contextStyleSheet);
 
-    void addParsedProperties(const CSSProperty* const *, int numProperties);
+    void addParsedProperties(const CSSProperty*, int numProperties);
     void addParsedProperty(const CSSProperty&);
 
     PassRefPtr<StylePropertySet> copyBlockProperties() const;
@@ -107,11 +107,13 @@ public:
     CSSStyleDeclaration* ensureCSSStyleDeclaration() const;
     CSSStyleDeclaration* ensureRuleCSSStyleDeclaration(const CSSRule* parentRule) const;
     CSSStyleDeclaration* ensureInlineCSSStyleDeclaration(const StyledElement* parentElement) const;
+    
+    bool hasCSSOMWrapper() const { return m_hasCSSOMWrapper; }
 
 private:
     StylePropertySet();
     StylePropertySet(const Vector<CSSProperty>&);
-    StylePropertySet(const CSSProperty* const *, int numProperties, bool useStrictParsing);
+    StylePropertySet(const CSSProperty*, int numProperties, bool useStrictParsing);
 
     void setNeedsStyleRecalc();
 

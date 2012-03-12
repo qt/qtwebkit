@@ -29,7 +29,7 @@
 #define WTF_Platform_h
 
 /* Include compiler specific macros */
-#include "Compiler.h"
+#include <wtf/Compiler.h>
 
 /* ==== PLATFORM handles OS, operating environment, graphics API, and
    CPU. This macro will be phased out in favor of platform adaptation
@@ -295,7 +295,7 @@
 
 #endif /* ARM */
 
-#if CPU(ARM) || CPU(MIPS) || CPU(SH4)
+#if CPU(ARM) || CPU(MIPS) || CPU(SH4) || CPU(SPARC)
 #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
 #endif
 
@@ -558,6 +558,9 @@
 #if defined(ENABLE_VIDEO)
 #define ENABLE_VIDEO_TRACK 1
 #endif
+#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
+#define HAVE_LAYER_HOSTING_IN_WINDOW_SERVER 1
+#endif
 #endif /* PLATFORM(MAC) && !PLATFORM(IOS) */
 
 #if PLATFORM(CHROMIUM) && OS(DARWIN)
@@ -607,8 +610,9 @@
     #define ENABLE_JIT 0
     #define ENABLE_YARR_JIT 0
 #else
-    #define ENABLE_CLASSIC_INTERPRETER 1
+    #define ENABLE_CLASSIC_INTERPRETER 0
     #define ENABLE_JIT 1
+    #define ENABLE_LLINT 1
     #define ENABLE_YARR_JIT 1
 #endif
 
@@ -920,7 +924,7 @@
 #define ENABLE_JIT 0
 #endif
 
-/* The JIT is enabled by default on all x86, x64-64, ARM & MIPS platforms. */
+/* The JIT is enabled by default on all x86, x86-64, ARM & MIPS platforms. */
 #if !defined(ENABLE_JIT) \
     && (CPU(X86) || CPU(X86_64) || CPU(ARM) || CPU(MIPS)) \
     && (OS(DARWIN) || !COMPILER(GCC) || GCC_VERSION_AT_LEAST(4, 1, 0)) \
@@ -931,7 +935,7 @@
 
 /* On some of the platforms where we have a JIT, we want to also have the 
    low-level interpreter. */
-#if !defined(ENABLE_LLINT) && ENABLE(JIT) && OS(DARWIN) && (CPU(X86) || CPU(ARM_THUMB2)) && USE(JSVALUE32_64)
+#if !defined(ENABLE_LLINT) && ENABLE(JIT) && OS(DARWIN) && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2))
 #define ENABLE_LLINT 1
 #endif
 
@@ -1074,6 +1078,11 @@
 #define WTF_USE_ACCELERATED_COMPOSITING 1
 #endif
 
+/* Compositing on the UI-process in WebKit2 */
+#if PLATFORM(QT)
+#define WTF_USE_UI_SIDE_COMPOSITING 1
+#endif
+
 #if (PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)) || PLATFORM(IOS)
 #define WTF_USE_PROTECTION_SPACE_AUTH_CALLBACK 1
 #endif
@@ -1098,6 +1107,10 @@
 #define WTF_USE_CROSS_PLATFORM_CONTEXT_MENUS 1
 #endif
 
+#if PLATFORM(MAC) && HAVE(ACCESSIBILITY)
+#define WTF_USE_ACCESSIBILITY_CONTEXT_MENUS 1
+#endif
+
 /* Geolocation request policy. pre-emptive policy is to acquire user permission before acquiring location.
    Client based implementations will have option to choose between pre-emptive and nonpre-emptive permission policy.
    pre-emptive permission policy is enabled by default for all client-based implementations. */
@@ -1118,7 +1131,7 @@
 #endif
 
 #if ENABLE(GLIB_SUPPORT)
-#include "GTypedefs.h"
+#include <wtf/gobject/GTypedefs.h>
 #endif
 
 /* FIXME: This define won't be needed once #27551 is fully landed. However, 
@@ -1192,6 +1205,10 @@
 
 #if !defined(WTF_USE_WTFURL)
 #define WTF_USE_WTFURL 0
+#endif
+
+#if !PLATFORM(QT) && !PLATFORM(EFL)
+#define WTF_USE_ZLIB 1
 #endif
 
 #endif /* WTF_Platform_h */

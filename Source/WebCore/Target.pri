@@ -19,7 +19,7 @@ DEFINES += QT_MAKEDLL
 haveQt(5) {
     # Add a QtScript dependency for the time being, in order to pull in the include
     # path for QtScript when it's built as a standalone module
-    QT += script widgets
+    QT += script
 } else {
     INCLUDEPATH += $$PWD/../JavaScriptCore/wtf/qt/compat
 }
@@ -37,6 +37,14 @@ SOURCES += \
     Modules/geolocation/Geolocation.cpp \
     Modules/geolocation/GeolocationController.cpp \
     Modules/geolocation/NavigatorGeolocation.cpp \
+    \
+    Modules/webdatabase/AbstractDatabase.cpp \
+    Modules/webdatabase/DOMWindowSQLDatabase.cpp \
+    Modules/webdatabase/Database.cpp \
+    Modules/webdatabase/DatabaseAuthorizer.cpp \
+    Modules/webdatabase/DatabaseContext.cpp \
+    Modules/webdatabase/DatabaseSync.cpp \
+    Modules/webdatabase/WorkerContextSQLDatabase.cpp \
     \
     accessibility/AccessibilityImageMapLink.cpp \
     accessibility/AccessibilityMediaControls.cpp \
@@ -173,7 +181,6 @@ v8 {
         bindings/v8/custom/V8DedicatedWorkerContextCustom.cpp \
         bindings/v8/custom/V8DocumentCustom.cpp \
         bindings/v8/custom/V8DocumentLocationCustom.cpp \
-        bindings/v8/custom/V8ElementCustom.cpp \
         bindings/v8/custom/V8EventCustom.cpp \
         bindings/v8/custom/V8FileReaderCustom.cpp \
         bindings/v8/custom/V8HTMLAllCollectionCustom.cpp
@@ -461,6 +468,7 @@ SOURCES += \
     css/ShadowValue.cpp \
     css/StyleMedia.cpp \
     css/StylePropertySet.cpp \
+    css/StyleRule.cpp \
     css/StyleSheet.cpp \
     css/StyleSheetList.cpp \
     css/WebKitCSSFilterValue.cpp \
@@ -488,6 +496,7 @@ SOURCES += \
     dom/Comment.cpp \
     dom/CompositionEvent.cpp \
     dom/ContainerNode.cpp \
+    dom/ContextDestructionObserver.cpp \
     dom/CustomEvent.cpp \
     dom/DecodedDataDocumentParser.cpp \
     dom/DeviceMotionController.cpp \
@@ -560,6 +569,7 @@ SOURCES += \
     dom/Range.cpp \
     dom/RangeException.cpp \
     dom/RawDataDocumentParser.h \
+    dom/RegionNodeList.cpp \
     dom/RegisteredEventListener.cpp \
     dom/ScopedEventQueue.cpp \
     dom/ScriptedAnimationController.cpp \
@@ -570,7 +580,7 @@ SOURCES += \
     dom/SecurityContext.cpp \
     dom/SelectorQuery.cpp \
     dom/ShadowRoot.cpp \
-    dom/ShadowRootList.cpp \
+    dom/ShadowTree.cpp \
     dom/SpaceSplitString.cpp \
     dom/StaticNodeList.cpp \
     dom/StyledElement.cpp \
@@ -650,6 +660,8 @@ SOURCES += \
     editing/VisibleSelection.cpp \
     editing/visible_units.cpp \
     editing/WrapContentsInDummySpanCommand.cpp \
+    fileapi/AsyncFileStream.cpp \
+    fileapi/AsyncFileStream.cpp \
     fileapi/Blob.cpp \
     fileapi/BlobURL.cpp \
     fileapi/DOMFilePath.cpp \
@@ -674,8 +686,6 @@ SOURCES += \
     fileapi/FileReader.cpp \
     fileapi/FileReaderLoader.cpp \
     fileapi/FileReaderSync.cpp \
-    fileapi/FileStreamProxy.cpp \
-    fileapi/FileSystemCallbacks.cpp \
     fileapi/FileThread.cpp \
     fileapi/FileWriter.cpp \
     fileapi/FileWriterBase.cpp \
@@ -684,6 +694,7 @@ SOURCES += \
     fileapi/OperationNotAllowedException.cpp \
     fileapi/ThreadableBlobRegistry.cpp \
     fileapi/WebKitBlobBuilder.cpp \
+    fileapi/WorkerContextFileSystem.cpp \
     history/BackForwardController.cpp \
     history/BackForwardListImpl.cpp \
     history/CachedFrame.cpp \
@@ -693,6 +704,7 @@ SOURCES += \
     history/PageCache.cpp \
     html/BaseButtonInputType.cpp \
     html/BaseCheckableInputType.cpp \
+    html/BaseClickableWithKeyInputType.cpp \
     html/BaseDateAndTimeInputType.cpp \
     html/BaseTextInputType.cpp \
     html/ButtonInputType.cpp \
@@ -798,6 +810,7 @@ SOURCES += \
     html/ImageDocument.cpp \
     html/ImageInputType.cpp \
     html/InputType.cpp \
+    html/LabelableElement.cpp \
     html/LabelsNodeList.cpp \
     html/LinkRelAttribute.cpp \
     html/MediaDocument.cpp \
@@ -1005,12 +1018,10 @@ SOURCES += \
     page/Navigator.cpp \
     page/NavigatorBase.cpp \
     page/NavigatorRegisterProtocolHandler.cpp \
-    page/NavigatorSupplement.cpp \
     page/OriginAccessEntry.cpp \
     page/Page.cpp \
     page/PageGroup.cpp \
     page/PageGroupLoadDeferrer.cpp \
-    page/PageSupplement.cpp \
     page/PageVisibilityState.cpp \
     page/Performance.cpp \
     page/PerformanceNavigation.cpp \
@@ -1072,6 +1083,8 @@ SOURCES += \
     platform/graphics/FontData.cpp \
     platform/graphics/Font.cpp \
     platform/graphics/FontCache.cpp \
+    platform/graphics/FractionalLayoutRect.cpp \
+    platform/graphics/FractionalLayoutSize.cpp \
     platform/graphics/GeneratorGeneratedImage.cpp \
     platform/graphics/Gradient.cpp \
     platform/graphics/GraphicsContext.cpp \
@@ -1212,7 +1225,6 @@ SOURCES += \
     rendering/RenderCombineText.cpp \
     rendering/RenderCounter.cpp \
     rendering/RenderDeprecatedFlexibleBox.cpp \
-    rendering/RenderDetails.cpp \
     rendering/RenderDetailsMarker.cpp \
     rendering/RenderEmbeddedObject.cpp \
     rendering/RenderFieldset.cpp \
@@ -1254,7 +1266,6 @@ SOURCES += \
     rendering/RenderScrollbarPart.cpp \
     rendering/RenderScrollbarTheme.cpp \
     rendering/RenderSlider.cpp \
-    rendering/RenderSummary.cpp \
     rendering/RenderTable.cpp \
     rendering/RenderTableCaption.cpp \
     rendering/RenderTableCell.cpp \
@@ -1290,6 +1301,7 @@ SOURCES += \
     rendering/style/StyleFlexibleBoxData.cpp \
     rendering/style/StyleGeneratedImage.cpp \
     rendering/style/StyleGridData.cpp \
+    rendering/style/StyleGridItemData.cpp \
     rendering/style/StyleInheritedData.cpp \
     rendering/style/StyleMarqueeData.cpp \
     rendering/style/StyleMultiColData.cpp \
@@ -1298,11 +1310,6 @@ SOURCES += \
     rendering/style/StyleSurroundData.cpp \
     rendering/style/StyleTransformData.cpp \
     rendering/style/StyleVisualData.cpp \
-    storage/AbstractDatabase.cpp \
-    storage/DOMWindowSQLDatabase.cpp \
-    storage/Database.cpp \
-    storage/DatabaseAuthorizer.cpp \
-    storage/DatabaseSync.cpp \
     storage/StorageTask.cpp \
     storage/StorageThread.cpp \
     storage/Storage.cpp \
@@ -1528,6 +1535,30 @@ HEADERS += \
     Modules/geolocation/PositionErrorCallback.h \
     Modules/geolocation/PositionOptions.h \
     \
+    Modules/webdatabase/AbstractDatabase.h \
+    Modules/webdatabase/ChangeVersionWrapper.h \
+    Modules/webdatabase/DOMWindowSQLDatabase.h \
+    Modules/webdatabase/DatabaseAuthorizer.h \
+    Modules/webdatabase/Database.h \
+    Modules/webdatabase/DatabaseCallback.h \
+    Modules/webdatabase/DatabaseSync.h \
+    Modules/webdatabase/DatabaseTask.h \
+    Modules/webdatabase/DatabaseThread.h \
+    Modules/webdatabase/DatabaseTracker.h \
+    Modules/webdatabase/OriginQuotaManager.h \
+    Modules/webdatabase/OriginUsageRecord.h \
+    Modules/webdatabase/SQLCallbackWrapper.h \
+    Modules/webdatabase/SQLResultSet.h \
+    Modules/webdatabase/SQLResultSetRowList.h \
+    Modules/webdatabase/SQLStatement.h \
+    Modules/webdatabase/SQLStatementSync.h \
+    Modules/webdatabase/SQLTransaction.h \
+    Modules/webdatabase/SQLTransactionClient.h \
+    Modules/webdatabase/SQLTransactionCoordinator.h \
+    Modules/webdatabase/SQLTransactionSync.h \
+    Modules/webdatabase/SQLTransactionSyncCallback.h \
+    Modules/webdatabase/WorkerContextSQLDatabase.h \
+    \
     css/CSSAspectRatioValue.h \
     css/CSSBorderImageSliceValue.h \
     css/CSSBorderImage.h \
@@ -1592,6 +1623,7 @@ HEADERS += \
     css/ShadowValue.h \
     css/StyleMedia.h \
     css/StylePropertySet.h \
+    css/StyleRule.h \
     css/StyleSheet.h \
     css/StyleSheetList.h \
     css/WebKitCSSFilterValue.h \
@@ -1690,7 +1722,7 @@ HEADERS += \
     dom/ScriptExecutionContext.h \
     dom/SelectorQuery.h \
     dom/ShadowRoot.h \
-    dom/ShadowRootList.h \
+    dom/ShadowTree.h \
     dom/SpaceSplitString.h \
     dom/StaticNodeList.h \
     dom/StyledElement.h \
@@ -1780,7 +1812,6 @@ HEADERS += \
     fileapi/FileReaderLoader.h \
     fileapi/FileReaderLoaderClient.h \
     fileapi/FileReaderSync.h \
-    fileapi/FileStreamProxy.h \
     fileapi/FileThread.h \
     fileapi/FileThreadTask.h \
     fileapi/OperationNotAllowedException.h \
@@ -1895,6 +1926,7 @@ HEADERS += \
     html/HTMLViewSourceDocument.h \
     html/ImageData.h \
     html/ImageDocument.h \
+    html/LabelableElement.h \
     html/LabelsNodeList.h \
     html/LinkRelAttribute.h \
     html/MediaController.h \
@@ -2046,7 +2078,7 @@ HEADERS += \
     mathml/MathMLTextElement.h \
     notifications/Notification.h \
     notifications/NotificationCenter.h \
-    notifications/NotificationPresenter.h \
+    notifications/NotificationClient.h \
     notifications/NotificationContents.h \
     notifications/NotificationController.h \
     page/animation/AnimationBase.h \
@@ -2084,7 +2116,6 @@ HEADERS += \
     page/PageGroup.h \
     page/PageGroupLoadDeferrer.h \
     page/Page.h \
-    page/PageSupplement.h \
     page/PageVisibilityState.h \
     page/PrintContext.h \
     page/Screen.h \
@@ -2105,7 +2136,6 @@ HEADERS += \
     platform/animation/AnimationList.h \
     platform/animation/AnimationUtilities.h \
     platform/Arena.h \
-    platform/AsyncFileStream.h \
     platform/CalculationValue.h \
     platform/Clock.h \
     platform/ClockGeneric.h \
@@ -2194,7 +2224,6 @@ HEADERS += \
     platform/graphics/Region.h \
     platform/graphics/RoundedRect.h \
     platform/graphics/qt/FontCustomPlatformData.h \
-    platform/graphics/qt/ImageDecoderQt.h \
     platform/graphics/qt/StillImageQt.h \
     platform/graphics/qt/TransparencyLayer.h \
     platform/graphics/SegmentedFontData.h \
@@ -2277,6 +2306,7 @@ HEADERS += \
     platform/ScrollableArea.h \
     platform/ScrollAnimator.h \
     platform/Scrollbar.h \
+    platform/ScrollbarThemeClient.h \
     platform/ScrollbarThemeComposite.h \
     platform/ScrollView.h \
     platform/SearchPopupMenu.h \
@@ -2363,7 +2393,6 @@ HEADERS += \
     rendering/RenderCombineText.h \
     rendering/RenderCounter.h \
     rendering/RenderDeprecatedFlexibleBox.h \
-    rendering/RenderDetails.h \
     rendering/RenderDetailsMarker.h \
     rendering/RenderEmbeddedObject.h \
     rendering/RenderFieldset.h \
@@ -2405,7 +2434,6 @@ HEADERS += \
     rendering/RenderScrollbarPart.h \
     rendering/RenderScrollbarTheme.h \
     rendering/RenderSlider.h \
-    rendering/RenderSummary.h \
     rendering/RenderTableCaption.h \
     rendering/RenderTableCell.h \
     rendering/RenderTableCol.h \
@@ -2481,7 +2509,6 @@ HEADERS += \
     rendering/svg/RenderSVGResourceRadialGradient.h \
     rendering/svg/RenderSVGResourceSolidColor.h \
     rendering/svg/RenderSVGRoot.h \
-    rendering/svg/RenderSVGShadowTreeRootContainer.h \
     rendering/svg/RenderSVGShape.h \
     rendering/svg/RenderSVGTSpan.h \
     rendering/svg/RenderSVGText.h \
@@ -2496,11 +2523,11 @@ HEADERS += \
     rendering/svg/SVGPathData.h \
     rendering/svg/SVGRenderSupport.h \
     rendering/svg/SVGRenderTreeAsText.h \
+    rendering/svg/SVGRenderingContext.h \
     rendering/svg/SVGResources.h \
     rendering/svg/SVGResourcesCache.h \
     rendering/svg/SVGResourcesCycleSolver.h \
     rendering/svg/SVGRootInlineBox.h \
-    rendering/svg/SVGShadowTreeElements.h \
     rendering/svg/SVGTextChunk.h \
     rendering/svg/SVGTextChunkBuilder.h \
     rendering/svg/SVGTextFragment.h \
@@ -2513,40 +2540,18 @@ HEADERS += \
     rendering/svg/SVGTextMetricsBuilder.h \
     rendering/svg/SVGTextQuery.h \
     rendering/svg/SVGTextRunRenderingContext.h \
-    storage/AbstractDatabase.h \
-    storage/ChangeVersionWrapper.h \
-    storage/DOMWindowSQLDatabase.h \
-    storage/DatabaseAuthorizer.h \
-    storage/Database.h \
-    storage/DatabaseCallback.h \
-    storage/DatabaseSync.h \
-    storage/DatabaseTask.h \
-    storage/DatabaseThread.h \
-    storage/DatabaseTracker.h \
-    storage/StorageTask.h \
-    storage/StorageThread.h \
-    storage/OriginQuotaManager.h \
-    storage/OriginUsageRecord.h \
-    storage/SQLCallbackWrapper.h \
-    storage/SQLResultSet.h \
-    storage/SQLResultSetRowList.h \
-    storage/SQLStatement.h \
-    storage/SQLStatementSync.h \
-    storage/SQLTransaction.h \
-    storage/SQLTransactionClient.h \
-    storage/SQLTransactionCoordinator.h \
-    storage/SQLTransactionSync.h \
-    storage/SQLTransactionSyncCallback.h \
+    storage/Storage.h \
     storage/StorageArea.h \
     storage/StorageAreaImpl.h \
     storage/StorageAreaSync.h \
     storage/StorageEvent.h \
     storage/StorageEventDispatcher.h \
-    storage/Storage.h \
     storage/StorageMap.h \
     storage/StorageNamespace.h \
     storage/StorageNamespaceImpl.h \
     storage/StorageSyncManager.h \
+    storage/StorageTask.h \
+    storage/StorageThread.h \
     storage/StorageTracker.h \
     storage/StorageTrackerClient.h \
     svg/animation/SMILTimeContainer.h \
@@ -2805,7 +2810,6 @@ SOURCES += \
     platform/graphics/qt/GraphicsContextQt.cpp \
     platform/graphics/qt/IconQt.cpp \
     platform/graphics/qt/ImageBufferQt.cpp \
-    platform/graphics/qt/ImageDecoderQt.cpp \
     platform/graphics/qt/ImageQt.cpp \
     platform/graphics/qt/IntPointQt.cpp \
     platform/graphics/qt/IntRectQt.cpp \
@@ -2865,13 +2869,6 @@ SOURCES += \
 
 !contains(DEFINES, WTF_USE_LIBXML2=1) {
     SOURCES += xml/parser/XMLDocumentParserQt.cpp
-}
-
-contains(DEFINES, HAVE_QSTYLE=1) {
-    HEADERS += platform/qt/QtStyleOptionWebComboBox.h \
-               platform/qt/RenderThemeQStyle.h \
-               platform/qt/ScrollbarThemeQt.h
-    SOURCES += platform/qt/RenderThemeQStyle.cpp
 }
 
 contains(DEFINES, ENABLE_SMOOTH_SCROLLING=1) {
@@ -2957,21 +2954,21 @@ plugin_backend_xlib {
 
 contains(DEFINES, ENABLE_SQL_DATABASE=1) {
     SOURCES += \
-        storage/ChangeVersionWrapper.cpp \
-        storage/DatabaseTask.cpp \
-        storage/DatabaseThread.cpp \
-        storage/DatabaseTracker.cpp \
-        storage/OriginQuotaManager.cpp \
-        storage/OriginUsageRecord.cpp \
-        storage/SQLException.cpp \
-        storage/SQLResultSet.cpp \
-        storage/SQLResultSetRowList.cpp \
-        storage/SQLStatement.cpp \
-        storage/SQLStatementSync.cpp \
-        storage/SQLTransaction.cpp \
-        storage/SQLTransactionClient.cpp \
-        storage/SQLTransactionCoordinator.cpp \
-        storage/SQLTransactionSync.cpp
+        Modules/webdatabase/ChangeVersionWrapper.cpp \
+        Modules/webdatabase/DatabaseTask.cpp \
+        Modules/webdatabase/DatabaseThread.cpp \
+        Modules/webdatabase/DatabaseTracker.cpp \
+        Modules/webdatabase/OriginQuotaManager.cpp \
+        Modules/webdatabase/OriginUsageRecord.cpp \
+        Modules/webdatabase/SQLException.cpp \
+        Modules/webdatabase/SQLResultSet.cpp \
+        Modules/webdatabase/SQLResultSetRowList.cpp \
+        Modules/webdatabase/SQLStatement.cpp \
+        Modules/webdatabase/SQLStatementSync.cpp \
+        Modules/webdatabase/SQLTransaction.cpp \
+        Modules/webdatabase/SQLTransactionClient.cpp \
+        Modules/webdatabase/SQLTransactionCoordinator.cpp \
+        Modules/webdatabase/SQLTransactionSync.cpp \
 
     !v8 {
         SOURCES += \
@@ -2989,31 +2986,31 @@ contains(DEFINES, ENABLE_INDEXED_DATABASE=1) {
     }
 
     HEADERS += \
-        storage/IDBAny.h \
-        storage/IDBCallbacks.h \
-        storage/IDBCursor.h \
-        storage/IDBCursorBackendImpl.h \
-        storage/IDBCursorBackendInterface.h \
-        storage/IDBDatabase.h \
-        storage/IDBDatabaseBackendImpl.h \
-        storage/IDBDatabaseBackendInterface.h \
-        storage/IDBDatabaseError.h \
-        storage/IDBDatabaseException.h \
-        storage/IDBEventDispatcher.h \
-        storage/IDBFactory.h \
-        storage/IDBFactoryBackendInterface.h \
-        storage/IDBFactoryBackendImpl.h \
-        storage/IDBIndex.h \
-        storage/IDBIndexBackendInterface.h \
-        storage/IDBIndexBackendImpl.h \
-        storage/IDBKey.h \
-        storage/IDBKeyRange.h \
-        storage/IDBObjectStore.h \
-        storage/IDBObjectStoreBackendImpl.h \
-        storage/IDBObjectStoreBackendInterface.h \
-        storage/IDBRequest.h \
-        storage/IDBTransaction.h \
-        storage/IDBTransactionBackendInterface.h
+        Modules/indexeddb/IDBAny.h \
+        Modules/indexeddb/IDBCallbacks.h \
+        Modules/indexeddb/IDBCursor.h \
+        Modules/indexeddb/IDBCursorBackendImpl.h \
+        Modules/indexeddb/IDBCursorBackendInterface.h \
+        Modules/indexeddb/IDBDatabase.h \
+        Modules/indexeddb/IDBDatabaseBackendImpl.h \
+        Modules/indexeddb/IDBDatabaseBackendInterface.h \
+        Modules/indexeddb/IDBDatabaseError.h \
+        Modules/indexeddb/IDBDatabaseException.h \
+        Modules/indexeddb/IDBEventDispatcher.h \
+        Modules/indexeddb/IDBFactory.h \
+        Modules/indexeddb/IDBFactoryBackendInterface.h \
+        Modules/indexeddb/IDBFactoryBackendImpl.h \
+        Modules/indexeddb/IDBIndex.h \
+        Modules/indexeddb/IDBIndexBackendInterface.h \
+        Modules/indexeddb/IDBIndexBackendImpl.h \
+        Modules/indexeddb/IDBKey.h \
+        Modules/indexeddb/IDBKeyRange.h \
+        Modules/indexeddb/IDBObjectStore.h \
+        Modules/indexeddb/IDBObjectStoreBackendImpl.h \
+        Modules/indexeddb/IDBObjectStoreBackendInterface.h \
+        Modules/indexeddb/IDBRequest.h \
+        Modules/indexeddb/IDBTransaction.h \
+        Modules/indexeddb/IDBTransactionBackendInterface.h
 
     !v8 {
         SOURCES += \
@@ -3023,24 +3020,27 @@ contains(DEFINES, ENABLE_INDEXED_DATABASE=1) {
     }
 
     SOURCES += \
-        storage/IDBAny.cpp \
-        storage/IDBCursor.cpp \
-        storage/IDBCursorBackendImpl.cpp \
-        storage/IDBDatabase.cpp \
-        storage/IDBDatabaseBackendImpl.cpp \
-        storage/IDBDatabaseException.cpp \
-        storage/IDBEventDispatcher.cpp \
-        storage/IDBFactory.cpp \
-        storage/IDBFactoryBackendInterface.cpp \
-        storage/IDBFactoryBackendImpl.cpp \
-        storage/IDBIndex.cpp \
-        storage/IDBIndexBackendImpl.cpp \
-        storage/IDBKey.cpp \
-        storage/IDBKeyRange.cpp \
-        storage/IDBObjectStore.cpp \
-        storage/IDBObjectStoreBackendImpl.cpp \
-        storage/IDBRequest.cpp \
-        storage/IDBTransaction.cpp
+        Modules/indexeddb/DOMWindowIndexedDatabase.cpp \
+        Modules/indexeddb/IDBAny.cpp \
+        Modules/indexeddb/IDBCursor.cpp \
+        Modules/indexeddb/IDBCursorBackendImpl.cpp \
+        Modules/indexeddb/IDBDatabase.cpp \
+        Modules/indexeddb/IDBDatabaseBackendImpl.cpp \
+        Modules/indexeddb/IDBDatabaseException.cpp \
+        Modules/indexeddb/IDBEventDispatcher.cpp \
+        Modules/indexeddb/IDBFactory.cpp \
+        Modules/indexeddb/IDBFactoryBackendInterface.cpp \
+        Modules/indexeddb/IDBFactoryBackendImpl.cpp \
+        Modules/indexeddb/IDBIndex.cpp \
+        Modules/indexeddb/IDBIndexBackendImpl.cpp \
+        Modules/indexeddb/IDBKey.cpp \
+        Modules/indexeddb/IDBKeyRange.cpp \
+        Modules/indexeddb/IDBObjectStore.cpp \
+        Modules/indexeddb/IDBObjectStoreBackendImpl.cpp \
+        Modules/indexeddb/IDBRequest.cpp \
+        Modules/indexeddb/IDBTransaction.cpp \
+        Modules/indexeddb/PageGroupIndexedDatabase.cpp \
+        Modules/indexeddb/WorkerContextIndexedDatabase.cpp
 }
 
 contains(DEFINES, ENABLE_DATA_TRANSFER_ITEMS=1) {
@@ -3158,6 +3158,10 @@ contains(DEFINES, ENABLE_INPUT_SPEECH=1) {
         rendering/RenderInputSpeech.cpp
 }
 
+contains(DEFINES, ENABLE_SCRIPTED_SPEECH=1) {
+    SOURCES += # FIXME!
+}
+
 contains(DEFINES, ENABLE_QUOTA=1) {
     HEADERS += \
         storage/StorageInfo.h \
@@ -3232,6 +3236,7 @@ contains(DEFINES, ENABLE_VIDEO=1) {
         HEADERS += \
             platform/graphics/gstreamer/GRefPtrGStreamer.h \
             platform/graphics/gstreamer/GStreamerGWorld.h \
+            platform/graphics/gstreamer/GStreamerVersioning.h \
             platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h \
             platform/graphics/gstreamer/VideoSinkGStreamer.h \
             platform/graphics/gstreamer/WebKitWebSourceGStreamer.h \
@@ -3241,6 +3246,7 @@ contains(DEFINES, ENABLE_VIDEO=1) {
         SOURCES += \
             platform/graphics/gstreamer/GRefPtrGStreamer.cpp \
             platform/graphics/gstreamer/GStreamerGWorld.cpp \
+            platform/graphics/gstreamer/GStreamerVersioning.cpp \
             platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp \
             platform/graphics/gstreamer/VideoSinkGStreamer.cpp \
             platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp \
@@ -3449,7 +3455,6 @@ contains(DEFINES, ENABLE_SVG=1) {
               rendering/svg/RenderSVGResourceRadialGradient.cpp \
               rendering/svg/RenderSVGResourceSolidColor.cpp \
               rendering/svg/RenderSVGRoot.cpp \
-              rendering/svg/RenderSVGShadowTreeRootContainer.cpp \
               rendering/svg/RenderSVGTSpan.cpp \
               rendering/svg/RenderSVGText.cpp \
               rendering/svg/RenderSVGTextPath.cpp \
@@ -3462,11 +3467,11 @@ contains(DEFINES, ENABLE_SVG=1) {
               rendering/svg/SVGPathData.cpp \
               rendering/svg/SVGRenderSupport.cpp \
               rendering/svg/SVGRenderTreeAsText.cpp \
+              rendering/svg/SVGRenderingContext.cpp \
               rendering/svg/SVGResources.cpp \
               rendering/svg/SVGResourcesCache.cpp \
               rendering/svg/SVGResourcesCycleSolver.cpp \
               rendering/svg/SVGRootInlineBox.cpp \
-              rendering/svg/SVGShadowTreeElements.cpp \
               rendering/svg/SVGTextChunk.cpp \
               rendering/svg/SVGTextChunkBuilder.cpp \
               rendering/svg/SVGTextLayoutAttributes.cpp \
@@ -3672,29 +3677,35 @@ contains(DEFINES, ENABLE_VIDEO_TRACK=1) {
 
 contains(DEFINES, ENABLE_WEB_SOCKETS=1) {
     HEADERS += \
-        websockets/CloseEvent.h \
-        websockets/ThreadableWebSocketChannel.h \
-        websockets/ThreadableWebSocketChannelClientWrapper.h \
-        websockets/WebSocket.h \
-        websockets/WebSocketChannel.h \
-        websockets/WebSocketChannelClient.h \
-        websockets/WebSocketExtensionDispatcher.h \
-        websockets/WebSocketExtensionProcessor.h \
-        websockets/WebSocketFrame.h \
-        websockets/WebSocketHandshake.h \
-        websockets/WebSocketHandshakeRequest.h \
-        websockets/WebSocketHandshakeResponse.h \
+        Modules/websockets/CloseEvent.h \
+        Modules/websockets/ThreadableWebSocketChannel.h \
+        Modules/websockets/ThreadableWebSocketChannelClientWrapper.h \
+        Modules/websockets/WebSocket.h \
+        Modules/websockets/WebSocketChannel.h \
+        Modules/websockets/WebSocketChannelClient.h \
+        Modules/websockets/WebSocketDeflateFramer.h \
+        Modules/websockets/WebSocketDeflater.h \
+        Modules/websockets/WebSocketExtensionDispatcher.h \
+        Modules/websockets/WebSocketExtensionProcessor.h \
+        Modules/websockets/WebSocketFrame.h \
+        Modules/websockets/WebSocketHandshake.h \
+        Modules/websockets/WebSocketHandshakeRequest.h \
+        Modules/websockets/WebSocketHandshakeResponse.h \
+        Modules/websockets/WorkerThreadableWebSocketChannel.h \
         platform/network/qt/SocketStreamHandlePrivate.h
 
     SOURCES += \
-        websockets/WebSocket.cpp \
-        websockets/WebSocketChannel.cpp \
-        websockets/WebSocketExtensionDispatcher.cpp \
-        websockets/WebSocketHandshake.cpp \
-        websockets/WebSocketHandshakeRequest.cpp \
-        websockets/WebSocketHandshakeResponse.cpp \
-        websockets/ThreadableWebSocketChannel.cpp \
-        websockets/ThreadableWebSocketChannelClientWrapper.cpp \
+        Modules/websockets/WebSocket.cpp \
+        Modules/websockets/WebSocketChannel.cpp \
+        Modules/websockets/WebSocketDeflateFramer.cpp \
+        Modules/websockets/WebSocketDeflater.cpp \
+        Modules/websockets/WebSocketExtensionDispatcher.cpp \
+        Modules/websockets/WebSocketHandshake.cpp \
+        Modules/websockets/WebSocketHandshakeRequest.cpp \
+        Modules/websockets/WebSocketHandshakeResponse.cpp \
+        Modules/websockets/WorkerThreadableWebSocketChannel.cpp \
+        Modules/websockets/ThreadableWebSocketChannel.cpp \
+        Modules/websockets/ThreadableWebSocketChannelClientWrapper.cpp \
         platform/network/SocketStreamErrorBase.cpp \
         platform/network/SocketStreamHandleBase.cpp \
         platform/network/qt/SocketStreamHandleQt.cpp
@@ -3706,10 +3717,10 @@ contains(DEFINES, ENABLE_WEB_SOCKETS=1) {
 
     contains(DEFINES, ENABLE_WORKERS=1) {
         HEADERS += \
-            websockets/WorkerThreadableWebSocketChannel.h
+            Modules/websockets/WorkerThreadableWebSocketChannel.h
 
         SOURCES += \
-            websockets/WorkerThreadableWebSocketChannel.cpp
+            Modules/websockets/WorkerThreadableWebSocketChannel.cpp
     }
 }
 
@@ -3735,6 +3746,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLRenderingContext.h \
         html/canvas/WebGLShader.h \
         html/canvas/WebGLSharedObject.h \
+        html/canvas/EXTTextureFilterAnisotropic.h \
         html/canvas/OESStandardDerivatives.h \
         html/canvas/OESTextureFloat.h \
         html/canvas/OESVertexArrayObject.h \
@@ -3775,6 +3787,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLRenderingContext.cpp \
         html/canvas/WebGLShader.cpp \
         html/canvas/WebGLSharedObject.cpp \
+        html/canvas/EXTTextureFilterAnisotropic.cpp \
         html/canvas/OESStandardDerivatives.cpp \
         html/canvas/OESTextureFloat.cpp \
         html/canvas/OESVertexArrayObject.cpp \
@@ -3939,6 +3952,35 @@ contains(DEFINES, ENABLE_MHTML=1) {
         loader/archive/mhtml/MHTMLArchive.cpp \
         loader/archive/mhtml/MHTMLParser.cpp \
         page/PageSerializer.cpp
+}
+
+contains(DEFINES, WTF_USE_QT_IMAGE_DECODER=1) {
+    HEADERS += platform/graphics/qt/ImageDecoderQt.h
+    SOURCES += platform/graphics/qt/ImageDecoderQt.cpp
+} else {
+    HEADERS += \
+        platform/image-decoders/bmp/BMPImageDecoder.h \
+        platform/image-decoders/bmp/BMPImageReader.h \
+        platform/image-decoders/gif/GIFImageDecoder.h \
+        platform/image-decoders/gif/GIFImageReader.h\
+        platform/image-decoders/ico/ICOImageDecoder.h \
+        platform/image-decoders/jpeg/JPEGImageDecoder.h \
+        platform/image-decoders/png/PNGImageDecoder.h
+
+    SOURCES += \
+        platform/image-decoders/ImageDecoder.cpp \
+        platform/image-decoders/bmp/BMPImageDecoder.cpp \
+        platform/image-decoders/bmp/BMPImageReader.cpp \
+        platform/image-decoders/gif/GIFImageDecoder.cpp \
+        platform/image-decoders/gif/GIFImageReader.cpp\
+        platform/image-decoders/ico/ICOImageDecoder.cpp \
+        platform/image-decoders/jpeg/JPEGImageDecoder.cpp \
+        platform/image-decoders/png/PNGImageDecoder.cpp
+
+    contains(DEFINES, WTF_USE_WEBP=1) {
+        HEADERS += platform/image-decoders/webp/WEBPImageDecoder.h
+        SOURCES += platform/image-decoders/webp/WEBPImageDecoder.cpp
+    }
 }
 
 !system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {

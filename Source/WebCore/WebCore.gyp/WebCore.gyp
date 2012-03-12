@@ -55,6 +55,11 @@
       '../Modules/geolocation',
       '../Modules/intents',
       '../Modules/indexeddb',
+      '../Modules/mediastream',
+      '../Modules/speech',
+      '../Modules/webdatabase',
+      '../Modules/webdatabase/chromium',
+      '../Modules/websockets',
       '../accessibility',
       '../accessibility/chromium',
       '../bindings',
@@ -85,7 +90,6 @@
       '../loader/cache',
       '../loader/icon',
       '../mathml',
-      '../mediastream',
       '../notifications',
       '../page',
       '../page/animation',
@@ -136,7 +140,6 @@
       '../svg/properties',
       '../../ThirdParty/glu',
       '../webaudio',
-      '../websockets',
       '../workers',
       '../xml',
       '../xml/parser',
@@ -190,18 +193,6 @@
           '<@(webcore_svg_bindings_idl_files)',
         ],
       }],
-      ['OS=="mac" and use_skia==0', {
-        'webcore_include_dirs+': [
-          # platform/graphics/cg and cocoa need to come before
-          # platform/graphics/chromium so that the Mac build picks up the
-          # version of ImageBufferData.h in the cg directory and
-          # FontPlatformData.h in the cocoa directory.  The + prepends this
-          # directory to the list.
-          # FIXME: This shouldn't need to be prepended.
-          '../platform/graphics/cocoa',
-          '../platform/graphics/cg',
-        ],
-      }],
       ['OS=="mac"', {
         'webcore_include_dirs': [
           # FIXME: Eliminate dependency on platform/mac and related
@@ -211,15 +202,11 @@
           # platform/graphics/cg may need to stick around, though.
           '../platform/audio/mac',
           '../platform/cocoa',
+          '../platform/graphics/cg',
+          '../platform/graphics/cocoa',
           '../platform/graphics/mac',
           '../platform/mac',
           '../platform/text/mac',
-        ],
-      }],
-      ['OS=="mac" and use_skia==1', {
-        'webcore_include_dirs': [
-              '../platform/graphics/cocoa',
-              '../platform/graphics/cg',
         ],
       }],
       ['OS=="win"', {
@@ -477,7 +464,7 @@
             'idl_files_list': '<|(idl_files_list.tmp <@(bindings_idl_files))',
           },
           'inputs': [
-            '../bindings/scripts/resolve-supplemental.pl',
+            '../bindings/scripts/preprocess-idls.pl',
             '../bindings/scripts/IDLParser.pm',
             '../bindings/scripts/IDLAttributes.txt',
             '<(idl_files_list)',
@@ -490,7 +477,7 @@
             'perl',
             '-w',
             '-I../bindings/scripts',
-            '../bindings/scripts/resolve-supplemental.pl',
+            '../bindings/scripts/preprocess-idls.pl',
             '--defines',
             '<(feature_defines) LANGUAGE_JAVASCRIPT V8_BINDING',
             '--idlFilesList',
@@ -728,7 +715,7 @@
           'action_name': 'EventFactory',
           'inputs': [
             '../dom/make_event_factory.pl',
-            '../dom/EventFactory.in',
+            '../dom/EventNames.in',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/EventFactory.cpp',
@@ -827,6 +814,7 @@
               '../css/mathml.css',
               '../css/mediaControls.css',
               '../css/mediaControlsChromium.css',
+              '../css/mediaControlsChromiumAndroid.css',
               '../css/fullscreen.css',
               # Skip fullscreenQuickTime.
             ],
@@ -987,11 +975,13 @@
           ],
           'variables': {
             'generator_include_dirs': [
+              '--include', '../Modules/indexeddb',
+              '--include', '../Modules/mediastream',
+              '--include', '../Modules/webdatabase',
               '--include', '../css',
               '--include', '../dom',
               '--include', '../fileapi',
               '--include', '../html',
-              '--include', '../mediastream',
               '--include', '../notifications',
               '--include', '../page',
               '--include', '../plugins',
@@ -999,7 +989,6 @@
               '--include', '../svg',
               '--include', '../testing',
               '--include', '../webaudio',
-              '--include', '../websockets',
               '--include', '../workers',
               '--include', '../xml',
             ],
@@ -1195,6 +1184,7 @@
         '<(chromium_src_dir)/third_party/ots/ots.gyp:ots',
         '<(chromium_src_dir)/third_party/sqlite/sqlite.gyp:sqlite',
         '<(chromium_src_dir)/third_party/angle/src/build_angle.gyp:translator_glsl',
+        '<(chromium_src_dir)/third_party/zlib/zlib.gyp:zlib',
         '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
         '<(libjpeg_gyp_path):libjpeg',
       ],
@@ -1363,7 +1353,6 @@
           # This directory needs to be on the include path for multiple sub-targets of webcore.
           'direct_dependent_settings': {
             'include_dirs': [
-              '<(chromium_src_dir)/third_party/ffmpeg/patched-ffmpeg',
               '<(chromium_src_dir)/third_party/ffmpeg',
             ],
           },
@@ -1513,15 +1502,6 @@
             ['include', 'platform/graphics/opentype/OpenTypeSanitizer\\.cpp$'],
           ],
         }],
-        ['OS=="mac" and use_skia==0', {
-          'sources/': [
-            # The Mac build is PLATFORM_CG too.  platform/graphics/cg is the
-            # only place that CG files we want to build are located, and not
-            # all of them even have a CG suffix, so just add them by a
-            # regexp matching their directory.
-            ['include', 'platform/graphics/cg/[^/]*(?<!Win)?\\.(cpp|mm?)$'],
-          ],
-        }],
         ['OS=="mac"', {
           # Necessary for Mac .mm stuff.
           'include_dirs': [
@@ -1618,29 +1598,7 @@
             ['exclude', 'platform/graphics/FontPlatformData\\.cpp$'],
           ],
         }],
-        ['OS=="mac" and use_skia==0', {
-          'sources/': [
-            # Cherry-pick some files that can't be included by broader regexps.
-            # Some of these are used instead of Chromium platform files, see
-            # the specific exclusions in the "exclude" list below.
-            ['include', 'platform/graphics/mac/GraphicsContextMac\\.mm$'],
-
-            # Chromium Mac does not use skia.
-            ['exclude', 'platform/graphics/skia/[^/]*Skia\\.(cpp|h)$'],
-
-            # The Mac currently uses ImageChromiumMac.mm from
-            # platform/graphics/chromium, included by regex above, instead.
-            ['exclude', 'platform/graphics/chromium/ImageChromium\\.cpp$'],
-
-            # ImageDecoderSkia is not used on mac.  ImageDecoderCG is used instead.
-            ['exclude', 'platform/image-decoders/skia/ImageDecoderSkia\\.cpp$'],
-            ['include', 'platform/image-decoders/cg/ImageDecoderCG\\.cpp$'],
-
-            # Again, Skia is not used on Mac.
-            ['exclude', 'platform/chromium/DragImageChromiumSkia\\.cpp$'],
-          ],
-        }],
-        ['OS=="mac" and use_skia==1', {
+        ['OS=="mac"', {
           'sources/': [
             ['include', 'platform/graphics/cg/FloatPointCG\\.cpp$'],
             ['include', 'platform/graphics/cg/FloatRectCG\\.cpp$'],
@@ -1656,7 +1614,7 @@
             ['exclude', 'platform/chromium/DragImageChromiumMac\\.cpp$'],
           ],
         }],
-        ['use_x11 == 0 and (OS!="mac" or use_skia==0)', {
+        ['use_x11 == 0 and OS != "mac"', {
           'sources/': [
             ['exclude', 'VDMX[^/]+\\.(cpp|h)$'],
           ],
@@ -1701,6 +1659,7 @@
             ['include', 'platform/graphics/harfbuzz/FontHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
+            ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.cpp$'],
             ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
           ],
         }, { # OS!="android"
@@ -1715,25 +1674,28 @@
     # See https://bugs.webkit.org/show_bug.cgi?id=62916.
     {
       'target_name': 'webcore_arm_neon',
-      'type': 'static_library',
-      'dependencies': [
-        'webcore_prerequisites',
-      ],
-      'hard_dependency': 1,
-      'sources': [
-        '<@(webcore_files)',
-      ],
-      'sources/': [
-        ['exclude', '.*'],
-        ['include', 'platform/graphics/filters/arm/.*NEON\\.(cpp|h)'],
-      ],
       'conditions': [
-        ['OS=="android"', {
-          'cflags!': ['-mthumb'],
+        ['target_arch=="arm"', {
+          'type': 'static_library',
+          'dependencies': [
+            'webcore_prerequisites',
+          ],
+          'hard_dependency': 1,
+          'sources': [
+            '<@(webcore_files)',
+          ],
+          'sources/': [
+            ['exclude', '.*'],
+            ['include', 'platform/graphics/filters/arm/.*NEON\\.(cpp|h)'],
+          ],
           'cflags': ['-marm'],
-        }],
-        ['OS=="linux" and target_arch=="arm"', {
-          'cflags': ['-marm'],
+          'conditions': [
+            ['OS=="android"', {
+              'cflags!': ['-mthumb'],
+            }],
+          ],
+        },{  # target_arch!="arm"
+          'type': 'none',
         }],
       ],
     },
@@ -1840,6 +1802,13 @@
 
         ['exclude', 'AllInOne\\.cpp$'],
 
+        ['exclude', 'Modules/indexeddb/IDBFactoryBackendInterface\\.cpp$'],
+        ['exclude', 'Modules/indexeddb/IDBKeyPathBackendImpl\\.cpp$'],
+        ['exclude', 'Modules/webdatabase/DatabaseTrackerClient\\.h$'],
+        ['exclude', 'Modules/webdatabase/DatabaseTracker\\.cpp$'],
+        ['exclude', 'Modules/webdatabase/OriginQuotaManager\\.(cpp|h)$'],
+        ['exclude', 'Modules/webdatabase/OriginUsageRecord\\.(cpp|h)$'],
+        ['exclude', 'Modules/webdatabase/SQLTransactionClient\\.cpp$'],
         ['exclude', 'fileapi/LocalFileSystem\\.cpp$'],
         ['exclude', 'inspector/InspectorFrontendClientLocal\\.cpp$'],
         ['exclude', 'inspector/JavaScript[^/]*\\.cpp$'],
@@ -1856,13 +1825,6 @@
         ['exclude', 'plugins/PluginStream\\.cpp$'],
         ['exclude', 'plugins/PluginView\\.cpp$'],
         ['exclude', 'plugins/npapi\\.cpp$'],
-        ['exclude', 'storage/DatabaseTrackerClient\\.h$'],
-        ['exclude', 'storage/DatabaseTracker\\.cpp$'],
-        ['exclude', 'storage/IDBFactoryBackendInterface\\.cpp$'],
-        ['exclude', 'storage/IDBKeyPathBackendImpl\\.cpp$'],
-        ['exclude', 'storage/OriginQuotaManager\\.(cpp|h)$'],
-        ['exclude', 'storage/OriginUsageRecord\\.(cpp|h)$'],
-        ['exclude', 'storage/SQLTransactionClient\\.cpp$'],
         ['exclude', 'storage/StorageEventDispatcher\\.cpp$'],
         ['exclude', 'storage/StorageNamespace\\.cpp$'],
         ['exclude', 'workers/DefaultSharedWorkerRepository\\.(cpp|h)$'],

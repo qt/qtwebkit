@@ -46,6 +46,7 @@
 #include "ChromeClient.h"
 #include "Console.h"
 #include "ContentSecurityPolicy.h"
+#include "DatabaseContext.h"
 #include "DOMImplementation.h"
 #include "DOMWindow.h"
 #include "Document.h"
@@ -250,7 +251,6 @@ void FrameLoader::setDefersLoading(bool defers)
 
 void FrameLoader::changeLocation(SecurityOrigin* securityOrigin, const KURL& url, const String& referrer, bool lockHistory, bool lockBackForwardList, bool refresh)
 {
-    RefPtr<Frame> protect(m_frame);
     urlSelected(FrameLoadRequest(securityOrigin, ResourceRequest(url, referrer, refresh ? ReloadIgnoringCacheData : UseProtocolCachePolicy), "_self"),
         0, lockHistory, lockBackForwardList, MaybeSendReferrer, ReplaceDocumentIfJavaScriptURL);
 }
@@ -267,6 +267,7 @@ void FrameLoader::urlSelected(const FrameLoadRequest& passedRequest, PassRefPtr<
 {
     ASSERT(!m_suppressOpenerInNewFrame);
 
+    RefPtr<Frame> protect(m_frame);
     FrameLoadRequest frameRequest(passedRequest);
 
     if (m_frame->script()->executeIfJavaScriptURL(frameRequest.resourceRequest().url(), shouldReplaceDocumentIfJavaScriptURL))
@@ -418,7 +419,8 @@ void FrameLoader::stopLoading(UnloadEventPolicy unloadEventPolicy)
         doc->setReadyState(Document::Complete);
 
 #if ENABLE(SQL_DATABASE)
-        doc->stopDatabases(0);
+        // FIXME: Should the DatabaseContext watch for something like ActiveDOMObject::stop() rather than being special-cased here?
+        DatabaseContext::stopDatabases(doc, 0);
 #endif
     }
 
@@ -736,6 +738,7 @@ void FrameLoader::checkCompleted()
 
     // OK, completed.
     m_isComplete = true;
+    m_requestedHistoryItem = 0;
     m_frame->document()->setReadyState(Document::Complete);
 
     RefPtr<Frame> protect(m_frame);
@@ -2023,7 +2026,7 @@ void FrameLoader::open(CachedFrameBase& cachedFrame)
     KURL url = cachedFrame.url();
 
     // FIXME: I suspect this block of code doesn't do anything.
-    if (url.protocolInHTTPFamily() && !url.host().isEmpty() && url.path().isEmpty())
+    if (url.protocolIsInHTTPFamily() && !url.host().isEmpty() && url.path().isEmpty())
         url.setPath("/");
 
     m_hasReceivedFirstData = false;
@@ -2552,7 +2555,7 @@ void FrameLoader::addExtraFieldsToRequest(ResourceRequest& request, FrameLoadTyp
     }
 
     // The remaining modifications are only necessary for HTTP and HTTPS.
-    if (!request.url().isEmpty() && !request.url().protocolInHTTPFamily())
+    if (!request.url().isEmpty() && !request.url().protocolIsInHTTPFamily())
         return;
 
     applyUserAgent(request);
@@ -3171,6 +3174,7 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem* item, FrameLoadType loa
 // Loads content into this frame, as specified by history item
 void FrameLoader::loadItem(HistoryItem* item, FrameLoadType loadType)
 {
+    m_requestedHistoryItem = item;
     HistoryItem* currentItem = history()->currentItem();
     bool sameDocumentNavigation = currentItem && item->shouldDoSameDocumentNavigationTo(currentItem);
 

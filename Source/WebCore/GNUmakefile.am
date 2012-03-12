@@ -12,6 +12,10 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/include/GLSLANG \
 	-I$(srcdir)/Source/WebCore \
 	-I$(srcdir)/Source/WebCore/Modules/geolocation \
+	-I$(srcdir)/Source/WebCore/Modules/indexeddb \
+	-I$(srcdir)/Source/WebCore/Modules/mediastream \
+	-I$(srcdir)/Source/WebCore/Modules/webdatabase \
+	-I$(srcdir)/Source/WebCore/Modules/websockets \
 	-I$(srcdir)/Source/WebCore/accessibility \
 	-I$(srcdir)/Source/WebCore/bindings \
 	-I$(srcdir)/Source/WebCore/bindings/generic \
@@ -39,7 +43,6 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/loader/cache \
 	-I$(srcdir)/Source/WebCore/loader/icon \
 	-I$(srcdir)/Source/WebCore/mathml \
-	-I$(srcdir)/Source/WebCore/mediastream \
 	-I$(srcdir)/Source/WebCore/notifications \
 	-I$(srcdir)/Source/WebCore/page \
 	-I$(srcdir)/Source/WebCore/page/animation \
@@ -108,6 +111,12 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gtk \
 	-I$(srcdir)/Source/WebCore/platform/gtk \
 	-I$(srcdir)/Source/WebCore/platform/network/soup
+
+# ---
+# Features enabled by default at compilation time
+# ---
+FEATURE_DEFINES += ENABLE_SMOOTH_SCROLLING=1
+webcore_cppflags += -DENABLE_SMOOTH_SCROLLING=1
 
 # ---
 # Channel mesaging support
@@ -295,6 +304,16 @@ webcore_cppflags += -DENABLE_INPUT_SPEECH=0
 endif # END ENABLE_INPUT_SPEECH
 
 # ----
+# Scripted Speech API support
+# ----
+if ENABLE_SCRIPTED_SPEECH
+FEATURE_DEFINES += ENABLE_SCRIPTED_SPEECH=1
+webcore_cppflags += -DENABLE_SCRIPTED_SPEECH=1
+else
+webcore_cppflags += -DENABLE_SCRIPTED_SPEECH=0
+endif # END ENABLE_SCRIPTED_SPEECH
+
+# ----
 # Icon Database Support
 # ----
 if ENABLE_ICONDATABASE
@@ -464,8 +483,8 @@ DerivedSources/WebCore/MathMLElementFactory.cpp DerivedSources/WebCore/MathMLNam
 # Notifications support
 # ----
 if ENABLE_NOTIFICATIONS
-FEATURE_DEFINES += ENABLE_NOTIFICATIONS=1
-webcore_cppflags += -DENABLE_NOTIFICATIONS=1
+FEATURE_DEFINES += ENABLE_NOTIFICATIONS=1 ENABLE_LEGACY_NOTIFICATIONS=1
+webcore_cppflags += -DENABLE_NOTIFICATIONS=1 -DENABLE_LEGACY_NOTIFICATIONS=1
 endif # END ENABLE_NOTIFICATIONS
 
 # ----
@@ -686,9 +705,9 @@ SCRIPTS_FOR_GENERATE_BINDINGS = \
 	$(WebCore)/bindings/scripts/generate-bindings.pl \
 	$(WebCore)/bindings/scripts/preprocessor.pm
 
-SCRIPTS_FOR_RESOLVE_SUPPLEMENTAL = \
+SCRIPTS_FOR_PREPROCESS_IDLS = \
 	$(WebCore)/bindings/scripts/IDLParser.pm \
-	$(WebCore)/bindings/scripts/resolve-supplemental.pl
+	$(WebCore)/bindings/scripts/preprocess-idls.pl
 
 DerivedSources/WebCore/UserAgentStyleSheetsData.cpp: DerivedSources/WebCore/UserAgentStyleSheets.h
 DerivedSources/WebCore/UserAgentStyleSheets.h: $(WebCore)/css/make-css-file-arrays.pl $(WebCore)/bindings/scripts/preprocessor.pm $(USER_AGENT_STYLE_SHEETS)
@@ -719,8 +738,8 @@ DerivedSources/WebCore/XMLNSNames.cpp DerivedSources/WebCore/XMLNSNames.h: $(Web
 DerivedSources/WebCore/XMLNames.cpp DerivedSources/WebCore/XMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/xml/xmlattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/xml/xmlattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
 
-DerivedSources/WebCore/EventFactory.cpp DerivedSources/WebCore/EventHeaders.h DerivedSources/WebCore/EventInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventFactory.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventFactory.in --outputDir "$(GENSOURCES_WEBCORE)"
+DerivedSources/WebCore/EventFactory.cpp DerivedSources/WebCore/EventHeaders.h DerivedSources/WebCore/EventInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventNames.in
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventNames.in --outputDir "$(GENSOURCES_WEBCORE)"
 
 DerivedSources/WebCore/EventTargetHeaders.h DerivedSources/WebCore/EventTargetInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventTargetFactory.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventTargetFactory.in --outputDir "$(GENSOURCES_WEBCORE)"
@@ -760,6 +779,10 @@ DerivedSources/ANGLE/glslang_tab.h: DerivedSources/ANGLE/glslang_tab.cpp
 
 IDL_PATH := \
     $(WebCore)/Modules/geolocation \
+    $(WebCore)/Modules/indexeddb \
+    $(WebCore)/Modules/mediastream \
+    $(WebCore)/Modules/webdatabase \
+    $(WebCore)/Modules/websockets \
     $(WebCore)/bindings/js \
     $(WebCore)/css \
     $(WebCore)/dom \
@@ -771,7 +794,6 @@ IDL_PATH := \
     $(WebCore)/html/track \
     $(WebCore)/inspector \
     $(WebCore)/loader/appcache \
-    $(WebCore)/mediastream \
     $(WebCore)/notifications \
     $(WebCore)/page \
     $(WebCore)/plugins \
@@ -790,11 +812,11 @@ idl_files_list = $(top_builddir)/DerivedSources/WebCore/idl_files_list
 idl_attributes_file = $(WebCore)/bindings/scripts/IDLAttributes.txt
 
 .SECONDARY:
-$(supplemental_dependency_file): $(SCRIPTS_FOR_RESOLVE_SUPPLEMENTAL) $(dom_binding_idls) $(idl_attributes_file)
+$(supplemental_dependency_file): $(SCRIPTS_FOR_PREPROCESS_IDLS) $(dom_binding_idls) $(idl_attributes_file)
 	$(AM_V_GEN)
 	$(AM_V_at)echo -n > $(idl_files_list)
 	$(AM_V_at)($(foreach idl, $(dom_binding_idls), echo $(idl) &&) echo -n) >> $(idl_files_list)
-	$(AM_V_at)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/resolve-supplemental.pl --defines "LANGUAGE_JAVASCRIPT=1 $(FEATURE_DEFINES)" --idlFilesList $(idl_files_list) --supplementalDependencyFile $@ --idlAttributesFile $(idl_attributes_file)
+	$(AM_V_at)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/preprocess-idls.pl --defines "LANGUAGE_JAVASCRIPT=1 $(FEATURE_DEFINES)" --idlFilesList $(idl_files_list) --supplementalDependencyFile $@ --idlAttributesFile $(idl_attributes_file)
 
 # This does not appear to work correctly with gnumake unless
 # it includes an empty command list (the semicolon).
@@ -899,6 +921,11 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(XT_CFLAGS)
 
 EXTRA_DIST += \
+	$(shell ls $(srcdir)/Source/WebCore/Modules/geolocation/*.idl) \
+	$(shell ls $(srcdir)/Source/WebCore/Modules/indexeddb/*.idl) \
+	$(shell ls $(srcdir)/Source/WebCore/Modules/mediastream/*.idl) \
+	$(shell ls $(srcdir)/Source/WebCore/Modules/webdatabase/*.idl) \
+	$(shell ls $(srcdir)/Source/WebCore/Modules/websockets/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/css/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/dom/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/fileapi/*.idl) \
@@ -908,7 +935,6 @@ EXTRA_DIST += \
 	$(shell ls $(srcdir)/Source/WebCore/html/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/inspector/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/loader/appcache/*.idl) \
-	$(shell ls $(srcdir)/Source/WebCore/mediastream/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/notifications/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/page/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/plugins/*.idl) \
@@ -916,7 +942,6 @@ EXTRA_DIST += \
 	$(shell ls $(srcdir)/Source/WebCore/svg/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/testing/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/webaudio/*.idl) \
-	$(shell ls $(srcdir)/Source/WebCore/websockets/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/workers/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/xml/*.idl) \
 	Source/ThirdParty/ANGLE/src/compiler/glslang.l \
@@ -924,6 +949,7 @@ EXTRA_DIST += \
 	Source/WebCore/bindings/scripts/CodeGeneratorGObject.pm \
 	Source/WebCore/bindings/scripts/CodeGeneratorJS.pm \
 	Source/WebCore/bindings/scripts/CodeGenerator.pm \
+	Source/WebCore/bindings/scripts/IDLAttributes.txt \
 	Source/WebCore/bindings/scripts/IDLParser.pm \
 	Source/WebCore/bindings/scripts/IDLStructure.pm \
 	Source/WebCore/bindings/scripts/InFilesCompiler.pm \
@@ -931,7 +957,7 @@ EXTRA_DIST += \
 	Source/WebCore/bindings/scripts/generate-bindings.pl \
 	Source/WebCore/bindings/scripts/gobject-generate-headers.pl \
 	Source/WebCore/bindings/scripts/preprocessor.pm \
-	Source/WebCore/bindings/scripts/resolve-supplemental.pl \
+	Source/WebCore/bindings/scripts/preprocess-idls.pl \
 	Source/WebCore/ChangeLog \
 	Source/WebCore/css/CSSGrammar.y \
 	Source/WebCore/css/CSSPropertyNames.in \
@@ -954,7 +980,7 @@ EXTRA_DIST += \
 	Source/WebCore/css/SVGCSSValueKeywords.in \
 	Source/WebCore/css/view-source.css \
 	Source/WebCore/css/WebKitFontFamilyNames.in \
-	Source/WebCore/dom/EventFactory.in \
+	Source/WebCore/dom/EventNames.in \
 	Source/WebCore/dom/EventTargetFactory.in \
 	Source/WebCore/dom/make_dom_exceptions.pl \
 	Source/WebCore/dom/make_event_factory.pl \

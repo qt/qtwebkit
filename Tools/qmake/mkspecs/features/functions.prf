@@ -25,7 +25,7 @@ defineReplace(toEvaluatablePath) {
 }
 
 defineReplace(activeBuildConfig) {
-    isActiveConfig(debug): return(debug)
+    CONFIG(debug, debug|release): return(debug)
     else: return(release)
 }
 
@@ -204,6 +204,14 @@ defineTest(haveQt) {
     return(true)
 }
 
+defineTest(haveQtModule) {
+    unset(module)
+    module = $$1
+    haveQt(4):contains(QT_CONFIG, $$module): return(true)
+    haveQt(5):!isEmpty(QT.$$module.name): return(true)
+    return(false)
+}
+
 defineTest(prependEach) {
     unset(variable)
     unset(prefix)
@@ -223,6 +231,22 @@ defineTest(prependEach) {
     return(true)
 }
 
+defineReplace(resolveFinalLibraryName) {
+    !debug_and_release: return($$1)
+
+    original_template = $$TEMPLATE
+    original_framework_name = $$QMAKE_FRAMEWORK_BUNDLE_NAME
+
+    TEMPLATE = lib # So that qtLibraryTarget works
+    target = $$qtLibraryTarget($$1)
+
+    TEMPLATE = $$original_template
+    QMAKE_FRAMEWORK_BUNDLE_NAME = $$original_framework_name
+    export(QMAKE_FRAMEWORK_BUNDLE_NAME)
+
+    return($$target)
+}
+
 defineTest(linkAgainstLibrary) {
     unset(target)
     target = $$1
@@ -232,12 +256,7 @@ defineTest(linkAgainstLibrary) {
 
     library = $$lower($$target)
 
-    debug_and_release {
-        original_template = $$TEMPLATE
-        TEMPLATE = lib # So that qtLibraryTarget works
-        target = $$qtLibraryTarget($$target)
-        TEMPLATE = $$original_template
-    }
+    target = $$resolveFinalLibraryName($$target)
 
     path = $$replace(source_dir, $${ROOT_WEBKIT_DIR}, $${ROOT_BUILD_DIR})/$$activeBuildConfig()
 

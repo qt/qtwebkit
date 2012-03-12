@@ -41,6 +41,7 @@
 #include "DFGOSREntry.h"
 #include "DFGOSRExit.h"
 #include "EvalCodeCache.h"
+#include "ExecutionCounter.h"
 #include "ExpressionRangeInfo.h"
 #include "GlobalResolveInfo.h"
 #include "HandlerInfo.h"
@@ -61,6 +62,7 @@
 #include "UString.h"
 #include "UnconditionalFinalizer.h"
 #include "ValueProfile.h"
+#include <wtf/RefCountedArray.h>
 #include <wtf/FastAllocBase.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
@@ -127,8 +129,6 @@ namespace JSC {
         }
 #endif
         
-        bool canProduceCopyWithBytecode() { return hasInstructions(); }
-
         void visitAggregate(SlotVisitor&);
 
         static void dumpStatistics();
@@ -341,20 +341,15 @@ namespace JSC {
         void setIsNumericCompareFunction(bool isNumericCompareFunction) { m_isNumericCompareFunction = isNumericCompareFunction; }
         bool isNumericCompareFunction() { return m_isNumericCompareFunction; }
 
-        bool hasInstructions() const { return !!m_instructions; }
-        unsigned numberOfInstructions() const { return !m_instructions ? 0 : m_instructions->m_instructions.size(); }
-        Vector<Instruction>& instructions() { return m_instructions->m_instructions; }
-        const Vector<Instruction>& instructions() const { return m_instructions->m_instructions; }
-        void discardBytecode() { m_instructions.clear(); }
-        void discardBytecodeLater()
-        {
-            m_shouldDiscardBytecode = true;
-        }
+        unsigned numberOfInstructions() const { return m_instructions.size(); }
+        RefCountedArray<Instruction>& instructions() { return m_instructions; }
+        const RefCountedArray<Instruction>& instructions() const { return m_instructions; }
+        
+        size_t predictedMachineCodeSize();
         
         bool usesOpcode(OpcodeID);
 
-        unsigned instructionCount() { return m_instructionCount; }
-        void setInstructionCount(unsigned instructionCount) { m_instructionCount = instructionCount; }
+        unsigned instructionCount() { return m_instructions.size(); }
 
 #if ENABLE(JIT)
         void setJITCode(const JITCode& code, MacroAssemblerCodePtr codeWithArityCheck)
@@ -374,18 +369,20 @@ namespace JSC {
         ExecutableMemoryHandle* executableMemory() { return getJITCode().getExecutableMemory(); }
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
         virtual void jettison() = 0;
-        bool jitCompile(JSGlobalData& globalData)
+        enum JITCompilationResult { AlreadyCompiled, CouldNotCompile, CompiledSuccessfully };
+        JITCompilationResult jitCompile(JSGlobalData& globalData)
         {
             if (getJITType() != JITCode::InterpreterThunk) {
                 ASSERT(getJITType() == JITCode::BaselineJIT);
-                return false;
+                return AlreadyCompiled;
             }
 #if ENABLE(JIT)
-            jitCompileImpl(globalData);
-            return true;
+            if (jitCompileImpl(globalData))
+                return CompiledSuccessfully;
+            return CouldNotCompile;
 #else
             UNUSED_PARAM(globalData);
-            return false;
+            return CouldNotCompile;
 #endif
         }
         virtual CodeBlock* replacement() = 0;
@@ -541,11 +538,10 @@ namespace JSC {
         {
             ValueProfile* result = WTF::genericBinarySearch<ValueProfile, int, getValueProfileBytecodeOffset>(m_valueProfiles, m_valueProfiles.size(), bytecodeOffset);
             ASSERT(result->m_bytecodeOffset != -1);
-            ASSERT(!hasInstructions()
-                   || instructions()[bytecodeOffset + opcodeLength(
-                           m_globalData->interpreter->getOpcodeID(
-                               instructions()[
-                                   bytecodeOffset].u.opcode)) - 1].u.profile == result);
+            ASSERT(instructions()[bytecodeOffset + opcodeLength(
+                       m_globalData->interpreter->getOpcodeID(
+                           instructions()[
+                               bytecodeOffset].u.opcode)) - 1].u.profile == result);
             return result;
         }
         PredictedType valueProfilePredictionForBytecodeOffset(int bytecodeOffset)
@@ -839,24 +835,29 @@ namespace JSC {
         // Functions for controlling when JITting kicks in, in a mixed mode
         // execution world.
         
+        bool checkIfJITThresholdReached()
+        {
+            return m_llintExecuteCounter.checkIfThresholdCrossedAndSet(this);
+        }
+        
         void dontJITAnytimeSoon()
         {
-            m_llintExecuteCounter = Options::executionCounterValueForDontJITAnytimeSoon;
+            m_llintExecuteCounter.deferIndefinitely();
         }
         
         void jitAfterWarmUp()
         {
-            m_llintExecuteCounter = Options::executionCounterValueForJITAfterWarmUp;
+            m_llintExecuteCounter.setNewThreshold(Options::thresholdForJITAfterWarmUp, this);
         }
         
         void jitSoon()
         {
-            m_llintExecuteCounter = Options::executionCounterValueForJITSoon;
+            m_llintExecuteCounter.setNewThreshold(Options::thresholdForJITSoon, this);
         }
         
         int32_t llintExecuteCounter() const
         {
-            return m_llintExecuteCounter;
+            return m_llintExecuteCounter.m_counter;
         }
         
         // Functions for controlling when tiered compilation kicks in. This
@@ -895,31 +896,41 @@ namespace JSC {
         
         int32_t counterValueForOptimizeAfterWarmUp()
         {
-            return Options::executionCounterValueForOptimizeAfterWarmUp << reoptimizationRetryCounter();
+            return Options::thresholdForOptimizeAfterWarmUp << reoptimizationRetryCounter();
         }
         
         int32_t counterValueForOptimizeAfterLongWarmUp()
         {
-            return Options::executionCounterValueForOptimizeAfterLongWarmUp << reoptimizationRetryCounter();
+            return Options::thresholdForOptimizeAfterLongWarmUp << reoptimizationRetryCounter();
         }
         
         int32_t* addressOfJITExecuteCounter()
         {
-            return &m_jitExecuteCounter;
+            return &m_jitExecuteCounter.m_counter;
         }
         
-        static ptrdiff_t offsetOfJITExecuteCounter() { return OBJECT_OFFSETOF(CodeBlock, m_jitExecuteCounter); }
+        static ptrdiff_t offsetOfJITExecuteCounter() { return OBJECT_OFFSETOF(CodeBlock, m_jitExecuteCounter) + OBJECT_OFFSETOF(ExecutionCounter, m_counter); }
+        static ptrdiff_t offsetOfJITExecutionActiveThreshold() { return OBJECT_OFFSETOF(CodeBlock, m_jitExecuteCounter) + OBJECT_OFFSETOF(ExecutionCounter, m_activeThreshold); }
+        static ptrdiff_t offsetOfJITExecutionTotalCount() { return OBJECT_OFFSETOF(CodeBlock, m_jitExecuteCounter) + OBJECT_OFFSETOF(ExecutionCounter, m_totalCount); }
 
-        int32_t jitExecuteCounter() const { return m_jitExecuteCounter; }
+        int32_t jitExecuteCounter() const { return m_jitExecuteCounter.m_counter; }
         
         unsigned optimizationDelayCounter() const { return m_optimizationDelayCounter; }
+        
+        // Check if the optimization threshold has been reached, and if not,
+        // adjust the heuristics accordingly. Returns true if the threshold has
+        // been reached.
+        bool checkIfOptimizationThresholdReached()
+        {
+            return m_jitExecuteCounter.checkIfThresholdCrossedAndSet(this);
+        }
         
         // Call this to force the next optimization trigger to fire. This is
         // rarely wise, since optimization triggers are typically more
         // expensive than executing baseline code.
         void optimizeNextInvocation()
         {
-            m_jitExecuteCounter = Options::executionCounterValueForOptimizeNextInvocation;
+            m_jitExecuteCounter.setNewThreshold(0, this);
         }
         
         // Call this to prevent optimization from happening again. Note that
@@ -929,7 +940,7 @@ namespace JSC {
         // the future as well.
         void dontOptimizeAnytimeSoon()
         {
-            m_jitExecuteCounter = Options::executionCounterValueForDontOptimizeAnytimeSoon;
+            m_jitExecuteCounter.deferIndefinitely();
         }
         
         // Call this to reinitialize the counter to its starting state,
@@ -940,14 +951,14 @@ namespace JSC {
         // counter that this corresponds to is also available directly.
         void optimizeAfterWarmUp()
         {
-            m_jitExecuteCounter = counterValueForOptimizeAfterWarmUp();
+            m_jitExecuteCounter.setNewThreshold(counterValueForOptimizeAfterWarmUp(), this);
         }
         
         // Call this to force an optimization trigger to fire only after
         // a lot of warm-up.
         void optimizeAfterLongWarmUp()
         {
-            m_jitExecuteCounter = counterValueForOptimizeAfterLongWarmUp();
+            m_jitExecuteCounter.setNewThreshold(counterValueForOptimizeAfterLongWarmUp(), this);
         }
         
         // Call this to cause an optimization trigger to fire soon, but
@@ -970,7 +981,7 @@ namespace JSC {
         // in the baseline code.
         void optimizeSoon()
         {
-            m_jitExecuteCounter = Options::executionCounterValueForOptimizeSoon << reoptimizationRetryCounter();
+            m_jitExecuteCounter.setNewThreshold(Options::thresholdForOptimizeSoon << reoptimizationRetryCounter(), this);
         }
         
         // The speculative JIT tracks its success rate, so that we can
@@ -1047,12 +1058,9 @@ namespace JSC {
         int m_numCapturedVars;
         bool m_isConstructor;
 
-        // This is public because otherwise we would have many friends.
-        bool m_shouldDiscardBytecode;
-
     protected:
 #if ENABLE(JIT)
-        virtual void jitCompileImpl(JSGlobalData&) = 0;
+        virtual bool jitCompileImpl(JSGlobalData&) = 0;
 #endif
         virtual void visitWeakReferences(SlotVisitor&);
         virtual void finalizeUnconditionally();
@@ -1115,11 +1123,7 @@ namespace JSC {
         WriteBarrier<ScriptExecutable> m_ownerExecutable;
         JSGlobalData* m_globalData;
 
-        struct Instructions : public RefCounted<Instructions> {
-            Vector<Instruction> m_instructions;
-        };
-        RefPtr<Instructions> m_instructions;
-        unsigned m_instructionCount;
+        RefCountedArray<Instruction> m_instructions;
 
         int m_thisRegister;
         int m_argumentsRegister;
@@ -1186,6 +1190,7 @@ namespace JSC {
             bool isJettisoned;
             bool livenessHasBeenProved; // Initialized and used on every GC.
             bool allTransitionsHaveBeenMarked; // Initialized and used on every GC.
+            unsigned visitAggregateHasBeenCalled; // Unsigned to make it work seamlessly with the broadest set of CAS implementations.
         };
         
         OwnPtr<DFGData> m_dfgData;
@@ -1217,13 +1222,14 @@ namespace JSC {
 
         OwnPtr<CodeBlock> m_alternative;
         
-        int32_t m_llintExecuteCounter;
+        ExecutionCounter m_llintExecuteCounter;
         
-        int32_t m_jitExecuteCounter;
+        ExecutionCounter m_jitExecuteCounter;
+        int32_t m_totalJITExecutions;
         uint32_t m_speculativeSuccessCounter;
         uint32_t m_speculativeFailCounter;
-        uint8_t m_optimizationDelayCounter;
-        uint8_t m_reoptimizationRetryCounter;
+        uint16_t m_optimizationDelayCounter;
+        uint16_t m_reoptimizationRetryCounter;
         
         struct RareData {
            WTF_MAKE_FAST_ALLOCATED;
@@ -1300,7 +1306,7 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
-        virtual void jitCompileImpl(JSGlobalData&);
+        virtual bool jitCompileImpl(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFGInternal();
 #endif
@@ -1335,7 +1341,7 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
-        virtual void jitCompileImpl(JSGlobalData&);
+        virtual bool jitCompileImpl(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFGInternal();
 #endif
@@ -1373,31 +1379,10 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
-        virtual void jitCompileImpl(JSGlobalData&);
+        virtual bool jitCompileImpl(JSGlobalData&);
         virtual CodeBlock* replacement();
         virtual bool canCompileWithDFGInternal();
 #endif
-    };
-
-    // Use this if you want to copy a code block and you're paranoid about a GC
-    // happening.
-    class BytecodeDestructionBlocker {
-    public:
-        BytecodeDestructionBlocker(CodeBlock* codeBlock)
-            : m_codeBlock(codeBlock)
-            , m_oldValueOfShouldDiscardBytecode(codeBlock->m_shouldDiscardBytecode)
-        {
-            codeBlock->m_shouldDiscardBytecode = false;
-        }
-        
-        ~BytecodeDestructionBlocker()
-        {
-            m_codeBlock->m_shouldDiscardBytecode = m_oldValueOfShouldDiscardBytecode;
-        }
-        
-    private:
-        CodeBlock* m_codeBlock;
-        bool m_oldValueOfShouldDiscardBytecode;
     };
 
     inline CodeBlock* baselineCodeBlockForOriginAndBaselineCodeBlock(const CodeOrigin& codeOrigin, CodeBlock* baselineCodeBlock)

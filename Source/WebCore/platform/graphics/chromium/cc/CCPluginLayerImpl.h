@@ -35,9 +35,9 @@ namespace WebCore {
 
 class CCPluginLayerImpl : public CCLayerImpl {
 public:
-    static PassRefPtr<CCPluginLayerImpl> create(int id)
+    static PassOwnPtr<CCPluginLayerImpl> create(int id)
     {
-        return adoptRef(new CCPluginLayerImpl(id));
+        return adoptPtr(new CCPluginLayerImpl(id));
     }
     virtual ~CCPluginLayerImpl();
 
@@ -50,6 +50,7 @@ public:
     typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexRectFlipAlpha> TexRectProgramFlip;
 
     virtual void dumpLayerProperties(TextStream&, int indent) const;
+    virtual void didLoseContext();
 
     void setTextureId(unsigned id) { m_textureId = id; }
     void setFlipped(bool flipped) { m_flipped = flipped; }
@@ -60,8 +61,6 @@ private:
     explicit CCPluginLayerImpl(int);
 
     virtual const char* layerTypeAsString() const { return "PluginLayer"; }
-
-    void cleanupResources();
 
     unsigned m_textureId;
     bool m_flipped;

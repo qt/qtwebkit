@@ -37,6 +37,9 @@ void InitWebCoreSystemInterface(void)
     
     dispatch_once(&initOnce, ^{
         INIT(AdvanceDefaultButtonPulseAnimation);
+#if !defined(BUILDING_ON_SNOW_LEOPARD)
+        INIT(CALayerEnumerateRectsBeingDrawnWithBlock);
+#endif
         INIT(CopyCFLocalizationPreferredName);
         INIT(CGContextGetShouldSmoothFonts);
         INIT(CGPatternCreateWithImageAndTransform);
@@ -150,6 +153,8 @@ void InitWebCoreSystemInterface(void)
         INIT(GetCFURLResponseHTTPResponse);
         INIT(CopyCFURLResponseSuggestedFilename);
         INIT(SetCFURLResponseMIMEType);
+
+        INIT(SetMetadataURL);
 
 #if !defined(BUILDING_ON_SNOW_LEOPARD)
         INIT(CreateVMPressureDispatchOnMainQueue);

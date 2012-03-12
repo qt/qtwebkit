@@ -131,7 +131,7 @@ protected:
         canvas->setBounds(IntSize(600, 300));
         canvas->setTextureId(backTextureId);
 
-        canvas->contentChanged();
+        canvas->setNeedsDisplay();
         EXPECT_TRUE(canvas->needsDisplay());
         Region occludedScreenSpace;
         canvas->paintContentsIfDirty(occludedScreenSpace);
@@ -139,7 +139,7 @@ protected:
         {
             DebugScopedSetImplThread scopedImplThread;
 
-            RefPtr<CCLayerImpl> layerImpl = canvas->createCCLayerImpl();
+            OwnPtr<CCLayerImpl> layerImpl = canvas->createCCLayerImpl();
             EXPECT_EQ(0u, static_cast<CCCanvasLayerImpl*>(layerImpl.get())->textureId());
 
             canvas->updateCompositorResources(implContext.get(), updater);

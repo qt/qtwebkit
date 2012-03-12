@@ -22,33 +22,32 @@
 #include "config.h"
 #include "CSSStyleRule.h"
 
-#include "CSSPageRule.h"
 #include "CSSParser.h"
 #include "CSSSelector.h"
 #include "CSSStyleSheet.h"
 #include "Document.h"
 #include "StylePropertySet.h"
-#include "StyledElement.h"
-#include "StyleSheet.h"
-
+#include "StyleRule.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 CSSStyleRule::CSSStyleRule(CSSStyleSheet* parent, int line)
     : CSSRule(parent, CSSRule::STYLE_RULE)
+    , m_styleRule(adoptPtr(new StyleRule(line, this)))
 {
-    setSourceLine(line);
-
-    // m_sourceLine is a bitfield, so let's catch any overflow early in debug mode.
-    ASSERT(sourceLine() == line);
 }
 
 CSSStyleRule::~CSSStyleRule()
 {
-    if (m_style)
-        m_style->clearParentRule(this);
+    if (m_styleRule->properties())
+        m_styleRule->properties()->clearParentRule(this);
     cleanup();
+}
+
+CSSStyleDeclaration* CSSStyleRule::style() const
+{
+    return m_styleRule->properties()->ensureRuleCSSStyleDeclaration(this);
 }
 
 typedef HashMap<const CSSStyleRule*, String> SelectorTextCache;
@@ -69,8 +68,8 @@ inline void CSSStyleRule::cleanup()
 String CSSStyleRule::generateSelectorText() const
 {
     StringBuilder builder;
-    for (CSSSelector* s = selectorList().first(); s; s = CSSSelectorList::next(s)) {
-        if (s != selectorList().first())
+    for (CSSSelector* s = m_styleRule->selectorList().first(); s; s = CSSSelectorList::next(s)) {
+        if (s != m_styleRule->selectorList().first())
             builder.append(", ");
         builder.append(s->selectorText());
     }
@@ -106,7 +105,7 @@ void CSSStyleRule::setSelectorText(const String& selectorText)
         return;
 
     String oldSelectorText = this->selectorText();
-    m_selectorList.adopt(selectorList);
+    m_styleRule->adoptSelectorList(selectorList);
 
     if (hasCachedSelectorText()) {
         ASSERT(selectorTextCache().contains(this));
@@ -124,16 +123,10 @@ String CSSStyleRule::cssText() const
     String result = selectorText();
 
     result += " { ";
-    result += m_style->asText();
+    result += m_styleRule->properties()->asText();
     result += "}";
 
     return result;
-}
-
-void CSSStyleRule::addSubresourceStyleURLs(ListHashSet<KURL>& urls)
-{
-    if (m_style)
-        m_style->addSubresourceStyleURLs(urls, parentStyleSheet());
 }
 
 } // namespace WebCore

@@ -27,7 +27,6 @@
 #include "config.h"
 
 #if USE(ACCELERATED_COMPOSITING)
-#if USE(SKIA)
 
 #include "FrameBufferSkPictureCanvasLayerTextureUpdater.h"
 
@@ -99,30 +98,30 @@ LayerTextureUpdater::SampledTexelFormat FrameBufferSkPictureCanvasLayerTextureUp
 
 void FrameBufferSkPictureCanvasLayerTextureUpdater::updateTextureRect(GraphicsContext3D* context, TextureAllocator* allocator, ManagedTexture* texture, const IntRect& sourceRect, const IntRect& destRect)
 {
-    // Make sure SKIA uses the correct GL context.
+    // Make sure ganesh uses the correct GL context.
     context->makeContextCurrent();
-    // Notify SKIA to sync its internal GL state.
+    // Notify ganesh to sync its internal GL state.
     context->grContext()->resetContext();
 
     // Create an accelerated canvas to draw on.
     OwnPtr<SkCanvas> canvas = createAcceleratedCanvas(context, allocator, texture);
 
-    canvas->clipRect(SkRect(destRect));
     // The compositor expects the textures to be upside-down so it can flip
     // the final composited image. Ganesh renders the image upright so we
     // need to do a y-flip.
     canvas->translate(0.0, texture->size().height());
     canvas->scale(1.0, -1.0);
+    // Only the region corresponding to destRect on the texture must be updated.
+    canvas->clipRect(SkRect(destRect));
     // Translate the origin of contentRect to that of destRect.
     // Note that destRect is defined relative to sourceRect.
     canvas->translate(contentRect().x() - sourceRect.x() + destRect.x(),
                       contentRect().y() - sourceRect.y() + destRect.y());
     drawPicture(canvas.get());
 
-    // Flush SKIA context so that all the rendered stuff appears on the texture.
+    // Flush ganesh context so that all the rendered stuff appears on the texture.
     context->grContext()->flush();
 }
 
 } // namespace WebCore
-#endif // USE(SKIA)
 #endif // USE(ACCELERATED_COMPOSITING)

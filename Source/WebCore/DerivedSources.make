@@ -29,6 +29,9 @@
 VPATH = \
     $(WebCore) \
     $(WebCore)/Modules/geolocation \
+    $(WebCore)/Modules/indexeddb \
+    $(WebCore)/Modules/webdatabase \
+    $(WebCore)/Modules/websockets \
     $(WebCore)/bindings/generic \
     $(WebCore)/bindings/js \
     $(WebCore)/bindings/objc \
@@ -60,6 +63,39 @@ BINDING_IDLS = \
     $(WebCore)/Modules/geolocation/PositionCallback.idl \
     $(WebCore)/Modules/geolocation/PositionError.idl \
     $(WebCore)/Modules/geolocation/PositionErrorCallback.idl \
+    $(WebCore)/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
+    $(WebCore)/Modules/indexeddb/IDBAny.idl \
+    $(WebCore)/Modules/indexeddb/IDBCursor.idl \
+    $(WebCore)/Modules/indexeddb/IDBDatabase.idl \
+    $(WebCore)/Modules/indexeddb/IDBDatabaseError.idl \
+    $(WebCore)/Modules/indexeddb/IDBDatabaseException.idl \
+    $(WebCore)/Modules/indexeddb/IDBFactory.idl \
+    $(WebCore)/Modules/indexeddb/IDBIndex.idl \
+    $(WebCore)/Modules/indexeddb/IDBKey.idl \
+    $(WebCore)/Modules/indexeddb/IDBKeyRange.idl \
+    $(WebCore)/Modules/indexeddb/IDBObjectStore.idl \
+    $(WebCore)/Modules/indexeddb/IDBRequest.idl \
+    $(WebCore)/Modules/indexeddb/IDBTransaction.idl \
+    $(WebCore)/Modules/indexeddb/WorkerContextIndexedDatabase.idl \
+    $(WebCore)/Modules/webdatabase/DOMWindowSQLDatabase.idl \
+    $(WebCore)/Modules/webdatabase/Database.idl \
+    $(WebCore)/Modules/webdatabase/DatabaseCallback.idl \
+    $(WebCore)/Modules/webdatabase/DatabaseSync.idl \
+    $(WebCore)/Modules/webdatabase/SQLError.idl \
+    $(WebCore)/Modules/webdatabase/SQLException.idl \
+    $(WebCore)/Modules/webdatabase/SQLResultSet.idl \
+    $(WebCore)/Modules/webdatabase/SQLResultSetRowList.idl \
+    $(WebCore)/Modules/webdatabase/SQLStatementCallback.idl \
+    $(WebCore)/Modules/webdatabase/SQLStatementErrorCallback.idl \
+    $(WebCore)/Modules/webdatabase/SQLTransaction.idl \
+    $(WebCore)/Modules/webdatabase/SQLTransactionCallback.idl \
+    $(WebCore)/Modules/webdatabase/SQLTransactionErrorCallback.idl \
+    $(WebCore)/Modules/webdatabase/SQLTransactionSync.idl \
+    $(WebCore)/Modules/webdatabase/SQLTransactionSyncCallback.idl \
+    $(WebCore)/Modules/webdatabase/WorkerContextSQLDatabase.idl \
+    $(WebCore)/Modules/websockets/CloseEvent.idl \
+    $(WebCore)/Modules/websockets/DOMWindowWebSocket.idl \
+    $(WebCore)/Modules/websockets/WebSocket.idl \
     $(WebCore)/css/CSSCharsetRule.idl \
     $(WebCore)/css/CSSFontFaceRule.idl \
     $(WebCore)/css/CSSImportRule.idl \
@@ -187,11 +223,11 @@ BINDING_IDLS = \
     $(WebCore)/fileapi/MetadataCallback.idl \
     $(WebCore)/fileapi/OperationNotAllowedException.idl \
     $(WebCore)/fileapi/WebKitBlobBuilder.idl \
+    $(WebCore)/fileapi/WorkerContextFileSystem.idl \
     $(WebCore)/html/DOMFormData.idl \
     $(WebCore)/html/DOMSettableTokenList.idl \
     $(WebCore)/html/DOMTokenList.idl \
     $(WebCore)/html/DOMURL.idl \
-    $(WebCore)/html/DOMWindowHTML.idl \
     $(WebCore)/html/HTMLAllCollection.idl \
     $(WebCore)/html/HTMLAnchorElement.idl \
     $(WebCore)/html/HTMLAppletElement.idl \
@@ -277,8 +313,8 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/CanvasPattern.idl \
     $(WebCore)/html/canvas/CanvasRenderingContext.idl \
     $(WebCore)/html/canvas/CanvasRenderingContext2D.idl \
-    $(WebCore)/html/canvas/DOMWindowWebGL.idl \
     $(WebCore)/html/canvas/DataView.idl \
+    $(WebCore)/html/canvas/EXTTextureFilterAnisotropic.idl \
     $(WebCore)/html/canvas/Float32Array.idl \
     $(WebCore)/html/canvas/Float64Array.idl \
     $(WebCore)/html/canvas/Int16Array.idl \
@@ -346,40 +382,12 @@ BINDING_IDLS = \
     $(WebCore)/plugins/DOMMimeTypeArray.idl \
     $(WebCore)/plugins/DOMPlugin.idl \
     $(WebCore)/plugins/DOMPluginArray.idl \
-    $(WebCore)/storage/DOMWindowSQLDatabase.idl \
-    $(WebCore)/storage/Database.idl \
-    $(WebCore)/storage/DatabaseCallback.idl \
-    $(WebCore)/storage/DatabaseSync.idl \
-    $(WebCore)/storage/IDBAny.idl \
-    $(WebCore)/storage/IDBCursor.idl \
-    $(WebCore)/storage/IDBDatabase.idl \
-    $(WebCore)/storage/IDBDatabaseError.idl \
-    $(WebCore)/storage/IDBDatabaseException.idl \
-    $(WebCore)/storage/IDBFactory.idl \
-    $(WebCore)/storage/IDBIndex.idl \
-    $(WebCore)/storage/IDBKey.idl \
-    $(WebCore)/storage/IDBKeyRange.idl \
-    $(WebCore)/storage/IDBObjectStore.idl \
-    $(WebCore)/storage/IDBRequest.idl \
-    $(WebCore)/storage/IDBTransaction.idl \
-    $(WebCore)/storage/SQLError.idl \
-    $(WebCore)/storage/SQLException.idl \
-    $(WebCore)/storage/SQLResultSet.idl \
-    $(WebCore)/storage/SQLResultSetRowList.idl \
-    $(WebCore)/storage/SQLStatementCallback.idl \
-    $(WebCore)/storage/SQLStatementErrorCallback.idl \
-    $(WebCore)/storage/SQLTransaction.idl \
-    $(WebCore)/storage/SQLTransactionCallback.idl \
-    $(WebCore)/storage/SQLTransactionErrorCallback.idl \
-    $(WebCore)/storage/SQLTransactionSync.idl \
-    $(WebCore)/storage/SQLTransactionSyncCallback.idl \
     $(WebCore)/storage/Storage.idl \
     $(WebCore)/storage/StorageEvent.idl \
     $(WebCore)/storage/StorageInfo.idl \
     $(WebCore)/storage/StorageInfoErrorCallback.idl \
     $(WebCore)/storage/StorageInfoQuotaCallback.idl \
     $(WebCore)/storage/StorageInfoUsageCallback.idl \
-    $(WebCore)/svg/DOMWindowSVG.idl \
     $(WebCore)/svg/ElementTimeControl.idl \
     $(WebCore)/svg/SVGAElement.idl \
     $(WebCore)/svg/SVGAltGlyphDefElement.idl \
@@ -561,18 +569,13 @@ BINDING_IDLS = \
     $(WebCore)/webaudio/OfflineAudioCompletionEvent.idl \
     $(WebCore)/webaudio/RealtimeAnalyserNode.idl \
     $(WebCore)/webaudio/WaveShaperNode.idl \
-    $(WebCore)/websockets/CloseEvent.idl \
-    $(WebCore)/websockets/DOMWindowWebSocket.idl \
-    $(WebCore)/websockets/WebSocket.idl \
     $(WebCore)/workers/AbstractWorker.idl \
-    $(WebCore)/workers/DOMWindowWorker.idl \
     $(WebCore)/workers/DedicatedWorkerContext.idl \
     $(WebCore)/workers/SharedWorker.idl \
     $(WebCore)/workers/SharedWorkerContext.idl \
     $(WebCore)/workers/Worker.idl \
     $(WebCore)/workers/WorkerContext.idl \
     $(WebCore)/workers/WorkerLocation.idl \
-    $(WebCore)/xml/DOMWindowXML.idl \
     $(WebCore)/xml/DOMParser.idl \
     $(WebCore)/xml/XMLHttpRequest.idl \
     $(WebCore)/xml/XMLHttpRequestException.idl \
@@ -635,14 +638,15 @@ ADDITIONAL_IDL_DEFINES :=
 ifeq ($(OS),MACOS)
 
 FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
+HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
 
-ifeq ($(shell $(CC) -E -P -dM $(FRAMEWORK_FLAGS) WebCore/ForwardingHeaders/wtf/Platform.h | grep ENABLE_DASHBOARD_SUPPORT | cut -d' ' -f3), 1)
+ifeq ($(shell $(CC) -x c++ -E -P -dM $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" /dev/null | grep ENABLE_DASHBOARD_SUPPORT | cut -d' ' -f3), 1)
     ENABLE_DASHBOARD_SUPPORT = 1
 else
     ENABLE_DASHBOARD_SUPPORT = 0
 endif
 
-ifeq ($(shell $(CC) -E -P -dM $(FRAMEWORK_FLAGS) WebCore/ForwardingHeaders/wtf/Platform.h | grep ENABLE_ORIENTATION_EVENTS | cut -d' ' -f3), 1)
+ifeq ($(shell $(CC) -x c++ -E -P -dM $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" /dev/null | grep ENABLE_ORIENTATION_EVENTS | cut -d' ' -f3), 1)
     ENABLE_ORIENTATION_EVENTS = 1
 else
     ENABLE_ORIENTATION_EVENTS = 0
@@ -865,8 +869,8 @@ XLinkNames.cpp : dom/make_names.pl svg/xlinkattrs.in
  
 # Register event constructors and targets
 
-EventFactory.cpp EventHeaders.h EventInterfaces.h : dom/make_event_factory.pl dom/EventFactory.in
-	perl -I $(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventFactory.in
+EventFactory.cpp EventHeaders.h EventInterfaces.h : dom/make_event_factory.pl dom/EventNames.in
+	perl -I $(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventNames.in
 
 EventTargetHeaders.h EventTargetInterfaces.h : dom/make_event_factory.pl dom/EventTargetFactory.in
 	perl -I $(WebCore)/bindings/scripts $< --input $(WebCore)/dom/EventTargetFactory.in
@@ -892,13 +896,13 @@ GENERATE_SCRIPTS = \
     bindings/scripts/generate-bindings.pl \
     bindings/scripts/preprocessor.pm
 
-RESOLVE_SUPPLEMENTAL_SCRIPTS = \
+PREPROCESS_IDLS_SCRIPTS = \
     bindings/scripts/IDLParser.pm \
-    bindings/scripts/resolve-supplemental.pl
+    bindings/scripts/preprocess-idls.pl
 
 generator_script = perl $(addprefix -I $(WebCore)/, $(sort $(dir $(1)))) $(WebCore)/bindings/scripts/generate-bindings.pl
 
-resolve_supplemental_script = perl $(addprefix -I $(WebCore)/, $(sort $(dir $(1)))) $(WebCore)/bindings/scripts/resolve-supplemental.pl
+preprocess_idls_script = perl $(addprefix -I $(WebCore)/, $(sort $(dir $(1)))) $(WebCore)/bindings/scripts/preprocess-idls.pl
 
 # JS bindings generator
 
@@ -926,9 +930,9 @@ IDL_ATTRIBUTES_FILE = $(WebCore)/bindings/scripts/IDLAttributes.txt
 space :=
 space +=
 
-$(SUPPLEMENTAL_DEPENDENCY_FILE) : $(RESOLVE_SUPPLEMENTAL_SCRIPTS) $(BINDING_IDLS) $(ADDITIONAL_IDLS) $(IDL_ATTRIBUTES_FILE)
+$(SUPPLEMENTAL_DEPENDENCY_FILE) : $(PREPROCESS_IDLS_SCRIPTS) $(BINDING_IDLS) $(ADDITIONAL_IDLS) $(IDL_ATTRIBUTES_FILE)
 	printf "$(subst $(space),,$(patsubst %,%\n,$(BINDING_IDLS) $(ADDITIONAL_IDLS)))" > $(IDL_FILES_TMP)
-	$(call resolve_supplemental_script, $(RESOLVE_SUPPLEMENTAL_SCRIPTS)) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --idlFilesList $(IDL_FILES_TMP) --supplementalDependencyFile $@ --idlAttributesFile $(IDL_ATTRIBUTES_FILE)
+	$(call preprocess_idls_script, $(PREPROCESS_IDLS_SCRIPTS)) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --idlFilesList $(IDL_FILES_TMP) --supplementalDependencyFile $@ --idlAttributesFile $(IDL_ATTRIBUTES_FILE)
 	rm -f $(IDL_FILES_TMP)
 
 JS%.h : %.idl $(JS_BINDINGS_SCRIPTS) $(SUPPLEMENTAL_DEPENDENCY_FILE)

@@ -75,6 +75,7 @@ private:
 
     // Called from WebInspectorClient
     WebPage* createInspectorPage();
+    void destroyInspectorPage();
 
     // Called from WebInspectorFrontendClient
     void didLoadInspectorPage();
@@ -101,6 +102,8 @@ private:
 
     void startJavaScriptProfiling();
     void stopJavaScriptProfiling();
+
+    void updateDockingAvailability();
 
     WebPage* m_page;
     WebPage* m_inspectorPage;

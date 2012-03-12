@@ -390,6 +390,7 @@ private:
 #endif
 
     virtual String mediaPlayerReferrer() const OVERRIDE;
+    virtual String mediaPlayerUserAgent() const OVERRIDE;
 
     void loadTimerFired(Timer<HTMLMediaElement>*);
     void progressEventTimerFired(Timer<HTMLMediaElement>*);
@@ -476,6 +477,8 @@ private:
     virtual void* preDispatchEventHandler(Event*);
 
     void changeNetworkStateFromLoadingToIdle();
+
+    void removeBehaviorsRestrictionsAfterFirstUserGesture();
 
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const;

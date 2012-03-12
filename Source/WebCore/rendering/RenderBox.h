@@ -42,6 +42,11 @@ public:
     RenderBox(Node*);
     virtual ~RenderBox();
 
+    virtual bool requiresLayer() const OVERRIDE { return isRoot() || isPositioned() || isRelPositioned() || isTransparent() || requiresLayerForOverflowClip() || hasTransform() || hasMask() || hasReflection() || hasFilter() || style()->specifiesColumns(); }
+    bool requiresLayerForOverflowClip() const;
+
+    bool hasOverflowClipWithLayer() const { return hasOverflowClip() && hasLayer(); }
+
     // Use this with caution! No type checking is done!
     RenderBox* firstChildBox() const;
     RenderBox* lastChildBox() const;
@@ -127,11 +132,13 @@ public:
     LayoutRect frameRect() const { return m_frameRect; }
     void setFrameRect(const LayoutRect& rect) { m_frameRect = rect; }
 
-    LayoutRect borderBoxRect() const { return LayoutRect(0, 0, width(), height()); }
-    virtual LayoutRect borderBoundingBox() const { return borderBoxRect(); } 
+    // FIXME: We shouldn't be returning this as a LayoutRect, since it loses its position and won't properly pixel snap.
+    LayoutRect borderBoxRect() const { return LayoutRect(LayoutPoint(), size()); }
+    IntRect pixelSnappedBorderBoxRect() const { return IntRect(IntPoint(), IntSize(m_frameRect.pixelSnappedWidth(), m_frameRect.pixelSnappedHeight())); }
+    virtual IntRect borderBoundingBox() const { return pixelSnappedBorderBoxRect(); }
 
     // The content area of the box (excludes padding and border).
-    LayoutRect contentBoxRect() const { return LayoutRect(borderLeft() + paddingLeft(), borderTop() + paddingTop(), contentWidth(), contentHeight()); }
+    LayoutRect contentBoxRect(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return LayoutRect(borderLeft() + paddingLeft(paddingOption), borderTop() + paddingTop(paddingOption), contentWidth(paddingOption), contentHeight(paddingOption)); }
     // The content box in absolute coords. Ignores transforms.
     LayoutRect absoluteContentBox() const;
     // The content box converted to absolute coords (taking transforms into account).
@@ -139,7 +146,7 @@ public:
 
     // Bounds of the outline box in absolute coords. Respects transforms
     virtual LayoutRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, LayoutPoint* cachedOffsetToRepaintContainer) const;
-    virtual void addFocusRingRects(Vector<LayoutRect>&, const LayoutPoint&);
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
 
     // Use this with caution! No type checking is done!
     RenderBox* previousSiblingBox() const;
@@ -178,10 +185,10 @@ public:
     
     void updateLayerTransform();
 
-    LayoutUnit contentWidth() const { return clientWidth() - paddingLeft() - paddingRight(); }
-    LayoutUnit contentHeight() const { return clientHeight() - paddingTop() - paddingBottom(); }
-    LayoutUnit contentLogicalWidth() const { return style()->isHorizontalWritingMode() ? contentWidth() : contentHeight(); }
-    LayoutUnit contentLogicalHeight() const { return style()->isHorizontalWritingMode() ? contentHeight() : contentWidth(); }
+    LayoutUnit contentWidth(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return clientWidth() - paddingLeft(paddingOption) - paddingRight(paddingOption); }
+    LayoutUnit contentHeight(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return clientHeight() - paddingTop(paddingOption) - paddingBottom(paddingOption); }
+    LayoutUnit contentLogicalWidth(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return style()->isHorizontalWritingMode() ? contentWidth(paddingOption) : contentHeight(paddingOption); }
+    LayoutUnit contentLogicalHeight(PaddingOptions paddingOption = ExcludeIntrinsicPadding) const { return style()->isHorizontalWritingMode() ? contentHeight(paddingOption) : contentWidth(paddingOption); }
 
     // IE extensions. Used to calculate offsetWidth/Height.  Overridden by inlines (RenderFlow)
     // to return the remaining width on a given line (and the height of a single line).
@@ -246,7 +253,7 @@ public:
     virtual LayoutUnit collapsedMarginBefore() const { return marginBefore(); }
     virtual LayoutUnit collapsedMarginAfter() const { return marginAfter(); }
 
-    virtual void absoluteRects(Vector<LayoutRect>&, const LayoutPoint& accumulatedOffset) const;
+    virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const;
     
     LayoutRect reflectionBox() const;
@@ -321,7 +328,7 @@ public:
         return document()->inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrPositioned() && (isRoot() || isBody());
     }
 
-    virtual LayoutSize intrinsicSize() const { return LayoutSize(); }
+    virtual IntSize intrinsicSize() const { return IntSize(); }
     LayoutUnit intrinsicLogicalWidth() const { return style()->isHorizontalWritingMode() ? intrinsicSize().width() : intrinsicSize().height(); }
     LayoutUnit intrinsicLogicalHeight() const { return style()->isHorizontalWritingMode() ? intrinsicSize().height() : intrinsicSize().width(); }
 
@@ -424,11 +431,11 @@ public:
     virtual LayoutUnit baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const;
 
     LayoutPoint flipForWritingModeForChild(const RenderBox* child, const LayoutPoint&) const;
-    int flipForWritingMode(int position) const; // The offset is in the block direction (y for horizontal writing modes, x for vertical writing modes).
-    IntPoint flipForWritingMode(const IntPoint&) const;
+    LayoutUnit flipForWritingMode(LayoutUnit position) const; // The offset is in the block direction (y for horizontal writing modes, x for vertical writing modes).
+    LayoutPoint flipForWritingMode(const LayoutPoint&) const;
     LayoutPoint flipForWritingModeIncludingColumns(const LayoutPoint&) const;
-    IntSize flipForWritingMode(const IntSize&) const;
-    void flipForWritingMode(IntRect&) const;
+    LayoutSize flipForWritingMode(const LayoutSize&) const;
+    void flipForWritingMode(LayoutRect&) const;
     FloatPoint flipForWritingMode(const FloatPoint&) const;
     void flipForWritingMode(FloatRect&) const;
     // These represent your location relative to your container as a physical offset.
@@ -448,6 +455,33 @@ public:
     virtual void computeIntrinsicRatioInformation(FloatSize& /* intrinsicSize */, double& /* intrinsicRatio */, bool& /* isPercentageIntrinsicSize */) const { }
 
     IntSize scrolledContentOffset() const;
+    IntSize cachedSizeForOverflowClip() const;
+    void updateCachedSizeForOverflowClip();
+    void clearCachedSizeForOverflowClip();
+
+    virtual bool hasRelativeDimensions() const;
+
+    bool hasHorizontalLayoutOverflow() const
+    {
+        if (RenderOverflow* overflow = hasRenderOverflow()) {
+            LayoutRect layoutOverflowRect = overflow->layoutOverflowRect();
+            flipForWritingMode(layoutOverflowRect);
+            return layoutOverflowRect.x() < x() || layoutOverflowRect.maxX() > x() + logicalWidth();
+        }
+
+        return false;
+    }
+
+    bool hasVerticalLayoutOverflow() const
+    {
+        if (RenderOverflow* overflow = hasRenderOverflow()) {
+            LayoutRect layoutOverflowRect = overflow->layoutOverflowRect();
+            flipForWritingMode(layoutOverflowRect);
+            return layoutOverflowRect.y() < y() || layoutOverflowRect.maxY() > y() + logicalHeight();
+        }
+
+        return false;
+    }
 
 protected:
     virtual void willBeDestroyed();
@@ -575,6 +609,24 @@ inline RenderBox* RenderBox::firstChildBox() const
 inline RenderBox* RenderBox::lastChildBox() const
 {
     return toRenderBox(lastChild());
+}
+
+inline bool RenderBox::requiresLayerForOverflowClip() const
+{
+    if (!hasOverflowClip())
+        return false;
+
+    // The resizer is attached to the RenderLayer so we need one.
+    if (style()->resize() != RESIZE_NONE)
+        return true;
+
+    // FIXME: overflow: auto could also lazily create its layer but some repainting
+    // issues are arising from that.
+    bool onlyOverflowHidden = style()->overflowX() == OHIDDEN && style()->overflowY() == OHIDDEN;
+
+    // Currently {push|pop}ContentsClip do not handle properly all cases involving a clip
+    // with a border radius so we need a RenderLayer to handle them.
+    return !onlyOverflowHidden || style()->hasBorderRadius();
 }
 
 } // namespace WebCore

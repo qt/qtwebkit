@@ -30,7 +30,6 @@
 #include "ClipboardQt.h"
 
 #include "CachedImage.h"
-#include "DOMStringList.h"
 #include "DataTransferItemListQt.h"
 #include "Document.h"
 #include "DragData.h"
@@ -144,28 +143,21 @@ void ClipboardQt::clearAllData()
     m_writableData = 0;
 }
 
-String ClipboardQt::getData(const String& type, bool& success) const
+String ClipboardQt::getData(const String& type) const
 {
 
-    if (policy() != ClipboardReadable) {
-        success = false;
+    if (policy() != ClipboardReadable)
         return String();
-    }
 
-    if (isHtmlMimeType(type) && m_readableData->hasHtml()) {
-        success = true;
+    if (isHtmlMimeType(type) && m_readableData->hasHtml())
         return m_readableData->html();
-    }
 
-    if (isTextMimeType(type) && m_readableData->hasText()) {
-        success = true;
+    if (isTextMimeType(type) && m_readableData->hasText())
         return m_readableData->text();
-    }
 
     ASSERT(m_readableData);
     QByteArray rawData = m_readableData->data(type);
     QString data = QTextCodec::codecForName("UTF-16")->toUnicode(rawData);
-    success = !data.isEmpty();
     return data;
 }
 
@@ -190,17 +182,17 @@ bool ClipboardQt::setData(const String& type, const String& data)
 }
 
 // extensions beyond IE's API
-PassRefPtr<DOMStringList> ClipboardQt::types() const
+HashSet<String> ClipboardQt::types() const
 {
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
-        return DOMStringList::create();
+        return HashSet<String>();
 
     ASSERT(m_readableData);
-    RefPtr<DOMStringList> result = DOMStringList::create();
+    HashSet<String> result;
     QStringList formats = m_readableData->formats();
     for (int i = 0; i < formats.count(); ++i)
-        result->append(formats.at(i));
-    return result.release();
+        result.add(formats.at(i));
+    return result;
 }
 
 PassRefPtr<FileList> ClipboardQt::files() const

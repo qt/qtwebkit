@@ -790,7 +790,7 @@ ObjectContentType FrameLoaderClientBlackBerry::objectContentType(const KURL& url
 
 void FrameLoaderClientBlackBerry::dispatchWillClose()
 {
-    m_webPagePrivate->m_inputHandler->frameUnloaded(m_frame);
+    m_webPagePrivate->frameUnloaded(m_frame);
 }
 
 void FrameLoaderClientBlackBerry::setMainDocumentError(DocumentLoader*, const ResourceError& error)
@@ -926,7 +926,7 @@ void FrameLoaderClientBlackBerry::detachedFromParent2()
     if (m_frame->document())
         m_webPagePrivate->clearDocumentData(m_frame->document());
 
-    m_webPagePrivate->m_inputHandler->frameUnloaded(m_frame);
+    m_webPagePrivate->frameUnloaded(m_frame);
     m_webPagePrivate->m_client->notifyFrameDetached(m_frame);
 }
 
@@ -968,12 +968,6 @@ void FrameLoaderClientBlackBerry::dispatchWillSendRequest(DocumentLoader* docLoa
         m_webPagePrivate->m_client->notifyClientRedirect(originalUrl.characters(), originalUrl.length(),
             finalUrl.characters(), finalUrl.length());
     }
-
-    // FIXME: Update the request type. See PR #119792.
-    if (docLoader->frameLoader()->isLoadingMainFrame())
-        request.setTargetType(ResourceRequest::TargetIsMainFrame);
-    else
-        request.setTargetType(ResourceRequest::TargetIsSubframe);
 
     FrameLoader* loader = m_frame->loader();
     ASSERT(loader);
@@ -1058,7 +1052,7 @@ void FrameLoaderClientBlackBerry::restoreViewState()
 
     // When rotate happens, only zoom when previous page was zoomToFitScale, otherwise keep old scale.
     if (orientationChanged && viewState.isZoomToFitScale)
-        scale = BlackBerry::Platform::Graphics::Screen::width() * scale / static_cast<double>(BlackBerry::Platform::Graphics::Screen::height());
+        scale = BlackBerry::Platform::Graphics::Screen::primaryScreen()->width() * scale / static_cast<double>(BlackBerry::Platform::Graphics::Screen::primaryScreen()->height());
     m_webPagePrivate->m_backingStore->d->suspendScreenAndBackingStoreUpdates(); // don't flash checkerboard for the setScrollPosition call
     m_frame->view()->setContentsSizeFromHistory(contentsSize);
 

@@ -53,6 +53,7 @@ SOURCES += \
     bytecode/CallLinkStatus.cpp \
     bytecode/CodeBlock.cpp \
     bytecode/DFGExitProfile.cpp \
+    bytecode/ExecutionCounter.cpp \
     bytecode/GetByIdStatus.cpp \
     bytecode/JumpTable.cpp \
     bytecode/LazyOperandValueProfile.cpp \
@@ -94,6 +95,7 @@ SOURCES += \
     dfg/DFGDriver.cpp \
     dfg/DFGGraph.cpp \
     dfg/DFGJITCompiler.cpp \
+    dfg/DFGNode.cpp \
     dfg/DFGOperations.cpp \
     dfg/DFGOSREntry.cpp \
     dfg/DFGOSRExit.cpp \
@@ -102,6 +104,7 @@ SOURCES += \
     dfg/DFGOSRExitCompiler32_64.cpp \
     dfg/DFGPhase.cpp \
     dfg/DFGPredictionPropagationPhase.cpp \
+    dfg/DFGRedundantPhiEliminationPhase.cpp \
     dfg/DFGRepatch.cpp \
     dfg/DFGSpeculativeJIT.cpp \
     dfg/DFGSpeculativeJIT32_64.cpp \

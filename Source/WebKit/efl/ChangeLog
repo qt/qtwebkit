@@ -1,3 +1,166 @@
+2012-03-09  Jon Lee  <jonlee@apple.com>
+
+        Rename NotificationPresenter to NotificationClient
+        https://bugs.webkit.org/show_bug.cgi?id=80488
+        <rdar://problem/10965558>
+
+        Reviewed by Kentaro Hara.
+
+        Refactor to use renamed WebCore::NotificationClient.
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::notificationPresenter):
+        * WebCoreSupport/ChromeClientEfl.h:
+        (ChromeClientEfl):
+
+2012-03-08  Hyowon Kim  <hw1008.kim@samsung.com>
+
+        [Texmap][EFL] Implementation of AcceleratedCompositingContext for EFL port
+        https://bugs.webkit.org/show_bug.cgi?id=80266
+
+        Reviewed by Noam Rosenthal.
+
+        This patch adds EFL's implementation of AcceleratedCompositingContext to WebCoreSupport.
+
+        * WebCoreSupport/AcceleratedCompositingContextEfl.cpp: Added.
+        (WebCore):
+        (WebCore::AcceleratedCompositingContext::create):
+        (WebCore::AcceleratedCompositingContext::AcceleratedCompositingContext):
+        (WebCore::AcceleratedCompositingContext::~AcceleratedCompositingContext):
+        (WebCore::AcceleratedCompositingContext::initialize):
+        (WebCore::AcceleratedCompositingContext::syncLayersNow):
+        (WebCore::AcceleratedCompositingContext::renderLayers):
+        (WebCore::AcceleratedCompositingContext::attachRootGraphicsLayer):
+        (WebCore::AcceleratedCompositingContext::context):
+        * WebCoreSupport/AcceleratedCompositingContextEfl.h: Added.
+        (WebCore):
+        (AcceleratedCompositingContext):
+
+2012-03-02  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL] Enabling 'Inspect Element' in Ewk_Context_Menu_Action.
+        https://bugs.webkit.org/show_bug.cgi?id=79646
+
+        Reviewed by Andreas Kling.
+
+        INSPECTOR feature is already enabled for WebKit-Efl port (OptionsEfl.cmake).
+        As a result WebCore's ContextMenuAction contains ContextMenuItemTagInspectElement
+        and enums order has been changed. WebKit-Efl has to synchronize ContextMenuAction
+        with Ewk_Context_Menu_Action.
+        To avoid similar case in the feature I added checks between WebCore and
+        WebKit-EFL's enums by using COMPILE_ASSERT_MATCHING_ENUM.
+
+        * WebCoreSupport/AssertMatchingEnums.cpp:
+        * ewk/ewk_contextmenu.h:
+
+2012-02-29  Tomasz Morawski  <t.morawski@samsung.com>
+
+        [EFL] Replace malloc/calloc/free to new/delete.
+        https://bugs.webkit.org/show_bug.cgi?id=75848
+
+        Reviewed by Hajime Morita.
+
+        Replaced almost all malloc/calloc/free to new/delete operator and where it was possible smart pointers were also
+        used. Left few c memory allocation by intention to not mix c and c++ memory managment. Left malloc for Ewk_Tile
+        object due to const fields present in Ewk_tile structure.
+
+        * ewk/ewk_auth_soup.cpp:
+        * ewk/ewk_contextmenu.cpp:
+        (ewk_context_menu_unref):
+        (ewk_context_menu_item_new):
+        (ewk_context_menu_item_free):
+        (ewk_context_menu_new):
+        * ewk/ewk_cookies.cpp:
+        (ewk_cookies_get_all):
+        (ewk_cookies_cookie_free):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_hit_test_free):
+        (ewk_frame_hit_test_new):
+        * ewk/ewk_history.cpp:
+        (ewk_history_item_new_from_core):
+        (_ewk_history_item_free):
+        (ewk_history_new):
+        (ewk_history_free):
+        * ewk/ewk_tiled_backing_store.cpp:
+        (_Ewk_Tiled_Backing_Store_Item):
+        (_ewk_tiled_backing_store_pre_render_request_add):
+        (_ewk_tiled_backing_store_pre_render_request_del):
+        (_ewk_tiled_backing_store_pre_render_request_flush):
+        (_ewk_tiled_backing_store_pre_render_request_clear):
+        (_ewk_tiled_backing_store_item_add):
+        (_ewk_tiled_backing_store_item_del):
+        * ewk/ewk_tiled_matrix.cpp:
+        (_ewk_tile_matrix_tile_free):
+        (ewk_tile_matrix_new):
+        (ewk_tile_matrix_zoom_level_set):
+        (ewk_tile_matrix_invalidate):
+        (ewk_tile_matrix_free):
+        * ewk/ewk_tiled_model.cpp:
+        (tile_account):
+        (ewk_tile_unused_cache_new):
+        (_ewk_tile_unused_cache_free):
+        (ewk_tile_unused_cache_clear):
+        (ewk_tile_unused_cache_flush):
+        (ewk_tile_unused_cache_tile_get):
+        (ewk_tile_unused_cache_tile_put):
+        * ewk/ewk_tiled_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_core_frame_new):
+        (_ewk_view_priv_new):
+        (_ewk_view_priv_del):
+        (ewk_view_core_page_get):
+        (ewk_view_popup_new):
+        (ewk_view_popup_destroy):
+        (EWKPrivate::corePage):
+        * ewk/ewk_window_features.cpp:
+        (ewk_window_features_unref):
+        (ewk_window_features_new_from_core):
+
+2012-02-27  JungJik Lee  <jungjik.lee@samsung.com>
+
+        [EFL] Pairing up between evas_object_image_data_get and evas_object_image_data_set.
+        https://bugs.webkit.org/show_bug.cgi?id=79031
+
+        Reviewed by Zoltan Herczeg.
+
+        - Get the pixel data when the cairo surface is created.
+        - evas_object_image_data_get increases the reference count and returns the image buffer pointer.
+        evas_object_image_data_set decreases the reference count and when the ref count become zero,
+        the function releases the cached image inside evas engine.
+        We should make a pair between evas_object_image_data_set/get to return evas resource.
+
+        * ewk/ewk_tiled_backing_store.h:
+        (_Ewk_Tile):
+        * ewk/ewk_tiled_model.cpp:
+        (tile_account):
+        (ewk_tile_new):
+        * ewk/ewk_view_tiled.cpp:
+        (_ewk_view_tiled_render_cb):
+
+2012-02-26  Hajime Morrita  <morrita@chromium.org>
+
+        Move ChromeClient::showContextMenu() to ContextMenuClient
+        https://bugs.webkit.org/show_bug.cgi?id=79427
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/ChromeClientEfl.h:
+        (ChromeClientEfl):
+
+2012-02-24  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL][DRT] Implement setValueForUser and setAutofilled.
+        https://bugs.webkit.org/show_bug.cgi?id=79237
+
+        Reviewed by Andreas Kling.
+
+        Adds missing implementation setValueForUser and setAutofilled to EFL's DumpRenderTreeSupport.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setValueForUser):
+        (DumpRenderTreeSupportEfl::setAutofilled):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
 2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
 
         SpellCheckRequest needs to know the context where the spellcheck happened.

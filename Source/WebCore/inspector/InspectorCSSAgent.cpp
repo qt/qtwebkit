@@ -36,6 +36,7 @@
 #include "CSSStyleRule.h"
 #include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
+#include "ContentSecurityPolicy.h"
 #include "DOMWindow.h"
 #include "HTMLHeadElement.h"
 #include "InspectorDOMAgent.h"
@@ -46,6 +47,7 @@
 #include "Node.h"
 #include "NodeList.h"
 #include "StylePropertySet.h"
+#include "StyleRule.h"
 #include "StyleSheetList.h"
 
 #include <wtf/CurrentTime.h>
@@ -168,7 +170,7 @@ inline void SelectorProfile::startSelector(const CSSStyleRule* rule)
             url = InspectorDOMAgent::documentURLString(styleSheet->findDocument());
     }
     m_currentMatchData.url = url;
-    m_currentMatchData.lineNumber = rule->sourceLine();
+    m_currentMatchData.lineNumber = rule->styleRule()->sourceLine();
     m_currentMatchData.startTime = WTF::currentTimeMS();
 }
 
@@ -895,13 +897,15 @@ InspectorStyleSheet* InspectorCSSAgent::viaInspectorStyleSheet(Document* documen
             targetNode = document->body();
         else
             return 0;
+
+        InlineStyleOverrideScope overrideScope(document);
         targetNode->appendChild(styleElement, ec);
     }
     if (ec)
         return 0;
     StyleSheetList* styleSheets = document->styleSheets();
     StyleSheet* styleSheet = styleSheets->item(styleSheets->length() - 1);
-    if (!styleSheet->isCSSStyleSheet())
+    if (!styleSheet || !styleSheet->isCSSStyleSheet())
         return 0;
     CSSStyleSheet* cssStyleSheet = static_cast<CSSStyleSheet*>(styleSheet);
     String id = String::number(m_lastStyleSheetId++);
@@ -984,10 +988,8 @@ void InspectorCSSAgent::didRemoveDOMNode(Node* node)
     if (!node)
         return;
 
-    if (m_lastElementWithPseudoState.get() == node) {
+    if (m_lastElementWithPseudoState.get() == node)
         clearPseudoState(false);
-        return;
-    }
 
     NodeToInspectorStyleSheet::iterator it = m_nodeToInspectorStyleSheet.find(node);
     if (it == m_nodeToInspectorStyleSheet.end())

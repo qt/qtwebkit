@@ -30,7 +30,7 @@
 
 #import "WKAPICast.h"
 #import "WebContext.h"
-#import "WKInspectorMac.h"
+#import "WKInspectorPrivateMac.h"
 #import "WKViewPrivate.h"
 #import "WebPageGroup.h"
 #import "WebPageProxy.h"
@@ -51,15 +51,18 @@ static const CGFloat windowContentBorderThickness = 55;
 // WKWebInspectorProxyObjCAdapter is a helper ObjC object used as a delegate or notification observer
 // for the sole purpose of getting back into the C++ code from an ObjC caller.
 
-@interface WKWebInspectorProxyObjCAdapter : NSObject <NSWindowDelegate> {
-    WebInspectorProxy* _inspectorProxy; // Not retained to prevent cycles
-}
+@interface WKWebInspectorProxyObjCAdapter ()
 
 - (id)initWithWebInspectorProxy:(WebInspectorProxy*)inspectorProxy;
 
 @end
 
 @implementation WKWebInspectorProxyObjCAdapter
+
+- (WKInspectorRef)inspectorRef
+{
+    return toAPI(static_cast<WebInspectorProxy*>(_inspectorProxy));
+}
 
 - (id)initWithWebInspectorProxy:(WebInspectorProxy*)inspectorProxy
 {
@@ -68,19 +71,19 @@ static const CGFloat windowContentBorderThickness = 55;
     if (!(self = [super init]))
         return nil;
 
-    _inspectorProxy = inspectorProxy; // Not retained to prevent cycles
+    _inspectorProxy = static_cast<void*>(inspectorProxy); // Not retained to prevent cycles
 
     return self;
 }
 
 - (void)windowWillClose:(NSNotification *)notification
 {
-    _inspectorProxy->close();
+    static_cast<WebInspectorProxy*>(_inspectorProxy)->close();
 }
 
 - (void)inspectedViewFrameDidChange:(NSNotification *)notification
 {
-    _inspectorProxy->inspectedViewFrameDidChange();
+    static_cast<WebInspectorProxy*>(_inspectorProxy)->inspectedViewFrameDidChange();
 }
 
 @end
@@ -191,8 +194,14 @@ void WebInspectorProxy::platformDidClose()
 
 void WebInspectorProxy::platformBringToFront()
 {
-    // FIXME: this will not bring a background tab in Safari to the front, only its window.
+    // FIXME <rdar://problem/10937688>: this will not bring a background tab in Safari to the front, only its window.
     [m_inspectorView.get().window makeKeyAndOrderFront:nil];
+}
+
+bool WebInspectorProxy::platformIsFront()
+{
+    // FIXME <rdar://problem/10937688>: this will not return false for a background tab in Safari, only a background window.
+    return m_isVisible && [m_inspectorView.get().window isMainWindow];
 }
 
 void WebInspectorProxy::platformInspectedURLChanged(const String& urlString)

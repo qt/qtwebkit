@@ -114,9 +114,9 @@ private:
 
 inline void LineWidth::updateAvailableWidth()
 {
-    int height = m_block->logicalHeight();
-    m_left = m_block->logicalLeftOffsetForLine(height, m_isFirstLine);
-    m_right = m_block->logicalRightOffsetForLine(height, m_isFirstLine);
+    LayoutUnit height = m_block->logicalHeight();
+    m_left = m_block->pixelSnappedLogicalLeftOffsetForLine(height, m_isFirstLine);
+    m_right = m_block->pixelSnappedLogicalRightOffsetForLine(height, m_isFirstLine);
 
     computeAvailableWidthFromLeftAndRight();
 }
@@ -759,8 +759,8 @@ void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox,
                                                          GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache)
 {
     ETextAlign textAlign = textAlignmentForLine(!reachedEnd && !lineBox->endsWithBreak());
-    float logicalLeft = logicalLeftOffsetForLine(logicalHeight(), lineInfo.isFirstLine());
-    float availableLogicalWidth = logicalRightOffsetForLine(logicalHeight(), lineInfo.isFirstLine()) - logicalLeft;
+    float logicalLeft = pixelSnappedLogicalLeftOffsetForLine(logicalHeight(), lineInfo.isFirstLine());
+    float availableLogicalWidth = pixelSnappedLogicalRightOffsetForLine(logicalHeight(), lineInfo.isFirstLine()) - logicalLeft;
 
     bool needsWordSpacing = false;
     float totalLogicalWidth = lineBox->getFlowSpacingLogicalWidth();
@@ -943,10 +943,10 @@ void RenderBlock::appendFloatingObjectToLastLine(FloatingObject* floatingObject)
 }
 
 // FIXME: This should be a BidiStatus constructor or create method.
-static inline BidiStatus statusWithDirection(TextDirection textDirection)
+static inline BidiStatus statusWithDirection(TextDirection textDirection, bool isOverride)
 {
     WTF::Unicode::Direction direction = textDirection == LTR ? LeftToRight : RightToLeft;
-    RefPtr<BidiContext> context = BidiContext::create(textDirection == LTR ? 0 : 1, direction, false, FromStyleOrDOM);
+    RefPtr<BidiContext> context = BidiContext::create(textDirection == LTR ? 0 : 1, direction, isOverride, FromStyleOrDOM);
 
     // This copies BidiStatus and may churn the ref on BidiContext. I doubt it matters.
     return BidiStatus(direction, direction, direction, context.release());
@@ -980,10 +980,10 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
         if (unicodeBidi == Plaintext)
             determineDirectionality(direction, InlineIterator(isolatedInline, isolatedRun->object(), 0));
         else {
-            ASSERT(unicodeBidi == Isolate);
+            ASSERT(unicodeBidi == Isolate || unicodeBidi == OverrideIsolate);
             direction = isolatedInline->style()->direction();
         }
-        isolatedResolver.setStatus(statusWithDirection(direction));
+        isolatedResolver.setStatus(statusWithDirection(direction, isOverride(unicodeBidi)));
 
         // FIXME: The fact that we have to construct an Iterator here
         // currently prevents this code from moving into BidiResolver.
@@ -1272,7 +1272,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             if (isNewUBAParagraph && styleToUse->unicodeBidi() == Plaintext && !resolver.context()->parent()) {
                 TextDirection direction = styleToUse->direction();
                 determineDirectionality(direction, resolver.position());
-                resolver.setStatus(BidiStatus(direction, styleToUse->unicodeBidi() == Override));
+                resolver.setStatus(BidiStatus(direction, isOverride(styleToUse->unicodeBidi())));
             }
             // FIXME: This ownership is reversed. We should own the BidiRunList and pass it to createBidiRunsForLine.
             BidiRunList<BidiRun>& bidiRuns = resolver.runs();
@@ -1462,7 +1462,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
     LineLayoutState layoutState(isFullLayout, repaintLogicalTop, repaintLogicalBottom);
 
     if (isFullLayout)
-        deleteLineBoxTree();
+        lineBoxes()->deleteLineBoxes(renderArena());
 
     // Text truncation only kicks in if your overflow isn't visible and your text-overflow-mode isn't
     // clip.
@@ -1486,7 +1486,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
             if (o->isReplaced() || o->isFloating() || o->isPositioned()) {
                 RenderBox* box = toRenderBox(o);
 
-                if (relayoutChildren || o->style()->width().isPercent() || o->style()->height().isPercent())
+                if (relayoutChildren || box->hasRelativeDimensions())
                     o->setChildNeedsLayout(true, false);
 
                 // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
@@ -1546,7 +1546,7 @@ void RenderBlock::checkFloatsInCleanLine(RootInlineBox* line, Vector<FloatWithRe
     for (Vector<RenderBox*>::iterator it = cleanLineFloats->begin(); it != end; ++it) {
         RenderBox* floatingBox = *it;
         floatingBox->layoutIfNeeded();
-        LayoutSize newSize(floatingBox->width() + floatingBox->marginLeft() + floatingBox->marginRight(), floatingBox->height() + floatingBox->marginTop() + floatingBox->marginBottom());
+        LayoutSize newSize(floatingBox->width() + floatingBox->marginWidth(), floatingBox->height() + floatingBox->marginHeight());
         ASSERT(floatIndex < floats.size());
         if (floats[floatIndex].object != floatingBox) {
             encounteredNewFloat = true;
@@ -1682,7 +1682,7 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
         TextDirection direction = style()->direction();
         if (style()->unicodeBidi() == Plaintext)
             determineDirectionality(direction, InlineIterator(this, bidiFirstSkippingEmptyInlines(this), 0));
-        resolver.setStatus(BidiStatus(direction, style()->unicodeBidi() == Override));
+        resolver.setStatus(BidiStatus(direction, isOverride(style()->unicodeBidi())));
         InlineIterator iter = InlineIterator(this, bidiFirstSkippingEmptyInlines(this, &resolver), 0);
         resolver.setPosition(iter, numberOfIsolateAncestors(iter));
     }

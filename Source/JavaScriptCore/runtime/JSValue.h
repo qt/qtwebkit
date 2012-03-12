@@ -221,7 +221,8 @@ namespace JSC {
         JSValue get(ExecState*, unsigned propertyName) const;
         JSValue get(ExecState*, unsigned propertyName, PropertySlot&) const;
         void put(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-        void put(ExecState*, unsigned propertyName, JSValue);
+        void putToPrimitive(ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
+        void putByIndex(ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
 
         JSObject* toThisObject(ExecState*) const;
 
@@ -251,8 +252,6 @@ namespace JSC {
         JS_EXPORT_PRIVATE JSString* toStringSlowCase(ExecState*) const;
         JS_EXPORT_PRIVATE JSObject* toObjectSlowCase(ExecState*, JSGlobalObject*) const;
         JS_EXPORT_PRIVATE JSObject* toThisObjectSlowCase(ExecState*) const;
-
-        JSObject* synthesizeObject(ExecState*) const;
 
 #if USE(JSVALUE32_64)
         /*

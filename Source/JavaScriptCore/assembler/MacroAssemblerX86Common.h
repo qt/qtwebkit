@@ -34,6 +34,11 @@
 namespace JSC {
 
 class MacroAssemblerX86Common : public AbstractMacroAssembler<X86Assembler> {
+protected:
+#if CPU(X86_64)
+    static const X86Registers::RegisterID scratchRegister = X86Registers::r11;
+#endif
+
     static const int DoubleConditionBitInvert = 0x10;
     static const int DoubleConditionBitSpecial = 0x20;
     static const int DoubleConditionBits = DoubleConditionBitInvert | DoubleConditionBitSpecial;
@@ -85,6 +90,13 @@ public:
         DoubleConditionBits_should_not_interfere_with_X86Assembler_Condition_codes);
 
     static const RegisterID stackPointerRegister = X86Registers::esp;
+
+#if ENABLE(JIT_CONSTANT_BLINDING)
+    static bool shouldBlindForSpecificArch(uint32_t value) { return value >= 0x00ffffff; }
+#if CPU(X86_64)
+    static bool shouldBlindForSpecificArch(uintptr_t value) { return value >= 0x00ffffff; }
+#endif
+#endif
 
     // Integer arithmetic operations:
     //
@@ -223,16 +235,6 @@ public:
         m_assembler.negl_m(srcDest.offset, srcDest.base);
     }
 
-    void not32(RegisterID srcDest)
-    {
-        m_assembler.notl_r(srcDest);
-    }
-
-    void not32(Address srcDest)
-    {
-        m_assembler.notl_m(srcDest.offset, srcDest.base);
-    }
-    
     void or32(RegisterID src, RegisterID dest)
     {
         m_assembler.orl_rr(src, dest);
@@ -375,7 +377,6 @@ public:
         m_assembler.subl_rm(src, dest.offset, dest.base);
     }
 
-
     void xor32(RegisterID src, RegisterID dest)
     {
         m_assembler.xorl_rr(src, dest);
@@ -383,11 +384,17 @@ public:
 
     void xor32(TrustedImm32 imm, Address dest)
     {
-        m_assembler.xorl_im(imm.m_value, dest.offset, dest.base);
+        if (imm.m_value == -1)
+            m_assembler.notl_m(dest.offset, dest.base);
+        else
+            m_assembler.xorl_im(imm.m_value, dest.offset, dest.base);
     }
 
     void xor32(TrustedImm32 imm, RegisterID dest)
     {
+        if (imm.m_value == -1)
+        m_assembler.notl_r(dest);
+        else
         m_assembler.xorl_ir(imm.m_value, dest);
     }
 
@@ -423,6 +430,23 @@ public:
     {
         m_assembler.sqrtsd_rr(src, dst);
     }
+
+    void absDouble(FPRegisterID src, FPRegisterID dst)
+    {
+        ASSERT(src != dst);
+        static const double negativeZeroConstant = -0.0;
+        loadDouble(&negativeZeroConstant, dst);
+        m_assembler.andnpd_rr(src, dst);
+    }
+
+    void negateDouble(FPRegisterID src, FPRegisterID dst)
+    {
+        ASSERT(src != dst);
+        static const double negativeZeroConstant = -0.0;
+        loadDouble(&negativeZeroConstant, dst);
+        m_assembler.xorpd_rr(src, dst);
+    }
+
 
     // Memory access operations:
     //
@@ -618,6 +642,17 @@ public:
         ASSERT(isSSE2Present());
         if (src != dest)
             m_assembler.movsd_rr(src, dest);
+    }
+
+    void loadDouble(const void* address, FPRegisterID dest)
+    {
+#if CPU(X86)
+        ASSERT(isSSE2Present());
+        m_assembler.movsd_mr(address, dest);
+#else
+        move(TrustedImmPtr(address), scratchRegister);
+        loadDouble(scratchRegister, dest);
+#endif
     }
 
     void loadDouble(ImplicitAddress address, FPRegisterID dest)

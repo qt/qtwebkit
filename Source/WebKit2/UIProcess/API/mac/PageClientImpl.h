@@ -37,10 +37,6 @@ namespace WebKit {
 
 class FindIndicatorWindow;
 
-// NOTE: This does not use String::operator NSString*() since that function
-// expects to be called on the thread running WebCore.
-NSString* nsStringFromWebCoreString(const String&);
-
 class PageClientImpl : public PageClient {
 public:
     static PassOwnPtr<PageClientImpl> create(WKView*);
@@ -59,7 +55,8 @@ private:
     virtual bool isViewFocused();
     virtual bool isViewVisible();
     virtual bool isViewInWindow();
-    
+    virtual LayerHostingMode layerHostingMode();
+
     virtual void processDidCrash();
     virtual void pageClosed();
     virtual void didRelaunchProcess();
@@ -95,6 +92,7 @@ private:
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&);
     virtual void exitAcceleratedCompositingMode();
+    virtual void updateAcceleratedCompositingMode(const LayerTreeContext&);
 
     virtual void accessibilityWebProcessTokenReceived(const CoreIPC::DataReference&);
 

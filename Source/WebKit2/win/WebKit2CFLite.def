@@ -169,7 +169,8 @@ EXPORTS
         ?page@Document@WebCore@@QBEPAVPage@2@XZ
         ?paintControlTints@FrameView@WebCore@@AAEXXZ
         ?rangeFromLocationAndLength@TextIterator@WebCore@@SA?AV?$PassRefPtr@VRange@WebCore@@@WTF@@PAVElement@2@HH_N@Z
-        ?removeShadowRoot@Element@WebCore@@QAEXXZ
+        ?removeShadowRootList@Element@WebCore@@QAEXXZ
+        ?s_info@JSNode@WebCore@@2UClassInfo@JSC@@B
         ?scriptExecutionContext@JSDOMGlobalObject@WebCore@@QBEPAVScriptExecutionContext@2@XZ
         ?scrollElementToRect@FrameView@WebCore@@QAEXPAVElement@2@ABVIntRect@2@@Z
         ?setDOMException@WebCore@@YAXPAVExecState@JSC@@H@Z
@@ -183,8 +184,9 @@ EXPORTS
         ?settings@Document@WebCore@@QBEPAVSettings@2@XZ
         ?settings@Frame@WebCore@@QBEPAVSettings@2@XZ
         ?setFixedElementsLayoutRelativeToFrame@Settings@WebCore@@QAEX_N@Z
-        ?shadowRootList@Element@WebCore@@QBEPAVShadowRootList@2@XZ
+        ?shadowTree@Element@WebCore@@QBEPAVShadowTree@2@XZ
         ?suggestedValue@HTMLInputElement@WebCore@@QBEABVString@WTF@@XZ
+        ?text@Range@WebCore@@QBE?AVString@WTF@@XZ
         ?toDocument@WebCore@@YAPAVDocument@1@VJSValue@JSC@@@Z
         ?toElement@WebCore@@YAPAVElement@1@VJSValue@JSC@@@Z
         ?toJS@WebCore@@YA?AVJSValue@JSC@@PAVExecState@3@PAVJSDOMGlobalObject@1@PAVClientRect@1@@Z

@@ -174,10 +174,6 @@ private:
     virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const OVERRIDE;
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const OVERRIDE;
 
-#if ENABLE(CONTEXT_MENUS)
-    virtual void showContextMenu() OVERRIDE;
-#endif
-
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) OVERRIDE;
     virtual void setNeedsOneShotDrawingSynchronization() OVERRIDE;
@@ -206,7 +202,6 @@ private:
     virtual bool supportsFullScreenForElement(const WebCore::Element*, bool withKeyboard) OVERRIDE;
     virtual void enterFullScreenForElement(WebCore::Element*) OVERRIDE;
     virtual void exitFullScreenForElement(WebCore::Element*) OVERRIDE;
-    virtual void setRootFullScreenLayer(WebCore::GraphicsLayer*) OVERRIDE;
 #endif
 
 #if PLATFORM(MAC)

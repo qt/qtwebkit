@@ -2,8 +2,9 @@ import QtQuick 2.0
 import QtTest 1.0
 import QtWebKit 3.0
 import QtWebKit.experimental 1.0
+import "../common"
 
-WebView {
+TestWebView {
     id: webView
 
     property bool modelMessageEqualsMessage: false
@@ -54,12 +55,6 @@ WebView {
         }
     }
 
-    SignalSpy {
-        id: loadSpy
-        target: webView
-        signalName: "loadSucceeded"
-    }
-
     TestCase {
         id: test
         name: "WebViewJavaScriptDialogs"
@@ -69,55 +64,48 @@ WebView {
             webView.messageFromAlertDialog = ""
             webView.confirmCount = 0
             webView.promptCount = 0
-            loadSpy.clear()
         }
 
         function test_alert() {
-            webView.load(Qt.resolvedUrl("../common/alert.html"))
-            loadSpy.wait()
-            compare(loadSpy.count, 1)
+            webView.url = Qt.resolvedUrl("../common/alert.html")
+            verify(webView.waitForLoadSucceeded())
             compare(webView.messageFromAlertDialog, "Hello Qt")
             verify(webView.modelMessageEqualsMessage)
         }
 
         function test_alertWithoutDialog() {
             webView.experimental.alertDialog = null
-            webView.load(Qt.resolvedUrl("../common/alert.html"))
-            loadSpy.wait()
-            compare(loadSpy.count, 1)
+            webView.url = Qt.resolvedUrl("../common/alert.html")
+            verify(webView.waitForLoadSucceeded())
             compare(webView.messageFromAlertDialog, "")
         }
 
         function test_confirm() {
-            webView.load(Qt.resolvedUrl("../common/confirm.html"))
-            loadSpy.wait()
-            compare(loadSpy.count, 1)
+            webView.url = Qt.resolvedUrl("../common/confirm.html")
+            verify(webView.waitForLoadSucceeded())
             compare(webView.confirmCount, 2)
             compare(webView.title, "ACCEPTED REJECTED")
         }
 
         function test_confirmWithoutDialog() {
             webView.experimental.confirmDialog = null
-            webView.load(Qt.resolvedUrl("../common/confirm.html"))
-            loadSpy.wait()
-            compare(loadSpy.count, 1)
+            webView.url = Qt.resolvedUrl("../common/confirm.html")
+            verify(webView.waitForLoadSucceeded())
             compare(webView.confirmCount, 0)
             compare(webView.title, "ACCEPTED ACCEPTED")
         }
 
         function test_prompt() {
-            webView.load(Qt.resolvedUrl("../common/prompt.html"))
-            loadSpy.wait()
-            compare(loadSpy.count, 1)
+            webView.url = Qt.resolvedUrl("../common/prompt.html")
+            verify(webView.waitForLoadSucceeded())
             compare(webView.promptCount, 2)
             compare(webView.title, "tQ olleH")
         }
 
         function test_promptWithoutDialog() {
             webView.experimental.promptDialog = null
-            webView.load(Qt.resolvedUrl("../common/prompt.html"))
-            loadSpy.wait()
-            compare(loadSpy.count, 1)
+            webView.url = Qt.resolvedUrl("../common/prompt.html")
+            verify(webView.waitForLoadSucceeded())
             compare(webView.promptCount, 0)
             compare(webView.title, "FAIL")
         }

@@ -53,6 +53,7 @@ namespace WebCore {
 
 ScrollingCoordinator::ScrollingCoordinator(Page* page)
     : m_page(page)
+    , m_forceMainThreadScrollLayerPositionUpdates(false)
 #if ENABLE(THREADED_SCROLLING)
     , m_scrollingTreeState(ScrollingTreeState::create())
     , m_scrollingTree(ScrollingTree::create(this))
@@ -265,7 +266,14 @@ void ScrollingCoordinator::updateMainFrameScrollPosition(const IntPoint& scrollP
 void ScrollingCoordinator::updateMainFrameScrollPositionAndScrollLayerPosition(const IntPoint& scrollPosition)
 {
 #if USE(ACCELERATED_COMPOSITING)
+    ASSERT(isMainThread());
+
+    if (!m_page)
+        return;
+
     FrameView* frameView = m_page->mainFrame()->view();
+    if (!frameView)
+        return;
 
     // Make sure to update the main frame scroll position before changing the scroll layer position,
     // otherwise we'll introduce jittering on pages with slow repaint objects (like background-attachment: fixed).
@@ -278,6 +286,22 @@ void ScrollingCoordinator::updateMainFrameScrollPositionAndScrollLayerPosition(c
         scrollLayer->setPosition(-frameView->scrollPosition());
 #endif
 }
+
+#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+void ScrollingCoordinator::handleWheelEventPhase(PlatformWheelEventPhase phase)
+{
+    ASSERT(isMainThread());
+
+    if (!m_page)
+        return;
+
+    FrameView* frameView = m_page->mainFrame()->view();
+    if (!frameView)
+        return;
+
+    frameView->scrollAnimator()->handleWheelEventPhase(phase);
+}
+#endif
 
 void ScrollingCoordinator::recomputeWheelEventHandlerCount()
 {
@@ -294,7 +318,16 @@ void ScrollingCoordinator::updateShouldUpdateScrollLayerPositionOnMainThread()
     FrameView* frameView = m_page->mainFrame()->view();
 
     // FIXME: Having fixed objects on the page should not trigger the slow path.
-    setShouldUpdateScrollLayerPositionOnMainThread(frameView->hasSlowRepaintObjects() || frameView->hasFixedObjects());
+    setShouldUpdateScrollLayerPositionOnMainThread(m_forceMainThreadScrollLayerPositionUpdates || frameView->hasSlowRepaintObjects() || frameView->hasFixedObjects());
+}
+
+void ScrollingCoordinator::setForceMainThreadScrollLayerPositionUpdates(bool forceMainThreadScrollLayerPositionUpdates)
+{
+    if (m_forceMainThreadScrollLayerPositionUpdates == forceMainThreadScrollLayerPositionUpdates)
+        return;
+
+    m_forceMainThreadScrollLayerPositionUpdates = forceMainThreadScrollLayerPositionUpdates;
+    updateShouldUpdateScrollLayerPositionOnMainThread();
 }
 
 #if ENABLE(THREADED_SCROLLING)

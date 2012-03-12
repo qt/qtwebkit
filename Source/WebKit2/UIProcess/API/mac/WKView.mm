@@ -40,6 +40,7 @@
 #import "PDFViewController.h"
 #import "PageClientImpl.h"
 #import "PasteboardTypes.h"
+#import "StringUtilities.h"
 #import "TextChecker.h"
 #import "TextCheckerState.h"
 #import "TiledCoreAnimationDrawingAreaProxy.h"
@@ -373,6 +374,7 @@ struct WKViewInterpretKeyEventsParameters {
 
     // Send back an empty string to the plug-in. This will disable text input.
     _data->_page->sendComplexTextInputToPlugin(_data->_pluginComplexTextInputIdentifier, String());
+    _data->_pluginComplexTextInputIdentifier = 0;   // Always reset the identifier when the plugin is disabled.
 }
 
 typedef HashMap<SEL, String> SelectorNameMap;
@@ -1262,8 +1264,10 @@ static const short kIOHIDEventTypeScroll = 6;
     if (string) {
         _data->_page->sendComplexTextInputToPlugin(_data->_pluginComplexTextInputIdentifier, string);
 
-        if (!usingLegacyCocoaTextInput)
+        if (!usingLegacyCocoaTextInput) {
             _data->_pluginComplexTextInputState = PluginComplexTextInputDisabled;
+            _data->_pluginComplexTextInputIdentifier = 0;   // Always reset the identifier when the plugin is disabled.
+        }
     }
 
     return didHandleEvent;
@@ -2456,6 +2460,12 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     [_data->_layerHostingView.get() setWantsLayer:NO];
     
     _data->_layerHostingView = nullptr;
+}
+
+- (void)_updateAcceleratedCompositingMode:(const WebKit::LayerTreeContext&)layerTreeContext
+{
+    [self _exitAcceleratedCompositingMode];
+    [self _enterAcceleratedCompositingMode:layerTreeContext];
 }
 
 - (void)_setAccessibilityWebProcessToken:(NSData *)data

@@ -101,9 +101,11 @@ bool ScrollableArea::scroll(ScrollDirection direction, ScrollGranularity granula
     case ScrollByPixel:
         step = scrollbar->pixelStep();
         break;
+    case ScrollByPixelVelocity:
+        break;
     }
 
-    if (direction == ScrollUp || direction == ScrollLeft)
+    if (granularity != ScrollByPixelVelocity && (direction == ScrollUp || direction == ScrollLeft))
         multiplier = -multiplier;
 
     return scrollAnimator()->scroll(orientation, granularity, step, multiplier);
@@ -123,6 +125,12 @@ void ScrollableArea::scrollToOffsetWithoutAnimation(ScrollbarOrientation orienta
 }
 
 void ScrollableArea::notifyScrollPositionChanged(const IntPoint& position)
+{
+    scrollPositionChanged(position);
+    scrollAnimator()->setCurrentPosition(position);
+}
+
+void ScrollableArea::scrollPositionChanged(const IntPoint& position)
 {
     // Tell the derived class to scroll its contents.
     setScrollOffset(position);
@@ -169,7 +177,7 @@ void ScrollableArea::setScrollOffsetFromAnimation(const IntPoint& offset)
     if (requestScrollPositionUpdate(offset))
         return;
 
-    notifyScrollPositionChanged(offset);
+    scrollPositionChanged(offset);
 }
 
 void ScrollableArea::willStartLiveResize()
@@ -286,11 +294,13 @@ void ScrollableArea::invalidateScrollbar(Scrollbar* scrollbar, const IntRect& re
     if (scrollbar == horizontalScrollbar()) {
         if (GraphicsLayer* graphicsLayer = layerForHorizontalScrollbar()) {
             graphicsLayer->setNeedsDisplay();
+            graphicsLayer->setContentsNeedsDisplay();
             return;
         }
     } else if (scrollbar == verticalScrollbar()) {
         if (GraphicsLayer* graphicsLayer = layerForVerticalScrollbar()) {
             graphicsLayer->setNeedsDisplay();
+            graphicsLayer->setContentsNeedsDisplay();
             return;
         }
     }
@@ -334,6 +344,11 @@ bool ScrollableArea::hasLayerForScrollCorner() const
 #else
     return false;
 #endif
+}
+
+void ScrollableArea::serviceScrollAnimations()
+{
+    scrollAnimator()->serviceScrollAnimations();
 }
 
 } // namespace WebCore

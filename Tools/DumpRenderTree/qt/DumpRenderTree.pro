@@ -13,13 +13,11 @@ load(features)
 
 WEBKIT += wtf webcore
 
-CONFIG += qtwebkit
-
 INCLUDEPATH += \
     $$PWD/.. \
     $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/WebCoreSupport
 
-QT = core gui network testlib
+QT = core gui network testlib webkit
 macx: QT += xml
 haveQt(5): QT += widgets printsupport
 
@@ -33,7 +31,6 @@ HEADERS += \
     WorkQueueItemQt.h \
     LayoutTestControllerQt.h \
     GCControllerQt.h \
-    PlainTextControllerQt.h \
     QtInitializeTestFonts.h \
     testplugin.h
 
@@ -43,7 +40,6 @@ SOURCES += \
     DumpRenderTreeQt.cpp \
     EventSenderQt.cpp \
     TextInputControllerQt.cpp \
-    PlainTextControllerQt.cpp \
     WorkQueueItemQt.cpp \
     LayoutTestControllerQt.cpp \
     GCControllerQt.cpp \

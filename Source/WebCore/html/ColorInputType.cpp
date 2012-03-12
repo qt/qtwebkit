@@ -39,6 +39,7 @@
 #include "MouseEvent.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
+#include "ShadowTree.h"
 
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/WTFString.h>
@@ -116,7 +117,7 @@ void ColorInputType::createShadowSubtree()
     ExceptionCode ec = 0;
     wrapperElement->appendChild(colorSwatch.release(), ec);
     ASSERT(!ec);
-    element()->shadowRootList()->oldestShadowRoot()->appendChild(wrapperElement.release(), ec);
+    element()->shadowTree()->oldestShadowRoot()->appendChild(wrapperElement.release(), ec);
     ASSERT(!ec);
     
     updateColorSwatch();
@@ -185,7 +186,7 @@ void ColorInputType::updateColorSwatch()
 
 HTMLElement* ColorInputType::shadowColorSwatch() const
 {
-    ShadowRoot* shadow = element()->shadowRootList()->oldestShadowRoot();
+    ShadowRoot* shadow = element()->shadowTree()->oldestShadowRoot();
     return shadow ? toHTMLElement(shadow->firstChild()->firstChild()) : 0;
 }
 

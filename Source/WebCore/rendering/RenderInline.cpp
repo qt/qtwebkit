@@ -507,15 +507,15 @@ void RenderInline::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     m_lineBoxes.paint(this, paintInfo, paintOffset);
 }
 
-void RenderInline::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset) const
+void RenderInline::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
     if (!alwaysCreateLineBoxes())
         culledInlineAbsoluteRects(this, rects, toLayoutSize(accumulatedOffset));
     else if (InlineFlowBox* curr = firstLineBox()) {
         for (; curr; curr = curr->nextLineBox())
-            rects.append(enclosingLayoutRect(FloatRect(accumulatedOffset + curr->topLeft(), curr->size())));
+            rects.append(enclosingIntRect(FloatRect(accumulatedOffset + curr->topLeft(), curr->size())));
     } else
-        rects.append(LayoutRect(accumulatedOffset, LayoutSize()));
+        rects.append(IntRect(roundedIntPoint(accumulatedOffset), IntSize()));
 
     if (continuation()) {
         if (continuation()->isBox()) {
@@ -526,7 +526,7 @@ void RenderInline::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& a
     }
 }
 
-void RenderInline::culledInlineAbsoluteRects(const RenderInline* container, Vector<LayoutRect>& rects, const LayoutSize& offset) const
+void RenderInline::culledInlineAbsoluteRects(const RenderInline* container, Vector<IntRect>& rects, const LayoutSize& offset) const
 {
     if (!culledInlineFirstLineBox()) {
         rects.append(IntRect(offset.width(), offset.height(), 0, 0));
@@ -548,9 +548,9 @@ void RenderInline::culledInlineAbsoluteRects(const RenderInline* container, Vect
                 int logicalHeight = container->style(rootBox->isFirstLineStyle())->font().fontMetrics().height();
                 FloatRect result;
                 if (isHorizontal)
-                    result = FloatRect(offset.width() + currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), offset.height() + logicalTop, currBox->width() + currBox->marginLeft() + currBox->marginRight(), logicalHeight);
+                    result = FloatRect(offset.width() + currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), offset.height() + logicalTop, currBox->width() + currBox->marginWidth(), logicalHeight);
                 else
-                    result = FloatRect(offset.width() + logicalTop, offset.height() + currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginTop() + currBox->marginBottom());
+                    result = FloatRect(offset.width() + logicalTop, offset.height() + currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginHeight());
                 rects.append(enclosingIntRect(result));
             }
         } else if (curr->isRenderInline()) {
@@ -632,9 +632,9 @@ void RenderInline::culledInlineAbsoluteQuads(const RenderInline* container, Vect
                 int logicalHeight = container->style(rootBox->isFirstLineStyle())->font().fontMetrics().height();
                 FloatRect result;
                 if (isHorizontal)
-                    result = FloatRect(currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), logicalTop, currBox->width() + currBox->marginLeft() + currBox->marginRight(), logicalHeight);
+                    result = FloatRect(currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), logicalTop, currBox->width() + currBox->marginWidth(), logicalHeight);
                 else
-                    result = FloatRect(logicalTop, currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginTop() + currBox->marginBottom());
+                    result = FloatRect(logicalTop, currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginHeight());
                 quads.append(localToAbsoluteQuad(result));
             }
         } else if (curr->isRenderInline()) {
@@ -838,9 +838,9 @@ FloatRect RenderInline::culledInlineBoundingBox(const RenderInline* container) c
                 int logicalTop = rootBox->logicalTop() + (rootBox->renderer()->style(rootBox->isFirstLineStyle())->font().fontMetrics().ascent() - container->style(rootBox->isFirstLineStyle())->font().fontMetrics().ascent());
                 int logicalHeight = container->style(rootBox->isFirstLineStyle())->font().fontMetrics().height();
                 if (isHorizontal)
-                    result.uniteIfNonZero(FloatRect(currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), logicalTop, currBox->width() + currBox->marginLeft() + currBox->marginRight(), logicalHeight));
+                    result.uniteIfNonZero(FloatRect(currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), logicalTop, currBox->width() + currBox->marginWidth(), logicalHeight));
                 else
-                    result.uniteIfNonZero(FloatRect(logicalTop, currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginTop() + currBox->marginBottom()));
+                    result.uniteIfNonZero(FloatRect(logicalTop, currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginHeight()));
             }
         } else if (curr->isRenderInline()) {
             // If the child doesn't need line boxes either, then we can recur.
@@ -1033,7 +1033,7 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(RenderBoxModelObject* rep
         LayoutRect repaintRect(r);
         repaintRect.move(-cb->scrolledContentOffset()); // For overflow:auto/scroll/hidden.
 
-        LayoutRect boxRect(LayoutPoint(), cb->layer()->size());
+        LayoutRect boxRect(LayoutPoint(), cb->cachedSizeForOverflowClip());
         r = intersection(repaintRect, boxRect);
     }
     
@@ -1135,7 +1135,7 @@ void RenderInline::computeRectForRepaint(RenderBoxModelObject* repaintContainer,
         topLeft -= containerBox->scrolledContentOffset(); // For overflow:auto/scroll/hidden.
 
         LayoutRect repaintRect(topLeft, rect.size());
-        LayoutRect boxRect(LayoutPoint(), containerBox->layer()->size());
+        LayoutRect boxRect(LayoutPoint(), containerBox->cachedSizeForOverflowClip());
         rect = intersection(repaintRect, boxRect);
         if (rect.isEmpty())
             return;
@@ -1368,13 +1368,13 @@ void RenderInline::imageChanged(WrappedImagePtr, const IntRect*)
     repaint();
 }
 
-void RenderInline::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint& additionalOffset)
+void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)
 {
     if (!alwaysCreateLineBoxes())
         culledInlineAbsoluteRects(this, rects, toLayoutSize(additionalOffset));
     else {
         for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox())
-            rects.append(enclosingLayoutRect(FloatRect(additionalOffset.x() + curr->x(), additionalOffset.y() + curr->y(), curr->width(), curr->height())));
+            rects.append(enclosingIntRect(FloatRect(additionalOffset.x() + curr->x(), additionalOffset.y() + curr->y(), curr->width(), curr->height())));
     }
 
     for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling()) {
@@ -1586,14 +1586,6 @@ void RenderInline::addDashboardRegions(Vector<DashboardRegionValue>& regions)
         FloatPoint absPos = container->localToAbsolute();
         region.bounds.setX(absPos.x() + region.bounds.x());
         region.bounds.setY(absPos.y() + region.bounds.y());
-
-        if (frame()) {
-            float deviceScaleFactor = frame()->page()->deviceScaleFactor();
-            if (deviceScaleFactor != 1.0f) {
-                region.bounds.scale(deviceScaleFactor);
-                region.clip.scale(deviceScaleFactor);
-            }
-        }
 
         regions.append(region);
     }

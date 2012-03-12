@@ -58,6 +58,22 @@ using namespace WebCore;
     [super dealloc];
 }
 
+- (id)initWithLayer:(id)layer
+{
+    UNUSED_PARAM(layer);
+
+    ASSERT_NOT_REACHED();
+    return nil;
+}
+
+- (id<CAAction>)actionForKey:(NSString *)key
+{
+    UNUSED_PARAM(key);
+    
+    // Disable all animations.
+    return nil;
+}
+
 - (void)setBounds:(CGRect)bounds
 {
     [super setBounds:bounds];
@@ -87,16 +103,7 @@ using namespace WebCore;
 
 - (void)setContentsScale:(CGFloat)contentsScale
 {
-#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-    CGFloat oldContentsScale = [self contentsScale];
-
-    [super setContentsScale:contentsScale];
-
-    if (contentsScale != oldContentsScale)
-        _tileCache->setContentsScale(contentsScale);
-#else
-    UNUSED_PARAM(contentsScale);
-#endif
+    _tileCache->setScale(contentsScale);
 }
 
 - (CALayer *)tileContainerLayer
@@ -104,9 +111,9 @@ using namespace WebCore;
     return _tileCache->tileContainerLayer();
 }
 
-- (void)visibleRectChanged
+- (void)visibleRectChanged:(const IntRect&)visibleRect
 {
-    _tileCache->visibleRectChanged();
+    _tileCache->visibleRectChanged(visibleRect);
 }
 
 - (CGColorRef)borderColor

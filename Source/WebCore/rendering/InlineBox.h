@@ -200,7 +200,13 @@ public:
     
     InlineBox* nextLeafChild() const;
     InlineBox* prevLeafChild() const;
-        
+
+    // Helper functions for editing and hit-testing code.
+    // FIXME: These two functions should be moved to RenderedPosition once the code to convert between
+    // Position and inline box, offset pair is moved to RenderedPosition.
+    InlineBox* nextLeafChildIgnoringLineBreak() const;
+    InlineBox* prevLeafChildIgnoringLineBreak() const;
+
     RenderObject* renderer() const { return m_renderer; }
 
     InlineFlowBox* parent() const
@@ -311,8 +317,8 @@ public:
     FloatPoint locationIncludingFlipping();
     void flipForWritingMode(FloatRect&);
     FloatPoint flipForWritingMode(const FloatPoint&);
-    void flipForWritingMode(IntRect&);
-    IntPoint flipForWritingMode(const IntPoint&);
+    void flipForWritingMode(LayoutRect&);
+    LayoutPoint flipForWritingMode(const LayoutPoint&);
 
     bool knownToHaveNoOverflow() const { return m_knownToHaveNoOverflow; }
     void clearKnownToHaveNoOverflow();
@@ -358,7 +364,7 @@ public:
 protected:
     mutable bool m_determinedIfNextOnLineExists : 1;
     mutable bool m_nextOnLineExists : 1;
-    signed m_expansion : 11; // for justified text
+    signed m_expansion : 12; // for justified text
 
 #ifndef NDEBUG
 private:

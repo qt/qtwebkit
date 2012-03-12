@@ -111,7 +111,7 @@ WebInspector.ConsoleView = function(hideContextSelector)
 
     this._linkifier = WebInspector.debuggerPresentationModel.createLinkifier();
 
-    this.prompt = new WebInspector.TextPromptWithHistory(this.completions.bind(this), ExpressionStopCharacters + ".");
+    this.prompt = new WebInspector.TextPromptWithHistory(this.completionsForTextPrompt.bind(this), ExpressionStopCharacters + ".");
     this.prompt.setSuggestBoxEnabled("generic-suggest");
     this.prompt.renderAsBlock();
     this.prompt.attach(this.promptElement);
@@ -342,16 +342,16 @@ WebInspector.ConsoleView.prototype = {
         this._linkifier.reset();
     },
 
-    completions: function(wordRange, force, completionsReadyCallback)
+    completionsForTextPrompt: function(textPrompt, wordRange, force, completionsReadyCallback)
     {
         // Pass less stop characters to rangeOfWord so the range will be a more complete expression.
-        var expressionRange = wordRange.startContainer.rangeOfWord(wordRange.startOffset, ExpressionStopCharacters, this.promptElement, "backward");
+        var expressionRange = wordRange.startContainer.rangeOfWord(wordRange.startOffset, ExpressionStopCharacters, textPrompt.proxyElement, "backward");
         var expressionString = expressionRange.toString();
         var prefix = wordRange.toString();
-        this._completions(expressionString, prefix, force, completionsReadyCallback);
+        this.completionsForExpression(expressionString, prefix, force, completionsReadyCallback);
     },
 
-    _completions: function(expressionString, prefix, force, completionsReadyCallback)
+    completionsForExpression: function(expressionString, prefix, force, completionsReadyCallback)
     {
         var lastIndex = expressionString.length - 1;
 
@@ -372,7 +372,7 @@ WebInspector.ConsoleView.prototype = {
             return;
         }
 
-        if (!expressionString && WebInspector.debuggerPresentationModel.paused)
+        if (!expressionString && WebInspector.debuggerPresentationModel.selectedCallFrame)
             WebInspector.debuggerPresentationModel.getSelectedCallFrameVariables(receivedPropertyNames.bind(this));
         else
             this.evalInInspectedWindow(expressionString, "completion", true, true, false, evaluated.bind(this));
@@ -409,7 +409,7 @@ WebInspector.ConsoleView.prototype = {
             }
 
             if (result.type === "object" || result.type === "function")
-                result.callFunctionJSON(getCompletions, receivedPropertyNames.bind(this));
+                result.callFunctionJSON(getCompletions, undefined, receivedPropertyNames.bind(this));
             else if (result.type === "string" || result.type === "number" || result.type === "boolean")
                 this.evalInInspectedWindow("(" + getCompletions + ")(\"" + result.type + "\")", "completion", false, true, true, receivedPropertyNamesFromEval.bind(this));
         }
@@ -592,7 +592,7 @@ WebInspector.ConsoleView.prototype = {
      */
     evalInInspectedWindow: function(expression, objectGroup, includeCommandLineAPI, doNotPauseOnExceptions, returnByValue, callback)
     {
-        if (WebInspector.debuggerPresentationModel.paused) {
+        if (WebInspector.debuggerPresentationModel.selectedCallFrame) {
             WebInspector.debuggerPresentationModel.evaluateInSelectedCallFrame(expression, objectGroup, includeCommandLineAPI, returnByValue, callback);
             return;
         }

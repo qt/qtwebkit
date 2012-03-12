@@ -103,6 +103,7 @@ public:
 
     virtual void setNeedsDisplay();
     virtual void setNeedsDisplayInRect(const FloatRect&);
+    virtual bool needsDisplay() const OVERRIDE { return !m_dirtyRects.isEmpty(); }
     virtual void setContentsNeedsDisplay();
     
     virtual void setContentsRect(const IntRect&);
@@ -134,7 +135,7 @@ public:
     virtual void syncCompositingState(const FloatRect&);
     virtual void syncCompositingStateForThisLayerOnly();
 
-    virtual void visibleRectChanged() OVERRIDE;
+    virtual void visibleRectChanged(const IntRect&) OVERRIDE;
 
     bool allowTiledLayer() const { return m_allowTiledLayer; }
     virtual void setAllowTiledLayer(bool b);

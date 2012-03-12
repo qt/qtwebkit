@@ -34,6 +34,7 @@
 #include "DateExtension.h"
 #include "Document.h"
 #include "Event.h"
+#include "EventNames.h"
 #include "Frame.h"
 #include "InspectorCounters.h"
 #include "V8Binding.h"
@@ -58,7 +59,9 @@ V8AbstractEventListener::V8AbstractEventListener(bool isAttribute, const WorldCo
     , m_isAttribute(isAttribute)
     , m_worldContext(worldContext)
 {
-    InspectorCounters::incrementCounter(InspectorCounters::JSEventListenerCounter);
+#if ENABLE(INSPECTOR)
+    ThreadLocalInspectorCounters::current().incrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
+#endif
 }
 
 V8AbstractEventListener::~V8AbstractEventListener()
@@ -69,7 +72,9 @@ V8AbstractEventListener::~V8AbstractEventListener()
         V8EventListenerList::clearWrapper(listener, m_isAttribute);
     }
     disposeListenerObject();
-    InspectorCounters::decrementCounter(InspectorCounters::JSEventListenerCounter);
+#if ENABLE(INSPECTOR)
+    ThreadLocalInspectorCounters::current().decrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
+#endif
 }
 
 void V8AbstractEventListener::handleEvent(ScriptExecutionContext* context, Event* event)
@@ -136,7 +141,7 @@ void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context
     v8::Local<v8::Value> returnValue;
 
     // In beforeunload/unload handlers, we want to avoid sleeps which do tight loops of calling Date.getTime().
-    if (event->type() == "beforeunload" || event->type() == "unload")
+    if (event->type() == eventNames().beforeunloadEvent || event->type() == eventNames().unloadEvent)
         DateExtension::get()->setAllowSleep(false);
 
     {
@@ -173,7 +178,7 @@ void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context
         tryCatch.Reset();
     }
 
-    if (event->type() == "beforeunload" || event->type() == "unload")
+    if (event->type() == eventNames().beforeunloadEvent || event->type() == eventNames().unloadEvent)
         DateExtension::get()->setAllowSleep(true);
 
     ASSERT(!V8Proxy::handleOutOfMemory() || returnValue.IsEmpty());

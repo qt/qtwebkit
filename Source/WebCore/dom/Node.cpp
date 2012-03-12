@@ -86,7 +86,7 @@
 #include "ScopedEventQueue.h"
 #include "SelectorQuery.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "StaticNodeList.h"
 #include "StorageEvent.h"
 #include "TagNodeList.h"
@@ -119,8 +119,6 @@
 #if ENABLE(MICRODATA)
 #include "HTMLPropertiesCollection.h"
 #endif
-
-#define DUMP_NODE_STATISTICS 0
 
 using namespace std;
 
@@ -161,13 +159,21 @@ void Node::dumpStatistics()
 
     size_t attributes = 0;
     size_t attributesWithAttr = 0;
-    size_t attrMaps = 0;
+    size_t elementsWithAttributeStorage = 0;
+    size_t elementsWithRareData = 0;
+    size_t elementsWithNamedNodeMap = 0;
 
     for (HashSet<Node*>::iterator it = liveNodeSet.begin(); it != liveNodeSet.end(); ++it) {
         Node* node = *it;
 
-        if (node->hasRareData())
+        if (node->hasRareData()) {
             ++nodesWithRareData;
+            if (node->isElementNode()) {
+                ++elementsWithRareData;
+                if (toElement(node)->hasNamedNodeMap())
+                    ++elementsWithNamedNodeMap;
+            }
+        }
 
         switch (node->nodeType()) {
             case ELEMENT_NODE: {
@@ -179,12 +185,11 @@ void Node::dumpStatistics()
                 if (!result.second)
                     result.first->second++;
 
-                // AttributeMap stats
-                if (NamedNodeMap* attrMap = element->attributes(true)) {
-                    attributes += attrMap->length();
-                    ++attrMaps;
-                    for (unsigned i = 0; i < attrMap->length(); ++i) {
-                        Attribute* attr = attrMap->attributeItem(i);
+                if (ElementAttributeData* attributeData = element->attributeData()) {
+                    attributes += attributeData->length();
+                    ++elementsWithAttributeStorage;
+                    for (unsigned i = 0; i < attributeData->length(); ++i) {
+                        Attribute* attr = attributeData->attributeItem(i);
                         if (attr->attr())
                             ++attributesWithAttr;
                     }
@@ -248,7 +253,7 @@ void Node::dumpStatistics()
     printf("Number of Nodes: %d\n\n", liveNodeSet.size());
     printf("Number of Nodes with RareData: %zu\n\n", nodesWithRareData);
 
-    printf("NodeType distrubution:\n");
+    printf("NodeType distribution:\n");
     printf("  Number of Element nodes: %zu\n", elementNodes);
     printf("  Number of Attribute nodes: %zu\n", attrNodes);
     printf("  Number of Text nodes: %zu\n", textNodes);
@@ -268,10 +273,12 @@ void Node::dumpStatistics()
     for (HashMap<String, size_t>::iterator it = perTagCount.begin(); it != perTagCount.end(); ++it)
         printf("  Number of <%s> tags: %zu\n", it->first.utf8().data(), it->second);
 
-    printf("Attribute Maps:\n");
+    printf("Attributes:\n");
     printf("  Number of Attributes (non-Node and Node): %zu [%zu]\n", attributes, sizeof(Attribute));
     printf("  Number of Attributes with an Attr: %zu\n", attributesWithAttr);
-    printf("  Number of NamedNodeMaps: %zu [%zu]\n", attrMaps, sizeof(NamedNodeMap));
+    printf("  Number of Elements with attribute storage: %zu [%zu]\n", elementsWithAttributeStorage, sizeof(ElementAttributeData));
+    printf("  Number of Elements with RareData: %zu\n", elementsWithRareData);
+    printf("  Number of Elements with NamedNodeMap: %zu [%zu]\n", elementsWithNamedNodeMap, sizeof(NamedNodeMap));
 #endif
 }
 
@@ -798,7 +805,7 @@ bool Node::hasNonEmptyBoundingBox() const
     if (!box->borderBoundingBox().isEmpty())
         return true;
 
-    Vector<LayoutRect> rects;
+    Vector<IntRect> rects;
     FloatPoint absPos = renderer()->localToAbsolute();
     renderer()->absoluteRects(rects, flooredLayoutPoint(absPos));
     size_t n = rects.size();
@@ -811,7 +818,7 @@ bool Node::hasNonEmptyBoundingBox() const
 
 inline static ShadowRoot* oldestShadowRootFor(const Node* node)
 {
-    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadowRootList()->oldestShadowRoot() : 0;
+    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadowTree()->oldestShadowRoot() : 0;
 }
 
 inline void Node::setStyleChange(StyleChangeType changeType)
@@ -965,6 +972,7 @@ void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& at
 #if ENABLE(MICRODATA)
         && attrName != itemscopeAttr
         && attrName != itempropAttr
+        && attrName != itemtypeAttr
 #endif
         && attrName != nameAttr)
         return;
@@ -1029,6 +1037,16 @@ void Node::removeCachedClassNodeList(ClassNodeList* list, const String& classNam
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_classNodeListCache.get(className));
     data->m_classNodeListCache.remove(className);
+}
+
+void Node::removeCachedRegionNodeList(RegionNodeList* list, const AtomicString& flowName)
+{
+    ASSERT(rareData());
+    ASSERT(rareData()->nodeLists());
+
+    NodeListsNodeData* data = rareData()->nodeLists();
+    ASSERT_UNUSED(list, list == data->m_regionNodeListCache.get(flowName));
+    data->m_regionNodeListCache.remove(flowName);
 }
 
 void Node::removeCachedNameNodeList(NameNodeList* list, const String& nodeName)
@@ -1470,12 +1488,6 @@ bool Node::canStartSelection() const
     return parentOrHostNode() ? parentOrHostNode()->canStartSelection() : true;
 }
 
-#if ENABLE(SVG)
-SVGUseElement* Node::svgShadowHost() const
-{
-    return isSVGShadowRoot() ? static_cast<SVGUseElement*>(parent()) : 0;
-}
-#endif
 
 Node* Node::shadowAncestorNode() const
 {
@@ -1498,7 +1510,7 @@ Node* Node::shadowTreeRootNode() const
 {
     Node* root = const_cast<Node*>(this);
     while (root) {
-        if (root->isShadowRoot() || root->isSVGShadowRoot())
+        if (root->isShadowRoot())
             return root;
         root = root->parentNodeGuaranteedHostFree();
     }
@@ -1510,7 +1522,7 @@ Node* Node::nonBoundaryShadowTreeRootNode()
     ASSERT(!isShadowRoot());
     Node* root = this;
     while (root) {
-        if (root->isShadowRoot() || root->isSVGShadowRoot())
+        if (root->isShadowRoot())
             return root;
         Node* parent = root->parentNodeGuaranteedHostFree();
         if (parent && parent->isShadowRoot())
@@ -1526,7 +1538,7 @@ ContainerNode* Node::nonShadowBoundaryParentNode() const
     return parent && !parent->isShadowRoot() ? parent : 0;
 }
 
-bool Node::isInShadowTree()
+bool Node::isInShadowTree() const
 {
     return treeScope() != document();
 }
@@ -1667,6 +1679,18 @@ PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
     return list.release();
 }
 
+PassRefPtr<NodeList> Node::getRegionsByContentNode(const AtomicString& flowName)
+{
+    pair<NodeListsNodeData::RegionNodeListCache::iterator, bool> result
+    = ensureRareData()->ensureNodeLists(this)->m_regionNodeListCache.add(flowName, 0);
+    if (!result.second)
+        return PassRefPtr<NodeList>(result.first->second);
+    
+    RefPtr<RegionNodeList> list = RegionNodeList::create(this, flowName);
+    result.first->second = list.get();
+    return list.release();
+}
+
 PassRefPtr<Element> Node::querySelector(const String& selectors, ExceptionCode& ec)
 {
     if (selectors.isEmpty()) {
@@ -1756,18 +1780,8 @@ bool Node::isEqualNode(Node* other) const
     if (nodeValue() != other->nodeValue())
         return false;
     
-    if (isElementNode()) {
-        NamedNodeMap* attributes = toElement(this)->updatedAttributes();
-        NamedNodeMap* otherAttributes = toElement(other)->updatedAttributes();
-
-        if (attributes) {
-            if (!attributes->mapsEquivalent(otherAttributes))
-                return false;
-        } else if (otherAttributes) {
-            if (!otherAttributes->mapsEquivalent(attributes))
-                return false;
-        }
-    }
+    if (isElementNode() && !toElement(this)->hasEquivalentAttributes(toElement(other)))
+        return false;
     
     Node* child = firstChild();
     Node* otherChild = other->firstChild();
@@ -1796,19 +1810,7 @@ bool Node::isEqualNode(Node* other) const
         if (documentTypeThis->internalSubset() != documentTypeOther->internalSubset())
             return false;
 
-        NamedNodeMap* entities = documentTypeThis->entities();
-        NamedNodeMap* otherEntities = documentTypeOther->entities();
-        if (!entities && otherEntities)
-            return false;
-        if (entities && !entities->mapsEquivalent(otherEntities))
-            return false;
-
-        NamedNodeMap* notations = documentTypeThis->notations();
-        NamedNodeMap* otherNotations = documentTypeOther->notations();
-        if (!notations && otherNotations)
-            return false;
-        if (notations && !notations->mapsEquivalent(otherNotations))
-            return false;
+        // FIXME: We don't compare entities or notations because currently both are always empty.
     }
     
     return true;
@@ -2043,7 +2045,7 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         case ENTITY_NODE:
         case ENTITY_REFERENCE_NODE:
         case DOCUMENT_FRAGMENT_NODE: {
-            ContainerNode* container = toContainerNode(this);
+            RefPtr<ContainerNode> container = toContainerNode(this);
 #if ENABLE(MUTATION_OBSERVERS)
             ChildListMutationScope mutation(this);
 #endif
@@ -2107,7 +2109,7 @@ unsigned short Node::compareDocumentPosition(Node* otherNode)
     if (attr1 && attr2 && start1 == start2 && start1) {
         // We are comparing two attributes on the same node. Crawl our attribute map and see which one we hit first.
         Element* owner1 = attr1->ownerElement();
-        owner1->updatedAttributes(); // Force update invalid attributes.
+        owner1->updatedAttributeData(); // Force update invalid attributes.
         unsigned length = owner1->attributeCount();
         for (unsigned i = 0; i < length; ++i) {
             // If neither of the two determining nodes is a child node and nodeType is the same for both determining nodes, then an 
@@ -2203,23 +2205,6 @@ FloatPoint Node::convertFromPage(const FloatPoint& p) const
     // No parent - no conversion needed
     return p;
 }
-
-#if ENABLE(MICRODATA)
-void Node::itemTypeAttributeChanged()
-{
-    Node * rootNode = document();
-
-    if (!rootNode->hasRareData())
-        return;
-
-    NodeRareData* data = rootNode->rareData();
-
-    if (!data->nodeLists())
-        return;
-
-    data->nodeLists()->invalidateMicrodataItemListCaches();
-}
-#endif
 
 #ifndef NDEBUG
 
@@ -2352,6 +2337,9 @@ void NodeListsNodeData::invalidateCaches()
     TagNodeListCacheNS::const_iterator tagCacheNSEnd = m_tagNodeListCacheNS.end();
     for (TagNodeListCacheNS::const_iterator it = m_tagNodeListCacheNS.begin(); it != tagCacheNSEnd; ++it)
         it->second->invalidateCache();
+    RegionNodeListCache::const_iterator regionListCacheEnd = m_regionNodeListCache.end();
+    for (RegionNodeListCache::const_iterator it = m_regionNodeListCache.begin(); it != regionListCacheEnd; ++it)
+        it->second->invalidateCache();
     invalidateCachesThatDependOnAttributes();
 }
 
@@ -2368,18 +2356,11 @@ void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
         m_labelsNodeListCache->invalidateCache();
 
 #if ENABLE(MICRODATA)
-    invalidateMicrodataItemListCaches();
-#endif
-}
-
-#if ENABLE(MICRODATA)
-void NodeListsNodeData::invalidateMicrodataItemListCaches()
-{
     MicroDataItemListCache::iterator itemListCacheEnd = m_microDataItemListCache.end();
     for (MicroDataItemListCache::iterator it = m_microDataItemListCache.begin(); it != itemListCacheEnd; ++it)
         it->second->invalidateCache();
-}
 #endif
+}
 
 bool NodeListsNodeData::isEmpty() const
 {
@@ -2398,10 +2379,12 @@ bool NodeListsNodeData::isEmpty() const
     if (!m_microDataItemListCache.isEmpty())
         return false;
 #endif
+    if (!m_regionNodeListCache.isEmpty())
+        return false;
 
     if (m_labelsNodeListCache)
         return false;
-
+    
     return true;
 }
 
@@ -2435,12 +2418,12 @@ ScriptExecutionContext* Node::scriptExecutionContext() const
 
 void Node::insertedIntoDocument()
 {
-    setInDocument();
+    setFlag(InDocumentFlag);
 }
 
 void Node::removedFromDocument()
 {
-    clearInDocument();
+    clearFlag(InDocumentFlag);
 }
 
 void Node::didMoveToNewDocument(Document* oldDocument)
@@ -2793,9 +2776,10 @@ bool Node::dispatchEvent(PassRefPtr<Event> event)
 
 void Node::dispatchSubtreeModifiedEvent()
 {
+    if (isInShadowTree())
+        return;
+
     ASSERT(!eventDispatchForbidden());
-    
-    document()->incDOMTreeVersion();
 
     if (!document()->hasListenerType(Document::DOMSUBTREEMODIFIED_LISTENER))
         return;

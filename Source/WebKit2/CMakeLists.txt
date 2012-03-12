@@ -155,6 +155,8 @@ SET(WebKit2_SOURCES
     Shared/WebPopupItem.cpp
     Shared/WebPreferencesStore.cpp
     Shared/WebProcessCreationParameters.cpp
+    Shared/WebRenderLayer.cpp
+    Shared/WebRenderObject.cpp
     Shared/WebTouchEvent.cpp
     Shared/WebURLRequest.cpp
     Shared/WebURLResponse.cpp
@@ -173,6 +175,8 @@ SET(WebKit2_SOURCES
     Shared/API/c/WKMutableArray.cpp
     Shared/API/c/WKMutableDictionary.cpp
     Shared/API/c/WKNumber.cpp
+    Shared/API/c/WKRenderLayer.cpp
+    Shared/API/c/WKRenderObject.cpp
     Shared/API/c/WKSecurityOrigin.cpp
     Shared/API/c/WKSerializedScriptValue.cpp
     Shared/API/c/WKString.cpp
@@ -516,6 +520,7 @@ ADD_DEPENDENCIES(${WebKit2_LIBRARY_NAME} ${WebCore_LIBRARY_NAME})
 ADD_DEPENDENCIES(${WebKit2_LIBRARY_NAME} ${ForwardingHeaders_NAME})
 ADD_DEPENDENCIES(${WebKit2_LIBRARY_NAME} ${ForwardingNetworkHeaders_NAME})
 TARGET_LINK_LIBRARIES(${WebKit2_LIBRARY_NAME} ${WebKit2_LIBRARIES})
+SET_TARGET_PROPERTIES(${WebKit2_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
 
 ADD_EXECUTABLE(${WebProcess_NAME} ${WebProcess_SOURCES})
 TARGET_LINK_LIBRARIES(${WebProcess_NAME} ${WebProcess_LIBRARIES})
@@ -526,4 +531,4 @@ IF (WebKit2_LINK_FLAGS)
     ADD_TARGET_PROPERTIES(${WebProcess_NAME} LINK_FLAGS "${WebKit2_LINK_FLAGS}")
 ENDIF ()
 
-INSTALL(TARGETS ${WebKit2_LIBRARY_NAME} DESTINATION lib)
+INSTALL(TARGETS ${WebKit2_LIBRARY_NAME} DESTINATION "${LIB_INSTALL_DIR}")

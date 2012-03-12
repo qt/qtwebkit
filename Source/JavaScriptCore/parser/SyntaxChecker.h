@@ -210,11 +210,16 @@ public:
             return Property(type);
         return Property(name, type);
     }
+    template <bool strict> Property createGetterOrSetterProperty(JSGlobalData* globalData, int, PropertyNode::Type type, double name, int, int, int, int, int, int)
+    {
+        if (!strict)
+            return Property(type);
+        return Property(&globalData->parserArena->identifierArena().makeNumericIdentifier(globalData, name), type);
+    }
 
     void appendStatement(int, int) { }
     void addVar(const Identifier*, bool) { }
     int combineCommaNodes(int, int, int) { return 1; }
-    int evalCount() const { return 0; }
     void appendBinaryExpressionInfo(int& operandStackDepth, int expr, int, int, int, bool)
     {
         if (!m_topBinaryExpr)

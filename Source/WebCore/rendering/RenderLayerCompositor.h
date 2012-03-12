@@ -210,6 +210,8 @@ public:
     void documentBackgroundColorDidChange();
 
 private:
+    class OverlapMap;
+
     // GraphicsLayerClient Implementation
     virtual void notifyAnimationStarted(const GraphicsLayer*, double) { }
     virtual void notifySyncRequired(const GraphicsLayer*) { scheduleLayerFlush(); }
@@ -233,10 +235,8 @@ private:
     // Repaint the given rect (which is layer's coords), and regions of child layers that intersect that rect.
     void recursiveRepaintLayerRect(RenderLayer*, const IntRect&);
 
-    typedef HashMap<RenderLayer*, IntRect> OverlapMap;
     void addToOverlapMap(OverlapMap&, RenderLayer*, IntRect& layerBounds, bool& boundsComputed);
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer*);
-    static bool overlapsCompositedLayers(OverlapMap&, const IntRect& layerBounds);
 
     void updateCompositingLayersTimerFired(Timer<RenderLayerCompositor>*);
 
@@ -282,7 +282,6 @@ private:
     bool requiresCompositingForPlugin(RenderObject*) const;
     bool requiresCompositingForFrame(RenderObject*) const;
     bool requiresCompositingWhenDescendantsAreCompositing(RenderObject*) const;
-    bool requiresCompositingForFullScreen(RenderObject*) const;
     bool requiresCompositingForFilters(RenderObject*) const;
     bool requiresCompositingForScrollableFrame() const;
     bool requiresCompositingForPosition(RenderObject*, const RenderLayer*) const;

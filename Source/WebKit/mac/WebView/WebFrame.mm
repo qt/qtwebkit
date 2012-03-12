@@ -60,6 +60,7 @@
 #import <WebCore/Chrome.h>
 #import <WebCore/ColorMac.h>
 #import <WebCore/DOMImplementation.h>
+#import <WebCore/DatabaseContext.h>
 #import <WebCore/DocumentFragment.h>
 #import <WebCore/DocumentLoader.h>
 #import <WebCore/DocumentMarkerController.h>
@@ -797,7 +798,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 
 - (void)_setTypingStyle:(DOMCSSStyleDeclaration *)style withUndoAction:(EditAction)undoAction
 {
-    if (!_private->coreFrame)
+    if (!_private->coreFrame || !style)
         return;
     // FIXME: We shouldn't have to create a copy here.
     _private->coreFrame->editor()->computeAndSetTypingStyle(core(style)->copy().get(), undoAction);
@@ -1120,13 +1121,9 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     
     if (Document* document = _private->coreFrame->document()) {
 #if ENABLE(SQL_DATABASE)
-        if (document->hasOpenDatabases())
+        if (DatabaseContext::hasOpenDatabases(document))
             [result setObject:[NSNumber numberWithBool:YES] forKey:WebFrameUsesDatabases];
 #endif
-            
-        if (document->usingGeolocation())
-            [result setObject:[NSNumber numberWithBool:YES] forKey:WebFrameUsesGeolocation];
-            
         if (!document->canSuspendActiveDOMObjects())
             [result setObject:[NSNumber numberWithBool:YES] forKey:WebFrameCanSuspendActiveDOMObjects];
     }

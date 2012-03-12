@@ -34,6 +34,7 @@
 #include "CheckedInt.h"
 #include "Console.h"
 #include "DOMWindow.h"
+#include "EXTTextureFilterAnisotropic.h"
 #include "ExceptionCode.h"
 #include "Extensions3D.h"
 #include "Frame.h"
@@ -82,6 +83,7 @@
 namespace WebCore {
 
 const double secondsBetweenRestoreAttempts = 1.0;
+const int maxGLErrorsAllowedToConsole = 10;
 
 namespace {
 
@@ -378,7 +380,7 @@ private:
 class WebGLRenderingContextErrorMessageCallback : public GraphicsContext3D::ErrorMessageCallback {
 public:
     explicit WebGLRenderingContextErrorMessageCallback(WebGLRenderingContext* cb) : m_context(cb) { }
-    virtual void onErrorMessage(const String& message, GC3Dint) { m_context->printWarningToConsole(message); }
+    virtual void onErrorMessage(const String& message, GC3Dint) { m_context->printGLErrorToConsole(message); }
     virtual ~WebGLRenderingContextErrorMessageCallback() { }
 private:
     WebGLRenderingContext* m_context;
@@ -401,6 +403,7 @@ PassOwnPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTMLCanvasElemen
 #else
     attributes.shareResources = false;
 #endif
+    attributes.preferDiscreteGPU = true;
 
 
     RefPtr<GraphicsContext3D> context(GraphicsContext3D::create(attributes, hostWindow));
@@ -426,6 +429,7 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
     , m_contextLostMode(SyntheticLostContext)
     , m_attributes(attributes)
     , m_synthesizedErrorsToConsole(false)
+    , m_numGLErrorsToConsoleAllowed(maxGLErrorsAllowedToConsole)
 {
     ASSERT(m_context);
     m_contextGroup = WebGLContextGroup::create();
@@ -466,6 +470,7 @@ void WebGLRenderingContext::initializeNewContext()
     m_stencilFuncMask = 0xFFFFFFFF;
     m_stencilFuncMaskBack = 0xFFFFFFFF;
     m_layerCleared = false;
+    m_numGLErrorsToConsoleAllowed = maxGLErrorsAllowedToConsole;
     
     m_clearColor[0] = m_clearColor[1] = m_clearColor[2] = m_clearColor[3] = 0;
     m_scissorEnabled = false;
@@ -2208,6 +2213,14 @@ WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
     if (isContextLost())
         return 0;
 
+    if (equalIgnoringCase(name, "WEBKIT_EXT_texture_filter_anisotropic")
+        && m_context->getExtensions()->supports("GL_EXT_texture_filter_anisotropic")) {
+        if (!m_extTextureFilterAnisotropic) {
+            m_context->getExtensions()->ensureEnabled("GL_EXT_texture_filter_anisotropic");
+            m_extTextureFilterAnisotropic = EXTTextureFilterAnisotropic::create(this);
+        }
+        return m_extTextureFilterAnisotropic.get();
+    }
     if (equalIgnoringCase(name, "OES_standard_derivatives")
         && m_context->getExtensions()->supports("GL_OES_standard_derivatives")) {
         if (!m_oesStandardDerivatives) {
@@ -2519,6 +2532,11 @@ WebGLGetInfo WebGLRenderingContext::getParameter(GC3Denum pname, ExceptionCode& 
         }
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, OES_vertex_array_object not enabled");
         return WebGLGetInfo();
+    case Extensions3D::MAX_TEXTURE_MAX_ANISOTROPY_EXT: // EXT_texture_filter_anisotropic
+        if (m_extTextureFilterAnisotropic)
+            return getUnsignedIntParameter(Extensions3D::MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, EXT_texture_filter_anisotropic not enabled");
+        return WebGLGetInfo();
     default:
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name");
         return WebGLGetInfo();
@@ -2680,6 +2698,8 @@ Vector<String> WebGLRenderingContext::getSupportedExtensions()
         result.append("OES_texture_float");
     if (m_context->getExtensions()->supports("GL_OES_standard_derivatives"))
         result.append("OES_standard_derivatives");
+    if (m_context->getExtensions()->supports("GL_EXT_texture_filter_anisotropic"))
+        result.append("WEBKIT_EXT_texture_filter_anisotropic");
     if (m_context->getExtensions()->supports("GL_OES_vertex_array_object"))
         result.append("OES_vertex_array_object");
     result.append("WEBKIT_WEBGL_lose_context");
@@ -2712,6 +2732,13 @@ WebGLGetInfo WebGLRenderingContext::getTexParameter(GC3Denum target, GC3Denum pn
     case GraphicsContext3D::TEXTURE_WRAP_T:
         m_context->getTexParameteriv(target, pname, &value);
         return WebGLGetInfo(static_cast<unsigned int>(value));
+    case Extensions3D::TEXTURE_MAX_ANISOTROPY_EXT: // EXT_texture_filter_anisotropic
+        if (m_extTextureFilterAnisotropic) {
+            m_context->getTexParameteriv(target, pname, &value);
+            return WebGLGetInfo(static_cast<unsigned int>(value));
+        }
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getTexParameter", "invalid parameter name, EXT_texture_filter_anisotropic not enabled");
+        return WebGLGetInfo();
     default:
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getTexParameter", "invalid parameter name");
         return WebGLGetInfo();
@@ -3535,6 +3562,12 @@ void WebGLRenderingContext::texParameter(GC3Denum target, GC3Denum pname, GC3Dfl
             return;
         }
         break;
+    case Extensions3D::TEXTURE_MAX_ANISOTROPY_EXT: // EXT_texture_filter_anisotropic
+        if (!m_extTextureFilterAnisotropic) {
+            synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "texParameter", "invalid parameter, EXT_texture_filter_anisotropic not enabled");
+            return;
+        }
+        break;
     default:
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "texParameter", "invalid parameter name");
         return;
@@ -3716,7 +3749,7 @@ void WebGLRenderingContext::uniform1fv(const WebGLUniformLocation* location, Flo
     if (isContextLost() || !validateUniformParameters("uniform1fv", location, v, 1))
         return;
 
-    m_context->uniform1fv(location->location(), v->data(), v->length());
+    m_context->uniform1fv(location->location(), v->length(), v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3726,7 +3759,7 @@ void WebGLRenderingContext::uniform1fv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform1fv", location, v, size, 1))
         return;
 
-    m_context->uniform1fv(location->location(), v, size);
+    m_context->uniform1fv(location->location(), size, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3751,7 +3784,7 @@ void WebGLRenderingContext::uniform1iv(const WebGLUniformLocation* location, Int
     if (isContextLost() || !validateUniformParameters("uniform1iv", location, v, 1))
         return;
 
-    m_context->uniform1iv(location->location(), v->data(), v->length());
+    m_context->uniform1iv(location->location(), v->length(), v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3761,7 +3794,7 @@ void WebGLRenderingContext::uniform1iv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform1iv", location, v, size, 1))
         return;
 
-    m_context->uniform1iv(location->location(), v, size);
+    m_context->uniform1iv(location->location(), size, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3786,7 +3819,7 @@ void WebGLRenderingContext::uniform2fv(const WebGLUniformLocation* location, Flo
     if (isContextLost() || !validateUniformParameters("uniform2fv", location, v, 2))
         return;
 
-    m_context->uniform2fv(location->location(), v->data(), v->length() / 2);
+    m_context->uniform2fv(location->location(), v->length() / 2, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3796,7 +3829,7 @@ void WebGLRenderingContext::uniform2fv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform2fv", location, v, size, 2))
         return;
 
-    m_context->uniform2fv(location->location(), v, size / 2);
+    m_context->uniform2fv(location->location(), size / 2, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3821,7 +3854,7 @@ void WebGLRenderingContext::uniform2iv(const WebGLUniformLocation* location, Int
     if (isContextLost() || !validateUniformParameters("uniform2iv", location, v, 2))
         return;
 
-    m_context->uniform2iv(location->location(), v->data(), v->length() / 2);
+    m_context->uniform2iv(location->location(), v->length() / 2, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3831,7 +3864,7 @@ void WebGLRenderingContext::uniform2iv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform2iv", location, v, size, 2))
         return;
 
-    m_context->uniform2iv(location->location(), v, size / 2);
+    m_context->uniform2iv(location->location(), size / 2, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3856,7 +3889,7 @@ void WebGLRenderingContext::uniform3fv(const WebGLUniformLocation* location, Flo
     if (isContextLost() || !validateUniformParameters("uniform3fv", location, v, 3))
         return;
 
-    m_context->uniform3fv(location->location(), v->data(), v->length() / 3);
+    m_context->uniform3fv(location->location(), v->length() / 3, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3866,7 +3899,7 @@ void WebGLRenderingContext::uniform3fv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform3fv", location, v, size, 3))
         return;
 
-    m_context->uniform3fv(location->location(), v, size / 3);
+    m_context->uniform3fv(location->location(), size / 3, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3891,7 +3924,7 @@ void WebGLRenderingContext::uniform3iv(const WebGLUniformLocation* location, Int
     if (isContextLost() || !validateUniformParameters("uniform3iv", location, v, 3))
         return;
 
-    m_context->uniform3iv(location->location(), v->data(), v->length() / 3);
+    m_context->uniform3iv(location->location(), v->length() / 3, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3901,7 +3934,7 @@ void WebGLRenderingContext::uniform3iv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform3iv", location, v, size, 3))
         return;
 
-    m_context->uniform3iv(location->location(), v, size / 3);
+    m_context->uniform3iv(location->location(), size / 3, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3926,7 +3959,7 @@ void WebGLRenderingContext::uniform4fv(const WebGLUniformLocation* location, Flo
     if (isContextLost() || !validateUniformParameters("uniform4fv", location, v, 4))
         return;
 
-    m_context->uniform4fv(location->location(), v->data(), v->length() / 4);
+    m_context->uniform4fv(location->location(), v->length() / 4, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3936,7 +3969,7 @@ void WebGLRenderingContext::uniform4fv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform4fv", location, v, size, 4))
         return;
 
-    m_context->uniform4fv(location->location(), v, size / 4);
+    m_context->uniform4fv(location->location(), size / 4, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3961,7 +3994,7 @@ void WebGLRenderingContext::uniform4iv(const WebGLUniformLocation* location, Int
     if (isContextLost() || !validateUniformParameters("uniform4iv", location, v, 4))
         return;
 
-    m_context->uniform4iv(location->location(), v->data(), v->length() / 4);
+    m_context->uniform4iv(location->location(), v->length() / 4, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3971,7 +4004,7 @@ void WebGLRenderingContext::uniform4iv(const WebGLUniformLocation* location, GC3
     if (isContextLost() || !validateUniformParameters("uniform4iv", location, v, size, 4))
         return;
 
-    m_context->uniform4iv(location->location(), v, size / 4);
+    m_context->uniform4iv(location->location(), size / 4, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3980,7 +4013,7 @@ void WebGLRenderingContext::uniformMatrix2fv(const WebGLUniformLocation* locatio
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateUniformMatrixParameters("uniformMatrix2fv", location, transpose, v, 4))
         return;
-    m_context->uniformMatrix2fv(location->location(), transpose, v->data(), v->length() / 4);
+    m_context->uniformMatrix2fv(location->location(), v->length() / 4, transpose, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3989,7 +4022,7 @@ void WebGLRenderingContext::uniformMatrix2fv(const WebGLUniformLocation* locatio
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateUniformMatrixParameters("uniformMatrix2fv", location, transpose, v, size, 4))
         return;
-    m_context->uniformMatrix2fv(location->location(), transpose, v, size / 4);
+    m_context->uniformMatrix2fv(location->location(), size / 4, transpose, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -3998,7 +4031,7 @@ void WebGLRenderingContext::uniformMatrix3fv(const WebGLUniformLocation* locatio
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateUniformMatrixParameters("uniformMatrix3fv", location, transpose, v, 9))
         return;
-    m_context->uniformMatrix3fv(location->location(), transpose, v->data(), v->length() / 9);
+    m_context->uniformMatrix3fv(location->location(), v->length() / 9, transpose, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -4007,7 +4040,7 @@ void WebGLRenderingContext::uniformMatrix3fv(const WebGLUniformLocation* locatio
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateUniformMatrixParameters("uniformMatrix3fv", location, transpose, v, size, 9))
         return;
-    m_context->uniformMatrix3fv(location->location(), transpose, v, size / 9);
+    m_context->uniformMatrix3fv(location->location(), size / 9, transpose, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -4016,7 +4049,7 @@ void WebGLRenderingContext::uniformMatrix4fv(const WebGLUniformLocation* locatio
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateUniformMatrixParameters("uniformMatrix4fv", location, transpose, v, 16))
         return;
-    m_context->uniformMatrix4fv(location->location(), transpose, v->data(), v->length() / 16);
+    m_context->uniformMatrix4fv(location->location(), v->length() / 16, transpose, v->data());
     cleanupAfterGraphicsCall(false);
 }
 
@@ -4025,7 +4058,7 @@ void WebGLRenderingContext::uniformMatrix4fv(const WebGLUniformLocation* locatio
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateUniformMatrixParameters("uniformMatrix4fv", location, transpose, v, size, 16))
         return;
-    m_context->uniformMatrix4fv(location->location(), transpose, v, size / 16);
+    m_context->uniformMatrix4fv(location->location(), size / 16, transpose, v);
     cleanupAfterGraphicsCall(false);
 }
 
@@ -4883,6 +4916,18 @@ bool WebGLRenderingContext::validateStencilFunc(const char* functionName, GC3Den
     }
 }
 
+void WebGLRenderingContext::printGLErrorToConsole(const String& message)
+{
+    if (!m_numGLErrorsToConsoleAllowed)
+        return;
+
+    --m_numGLErrorsToConsoleAllowed;
+    printWarningToConsole(message);
+
+    if (!m_numGLErrorsToConsoleAllowed)
+        printWarningToConsole("WebGL: too many errors, no more errors will be reported to the console for this context.");
+}
+
 void WebGLRenderingContext::printWarningToConsole(const String& message)
 {
     if (!canvas())
@@ -5315,13 +5360,13 @@ ImageBuffer* WebGLRenderingContext::LRUImageBufferCache::imageBuffer(const IntSi
         ImageBuffer* buf = m_buffers[i].get();
         if (!buf)
             break;
-        if (buf->size() != size)
+        if (buf->logicalSize() != size)
             continue;
         bubbleToFront(i);
         return buf;
     }
 
-    OwnPtr<ImageBuffer> temp = ImageBuffer::create(size);
+    OwnPtr<ImageBuffer> temp = ImageBuffer::create(size, 1);
     if (!temp)
         return 0;
     i = std::min(m_capacity - 1, i);
@@ -5366,7 +5411,7 @@ void WebGLRenderingContext::synthesizeGLError(GC3Denum error, const char* functi
 {
     if (m_synthesizedErrorsToConsole) {
       String str = String("WebGL: ") + GetErrorString(error) +  ": " + String(functionName) + ": " + String(description);
-      printWarningToConsole(str);
+      printGLErrorToConsole(str);
     }
     m_context->synthesizeGLError(error);
 }

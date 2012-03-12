@@ -43,9 +43,6 @@ public:
         
         for (unsigned i = 0; i < m_graph.size(); ++i)
             m_replacements[i] = NoNode;
-        
-        for (unsigned i = 0; i < LastNodeId; ++i)
-            m_lastSeen[i] = NoNode;
     }
     
     void run()
@@ -71,68 +68,14 @@ private:
         return canonicalize(nodeUse.indexUnchecked());
     }
     
-    // Computes where the search for a candidate for CSE should start. Don't call
-    // this directly; call startIndex() instead as it does logging in debug mode.
-    NodeIndex computeStartIndexForChildren(NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
+    unsigned endIndexForPureCSE()
     {
-        const unsigned limit = 300;
-        
-        NodeIndex start = m_start;
-        if (m_compileIndex - start > limit)
-            start = m_compileIndex - limit;
-        
-        ASSERT(start >= m_start);
-        
-        NodeIndex child = canonicalize(child1);
-        if (child == NoNode)
-            return start;
-        
-        if (start < child)
-            start = child;
-        
-        child = canonicalize(child2);
-        if (child == NoNode)
-            return start;
-        
-        if (start < child)
-            start = child;
-        
-        child = canonicalize(child3);
-        if (child == NoNode)
-            return start;
-        
-        if (start < child)
-            start = child;
-        
-        return start;
-    }
-    
-    NodeIndex startIndexForChildren(NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
-    {
-        NodeIndex result = computeStartIndexForChildren(child1, child2, child3);
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("  lookback %u: ", result);
-#endif
-        return result;
-    }
-    
-    NodeIndex startIndex()
-    {
-        Node& node = m_graph[m_compileIndex];
-        return startIndexForChildren(
-            node.child1().indexUnchecked(),
-            node.child2().indexUnchecked(),
-            node.child3().indexUnchecked());
-    }
-    
-    NodeIndex endIndexForPureCSE()
-    {
-        NodeIndex result = m_lastSeen[m_graph[m_compileIndex].op & NodeIdMask];
-        if (result == NoNode)
+        unsigned result = m_lastSeen[m_graph[m_compileIndex].op];
+        if (result == UINT_MAX)
             result = 0;
         else
             result++;
-        ASSERT(result <= m_compileIndex);
+        ASSERT(result <= m_indexInBlock);
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLog("  limit %u: ", result);
 #endif
@@ -145,13 +88,16 @@ private:
         NodeIndex child2 = canonicalize(node.child2());
         NodeIndex child3 = canonicalize(node.child3());
         
-        NodeIndex start = startIndex();
-        for (NodeIndex index = endIndexForPureCSE(); index-- > start;) {
+        for (unsigned i = endIndexForPureCSE(); i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1 || index == child2 || index == child3)
+                break;
+
             Node& otherNode = m_graph[index];
             if (node.op != otherNode.op)
                 continue;
             
-            if (node.arithNodeFlagsForCompare() != otherNode.arithNodeFlagsForCompare())
+            if (node.arithNodeFlags() != otherNode.arithNodeFlags())
                 continue;
             
             NodeIndex otherChild = canonicalize(otherNode.child1());
@@ -201,9 +147,9 @@ private:
     bool clobbersWorld(NodeIndex nodeIndex)
     {
         Node& node = m_graph[nodeIndex];
-        if (node.op & NodeClobbersWorld)
+        if (node.flags & NodeClobbersWorld)
             return true;
-        if (!(node.op & NodeMightClobber))
+        if (!(node.flags & NodeMightClobber))
             return false;
         switch (node.op) {
         case ValueAdd:
@@ -229,11 +175,14 @@ private:
         NodeIndex child2 = canonicalize(node.child2());
         NodeIndex child3 = canonicalize(node.child3());
         
-        NodeIndex start = startIndex();
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1 || index == child2 || index == child3)
+                break;
+
             Node& otherNode = m_graph[index];
             if (node.op == otherNode.op
-                && node.arithNodeFlagsForCompare() == otherNode.arithNodeFlagsForCompare()) {
+                && node.arithNodeFlags() == otherNode.arithNodeFlags()) {
                 NodeIndex otherChild = canonicalize(otherNode.child1());
                 if (otherChild == NoNode)
                     return index;
@@ -258,8 +207,8 @@ private:
     
     NodeIndex globalVarLoadElimination(unsigned varNumber, JSGlobalObject* globalObject)
     {
-        NodeIndex start = startIndexForChildren();
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
             Node& node = m_graph[index];
             switch (node.op) {
             case GetGlobalVar:
@@ -281,8 +230,11 @@ private:
     
     NodeIndex getByValLoadElimination(NodeIndex child1, NodeIndex child2)
     {
-        NodeIndex start = startIndexForChildren(child1, child2);
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1 || index == canonicalize(child2)) 
+                break;
+
             Node& node = m_graph[index];
             switch (node.op) {
             case GetByVal:
@@ -322,8 +274,11 @@ private:
 
     bool checkFunctionElimination(JSFunction* function, NodeIndex child1)
     {
-        NodeIndex start = startIndexForChildren(child1);
-        for (NodeIndex index = endIndexForPureCSE(); index-- > start;) {
+        for (unsigned i = endIndexForPureCSE(); i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1) 
+                break;
+
             Node& node = m_graph[index];
             if (node.op == CheckFunction && node.child1() == child1 && node.function() == function)
                 return true;
@@ -333,8 +288,11 @@ private:
 
     bool checkStructureLoadElimination(const StructureSet& structureSet, NodeIndex child1)
     {
-        NodeIndex start = startIndexForChildren(child1);
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1) 
+                break;
+
             Node& node = m_graph[index];
             switch (node.op) {
             case CheckStructure:
@@ -376,8 +334,11 @@ private:
     
     NodeIndex getByOffsetLoadElimination(unsigned identifierNumber, NodeIndex child1)
     {
-        NodeIndex start = startIndexForChildren(child1);
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1) 
+                break;
+
             Node& node = m_graph[index];
             switch (node.op) {
             case GetByOffset:
@@ -419,8 +380,11 @@ private:
     
     NodeIndex getPropertyStorageLoadElimination(NodeIndex child1)
     {
-        NodeIndex start = startIndexForChildren(child1);
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1) 
+                break;
+
             Node& node = m_graph[index];
             switch (node.op) {
             case GetPropertyStorage:
@@ -455,8 +419,11 @@ private:
 
     NodeIndex getIndexedPropertyStorageLoadElimination(NodeIndex child1, bool hasIntegerIndexPrediction)
     {
-        NodeIndex start = startIndexForChildren(child1);
-        for (NodeIndex index = m_compileIndex; index-- > start;) {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1) 
+                break;
+
             Node& node = m_graph[index];
             switch (node.op) {
             case GetIndexedPropertyStorage: {
@@ -493,8 +460,8 @@ private:
     
     NodeIndex getScopeChainLoadElimination(unsigned depth)
     {
-        NodeIndex start = startIndexForChildren();
-        for (NodeIndex index = endIndexForPureCSE(); index-- > start;) {
+        for (unsigned i = endIndexForPureCSE(); i--;) {
+            NodeIndex index = m_currentBlock->at(i);
             Node& node = m_graph[index];
             if (node.op == GetScopeChain
                 && node.scopeChainDepth() == depth)
@@ -539,7 +506,7 @@ private:
 #endif
         
         Node& node = m_graph[m_compileIndex];
-        node.op = Phantom;
+        node.setOpAndDefaultFlags(Phantom);
         node.setRefCount(1);
         
         // At this point we will eliminate all references to this node.
@@ -555,14 +522,14 @@ private:
         Node& node = m_graph[m_compileIndex];
         ASSERT(node.refCount() == 1);
         ASSERT(node.mustGenerate());
-        node.op = Phantom;
+        node.setOpAndDefaultFlags(Phantom);
     }
     
     void performNodeCSE(Node& node)
     {
         bool shouldGenerate = node.shouldGenerate();
 
-        if (node.op & NodeHasVarArgs) {
+        if (node.flags & NodeHasVarArgs) {
             for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
                 performSubstitution(m_graph.m_varArgChildren[childIdx], shouldGenerate);
         } else {
@@ -575,7 +542,7 @@ private:
             return;
         
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("   %s @%u: ", Graph::opName(m_graph[m_compileIndex].op), m_compileIndex);
+        dataLog("   %s @%u: ", Graph::opName(static_cast<NodeType>(m_graph[m_compileIndex].op)), m_compileIndex);
 #endif
         
         // NOTE: there are some nodes that we deliberately don't CSE even though we
@@ -598,6 +565,7 @@ private:
         case BitURShift:
         case ArithAdd:
         case ArithSub:
+        case ArithNegate:
         case ArithMul:
         case ArithMod:
         case ArithDiv:
@@ -701,7 +669,7 @@ private:
             break;
         }
         
-        m_lastSeen[node.op & NodeIdMask] = m_compileIndex;
+        m_lastSeen[node.op] = m_indexInBlock;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLog("\n");
 #endif
@@ -709,16 +677,21 @@ private:
     
     void performBlockCSE(BasicBlock& block)
     {
-        m_start = block.begin;
-        NodeIndex end = block.end;
-        for (m_compileIndex = m_start; m_compileIndex < end; ++m_compileIndex)
+        m_currentBlock = &block;
+        for (unsigned i = 0; i < LastNodeType; ++i)
+            m_lastSeen[i] = UINT_MAX;
+
+        for (m_indexInBlock = 0; m_indexInBlock < block.size(); ++m_indexInBlock) {
+            m_compileIndex = block[m_indexInBlock];
             performNodeCSE(m_graph[m_compileIndex]);
+        }
     }
     
-    NodeIndex m_start;
+    BasicBlock* m_currentBlock;
     NodeIndex m_compileIndex;
+    unsigned m_indexInBlock;
     Vector<NodeIndex, 16> m_replacements;
-    FixedArray<NodeIndex, LastNodeId> m_lastSeen;
+    FixedArray<unsigned, LastNodeType> m_lastSeen;
 };
 
 void performCSE(Graph& graph)

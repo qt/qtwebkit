@@ -73,7 +73,7 @@
 #include "SecurityPolicy.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "TimeRanges.h"
 #include "UUID.h"
 #include <limits>
@@ -619,6 +619,8 @@ void HTMLMediaElement::load(ExceptionCode& ec)
         ec = INVALID_STATE_ERR;
     else {
         m_loadInitiatedByUserGesture = ScriptController::processingUserGesture();
+        if (m_loadInitiatedByUserGesture)
+            removeBehaviorsRestrictionsAfterFirstUserGesture();
         prepareForLoad();
         loadInternal();
     }
@@ -2073,6 +2075,8 @@ void HTMLMediaElement::play()
 
     if (userGestureRequiredForRateChange() && !ScriptController::processingUserGesture())
         return;
+    if (ScriptController::processingUserGesture())
+        removeBehaviorsRestrictionsAfterFirstUserGesture();
 
     Settings* settings = document()->settings();
     if (settings && settings->needsSiteSpecificQuirks() && m_dispatchingCanPlayEvent && !m_loadInitiatedByUserGesture) {
@@ -2754,6 +2758,7 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType *contentType, InvalidUR
     HTMLSourceElement* source = 0;
     bool lookingForStartNode = m_nextChildNodeToConsider;
     bool canUse = false;
+    String type;
 
     for (node = firstChild(); !canUse && node; node = node->nextSibling()) {
         if (lookingForStartNode && m_nextChildNodeToConsider != node)
@@ -2785,12 +2790,15 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType *contentType, InvalidUR
                 goto check_again;
         }
 
-        if (source->fastHasAttribute(typeAttr)) {
+        type = source->type();
+        if (type.isEmpty() && mediaURL.protocolIsData())
+            type = mimeTypeFromDataURL(mediaURL);
+        if (!type.isEmpty()) {
 #if !LOG_DISABLED
             if (shouldLog)
-                LOG(Media, "HTMLMediaElement::selectNextSourceChild - 'type' is %s", source->type().utf8().data());
+                LOG(Media, "HTMLMediaElement::selectNextSourceChild - 'type' is %s", type.utf8().data());
 #endif
-            if (!MediaPlayer::supportsType(ContentType(source->type())))
+            if (!MediaPlayer::supportsType(ContentType(type)))
                 goto check_again;
         }
 
@@ -2808,7 +2816,7 @@ check_again:
 
     if (canUse) {
         if (contentType)
-            *contentType = ContentType(source->type());
+            *contentType = ContentType(type);
         m_currentSourceNode = source;
         m_nextChildNodeToConsider = source->nextSibling();
         if (!m_nextChildNodeToConsider)
@@ -3400,12 +3408,13 @@ void HTMLMediaElement::stop()
 void HTMLMediaElement::suspend(ReasonForSuspension why)
 {
     LOG(Media, "HTMLMediaElement::suspend");
-    
+
     switch (why)
     {
         case DocumentWillBecomeInactive:
             stop();
             break;
+        case PageWillBeSuspended:
         case JavaScriptDebuggerPaused:
         case WillShowDialog:
             // Do nothing, we don't pause media playback in these cases.
@@ -3747,7 +3756,7 @@ void HTMLMediaElement::privateBrowsingStateDidChange()
 
 MediaControls* HTMLMediaElement::mediaControls()
 {
-    return toMediaControls(shadowRootList()->oldestShadowRoot()->firstChild());
+    return toMediaControls(shadowTree()->oldestShadowRoot()->firstChild());
 }
 
 bool HTMLMediaElement::hasMediaControls()
@@ -3755,7 +3764,7 @@ bool HTMLMediaElement::hasMediaControls()
     if (!hasShadowRoot())
         return false;
 
-    Node* node = shadowRootList()->oldestShadowRoot()->firstChild();
+    Node* node = shadowTree()->oldestShadowRoot()->firstChild();
     return node && node->isMediaControls();
 }
 
@@ -4051,6 +4060,21 @@ String HTMLMediaElement::mediaPlayerReferrer() const
         return String();
 
     return SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), m_currentSrc, frame->loader()->outgoingReferrer());
+}
+
+String HTMLMediaElement::mediaPlayerUserAgent() const
+{
+    Frame* frame = document()->frame();
+    if (!frame)
+        return String();
+
+    return frame->loader()->userAgent(m_currentSrc);
+
+}
+
+void HTMLMediaElement::removeBehaviorsRestrictionsAfterFirstUserGesture()
+{
+    m_restrictions = NoRestrictions;
 }
 
 }

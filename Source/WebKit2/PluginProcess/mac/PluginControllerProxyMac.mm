@@ -28,9 +28,9 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
+#import "LayerHostingContext.h"
 #import "PluginProcess.h"
 #import "PluginProxyMessages.h"
-#import "WebKitSystemInterface.h"
 #import "WebProcessConnection.h"
 #import <QuartzCore/QuartzCore.h>
 
@@ -59,34 +59,31 @@ void PluginControllerProxy::platformInitialize()
     if (!platformLayer)
         return;
 
-    ASSERT(!m_remoteLayerClient);
-
-    m_remoteLayerClient = WKCARemoteLayerClientMakeWithServerPort(PluginProcess::shared().compositingRenderServerPort());
-    ASSERT(m_remoteLayerClient);
-
-    WKCARemoteLayerClientSetLayer(m_remoteLayerClient.get(), platformLayer);
+    ASSERT(!m_layerHostingContext);
+    m_layerHostingContext = LayerHostingContext::createForPort(PluginProcess::shared().compositingRenderServerPort());
+    m_layerHostingContext->setRootLayer(platformLayer);
 }
 
 void PluginControllerProxy::platformDestroy()
 {
-    if (!m_remoteLayerClient)
+    if (!m_layerHostingContext)
         return;
 
-    WKCARemoteLayerClientInvalidate(m_remoteLayerClient.get());
-    m_remoteLayerClient = nullptr;
+    m_layerHostingContext->invalidate();
+    m_layerHostingContext = nullptr;
 }
 
 uint32_t PluginControllerProxy::remoteLayerClientID() const
 {
-    if (!m_remoteLayerClient)
+    if (!m_layerHostingContext)
         return 0;
 
-    return WKCARemoteLayerClientGetClientId(m_remoteLayerClient.get());
+    return m_layerHostingContext->contextID();
 }
 
 void PluginControllerProxy::platformGeometryDidChange()
 {
-    CALayer * pluginLayer = m_plugin->pluginLayer();
+    CALayer *pluginLayer = m_plugin->pluginLayer();
 
     // We don't want to animate to the new size so we disable actions for this transaction.
     [CATransaction begin];

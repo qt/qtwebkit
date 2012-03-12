@@ -70,8 +70,7 @@ LayoutState::LayoutState(LayoutState* prev, RenderBox* renderer, const LayoutSiz
         m_clipRect = prev->m_clipRect;
 
     if (renderer->hasOverflowClip()) {
-        RenderLayer* layer = renderer->layer();
-        LayoutRect clipRect(toPoint(m_paintOffset) + renderer->view()->layoutDelta(), layer->size());
+        LayoutRect clipRect(toPoint(m_paintOffset) + renderer->view()->layoutDelta(), renderer->cachedSizeForOverflowClip());
         if (m_clipped)
             m_clipRect.intersect(clipRect);
         else {
@@ -156,10 +155,9 @@ LayoutState::LayoutState(RenderObject* root)
     m_paintOffset = LayoutSize(absContentPoint.x(), absContentPoint.y());
 
     if (container->hasOverflowClip()) {
-        RenderBox* containerBox = toRenderBox(container);
-        RenderLayer* layer = containerBox->layer();
         m_clipped = true;
-        m_clipRect = LayoutRect(toPoint(m_paintOffset), layer->size());
+        RenderBox* containerBox = toRenderBox(container);
+        m_clipRect = LayoutRect(toPoint(m_paintOffset), containerBox->cachedSizeForOverflowClip());
         m_paintOffset -= containerBox->scrolledContentOffset();
     }
 }
@@ -280,7 +278,7 @@ void LayoutState::computeLineGridPaginationOrigin(RenderBox* renderer)
         if (pageLogicalTop > firstLineTopWithLeading) {
             // Shift to the next highest line grid multiple past the page logical top. Cache the delta
             // between this new value and the page logical top as the pagination origin.
-            LayoutUnit remainder = (pageLogicalTop - firstLineTopWithLeading) % gridLineHeight;
+            LayoutUnit remainder = roundToInt(pageLogicalTop - firstLineTopWithLeading) % roundToInt(gridLineHeight);
             LayoutUnit paginationDelta = gridLineHeight - remainder;
             if (isHorizontalWritingMode)
                 m_lineGridPaginationOrigin.setHeight(paginationDelta);

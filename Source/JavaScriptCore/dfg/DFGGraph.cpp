@@ -41,7 +41,7 @@ static const char* dfgOpNames[] = {
 
 const char *Graph::opName(NodeType op)
 {
-    return dfgOpNames[op & NodeIdMask];
+    return dfgOpNames[op];
 }
 
 const char* Graph::nameOfVariableAccessData(VariableAccessData* variableAccessData)
@@ -120,7 +120,7 @@ void Graph::dumpCodeOrigin(NodeIndex nodeIndex)
 void Graph::dump(NodeIndex nodeIndex)
 {
     Node& node = at(nodeIndex);
-    NodeType op = node.op;
+    NodeType op = static_cast<NodeType>(node.op);
 
     unsigned refCount = node.refCount();
     bool skipped = !refCount;
@@ -157,7 +157,7 @@ void Graph::dump(NodeIndex nodeIndex)
         dataLog("-");
     dataLog(">\t%s(", opName(op));
     bool hasPrinted = false;
-    if (op & NodeHasVarArgs) {
+    if (node.flags & NodeHasVarArgs) {
         for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++) {
             if (hasPrinted)
                 dataLog(", ");
@@ -175,8 +175,8 @@ void Graph::dump(NodeIndex nodeIndex)
         hasPrinted = !!node.child1();
     }
 
-    if (node.hasArithNodeFlags()) {
-        dataLog("%s%s", hasPrinted ? ", " : "", arithNodeFlagsAsString(node.rawArithNodeFlags()));
+    if (node.arithNodeFlags()) {
+        dataLog("%s%s", hasPrinted ? ", " : "", arithNodeFlagsAsString(node.arithNodeFlags()));
         hasPrinted = true;
     }
     if (node.hasVarNumber()) {
@@ -265,6 +265,12 @@ void Graph::dump()
     for (size_t b = 0; b < m_blocks.size(); ++b) {
         BasicBlock* block = m_blocks[b].get();
         dataLog("Block #%u (bc#%u): %s%s\n", (int)b, block->bytecodeBegin, block->isReachable ? "" : " (skipped)", block->isOSRTarget ? " (OSR target)" : "");
+        dataLog("  Phi Nodes:\n");
+        for (size_t i = 0; i < block->phis.size(); ++i) {
+            // Dumping the dead Phi nodes is just annoying!
+            if (at(block->phis[i]).refCount())
+                dump(block->phis[i]);
+        }
         dataLog("  vars before: ");
         if (block->cfaHasVisited)
             dumpOperands(block->valuesAtHead, WTF::dataFile());
@@ -274,8 +280,8 @@ void Graph::dump()
         dataLog("  var links: ");
         dumpOperands(block->variablesAtHead, WTF::dataFile());
         dataLog("\n");
-        for (size_t i = block->begin; i < block->end; ++i)
-            dump(i);
+        for (size_t i = 0; i < block->size(); ++i)
+            dump(block->at(i));
         dataLog("  vars after: ");
         if (block->cfaHasVisited)
             dumpOperands(block->valuesAtTail, WTF::dataFile());
@@ -283,15 +289,12 @@ void Graph::dump()
             dataLog("<empty>");
         dataLog("\n");
     }
-    dataLog("Phi Nodes:\n");
-    for (size_t i = m_blocks.last()->end; i < size(); ++i)
-        dump(i);
 }
 
 // FIXME: Convert this to be iterative, not recursive.
 #define DO_TO_CHILDREN(node, thingToDo) do {                            \
         Node& _node = (node);                                           \
-        if (_node.op & NodeHasVarArgs) {                                \
+        if (_node.flags & NodeHasVarArgs) {                             \
             for (unsigned _childIdx = _node.firstChild();               \
                  _childIdx < _node.firstChild() + _node.numChildren();  \
                  _childIdx++)                                           \

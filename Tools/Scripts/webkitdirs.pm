@@ -1264,7 +1264,8 @@ sub isARM()
 
 sub isCrossCompilation()
 {
-  my $compiler = "" unless $ENV{'CC'};
+  my $compiler = "";
+  $compiler = $ENV{'CC'} if (defined($ENV{'CC'}));
   if ($compiler =~ /gcc/) {
       my $compiler_options = `$compiler -v 2>&1`;
       my @host = $compiler_options =~ m/--host=(.*?)\s/;
@@ -1976,6 +1977,7 @@ sub generateBuildSystemFromCMakeProject
     my @args;
     push @args, "-DPORT=\"$port\"";
     push @args, "-DCMAKE_INSTALL_PREFIX=\"$prefixPath\"" if $prefixPath;
+    push @args, "-DSHARED_CORE=ON" if isEfl() && $ENV{"ENABLE_DRT"};
     if ($config =~ /release/i) {
         push @args, "-DCMAKE_BUILD_TYPE=Release";
     } elsif ($config =~ /debug/i) {
@@ -2063,6 +2065,7 @@ sub buildQMakeProjects
 
     my @buildArgs = ();
 
+    my $make = qtMakeCommand($qmakebin);
     my $makeargs = "";
     my $installHeaders;
     my $installLibs;
@@ -2083,6 +2086,11 @@ sub buildQMakeProjects
         }
     }
 
+    # Automatically determine the number of CPUs for make only if this make argument haven't already been specified.
+    if ($make eq "make" && $makeargs !~ /-j\s*\d+/i && (!defined $ENV{"MAKEFLAGS"} || ($ENV{"MAKEFLAGS"} !~ /-j\s*\d+/i ))) {
+        $makeargs .= " -j" . numberOfCPUs();
+    }
+
     my $qmakepath = File::Spec->catfile(sourceDir(), "Tools", "qmake");
     my $qmakecommand;
     if (isWindows()) {
@@ -2091,7 +2099,6 @@ sub buildQMakeProjects
         $qmakecommand = "QMAKEPATH=$qmakepath $qmakebin";
     }
 
-    my $make = qtMakeCommand($qmakebin);
     my $config = configuration();
     push @buildArgs, "INSTALL_HEADERS=" . $installHeaders if defined($installHeaders);
     push @buildArgs, "INSTALL_LIBS=" . $installLibs if defined($installLibs);
@@ -2184,6 +2191,9 @@ sub buildQMakeProjects
             # to run config tests and generate the removed Tools/qmake/.qmake.cache again.
             qtFeatureDefaults(\@buildArgs);
         #}
+
+        # Still trigger an incremental build
+        $buildHint = "incremental";
     }
 
     # Save config up-front so we can detect changes to the build config even

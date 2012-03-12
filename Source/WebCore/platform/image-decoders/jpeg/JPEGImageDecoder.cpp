@@ -103,7 +103,11 @@ void init_source(j_decompress_ptr jd);
 boolean fill_input_buffer(j_decompress_ptr jd);
 void skip_input_data(j_decompress_ptr jd, long num_bytes);
 void term_source(j_decompress_ptr jd);
+#if PLATFORM(QT)
+void error_exit(j_common_ptr) NO_RETURN;
+#else
 void error_exit(j_common_ptr cinfo);
+#endif
 
 // Implementation of a JPEG src object that understands our state machine
 struct decoder_source_mgr {
@@ -243,6 +247,14 @@ public:
             case JCS_YCbCr:
                 // libjpeg can convert GRAYSCALE and YCbCr image pixels to RGB.
                 m_info.out_color_space = rgbOutputColorSpace();
+#if defined(TURBO_JPEG_RGB_SWIZZLE)
+                if (m_info.saw_JFIF_marker)
+                    break;
+                // FIXME: Swizzle decoding does not support Adobe transform=0
+                // images (yet), so revert to using JSC_RGB in that case.
+                if (m_info.saw_Adobe_marker && !m_info.Adobe_transform)
+                    m_info.out_color_space = JCS_RGB;
+#endif
                 break;
             case JCS_CMYK:
             case JCS_YCCK:
@@ -489,7 +501,9 @@ bool JPEGImageDecoder::outputScanlines()
         if (!buffer.setSize(scaledSize().width(), scaledSize().height()))
             return setFailed();
         buffer.setStatus(ImageFrame::FramePartial);
-        buffer.setHasAlpha(false);
+        // The buffer is transparent outside the decoded area while the image is
+        // loading. The completed image will be marked fully opaque in jpegComplete().
+        buffer.setHasAlpha(true);
         buffer.setColorProfile(m_colorProfile);
 
         // For JPEGs, the frame always fills the entire image.
@@ -557,7 +571,9 @@ void JPEGImageDecoder::jpegComplete()
 
     // Hand back an appropriately sized buffer, even if the image ended up being
     // empty.
-    m_frameBufferCache[0].setStatus(ImageFrame::FrameComplete);
+    ImageFrame& buffer = m_frameBufferCache[0];
+    buffer.setStatus(ImageFrame::FrameComplete);
+    buffer.setHasAlpha(false);
 }
 
 void JPEGImageDecoder::decode(bool onlySize)

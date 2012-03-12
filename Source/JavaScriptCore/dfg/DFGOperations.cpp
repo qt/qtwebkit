@@ -31,10 +31,12 @@
 #include "DFGRepatch.h"
 #include "HostCallReturnValue.h"
 #include "GetterSetter.h"
-#include "InlineASM.h"
+#include <wtf/InlineASM.h>
 #include "Interpreter.h"
+#include "JSActivation.h"
 #include "JSByteArray.h"
 #include "JSGlobalData.h"
+#include "JSStaticScopeObject.h"
 #include "Operations.h"
 
 #if ENABLE(DFG_JIT)
@@ -144,6 +146,7 @@ FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function)
 
 namespace JSC { namespace DFG {
 
+template<bool strict>
 static inline void putByVal(ExecState* exec, JSValue baseValue, uint32_t index, JSValue value)
 {
     JSGlobalData* globalData = &exec->globalData();
@@ -155,7 +158,7 @@ static inline void putByVal(ExecState* exec, JSValue baseValue, uint32_t index, 
             return;
         }
 
-        JSArray::putByIndex(array, exec, index, value);
+        JSArray::putByIndex(array, exec, index, value, strict);
         return;
     }
 
@@ -173,7 +176,7 @@ static inline void putByVal(ExecState* exec, JSValue baseValue, uint32_t index, 
         }
     }
 
-    baseValue.put(exec, index, value);
+    baseValue.putByIndex(exec, index, value, strict);
 }
 
 template<bool strict>
@@ -187,7 +190,7 @@ ALWAYS_INLINE static void DFG_OPERATION operationPutByValInternal(ExecState* exe
     JSValue value = JSValue::decode(encodedValue);
 
     if (LIKELY(property.isUInt32())) {
-        putByVal(exec, baseValue, property.asUInt32(), value);
+        putByVal<strict>(exec, baseValue, property.asUInt32(), value);
         return;
     }
 
@@ -195,7 +198,7 @@ ALWAYS_INLINE static void DFG_OPERATION operationPutByValInternal(ExecState* exe
         double propertyAsDouble = property.asDouble();
         uint32_t propertyAsUInt32 = static_cast<uint32_t>(propertyAsDouble);
         if (propertyAsDouble == propertyAsUInt32) {
-            putByVal(exec, baseValue, propertyAsUInt32, value);
+            putByVal<strict>(exec, baseValue, propertyAsUInt32, value);
             return;
         }
     }
@@ -471,14 +474,24 @@ void DFG_OPERATION operationPutByValCellNonStrict(ExecState* exec, JSCell* cell,
     operationPutByValInternal<false>(exec, JSValue::encode(cell), encodedProperty, encodedValue);
 }
 
-void DFG_OPERATION operationPutByValBeyondArrayBounds(ExecState* exec, JSArray* array, int32_t index, EncodedJSValue encodedValue)
+void DFG_OPERATION operationPutByValBeyondArrayBoundsStrict(ExecState* exec, JSArray* array, int32_t index, EncodedJSValue encodedValue)
 {
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
     
     // We should only get here if index is outside the existing vector.
     ASSERT(!array->canSetIndex(index));
-    JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue));
+    JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue), true);
+}
+
+void DFG_OPERATION operationPutByValBeyondArrayBoundsNonStrict(ExecState* exec, JSArray* array, int32_t index, EncodedJSValue encodedValue)
+{
+    JSGlobalData* globalData = &exec->globalData();
+    NativeCallFrameTracer tracer(globalData, exec);
+    
+    // We should only get here if index is outside the existing vector.
+    ASSERT(!array->canSetIndex(index));
+    JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue), false);
 }
 
 EncodedJSValue DFG_OPERATION operationArrayPush(ExecState* exec, EncodedJSValue encodedValue, JSArray* array)
@@ -734,8 +747,11 @@ size_t DFG_OPERATION operationCompareStrictEq(ExecState* exec, EncodedJSValue en
 {
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
+
+    JSValue src1 = JSValue::decode(encodedOp1);
+    JSValue src2 = JSValue::decode(encodedOp2);
     
-    return JSValue::strictEqual(exec, JSValue::decode(encodedOp1), JSValue::decode(encodedOp2));
+    return JSValue::strictEqual(exec, src1, src2);
 }
 
 static void* handleHostCall(ExecState* execCallee, JSValue callee, CodeSpecializationKind kind)
@@ -972,6 +988,43 @@ EncodedJSValue DFG_OPERATION operationNewRegexp(ExecState* exec, void* regexpPtr
     }
     
     return JSValue::encode(RegExpObject::create(exec->globalData(), exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->regExpStructure(), regexp));
+}
+
+JSCell* DFG_OPERATION operationCreateActivation(ExecState* exec)
+{
+    JSGlobalData& globalData = exec->globalData();
+    JSActivation* activation = JSActivation::create(
+        globalData, exec, static_cast<FunctionExecutable*>(exec->codeBlock()->ownerExecutable()));
+    exec->setScopeChain(exec->scopeChain()->push(activation));
+    return activation;
+}
+
+void DFG_OPERATION operationTearOffActivation(ExecState* exec, JSCell* activation)
+{
+    ASSERT(activation);
+    ASSERT(activation->inherits(&JSActivation::s_info));
+    static_cast<JSActivation*>(activation)->tearOff(exec->globalData());
+}
+
+JSCell* DFG_OPERATION operationNewFunction(ExecState* exec, JSCell* functionExecutable)
+{
+    ASSERT(functionExecutable->inherits(&FunctionExecutable::s_info));
+    return static_cast<FunctionExecutable*>(functionExecutable)->make(exec, exec->scopeChain());
+}
+
+JSCell* DFG_OPERATION operationNewFunctionExpression(ExecState* exec, JSCell* functionExecutableAsCell)
+{
+    ASSERT(functionExecutableAsCell->inherits(&FunctionExecutable::s_info));
+    FunctionExecutable* functionExecutable =
+        static_cast<FunctionExecutable*>(functionExecutableAsCell);
+    JSFunction *function = functionExecutable->make(exec, exec->scopeChain());
+    if (!functionExecutable->name().isNull()) {
+        JSStaticScopeObject* functionScopeObject =
+            JSStaticScopeObject::create(
+                exec, functionExecutable->name(), function, ReadOnly | DontDelete);
+        function->setScope(exec->globalData(), function->scope()->push(functionScopeObject));
+    }
+    return function;
 }
 
 DFGHandlerEncoded DFG_OPERATION lookupExceptionHandler(ExecState* exec, uint32_t callIndex)

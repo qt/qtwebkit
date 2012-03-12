@@ -95,6 +95,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/DFGExitProfile.cpp \
 	Source/JavaScriptCore/bytecode/DFGExitProfile.h \
 	Source/JavaScriptCore/bytecode/EvalCodeCache.h \
+	Source/JavaScriptCore/bytecode/ExecutionCounter.cpp \
+	Source/JavaScriptCore/bytecode/ExecutionCounter.h \
 	Source/JavaScriptCore/bytecode/ExpressionRangeInfo.h \
 	Source/JavaScriptCore/bytecode/GetByIdStatus.cpp \
 	Source/JavaScriptCore/bytecode/GetByIdStatus.h \
@@ -167,6 +169,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGGraph.h \
 	Source/JavaScriptCore/dfg/DFGJITCompiler.cpp \
 	Source/JavaScriptCore/dfg/DFGJITCompiler.h \
+	Source/JavaScriptCore/dfg/DFGNode.cpp \
 	Source/JavaScriptCore/dfg/DFGNode.h \
 	Source/JavaScriptCore/dfg/DFGNodeReferenceBlob.h \
 	Source/JavaScriptCore/dfg/DFGNodeUse.h \
@@ -185,6 +188,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGPhase.h \
 	Source/JavaScriptCore/dfg/DFGPredictionPropagationPhase.cpp \
 	Source/JavaScriptCore/dfg/DFGPredictionPropagationPhase.h \
+	Source/JavaScriptCore/dfg/DFGRedundantPhiEliminationPhase.cpp \
+	Source/JavaScriptCore/dfg/DFGRedundantPhiEliminationPhase.h \
 	Source/JavaScriptCore/dfg/DFGRegisterBank.h \
 	Source/JavaScriptCore/dfg/DFGRepatch.cpp \
 	Source/JavaScriptCore/dfg/DFGRepatch.h \
@@ -309,6 +314,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/jit/JITCall32_64.cpp \
 	Source/JavaScriptCore/jit/JITCall.cpp \
 	Source/JavaScriptCore/jit/JITCode.h \
+	Source/JavaScriptCore/jit/JITCompilationEffort.h \
 	Source/JavaScriptCore/jit/JITDriver.h \
 	Source/JavaScriptCore/jit/JIT.cpp \
 	Source/JavaScriptCore/jit/JIT.h \
@@ -328,6 +334,10 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/jit/ThunkGenerators.cpp \
 	Source/JavaScriptCore/jit/ThunkGenerators.h \
 	Source/JavaScriptCore/llint/LLIntData.h \
+	Source/JavaScriptCore/llint/LLIntEntrypoints.cpp \
+	Source/JavaScriptCore/llint/LLIntEntrypoints.h \
+	Source/JavaScriptCore/llint/LowLevelInterpreter.cpp \
+	Source/JavaScriptCore/llint/LowLevelInterpreter.h \
 	Source/JavaScriptCore/os-win32/stdbool.h \
 	Source/JavaScriptCore/os-win32/stdint.h \
 	Source/JavaScriptCore/parser/ASTBuilder.h \
@@ -583,7 +593,9 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/wtf/ByteArray.h \
 	Source/JavaScriptCore/wtf/CheckedArithmetic.h \
 	Source/JavaScriptCore/wtf/CheckedBoolean.h \
+	Source/JavaScriptCore/wtf/RefCountedArray.h \
 	Source/JavaScriptCore/wtf/Compiler.h \
+	Source/JavaScriptCore/wtf/Complex.h \
 	Source/JavaScriptCore/wtf/CryptographicallyRandomNumber.cpp \
 	Source/JavaScriptCore/wtf/CryptographicallyRandomNumber.h \
 	Source/JavaScriptCore/wtf/CurrentTime.cpp \
@@ -710,6 +722,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/wtf/SentinelLinkedList.h \
 	Source/JavaScriptCore/wtf/SHA1.cpp \
 	Source/JavaScriptCore/wtf/SHA1.h \
+	Source/JavaScriptCore/wtf/SimpleStats.h \
 	Source/JavaScriptCore/wtf/SinglyLinkedList.h \
 	Source/JavaScriptCore/wtf/Spectrum.h \
 	Source/JavaScriptCore/wtf/StackBounds.cpp \
@@ -831,4 +844,5 @@ Programs_minidom_SOURCES = \
 	Source/JavaScriptCore/API/tests/minidom.c
 
 Programs_jsc_@WEBKITGTK_API_MAJOR_VERSION@_SOURCES = \
+	Source/JavaScriptCore/JSCTypedArrayStubs.h \
 	Source/JavaScriptCore/jsc.cpp

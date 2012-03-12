@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import optparse
 import os.path
 import re
 import shutil
@@ -56,7 +57,7 @@ def _baseline_name(fs, test_name, suffix):
 class RebaselineTest(AbstractDeclarativeCommand):
     name = "rebaseline-test"
     help_text = "Rebaseline a single test from a buildbot.  (Currently works only with build.chromium.org buildbots.)"
-    argument_names = "BUILDER_NAME TEST_NAME"
+    argument_names = "BUILDER_NAME TEST_NAME [PLATFORM_TO_MOVE_EXISTING_BASELINES_TO]"
 
     def _results_url(self, builder_name):
         # FIXME: Generalize this command to work with non-build.chromium.org builders.
@@ -66,6 +67,23 @@ class RebaselineTest(AbstractDeclarativeCommand):
     def _baseline_directory(self, builder_name):
         port = self._tool.port_factory.get_from_builder_name(builder_name)
         return port.baseline_path()
+
+    def _copy_existing_baseline(self, platform_to_move_existing_baselines_to, test_name, suffix):
+        port = self._tool.port_factory.get(platform_to_move_existing_baselines_to)
+        old_baseline = port.expected_filename(test_name, "." + suffix)
+        if not self._tool.filesystem.exists(old_baseline):
+            print("No existing baseline for %s." % test_name)
+            return
+
+        new_baseline = self._tool.filesystem.join(port.baseline_path(), self._file_name_for_expected_result(test_name, suffix))
+        if self._tool.filesystem.exists(new_baseline):
+            print("Existing baseline at %s, not copying over it." % new_baseline)
+        else:
+            print("Copying baseline from %s to %s." % (old_baseline, new_baseline))
+            self._tool.filesystem.maybe_make_directory(self._tool.filesystem.dirname(new_baseline))
+            self._tool.filesystem.copyfile(old_baseline, new_baseline)
+            if not self._tool.scm().exists(new_baseline):
+                self._tool.scm().add(new_baseline)
 
     def _save_baseline(self, data, target_baseline):
         if not data:
@@ -85,19 +103,27 @@ class RebaselineTest(AbstractDeclarativeCommand):
     def _file_name_for_expected_result(self, test_name, suffix):
         return "%s-expected.%s" % (self._test_root(test_name), suffix)
 
-    def _rebaseline_test(self, builder_name, test_name, suffix):
+    def _rebaseline_test(self, builder_name, test_name, platform_to_move_existing_baselines_to, suffix):
         results_url = self._results_url(builder_name)
         baseline_directory = self._baseline_directory(builder_name)
 
         source_baseline = "%s/%s" % (results_url, self._file_name_for_actual_result(test_name, suffix))
-        target_baseline = os.path.join(baseline_directory, self._file_name_for_expected_result(test_name, suffix))
+        target_baseline = self._tool.filesystem.join(baseline_directory, self._file_name_for_expected_result(test_name, suffix))
+
+        if platform_to_move_existing_baselines_to:
+            self._copy_existing_baseline(platform_to_move_existing_baselines_to, test_name, suffix)
 
         print "Retrieving %s." % source_baseline
         self._save_baseline(self._tool.web.get_binary(source_baseline, convert_404_to_None=True), target_baseline)
 
     def execute(self, options, args, tool):
         for suffix in _baseline_suffix_list:
-            self._rebaseline_test(args[0], args[1], suffix)
+            if len(args) > 2:
+                platform_to_move_existing_baselines_to = args[2]
+            else:
+                platform_to_move_existing_baselines_to = None
+
+            self._rebaseline_test(args[0], args[1], platform_to_move_existing_baselines_to, suffix)
 
 
 class OptimizeBaselines(AbstractDeclarativeCommand):
@@ -150,6 +176,15 @@ class RebaselineExpectations(AbstractDeclarativeCommand):
     name = "rebaseline-expectations"
     help_text = "Rebaselines the tests indicated in test_expectations.txt."
 
+    def __init__(self):
+        options = [
+            optparse.make_option('--no-optimize', dest='optimize', action='store_false', default=True,
+                help=('Do not optimize/de-dup the expectations after rebaselining '
+                      '(default is to de-dup automatically). '
+                      'You can use "webkit-patch optimize-baselines" to optimize separately.')),
+        ]
+        AbstractDeclarativeCommand.__init__(self, options=options)
+
     def _run_webkit_patch(self, args):
         try:
             self._tool.executive.run_command([self._tool.path()] + args, cwd=self._tool.scm().checkout_root)
@@ -192,6 +227,8 @@ class RebaselineExpectations(AbstractDeclarativeCommand):
             self._rebaseline_port(port_name)
         for port_name in tool.port_factory.all_port_names():
             self._update_expectations_file(port_name)
+        if not options.optimize:
+            return
         for test_name in self._touched_test_names:
             print "Optimizing baselines for %s." % test_name
             self._run_webkit_patch(['optimize-baselines', test_name])

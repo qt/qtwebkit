@@ -141,12 +141,6 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
     def __init__(self, host, port_name, **kwargs):
         chromium.ChromiumPort.__init__(self, host, port_name, **kwargs)
 
-        # The chromium-android port always uses the GPU code path, so we set
-        # these options here, almost as if this was the chromium-gpu-android
-        # port.
-        self._options.accelerated_2d_canvas = True
-        self._options.accelerated_video = True
-
         self._operating_system = 'android'
         self._version = 'icecreamsandwich'
         # FIXME: we may support other architectures in the future.
@@ -401,14 +395,13 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
 class ChromiumAndroidDriver(chromium.ChromiumDriver):
     def __init__(self, port, worker_number, pixel_tests, no_timeout=False):
         chromium.ChromiumDriver.__init__(self, port, worker_number, pixel_tests, no_timeout)
-        if self._image_path:
-            self._device_image_path = DEVICE_DRT_DIR + port.host.filesystem.basename(self._image_path)
+        self._device_image_path = None
 
-    def _start(self):
+    def _start(self, pixel_tests, per_test_args):
         # Convert the original command line into to two parts:
         # - the 'adb shell' command line to start an interactive adb shell;
         # - the DumpRenderTree command line to send to the adb shell.
-        original_cmd = self.cmd_line()
+        original_cmd = self.cmd_line(pixel_tests, per_test_args)
         shell_cmd = []
         drt_args = []
         path_to_driver = self._port._path_to_driver()
@@ -421,6 +414,8 @@ class ChromiumAndroidDriver(chromium.ChromiumDriver):
                     shell_cmd.append(param)
             else:
                 if param.startswith('--pixel-tests='):
+                    if not self._device_image_path:
+                        self._device_image_path = DEVICE_DRT_DIR + self._port.host.filesystem.basename(self._image_path)
                     param = '--pixel-tests=' + self._device_image_path
                 drt_args.append(param)
 
@@ -430,10 +425,10 @@ class ChromiumAndroidDriver(chromium.ChromiumDriver):
         while True:
             _log.debug('Starting adb shell for DumpRenderTree: ' + ' '.join(shell_cmd))
             executive = self._port.host.executive
-            self._proc = executive.Popen(shell_cmd, stdin=executive.PIPE, stdout=executive.PIPE, stderr=executive.STDOUT, close_fds=True)
-            # Read back the shell prompt ('# ') to ensure adb shell ready.
-            prompt = self._proc.stdout.read(2)
-            assert(prompt == '# ')
+            self._proc = executive.popen(shell_cmd, stdin=executive.PIPE, stdout=executive.PIPE, stderr=executive.STDOUT,
+                                         close_fds=True, universal_newlines=True)
+            # Read back the shell prompt to ensure adb shell ready.
+            self._read_prompt()
             # Some tests rely on this to produce proper number format etc.,
             # e.g. fast/speech/input-appearance-numberandspeech.html.
             self._write_command_and_read_line("export LC_CTYPE='en_US'\n")
@@ -526,3 +521,14 @@ class ChromiumAndroidDriver(chromium.ChromiumDriver):
         # (which causes Shell to output a message), and dumps the stack strace.
         # We use the Shell output as a crash hint.
         return line is not None and line.find('[1] + Stopped (signal)') >= 0
+
+    def _read_prompt(self):
+        last_char = ''
+        while True:
+            current_char = self._proc.stdout.read(1)
+            if current_char == ' ':
+                if last_char == '#':
+                    return
+                if last_char == '$':
+                    raise AssertionError('Adbd is not running as root')
+            last_char = current_char

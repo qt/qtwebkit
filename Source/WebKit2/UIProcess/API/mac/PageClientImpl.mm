@@ -33,6 +33,7 @@
 #import "WKAPICast.h"
 #import "WKStringCF.h"
 #import "WKViewInternal.h"
+#import "StringUtilities.h"
 #import "WebContextMenuProxyMac.h"
 #import "WebEditCommandProxy.h"
 #import "WebPopupMenuProxyMac.h"
@@ -50,6 +51,12 @@
 @interface NSApplication (WebNSApplicationDetails)
 - (NSCursor *)_cursorRectCursor;
 @end
+
+#if HAVE(LAYER_HOSTING_IN_WINDOW_SERVER)
+@interface NSWindow (WebNSWindowDetails)
+- (BOOL)_hostsLayersInWindowServer;
+@end
+#endif
 
 using namespace WebCore;
 using namespace WebKit;
@@ -103,11 +110,6 @@ using namespace WebKit;
 @end
 
 namespace WebKit {
-
-NSString* nsStringFromWebCoreString(const String& string)
-{
-    return string.impl() ? HardAutorelease(WKStringCopyCFString(0, toAPI(string.impl()))) : @"";
-}
 
 PassOwnPtr<PageClientImpl> PageClientImpl::create(WKView* wkView)
 {
@@ -186,6 +188,18 @@ bool PageClientImpl::isViewVisible()
 bool PageClientImpl::isViewInWindow()
 {
     return [m_wkView window];
+}
+
+LayerHostingMode PageClientImpl::layerHostingMode()
+{
+#if HAVE(LAYER_HOSTING_IN_WINDOW_SERVER)
+    if (![m_wkView window])
+        return LayerHostingModeDefault;
+
+    return [[m_wkView window] _hostsLayersInWindowServer] ? LayerHostingModeInWindowServer : LayerHostingModeDefault;
+#else
+    return LayerHostingModeDefault;
+#endif
 }
 
 void PageClientImpl::processDidCrash()
@@ -340,6 +354,11 @@ void PageClientImpl::enterAcceleratedCompositingMode(const LayerTreeContext& lay
 void PageClientImpl::exitAcceleratedCompositingMode()
 {
     [m_wkView _exitAcceleratedCompositingMode];
+}
+
+void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext& layerTreeContext)
+{
+    [m_wkView _updateAcceleratedCompositingMode:layerTreeContext];
 }
 #endif // USE(ACCELERATED_COMPOSITING)
 

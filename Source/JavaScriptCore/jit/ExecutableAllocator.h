@@ -25,6 +25,7 @@
 
 #ifndef ExecutableAllocator_h
 #define ExecutableAllocator_h
+#include "JITCompilationEffort.h"
 #include <stddef.h> // for ptrdiff_t
 #include <limits>
 #include <wtf/Assertions.h>
@@ -95,11 +96,16 @@ typedef WTF::MetaAllocatorHandle ExecutableMemoryHandle;
 
 #if ENABLE(JIT) && ENABLE(ASSEMBLER)
 
+#if ENABLE(EXECUTABLE_ALLOCATOR_DEMAND)
+class DemandExecutableAllocator;
+#endif
+
 class ExecutableAllocator {
     enum ProtectionSetting { Writable, Executable };
 
 public:
     ExecutableAllocator(JSGlobalData&);
+    ~ExecutableAllocator();
     
     static void initializeAllocator();
 
@@ -107,13 +113,15 @@ public:
 
     static bool underMemoryPressure();
     
+    static double memoryPressureMultiplier(size_t addedMemoryUsage);
+    
 #if ENABLE(META_ALLOCATOR_PROFILE)
     static void dumpProfile();
 #else
     static void dumpProfile() { }
 #endif
 
-    PassRefPtr<ExecutableMemoryHandle> allocate(JSGlobalData&, size_t sizeInBytes, void* ownerUID);
+    PassRefPtr<ExecutableMemoryHandle> allocate(JSGlobalData&, size_t sizeInBytes, void* ownerUID, JITCompilationEffort);
 
 #if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
     static void makeWritable(void* start, size_t size)
@@ -232,7 +240,13 @@ private:
 
 #if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
     static void reprotectRegion(void*, size_t, ProtectionSetting);
+#if ENABLE(EXECUTABLE_ALLOCATOR_DEMAND)
+    // We create a MetaAllocator for each JS global object.
+    OwnPtr<DemandExecutableAllocator> m_allocator;
+    DemandExecutableAllocator* allocator() { return m_allocator.get(); }
 #endif
+#endif
+
 };
 
 #endif // ENABLE(JIT) && ENABLE(ASSEMBLER)

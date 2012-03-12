@@ -64,13 +64,9 @@
 #include "cc/CCSolidColorDrawQuad.h"
 #include "cc/CCTileDrawQuad.h"
 #include "cc/CCVideoDrawQuad.h"
-#if USE(SKIA)
 #include "Extensions3D.h"
 #include "NativeImageSkia.h"
 #include "PlatformContextSkia.h"
-#elif USE(CG)
-#include <CoreGraphics/CGBitmapContext.h>
-#endif
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 
@@ -114,7 +110,6 @@ static TransformationMatrix screenMatrix(int x, int y, int width, int height)
     return screen;
 }
 
-#if USE(SKIA)
 bool contextSupportsAcceleratedPainting(GraphicsContext3D* context)
 {
     WebCore::Extensions3D* extensions = context->getExtensions();
@@ -133,7 +128,21 @@ bool contextSupportsAcceleratedPainting(GraphicsContext3D* context)
 
     return true;
 }
+
+bool needsLionIOSurfaceReadbackWorkaround()
+{
+#if OS(DARWIN)
+    static SInt32 systemVersion = 0;
+    if (!systemVersion) {
+        if (Gestalt(gestaltSystemVersion, &systemVersion) != noErr)
+            return false;
+    }
+
+    return systemVersion >= 0x1070;
+#else
+    return false;
 #endif
+}
 
 } // anonymous namespace
 
@@ -160,18 +169,18 @@ private:
 };
 
 
-PassOwnPtr<LayerRendererChromium> LayerRendererChromium::create(CCLayerTreeHostImpl* owner, PassRefPtr<GraphicsContext3D> context)
+PassOwnPtr<LayerRendererChromium> LayerRendererChromium::create(LayerRendererChromiumClient* client, PassRefPtr<GraphicsContext3D> context)
 {
-    OwnPtr<LayerRendererChromium> layerRenderer(adoptPtr(new LayerRendererChromium(owner, context)));
+    OwnPtr<LayerRendererChromium> layerRenderer(adoptPtr(new LayerRendererChromium(client, context)));
     if (!layerRenderer->initialize())
         return nullptr;
 
     return layerRenderer.release();
 }
 
-LayerRendererChromium::LayerRendererChromium(CCLayerTreeHostImpl* owner,
+LayerRendererChromium::LayerRendererChromium(LayerRendererChromiumClient* client,
                                              PassRefPtr<GraphicsContext3D> context)
-    : m_owner(owner)
+    : m_client(client)
     , m_currentRenderSurface(0)
     , m_offscreenFramebufferId(0)
     , m_context(context)
@@ -181,15 +190,34 @@ LayerRendererChromium::LayerRendererChromium(CCLayerTreeHostImpl* owner,
 {
 }
 
+class ContextLostCallbackAdapter : public GraphicsContext3D::ContextLostCallback {
+public:
+    static PassOwnPtr<ContextLostCallbackAdapter> create(LayerRendererChromiumClient* client)
+    {
+        return adoptPtr(new ContextLostCallbackAdapter(client));
+    }
+
+    virtual void onContextLost()
+    {
+        m_client->didLoseContext();
+    }
+
+private:
+    explicit ContextLostCallbackAdapter(LayerRendererChromiumClient* client)
+        : m_client(client) { }
+
+    LayerRendererChromiumClient* m_client;
+};
+
 bool LayerRendererChromium::initialize()
 {
     if (!m_context->makeContextCurrent())
         return false;
 
-#if USE(SKIA)
+    m_context->setContextLostCallback(ContextLostCallbackAdapter::create(m_client));
+
     if (settings().acceleratePainting && contextSupportsAcceleratedPainting(m_context.get()))
         m_capabilities.usingAcceleratedPainting = true;
-#endif
 
     WebCore::Extensions3D* extensions = m_context->getExtensions();
     m_capabilities.contextHasCachedFrontBuffer = extensions->supports("GL_CHROMIUM_front_buffer_cached");
@@ -285,6 +313,9 @@ void LayerRendererChromium::setVisible(bool visible)
 {
     if (!visible)
         releaseRenderSurfaceTextures();
+
+    // TODO: Replace setVisibilityCHROMIUM with an extension to explicitly manage front/backbuffers
+    // crbug.com/116049
     if (m_capabilities.usingSetVisibility) {
         Extensions3DChromium* extensions3DChromium = static_cast<Extensions3DChromium*>(m_context->getExtensions());
         extensions3DChromium->setVisibilityCHROMIUM(visible);
@@ -448,7 +479,7 @@ void LayerRendererChromium::drawDebugBorderQuad(const CCDebugBorderDrawQuad* qua
     renderMatrix.translate(0.5 * layerRect.width() + layerRect.x(), 0.5 * layerRect.height() + layerRect.y());
     renderMatrix.scaleNonUniform(layerRect.width(), layerRect.height());
     LayerRendererChromium::toGLMatrix(&glMatrix[0], projectionMatrix() * renderMatrix);
-    GLC(context(), context()->uniformMatrix4fv(program->vertexShader().matrixLocation(), false, &glMatrix[0], 1));
+    GLC(context(), context()->uniformMatrix4fv(program->vertexShader().matrixLocation(), 1, false, &glMatrix[0]));
 
     GLC(context(), context()->uniform4f(program->fragmentShader().colorLocation(), quad->color().red() / 255.0, quad->color().green() / 255.0, quad->color().blue() / 255.0, quad->color().alpha() / 255.0));
 
@@ -603,7 +634,7 @@ void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
         float edge[24];
         deviceLayerEdges.toFloatArray(edge);
         deviceLayerBounds.toFloatArray(&edge[12]);
-        GLC(context(), context()->uniform3fv(uniforms.edgeLocation, edge, 8));
+        GLC(context(), context()->uniform3fv(uniforms.edgeLocation, 8, edge));
 
         GLC(context(), context()->uniform4f(uniforms.vertexTexTransformLocation, vertexTexTranslateX, vertexTexTranslateY, vertexTexScaleX, vertexTexScaleY));
         GLC(context(), context()->uniform4f(uniforms.fragmentTexTransformLocation, fragmentTexTranslateX, fragmentTexTranslateY, fragmentTexScaleX, fragmentTexScaleY));
@@ -722,8 +753,8 @@ void LayerRendererChromium::drawYUV(const CCVideoDrawQuad* quad)
     GLC(context(), context()->uniform1i(program->fragmentShader().uTextureLocation(), 2));
     GLC(context(), context()->uniform1i(program->fragmentShader().vTextureLocation(), 3));
 
-    GLC(context(), context()->uniformMatrix3fv(program->fragmentShader().ccMatrixLocation(), 0, const_cast<float*>(CCVideoLayerImpl::yuv2RGB), 1));
-    GLC(context(), context()->uniform3fv(program->fragmentShader().yuvAdjLocation(), const_cast<float*>(CCVideoLayerImpl::yuvAdjust), 1));
+    GLC(context(), context()->uniformMatrix3fv(program->fragmentShader().ccMatrixLocation(), 1, 0, const_cast<float*>(CCVideoLayerImpl::yuv2RGB)));
+    GLC(context(), context()->uniform3fv(program->fragmentShader().yuvAdjLocation(), 1, const_cast<float*>(CCVideoLayerImpl::yuvAdjust)));
 
     const IntSize& bounds = quad->quadRect().size();
     drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), FloatQuad(),
@@ -775,7 +806,7 @@ void LayerRendererChromium::drawStreamTexture(const CCVideoDrawQuad* quad)
     const CCVideoLayerImpl::StreamTextureProgram* program = streamTextureLayerProgram();
     GLC(context(), context()->useProgram(program->program()));
     ASSERT(quad->matrix());
-    GLC(context(), context()->uniformMatrix4fv(program->vertexShader().texMatrixLocation(), false, const_cast<float*>(quad->matrix()), 1));
+    GLC(context(), context()->uniformMatrix4fv(program->vertexShader().texMatrixLocation(), 1, false, const_cast<float*>(quad->matrix())));
 
     drawSingleTextureVideoQuad(quad, program, 1, quad->frame()->textureId(), Extensions3DChromium::GL_TEXTURE_EXTERNAL_OES);
 }
@@ -990,7 +1021,7 @@ void LayerRendererChromium::drawTexturedQuad(const TransformationMatrix& drawMat
     // Apply the projection matrix before sending the transform over to the shader.
     toGLMatrix(&glMatrix[0], m_projectionMatrix * renderMatrix);
 
-    GLC(m_context, m_context->uniformMatrix4fv(matrixLocation, false, &glMatrix[0], 1));
+    GLC(m_context, m_context->uniformMatrix4fv(matrixLocation, 1, false, &glMatrix[0]));
 
     if (quadLocation != -1) {
         float point[8];
@@ -1002,7 +1033,7 @@ void LayerRendererChromium::drawTexturedQuad(const TransformationMatrix& drawMat
         point[5] = quad.p3().y();
         point[6] = quad.p4().x();
         point[7] = quad.p4().y();
-        GLC(m_context, m_context->uniform2fv(quadLocation, point, 4));
+        GLC(m_context, m_context->uniform2fv(quadLocation, 4, point));
     }
 
     if (alphaLocation != -1)
@@ -1039,7 +1070,7 @@ void LayerRendererChromium::swapBuffers(const IntRect& subBuffer)
 
 void LayerRendererChromium::onSwapBuffersComplete()
 {
-    m_owner->onSwapBuffersComplete();
+    m_client->onSwapBuffersComplete();
 }
 
 void LayerRendererChromium::getFramebufferPixels(void *pixels, const IntRect& rect)
@@ -1051,8 +1082,44 @@ void LayerRendererChromium::getFramebufferPixels(void *pixels, const IntRect& re
 
     makeContextCurrent();
 
-    GLC(m_context.get(), m_context->readPixels(rect.x(), rect.y(), rect.width(), rect.height(),
-                                         GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, pixels));
+    bool doWorkaround = needsLionIOSurfaceReadbackWorkaround();
+
+    Platform3DObject temporaryTexture = NullPlatform3DObject;
+    Platform3DObject temporaryFBO = NullPlatform3DObject;
+    GraphicsContext3D* context = m_context.get();
+
+    if (doWorkaround) {
+        // On Mac OS X 10.7, calling glReadPixels against an FBO whose color attachment is an
+        // IOSurface-backed texture causes corruption of future glReadPixels calls, even those on
+        // different OpenGL contexts. It is believed that this is the root cause of top crasher
+        // http://crbug.com/99393. <rdar://problem/10949687>
+
+        temporaryTexture = context->createTexture();
+        GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, temporaryTexture));
+        GLC(context, context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR));
+        GLC(context, context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR));
+        GLC(context, context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE));
+        GLC(context, context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE));
+        // Copy the contents of the current (IOSurface-backed) framebuffer into a temporary texture.
+        GLC(context, context->copyTexImage2D(GraphicsContext3D::TEXTURE_2D, 0, GraphicsContext3D::RGBA, 0, 0, rect.maxX(), rect.maxY(), 0));
+        temporaryFBO = context->createFramebuffer();
+        // Attach this texture to an FBO, and perform the readback from that FBO.
+        GLC(context, context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, temporaryFBO));
+        GLC(context, context->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, temporaryTexture, 0));
+
+        ASSERT(context->checkFramebufferStatus(GraphicsContext3D::FRAMEBUFFER) == GraphicsContext3D::FRAMEBUFFER_COMPLETE);
+    }
+
+    GLC(context, context->readPixels(rect.x(), rect.y(), rect.width(), rect.height(),
+                                     GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, pixels));
+
+    if (doWorkaround) {
+        // Clean up.
+        GLC(context, context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, 0));
+        GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, 0));
+        GLC(context, context->deleteFramebuffer(temporaryFBO));
+        GLC(context, context->deleteTexture(temporaryTexture));
+    }
 }
 
 ManagedTexture* LayerRendererChromium::getOffscreenLayerTexture()
@@ -1424,12 +1491,12 @@ void LayerRendererChromium::cleanupSharedObjects()
         m_tilerProgram->cleanup(m_context.get());
     if (m_tilerProgramOpaque)
         m_tilerProgramOpaque->cleanup(m_context.get());
-    if (m_tilerProgramAA)
-        m_tilerProgramAA->cleanup(m_context.get());
     if (m_tilerProgramSwizzle)
         m_tilerProgramSwizzle->cleanup(m_context.get());
     if (m_tilerProgramSwizzleOpaque)
         m_tilerProgramSwizzleOpaque->cleanup(m_context.get());
+    if (m_tilerProgramAA)
+        m_tilerProgramAA->cleanup(m_context.get());
     if (m_tilerProgramSwizzleAA)
         m_tilerProgramSwizzleAA->cleanup(m_context.get());
     if (m_canvasLayerProgram)
@@ -1438,18 +1505,24 @@ void LayerRendererChromium::cleanupSharedObjects()
         m_pluginLayerProgram->cleanup(m_context.get());
     if (m_pluginLayerProgramFlip)
         m_pluginLayerProgramFlip->cleanup(m_context.get());
+    if (m_pluginLayerTexRectProgram)
+        m_pluginLayerTexRectProgram->cleanup(m_context.get());
+    if (m_pluginLayerTexRectProgramFlip)
+        m_pluginLayerTexRectProgramFlip->cleanup(m_context.get());
     if (m_renderSurfaceMaskProgram)
         m_renderSurfaceMaskProgram->cleanup(m_context.get());
-    if (m_renderSurfaceMaskProgramAA)
-        m_renderSurfaceMaskProgramAA->cleanup(m_context.get());
     if (m_renderSurfaceProgram)
         m_renderSurfaceProgram->cleanup(m_context.get());
+    if (m_renderSurfaceMaskProgramAA)
+        m_renderSurfaceMaskProgramAA->cleanup(m_context.get());
     if (m_renderSurfaceProgramAA)
         m_renderSurfaceProgramAA->cleanup(m_context.get());
     if (m_videoLayerRGBAProgram)
         m_videoLayerRGBAProgram->cleanup(m_context.get());
     if (m_videoLayerYUVProgram)
         m_videoLayerYUVProgram->cleanup(m_context.get());
+    if (m_videoLayerNativeTextureProgram)
+        m_videoLayerNativeTextureProgram->cleanup(m_context.get());
     if (m_streamTextureLayerProgram)
         m_streamTextureLayerProgram->cleanup(m_context.get());
 
@@ -1457,19 +1530,22 @@ void LayerRendererChromium::cleanupSharedObjects()
     m_headsUpDisplayProgram.clear();
     m_tilerProgram.clear();
     m_tilerProgramOpaque.clear();
-    m_tilerProgramAA.clear();
     m_tilerProgramSwizzle.clear();
     m_tilerProgramSwizzleOpaque.clear();
+    m_tilerProgramAA.clear();
     m_tilerProgramSwizzleAA.clear();
     m_canvasLayerProgram.clear();
     m_pluginLayerProgram.clear();
     m_pluginLayerProgramFlip.clear();
+    m_pluginLayerTexRectProgram.clear();
+    m_pluginLayerTexRectProgramFlip.clear();
     m_renderSurfaceMaskProgram.clear();
-    m_renderSurfaceMaskProgramAA.clear();
     m_renderSurfaceProgram.clear();
+    m_renderSurfaceMaskProgramAA.clear();
     m_renderSurfaceProgramAA.clear();
     m_videoLayerRGBAProgram.clear();
     m_videoLayerYUVProgram.clear();
+    m_videoLayerNativeTextureProgram.clear();
     m_streamTextureLayerProgram.clear();
     if (m_offscreenFramebufferId)
         GLC(m_context.get(), m_context->deleteFramebuffer(m_offscreenFramebufferId));

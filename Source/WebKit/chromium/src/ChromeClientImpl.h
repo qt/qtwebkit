@@ -35,6 +35,7 @@
 #include "ChromeClientChromium.h"
 #include "PopupMenu.h"
 #include "SearchPopupMenu.h"
+#include "WebNavigationPolicy.h"
 
 namespace WebCore {
 class AccessibilityObject;
@@ -189,16 +190,13 @@ public:
 
     // ChromeClientImpl:
     void setCursorForPlugin(const WebCursorInfo&);
+    void setNewWindowNavigationPolicy(WebNavigationPolicy);
 
     virtual bool selectItemWritingDirectionIsNatural();
     virtual bool selectItemAlignmentFollowsMenuWritingDirection();
     virtual bool hasOpenedPopup() const OVERRIDE;
     virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const;
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const;
-
-#if ENABLE(CONTEXT_MENUS)
-    virtual void showContextMenu() { }
-#endif
 
     virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String& dialogMessage, WebCore::FrameLoader::PageDismissalType) const;
 
@@ -213,6 +211,7 @@ public:
 #endif
 
 private:
+    WebNavigationPolicy getNavigationPolicy();
     void getPopupMenuInfo(WebCore::PopupContainer*, WebPopupMenuInfo*);
     void setCursor(const WebCursorInfo&);
 
@@ -222,6 +221,9 @@ private:
     bool m_scrollbarsVisible;
     bool m_menubarVisible;
     bool m_resizable;
+
+    // The policy for how the next webview to be created will be shown.
+    WebNavigationPolicy m_nextNewWindowNavigationPolicy;
 };
 
 } // namespace WebKit

@@ -427,10 +427,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Shared\ContextMenuState.h"
-				>
-			</File>
-			<File
 				RelativePath="..\Shared\DictionaryPopupInfo.cpp"
 				>
 			</File>
@@ -791,6 +787,22 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Shared\WebRenderLayer.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\Shared\WebRenderLayer.h"
+				>
+			</File>
+			<File
+				RelativePath="..\Shared\WebRenderObject.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\Shared\WebRenderObject.h"
+				>
+			</File>
+			<File
 				RelativePath="..\Shared\WebSecurityOrigin.h"
 				>
 			</File>
@@ -971,6 +983,22 @@
 				</File>
 				<File
 					RelativePath="..\Shared\API\c\WKPageLoadTypes.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Shared\API\c\WKRenderLayer.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Shared\API\c\WKRenderLayer.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Shared\API\c\WKRenderObject.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Shared\API\c\WKRenderObject.h"
 					>
 				</File>
 				<File
@@ -2705,18 +2733,6 @@
 					RelativePath="..\WebProcess\FullScreen\WebFullScreenManager.h"
 					>
 				</File>
-				<Filter
-					Name="win"
-					>
-					<File
-						RelativePath="..\WebProcess\FullScreen\win\WebFullScreenManagerWin.cpp"
-						>
-					</File>
-					<File
-						RelativePath="..\WebProcess\FullScreen\win\WebFullScreenManagerWin.h"
-						>
-					</File>
-				</Filter>
 			</Filter>
 			<Filter
 				Name="Notifications (User)"

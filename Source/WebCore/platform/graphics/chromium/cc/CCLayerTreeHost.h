@@ -55,8 +55,8 @@ public:
     virtual void updateAnimations(double frameBeginTime) = 0;
     virtual void layout() = 0;
     virtual void applyScrollAndScale(const IntSize& scrollDelta, float pageScale) = 0;
-    virtual PassRefPtr<GraphicsContext3D> createLayerTreeHostContext3D() = 0;
-    virtual void didRecreateGraphicsContext(bool success) = 0;
+    virtual PassRefPtr<GraphicsContext3D> createContext() = 0;
+    virtual void didRecreateContext(bool success) = 0;
     virtual void didCommitAndDrawFrame() = 0;
     virtual void didCompleteSwapBuffers() = 0;
 
@@ -130,13 +130,21 @@ public:
     void beginCommitOnImplThread(CCLayerTreeHostImpl*);
     void finishCommitOnImplThread(CCLayerTreeHostImpl*);
     void commitComplete();
-    PassRefPtr<GraphicsContext3D> createLayerTreeHostContext3D();
+    PassRefPtr<GraphicsContext3D> createContext();
     virtual PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHostImpl(CCLayerTreeHostImplClient*);
     void didBecomeInvisibleOnImplThread(CCLayerTreeHostImpl*);
-    void didRecreateGraphicsContext(bool success);
+    void didLoseContext();
+    enum RecreateResult {
+        RecreateSucceeded,
+        RecreateFailedButTryAgain,
+        RecreateFailedAndGaveUp,
+    };
+    RecreateResult recreateContext();
     void didCommitAndDrawFrame() { m_client->didCommitAndDrawFrame(); }
     void didCompleteSwapBuffers() { m_client->didCompleteSwapBuffers(); }
     void deleteContentsTexturesOnImplThread(TextureAllocator*);
+    // Returns false if we should abort this frame due to initialization failure.
+    bool updateLayers();
 
     CCLayerTreeHostClient* client() { return m_client; }
 
@@ -145,6 +153,8 @@ public:
     // Only used when compositing on the main thread.
     void composite();
 
+    // NOTE: The returned value can only be used to make GL calls or make the
+    // context current on the thread the compositor is running on!
     GraphicsContext3D* context();
 
     // Composites and attempts to read back the result into the provided
@@ -159,14 +169,14 @@ public:
     const LayerRendererCapabilities& layerRendererCapabilities() const;
 
     // Test only hook
-    void loseCompositorContext(int numTimes);
+    void loseContext(int numTimes);
 
     void setNeedsAnimate();
     // virtual for testing
     virtual void setNeedsCommit();
     void setNeedsRedraw();
 
-    void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>);
+    void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime);
 
     LayerChromium* rootLayer() { return m_rootLayer.get(); }
     const LayerChromium* rootLayer() const { return m_rootLayer.get(); }
@@ -184,9 +194,6 @@ public:
 
     bool visible() const { return m_visible; }
     void setVisible(bool);
-
-    // Returns false if we should abort this frame due to initialization failure.
-    bool updateLayers();
 
     void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double durationSec);
 
@@ -218,6 +225,8 @@ private:
     void reserveTextures();
     void clearPendingUpdate();
 
+    void setAnimationEventsRecursive(const CCAnimationEventsVector&, LayerChromium*, double wallClockTime);
+
     int m_compositorIdentifier;
 
     bool m_animating;
@@ -228,6 +237,9 @@ private:
 
     OwnPtr<CCProxy> m_proxy;
     bool m_layerRendererInitialized;
+    bool m_contextLost;
+    int m_numTimesRecreateShouldFail;
+    int m_numFailedRecreateAttempts;
 
     RefPtr<LayerChromium> m_rootLayer;
     OwnPtr<TextureManager> m_contentsTextureManager;

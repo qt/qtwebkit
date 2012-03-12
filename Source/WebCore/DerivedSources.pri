@@ -43,7 +43,7 @@ XMLNS_NAMES = $$PWD/xml/xmlnsattrs.in
 
 HTML_ENTITIES = $$PWD/html/parser/HTMLEntityNames.in
 
-EVENT_FACTORY = $$PWD/dom/EventFactory.in
+EVENTS_NAMES = $$PWD/dom/EventNames.in
 
 EVENT_TARGET_FACTORY = $$PWD/dom/EventTargetFactory.in
 
@@ -92,6 +92,39 @@ IDL_BINDINGS += \
     $$PWD/Modules/geolocation/PositionCallback.idl \
     $$PWD/Modules/geolocation/PositionError.idl \
     $$PWD/Modules/geolocation/PositionErrorCallback.idl \
+    $$PWD/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
+    $$PWD/Modules/indexeddb/IDBAny.idl \
+    $$PWD/Modules/indexeddb/IDBCursor.idl \
+    $$PWD/Modules/indexeddb/IDBDatabaseError.idl \
+    $$PWD/Modules/indexeddb/IDBDatabaseException.idl \
+    $$PWD/Modules/indexeddb/IDBDatabase.idl \
+    $$PWD/Modules/indexeddb/IDBFactory.idl \
+    $$PWD/Modules/indexeddb/IDBIndex.idl \
+    $$PWD/Modules/indexeddb/IDBKey.idl \
+    $$PWD/Modules/indexeddb/IDBKeyRange.idl \
+    $$PWD/Modules/indexeddb/IDBObjectStore.idl \
+    $$PWD/Modules/indexeddb/IDBRequest.idl \
+    $$PWD/Modules/indexeddb/IDBTransaction.idl \
+    $$PWD/Modules/indexeddb/WorkerContextIndexedDatabase.idl \
+    $$PWD/Modules/webdatabase/DOMWindowSQLDatabase.idl \
+    $$PWD/Modules/webdatabase/Database.idl \
+    $$PWD/Modules/webdatabase/DatabaseCallback.idl \
+    $$PWD/Modules/webdatabase/DatabaseSync.idl \
+    $$PWD/Modules/webdatabase/SQLError.idl \
+    $$PWD/Modules/webdatabase/SQLException.idl \
+    $$PWD/Modules/webdatabase/SQLResultSet.idl \
+    $$PWD/Modules/webdatabase/SQLResultSetRowList.idl \
+    $$PWD/Modules/webdatabase/SQLStatementCallback.idl \
+    $$PWD/Modules/webdatabase/SQLStatementErrorCallback.idl \
+    $$PWD/Modules/webdatabase/SQLTransaction.idl \
+    $$PWD/Modules/webdatabase/SQLTransactionCallback.idl \
+    $$PWD/Modules/webdatabase/SQLTransactionErrorCallback.idl \
+    $$PWD/Modules/webdatabase/SQLTransactionSync.idl \
+    $$PWD/Modules/webdatabase/SQLTransactionSyncCallback.idl \
+    $$PWD/Modules/webdatabase/WorkerContextSQLDatabase.idl \
+    $$PWD/Modules/websockets/CloseEvent.idl \
+    $$PWD/Modules/websockets/DOMWindowWebSocket.idl \
+    $$PWD/Modules/websockets/WebSocket.idl \
     $$PWD/css/Counter.idl \
     $$PWD/css/CSSCharsetRule.idl \
     $$PWD/css/CSSFontFaceRule.idl \
@@ -213,9 +246,9 @@ IDL_BINDINGS += \
     $$PWD/fileapi/Metadata.idl \
     $$PWD/fileapi/MetadataCallback.idl \
     $$PWD/fileapi/WebKitBlobBuilder.idl \
+    $$PWD/fileapi/WorkerContextFileSystem.idl \
     $$PWD/html/canvas/ArrayBufferView.idl \
     $$PWD/html/canvas/ArrayBuffer.idl \
-    $$PWD/html/canvas/DOMWindowWebGL.idl \
     $$PWD/html/canvas/DataView.idl \
     $$PWD/html/canvas/Int8Array.idl \
     $$PWD/html/canvas/Float32Array.idl \
@@ -225,6 +258,7 @@ IDL_BINDINGS += \
     $$PWD/html/canvas/CanvasPattern.idl \
     $$PWD/html/canvas/CanvasRenderingContext.idl \
     $$PWD/html/canvas/CanvasRenderingContext2D.idl \
+    $$PWD/html/canvas/EXTTextureFilterAnisotropic.idl \
     $$PWD/html/canvas/OESStandardDerivatives.idl \
     $$PWD/html/canvas/OESTextureFloat.idl \
     $$PWD/html/canvas/OESVertexArrayObject.idl \
@@ -253,7 +287,6 @@ IDL_BINDINGS += \
     $$PWD/html/DOMSettableTokenList.idl \
     $$PWD/html/DOMTokenList.idl \
     $$PWD/html/DOMURL.idl \
-    $$PWD/html/DOMWindowHTML.idl \
     $$PWD/html/HTMLAllCollection.idl \
     $$PWD/html/HTMLAudioElement.idl \
     $$PWD/html/HTMLAnchorElement.idl \
@@ -370,39 +403,12 @@ IDL_BINDINGS += \
     $$PWD/plugins/DOMMimeType.idl \
     $$PWD/plugins/DOMPluginArray.idl \
     $$PWD/plugins/DOMMimeTypeArray.idl \
-    $$PWD/storage/DOMWindowSQLDatabase.idl \
-    $$PWD/storage/Database.idl \
-    $$PWD/storage/DatabaseCallback.idl \
-    $$PWD/storage/DatabaseSync.idl \
-    $$PWD/storage/IDBAny.idl \
-    $$PWD/storage/IDBCursor.idl \
-    $$PWD/storage/IDBDatabaseError.idl \
-    $$PWD/storage/IDBDatabaseException.idl \
-    $$PWD/storage/IDBDatabase.idl \
-    $$PWD/storage/IDBFactory.idl \
-    $$PWD/storage/IDBIndex.idl \
-    $$PWD/storage/IDBKey.idl \
-    $$PWD/storage/IDBKeyRange.idl \
-    $$PWD/storage/IDBObjectStore.idl \
-    $$PWD/storage/IDBRequest.idl \
-    $$PWD/storage/IDBTransaction.idl \
     $$PWD/storage/Storage.idl \
     $$PWD/storage/StorageEvent.idl \
     $$PWD/storage/StorageInfo.idl \
     $$PWD/storage/StorageInfoErrorCallback.idl \
     $$PWD/storage/StorageInfoQuotaCallback.idl \
     $$PWD/storage/StorageInfoUsageCallback.idl \
-    $$PWD/storage/SQLError.idl \
-    $$PWD/storage/SQLException.idl \
-    $$PWD/storage/SQLResultSet.idl \
-    $$PWD/storage/SQLResultSetRowList.idl \
-    $$PWD/storage/SQLStatementCallback.idl \
-    $$PWD/storage/SQLStatementErrorCallback.idl \
-    $$PWD/storage/SQLTransaction.idl \
-    $$PWD/storage/SQLTransactionCallback.idl \
-    $$PWD/storage/SQLTransactionErrorCallback.idl \
-    $$PWD/storage/SQLTransactionSync.idl \
-    $$PWD/storage/SQLTransactionSyncCallback.idl \
     $$PWD/testing/Internals.idl \
     $$PWD/testing/InternalSettings.idl \
     $$PWD/webaudio/AudioBuffer.idl \
@@ -426,18 +432,13 @@ IDL_BINDINGS += \
     $$PWD/webaudio/JavaScriptAudioNode.idl \
     $$PWD/webaudio/LowPass2FilterNode.idl \
     $$PWD/webaudio/RealtimeAnalyserNode.idl \
-    $$PWD/websockets/CloseEvent.idl \
-    $$PWD/websockets/DOMWindowWebSocket.idl \
-    $$PWD/websockets/WebSocket.idl \
     $$PWD/workers/AbstractWorker.idl \
-    $$PWD/workers/DOMWindowWorker.idl \
     $$PWD/workers/DedicatedWorkerContext.idl \
     $$PWD/workers/SharedWorker.idl \
     $$PWD/workers/SharedWorkerContext.idl \
     $$PWD/workers/Worker.idl \
     $$PWD/workers/WorkerContext.idl \
     $$PWD/workers/WorkerLocation.idl \
-    $$PWD/xml/DOMWindowXML.idl \
     $$PWD/xml/DOMParser.idl \
     $$PWD/xml/XMLHttpRequest.idl \
     $$PWD/xml/XMLHttpRequestException.idl \
@@ -460,7 +461,6 @@ v8 {
 
 contains(DEFINES, ENABLE_SVG=1) {
   IDL_BINDINGS += \
-    $$PWD/svg/DOMWindowSVG.idl \
     $$PWD/svg/SVGZoomEvent.idl \
     $$PWD/svg/SVGAElement.idl \
     $$PWD/svg/SVGAltGlyphDefElement.idl \
@@ -665,23 +665,28 @@ GENERATORS += cssvalues
 # GENERATOR 0: Resolve [Supplemental] dependency in IDLs
 SUPPLEMENTAL_DEPENDENCY_FILE = supplemental_dependency.tmp
 IDL_FILES_TMP = ${QMAKE_FUNC_FILE_OUT_PATH}/idl_files.tmp
-RESOLVE_SUPPLEMENTAL_SCRIPT = $$PWD/bindings/scripts/resolve-supplemental.pl
+PREPROCESS_IDLS_SCRIPT = $$PWD/bindings/scripts/preprocess-idls.pl
 IDL_ATTRIBUTES_FILE = $$PWD/bindings/scripts/IDLAttributes.txt
 
-resolveSupplemental.input = IDL_ATTRIBUTES_FILE
-resolveSupplemental.script = $$RESOLVE_SUPPLEMENTAL_SCRIPT
+preprocessIdls.input = IDL_ATTRIBUTES_FILE
+preprocessIdls.script = $$PREPROCESS_IDLS_SCRIPT
 # FIXME : We need to use only perl at some point.
-resolveSupplemental.commands = echo $$IDL_BINDINGS | tr \' \' \'\\n\' > $$IDL_FILES_TMP && \
-                               perl -I$$PWD/bindings/scripts $$resolveSupplemental.script \
+EOC = $$escape_expand(\\n\\t)
+win_cmd_shell: preprocessIdls.commands = type nul > $$IDL_FILES_TMP $$EOC
+else: preprocessIdls.commands = cat /dev/null > $$IDL_FILES_TMP $$EOC
+for(binding, IDL_BINDINGS) {
+    preprocessIdls.commands += echo $$binding >> $$IDL_FILES_TMP $$EOC
+}
+preprocessIdls.commands += perl -I$$PWD/bindings/scripts $$preprocessIdls.script \
                                --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
                                --idlFilesList $$IDL_FILES_TMP \
                                --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \
                                --idlAttributesFile $${IDL_ATTRIBUTES_FILE} \
                                --preprocessor \"$${QMAKE_MOC} -E\"
-resolveSupplemental.output = $$SUPPLEMENTAL_DEPENDENCY_FILE
-resolveSupplemental.add_output_to_sources = false
-resolveSupplemental.depends = $$PWD/bindings/scripts/IDLParser.pm $$IDL_BINDINGS
-GENERATORS += resolveSupplemental
+preprocessIdls.output = $$SUPPLEMENTAL_DEPENDENCY_FILE
+preprocessIdls.add_output_to_sources = false
+preprocessIdls.depends = $$PWD/bindings/scripts/IDLParser.pm $$IDL_BINDINGS
+GENERATORS += preprocessIdls
 
 # GENERATOR 1: Generate .h and .cpp from IDLs
 generateBindings.input = IDL_BINDINGS
@@ -692,6 +697,9 @@ generateBindings.commands = perl -I$$PWD/bindings/scripts $$generateBindings.scr
                             --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
                             --generator $$generator \
                             --include $$PWD/Modules/geolocation \
+                            --include $$PWD/Modules/indexeddb \
+                            --include $$PWD/Modules/webdatabase \
+                            --include $$PWD/Modules/websockets \
                             --include $$PWD/dom \
                             --include $$PWD/fileapi \
                             --include $$PWD/html \
@@ -814,10 +822,10 @@ GENERATORS += fontnames
 
 # GENERATOR 5-E:
 eventfactory.output = EventFactory.cpp
-eventfactory.input = EVENT_FACTORY
+eventfactory.input = EVENTS_NAMES
 eventfactory.script = $$PWD/dom/make_event_factory.pl
-eventfactory.commands = perl -I$$PWD/bindings/scripts $$eventfactory.script --input $$EVENT_FACTORY --outputDir ${QMAKE_FUNC_FILE_OUT_PATH}
-eventfactory.depends = $$PWD/dom/make_event_factory.pl $$EVENT_FACTORY
+eventfactory.commands = perl -I$$PWD/bindings/scripts $$eventfactory.script --input $$EVENTS_NAMES --outputDir ${QMAKE_FUNC_FILE_OUT_PATH}
+eventfactory.depends = $$PWD/dom/make_event_factory.pl $$EVENTS_NAMES
 GENERATORS += eventfactory
 
 # GENERATOR 5-F:

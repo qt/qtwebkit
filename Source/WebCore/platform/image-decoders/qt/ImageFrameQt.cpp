@@ -30,10 +30,9 @@
 
 #include "NotImplemented.h"
 
-#include <QPixmap>
-#include <stdio.h>
-
 namespace WebCore {
+
+#if USE(QT_IMAGE_DECODER)
 
 ImageFrame::ImageFrame()
     : m_hasAlpha(false) 
@@ -153,5 +152,22 @@ int ImageFrame::height() const
 {
     return m_size.height();
 }
+
+#else
+
+QPixmap* ImageFrame::asNewNativeImage() const
+{
+    QImage::Format fmt;
+    if (m_hasAlpha)
+        fmt = m_premultiplyAlpha ?  QImage::Format_ARGB32_Premultiplied : QImage::Format_ARGB32;
+    else
+        fmt = QImage::Format_RGB32;
+
+    QImage img(reinterpret_cast<uchar*>(m_bytes), m_size.width(), m_size.height(), sizeof(PixelData) * m_size.width(), fmt);
+
+    return new QPixmap(QPixmap::fromImage(img));
+}
+
+#endif // USE(QT_IMAGE_DECODER)
 
 }

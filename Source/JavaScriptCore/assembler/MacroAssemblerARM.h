@@ -108,6 +108,11 @@ public:
         add32(ARMRegisters::S1, dest);
     }
 
+    void add32(RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        m_assembler.adds_r(dest, src, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
+    }
+
     void and32(RegisterID src, RegisterID dest)
     {
         m_assembler.ands_r(dest, dest, src);
@@ -120,6 +125,15 @@ public:
             m_assembler.bics_r(dest, dest, w & ~ARMAssembler::OP2_INV_IMM);
         else
             m_assembler.ands_r(dest, dest, w);
+    }
+
+    void and32(TrustedImm32 imm, RegisterID src, RegisterID dest)
+    {
+        ARMWord w = m_assembler.getImm(imm.m_value, ARMRegisters::S0, true);
+        if (w & ARMAssembler::OP2_INV_IMM)
+            m_assembler.bics_r(dest, src, w & ~ARMAssembler::OP2_INV_IMM);
+        else
+            m_assembler.ands_r(dest, src, w);
     }
 
     void lshift32(RegisterID shift_amount, RegisterID dest)
@@ -154,11 +168,6 @@ public:
     void neg32(RegisterID srcDest)
     {
         m_assembler.rsbs_r(srcDest, srcDest, ARMAssembler::getOp2(0));
-    }
-
-    void not32(RegisterID dest)
-    {
-        m_assembler.mvns_r(dest, dest);
     }
 
     void or32(RegisterID src, RegisterID dest)
@@ -232,6 +241,11 @@ public:
         sub32(ARMRegisters::S1, dest);
     }
 
+    void sub32(RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        m_assembler.subs_r(dest, src, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
+    }
+
     void xor32(RegisterID src, RegisterID dest)
     {
         m_assembler.eors_r(dest, dest, src);
@@ -239,7 +253,10 @@ public:
 
     void xor32(TrustedImm32 imm, RegisterID dest)
     {
-        m_assembler.eors_r(dest, dest, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
+        if (imm.m_value == -1)
+            m_assembler.mvns_r(dest, dest);
+        else
+            m_assembler.eors_r(dest, dest, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
     }
 
     void countLeadingZeros32(RegisterID src, RegisterID dest)
@@ -547,6 +564,13 @@ public:
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 
+    Jump branchAdd32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        add32(src, imm, dest);
+        return Jump(m_assembler.jmp(ARMCondition(cond)));
+    }
+
     void mull32(RegisterID src1, RegisterID src2, RegisterID dest)
     {
         if (src1 == dest) {
@@ -593,6 +617,13 @@ public:
     {
         ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
         sub32(imm, dest);
+        return Jump(m_assembler.jmp(ARMCondition(cond)));
+    }
+
+    Jump branchSub32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        sub32(src, imm, dest);
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 

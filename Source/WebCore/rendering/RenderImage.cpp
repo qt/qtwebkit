@@ -264,9 +264,16 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
 
     GraphicsContext* context = paintInfo.context;
 
+    Page* page = 0;
+    if (Frame* frame = this->frame())
+        page = frame->page();
+
     if (!m_imageResource->hasImage() || m_imageResource->errorOccurred()) {
         if (paintInfo.phase == PaintPhaseSelection)
             return;
+
+        if (page && paintInfo.phase == PaintPhaseForeground)
+            page->addRelevantUnpaintedObject(this, visualOverflowRect());
 
         if (cWidth > 2 && cHeight > 2) {
             // Draw an outline rect where the image should be.
@@ -325,13 +332,11 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
         }
     } else if (m_imageResource->hasImage() && cWidth > 0 && cHeight > 0) {
         RefPtr<Image> img = m_imageResource->image(cWidth, cHeight);
-        if (!img || img->isNull())
+        if (!img || img->isNull()) {
+            if (page && paintInfo.phase == PaintPhaseForeground)
+                page->addRelevantUnpaintedObject(this, visualOverflowRect());
             return;
-
-    if (Frame* frame = this->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(this, paintInfo.rect);
-    }
+        }
 
 #if PLATFORM(MAC)
         if (style()->highlight() != nullAtom && !paintInfo.context->paintingDisabled())
@@ -342,6 +347,15 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
         LayoutPoint contentLocation = paintOffset;
         contentLocation.move(leftBorder + leftPad, topBorder + topPad);
         paintIntoRect(context, LayoutRect(contentLocation, contentSize));
+        
+        if (cachedImage() && page && paintInfo.phase == PaintPhaseForeground) {
+            // For now, count images as unpainted if they are still progressively loading. We may want 
+            // to refine this in the future to account for the portion of the image that has painted.
+            if (cachedImage()->isLoading())
+                page->addRelevantUnpaintedObject(this, LayoutRect(contentLocation, contentSize));
+            else
+                page->addRelevantRepaintedObject(this, LayoutRect(contentLocation, contentSize));
+        }
     }
 }
 
@@ -490,8 +504,8 @@ void RenderImage::updateAltText()
 
 LayoutUnit RenderImage::computeReplacedLogicalWidth(bool includeMaxWidth) const
 {
-    // If we've got an explicit width/height assigned, propagate it to the image resource.    
-    if (style()->logicalWidth().isFixed() && style()->logicalHeight().isFixed()) {
+    // If we've got an explicit width/height assigned, propagate it to the image resource.
+    if (style()->logicalWidth().isSpecified() && style()->logicalHeight().isSpecified()) {
         LayoutUnit width = RenderReplaced::computeReplacedLogicalWidth(includeMaxWidth);
         m_imageResource->setContainerSizeForRenderer(IntSize(width, computeReplacedLogicalHeight()));
         return width;

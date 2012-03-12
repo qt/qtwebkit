@@ -27,6 +27,7 @@
 #ifndef ShadowRoot_h
 #define ShadowRoot_h
 
+#include "Document.h"
 #include "DocumentFragment.h"
 #include "ExceptionCode.h"
 #include "TreeScope.h"
@@ -38,7 +39,7 @@ class Document;
 class HTMLContentElement;
 class HTMLContentSelector;
 class InsertionPoint;
-class ShadowRootList;
+class ShadowTree;
 
 class ShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
     friend class WTF::DoublyLinkedListNode<ShadowRoot>;
@@ -64,18 +65,30 @@ public:
     InsertionPoint* insertionPointFor(Node*) const;
     void hostChildrenChanged();
 
-    virtual void attach();
-
     virtual bool applyAuthorSheets() const;
     void setApplyAuthorSheets(bool);
 
     Element* host() const { return shadowHost(); }
-    ShadowRootList* list() const;
+    ShadowTree* tree() const;
+
+    String innerHTML() const;
+    void setInnerHTML(const String&, ExceptionCode&);
+
+    Element* activeElement() const;
 
     ShadowRoot* youngerShadowRoot() const { return prev(); }
     ShadowRoot* olderShadowRoot() const { return next(); }
 
-    bool hasContentElement() const;
+    bool isYoungest() const { return !youngerShadowRoot(); }
+    bool isOldest() const { return !olderShadowRoot(); }
+
+    bool hasInsertionPoint() const;
+
+    virtual void attach();
+
+    bool isUsedForRendering() const;
+    InsertionPoint* assignedTo() const;
+    void setAssignedTo(InsertionPoint*);
 
 private:
     ShadowRoot(Document*);
@@ -88,7 +101,31 @@ private:
     ShadowRoot* m_prev;
     ShadowRoot* m_next;
     bool m_applyAuthorSheets : 1;
+    InsertionPoint* m_insertionPointAssignedTo;
 };
+
+inline InsertionPoint* ShadowRoot::assignedTo() const
+{
+    return m_insertionPointAssignedTo;
+}
+
+inline void ShadowRoot::setAssignedTo(InsertionPoint* insertionPoint)
+{
+    ASSERT(!m_insertionPointAssignedTo || !insertionPoint);
+    m_insertionPointAssignedTo = insertionPoint;
+}
+
+inline bool ShadowRoot::isUsedForRendering() const
+{
+    return isYoungest() || assignedTo();
+}
+
+inline Element* ShadowRoot::activeElement() const
+{
+    if (document()->isHTMLDocument())
+        return treeScope()->activeElement();
+    return 0;
+}
 
 inline const ShadowRoot* toShadowRoot(const Node* node)
 {
@@ -99,6 +136,18 @@ inline const ShadowRoot* toShadowRoot(const Node* node)
 inline ShadowRoot* toShadowRoot(Node* node)
 {
     return const_cast<ShadowRoot*>(toShadowRoot(static_cast<const Node*>(node)));
+}
+
+inline ShadowRoot* toShadowRoot(TreeScope* scope)
+{
+    ASSERT(!scope || scope->isShadowRoot());
+    return static_cast<ShadowRoot*>(scope);
+}
+
+// Put this TreeScope method here to inline it.
+inline bool TreeScope::isShadowRoot() const
+{
+    return m_rootNode->isShadowRoot();
 }
 
 } // namespace

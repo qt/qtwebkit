@@ -109,7 +109,7 @@ namespace JSC {
         bool allowsAccessFrom(ExecState*);
 
         JS_EXPORT_PRIVATE static void put(JSCell*, ExecState*, const Identifier& propertyName, JSValue, PutPropertySlot&);
-        JS_EXPORT_PRIVATE static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue);
+        JS_EXPORT_PRIVATE static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
 
         // putDirect is effectively an unchecked vesion of 'defineOwnProperty':
         //  - the prototype chain is not consulted
@@ -834,21 +834,20 @@ inline JSValue JSValue::get(ExecState* exec, unsigned propertyName, PropertySlot
 inline void JSValue::put(ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot& slot)
 {
     if (UNLIKELY(!isCell())) {
-        JSObject* thisObject = synthesizeObject(exec);
-        thisObject->methodTable()->put(thisObject, exec, propertyName, value, slot);
+        putToPrimitive(exec, propertyName, value, slot);
         return;
     }
     asCell()->methodTable()->put(asCell(), exec, propertyName, value, slot);
 }
 
-inline void JSValue::put(ExecState* exec, unsigned propertyName, JSValue value)
+inline void JSValue::putByIndex(ExecState* exec, unsigned propertyName, JSValue value, bool shouldThrow)
 {
     if (UNLIKELY(!isCell())) {
-        JSObject* thisObject = synthesizeObject(exec);
-        thisObject->methodTable()->putByIndex(thisObject, exec, propertyName, value);
+        PutPropertySlot slot(shouldThrow);
+        putToPrimitive(exec, Identifier::from(exec, propertyName), value, slot);
         return;
     }
-    asCell()->methodTable()->putByIndex(asCell(), exec, propertyName, value);
+    asCell()->methodTable()->putByIndex(asCell(), exec, propertyName, value, shouldThrow);
 }
 
 // --- JSValue inlines ----------------------------

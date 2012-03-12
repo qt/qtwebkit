@@ -38,7 +38,7 @@
 #include "HTMLNames.h"
 #include "RenderTextControlMultiLine.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "Text.h"
 #include "TextControlInnerElements.h"
 #include "TextIterator.h"
@@ -112,24 +112,24 @@ void HTMLTextAreaElement::restoreFormControlState(const String& state)
 
 void HTMLTextAreaElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
+    HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
     setLastChangeWasNotUserEdit();
     if (!m_isDirty)
         setNonDirtyValue(defaultValue());
     setInnerTextValue(value());
-    HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-bool HTMLTextAreaElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLTextAreaElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == alignAttr) {
+    if (name == alignAttr) {
         // Don't map 'align' attribute.  This matches what Firefox, Opera and IE do.
         // See http://bugs.webkit.org/show_bug.cgi?id=7075
         return false;
     }
 
-    if (attr->name() == wrapAttr)
+    if (name == wrapAttr)
         return true;
-    return HTMLTextFormControlElement::isPresentationAttribute(attr);
+    return HTMLTextFormControlElement::isPresentationAttribute(name);
 }
 
 void HTMLTextAreaElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
@@ -294,7 +294,7 @@ String HTMLTextAreaElement::sanitizeUserInputValue(const String& proposedValue, 
 
 HTMLElement* HTMLTextAreaElement::innerTextElement() const
 {
-    Node* node = shadowRootList()->oldestShadowRoot()->firstChild();
+    Node* node = shadowTree()->oldestShadowRoot()->firstChild();
     ASSERT(!node || node->hasTagName(divTag));
     return toHTMLElement(node);
 }
@@ -384,8 +384,9 @@ String HTMLTextAreaElement::defaultValue() const
 
 void HTMLTextAreaElement::setDefaultValue(const String& defaultValue)
 {
-    // To preserve comments, remove only the text nodes, then add a single text node.
+    RefPtr<Node> protectFromMutationEvents(this);
 
+    // To preserve comments, remove only the text nodes, then add a single text node.
     Vector<RefPtr<Node> > textNodes;
     for (Node* n = firstChild(); n; n = n->nextSibling()) {
         if (n->isTextNode())
@@ -471,7 +472,7 @@ void HTMLTextAreaElement::updatePlaceholderText()
     String placeholderText = strippedPlaceholder();
     if (placeholderText.isEmpty()) {
         if (m_placeholder) {
-            shadowRootList()->oldestShadowRoot()->removeChild(m_placeholder.get(), ec);
+            shadowTree()->oldestShadowRoot()->removeChild(m_placeholder.get(), ec);
             ASSERT(!ec);
             m_placeholder.clear();
         }
@@ -480,7 +481,7 @@ void HTMLTextAreaElement::updatePlaceholderText()
     if (!m_placeholder) {
         m_placeholder = HTMLDivElement::create(document());
         m_placeholder->setShadowPseudoId("-webkit-input-placeholder");
-        shadowRootList()->oldestShadowRoot()->insertBefore(m_placeholder, shadowRootList()->oldestShadowRoot()->firstChild()->nextSibling(), ec);
+        shadowTree()->oldestShadowRoot()->insertBefore(m_placeholder, shadowTree()->oldestShadowRoot()->firstChild()->nextSibling(), ec);
         ASSERT(!ec);
     }
     m_placeholder->setInnerText(placeholderText, ec);

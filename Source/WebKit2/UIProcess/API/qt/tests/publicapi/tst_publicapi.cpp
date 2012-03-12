@@ -23,8 +23,9 @@
 #include <QMetaProperty>
 #include <QMetaType>
 #include <QtTest/QtTest>
-#include <qquickwebview_p.h>
-#include <qwebnavigationrequest_p.h>
+#include <private/qquickwebview_p.h>
+#include <private/qwebloadrequest_p.h>
+#include <private/qwebnavigationrequest_p.h>
 
 class tst_publicapi : public QObject {
     Q_OBJECT
@@ -34,11 +35,16 @@ private slots:
 
 static QList<const QMetaObject*> typesToCheck = QList<const QMetaObject*>()
     << &QQuickWebView::staticMetaObject
+    << &QWebLoadRequest::staticMetaObject
     << &QWebNavigationRequest::staticMetaObject;
 
 static QStringList expectedAPI = QStringList()
     << "QQuickWebView.AcceptRequest --> NavigationRequestAction"
     << "QQuickWebView.IgnoreRequest --> NavigationRequestAction"
+    << "QQuickWebView.LoadStartedStatus --> LoadStatus"
+    << "QQuickWebView.LoadSucceededStatus --> LoadStatus"
+    << "QQuickWebView.LoadFailedStatus --> LoadStatus"
+    << "QQuickWebView.NoErrorDomain --> ErrorDomain"
     << "QQuickWebView.InternalErrorDomain --> ErrorDomain"
     << "QQuickWebView.NetworkErrorDomain --> ErrorDomain"
     << "QQuickWebView.HttpErrorDomain --> ErrorDomain"
@@ -52,33 +58,33 @@ static QStringList expectedAPI = QStringList()
     << "QQuickWebView.title --> QString"
     << "QQuickWebView.url --> QUrl"
     << "QQuickWebView.icon --> QUrl"
-    << "QQuickWebView.loadProgress --> int"
     << "QQuickWebView.canGoBack --> bool"
     << "QQuickWebView.canGoForward --> bool"
     << "QQuickWebView.loading --> bool"
-    << "QQuickWebView.canReload --> bool"
-    << "QQuickWebView.titleChanged(QString) --> void"
-    << "QQuickWebView.loadStarted() --> void"
-    << "QQuickWebView.loadSucceeded() --> void"
-    << "QQuickWebView.loadFailed(QQuickWebView::ErrorDomain,int,QUrl,QString) --> void"
-    << "QQuickWebView.loadProgressChanged(int) --> void"
-    << "QQuickWebView.urlChanged(QUrl) --> void"
-    << "QQuickWebView.iconChanged(QUrl) --> void"
+    << "QQuickWebView.loadProgress --> int"
+    << "QQuickWebView.titleChanged() --> void"
+    << "QQuickWebView.navigationHistoryChanged() --> void"
+    << "QQuickWebView.loadingChanged(QWebLoadRequest*) --> void"
+    << "QQuickWebView.loadProgressChanged() --> void"
+    << "QQuickWebView.urlChanged() --> void"
+    << "QQuickWebView.iconChanged() --> void"
     << "QQuickWebView.linkHovered(QUrl,QString) --> void"
-    << "QQuickWebView.navigationStateChanged() --> void"
     << "QQuickWebView.navigationRequested(QWebNavigationRequest*) --> void"
-    << "QQuickWebView.load(QUrl) --> void"
     << "QQuickWebView.loadHtml(QString,QUrl) --> void"
     << "QQuickWebView.loadHtml(QString) --> void"
     << "QQuickWebView.goBack() --> void"
     << "QQuickWebView.goForward() --> void"
     << "QQuickWebView.stop() --> void"
     << "QQuickWebView.reload() --> void"
+    << "QWebLoadRequest.url --> QUrl"
+    << "QWebLoadRequest.status --> QQuickWebView::LoadStatus"
+    << "QWebLoadRequest.errorString --> QString"
+    << "QWebLoadRequest.errorDomain --> QQuickWebView::ErrorDomain"
+    << "QWebLoadRequest.errorCode --> int"
     << "QWebNavigationRequest.url --> QUrl"
-    << "QWebNavigationRequest.originatingUrl --> QUrl"
-    << "QWebNavigationRequest.button --> int"
-    << "QWebNavigationRequest.modifiers --> int"
-    << "QWebNavigationRequest.action --> int"
+    << "QWebNavigationRequest.mouseButton --> int"
+    << "QWebNavigationRequest.keyboardModifiers --> int"
+    << "QWebNavigationRequest.action --> QQuickWebView::NavigationRequestAction"
     << "QWebNavigationRequest.navigationType --> QQuickWebView::NavigationType"
     << "QWebNavigationRequest.actionChanged() --> void"
     ;

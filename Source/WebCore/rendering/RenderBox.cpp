@@ -263,6 +263,9 @@ void RenderBox::willBeDestroyed()
     // value during laying out. It causes a use-after-free bug.
     ASSERT(!RenderBlock::hasPercentHeightDescendant(this));
 
+    if (hasOverflowClip() && everHadLayout() && !hasLayer())
+        clearCachedSizeForOverflowClip();
+
     RenderBoxModelObject::willBeDestroyed();
 }
 
@@ -285,7 +288,7 @@ void RenderBox::removeFloatingOrPositionedChildFromBlockLists()
 
         if (parentBlock) {
             RenderObject* parent = parentBlock->parent();
-            if (parent && parent->isDeprecatedFlexibleBox())
+            if (parent && parent->isFlexibleBoxIncludingDeprecated())
                 parentBlock = toRenderBlock(parent);
 
             parentBlock->markSiblingsWithFloatsForLayout(this);
@@ -360,7 +363,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
 
     // If our zoom factor changes and we have a defined scrollLeft/Top, we need to adjust that value into the
     // new zoomed coordinate space.
-    if (hasOverflowClip() && oldStyle && newStyle && oldStyle->effectiveZoom() != newStyle->effectiveZoom()) {
+    if (hasOverflowClipWithLayer() && oldStyle && newStyle && oldStyle->effectiveZoom() != newStyle->effectiveZoom()) {
         if (int left = layer()->scrollXOffset()) {
             left = (left / oldStyle->effectiveZoom()) * newStyle->effectiveZoom();
             layer()->scrollToXOffset(left);
@@ -463,6 +466,10 @@ void RenderBox::layout()
         child = child->nextSibling();
     }
     statePusher.pop();
+
+    if (hasOverflowClip() && !hasLayer())
+        updateCachedSizeForOverflowClip();
+
     setNeedsLayout(false);
 }
 
@@ -480,17 +487,17 @@ LayoutUnit RenderBox::clientHeight() const
 
 int RenderBox::pixelSnappedClientWidth() const
 {
-    return clientWidth();
+    return snapSizeToPixel(clientWidth(), clientLeft());
 }
 
 int RenderBox::pixelSnappedClientHeight() const
 {
-    return clientHeight();
+    return snapSizeToPixel(clientHeight(), clientTop());
 }
 
 int RenderBox::scrollWidth() const
 {
-    if (hasOverflowClip())
+    if (hasOverflowClipWithLayer())
         return layer()->scrollWidth();
     // For objects with visible overflow, this matches IE.
     // FIXME: Need to work right with writing modes.
@@ -501,7 +508,7 @@ int RenderBox::scrollWidth() const
 
 int RenderBox::scrollHeight() const
 {
-    if (hasOverflowClip())
+    if (hasOverflowClipWithLayer())
         return layer()->scrollHeight();
     // For objects with visible overflow, this matches IE.
     // FIXME: Need to work right with writing modes.
@@ -510,29 +517,29 @@ int RenderBox::scrollHeight() const
 
 int RenderBox::scrollLeft() const
 {
-    return hasOverflowClip() ? layer()->scrollXOffset() : 0;
+    return hasOverflowClipWithLayer() ? layer()->scrollXOffset() : 0;
 }
 
 int RenderBox::scrollTop() const
 {
-    return hasOverflowClip() ? layer()->scrollYOffset() : 0;
+    return hasOverflowClipWithLayer() ? layer()->scrollYOffset() : 0;
 }
 
 void RenderBox::setScrollLeft(int newLeft)
 {
-    if (hasOverflowClip())
+    if (hasOverflowClipWithLayer())
         layer()->scrollToXOffset(newLeft, RenderLayer::ScrollOffsetClamped);
 }
 
 void RenderBox::setScrollTop(int newTop)
 {
-    if (hasOverflowClip())
+    if (hasOverflowClipWithLayer())
         layer()->scrollToYOffset(newTop, RenderLayer::ScrollOffsetClamped);
 }
 
 void RenderBox::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
-    rects.append(LayoutRect(accumulatedOffset, size()));
+    rects.append(pixelSnappedIntRect(accumulatedOffset, size()));
 }
 
 void RenderBox::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
@@ -581,10 +588,10 @@ LayoutRect RenderBox::outlineBoundsForRepaint(RenderBoxModelObject* repaintConta
     return box;
 }
 
-void RenderBox::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint& additionalOffset)
+void RenderBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)
 {
     if (!size().isEmpty())
-        rects.append(LayoutRect(additionalOffset, size()));
+        rects.append(pixelSnappedIntRect(additionalOffset, size()));
 }
 
 LayoutRect RenderBox::reflectionBox() const
@@ -651,13 +658,13 @@ bool RenderBox::fixedElementLaysOutRelativeToFrame(Frame* frame, FrameView* fram
 
 bool RenderBox::includeVerticalScrollbarSize() const
 {
-    return hasOverflowClip() && !layer()->hasOverlayScrollbars()
+    return hasOverflowClipWithLayer() && !layer()->hasOverlayScrollbars()
         && (style()->overflowY() == OSCROLL || style()->overflowY() == OAUTO);
 }
 
 bool RenderBox::includeHorizontalScrollbarSize() const
 {
-    return hasOverflowClip() && !layer()->hasOverlayScrollbars()
+    return hasOverflowClipWithLayer() && !layer()->hasOverlayScrollbars()
         && (style()->overflowX() == OSCROLL || style()->overflowX() == OAUTO);
 }
 
@@ -749,8 +756,56 @@ bool RenderBox::needsPreferredWidthsRecalculation() const
 IntSize RenderBox::scrolledContentOffset() const
 {
     ASSERT(hasOverflowClip());
-    ASSERT(hasLayer());
-    return layer()->scrolledContentOffset();
+
+    if (hasLayer())
+        return layer()->scrolledContentOffset();
+
+    // If we have no layer, it means that we have no overflowing content as we lazily
+    // allocate it on demand. Thus we don't have any scroll offset.
+    ASSERT(!requiresLayerForOverflowClip());
+    return LayoutSize();
+}
+
+typedef HashMap<const RenderBox*, LayoutSize> RendererSizeCache;
+static RendererSizeCache& cachedSizeForOverflowClipMap()
+{
+    DEFINE_STATIC_LOCAL(RendererSizeCache, cachedSizeForOverflowClipMap, ());
+    return cachedSizeForOverflowClipMap;
+}
+
+IntSize RenderBox::cachedSizeForOverflowClip() const
+{
+    ASSERT(hasOverflowClip());
+    if (hasLayer())
+        return layer()->size();
+
+    ASSERT(!requiresLayerForOverflowClip());
+    RendererSizeCache::iterator it = cachedSizeForOverflowClipMap().find(this);
+    if (it == cachedSizeForOverflowClipMap().end())
+        return LayoutSize();
+
+    return it->second;
+}
+
+void RenderBox::updateCachedSizeForOverflowClip()
+{
+    ASSERT(hasOverflowClip());
+    ASSERT(!requiresLayerForOverflowClip());
+    ASSERT(!hasLayer());
+
+    cachedSizeForOverflowClipMap().set(this, size());
+}
+
+void RenderBox::clearCachedSizeForOverflowClip()
+{
+    ASSERT(hasOverflowClip());
+    ASSERT(!requiresLayerForOverflowClip());
+    ASSERT(!hasLayer());
+
+    // FIXME: We really would like to enable this ASSERT. However the current updateScrollInfoAfterLayout
+    // is not bullet-proof and it triggers in non-obvious ways under NRWT.
+    // ASSERT(cachedSizeForOverflowClipMap().contains(this));
+    cachedSizeForOverflowClipMap().remove(this);
 }
 
 LayoutUnit RenderBox::minPreferredLogicalWidth() const
@@ -795,9 +850,9 @@ void RenderBox::setOverrideWidth(LayoutUnit width)
 
 void RenderBox::clearOverrideSize()
 {
-    if (hasOverrideHeight())
+    if (gOverrideHeightMap)
         gOverrideHeightMap->remove(this);
-    if (hasOverrideWidth())
+    if (gOverrideWidthMap)
         gOverrideWidthMap->remove(this);
 }
 
@@ -1070,7 +1125,7 @@ void RenderBox::paintFillLayers(const PaintInfo& paintInfo, const Color& c, cons
 void RenderBox::paintFillLayer(const PaintInfo& paintInfo, const Color& c, const FillLayer* fillLayer, const LayoutRect& rect,
     BackgroundBleedAvoidance bleedAvoidance, CompositeOperator op, RenderObject* backgroundObject)
 {
-    paintFillLayerExtended(paintInfo, c, fillLayer, rect, bleedAvoidance, 0, IntSize(), op, backgroundObject);
+    paintFillLayerExtended(paintInfo, c, fillLayer, rect, bleedAvoidance, 0, LayoutSize(), op, backgroundObject);
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1133,8 +1188,8 @@ bool RenderBox::repaintLayerRectsForImage(WrappedImagePtr image, const FillLayer
                     }
                     rendererRect = LayoutRect(-layerRenderer->marginLeft(),
                         -layerRenderer->marginTop(),
-                        max(layerRenderer->width() + layerRenderer->marginLeft() + layerRenderer->marginRight() + layerRenderer->borderLeft() + layerRenderer->borderRight(), rw),
-                        max(layerRenderer->height() + layerRenderer->marginTop() + layerRenderer->marginBottom() + layerRenderer->borderTop() + layerRenderer->borderBottom(), rh));
+                        max(layerRenderer->width() + layerRenderer->marginWidth() + layerRenderer->borderLeft() + layerRenderer->borderRight(), rw),
+                        max(layerRenderer->height() + layerRenderer->marginHeight() + layerRenderer->borderTop() + layerRenderer->borderBottom(), rh));
                 } else {
                     layerRenderer = this;
                     rendererRect = borderBoxRect();
@@ -1182,7 +1237,7 @@ bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumu
         return false;
         
     bool isControlClip = hasControlClip();
-    bool isOverflowClip = hasOverflowClip() && !layer()->isSelfPaintingLayer();
+    bool isOverflowClip = hasOverflowClip() && !hasSelfPaintingLayer();
     
     if (!isControlClip && !isOverflowClip)
         return false;
@@ -1204,7 +1259,7 @@ bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumu
 
 void RenderBox::popContentsClip(PaintInfo& paintInfo, PaintPhase originalPhase, const LayoutPoint& accumulatedOffset)
 {
-    ASSERT(hasControlClip() || (hasOverflowClip() && !layer()->isSelfPaintingLayer()));
+    ASSERT(hasControlClip() || (hasOverflowClip() && !hasSelfPaintingLayer()));
 
     paintInfo.context->restore();
     if (originalPhase == PaintPhaseOutline) {
@@ -1224,8 +1279,11 @@ LayoutRect RenderBox::overflowClipRect(const LayoutPoint& location, RenderRegion
     clipRect.setSize(clipRect.size() - LayoutSize(borderLeft() + borderRight(), borderTop() + borderBottom()));
 
     // Subtract out scrollbars if we have them.
-    if (layer())
+     if (layer()) {
+        if (style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
+            clipRect.move(layer()->verticalScrollbarWidth(relevancy), 0);
         clipRect.contract(layer()->verticalScrollbarWidth(relevancy), layer()->horizontalScrollbarHeight(relevancy));
+     }
 
     return clipRect;
 }
@@ -1265,7 +1323,7 @@ LayoutUnit RenderBox::shrinkLogicalWidthToAvoidFloats(LayoutUnit childMarginStar
     LayoutUnit logicalTopPosition = logicalTop();
     LayoutUnit adjustedPageOffsetForContainingBlock = offsetFromLogicalTopOfFirstPage - logicalTop();
     if (region) {
-        LayoutUnit offsetFromLogicalTopOfRegion = region ? region->offsetFromLogicalTopOfFirstPage() - offsetFromLogicalTopOfFirstPage : 0;
+        LayoutUnit offsetFromLogicalTopOfRegion = region ? region->offsetFromLogicalTopOfFirstPage() - offsetFromLogicalTopOfFirstPage : zeroLayoutUnit;
         logicalTopPosition = max(logicalTopPosition, logicalTopPosition + offsetFromLogicalTopOfRegion);
         containingBlockRegion = cb->clampToStartAndEndRegions(region);
     }
@@ -1346,8 +1404,7 @@ void RenderBox::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool
     if (RenderView* v = view()) {
         if (v->layoutStateEnabled() && !repaintContainer) {
             LayoutState* layoutState = v->layoutState();
-            LayoutSize offset = layoutState->m_paintOffset;
-            offset.expand(x(), y());
+            LayoutSize offset = layoutState->m_paintOffset + locationOffset();
             if (style()->position() == RelativePosition && layer())
                 offset += layer()->relativePositionOffset();
             transformState.move(offset);
@@ -1474,7 +1531,7 @@ void RenderBox::positionLineBox(InlineBox* box)
             // our object was inline originally, since otherwise it would have ended up underneath
             // the inlines.
             RootInlineBox* root = box->root();
-            root->block()->setStaticInlinePositionForChild(this, root->lineTopWithLeading(), lroundf(box->logicalLeft()));
+            root->block()->setStaticInlinePositionForChild(this, root->lineTopWithLeading(), roundedLayoutUnit(box->logicalLeft()));
             if (style()->hasStaticInlinePosition(box->isHorizontal()))
                 setChildNeedsLayout(true, false); // Just go ahead and mark the positioned object as needing layout, so it will update its position properly.
         } else {
@@ -1597,7 +1654,7 @@ void RenderBox::computeRectForRepaint(RenderBoxModelObject* repaintContainer, La
 #endif
 
     LayoutPoint topLeft = rect.location();
-    topLeft.move(x(), y());
+    topLeft.move(locationOffset());
 
     EPosition position = styleToUse->position();
 
@@ -1607,7 +1664,7 @@ void RenderBox::computeRectForRepaint(RenderBoxModelObject* repaintContainer, La
         fixed = position == FixedPosition;
         rect = layer()->transform()->mapRect(rect);
         topLeft = rect.location();
-        topLeft.move(x(), y());
+        topLeft.move(locationOffset());
     } else if (position == FixedPosition)
         fixed = true;
 
@@ -1642,7 +1699,7 @@ void RenderBox::computeRectForRepaint(RenderBoxModelObject* repaintContainer, La
         topLeft -= containerBox->scrolledContentOffset(); // For overflow:auto/scroll/hidden.
 
         LayoutRect repaintRect(topLeft, rect.size());
-        LayoutRect boxRect(LayoutPoint(), containerBox->layer()->size());
+        LayoutRect boxRect(LayoutPoint(), containerBox->cachedSizeForOverflowClip());
         rect = intersection(repaintRect, boxRect);
         if (rect.isEmpty())
             return;
@@ -1830,7 +1887,8 @@ bool RenderBox::sizesToIntrinsicLogicalWidth(LogicalWidthType widthType) const
     // In the case of columns that have a stretch alignment, we go ahead and layout at the
     // stretched size to avoid an extra layout when applying alignment.
     if (parent()->isFlexibleBox()) {
-        if (!parent()->style()->isColumnFlexDirection())
+        // For multiline columns, we need to apply the flex-line-pack first, so we can't stretch now.
+        if (!parent()->style()->isColumnFlexDirection() || parent()->style()->flexWrap() != FlexWrapNone)
             return true;
         EFlexAlign itemAlign = style()->flexItemAlign();
         if (itemAlign != AlignStretch && (itemAlign != AlignAuto || parent()->style()->flexAlign() != AlignStretch))
@@ -3675,6 +3733,10 @@ void RenderBox::addLayoutOverflow(const LayoutRect& rect)
     if (!m_overflow)
         m_overflow = adoptPtr(new RenderOverflow(clientBox, borderBoxRect()));
     
+    // Lazily allocate our layer as we will need it to hold our scroll information.
+    if (hasOverflowClip())
+        ensureLayer();
+
     m_overflow->addLayoutOverflow(overflowRect);
 }
 
@@ -3884,7 +3946,7 @@ LayoutPoint RenderBox::flipForWritingModeForChild(const RenderBox* child, const 
     return LayoutPoint(point.x() + width() - child->width() - (2 * child->x()), point.y());
 }
 
-void RenderBox::flipForWritingMode(IntRect& rect) const
+void RenderBox::flipForWritingMode(LayoutRect& rect) const
 {
     if (!style()->isFlippedBlocksWritingMode())
         return;
@@ -3895,18 +3957,18 @@ void RenderBox::flipForWritingMode(IntRect& rect) const
         rect.setX(width() - rect.maxX());
 }
 
-int RenderBox::flipForWritingMode(int position) const
+LayoutUnit RenderBox::flipForWritingMode(LayoutUnit position) const
 {
     if (!style()->isFlippedBlocksWritingMode())
         return position;
     return logicalHeight() - position;
 }
 
-IntPoint RenderBox::flipForWritingMode(const IntPoint& position) const
+LayoutPoint RenderBox::flipForWritingMode(const LayoutPoint& position) const
 {
     if (!style()->isFlippedBlocksWritingMode())
         return position;
-    return isHorizontalWritingMode() ? IntPoint(position.x(), height() - position.y()) : IntPoint(width() - position.x(), position.y());
+    return isHorizontalWritingMode() ? LayoutPoint(position.x(), height() - position.y()) : LayoutPoint(width() - position.x(), position.y());
 }
 
 LayoutPoint RenderBox::flipForWritingModeIncludingColumns(const LayoutPoint& point) const
@@ -3916,11 +3978,11 @@ LayoutPoint RenderBox::flipForWritingModeIncludingColumns(const LayoutPoint& poi
     return toRenderBlock(this)->flipForWritingModeIncludingColumns(point);
 }
 
-IntSize RenderBox::flipForWritingMode(const IntSize& offset) const
+LayoutSize RenderBox::flipForWritingMode(const LayoutSize& offset) const
 {
     if (!style()->isFlippedBlocksWritingMode())
         return offset;
-    return isHorizontalWritingMode() ? IntSize(offset.width(), height() - offset.height()) : IntSize(width() - offset.width(), offset.height());
+    return isHorizontalWritingMode() ? LayoutSize(offset.width(), height() - offset.height()) : LayoutSize(width() - offset.width(), offset.height());
 }
 
 FloatPoint RenderBox::flipForWritingMode(const FloatPoint& position) const
@@ -3958,6 +4020,13 @@ LayoutSize RenderBox::topLeftLocationOffset() const
     LayoutRect rect(frameRect());
     containerBlock->flipForWritingMode(rect); // FIXME: This is wrong if we are an absolutely positioned object enclosed by a relative-positioned inline.
     return LayoutSize(rect.x(), rect.y());
+}
+
+bool RenderBox::hasRelativeDimensions() const
+{
+    return style()->height().isPercent() || style()->width().isPercent()
+            || style()->maxHeight().isPercent() || style()->maxWidth().isPercent()
+            || style()->minHeight().isPercent() || style()->minWidth().isPercent();
 }
 
 } // namespace WebCore

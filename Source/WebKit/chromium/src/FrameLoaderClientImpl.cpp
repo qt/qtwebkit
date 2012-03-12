@@ -145,10 +145,10 @@ void FrameLoaderClientImpl::documentElementAvailable()
 }
 
 #if USE(V8)
-void FrameLoaderClientImpl::didCreateScriptContext(v8::Handle<v8::Context> context, int worldId)
+void FrameLoaderClientImpl::didCreateScriptContext(v8::Handle<v8::Context> context, int extensionGroup, int worldId)
 {
     if (m_webFrame->client())
-        m_webFrame->client()->didCreateScriptContext(m_webFrame, context, worldId);
+        m_webFrame->client()->didCreateScriptContext(m_webFrame, context, extensionGroup, worldId);
 }
 
 void FrameLoaderClientImpl::willReleaseScriptContext(v8::Handle<v8::Context> context, int worldId)
@@ -612,7 +612,7 @@ void FrameLoaderClientImpl::dispatchWillPerformClientRedirect(
     // carry out such a navigation anyway, the best thing we can do for now to
     // not get confused is ignore this notification.
     if (m_expectedClientRedirectDest.isLocalFile()
-        && m_expectedClientRedirectSrc.protocolInHTTPFamily()) {
+        && m_expectedClientRedirectSrc.protocolIsInHTTPFamily()) {
         m_expectedClientRedirectSrc = KURL();
         m_expectedClientRedirectDest = KURL();
         return;
@@ -873,21 +873,27 @@ void FrameLoaderClientImpl::dispatchDidFirstVisuallyNonEmptyLayout()
 
 Frame* FrameLoaderClientImpl::dispatchCreatePage(const NavigationAction& action)
 {
-    struct WindowFeatures features;
-    Page* newPage = m_webFrame->frame()->page()->chrome()->createWindow(
-        m_webFrame->frame(), FrameLoadRequest(m_webFrame->frame()->document()->securityOrigin()),
-        features, action);
-
     // Make sure that we have a valid disposition.  This should have been set in
     // the preceeding call to dispatchDecidePolicyForNewWindowAction.
     ASSERT(m_nextNavigationPolicy != WebNavigationPolicyIgnore);
     WebNavigationPolicy policy = m_nextNavigationPolicy;
     m_nextNavigationPolicy = WebNavigationPolicyIgnore;
 
+    // Store the disposition on the opener ChromeClientImpl so that we can pass
+    // it to WebViewClient::createView.
+    ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(m_webFrame->frame()->page()->chrome()->client());
+    chromeClient->setNewWindowNavigationPolicy(policy);
+
+    struct WindowFeatures features;
+    Page* newPage = m_webFrame->frame()->page()->chrome()->createWindow(
+        m_webFrame->frame(), FrameLoadRequest(m_webFrame->frame()->document()->securityOrigin()),
+        features, action);
+
     // createWindow can return null (e.g., popup blocker denies the window).
     if (!newPage)
         return 0;
 
+    // Also give the disposition to the new window.
     WebViewImpl::fromPage(newPage)->setInitialNavigationPolicy(policy);
     return newPage->mainFrame();
 }
@@ -949,6 +955,11 @@ void FrameLoaderClientImpl::dispatchDecidePolicyForNewWindowAction(
         // creating or showing the new window that would allow us to avoid having
         // to keep this state.
         m_nextNavigationPolicy = navigationPolicy;
+
+        // Store the disposition on the opener ChromeClientImpl so that we can pass
+        // it to WebViewClient::createView.
+        ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(m_webFrame->frame()->page()->chrome()->client());
+        chromeClient->setNewWindowNavigationPolicy(navigationPolicy);
     }
     (m_webFrame->frame()->loader()->policyChecker()->*function)(policyAction);
 }

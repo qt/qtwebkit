@@ -7,6 +7,8 @@
 TEMPLATE = subdirs
 CONFIG += ordered
 
+load(features)
+
 WEBKIT_TESTS_DIR = $$PWD/WebKit/qt/tests
 
 SUBDIRS += \
@@ -26,18 +28,19 @@ linux-* {
     SUBDIRS += $$WEBKIT_TESTS_DIR/MIMESniffing
 }
 
-contains(QT_CONFIG, declarative)|contains(QT_CONFIG, qtquick1) {
-    SUBDIRS += $$WEBKIT_TESTS_DIR/qdeclarativewebview
-}
+contains(DEFINES, HAVE_QQUICK1=1): SUBDIRS += $$WEBKIT_TESTS_DIR/qdeclarativewebview
 
 # Benchmarks
 SUBDIRS += \
     $$WEBKIT_TESTS_DIR/benchmarks/painting \
     $$WEBKIT_TESTS_DIR/benchmarks/loading
 
-contains(DEFINES, ENABLE_WEBGL=1) {
-    SUBDIRS += $$WEBKIT_TESTS_DIR/benchmarks/webgl
-}
+# WebGL performance tests are disabled temporarily.
+# https://bugs.webkit.org/show_bug.cgi?id=80503
+#
+#contains(DEFINES, ENABLE_WEBGL=1) {
+#    SUBDIRS += $$WEBKIT_TESTS_DIR/benchmarks/webgl
+#}
 
 !no_webkit2 {
     WEBKIT2_TESTS_DIR = $$PWD/WebKit2/UIProcess/API/qt/tests

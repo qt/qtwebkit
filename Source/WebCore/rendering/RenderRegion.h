@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Adobe Systems Incorporated. All Rights Reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,6 +56,7 @@ public:
     void attachRegion();
     void detachRegion();
 
+    RenderFlowThread* flowThread() const { return m_flowThread; }
     RenderFlowThread* parentFlowThread() const { return m_parentFlowThread; }
 
     // Valid regions do not create circular dependencies with other flows.

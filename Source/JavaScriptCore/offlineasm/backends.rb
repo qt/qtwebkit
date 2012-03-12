@@ -28,6 +28,7 @@ require "x86"
 BACKENDS =
     [
      "X86",
+     "X86_64",
      "ARMv7"
     ]
 
@@ -39,6 +40,7 @@ BACKENDS =
 WORKING_BACKENDS =
     [
      "X86",
+     "X86_64",
      "ARMv7"
     ]
 
@@ -46,7 +48,12 @@ BACKEND_PATTERN = Regexp.new('\\A(' + BACKENDS.join(')|(') + ')\\Z')
 
 class Node
     def lower(name)
-        send("lower" + name)
+        begin
+            $activeBackend = name
+            send("lower" + name)
+        rescue => e
+            raise "Got error #{e} at #{codeOriginString}"
+        end
     end
 end
 
@@ -83,7 +90,14 @@ end
 
 class Sequence
     def lower(name)
-        if respond_to? "lower#{name}"
+        $activeBackend = name
+        if respond_to? "getModifiedList#{name}"
+            newList = send("getModifiedList#{name}")
+            newList.each {
+                | node |
+                node.lower(name)
+            }
+        elsif respond_to? "lower#{name}"
             send("lower#{name}")
         else
             @list.each {

@@ -209,11 +209,6 @@ public:
         releaseScratch(scr);
     }
 
-    void not32(RegisterID src, RegisterID dest)
-    {
-        m_assembler.notlReg(src, dest);
-    }
-
     void or32(RegisterID src, RegisterID dest)
     {
         m_assembler.orlRegReg(src, dest);
@@ -380,6 +375,11 @@ public:
 
     void xor32(TrustedImm32 imm, RegisterID srcDest)
     {
+        if (imm.m_value == -1) {
+            m_assembler.notlReg(srcDest, srcDest);
+            return;
+        }
+
         if ((srcDest != SH4Registers::r0) || (imm.m_value > 255) || (imm.m_value < 0)) {
             RegisterID scr = claimScratch();
             m_assembler.loadConstant((imm.m_value), scr);
@@ -1565,6 +1565,33 @@ public:
         return branchAdd32(cond, scratchReg3, dest);
     }
 
+    Jump branchAdd32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+
+        if (src != dest)
+            move(src, dest);
+
+        if (cond == Overflow) {
+            move(imm, scratchReg3);
+            m_assembler.addvlRegReg(scratchReg3, dest);
+            return branchTrue();
+        }
+
+        add32(imm, dest);
+
+        if (cond == Signed) {
+            m_assembler.cmppz(dest);
+            return branchFalse();
+        }
+
+        compare32(0, dest, Equal);
+
+        if (cond == NotEqual)
+            return branchFalse();
+        return branchTrue();
+    }
+
     Jump branchMul32(ResultCondition cond, RegisterID src, RegisterID dest)
     {
         ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
@@ -1642,6 +1669,14 @@ public:
         return branchSub32(cond, scratchReg3, dest);
     }
 
+    Jump branchSub32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        move(imm, scratchReg3);
+        if (src != dest)
+            move(src, dest);
+        return branchSub32(cond, scratchReg3, dest);
+    }
+
     Jump branchOr32(ResultCondition cond, RegisterID src, RegisterID dest)
     {
         ASSERT((cond == Signed) || (cond == Zero) || (cond == NonZero));
@@ -1679,11 +1714,6 @@ public:
     void neg32(RegisterID dst)
     {
         m_assembler.neg(dst, dst);
-    }
-
-    void not32(RegisterID dst)
-    {
-        m_assembler.notlReg(dst, dst);
     }
 
     void urshift32(RegisterID shiftamount, RegisterID dest)

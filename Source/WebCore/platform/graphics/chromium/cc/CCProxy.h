@@ -53,6 +53,9 @@ public:
     static void setImplThread(CCThread*);
     static CCThread* implThread();
 
+    // Returns 0 if the current thread is neither the main thread nor the impl thread.
+    static CCThread* currentThread();
+
     virtual ~CCProxy();
 
     virtual bool compositeAndReadback(void *pixels, const IntRect&) = 0;
@@ -69,6 +72,10 @@ public:
 
     // Attempts to initialize the layer renderer. Returns false if the context isn't usable for compositing.
     virtual bool initializeLayerRenderer() = 0;
+
+    // Attempts to recreate the context and layer renderer after a context lost. Returns false if the renderer couldn't be
+    // reinitialized.
+    virtual bool recreateContext() = 0;
 
     virtual int compositorIdentifier() const = 0;
 
@@ -95,7 +102,7 @@ public:
     virtual GraphicsContext3D* context() = 0;
 
     // Testing hooks
-    virtual void loseCompositorContext(int numTimes) = 0;
+    virtual void loseContext() = 0;
 
 #ifndef NDEBUG
     static void setCurrentThreadIsImplThread(bool);

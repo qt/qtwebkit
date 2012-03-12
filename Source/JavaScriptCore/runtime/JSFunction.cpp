@@ -181,7 +181,15 @@ JSValue JSFunction::callerGetter(ExecState* exec, JSValue slotBase, const Identi
 {
     JSFunction* thisObj = asFunction(slotBase);
     ASSERT(!thisObj->isHostFunction());
-    return exec->interpreter()->retrieveCallerFromVMCode(exec, thisObj);
+    JSValue caller = exec->interpreter()->retrieveCallerFromVMCode(exec, thisObj);
+
+    // See ES5.1 15.3.5.4 - Function.caller may not be used to retrieve a strict caller.
+    if (!caller.isObject() || !asObject(caller)->inherits(&JSFunction::s_info))
+        return caller;
+    JSFunction* function = asFunction(caller);
+    if (function->isHostFunction() || !function->jsExecutable()->isStrictMode())
+        return caller;
+    return throwTypeError(exec, "Function.caller used to retrieve strict caller");
 }
 
 JSValue JSFunction::lengthGetter(ExecState*, JSValue slotBase, const Identifier&)
@@ -329,19 +337,78 @@ void JSFunction::put(JSCell* cell, ExecState* exec, const Identifier& propertyNa
         Base::put(thisObject, exec, propertyName, value, slot);
         return;
     }
-    if (propertyName == exec->propertyNames().arguments || propertyName == exec->propertyNames().length)
+    if (propertyName == exec->propertyNames().arguments || propertyName == exec->propertyNames().length || propertyName == exec->propertyNames().caller) {
+        if (slot.isStrictMode())
+            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
         return;
+    }
     Base::put(thisObject, exec, propertyName, value, slot);
 }
 
 bool JSFunction::deleteProperty(JSCell* cell, ExecState* exec, const Identifier& propertyName)
 {
     JSFunction* thisObject = jsCast<JSFunction*>(cell);
-    if (thisObject->isHostFunction())
-        return Base::deleteProperty(thisObject, exec, propertyName);
-    if (propertyName == exec->propertyNames().arguments || propertyName == exec->propertyNames().length)
+    // For non-host functions, don't let these properties by deleted - except by DefineOwnProperty.
+    if (!thisObject->isHostFunction() && !exec->globalData().isInDefineOwnProperty()
+        && (propertyName == exec->propertyNames().arguments
+            || propertyName == exec->propertyNames().length
+            || propertyName == exec->propertyNames().prototype
+            || propertyName == exec->propertyNames().caller))
         return false;
     return Base::deleteProperty(thisObject, exec, propertyName);
+}
+
+bool JSFunction::defineOwnProperty(JSObject* object, ExecState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor, bool throwException)
+{
+    JSFunction* thisObject = jsCast<JSFunction*>(object);
+    if (thisObject->isHostFunction())
+        return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
+
+    if (propertyName == exec->propertyNames().prototype) {
+        // Make sure prototype has been reified, such that it can only be overwritten
+        // following the rules set out in ECMA-262 8.12.9.
+        PropertySlot slot;
+        thisObject->methodTable()->getOwnPropertySlot(thisObject, exec, propertyName, slot);
+    } else if (propertyName == exec->propertyNames().arguments || propertyName == exec->propertyNames().length || propertyName == exec->propertyNames().caller) {
+        if (!object->isExtensible()) {
+            if (throwException)
+                throwError(exec, createTypeError(exec, "Attempting to define property on object that is not extensible."));
+            return false;
+        }
+        if (descriptor.configurablePresent() && descriptor.configurable()) {
+            if (throwException)
+                throwError(exec, createTypeError(exec, "Attempting to configurable attribute of unconfigurable property."));
+            return false;
+        }
+        if (descriptor.enumerablePresent() && descriptor.enumerable()) {
+            if (throwException)
+                throwError(exec, createTypeError(exec, "Attempting to change enumerable attribute of unconfigurable property."));
+            return false;
+        }
+        if (descriptor.isAccessorDescriptor()) {
+            if (throwException)
+                throwError(exec, createTypeError(exec, "Attempting to change access mechanism for an unconfigurable property."));
+            return false;
+        }
+        if (descriptor.writablePresent() && descriptor.writable()) {
+            if (throwException)
+                throwError(exec, createTypeError(exec, "Attempting to change writable attribute of unconfigurable property."));
+            return false;
+        }
+        if (!descriptor.value())
+            return true;
+        if (propertyName == exec->propertyNames().arguments && sameValue(exec, descriptor.value(), exec->interpreter()->retrieveArgumentsFromVMCode(exec, thisObject)))
+            return true;
+        if (propertyName == exec->propertyNames().length && sameValue(exec, descriptor.value(), jsNumber(thisObject->jsExecutable()->parameterCount())))
+            return true;
+        if (propertyName == exec->propertyNames().caller && sameValue(exec, descriptor.value(), exec->interpreter()->retrieveCallerFromVMCode(exec, thisObject)))
+            return true;
+        if (throwException)
+            throwError(exec, createTypeError(exec, "Attempting to change value of a readonly property."));
+        return false;
+    }
+
+    return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
 }
 
 // ECMA 13.2.2 [[Construct]]

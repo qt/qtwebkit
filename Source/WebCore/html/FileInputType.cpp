@@ -36,7 +36,7 @@
 #include "RenderFileUploadControl.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
@@ -84,7 +84,7 @@ const AtomicString& UploadButtonElement::shadowPseudoId() const
 }
 
 inline FileInputType::FileInputType(HTMLInputElement* element)
-    : BaseButtonInputType(element)
+    : BaseClickableWithKeyInputType(element)
     , m_fileList(FileList::create())
 {
 }
@@ -97,6 +97,26 @@ PassOwnPtr<InputType> FileInputType::create(HTMLInputElement* element)
 const AtomicString& FileInputType::formControlType() const
 {
     return InputTypeNames::file();
+}
+
+bool FileInputType::saveFormControlState(String& result) const
+{
+    if (m_fileList->isEmpty())
+        return false;
+    result = String();
+    unsigned numFiles = m_fileList->length();
+    for (unsigned i = 0; i < numFiles; ++i) {
+        result.append(m_fileList->item(i)->path());
+        result.append('\0');
+    }
+    return true;
+}
+
+void FileInputType::restoreFormControlState(const String& state)
+{
+    Vector<String> files;
+    state.split('\0', files);
+    filesChosen(files);
 }
 
 bool FileInputType::appendFormData(FormDataList& encoding, bool multipart) const
@@ -213,11 +233,6 @@ bool FileInputType::getTypeSpecificValue(String& value)
     return true;
 }
 
-bool FileInputType::storesValueSeparateFromAttribute()
-{
-    return true;
-}
-
 void FileInputType::setValue(const String&, bool, TextFieldEventBehavior)
 {
     m_fileList->clear();
@@ -268,13 +283,13 @@ void FileInputType::createShadowSubtree()
 {
     ASSERT(element()->hasShadowRoot());
     ExceptionCode ec = 0;
-    element()->shadowRootList()->oldestShadowRoot()->appendChild(element()->multiple() ? UploadButtonElement::createForMultiple(element()->document()): UploadButtonElement::create(element()->document()), ec);
+    element()->shadowTree()->oldestShadowRoot()->appendChild(element()->multiple() ? UploadButtonElement::createForMultiple(element()->document()): UploadButtonElement::create(element()->document()), ec);
 }
 
 void FileInputType::multipleAttributeChanged()
 {
     ASSERT(element()->hasShadowRoot());
-    UploadButtonElement* button = static_cast<UploadButtonElement*>(element()->shadowRootList()->oldestShadowRoot()->firstChild());
+    UploadButtonElement* button = static_cast<UploadButtonElement*>(element()->shadowTree()->oldestShadowRoot()->firstChild());
     if (button)
         button->setValue(element()->multiple() ? fileButtonChooseMultipleFilesLabel() : fileButtonChooseFileLabel());
 }

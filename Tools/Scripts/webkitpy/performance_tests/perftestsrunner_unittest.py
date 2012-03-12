@@ -174,7 +174,7 @@ max 1120
         unexpected_result_count = runner._run_tests_set(tests, runner._port)
         self.assertEqual(TestDriverWithStopCount.stop_count, 6)
 
-    def test_run_test_set_kills_drt_per_run(self):
+    def test_run_test_pause_before_testing(self):
         class TestDriverWithStartCount(MainTest.TestDriver):
             start_count = 0
 
@@ -195,7 +195,7 @@ max 1120
         finally:
             _, stderr, logs = output.restore_output()
             self.assertEqual(stderr, "Ready to run test?\n")
-            self.assertEqual(logs, "Running inspector/pass.html (1 of 1)\n\n")
+            self.assertTrue("Running inspector/pass.html (1 of 1)" in logs)
 
     def test_run_test_set_for_parser_tests(self):
         buildbot_output = StringIO.StringIO()
@@ -280,6 +280,10 @@ max 1120
         self.assertEqual(generated_json['builder-name'], 'builder1')
         self.assertEqual(generated_json['build-number'], 123)
         upload_json_returns_true = False
+
+        runner = self.create_runner(args=['--output-json-path=/mock-checkout/output.json',
+            '--test-results-server', 'some.host', '--platform', 'platform1', '--builder-name', 'builder1', '--build-number', '123'])
+        runner._upload_json = mock_upload_json
         self.assertEqual(runner.run(), -3)
 
     def test_upload_json(self):

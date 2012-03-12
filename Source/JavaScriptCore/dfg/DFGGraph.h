@@ -177,6 +177,12 @@ public:
         return Node::shouldSpeculateInteger(left, right) && add.canSpeculateInteger();
     }
     
+    bool negateShouldSpeculateInteger(Node& negate)
+    {
+        ASSERT(negate.op == ArithNegate);
+        return at(negate.child1()).shouldSpeculateInteger() && negate.canSpeculateInteger();
+    }
+    
     bool addShouldSpeculateInteger(NodeIndex nodeIndex)
     {
         return addShouldSpeculateInteger(at(nodeIndex));
@@ -303,6 +309,41 @@ public:
         }
         
         return MethodOfGettingAValueProfile(valueProfileFor(nodeIndex));
+    }
+    
+    bool needsActivation() const
+    {
+#if DFG_ENABLE(ALL_VARIABLES_CAPTURED)
+        return true;
+#else
+        return m_codeBlock->needsFullScopeChain() && m_codeBlock->codeType() != GlobalCode;
+#endif
+    }
+    
+    // Pass an argument index. Currently it's ignored, but that's somewhat
+    // of a bug.
+    bool argumentIsCaptured(int) const
+    {
+        return needsActivation();
+    }
+    bool localIsCaptured(int operand) const
+    {
+#if DFG_ENABLE(ALL_VARIABLES_CAPTURED)
+        return operand < m_codeBlock->m_numVars;
+#else
+        return operand < m_codeBlock->m_numCapturedVars;
+#endif
+    }
+    
+    bool isCaptured(int operand) const
+    {
+        if (operandIsArgument(operand))
+            return argumentIsCaptured(operandToArgument(operand));
+        return localIsCaptured(operand);
+    }
+    bool isCaptured(VirtualRegister virtualRegister) const
+    {
+        return isCaptured(static_cast<int>(virtualRegister));
     }
     
     JSGlobalData& m_globalData;

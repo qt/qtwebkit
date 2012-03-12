@@ -22,13 +22,13 @@
 #ifndef WTF_HashTable_h
 #define WTF_HashTable_h
 
-#include "Alignment.h"
-#include "Assertions.h"
-#include "FastMalloc.h"
-#include "HashTraits.h"
-#include "StdLibExtras.h"
-#include "Threading.h"
-#include "ValueCheck.h"
+#include <wtf/Alignment.h>
+#include <wtf/Assertions.h>
+#include <wtf/FastMalloc.h>
+#include <wtf/HashTraits.h>
+#include <wtf/StdLibExtras.h>
+#include <wtf/Threading.h>
+#include <wtf/ValueCheck.h>
 
 namespace WTF {
 
@@ -310,7 +310,8 @@ namespace WTF {
         ~HashTable() 
         {
             invalidateIterators(); 
-            deallocateTable(m_table, m_tableSize); 
+            if (m_table)
+                deallocateTable(m_table, m_tableSize);
 #if CHECK_HASHTABLE_USE_AFTER_DESTRUCTION
             m_table = (ValueType*)(uintptr_t)0xbbadbeef;
 #endif
@@ -979,6 +980,9 @@ namespace WTF {
     void HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::clear()
     {
         invalidateIterators();
+        if (!m_table)
+            return;
+
         deallocateTable(m_table, m_tableSize);
         m_table = 0;
         m_tableSize = 0;
@@ -1240,6 +1244,6 @@ namespace WTF {
 
 } // namespace WTF
 
-#include "HashIterators.h"
+#include <wtf/HashIterators.h>
 
 #endif // WTF_HashTable_h

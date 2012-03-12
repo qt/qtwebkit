@@ -272,35 +272,51 @@ WebInspector.RemoteObject.prototype = {
 
     /**
      * @param {string} functionDeclaration
+     * @param {Array.<RuntimeAgent.CallArgument>} args
      * @param {function(?WebInspector.RemoteObject)} callback
      */
-    callFunction: function(functionDeclaration, callback)
+    callFunction: function(functionDeclaration, args, callback)
     {
         function mycallback(error, result, wasThrown)
         {
             callback((error || wasThrown) ? null : WebInspector.RemoteObject.fromPayload(result));
         }
 
-        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), undefined, undefined, mycallback);
+        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), args, undefined, mycallback);
     },
 
     /**
      * @param {string} functionDeclaration
+     * @param {Array.<RuntimeAgent.CallArgument>} args
      * @param {function(*)} callback
      */
-    callFunctionJSON: function(functionDeclaration, callback)
+    callFunctionJSON: function(functionDeclaration, args, callback)
     {
         function mycallback(error, result, wasThrown)
         {
             callback((error || wasThrown) ? null : result.value);
         }
 
-        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), undefined, true, mycallback);
+        RuntimeAgent.callFunctionOn(this._objectId, functionDeclaration.toString(), args, true, mycallback);
     },
 
     release: function()
     {
         RuntimeAgent.releaseObject(this._objectId);
+    },
+
+    /**
+     * @return {number}
+     */
+    arrayLength: function()
+    {
+        if (this.subtype !== "array")
+            return 0;
+
+        var matches = this._description.match(/\[([0-9]+)\]/);
+        if (!matches)
+            return 0;
+        return parseInt(matches[1], 10);
     }
 }
 
@@ -364,6 +380,9 @@ WebInspector.LocalJSONObject.prototype = {
                 }
                 this._cachedDescription = this._concatenate("[", "]", formatArrayItem);
                 break;
+            case "date":
+                this._cachedDescription = "" + this._value;
+                break;
             case "null":
                 this._cachedDescription = "null";
                 break;
@@ -424,6 +443,9 @@ WebInspector.LocalJSONObject.prototype = {
         if (this._value instanceof Array)
             return "array";
 
+        if (this._value instanceof Date)
+            return "date";
+
         return undefined;
     },
 
@@ -474,5 +496,13 @@ WebInspector.LocalJSONObject.prototype = {
     isError: function()
     {
         return false;
+    },
+
+    /**
+     * @return {number}
+     */
+    arrayLength: function()
+    {
+        return this._value instanceof Array ? this._value.length : 0;
     }
 }

@@ -226,7 +226,7 @@ static bool isPropertyAccess(OpcodeID opcodeID)
     }
 }
 
-static unsigned instructionOffsetForNth(ExecState* exec, const Vector<Instruction>& instructions, int nth, bool (*predicate)(OpcodeID))
+static unsigned instructionOffsetForNth(ExecState* exec, const RefCountedArray<Instruction>& instructions, int nth, bool (*predicate)(OpcodeID))
 {
     size_t i = 0;
     while (i < instructions.size()) {
@@ -347,18 +347,13 @@ void CodeBlock::printStructures(const Instruction* vPC) const
 
 void CodeBlock::dump(ExecState* exec) const
 {
-    if (!m_instructions) {
-        dataLog("No instructions available.\n");
-        return;
-    }
-
     size_t instructionCount = 0;
 
     for (size_t i = 0; i < instructions().size(); i += opcodeLengths[exec->interpreter()->getOpcodeID(instructions()[i].u.opcode)])
         ++instructionCount;
 
     dataLog("%lu m_instructions; %lu bytes at %p; %d parameter(s); %d callee register(s); %d variable(s)\n\n",
-        static_cast<unsigned long>(instructionCount),
+        static_cast<unsigned long>(instructions().size()),
         static_cast<unsigned long>(instructions().size() * sizeof(Instruction)),
         this, m_numParameters, m_numCalleeRegisters, m_numVars);
 
@@ -687,10 +682,6 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
         case op_bitor: {
             printBinaryOp(exec, location, it, "bitor");
             ++it;
-            break;
-        }
-        case op_bitnot: {
-            printUnaryOp(exec, location, it, "bitnot");
             break;
         }
         case op_check_has_instance: {
@@ -1424,11 +1415,9 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_numVars(other.m_numVars)
     , m_numCapturedVars(other.m_numCapturedVars)
     , m_isConstructor(other.m_isConstructor)
-    , m_shouldDiscardBytecode(false)
     , m_ownerExecutable(*other.m_globalData, other.m_ownerExecutable.get(), other.m_ownerExecutable.get())
     , m_globalData(other.m_globalData)
     , m_instructions(other.m_instructions)
-    , m_instructionCount(other.m_instructionCount)
     , m_thisRegister(other.m_thisRegister)
     , m_argumentsRegister(other.m_argumentsRegister)
     , m_activationRegister(other.m_activationRegister)
@@ -1484,12 +1473,9 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlo
     , m_numCalleeRegisters(0)
     , m_numVars(0)
     , m_isConstructor(isConstructor)
-    , m_shouldDiscardBytecode(false)
     , m_numParameters(0)
     , m_ownerExecutable(globalObject->globalData(), ownerExecutable, ownerExecutable)
     , m_globalData(0)
-    , m_instructions(adoptRef(new Instructions))
-    , m_instructionCount(0)
     , m_argumentsRegister(-1)
     , m_needsFullScopeChain(ownerExecutable->needsActivation())
     , m_usesEval(ownerExecutable->usesEval())
@@ -1595,13 +1581,15 @@ void CodeBlock::visitStructures(SlotVisitor& visitor, Instruction* vPC) const
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_chain)) {
         visitor.append(&vPC[4].u.structure);
-        visitor.append(&vPC[5].u.structureChain);
+        if (vPC[5].u.structureChain)
+            visitor.append(&vPC[5].u.structureChain);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_transition)) {
         visitor.append(&vPC[4].u.structure);
         visitor.append(&vPC[5].u.structure);
-        visitor.append(&vPC[6].u.structureChain);
+        if (vPC[6].u.structureChain)
+            visitor.append(&vPC[6].u.structureChain);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id) && vPC[4].u.structure) {
@@ -1631,6 +1619,32 @@ void EvalCodeCache::visitAggregate(SlotVisitor& visitor)
 
 void CodeBlock::visitAggregate(SlotVisitor& visitor)
 {
+#if ENABLE(PARALLEL_GC) && ENABLE(DFG_JIT)
+    if (!!m_dfgData) {
+        // I may be asked to scan myself more than once, and it may even happen concurrently.
+        // To this end, use a CAS loop to check if I've been called already. Only one thread
+        // may proceed past this point - whichever one wins the CAS race.
+        unsigned oldValue;
+        do {
+            oldValue = m_dfgData->visitAggregateHasBeenCalled;
+            if (oldValue) {
+                // Looks like someone else won! Return immediately to ensure that we don't
+                // trace the same CodeBlock concurrently. Doing so is hazardous since we will
+                // be mutating the state of ValueProfiles, which contain JSValues, which can
+                // have word-tearing on 32-bit, leading to awesome timing-dependent crashes
+                // that are nearly impossible to track down.
+                
+                // Also note that it must be safe to return early as soon as we see the
+                // value true (well, (unsigned)1), since once a GC thread is in this method
+                // and has won the CAS race (i.e. was responsible for setting the value true)
+                // it will definitely complete the rest of this method before declaring
+                // termination.
+                return;
+            }
+        } while (!WTF::weakCompareAndSwap(&m_dfgData->visitAggregateHasBeenCalled, 0, 1));
+    }
+#endif // ENABLE(PARALLEL_GC) && ENABLE(DFG_JIT)
+    
     if (!!m_alternative)
         m_alternative->visitAggregate(visitor);
 
@@ -1903,12 +1917,6 @@ void CodeBlock::finalizeUnconditionally()
         }
     }
 #endif
-
-    // Handle the bytecode discarding chore.
-    if (m_shouldDiscardBytecode) {
-        discardBytecode();
-        m_shouldDiscardBytecode = false;
-    }
 }
 
 void CodeBlock::stronglyVisitStrongReferences(SlotVisitor& visitor)
@@ -1980,7 +1988,7 @@ void CodeBlock::stronglyVisitWeakReferences(SlotVisitor& visitor)
 
 HandlerInfo* CodeBlock::handlerForBytecodeOffset(unsigned bytecodeOffset)
 {
-    ASSERT(bytecodeOffset < m_instructionCount);
+    ASSERT(bytecodeOffset < instructions().size());
 
     if (!m_rareData)
         return 0;
@@ -1998,7 +2006,7 @@ HandlerInfo* CodeBlock::handlerForBytecodeOffset(unsigned bytecodeOffset)
 
 int CodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
 {
-    ASSERT(bytecodeOffset < m_instructionCount);
+    ASSERT(bytecodeOffset < instructions().size());
 
     if (!m_rareData)
         return m_ownerExecutable->source().firstLine();
@@ -2022,7 +2030,7 @@ int CodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
 
 void CodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot, int& startOffset, int& endOffset)
 {
-    ASSERT(bytecodeOffset < m_instructionCount);
+    ASSERT(bytecodeOffset < instructions().size());
 
     if (!m_rareData) {
         startOffset = 0;
@@ -2102,8 +2110,6 @@ bool CodeBlock::hasGlobalResolveInfoAtBytecodeOffset(unsigned bytecodeOffset)
 
 void CodeBlock::shrinkToFit()
 {
-    instructions().shrinkToFit();
-
 #if ENABLE(CLASSIC_INTERPRETER)
     m_propertyAccessInstructions.shrinkToFit();
     m_globalResolveInstructions.shrinkToFit();
@@ -2345,21 +2351,21 @@ void FunctionCodeBlock::jettison()
     static_cast<FunctionExecutable*>(ownerExecutable())->jettisonOptimizedCodeFor(*globalData(), m_isConstructor ? CodeForConstruct : CodeForCall);
 }
 
-void ProgramCodeBlock::jitCompileImpl(JSGlobalData& globalData)
+bool ProgramCodeBlock::jitCompileImpl(JSGlobalData& globalData)
 {
     ASSERT(getJITType() == JITCode::InterpreterThunk);
     ASSERT(this == replacement());
     return static_cast<ProgramExecutable*>(ownerExecutable())->jitCompile(globalData);
 }
 
-void EvalCodeBlock::jitCompileImpl(JSGlobalData& globalData)
+bool EvalCodeBlock::jitCompileImpl(JSGlobalData& globalData)
 {
     ASSERT(getJITType() == JITCode::InterpreterThunk);
     ASSERT(this == replacement());
     return static_cast<EvalExecutable*>(ownerExecutable())->jitCompile(globalData);
 }
 
-void FunctionCodeBlock::jitCompileImpl(JSGlobalData& globalData)
+bool FunctionCodeBlock::jitCompileImpl(JSGlobalData& globalData)
 {
     ASSERT(getJITType() == JITCode::InterpreterThunk);
     ASSERT(this == replacement());
@@ -2467,7 +2473,38 @@ void CodeBlock::dumpValueProfiles()
 }
 #endif
 
-#ifndef NDEBUG
+size_t CodeBlock::predictedMachineCodeSize()
+{
+    // This will be called from CodeBlock::CodeBlock before either m_globalData or the
+    // instructions have been initialized. It's OK to return 0 because what will really
+    // matter is the recomputation of this value when the slow path is triggered.
+    if (!m_globalData)
+        return 0;
+    
+    if (!m_globalData->machineCodeBytesPerBytecodeWordForBaselineJIT)
+        return 0; // It's as good of a prediction as we'll get.
+    
+    // Be conservative: return a size that will be an overestimation 84% of the time.
+    double multiplier = m_globalData->machineCodeBytesPerBytecodeWordForBaselineJIT.mean() +
+        m_globalData->machineCodeBytesPerBytecodeWordForBaselineJIT.standardDeviation();
+    
+    // Be paranoid: silently reject bogus multipiers. Silently doing the "wrong" thing
+    // here is OK, since this whole method is just a heuristic.
+    if (multiplier < 0 || multiplier > 1000)
+        return 0;
+    
+    double doubleResult = multiplier * m_instructions.size();
+    
+    // Be even more paranoid: silently reject values that won't fit into a size_t. If
+    // the function is so huge that we can't even fit it into virtual memory then we
+    // should probably have some other guards in place to prevent us from even getting
+    // to this point.
+    if (doubleResult > std::numeric_limits<size_t>::max())
+        return 0;
+    
+    return static_cast<size_t>(doubleResult);
+}
+
 bool CodeBlock::usesOpcode(OpcodeID opcodeID)
 {
     Interpreter* interpreter = globalData()->interpreter;
@@ -2492,6 +2529,5 @@ bool CodeBlock::usesOpcode(OpcodeID opcodeID)
     
     return false;
 }
-#endif
 
 } // namespace JSC

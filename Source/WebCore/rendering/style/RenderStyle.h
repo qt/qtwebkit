@@ -77,6 +77,7 @@
 
 #if ENABLE(CSS_GRID_LAYOUT)
 #include "StyleGridData.h"
+#include "StyleGridItemData.h"
 #endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -814,6 +815,9 @@ public:
 #if ENABLE(CSS_GRID_LAYOUT)
     const Vector<Length>& gridColumns() const { return rareNonInheritedData->m_grid->m_gridColumns; }
     const Vector<Length>& gridRows() const { return rareNonInheritedData->m_grid->m_gridRows; }
+
+    const Length& gridItemColumn() const { return rareNonInheritedData->m_gridItem->m_gridColumn; }
+    const Length& gridItemRow() const { return rareNonInheritedData->m_gridItem->m_gridRow; }
 #endif
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
@@ -957,7 +961,7 @@ public:
 
     EImageRendering imageRendering() const { return static_cast<EImageRendering>(rareInheritedData->m_imageRendering); }
     
-    ESpeak speak() { return static_cast<ESpeak>(rareInheritedData->speak); }
+    ESpeak speak() const { return static_cast<ESpeak>(rareInheritedData->speak); }
 
 #if ENABLE(CSS_FILTERS)
     FilterOperations& filter() { return rareNonInheritedData.access()->m_filter.access()->m_operations; }
@@ -965,6 +969,12 @@ public:
     bool hasFilter() const { return !rareNonInheritedData->m_filter->m_operations.operations().isEmpty(); }
 #else
     bool hasFilter() const { return false; }
+#endif
+
+#if USE(RTL_SCROLLBAR)
+    bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
+#else
+    bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return false; }
 #endif
         
 // attribute setter methods
@@ -1100,7 +1110,7 @@ public:
         return false;
     }
 
-    // Only used for blending font sizes when animating.
+    // Only used for blending font sizes when animating, or MathML anonymous blocks.
     void setBlendedFontSize(int);
 
     void setColor(const Color& v) { SET_VAR(inherited, color, v) }
@@ -1240,6 +1250,9 @@ public:
 #if ENABLE(CSS_GRID_LAYOUT)
     void setGridColumns(const Vector<Length>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridColumns, lengths); }
     void setGridRows(const Vector<Length>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridRows, lengths); }
+
+    void setGridItemColumn(const Length& columnPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumn, columnPosition); }
+    void setGridItemRow(const Length& rowPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRow, rowPosition); }
 #endif
 
     void setMarqueeIncrement(const Length& f) { SET_VAR(rareNonInheritedData.access()->m_marquee, increment, f); }
@@ -1443,21 +1456,9 @@ public:
 
     StyleDifference diff(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
 
-    bool isDisplayReplacedType() const
-    {
-        return display() == INLINE_BLOCK || display() == INLINE_BOX || display() == INLINE_TABLE;
-    }
-
-    bool isDisplayInlineType() const
-    {
-        return display() == INLINE || isDisplayReplacedType();
-    }
-
-    bool isOriginalDisplayInlineType() const
-    {
-        return originalDisplay() == INLINE || originalDisplay() == INLINE_BLOCK
-            || originalDisplay() == INLINE_BOX || originalDisplay() == INLINE_TABLE;
-    }
+    bool isDisplayReplacedType() const { return isDisplayReplacedType(display()); }
+    bool isDisplayInlineType() const { return isDisplayInlineType(display()); }
+    bool isOriginalDisplayInlineType() const { return isDisplayInlineType(originalDisplay()); }
 
     void setWritingMode(WritingMode v) { inherited_flags.m_writingMode = v; }
 
@@ -1636,6 +1637,10 @@ public:
     }
     static Vector<Length> initialGridColumns() { return initialGridTrackValue(); }
     static Vector<Length> initialGridRows() { return initialGridTrackValue(); }
+
+    // 'auto' is the default.
+    static Length initialGridItemColumn() { return Length(); }
+    static Length initialGridItemRow() { return Length(); }
 #endif
 
     static const AtomicString& initialLineGrid() { return nullAtom; }
@@ -1703,6 +1708,12 @@ private:
     {
         return isHorizontalWritingMode() ? getImageVerticalOutsets(image, logicalTop, logicalBottom) : getImageHorizontalOutsets(image, logicalTop, logicalBottom);
     }
+
+    bool isDisplayReplacedType(EDisplay display) const
+    {
+        return display == INLINE_BLOCK || display == INLINE_BOX || display == INLINE_FLEXBOX || display == INLINE_TABLE;
+    }
+    bool isDisplayInlineType(EDisplay display) const { return display == INLINE || isDisplayReplacedType(display); }
 
     // Color accessors are all private to make sure callers use visitedDependentColor instead to access them.
     const Color& invalidColor() const { static Color invalid; return invalid; }

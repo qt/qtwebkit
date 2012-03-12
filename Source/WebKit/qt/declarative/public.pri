@@ -11,6 +11,8 @@ TARGET.module_name = QtWebKit
 
 CONFIG += qt plugin
 
+load(features)
+
 QMLDIRFILE = $${_PRO_FILE_PWD_}/qmldir
 copy2build.input = QMLDIRFILE
 copy2build.output = $${ROOT_BUILD_DIR}/imports/$${TARGET.module_name}/qmldir
@@ -24,24 +26,27 @@ contains(QT_CONFIG, reduce_exports):CONFIG += hide_symbols
 
 wince*:LIBS += $$QMAKE_LIBS_GUI
 
-CONFIG += qtwebkit qtwebkit-private
+QT += declarative webkit webkit-private
+haveQt(5): QT += widgets quick
 
-QT += declarative
-haveQt(5): QT += widgets quick quick1
+contains(DEFINES, HAVE_QQUICK1=1) {
+    SOURCES += qdeclarativewebview.cpp
+    HEADERS += qdeclarativewebview_p.h
+}
 
 DESTDIR = $${ROOT_BUILD_DIR}/imports/$${TARGET.module_name}
 
 CONFIG += rpath
 RPATHDIR_RELATIVE_TO_DESTDIR = ../../lib
 
+# FIXME: Why are these needed, and why can't we use WEBKIT += ... ?
 INCLUDEPATH += \
     ../../../WebKit2/Shared/qt \
     ../../../JavaScriptCore \
     ../../../JavaScriptCore/runtime \
     ../../../JavaScriptCore/wtf
 
-SOURCES += qdeclarativewebview.cpp plugin.cpp
-HEADERS += qdeclarativewebview_p.h
+SOURCES += plugin.cpp
 
 !no_webkit2: {
     DEFINES += HAVE_WEBKIT2

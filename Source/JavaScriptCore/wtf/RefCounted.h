@@ -21,12 +21,12 @@
 #ifndef RefCounted_h
 #define RefCounted_h
 
-#include "Assertions.h"
-#include "FastAllocBase.h"
-#include "ThreadRestrictionVerifier.h"
-#include "Noncopyable.h"
-#include "OwnPtr.h"
-#include "UnusedParam.h"
+#include <wtf/Assertions.h>
+#include <wtf/FastAllocBase.h>
+#include <wtf/Noncopyable.h>
+#include <wtf/OwnPtr.h>
+#include <wtf/ThreadRestrictionVerifier.h>
+#include <wtf/UnusedParam.h>
 
 namespace WTF {
 
@@ -77,8 +77,15 @@ public:
 
     // Turns off verification. Use of this method is discouraged (instead extend
     // ThreadRestrictionVerifier to verify your case).
-    // FIXME: remove this method.
-    void deprecatedTurnOffVerifier()
+    // NB. It is necessary to call this in the constructor of many objects in
+    // JavaScriptCore, because JavaScriptCore objects may be used from multiple
+    // threads even if the reference counting is done in a racy manner. This is
+    // because a JSC instance may be used from multiple threads so long as all
+    // accesses into that instance are protected by a per-instance lock. It would
+    // be absolutely wrong to prohibit this pattern, and it would be a disastrous
+    // regression to require that the objects within that instance use a thread-
+    // safe version of reference counting.
+    void turnOffVerifier()
     {
 #ifndef NDEBUG
         m_verifier.turnOffVerification();

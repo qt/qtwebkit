@@ -92,6 +92,7 @@
             'tests/ClipboardChromiumTest.cpp',
             'tests/CompositorFakeGraphicsContext3D.h',
             'tests/CompositorFakeWebGraphicsContext3D.h',
+            'tests/DragImageTest.cpp',
             'tests/FakeCCLayerTreeHostClient.h',
             'tests/FakeGraphicsContext3DTest.cpp',
             'tests/FakeWebGraphicsContext3D.h',
@@ -101,15 +102,20 @@
             'tests/IDBBindingUtilitiesTest.cpp',
             'tests/IDBKeyPathTest.cpp',
             'tests/IDBLevelDBCodingTest.cpp',
+            'tests/ImageLayerChromiumTest.cpp',
             'tests/KeyboardTest.cpp',
             'tests/KURLTest.cpp',
             'tests/LayerChromiumTest.cpp',
             'tests/LayerTextureUpdaterTest.cpp',
+            'tests/LocalizedNumberICUTest.cpp',
             'tests/PaintAggregatorTest.cpp',
+            'tests/PlatformGestureCurveTest.cpp',
+            'tests/PlatformContextSkiaTest.cpp',
             'tests/PODArenaTest.cpp',
             'tests/PODIntervalTreeTest.cpp',
             'tests/PODRedBlackTreeTest.cpp',
             'tests/RenderTableCellTest.cpp',
+            'tests/ScrollbarLayerChromiumTest.cpp',
             'tests/TextureManagerTest.cpp',
             'tests/TiledLayerChromiumTest.cpp',
             'tests/TilingDataTest.cpp',
@@ -131,13 +137,6 @@
         ],
 
         'conditions': [
-            ['use_skia == 1', {
-                'webkit_unittest_files': [
-                    'tests/DragImageTest.cpp',
-                    'tests/ImageLayerChromiumTest.cpp',
-                    'tests/PlatformContextSkiaTest.cpp',
-                ],
-            }],
             ['OS=="win"', {
                 'webkit_unittest_files': [
                     # FIXME: Port PopupMenuTest to Linux and Mac.

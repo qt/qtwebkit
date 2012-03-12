@@ -30,12 +30,14 @@
 #include "CSSImportRule.h"
 #include "CSSMediaRule.h"
 #include "CSSParser.h"
+#include "CSSPropertyNames.h"
 #include "CSSPropertySourceData.h"
 #include "CSSRule.h"
 #include "CSSRuleList.h"
 #include "CSSStyleRule.h"
 #include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
+#include "ContentSecurityPolicy.h"
 #include "Document.h"
 #include "Element.h"
 #include "HTMLHeadElement.h"
@@ -46,6 +48,7 @@
 #include "InspectorValues.h"
 #include "Node.h"
 #include "SVGNames.h"
+#include "StyleRule.h"
 #include "StyleSheetList.h"
 #include "WebKitCSSKeyframesRule.h"
 
@@ -329,6 +332,10 @@ bool InspectorStyle::setPropertyText(unsigned index, const String& propertyText,
 
     InspectorStyleTextEditor editor(&allProperties, &m_disabledProperties, text, newLineAndWhitespaceDelimiters());
     if (overwrite) {
+        if (index >= allProperties.size()) {
+            ec = INDEX_SIZE_ERR;
+            return false;
+        }
         *oldText = allProperties.at(index).rawText;
         editor.replaceProperty(index, propertyText);
     } else
@@ -478,7 +485,10 @@ void InspectorStyle::populateObjectWithStyleProperties(InspectorObject* result) 
                 // Parsed property overrides any property with the same name. Non-parsed property overrides
                 // previous non-parsed property with the same name (if any).
                 bool shouldInactivate = false;
-                HashMap<String, RefPtr<InspectorObject> >::iterator activeIt = propertyNameToPreviousActiveProperty.find(name);
+                CSSPropertyID propertyId = static_cast<CSSPropertyID>(cssPropertyID(name));
+                // Canonicalize property names to treat non-prefixed and vendor-prefixed property names the same (opacity vs. -webkit-opacity).
+                String canonicalPropertyName = propertyId ? String(getPropertyName(propertyId)) : name;
+                HashMap<String, RefPtr<InspectorObject> >::iterator activeIt = propertyNameToPreviousActiveProperty.find(canonicalPropertyName);
                 if (activeIt != propertyNameToPreviousActiveProperty.end()) {
                     if (propertyEntry.parsedOk)
                         shouldInactivate = true;
@@ -489,12 +499,12 @@ void InspectorStyle::populateObjectWithStyleProperties(InspectorObject* result) 
                             shouldInactivate = true;
                     }
                 } else
-                    propertyNameToPreviousActiveProperty.set(name, property);
+                    propertyNameToPreviousActiveProperty.set(canonicalPropertyName, property);
 
                 if (shouldInactivate) {
                     activeIt->second->setString("status", "inactive");
                     activeIt->second->remove("shorthandName");
-                    propertyNameToPreviousActiveProperty.set(name, property);
+                    propertyNameToPreviousActiveProperty.set(canonicalPropertyName, property);
                 }
             } else {
                 bool implicit = m_style->isPropertyImplicit(name);
@@ -862,7 +872,7 @@ PassRefPtr<InspectorObject> InspectorStyleSheet::buildObjectForRule(CSSStyleRule
     // "sourceURL" is present only for regular rules, otherwise "origin" should be used in the frontend.
     if (m_origin == "regular")
         result->setString("sourceURL", finalURL());
-    result->setNumber("sourceLine", rule->sourceLine());
+    result->setNumber("sourceLine", rule->styleRule()->sourceLine());
     result->setString("origin", m_origin);
 
     result->setObject("style", buildObjectForStyle(rule->style()));
@@ -1148,7 +1158,7 @@ void InspectorStyleSheet::revalidateStyle(CSSStyleDeclaration* pageStyle)
     for (unsigned i = 0, size = m_flatRules.size(); i < size; ++i) {
         CSSStyleRule* parsedRule = m_flatRules.at(i);
         if (parsedRule->style() == pageStyle) {
-            if (parsedRule->declaration()->asText() != pageStyle->cssText()) {
+            if (parsedRule->styleRule()->properties()->asText() != pageStyle->cssText()) {
                 // Clear the disabled properties for the invalid style here.
                 m_inspectorStyles.remove(pageStyle);
                 setStyleText(pageStyle, pageStyle->cssText());
@@ -1318,7 +1328,12 @@ bool InspectorStyleSheetForInlineStyle::setStyleText(CSSStyleDeclaration* style,
 {
     ASSERT_UNUSED(style, style == inlineStyle());
     ExceptionCode ec = 0;
-    m_element->setAttribute("style", text, ec);
+
+    {
+        InspectorCSSAgent::InlineStyleOverrideScope overrideScope(m_element->ownerDocument());
+        m_element->setAttribute("style", text, ec);
+    }
+
     m_styleText = text;
     m_isStyleTextValid = true;
     m_ruleSourceData.clear();

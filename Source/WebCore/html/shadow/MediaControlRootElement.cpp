@@ -73,7 +73,6 @@ MediaControlRootElement::MediaControlRootElement(Document* document)
     , m_panel(0)
 #if ENABLE(VIDEO_TRACK)
     , m_textDisplayContainer(0)
-    , m_textTrackDisplay(0)
 #endif
     , m_hideFullscreenControlsTimer(this, &MediaControlRootElement::hideFullscreenControlsTimerFired)
     , m_isMouseOverControls(false)
@@ -277,8 +276,6 @@ void MediaControlRootElement::setMediaController(MediaControllerInterface* contr
 #if ENABLE(VIDEO_TRACK)
     if (m_textDisplayContainer)
         m_textDisplayContainer->setMediaController(controller);
-    if (m_textTrackDisplay)
-        m_textTrackDisplay->setMediaController(controller);
 #endif
     reset();
 }
@@ -343,6 +340,9 @@ void MediaControlRootElement::reset()
     m_playButton->updateDisplayType();
 
 #if ENABLE(FULLSCREEN_API)
+    if (m_fullScreenVolumeSlider)
+        m_fullScreenVolumeSlider->setVolume(m_mediaController->volume());
+
     if (document()->webkitIsFullScreen() && document()->webkitCurrentFullScreenElement() == toParentMediaElement(this)) {
         if (m_mediaController->isLiveStream()) {
             m_seekBackButton->hide();
@@ -601,16 +601,8 @@ void MediaControlRootElement::createTextTrackDisplay()
     RefPtr<MediaControlTextTrackContainerElement> textDisplayContainer = MediaControlTextTrackContainerElement::create(document());
     m_textDisplayContainer = textDisplayContainer.get();
 
-    RefPtr<MediaControlTextTrackDisplayElement> textDisplay = MediaControlTextTrackDisplayElement::create(document());
-    m_textDisplayContainer->hide();
-    m_textTrackDisplay = textDisplay.get();
-
-    ExceptionCode ec;
-    textDisplayContainer->appendChild(textDisplay.release(), ec, true);
-    if (ec)
-        return;
-
     // Insert it before the first controller element so it always displays behind the controls.
+    ExceptionCode ec;
     insertBefore(textDisplayContainer.release(), m_panel, ec, true);
 }
 
@@ -633,28 +625,8 @@ void MediaControlRootElement::updateTextTrackDisplay()
     if (!m_textDisplayContainer)
         createTextTrackDisplay();
 
-    CueList activeCues = toParentMediaElement(m_textDisplayContainer)->currentlyActiveCues();
-    m_textTrackDisplay->removeChildren();
-    bool nothingToDisplay = true;
-    for (size_t i = 0; i < activeCues.size(); ++i) {
-        TextTrackCue* cue = activeCues[i].data();
-        ASSERT(cue->isActive());
-        if (!cue->track() || cue->track()->mode() != TextTrack::SHOWING)
-            continue;
+    m_textDisplayContainer->updateDisplay();
 
-        String cueText = cue->text();
-        if (!cueText.isEmpty()) {
-            if (!nothingToDisplay)
-                m_textTrackDisplay->appendChild(document()->createElement(HTMLNames::brTag, false), ASSERT_NO_EXCEPTION);
-            m_textTrackDisplay->appendChild(document()->createTextNode(cueText), ASSERT_NO_EXCEPTION);
-            nothingToDisplay = false;
-        }
-    }
-
-    if (!nothingToDisplay)
-        m_textDisplayContainer->show();
-    else
-        m_textDisplayContainer->hide();
 }
 #endif
 

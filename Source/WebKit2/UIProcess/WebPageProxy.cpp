@@ -85,7 +85,7 @@
 #include <WebCore/WindowFeatures.h>
 #include <stdio.h>
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(UI_SIDE_COMPOSITING)
 #include "LayerTreeHostProxyMessages.h"
 #endif
 
@@ -161,6 +161,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_pageScaleFactor(1)
     , m_intrinsicDeviceScaleFactor(1)
     , m_customDeviceScaleFactor(0)
+    , m_layerHostingMode(LayerHostingModeDefault)
     , m_drawsBackground(true)
     , m_drawsTransparentBackground(false)
     , m_areMemoryCacheClientCallsEnabled(true)
@@ -186,6 +187,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_needTouchEvents(false)
 #endif
     , m_pageID(pageID)
+    , m_isPageSuspended(false)
 #if PLATFORM(MAC)
     , m_isSmartInsertDeleteEnabled(TextChecker::isSmartInsertDeleteEnabled())
 #endif
@@ -372,7 +374,10 @@ void WebPageProxy::close()
         m_openPanelResultListener = 0;
     }
 
+#if ENABLE(GEOLOCATION)
     m_geolocationPermissionRequestManager.invalidateRequests();
+#endif
+
     m_notificationPermissionRequestManager.invalidateRequests();
 
     m_toolTip = String();
@@ -759,6 +764,12 @@ void WebPageProxy::viewStateDidChange(ViewStateFlags flags)
             m_isInWindow = isInWindow;
             process()->send(Messages::WebPage::SetIsInWindow(isInWindow), m_pageID);
         }
+
+        LayerHostingMode layerHostingMode = m_pageClient->viewLayerHostingMode();
+        if (m_layerHostingMode != layerHostingMode) {
+            m_layerHostingMode = layerHostingMode;
+            m_drawingArea->layerHostingModeDidChange();
+        }
     }
 
     updateBackingStoreDiscardableState();
@@ -999,7 +1010,10 @@ void WebPageProxy::handleTouchEvent(const NativeWebTouchEvent& event)
     if (!isValid())
         return;
 
-    if (m_needTouchEvents) {
+    // If the page is suspended, which should be the case during panning, pinching
+    // and animation on the page itself (kinetic scrolling, tap to zoom) etc, then
+    // we do not send any of the events to the page even if is has listeners.
+    if (m_needTouchEvents && !m_isPageSuspended) {
         m_touchEventQueue.append(event);
         process()->responsivenessTimer()->start();
         if (m_shouldSendEventsSynchronously) {
@@ -1124,6 +1138,26 @@ void WebPageProxy::setCustomUserAgent(const String& customUserAgent)
     }
 
     setUserAgent(m_customUserAgent);
+}
+
+void WebPageProxy::resumeActiveDOMObjectsAndAnimations()
+{
+    if (!isValid() || !m_isPageSuspended)
+        return;
+
+    m_isPageSuspended = false;
+
+    process()->send(Messages::WebPage::ResumeActiveDOMObjectsAndAnimations(), m_pageID);
+}
+
+void WebPageProxy::suspendActiveDOMObjectsAndAnimations()
+{
+    if (!isValid() || m_isPageSuspended)
+        return;
+
+    m_isPageSuspended = true;
+
+    process()->send(Messages::WebPage::SuspendActiveDOMObjectsAndAnimations(), m_pageID);
 }
 
 bool WebPageProxy::supportsTextEncoding() const
@@ -1542,7 +1576,7 @@ void WebPageProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::M
         return;
     }
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER) && USE(TILED_BACKING_STORE)
+#if USE(UI_SIDE_COMPOSITING)
     if (messageID.is<CoreIPC::MessageClassLayerTreeHostProxy>()) {
         m_drawingArea->didReceiveLayerTreeHostProxyMessage(connection, messageID, arguments);
         return;
@@ -2604,22 +2638,22 @@ void WebPageProxy::hidePopupMenu()
     m_activePopupMenu = 0;
 }
 
-void WebPageProxy::showContextMenu(const IntPoint& menuLocation, const ContextMenuState& contextMenuState, const Vector<WebContextMenuItemData>& proposedItems, CoreIPC::ArgumentDecoder* arguments)
+void WebPageProxy::showContextMenu(const IntPoint& menuLocation, const WebHitTestResult::Data& hitTestResultData, const Vector<WebContextMenuItemData>& proposedItems, CoreIPC::ArgumentDecoder* arguments)
 {
-    internalShowContextMenu(menuLocation, contextMenuState, proposedItems, arguments);
+    internalShowContextMenu(menuLocation, hitTestResultData, proposedItems, arguments);
     
     // No matter the result of internalShowContextMenu, always notify the WebProcess that the menu is hidden so it starts handling mouse events again.
     process()->send(Messages::WebPage::ContextMenuHidden(), m_pageID);
 }
 
-void WebPageProxy::internalShowContextMenu(const IntPoint& menuLocation, const ContextMenuState& contextMenuState, const Vector<WebContextMenuItemData>& proposedItems, CoreIPC::ArgumentDecoder* arguments)
+void WebPageProxy::internalShowContextMenu(const IntPoint& menuLocation, const WebHitTestResult::Data& hitTestResultData, const Vector<WebContextMenuItemData>& proposedItems, CoreIPC::ArgumentDecoder* arguments)
 {
     RefPtr<APIObject> userData;
     WebContextUserMessageDecoder messageDecoder(userData, m_process->context());
     if (!arguments->decode(messageDecoder))
         return;
 
-    m_activeContextMenuState = contextMenuState;
+    m_activeContextMenuHitTestResultData = hitTestResultData;
 
     if (m_activeContextMenu) {
         m_activeContextMenu->hideContextMenu();
@@ -2633,7 +2667,7 @@ void WebPageProxy::internalShowContextMenu(const IntPoint& menuLocation, const C
 
     // Give the PageContextMenuClient one last swipe at changing the menu.
     Vector<WebContextMenuItemData> items;
-    if (!m_contextMenuClient.getContextMenuFromProposedMenu(this, proposedItems, items, userData.get()))
+    if (!m_contextMenuClient.getContextMenuFromProposedMenu(this, proposedItems, items, hitTestResultData, userData.get()))
         m_activeContextMenu->showContextMenu(menuLocation, proposedItems);
     else
         m_activeContextMenu->showContextMenu(menuLocation, items);
@@ -2685,11 +2719,11 @@ void WebPageProxy::contextMenuItemSelected(const WebContextMenuItemData& item)
     }
 #endif
     if (item.action() == ContextMenuItemTagDownloadImageToDisk) {
-        m_process->context()->download(this, KURL(KURL(), m_activeContextMenuState.absoluteImageURLString));
+        m_process->context()->download(this, KURL(KURL(), m_activeContextMenuHitTestResultData.absoluteImageURL));
         return;    
     }
     if (item.action() == ContextMenuItemTagDownloadLinkToDisk) {
-        m_process->context()->download(this, KURL(KURL(), m_activeContextMenuState.absoluteLinkURLString));
+        m_process->context()->download(this, KURL(KURL(), m_activeContextMenuHitTestResultData.absoluteLinkURL));
         return;
     }
     if (item.action() == ContextMenuItemTagCheckSpellingWhileTyping) {
@@ -3191,6 +3225,7 @@ void WebPageProxy::processDidCrash()
     ASSERT(m_pageClient);
 
     m_isValid = false;
+    m_isPageSuspended = false;
 
     if (m_mainFrame) {
         m_urlAtProcessExit = m_mainFrame->url();
@@ -3219,7 +3254,10 @@ void WebPageProxy::processDidCrash()
         m_openPanelResultListener = nullptr;
     }
 
+#if ENABLE(GEOLOCATION)
     m_geolocationPermissionRequestManager.invalidateRequests();
+#endif
+
     m_notificationPermissionRequestManager.invalidateRequests();
 
     m_toolTip = String();
@@ -3335,6 +3373,11 @@ void WebPageProxy::exitAcceleratedCompositingMode()
 {
     m_pageClient->exitAcceleratedCompositingMode();
 }
+
+void WebPageProxy::updateAcceleratedCompositingMode(const LayerTreeContext& layerTreeContext)
+{
+    m_pageClient->updateAcceleratedCompositingMode(layerTreeContext);
+}
 #endif // USE(ACCELERATED_COMPOSITING)
 
 void WebPageProxy::backForwardClear()
@@ -3397,9 +3440,9 @@ void WebPageProxy::requestNotificationPermission(uint64_t requestID, const Strin
         request->deny();
 }
 
-void WebPageProxy::showNotification(const String& title, const String& body, const String& iconURL, const String& originString, uint64_t notificationID)
+void WebPageProxy::showNotification(const String& title, const String& body, const String& iconURL, const String& replaceID, const String& originString, uint64_t notificationID)
 {
-    m_process->context()->notificationManagerProxy()->show(this, title, body, iconURL, originString, notificationID);
+    m_process->context()->notificationManagerProxy()->show(this, title, body, iconURL, replaceID, originString, notificationID);
 }
 
 float WebPageProxy::headerHeight(WebFrameProxy* frame)

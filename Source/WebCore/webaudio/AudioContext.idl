@@ -28,10 +28,9 @@ module webaudio {
         Conditional=WEB_AUDIO,
         ActiveDOMObject,
         CustomConstructor,
+        ConstructorParameters=0,
         JSCustomMarkFunction,
-#if defined(V8_BINDING) && V8_BINDING
         EventTarget
-#endif        
     ] AudioContext {
         // All rendered audio ultimately connects to destination, which represents the audio hardware.
         readonly attribute AudioDestinationNode destination;
@@ -62,7 +61,7 @@ module webaudio {
 #endif
         // Processing nodes
         AudioGainNode createGainNode();
-        DelayNode createDelayNode();
+        DelayNode createDelayNode(in [Optional] double maxDelayTime);
         BiquadFilterNode createBiquadFilter();
         WaveShaperNode createWaveShaper();
         LowPass2FilterNode createLowPass2Filter();

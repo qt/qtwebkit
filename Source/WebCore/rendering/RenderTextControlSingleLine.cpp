@@ -250,7 +250,8 @@ void RenderTextControlSingleLine::layout()
         } else if (containerRenderer->height() < contentHeight()) {
             containerRenderer->style()->setHeight(Length(contentHeight(), Fixed));
             relayoutChildren = true;
-        }
+        } else
+            containerRenderer->style()->setHeight(Length(containerHeight, Fixed));
     }
 
     RenderBlock::layoutBlock(relayoutChildren);
@@ -360,13 +361,6 @@ void RenderTextControlSingleLine::capsLockStateMayHaveChanged()
     }
 }
 
-#if ENABLE(INPUT_SPEECH)
-HTMLElement* RenderTextControlSingleLine::speechButtonElement() const
-{
-    return inputElement()->speechButtonElement();
-}
-#endif
-
 bool RenderTextControlSingleLine::hasControlClip() const
 {
     // Apply control clip for text fields with decorations.
@@ -417,16 +411,6 @@ LayoutUnit RenderTextControlSingleLine::preferredContentWidth(float charWidth) c
     if (maxCharWidth > 0.f)
         result += maxCharWidth - charWidth;
 
-    HTMLElement* resultsButton = resultsButtonElement();
-    if (RenderBox* resultsRenderer = resultsButton ? resultsButton->renderBox() : 0)
-        result += resultsRenderer->borderLeft() + resultsRenderer->borderRight() +
-                  resultsRenderer->paddingLeft() + resultsRenderer->paddingRight();
-
-    HTMLElement* cancelButton = cancelButtonElement();
-    if (RenderBox* cancelRenderer = cancelButton ? cancelButton->renderBox() : 0)
-        result += cancelRenderer->borderLeft() + cancelRenderer->borderRight() +
-                  cancelRenderer->paddingLeft() + cancelRenderer->paddingRight();
-
     if (includesDecoration) {
         HTMLElement* spinButton = innerSpinButtonElement();
         if (RenderBox* spinRenderer = spinButton ? spinButton->renderBox() : 0) {
@@ -438,38 +422,25 @@ LayoutUnit RenderTextControlSingleLine::preferredContentWidth(float charWidth) c
         }
     }
 
-#if ENABLE(INPUT_SPEECH)
-    HTMLElement* speechButton = speechButtonElement();
-    if (RenderBox* speechRenderer = speechButton ? speechButton->renderBox() : 0) {
-        result += speechRenderer->borderLeft() + speechRenderer->borderRight() +
-                  speechRenderer->paddingLeft() + speechRenderer->paddingRight();
-    }
-#endif
     return result;
 }
 
-void RenderTextControlSingleLine::adjustControlHeightBasedOnLineHeight(LayoutUnit lineHeight)
+LayoutUnit RenderTextControlSingleLine::computeControlHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const
 {
     HTMLElement* resultsButton = resultsButtonElement();
     if (RenderBox* resultsRenderer = resultsButton ? resultsButton->renderBox() : 0) {
         resultsRenderer->computeLogicalHeight();
-        setHeight(max(height(),
-                  resultsRenderer->borderTop() + resultsRenderer->borderBottom() +
-                  resultsRenderer->paddingTop() + resultsRenderer->paddingBottom() +
-                  resultsRenderer->marginTop() + resultsRenderer->marginBottom()));
+        nonContentHeight = max(nonContentHeight, resultsRenderer->borderAndPaddingHeight() + resultsRenderer->marginHeight());
         lineHeight = max(lineHeight, resultsRenderer->height());
     }
     HTMLElement* cancelButton = cancelButtonElement();
     if (RenderBox* cancelRenderer = cancelButton ? cancelButton->renderBox() : 0) {
         cancelRenderer->computeLogicalHeight();
-        setHeight(max(height(),
-                  cancelRenderer->borderTop() + cancelRenderer->borderBottom() +
-                  cancelRenderer->paddingTop() + cancelRenderer->paddingBottom() +
-                  cancelRenderer->marginTop() + cancelRenderer->marginBottom()));
+        nonContentHeight = max(nonContentHeight, cancelRenderer->borderAndPaddingHeight() + cancelRenderer->marginHeight());
         lineHeight = max(lineHeight, cancelRenderer->height());
     }
 
-    setHeight(height() + lineHeight);
+    return lineHeight + nonContentHeight;
 }
 
 void RenderTextControlSingleLine::updateFromElement()
@@ -620,7 +591,8 @@ PopupMenuStyle RenderTextControlSingleLine::itemStyle(unsigned) const
 
 PopupMenuStyle RenderTextControlSingleLine::menuStyle() const
 {
-    return PopupMenuStyle(style()->visitedDependentColor(CSSPropertyColor), style()->visitedDependentColor(CSSPropertyBackgroundColor), style()->font(), style()->visibility() == VISIBLE, style()->display() == NONE, style()->textIndent(), style()->direction(), style()->unicodeBidi() == Override);
+    return PopupMenuStyle(style()->visitedDependentColor(CSSPropertyColor), style()->visitedDependentColor(CSSPropertyBackgroundColor), style()->font(), style()->visibility() == VISIBLE,
+        style()->display() == NONE, style()->textIndent(), style()->direction(), isOverride(style()->unicodeBidi()));
 }
 
 int RenderTextControlSingleLine::clientInsetLeft() const
@@ -641,22 +613,18 @@ int RenderTextControlSingleLine::clientInsetRight() const
 LayoutUnit RenderTextControlSingleLine::clientPaddingLeft() const
 {
     LayoutUnit padding = paddingLeft();
-
-    HTMLElement* resultsButton = resultsButtonElement();
-    if (RenderBox* resultsRenderer = resultsButton ? resultsButton->renderBox() : 0)
-        padding += resultsRenderer->width() + resultsRenderer->marginLeft() + resultsRenderer->paddingLeft() + resultsRenderer->marginRight() + resultsRenderer->paddingRight();
-
+    if (RenderBox* box = innerBlockElement() ? innerBlockElement()->renderBox() : 0)
+        padding += box->x();
     return padding;
 }
 
 LayoutUnit RenderTextControlSingleLine::clientPaddingRight() const
 {
     LayoutUnit padding = paddingRight();
-
-    HTMLElement* cancelButton = cancelButtonElement();
-    if (RenderBox* cancelRenderer = cancelButton ? cancelButton->renderBox() : 0)
-        padding += cancelRenderer->width() + cancelRenderer->marginLeft() + cancelRenderer->paddingLeft() + cancelRenderer->marginRight() + cancelRenderer->paddingRight();
-
+    if (RenderBox* containerBox = containerElement() ? containerElement()->renderBox() : 0) {
+        if (RenderBox* innerBlockBox = innerBlockElement() ? innerBlockElement()->renderBox() : 0)
+            padding += containerBox->width() - (innerBlockBox->x() + innerBlockBox->width());
+    }
     return padding;
 }
 

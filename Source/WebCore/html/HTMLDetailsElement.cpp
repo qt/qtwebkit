@@ -29,9 +29,9 @@
 #include "LocalizedStrings.h"
 #include "MouseEvent.h"
 #include "NodeRenderingContext.h"
-#include "RenderDetails.h"
+#include "RenderBlock.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "Text.h"
 
 namespace WebCore {
@@ -50,7 +50,7 @@ public:
 
 private:
     DetailsContentElement(Document* document)
-        : HTMLContentElement(HTMLNames::divTag, document)
+        : HTMLContentElement(HTMLNames::webkitShadowContentTag, document)
     {
     }
 };
@@ -72,7 +72,7 @@ public:
 
 private:
     DetailsSummaryElement(Document* document)
-        : HTMLContentElement(HTMLNames::divTag, document)
+        : HTMLContentElement(HTMLNames::webkitShadowContentTag, document)
     {
         setSelect(summaryQuerySelector());
     }
@@ -105,7 +105,7 @@ HTMLDetailsElement::HTMLDetailsElement(const QualifiedName& tagName, Document* d
 
 RenderObject* HTMLDetailsElement::createRenderer(RenderArena* arena, RenderStyle*)
 {
-    return new (arena) RenderDetails(this);
+    return new (arena) RenderBlock(this);
 }
 
 void HTMLDetailsElement::createShadowSubtree()
@@ -124,7 +124,7 @@ Element* HTMLDetailsElement::findMainSummary() const
             return toElement(child);
     }
 
-    return static_cast<DetailsSummaryElement*>(shadowRootList()->oldestShadowRoot()->firstChild())->fallbackSummary();
+    return static_cast<DetailsSummaryElement*>(shadowTree()->oldestShadowRoot()->firstChild())->fallbackSummary();
 }
 
 void HTMLDetailsElement::parseAttribute(Attribute* attr)

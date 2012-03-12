@@ -105,7 +105,7 @@ private:
         if (!node.shouldGenerate())
             return;
         
-        NodeType op = node.op;
+        NodeType op = static_cast<NodeType>(node.op);
 
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLog("   %s @%u: ", Graph::opName(op), m_compileIndex);
@@ -208,6 +208,15 @@ private:
             }
             break;
         }
+            
+        case ArithNegate:
+            if (m_graph[node.child1()].prediction()) {
+                if (m_graph.negateShouldSpeculateInteger(node))
+                    changed |= mergePrediction(PredictInt32);
+                else
+                    changed |= mergePrediction(PredictDouble);
+            }
+            break;
             
         case ArithMul:
         case ArithMin:
@@ -397,6 +406,18 @@ private:
             break;
         }
             
+        case CreateActivation: {
+            changed |= setPrediction(PredictObjectOther);
+            break;
+        }
+            
+        case NewFunction:
+        case NewFunctionNoCheck:
+        case NewFunctionExpression: {
+            changed |= setPrediction(PredictFunction);
+            break;
+        }
+            
         case GetArrayLength:
         case GetByteArrayLength:
         case GetInt8ArrayLength:
@@ -415,6 +436,9 @@ private:
             break;
         }
         
+        case Flush:
+            break;
+
 #ifndef NDEBUG
         // These get ignored because they don't return anything.
         case PutScopedVar:
@@ -424,7 +448,6 @@ private:
         case Return:
         case CheckHasInstance:
         case Phi:
-        case Flush:
         case Throw:
         case ThrowReferenceError:
         case ForceOSRExit:
@@ -437,12 +460,17 @@ private:
         case CheckFunction:
         case PutStructure:
         case PutByOffset:
+        case TearOffActivation:
             break;
             
         // These gets ignored because it doesn't do anything.
         case Phantom:
         case InlineStart:
         case Nop:
+            break;
+            
+        case LastNodeType:
+            ASSERT_NOT_REACHED();
             break;
 #else
         default:
@@ -492,7 +520,7 @@ private:
     
     void vote(Node& node, VariableAccessData::Ballot ballot)
     {
-        if (node.op & NodeHasVarArgs) {
+        if (node.flags & NodeHasVarArgs) {
             for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
                 vote(m_graph.m_varArgChildren[childIdx], ballot);
             return;
@@ -586,8 +614,13 @@ private:
                 break;
             }
         }
-        for (unsigned i = 0; i < m_graph.m_variableAccessData.size(); ++i)
-            m_changed |= m_graph.m_variableAccessData[i].find()->tallyVotesForShouldUseDoubleFormat();
+        for (unsigned i = 0; i < m_graph.m_variableAccessData.size(); ++i) {
+            VariableAccessData* variableAccessData = m_graph.m_variableAccessData[i].find();
+            if (operandIsArgument(variableAccessData->local())
+                || m_graph.isCaptured(variableAccessData->local()))
+                continue;
+            m_changed |= variableAccessData->tallyVotesForShouldUseDoubleFormat();
+        }
     }
     
     void fixupNode(Node& node)
@@ -595,7 +628,7 @@ private:
         if (!node.shouldGenerate())
             return;
         
-        NodeType op = node.op;
+        NodeType op = static_cast<NodeType>(node.op);
 
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         dataLog("   %s @%u: ", Graph::opName(op), m_compileIndex);
@@ -651,13 +684,16 @@ private:
                 node.op = GetFloat64ArrayLength;
             else
                 ASSERT_NOT_REACHED();
-            m_graph.deref(m_compileIndex); // No longer MustGenerate
+            // No longer MustGenerate
+            ASSERT(node.flags & NodeMustGenerate);
+            node.flags &= ~NodeMustGenerate;
+            m_graph.deref(m_compileIndex);
             break;
         }
         case GetIndexedPropertyStorage: {
             PredictedType basePrediction = m_graph[node.child2()].prediction();
             if (!(basePrediction & PredictInt32) && basePrediction) {
-                node.op = Nop;
+                node.setOpAndDefaultFlags(Nop);
                 m_graph.clearAndDerefChild1(node);
                 m_graph.clearAndDerefChild2(node);
                 m_graph.clearAndDerefChild3(node);

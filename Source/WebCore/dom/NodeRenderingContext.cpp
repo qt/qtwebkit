@@ -29,13 +29,15 @@
 #include "ContainerNode.h"
 #include "HTMLContentElement.h"
 #include "HTMLContentSelector.h"
+#include "HTMLNames.h"
+#include "HTMLShadowElement.h"
 #include "Node.h"
 #include "RenderFlowThread.h"
 #include "RenderFullScreen.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 
 #if ENABLE(SVG)
 #include "SVGNames.h"
@@ -43,11 +45,16 @@
 
 namespace WebCore {
 
+using namespace HTMLNames;
+
+static RenderObject* firstRendererOf(Node*);
+static RenderObject* lastRendererOf(Node*);
+
 NodeRenderingContext::NodeRenderingContext(Node* node)
     : m_phase(AttachingNotInTree)
     , m_node(node)
     , m_parentNodeForRenderingAndStyle(0)
-    , m_visualParentShadowRootList(0)
+    , m_visualParentShadowTree(0)
     , m_insertionPoint(0)
     , m_style(0)
     , m_parentFlowRenderer(0)
@@ -56,20 +63,25 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
     if (!parent)
         return;
 
-    if (parent->isShadowRoot()) {
+    if (parent->isShadowRoot() && toShadowRoot(parent)->isYoungest()) {
         m_phase = AttachingShadowChild;
         m_parentNodeForRenderingAndStyle = parent->shadowHost();
         return;
     }
 
-    if (parent->isElementNode()) {
-        if (toElement(parent)->hasShadowRoot()) {
-            m_visualParentShadowRootList = toElement(parent)->shadowRootList();
-            if ((m_insertionPoint = m_visualParentShadowRootList->insertionPointFor(m_node))
-                && m_visualParentShadowRootList->isSelectorActive()) {
-                m_phase = AttachingDistributed;
-                m_parentNodeForRenderingAndStyle = NodeRenderingContext(m_insertionPoint).parentNodeForRenderingAndStyle();
-                return;
+    if (parent->isElementNode() || parent->isShadowRoot()) {
+        if (parent->isElementNode() && toElement(parent)->hasShadowRoot())
+            m_visualParentShadowTree = toElement(parent)->shadowTree();
+        else if (parent->isShadowRoot())
+            m_visualParentShadowTree = toShadowRoot(parent)->tree();
+
+        if (m_visualParentShadowTree) {
+            if ((m_insertionPoint = m_visualParentShadowTree->insertionPointFor(m_node))) {
+                if (toShadowRoot(m_insertionPoint->shadowTreeRootNode())->isUsedForRendering()) {
+                    m_phase = AttachingDistributed;
+                    m_parentNodeForRenderingAndStyle = NodeRenderingContext(m_insertionPoint).parentNodeForRenderingAndStyle();
+                    return;
+                }
             }
 
             m_phase = AttachingNotDistributed;
@@ -77,7 +89,13 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
             return;
         }
 
-        if (isInsertionPoint(parent)) {
+        if (isShadowBoundary(parent)) {
+            if (!toShadowRoot(parent->shadowTreeRootNode())->isUsedForRendering()) {
+                m_phase = AttachingNotDistributed;
+                m_parentNodeForRenderingAndStyle = parent;
+                return;
+            }
+
             if (toInsertionPoint(parent)->hasSelection())
                 m_phase = AttachingNotFallbacked;
             else
@@ -95,7 +113,7 @@ NodeRenderingContext::NodeRenderingContext(Node* node, RenderStyle* style)
     : m_phase(Calculating)
     , m_node(node)
     , m_parentNodeForRenderingAndStyle(0)
-    , m_visualParentShadowRootList(0)
+    , m_visualParentShadowTree(0)
     , m_insertionPoint(0)
     , m_style(style)
     , m_parentFlowRenderer(0)
@@ -117,7 +135,7 @@ PassRefPtr<RenderStyle> NodeRenderingContext::releaseStyle()
     return m_style.release();
 }
 
-static RenderObject* nextRendererOf(InsertionPoint* parent, Node* current)
+static inline RenderObject* nextRendererOfInsertionPoint(InsertionPoint* parent, Node* current)
 {
     HTMLContentSelection* currentSelection = parent->selections()->find(current);
     if (!currentSelection)
@@ -131,7 +149,7 @@ static RenderObject* nextRendererOf(InsertionPoint* parent, Node* current)
     return 0;
 }
 
-static RenderObject* previousRendererOf(InsertionPoint* parent, Node* current)
+static inline RenderObject* previousRendererOfInsertionPoint(InsertionPoint* parent, Node* current)
 {
     RenderObject* lastRenderer = 0;
 
@@ -145,7 +163,7 @@ static RenderObject* previousRendererOf(InsertionPoint* parent, Node* current)
     return lastRenderer;
 }
 
-static RenderObject* firstRendererOf(InsertionPoint* parent)
+static inline RenderObject* firstRendererOfInsertionPoint(InsertionPoint* parent)
 {
     if (parent->hasSelection()) {
         for (HTMLContentSelection* selection = parent->selections()->first(); selection; selection = selection->next()) {
@@ -156,10 +174,10 @@ static RenderObject* firstRendererOf(InsertionPoint* parent)
         return 0;
     }
 
-    return NodeRenderingContext(parent).nextRenderer();
+    return firstRendererOf(parent->firstChild());
 }
 
-static RenderObject* lastRendererOf(InsertionPoint* parent)
+static inline RenderObject* lastRendererOfInsertionPoint(InsertionPoint* parent)
 {
     if (parent->hasSelection()) {
         for (HTMLContentSelection* selection = parent->selections()->last(); selection; selection = selection->previous()) {
@@ -170,7 +188,44 @@ static RenderObject* lastRendererOf(InsertionPoint* parent)
         return 0;
     }
 
-    return NodeRenderingContext(parent).previousRenderer();
+    return lastRendererOf(parent->lastChild());
+}
+
+static inline RenderObject* firstRendererOf(Node* node)
+{
+    for (; node; node = node->nextSibling()) {
+        if (node->renderer()) {
+            // Do not return elements that are attached to a different flow-thread.
+            if (node->renderer()->style() && !node->renderer()->style()->flowThread().isEmpty())
+                continue;
+            return node->renderer();
+        }
+
+        if (isInsertionPoint(node)) {
+            if (RenderObject* first = firstRendererOfInsertionPoint(toInsertionPoint(node)))
+                return first;
+        }
+    }
+
+    return 0;
+}
+
+static inline RenderObject* lastRendererOf(Node* node)
+{
+    for (; node; node = node->previousSibling()) {
+        if (node->renderer()) {
+            // Do not return elements that are attached to a different flow-thread.
+            if (node->renderer()->style() && !node->renderer()->style()->flowThread().isEmpty())
+                continue;
+            return node->renderer();
+        }
+        if (isInsertionPoint(node)) {
+            if (RenderObject* last = lastRendererOfInsertionPoint(toInsertionPoint(node)))
+                return last;
+        }
+    }
+
+    return 0;
 }
 
 RenderObject* NodeRenderingContext::nextRenderer() const
@@ -183,7 +238,7 @@ RenderObject* NodeRenderingContext::nextRenderer() const
         return m_parentFlowRenderer->nextRendererForNode(m_node);
 
     if (m_phase == AttachingDistributed) {
-        if (RenderObject* found = nextRendererOf(m_insertionPoint, m_node))
+        if (RenderObject* found = nextRendererOfInsertionPoint(m_insertionPoint, m_node))
             return found;
         return NodeRenderingContext(m_insertionPoint).nextRenderer();
     }
@@ -193,21 +248,7 @@ RenderObject* NodeRenderingContext::nextRenderer() const
     if (m_node->parentOrHostNode() && !m_node->parentOrHostNode()->attached())
         return 0;
 
-    for (Node* node = m_node->nextSibling(); node; node = node->nextSibling()) {
-        if (node->renderer()) {
-            // Do not return elements that are attached to a different flow-thread.
-            if (node->renderer()->style() && !node->renderer()->style()->flowThread().isEmpty())
-                continue;
-            return node->renderer();
-        }
-
-        if (isInsertionPoint(node)) {
-            if (RenderObject* first = firstRendererOf(toInsertionPoint(node)))
-                return first;
-        }
-    }
-
-    return 0;
+    return firstRendererOf(m_node->nextSibling());
 }
 
 RenderObject* NodeRenderingContext::previousRenderer() const
@@ -221,27 +262,14 @@ RenderObject* NodeRenderingContext::previousRenderer() const
         return m_parentFlowRenderer->previousRendererForNode(m_node);
 
     if (m_phase == AttachingDistributed) {
-        if (RenderObject* found = previousRendererOf(m_insertionPoint, m_node))
+        if (RenderObject* found = previousRendererOfInsertionPoint(m_insertionPoint, m_node))
             return found;
         return NodeRenderingContext(m_insertionPoint).previousRenderer();
     }
 
     // FIXME: We should have the same O(N^2) avoidance as nextRenderer does
     // however, when I tried adding it, several tests failed.
-    for (Node* node = m_node->previousSibling(); node; node = node->previousSibling()) {
-        if (node->renderer()) {
-            // Do not return elements that are attached to a different flow-thread.
-            if (node->renderer()->style() && !node->renderer()->style()->flowThread().isEmpty())
-                continue;
-            return node->renderer();
-        }
-        if (isInsertionPoint(node)) {
-            if (RenderObject* last = lastRendererOf(toInsertionPoint(node)))
-                return last;
-        }
-    }
-
-    return 0;
+    return lastRendererOf(m_node->previousSibling());
 }
 
 RenderObject* NodeRenderingContext::parentRenderer() const
@@ -260,8 +288,8 @@ RenderObject* NodeRenderingContext::parentRenderer() const
 
 void NodeRenderingContext::hostChildrenChanged()
 {
-    if (m_phase == AttachingNotDistributed)
-        m_visualParentShadowRootList->hostChildrenChanged();
+    if (m_phase == AttachingNotDistributed && m_visualParentShadowTree)
+        m_visualParentShadowTree->hostChildrenChanged();
 }
 
 bool NodeRenderingContext::shouldCreateRenderer() const

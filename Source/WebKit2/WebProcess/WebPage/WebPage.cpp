@@ -199,7 +199,9 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #if PLATFORM(QT)
     , m_tapHighlightController(this)
 #endif
+#if ENABLE(GEOLOCATION)
     , m_geolocationPermissionRequestManager(this)
+#endif
     , m_pageID(pageID)
     , m_canRunBeforeUnloadConfirmPanel(parameters.canRunBeforeUnloadConfirmPanel)
     , m_canRunModal(parameters.canRunModal)
@@ -1220,25 +1222,25 @@ static bool isContextClick(const PlatformMouseEvent& event)
     return false;
 }
 
-static bool handleContextMenuEvent(const PlatformMouseEvent& platformMouseEvent, Page* page)
+static bool handleContextMenuEvent(const PlatformMouseEvent& platformMouseEvent, WebPage* page)
 {
-    IntPoint point = page->mainFrame()->view()->windowToContents(platformMouseEvent.position());
-    HitTestResult result = page->mainFrame()->eventHandler()->hitTestResultAtPoint(point, false);
+    IntPoint point = page->corePage()->mainFrame()->view()->windowToContents(platformMouseEvent.position());
+    HitTestResult result = page->corePage()->mainFrame()->eventHandler()->hitTestResultAtPoint(point, false);
 
-    Frame* frame = page->mainFrame();
+    Frame* frame = page->corePage()->mainFrame();
     if (result.innerNonSharedNode())
         frame = result.innerNonSharedNode()->document()->frame();
     
     bool handled = frame->eventHandler()->sendContextMenuEvent(platformMouseEvent);
     if (handled)
-        page->chrome()->showContextMenu();
+        page->contextMenu()->show();
 
     return handled;
 }
 
-static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page, bool onlyUpdateScrollbars)
+static bool handleMouseEvent(const WebMouseEvent& mouseEvent, WebPage* page, bool onlyUpdateScrollbars)
 {
-    Frame* frame = page->mainFrame();
+    Frame* frame = page->corePage()->mainFrame();
     if (!frame->view())
         return false;
 
@@ -1247,7 +1249,7 @@ static bool handleMouseEvent(const WebMouseEvent& mouseEvent, Page* page, bool o
     switch (platformMouseEvent.type()) {
         case PlatformEvent::MousePressed: {
             if (isContextClick(platformMouseEvent))
-                page->contextMenuController()->clearContextMenu();
+                page->corePage()->contextMenuController()->clearContextMenu();
             
             bool handled = frame->eventHandler()->handleMousePressEvent(platformMouseEvent);
             if (isContextClick(platformMouseEvent))
@@ -1291,7 +1293,7 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
         // of those cases where the page is not active and the mouse is not pressed, then we can fire a more
         // efficient scrollbars-only version of the event.
         bool onlyUpdateScrollbars = !(m_page->focusController()->isActive() || (mouseEvent.button() != WebMouseEvent::NoButton));
-        handled = handleMouseEvent(mouseEvent, m_page.get(), onlyUpdateScrollbars);
+        handled = handleMouseEvent(mouseEvent, this, onlyUpdateScrollbars);
     }
 
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(mouseEvent.type()), handled));
@@ -1299,12 +1301,6 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
 
 void WebPage::mouseEventSyncForTesting(const WebMouseEvent& mouseEvent, bool& handled)
 {
-    // Don't try to handle any pending mouse events if a context menu is showing.
-    if (m_isShowingContextMenu) {
-        handled = true;
-        return;
-    }
-
     handled = m_pageOverlay && m_pageOverlay->mouseEvent(mouseEvent);
 
     if (!handled) {
@@ -1316,7 +1312,7 @@ void WebPage::mouseEventSyncForTesting(const WebMouseEvent& mouseEvent, bool& ha
         // of those cases where the page is not active and the mouse is not pressed, then we can fire a more
         // efficient scrollbars-only version of the event.
         bool onlyUpdateScrollbars = !(m_page->focusController()->isActive() || (mouseEvent.button() != WebMouseEvent::NoButton));
-        handled = handleMouseEvent(mouseEvent, m_page.get(), onlyUpdateScrollbars);
+        handled = handleMouseEvent(mouseEvent, this, onlyUpdateScrollbars);
     }
 }
 
@@ -1660,7 +1656,20 @@ void WebPage::setUserAgent(const String& userAgent)
 {
     m_userAgent = userAgent;
 }
-  
+
+void WebPage::suspendActiveDOMObjectsAndAnimations()
+{
+    m_page->suspendActiveDOMObjectsAndAnimations();
+}
+
+void WebPage::resumeActiveDOMObjectsAndAnimations()
+{
+    m_page->resumeActiveDOMObjectsAndAnimations();
+
+    // We need to repaint on resume to kickstart animated painting again.
+    m_drawingArea->setNeedsDisplay(IntRect(IntPoint(0, 0), m_viewSize));
+}
+
 IntPoint WebPage::screenToWindow(const IntPoint& point)
 {
     IntPoint windowPoint;
@@ -1814,6 +1823,9 @@ void WebPage::forceRepaintWithoutCallback()
 
 void WebPage::forceRepaint(uint64_t callbackID)
 {
+    if (m_drawingArea->forceRepaintAsync(callbackID))
+        return;
+
     forceRepaintWithoutCallback();
     send(Messages::WebPageProxy::VoidCallback(callbackID));
 }
@@ -1893,6 +1905,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setMediaPlaybackRequiresUserGesture(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackRequiresUserGestureKey()));
     settings->setMediaPlaybackAllowsInline(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackAllowsInlineKey()));
     settings->setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
+    settings->setHyperlinkAuditingEnabled(store.getBoolValueForKey(WebPreferencesKey::hyperlinkAuditingEnabledKey()));
 
     // <rdar://problem/10697417>: It is necessary to force compositing when accelerate drawing
     // is enabled on Mac so that scrollbars are always in their own layers.
@@ -2243,10 +2256,12 @@ void WebPage::extendSandboxForFileFromOpenPanel(const SandboxExtension::Handle& 
 }
 #endif
 
+#if ENABLE(GEOLOCATION)
 void WebPage::didReceiveGeolocationPermissionDecision(uint64_t geolocationID, bool allowed)
 {
     m_geolocationPermissionRequestManager.didReceiveGeolocationPermissionDecision(geolocationID, allowed);
 }
+#endif
 
 void WebPage::didReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed)
 {

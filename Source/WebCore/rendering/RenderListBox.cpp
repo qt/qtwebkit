@@ -316,7 +316,7 @@ void RenderListBox::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOf
     }
 }
 
-void RenderListBox::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint& additionalOffset)
+void RenderListBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)
 {
     if (!isSpatialNavigationEnabled(frame()))
         return RenderBlock::addFocusRingRects(rects, additionalOffset);
@@ -326,7 +326,7 @@ void RenderListBox::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoi
     // Focus the last selected item.
     int selectedItem = select->activeSelectionEndListIndex();
     if (selectedItem >= 0) {
-        rects.append(itemBoundingBoxRect(additionalOffset, selectedItem));
+        rects.append(pixelSnappedIntRect(itemBoundingBoxRect(additionalOffset, selectedItem)));
         return;
     }
 
@@ -336,7 +336,7 @@ void RenderListBox::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoi
     for (int i = 0; i < size; ++i) {
         HTMLElement* element = listItems[i];
         if (element->hasTagName(optionTag) && !toHTMLOptionElement(element)->disabled()) {
-            rects.append(itemBoundingBoxRect(additionalOffset, i));
+            rects.append(pixelSnappedIntRect(itemBoundingBoxRect(additionalOffset, i)));
             return;
         }
     }
@@ -409,7 +409,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
 
     unsigned length = itemText.length();
     const UChar* string = itemText.characters();
-    TextRun textRun(string, length, false, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), itemStyle->unicodeBidi() == Override, TextRun::NoRounding);
+    TextRun textRun(string, length, false, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), isOverride(itemStyle->unicodeBidi()), TextRun::NoRounding);
     Font itemFont = style()->font();
     LayoutRect r = itemBoundingBoxRect(paintOffset, listIndex);
     r.move(itemOffsetForAlignment(textRun, itemStyle, itemFont, r));
@@ -643,15 +643,15 @@ int RenderListBox::verticalScrollbarWidth() const
 
 // FIXME: We ignore padding in the vertical direction as far as these values are concerned, since that's
 // how the control currently paints.
-LayoutUnit RenderListBox::scrollWidth() const
+int RenderListBox::scrollWidth() const
 {
     // There is no horizontal scrolling allowed.
-    return clientWidth();
+    return pixelSnappedClientWidth();
 }
 
 int RenderListBox::scrollHeight() const
 {
-    return max(pixelSnappedClientHeight(), listHeight());
+    return max(pixelSnappedClientHeight(), roundToInt(listHeight()));
 }
 
 int RenderListBox::scrollLeft() const

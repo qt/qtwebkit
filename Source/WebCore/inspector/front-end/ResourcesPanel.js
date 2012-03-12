@@ -1513,6 +1513,19 @@ WebInspector.IndexedDBTreeElement.prototype = {
             this._createIndexedDBModel();
     },
 
+    onattach: function()
+    {
+        WebInspector.StorageCategoryTreeElement.prototype.onattach.call(this);
+        this.listItemElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), true);
+    },
+
+    _handleContextMenuEvent: function(event)
+    {
+        var contextMenu = new WebInspector.ContextMenu();
+        contextMenu.appendItem(WebInspector.UIString("Refresh IndexedDB"), this.refreshIndexedDB.bind(this));
+        contextMenu.show(event);
+    },
+
     _createIndexedDBModel: function()
     {
         this._indexedDBModel = new WebInspector.IndexedDBModel();
@@ -1617,6 +1630,24 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
         return "indexedDB://" + this._databaseId.securityOrigin + "/" + this._databaseId.name;
     },
 
+    onattach: function()
+    {
+        WebInspector.BaseStorageTreeElement.prototype.onattach.call(this);
+        this.listItemElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), true);
+    },
+
+    _handleContextMenuEvent: function(event)
+    {
+        var contextMenu = new WebInspector.ContextMenu();
+        contextMenu.appendItem(WebInspector.UIString("Refresh IndexedDB"), this._refreshIndexedDB.bind(this));
+        contextMenu.show(event);
+    },
+
+    _refreshIndexedDB: function(event)
+    {
+        this._model.refreshDatabaseNames();
+    },
+
     /**
      * @param {WebInspector.IndexedDBModel.Database} database
      */
@@ -1640,7 +1671,7 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
                 delete this._idbObjectStoreTreeElements[objectStoreName];
             }
         }
-        
+
         if (this.children.length) {
             this.hasChildren = true;
             this.expand();
@@ -1648,6 +1679,13 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
 
         if (this._view)
             this._view.update(database);
+        
+        this._updateTooltip();
+    },
+
+    _updateTooltip: function()
+    {
+        this.tooltip = WebInspector.UIString("Version") + ": " + this._database.version;
     },
 
     onselect: function()
@@ -1656,7 +1694,7 @@ WebInspector.IDBDatabaseTreeElement.prototype = {
         if (!this._view)
             this._view = new WebInspector.IDBDatabaseView(this._database);
 
-        this._storagePanel.showIndexedDB(this._view);        
+        this._storagePanel.showIndexedDB(this._view);
     }
 }
 
@@ -1708,7 +1746,7 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
                 delete this._idbIndexTreeElements[indexName];
             }
         }
-        
+
         if (this.children.length) {
             this.hasChildren = true;
             this.expand();
@@ -1716,6 +1754,13 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
 
         if (this._view)
             this._view.update(this._objectStore);
+        
+        this._updateTooltip();
+    },
+
+    _updateTooltip: function()
+    {
+        this.tooltip = this._objectStore.keyPath ? (WebInspector.UIString("Key path") + ": " + this._objectStore.keyPath) : "";
     },
 
     onselect: function()
@@ -1724,7 +1769,7 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
         if (!this._view)
             this._view = new WebInspector.IDBDataView(this._model, this._databaseId, this._objectStore, null);
 
-        this._storagePanel.showIndexedDB(this._view);        
+        this._storagePanel.showIndexedDB(this._view);
     }
 }
 
@@ -1760,9 +1805,22 @@ WebInspector.IDBIndexTreeElement.prototype = {
     update: function(index)
     {
         this._index = index;
-        
+
         if (this._view)
             this._view.update(this._index);
+        
+        this._updateTooltip();
+    },
+
+    _updateTooltip: function()
+    {
+        var tooltipLines = [];
+        tooltipLines.push(WebInspector.UIString("Key path") + ": " + this._index.keyPath);
+        if (this._index.unique)
+            tooltipLines.push(WebInspector.UIString("unique"));
+        if (this._index.multiEntry)
+            tooltipLines.push(WebInspector.UIString("multiEntry"));
+        this.tooltip = tooltipLines.join("\n");
     },
 
     onselect: function()
@@ -1771,7 +1829,7 @@ WebInspector.IDBIndexTreeElement.prototype = {
         if (!this._view)
             this._view = new WebInspector.IDBDataView(this._model, this._databaseId, this._objectStore, this._index);
 
-        this._storagePanel.showIndexedDB(this._view);        
+        this._storagePanel.showIndexedDB(this._view);
     }
 }
 

@@ -455,11 +455,19 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
     unsigned sourceLen = source.length();
     if (exec->hadException())
         return JSValue::encode(JSValue());
-    RegExp* regExp = asRegExpObject(searchValue)->regExp();
+    RegExpObject* regExpObject = asRegExpObject(searchValue);
+    RegExp* regExp = regExpObject->regExp();
     bool global = regExp->global();
 
-    if (global && callType == CallTypeNone && !replacementString.length())
-        return removeUsingRegExpSearch(exec, string, source, regExp);
+    if (global) {
+        // ES5.1 15.5.4.10 step 8.a.
+        regExpObject->setLastIndex(exec, 0);
+        if (exec->hadException())
+            return JSValue::encode(JSValue());
+
+        if (callType == CallTypeNone && !replacementString.length())
+            return removeUsingRegExpSearch(exec, string, source, regExp);
+    }
 
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
 
@@ -808,9 +816,17 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
     JSValue a0 = exec->argument(0);
 
     RegExp* reg;
-    if (a0.inherits(&RegExpObject::s_info))
-        reg = asRegExpObject(a0)->regExp();
-    else {
+    bool global = false;
+    if (a0.inherits(&RegExpObject::s_info)) {
+        RegExpObject* regExpObject = asRegExpObject(a0);
+        reg = regExpObject->regExp();
+        if ((global = reg->global())) {
+            // ES5.1 15.5.4.10 step 8.a.
+            regExpObject->setLastIndex(exec, 0);
+            if (exec->hadException())
+                return JSValue::encode(JSValue());
+        }
+    } else {
         /*
          *  ECMA 15.5.4.12 String.prototype.search (regexp)
          *  If regexp is not an object whose [[Class]] property is "RegExp", it is
@@ -825,7 +841,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
     int pos;
     int matchLength = 0;
     regExpConstructor->performMatch(*globalData, reg, s, 0, pos, matchLength);
-    if (!(reg->global())) {
+    if (!global) {
         // case without 'g' flag is handled like RegExp.prototype.exec
         if (pos < 0)
             return JSValue::encode(jsNull());
@@ -948,7 +964,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
         if (separatorValue.isUndefined()) {
             // a. Call the [[DefineOwnProperty]] internal method of A with arguments "0",
             //    Property Descriptor {[[Value]]: S, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
-            result->methodTable()->putByIndex(result, exec, 0, jsStringWithReuse(exec, thisValue, input));
+            result->putDirectIndex(exec, 0, jsStringWithReuse(exec, thisValue, input), false);
             // b. Return A.
             return JSValue::encode(result);
         }
@@ -961,7 +977,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             //    Property Descriptor {[[Value]]: S, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
             // d. Return A.
             if (reg->match(*globalData, input, 0) < 0)
-                result->methodTable()->putByIndex(result, exec, 0, jsStringWithReuse(exec, thisValue, input));
+                result->putDirectIndex(exec, 0, jsStringWithReuse(exec, thisValue, input), false);
             return JSValue::encode(result);
         }
 
@@ -992,7 +1008,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             //    through q (exclusive).
             // 2. Call the [[DefineOwnProperty]] internal method of A with arguments ToString(lengthA),
             //    Property Descriptor {[[Value]]: T, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
-            result->methodTable()->putByIndex(result, exec, resultLength, jsSubstring(exec, input, position, matchPosition - position));
+            result->putDirectIndex(exec, resultLength, jsSubstring(exec, input, position, matchPosition - position), false);
             // 3. Increment lengthA by 1.
             // 4. If lengthA == lim, return A.
             if (++resultLength == limit)
@@ -1011,7 +1027,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
                 //   ToString(lengthA), Property Descriptor {[[Value]]: cap[i], [[Writable]]:
                 //   true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
                 int sub = ovector[i * 2];
-                result->methodTable()->putByIndex(result, exec, resultLength, sub < 0 ? jsUndefined() : jsSubstring(exec, input, sub, ovector[i * 2 + 1] - sub));
+                result->putDirectIndex(exec, resultLength, sub < 0 ? jsUndefined() : jsSubstring(exec, input, sub, ovector[i * 2 + 1] - sub), false);
                 // c Increment lengthA by 1.
                 // d If lengthA == lim, return A.
                 if (++resultLength == limit)
@@ -1030,7 +1046,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
         if (separatorValue.isUndefined()) {
             // a.  Call the [[DefineOwnProperty]] internal method of A with arguments "0",
             //     Property Descriptor {[[Value]]: S, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
-            result->methodTable()->putByIndex(result, exec, 0, jsStringWithReuse(exec, thisValue, input));
+            result->putDirectIndex(exec, 0, jsStringWithReuse(exec, thisValue, input), false);
             // b.  Return A.
             return JSValue::encode(result);
         }
@@ -1043,7 +1059,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             //    Property Descriptor {[[Value]]: S, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
             // d. Return A.
             if (!separator.isEmpty())
-                result->methodTable()->putByIndex(result, exec, 0, jsStringWithReuse(exec, thisValue, input));
+                result->putDirectIndex(exec, 0, jsStringWithReuse(exec, thisValue, input), false);
             return JSValue::encode(result);
         }
 
@@ -1054,7 +1070,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             ASSERT(limit);
 
             do {
-                result->methodTable()->putByIndex(result, exec, position, jsSingleCharacterSubstring(exec, input, position));
+                result->putDirectIndex(exec, position, jsSingleCharacterSubstring(exec, input, position), false);
             } while (++position < limit);
 
             return JSValue::encode(result);
@@ -1071,7 +1087,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
             //    through q (exclusive).
             // 2. Call the [[DefineOwnProperty]] internal method of A with arguments ToString(lengthA),
             //    Property Descriptor {[[Value]]: T, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
-            result->methodTable()->putByIndex(result, exec, resultLength, jsSubstring(exec, input, position, matchPosition - position));
+            result->putDirectIndex(exec, resultLength, jsSubstring(exec, input, position, matchPosition - position), false);
             // 3. Increment lengthA by 1.
             // 4. If lengthA == lim, return A.
             if (++resultLength == limit)
@@ -1087,7 +1103,7 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncSplit(ExecState* exec)
     //     through s (exclusive).
     // 15. Call the [[DefineOwnProperty]] internal method of A with arguments ToString(lengthA), Property Descriptor
     //     {[[Value]]: T, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true}, and false.
-    result->methodTable()->putByIndex(result, exec, resultLength++, jsSubstring(exec, input, position, input.length() - position));
+    result->putDirectIndex(exec, resultLength++, jsSubstring(exec, input, position, input.length() - position), false);
 
     // 16. Return A.
     return JSValue::encode(result);

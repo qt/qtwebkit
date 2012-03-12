@@ -196,7 +196,7 @@ void Arguments::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyN
     JSObject::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
-void Arguments::putByIndex(JSCell* cell, ExecState* exec, unsigned i, JSValue value)
+void Arguments::putByIndex(JSCell* cell, ExecState* exec, unsigned i, JSValue value, bool shouldThrow)
 {
     Arguments* thisObject = jsCast<Arguments*>(cell);
     if (i < static_cast<unsigned>(thisObject->d->numArguments) && (!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i])) {
@@ -204,7 +204,7 @@ void Arguments::putByIndex(JSCell* cell, ExecState* exec, unsigned i, JSValue va
         return;
     }
 
-    PutPropertySlot slot;
+    PutPropertySlot slot(shouldThrow);
     JSObject::put(thisObject, exec, Identifier(exec, UString::number(i)), value, slot);
 }
 
@@ -320,12 +320,15 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, const Ident
             if (descriptor.isAccessorDescriptor()) {
                 // i. Call the [[Delete]] internal method of map passing P, and false as the arguments.
                 thisObject->d->deletedArguments[i] = true;
-            } else if (descriptor.value()) { // b. Else i. If Desc.[[Value]] is present, then
+            } else { // b. Else
+                // i. If Desc.[[Value]] is present, then
                 // 1. Call the [[Put]] internal method of map passing P, Desc.[[Value]], and Throw as the arguments.
+                if (descriptor.value())
+                    thisObject->argument(i).set(exec->globalData(), thisObject, descriptor.value());
                 // ii. If Desc.[[Writable]] is present and its value is false, then
-                thisObject->argument(i).set(exec->globalData(), thisObject, descriptor.value());
+                // 1. Call the [[Delete]] internal method of map passing P and false as arguments.
                 if (descriptor.writablePresent() && !descriptor.writable())
-                    thisObject->d->deletedArguments[i] = true; // 1. Call the [[Delete]] internal method of map passing P and false as arguments.
+                    thisObject->d->deletedArguments[i] = true;
             }
         }
 

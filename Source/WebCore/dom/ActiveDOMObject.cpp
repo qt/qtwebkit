@@ -33,30 +33,6 @@
 
 namespace WebCore {
 
-ContextDestructionObserver::ContextDestructionObserver(ScriptExecutionContext* scriptExecutionContext)
-    : m_scriptExecutionContext(scriptExecutionContext)
-{
-    if (!m_scriptExecutionContext)
-        return;
-
-    ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->didCreateDestructionObserver(this);
-}
-
-ContextDestructionObserver::~ContextDestructionObserver()
-{
-    if (!m_scriptExecutionContext)
-        return;
-
-    ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->willDestroyDestructionObserver(this);
-}
-
-void ContextDestructionObserver::contextDestroyed()
-{
-    m_scriptExecutionContext = 0;
-}
-
 ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext, void* upcastPointer)
     : ContextDestructionObserver(scriptExecutionContext)
     , m_pendingActivityCount(0)

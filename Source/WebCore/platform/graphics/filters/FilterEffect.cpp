@@ -102,6 +102,11 @@ void FilterEffect::apply()
             return;
     }
     determineAbsolutePaintRect();
+
+    if (requiresValidPreMultipliedPixels()) {
+        for (unsigned i = 0; i < size; ++i)
+            inputEffect(i)->correctFilterResultIfNeeded();
+    }
     
     // Add platform specific apply functions here and return earlier.
 #if USE(SKIA)
@@ -109,6 +114,35 @@ void FilterEffect::apply()
         return;
 #endif
     platformApplySoftware();
+}
+
+void FilterEffect::forceValidPreMultipliedPixels()
+{
+    // Must operate on pre-multiplied results; other formats cannot have invalid pixels.
+    if (!m_premultipliedImageResult)
+        return;
+
+    ByteArray* imageArray = m_premultipliedImageResult.get();
+    unsigned char* pixelData = imageArray->data();
+    int pixelArrayLength = imageArray->length();
+
+    // We must have four bytes per pixel, and complete pixels
+    ASSERT(!(pixelArrayLength % 4));
+    int numPixels = pixelArrayLength / 4;
+
+    // Iterate over each pixel, checking alpha and adjusting color components if necessary
+    while (--numPixels >= 0) {
+        // Alpha is the 4th byte in a pixel
+        unsigned char a = *(pixelData + 3);
+        // Clamp each component to alpha, and increment the pixel location
+        for (int i = 0; i < 3; ++i) {
+            if (*pixelData > a)
+                *pixelData = a;
+            ++pixelData;
+        }
+        // Increment for alpha
+        ++pixelData;
+    }
 }
 
 void FilterEffect::clearResult()
@@ -127,7 +161,7 @@ ImageBuffer* FilterEffect::asImageBuffer()
         return 0;
     if (m_imageBufferResult)
         return m_imageBufferResult.get();
-    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), ColorSpaceLinearRGB, m_filter->renderingMode());
+    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), 1, ColorSpaceLinearRGB, m_filter->renderingMode());
     IntRect destinationRect(IntPoint(), m_absolutePaintRect.size());
     if (m_premultipliedImageResult)
         m_imageBufferResult->putByteArray(Premultiplied, m_premultipliedImageResult.get(), destinationRect.size(), destinationRect, IntPoint());
@@ -264,7 +298,7 @@ ImageBuffer* FilterEffect::createImageBufferResult()
     ASSERT(!hasResult());
     if (m_absolutePaintRect.isEmpty())
         return 0;
-    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), ColorSpaceLinearRGB, m_filter->renderingMode());
+    m_imageBufferResult = ImageBuffer::create(m_absolutePaintRect.size(), 1, ColorSpaceLinearRGB, m_filter->renderingMode());
     if (!m_imageBufferResult)
         return 0;
     ASSERT(m_imageBufferResult->context());

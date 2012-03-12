@@ -29,12 +29,13 @@ namespace WebCore {
 
 class HTMLParagraphElement : public HTMLElement {
 public:
+    static PassRefPtr<HTMLParagraphElement> create(Document*);
     static PassRefPtr<HTMLParagraphElement> create(const QualifiedName&, Document*);
 
 private:
     HTMLParagraphElement(const QualifiedName&, Document*);
 
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
 };
 

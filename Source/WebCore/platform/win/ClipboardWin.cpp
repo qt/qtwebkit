@@ -28,7 +28,6 @@
 
 #include "CachedImage.h"
 #include "ClipboardUtilitiesWin.h"
-#include "DOMStringList.h"
 #include "Document.h"
 #include "DragData.h"
 #include "Editor.h"
@@ -436,22 +435,21 @@ void ClipboardWin::clearAllData()
     m_dataObject = m_writableDataObject;
 }
 
-String ClipboardWin::getData(const String& type, bool& success) const
+String ClipboardWin::getData(const String& type) const
 {     
-    success = false;
     if (policy() != ClipboardReadable || (!m_dataObject && m_dragDataMap.isEmpty()))
         return "";
 
     ClipboardDataType dataType = clipboardTypeFromMIMEType(type);
     if (dataType == ClipboardDataTypeText)
-        return m_dataObject ? getPlainText(m_dataObject.get(), success) : getPlainText(&m_dragDataMap);
+        return m_dataObject ? getPlainText(m_dataObject.get()) : getPlainText(&m_dragDataMap);
     if (dataType == ClipboardDataTypeURL)
-        return m_dataObject ? getURL(m_dataObject.get(), DragData::DoNotConvertFilenames, success) : getURL(&m_dragDataMap, DragData::DoNotConvertFilenames);
+        return m_dataObject ? getURL(m_dataObject.get(), DragData::DoNotConvertFilenames) : getURL(&m_dragDataMap, DragData::DoNotConvertFilenames);
     else if (dataType == ClipboardDataTypeTextHTML) {
-        String data = m_dataObject ? getTextHTML(m_dataObject.get(), success) : getTextHTML(&m_dragDataMap);
-        if (success)
+        String data = m_dataObject ? getTextHTML(m_dataObject.get()) : getTextHTML(&m_dragDataMap);
+        if (!data.isEmpty())
             return data;
-        return m_dataObject ? getCFHTML(m_dataObject.get(), success) : getCFHTML(&m_dragDataMap);
+        return m_dataObject ? getCFHTML(m_dataObject.get()) : getCFHTML(&m_dragDataMap);
     }
     
     return "";
@@ -486,24 +484,24 @@ bool ClipboardWin::setData(const String& type, const String& data)
     return false;
 }
 
-static void addMimeTypesForFormat(DOMStringList* results, const FORMATETC& format)
+static void addMimeTypesForFormat(HashSet<String>& results, const FORMATETC& format)
 {
     // URL and Text are provided for compatibility with IE's model
     if (format.cfFormat == urlFormat()->cfFormat || format.cfFormat == urlWFormat()->cfFormat) {
-        results->append("URL");
-        results->append("text/uri-list");
+        results.add("URL");
+        results.add("text/uri-list");
     }
 
     if (format.cfFormat == plainTextWFormat()->cfFormat || format.cfFormat == plainTextFormat()->cfFormat) {
-        results->append("Text");
-        results->append("text/plain");
+        results.add("Text");
+        results.add("text/plain");
     }
 }
 
 // extensions beyond IE's API
-PassRefPtr<DOMStringList> ClipboardWin::types() const
+HashSet<String> ClipboardWin::types() const
 { 
-    RefPtr<DOMStringList> results = DOMStringList::create();
+    HashSet<String> results; 
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
         return results;
 
@@ -523,16 +521,16 @@ PassRefPtr<DOMStringList> ClipboardWin::types() const
 
         // IEnumFORMATETC::Next returns S_FALSE if there are no more items.
         while (itr->Next(1, &data, 0) == S_OK)
-            addMimeTypesForFormat(results.get(), data);
+            addMimeTypesForFormat(results, data);
     } else {
         for (DragDataMap::const_iterator it = m_dragDataMap.begin(); it != m_dragDataMap.end(); ++it) {
             FORMATETC data;
             data.cfFormat = (*it).first;
-            addMimeTypesForFormat(results.get(), data);
+            addMimeTypesForFormat(results, data);
         }
     }
 
-    return results.release();
+    return results;
 }
 
 PassRefPtr<FileList> ClipboardWin::files() const

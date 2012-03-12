@@ -256,9 +256,9 @@ void LayoutTestController::setUserStyleSheetLocation(JSStringRef path)
         setUserStyleSheetEnabled(true);
 }
 
-void LayoutTestController::setValueForUser(JSContextRef, JSValueRef, JSStringRef)
+void LayoutTestController::setValueForUser(JSContextRef context, JSValueRef nodeObject, JSStringRef value)
 {
-    notImplemented();
+    DumpRenderTreeSupportEfl::setValueForUser(context, nodeObject, value);
 }
 
 void LayoutTestController::setViewModeMediaFeature(JSStringRef)
@@ -337,9 +337,9 @@ void LayoutTestController::setAuthorAndUserStylesEnabled(bool)
     notImplemented();
 }
 
-void LayoutTestController::setAutofilled(JSContextRef, JSValueRef, bool)
+void LayoutTestController::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool autofilled)
 {
-    notImplemented();
+    DumpRenderTreeSupportEfl::setAutofilled(context, nodeObject, autofilled);
 }
 
 void LayoutTestController::disableImageLoading()
@@ -436,9 +436,9 @@ void LayoutTestController::setSelectTrailingWhitespaceEnabled(bool)
     notImplemented();
 }
 
-void LayoutTestController::setPopupBlockingEnabled(bool)
+void LayoutTestController::setPopupBlockingEnabled(bool flag)
 {
-    notImplemented();
+    ewk_view_setting_scripts_can_open_windows_set(browser->mainView(), !flag);
 }
 
 void LayoutTestController::setPluginsEnabled(bool flag)

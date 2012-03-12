@@ -167,12 +167,10 @@ bool Attr::childTypeAllowed(NodeType type) const
     }
 }
 
-void Attr::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void Attr::childrenChanged(bool, Node*, Node*, int)
 {
     if (m_ignoreChildrenChanged > 0)
         return;
-
-    Node::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 
     invalidateNodeListsCacheAfterAttributeChanged(m_attribute->name());
 

@@ -48,7 +48,6 @@ class CSSImageValue;
 class CSSRuleList;
 class CSSSelector;
 class CSSStyleApplyProperty;
-class CSSStyleRule;
 class CSSStyleSheet;
 class CSSValue;
 class ContainerNode;
@@ -70,6 +69,7 @@ class Settings;
 class StyleImage;
 class StylePendingImage;
 class StylePropertySet;
+class StyleRule;
 class StyleShader;
 class StyleSheet;
 class StyleSheetList;
@@ -107,8 +107,10 @@ public:
     ~CSSStyleSelector();
 
     // Using these during tree walk will allow style selector to optimize child and descendant selector lookups.
-    void pushParent(Element* parent);
-    void popParent(Element* parent);
+    void pushParentElement(Element*);
+    void popParentElement(Element*);
+    void pushParentShadowRoot(const ShadowRoot*);
+    void popParentShadowRoot(const ShadowRoot*);
 
     PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false, RenderRegion* regionForStyling = 0);
 
@@ -149,6 +151,14 @@ private:
     bool canShareStyleWithElement(StyledElement*) const;
 
     PassRefPtr<RenderStyle> styleForKeyframe(const RenderStyle*, const WebKitCSSKeyframeRule*, KeyframeValue&);
+
+#if ENABLE(STYLE_SCOPED)
+    void pushScope(const ContainerNode* scope, const ContainerNode* scopeParent);
+    void popScope(const ContainerNode* scope);
+#else
+    void pushScope(const ContainerNode*, const ContainerNode*) { }
+    void popScope(const ContainerNode*) { }
+#endif
 
 public:
     // These methods will give back the set of rules that matched for a given element (or a pseudo-element).
@@ -228,8 +238,8 @@ public:
 #endif // ENABLE(CSS_FILTERS)
 
     struct RuleSelectorPair {
-        RuleSelectorPair(CSSStyleRule* rule, CSSSelector* selector) : rule(rule), selector(selector) { }
-        CSSStyleRule* rule;
+        RuleSelectorPair(StyleRule* rule, CSSSelector* selector) : rule(rule), selector(selector) { }
+        StyleRule* rule;
         CSSSelector* selector;
     };
     struct Features {
@@ -271,7 +281,10 @@ private:
         
         RefPtr<StylePropertySet> properties;
         union {
-            unsigned linkMatchType;
+            struct {
+                unsigned linkMatchType : 2;
+                unsigned isInRegionRule : 1;
+            };
             // Used to make sure all memory is zero-initialized since we compute the hash over the bytes of this object.
             void* possiblyPaddedMember;
         };
@@ -280,18 +293,19 @@ private:
     struct MatchResult {
         MatchResult() : isCacheable(true) { }
         Vector<MatchedProperties, 64> matchedProperties;
-        Vector<CSSStyleRule*, 64> matchedRules;
+        Vector<StyleRule*, 64> matchedRules;
         MatchRanges ranges;
         bool isCacheable;
     };
 
     struct MatchOptions {
-        MatchOptions(bool includeEmptyRules, const Element* scope = 0) : scope(scope), includeEmptyRules(includeEmptyRules) { }
-        const Element* scope;
+        MatchOptions(bool includeEmptyRules, const ContainerNode* scope = 0) : scope(scope), includeEmptyRules(includeEmptyRules) { }
+        const ContainerNode* scope;
         bool includeEmptyRules;
     };
 
-    static void addMatchedProperties(MatchResult& matchResult, StylePropertySet* properties, CSSStyleRule* rule = 0, unsigned linkMatchType =  SelectorChecker::MatchAll);
+    static void addMatchedProperties(MatchResult&, StylePropertySet* properties, StyleRule* = 0, unsigned linkMatchType = SelectorChecker::MatchAll, bool inRegionRule = false);
+    void addElementStyleProperties(MatchResult&, StylePropertySet*, bool isCacheable = true);
 
     void matchAllRules(MatchResult&);
     void matchUARules(MatchResult&);
@@ -306,13 +320,13 @@ private:
     void sortMatchedRules();
     void sortAndTransferMatchedRules(MatchResult&);
 
-    bool checkSelector(const RuleData&, const Element* scope = 0);
+    bool checkSelector(const RuleData&, const ContainerNode* scope = 0);
     bool checkRegionSelector(CSSSelector* regionSelector, Element* regionElement);
     void applyMatchedProperties(const MatchResult&);
     template <bool firstPass>
     void applyMatchedProperties(const MatchResult&, bool important, int startIndex, int endIndex, bool inheritedOnly);
     template <bool firstPass>
-    void applyProperties(const StylePropertySet* properties, CSSStyleRule*, bool isImportant, bool inheritedOnly);
+    void applyProperties(const StylePropertySet* properties, StyleRule*, bool isImportant, bool inheritedOnly, bool filterRegionProperties);
 
     static bool isValidRegionStyleProperty(int id);
 
@@ -347,6 +361,9 @@ public:
 
     bool applyPropertyToRegularStyle() const { return m_applyPropertyToRegularStyle; }
     bool applyPropertyToVisitedLinkStyle() const { return m_applyPropertyToVisitedLinkStyle; }
+
+    static Length convertToIntLength(CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, double multiplier = 1);
+    static Length convertToFloatLength(CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, double multiplier = 1);
 
 private:
     static RenderStyle* s_styleNotYetAvailable;
@@ -449,29 +466,29 @@ private:
 #endif
 
 #if ENABLE(STYLE_SCOPED)
-    static const Element* determineScopingElement(const CSSStyleSheet*);
+    static const ContainerNode* determineScope(const CSSStyleSheet*);
 
-    typedef HashMap<const Element*, OwnPtr<RuleSet> > ScopedRuleSetMap;
+    typedef HashMap<const ContainerNode*, OwnPtr<RuleSet> > ScopedRuleSetMap;
 
-    RuleSet* scopedRuleSetForElement(const Element*) const;
+    RuleSet* ruleSetForScope(const ContainerNode*) const;
 
-    void setupScopingElementStack(const Element*);
-    bool scopingElementStackIsConsistent(const Element* parent) const { return parent && parent == m_scopingElementStackParent; }
+    void setupScopeStack(const ContainerNode*);
+    bool scopeStackIsConsistent(const ContainerNode* parent) const { return parent && parent == m_scopeStackParent; }
 
     ScopedRuleSetMap m_scopedAuthorStyles;
     
     struct ScopeStackFrame {
-        ScopeStackFrame() : m_element(0), m_ruleSet(0) { }
-        ScopeStackFrame(const Element* element, RuleSet* ruleSet) : m_element(element), m_ruleSet(ruleSet) { }
-        const Element* m_element;
+        ScopeStackFrame() : m_scope(0), m_ruleSet(0) { }
+        ScopeStackFrame(const ContainerNode* scope, RuleSet* ruleSet) : m_scope(scope), m_ruleSet(ruleSet) { }
+        const ContainerNode* m_scope;
         RuleSet* m_ruleSet;
     };
     // Vector (used as stack) that keeps track of scoping elements (i.e., elements with a <style scoped> child)
     // encountered during tree iteration for style resolution.
-    Vector<ScopeStackFrame> m_scopingElementStack;
+    Vector<ScopeStackFrame> m_scopeStack;
     // Element last seen as parent element when updating m_scopingElementStack.
     // This is used to decide whether m_scopingElementStack is consistent, separately from SelectorChecker::m_parentStack.
-    const Element* m_scopingElementStackParent;
+    const ContainerNode* m_scopeStackParent;
 #endif
 
     friend class CSSStyleApplyProperty;

@@ -32,6 +32,8 @@
 #include <WebCore/FullScreenController.h>
 #include <WebCore/IntRect.h>
 
+using namespace WebCore;
+
 namespace WebKit {
 
 void WebFullScreenManagerProxy::invalidate()
@@ -57,53 +59,14 @@ void WebFullScreenManagerProxy::exitFullScreen()
     m_webView->fullScreenController()->exitFullScreen();
 }
 
-void WebFullScreenManagerProxy::beganEnterFullScreenAnimation()
+void WebFullScreenManagerProxy::beganEnterFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
 {
-    if (!m_webView)
-        return;
-    // FIXME: Implement
+    // No-op.
 }
 
-void WebFullScreenManagerProxy::finishedEnterFullScreenAnimation(bool completed)
+void WebFullScreenManagerProxy::beganExitFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
 {
-    if (!m_webView)
-        return;
-    // FIXME: Implement
-}
-
-void WebFullScreenManagerProxy::beganExitFullScreenAnimation()
-{
-    if (!m_webView)
-        return;
-    // FIXME: Implement
-}
-
-void WebFullScreenManagerProxy::finishedExitFullScreenAnimation(bool completed)
-{
-    if (!m_webView)
-        return;
-    // FIXME: Implement
-}
-    
-void WebFullScreenManagerProxy::enterAcceleratedCompositingMode(const LayerTreeContext& context)
-{
-    if (!m_webView)
-        return;
-    // FIXME: Implement
-}
-
-void WebFullScreenManagerProxy::exitAcceleratedCompositingMode()
-{
-    if (!m_webView)
-        return;
-    // FIXME: Implement
-}
-
-void WebFullScreenManagerProxy::getFullScreenRect(WebCore::IntRect& rect)
-{
-    if (!m_webView)
-        return;
-    // FIXME: Implement
+    // No-op.
 }
 
 } // namespace WebKit

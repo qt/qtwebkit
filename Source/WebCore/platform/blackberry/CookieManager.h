@@ -103,6 +103,7 @@ public:
     CookieStorageAcceptPolicy cookiePolicy() const { return m_policy; }
     void setPrivateMode(const bool);
 
+    String generateHtmlFragmentForCookies();
     String getCookie(const KURL& requestURL, CookieFilter) const;
 
     // Returns all cookies that are associated with the specified URL as raw cookies.
@@ -120,8 +121,7 @@ private:
 
     bool shouldRejectForSecurityReason(const ParsedCookie*, const KURL&);
 
-    void addCookieToMap(CookieMap*, ParsedCookie*, BackingStoreRemovalPolicy);
-    void update(CookieMap*, ParsedCookie*, BackingStoreRemovalPolicy);
+    void addCookieToMap(CookieMap* targetMap, ParsedCookie* candidateCookie, BackingStoreRemovalPolicy postToBackingStore);
 
     CookieMap* findOrCreateCookieMap(CookieMap* protocolMap, const String& domain, bool findOnly);
 

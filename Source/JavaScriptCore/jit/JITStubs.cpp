@@ -43,7 +43,7 @@
 #include "ExceptionHelpers.h"
 #include "GetterSetter.h"
 #include "Heap.h"
-#include "InlineASM.h"
+#include <wtf/InlineASM.h>
 #include "JIT.h"
 #include "JITExceptions.h"
 #include "JSActivation.h"
@@ -1929,11 +1929,15 @@ DEFINE_STUB_FUNCTION(void, optimize_from_loop)
     
     CallFrame* callFrame = stackFrame.callFrame;
     CodeBlock* codeBlock = callFrame->codeBlock();
-    unsigned bytecodeIndex = stackFrame.args[0].int32();
 
+    unsigned bytecodeIndex = stackFrame.args[0].int32();
+    
 #if ENABLE(JIT_VERBOSE_OSR)
     dataLog("%p: Entered optimize_from_loop with executeCounter = %d, reoptimizationRetryCounter = %u, optimizationDelayCounter = %u\n", codeBlock, codeBlock->jitExecuteCounter(), codeBlock->reoptimizationRetryCounter(), codeBlock->optimizationDelayCounter());
 #endif
+
+    if (!codeBlock->checkIfOptimizationThresholdReached())
+        return;
 
     if (codeBlock->hasOptimizedReplacement()) {
 #if ENABLE(JIT_VERBOSE_OSR)
@@ -2032,6 +2036,9 @@ DEFINE_STUB_FUNCTION(void, optimize_from_ret)
 #if ENABLE(JIT_VERBOSE_OSR)
     dataLog("Entered optimize_from_ret with executeCounter = %d, reoptimizationRetryCounter = %u, optimizationDelayCounter = %u\n", codeBlock->jitExecuteCounter(), codeBlock->reoptimizationRetryCounter(), codeBlock->optimizationDelayCounter());
 #endif
+
+    if (!codeBlock->checkIfOptimizationThresholdReached())
+        return;
 
     if (codeBlock->hasOptimizedReplacement()) {
 #if ENABLE(JIT_VERBOSE_OSR)
@@ -2546,7 +2553,7 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val)
             if (jsArray->canSetIndex(i))
                 jsArray->setIndex(*globalData, i, value);
             else
-                JSArray::putByIndex(jsArray, callFrame, i, value);
+                JSArray::putByIndex(jsArray, callFrame, i, value, callFrame->codeBlock()->isStrictMode());
         } else if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i)) {
             JSByteArray* jsByteArray = asByteArray(baseValue);
             ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_put_by_val_byte_array));
@@ -2561,9 +2568,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val)
                 }
             }
 
-            baseValue.put(callFrame, i, value);
+            baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
         } else
-            baseValue.put(callFrame, i, value);
+            baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
     } else {
         Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
         if (!stackFrame.globalData->exception) { // Don't put to an object if toString threw an exception.
@@ -2604,7 +2611,7 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val_byte_array)
 
         if (!isJSByteArray(baseValue))
             ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_put_by_val));
-        baseValue.put(callFrame, i, value);
+        baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
     } else {
         Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
         if (!stackFrame.globalData->exception) { // Don't put to an object if toString threw an exception.
@@ -3036,19 +3043,6 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_rshift)
     return JSValue::encode(result);
 }
 
-DEFINE_STUB_FUNCTION(EncodedJSValue, op_bitnot)
-{
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    JSValue src = stackFrame.args[0].jsValue();
-
-    ASSERT(!src.isInt32());
-    CallFrame* callFrame = stackFrame.callFrame;
-    JSValue result = jsNumber(~src.toInt32(callFrame));
-    CHECK_FOR_EXCEPTION_AT_END();
-    return JSValue::encode(result);
-}
-
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_with_base)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
@@ -3307,7 +3301,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_stricteq)
 
     JSValue src1 = stackFrame.args[0].jsValue();
     JSValue src2 = stackFrame.args[1].jsValue();
-
+    
     bool result = JSValue::strictEqual(stackFrame.callFrame, src1, src2);
     CHECK_FOR_EXCEPTION_AT_END();
     return JSValue::encode(jsBoolean(result));
@@ -3408,7 +3402,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_index)
     CallFrame* callFrame = stackFrame.callFrame;
     unsigned property = stackFrame.args[1].int32();
 
-    stackFrame.args[0].jsValue().put(callFrame, property, stackFrame.args[2].jsValue());
+    JSValue arrayValue = stackFrame.args[0].jsValue();
+    ASSERT(isJSArray(arrayValue));
+    asArray(arrayValue)->putDirectIndex(callFrame, property, stackFrame.args[2].jsValue(), false);
 }
 
 DEFINE_STUB_FUNCTION(void*, op_switch_imm)

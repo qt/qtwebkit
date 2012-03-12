@@ -32,6 +32,7 @@ import sys
 import time
 
 from webkitpy.layout_tests.port import Port, Driver, DriverOutput
+from webkitpy.layout_tests.port.base import VirtualTestSuite
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 
@@ -159,6 +160,7 @@ layer at (0,0) size 800x34
     tests.add('http/tests/passes/text.html')
     tests.add('http/tests/passes/image.html')
     tests.add('http/tests/ssl/text.html')
+    tests.add('passes/args.html')
     tests.add('passes/error.html', error='stuff going to stderr')
     tests.add('passes/image.html')
     tests.add('passes/audio.html',
@@ -304,6 +306,7 @@ WONTFIX SKIP : failures/expected/exception.html = CRASH
         add_file(test, '-expected.txt', test.expected_text)
         add_file(test, '-expected.png', test.expected_image)
 
+    filesystem.write_text_file(filesystem.join(LAYOUT_TEST_DIR, 'virtual', 'passes', 'args-expected.txt'), 'args-txt --virtual-arg')
     # Clear the list of written files so that we can watch what happens during testing.
     filesystem.clear_written_files()
 
@@ -352,7 +355,7 @@ class TestPort(Port):
     def _path_to_driver(self):
         # This routine shouldn't normally be called, but it is called by
         # the mock_drt Driver. We return something, but make sure it's useless.
-        return 'junk'
+        return 'MOCK _path_to_driver'
 
     def baseline_search_path(self):
         search_paths = {
@@ -489,16 +492,22 @@ class TestPort(Port):
     def all_baseline_variants(self):
         return self.ALL_BASELINE_VARIANTS
 
+    def virtual_test_suites(self):
+        return [
+            VirtualTestSuite('virtual/passes', 'passes', ['--virtual-arg']),
+        ]
 
 class TestDriver(Driver):
     """Test/Dummy implementation of the DumpRenderTree interface."""
 
-    def cmd_line(self):
-        return [self._port._path_to_driver()] + self._port.get_option('additional_drt_flag', [])
+    def cmd_line(self, pixel_tests, per_test_args):
+        pixel_tests_flag = '-p' if pixel_tests else ''
+        return [self._port._path_to_driver()] + [pixel_tests_flag] + self._port.get_option('additional_drt_flag', []) + per_test_args
 
     def run_test(self, test_input):
         start_time = time.time()
         test_name = test_input.test_name
+        test_args = test_input.args or []
         test = self._port._tests[test_name]
         if test.keyboard:
             raise KeyboardInterrupt
@@ -508,6 +517,10 @@ class TestDriver(Driver):
             time.sleep((float(test_input.timeout) * 4) / 1000.0)
 
         audio = None
+        actual_text = test.actual_text
+        if actual_text and test_args and test_name == 'passes/args.html':
+            actual_text = actual_text + ' ' + ' '.join(test_args)
+
         if test.actual_audio:
             audio = base64.b64decode(test.actual_audio)
         crashed_process_name = None
@@ -515,12 +528,12 @@ class TestDriver(Driver):
             crashed_process_name = self._port.driver_name()
         elif test.web_process_crash:
             crashed_process_name = 'WebProcess'
-        return DriverOutput(test.actual_text, test.actual_image,
+        return DriverOutput(actual_text, test.actual_image,
             test.actual_checksum, audio, crash=test.crash or test.web_process_crash,
             crashed_process_name=crashed_process_name,
             test_time=time.time() - start_time, timeout=test.timeout, error=test.error)
 
-    def start(self):
+    def start(self, pixel_tests, per_test_args):
         pass
 
     def stop(self):

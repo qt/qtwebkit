@@ -38,7 +38,7 @@
 #include "RenderSVGResource.h"
 #include "RenderView.h"
 #include "SVGLength.h"
-#include "SVGRenderSupport.h"
+#include "SVGRenderingContext.h"
 #include "SVGResources.h"
 #include "SVGResourcesCache.h"
 #include "SVGSVGElement.h"
@@ -188,8 +188,20 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalHeight() const
     if (hasReplacedLogicalHeight())
         return RenderReplaced::computeReplacedLogicalHeight();
 
-    if (svg->heightAttributeEstablishesViewport())
-        return resolveLengthAttributeForSVG(svg->intrinsicHeight(SVGSVGElement::IgnoreCSSProperties), style()->effectiveZoom(), containingBlock()->availableLogicalHeight());
+    if (svg->heightAttributeEstablishesViewport()) {
+        Length height = svg->intrinsicHeight(SVGSVGElement::IgnoreCSSProperties);
+        if (height.isPercent()) {
+            RenderBlock* cb = containingBlock();
+            ASSERT(cb);
+            while (cb->isAnonymous()) {
+                cb = cb->containingBlock();
+                cb->addPercentHeightDescendant(const_cast<RenderSVGRoot*>(this));
+            }
+        } else
+            RenderBlock::removePercentHeightDescendant(const_cast<RenderSVGRoot*>(this));
+
+        return resolveLengthAttributeForSVG(height, style()->effectiveZoom(), containingBlock()->availableLogicalHeight());
+    }
 
     // Only SVGs embedded in <object> reach this point.
     ASSERT(isEmbeddedThroughFrameContainingSVGDocument());
@@ -206,7 +218,7 @@ void RenderSVGRoot::layout()
     bool needsLayout = selfNeedsLayout();
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout() && needsLayout);
 
-    LayoutSize oldSize(width(), height());
+    LayoutSize oldSize = size();
     computeLogicalWidth();
     computeLogicalHeight();
     buildLocalToBorderBoxTransform();
@@ -237,17 +249,22 @@ void RenderSVGRoot::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& adjus
     if (paintInfo.context->paintingDisabled())
         return;
 
+    Page* page = 0;
+    if (Frame* frame = this->frame())
+        page = frame->page();
+
     // Don't paint if we don't have kids, except if we have filters we should paint those.
     if (!firstChild()) {
         SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(this);
-        if (!resources || !resources->filter())
+        if (!resources || !resources->filter()) {
+            if (page && paintInfo.phase == PaintPhaseForeground)
+                page->addRelevantUnpaintedObject(this, visualOverflowRect());
             return;
+        }
     }
 
-    if (Frame* frame = this->frame()) {
-        if (Page* page = frame->page())
-            page->addRelevantRepaintedObject(this, paintInfo.rect);
-    }
+    if (page && paintInfo.phase == PaintPhaseForeground)
+        page->addRelevantRepaintedObject(this, visualOverflowRect());
 
     // Make a copy of the PaintInfo because applyTransform will modify the damage rect.
     PaintInfo childPaintInfo(paintInfo);
@@ -260,21 +277,23 @@ void RenderSVGRoot::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& adjus
     // Transform from our paint container's coordinate system to our local coords.
     childPaintInfo.applyTransform(AffineTransform::translation(adjustedPaintOffset.x() - x(), adjustedPaintOffset.y() - y()) * localToParentTransform());
 
+    SVGRenderingContext renderingContext;
     bool continueRendering = true;
-    if (childPaintInfo.phase == PaintPhaseForeground)
-        continueRendering = SVGRenderSupport::prepareToRenderSVGContent(this, childPaintInfo);
+    if (childPaintInfo.phase == PaintPhaseForeground) {
+        renderingContext.prepareToRenderSVGContent(this, childPaintInfo);
+        continueRendering = renderingContext.isRenderingPrepared();
+    }
 
     if (continueRendering)
         RenderBox::paint(childPaintInfo, LayoutPoint());
-
-    if (childPaintInfo.phase == PaintPhaseForeground)
-        SVGRenderSupport::finishRenderSVGContent(this, childPaintInfo, paintInfo.context);
 
     childPaintInfo.context->restore();
 }
 
 void RenderSVGRoot::willBeDestroyed()
 {
+    RenderBlock::removePercentHeightDescendant(const_cast<RenderSVGRoot*>(this));
+
     SVGResourcesCache::clientDestroyed(this);
     RenderReplaced::willBeDestroyed();
 }
@@ -317,9 +336,9 @@ const AffineTransform& RenderSVGRoot::localToParentTransform() const
     // Slightly optimized version of m_localToParentTransform = AffineTransform::translation(x(), y()) * m_localToBorderBoxTransform;
     m_localToParentTransform = m_localToBorderBoxTransform;
     if (x())
-        m_localToParentTransform.setE(m_localToParentTransform.e() + x());
+        m_localToParentTransform.setE(m_localToParentTransform.e() + roundToInt(x()));
     if (y())
-        m_localToParentTransform.setF(m_localToParentTransform.f() + y());
+        m_localToParentTransform.setF(m_localToParentTransform.f() + roundToInt(y()));
     return m_localToParentTransform;
 }
 
@@ -376,7 +395,7 @@ bool RenderSVGRoot::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     if (!contentBoxRect().contains(pointInBorderBox))
         return false;
 
-    LayoutPoint localPoint = localToParentTransform().inverse().mapPoint(pointInParent);
+    FloatPoint localPoint = localToParentTransform().inverse().mapPoint(FloatPoint(pointInParent));
 
     for (RenderObject* child = lastChild(); child; child = child->previousSibling()) {
         if (child->nodeAtFloatPoint(request, result, localPoint, hitTestAction)) {
@@ -399,6 +418,14 @@ bool RenderSVGRoot::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     }
 
     return false;
+}
+
+bool RenderSVGRoot::hasRelativeDimensions() const
+{
+    SVGSVGElement* svg = static_cast<SVGSVGElement*>(node());
+    ASSERT(svg);
+
+    return svg->intrinsicHeight(SVGSVGElement::IgnoreCSSProperties).isPercent() || svg->intrinsicWidth(SVGSVGElement::IgnoreCSSProperties).isPercent();
 }
 
 }

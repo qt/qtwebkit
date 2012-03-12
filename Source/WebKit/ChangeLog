@@ -1,3 +1,65 @@
+2012-03-11  Timothy Hatcher  <timothy@apple.com>
+
+        Update how the Web Inspector resources are loaded.
+
+        https://bugs.webkit.org/show_bug.cgi?id=80798
+        rdar://problem/10359959
+
+        Reviewed by Brian Weinstein.
+
+        * WebKit.xcodeproj/project.pbxproj: Add a framework.
+
+2012-03-06  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Make the removal of transitive library dependencies work with CMake < 2.8.7.
+        https://bugs.webkit.org/show_bug.cgi?id=80469
+
+        Reviewed by Antonio Gomes.
+
+        * CMakeLists.txt: Manually set the LINK_INTERFACE_LIBRARIES target
+        property on the library being created.
+
+2012-03-06  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [EFL] Unreviewed; fix the build after r109877.
+
+        * CMakeLists.txt: Add WebCore/Modules/webdatabase to the list of
+        include directories so that #include'ing DatabaseDetails.h and
+        friends still works.
+
+2012-03-04  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] upstream CredentialManager and CredentialTransformData implementation
+        https://bugs.webkit.org/show_bug.cgi?id=80107
+
+        Reviewed by Antonio Gomes.
+
+        Initial upstream of CredentialManager.[h|cpp] and
+        CredentialTransformData.[h|cpp].
+        No new test.
+
+        * PlatformBlackBerry.cmake:
+
+2012-03-04  Raphael Kubo da Costa  <kubo@profusion.mobi>
+
+        [CMake] Libraries are installed to /usr/lib and not /usr/lib64 on x86_64
+        https://bugs.webkit.org/show_bug.cgi?id=71507
+
+        Reviewed by Antonio Gomes.
+
+        * CMakeLists.txt: Use ${LIB_INSTALL_DIR} instead of hardcoding "lib".
+
+2012-02-24  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL][DRT] Implement setValueForUser and setAutofilled.
+        https://bugs.webkit.org/show_bug.cgi?id=79237
+
+        Reviewed by Andreas Kling.
+
+        Adds the main directory of WebKit's source to find headers of JavaScriptCore.
+
+        * PlatformEfl.cmake:
+
 2012-02-23  Patrick Gansterer  <paroga@webkit.org>
 
         [CMake] Add WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS macro

@@ -34,7 +34,7 @@
 #include "JITDriver.h"
 #include "Parser.h"
 #include "UStringBuilder.h"
-#include "Vector.h"
+#include <wtf/Vector.h>
 
 namespace JSC {
 
@@ -177,10 +177,9 @@ JSObject* EvalExecutable::compileOptimized(ExecState* exec, ScopeChainNode* scop
 }
 
 #if ENABLE(JIT)
-void EvalExecutable::jitCompile(JSGlobalData& globalData)
+bool EvalExecutable::jitCompile(JSGlobalData& globalData)
 {
-    bool result = jitCompileIfAppropriate(globalData, m_evalCodeBlock, m_jitCodeForCall, JITCode::bottomTierJIT());
-    ASSERT_UNUSED(result, result);
+    return jitCompileIfAppropriate(globalData, m_evalCodeBlock, m_jitCodeForCall, JITCode::bottomTierJIT(), JITCompilationCanFail);
 }
 #endif
 
@@ -210,8 +209,7 @@ JSObject* EvalExecutable::compileInternal(ExecState* exec, ScopeChainNode* scope
     JSGlobalData* globalData = &exec->globalData();
     JSGlobalObject* lexicalGlobalObject = exec->lexicalGlobalObject();
     
-    if (!!m_evalCodeBlock && m_evalCodeBlock->canProduceCopyWithBytecode()) {
-        BytecodeDestructionBlocker blocker(m_evalCodeBlock.get());
+    if (!!m_evalCodeBlock) {
         OwnPtr<EvalCodeBlock> newCodeBlock = adoptPtr(new EvalCodeBlock(CodeBlock::CopyParsedBlock, *m_evalCodeBlock));
         newCodeBlock->setAlternative(static_pointer_cast<CodeBlock>(m_evalCodeBlock.release()));
         m_evalCodeBlock = newCodeBlock.release();
@@ -223,7 +221,7 @@ JSObject* EvalExecutable::compileInternal(ExecState* exec, ScopeChainNode* scope
             ASSERT(exception);
             return exception;
         }
-        recordParse(evalNode->features(), evalNode->hasCapturedVariables(), evalNode->lineNo(), evalNode->lastLine());
+        recordParse(evalNode->scopeFlags(), evalNode->hasCapturedVariables(), evalNode->lineNo(), evalNode->lastLine());
         
         JSGlobalObject* globalObject = scopeChainNode->globalObject.get();
         
@@ -328,10 +326,9 @@ JSObject* ProgramExecutable::compileOptimized(ExecState* exec, ScopeChainNode* s
 }
 
 #if ENABLE(JIT)
-void ProgramExecutable::jitCompile(JSGlobalData& globalData)
+bool ProgramExecutable::jitCompile(JSGlobalData& globalData)
 {
-    bool result = jitCompileIfAppropriate(globalData, m_programCodeBlock, m_jitCodeForCall, JITCode::bottomTierJIT());
-    ASSERT_UNUSED(result, result);
+    return jitCompileIfAppropriate(globalData, m_programCodeBlock, m_jitCodeForCall, JITCode::bottomTierJIT(), JITCompilationCanFail);
 }
 #endif
 
@@ -346,8 +343,7 @@ JSObject* ProgramExecutable::compileInternal(ExecState* exec, ScopeChainNode* sc
     JSGlobalData* globalData = &exec->globalData();
     JSGlobalObject* lexicalGlobalObject = exec->lexicalGlobalObject();
     
-    if (!!m_programCodeBlock && m_programCodeBlock->canProduceCopyWithBytecode()) {
-        BytecodeDestructionBlocker blocker(m_programCodeBlock.get());
+    if (!!m_programCodeBlock) {
         OwnPtr<ProgramCodeBlock> newCodeBlock = adoptPtr(new ProgramCodeBlock(CodeBlock::CopyParsedBlock, *m_programCodeBlock));
         newCodeBlock->setAlternative(static_pointer_cast<CodeBlock>(m_programCodeBlock.release()));
         m_programCodeBlock = newCodeBlock.release();
@@ -357,7 +353,7 @@ JSObject* ProgramExecutable::compileInternal(ExecState* exec, ScopeChainNode* sc
             ASSERT(exception);
             return exception;
         }
-        recordParse(programNode->features(), programNode->hasCapturedVariables(), programNode->lineNo(), programNode->lastLine());
+        recordParse(programNode->scopeFlags(), programNode->hasCapturedVariables(), programNode->lineNo(), programNode->lastLine());
 
         JSGlobalObject* globalObject = scopeChainNode->globalObject.get();
     
@@ -479,33 +475,26 @@ JSObject* FunctionExecutable::compileOptimizedForConstruct(ExecState* exec, Scop
 }
 
 #if ENABLE(JIT)
-void FunctionExecutable::jitCompileForCall(JSGlobalData& globalData)
+bool FunctionExecutable::jitCompileForCall(JSGlobalData& globalData)
 {
-    bool result = jitCompileFunctionIfAppropriate(globalData, m_codeBlockForCall, m_jitCodeForCall, m_jitCodeForCallWithArityCheck, m_symbolTable, JITCode::bottomTierJIT());
-    ASSERT_UNUSED(result, result);
+    return jitCompileFunctionIfAppropriate(globalData, m_codeBlockForCall, m_jitCodeForCall, m_jitCodeForCallWithArityCheck, m_symbolTable, JITCode::bottomTierJIT(), JITCompilationCanFail);
 }
 
-void FunctionExecutable::jitCompileForConstruct(JSGlobalData& globalData)
+bool FunctionExecutable::jitCompileForConstruct(JSGlobalData& globalData)
 {
-    bool result = jitCompileFunctionIfAppropriate(globalData, m_codeBlockForConstruct, m_jitCodeForConstruct, m_jitCodeForConstructWithArityCheck, m_symbolTable, JITCode::bottomTierJIT());
-    ASSERT_UNUSED(result, result);
+    return jitCompileFunctionIfAppropriate(globalData, m_codeBlockForConstruct, m_jitCodeForConstruct, m_jitCodeForConstructWithArityCheck, m_symbolTable, JITCode::bottomTierJIT(), JITCompilationCanFail);
 }
 #endif
 
 FunctionCodeBlock* FunctionExecutable::codeBlockWithBytecodeFor(CodeSpecializationKind kind)
 {
-    FunctionCodeBlock* codeBlock = baselineCodeBlockFor(kind);
-    if (codeBlock->canProduceCopyWithBytecode())
-        return codeBlock;
-    return 0;
+    return baselineCodeBlockFor(kind);
 }
 
 PassOwnPtr<FunctionCodeBlock> FunctionExecutable::produceCodeBlockFor(ScopeChainNode* scopeChainNode, CompilationKind compilationKind, CodeSpecializationKind specializationKind, JSObject*& exception)
 {
-    if (!!codeBlockFor(specializationKind) && codeBlockFor(specializationKind)->canProduceCopyWithBytecode()) {
-        BytecodeDestructionBlocker blocker(codeBlockFor(specializationKind).get());
+    if (!!codeBlockFor(specializationKind))
         return adoptPtr(new FunctionCodeBlock(CodeBlock::CopyParsedBlock, *codeBlockFor(specializationKind)));
-    }
     
     exception = 0;
     JSGlobalData* globalData = scopeChainNode->globalData;
@@ -519,7 +508,7 @@ PassOwnPtr<FunctionCodeBlock> FunctionExecutable::produceCodeBlockFor(ScopeChain
     if (m_forceUsesArguments)
         body->setUsesArguments();
     body->finishParsing(m_parameters, m_name);
-    recordParse(body->features(), body->hasCapturedVariables(), body->lineNo(), body->lastLine());
+    recordParse(body->scopeFlags(), body->hasCapturedVariables(), body->lineNo(), body->lastLine());
 
     OwnPtr<FunctionCodeBlock> result;
     ASSERT((compilationKind == FirstCompilation) == !codeBlockFor(specializationKind));

@@ -120,10 +120,6 @@ public:
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded);
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded);
 
-#if ENABLE(CONTEXT_MENUS)
-    virtual void showContextMenu() { }
-#endif
-
     virtual void populateVisitedLinks();
 
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>);
@@ -160,7 +156,7 @@ public:
 #endif
 
 #if ENABLE(NOTIFICATIONS)
-    virtual WebCore::NotificationPresenter* notificationPresenter() const { return reinterpret_cast<WebCore::NotificationPresenter*>(m_notificationsDelegate.get()); }
+    virtual WebCore::NotificationClient* notificationPresenter() const { return reinterpret_cast<WebCore::NotificationClient*>(m_notificationsDelegate.get()); }
 #endif
 
     virtual bool selectItemWritingDirectionIsNatural();

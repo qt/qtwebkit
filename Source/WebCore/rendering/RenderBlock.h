@@ -113,6 +113,9 @@ public:
     static bool hasPercentHeightDescendant(RenderBox*);
 #endif
 
+    void setHasMarkupTruncation(bool b) { m_hasMarkupTruncation = b; }
+    bool hasMarkupTruncation() const { return m_hasMarkupTruncation; }
+
     RootInlineBox* createAndAppendRootInlineBox();
 
     bool generatesLineBoxesForInlineChild(RenderObject*);
@@ -182,7 +185,7 @@ public:
 
     int pixelSnappedLogicalLeftOffsetForLine(LayoutUnit position, bool firstLine) const
     {
-        return logicalLeftOffsetForLine(position, logicalLeftOffsetForContent(position), firstLine, 0);
+        return roundToInt(logicalLeftOffsetForLine(position, logicalLeftOffsetForContent(position), firstLine, 0));
     }
     
     LayoutUnit startAlignedOffsetForLine(RenderBox* child, LayoutUnit position, bool firstLine);
@@ -378,6 +381,8 @@ public:
 protected:
     virtual void willBeDestroyed();
 
+    void updateScrollInfoAfterLayout();
+
     // These functions are only used internally to manipulate the render tree structure via remove/insert/appendChildNode.
     // Since they are typically called only to move objects around within anonymous blocks (which only have layers in
     // the case of column spans), the default for fullRemoveInsert is false rather than true.
@@ -467,7 +472,7 @@ protected:
     void addOverflowFromInlineChildren();
     void addVisualOverflowFromTheme();
 
-    virtual void addFocusRingRects(Vector<LayoutRect>&, const LayoutPoint&);
+    virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
 
 #if ENABLE(SVG)
     // Only used by RenderSVGText, which explicitely overrides RenderBlock::layoutBlock(), do NOT use for anything else.
@@ -527,7 +532,7 @@ private:
     struct FloatWithRect {
         FloatWithRect(RenderBox* f)
             : object(f)
-            , rect(LayoutRect(f->x() - f->marginLeft(), f->y() - f->marginTop(), f->width() + f->marginLeft() + f->marginRight(), f->height() + f->marginTop() + f->marginBottom()))
+            , rect(LayoutRect(f->x() - f->marginLeft(), f->y() - f->marginTop(), f->width() + f->marginWidth(), f->height() + f->marginHeight()))
             , everHadLayout(f->everHadLayout())
         {
         }
@@ -634,11 +639,11 @@ private:
     LayoutUnit logicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->maxX() : child->maxY(); }
     LayoutUnit logicalWidthForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->width() : child->height(); }
 
-    // FIXME: The implementation for these functions will change once we move to subpixel layout. See bug 60318.
-    int pixelSnappedLogicalTopForFloat(const FloatingObject* child) const { return logicalTopForFloat(child); }
-    int pixelSnappedLogicalBottomForFloat(const FloatingObject* child) const { return logicalBottomForFloat(child); }
-    int pixelSnappedLogicalLeftForFloat(const FloatingObject* child) const { return logicalLeftForFloat(child); }
-    int pixelSnappedLogicalRightForFloat(const FloatingObject* child) const { return logicalRightForFloat(child); }
+    int pixelSnappedLogicalTopForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedY() : child->pixelSnappedX(); }
+    int pixelSnappedLogicalBottomForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedMaxY() : child->pixelSnappedMaxX(); }
+    int pixelSnappedLogicalLeftForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedX() : child->pixelSnappedY(); }
+    int pixelSnappedLogicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedMaxX() : child->pixelSnappedMaxY(); }
+    int pixelSnappedLogicalWidthForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedWidth() : child->pixelSnappedHeight(); }
 
     void setLogicalTopForFloat(FloatingObject* child, LayoutUnit logicalTop)
     {
@@ -810,7 +815,7 @@ private:
     LayoutUnit logicalLeftSelectionOffset(RenderBlock* rootBlock, LayoutUnit position);
     LayoutUnit logicalRightSelectionOffset(RenderBlock* rootBlock, LayoutUnit position);
     
-    virtual void absoluteRects(Vector<LayoutRect>&, const LayoutPoint& accumulatedOffset) const;
+    virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const;
 
     LayoutUnit desiredColumnWidth() const;
@@ -838,8 +843,6 @@ private:
     void makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlock* newBlockBox, RenderObject* newChild);
 
     bool expandsToEncloseOverhangingFloats() const;
-
-    void updateScrollInfoAfterLayout();
 
     RenderObject* splitAnonymousBlocksAroundChild(RenderObject* beforeChild);
     RenderObject* splitTablePartsAroundChild(RenderObject* beforeChild);
@@ -1119,9 +1122,10 @@ protected:
     RenderObjectChildList m_children;
     RenderLineBoxList m_lineBoxes;   // All of the root line boxes created for this block flow.  For example, <div>Hello<br>world.</div> will have two total lines for the <div>.
 
-    mutable signed m_lineHeight : 30;
+    mutable signed m_lineHeight : 29;
     bool m_beingDestroyed : 1;
     bool m_hasPositionedFloats : 1;
+    bool m_hasMarkupTruncation : 1;
 
     // RenderRubyBase objects need to be able to split and merge, moving their children around
     // (calling moveChildTo, moveAllChildrenTo, and makeChildrenNonInline).

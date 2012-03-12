@@ -37,9 +37,9 @@ class DrawableTile;
 
 class CCTiledLayerImpl : public CCLayerImpl {
 public:
-    static PassRefPtr<CCTiledLayerImpl> create(int id)
+    static PassOwnPtr<CCTiledLayerImpl> create(int id)
     {
-        return adoptRef(new CCTiledLayerImpl(id));
+        return adoptPtr(new CCTiledLayerImpl(id));
     }
     virtual ~CCTiledLayerImpl();
 
@@ -55,6 +55,8 @@ public:
 
     void setContentsSwizzled(bool contentsSwizzled) { m_contentsSwizzled = contentsSwizzled; }
     bool contentsSwizzled() const { return m_contentsSwizzled; }
+
+    virtual Region opaqueContentsRegion() const;
 
     typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexAlpha> Program;
     // Shader program that swaps red and blue components of texture.

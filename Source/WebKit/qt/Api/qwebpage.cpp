@@ -3290,15 +3290,11 @@ bool QWebPage::swallowContextMenuEvent(QContextMenuEvent *event)
 {
     d->page->contextMenuController()->clearContextMenu();
 
-#if HAVE(QSTYLE)
-    if (!RenderThemeQt::useMobileTheme()) {
-        if (QWebFrame* webFrame = frameAt(event->pos())) {
-            Frame* frame = QWebFramePrivate::core(webFrame);
-            if (Scrollbar* scrollbar = frame->view()->scrollbarAtPoint(convertMouseEvent(event, 1).position()))
-                return handleScrollbarContextMenuEvent(scrollbar, event);
-        }
+    if (QWebFrame* webFrame = frameAt(event->pos())) {
+        Frame* frame = QWebFramePrivate::core(webFrame);
+        if (Scrollbar* scrollbar = frame->view()->scrollbarAtPoint(convertMouseEvent(event, 1).position()))
+            return handleScrollbarContextMenuEvent(scrollbar, event);
     }
-#endif
 
     WebCore::Frame* focusedFrame = d->page->focusController()->focusedOrMainFrame();
     focusedFrame->eventHandler()->sendContextMenuEvent(convertMouseEvent(event, 1));
@@ -3744,11 +3740,11 @@ QWebPluginFactory *QWebPage::pluginFactory() const
 
     In this string the following values are replaced at run-time:
     \list
-    \o %Platform% expands to the windowing system followed by "; " if it is not Windows (e.g. "X11; ").
-    \o %Security% expands to "N; " if SSL is disabled.
-    \o %Subplatform% expands to the operating system version (e.g. "Windows NT 6.1" or "Intel Mac OS X 10.5").
-    \o %WebKitVersion% is the version of WebKit the application was compiled against.
-    \o %AppVersion% expands to QCoreApplication::applicationName()/QCoreApplication::applicationVersion() if they're set; otherwise defaulting to Qt and the current Qt version.
+    \li %Platform% expands to the windowing system followed by "; " if it is not Windows (e.g. "X11; ").
+    \li %Security% expands to "N; " if SSL is disabled.
+    \li %Subplatform% expands to the operating system version (e.g. "Windows NT 6.1" or "Intel Mac OS X 10.5").
+    \li %WebKitVersion% is the version of WebKit the application was compiled against.
+    \li %AppVersion% expands to QCoreApplication::applicationName()/QCoreApplication::applicationVersion() if they're set; otherwise defaulting to Qt and the current Qt version.
     \endlist
 */
 QString QWebPage::userAgentForUrl(const QUrl&) const

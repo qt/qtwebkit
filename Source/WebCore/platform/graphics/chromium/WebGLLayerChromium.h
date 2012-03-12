@@ -53,9 +53,10 @@ public:
     void setTextureId(unsigned textureId) { m_textureId = textureId; }
 
     virtual bool drawsContent() const;
+    virtual void paintContentsIfDirty(const Region&);
     virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
     virtual void pushPropertiesTo(CCLayerImpl*);
-    virtual void contentChanged();
+    virtual void setNeedsDisplayRect(const FloatRect&);
     bool paintRenderedResultsToCanvas(ImageBuffer*);
 
     GraphicsContext3D* context() const;
@@ -66,13 +67,12 @@ private:
     WebGLLayerChromium();
     friend class WebGLLayerChromiumRateLimitTask;
 
-    GraphicsContext3D* layerRendererContext();
-
     bool m_hasAlpha;
     bool m_premultipliedAlpha;
     unsigned m_textureId;
     bool m_textureChanged;
     bool m_textureUpdated;
+    bool m_contextLost;
 
     // The DrawingBuffer holding the WebGL contents for this layer.
     // A reference is not held here, because the DrawingBuffer already holds

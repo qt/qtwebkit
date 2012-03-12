@@ -36,6 +36,7 @@ if (!window.InspectorFrontendHost) {
 WebInspector.InspectorFrontendHostStub = function()
 {
     this._attachedWindowHeight = 0;
+    this.isStub = true;
 }
 
 WebInspector.InspectorFrontendHostStub.prototype = {
@@ -136,11 +137,6 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         fr.readAsDataURL(blob);
     },
 
-    canAttachWindow: function()
-    {
-        return false;
-    },
-
     sendMessageToBackend: function(message)
     {
     },
@@ -160,6 +156,10 @@ WebInspector.InspectorFrontendHostStub.prototype = {
     loadResourceSynchronously: function(url)
     {
         return "";
+    },
+
+    setZoomFactor: function(zoom)
+    {
     }
 }
 

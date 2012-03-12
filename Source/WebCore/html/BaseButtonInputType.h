@@ -31,22 +31,18 @@
 #ifndef BaseButtonInputType_h
 #define BaseButtonInputType_h
 
-#include "InputType.h"
+#include "BaseClickableWithKeyInputType.h"
 
 namespace WebCore {
 
 // Base of button, file, image, reset, and submit types.
-class BaseButtonInputType : public InputType {
+class BaseButtonInputType : public BaseClickableWithKeyInputType {
 protected:
-    BaseButtonInputType(HTMLInputElement* element) : InputType(element) { }
+    BaseButtonInputType(HTMLInputElement* element) : BaseClickableWithKeyInputType(element) { }
 
 private:
     virtual bool appendFormData(FormDataList&, bool) const OVERRIDE;
-    virtual void handleKeydownEvent(KeyboardEvent*) OVERRIDE;
-    virtual void handleKeypressEvent(KeyboardEvent*) OVERRIDE;
-    virtual void handleKeyupEvent(KeyboardEvent*) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const OVERRIDE;
-    virtual void accessKeyAction(bool sendMouseEvents) OVERRIDE;
     virtual bool storesValueSeparateFromAttribute() OVERRIDE;
     virtual void setValue(const String&, bool, TextFieldEventBehavior) OVERRIDE;
 };

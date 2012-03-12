@@ -37,9 +37,6 @@ class WebDOMOptionsObject;
 class WebDOMSVGPoint;
 class WebDOMString;
 class WebDOMTestObj;
-class WebDOMTestObjectAConstructor;
-class WebDOMTestObjectBConstructor;
-class WebDOMTestObjectCConstructor;
 class WebDOMa;
 class WebDOMb;
 class WebDOMbool;
@@ -132,18 +129,6 @@ public:
     int conditionalAttr3() const;
     void setConditionalAttr3(int);
 #endif
-#if ENABLE(Condition1)
-    WebDOMTestObjectAConstructor conditionalAttr4() const;
-    void setConditionalAttr4(const WebDOMTestObjectAConstructor&);
-#endif
-#if ENABLE(Condition1) && ENABLE(Condition2)
-    WebDOMTestObjectBConstructor conditionalAttr5() const;
-    void setConditionalAttr5(const WebDOMTestObjectBConstructor&);
-#endif
-#if ENABLE(Condition1) || ENABLE(Condition2)
-    WebDOMTestObjectCConstructor conditionalAttr6() const;
-    void setConditionalAttr6(const WebDOMTestObjectCConstructor&);
-#endif
     WebDOMDocument contentDocument() const;
     WebDOMSVGPoint mutablePoint() const;
     void setMutablePoint(const WebDOMSVGPoint&);
@@ -175,13 +160,23 @@ public:
     void methodWithOptionalString(const WebDOMString& str);
     void methodWithOptionalStringIsUndefined(const WebDOMString& str);
     void methodWithOptionalStringIsNullString(const WebDOMString& str);
+#if ENABLE(Condition1)
     WebDOMString conditionalMethod1();
+#endif
+#if ENABLE(Condition1) && ENABLE(Condition2)
     void conditionalMethod2();
+#endif
+#if ENABLE(Condition1) || ENABLE(Condition2)
     void conditionalMethod3();
+#endif
     void classMethod();
     int classMethodWithOptional(int arg);
+#if ENABLE(Condition1)
     void overloadedMethod1(int arg);
+#endif
+#if ENABLE(Condition1)
     void overloadedMethod1(const WebDOMString& type);
+#endif
     void convert1(const WebDOMa& );
     void convert2(const WebDOMb& );
     void convert3(const WebDOMc& );

@@ -379,6 +379,11 @@ class Port(object):
         platform_dir, baseline_filename = self.expected_baselines(test_name, suffix)[0]
         if platform_dir:
             return self._filesystem.join(platform_dir, baseline_filename)
+
+        actual_test_name = self.lookup_virtual_test_base(test_name)
+        if actual_test_name:
+            return self.expected_filename(actual_test_name, suffix)
+
         return self._filesystem.join(self.layout_tests_dir(), baseline_filename)
 
     def expected_checksum(self, test_name):
@@ -459,6 +464,9 @@ class Port(object):
 
     def tests(self, paths):
         """Return the list of tests found."""
+        return self._real_tests(paths).union(self._virtual_tests(paths, self.populated_virtual_test_suites()))
+
+    def _real_tests(self, paths):
         # When collecting test cases, skip these directories
         skipped_directories = set(['.svn', '_svn', 'resources', 'script-tests', 'reference', 'reftest'])
         files = find_files.find(self._filesystem, self.layout_tests_dir(), paths, skipped_directories, Port._is_test_file)
@@ -498,22 +506,26 @@ class Port(object):
     def test_isfile(self, test_name):
         """Return True if the test name refers to a directory of tests."""
         # Used by test_expectations.py to apply rules to whole directories.
-        test_path = self.abspath_for_test(test_name)
-        return self._filesystem.isfile(test_path)
+        if self._filesystem.isfile(self.abspath_for_test(test_name)):
+            return True
+        base = self.lookup_virtual_test_base(test_name)
+        return base and self._filesystem.isfile(self.abspath_for_test(base))
 
     @memoized
     def test_isdir(self, test_name):
         """Return True if the test name refers to a directory of tests."""
         # Used by test_expectations.py to apply rules to whole directories.
-        test_path = self.abspath_for_test(test_name)
-        return self._filesystem.isdir(test_path)
+        if self._filesystem.isdir(self.abspath_for_test(test_name)):
+            return True
+        base = self.lookup_virtual_test_base(test_name)
+        return base and self._filesystem.isdir(self.abspath_for_test(base))
 
+    @memoized
     def test_exists(self, test_name):
         """Return True if the test name refers to an existing test or baseline."""
         # Used by test_expectations.py to determine if an entry refers to a
         # valid test and by printing.py to determine if baselines exist.
-        test_path = self.abspath_for_test(test_name)
-        return self._filesystem.exists(test_path)
+        return self.test_isfile(test_name) or self.test_isdir(test_name)
 
     def split_test(self, test_name):
         """Splits a test name into the 'directory' part and the 'basename' part."""
@@ -533,7 +545,7 @@ class Port(object):
     def driver_cmd_line(self):
         """Prints the DRT command line that will be used."""
         driver = self.create_driver(0)
-        return driver.cmd_line()
+        return driver.cmd_line(self.get_option('pixel_tests'), [])
 
     def update_baseline(self, baseline_path, data):
         """Updates the baseline for a test.
@@ -1043,3 +1055,56 @@ class Port(object):
     def _driver_class(self):
         """Returns the port's driver implementation."""
         raise NotImplementedError('Port._driver_class')
+
+    def virtual_test_suites(self):
+        return []
+
+    @memoized
+    def populated_virtual_test_suites(self):
+        suites = self.virtual_test_suites()
+
+        # Sanity-check the suites to make sure they don't point to other suites.
+        suite_dirs = [suite.name for suite in suites]
+        for suite in suites:
+            assert suite.base not in suite_dirs
+
+        for suite in suites:
+            base_tests = self._real_tests([suite.base])
+            suite.tests = {}
+            for test in base_tests:
+                suite.tests[test.replace(suite.base, suite.name)] = test
+        return suites
+
+    def _virtual_tests(self, paths, suites):
+        virtual_tests = set()
+        for suite in suites:
+            if paths:
+                for test in suite.tests:
+                    if any(test.startswith(p) for p in paths):
+                        virtual_tests.add(test)
+            else:
+                virtual_tests.update(set(suite.tests.keys()))
+        return virtual_tests
+
+    def lookup_virtual_test_base(self, test_name):
+        for suite in self.populated_virtual_test_suites():
+            if test_name.startswith(suite.name):
+                return suite.tests.get(test_name)
+        return None
+
+    def lookup_virtual_test_args(self, test_name):
+        for suite in self.populated_virtual_test_suites():
+            if test_name.startswith(suite.name):
+                return suite.args
+        return []
+
+
+class VirtualTestSuite(object):
+    def __init__(self, name, base, args, tests=None):
+        self.name = name
+        self.base = base
+        self.args = args
+        self.tests = tests or set()
+
+    def __repr__(self):
+        return "VirtualTestSuite('%s', '%s', %s)" % (self.name, self.base, self.args)

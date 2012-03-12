@@ -58,6 +58,12 @@ void JSCSSStyleDeclaration::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.addOpaqueRoot(root(thisObject->impl()));
 }
 
+class CSSPropertyInfo {
+public:
+    int propertyID;
+    bool hadPixelOrPosPrefix;
+};
+
 enum PropertyNamePrefix
 {
     PropertyNamePrefixNone,
@@ -161,16 +167,23 @@ static inline void writeEpubPrefix(char*& buffer)
     *buffer++ = '-';
 }
 
-static int cssPropertyIDForJSCSSPropertyName(const Identifier& propertyName, bool* hadPixelOrPosPrefix = 0)
+static CSSPropertyInfo cssPropertyIDForJSCSSPropertyName(const Identifier& propertyName)
 {
-    if (hadPixelOrPosPrefix)
-        *hadPixelOrPosPrefix = false;
+    CSSPropertyInfo propertyInfo = {0, false};
+    bool hadPixelOrPosPrefix = false;
 
     unsigned length = propertyName.length();
     if (!length)
-        return 0;
+        return propertyInfo;
 
     StringImpl* propertyNameString = propertyName.impl();
+    String stringForCache = String(propertyNameString);
+    typedef HashMap<String, CSSPropertyInfo> CSSPropertyInfoMap;
+    DEFINE_STATIC_LOCAL(CSSPropertyInfoMap, propertyInfoCache, ());
+    propertyInfo = propertyInfoCache.get(stringForCache);
+    if (propertyInfo.propertyID)
+        return propertyInfo;
+
     const size_t bufferSize = maxCSSPropertyNameLength + 1;
     char buffer[bufferSize];
     char* bufferPtr = buffer;
@@ -183,20 +196,18 @@ static int cssPropertyIDForJSCSSPropertyName(const Identifier& propertyName, boo
     switch (getCSSPropertyNamePrefix(*propertyNameString)) {
     case PropertyNamePrefixNone:
         if (isASCIIUpper((*propertyNameString)[0]))
-            return 0;
+            return propertyInfo;
         break;
     case PropertyNamePrefixCSS:
         i += 3;
         break;
     case PropertyNamePrefixPixel:
         i += 5;
-        if (hadPixelOrPosPrefix)
-            *hadPixelOrPosPrefix = true;
+        hadPixelOrPosPrefix = true;
         break;
     case PropertyNamePrefixPos:
         i += 3;
-        if (hadPixelOrPosPrefix)
-            *hadPixelOrPosPrefix = true;
+        hadPixelOrPosPrefix = true;
         break;
     case PropertyNamePrefixApple:
     case PropertyNamePrefixKHTML:
@@ -220,17 +231,17 @@ static int cssPropertyIDForJSCSSPropertyName(const Identifier& propertyName, boo
     size_t bufferSizeLeft = stringEnd - bufferPtr;
     size_t propertySizeLeft = length - i;
     if (propertySizeLeft > bufferSizeLeft)
-        return 0;
+        return propertyInfo;
 
     for (; i < length; ++i) {
         UChar c = (*propertyNameString)[i];
         if (!c || c >= 0x7F)
-            return 0; // illegal character
+            return propertyInfo; // illegal character
         if (isASCIIUpper(c)) {
             size_t bufferSizeLeft = stringEnd - bufferPtr;
             size_t propertySizeLeft = length - i + 1;
             if (propertySizeLeft > bufferSizeLeft)
-                return 0;
+                return propertyInfo;
             *bufferPtr++ = '-';
             *bufferPtr++ = toASCIILower(c);
         } else
@@ -246,54 +257,97 @@ static int cssPropertyIDForJSCSSPropertyName(const Identifier& propertyName, boo
 #endif
 
     const Property* hashTableEntry = findProperty(name, outputLength);
-    return hashTableEntry ? hashTableEntry->id : 0;
+    int propertyID = hashTableEntry ? hashTableEntry->id : 0;
+    if (propertyID) {
+        propertyInfo.hadPixelOrPosPrefix = hadPixelOrPosPrefix;
+        propertyInfo.propertyID = propertyID;
+        propertyInfoCache.add(stringForCache, propertyInfo);
+    }
+    return propertyInfo;
 }
 
-static bool isCSSPropertyName(const Identifier& propertyIdentifier)
+static inline JSValue getPropertyValueFallback(ExecState* exec, JSCSSStyleDeclaration* thisObj, unsigned index)
 {
-    return cssPropertyIDForJSCSSPropertyName(propertyIdentifier);
+    // If the property is a shorthand property (such as "padding"),
+    // it can only be accessed using getPropertyValue.
+    return jsString(exec, thisObj->impl()->getPropertyValueInternal(static_cast<CSSPropertyID>(index)));
 }
 
-bool JSCSSStyleDeclaration::canGetItemsForName(ExecState*, CSSStyleDeclaration*, const Identifier& propertyName)
+static inline JSValue cssPropertyGetterPixelOrPosPrefix(ExecState* exec, JSCSSStyleDeclaration* thisObj, unsigned propertyID)
 {
-    return isCSSPropertyName(propertyName);
-}
-
-JSValue JSCSSStyleDeclaration::nameGetter(ExecState* exec, JSValue slotBase, const Identifier& propertyName)
-{
-    JSCSSStyleDeclaration* thisObj = static_cast<JSCSSStyleDeclaration*>(asObject(slotBase));
-
     // Set up pixelOrPos boolean to handle the fact that
     // pixelTop returns "CSS Top" as number value in unit pixels
     // posTop returns "CSS top" as number value in unit pixels _if_ its a
     // positioned element. if it is not a positioned element, return 0
     // from MSIE documentation FIXME: IMPLEMENT THAT (Dirk)
-    bool pixelOrPos;
-    int cssPropertyID = cssPropertyIDForJSCSSPropertyName(propertyName, &pixelOrPos);
-    RefPtr<CSSValue> v = thisObj->impl()->getPropertyCSSValueInternal(static_cast<CSSPropertyID>(cssPropertyID));
+    RefPtr<CSSValue> v = thisObj->impl()->getPropertyCSSValueInternal(static_cast<CSSPropertyID>(propertyID));
     if (v) {
-        if (pixelOrPos && v->isPrimitiveValue())
+        if (v->isPrimitiveValue())
             return jsNumber(static_pointer_cast<CSSPrimitiveValue>(v)->getFloatValue(CSSPrimitiveValue::CSS_PX));
         return jsStringOrNull(exec, v->cssText());
     }
 
-    // If the property is a shorthand property (such as "padding"), 
-    // it can only be accessed using getPropertyValue.
-    return jsString(exec, thisObj->impl()->getPropertyValueInternal(static_cast<CSSPropertyID>(cssPropertyID)));
+    return getPropertyValueFallback(exec, thisObj, propertyID);
+}
+
+static JSValue cssPropertyGetterPixelOrPosPrefixCallback(ExecState* exec, JSValue slotBase, unsigned propertyID)
+{
+    return cssPropertyGetterPixelOrPosPrefix(exec, static_cast<JSCSSStyleDeclaration*>(asObject(slotBase)), propertyID);
+}
+
+static inline JSValue cssPropertyGetter(ExecState* exec, JSCSSStyleDeclaration* thisObj, unsigned propertyID)
+{
+    RefPtr<CSSValue> v = thisObj->impl()->getPropertyCSSValueInternal(static_cast<CSSPropertyID>(propertyID));
+    if (v)
+        return jsStringOrNull(exec, v->cssText());
+
+    return getPropertyValueFallback(exec, thisObj, propertyID);
+}
+
+static JSValue cssPropertyGetterCallback(ExecState* exec, JSValue slotBase, unsigned propertyID)
+{
+    return cssPropertyGetter(exec, static_cast<JSCSSStyleDeclaration*>(asObject(slotBase)), propertyID);
+}
+
+bool JSCSSStyleDeclaration::getOwnPropertySlotDelegate(ExecState*, const Identifier& propertyIdentifier, PropertySlot& slot)
+{
+    CSSPropertyInfo propertyInfo = cssPropertyIDForJSCSSPropertyName(propertyIdentifier);
+    if (!propertyInfo.propertyID)
+        return false;
+
+    if (propertyInfo.hadPixelOrPosPrefix)
+        slot.setCustomIndex(this, static_cast<unsigned>(propertyInfo.propertyID), cssPropertyGetterPixelOrPosPrefixCallback);
+    else
+        slot.setCustomIndex(this, static_cast<unsigned>(propertyInfo.propertyID), cssPropertyGetterCallback);
+    return true;
+}
+
+bool JSCSSStyleDeclaration::getOwnPropertyDescriptorDelegate(JSC::ExecState* exec, const JSC::Identifier& propertyIdentifier, JSC::PropertyDescriptor& descriptor)
+{
+    CSSPropertyInfo propertyInfo = cssPropertyIDForJSCSSPropertyName(propertyIdentifier);
+    if (!propertyInfo.propertyID)
+        return false;
+
+    JSValue value;
+    if (propertyInfo.hadPixelOrPosPrefix)
+        value = cssPropertyGetterPixelOrPosPrefix(exec, this, propertyInfo.propertyID);
+    else
+        value = cssPropertyGetter(exec, this, propertyInfo.propertyID);
+    descriptor.setDescriptor(value, ReadOnly | DontDelete | DontEnum);
+    return true;
 }
 
 bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, const Identifier& propertyName, JSValue value, PutPropertySlot&)
 {
-    bool pixelOrPos;
-    int cssPropertyID = cssPropertyIDForJSCSSPropertyName(propertyName, &pixelOrPos);
-    if (!cssPropertyID)
+    CSSPropertyInfo propertyInfo = cssPropertyIDForJSCSSPropertyName(propertyName);
+    if (!propertyInfo.propertyID)
         return false;
 
     String propValue = valueToStringWithNullCheck(exec, value);
-    if (pixelOrPos)
+    if (propertyInfo.hadPixelOrPosPrefix)
         propValue += "px";
     ExceptionCode ec = 0;
-    impl()->setPropertyInternal(static_cast<CSSPropertyID>(cssPropertyID), propValue, false, ec);
+    impl()->setPropertyInternal(static_cast<CSSPropertyID>(propertyInfo.propertyID), propValue, false, ec);
     setDOMException(exec, ec);
     return true;
 }

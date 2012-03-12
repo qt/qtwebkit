@@ -36,18 +36,13 @@
 #include <WebCore/RunLoop.h>
 #include <wtf/Noncopyable.h>
 
-#if PLATFORM(MAC)
-#include <wtf/RetainPtr.h>
-
-typedef struct __WKCARemoteLayerClientRef *WKCARemoteLayerClientRef;
-#endif
-
 namespace CoreIPC {
     class DataReference;
 }
 
 namespace WebKit {
 
+class LayerHostingContext;
 class ShareableBitmap;
 class WebProcessConnection;
 struct PluginCreationParameters;
@@ -191,7 +186,7 @@ private:
     bool m_isComplexTextInputEnabled;
 
     // For CA plug-ins, this holds the information needed to export the layer hierarchy to the UI process.
-    RetainPtr<WKCARemoteLayerClientRef> m_remoteLayerClient;
+    OwnPtr<LayerHostingContext> m_layerHostingContext;
 #endif
 
     // The contents scale factor of this plug-in.

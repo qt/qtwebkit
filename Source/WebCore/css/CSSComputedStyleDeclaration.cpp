@@ -232,6 +232,9 @@ static const int computedProperties[] = {
 #if ENABLE(CSS_GRID_LAYOUT)
     CSSPropertyWebkitGridColumns,
     CSSPropertyWebkitGridRows,
+
+    CSSPropertyWebkitGridColumn,
+    CSSPropertyWebkitGridRow,
 #endif
     CSSPropertyWebkitHighlight,
     CSSPropertyWebkitHyphenateCharacter,
@@ -913,6 +916,15 @@ static PassRefPtr<CSSValue> valueForGridTrackList(const Vector<Length>& trackLen
         list->append(valueForGridTrackBreadth(trackLengths[i], style, cssValuePool));
     return list.release();
 }
+
+static PassRefPtr<CSSValue> valueForGridPosition(const Length& position, CSSValuePool* cssValuePool)
+{
+    if (position.isAuto())
+        return cssValuePool->createIdentifierValue(CSSValueAuto);
+
+    ASSERT(position.isFixed());
+    return cssValuePool->createValue(position.value(), CSSPrimitiveValue::CSS_NUMBER);
+}
 #endif
 
 static PassRefPtr<CSSValue> getDelayValue(const AnimationList* animList, CSSValuePool* cssValuePool)
@@ -1116,6 +1128,31 @@ static PassRefPtr<CSSPrimitiveValue> valueForFamily(const AtomicString& family, 
     return cssValuePool->createValue(family.string(), CSSPrimitiveValue::CSS_STRING);
 }
 
+static PassRefPtr<CSSValue> renderUnicodeBidiFlagsToCSSValue(EUnicodeBidi unicodeBidi, CSSValuePool* cssValuePool)
+{
+    switch (unicodeBidi) {
+    case UBNormal:
+        return cssValuePool->createIdentifierValue(CSSValueNormal);
+    case Embed:
+        return cssValuePool->createIdentifierValue(CSSValueEmbed);
+    case Plaintext:
+        return cssValuePool->createIdentifierValue(CSSValueWebkitPlaintext);
+    case Override:
+        return cssValuePool->createIdentifierValue(CSSValueBidiOverride);
+    case Isolate:
+        return cssValuePool->createIdentifierValue(CSSValueWebkitIsolate);
+    case OverrideIsolate:
+    {
+        RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+        list->append(cssValuePool->createIdentifierValue(CSSValueBidiOverride));
+        list->append(cssValuePool->createIdentifierValue(CSSValueWebkitIsolate));
+        return list;
+    }
+    }
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
 static PassRefPtr<CSSValue> renderTextDecorationFlagsToCSSValue(int textDecoration, CSSValuePool* cssValuePool)
 {
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
@@ -1303,6 +1340,13 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
 
     if (!style)
         return 0;
+
+    if (renderer) {
+        if (m_pseudoElementSpecifier == AFTER)
+            renderer = renderer->afterPseudoElementRenderer();
+        else if (m_pseudoElementSpecifier == BEFORE)
+            renderer = renderer->beforePseudoElementRenderer();
+    }
 
     CSSValuePool* cssValuePool = node->document()->cssValuePool().get();
 
@@ -1648,6 +1692,11 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyWebkitGridRows: {
             return valueForGridTrackList(style->gridRows(), style.get(), cssValuePool);
         }
+
+        case CSSPropertyWebkitGridColumn:
+            return valueForGridPosition(style->gridItemColumn(), cssValuePool);
+        case CSSPropertyWebkitGridRow:
+            return valueForGridPosition(style->gridItemRow(), cssValuePool);
 #endif
         case CSSPropertyHeight:
             if (renderer) {
@@ -1792,19 +1841,19 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return cssValuePool->createValue(style->overflowY());
         case CSSPropertyPaddingTop:
             if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingTop(false), style.get(), cssValuePool);
+                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingTop(ExcludeIntrinsicPadding), style.get(), cssValuePool);
             return zoomAdjustedPixelValueForLength(style->paddingTop(), style.get(), cssValuePool);
         case CSSPropertyPaddingRight:
             if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingRight(false), style.get(), cssValuePool);
+                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingRight(ExcludeIntrinsicPadding), style.get(), cssValuePool);
             return zoomAdjustedPixelValueForLength(style->paddingRight(), style.get(), cssValuePool);
         case CSSPropertyPaddingBottom:
             if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingBottom(false), style.get(), cssValuePool);
+                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingBottom(ExcludeIntrinsicPadding), style.get(), cssValuePool);
             return zoomAdjustedPixelValueForLength(style->paddingBottom(), style.get(), cssValuePool);
         case CSSPropertyPaddingLeft:
             if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingLeft(false), style.get(), cssValuePool);
+                return zoomAdjustedPixelValue(toRenderBox(renderer)->paddingLeft(ExcludeIntrinsicPadding), style.get(), cssValuePool);
             return zoomAdjustedPixelValueForLength(style->paddingLeft(), style.get(), cssValuePool);
         case CSSPropertyPageBreakAfter:
             return cssValuePool->createValue(style->pageBreakAfter());
@@ -1880,7 +1929,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
         case CSSPropertyTop:
             return getPositionOffsetValue(style.get(), CSSPropertyTop, cssValuePool);
         case CSSPropertyUnicodeBidi:
-            return cssValuePool->createValue(style->unicodeBidi());
+            return renderUnicodeBidiFlagsToCSSValue(style->unicodeBidi(), cssValuePool);
         case CSSPropertyVerticalAlign:
             switch (style->verticalAlign()) {
                 case BASELINE:
@@ -2250,7 +2299,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(int proper
             return counterToCSSValue(style.get(), propertyID, cssValuePool);
         case CSSPropertyWebkitFlowInto:
             if (style->flowThread().isNull())
-                return cssValuePool->createIdentifierValue(CSSValueAuto);
+                return cssValuePool->createIdentifierValue(CSSValueNone);
             return cssValuePool->createValue(style->flowThread(), CSSPrimitiveValue::CSS_STRING);
         case CSSPropertyWebkitFlowFrom:
             if (style->regionThread().isNull())

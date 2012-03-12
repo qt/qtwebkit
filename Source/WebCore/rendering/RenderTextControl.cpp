@@ -142,14 +142,9 @@ void RenderTextControl::computeLogicalHeight()
 {
     HTMLElement* innerText = innerTextElement();
     ASSERT(innerText);
-    RenderBox* innerTextRenderBox = innerText->renderBox();
-
-    setHeight(innerTextRenderBox->borderTop() + innerTextRenderBox->borderBottom() +
-              innerTextRenderBox->paddingTop() + innerTextRenderBox->paddingBottom() +
-              innerTextRenderBox->marginTop() + innerTextRenderBox->marginBottom());
-
-    adjustControlHeightBasedOnLineHeight(innerText->renderBox()->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes));
-    setHeight(height() + borderAndPaddingHeight());
+    RenderBox* innerTextBox = innerText->renderBox();
+    LayoutUnit nonContentHeight = innerTextBox->borderAndPaddingHeight() + innerTextBox->marginHeight();
+    setHeight(computeControlHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + borderAndPaddingHeight());
 
     // We are able to have a horizontal scrollbar if the overflow style is scroll, or if its auto and there's no word wrap.
     if (style()->overflowX() == OSCROLL ||  (style()->overflowX() == OAUTO && innerText->renderer()->style()->wordWrap() == NormalWordWrap))
@@ -280,10 +275,10 @@ void RenderTextControl::computePreferredLogicalWidths()
     setPreferredLogicalWidthsDirty(false);
 }
 
-void RenderTextControl::addFocusRingRects(Vector<LayoutRect>& rects, const LayoutPoint& additionalOffset)
+void RenderTextControl::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)
 {
     if (!size().isEmpty())
-        rects.append(LayoutRect(additionalOffset, size()));
+        rects.append(pixelSnappedIntRect(additionalOffset, size()));
 }
 
 RenderObject* RenderTextControl::layoutSpecialExcludedChild(bool relayoutChildren)

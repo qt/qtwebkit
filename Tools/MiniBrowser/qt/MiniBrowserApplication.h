@@ -98,7 +98,7 @@ public:
     virtual bool notify(QObject*, QEvent*);
 
 private:
-    void sendTouchEvent(BrowserWindow*);
+    bool sendTouchEvent(BrowserWindow*, QEvent::Type, ulong timestamp);
     void handleUserOptions();
 
 private:
@@ -109,7 +109,11 @@ private:
     int m_robotExtraTimeSeconds;
     QStringList m_urls;
 
-    QHash<int, QWindowSystemInterface::TouchPoint> m_touchPoints;
+    QPointF m_lastPos;
+    QPointF m_lastScreenPos;
+    QPointF m_startScreenPos;
+
+    QHash<int, QTouchEvent::TouchPoint> m_touchPoints;
     QSet<int> m_heldTouchPoints;
 
     WindowOptions m_windowOptions;

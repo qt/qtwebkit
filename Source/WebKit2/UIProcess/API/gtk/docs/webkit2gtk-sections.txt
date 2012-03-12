@@ -49,6 +49,8 @@ webkit_web_context_get_type
 WebKitWebView
 WebKitLoadEvent
 WebKitPolicyDecisionType
+WebKitScriptDialog
+WebKitScriptDialogType
 
 <SUBSECTION Editing Commands>
 WEBKIT_EDITING_COMMAND_CUT
@@ -86,6 +88,12 @@ webkit_web_view_get_zoom_level
 webkit_web_view_can_execute_editing_command
 webkit_web_view_can_execute_editing_command_finish
 webkit_web_view_execute_editing_command
+webkit_web_view_get_find_controller
+webkit_script_dialog_get_dialog_type
+webkit_script_dialog_get_message
+webkit_script_dialog_confirm_set_confirmed
+webkit_script_dialog_prompt_get_default_text
+webkit_script_dialog_prompt_set_text
 
 <SUBSECTION Standard>
 WebKitWebViewClass
@@ -95,9 +103,11 @@ WEBKIT_TYPE_WEB_VIEW
 WEBKIT_WEB_VIEW_CLASS
 WEBKIT_IS_WEB_VIEW_CLASS
 WEBKIT_WEB_VIEW_GET_CLASS
+WEBKIT_TYPE_SCRIPT_DIALOG
 
 <SUBSECTION Private>
 webkit_web_view_get_type
+webkit_script_dialog_get_type
 WebKitWebViewPrivate
 </SECTION>
 
@@ -220,6 +230,8 @@ webkit_settings_get_enable_webaudio
 webkit_settings_set_enable_webaudio
 webkit_settings_get_enable_webgl
 webkit_settings_set_enable_webgl
+webkit_settings_get_zoom_text_only
+webkit_settings_set_zoom_text_only
 
 <SUBSECTION Standard>
 WebKitSettingsClass
@@ -461,3 +473,30 @@ webkit_policy_error_quark
 webkit_download_error_quark
 </SECTION>
 
+<SECTION>
+<FILE>WebKitFindController</FILE>
+WebKitFindController
+WebKitFindOptions
+webkit_find_controller_search
+webkit_find_controller_search_finish
+webkit_find_controller_search_next
+webkit_find_controller_search_previous
+webkit_find_controller_get_search_text
+webkit_find_controller_count_matches
+webkit_find_controller_get_options
+webkit_find_controller_get_max_match_count
+webkit_find_controller_get_web_view
+
+<SUBSECTION Standard>
+WebKitFindControllerClass
+WEBKIT_TYPE_FIND_CONTROLLER
+WEBKIT_FIND_CONTROLLER
+WEBKIT_IS_FIND_CONTROLLER
+WEBKIT_FIND_CONTROLLER_CLASS
+WEBKIT_IS_FIND_CONTROLLER_CLASS
+WEBKIT_FIND_CONTROLLER_GET_CLASS
+
+<SUBSECTION Private>
+WebKitFindControllerPrivate
+webkit_find_controller_get_type
+</SECTION>

@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -47,16 +47,7 @@
 namespace WebCore {
 
     class Blob;
-    class DOMFileSystemSync;
     class DOMURL;
-    class Database;
-    class DatabaseCallback;
-    class DatabaseSync;
-    class EntryCallback;
-    class EntrySync;
-    class ErrorCallback;
-    class FileSystemCallback;
-    class IDBFactory;
     class NotificationCenter;
     class ScheduledAction;
     class WorkerInspectorController;
@@ -118,29 +109,9 @@ namespace WebCore {
         NotificationCenter* webkitNotifications() const;
 #endif
 
-#if ENABLE(SQL_DATABASE)
-        // HTML 5 client-side database
-        PassRefPtr<Database> openDatabase(const String& name, const String& version, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback> creationCallback, ExceptionCode&);
-        PassRefPtr<DatabaseSync> openDatabaseSync(const String& name, const String& version, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback> creationCallback, ExceptionCode&);
-
-        // Not implemented yet.
-        virtual bool allowDatabaseAccess() const { return true; }
-        // Not implemented for real yet.
-        virtual void databaseExceededQuota(const String&);
-#endif
         virtual bool isContextThread() const;
         virtual bool isJSExecutionForbidden() const;
 
-#if ENABLE(FILE_SYSTEM)
-        enum FileSystemType {
-            TEMPORARY,
-            PERSISTENT,
-        };
-        void webkitRequestFileSystem(int type, long long size, PassRefPtr<FileSystemCallback> successCallback, PassRefPtr<ErrorCallback>);
-        PassRefPtr<DOMFileSystemSync> webkitRequestFileSystemSync(int type, long long size, ExceptionCode&);
-        void webkitResolveLocalFileSystemURL(const String& url, PassRefPtr<EntryCallback> successCallback, PassRefPtr<ErrorCallback>);
-        PassRefPtr<EntrySync> webkitResolveLocalFileSystemSyncURL(const String& url, ExceptionCode&);
-#endif
 #if ENABLE(INSPECTOR)
         WorkerInspectorController* workerInspectorController() { return m_workerInspectorController.get(); }
 #endif
@@ -169,9 +140,6 @@ namespace WebCore {
         void registerObserver(Observer*);
         void unregisterObserver(Observer*);
         void notifyObserversOfStop();
-#if ENABLE(INDEXED_DATABASE)
-        IDBFactory* webkitIndexedDB() const;
-#endif
 
     protected:
         WorkerContext(const KURL&, const String&, WorkerThread*, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType);
@@ -219,12 +187,6 @@ namespace WebCore {
         HashSet<Observer*> m_workerObservers;
 
         OwnPtr<WorkerEventQueue> m_eventQueue;
-
-#if ENABLE(INDEXED_DATABASE)
-        mutable RefPtr<IDBFactory> m_idbFactory;
-        mutable RefPtr<IDBFactoryBackendInterface> m_idbFactoryBackendInterface;
-#endif
-
     };
 
 } // namespace WebCore

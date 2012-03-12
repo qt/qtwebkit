@@ -65,16 +65,14 @@ JSValue JSCallbackData::invokeCallback(MarkedArgumentBuffer& args, bool* raisedE
         return JSValue();
 
     globalObject()->globalData().timeoutChecker.start();
+    InspectorInstrumentationCookie cookie = JSMainThreadExecState::instrumentFunctionCall(context, callType, callData);
 
     bool contextIsDocument = context->isDocument();
-    JSValue result;
-    if (contextIsDocument) {
-        Frame* frame = static_cast<JSDOMWindow*>(globalObject())->impl()->frame();
-        Page* page = frame ? frame->page() : 0;
-        result = JSMainThreadExecState::instrumentedCall(page, exec, function, callType, callData, callback(), args);
-    } else
-        result = JSC::call(exec, function, callType, callData, callback(), args);
+    JSValue result = contextIsDocument
+        ? JSMainThreadExecState::call(exec, function, callType, callData, callback(), args)
+        : JSC::call(exec, function, callType, callData, callback(), args);
 
+    InspectorInstrumentation::didCallFunction(cookie);
     globalObject()->globalData().timeoutChecker.stop();
 
     if (contextIsDocument)

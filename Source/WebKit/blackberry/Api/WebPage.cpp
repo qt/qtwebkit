@@ -72,6 +72,9 @@
 #include "LayerWebKitThread.h"
 #include "NetworkManager.h"
 #include "NodeRenderStyle.h"
+#if ENABLE(NOTIFICATIONS)
+#include "NotificationPresenterImpl.h"
+#endif
 #include "Page.h"
 #include "PageCache.h"
 #include "PageGroup.h"
@@ -330,6 +333,13 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
 {
 }
 
+WebPage::WebPage(WebPageClient* client, const WebString& pageGroupName, const Platform::IntRect& rect)
+{
+    globalInitialize();
+    d = new WebPagePrivate(this, client, rect);
+    d->init(pageGroupName);
+}
+
 WebPagePrivate::~WebPagePrivate()
 {
     // Hand the backingstore back to another owner if necessary.
@@ -366,6 +376,17 @@ WebPagePrivate::~WebPagePrivate()
     delete m_dumpRenderTree;
     m_dumpRenderTree = 0;
 #endif
+}
+
+WebPage::~WebPage()
+{
+    delete d;
+    d = 0;
+}
+
+Page* WebPagePrivate::core(const WebPage* webPage)
+{
+    return webPage->d->m_page;
 }
 
 void WebPagePrivate::init(const WebString& pageGroupName)
@@ -410,6 +431,10 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     pageClients.deviceOrientationClient = new DeviceOrientationClientBlackBerry(this);
     m_page = new Page(pageClients);
 
+#if ENABLE(NOTIFICATIONS)
+    WebCore::provideNotification(m_page, NotificationPresenterImpl::instance());
+#endif
+
 #if ENABLE(CLIENT_BASED_GEOLOCATION) && ENABLE_DRT
     // In case running in DumpRenderTree mode set the controller to mock provider.
     if (getenv("drtRun"))
@@ -449,6 +474,7 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     m_page->settings()->setUseHixie76WebSocketProtocol(false);
     m_page->settings()->setInteractiveFormValidationEnabled(true);
     m_page->settings()->setAllowUniversalAccessFromFileURLs(false);
+    m_page->settings()->setAllowFileAccessFromFileURLs(false);
 
     m_backingStoreClient = BackingStoreClient::create(m_mainFrame, /* parent frame */ 0, m_webPage);
     // The direct access to BackingStore is left here for convenience since it
@@ -456,7 +482,7 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     m_backingStore = m_backingStoreClient->backingStore();
 
     m_page->settings()->setSpatialNavigationEnabled(m_webSettings->isSpatialNavigationEnabled());
-    blockClickRadius = int(roundf(0.35 * Platform::Graphics::Screen::pixelsPerInch(0).width())); // The clicked rectangle area should be a fixed unit of measurement.
+    blockClickRadius = int(roundf(0.35 * Platform::Graphics::Screen::primaryScreen()->pixelsPerInch(0).width())); // The clicked rectangle area should be a fixed unit of measurement.
 
     m_page->settings()->setDelegateSelectionPaint(true);
 }
@@ -507,6 +533,32 @@ void WebPagePrivate::load(const char* url, const char* networkToken, const char*
     m_mainFrame->loader()->load(request, "" /* name */, false);
 }
 
+void WebPage::load(const char* url, const char* networkToken, bool isInitial)
+{
+    d->load(url, networkToken, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, isInitial, false);
+}
+
+void WebPage::loadExtended(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy cachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool mustHandleInternally)
+{
+    d->load(url, networkToken, method, cachePolicy, data, dataLength, headers, headersLength, false, mustHandleInternally, false, "");
+}
+
+void WebPage::loadFile(const char* path, const char* overrideContentType)
+{
+    std::string fileUrl(path);
+    if (!fileUrl.find("/"))
+        fileUrl.insert(0, "file://");
+    else if (fileUrl.find("file:///"))
+        return;
+
+    d->load(fileUrl.c_str(), 0, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, false, overrideContentType);
+}
+
+void WebPage::download(const Platform::NetworkRequest& request)
+{
+    d->load(request.getUrlRef().c_str(), 0, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, true, "");
+}
+
 void WebPagePrivate::loadString(const char* string, const char* baseURL, const char* contentType, const char* failingURL)
 {
     KURL kurl = parseUrl(baseURL);
@@ -518,6 +570,11 @@ void WebPagePrivate::loadString(const char* string, const char* baseURL, const c
                                   extractCharsetFromMediaType(contentType),
                                   failingURL ? parseUrl(failingURL) : KURL());
     m_mainFrame->loader()->load(request, substituteData, false);
+}
+
+void WebPage::loadString(const char* string, const char* baseURL, const char* mimeType, const char* failingURL)
+{
+    d->loadString(string, baseURL, mimeType, failingURL);
 }
 
 bool WebPagePrivate::executeJavaScript(const char* script, JavaScriptDataType& returnType, WebString& returnValue)
@@ -562,6 +619,11 @@ bool WebPagePrivate::executeJavaScript(const char* script, JavaScriptDataType& r
     }
 
     return true;
+}
+
+bool WebPage::executeJavaScript(const char* script, JavaScriptDataType& returnType, WebString& returnValue)
+{
+    return d->executeJavaScript(script, returnType, returnValue);
 }
 
 bool WebPagePrivate::executeJavaScriptInIsolatedWorld(const ScriptSourceCode& sourceCode, JavaScriptDataType& returnType, WebString& returnValue)
@@ -612,6 +674,33 @@ bool WebPagePrivate::executeJavaScriptInIsolatedWorld(const ScriptSourceCode& so
     return true;
 }
 
+bool WebPage::executeJavaScriptInIsolatedWorld(const std::wstring& script, JavaScriptDataType& returnType, WebString& returnValue)
+{
+    // On our platform wchar_t is unsigned int and UChar is unsigned short
+    // so we have to convert using ICU conversion function
+    int lengthCopied = 0;
+    UErrorCode error = U_ZERO_ERROR;
+    const int length = script.length() + 1 /*null termination char*/;
+    UChar data[length];
+
+    // FIXME: PR 138162 is giving U_INVALID_CHAR_FOUND error.
+    u_strFromUTF32(data, length, &lengthCopied, reinterpret_cast<const UChar32*>(script.c_str()), script.length(), &error);
+    BLACKBERRY_ASSERT(error == U_ZERO_ERROR);
+    if (error != U_ZERO_ERROR) {
+        Platform::logAlways(Platform::LogLevelCritical, "WebPage::executeJavaScriptInIsolatedWorld failed to convert UTF16 to JavaScript!");
+        return false;
+    }
+    String str = String(data, lengthCopied);
+    ScriptSourceCode sourceCode(str, KURL());
+    return d->executeJavaScriptInIsolatedWorld(sourceCode, returnType, returnValue);
+}
+
+bool WebPage::executeJavaScriptInIsolatedWorld(const char* script, JavaScriptDataType& returnType, WebString& returnValue)
+{
+    ScriptSourceCode sourceCode(String::fromUTF8(script), KURL());
+    return d->executeJavaScriptInIsolatedWorld(sourceCode, returnType, returnValue);
+}
+
 void WebPagePrivate::stopCurrentLoad()
 {
     // This function should contain all common code triggered by WebPage::load
@@ -624,6 +713,11 @@ void WebPagePrivate::stopCurrentLoad()
     // Cancel any deferred script that hasn't been processed yet.
     FrameLoaderClientBlackBerry* frameLoaderClient = static_cast<FrameLoaderClientBlackBerry*>(m_mainFrame->loader()->client());
     frameLoaderClient->setDeferredManualScript(KURL());
+}
+
+void WebPage::stopLoading()
+{
+    d->stopCurrentLoad();
 }
 
 static void closeURLRecursively(Frame* frame)
@@ -650,6 +744,11 @@ void WebPagePrivate::prepareToDestroy()
     // so it can take effect while all the client's state (e.g. scroll position)
     // is still present.
     closeURLRecursively(m_mainFrame);
+}
+
+void WebPage::prepareToDestroy()
+{
+    d->prepareToDestroy();
 }
 
 void WebPagePrivate::setLoadState(LoadState state)
@@ -1028,6 +1127,24 @@ void WebPagePrivate::setScrollPosition(const IntPoint& pos)
     m_backingStoreClient->setScrollPosition(pos);
 }
 
+// Setting the scroll position is in transformed coordinates.
+void WebPage::setScrollPosition(const Platform::IntPoint& point)
+{
+    if (d->transformedPointEqualsUntransformedPoint(point, d->scrollPosition()))
+        return;
+
+    // If the user recently performed an event, this new scroll position
+    // could possibly be a result of that. Or not, this is just a heuristic.
+    if (currentTime() - d->m_lastUserEventTimestamp < manualScrollInterval)
+        d->m_userPerformedManualScroll = true;
+
+    d->m_backingStoreClient->setIsClientGeneratedScroll(true);
+    d->m_mainFrame->view()->setCanOverscroll(true);
+    d->setScrollPosition(d->mapFromTransformed(point));
+    d->m_mainFrame->view()->setCanOverscroll(false);
+    d->m_backingStoreClient->setIsClientGeneratedScroll(false);
+}
+
 bool WebPagePrivate::shouldSendResizeEvent()
 {
     if (!m_mainFrame->document())
@@ -1066,14 +1183,6 @@ void WebPagePrivate::didResumeLoading()
     m_client->didResumeLoading();
 }
 
-bool WebPage::scrollBy(const Platform::IntSize& delta, bool scrollMainFrame)
-{
-    d->m_backingStoreClient->setIsClientGeneratedScroll(true);
-    bool b = d->scrollBy(delta.width(), delta.height(), scrollMainFrame);
-    d->m_backingStoreClient->setIsClientGeneratedScroll(false);
-    return b;
-}
-
 bool WebPagePrivate::scrollBy(int deltaX, int deltaY, bool scrollMainFrame)
 {
     IntSize delta(deltaX, deltaY);
@@ -1104,9 +1213,12 @@ bool WebPagePrivate::scrollBy(int deltaX, int deltaY, bool scrollMainFrame)
     return true;
 }
 
-void WebPage::notifyInRegionScrollStatusChanged(bool status)
+bool WebPage::scrollBy(const Platform::IntSize& delta, bool scrollMainFrame)
 {
-    d->notifyInRegionScrollStatusChanged(status);
+    d->m_backingStoreClient->setIsClientGeneratedScroll(true);
+    bool b = d->scrollBy(delta.width(), delta.height(), scrollMainFrame);
+    d->m_backingStoreClient->setIsClientGeneratedScroll(false);
+    return b;
 }
 
 void WebPagePrivate::notifyInRegionScrollStatusChanged(bool status)
@@ -1115,6 +1227,11 @@ void WebPagePrivate::notifyInRegionScrollStatusChanged(bool status)
         enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling(m_inRegionScrollStartingNode.get());
         m_inRegionScrollStartingNode = 0;
     }
+}
+
+void WebPage::notifyInRegionScrollStatusChanged(bool status)
+{
+    d->notifyInRegionScrollStatusChanged(status);
 }
 
 void WebPagePrivate::enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling(Node* scrolledNode)
@@ -1399,6 +1516,11 @@ double WebPagePrivate::zoomToFitScale() const
     return contentWidth > 0.0 ? static_cast<double>(m_actualVisibleWidth) / contentWidth : 1.0;
 }
 
+double WebPage::zoomToFitScale() const
+{
+    return d->zoomToFitScale();
+}
+
 double WebPagePrivate::initialScale() const
 {
     if (m_initialScale > 0.0)
@@ -1408,6 +1530,11 @@ double WebPagePrivate::initialScale() const
         return zoomToFitScale();
 
     return 1.0;
+}
+
+double WebPage::initialScale() const
+{
+    return d->initialScale();
 }
 
 void WebPage::initializeIconDataBase()
@@ -1425,16 +1552,6 @@ double WebPage::currentScale() const
     return d->currentScale();
 }
 
-double WebPage::initialScale() const
-{
-    return d->initialScale();
-}
-
-double WebPage::zoomToFitScale() const
-{
-    return d->zoomToFitScale();
-}
-
 void WebPage::setInitialScale(double initialScale)
 {
     d->setInitialScale(initialScale);
@@ -1450,11 +1567,6 @@ void WebPage::setMinimumScale(double minimumScale)
     d->setMinimumScale(minimumScale);
 }
 
-double WebPage::maximumScale() const
-{
-    return d->maximumScale();
-}
-
 void WebPage::setMaximumScale(double maximumScale)
 {
     d->setMaximumScale(maximumScale);
@@ -1466,6 +1578,11 @@ double WebPagePrivate::maximumScale() const
         return m_maximumScale;
 
     return hasVirtualViewport() ? std::max<double>(zoomToFitScale(), 4.0) : 4.0;
+}
+
+double WebPage::maximumScale() const
+{
+    return d->maximumScale();
 }
 
 void WebPagePrivate::resetScales()
@@ -1486,6 +1603,12 @@ IntPoint WebPagePrivate::transformedScrollPosition() const
     return m_backingStoreClient->transformedScrollPosition();
 }
 
+// Returned scroll position is in transformed coordinates.
+Platform::IntPoint WebPage::scrollPosition() const
+{
+    return d->transformedScrollPosition();
+}
+
 IntPoint WebPagePrivate::transformedMaximumScrollPosition() const
 {
     return m_backingStoreClient->transformedMaximumScrollPosition();
@@ -1496,9 +1619,14 @@ IntSize WebPagePrivate::transformedActualVisibleSize() const
     return IntSize(m_actualVisibleWidth, m_actualVisibleHeight);
 }
 
+Platform::IntSize WebPage::viewportSize() const
+{
+    return d->transformedActualVisibleSize();
+}
+
 IntSize WebPagePrivate::transformedViewportSize() const
 {
-    return Platform::Graphics::Screen::size();
+    return Platform::Graphics::Screen::primaryScreen()->size();
 }
 
 IntRect WebPagePrivate::transformedVisibleContentsRect() const
@@ -1947,6 +2075,11 @@ ActiveNodeContext WebPagePrivate::activeNodeContext(TargetDetectionStrategy stra
     return context;
 }
 
+ActiveNodeContext WebPage::activeNodeContext(TargetDetectionStrategy strategy) const
+{
+    return d->activeNodeContext(strategy);
+}
+
 void WebPagePrivate::updateCursor()
 {
     int buttonMask = 0;
@@ -2029,10 +2162,10 @@ IntSize WebPagePrivate::fixedLayoutSize(bool snapToIncrement) const
             // layout width.
 #if ENABLE(ORIENTATION_EVENTS)
             minWidth = m_mainFrame->orientation() % 180
-                ? Platform::Graphics::Screen::height()
-                : Platform::Graphics::Screen::width();
+                ? Platform::Graphics::Screen::primaryScreen()->height()
+                : Platform::Graphics::Screen::primaryScreen()->width();
 #else
-            minWidth = Platform::Graphics::Screen::width();
+            minWidth = Platform::Graphics::Screen::primaryScreen()->width();
 #endif
         }
     }
@@ -2189,11 +2322,6 @@ IntRect WebPagePrivate::getRecursiveVisibleWindowRect(ScrollView* view, bool noC
     return visibleWindowRect;
 }
 
-void WebPage::assignFocus(Platform::FocusDirection direction)
-{
-    d->assignFocus(direction);
-}
-
 void WebPagePrivate::assignFocus(Platform::FocusDirection direction)
 {
     ASSERT((int) Platform::FocusDirectionNone == (int) FocusDirectionNone);
@@ -2215,6 +2343,11 @@ void WebPagePrivate::assignFocus(Platform::FocusDirection direction)
     default:
         ASSERT_NOT_REACHED();
     }
+}
+
+void WebPage::assignFocus(Platform::FocusDirection direction)
+{
+    d->assignFocus(direction);
 }
 
 Platform::IntRect WebPagePrivate::focusNodeRect()
@@ -2563,11 +2696,6 @@ IntRect WebPagePrivate::blockZoomRectForNode(Node* node)
     return blockRect;
 }
 
-void WebPage::blockZoomAnimationFinished()
-{
-    d->zoomBlock();
-}
-
 // This function should not be called directly.
 // It is called after the animation ends (see above).
 void WebPagePrivate::zoomBlock()
@@ -2649,19 +2777,16 @@ void WebPagePrivate::zoomBlock()
     m_client->zoomChanged(m_webPage->isMinZoomed(), m_webPage->isMaxZoomed(), !shouldZoomOnEscape(), currentScale());
 }
 
+void WebPage::blockZoomAnimationFinished()
+{
+    d->zoomBlock();
+}
 
 void WebPagePrivate::resetBlockZoom()
 {
     m_currentBlockZoomNode = 0;
     m_currentBlockZoomAdjustedNode = 0;
     m_shouldReflowBlock = false;
-}
-
-WebPage::WebPage(WebPageClient* client, const WebString& pageGroupName, const Platform::IntRect& rect)
-{
-    globalInitialize();
-    d = new WebPagePrivate(this, client, rect);
-    d->init(pageGroupName);
 }
 
 void WebPage::destroyWebPageCompositor()
@@ -2703,88 +2828,9 @@ void WebPage::destroy()
     delete this;
 }
 
-WebPage::~WebPage()
-{
-    delete d;
-    d = 0;
-}
-
 WebPageClient* WebPage::client() const
 {
     return d->m_client;
-}
-
-void WebPage::load(const char* url, const char* networkToken, bool isInitial)
-{
-    d->load(url, networkToken, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, isInitial, false);
-}
-
-void WebPage::loadExtended(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy cachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool mustHandleInternally)
-{
-    d->load(url, networkToken, method, cachePolicy, data, dataLength, headers, headersLength, false, mustHandleInternally, false, "");
-}
-
-void WebPage::loadFile(const char* path, const char* overrideContentType)
-{
-    std::string fileUrl(path);
-    if (!fileUrl.find("/"))
-        fileUrl.insert(0, "file://");
-    else if (fileUrl.find("file:///"))
-        return;
-
-    d->load(fileUrl.c_str(), 0, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, false, overrideContentType);
-}
-
-void WebPage::loadString(const char* string, const char* baseURL, const char* mimeType, const char* failingURL)
-{
-    d->loadString(string, baseURL, mimeType, failingURL);
-}
-
-void WebPage::download(const Platform::NetworkRequest& request)
-{
-    d->load(request.getUrlRef().c_str(), 0, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, true, "");
-}
-
-bool WebPage::executeJavaScript(const char* script, JavaScriptDataType& returnType, WebString& returnValue)
-{
-    return d->executeJavaScript(script, returnType, returnValue);
-}
-
-bool WebPage::executeJavaScriptInIsolatedWorld(const std::wstring& script, JavaScriptDataType& returnType, WebString& returnValue)
-{
-    // On our platform wchar_t is unsigned int and UChar is unsigned short
-    // so we have to convert using ICU conversion function
-    int lengthCopied = 0;
-    UErrorCode error = U_ZERO_ERROR;
-    const int length = script.length() + 1 /*null termination char*/;
-    UChar data[length];
-
-    // FIXME: PR 138162 is giving U_INVALID_CHAR_FOUND error.
-    u_strFromUTF32(data, length, &lengthCopied, reinterpret_cast<const UChar32*>(script.c_str()), script.length(), &error);
-    BLACKBERRY_ASSERT(error == U_ZERO_ERROR);
-    if (error != U_ZERO_ERROR) {
-        Platform::logAlways(Platform::LogLevelCritical, "WebPage::executeJavaScriptInIsolatedWorld failed to convert UTF16 to JavaScript!");
-        return false;
-    }
-    String str = String(data, lengthCopied);
-    ScriptSourceCode sourceCode(str, KURL());
-    return d->executeJavaScriptInIsolatedWorld(sourceCode, returnType, returnValue);
-}
-
-bool WebPage::executeJavaScriptInIsolatedWorld(const char* script, JavaScriptDataType& returnType, WebString& returnValue)
-{
-    ScriptSourceCode sourceCode(String::fromUTF8(script), KURL());
-    return d->executeJavaScriptInIsolatedWorld(sourceCode, returnType, returnValue);
-}
-
-void WebPage::stopLoading()
-{
-    d->stopCurrentLoad();
-}
-
-void WebPage::prepareToDestroy()
-{
-    d->prepareToDestroy();
 }
 
 int WebPage::backForwardListLength() const
@@ -2953,11 +2999,6 @@ void WebPage::setColorInput(const WebString& value)
     d->m_inputHandler->setInputValue(String(value.impl()));
 }
 
-ActiveNodeContext WebPage::activeNodeContext(TargetDetectionStrategy strategy) const
-{
-    return d->activeNodeContext(strategy);
-}
-
 void WebPage::setVirtualViewportSize(int width, int height)
 {
     d->m_virtualViewportWidth = width;
@@ -2976,9 +3017,9 @@ IntSize WebPagePrivate::recomputeVirtualViewportFromViewportArguments()
         return IntSize();
 
     int desktopWidth = defaultMaxLayoutSize().width();
-    int deviceWidth = Platform::Graphics::Screen::width();
-    int deviceHeight = Platform::Graphics::Screen::height();
-    FloatSize currentPPI = Platform::Graphics::Screen::pixelsPerInch(-1);
+    int deviceWidth = Platform::Graphics::Screen::primaryScreen()->width();
+    int deviceHeight = Platform::Graphics::Screen::primaryScreen()->height();
+    FloatSize currentPPI = Platform::Graphics::Screen::primaryScreen()->pixelsPerInch(-1);
     int deviceDPI = int(roundf((currentPPI.width() + currentPPI.height()) / 2));
     if (m_viewportArguments.targetDensityDpi == ViewportArguments::ValueAuto) {
         // Auto means 160dpi if we leave it alone. This looks terrible for pages wanting 1:1.
@@ -2987,6 +3028,7 @@ IntSize WebPagePrivate::recomputeVirtualViewportFromViewportArguments()
     }
 
     ViewportAttributes result = computeViewportAttributes(m_viewportArguments, desktopWidth, deviceWidth, deviceHeight, deviceDPI, m_defaultLayoutSize);
+    m_page->setDeviceScaleFactor(result.devicePixelRatio);
     return IntSize(result.layoutSize.width(), result.layoutSize.height());
 }
 
@@ -3048,15 +3090,9 @@ void WebPagePrivate::onInputLocaleChanged(bool isRTL)
     }
 }
 
-void WebPage::setScreenOrientation(int orientation)
+void WebPage::onInputLocaleChanged(bool isRTL)
 {
-    d->m_pendingOrientation = orientation;
-}
-
-void WebPage::applyPendingOrientationIfNeeded()
-{
-    if (d->m_pendingOrientation != -1)
-        d->setScreenOrientation(d->m_pendingOrientation);
+    d->onInputLocaleChanged(isRTL);
 }
 
 void WebPagePrivate::suspendBackingStore()
@@ -3111,14 +3147,15 @@ void WebPagePrivate::setScreenOrientation(int orientation)
 #endif
 }
 
-Platform::IntSize WebPage::viewportSize() const
+void WebPage::setScreenOrientation(int orientation)
 {
-    return d->transformedActualVisibleSize();
+    d->m_pendingOrientation = orientation;
 }
 
-void WebPage::setViewportSize(const Platform::IntSize& viewportSize, bool ensureFocusElementVisible)
+void WebPage::applyPendingOrientationIfNeeded()
 {
-    d->setViewportSize(viewportSize, ensureFocusElementVisible);
+    if (d->m_pendingOrientation != -1)
+        d->setScreenOrientation(d->m_pendingOrientation);
 }
 
 void WebPagePrivate::screenRotated()
@@ -3165,7 +3202,7 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
     bool newVisibleRectContainsOldVisibleRect = (m_actualVisibleHeight <= transformedActualVisibleSize.height())
                                           && (m_actualVisibleWidth <= transformedActualVisibleSize.width());
 
-    bool atInitialScale = currentScale() == initialScale();
+    bool atInitialScale = m_webPage->isAtInitialZoom();
     bool atTop = !scrollPosition().y();
     bool atLeft = !scrollPosition().x();
 
@@ -3235,8 +3272,10 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
     if (setViewMode(viewMode()))
         needsLayout = true;
 
+    bool needsLayoutToFindContentSize = hasPendingOrientation;
+
     // We need to update the viewport size of the WebCore::ScrollView...
-    updateViewportSize(!hasPendingOrientation /* setFixedReportedSize */, false /* sendResizeEvent */);
+    updateViewportSize(!needsLayoutToFindContentSize /* setFixedReportedSize */, false /* sendResizeEvent */);
     notifyTransformedContentsSizeChanged();
 
     // If automatic zooming is disabled, prevent zooming below.
@@ -3273,7 +3312,7 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
     // Do our own clamping.
     scale = clampedScale(scale);
 
-    if (hasPendingOrientation) {
+    if (needsLayoutToFindContentSize) {
         // Set the fixed reported size here so that innerWidth|innerHeight works
         // with this new scale.
         TransformationMatrix rotationMatrix;
@@ -3281,6 +3320,7 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
         IntRect viewportRect = IntRect(IntPoint::zero(), transformedActualVisibleSize);
         IntRect actualVisibleRect = enclosingIntRect(rotationMatrix.inverse().mapRect(FloatRect(viewportRect)));
         m_mainFrame->view()->setFixedReportedSize(actualVisibleRect.size());
+        m_mainFrame->view()->repaintFixedElementsAfterScrolling();
     }
 
     // We're going to need to send a resize event to JavaScript because
@@ -3339,26 +3379,30 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
         ensureContentVisible(!newVisibleRectContainsOldVisibleRect);
 }
 
-void WebPage::setDefaultLayoutSize(int width, int height)
+void WebPage::setViewportSize(const Platform::IntSize& viewportSize, bool ensureFocusElementVisible)
 {
-    IntSize size(width, height);
-    d->setDefaultLayoutSize(size);
+    d->setViewportSize(viewportSize, ensureFocusElementVisible);
 }
 
 void WebPagePrivate::setDefaultLayoutSize(const IntSize& size)
 {
-    if (size == m_defaultLayoutSize)
-        return;
-
-    IntSize screenSize = Platform::Graphics::Screen::size();
+    IntSize screenSize = Platform::Graphics::Screen::primaryScreen()->size();
     ASSERT(size.width() <= screenSize.width() && size.height() <= screenSize.height());
     m_defaultLayoutSize = size.expandedTo(minimumLayoutSize).shrunkTo(screenSize);
+}
 
-    bool needsLayout = setViewMode(viewMode());
+void WebPage::setDefaultLayoutSize(int width, int height)
+{
+    IntSize size(width, height);
+    if (size == d->m_defaultLayoutSize)
+        return;
+
+    d->setDefaultLayoutSize(size);
+    bool needsLayout = d->setViewMode(d->viewMode());
     if (needsLayout) {
-        setNeedsLayout();
-        if (!isLoading())
-            requestLayoutIfNeeded();
+        d->setNeedsLayout();
+        if (!d->isLoading())
+            d->requestLayoutIfNeeded();
     }
 }
 
@@ -3590,12 +3634,6 @@ bool WebPage::touchEvent(const Platform::TouchEvent& event)
     return false;
 }
 
-void WebPage::setScrollOriginPoint(const Platform::IntPoint& point)
-{
-    Platform::IntPoint untransformedPoint = d->mapFromTransformed(point);
-    d->setScrollOriginPoint(untransformedPoint);
-}
-
 void WebPagePrivate::setScrollOriginPoint(const Platform::IntPoint& point)
 {
     m_inRegionScrollStartingNode = 0;
@@ -3604,6 +3642,12 @@ void WebPagePrivate::setScrollOriginPoint(const Platform::IntPoint& point)
         return;
 
     m_client->notifyInRegionScrollingStartingPointChanged(inRegionScrollableAreasForPoint(point));
+}
+
+void WebPage::setScrollOriginPoint(const Platform::IntPoint& point)
+{
+    Platform::IntPoint untransformedPoint = d->mapFromTransformed(point);
+    d->setScrollOriginPoint(untransformedPoint);
 }
 
 bool WebPagePrivate::dispatchTouchEventToFullScreenPlugin(PluginView* plugin, const Platform::TouchEvent& event)
@@ -3733,6 +3777,38 @@ void WebPagePrivate::clearFocusNode()
 
     if (frame->document()->focusedNode())
         frame->page()->focusController()->setFocusedNode(0, frame);
+}
+
+WebString WebPage::textEncoding()
+{
+    Frame* frame = d->focusedOrMainFrame();
+    if (!frame)
+        return "";
+
+    Document* document = frame->document();
+    if (!document)
+        return "";
+
+    return document->loader()->writer()->encoding();
+}
+
+WebString WebPage::forcedTextEncoding()
+{
+    Frame* frame = d->focusedOrMainFrame();
+    if (!frame)
+        return "";
+
+    Document* document = frame->document();
+    if (!document)
+        return "";
+
+    return document->loader()->overrideEncoding();
+}
+
+void WebPage::setForcedTextEncoding(const char* encoding)
+{
+    if (encoding && d->focusedOrMainFrame() && d->focusedOrMainFrame()->loader() && d->focusedOrMainFrame()->loader())
+        return d->focusedOrMainFrame()->loader()->reloadWithOverrideEncoding(encoding);
 }
 
 bool WebPagePrivate::scrollNodeRecursively(Node* node, const IntSize& delta)
@@ -3960,7 +4036,7 @@ int32_t WebPage::commitText(spannable_string_t* spannableString, int32_t relativ
     return d->m_inputHandler->commitText(spannableString, relativeCursorPosition);
 }
 
-void WebPage::spellCheckingEnabled(bool enabled)
+void WebPage::setSpellCheckingEnabled(bool enabled)
 {
     static_cast<EditorClientBlackBerry*>(d->m_page->editorClient())->enableSpellChecking(enabled);
 }
@@ -4053,62 +4129,6 @@ void WebPage::selectAtPoint(const Platform::IntPoint& location)
     d->m_selectionHandler->selectAtPoint(selectionLocation);
 }
 
-// Returned scroll position is in transformed coordinates.
-Platform::IntPoint WebPage::scrollPosition() const
-{
-    return d->transformedScrollPosition();
-}
-
-// Setting the scroll position is in transformed coordinates.
-void WebPage::setScrollPosition(const Platform::IntPoint& point)
-{
-    if (d->transformedPointEqualsUntransformedPoint(point, d->scrollPosition()))
-        return;
-
-    // If the user recently performed an event, this new scroll position
-    // could possibly be a result of that. Or not, this is just a heuristic.
-    if (currentTime() - d->m_lastUserEventTimestamp < manualScrollInterval)
-        d->m_userPerformedManualScroll = true;
-
-    d->m_backingStoreClient->setIsClientGeneratedScroll(true);
-    d->m_mainFrame->view()->setCanOverscroll(true);
-    d->setScrollPosition(d->mapFromTransformed(point));
-    d->m_mainFrame->view()->setCanOverscroll(false);
-    d->m_backingStoreClient->setIsClientGeneratedScroll(false);
-}
-
-WebString WebPage::textEncoding()
-{
-    Frame* frame = d->focusedOrMainFrame();
-    if (!frame)
-        return "";
-
-    Document* document = frame->document();
-    if (!document)
-        return "";
-
-    return document->loader()->writer()->encoding();
-}
-
-WebString WebPage::forcedTextEncoding()
-{
-    Frame* frame = d->focusedOrMainFrame();
-    if (!frame)
-        return "";
-
-    Document* document = frame->document();
-    if (!document)
-        return "";
-
-    return document->loader()->overrideEncoding();
-}
-
-void WebPage::setForcedTextEncoding(const char* encoding)
-{
-    if (encoding && d->focusedOrMainFrame() && d->focusedOrMainFrame()->loader() && d->focusedOrMainFrame()->loader())
-        return d->focusedOrMainFrame()->loader()->reloadWithOverrideEncoding(encoding);
-}
-
 // FIXME: Move to DOMSupport.
 bool WebPagePrivate::canScrollInnerFrame(Frame* frame) const
 {
@@ -4152,7 +4172,6 @@ bool WebPagePrivate::canScrollRenderBox(RenderBox* box)
 static RenderLayer* parentLayer(RenderLayer* layer)
 {
     ASSERT(layer);
-
     if (layer->parent())
         return layer->parent();
 
@@ -4203,7 +4222,6 @@ std::vector<Platform::ScrollViewBase> WebPagePrivate::inRegionScrollableAreasFor
         return emptyReturn;
 
     RenderLayer* layer = renderer->enclosingLayer();
-
     do {
         RenderObject* renderer = layer->renderer();
 
@@ -4231,7 +4249,6 @@ std::vector<Platform::ScrollViewBase> WebPagePrivate::inRegionScrollableAreasFor
         }
 
     } while (layer = parentLayer(layer));
-
     if (validReturn.empty())
         return emptyReturn;
 
@@ -4533,11 +4550,6 @@ bool WebPage::zoomToOneOne()
 
     double scale = 1;
     return d->zoomAboutPoint(scale, d->centerOfVisibleContentsRect());
-}
-
-Platform::IntRect WebPage::focusNodeRect()
-{
-    return d->focusNodeRect();
 }
 
 void WebPage::setFocused(bool focused)
@@ -4903,20 +4915,12 @@ void WebPage::notifyPageResume()
 
 void WebPage::notifyPageBackground()
 {
-#if USE(ACCELERATED_COMPOSITING)
-    d->suspendRootLayerCommit();
-#endif
-
     FOR_EACH_PLUGINVIEW(d->m_pluginViews)
         (*it)->handleBackgroundEvent();
 }
 
 void WebPage::notifyPageForeground()
 {
-#if USE(ACCELERATED_COMPOSITING)
-    d->resumeRootLayerCommit();
-#endif
-
     FOR_EACH_PLUGINVIEW(d->m_pluginViews)
         (*it)->handleForegroundEvent();
 }
@@ -4998,11 +5002,6 @@ void WebPage::clearPluginSiteData()
         (*it)->clearSiteData(String());
 }
 
-void WebPage::onInputLocaleChanged(bool isRTL)
-{
-    d->onInputLocaleChanged(isRTL);
-}
-
 void WebPage::onNetworkAvailabilityChanged(bool available)
 {
     updateOnlineStatus(available);
@@ -5027,6 +5026,11 @@ void WebPage::disableWebInspector()
     d->m_page->settings()->setDeveloperExtrasEnabled(false);
 }
 
+bool WebPage::isWebInspectorEnabled()
+{
+    return d->m_page->settings()->developerExtrasEnabled();
+}
+
 void WebPage::enablePasswordEcho()
 {
     d->m_page->settings()->setPasswordEchoEnabled(true);
@@ -5037,15 +5041,10 @@ void WebPage::disablePasswordEcho()
     d->m_page->settings()->setPasswordEchoEnabled(false);
 }
 
-void WebPage::dispatchInspectorMessage(const char* message, int length)
+void WebPage::dispatchInspectorMessage(const std::string& message)
 {
-    String stringMessage(message, length);
+    String stringMessage(message.c_str(), message.length());
     d->m_page->inspectorController()->dispatchMessageFromFrontend(stringMessage);
-}
-
-Frame* WebPage::mainFrame() const
-{
-    return d->m_mainFrame;
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -5414,14 +5413,14 @@ void WebPagePrivate::enterFullscreenForNode(Node* node)
     if (!mmrPlayer)
         return;
 
-    Platform::Graphics::Window* window = mmrPlayer->windowGet();
+    Platform::Graphics::Window* window = mmrPlayer->getWindow();
     if (!window)
         return;
 
     unsigned x, y, width, height;
-    mmrPlayer->windowPositionGet(x, y, width, height);
+    mmrPlayer->getWindowPosition(x, y, width, height);
 
-    const char* contextName = mmrPlayer->mmrContextNameGet();
+    const char* contextName = mmrPlayer->mmrContextName();
     if (!contextName)
         return;
 
@@ -5466,7 +5465,7 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
     coreSettings->setPrivateBrowsingEnabled(webSettings->isPrivateBrowsingEnabled());
     coreSettings->setDefaultFixedFontSize(webSettings->defaultFixedFontSize());
     coreSettings->setDefaultFontSize(webSettings->defaultFontSize());
-    coreSettings->setMinimumFontSize(webSettings->minimumFontSize());
+    coreSettings->setMinimumLogicalFontSize(webSettings->minimumFontSize());
     coreSettings->setSerifFontFamily(webSettings->serifFontFamily().impl());
     coreSettings->setFixedFontFamily(webSettings->fixedFontFamily().impl());
     coreSettings->setSansSerifFontFamily(webSettings->sansSerifFontFamily().impl());
@@ -5546,8 +5545,8 @@ IntSize WebPagePrivate::defaultMaxLayoutSize()
 {
     static IntSize size;
     if (size.isEmpty())
-        size = IntSize(std::max(1024, Platform::Graphics::Screen::landscapeWidth()),
-                       std::max(768, Platform::Graphics::Screen::landscapeHeight()));
+        size = IntSize(std::max(1024, Platform::Graphics::Screen::primaryScreen()->landscapeWidth()),
+                       std::max(768, Platform::Graphics::Screen::primaryScreen()->landscapeHeight()));
 
     return size;
 }
@@ -5592,6 +5591,12 @@ bool WebPage::isWebGLEnabled() const
 void WebPagePrivate::setNeedTouchEvents(bool value)
 {
     m_needTouchEvents = value;
+}
+
+void WebPagePrivate::frameUnloaded(const Frame* frame)
+{
+    m_inputHandler->frameUnloaded(frame);
+    m_inPageSearchManager->frameUnloaded(frame);
 }
 
 }

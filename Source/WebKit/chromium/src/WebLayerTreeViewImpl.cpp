@@ -78,7 +78,7 @@ void WebLayerTreeViewImpl::applyScrollAndScale(const WebCore::IntSize& scrollDel
         m_client->applyScrollAndScale(WebSize(scrollDelta), pageScale);
 }
 
-PassRefPtr<GraphicsContext3D> WebLayerTreeViewImpl::createLayerTreeHostContext3D()
+PassRefPtr<GraphicsContext3D> WebLayerTreeViewImpl::createContext()
 {
     if (!m_client)
         return 0;
@@ -89,20 +89,22 @@ PassRefPtr<GraphicsContext3D> WebLayerTreeViewImpl::createLayerTreeHostContext3D
     return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), GraphicsContext3D::RenderDirectlyToHostWindow, false /* preserveDrawingBuffer */ );
 }
 
+void WebLayerTreeViewImpl::didRecreateContext(bool success)
+{
+    if (m_client)
+        m_client->didRebindGraphicsContext(success);
+}
+
 void WebLayerTreeViewImpl::didCommitAndDrawFrame()
 {
-    // FIXME: route this up to the WebLayerTreeView client
+    if (m_client)
+        m_client->didCommitAndDrawFrame();
 }
 
 void WebLayerTreeViewImpl::didCompleteSwapBuffers()
 {
-    // FIXME: route this up to the WebLayerTreeView client
-}
-
-void WebLayerTreeViewImpl::didRecreateGraphicsContext(bool success)
-{
     if (m_client)
-        m_client->didRebindGraphicsContext(success);
+        m_client->didCompleteSwapBuffers();
 }
 
 void WebLayerTreeViewImpl::scheduleComposite()

@@ -173,13 +173,28 @@ bool isColorInputField(const Element* element)
     return false;
 }
 
+// This is a Tristate return to allow us to override name matching when
+// the attribute is expressly requested for a field. Default indicates
+// that the setting is On which is the default but not expressly requested
+// for the element being checked. On indicates that it is directly added
+// to the element.
 AttributeState elementSupportsAutocorrect(const Element* element)
+{
+    DEFINE_STATIC_LOCAL(QualifiedName, autocorrectAttr, (nullAtom, "autocorrect", nullAtom));
+    return elementAttributeState(element, autocorrectAttr);
+}
+
+AttributeState elementSupportsAutocomplete(const Element* element)
+{
+    return elementAttributeState(element, HTMLNames::autocompleteAttr);
+}
+
+AttributeState elementAttributeState(const Element* element, const QualifiedName& attributeName)
 {
     // First we check the input item itself. If the attribute is not defined,
     // we check its parent form.
-    QualifiedName autocorrectAttr = QualifiedName(nullAtom, "autocorrect", nullAtom);
-    if (element->fastHasAttribute(autocorrectAttr)) {
-        AtomicString attributeString = element->fastGetAttribute(autocorrectAttr);
+    if (element->fastHasAttribute(attributeName)) {
+        AtomicString attributeString = element->fastGetAttribute(attributeName);
         if (equalIgnoringCase(attributeString, "off"))
             return Off;
         if (equalIgnoringCase(attributeString, "on"))
@@ -189,8 +204,8 @@ AttributeState elementSupportsAutocorrect(const Element* element)
     }
     if (element->isFormControlElement()) {
         const HTMLFormControlElement* formElement = static_cast<const HTMLFormControlElement*>(element);
-        if (formElement->form() && formElement->form()->fastHasAttribute(autocorrectAttr)) {
-            AtomicString attributeString = formElement->form()->fastGetAttribute(autocorrectAttr);
+        if (formElement->form() && formElement->form()->fastHasAttribute(attributeName)) {
+            AtomicString attributeString = formElement->form()->fastGetAttribute(attributeName);
             if (equalIgnoringCase(attributeString, "off"))
                 return Off;
             if (equalIgnoringCase(attributeString, "on"))
@@ -254,6 +269,10 @@ VisibleSelection visibleSelectionForRangeInputElement(Element* element, int star
 
     // Must be content editable, generate the range.
     RefPtr<Range> selectionRange = TextIterator::rangeFromLocationAndLength(element, start, end - start);
+
+    if (!selectionRange)
+        return VisibleSelection();
+
     if (start == end)
         return VisibleSelection(selectionRange.get()->startPosition(), DOWNSTREAM);
 
@@ -283,25 +302,6 @@ bool isPositionInNode(Node* node, const Position& position)
     int ec;
 
     return rangeForNode->isPointInRange(domNodeAtPos, offset, ec);
-}
-
-// This is a Tristate return to allow us to override name matching when
-// autocomplete is expressly requested for a field. Default indicates
-// that the setting is On which is the default but not expressly requested
-// for the element being checked. On indicates that it is directly added
-// to the element.
-AttributeState elementSupportsAutocomplete(const Element* element)
-{
-    if (!element->hasTagName(HTMLNames::inputTag))
-        return Default;
-
-    const HTMLInputElement* inputElement = static_cast<const HTMLInputElement*>(element);
-    if (inputElement->fastHasAttribute(HTMLNames::autocompleteAttr)) {
-        if (equalIgnoringCase(inputElement->fastGetAttribute(HTMLNames::autocompleteAttr), "on"))
-            return On;
-    }
-
-    return inputElement->shouldAutocomplete() ? Default : Off;
 }
 
 bool matchesReservedStringPreventingAutocomplete(AtomicString& string)
@@ -336,7 +336,7 @@ bool elementIdOrNameIndicatesNoAutocomplete(const Element* element)
     return false;
 }
 
-IntPoint convertPointToFrame(const Frame* sourceFrame, const Frame* targetFrame, const IntPoint& point)
+IntPoint convertPointToFrame(const Frame* sourceFrame, const Frame* targetFrame, const IntPoint& point, const bool clampToTargetFrame)
 {
     ASSERT(sourceFrame && targetFrame);
     if (sourceFrame == targetFrame)
@@ -347,6 +347,7 @@ IntPoint convertPointToFrame(const Frame* sourceFrame, const Frame* targetFrame,
 
     Frame* targetFrameParent = targetFrame->tree()->parent();
     IntRect targetFrameRect = targetFrame->view()->frameRect();
+    IntPoint targetPoint = point;
 
     // Convert the target frame rect to source window content coordinates. This is only required
     // if the parent frame is not the source. If the parent is the source, subframeRect
@@ -355,11 +356,14 @@ IntPoint convertPointToFrame(const Frame* sourceFrame, const Frame* targetFrame,
         targetFrameRect = sourceFrame->view()->windowToContents(targetFrameParent->view()->contentsToWindow(targetFrameRect));
 
     // Requested point is outside of target frame, return InvalidPoint.
-    if (!targetFrameRect.contains(point))
+    if (clampToTargetFrame && !targetFrameRect.contains(targetPoint))
+        targetPoint = IntPoint(targetPoint.x() < targetFrameRect.x() ? targetFrameRect.x() : std::min(targetPoint.x(), targetFrameRect.maxX()),
+                targetPoint.y() < targetFrameRect.y() ? targetFrameRect.y() : std::min(targetPoint.y(), targetFrameRect.maxY()));
+    else if (!targetFrameRect.contains(targetPoint))
         return InvalidPoint;
 
     // Adjust the points to be relative to the target.
-    return targetFrame->view()->windowToContents(sourceFrame->view()->contentsToWindow(point));
+    return targetFrame->view()->windowToContents(sourceFrame->view()->contentsToWindow(targetPoint));
 }
 
 VisibleSelection visibleSelectionForClosestActualWordStart(const VisibleSelection& selection)
@@ -397,6 +401,14 @@ VisibleSelection visibleSelectionForClosestActualWordStart(const VisibleSelectio
 
     // No adjustment required.
     return selection;
+}
+
+// This function is copied from WebCore/page/Page.cpp.
+Frame* incrementFrame(Frame* curr, bool forward, bool wrapFlag)
+{
+    return forward
+        ? curr->tree()->traverseNextWithWrap(wrapFlag)
+        : curr->tree()->traversePreviousWithWrap(wrapFlag);
 }
 
 } // DOMSupport

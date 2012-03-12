@@ -192,11 +192,10 @@ void SVGSMILElement::reset()
 void SVGSMILElement::insertedIntoDocument()
 {
     SVGElement::insertedIntoDocument();
-#ifndef NDEBUG
+
     // Verify we are not in <use> instance tree.
-    for (ContainerNode* n = this; n; n = n->parentNode())
-        ASSERT(!n->isSVGShadowRoot());
-#endif
+    ASSERT(!isInShadowTree());
+
     m_attributeName = constructQualifiedName(this, fastGetAttribute(SVGNames::attributeNameAttr));
     SVGSVGElement* owner = ownerSVGElement();
     if (!owner)
@@ -222,14 +221,17 @@ void SVGSMILElement::removedFromDocument()
         m_timeContainer->unschedule(this);
         m_timeContainer = 0;
     }
-    if (m_targetElement) {
-        document()->accessSVGExtensions()->removeAnimationElementFromTarget(this, m_targetElement);
-        m_targetElement = 0;
-    }
     // Calling disconnectConditions() may kill us if there are syncbase conditions.
     // OK, but we don't want to die inside the call.
     RefPtr<SVGSMILElement> keepAlive(this);
     disconnectConditions();
+
+    // Clear target now, because disconnectConditions calls targetElement() which will recreate the target if we removed it sooner. 
+    if (m_targetElement) {
+        document()->accessSVGExtensions()->removeAnimationElementFromTarget(this, m_targetElement);
+        m_targetElement = 0;
+    }
+
     SVGElement::removedFromDocument();
 }
    

@@ -53,6 +53,12 @@ typedef struct _GdkRectangle GdkRectangle;
 #endif
 #elif PLATFORM(EFL)
 typedef struct _Eina_Rectangle Eina_Rectangle;
+#elif PLATFORM(BLACKBERRY)
+namespace BlackBerry {
+namespace Platform {
+class IntRect;
+}
+}
 #endif
 
 #if USE(CAIRO)
@@ -96,6 +102,15 @@ public:
     int maxY() const { return y() + height(); }
     int width() const { return m_size.width(); }
     int height() const { return m_size.height(); }
+
+    // FIXME: These methods are here only to ease the transition to sub-pixel layout. They should
+    // be removed when we close http://webkit.org/b/60318
+    int pixelSnappedX() const { return m_location.x(); }
+    int pixelSnappedY() const { return m_location.y(); }
+    int pixelSnappedMaxX() const { return x() + width(); }
+    int pixelSnappedMaxY() const { return y() + height(); }
+    int pixelSnappedWidth() const { return m_size.width(); }
+    int pixelSnappedHeight() const { return m_size.height(); }
 
     void setX(int x) { m_location.setX(x); }
     void setY(int y) { m_location.setY(y); }
@@ -212,6 +227,11 @@ public:
 #if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)) \
         || (PLATFORM(CHROMIUM) && OS(DARWIN))  || (PLATFORM(QT) && USE(QTKIT))
     operator NSRect() const;
+#endif
+
+#if PLATFORM(BLACKBERRY)
+    IntRect(const BlackBerry::Platform::IntRect&);
+    operator BlackBerry::Platform::IntRect() const;
 #endif
 
 private:

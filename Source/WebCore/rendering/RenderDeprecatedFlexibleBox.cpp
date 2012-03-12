@@ -226,7 +226,7 @@ void RenderDeprecatedFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit 
         return;
 
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
-    LayoutStateMaintainer statePusher(view(), this, LayoutSize(x(), y()), hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
+    LayoutStateMaintainer statePusher(view(), this, locationOffset(), hasTransform() || hasReflection() || style()->isFlippedBlocksWritingMode());
 
     if (inRenderFlowThread()) {
         // Regions changing widths can force us to relayout our children.
@@ -305,8 +305,7 @@ void RenderDeprecatedFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit 
 
     // Update our scrollbars if we're overflow:auto/scroll/hidden now that we know if
     // we overflow or not.
-    if (hasOverflowClip())
-        layer()->updateScrollInfoAfterLayout();
+    updateScrollInfoAfterLayout();
 
     // Repaint with our new bounds if they are different from our old bounds.
     repainter.repaintAfterLayout();
@@ -395,7 +394,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
                 if (ascent == -1)
                     ascent = child->height() + child->marginBottom();
                 ascent += child->marginTop();
-                LayoutUnit descent = (child->marginTop() + child->height() + child->marginBottom()) - ascent;
+                LayoutUnit descent = (child->height() + child->marginHeight()) - ascent;
 
                 // Update our maximum ascent.
                 maxAscent = max(maxAscent, ascent);
@@ -407,7 +406,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
                 setHeight(max(yPos + maxAscent + maxDescent, height()));
             }
             else
-                setHeight(max(height(), yPos + child->marginTop() + child->height() + child->marginBottom()));
+                setHeight(max(height(), yPos + child->height() + child->marginHeight()));
         }
 
         if (!iterator.first() && hasLineIfEmpty())
@@ -461,7 +460,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
             LayoutUnit childY = yPos;
             switch (style()->boxAlign()) {
                 case BCENTER:
-                    childY += child->marginTop() + max<LayoutUnit>(0, (contentHeight() - (child->height() + child->marginTop() + child->marginBottom())) / 2);
+                    childY += child->marginTop() + max<LayoutUnit>(0, (contentHeight() - (child->height() + child->marginHeight())) / 2);
                     break;
                 case BBASELINE: {
                     LayoutUnit ascent = child->firstLineBoxBaseline();
@@ -700,7 +699,7 @@ void RenderDeprecatedFlexibleBox::layoutVerticalBox(bool relayoutChildren)
             switch (style()->boxAlign()) {
                 case BCENTER:
                 case BBASELINE: // Baseline just maps to center for vertical boxes
-                    childX += child->marginLeft() + max<LayoutUnit>(0, (contentWidth() - (child->width() + child->marginLeft() + child->marginRight())) / 2);
+                    childX += child->marginLeft() + max<LayoutUnit>(0, (contentWidth() - (child->width() + child->marginWidth())) / 2);
                     break;
                 case BEND:
                     if (!style()->isLeftToRightDirection())

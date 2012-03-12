@@ -24109,6 +24109,510 @@
 					>
 				</File>
 			</Filter>
+			<Filter
+				Name="indexeddb"
+				>
+				<File
+					RelativePath="..\Modules\indexeddb\DOMWindowIndexedDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\DOMWindowIndexedDatabase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBAny.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBAny.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBCallbacks.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBCursor.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBCursor.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBCursorBackendImpl.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBCursorBackendImpl.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBCursorBackendInterface.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabaseBackendImpl.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabaseBackendImpl.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabaseBackendInterface.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabaseError.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBDatabaseException.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBFactory.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBFactory.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBFactoryBackendImpl.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBFactoryBackendImpl.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBFactoryBackendInterface.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBFactoryBackendInterface.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBIndex.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBIndex.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBIndexBackendImpl.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBIndexBackendImpl.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBIndexBackendInterface.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBKey.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBKey.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBKeyRange.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBKeyRange.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBObjectStore.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBObjectStore.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBObjectStoreBackendImpl.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBObjectStoreBackendImpl.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBObjectStoreBackendInterface.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBRequest.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBRequest.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBTransaction.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\IDBTransaction.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\PageGroupIndexedDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\PageGroupIndexedDatabase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\WorkerContextIndexedDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\indexeddb\WorkerContextIndexedDatabase.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="webdatabase"
+				>
+				<File
+					RelativePath="..\Modules\webdatabase\AbstractDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\AbstractDatabase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\ChangeVersionWrapper.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\ChangeVersionWrapper.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\Database.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\Database.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseAuthorizer.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseAuthorizer.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseContext.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseContext.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseSync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseSync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseTask.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseTask.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseThread.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseThread.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseTracker.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DatabaseTracker.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DOMWindowSQLDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\DOMWindowSQLDatabase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\OriginQuotaManager.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\OriginQuotaManager.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\OriginUsageRecord.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\OriginUsageRecord.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLCallbackWrapper.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLError.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLException.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLException.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLResultSet.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLResultSet.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLResultSetRowList.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLResultSetRowList.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLStatement.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLStatement.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLStatementCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLStatementErrorCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLStatementSync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLStatementSync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransaction.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransaction.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionClient.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionClient.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionCoordinator.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionCoordinator.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionErrorCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionSync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionSync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\SQLTransactionSyncCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\WorkerContextSQLDatabase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\webdatabase\WorkerContextSQLDatabase.h"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="websockets"
+				>
+				<File
+					RelativePath="..\Modules\websockets\CloseEvent.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\ThreadableWebSocketChannel.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\ThreadableWebSocketChannel.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\ThreadableWebSocketChannelClientWrapper.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\ThreadableWebSocketChannelClientWrapper.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocket.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocket.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketChannel.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketChannel.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketChannelClient.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketDeflateFramer.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketDeflateFramer.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketDeflater.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketDeflater.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketExtensionDispatcher.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketExtensionDispatcher.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketExtensionProcessor.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketFrame.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketHandshake.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketHandshake.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketHandshakeRequest.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketHandshakeRequest.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketHandshakeResponse.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WebSocketHandshakeResponse.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WorkerThreadableWebSocketChannel.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\websockets\WorkerThreadableWebSocketChannel.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="accessibility"
@@ -25610,14 +26114,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\page\NavigatorSupplement.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\page\NavigatorSupplement.h"
-				>
-			</File>
-			<File
 				RelativePath="..\page\OriginAccessEntry.cpp"
 				>
 			</File>
@@ -25651,14 +26147,6 @@
 			</File>
 			<File
 				RelativePath="..\page\PageSerializer.h"
-				>
-			</File>
-			<File
-				RelativePath="..\page\PageSupplement.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\page\PageSupplement.h"
 				>
 			</File>
 			<File
@@ -25707,6 +26195,18 @@
 			</File>
 			<File
 				RelativePath="..\page\Screen.h"
+				>
+			</File>
+			<File
+				RelativePath="..\page\scrolling\ScrollingCoordinator.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\scrolling\ScrollingCoordinator.h"
+				>
+			</File>
+			<File
+				RelativePath="..\page\scrolling\ScrollingCoordinatorNone.cpp"
 				>
 			</File>
 			<File
@@ -25831,18 +26331,6 @@
 			</File>
 			<File
 				RelativePath="..\page\WorkerNavigator.h"
-				>
-			</File>
-			<File
-				RelativePath="..\page\scrolling\ScrollingCoordinator.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\page\scrolling\ScrollingCoordinator.h"
-				>
-			</File>
-			<File
-				RelativePath="..\page\scrolling\ScrollingCoordinatorNone.cpp"
 				>
 			</File>
 			<Filter
@@ -26299,14 +26787,82 @@
 				<File
 					RelativePath="..\loader\appcache\ApplicationCache.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\loader\appcache\ApplicationCache.h"
 					>
 				</File>
 				<File
+					RelativePath="..\loader\appcache\ApplicationCacheAllInOne.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_All|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\loader\appcache\ApplicationCacheGroup.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheGroup.h"
@@ -26315,6 +26871,22 @@
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheHost.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheHost.h"
@@ -26323,6 +26895,22 @@
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheResource.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheResource.h"
@@ -26331,6 +26919,22 @@
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheStorage.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\loader\appcache\ApplicationCacheStorage.h"
@@ -26547,10 +27151,6 @@
 			</File>
 			<File
 				RelativePath="..\platform\Arena.h"
-				>
-			</File>
-			<File
-				RelativePath="..\platform\AsyncFileStream.h"
 				>
 			</File>
 			<File
@@ -26947,6 +27547,10 @@
 			</File>
 			<File
 				RelativePath="..\platform\ScrollbarTheme.h"
+				>
+			</File>
+			<File
+				RelativePath="..\platform\ScrollbarThemeClient.h"
 				>
 			</File>
 			<File
@@ -27605,26 +28209,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\platform\graphics\FractionalLayoutRect.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\platform\graphics\FractionalLayoutRect.h"
-					>
-				</File>
-				<File
-					RelativePath="..\platform\graphics\FractionalLayoutSize.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\platform\graphics\FractionalLayoutSize.h"
-					>
-				</File>
-				<File
-					RelativePath="..\platform\graphics\FractionalLayoutPoint.h"
-					>
-				</File>
-				<File
 					RelativePath="..\platform\graphics\FloatPoint.cpp"
 					>
 				</File>
@@ -27750,6 +28334,26 @@
 				</File>
 				<File
 					RelativePath="..\platform\graphics\FontTraitsMask.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutPoint.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutRect.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutRect.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutSize.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutSize.h"
 					>
 				</File>
 				<File
@@ -31729,8 +32333,60 @@
 					>
 				</File>
 				<File
+					RelativePath="..\platform\text\TextAllInOne.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_All|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
 					RelativePath="..\platform\text\TextBoundaries.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextBoundaries.h"
@@ -31743,6 +32399,22 @@
 				<File
 					RelativePath="..\platform\text\TextBreakIteratorICU.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextBreakIteratorInternalICU.h"
@@ -31759,6 +32431,22 @@
 				<File
 					RelativePath="..\platform\text\TextCodec.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextCodec.h"
@@ -31771,6 +32459,22 @@
 				<File
 					RelativePath="..\platform\text\TextCodecICU.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextCodecICU.h"
@@ -31779,6 +32483,22 @@
 				<File
 					RelativePath="..\platform\text\TextCodecLatin1.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextCodecLatin1.h"
@@ -31787,6 +32507,22 @@
 				<File
 					RelativePath="..\platform\text\TextCodecUserDefined.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextCodecUserDefined.h"
@@ -31795,6 +32531,22 @@
 				<File
 					RelativePath="..\platform\text\TextCodecUTF16.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextCodecUTF16.h"
@@ -31803,6 +32555,22 @@
 				<File
 					RelativePath="..\platform\text\TextCodecUTF8.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextCodecUTF8.h"
@@ -31815,6 +32583,22 @@
 				<File
 					RelativePath="..\platform\text\TextEncoding.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextEncoding.h"
@@ -31827,10 +32611,42 @@
 				<File
 					RelativePath="..\platform\text\TextEncodingDetectorICU.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextEncodingRegistry.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextEncodingRegistry.h"
@@ -31839,6 +32655,22 @@
 				<File
 					RelativePath="..\platform\text\TextStream.cpp"
 					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
 				</File>
 				<File
 					RelativePath="..\platform\text\TextStream.h"
@@ -35418,12 +36250,64 @@
 				>
 			</File>
 			<File
+				RelativePath="..\css\MediaAllInOne.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\css\mediaControls.css"
 				>
 			</File>
 			<File
 				RelativePath="..\css\MediaFeatureNames.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaFeatureNames.h"
@@ -35432,6 +36316,22 @@
 			<File
 				RelativePath="..\css\MediaList.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaList.h"
@@ -35440,6 +36340,22 @@
 			<File
 				RelativePath="..\css\MediaQuery.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaQuery.h"
@@ -35448,6 +36364,22 @@
 			<File
 				RelativePath="..\css\MediaQueryEvaluator.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaQueryEvaluator.h"
@@ -35456,6 +36388,22 @@
 			<File
 				RelativePath="..\css\MediaQueryExp.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaQueryExp.h"
@@ -35464,6 +36412,22 @@
 			<File
 				RelativePath="..\css\MediaQueryList.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaQueryList.h"
@@ -35472,6 +36436,22 @@
 			<File
 				RelativePath="..\css\MediaQueryListListener.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaQueryListListener.h"
@@ -35480,6 +36460,22 @@
 			<File
 				RelativePath="..\css\MediaQueryMatcher.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\css\MediaQueryMatcher.h"
@@ -35591,6 +36587,14 @@
 			</File>
 			<File
 				RelativePath="..\css\StylePropertySet.h"
+				>
+			</File>
+			<File
+				RelativePath="..\css\StyleRule.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\css\StyleRule.h"
 				>
 			</File>
 			<File
@@ -37159,62 +38163,6 @@
 			</File>
 			<File
 				RelativePath="..\rendering\RenderDeprecatedFlexibleBox.h"
-				>
-			</File>
-			<File
-				RelativePath="..\rendering\RenderDetails.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\rendering\RenderDetails.h"
 				>
 			</File>
 			<File
@@ -39522,62 +40470,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\rendering\RenderSummary.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\rendering\RenderSummary.h"
-				>
-			</File>
-			<File
 				RelativePath="..\rendering\svg\RenderSVGAllInOne.cpp"
 				>
 			</File>
@@ -40644,114 +41536,6 @@
 			<File
 				RelativePath="..\rendering\svg\RenderSVGRoot.h"
 				>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\RenderSVGShadowTreeRootContainer.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\RenderSVGShadowTreeRootContainer.h"
-				>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\RenderSVGTransformableContainer.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\rendering\svg\RenderSVGTransformableContainer.h"
@@ -42240,6 +43024,62 @@
 				>
 			</File>
 			<File
+				RelativePath="..\rendering\svg\SVGRenderingContext.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\rendering\svg\SVGRenderingContext.h"
+				>
+			</File>
+			<File
 				RelativePath="..\rendering\svg\SVGResources.cpp"
 				>
 				<FileConfiguration
@@ -42405,62 +43245,6 @@
 			</File>
 			<File
 				RelativePath="..\rendering\svg\SVGResourcesCycleSolver.h"
-				>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\SVGShadowTreeElements.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\SVGShadowTreeElements.h"
 				>
 			</File>
 			<File
@@ -43504,6 +44288,62 @@
 				</File>
 				<File
 					RelativePath="..\rendering\style\StyleGridData.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\style\StyleGridItemData.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_All|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\rendering\style\StyleGridItemData.h"
 					>
 				</File>
 				<File
@@ -46811,6 +47651,62 @@
 			</File>
 			<File
 				RelativePath="..\dom\ContainerNode.h"
+				>
+			</File>
+			<File
+				RelativePath="..\dom\ContextDestructionObserver.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\ContextDestructionObserver.h"
 				>
 			</File>
 			<File
@@ -50654,6 +51550,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\dom\RegionNodeList.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\dom\RegionNodeList.h"
+				>
+			</File>
+			<File
 				RelativePath="..\dom\RegisteredEventListener.cpp"
 				>
 				<FileConfiguration
@@ -52690,11 +53594,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\notifications\NotificationContents.h"
+				RelativePath="..\notifications\NotificationClient.h"
 				>
 			</File>
 			<File
-				RelativePath="..\notifications\NotificationPresenter.h"
+				RelativePath="..\notifications\NotificationContents.h"
 				>
 			</File>
 		</Filter>
@@ -55766,6 +56670,14 @@
 			Name="html"
 			>
 			<File
+				RelativePath="..\fileapi\AsyncFileStream.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\fileapi\AsyncFileStream.h"
+				>
+			</File>
+			<File
 				RelativePath="..\fileapi\AsyncFileWriter.h"
 				>
 			</File>
@@ -55787,6 +56699,14 @@
 			</File>
 			<File
 				RelativePath="..\html\BaseCheckableInputType.h"
+				>
+			</File>
+			<File
+				RelativePath="..\html\BaseClickableWithKeyInputType.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\html\BaseClickableWithKeyInputType.h"
 				>
 			</File>
 			<File
@@ -56175,14 +57095,6 @@
 			</File>
 			<File
 				RelativePath="..\fileapi\FileReaderSync.h"
-				>
-			</File>
-			<File
-				RelativePath="..\fileapi\FileStreamProxy.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\fileapi\FileStreamProxy.h"
 				>
 			</File>
 			<File
@@ -60551,6 +61463,14 @@
 			</File>
 			<File
 				RelativePath="..\html\InputType.h"
+				>
+			</File>
+			<File
+				RelativePath="..\html\LabelableElement.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\html\LabelableElement.h"
 				>
 			</File>
 			<File
@@ -68889,6 +69809,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\bindings\scripts\IDLAttributes.txt"
+					>
+				</File>
+				<File
 					RelativePath="..\bindings\scripts\IDLParser.pm"
 					>
 				</File>
@@ -68897,11 +69821,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\bindings\scripts\resolve-supplemental.pl"
-					>
-				</File>
-				<File
-					RelativePath="..\bindings\scripts\IDLAttributes.txt"
+					RelativePath="..\bindings\scripts\preprocess-idls.pl"
 					>
 				</File>
 			</Filter>
@@ -70702,370 +71622,6 @@
 			Name="storage"
 			>
 			<File
-				RelativePath="..\storage\AbstractDatabase.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\AbstractDatabase.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\ChangeVersionWrapper.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\ChangeVersionWrapper.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\Database.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\Database.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseAuthorizer.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseAuthorizer.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseCallback.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseSync.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseSync.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseTask.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseTask.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseThread.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseThread.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseTracker.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DatabaseTracker.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DOMWindowSQLDatabase.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\DOMWindowSQLDatabase.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBAny.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBAny.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBCallbacks.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBCursor.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBCursor.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBCursorBackendImpl.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBCursorBackendImpl.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBCursorBackendInterface.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabase.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabase.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabaseBackendImpl.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabaseBackendImpl.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabaseBackendInterface.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabaseError.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBDatabaseException.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBFactory.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBFactory.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBFactoryBackendImpl.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBFactoryBackendImpl.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBFactoryBackendInterface.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBFactoryBackendInterface.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBIndex.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBIndex.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBIndexBackendImpl.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBIndexBackendImpl.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBIndexBackendInterface.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBKey.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBKey.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBKeyRange.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBKeyRange.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBObjectStore.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBObjectStore.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBObjectStoreBackendImpl.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBObjectStoreBackendImpl.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBObjectStoreBackendInterface.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBRequest.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBRequest.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBTransaction.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\IDBTransaction.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\StorageTask.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\StorageTask.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\StorageThread.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\StorageThread.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\OriginQuotaManager.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\OriginQuotaManager.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\OriginUsageRecord.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\OriginUsageRecord.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLCallbackWrapper.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLError.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLException.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLException.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLResultSet.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLResultSet.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLResultSetRowList.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLResultSetRowList.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLStatement.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLStatement.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLStatementCallback.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLStatementErrorCallback.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLStatementSync.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLStatementSync.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransaction.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransaction.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionCallback.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionClient.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionClient.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionCoordinator.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionCoordinator.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionErrorCallback.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionSync.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionSync.h"
-				>
-			</File>
-			<File
-				RelativePath="..\storage\SQLTransactionSyncCallback.h"
-				>
-			</File>
-			<File
 				RelativePath="..\storage\Storage.cpp"
 				>
 			</File>
@@ -71162,6 +71718,22 @@
 				>
 			</File>
 			<File
+				RelativePath="..\storage\StorageTask.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\storage\StorageTask.h"
+				>
+			</File>
+			<File
+				RelativePath="..\storage\StorageThread.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\storage\StorageThread.h"
+				>
+			</File>
+			<File
 				RelativePath="..\storage\StorageTracker.cpp"
 				>
 			</File>
@@ -71169,24 +71741,20 @@
 				RelativePath="..\storage\StorageTracker.h"
 				>
 			</File>
-			<File
-				RelativePath="..\storage\VersionChangeCallback.h"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="strings"
 			>
 			<File
-				RelativePath="$(ConfigurationBuildDir)\include\private\JavaScriptCore\AtomicString.cpp"
+				RelativePath="$(ConfigurationBuildDir)\include\private\JavaScriptCore\wtf\text\AtomicString.cpp"
 				>
 			</File>
 			<File
-				RelativePath="$(ConfigurationBuildDir)\include\private\JavaScriptCore\StringImpl.cpp"
+				RelativePath="$(ConfigurationBuildDir)\include\private\JavaScriptCore\wtf\text\StringImpl.cpp"
 				>
 			</File>
 			<File
-				RelativePath="$(ConfigurationBuildDir)\include\private\JavaScriptCore\WTFString.cpp"
+				RelativePath="$(ConfigurationBuildDir)\include\private\JavaScriptCore\wtf\text\WTFString.cpp"
 				>
 			</File>
 		</Filter>
@@ -71714,7 +72282,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\inspector\InspectorCounters.h"
+				RelativePath="..\inspector\InspectorController.h"
 				>
 			</File>
 			<File
@@ -71738,7 +72306,7 @@
 				</FileConfiguration>
 			</File>
 			<File
-				RelativePath="..\inspector\InspectorController.h"
+				RelativePath="..\inspector\InspectorCounters.h"
 				>
 			</File>
 			<File
@@ -73233,6 +73801,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\ScriptMapping.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\ScriptsNavigator.js"
 					>
 				</File>
@@ -73373,15 +73945,15 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\TimelineAgent.js"
-					>
-				</File>
-				<File
 					RelativePath="..\inspector\front-end\TimelineGrid.js"
 					>
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\TimelineManager.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\TimelineModel.js"
 					>
 				</File>
 				<File
@@ -73394,6 +73966,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\TimelinePanel.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\TimelinePresentationModel.js"
 					>
 				</File>
 				<File
@@ -73439,111 +74015,63 @@
 			</Filter>
 		</Filter>
 		<Filter
-			Name="websockets"
-			>
-			<File
-				RelativePath="..\websockets\CloseEvent.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\ThreadableWebSocketChannel.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\ThreadableWebSocketChannel.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\ThreadableWebSocketChannelClientWrapper.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\ThreadableWebSocketChannelClientWrapper.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocket.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocket.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketChannel.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketChannel.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketChannelClient.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketDeflater.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketDeflater.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketExtensionDispatcher.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketExtensionDispatcher.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketExtensionProcessor.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketFrame.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketHandshake.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketHandshake.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketHandshakeRequest.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketHandshakeRequest.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketHandshakeResponse.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WebSocketHandshakeResponse.h"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WorkerThreadableWebSocketChannel.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\websockets\WorkerThreadableWebSocketChannel.h"
-				>
-			</File>
-		</Filter>
-		<Filter
 			Name="mathml"
 			>
 			<File
+				RelativePath="..\mathml\MathMLAllInOne.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath="..\mathml\MathMLElement.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\mathml\MathMLElement.h"
@@ -73552,6 +74080,22 @@
 			<File
 				RelativePath="..\mathml\MathMLInlineContainerElement.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\mathml\MathMLInlineContainerElement.h"
@@ -73560,6 +74104,22 @@
 			<File
 				RelativePath="..\mathml\MathMLMathElement.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\mathml\MathMLMathElement.h"
@@ -73568,9 +74128,53 @@
 			<File
 				RelativePath="..\mathml\MathMLTextElement.cpp"
 				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\mathml\MathMLTextElement.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="fileapi"
+			>
+			<File
+				RelativePath="..\fileapi\DOMWindowFileSystem.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\fileapi\DOMWindowFileSystem.h"
+				>
+			</File>
+			<File
+				RelativePath="..\fileapi\EntryBase.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\fileapi\SyncCallbackHelper.h"
+				>
+			</File>
+			<File
+				RelativePath="..\fileapi\WorkerContextFileSystem.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\fileapi\WorkerContextFileSystem.h"
 				>
 			</File>
 		</Filter>

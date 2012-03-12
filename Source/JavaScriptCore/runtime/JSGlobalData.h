@@ -47,6 +47,7 @@
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
+#include <wtf/SimpleStats.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
 #if ENABLE(REGEXP_TRACING)
@@ -201,6 +202,7 @@ namespace JSC {
         SmallStrings smallStrings;
         NumericStrings numericStrings;
         DateInstanceCache dateInstanceCache;
+        WTF::SimpleStats machineCodeBytesPerBytecodeWordForBaselineJIT;
         Vector<CodeBlock*> codeBlocksBeingCompiled;
         void startedCompiling(CodeBlock* codeBlock)
         {
@@ -229,7 +231,7 @@ namespace JSC {
 
 #if !ENABLE(JIT)
         bool canUseJIT() { return false; } // interpreter only
-#elif !ENABLE(CLASSIC_INTERPRETER)
+#elif !ENABLE(CLASSIC_INTERPRETER) && !ENABLE(LLINT)
         bool canUseJIT() { return true; } // jit only
 #else
         bool canUseJIT() { return m_canUseJIT; }
@@ -367,7 +369,7 @@ namespace JSC {
         JSGlobalData(GlobalDataType, ThreadStackType, HeapSize);
         static JSGlobalData*& sharedInstanceInternal();
         void createNativeThunk();
-#if ENABLE(JIT) && ENABLE(CLASSIC_INTERPRETER)
+#if ENABLE(JIT) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
         bool m_canUseJIT;
 #endif
 #if ENABLE(GC_VALIDATION)

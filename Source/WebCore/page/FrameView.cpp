@@ -49,6 +49,8 @@
 #include "HTMLFrameSetElement.h"
 #include "HTMLNames.h"
 #include "HTMLPlugInImageElement.h"
+#include "InspectorClient.h"
+#include "InspectorController.h"
 #include "InspectorInstrumentation.h"
 #include "OverflowEvent.h"
 #include "RenderArena.h"
@@ -407,10 +409,13 @@ void FrameView::setFrameRect(const IntRect& newRect)
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-void FrameView::scheduleAnimation()
+bool FrameView::scheduleAnimation()
 {
-    if (hostWindow())
+    if (hostWindow()) {
         hostWindow()->scheduleAnimation();
+        return true;
+    }
+    return false;
 }
 #endif
 
@@ -626,13 +631,6 @@ void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, Scrollbar
 
 #if USE(ACCELERATED_COMPOSITING)
 
-#if ENABLE(FULLSCREEN_API)
-static bool isDocumentRunningFullScreenAnimation(Document* document)
-{
-    return document->webkitIsFullScreen() && document->fullScreenRenderer() && document->isAnimatingFullScreen();
-}
-#endif
-
 void FrameView::updateCompositingLayers()
 {
     RenderView* root = rootRenderer(this);
@@ -642,12 +640,6 @@ void FrameView::updateCompositingLayers()
     // This call will make sure the cached hasAcceleratedCompositing is updated from the pref
     root->compositor()->cacheAcceleratedCompositingFlags();
     root->compositor()->updateCompositingLayers(CompositingUpdateAfterLayoutOrStyleChange);
-    
-#if ENABLE(FULLSCREEN_API)
-    Document* document = m_frame->document();
-    if (isDocumentRunningFullScreenAnimation(document))
-        root->compositor()->updateCompositingLayers(CompositingUpdateAfterLayoutOrStyleChange, document->fullScreenRenderer()->layer());
-#endif
 }
 
 void FrameView::clearBackingStores()
@@ -722,20 +714,6 @@ bool FrameView::syncCompositingStateForThisFrame(Frame* rootFrameForSync)
 
     root->compositor()->flushPendingLayerChanges(rootFrameForSync == m_frame);
 
-#if ENABLE(FULLSCREEN_API)
-    // The fullScreenRenderer's graphicsLayer has been re-parented, and the above recursive syncCompositingState
-    // call will not cause the subtree under it to repaint.  Explicitly call the syncCompositingState on 
-    // the fullScreenRenderer's graphicsLayer here:
-    Document* document = m_frame->document();
-    if (isDocumentRunningFullScreenAnimation(document)) {
-        RenderLayerBacking* backing = document->fullScreenRenderer()->layer()->backing();
-        if (GraphicsLayer* fullScreenLayer = backing->graphicsLayer()) {
-            // FIXME: Passing frameRect() is correct only when RenderLayerCompositor uses a ScrollLayer (as in WebKit2)
-            // otherwise, the passed clip rect needs to take scrolling into account
-            fullScreenLayer->syncCompositingState(frameRect());
-        }
-    }
-#endif
     return true;
 }
 
@@ -2103,6 +2081,8 @@ void FrameView::unscheduleRelayout()
 #if ENABLE(REQUEST_ANIMATION_FRAME)
 void FrameView::serviceScriptedAnimations(DOMTimeStamp time)
 {
+    serviceScrollAnimations();
+
     Vector<AnimationController*> animations;
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext())
         frame->animation()->serviceAnimations();
@@ -2331,8 +2311,20 @@ void FrameView::performPostLayoutTasks()
         bool resized = !m_firstLayout && (currentSize != m_lastLayoutSize || currentZoomFactor != m_lastZoomFactor);
         m_lastLayoutSize = currentSize;
         m_lastZoomFactor = currentZoomFactor;
-        if (resized)
+        if (resized) {
             m_frame->eventHandler()->sendResizeEvent();
+
+#if ENABLE(INSPECTOR)
+            if (InspectorInstrumentation::hasFrontends()) {
+                if (Page* page = m_frame->page()) {
+                    if (page->mainFrame() == m_frame) {
+                        if (InspectorClient* inspectorClient = page->inspectorController()->inspectorClient())
+                            inspectorClient->didResizeMainFrame(m_frame.get());
+                    }
+                }
+            }
+#endif
+        }
     }
 }
 
@@ -2702,11 +2694,26 @@ void FrameView::paintScrollCorner(GraphicsContext* context, const IntRect& corne
     }
 
     if (m_scrollCorner) {
+        bool needsBackgorund = m_frame->page() && m_frame->page()->mainFrame() == m_frame;
+        if (needsBackgorund)
+            context->fillRect(cornerRect, baseBackgroundColor(), ColorSpaceDeviceRGB);
         m_scrollCorner->paintIntoRect(context, cornerRect.location(), cornerRect);
         return;
     }
 
     ScrollView::paintScrollCorner(context, cornerRect);
+}
+
+void FrameView::paintScrollbar(GraphicsContext* context, Scrollbar* bar, const IntRect& rect)
+{
+    bool needsBackgorund = bar->isCustomScrollbar() && (m_frame->page() && m_frame->page()->mainFrame() == m_frame);
+    if (needsBackgorund) {
+        IntRect toFill = bar->frameRect();
+        toFill.intersect(rect);
+        context->fillRect(toFill, baseBackgroundColor(), ColorSpaceDeviceRGB);
+    }
+
+    ScrollView::paintScrollbar(context, bar, rect);
 }
 
 Color FrameView::documentBackgroundColor() const
@@ -3024,11 +3031,15 @@ void FrameView::enableAutoSizeMode(bool enable, const IntSize& minSize, const In
     m_minAutoSize = minSize;
     m_maxAutoSize = maxSize;
 
-    if (!m_shouldAutoSize)
-        return;
-
     setNeedsLayout();
     scheduleRelayout();
+    if (m_shouldAutoSize)
+        return;
+
+    // Since autosize mode forces the scrollbar mode, change them to being auto.
+    setVerticalScrollbarLock(false);
+    setHorizontalScrollbarLock(false);
+    setScrollbarModes(ScrollbarAuto, ScrollbarAuto);
 }
 
 void FrameView::forceLayout(bool allowSubtree)

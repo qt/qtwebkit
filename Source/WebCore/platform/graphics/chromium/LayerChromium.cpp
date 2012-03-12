@@ -33,16 +33,15 @@
 #if USE(ACCELERATED_COMPOSITING)
 #include "LayerChromium.h"
 
-#include "cc/CCLayerAnimationController.h"
-#include "cc/CCLayerImpl.h"
-#include "cc/CCLayerTreeHost.h"
-#if USE(SKIA)
 #include "NativeImageSkia.h"
 #include "PlatformContextSkia.h"
-#endif
-#include "Region.h"
 #include "RenderLayerBacking.h"
 #include "TextStream.h"
+#include "cc/CCAnimationEvents.h"
+#include "cc/CCLayerAnimationController.h"
+#include "cc/CCLayerAnimationDelegate.h"
+#include "cc/CCLayerImpl.h"
+#include "cc/CCLayerTreeHost.h"
 #include "skia/ext/platform_canvas.h"
 
 namespace WebCore {
@@ -62,7 +61,9 @@ LayerChromium::LayerChromium()
     , m_parent(0)
     , m_layerAnimationController(CCLayerAnimationController::create())
     , m_scrollable(false)
+    , m_shouldScrollOnMainThread(false)
     , m_haveWheelEventHandlers(false)
+    , m_nonFastScrollableRegionChanged(false)
     , m_anchorPoint(0.5, 0.5)
     , m_backgroundColor(0, 0, 0, 0)
     , m_backgroundCoversViewport(false)
@@ -81,7 +82,7 @@ LayerChromium::LayerChromium()
     , m_drawOpacity(0)
     , m_targetRenderSurface(0)
     , m_contentsScale(1.0)
-    , m_pageScaleDirty(false)
+    , m_layerAnimationDelegate(0)
 {
 }
 
@@ -139,6 +140,24 @@ void LayerChromium::setLayerAnimationController(PassOwnPtr<CCLayerAnimationContr
 bool LayerChromium::hasActiveAnimation() const
 {
     return m_layerAnimationController->hasActiveAnimation();
+}
+
+void LayerChromium::setAnimationEvent(const CCAnimationEvent& event, double wallClockTime)
+{
+    switch (event.type()) {
+
+    case CCAnimationEvent::Started: {
+        m_layerAnimationDelegate->notifyAnimationStarted(wallClockTime);
+        break;
+    }
+
+    case CCAnimationEvent::Finished: {
+        const CCAnimationFinishedEvent* finishedEvent = event.toAnimationFinishedEvent();
+        m_layerAnimationDelegate->notifyAnimationFinished(finishedEvent->animationId());
+        break;
+    }
+
+    }
 }
 
 void LayerChromium::setIsNonCompositedContent(bool isNonCompositedContent)
@@ -255,12 +274,10 @@ void LayerChromium::setBounds(const IntSize& size)
 
     m_bounds = size;
 
-    if (firstResize || m_pageScaleDirty)
+    if (firstResize)
         setNeedsDisplay();
     else
         setNeedsCommit();
-
-    m_pageScaleDirty = false;
 }
 
 const LayerChromium* LayerChromium::rootLayer() const
@@ -337,8 +354,10 @@ void LayerChromium::setMaskLayer(LayerChromium* maskLayer)
     if (m_maskLayer)
         m_maskLayer->setLayerTreeHost(0);
     m_maskLayer = maskLayer;
-    if (m_maskLayer)
+    if (m_maskLayer) {
         m_maskLayer->setLayerTreeHost(m_layerTreeHost.get());
+        m_maskLayer->setIsMask(true);
+    }
     setNeedsCommit();
 }
 
@@ -418,11 +437,28 @@ void LayerChromium::setScrollable(bool scrollable)
     setNeedsCommit();
 }
 
+void LayerChromium::setShouldScrollOnMainThread(bool shouldScrollOnMainThread)
+{
+    if (m_shouldScrollOnMainThread == shouldScrollOnMainThread)
+        return;
+    m_shouldScrollOnMainThread = shouldScrollOnMainThread;
+    setNeedsCommit();
+}
+
 void LayerChromium::setHaveWheelEventHandlers(bool haveWheelEventHandlers)
 {
     if (m_haveWheelEventHandlers == haveWheelEventHandlers)
         return;
     m_haveWheelEventHandlers = haveWheelEventHandlers;
+    setNeedsCommit();
+}
+
+void LayerChromium::setNonFastScrollableRegion(const Region& region)
+{
+    if (m_nonFastScrollableRegion == region)
+        return;
+    m_nonFastScrollableRegion = region;
+    m_nonFastScrollableRegionChanged = true;
     setNeedsCommit();
 }
 
@@ -448,13 +484,10 @@ LayerChromium* LayerChromium::parent() const
     return m_parent;
 }
 
-void LayerChromium::setName(const String& name)
-{
-    m_name = name;
-}
-
 void LayerChromium::setNeedsDisplayRect(const FloatRect& dirtyRect)
 {
+    m_updateRect.unite(dirtyRect);
+
     // Simply mark the contents as dirty. For non-root layers, the call to
     // setNeedsCommit will schedule a fresh compositing pass.
     // For the root layer, setNeedsCommit has no effect.
@@ -474,14 +507,21 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
     layer->setContentBounds(contentBounds());
     layer->setDebugBorderColor(m_debugBorderColor);
     layer->setDebugBorderWidth(m_debugBorderWidth);
+    layer->setDebugName(m_debugName.isolatedCopy()); // We have to use isolatedCopy() here to safely pass ownership to another thread.
     layer->setDoubleSided(m_doubleSided);
     layer->setDrawsContent(drawsContent());
     layer->setFilters(filters());
     layer->setIsNonCompositedContent(m_isNonCompositedContent);
     layer->setMasksToBounds(m_masksToBounds);
     layer->setScrollable(m_scrollable);
+    layer->setShouldScrollOnMainThread(m_shouldScrollOnMainThread);
     layer->setHaveWheelEventHandlers(m_haveWheelEventHandlers);
-    layer->setName(m_name);
+    // Copying a Region is more expensive than most layer properties, since it involves copying two Vectors that may be
+    // arbitrarily large depending on page content, so we only push the property if it's changed.
+    if (m_nonFastScrollableRegionChanged) {
+        layer->setNonFastScrollableRegion(m_nonFastScrollableRegion);
+        m_nonFastScrollableRegionChanged = false;
+    }
     layer->setOpaque(m_opaque);
     layer->setOpacity(m_opacity);
     layer->setPosition(m_position);
@@ -505,7 +545,7 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
     m_updateRect = FloatRect();
 }
 
-PassRefPtr<CCLayerImpl> LayerChromium::createCCLayerImpl()
+PassOwnPtr<CCLayerImpl> LayerChromium::createCCLayerImpl()
 {
     return CCLayerImpl::create(m_layerId);
 }
@@ -522,41 +562,19 @@ void LayerChromium::setDebugBorderWidth(float width)
     setNeedsCommit();
 }
 
+void LayerChromium::setDebugName(const String& debugName)
+{
+    m_debugName = debugName;
+    setNeedsCommit();
+}
+
+
 void LayerChromium::setContentsScale(float contentsScale)
 {
     if (!needsContentsScale() || m_contentsScale == contentsScale)
         return;
     m_contentsScale = contentsScale;
     setNeedsDisplay();
-}
-
-TransformationMatrix LayerChromium::contentToScreenSpaceTransform() const
-{
-    IntSize boundsInLayerSpace = bounds();
-    IntSize boundsInContentSpace = contentBounds();
-
-    TransformationMatrix transform = screenSpaceTransform();
-
-    // Scale from content space to layer space
-    transform.scaleNonUniform(boundsInLayerSpace.width() / static_cast<double>(boundsInContentSpace.width()),
-                              boundsInLayerSpace.height() / static_cast<double>(boundsInContentSpace.height()));
-
-    return transform;
-}
-
-void LayerChromium::addSelfToOccludedScreenSpace(Region& occludedScreenSpace)
-{
-    if (!opaque() || drawOpacity() != 1 || !isPaintedAxisAlignedInScreen())
-        return;
-
-    FloatRect targetRect = contentToScreenSpaceTransform().mapRect(FloatRect(visibleLayerRect()));
-    occludedScreenSpace.unite(enclosedIntRect(targetRect));
-}
-
-bool LayerChromium::isPaintedAxisAlignedInScreen() const
-{
-    FloatQuad quad = contentToScreenSpaceTransform().mapQuad(FloatQuad(visibleLayerRect()));
-    return quad.isRectilinear();
 }
 
 void LayerChromium::createRenderSurface()

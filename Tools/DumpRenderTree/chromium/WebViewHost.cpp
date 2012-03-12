@@ -242,7 +242,7 @@ static string textAffinityDescription(WebTextAffinity affinity)
 
 // WebViewClient -------------------------------------------------------------
 
-WebView* WebViewHost::createView(WebFrame*, const WebURLRequest& request, const WebWindowFeatures&, const WebString&)
+WebView* WebViewHost::createView(WebFrame*, const WebURLRequest& request, const WebWindowFeatures&, const WebString&, WebNavigationPolicy)
 {
     if (!layoutTestController()->canOpenWindows())
         return 0;
@@ -255,6 +255,7 @@ WebWidget* WebViewHost::createPopupMenu(WebPopupType type)
 {
     switch (type) {
     case WebKit::WebPopupTypeNone:
+    case WebKit::WebPopupTypePage:
         break;
     case WebKit::WebPopupTypeSelect:
     case WebKit::WebPopupTypeSuggestion:
@@ -273,14 +274,14 @@ WebWidget* WebViewHost::createPopupMenu(const WebPopupMenuInfo&)
 
 WebStorageNamespace* WebViewHost::createSessionStorageNamespace(unsigned quota)
 {
-    return WebKit::WebStorageNamespace::createSessionStorageNamespace(quota);
+    return webkit_support::CreateSessionStorageNamespace(quota);
 }
 
-WebKit::WebGraphicsContext3D* WebViewHost::createGraphicsContext3D(const WebKit::WebGraphicsContext3D::Attributes& attributes, bool direct)
+WebKit::WebGraphicsContext3D* WebViewHost::createGraphicsContext3D(const WebKit::WebGraphicsContext3D::Attributes& attributes)
 {
     if (!webView())
         return 0;
-    return webkit_support::CreateGraphicsContext3D(attributes, webView(), direct);
+    return webkit_support::CreateGraphicsContext3D(attributes, webView(), true);
 }
 
 void WebViewHost::didAddMessageToConsole(const WebConsoleMessage& message, const WebString& sourceName, unsigned sourceLine)
@@ -932,7 +933,7 @@ void WebViewHost::exitFullScreen()
 WebPlugin* WebViewHost::createPlugin(WebFrame* frame, const WebPluginParams& params)
 {
     if (params.mimeType == TestWebPlugin::mimeType())
-        return new TestWebPlugin(this, frame, params);
+        return new TestWebPlugin(frame, params);
 
     return webkit_support::CreateWebPlugin(frame, params);
 }

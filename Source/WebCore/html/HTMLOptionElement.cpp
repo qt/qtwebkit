@@ -137,10 +137,12 @@ String HTMLOptionElement::text() const
 
 void HTMLOptionElement::setText(const String &text, ExceptionCode& ec)
 {
+    RefPtr<Node> protectFromMutationEvents(this);
+
     // Changing the text causes a recalc of a select's items, which will reset the selected
     // index to the first item if the select is single selection with a menu list. We attempt to
     // preserve the selected item.
-    HTMLSelectElement* select = ownerSelectElement();
+    RefPtr<HTMLSelectElement> select = ownerSelectElement();
     bool selectIsMenuList = select && select->usesMenuList();
     int oldSelectedIndex = selectIsMenuList ? select->selectedIndex() : -1;
 
@@ -297,7 +299,7 @@ String HTMLOptionElement::textIndentedToRespectGroupLabel() const
 
 bool HTMLOptionElement::disabled() const
 {
-    return ownElementDisabled() || (parentNode() && static_cast<HTMLFormControlElement*>(parentNode())->disabled());
+    return ownElementDisabled() || (parentNode() && parentNode()->isHTMLElement() && static_cast<HTMLElement*>(parentNode())->disabled());
 }
 
 void HTMLOptionElement::insertedIntoTree(bool deep)

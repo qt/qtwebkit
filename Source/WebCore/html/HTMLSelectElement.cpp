@@ -257,15 +257,15 @@ void HTMLSelectElement::setValue(const String &value)
     setSelectedIndex(-1);
 }
 
-bool HTMLSelectElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLSelectElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == alignAttr) {
+    if (name == alignAttr) {
         // Don't map 'align' attribute. This matches what Firefox, Opera and IE do.
         // See http://bugs.webkit.org/show_bug.cgi?id=12072
         return false;
     }
 
-    return HTMLFormControlElementWithState::isPresentationAttribute(attr);
+    return HTMLFormControlElementWithState::isPresentationAttribute(name);
 }
 
 void HTMLSelectElement::parseAttribute(Attribute* attr)
@@ -329,6 +329,13 @@ RenderObject* HTMLSelectElement::createRenderer(RenderArena* arena, RenderStyle*
 bool HTMLSelectElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
     return childContext.isOnEncapsulationBoundary() && HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
+}
+
+HTMLCollection* HTMLSelectElement::selectedOptions()
+{
+    if (!m_selectedOptionsCollection)
+        m_selectedOptionsCollection = HTMLCollection::create(this, SelectedOptions);
+    return m_selectedOptionsCollection.get();
 }
 
 HTMLOptionsCollection* HTMLSelectElement::options()

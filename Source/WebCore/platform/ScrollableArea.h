@@ -156,6 +156,11 @@ public:
     // NOTE: Only called from Internals for testing.
     void setScrollOffsetFromInternals(const IntPoint&);
 
+    // Let subclasses provide a way of asking for and servicing scroll
+    // animations.
+    virtual bool scheduleAnimation() { return false; }
+    void serviceScrollAnimations();
+
 protected:
     ScrollableArea();
     virtual ~ScrollableArea();
@@ -179,6 +184,8 @@ protected:
     bool hasLayerForScrollCorner() const;
 
 private:
+    void scrollPositionChanged(const IntPoint&);
+    
     // NOTE: Only called from the ScrollAnimator.
     friend class ScrollAnimator;
     void setScrollOffsetFromAnimation(const IntPoint&);

@@ -89,6 +89,7 @@ typedef void DFG_OPERATION (*V_DFGOperation_EAZJ)(ExecState*, JSArray*, int32_t,
 typedef double DFG_OPERATION (*D_DFGOperation_DD)(double, double);
 typedef double DFG_OPERATION (*D_DFGOperation_EJ)(ExecState*, EncodedJSValue);
 typedef void* DFG_OPERATION (*P_DFGOperation_E)(ExecState*);
+typedef void DFG_OPERATION (V_DFGOperation_EC)(ExecState*, JSCell*);
 
 // These routines are provide callbacks out to C++ implementations of operations too complex to JIT.
 JSCell* DFG_OPERATION operationNewObject(ExecState*);
@@ -118,7 +119,8 @@ void DFG_OPERATION operationPutByValStrict(ExecState*, EncodedJSValue encodedBas
 void DFG_OPERATION operationPutByValNonStrict(ExecState*, EncodedJSValue encodedBase, EncodedJSValue encodedProperty, EncodedJSValue encodedValue);
 void DFG_OPERATION operationPutByValCellStrict(ExecState*, JSCell*, EncodedJSValue encodedProperty, EncodedJSValue encodedValue);
 void DFG_OPERATION operationPutByValCellNonStrict(ExecState*, JSCell*, EncodedJSValue encodedProperty, EncodedJSValue encodedValue);
-void DFG_OPERATION operationPutByValBeyondArrayBounds(ExecState*, JSArray*, int32_t index, EncodedJSValue encodedValue);
+void DFG_OPERATION operationPutByValBeyondArrayBoundsStrict(ExecState*, JSArray*, int32_t index, EncodedJSValue encodedValue);
+void DFG_OPERATION operationPutByValBeyondArrayBoundsNonStrict(ExecState*, JSArray*, int32_t index, EncodedJSValue encodedValue);
 EncodedJSValue DFG_OPERATION operationArrayPush(ExecState*, EncodedJSValue encodedValue, JSArray*);
 EncodedJSValue DFG_OPERATION operationArrayPop(ExecState*, JSArray*);
 void DFG_OPERATION operationPutByIdStrict(ExecState*, EncodedJSValue encodedValue, JSCell* base, Identifier*);
@@ -145,6 +147,10 @@ void* DFG_OPERATION operationVirtualCall(ExecState*);
 void* DFG_OPERATION operationLinkCall(ExecState*);
 void* DFG_OPERATION operationVirtualConstruct(ExecState*);
 void* DFG_OPERATION operationLinkConstruct(ExecState*);
+JSCell* DFG_OPERATION operationCreateActivation(ExecState*);
+void DFG_OPERATION operationTearOffActivation(ExecState*, JSCell*);
+JSCell* DFG_OPERATION operationNewFunction(ExecState*, JSCell*);
+JSCell* DFG_OPERATION operationNewFunctionExpression(ExecState*, JSCell*);
 
 // This method is used to lookup an exception hander, keyed by faultLocation, which is
 // the return location from one of the calls out to one of the helper operations above.

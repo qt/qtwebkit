@@ -1,3 +1,67 @@
+2012-03-09  Jon Lee  <jonlee@apple.com>
+
+        Rename NotificationPresenter to NotificationClient
+        https://bugs.webkit.org/show_bug.cgi?id=80488
+        <rdar://problem/10965558>
+
+        Reviewed by Kentaro Hara.
+
+        Refactor to use renamed WebCore::NotificationClient.
+        * WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient::notificationPresenter):
+        * WebCoreSupport/WebDesktopNotificationsDelegate.cpp:
+        (WebDesktopNotificationsDelegate::checkPermission):
+        * WebCoreSupport/WebDesktopNotificationsDelegate.h:
+        (WebDesktopNotificationsDelegate):
+
+2012-03-09  Emil A Eklund  <eae@chromium.org>
+
+        Add roundedPoint to HitTestResult and change platform code to use it
+        https://bugs.webkit.org/show_bug.cgi?id=80715
+
+        Reviewed by James Robinson.
+
+        Change ports to use roundedPoint to avoid exposing subpixel types to
+        platform code.
+
+        * WebView.cpp:
+        (WebView::handleContextMenuEvent):
+
+2012-03-08  Steve Falkenburg  <sfalken@apple.com>
+
+        Separate WTF parts of JavaScriptCoreGenerated into WTFGenerated for Windows build
+        https://bugs.webkit.org/show_bug.cgi?id=80657
+
+        Preparation for WTF separation from JavaScriptCore.
+        The "Generated" vcproj files on Windows are necessary so Visual Studio can calculate correct
+        dependencies for generated files.
+
+        Reviewed by Jessie Berlin.
+
+        * WebKit.vcproj/WebKit.sln: Add WTFGenerated, update dependent projects.
+
+2012-03-03  Benjamin Poulain  <benjamin@webkit.org>
+
+        Remove the redundant method KURL::protocolInHTTPFamily()
+        https://bugs.webkit.org/show_bug.cgi?id=80216
+
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebFrameLoaderClient::dispatchDidFailToStartPlugin):
+        * WebHistory.cpp:
+        (WebHistory::visitedURL):
+
+2012-02-26  Hajime Morrita  <morrita@chromium.org>
+
+        Move ChromeClient::showContextMenu() to ContextMenuClient
+        https://bugs.webkit.org/show_bug.cgi?id=79427
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient):
+
 2012-02-24  Shinya Kawanaka  <shinyak@chromium.org>
 
         SpellCheckRequest needs to know the context where the spellcheck happened.

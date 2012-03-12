@@ -37,10 +37,6 @@
 
 #if PLATFORM(GTK)
 #include <wtf/gobject/GRefPtr.h>
-typedef struct _GSource GSource;
-typedef struct _GMainLoop GMainLoop;
-typedef struct _GMainContext GMainContext;
-typedef int gboolean;
 #endif
 
 namespace WebCore {
@@ -155,10 +151,12 @@ private:
 #elif PLATFORM(GTK)
 public:
     static gboolean queueWork(RunLoop*);
-    GMainLoop* mainLoop();
+    GMainLoop* innermostLoop();
+    void pushNestedMainLoop(GMainLoop*);
+    void popNestedMainLoop();
 private:
-    GMainContext* m_runLoopContext;
-    GMainLoop* m_runLoopMain;
+    GRefPtr<GMainContext> m_runLoopContext;
+    Vector<GRefPtr<GMainLoop> > m_runLoopMainLoops;
 #endif
 };
 

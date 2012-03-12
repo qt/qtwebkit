@@ -42,10 +42,13 @@ namespace WebCore {
 
 CCLayerImpl::CCLayerImpl(int id)
     : m_parent(0)
+    , m_maskLayerId(-1)
+    , m_replicaLayerId(-1)
     , m_layerId(id)
     , m_anchorPoint(0.5, 0.5)
     , m_anchorPointZ(0)
     , m_scrollable(false)
+    , m_shouldScrollOnMainThread(false)
     , m_haveWheelEventHandlers(false)
     , m_backgroundCoversViewport(false)
     , m_doubleSided(true)
@@ -73,7 +76,7 @@ CCLayerImpl::~CCLayerImpl()
     ASSERT(CCProxy::isImplThread());
 }
 
-void CCLayerImpl::addChild(PassRefPtr<CCLayerImpl> child)
+void CCLayerImpl::addChild(PassOwnPtr<CCLayerImpl> child)
 {
     child->setParent(this);
     m_children.append(child);
@@ -83,13 +86,16 @@ void CCLayerImpl::removeFromParent()
 {
     if (!m_parent)
         return;
-    for (size_t i = 0; i < m_parent->m_children.size(); ++i) {
-        if (m_parent->m_children[i].get() == this) {
-            m_parent->m_children.remove(i);
-            break;
+
+    CCLayerImpl* parent = m_parent;
+    m_parent = 0;
+
+    for (size_t i = 0; i < parent->m_children.size(); ++i) {
+        if (parent->m_children[i].get() == this) {
+            parent->m_children.remove(i);
+            return;
         }
     }
-    m_parent = 0;
 }
 
 void CCLayerImpl::removeAllChildren()
@@ -188,12 +194,6 @@ void CCLayerImpl::scrollBy(const IntSize& scroll)
     noteLayerPropertyChangedForSubtree();
 }
 
-void CCLayerImpl::cleanupResources()
-{
-    if (renderSurface())
-        renderSurface()->cleanupResources();
-}
-
 const IntRect CCLayerImpl::getDrawRect() const
 {
     // Form the matrix used by the shader to map the corners of the layer's
@@ -244,7 +244,7 @@ void CCLayerImpl::dumpLayerProperties(TextStream& ts, int indent) const
     ts << "drawsContent: " << (m_drawsContent ? "yes" : "no") << "\n";
 }
 
-void sortLayers(Vector<RefPtr<CCLayerImpl> >::iterator first, Vector<RefPtr<CCLayerImpl> >::iterator end, CCLayerSorter* layerSorter)
+void sortLayers(Vector<CCLayerImpl*>::iterator first, Vector<CCLayerImpl*>::iterator end, CCLayerSorter* layerSorter)
 {
     TRACE_EVENT("LayerRendererChromium::sortLayers", 0, 0);
     layerSorter->sort(first, end);
@@ -260,7 +260,7 @@ String CCLayerImpl::layerTreeAsText() const
 void CCLayerImpl::dumpLayer(TextStream& ts, int indent) const
 {
     writeIndent(ts, indent);
-    ts << layerTypeAsString() << "(" << m_name << ")\n";
+    ts << layerTypeAsString() << "(" << m_debugName << ")\n";
     dumpLayerProperties(ts, indent+2);
     if (m_replicaLayer) {
         writeIndent(ts, indent+2);
@@ -319,21 +319,27 @@ void CCLayerImpl::setBounds(const IntSize& bounds)
         m_layerPropertyChanged = true;
 }
 
-void CCLayerImpl::setMaskLayer(PassRefPtr<CCLayerImpl> maskLayer)
+void CCLayerImpl::setMaskLayer(PassOwnPtr<CCLayerImpl> maskLayer)
 {
-    if (m_maskLayer == maskLayer)
+    m_maskLayer = maskLayer;
+
+    int newLayerId = m_maskLayer ? m_maskLayer->id() : -1;
+    if (newLayerId == m_maskLayerId)
         return;
 
-    m_maskLayer = maskLayer;
+    m_maskLayerId = newLayerId;
     noteLayerPropertyChangedForSubtree();
 }
 
-void CCLayerImpl::setReplicaLayer(PassRefPtr<CCLayerImpl> replicaLayer)
+void CCLayerImpl::setReplicaLayer(PassOwnPtr<CCLayerImpl> replicaLayer)
 {
-    if (m_replicaLayer == replicaLayer)
+    m_replicaLayer = replicaLayer;
+
+    int newLayerId = m_replicaLayer ? m_replicaLayer->id() : -1;
+    if (newLayerId == m_replicaLayerId)
         return;
 
-    m_replicaLayer = replicaLayer;
+    m_replicaLayerId = newLayerId;
     noteLayerPropertyChangedForSubtree();
 }
 
@@ -521,6 +527,10 @@ void CCLayerImpl::setDoubleSided(bool doubleSided)
 
     m_doubleSided = doubleSided;
     noteLayerPropertyChangedForSubtree();
+}
+
+void CCLayerImpl::didLoseContext()
+{
 }
 
 }

@@ -40,6 +40,7 @@
 
 namespace WebCore {
 
+class EXTTextureFilterAnisotropic;
 class HTMLImageElement;
 class HTMLVideoElement;
 class ImageBuffer;
@@ -496,8 +497,10 @@ public:
     bool m_isDepthStencilSupported;
 
     bool m_synthesizedErrorsToConsole;
+    int m_numGLErrorsToConsoleAllowed;
 
     // Enabled extension objects.
+    OwnPtr<EXTTextureFilterAnisotropic> m_extTextureFilterAnisotropic;
     OwnPtr<OESTextureFloat> m_oesTextureFloat;
     OwnPtr<OESStandardDerivatives> m_oesStandardDerivatives;
     OwnPtr<OESVertexArrayObject> m_oesVertexArrayObject;
@@ -621,6 +624,9 @@ public:
 
     // Helper function for texParameterf and texParameteri.
     void texParameter(GC3Denum target, GC3Denum pname, GC3Dfloat parami, GC3Dint paramf, bool isFloat);
+
+    // Helper function to print GL errors to console.
+    void printGLErrorToConsole(const String&);
 
     // Helper function to print warnings to console. Currently
     // used only to warn about use of obsolete functions.

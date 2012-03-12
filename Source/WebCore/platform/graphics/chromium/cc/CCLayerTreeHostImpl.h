@@ -25,6 +25,7 @@
 #ifndef CCLayerTreeHostImpl_h
 #define CCLayerTreeHostImpl_h
 
+#include "LayerRendererChromium.h"
 #include "cc/CCAnimationEvents.h"
 #include "cc/CCInputHandler.h"
 #include "cc/CCLayerSorter.h"
@@ -39,6 +40,7 @@ namespace WebCore {
 class CCCompletionEvent;
 class CCPageScaleAnimation;
 class CCLayerImpl;
+class CCLayerTreeHostImplTimeSourceAdapter;
 class LayerRendererChromium;
 class TextureAllocator;
 struct LayerRendererCapabilities;
@@ -47,14 +49,15 @@ class TransformationMatrix;
 // CCLayerTreeHost->CCProxy callback interface.
 class CCLayerTreeHostImplClient {
 public:
+    virtual void didLoseContextOnImplThread() = 0;
     virtual void onSwapBuffersCompleteOnImplThread() = 0;
     virtual void setNeedsRedrawOnImplThread() = 0;
     virtual void setNeedsCommitOnImplThread() = 0;
-    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>) = 0;
+    virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) = 0;
 };
 
 // CCLayerTreeHostImpl owns the CCLayerImpl tree as well as associated rendering state
-class CCLayerTreeHostImpl : public CCInputHandlerClient {
+class CCLayerTreeHostImpl : public CCInputHandlerClient, LayerRendererChromiumClient {
     WTF_MAKE_NONCOPYABLE(CCLayerTreeHostImpl);
 public:
     static PassOwnPtr<CCLayerTreeHostImpl> create(const CCSettings&, CCLayerTreeHostImplClient*);
@@ -68,14 +71,23 @@ public:
     virtual void pinchGestureBegin();
     virtual void pinchGestureUpdate(float, const IntPoint&);
     virtual void pinchGestureEnd();
-    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool anchorPoint, float pageScale, double startTimeMs, double durationMs);
+    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool anchorPoint, float pageScale, double startTime, double duration);
 
     // Virtual for testing.
     virtual void beginCommit();
     virtual void commitComplete();
-    virtual void animate(double frameDisplayTimeMs);
+    virtual void animate(double monotonicTime, double wallClockTime);
     virtual void drawLayers();
 
+    // LayerRendererChromiumClient implementation
+    virtual const IntSize& viewportSize() const { return m_viewportSize; }
+    virtual const CCSettings& settings() const { return m_settings; }
+    virtual CCLayerImpl* rootLayer() { return m_rootLayerImpl.get(); }
+    virtual const CCLayerImpl* rootLayer() const  { return m_rootLayerImpl.get(); }
+    virtual void didLoseContext();
+    virtual void onSwapBuffersComplete();
+
+    // Implementation
     bool canDraw();
     GraphicsContext3D* context();
 
@@ -89,14 +101,13 @@ public:
     TextureAllocator* contentsTextureAllocator() const;
 
     void swapBuffers();
-    void onSwapBuffersComplete();
 
     void readback(void* pixels, const IntRect&);
 
-    CCLayerImpl* rootLayer() const { return m_rootLayerImpl.get(); }
-    void setRootLayer(PassRefPtr<CCLayerImpl>);
+    void setRootLayer(PassOwnPtr<CCLayerImpl>);
+    PassOwnPtr<CCLayerImpl> releaseRootLayer() { return m_rootLayerImpl.release(); }
 
-    CCLayerImpl* scrollLayer() const { return m_scrollLayerImpl.get(); }
+    CCLayerImpl* scrollLayer() const { return m_scrollLayerImpl; }
 
     bool visible() const { return m_visible; }
     void setVisible(bool);
@@ -105,12 +116,9 @@ public:
     void setSourceFrameNumber(int frameNumber) { m_sourceFrameNumber = frameNumber; }
 
     void setViewportSize(const IntSize&);
-    const IntSize& viewportSize() const { return m_viewportSize; }
 
     void setPageScaleFactorAndLimits(float pageScale, float minPageScale, float maxPageScale);
     float pageScale() const { return m_pageScale; }
-
-    const CCSettings& settings() const { return m_settings; }
 
     PassOwnPtr<CCScrollAndScaleSet> processScrollDeltas();
 
@@ -126,17 +134,17 @@ public:
 protected:
     CCLayerTreeHostImpl(const CCSettings&, CCLayerTreeHostImplClient*);
 
-    void animatePageScale(double frameBeginTimeMs);
+    void animatePageScale(double monotonicTime);
 
     // Virtual for testing.
-    virtual void animateLayers(double frameBeginTimeMs);
+    virtual void animateLayers(double monotonicTime, double wallClockTime);
 
     CCLayerTreeHostImplClient* m_client;
     int m_sourceFrameNumber;
     int m_frameNumber;
 
 private:
-    typedef Vector<RefPtr<CCLayerImpl> > CCLayerList;
+    typedef Vector<CCLayerImpl*> CCLayerList;
 
     void computeDoubleTapZoomDeltas(CCScrollAndScaleSet* scrollInfo);
     void computePinchZoomDeltas(CCScrollAndScaleSet* scrollInfo);
@@ -149,12 +157,13 @@ private:
     void trackDamageForAllSurfaces(CCLayerImpl* rootDrawLayer, const CCLayerList& renderSurfaceLayerList);
     void calculateRenderPasses(CCRenderPassList&, CCLayerList& renderSurfaceLayerList);
     void optimizeRenderPasses(CCRenderPassList&);
-    void animateLayersRecursive(CCLayerImpl*, double frameBeginTimeSecs, CCAnimationEventsVector&, bool& didAnimate, bool& needsAnimateLayers);
+    void animateLayersRecursive(CCLayerImpl*, double monotonicTime, double wallClockTime, CCAnimationEventsVector&, bool& didAnimate, bool& needsAnimateLayers);
     IntSize contentSize() const;
+    void sendDidLoseContextRecursive(CCLayerImpl*);
 
     OwnPtr<LayerRendererChromium> m_layerRenderer;
-    RefPtr<CCLayerImpl> m_rootLayerImpl;
-    RefPtr<CCLayerImpl> m_scrollLayerImpl;
+    OwnPtr<CCLayerImpl> m_rootLayerImpl;
+    CCLayerImpl* m_scrollLayerImpl;
     CCSettings m_settings;
     IntSize m_viewportSize;
     bool m_visible;
@@ -170,6 +179,9 @@ private:
     IntPoint m_previousPinchAnchor;
 
     OwnPtr<CCPageScaleAnimation> m_pageScaleAnimation;
+
+    // This is used for ticking animations slowly when hidden.
+    OwnPtr<CCLayerTreeHostImplTimeSourceAdapter> m_timeSourceClientAdapter;
 
     CCLayerSorter m_layerSorter;
 

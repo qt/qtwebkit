@@ -77,6 +77,31 @@ bool Region::contains(const IntPoint& point) const
     return contains(IntRect(point, IntSize(1, 1)));
 }
 
+bool Region::intersects(const Region& region) const
+{
+    if (!m_bounds.intersects(region.m_bounds))
+        return false;
+
+    // FIXME: this could be optimized.
+    Region tempRegion(*this);
+    tempRegion.intersect(region);
+    return !tempRegion.isEmpty();
+}
+
+unsigned Region::totalArea() const
+{
+    Vector<IntRect> rects = this->rects();
+    size_t size = rects.size();
+    unsigned totalArea = 0;
+
+    for (size_t i = 0; i < size; ++i) {
+        IntRect rect = rects[i];
+        totalArea += (rect.width() * rect.height());
+    }
+
+    return totalArea;
+}
+
 Region::Shape::Shape()
 {
 }

@@ -30,6 +30,7 @@
 #include "EventTarget.h"
 #include "FrameDestructionObserver.h"
 #include "KURL.h"
+#include "Supplementable.h"
 
 namespace WebCore {
 
@@ -56,6 +57,7 @@ namespace WebCore {
     class Navigator;
     class Node;
     class NotificationCenter;
+    class Page;
     class Performance;
     class PostMessageTimer;
     class ScheduledAction;
@@ -79,7 +81,7 @@ namespace WebCore {
 
     enum SetLocationLocking { LockHistoryBasedOnGestureState, LockHistoryAndBackForwardList };
 
-    class DOMWindow : public RefCounted<DOMWindow>, public EventTarget, public FrameDestructionObserver {
+    class DOMWindow : public RefCounted<DOMWindow>, public EventTarget, public FrameDestructionObserver, public Supplementable<DOMWindow> {
     public:
         static PassRefPtr<DOMWindow> create(Frame* frame) { return adoptRef(new DOMWindow(frame)); }
         virtual ~DOMWindow();
@@ -355,7 +357,7 @@ namespace WebCore {
 #if ENABLE(NOTIFICATIONS)
         NotificationCenter* webkitNotifications() const;
         // Renders webkitNotifications object safely inoperable, disconnects
-        // if from embedder-provided NotificationPresenter.
+        // if from embedder-provided NotificationClient.
         void resetNotifications();
 #endif
 
@@ -392,13 +394,10 @@ namespace WebCore {
         // by the document that is currently active in m_frame.
         bool isCurrentlyDisplayedInFrame() const;
 
-#if ENABLE(INDEXED_DATABASE)
-        IDBFactory* idbFactory() { return m_idbFactory.get(); }
-        void setIDBFactory(PassRefPtr<IDBFactory>);
-#endif
-
     private:
         explicit DOMWindow(Frame*);
+
+        Page* page();
 
         virtual void frameDestroyed() OVERRIDE;
         virtual void willDetachPage() OVERRIDE;
@@ -442,11 +441,6 @@ namespace WebCore {
 
         mutable RefPtr<Storage> m_sessionStorage;
         mutable RefPtr<Storage> m_localStorage;
-
-#if ENABLE(INDEXED_DATABASE)
-        mutable RefPtr<IDBFactory> m_idbFactory;
-#endif
-
         mutable RefPtr<DOMApplicationCache> m_applicationCache;
 
 #if ENABLE(NOTIFICATIONS)

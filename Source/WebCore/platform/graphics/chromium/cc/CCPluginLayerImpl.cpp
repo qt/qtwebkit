@@ -53,7 +53,9 @@ CCPluginLayerImpl::CCPluginLayerImpl(int id)
 
 CCPluginLayerImpl::~CCPluginLayerImpl()
 {
-    cleanupResources();
+    // FIXME: it seems there is no layer renderer / GraphicsContext3D available here. Ideally we
+    // would like to delete m_ioSurfaceTextureId.
+    m_ioSurfaceTextureId = 0;
 }
 
 void CCPluginLayerImpl::willDraw(LayerRendererChromium* layerRenderer)
@@ -101,6 +103,16 @@ void CCPluginLayerImpl::dumpLayerProperties(TextStream& ts, int indent) const
     CCLayerImpl::dumpLayerProperties(ts, indent);
 }
 
+void CCPluginLayerImpl::didLoseContext()
+{
+    if (m_ioSurfaceId) {
+        // We don't have a valid texture ID in the new context; however,
+        // the IOSurface is still valid.
+        m_ioSurfaceTextureId = 0;
+        m_ioSurfaceChanged = true;
+    }
+}
+
 void CCPluginLayerImpl::setIOSurfaceProperties(int width, int height, uint32_t ioSurfaceId)
 {
     if (m_ioSurfaceId != ioSurfaceId)
@@ -109,13 +121,6 @@ void CCPluginLayerImpl::setIOSurfaceProperties(int width, int height, uint32_t i
     m_ioSurfaceWidth = width;
     m_ioSurfaceHeight = height;
     m_ioSurfaceId = ioSurfaceId;
-}
-
-void CCPluginLayerImpl::cleanupResources()
-{
-    // FIXME: it seems there is no layer renderer / GraphicsContext3D available here. Ideally we
-    // would like to delete m_ioSurfaceTextureId.
-    m_ioSurfaceTextureId = 0;
 }
 
 } // namespace WebCore

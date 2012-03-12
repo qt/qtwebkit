@@ -522,7 +522,6 @@ select.status-bar-item:active {
     -webkit-mask-image: url(Images/statusbarButtonGlyphs.png);
 }
 
-
 button.dock-status-bar-item.status-bar-item .glyph {
     -webkit-mask-position: 0 -48px;
 }
@@ -540,7 +539,6 @@ button.settings-status-bar-item {
 .settings-status-bar-item .glyph {
     -webkit-mask-position: -160px -24px;
 }
-
 
 body.port-qt #dock-status-bar-item {
     display: none
@@ -895,14 +893,14 @@ body.platform-linux .monospace, body.platform-linux .source-code {
     display: none;
 }
 
-.console-formatted-object, .console-formatted-node {
+.console-formatted-object, .console-formatted-node, .console-formatted-array {
     position: relative;
     display: inline-block;
     vertical-align: top;
     color: black;
 }
 
-.console-formatted-object .section, .console-formatted-node .section {
+.console-formatted-object .section, .console-formatted-node .section, .console-formatted-array .section {
     position: static;
 }
 
@@ -1073,6 +1071,10 @@ iframe.panel.extension {
 
 .outline-disclosure li .webkit-html-tag.close {
     margin-left: -12px;
+}
+
+.webkit-html-tag.shadow, .webkit-html-fragment.shadow {
+    opacity: 0.6;
 }
 
 .outline-disclosure li.parent::before {
@@ -1375,7 +1377,7 @@ li.editing .swatch, li.editing .enabled-button,  li.editing-sub-part .delete-but
     padding-top: 2px;
 }
 
-.watch-expressions > li.editing-sub-part .name {
+.watch-expressions > li.editing-sub-part .text-prompt {
     display: block;
     width: 100%;
 }
@@ -1802,6 +1804,8 @@ button.edit-source-status-bar-item.toggled-on .glyph {
     height: 36px;
     padding: 0 5px 0 5px;
     white-space: nowrap;
+    overflow-x: hidden;
+    overflow-y: hidden;
     margin-top: 1px;
     line-height: 34px;
     border-top: 1px solid transparent;

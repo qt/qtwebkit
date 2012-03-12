@@ -256,6 +256,7 @@ private:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual bool isEnumeratable() const;
+    virtual bool isLabelable() const OVERRIDE;
     virtual void updateFocusAppearance(bool restorePreviousSelection);
     virtual void aboutToUnload();
     virtual bool shouldUseInputMethod();
@@ -276,7 +277,7 @@ private:
     virtual void accessKeyAction(bool sendMouseEvents);
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual bool isPresentationAttribute(Attribute*) const OVERRIDE;
+    virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
     virtual void finishParsingChildren();
 

@@ -66,7 +66,7 @@ public:
 
     virtual void reserveTextures();
 
-    virtual void addSelfToOccludedScreenSpace(Region& occludedScreenSpace);
+    virtual Region opaqueContentsRegion() const;
 
 protected:
     TiledLayerChromium();
@@ -86,11 +86,14 @@ protected:
     // Set invalidations to be potentially repainted during update().
     void invalidateRect(const IntRect& layerRect);
 
+    // Reset state on tiles that will be used for updating the layer.
+    void resetUpdateState();
+
     // Prepare data needed to update textures that intersect with layerRect.
-    void prepareToUpdate(const IntRect& layerRect);
+    void prepareToUpdate(const IntRect& layerRect, const Region& occludedTargetSpace);
 
     // Same as above, but this will try to paint additional surrounding content if idle.
-    void prepareToUpdateIdle(const IntRect& layerRect);
+    void prepareToUpdateIdle(const IntRect& layerRect, const Region& occludedTargetSpace);
 
     // After preparing an update, returns true if more pre-painting is needed.
     bool needsIdlePaint(const IntRect& layerRect);
@@ -102,7 +105,7 @@ protected:
     virtual TextureManager* textureManager() const;
 
 private:
-    virtual PassRefPtr<CCLayerImpl> createCCLayerImpl();
+    virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl();
 
     void createTilerIfNeeded();
     void setTilingOption(TilingOption);
@@ -110,7 +113,7 @@ private:
     bool tileOnlyNeedsPartialUpdate(UpdatableTile*);
     bool tileNeedsBufferedUpdate(UpdatableTile*);
 
-    void prepareToUpdateTiles(bool idle, int left, int top, int right, int bottom);
+    void prepareToUpdateTiles(bool idle, int left, int top, int right, int bottom, const Region& occludedTargetSpace);
     IntRect idlePaintRect(const IntRect& visibleLayerRect);
 
     UpdatableTile* tileAt(int, int) const;

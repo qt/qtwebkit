@@ -1416,6 +1416,19 @@ static AtkObject* webkit_web_view_get_accessible(GtkWidget* widget)
     return axRoot;
 }
 
+static double screenDPI(GdkScreen* screen)
+{
+    // gdk_screen_get_resolution() returns -1 when no DPI is set.
+    double dpi = gdk_screen_get_resolution(screen);
+    if (dpi != -1)
+        return dpi;
+
+    static const double kMillimetresPerInch = 25.4;
+    double diagonalSizeInPixels = hypot(gdk_screen_get_width(screen), gdk_screen_get_height(screen));
+    double diagonalSizeInInches = hypot(gdk_screen_get_width_mm(screen), gdk_screen_get_height_mm(screen)) / kMillimetresPerInch;
+    return diagonalSizeInPixels / diagonalSizeInInches;
+}
+
 static gdouble webViewGetDPI(WebKitWebView* webView)
 {
     if (webView->priv->webSettings->priv->enforce96DPI)
@@ -1423,12 +1436,12 @@ static gdouble webViewGetDPI(WebKitWebView* webView)
 
     static const double defaultDPI = 96;
     GdkScreen* screen = gtk_widget_has_screen(GTK_WIDGET(webView)) ? gtk_widget_get_screen(GTK_WIDGET(webView)) : gdk_screen_get_default();
-    if (!screen) 
-        return defaultDPI;
+    return screen ? screenDPI(screen) : defaultDPI;
+}
 
-    // gdk_screen_get_resolution() returns -1 when no DPI is set.
-    gdouble DPI = gdk_screen_get_resolution(screen);
-    return DPI != -1 ? DPI : defaultDPI;
+static inline gint webViewConvertFontSizeToPixels(WebKitWebView* webView, double fontSize)
+{
+    return fontSize / 72.0 * webViewGetDPI(webView);
 }
 
 static void webkit_web_view_screen_changed(GtkWidget* widget, GdkScreen* previousScreen)
@@ -1441,8 +1454,6 @@ static void webkit_web_view_screen_changed(GtkWidget* widget, GdkScreen* previou
 
     WebKitWebSettings* webSettings = priv->webSettings.get();
     Settings* settings = core(webView)->settings();
-    gdouble DPI = webViewGetDPI(webView);
-
     guint defaultFontSize, defaultMonospaceFontSize, minimumFontSize, minimumLogicalFontSize;
 
     g_object_get(webSettings,
@@ -1452,10 +1463,10 @@ static void webkit_web_view_screen_changed(GtkWidget* widget, GdkScreen* previou
                  "minimum-logical-font-size", &minimumLogicalFontSize,
                  NULL);
 
-    settings->setDefaultFontSize(defaultFontSize / 72.0 * DPI);
-    settings->setDefaultFixedFontSize(defaultMonospaceFontSize / 72.0 * DPI);
-    settings->setMinimumFontSize(minimumFontSize / 72.0 * DPI);
-    settings->setMinimumLogicalFontSize(minimumLogicalFontSize / 72.0 * DPI);
+    settings->setDefaultFontSize(webViewConvertFontSizeToPixels(webView, defaultFontSize));
+    settings->setDefaultFixedFontSize(webViewConvertFontSizeToPixels(webView, defaultMonospaceFontSize));
+    settings->setMinimumFontSize(webViewConvertFontSizeToPixels(webView, minimumFontSize));
+    settings->setMinimumLogicalFontSize(webViewConvertFontSizeToPixels(webView, minimumLogicalFontSize));
 }
 
 static void webkit_web_view_drag_end(GtkWidget* widget, GdkDragContext* context)
@@ -2520,8 +2531,8 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * purpose, to make them not be catched by gtk-doc.
      */
 
-    /*
-     * WebKitWebView::document-load-finished
+    /**
+     * WebKitWebView::document-load-finished:
      * @web_view: the object which received the signal
      * @web_frame: the #WebKitWebFrame whose load dispatched this request
      *
@@ -2537,8 +2548,8 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             G_TYPE_NONE, 1,
             WEBKIT_TYPE_WEB_FRAME);
 
-    /*
-     * WebKitWebView::frame-created
+    /**
+     * WebKitWebView::frame-created:
      * @web_view: the object which received the signal
      * @web_frame: the #WebKitWebFrame which was just created.
      *
@@ -2720,11 +2731,11 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
                          webkit_marshal_BOOLEAN__OBJECT,
                          G_TYPE_BOOLEAN, 1, WEBKIT_TYPE_DOM_HTML_ELEMENT);
 
-    /*
-     * WebKitWebView::resource-response-received
-     * @webView: the object which received the signal
-     * @webFrame: the #WebKitWebFrame the response was received for
-     * @webResource: the #WebKitWebResource being loaded
+    /**
+     * WebKitWebView::resource-response-received:
+     * @web_view: the object which received the signal
+     * @web_frame: the #WebKitWebFrame the response was received for
+     * @web_resource: the #WebKitWebResource being loaded
      * @response: the #WebKitNetworkResponse that was received
      *
      * Emitted when the first byte of data arrives
@@ -2742,11 +2753,11 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             WEBKIT_TYPE_WEB_RESOURCE,
             WEBKIT_TYPE_NETWORK_RESPONSE);
 
-    /*
-     * WebKitWebView::resource-load-finished
-     * @webView: the object which received the signal
-     * @webFrame: the #WebKitWebFrame the response was received for
-     * @webResource: the #WebKitWebResource that was loaded
+    /**
+     * WebKitWebView::resource-load-finished:
+     * @web_view: the object which received the signal
+     * @web_frame: the #WebKitWebFrame the response was received for
+     * @web_resource: the #WebKitWebResource that was loaded
      *
      * Emitted when all the data for the resource was loaded
      *
@@ -2762,15 +2773,17 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             WEBKIT_TYPE_WEB_FRAME,
             WEBKIT_TYPE_WEB_RESOURCE);
 
-    /*
-     * WebKitWebView::resource-content-length-received
-     * @webView: the object which received the signal
-     * @webFrame: the #WebKitWebFrame the response was received for
-     * @webResource: the #WebKitWebResource that was loaded
-     * @lengthReceived: the resource data length in bytes
+    /**
+     * WebKitWebView::resource-content-length-received:
+     * @web_view: the object which received the signal
+     * @web_frame: the #WebKitWebFrame the response was received for
+     * @web_resource: the #WebKitWebResource that was loaded
+     * @length_received: the amount of data received since the last signal emission
      *
-     * Emitted when the HTTP Content-Length response header has been
-     * received and parsed successfully.
+     * Emitted when new resource data has been received. The
+     * @length_received variable stores the amount of bytes received
+     * since the last time this signal was emitted. This is useful to
+     * provide progress information about the resource load operation.
      *
      * Since: 1.7.5
      */
@@ -2785,12 +2798,12 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             WEBKIT_TYPE_WEB_RESOURCE,
             G_TYPE_INT);
 
-    /*
-     * WebKitWebView::resource-load-failed
-     * @webView: the object which received the signal
-     * @webFrame: the #WebKitWebFrame the response was received for
-     * @webResource: the #WebKitWebResource that was loaded
-     * @webError: the #GError that was triggered
+    /**
+     * WebKitWebView::resource-load-failed:
+     * @web_view: the object which received the signal
+     * @web_frame: the #WebKitWebFrame the response was received for
+     * @web_resource: the #WebKitWebResource that was loaded
+     * @error: the #GError that was triggered
      *
      * Invoked when a resource failed to load
      *
@@ -3330,15 +3343,14 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     coreSettings->setUseHixie76WebSocketProtocol(false);
 #endif
 
+#if ENABLE(SMOOTH_SCROLLING)
+    coreSettings->setEnableScrollAnimator(settingsPrivate->enableSmoothScrolling);
+#endif
+
     if (Page* page = core(webView))
         page->setTabKeyCyclesThroughElements(settingsPrivate->tabKeyCyclesThroughElements);
 
     webkit_web_view_screen_changed(GTK_WIDGET(webView), NULL);
-}
-
-static inline gint pixelsFromSize(WebKitWebView* webView, gint size)
-{
-    return size / 72.0 * webViewGetDPI(webView);
 }
 
 static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GParamSpec* pspec, WebKitWebView* webView)
@@ -3365,13 +3377,13 @@ static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GPar
     else if (name == g_intern_string("serif-font-family"))
         settings->setSerifFontFamily(g_value_get_string(&value));
     else if (name == g_intern_string("default-font-size"))
-        settings->setDefaultFontSize(pixelsFromSize(webView, g_value_get_int(&value)));
+        settings->setDefaultFontSize(webViewConvertFontSizeToPixels(webView, g_value_get_int(&value)));
     else if (name == g_intern_string("default-monospace-font-size"))
-        settings->setDefaultFixedFontSize(pixelsFromSize(webView, g_value_get_int(&value)));
+        settings->setDefaultFixedFontSize(webViewConvertFontSizeToPixels(webView, g_value_get_int(&value)));
     else if (name == g_intern_string("minimum-font-size"))
-        settings->setMinimumFontSize(pixelsFromSize(webView, g_value_get_int(&value)));
+        settings->setMinimumFontSize(webViewConvertFontSizeToPixels(webView, g_value_get_int(&value)));
     else if (name == g_intern_string("minimum-logical-font-size"))
-        settings->setMinimumLogicalFontSize(pixelsFromSize(webView, g_value_get_int(&value)));
+        settings->setMinimumLogicalFontSize(webViewConvertFontSizeToPixels(webView, g_value_get_int(&value)));
     else if (name == g_intern_string("enforce-96-dpi"))
         webkit_web_view_screen_changed(GTK_WIDGET(webView), NULL);
     else if (name == g_intern_string("auto-load-images"))
@@ -3462,6 +3474,11 @@ static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GPar
 #if ENABLE(WEB_AUDIO)
     else if (name == g_intern_string("enable-webaudio"))
         settings->setWebAudioEnabled(g_value_get_boolean(&value));
+#endif
+
+#if ENABLE(SMOOTH_SCROLLING)
+    else if (name == g_intern_string("enable-smooth-scrolling"))
+        settings->setEnableScrollAnimator(g_value_get_boolean(&value));
 #endif
 
     else if (!g_object_class_find_property(G_OBJECT_GET_CLASS(webSettings), name))
@@ -5099,7 +5116,7 @@ void webViewEnterFullscreen(WebKitWebView* webView, Node* node)
     if (!node->hasTagName(HTMLNames::videoTag))
         return;
 
-#if ENABLE(VIDEO)
+#if ENABLE(VIDEO) && !defined(GST_API_VERSION_1)
     HTMLMediaElement* videoElement = static_cast<HTMLMediaElement*>(node);
     WebKitWebViewPrivate* priv = webView->priv;
 
@@ -5115,7 +5132,7 @@ void webViewEnterFullscreen(WebKitWebView* webView, Node* node)
 
 void webViewExitFullscreen(WebKitWebView* webView)
 {
-#if ENABLE(VIDEO)
+#if ENABLE(VIDEO) && !defined(GST_API_VERSION_1)
     WebKitWebViewPrivate* priv = webView->priv;
     if (priv->fullscreenVideoController)
         priv->fullscreenVideoController->exitFullscreen();

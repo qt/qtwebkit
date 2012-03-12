@@ -32,12 +32,15 @@
 
 #include "CallData.h"
 #include "Intrinsic.h"
+#include "LowLevelInterpreter.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Register.h"
 #include "ThunkGenerators.h"
 #include <wtf/HashMap.h>
 
 namespace JSC {
+
+#if ENABLE(JIT)
 
     struct StructureStubInfo;
 
@@ -261,8 +264,6 @@ namespace JSC {
 
 #define JITSTACKFRAME_ARGS_INDEX (OBJECT_OFFSETOF(JITStackFrame, args) / sizeof(void*))
 
-#if ENABLE(JIT)
-
 #define STUB_ARGS_DECLARATION void** args
 #define STUB_ARGS (args)
 
@@ -306,8 +307,22 @@ namespace JSC {
         MacroAssemblerCodePtr ctiVirtualConstructLink() { return m_trampolineStructure.ctiVirtualConstructLink; }
         MacroAssemblerCodePtr ctiVirtualCall() { return m_trampolineStructure.ctiVirtualCall; }
         MacroAssemblerCodePtr ctiVirtualConstruct() { return m_trampolineStructure.ctiVirtualConstruct; }
-        MacroAssemblerCodePtr ctiNativeCall() { return m_trampolineStructure.ctiNativeCall; }
-        MacroAssemblerCodePtr ctiNativeConstruct() { return m_trampolineStructure.ctiNativeConstruct; }
+        MacroAssemblerCodePtr ctiNativeCall()
+        {
+#if ENABLE(LLINT)
+            if (!m_executableMemory)
+                return MacroAssemblerCodePtr::createLLIntCodePtr(llint_native_call_trampoline);
+#endif
+            return m_trampolineStructure.ctiNativeCall;
+        }
+        MacroAssemblerCodePtr ctiNativeConstruct()
+        {
+#if ENABLE(LLINT)
+            if (!m_executableMemory)
+                return MacroAssemblerCodePtr::createLLIntCodePtr(llint_native_construct_trampoline);
+#endif
+            return m_trampolineStructure.ctiNativeConstruct;
+        }
         MacroAssemblerCodePtr ctiSoftModulo() { return m_trampolineStructure.ctiSoftModulo; }
 
         MacroAssemblerCodeRef ctiStub(JSGlobalData*, ThunkGenerator);
@@ -330,7 +345,6 @@ namespace JSC {
 extern "C" {
     EncodedJSValue JIT_STUB cti_op_add(STUB_ARGS_DECLARATION);
     EncodedJSValue JIT_STUB cti_op_bitand(STUB_ARGS_DECLARATION);
-    EncodedJSValue JIT_STUB cti_op_bitnot(STUB_ARGS_DECLARATION);
     EncodedJSValue JIT_STUB cti_op_bitor(STUB_ARGS_DECLARATION);
     EncodedJSValue JIT_STUB cti_op_bitxor(STUB_ARGS_DECLARATION);
     EncodedJSValue JIT_STUB cti_op_call_NotJSFunction(STUB_ARGS_DECLARATION);

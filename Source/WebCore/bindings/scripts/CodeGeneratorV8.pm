@@ -3,7 +3,7 @@
 # Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
 # Copyright (C) 2006 Alexey Proskuryakov <ap@webkit.org>
 # Copyright (C) 2006 Apple Computer, Inc.
-# Copyright (C) 2007, 2008, 2009 Google Inc.
+# Copyright (C) 2007, 2008, 2009, 2012 Google Inc.
 # Copyright (C) 2009 Cameron McCormack <cam@mcc.id.au>
 # Copyright (C) Research In Motion Limited 2010. All rights reserved.
 # Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
@@ -365,9 +365,12 @@ END
         my $attrExt = $function->signature->extendedAttributes;
 
         if (($attrExt->{"Custom"} || $attrExt->{"V8Custom"}) && !$attrExt->{"ImplementedBy"} && $function->{overloadIndex} == 1) {
+            my $conditionalString = GenerateConditionalString($function->signature);
+            push(@headerContent, "#if ${conditionalString}\n") if $conditionalString;
             push(@headerContent, <<END);
     static v8::Handle<v8::Value> ${name}Callback(const v8::Arguments&);
 END
+            push(@headerContent, "#endif // ${conditionalString}\n") if $conditionalString;
         }
 
         if ($attrExt->{"V8EnabledAtRuntime"}) {
@@ -384,19 +387,24 @@ END
     foreach my $attribute (@{$dataNode->attributes}) {
         my $name = $attribute->signature->name;
         my $attrExt = $attribute->signature->extendedAttributes;
+        my $conditionalString = GenerateConditionalString($attribute->signature);
         if (($attrExt->{"V8CustomGetter"} || $attrExt->{"CustomGetter"} ||
              $attrExt->{"V8Custom"} || $attrExt->{"Custom"}) &&
             !$attrExt->{"ImplementedBy"}) {
+            push(@headerContent, "#if ${conditionalString}\n") if $conditionalString;
             push(@headerContent, <<END);
     static v8::Handle<v8::Value> ${name}AccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo&);
 END
+            push(@headerContent, "#endif // ${conditionalString}\n") if $conditionalString;
         }
         if (($attrExt->{"V8CustomSetter"} || $attrExt->{"CustomSetter"} ||
              $attrExt->{"V8Custom"} || $attrExt->{"Custom"}) &&
             !$attrExt->{"ImplementedBy"}) {
+            push(@headerContent, "#if ${conditionalString}\n") if $conditionalString;
             push(@headerContent, <<END);
     static void ${name}AccessorSetter(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::AccessorInfo&);
 END
+            push(@headerContent, "#endif // ${conditionalString}\n") if $conditionalString;
         }
         if ($attrExt->{"V8EnabledAtRuntime"}) {
             push(@enabledAtRuntime, $attribute);
@@ -447,7 +455,9 @@ END
 }
 END
 
-    if (!($dataNode->extendedAttributes->{"CustomToJSObject"} or $dataNode->extendedAttributes->{"V8CustomToJSObject"})) {
+    if ($interfaceName eq 'Element') {
+        # Do not generate toV8() for performance optimization.
+    } elsif (!($dataNode->extendedAttributes->{"CustomToJSObject"} or $dataNode->extendedAttributes->{"V8CustomToJSObject"})) {
         push(@headerContent, <<END);
 
 inline v8::Handle<v8::Value> toV8(${nativeType}* impl${forceNewObjectParameter})
@@ -2988,7 +2998,8 @@ END
                 my $paramName = $param->name;
                 push(@implContent, "    v8::Handle<v8::Value> ${paramName}Handle = " . NativeToJSValue($param, $paramName) . ";\n");
                 push(@implContent, "    if (${paramName}Handle.IsEmpty()) {\n");
-                push(@implContent, "        CRASH();\n");
+                push(@implContent, "        if (!isScriptControllerTerminating())\n");
+                push(@implContent, "            CRASH();\n");
                 push(@implContent, "        return true;\n");
                 push(@implContent, "    }\n");
                 push(@args, "        ${paramName}Handle");
@@ -3029,21 +3040,28 @@ sub GenerateToV8Converters
 v8::Handle<v8::Object> ${className}::wrapSlow(${nativeType}* impl)
 {
     v8::Handle<v8::Object> wrapper;
-    V8Proxy* proxy = 0;
 END
 
+    my $proxyInit;
     if (IsNodeSubType($dataNode)) {
-        push(@implContent, <<END);
-    if (impl->document()) {
-        proxy = V8Proxy::retrieve(impl->document()->frame());
-        if (proxy && static_cast<Node*>(impl->document()) == static_cast<Node*>(impl)) {
-            if (proxy->windowShell()->context().IsEmpty() && proxy->windowShell()->initContextIfNeeded()) {
-                // initContextIfNeeded may have created a wrapper for the object, retry from the start.
-                return ${className}::wrap(impl);
-            }
+        $proxyInit = "V8Proxy::retrieve(impl->document()->frame())";
+        # DocumentType nodes are the only nodes that may have a NULL document.
+        if ($interfaceName eq "DocumentType") {
+            $proxyInit = "impl->document() ? $proxyInit : 0";
         }
+    } else {
+        $proxyInit = "0";
     }
+    push(@implContent, <<END);
+    V8Proxy* proxy = $proxyInit;
+END
 
+    if (IsSubType($dataNode, "Document")) {
+        push(@implContent, <<END);
+    if (proxy && proxy->windowShell()->context().IsEmpty() && proxy->windowShell()->initContextIfNeeded()) {
+        // initContextIfNeeded may have created a wrapper for the object, retry from the start.
+        return ${className}::wrap(impl);
+    }
 END
     }
 
@@ -3085,7 +3103,7 @@ END
     }
 
     push(@implContent, <<END);
-    if (wrapper.IsEmpty())
+    if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 END
     push(@implContent, "\n    impl->ref();\n") if IsRefPtrType($interfaceName);

@@ -42,8 +42,12 @@ namespace WebCore {
 
 HarfBuzzShaperBase::HarfBuzzShaperBase(const Font* font, const TextRun& run)
     : m_font(font)
+    , m_normalizedBufferLength(0)
     , m_run(run)
     , m_wordSpacingAdjustment(font->wordSpacing())
+    , m_padding(0)
+    , m_padPerWordBreak(0)
+    , m_padError(0)
     , m_letterSpacing(font->letterSpacing())
 {
 }
@@ -64,7 +68,7 @@ static void normalizeSpacesAndMirrorChars(const UChar* source, UChar* destinatio
         else if (normalizeMode == HarfBuzzShaperBase::NormalizeMirrorChars)
             character = u_charMirror(character);
         U16_APPEND(destination, position, length, character, error);
-        ASSERT(!error);
+        ASSERT_UNUSED(error, !error);
         position = nextPosition;
     }
 }

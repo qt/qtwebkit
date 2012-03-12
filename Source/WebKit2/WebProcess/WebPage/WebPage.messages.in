@@ -101,6 +101,9 @@ messages -> WebPage {
     SetUserAgent(WTF::String userAgent)
     SetCustomTextEncodingName(WTF::String encodingName)
 
+    SuspendActiveDOMObjectsAndAnimations()
+    ResumeActiveDOMObjectsAndAnimations()
+
 #if USE(TILED_BACKING_STORE)
     SetFixedVisibleContentRect(WebCore::IntRect rect)
     SetViewportSize(WebCore::IntSize size)
@@ -176,9 +179,11 @@ messages -> WebPage {
     SetSmartInsertDeleteEnabled(bool isSmartInsertDeleteEnabled);
 #endif
 
+#if ENABLE(GEOLOCATION)
     # Geolocation
     DidReceiveGeolocationPermissionDecision(uint64_t geolocationID, bool allowed)
-    
+#endif
+
     # Notification
     DidReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed)
 

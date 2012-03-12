@@ -135,6 +135,7 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
 #endif
 #if ENABLE(CSS_GRID_LAYOUT)
     rareNonInheritedData.access()->m_grid.init();
+    rareNonInheritedData.access()->m_gridItem.init();
 #endif
     rareInheritedData.init();
     inherited.init();
@@ -424,7 +425,8 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         }
 #endif
 #if ENABLE(CSS_GRID_LAYOUT)
-        if (rareNonInheritedData->m_grid.get() != other->rareNonInheritedData->m_grid.get())
+        if (rareNonInheritedData->m_grid.get() != other->rareNonInheritedData->m_grid.get()
+            && rareNonInheritedData->m_gridItem.get() != other->rareNonInheritedData->m_gridItem.get())
             return StyleDifferenceLayout;
 #endif
 
@@ -843,14 +845,14 @@ void RenderStyle::setBoxShadow(PassOwnPtr<ShadowData> shadowData, bool add)
 static RoundedRect::Radii calcRadiiFor(const BorderData& border, LayoutSize size)
 {
     return RoundedRect::Radii(
-        LayoutSize(border.topLeft().width().calcValue(size.width()), 
-                   border.topLeft().height().calcValue(size.height())),
-        LayoutSize(border.topRight().width().calcValue(size.width()),
-                   border.topRight().height().calcValue(size.height())),
-        LayoutSize(border.bottomLeft().width().calcValue(size.width()), 
-                   border.bottomLeft().height().calcValue(size.height())),
-        LayoutSize(border.bottomRight().width().calcValue(size.width()), 
-                   border.bottomRight().height().calcValue(size.height())));
+        IntSize(border.topLeft().width().calcValue(size.width()), 
+                border.topLeft().height().calcValue(size.height())),
+        IntSize(border.topRight().width().calcValue(size.width()),
+                border.topRight().height().calcValue(size.height())),
+        IntSize(border.bottomLeft().width().calcValue(size.width()), 
+                border.bottomLeft().height().calcValue(size.height())),
+        IntSize(border.bottomRight().width().calcValue(size.width()), 
+                border.bottomRight().height().calcValue(size.height())));
 }
 
 static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radii& radii)

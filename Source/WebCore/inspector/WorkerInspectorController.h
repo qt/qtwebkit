@@ -51,9 +51,11 @@ class InspectorFrontend;
 class InspectorFrontendChannel;
 class InspectorConsoleAgent;
 class InspectorInstrumentation;
+class InspectorProfilerAgent;
 class InspectorRuntimeAgent;
 class InspectorState;
 class InspectorStateClient;
+class InspectorTimelineAgent;
 class InstrumentingAgents;
 class WorkerContext;
 
@@ -83,9 +85,11 @@ private:
     OwnPtr<InjectedScriptManager> m_injectedScriptManager;
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     OwnPtr<InspectorDebuggerAgent> m_debuggerAgent;
+    OwnPtr<InspectorProfilerAgent> m_profilerAgent;
 #endif
     OwnPtr<InspectorRuntimeAgent> m_runtimeAgent;
     OwnPtr<InspectorConsoleAgent> m_consoleAgent;
+    OwnPtr<InspectorTimelineAgent> m_timelineAgent;
 
     OwnPtr<InspectorFrontendChannel> m_frontendChannel;
     OwnPtr<InspectorFrontend> m_frontend;

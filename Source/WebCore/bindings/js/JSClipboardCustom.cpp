@@ -48,6 +48,21 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
+JSValue JSClipboard::types(ExecState* exec) const
+{
+    Clipboard* clipboard = impl();
+
+    HashSet<String> types = clipboard->types();
+    if (types.isEmpty())
+        return jsNull();
+
+    MarkedArgumentBuffer list;
+    HashSet<String>::const_iterator end = types.end();
+    for (HashSet<String>::const_iterator it = types.begin(); it != end; ++it)
+        list.append(jsString(exec, stringToUString(*it)));
+    return constructArray(exec, globalObject(), list);
+}
+
 JSValue JSClipboard::clearData(ExecState* exec)
 {
     Clipboard* clipboard = impl();
@@ -64,22 +79,6 @@ JSValue JSClipboard::clearData(ExecState* exec)
 
     // FIXME: It does not match the rest of the JS bindings to throw on invalid number of arguments. 
     return throwError(exec, createSyntaxError(exec, "clearData: Invalid number of arguments"));
-}
-
-JSValue JSClipboard::getData(ExecState* exec)
-{
-    // FIXME: It does not match the rest of the JS bindings to throw on invalid number of arguments.
-    if (exec->argumentCount() != 1)
-        return throwError(exec, createSyntaxError(exec, "getData: Invalid number of arguments"));
-
-    Clipboard* clipboard = impl();
-
-    bool success;
-    String result = clipboard->getData(ustringToString(exec->argument(0).toString(exec)->value(exec)), success);
-    if (!success)
-        return jsUndefined();
-
-    return jsString(exec, result);
 }
 
 JSValue JSClipboard::setDragImage(ExecState* exec)

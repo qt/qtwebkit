@@ -1,3 +1,316 @@
+2012-03-09  Jon Lee  <jonlee@apple.com>
+
+        Rename NotificationPresenter to NotificationClient
+        https://bugs.webkit.org/show_bug.cgi?id=80488
+        <rdar://problem/10965558>
+
+        Reviewed by Kentaro Hara.
+
+        Refactor to use renamed WebCore::NotificationClient.
+        * WebCoreSupport/NotificationPresenterClientQt.cpp:
+        (WebCore::NotificationPresenterClientQt::checkPermission):
+        (WebCore::NotificationPresenterClientQt::allowNotificationForFrame):
+        * WebCoreSupport/NotificationPresenterClientQt.h:
+        (NotificationPresenterClientQt):
+
+2012-03-09  Emil A Eklund  <eae@chromium.org>
+
+        Add roundedPoint to HitTestResult and change platform code to use it
+        https://bugs.webkit.org/show_bug.cgi?id=80715
+
+        Reviewed by James Robinson.
+
+        Change ports to use roundedPoint to avoid exposing subpixel types to
+        platform code.
+
+        * Api/qwebframe.cpp:
+        (QWebHitTestResultPrivate::QWebHitTestResultPrivate):
+
+2012-03-09  Jon Lee  <jonlee@apple.com>
+
+        Add support for ENABLE(LEGACY_NOTIFICATIONS)
+        https://bugs.webkit.org/show_bug.cgi?id=80497
+
+        Reviewed by Adam Barth.
+
+        Prep for b80472: Update API for Web Notifications
+        * examples/platformplugin/platformplugin.pro:
+
+2012-03-09  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [Qt] Fix compilation without QtQuick1
+        https://bugs.webkit.org/show_bug.cgi?id=80503
+
+        Qt 4.8 API test fix after r110050.
+
+        Reviewed by Zoltan Herczeg.
+
+        * declarative/public.pri: Add load(features) to ensure HAVE_QQUICK1=1 is set.
+
+2012-03-08  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Use Qt's module system for install rules and depending on QtWebKit
+
+        Instead of rolling our own install rules we now use the same approach as
+        every other Qt module, by loading qt_module.prf and qt_module_config.prf.
+
+        This ensures that we follow the same semantics as the rest of Qt on
+        what sort of config options are enabled by default (create_cmake eg.).
+        It also allows us to use QT += webkit instead of the workaround we had
+        with CONFIG += qtwebkit.
+
+        We do however force Qt to always treat our build as a non-developer build,
+        so the libraries will end up in the WebKit lib directory instead of the
+        qtbase directory (as with a normal developer-build). This allows us to
+        keep the webkit-build self-contained. If Qt is a developer build we still
+        copy the module file manually to Qt, so that you don't have to install
+        WebKit to make it available.
+
+        For non-developer builds of Qt, it is still possible to use the built
+        WebKit libraries without having to install them, by having the variable
+        QMAKE_EXTRA_MODULE_FORWARDS set in the project's .qmake.cache file,
+        pointing to $WEBKITOUTUTDIR/$CONFIGURATION/modules.
+
+        https://bugs.webkit.org/show_bug.cgi?id=80590
+
+        Reviewed by Simon Hausmann.
+
+        * declarative/experimental/experimental.pri:
+        * declarative/experimental/plugin.cpp:
+        * declarative/plugin.cpp:
+        * declarative/public.pri:
+        * tests/tests.pri:
+
+2012-03-08  Antti Koivisto  <antti@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=80370
+        Enable matched declaration caching for elements with a style attribute
+
+        Reviewed by Andreas Kling
+
+        * Api/qwebelement.cpp:
+        (QWebElement::styleProperty):
+        (QWebElement::setStyleProperty):
+
+2012-03-07  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix compilation without QtQuick1
+        https://bugs.webkit.org/show_bug.cgi?id=80503
+
+        Reviewed by Tor Arne Vestbø.
+
+        Compile and enable the QtQuick1/QML1 plugin and webview
+        only if we're using Qt 4 at the moment. QQuick1 clashes
+        with QQuick2 right now because both declare QDeclarativeEngine
+        and friends as classes.
+
+        * declarative/plugin.cpp:
+        (WebKitQmlPlugin::registerTypes):
+        * declarative/public.pri:
+        * tests/tests.pri:
+
+2012-03-07  Kangil Han  <kangil.han@samsung.com>
+
+        [DRT] Remove PlainTextController implementations.
+        https://bugs.webkit.org/show_bug.cgi?id=79959
+
+        Reviewed by Hajime Morita.
+
+        PlainTextController usages in existing tests have been
+        replaced by internals API by bug 78570.
+        So this patch will remove PlainTextController implementations
+        to avoid further usage in new tests.
+
+        * WebCoreSupport/DumpRenderTreeSupportQt.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportQt.h:
+
+2012-03-06  Philippe Normand  <pnormand@igalia.com>
+
+        [GStreamer] disable GStreamerGWorld when building against 0.11
+        https://bugs.webkit.org/show_bug.cgi?id=77088
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/ChromeClientQt.cpp:
+        (WebCore::ChromeClientQt::ChromeClientQt):
+        (WebCore::ChromeClientQt::~ChromeClientQt):
+        (WebCore):
+        * WebCoreSupport/FullScreenVideoQt.cpp:
+        (WebCore):
+        (WebCore::FullScreenVideoQt::FullScreenVideoQt):
+        (WebCore::FullScreenVideoQt::~FullScreenVideoQt):
+        (WebCore::FullScreenVideoQt::enterFullScreenForNode):
+        (WebCore::FullScreenVideoQt::exitFullScreenForNode):
+        (WebCore::FullScreenVideoQt::isValid):
+        * WebCoreSupport/FullScreenVideoQt.h:
+        (WebCore):
+
+2012-03-03  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix static_libs_as_shared build
+        https://bugs.webkit.org/show_bug.cgi?id=80214
+
+        Reviewed by Tor Arne Vestbø.
+
+        Add helper function to be called by WebProcess main
+        to potentially initialize the QStyle theme.
+
+        * WebCoreSupport/InitWebCoreQt.cpp:
+        (WebKit):
+        (WebKit::initializeWebKit2Theme):
+
+2012-03-02  Casper van Donderen  <casper.vandonderen@nokia.com>
+
+        [Qt] Documentation cleanup
+        https://bugs.webkit.org/show_bug.cgi?id=80131
+
+        Reviewed by Simon Hausmann.
+
+        QDoc uses different commands to do bold, lists, and italics.
+        This change updates the documentation accordingly.
+        QTBUG-24578
+
+        * Api/qwebframe.cpp:
+        * Api/qwebhistory.cpp:
+        * Api/qwebinspector.cpp:
+        * Api/qwebpage.cpp:
+        * Api/qwebpluginfactory.cpp:
+        * Api/qwebsettings.cpp:
+        * declarative/qdeclarativewebview.cpp:
+        * docs/qtwebkit-bridge.qdoc:
+        * docs/qtwebkit.qdoc:
+        * docs/qtwebkit.qdocconf:
+
+2012-03-02  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Build system cleanup
+
+        Rubber-stamped by Antti Koivisto.
+
+        * tests/MIMESniffing/MIMESniffing.pro: Don't link in WTFAssertions.cpp for ASSERT, now
+        that the symbols are properly exported with export macros from the DLL.
+
+2012-03-02  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Move QStyle theming code out of WebCore into WebKit1
+        https://bugs.webkit.org/show_bug.cgi?id=80128
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Moved the bulk of the QStyle dependant code here, where it's okay to depend on QtWidgets/QStyle.
+        Install the QStyle factory functions in initWebCoreQt.cpp.
+
+        * Api/qwebpage.cpp:
+        (QWebPage::swallowContextMenuEvent):
+        * WebCoreSupport/InitWebCoreQt.cpp:
+        (WebCore::initializeWebCoreQt):
+        * WebCoreSupport/RenderThemeQStyle.cpp: Renamed from Source/WebCore/platform/qt/RenderThemeQStyle.cpp.
+        (WebCore):
+        (WebCore::initStyleOption):
+        (WebCore::RenderThemeQStyle::getStylePainter):
+        (WebCore::StylePainterQStyle::StylePainterQStyle):
+        (WebCore::StylePainterQStyle::init):
+        (WebCore::RenderThemeQStyle::create):
+        (WebCore::RenderThemeQStyle::RenderThemeQStyle):
+        (WebCore::RenderThemeQStyle::~RenderThemeQStyle):
+        (WebCore::RenderThemeQStyle::fallbackStyle):
+        (WebCore::RenderThemeQStyle::qStyle):
+        (WebCore::RenderThemeQStyle::findFrameLineWidth):
+        (WebCore::RenderThemeQStyle::inflateButtonRect):
+        (WebCore::RenderThemeQStyle::computeSizeBasedOnStyle):
+        (WebCore::RenderThemeQStyle::adjustButtonStyle):
+        (WebCore::RenderThemeQStyle::setButtonPadding):
+        (WebCore::RenderThemeQStyle::paintButton):
+        (WebCore::RenderThemeQStyle::paintTextField):
+        (WebCore::RenderThemeQStyle::adjustTextAreaStyle):
+        (WebCore::RenderThemeQStyle::paintTextArea):
+        (WebCore::RenderThemeQStyle::setPopupPadding):
+        (WebCore::RenderThemeQStyle::paintMenuList):
+        (WebCore::RenderThemeQStyle::adjustMenuListButtonStyle):
+        (WebCore::RenderThemeQStyle::paintMenuListButton):
+        (WebCore::RenderThemeQStyle::animationDurationForProgressBar):
+        (WebCore::RenderThemeQStyle::paintProgressBar):
+        (WebCore::RenderThemeQStyle::paintSliderTrack):
+        (WebCore::RenderThemeQStyle::adjustSliderTrackStyle):
+        (WebCore::RenderThemeQStyle::paintSliderThumb):
+        (WebCore::RenderThemeQStyle::adjustSliderThumbStyle):
+        (WebCore::RenderThemeQStyle::paintSearchField):
+        (WebCore::RenderThemeQStyle::adjustSearchFieldDecorationStyle):
+        (WebCore::RenderThemeQStyle::paintSearchFieldDecoration):
+        (WebCore::RenderThemeQStyle::adjustSearchFieldResultsDecorationStyle):
+        (WebCore::RenderThemeQStyle::paintSearchFieldResultsDecoration):
+        (WebCore::RenderThemeQStyle::paintInnerSpinButton):
+        (WebCore::RenderThemeQStyle::initializeCommonQStyleOptions):
+        (WebCore::RenderThemeQStyle::adjustSliderThumbSize):
+        * WebCoreSupport/RenderThemeQStyle.h: Renamed from Source/WebCore/platform/qt/RenderThemeQStyle.h.
+        (WebCore):
+        (RenderThemeQStyle):
+        (StylePainterQStyle):
+        (WebCore::StylePainterQStyle::isValid):
+        (WebCore::StylePainterQStyle::drawPrimitive):
+        (WebCore::StylePainterQStyle::drawControl):
+        (WebCore::StylePainterQStyle::drawComplexControl):
+        * WebCoreSupport/ScrollbarThemeQStyle.cpp: Copied from Source/WebCore/platform/qt/ScrollbarThemeQt.cpp.
+        (WebCore):
+        (WebCore::ScrollbarThemeQStyle::~ScrollbarThemeQStyle):
+        (WebCore::scPart):
+        (WebCore::scrollbarPart):
+        (WebCore::styleOptionSlider):
+        (WebCore::ScrollbarThemeQStyle::paint):
+        (WebCore::ScrollbarThemeQStyle::hitTest):
+        (WebCore::ScrollbarThemeQStyle::shouldCenterOnThumb):
+        (WebCore::ScrollbarThemeQStyle::invalidatePart):
+        (WebCore::ScrollbarThemeQStyle::scrollbarThickness):
+        (WebCore::ScrollbarThemeQStyle::thumbPosition):
+        (WebCore::ScrollbarThemeQStyle::thumbLength):
+        (WebCore::ScrollbarThemeQStyle::trackPosition):
+        (WebCore::ScrollbarThemeQStyle::trackLength):
+        (WebCore::ScrollbarThemeQStyle::paintScrollCorner):
+        (WebCore::ScrollbarThemeQStyle::style):
+        * WebCoreSupport/ScrollbarThemeQStyle.h: Renamed from Source/WebCore/platform/qt/ScrollbarThemeQt.h.
+        (WebCore):
+        (ScrollbarThemeQStyle):
+
+2012-02-27  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        [Qt] Move registration of experimental types to the proper plugin
+        https://bugs.webkit.org/show_bug.cgi?id=79706
+
+        Reviewed by Tor Arne Vestbø.
+
+        * declarative/experimental/plugin.cpp:
+        * declarative/plugin.cpp:
+        (WebKitQmlPlugin::registerTypes):
+
+2012-02-28  Antti Koivisto  <antti@apple.com>
+
+        Try to fix build.
+
+        Not reviewed.
+
+        * Api/qwebelement.cpp:
+        (QWebElement::styleProperty):
+
+2012-02-26  Hajime Morrita  <morrita@chromium.org>
+
+        Move ChromeClient::showContextMenu() to ContextMenuClient
+        https://bugs.webkit.org/show_bug.cgi?id=79427
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/ChromeClientQt.h:
+        (ChromeClientQt):
+
+2012-02-24  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt] API: Unify the loading properties and signals.
+        https://bugs.webkit.org/show_bug.cgi?id=79486
+
+        Reviewed by Simon Hausmann.
+
+        * declarative/plugin.cpp:
+        (WebKitQmlPlugin::registerTypes):
+
 2012-02-24  Holger Hans Peter Freyther  <holger@moiji-mobile.com>
 
         [Qt] Build fix. macro "QSKIP" now only takes 1 argument on Qt5

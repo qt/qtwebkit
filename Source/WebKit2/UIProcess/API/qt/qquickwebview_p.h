@@ -30,6 +30,7 @@ class QWebNavigationRequest;
 class QDeclarativeComponent;
 class QQuickWebPage;
 class QQuickWebViewAttached;
+class QWebLoadRequest;
 class QQuickWebViewPrivate;
 class QQuickWebViewExperimental;
 class QWebDownloadItem;
@@ -67,24 +68,30 @@ QT_END_NAMESPACE
 class QWEBKIT_EXPORT QQuickWebView : public QQuickItem {
     Q_OBJECT
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
-    Q_PROPERTY(QUrl url READ url NOTIFY urlChanged)
+    Q_PROPERTY(QUrl url READ url WRITE setUrl NOTIFY urlChanged)
     Q_PROPERTY(QUrl icon READ icon NOTIFY iconChanged FINAL)
+    Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationHistoryChanged FINAL)
+    Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationHistoryChanged FINAL)
+    Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged FINAL)
     Q_PROPERTY(int loadProgress READ loadProgress NOTIFY loadProgressChanged)
-    Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY navigationStateChanged FINAL)
-    Q_PROPERTY(bool canGoForward READ canGoForward NOTIFY navigationStateChanged FINAL)
-    Q_PROPERTY(bool loading READ loading NOTIFY navigationStateChanged FINAL)
-    Q_PROPERTY(bool canReload READ canReload NOTIFY navigationStateChanged FINAL)
     Q_ENUMS(NavigationRequestAction)
+    Q_ENUMS(LoadStatus)
     Q_ENUMS(ErrorDomain)
     Q_ENUMS(NavigationType)
 
 public:
     enum NavigationRequestAction {
         AcceptRequest,
-        IgnoreRequest
+        // Make room in the valid range of the enum for extra actions exposed in Experimental.
+        IgnoreRequest = 0xFF
     };
-
+    enum LoadStatus {
+        LoadStartedStatus,
+        LoadSucceededStatus,
+        LoadFailedStatus
+    };
     enum ErrorDomain {
+        NoErrorDomain,
         InternalErrorDomain,
         NetworkErrorDomain,
         HttpErrorDomain,
@@ -104,6 +111,7 @@ public:
     virtual ~QQuickWebView();
 
     QUrl url() const;
+    void setUrl(const QUrl&);
     QUrl icon() const;
     QString title() const;
     int loadProgress() const;
@@ -111,7 +119,6 @@ public:
     bool canGoBack() const;
     bool canGoForward() const;
     bool loading() const;
-    bool canReload() const;
 
     virtual QVariant inputMethodQuery(Qt::InputMethodQuery property) const;
 
@@ -132,7 +139,6 @@ public:
     QPointF pageItemPos();
 
 public Q_SLOTS:
-    void load(const QUrl&);
     void loadHtml(const QString& html, const QUrl& baseUrl = QUrl());
 
     void goBack();
@@ -141,15 +147,13 @@ public Q_SLOTS:
     void reload();
 
 Q_SIGNALS:
-    void titleChanged(const QString& title);
-    void loadStarted();
-    void loadSucceeded();
-    void loadFailed(QQuickWebView::ErrorDomain errorDomain, int errorCode, const QUrl& url, const QString& description);
-    void loadProgressChanged(int progress);
-    void urlChanged(const QUrl& url);
-    void iconChanged(const QUrl& iconURL);
-    void linkHovered(const QUrl& url, const QString& title);
-    void navigationStateChanged();
+    void titleChanged();
+    void navigationHistoryChanged();
+    void loadingChanged(QWebLoadRequest* loadRequest);
+    void loadProgressChanged();
+    void urlChanged();
+    void iconChanged();
+    void linkHovered(const QUrl& hoveredUrl, const QString& hoveredTitle);
     void navigationRequested(QWebNavigationRequest* request);
 
 protected:
@@ -189,6 +193,7 @@ private:
     Q_PRIVATE_SLOT(d_func(), void _q_onOpenPanelFilesSelected());
     Q_PRIVATE_SLOT(d_func(), void _q_onOpenPanelFinished(int result));
     Q_PRIVATE_SLOT(d_func(), void _q_onVisibleChanged());
+    Q_PRIVATE_SLOT(d_func(), void _q_onUrlChanged());
     Q_PRIVATE_SLOT(d_func(), void _q_onReceivedResponseFromDownload(QWebDownloadItem*));
     Q_PRIVATE_SLOT(d_func(), void _q_onIconChangedForPageURL(const QUrl&, const QUrl&));
     // Hides QObject::d_ptr allowing us to use the convenience macros.
@@ -233,6 +238,7 @@ class QWEBKIT_EXPORT QQuickWebViewExperimental : public QObject {
     Q_PROPERTY(qreal contentY READ contentY WRITE setContentY NOTIFY contentYChanged)
     Q_PROPERTY(QQuickItem* contentItem READ contentItem CONSTANT)
     Q_PROPERTY(QDeclarativeListProperty<QObject> flickableData READ flickableData)
+    Q_PROPERTY(bool transparentBackground WRITE setTransparentBackground READ transparentBackground)
 
     Q_PROPERTY(QWebNavigationHistory* navigationHistory READ navigationHistory CONSTANT FINAL)
     Q_PROPERTY(QDeclarativeComponent* alertDialog READ alertDialog WRITE setAlertDialog NOTIFY alertDialogChanged)
@@ -245,11 +251,11 @@ class QWEBKIT_EXPORT QQuickWebViewExperimental : public QObject {
     Q_PROPERTY(QWebPreferences* preferences READ preferences CONSTANT FINAL)
     Q_PROPERTY(QWebViewportInfo* viewportInfo READ viewportInfo CONSTANT FINAL)
     Q_PROPERTY(QDeclarativeListProperty<QQuickUrlSchemeDelegate> urlSchemeDelegates READ schemeDelegates)
-    Q_ENUMS(NavigationRequestAction)
+    Q_ENUMS(NavigationRequestActionExperimental)
 
 public:
-    enum NavigationRequestAction {
-        DownloadRequest = 2
+    enum NavigationRequestActionExperimental {
+        DownloadRequest = QQuickWebView::IgnoreRequest - 1
     };
 
     QQuickWebViewExperimental(QQuickWebView* webView);
@@ -294,6 +300,8 @@ public:
     void setContentX(qreal);
     qreal contentY() const;
     void setContentY(qreal);
+    bool transparentBackground() const;
+    void setTransparentBackground(bool);
 
     // C++ only
     bool renderToOffscreenBuffer() const;

@@ -131,12 +131,8 @@ public:
     // for this origin.
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded);
 
-#if ENABLE(CONTEXT_MENUS)
-    virtual void showContextMenu() { }
-#endif
-
 #if ENABLE(NOTIFICATIONS)
-    virtual WebCore::NotificationPresenter* notificationPresenter() const;
+    virtual WebCore::NotificationClient* notificationPresenter() const;
 #endif
 
     // This can be either a synchronous or asynchronous call. The ChromeClient can display UI asking the user for permission

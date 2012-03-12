@@ -29,11 +29,10 @@
 #include "LayerTreeHostCA.h"
 #include <WebCore/LayerFlushScheduler.h>
 #include <WebCore/LayerFlushSchedulerClient.h>
-#include <wtf/RetainPtr.h>
-
-typedef struct __WKCARemoteLayerClientRef* WKCARemoteLayerClientRef;
 
 namespace WebKit {
+
+class LayerHostingContext;
 
 class LayerTreeHostCAMac : public LayerTreeHostCA, public WebCore::LayerFlushSchedulerClient {
 public:
@@ -61,7 +60,7 @@ private:
     // LayerFlushSchedulerClient
     virtual bool flushLayers();
 
-    RetainPtr<WKCARemoteLayerClientRef> m_remoteLayerClient;
+    OwnPtr<LayerHostingContext> m_layerHostingContext;
     WebCore::LayerFlushScheduler m_layerFlushScheduler;
 };
 

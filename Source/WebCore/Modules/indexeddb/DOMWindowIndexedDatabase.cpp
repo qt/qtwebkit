@@ -10,7 +10,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY GOOGLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS BE LIABLE
@@ -32,12 +32,14 @@
 #include "Document.h"
 #include "IDBFactory.h"
 #include "Page.h"
-#include "PageGroup.h"
+#include "PageGroupIndexedDatabase.h"
 #include "SecurityOrigin.h"
 
 namespace WebCore {
 
-DOMWindowIndexedDatabase::DOMWindowIndexedDatabase()
+DOMWindowIndexedDatabase::DOMWindowIndexedDatabase(DOMWindow* window)
+    : DOMWindowProperty(window->frame())
+    , m_window(window)
 {
 }
 
@@ -45,9 +47,31 @@ DOMWindowIndexedDatabase::~DOMWindowIndexedDatabase()
 {
 }
 
+DOMWindowIndexedDatabase* DOMWindowIndexedDatabase::from(DOMWindow* window)
+{
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("DOMWindowIndexedDatabase"));
+    DOMWindowIndexedDatabase* supplement = static_cast<DOMWindowIndexedDatabase*>(Supplement<DOMWindow>::from(window, name));
+    if (!supplement) {
+        supplement = new DOMWindowIndexedDatabase(window);
+        provideTo(window, name, adoptPtr(supplement));
+    }
+    return supplement;
+}
+
+void DOMWindowIndexedDatabase::disconnectFrame()
+{
+    m_idbFactory = 0;
+    DOMWindowProperty::disconnectFrame();
+}
+
 IDBFactory* DOMWindowIndexedDatabase::webkitIndexedDB(DOMWindow* window)
 {
-    Document* document = window->document();
+    return from(window)->webkitIndexedDB();
+}
+
+IDBFactory* DOMWindowIndexedDatabase::webkitIndexedDB()
+{
+    Document* document = m_window->document();
     if (!document)
         return 0;
 
@@ -58,9 +82,9 @@ IDBFactory* DOMWindowIndexedDatabase::webkitIndexedDB(DOMWindow* window)
     if (!document->securityOrigin()->canAccessDatabase())
         return 0;
 
-    if (!window->idbFactory() && window->isCurrentlyDisplayedInFrame())
-        window->setIDBFactory(IDBFactory::create(page->group().idbFactory()));
-    return window->idbFactory();
+    if (!m_idbFactory && m_window->isCurrentlyDisplayedInFrame())
+        m_idbFactory = IDBFactory::create(PageGroupIndexedDatabase::from(page->group())->factoryBackend());
+    return m_idbFactory.get();
 }
 
 } // namespace WebCore

@@ -142,7 +142,8 @@ WebInspector.ProfilesPanel = function()
     this._launcherView.setUpEventListeners();
 
     this._registerProfileType(new WebInspector.CPUProfileType());
-    this._registerProfileType(new WebInspector.CSSSelectorProfileType());
+    if (!WebInspector.WorkerManager.isWorkerFrontend())
+        this._registerProfileType(new WebInspector.CSSSelectorProfileType());
     if (Capabilities.heapProfilerPresent)
         this._registerProfileType(new WebInspector.DetailedHeapshotProfileType());
 
@@ -858,7 +859,7 @@ WebInspector.ProfilesPanel.prototype = {
     _reportHeapSnapshotProgress: function(done, total)
     {
         if (this.hasTemporaryProfile(WebInspector.DetailedHeapshotProfileType.TypeId)) {
-            this._temporaryRecordingProfile.sidebarElement.subtitle = WebInspector.UIString("%.2f%%", (done / total) * 100);
+            this._temporaryRecordingProfile.sidebarElement.subtitle = WebInspector.UIString("%.2f%", (done / total) * 100);
             this._temporaryRecordingProfile.sidebarElement.wait = true;
             if (done >= total)
                 this._removeTemporaryProfile();

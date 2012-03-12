@@ -660,11 +660,11 @@ void HTMLInputElement::accessKeyAction(bool sendMouseEvents)
     m_inputType->accessKeyAction(sendMouseEvents);
 }
 
-bool HTMLInputElement::isPresentationAttribute(Attribute* attr) const
+bool HTMLInputElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name() == vspaceAttr || attr->name() == hspaceAttr || attr->name() == alignAttr || attr->name() == widthAttr || attr->name() == heightAttr || (attr->name() == borderAttr && isImageButton()))
+    if (name == vspaceAttr || name == hspaceAttr || name == alignAttr || name == widthAttr || name == heightAttr || (name == borderAttr && isImageButton()))
         return true;
-    return HTMLTextFormControlElement::isPresentationAttribute(attr);
+    return HTMLTextFormControlElement::isPresentationAttribute(name);
 }
 
 void HTMLInputElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
@@ -1356,7 +1356,8 @@ void HTMLInputElement::setCanReceiveDroppedFiles(bool canReceiveDroppedFiles)
     if (m_canReceiveDroppedFiles == canReceiveDroppedFiles)
         return;
     m_canReceiveDroppedFiles = canReceiveDroppedFiles;
-    renderer()->updateFromElement();
+    if (renderer())
+        renderer()->updateFromElement();
 }
 
 String HTMLInputElement::visibleValue() const
@@ -1758,6 +1759,12 @@ bool HTMLInputElement::isURLField() const
 bool HTMLInputElement::isEnumeratable() const
 {
     return m_inputType->isEnumeratable();
+}
+
+bool HTMLInputElement::isLabelable() const
+{
+    // FIXME: We should return false for type="hidden".
+    return true;
 }
 
 bool HTMLInputElement::shouldAppearChecked() const

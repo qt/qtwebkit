@@ -83,7 +83,7 @@ GPRReg SpeculativeJIT::fillStorage(NodeIndex nodeIndex)
 
 void SpeculativeJIT::useChildren(Node& node)
 {
-    if (node.op & NodeHasVarArgs) {
+    if (node.flags & NodeHasVarArgs) {
         for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++)
             use(m_jit.graph().m_varArgChildren[childIdx]);
     } else {
@@ -365,12 +365,15 @@ void SpeculativeJIT::writeBarrier(JSCell* owner, GPRReg valueGPR, NodeUse valueU
 
 bool SpeculativeJIT::nonSpeculativeCompare(Node& node, MacroAssembler::RelationalCondition cond, S_DFGOperation_EJJ helperFunction)
 {
-    NodeIndex branchNodeIndex = detectPeepHoleBranch();
-    if (branchNodeIndex != NoNode) {
+    unsigned branchIndexInBlock = detectPeepHoleBranch();
+    if (branchIndexInBlock != UINT_MAX) {
+        NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
+
         ASSERT(node.adjustedRefCount() == 1);
         
         nonSpeculativePeepholeBranch(node, branchNodeIndex, cond, helperFunction);
     
+        m_indexInBlock = branchIndexInBlock;
         m_compileIndex = branchNodeIndex;
         
         return true;
@@ -383,15 +386,15 @@ bool SpeculativeJIT::nonSpeculativeCompare(Node& node, MacroAssembler::Relationa
 
 bool SpeculativeJIT::nonSpeculativeStrictEq(Node& node, bool invert)
 {
-    if (!invert && (isKnownNumeric(node.child1().index()) || isKnownNumeric(node.child2().index())))
-        return nonSpeculativeCompare(node, MacroAssembler::Equal, operationCompareStrictEq);
-    
-    NodeIndex branchNodeIndex = detectPeepHoleBranch();
-    if (branchNodeIndex != NoNode) {
+    unsigned branchIndexInBlock = detectPeepHoleBranch();
+    if (branchIndexInBlock != UINT_MAX) {
+        NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
+
         ASSERT(node.adjustedRefCount() == 1);
         
         nonSpeculativePeepholeStrictEq(node, branchNodeIndex, invert);
     
+        m_indexInBlock = branchIndexInBlock;
         m_compileIndex = branchNodeIndex;
         
         return true;
@@ -765,7 +768,6 @@ FPRTemporary::FPRTemporary(SpeculativeJIT* jit, JSValueOperand& op1)
 }
 #endif
 
-#ifndef NDEBUG
 void ValueSource::dump(FILE* out) const
 {
     switch (kind()) {
@@ -792,7 +794,6 @@ void ValueSource::dump(FILE* out) const
         break;
     }
 }
-#endif
 
 void SpeculativeJIT::compilePeepHoleDoubleBranch(Node& node, NodeIndex branchNodeIndex, JITCompiler::DoubleCondition condition)
 {
@@ -873,8 +874,10 @@ void SpeculativeJIT::compilePeepHoleIntegerBranch(Node& node, NodeIndex branchNo
 bool SpeculativeJIT::compilePeepHoleBranch(Node& node, MacroAssembler::RelationalCondition condition, MacroAssembler::DoubleCondition doubleCondition, S_DFGOperation_EJJ operation)
 {
     // Fused compare & branch.
-    NodeIndex branchNodeIndex = detectPeepHoleBranch();
-    if (branchNodeIndex != NoNode) {
+    unsigned branchIndexInBlock = detectPeepHoleBranch();
+    if (branchIndexInBlock != UINT_MAX) {
+        NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
+
         // detectPeepHoleBranch currently only permits the branch to be the very next node,
         // so can be no intervening nodes to also reference the compare. 
         ASSERT(node.adjustedRefCount() == 1);
@@ -898,6 +901,7 @@ bool SpeculativeJIT::compilePeepHoleBranch(Node& node, MacroAssembler::Relationa
         } else
             nonSpeculativePeepholeBranch(node, branchNodeIndex, condition, operation);
 
+        m_indexInBlock = branchIndexInBlock;
         m_compileIndex = branchNodeIndex;
         return true;
     }
@@ -915,12 +919,9 @@ void SpeculativeJIT::compileMovHint(Node& node)
 void SpeculativeJIT::compile(BasicBlock& block)
 {
     ASSERT(m_compileOkay);
-    ASSERT(m_compileIndex == block.begin);
     
-    if (!block.isReachable) {
-        m_compileIndex = block.end;
+    if (!block.isReachable)
         return;
-    }
 
     m_blockHeads[m_block] = m_jit.label();
 #if DFG_ENABLE(JIT_BREAK_ON_EVERY_BLOCK)
@@ -930,7 +931,7 @@ void SpeculativeJIT::compile(BasicBlock& block)
     ASSERT(m_arguments.size() == block.variablesAtHead.numberOfArguments());
     for (size_t i = 0; i < m_arguments.size(); ++i) {
         NodeIndex nodeIndex = block.variablesAtHead.argument(i);
-        if (nodeIndex == NoNode)
+        if (nodeIndex == NoNode || m_jit.graph().argumentIsCaptured(i))
             m_arguments[i] = ValueSource(ValueInRegisterFile);
         else
             m_arguments[i] = ValueSource::forPrediction(at(nodeIndex).variableAccessData()->prediction());
@@ -942,7 +943,7 @@ void SpeculativeJIT::compile(BasicBlock& block)
     ASSERT(m_variables.size() == block.variablesAtHead.numberOfLocals());
     for (size_t i = 0; i < m_variables.size(); ++i) {
         NodeIndex nodeIndex = block.variablesAtHead.local(i);
-        if (nodeIndex == NoNode)
+        if (nodeIndex == NoNode || m_jit.graph().localIsCaptured(i))
             m_variables[i] = ValueSource(ValueInRegisterFile);
         else if (at(nodeIndex).variableAccessData()->shouldUseDoubleFormat())
             m_variables[i] = ValueSource(DoubleInRegisterFile);
@@ -955,12 +956,13 @@ void SpeculativeJIT::compile(BasicBlock& block)
     
     if (DFG_ENABLE_EDGE_CODE_VERIFICATION) {
         JITCompiler::Jump verificationSucceeded =
-            m_jit.branch32(JITCompiler::Equal, GPRInfo::regT0, Imm32(m_block));
+            m_jit.branch32(JITCompiler::Equal, GPRInfo::regT0, TrustedImm32(m_block));
         m_jit.breakpoint();
         verificationSucceeded.link(&m_jit);
     }
 
-    for (; m_compileIndex < block.end; ++m_compileIndex) {
+    for (m_indexInBlock = 0; m_indexInBlock < block.size(); ++m_indexInBlock) {
+        m_compileIndex = block[m_indexInBlock];
         Node& node = at(m_compileIndex);
         m_codeOriginForOSR = node.codeOrigin;
         if (!node.shouldGenerate()) {
@@ -1005,7 +1007,6 @@ void SpeculativeJIT::compile(BasicBlock& block)
             compile(node);
             if (!m_compileOkay) {
                 m_compileOkay = true;
-                m_compileIndex = block.end;
                 clearGenerationInfo();
                 return;
             }
@@ -1045,7 +1046,7 @@ void SpeculativeJIT::compile(BasicBlock& block)
 #endif
         
         // Make sure that the abstract state is rematerialized for the next node.
-        m_state.execute(m_compileIndex);
+        m_state.execute(m_indexInBlock);
         
         if (node.shouldGenerate())
             checkConsistency();
@@ -1232,7 +1233,7 @@ bool SpeculativeJIT::compile()
     checkArgumentTypes();
 
     if (DFG_ENABLE_EDGE_CODE_VERIFICATION)
-        m_jit.move(Imm32(0), GPRInfo::regT0);
+        m_jit.move(TrustedImm32(0), GPRInfo::regT0);
 
     ASSERT(!m_compileIndex);
     for (m_block = 0; m_block < m_jit.graph().m_blocks.size(); ++m_block)
@@ -1258,7 +1259,7 @@ void SpeculativeJIT::createOSREntries()
         }
         
         m_osrEntryHeads.append(m_jit.label());
-        m_jit.move(Imm32(blockIndex), GPRInfo::regT0);
+        m_jit.move(TrustedImm32(blockIndex), GPRInfo::regT0);
         m_jit.jump().linkTo(m_blockHeads[blockIndex], &m_jit);
     }
 }
@@ -2318,8 +2319,14 @@ void SpeculativeJIT::compileArithSub(Node& node)
             if (nodeCanTruncateInteger(node.arithNodeFlags())) {
                 m_jit.move(op1.gpr(), result.gpr());
                 m_jit.sub32(Imm32(imm2), result.gpr());
-            } else
+            } else {
+#if ENABLE(JIT_CONSTANT_BLINDING)
+                GPRTemporary scratch(this);
+                speculationCheck(Overflow, JSValueRegs(), NoNode, m_jit.branchSub32(MacroAssembler::Overflow, op1.gpr(), Imm32(imm2), result.gpr(), scratch.gpr()));
+#else
                 speculationCheck(Overflow, JSValueRegs(), NoNode, m_jit.branchSub32(MacroAssembler::Overflow, op1.gpr(), Imm32(imm2), result.gpr()));
+#endif
+            }
 
             integerResult(result.gpr(), m_compileIndex);
             return;
@@ -2361,6 +2368,34 @@ void SpeculativeJIT::compileArithSub(Node& node)
     FPRReg reg1 = op1.fpr();
     FPRReg reg2 = op2.fpr();
     m_jit.subDouble(reg1, reg2, result.fpr());
+
+    doubleResult(result.fpr(), m_compileIndex);
+}
+
+void SpeculativeJIT::compileArithNegate(Node& node)
+{
+    if (m_jit.graph().negateShouldSpeculateInteger(node)) {
+        SpeculateIntegerOperand op1(this, node.child1());
+        GPRTemporary result(this);
+
+        m_jit.move(op1.gpr(), result.gpr());
+
+        if (nodeCanTruncateInteger(node.arithNodeFlags()))
+            m_jit.neg32(result.gpr());
+        else {
+            speculationCheck(Overflow, JSValueRegs(), NoNode, m_jit.branchNeg32(MacroAssembler::Overflow, result.gpr()));
+            if (!nodeCanIgnoreNegativeZero(node.arithNodeFlags()))
+                speculationCheck(Overflow, JSValueRegs(), NoNode, m_jit.branchTest32(MacroAssembler::Zero, result.gpr()));
+        }
+
+        integerResult(result.gpr(), m_compileIndex);
+        return;
+    }
+        
+    SpeculateDoubleOperand op1(this, node.child1());
+    FPRTemporary result(this);
+
+    m_jit.negateDouble(op1.fpr(), result.fpr());
 
     doubleResult(result.fpr(), m_compileIndex);
 }
@@ -2456,8 +2491,9 @@ bool SpeculativeJIT::compileStrictEqForConstant(Node& node, NodeUse value, JSVal
 {
     JSValueOperand op1(this, value);
     
-    NodeIndex branchNodeIndex = detectPeepHoleBranch();
-    if (branchNodeIndex != NoNode) {
+    unsigned branchIndexInBlock = detectPeepHoleBranch();
+    if (branchIndexInBlock != UINT_MAX) {
+        NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
         Node& branchNode = at(branchNodeIndex);
         BlockIndex taken = branchNode.takenBlockIndex();
         BlockIndex notTaken = branchNode.notTakenBlockIndex();
@@ -2493,6 +2529,7 @@ bool SpeculativeJIT::compileStrictEqForConstant(Node& node, NodeUse value, JSVal
         
         use(node.child1());
         use(node.child2());
+        m_indexInBlock = branchIndexInBlock;
         m_compileIndex = branchNodeIndex;
         return true;
     }
@@ -2504,18 +2541,18 @@ bool SpeculativeJIT::compileStrictEqForConstant(Node& node, NodeUse value, JSVal
     GPRReg resultGPR = result.gpr();
     m_jit.move(MacroAssembler::TrustedImmPtr(bitwise_cast<void*>(ValueFalse)), resultGPR);
     MacroAssembler::Jump notEqual = m_jit.branchPtr(MacroAssembler::NotEqual, op1GPR, MacroAssembler::TrustedImmPtr(bitwise_cast<void*>(JSValue::encode(constant))));
-    m_jit.or32(MacroAssembler::Imm32(1), resultGPR);
+    m_jit.or32(MacroAssembler::TrustedImm32(1), resultGPR);
     notEqual.link(&m_jit);
     jsValueResult(resultGPR, m_compileIndex, DataFormatJSBoolean);
 #else
     GPRReg op1PayloadGPR = op1.payloadGPR();
     GPRReg op1TagGPR = op1.tagGPR();
     GPRReg resultGPR = result.gpr();
-    m_jit.move(Imm32(0), resultGPR);
+    m_jit.move(TrustedImm32(0), resultGPR);
     MacroAssembler::JumpList notEqual;
     notEqual.append(m_jit.branch32(MacroAssembler::NotEqual, op1TagGPR, MacroAssembler::Imm32(constant.tag())));
     notEqual.append(m_jit.branch32(MacroAssembler::NotEqual, op1PayloadGPR, MacroAssembler::Imm32(constant.payload())));
-    m_jit.move(Imm32(1), resultGPR);
+    m_jit.move(TrustedImm32(1), resultGPR);
     notEqual.link(&m_jit);
     booleanResult(resultGPR, m_compileIndex);
 #endif
@@ -2543,11 +2580,13 @@ bool SpeculativeJIT::compileStrictEq(Node& node)
     // 2) If the operands are predicted integer, do an integer comparison.
     
     if (Node::shouldSpeculateInteger(at(node.child1()), at(node.child2()))) {
-        NodeIndex branchNodeIndex = detectPeepHoleBranch();
-        if (branchNodeIndex != NoNode) {
+        unsigned branchIndexInBlock = detectPeepHoleBranch();
+        if (branchIndexInBlock != UINT_MAX) {
+            NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
             compilePeepHoleIntegerBranch(node, branchNodeIndex, MacroAssembler::Equal);
             use(node.child1());
             use(node.child2());
+            m_indexInBlock = branchIndexInBlock;
             m_compileIndex = branchNodeIndex;
             return true;
         }
@@ -2558,11 +2597,13 @@ bool SpeculativeJIT::compileStrictEq(Node& node)
     // 3) If the operands are predicted double, do a double comparison.
     
     if (Node::shouldSpeculateNumber(at(node.child1()), at(node.child2()))) {
-        NodeIndex branchNodeIndex = detectPeepHoleBranch();
-        if (branchNodeIndex != NoNode) {
+        unsigned branchIndexInBlock = detectPeepHoleBranch();
+        if (branchIndexInBlock != UINT_MAX) {
+            NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
             compilePeepHoleDoubleBranch(node, branchNodeIndex, MacroAssembler::DoubleEqual);
             use(node.child1());
             use(node.child2());
+            m_indexInBlock = branchIndexInBlock;
             m_compileIndex = branchNodeIndex;
             return true;
         }
@@ -2574,11 +2615,13 @@ bool SpeculativeJIT::compileStrictEq(Node& node)
     //    or array comparison.
     
     if (Node::shouldSpeculateFinalObject(at(node.child1()), at(node.child2()))) {
-        NodeIndex branchNodeIndex = detectPeepHoleBranch();
-        if (branchNodeIndex != NoNode) {
+        unsigned branchIndexInBlock = detectPeepHoleBranch();
+        if (branchIndexInBlock != UINT_MAX) {
+            NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
             compilePeepHoleObjectEquality(node, branchNodeIndex, &JSFinalObject::s_info, isFinalObjectPrediction);
             use(node.child1());
             use(node.child2());
+            m_indexInBlock = branchIndexInBlock;
             m_compileIndex = branchNodeIndex;
             return true;
         }
@@ -2587,11 +2630,13 @@ bool SpeculativeJIT::compileStrictEq(Node& node)
     }
     
     if (Node::shouldSpeculateArray(at(node.child1()), at(node.child2()))) {
-        NodeIndex branchNodeIndex = detectPeepHoleBranch();
-        if (branchNodeIndex != NoNode) {
+        unsigned branchIndexInBlock = detectPeepHoleBranch();
+        if (branchIndexInBlock != UINT_MAX) {
+            NodeIndex branchNodeIndex = m_jit.graph().m_blocks[m_block]->at(branchIndexInBlock);
             compilePeepHoleObjectEquality(node, branchNodeIndex, &JSArray::s_info, isArrayPrediction);
             use(node.child1());
             use(node.child2());
+            m_indexInBlock = branchIndexInBlock;
             m_compileIndex = branchNodeIndex;
             return true;
         }
@@ -2689,6 +2734,28 @@ void SpeculativeJIT::compileGetIndexedPropertyStorage(Node& node)
         m_jit.loadPtr(MacroAssembler::Address(baseReg, JSArray::storageOffset()), storageReg);
     }
     storageResult(storageReg, m_compileIndex);
+}
+
+void SpeculativeJIT::compileNewFunctionNoCheck(Node& node)
+{
+    GPRResult result(this);
+    GPRReg resultGPR = result.gpr();
+    flushRegisters();
+    callOperation(
+        operationNewFunction, resultGPR, m_jit.codeBlock()->functionDecl(node.functionDeclIndex()));
+    cellResult(resultGPR, m_compileIndex);
+}
+
+void SpeculativeJIT::compileNewFunctionExpression(Node& node)
+{
+    GPRResult result(this);
+    GPRReg resultGPR = result.gpr();
+    flushRegisters();
+    callOperation(
+        operationNewFunctionExpression,
+        resultGPR,
+        m_jit.codeBlock()->functionExpr(node.functionExprIndex()));
+    cellResult(resultGPR, m_compileIndex);
 }
 
 } } // namespace JSC::DFG

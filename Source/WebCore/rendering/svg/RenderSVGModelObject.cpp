@@ -34,6 +34,7 @@
 #include "RenderSVGModelObject.h"
 
 #include "RenderSVGResource.h"
+#include "SVGNames.h"
 #include "SVGResourcesCache.h"
 #include "SVGStyledElement.h"
 
@@ -71,10 +72,10 @@ LayoutRect RenderSVGModelObject::outlineBoundsForRepaint(RenderBoxModelObject* r
     return containerRelativeQuad.enclosingBoundingBox();
 }
 
-void RenderSVGModelObject::absoluteRects(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset) const
+void RenderSVGModelObject::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
-    LayoutRect rect = enclosingLayoutRect(strokeBoundingBox());
-    rect.moveBy(accumulatedOffset);
+    IntRect rect = enclosingIntRect(strokeBoundingBox());
+    rect.moveBy(roundedIntPoint(accumulatedOffset));
     rects.append(rect);
 }
 
@@ -161,7 +162,7 @@ static bool intersectsAllowingEmpty(const FloatRect& r, const FloatRect& other)
 // image, line, path, polygon, polyline, rect, text and use.
 static bool isGraphicsElement(RenderObject* renderer)
 {
-    return renderer->isSVGShape() || renderer->isSVGText() || renderer->isSVGImage() || renderer->isSVGShadowTreeRootContainer();
+    return renderer->isSVGShape() || renderer->isSVGText() || renderer->isSVGImage() || renderer->node()->hasTagName(SVGNames::useTag);
 }
 
 bool RenderSVGModelObject::checkIntersection(RenderObject* renderer, const FloatRect& rect)

@@ -100,14 +100,14 @@ RenderedPosition::RenderedPosition(const Position& position, EAffinity affinity)
 InlineBox* RenderedPosition::prevLeafChild() const
 {
     if (m_prevLeafChild == uncachedInlineBox())
-        m_prevLeafChild = m_inlineBox->prevLeafChild();
+        m_prevLeafChild = m_inlineBox->prevLeafChildIgnoringLineBreak();
     return m_prevLeafChild;
 }
 
 InlineBox* RenderedPosition::nextLeafChild() const
 {
     if (m_nextLeafChild == uncachedInlineBox())
-        m_nextLeafChild = m_inlineBox->nextLeafChild();
+        m_nextLeafChild = m_inlineBox->nextLeafChildIgnoringLineBreak();
     return m_nextLeafChild;
 }
 
@@ -137,7 +137,7 @@ RenderedPosition RenderedPosition::leftBoundaryOfBidiRun(unsigned char bidiLevel
 
     InlineBox* box = m_inlineBox;
     do {
-        InlineBox* prev = box->prevLeafChild();
+        InlineBox* prev = box->prevLeafChildIgnoringLineBreak();
         if (!prev || prev->bidiLevel() < bidiLevelOfRun)
             return RenderedPosition(box->renderer(), box, box->caretLeftmostOffset());
         box = prev;
@@ -154,7 +154,7 @@ RenderedPosition RenderedPosition::rightBoundaryOfBidiRun(unsigned char bidiLeve
 
     InlineBox* box = m_inlineBox;
     do {
-        InlineBox* next = box->nextLeafChild();
+        InlineBox* next = box->nextLeafChildIgnoringLineBreak();
         if (!next || next->bidiLevel() < bidiLevelOfRun)
             return RenderedPosition(box->renderer(), box, box->caretRightmostOffset());
         box = next;

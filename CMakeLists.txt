@@ -42,6 +42,7 @@ SET(DERIVED_SOURCES_WEBKIT2_DIR "${CMAKE_BINARY_DIR}/DerivedSources/WebKit2")
 
 SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Source/cmake")
 
+SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -115,24 +116,24 @@ SET(JavaScriptCore_LIBRARY_NAME JavaScriptCore)
 SET(WebCore_LIBRARY_NAME WebCore)
 SET(WebKit_LIBRARY_NAME WebKit)
 SET(WebKit2_LIBRARY_NAME WebKit2)
+SET(WebCoreTestSupport_LIBRARY_NAME WebCoreTestSupport)
 
 # -----------------------------------------------------------------------------
 # Default library types
 # -----------------------------------------------------------------------------
-OPTION(SHARED_CORE "build WTF, JavaScriptCore and WebCore as shared libraries")
+OPTION(SHARED_CORE "build JavaScriptCore and WebCore as shared libraries")
 
 IF (SHARED_CORE)
-    SET(WTF_LIBRARY_TYPE SHARED)
     SET(JavaScriptCore_LIBRARY_TYPE SHARED)
     SET(WebCore_LIBRARY_TYPE SHARED)
 ELSE ()
-    SET(WTF_LIBRARY_TYPE STATIC)
     SET(JavaScriptCore_LIBRARY_TYPE STATIC)
     SET(WebCore_LIBRARY_TYPE STATIC)
 ENDIF ()
 
 SET(WebKit_LIBRARY_TYPE SHARED)
 SET(WebKit2_LIBRARY_TYPE SHARED)
+SET(WebCoreTestSupport_LIBRARY_TYPE STATIC)
 
 # -----------------------------------------------------------------------------
 # Port-specific options

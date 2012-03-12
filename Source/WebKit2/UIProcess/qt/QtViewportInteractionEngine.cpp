@@ -61,13 +61,18 @@ static const int kScaleAnimationDurationMillis = 250;
 
 class ViewportUpdateDeferrer {
 public:
-    ViewportUpdateDeferrer(QtViewportInteractionEngine* engine)
+    enum SuspendContentFlag { DeferUpdate, DeferUpdateAndSuspendContent };
+    ViewportUpdateDeferrer(QtViewportInteractionEngine* engine, SuspendContentFlag suspendContentFlag = DeferUpdate)
         : engine(engine)
     {
-        if (engine->m_suspendCount++)
-            return;
+        engine->m_suspendCount++;
 
-        emit engine->contentSuspendRequested();
+        // There is no need to suspend content for immediate updates
+        // only during animations or longer gestures.
+        if (suspendContentFlag == DeferUpdateAndSuspendContent && !engine->m_hasSuspendedContent) {
+            engine->m_hasSuspendedContent = true;
+            emit engine->contentSuspendRequested();
+        }
     }
 
     ~ViewportUpdateDeferrer()
@@ -75,7 +80,10 @@ public:
         if (--(engine->m_suspendCount))
             return;
 
-        emit engine->contentResumeRequested();
+        if (engine->m_hasSuspendedContent) {
+            engine->m_hasSuspendedContent = false;
+            emit engine->contentResumeRequested();
+        }
 
         // Make sure that tiles all around the viewport will be requested.
         emit engine->contentWasMoved(QPointF());
@@ -117,6 +125,7 @@ QtViewportInteractionEngine::QtViewportInteractionEngine(QQuickWebView* viewport
     , m_content(content)
     , m_flickProvider(flickProvider)
     , m_suspendCount(0)
+    , m_hasSuspendedContent(false)
     , m_hadUserInteraction(false)
     , m_scaleAnimation(new ScaleAnimation(this))
     , m_pinchStartScale(-1)
@@ -125,7 +134,8 @@ QtViewportInteractionEngine::QtViewportInteractionEngine(QQuickWebView* viewport
 
     connect(m_content, SIGNAL(widthChanged()), SLOT(itemSizeChanged()), Qt::DirectConnection);
     connect(m_content, SIGNAL(heightChanged()), SLOT(itemSizeChanged()), Qt::DirectConnection);
-    connect(m_flickProvider, SIGNAL(movingChanged()), SLOT(flickableMovingStateChanged()), Qt::DirectConnection);
+    connect(m_flickProvider, SIGNAL(movementStarted()), SLOT(flickableMoveStarted()), Qt::DirectConnection);
+    connect(m_flickProvider, SIGNAL(movementEnded()), SLOT(flickableMoveEnded()), Qt::DirectConnection);
 
     connect(m_scaleAnimation, SIGNAL(valueChanged(QVariant)),
             SLOT(scaleAnimationValueChanged(QVariant)), Qt::DirectConnection);
@@ -187,27 +197,19 @@ bool QtViewportInteractionEngine::animateItemRectVisible(const QRectF& itemRect)
     return true;
 }
 
-void QtViewportInteractionEngine::flickableMovingStateChanged()
+void QtViewportInteractionEngine::flickableMoveStarted()
 {
-    if (m_flickProvider->isMoving()) {
-        if (m_scrollUpdateDeferrer)
-            return; // We get the isMoving() signal multiple times.
-        panMoveStarted();
-    } else
-        panMoveEnded();
-}
-
-void QtViewportInteractionEngine::panMoveStarted()
-{
-    m_scrollUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this));
+    Q_ASSERT(m_flickProvider->isMoving());
+    m_scrollUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this, ViewportUpdateDeferrer::DeferUpdateAndSuspendContent));
 
     m_lastScrollPosition = m_flickProvider->contentPos();
     connect(m_flickProvider, SIGNAL(contentXChanged()), SLOT(flickableMovingPositionUpdate()));
     connect(m_flickProvider, SIGNAL(contentYChanged()), SLOT(flickableMovingPositionUpdate()));
 }
 
-void QtViewportInteractionEngine::panMoveEnded()
+void QtViewportInteractionEngine::flickableMoveEnded()
 {
+    Q_ASSERT(!m_flickProvider->isMoving());
     // This method is called on the end of the pan or pan kinetic animation.
     m_scrollUpdateDeferrer.clear();
 
@@ -230,7 +232,7 @@ void QtViewportInteractionEngine::scaleAnimationStateChanged(QAbstractAnimation:
     switch (newState) {
     case QAbstractAnimation::Running:
         if (!m_scaleUpdateDeferrer)
-            m_scaleUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this));
+            m_scaleUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this, ViewportUpdateDeferrer::DeferUpdateAndSuspendContent));
         break;
     case QAbstractAnimation::Stopped:
         m_scaleUpdateDeferrer.clear();
@@ -507,7 +509,7 @@ void QtViewportInteractionEngine::pinchGestureStarted(const QPointF& pinchCenter
 
     m_hadUserInteraction = true;
 
-    m_scaleUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this));
+    m_scaleUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this, ViewportUpdateDeferrer::DeferUpdateAndSuspendContent));
 
     m_lastPinchCenterInViewportCoordinates = pinchCenterInViewportCoordinates;
     m_pinchStartScale = m_content->contentsScale();

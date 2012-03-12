@@ -118,6 +118,7 @@
     <file>Script.js</file>
     <file>ScriptFormatter.js</file>
     <file>ScriptFormatterWorker.js</file>
+    <file>ScriptMapping.js</file>
     <file>ScriptsPanel.js</file>
     <file>ScriptsNavigator.js</file>
     <file>ScriptsSearchScope.js</file>
@@ -147,8 +148,9 @@
     <file>TextEditorModel.js</file>
     <file>TextPrompt.js</file>
     <file>TextViewer.js</file>
-    <file>TimelineAgent.js</file>
     <file>TimelineManager.js</file>
+    <file>TimelineModel.js</file>
+    <file>TimelinePresentationModel.js</file>
     <file>TimelineGrid.js</file>
     <file>TimelineOverviewPane.js</file>
     <file>TimelinePanel.js</file>

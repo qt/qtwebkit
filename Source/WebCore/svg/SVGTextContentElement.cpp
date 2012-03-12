@@ -228,11 +228,11 @@ bool SVGTextContentElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-bool SVGTextContentElement::isPresentationAttribute(Attribute* attr) const
+bool SVGTextContentElement::isPresentationAttribute(const QualifiedName& name) const
 {
-    if (attr->name().matches(XMLNames::spaceAttr))
+    if (name.matches(XMLNames::spaceAttr))
         return true;
-    return SVGStyledElement::isPresentationAttribute(attr);
+    return SVGStyledElement::isPresentationAttribute(name);
 }
 
 void SVGTextContentElement::collectStyleForAttribute(Attribute* attr, StylePropertySet* style)
@@ -329,7 +329,7 @@ void SVGTextContentElement::childrenChanged(bool changedByParser, Node* beforeCh
         return;
 
     // Invalidate the TextPosition cache in SVGTextLayoutAttributesBuilder as it may now point
-    // to no-longer existing SVGTextPositioningElements and thus needs to be rebuild.
+    // to no-longer existing SVGTextPositioningElements and thus needs to be rebuilt.
     if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(renderer()))
         textRenderer->textDOMChanged();
 }

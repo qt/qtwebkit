@@ -34,8 +34,9 @@
  * @param {function(WebInspector.Breakpoint)} breakpointAddedDelegate
  * @param {function(WebInspector.Breakpoint)} breakpointRemovedDelegate
  * @param {WebInspector.DebuggerModel} debuggerModel
+ * @param {WebInspector.MainScriptMapping} scriptMapping
  */
-WebInspector.BreakpointManager = function(breakpointStorage, breakpointAddedDelegate, breakpointRemovedDelegate, debuggerModel)
+WebInspector.BreakpointManager = function(breakpointStorage, breakpointAddedDelegate, breakpointRemovedDelegate, debuggerModel, scriptMapping)
 {
     this._breakpointStorage = breakpointStorage;
     this._breakpointAddedDelegate = breakpointAddedDelegate;
@@ -46,6 +47,7 @@ WebInspector.BreakpointManager = function(breakpointStorage, breakpointAddedDele
     this._breakpointsByUILocation = {};
 
     this._debuggerModel = debuggerModel;
+    this._scriptMapping = scriptMapping;
 
     /**
      * @type {Object.<DebuggerAgent.BreakpointId, WebInspector.Breakpoint>}
@@ -71,7 +73,7 @@ WebInspector.BreakpointManager.prototype = {
         for (var lineNumber in breakpoints) {
             var breakpoint = breakpoints[lineNumber];
             breakpoint.uiSourceCode = uiSourceCode;
-            this._materializeBreakpoint(breakpoint, uiSourceCode.rawSourceCode.sourceMapping, uiSourceCode);
+            this._materializeBreakpoint(breakpoint, uiSourceCode);
             if (breakpoint._debuggerLocation)
                 this._breakpointDebuggerLocationChanged(breakpoint);
         }
@@ -100,7 +102,7 @@ WebInspector.BreakpointManager.prototype = {
         var breakpoint = new WebInspector.Breakpoint(uiSourceCode.id, lineNumber, condition, enabled, persistent);
         breakpoint.uiSourceCode = uiSourceCode;
         this._addBreakpointToUI(breakpoint);
-        this._materializeBreakpoint(breakpoint, uiSourceCode.rawSourceCode.sourceMapping, uiSourceCode);
+        this._materializeBreakpoint(breakpoint, uiSourceCode);
     },
 
     /**
@@ -131,16 +133,15 @@ WebInspector.BreakpointManager.prototype = {
 
     /**
      * @param {WebInspector.Breakpoint} breakpoint
-     * @param {WebInspector.RawSourceCode.SourceMapping} sourceMapping
      * @param {WebInspector.UISourceCode} uiSourceCode
      */
-    _materializeBreakpoint: function(breakpoint, sourceMapping, uiSourceCode)
+    _materializeBreakpoint: function(breakpoint, uiSourceCode)
     {
         if (!breakpoint.enabled || breakpoint._materialized)
             return;
 
         breakpoint._materialized = true;
-        var rawLocation = sourceMapping.uiLocationToRawLocation(uiSourceCode, breakpoint.lineNumber, 0);
+        var rawLocation = this._scriptMapping.uiLocationToRawLocation(uiSourceCode, breakpoint.lineNumber, 0);
         this._setBreakpointInDebugger(breakpoint, rawLocation);
     },
 
@@ -149,9 +150,9 @@ WebInspector.BreakpointManager.prototype = {
      */
     _breakpointDebuggerLocationChanged: function(breakpoint)
     {
-        if (!breakpoint.uiSourceCode)
+        var uiLocation = this._scriptMapping.rawLocationToUILocation(breakpoint._debuggerLocation);
+        if (!uiLocation)
             return;
-        var uiLocation = breakpoint.uiSourceCode.rawSourceCode.sourceMapping.rawLocationToUILocation(breakpoint._debuggerLocation);
         if (uiLocation.lineNumber === breakpoint.lineNumber)
             return;
 

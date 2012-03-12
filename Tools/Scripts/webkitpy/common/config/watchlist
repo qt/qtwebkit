@@ -21,14 +21,19 @@
         "ChromiumPublicApi": {
             "filename": r"Source/WebKit/chromium/public/"
         },
+        "ChromiumPlatformApi": {
+            "filename": r"Source/Platform/chromium/public/"
+        },
         "AppleMacPublicApi": {
             "filename": r"Source/WebCore/bindings/objc/PublicDOMInterfaces.h"
         },
         "Forms": {
-            "filename": r"Source/WebCore/html/HTML(FieldSet|Form|FormControl|Input|Label"
-                        r"|OptGroup|Option|Select|TextArea|TextFormControl)Element\."
+            "filename": r"Source/WebCore/html/HTML(DataList|FieldSet|Form|FormControl|Input|Keygen|Label"
+                        r"|Legend|OptGroup|Option|Output|Select|TextArea|TextFormControl)Element\."
+                        r"|Source/WebCore/html/FormAssociatedElement\."
                         r"|Source/WebCore/html/\w*InputType\."
-                        r"|Source/WebCore/rendering/Render(ListBox|MenuList|Slider|TextControl"
+                        r"|Source/WebCore/html/shadow/(SliderThumbElement|TextControlInnerElements)\."
+                        r"|Source/WebCore/rendering/Render(FileUploadControl|ListBox|MenuList|Slider|TextControl"
                         r"|TextControlMultiLine|TextControlSingleLine)\."
         },
         "GStreamerGraphics": {
@@ -133,6 +138,9 @@
         "SoupNetwork": {
             "filename": r"Source/WebCore/platform/network/soup/",
         },
+        "ScrollingCoordinator": {
+            "filename": r"Source/WebCore/page/scrolling/",
+        }
     },
     "CC_RULES": {
         # Note: All email addresses listed must be registered with bugzilla.
@@ -140,7 +148,8 @@
         # two different accounts as far as bugzilla is concerned.
         "ChromiumDumpRenderTree": [ "tkent@chromium.org", ],
         "ChromiumGraphics": [ "jamesr@chromium.org", "cc-bugs@google.com" ],
-        "ChromiumPublicApi": [ "fishd@chromium.org", ],
+        "ChromiumPublicApi": [ "abarth@webkit.org", "fishd@chromium.org" ],
+        "ChromiumPlatformApi": [ "abarth@webkit.org", "fishd@chromium.org", "jamesr@chromium.org" ],
         "AppleMacPublicApi": [ "timothy@apple.com" ],
         "Forms": [ "tkent@chromium.org", ],
         "GStreamerGraphics": [ "alexis.menard@openbossa.org", "pnormand@igalia.com", "gns@gnome.org" ],
@@ -148,7 +157,7 @@
         "StyleChecker": [ "levin@chromium.org", ],
         "ThreadingFiles|ThreadingUsage": [ "levin+threading@chromium.org", ],
         "WatchListScript": [ "levin+watchlist@chromium.org", ],
-        "V8Bindings|BindingsScripts": [ "abarth@webkit.org", "japhet@chromium.org" ],
+        "V8Bindings|BindingsScripts": [ "abarth@webkit.org", "japhet@chromium.org", "haraken@chromium.org" ],
         "FrameLoader": [ "abarth@webkit.org", "japhet@chromium.org" ],
         "Loader": [ "japhet@chromium.org" ],
         "SecurityCritical": [ "abarth@webkit.org" ],
@@ -162,10 +171,13 @@
         "EFL": [ "kubo@profusion.mobi", ],
         "CMake": [ "kubo@profusion.mobi", ],
         "SoupNetwork": [ "kubo@profusion.mobi", ],
+        "ScrollingCoordinator": [ "andersca@apple.com", "jamesr@chromium.org", "tonikitoo@webkit.org" ],
     },
     "MESSAGE_RULES": {
         "ChromiumPublicApi": [ "Please wait for approval from fishd@chromium.org before submitting "
                                "because this patch contains changes to the Chromium public API.", ],
+        "ChromiumPlatformApi": [ "Please wait for approval from fishd@chromium.org, abarth@webkit.org or jamesr@chromium.org before submitting "
+                                 "because this patch contains changes to the Chromium platform API.", ],
         "AppleMacPublicApi": [ "Please wait for approval from timothy@apple.com (or another member "
                                "of the Apple Safari Team) before submitting "
                                "because this patch contains changes to the Apple Mac "

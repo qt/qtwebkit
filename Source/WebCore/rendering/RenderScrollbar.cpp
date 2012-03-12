@@ -202,7 +202,7 @@ void RenderScrollbar::updateScrollbarParts(bool destroy)
     }
     
     if (newThickness != oldThickness) {
-        setFrameRect(IntRect(x(), y(), isHorizontal ? width() : newThickness, isHorizontal ? newThickness : height()));
+        setFrameRect(IntRect(location(), IntSize(isHorizontal ? width() : newThickness, isHorizontal ? newThickness : height())));
         if (RenderBox* box = owningRenderer())
             box->setChildNeedsLayout(true);
     }
@@ -297,7 +297,7 @@ IntRect RenderScrollbar::buttonRect(ScrollbarPart partType)
     
     bool isHorizontal = orientation() == HorizontalScrollbar;
     if (partType == BackButtonStartPart)
-        return IntRect(x(), y(), isHorizontal ? partRenderer->width() : width(), isHorizontal ? height() : partRenderer->height());
+        return IntRect(location(), IntSize(isHorizontal ? partRenderer->width() : width(), isHorizontal ? height() : partRenderer->height()));
     if (partType == ForwardButtonEndPart)
         return IntRect(isHorizontal ? x() + width() - partRenderer->width() : x(),
         
@@ -355,10 +355,10 @@ IntRect RenderScrollbar::trackPieceRectWithMargins(ScrollbarPart partType, const
     IntRect rect = oldRect;
     if (orientation() == HorizontalScrollbar) {
         rect.setX(rect.x() + partRenderer->marginLeft());
-        rect.setWidth(rect.width() - (partRenderer->marginLeft() + partRenderer->marginRight()));
+        rect.setWidth(rect.width() - partRenderer->marginWidth());
     } else {
         rect.setY(rect.y() + partRenderer->marginTop());
-        rect.setHeight(rect.height() - (partRenderer->marginTop() + partRenderer->marginBottom()));
+        rect.setHeight(rect.height() - partRenderer->marginHeight());
     }
     return rect;
 }

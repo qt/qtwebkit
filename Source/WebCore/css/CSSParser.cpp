@@ -74,6 +74,7 @@
 #include "Settings.h"
 #include "ShadowValue.h"
 #include "StylePropertySet.h"
+#include "StyleRule.h"
 #if ENABLE(CSS_FILTERS)
 #include "WebKitCSSFilterValue.h"
 #endif
@@ -177,17 +178,11 @@ inline void CSSParser::ensureCSSValuePool()
         m_cssValuePool = CSSValuePool::create();
 }
 
-// FIXME: Can m_parsedProperties just be a Vector?
-    
 CSSParser::CSSParser(bool strictParsing)
     : m_strict(strictParsing)
     , m_important(false)
     , m_id(0)
     , m_styleSheet(0)
-    , m_parsedProperties(static_cast<CSSProperty**>(fastMalloc(32 * sizeof(CSSProperty*))))
-    , m_numParsedProperties(0)
-    , m_maxParsedProperties(32)
-    , m_numParsedPropertiesBeforeMarginBox(INVALID_NUM_PARSED_PROPERTIES)
     , m_inParseShorthand(0)
     , m_currentShorthand(0)
     , m_implicitShorthand(false)
@@ -217,7 +212,6 @@ CSSParser::CSSParser(bool strictParsing)
 CSSParser::~CSSParser()
 {
     clearProperties();
-    fastFree(m_parsedProperties);
 
     fastDeleteAllValues(m_floatingSelectors);
     deleteAllValues(m_floatingSelectorVectors);
@@ -519,9 +513,9 @@ bool CSSParser::parseValue(StylePropertySet* declaration, int propertyId, const 
     bool ok = false;
     if (m_hasFontFaceOnlyValues)
         deleteFontFaceOnlyValues();
-    if (m_numParsedProperties) {
+    if (!m_parsedProperties.isEmpty()) {
         ok = true;
-        declaration->addParsedProperties(m_parsedProperties, m_numParsedProperties);
+        declaration->addParsedProperties(m_parsedProperties.data(), m_parsedProperties.size());
         clearProperties();
     }
 
@@ -542,7 +536,7 @@ bool CSSParser::parseColor(RGBA32& color, const String& string, bool strict)
     if (!parser.parseColor(string))
         return false;
 
-    CSSValue* value = parser.m_parsedProperties[0]->value();
+    CSSValue* value = parser.m_parsedProperties.first().value();
     if (!value->isPrimitiveValue())
         return false;
 
@@ -564,7 +558,7 @@ bool CSSParser::parseColor(const String& string)
     cssyyparse(this);
     m_rule = 0;
 
-    return (m_numParsedProperties && m_parsedProperties[0]->m_id == CSSPropertyColor);
+    return !m_parsedProperties.isEmpty() && m_parsedProperties.first().id() == CSSPropertyColor;
 }
 
 bool CSSParser::parseSystemColor(RGBA32& color, const String& string, Document* document)
@@ -620,9 +614,9 @@ bool CSSParser::parseDeclaration(StylePropertySet* declaration, const String& st
     bool ok = false;
     if (m_hasFontFaceOnlyValues)
         deleteFontFaceOnlyValues();
-    if (m_numParsedProperties) {
+    if (!m_parsedProperties.isEmpty()) {
         ok = true;
-        declaration->addParsedProperties(m_parsedProperties, m_numParsedProperties);
+        declaration->addParsedProperties(m_parsedProperties.data(), m_parsedProperties.size());
         clearProperties();
     }
 
@@ -666,31 +660,19 @@ bool CSSParser::parseMediaQuery(MediaList* queries, const String& string)
 
 void CSSParser::addProperty(int propId, PassRefPtr<CSSValue> value, bool important, bool implicit)
 {
-    OwnPtr<CSSProperty> prop(adoptPtr(new CSSProperty(propId, value, important, m_currentShorthand, m_implicitShorthand || implicit)));
-    if (m_numParsedProperties >= m_maxParsedProperties) {
-        if (m_numParsedProperties > (UINT_MAX / sizeof(CSSProperty*)) - 32)
-            CRASH();  // Avoid inconsistencies with rollbackLastProperties.
-        m_maxParsedProperties += 32;
-        m_parsedProperties = static_cast<CSSProperty**>(fastRealloc(m_parsedProperties,
-            m_maxParsedProperties * sizeof(CSSProperty*)));
-    }
-    m_parsedProperties[m_numParsedProperties++] = prop.leakPtr();
+    m_parsedProperties.append(CSSProperty(propId, value, important, m_currentShorthand, m_implicitShorthand || implicit));
 }
 
 void CSSParser::rollbackLastProperties(int num)
 {
     ASSERT(num >= 0);
-    ASSERT(m_numParsedProperties >= static_cast<unsigned>(num));
-
-    for (int i = 0; i < num; ++i)
-        delete m_parsedProperties[--m_numParsedProperties];
+    ASSERT(m_parsedProperties.size() >= static_cast<unsigned>(num));
+    m_parsedProperties.shrink(m_parsedProperties.size() - num);
 }
 
 void CSSParser::clearProperties()
 {
-    for (unsigned i = 0; i < m_numParsedProperties; i++)
-        delete m_parsedProperties[i];
-    m_numParsedProperties = 0;
+    m_parsedProperties.clear();
     m_numParsedPropertiesBeforeMarginBox = INVALID_NUM_PARSED_PROPERTIES;
     m_hasFontFaceOnlyValues = false;
 }
@@ -967,13 +949,30 @@ bool CSSParser::parseValue(int propId, bool important)
         else
             return parseQuotes(propId, important);
         break;
-    case CSSPropertyUnicodeBidi: // normal | embed | bidi-override | isolate | plaintext | inherit
+    case CSSPropertyUnicodeBidi: // normal | embed | (bidi-override || isolate) | plaintext | inherit
         if (id == CSSValueNormal
             || id == CSSValueEmbed
-            || id == CSSValueBidiOverride
-            || id == CSSValueWebkitIsolate
             || id == CSSValueWebkitPlaintext)
             validPrimitive = true;
+        else {
+            RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+            bool isValid = true;
+            while (isValid && value) {
+                switch (value->id) {
+                case CSSValueBidiOverride:
+                case CSSValueWebkitIsolate:
+                    list->append(cssValuePool()->createIdentifierValue(value->id));
+                    break;
+                default:
+                    isValid = false;
+                }
+                value = m_valueList->next();
+            }
+            if (list->length() && isValid) {
+                parsedValue = list.release();
+                m_valueList->next();
+            }
+        }
         break;
 
     case CSSPropertyPosition:             // static | relative | absolute | fixed | inherit
@@ -1054,7 +1053,7 @@ bool CSSParser::parseValue(int propId, bool important)
         ShorthandScope scope(this, propId);
         if (num != 1 || !parseValue(CSSPropertyOverflowX, important))
             return false;
-        CSSValue* value = m_parsedProperties[m_numParsedProperties - 1]->value();
+        CSSValue* value = m_parsedProperties.last().value();
         addProperty(CSSPropertyOverflowY, value, important);
         return true;
     }
@@ -1148,7 +1147,7 @@ bool CSSParser::parseValue(int propId, bool important)
             ShorthandScope scope(this, CSSPropertyBorderSpacing);
             if (!parseValue(properties[0], important))
                 return false;
-            CSSValue* value = m_parsedProperties[m_numParsedProperties-1]->value();
+            CSSValue* value = m_parsedProperties.last().value();
             addProperty(properties[1], value, important);
             return true;
         }
@@ -1882,6 +1881,11 @@ bool CSSParser::parseValue(int propId, bool important)
     case CSSPropertyWebkitGridColumns:
     case CSSPropertyWebkitGridRows:
         return parseGridTrackList(propId, important);
+
+    case CSSPropertyWebkitGridColumn:
+    case CSSPropertyWebkitGridRow:
+        validPrimitive = id == CSSValueAuto || validUnit(value, FInteger, m_strict);
+        break;
 #endif
     case CSSPropertyWebkitMarginCollapse: {
         const int properties[2] = { CSSPropertyWebkitMarginBeforeCollapse,
@@ -1890,7 +1894,7 @@ bool CSSParser::parseValue(int propId, bool important)
             ShorthandScope scope(this, CSSPropertyWebkitMarginCollapse);
             if (!parseValue(properties[0], important))
                 return false;
-            CSSValue* value = m_parsedProperties[m_numParsedProperties-1]->value();
+            CSSValue* value = m_parsedProperties.last().value();
             addProperty(properties[1], value, important);
             return true;
         }
@@ -2568,10 +2572,12 @@ bool CSSParser::parseAnimationShorthand(bool important)
     RefPtr<CSSValue> values[numProperties];
 
     int i;
+    int initialParsedPropertyIndex = 0;
     while (m_valueList->current()) {
         CSSParserValue* val = m_valueList->current();
         if (val->unit == CSSParserValue::Operator && val->iValue == ',') {
             // We hit the end.  Fill in all remaining values with the initial value.
+            initialParsedPropertyIndex = 0;
             m_valueList->next();
             for (i = 0; i < numProperties; ++i) {
                 if (!parsedProperty[i])
@@ -2583,11 +2589,12 @@ bool CSSParser::parseAnimationShorthand(bool important)
         }
 
         bool found = false;
-        for (i = 0; !found && i < numProperties; ++i) {
+        for (i = initialParsedPropertyIndex; !found && i < numProperties; ++i) {
             if (!parsedProperty[i]) {
                 RefPtr<CSSValue> val;
                 if (parseAnimationProperty(properties[i], val)) {
                     parsedProperty[i] = found = true;
+                    initialParsedPropertyIndex = 1;
                     addAnimationValue(values[i], val.release());
                 }
             }
@@ -2728,7 +2735,7 @@ bool CSSParser::parse4Values(int propId, const int *properties,  bool important)
         case 1: {
             if (!parseValue(properties[0], important))
                 return false;
-            CSSValue *value = m_parsedProperties[m_numParsedProperties-1]->value();
+            CSSValue *value = m_parsedProperties.last().value();
             ImplicitScope implicitScope(this, PropertyImplicit);
             addProperty(properties[1], value, important);
             addProperty(properties[2], value, important);
@@ -2738,17 +2745,17 @@ bool CSSParser::parse4Values(int propId, const int *properties,  bool important)
         case 2: {
             if (!parseValue(properties[0], important) || !parseValue(properties[1], important))
                 return false;
-            CSSValue *value = m_parsedProperties[m_numParsedProperties-2]->value();
+            CSSValue *value = m_parsedProperties[m_parsedProperties.size() - 2].value();
             ImplicitScope implicitScope(this, PropertyImplicit);
             addProperty(properties[2], value, important);
-            value = m_parsedProperties[m_numParsedProperties-2]->value();
+            value = m_parsedProperties[m_parsedProperties.size() - 2].value();
             addProperty(properties[3], value, important);
             break;
         }
         case 3: {
             if (!parseValue(properties[0], important) || !parseValue(properties[1], important) || !parseValue(properties[2], important))
                 return false;
-            CSSValue *value = m_parsedProperties[m_numParsedProperties-2]->value();
+            CSSValue *value = m_parsedProperties[m_parsedProperties.size() - 2].value();
             ImplicitScope implicitScope(this, PropertyImplicit);
             addProperty(properties[3], value, important);
             break;
@@ -7065,13 +7072,11 @@ PassRefPtr<CSSValueList> CSSParser::parseFilter()
 
 static bool validFlowName(const String& flowName)
 {
-    if (equalIgnoringCase(flowName, "auto")
-        || equalIgnoringCase(flowName, "default")
-        || equalIgnoringCase(flowName, "inherit")
-        || equalIgnoringCase(flowName, "initial")
-        || equalIgnoringCase(flowName, "none"))
-        return false;
-    return true;
+    return !(equalIgnoringCase(flowName, "auto")
+            || equalIgnoringCase(flowName, "default")
+            || equalIgnoringCase(flowName, "inherit")
+            || equalIgnoringCase(flowName, "initial")
+            || equalIgnoringCase(flowName, "none"));
 }
 
 bool CSSParser::cssRegionsEnabled() const
@@ -7082,7 +7087,23 @@ bool CSSParser::cssRegionsEnabled() const
     return false;
 }
 
-// auto | <ident>
+bool CSSParser::parseFlowThread(const String& flowName, Document* doc)
+{
+    ASSERT(doc);
+    ASSERT(doc->cssRegionsEnabled());
+
+    RefPtr<CSSStyleSheet> dummyStyleSheet = CSSStyleSheet::create(doc);
+    setStyleSheet(dummyStyleSheet.get());
+
+    setupParser("@-webkit-decls{-webkit-flow-into:", flowName, "}");
+    cssyyparse(this);
+
+    m_rule = 0;
+
+    return ((m_parsedProperties.size() == 1) && (m_parsedProperties.first().id() == CSSPropertyWebkitFlowInto));
+}
+
+// none | <ident>
 bool CSSParser::parseFlowThread(int propId, bool important)
 {
     ASSERT(propId == CSSPropertyWebkitFlowInto);
@@ -7098,7 +7119,7 @@ bool CSSParser::parseFlowThread(int propId, bool important)
     if (value->unit != CSSPrimitiveValue::CSS_IDENT)
         return false;
 
-    if (value->id == CSSValueAuto) {
+    if (value->id == CSSValueNone) {
         addProperty(propId, cssValuePool()->createIdentifierValue(value->id), important);
         return true;
     }
@@ -7109,7 +7130,7 @@ bool CSSParser::parseFlowThread(int propId, bool important)
             return false;
         addProperty(propId, cssValuePool()->createValue(inputProperty, CSSPrimitiveValue::CSS_STRING), important);
     } else
-        addProperty(propId, cssValuePool()->createIdentifierValue(CSSValueAuto), important);
+        addProperty(propId, cssValuePool()->createIdentifierValue(CSSValueNone), important);
 
     return true;
 }
@@ -8821,10 +8842,10 @@ CSSRule* CSSParser::createStyleRule(Vector<OwnPtr<CSSParserSelector> >* selector
     if (selectors) {
         m_allowImportRules = m_allowNamespaceDeclarations = false;
         RefPtr<CSSStyleRule> rule = CSSStyleRule::create(m_styleSheet, m_lastSelectorLineNumber);
-        rule->adoptSelectorVector(*selectors);
+        rule->styleRule()->adoptSelectorVector(*selectors);
         if (m_hasFontFaceOnlyValues)
             deleteFontFaceOnlyValues();
-        rule->setDeclaration(StylePropertySet::create(m_parsedProperties, m_numParsedProperties, m_strict));
+        rule->styleRule()->setProperties(StylePropertySet::create(m_parsedProperties.data(), m_parsedProperties.size(), m_strict));
         result = rule.get();
         m_parsedRules.append(rule.release());
         if (m_ruleRangeMap) {
@@ -8846,14 +8867,13 @@ CSSRule* CSSParser::createStyleRule(Vector<OwnPtr<CSSParserSelector> >* selector
 CSSRule* CSSParser::createFontFaceRule()
 {
     m_allowImportRules = m_allowNamespaceDeclarations = false;
-    for (unsigned i = 0; i < m_numParsedProperties; ++i) {
-        CSSProperty* property = m_parsedProperties[i];
-        int id = property->id();
-        if (id == CSSPropertyFontVariant && property->value()->isPrimitiveValue()) {
-            RefPtr<CSSValue> value = property->m_value.release();
-            property->m_value = CSSValueList::createCommaSeparated();
-            static_cast<CSSValueList*>(property->value())->append(value.release());
-        } else if (id == CSSPropertyFontFamily && (!property->value()->isValueList() || static_cast<CSSValueList*>(property->value())->length() != 1)) {
+    for (unsigned i = 0; i < m_parsedProperties.size(); ++i) {
+        CSSProperty& property = m_parsedProperties[i];
+        if (property.id() == CSSPropertyFontVariant && property.value()->isPrimitiveValue()) {
+            RefPtr<CSSValue> value = property.m_value.release();
+            property.m_value = CSSValueList::createCommaSeparated();
+            static_cast<CSSValueList*>(property.value())->append(value.release());
+        } else if (property.id() == CSSPropertyFontFamily && (!property.value()->isValueList() || static_cast<CSSValueList*>(property.value())->length() != 1)) {
             // Unlike font-family property, font-family descriptor in @font-face rule
             // has to be a value list with exactly one family name. It cannot have a
             // have 'initial' value and cannot 'inherit' from parent.
@@ -8863,7 +8883,7 @@ CSSRule* CSSParser::createFontFaceRule()
         }
     }
     RefPtr<CSSFontFaceRule> rule = CSSFontFaceRule::create(m_styleSheet);
-    rule->setDeclaration(StylePropertySet::create(m_parsedProperties, m_numParsedProperties, m_strict));
+    rule->setDeclaration(StylePropertySet::create(m_parsedProperties.data(), m_parsedProperties.size(), m_strict));
     clearProperties();
     CSSFontFaceRule* result = rule.get();
     m_parsedRules.append(rule.release());
@@ -8930,11 +8950,11 @@ CSSRule* CSSParser::createPageRule(PassOwnPtr<CSSParserSelector> pageSelector)
     m_allowImportRules = m_allowNamespaceDeclarations = false;
     CSSPageRule* pageRule = 0;
     if (pageSelector) {
-        RefPtr<CSSPageRule> rule = CSSPageRule::create(m_styleSheet, m_lastSelectorLineNumber);
+        RefPtr<CSSPageRule> rule = CSSPageRule::create(m_styleSheet);
         Vector<OwnPtr<CSSParserSelector> > selectorVector;
         selectorVector.append(pageSelector);
         rule->adoptSelectorVector(selectorVector);
-        rule->setDeclaration(StylePropertySet::create(m_parsedProperties, m_numParsedProperties, m_strict));
+        rule->setDeclaration(StylePropertySet::create(m_parsedProperties.data(), m_parsedProperties.size(), m_strict));
         pageRule = rule.get();
         m_parsedRules.append(rule.release());
     }
@@ -8967,7 +8987,7 @@ CSSRule* CSSParser::createMarginAtRule(CSSSelector::MarginBoxType /* marginBox *
 {
     // FIXME: Implement margin at-rule here, using:
     //        - marginBox: margin box
-    //        - m_parsedProperties: properties at [m_numParsedPropertiesBeforeMarginBox, m_numParsedProperties) are for this at-rule.
+    //        - m_parsedProperties: properties at [m_numParsedPropertiesBeforeMarginBox, m_parsedProperties.size()] are for this at-rule.
     // Don't forget to also update the action for page symbol in CSSGrammar.y such that margin at-rule data is cleared if page_selector is invalid.
 
     endDeclarationsForMarginBox();
@@ -8976,32 +8996,26 @@ CSSRule* CSSParser::createMarginAtRule(CSSSelector::MarginBoxType /* marginBox *
 
 void CSSParser::startDeclarationsForMarginBox()
 {
-    m_numParsedPropertiesBeforeMarginBox = m_numParsedProperties;
+    m_numParsedPropertiesBeforeMarginBox = m_parsedProperties.size();
 }
 
 void CSSParser::endDeclarationsForMarginBox()
 {
-    ASSERT(m_numParsedPropertiesBeforeMarginBox != INVALID_NUM_PARSED_PROPERTIES);
-    rollbackLastProperties(m_numParsedProperties - m_numParsedPropertiesBeforeMarginBox);
+    rollbackLastProperties(m_parsedProperties.size() - m_numParsedPropertiesBeforeMarginBox);
     m_numParsedPropertiesBeforeMarginBox = INVALID_NUM_PARSED_PROPERTIES;
 }
 
 void CSSParser::deleteFontFaceOnlyValues()
 {
     ASSERT(m_hasFontFaceOnlyValues);
-    int deletedProperties = 0;
-
-    for (unsigned i = 0; i < m_numParsedProperties; ++i) {
-        CSSProperty* property = m_parsedProperties[i];
-        int id = property->id();
-        if (id == CSSPropertyFontVariant && property->value()->isValueList()) {
-            delete property;
-            deletedProperties++;
-        } else if (deletedProperties)
-            m_parsedProperties[i - deletedProperties] = m_parsedProperties[i];
+    for (unsigned i = 0; i < m_parsedProperties.size();) {
+        CSSProperty& property = m_parsedProperties[i];
+        if (property.id() == CSSPropertyFontVariant && property.value()->isValueList()) {
+            m_parsedProperties.remove(i);
+            continue;
+        }
+        ++i;
     }
-
-    m_numParsedProperties -= deletedProperties;
 }
 
 WebKitCSSKeyframeRule* CSSParser::createKeyframeRule(CSSParserValueList* keys)
@@ -9018,7 +9032,7 @@ WebKitCSSKeyframeRule* CSSParser::createKeyframeRule(CSSParserValueList* keys)
 
     RefPtr<WebKitCSSKeyframeRule> keyframe = WebKitCSSKeyframeRule::create(m_styleSheet);
     keyframe->setKeyText(keyString);
-    keyframe->setDeclaration(StylePropertySet::create(m_parsedProperties, m_numParsedProperties, m_strict));
+    keyframe->setDeclaration(StylePropertySet::create(m_parsedProperties.data(), m_parsedProperties.size(), m_strict));
 
     clearProperties();
 

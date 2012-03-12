@@ -147,6 +147,16 @@ public:
     static bool webkitSpeechEnabled() { return isSpeechInputEnabled; }
     static bool webkitGrammarEnabled() { return isSpeechInputEnabled; }
 
+#if ENABLE(SCRIPTED_SPEECH)
+    static void setScriptedSpeechEnabled(bool isEnabled) { isScriptedSpeechEnabled = isEnabled; }
+    static bool scriptedSpeechEnabled() { return isScriptedSpeechEnabled; }
+    static bool webkitSpeechRecognitionEnabled() { return isScriptedSpeechEnabled; }
+    static bool webkitSpeechRecognitionErrorEnabled() { return isScriptedSpeechEnabled; }
+    static bool webkitSpeechRecognitionEventEnabled() { return isScriptedSpeechEnabled; }
+    static bool webkitSpeechGrammarEnabled() { return isScriptedSpeechEnabled; }
+    static bool webkitSpeechGrammarListEnabled() { return isScriptedSpeechEnabled; }
+#endif
+
 #if ENABLE(XHR_RESPONSE_BLOB)
     static bool xhrResponseBlobEnabled() { return isXHRResponseBlobEnabled; }
     static void setXHRResponseBlobEnabled(bool isEnabled) { isXHRResponseBlobEnabled = isEnabled; }
@@ -196,7 +206,7 @@ public:
     static void setShadowDOMEnabled(bool isEnabled) { isShadowDOMEnabled = isEnabled; }
 
     static bool multipleShadowSubtreesEnabled() { return isMultipleShadowSubtreesEnabled; }
-    static void setMultipleShadowSubtreesEnabled(bool isEnabled) { isMultipleShadowSubtreesEnabled = isEnabled; }
+    static void setMultipleShadowSubtreesEnabled(bool isEnabled);
 #endif
 
 #if ENABLE(STYLE_SCOPED)
@@ -221,6 +231,9 @@ private:
     static bool isDeviceMotionEnabled;
     static bool isDeviceOrientationEnabled;
     static bool isSpeechInputEnabled;
+#if ENABLE(SCRIPTED_SPEECH)
+    static bool isScriptedSpeechEnabled;
+#endif
 #if ENABLE(XHR_RESPONSE_BLOB)
     static bool isXHRResponseBlobEnabled;
 #endif

@@ -8,6 +8,10 @@ LIST(APPEND WebCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/runtime"
 )
 
+LIST(APPEND WebCoreTestSupport_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/testing/v8"
+)
+
 LIST(APPEND WebCore_IDL_INCLUDES
     bindings/v8
 )
@@ -91,7 +95,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8DirectoryEntrySyncCustom.cpp
     bindings/v8/custom/V8DocumentCustom.cpp
     bindings/v8/custom/V8DocumentLocationCustom.cpp
-    bindings/v8/custom/V8ElementCustom.cpp
     bindings/v8/custom/V8EntrySyncCustom.cpp
     bindings/v8/custom/V8EventConstructors.cpp
     bindings/v8/custom/V8EventCustom.cpp
@@ -160,6 +163,11 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/specialization/V8BindingState.cpp
 )
 
+LIST(APPEND WebCoreTestSupport_SOURCES
+    testing/v8/V8InternalsCustom.cpp
+    testing/v8/WebCoreTestSupport.cpp
+)
+
 LIST(APPEND WebCore_SOURCES
     ${JAVASCRIPTCORE_DIR}/yarr/YarrInterpreter.cpp
     ${JAVASCRIPTCORE_DIR}/yarr/YarrJIT.cpp
@@ -214,6 +222,10 @@ FOREACH (_include ${WebCore_IDL_INCLUDES})
     LIST(APPEND IDL_INCLUDES --include=${WEBCORE_DIR}/${_include})
 ENDFOREACH ()
 
+FOREACH (_include ${WebCoreTestSupport_IDL_INCLUDES})
+    LIST(APPEND IDL_INCLUDES --include=${WEBCORE_DIR}/${_include})
+ENDFOREACH ()
+
 SET(FEATURE_DEFINES_JAVASCRIPT "LANGUAGE_JAVASCRIPT=1 V8_BINDING=1")
 FOREACH (_feature ${FEATURE_DEFINES})
     SET(FEATURE_DEFINES_JAVASCRIPT "${FEATURE_DEFINES_JAVASCRIPT} ${_feature}")
@@ -249,12 +261,17 @@ LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/V8ArrayBufferViewCust
 FOREACH (_idl ${WebCore_IDL_FILES})
     SET(IDL_FILES_LIST "${IDL_FILES_LIST}${WEBCORE_DIR}/${_idl}\n")
 ENDFOREACH ()
+
+FOREACH (_idl ${WebCoreTestSupport_IDL_FILES})
+    SET(IDL_FILES_LIST "${IDL_FILES_LIST}${WEBCORE_DIR}/${_idl}\n")
+ENDFOREACH ()
+
 FILE(WRITE ${IDL_FILES_TMP} ${IDL_FILES_LIST})
 
 ADD_CUSTOM_COMMAND(
     OUTPUT ${SUPPLEMENTAL_DEPENDENCY_FILE}
-    DEPENDS ${WEBCORE_DIR}/bindings/scripts/resolve-supplemental.pl ${SCRIPTS_RESOLVE_SUPPLEMENTAL} ${WebCore_IDL_FILES} ${IDL_ATTRIBUTES_FILE}
-    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/resolve-supplemental.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --idlFilesList ${IDL_FILES_TMP} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE} --idlAttributesFile ${IDL_ATTRIBUTES_FILE}
+    DEPENDS ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl ${SCRIPTS_PREPROCESS_IDLS} ${WebCore_IDL_FILES} ${WebCoreTestSupport_IDL_FILES} ${IDL_ATTRIBUTES_FILE}
+    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --idlFilesList ${IDL_FILES_TMP} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE} --idlAttributesFile ${IDL_ATTRIBUTES_FILE}
     VERBATIM)
 
 FOREACH (_file ${WebCore_IDL_FILES})
@@ -266,4 +283,15 @@ FOREACH (_file ${WebCore_IDL_FILES})
         COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/generate-bindings.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --generator V8 ${IDL_INCLUDES} --outputDir "${DERIVED_SOURCES_WEBCORE_DIR}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE} ${WEBCORE_DIR}/${_file}
         VERBATIM)
     LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/V8${_name}.cpp)
+ENDFOREACH ()
+
+FOREACH (_file ${WebCoreTestSupport_IDL_FILES})
+    GET_FILENAME_COMPONENT (_name ${_file} NAME_WE)
+    ADD_CUSTOM_COMMAND(
+        OUTPUT  ${DERIVED_SOURCES_WEBCORE_DIR}/V8${_name}.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/V8${_name}.h
+        MAIN_DEPENDENCY ${_file}
+        DEPENDS ${WEBCORE_DIR}/bindings/scripts/generate-bindings.pl ${SCRIPTS_BINDINGS} ${WEBCORE_DIR}/bindings/scripts/CodeGeneratorV8.pm ${SUPPLEMENTAL_DEPENDENCY_FILE}
+        COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/generate-bindings.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --generator V8 ${IDL_INCLUDES} --outputDir "${DERIVED_SOURCES_WEBCORE_DIR}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE} ${WEBCORE_DIR}/${_file}
+        VERBATIM)
+    LIST(APPEND WebCoreTestSupport_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/V8${_name}.cpp)
 ENDFOREACH ()

@@ -844,8 +844,8 @@ void ScrollView::setFrameRect(const IntRect& newRect)
     frameRectsChanged();
 
     updateScrollbars(scrollOffset());
-    
-    if (!m_useFixedLayout)
+
+    if (!m_useFixedLayout && oldRect.size() != newRect.size())
         contentsResized();
 }
 
@@ -970,6 +970,11 @@ void ScrollView::paintScrollCorner(GraphicsContext* context, const IntRect& corn
     ScrollbarTheme::theme()->paintScrollCorner(this, context, cornerRect);
 }
 
+void ScrollView::paintScrollbar(GraphicsContext* context, Scrollbar* bar, const IntRect& rect)
+{
+    bar->paint(context, rect);
+}
+
 void ScrollView::invalidateScrollCornerRect(const IntRect& rect)
 {
     invalidateRect(rect);
@@ -982,13 +987,13 @@ void ScrollView::paintScrollbars(GraphicsContext* context, const IntRect& rect)
         && !layerForHorizontalScrollbar()
 #endif
                                       )
-        m_horizontalScrollbar->paint(context, rect);
+        paintScrollbar(context, m_horizontalScrollbar.get(), rect);
     if (m_verticalScrollbar
 #if USE(ACCELERATED_COMPOSITING)
         && !layerForVerticalScrollbar()
 #endif
                                     )
-        m_verticalScrollbar->paint(context, rect);
+        paintScrollbar(context, m_verticalScrollbar.get(), rect);
 
 #if USE(ACCELERATED_COMPOSITING)
     if (layerForScrollCorner())
@@ -1000,7 +1005,10 @@ void ScrollView::paintScrollbars(GraphicsContext* context, const IntRect& rect)
 void ScrollView::paintPanScrollIcon(GraphicsContext* context)
 {
     static Image* panScrollIcon = Image::loadPlatformResource("panIcon").leakRef();
-    context->drawImage(panScrollIcon, ColorSpaceDeviceRGB, m_panScrollIconPoint);
+    IntPoint iconGCPoint = m_panScrollIconPoint;
+    if (parent())
+        iconGCPoint = parent()->windowToContents(iconGCPoint);
+    context->drawImage(panScrollIcon, ColorSpaceDeviceRGB, iconGCPoint);
 }
 
 void ScrollView::paint(GraphicsContext* context, const IntRect& rect)

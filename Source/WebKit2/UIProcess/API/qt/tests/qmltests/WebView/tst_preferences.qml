@@ -2,9 +2,10 @@ import QtQuick 2.0
 import QtTest 1.0
 import QtWebKit 3.0
 import QtWebKit.experimental 1.0
+import "../common"
 
 Item {
-    WebView {
+    TestWebView {
         id: webView
         width: 400
         height: 300
@@ -13,16 +14,10 @@ Item {
         experimental.preferences.localStorageEnabled: true
         experimental.preferences.pluginsEnabled: true
 
-        WebView {
+        TestWebView {
             id: webView2
             width: 400
             height: 300
-        }
-
-        SignalSpy {
-            id: spy
-            target: webView
-            signalName: "loadSucceeded"
         }
 
         SignalSpy {
@@ -85,12 +80,6 @@ Item {
             signalName: "defaultFixedFontSizeChanged"
         }
 
-        SignalSpy {
-            id: otherSpy
-            target: webView2
-            signalName: "loadSucceeded"
-        }
-
         TestCase {
             name: "WebViewPreferences"
 
@@ -132,9 +121,8 @@ Item {
                     webView.experimental.preferences.defaultFixedFontSize = defaultFixedFontSize
 
                     if (webView.url != '' && webView.url != 'about:blank') {
-                        spy.clear()
-                        webView.load('about:blank')
-                        spy.wait()
+                        webView.url = 'about:blank'
+                        verify(webView.waitForLoadSucceeded())
                     }
 
                     standardFontFamilySpy.clear()
@@ -151,42 +139,40 @@ Item {
                 webView.experimental.preferences.javascriptEnabled = true
                 webView.experimental.preferences.localStorageEnabled = true
                 webView.experimental.preferences.pluginsEnabled = true
-                spy.clear()
                 titleSpy.clear()
             }
 
             function test_javascriptEnabled() {
                 webView.experimental.preferences.javascriptEnabled = true
                 var testUrl = Qt.resolvedUrl("../common/javascript.html")
-                webView.load(testUrl)
-                spy.wait()
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
                 compare(webView.title, "New Title")
             }
 
             function test_javascriptDisabled() {
                 webView.experimental.preferences.javascriptEnabled = false
                 var testUrl = Qt.resolvedUrl("../common/javascript.html")
-                webView.load(testUrl)
-                spy.wait()
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
                 compare(webView.title, "Original Title")
             }
 
             function test_localStorageDisabled() {
                 webView.experimental.preferences.localStorageEnabled = false
                 var testUrl = Qt.resolvedUrl("../common/localStorage.html")
-                webView.load(testUrl)
-                spy.wait()
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
                 compare(webView.title, "Original Title")
             }
 
             function test_localStorageEnabled() {
                 webView.experimental.preferences.localStorageEnabled = true
                 var testUrl = Qt.resolvedUrl("../common/localStorage.html")
-                webView.load(testUrl)
-                spy.wait()
-                spy.clear()
-                webView.load(testUrl)
-                spy.wait()
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
                 compare(webView.title, "New Title")
             }
 
@@ -194,26 +180,24 @@ Item {
                 webView.experimental.preferences.javascriptEnabled = true
                 webView2.experimental.preferences.javascriptEnabled = true
                 var testUrl = Qt.resolvedUrl("../common/javascript.html")
-                webView.load(testUrl)
-                spy.wait()
-                webView2.load(testUrl)
-                otherSpy.wait()
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
+                webView2.url = testUrl
+                verify(webView2.waitForLoadSucceeded())
                 compare(webView.title, "New Title")
                 compare(webView2.title, "New Title")
-                spy.clear()
-                otherSpy.clear()
                 webView.experimental.preferences.javascriptEnabled = false
-                webView.load(testUrl)
-                spy.wait()
-                webView2.load(testUrl)
-                otherSpy.wait()
+                webView.url = testUrl
+                verify(webView.waitForLoadSucceeded())
+                webView2.url = testUrl
+                verify(webView2.waitForLoadSucceeded())
                 compare(webView.title, "Original Title")
                 compare(webView2.title, "New Title")
             }
 
             function test_standardFontFamilyChanged() {
                 var url = Qt.resolvedUrl("../common/font-preferences.html?standard#font-family")
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -222,7 +206,7 @@ Item {
                 webView.experimental.preferences.standardFontFamily = "foobar"
                 standardFontFamilySpy.wait()
                 compare(standardFontFamilySpy.count, 1)
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -231,7 +215,7 @@ Item {
 
             function test_fontSizeChanged() {
                 var url = Qt.resolvedUrl("../common/font-preferences.html?standard#font-size")
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -240,7 +224,7 @@ Item {
                 webView.experimental.preferences.defaultFontSize = defaultFontSize + 1
                 defaultFontSizeSpy.wait()
                 compare(defaultFontSizeSpy.count, 1)
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -249,7 +233,7 @@ Item {
 
             function test_fixedFontSizeChanged() {
                 var url = Qt.resolvedUrl("../common/font-preferences.html?fixed#font-size")
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -258,13 +242,13 @@ Item {
                 webView.experimental.preferences.defaultFixedFontSize = defaultFixedFontSize + 1
                 defaultFixedFontSizeSpy.wait()
                 compare(defaultFixedFontSizeSpy.count, 1)
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
                 compare(webView.title, (defaultFixedFontSize + 1).toString() + "px")
 
-                webView.load(Qt.resolvedUrl("../common/font-preferences.html?standard#font-size"))
+                webView.url = Qt.resolvedUrl("../common/font-preferences.html?standard#font-size")
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -274,7 +258,7 @@ Item {
             function test_minimumFontSizeChanged() {
                 verify(defaultMinimumFontSize < defaultFontSize)
                 var url = Qt.resolvedUrl("../common/font-preferences.html?minimum#font-size")
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()
@@ -286,7 +270,7 @@ Item {
                 webView.experimental.preferences.minimumFontSize = defaultFontSize
                 minimumFontSizeSpy.wait()
                 compare(minimumFontSizeSpy.count, 1)
-                webView.load(url)
+                webView.url = url
                 titleSpy.wait()
                 compare(webView.title, "Original Title")
                 titleSpy.wait()

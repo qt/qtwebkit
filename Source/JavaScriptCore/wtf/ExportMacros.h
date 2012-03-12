@@ -30,7 +30,7 @@
 #ifndef ExportMacros_h
 #define ExportMacros_h
 
-#include "Platform.h"
+#include <wtf/Platform.h>
 
 // See note in wtf/Platform.h for more info on EXPORT_MACROS.
 #if USE(EXPORT_MACROS)
@@ -81,6 +81,14 @@
 #define WTF_EXPORT_PRIVATE WTF_EXPORT
 #else
 #define WTF_EXPORT_PRIVATE WTF_IMPORT
+#endif
+
+// wxWebKit uses RTTI because wx itself does, so use a special macro for
+// extra exports it needs.
+#if PLATFORM(WX)
+#define WTF_EXPORT_PRIVATE_RTTI WTF_EXPORT_PRIVATE
+#else
+#define WTF_EXPORT_PRIVATE_RTTI
 #endif
 
 #define WTF_EXPORT_HIDDEN WTF_HIDDEN

@@ -47,6 +47,7 @@ LIST(APPEND WebCore_SOURCES
   platform/efl/PopupMenuEfl.cpp
   platform/efl/RefPtrEfl.cpp
   platform/efl/RenderThemeEfl.cpp
+  platform/efl/RunLoopEfl.cpp
   platform/efl/ScrollViewEfl.cpp
   platform/efl/ScrollbarEfl.cpp
   platform/efl/ScrollbarThemeEfl.cpp
@@ -188,6 +189,7 @@ IF (ENABLE_VIDEO)
   LIST(APPEND WebCore_SOURCES
     platform/graphics/gstreamer/GRefPtrGStreamer.cpp
     platform/graphics/gstreamer/GStreamerGWorld.cpp
+    platform/graphics/gstreamer/GStreamerVersioning.cpp
     platform/graphics/gstreamer/ImageGStreamerCairo.cpp
     platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
     platform/graphics/gstreamer/PlatformVideoWindowEfl.cpp
@@ -203,8 +205,10 @@ LIST(APPEND WebCore_LIBRARIES
   ${EVAS_LIBRARIES}
   ${FREETYPE_LIBRARIES}
   ${ICU_LIBRARIES}
+  ${JPEG_LIBRARY}
   ${LIBXML2_LIBRARIES}
   ${LIBXSLT_LIBRARIES}
+  ${PNG_LIBRARY}
   ${SQLITE_LIBRARIES}
   ${Glib_LIBRARIES}
   ${LIBSOUP24_LIBRARIES}

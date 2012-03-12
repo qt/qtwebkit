@@ -31,6 +31,7 @@
 namespace WebCore {
 
 class Attribute;
+struct PresentationAttributeCacheKey;
 
 class StyledElement : public Element {
 public:
@@ -39,8 +40,8 @@ public:
     virtual StylePropertySet* additionalAttributeStyle() { return 0; }
     void invalidateStyleAttribute();
 
-    StylePropertySet* inlineStyleDecl() const { return attributeData() ? attributeData()->inlineStyleDecl() : 0; }
-    StylePropertySet* ensureInlineStyleDecl() { return ensureAttributeData()->ensureInlineStyleDecl(this); }
+    const StylePropertySet* inlineStyle() const { return attributeData() ? attributeData()->inlineStyle() : 0; }
+    const StylePropertySet* ensureInlineStyle() { return ensureAttributeData()->ensureInlineStyle(this); }
     
     // Unlike StylePropertySet setters, these implement invalidation.
     bool setInlineStyleProperty(int propertyID, int identifier, bool important = false);
@@ -48,7 +49,7 @@ public:
     bool setInlineStyleProperty(int propertyID, const String& value, bool important = false);
     bool removeInlineStyleProperty(int propertyID);
     
-    virtual CSSStyleDeclaration* style() OVERRIDE { return ensureInlineStyleDecl()->ensureInlineCSSStyleDeclaration(this); }
+    virtual CSSStyleDeclaration* style() OVERRIDE;
 
     StylePropertySet* attributeStyle();
 
@@ -64,7 +65,7 @@ protected:
     virtual void parseAttribute(Attribute*);
     virtual void copyNonAttributeProperties(const Element*);
 
-    virtual bool isPresentationAttribute(Attribute*) const { return false; }
+    virtual bool isPresentationAttribute(const QualifiedName&) const { return false; }
     virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) { }
 
     void addPropertyToAttributeStyle(StylePropertySet*, int propertyID, int identifier);
@@ -82,12 +83,13 @@ private:
     virtual void updateStyleAttribute() const;
     void inlineStyleChanged();
 
+    void makePresentationAttributeCacheKey(PresentationAttributeCacheKey&) const;
     void updateAttributeStyle();
 
-    void destroyInlineStyleDecl()
+    void destroyInlineStyle()
     {
         if (attributeData())
-            attributeData()->destroyInlineStyleDecl(this);
+            attributeData()->destroyInlineStyle(this);
     }
 };
 

@@ -38,7 +38,39 @@ struct Instruction;
 
 namespace LLInt {
 
+#if USE(JSVALUE64)
+struct SlowPathReturnType {
+    void* a;
+    void* b;
+    
+    SlowPathReturnType(void* a, void* b)
+        : a(a)
+        , b(b)
+    {
+    }
+};
+
+inline SlowPathReturnType encodeResult(void* a, void* b)
+{
+    return SlowPathReturnType(a, b);
+}
+#else
 typedef int64_t SlowPathReturnType;
+
+inline SlowPathReturnType encodeResult(void* a, void* b)
+{
+    union {
+        struct {
+            void* a;
+            void* b;
+        } pair;
+        int64_t i;
+    } u;
+    u.pair.a = a;
+    u.pair.b = b;
+    return u.i;
+}
+#endif
 
 extern "C" SlowPathReturnType llint_trace_operand(ExecState*, Instruction*, int fromWhere, int operand);
 extern "C" SlowPathReturnType llint_trace_value(ExecState*, Instruction*, int fromWhere, int operand);
@@ -97,7 +129,6 @@ LLINT_SLOW_PATH_DECL(slow_path_urshift);
 LLINT_SLOW_PATH_DECL(slow_path_bitand);
 LLINT_SLOW_PATH_DECL(slow_path_bitor);
 LLINT_SLOW_PATH_DECL(slow_path_bitxor);
-LLINT_SLOW_PATH_DECL(slow_path_bitnot);
 LLINT_SLOW_PATH_DECL(slow_path_check_has_instance);
 LLINT_SLOW_PATH_DECL(slow_path_instanceof);
 LLINT_SLOW_PATH_DECL(slow_path_typeof);
@@ -162,6 +193,7 @@ LLINT_SLOW_PATH_DECL(slow_path_throw_reference_error);
 LLINT_SLOW_PATH_DECL(slow_path_debug);
 LLINT_SLOW_PATH_DECL(slow_path_profile_will_call);
 LLINT_SLOW_PATH_DECL(slow_path_profile_did_call);
+LLINT_SLOW_PATH_DECL(throw_from_native_call);
 
 } } // namespace JSC::LLInt
 

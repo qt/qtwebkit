@@ -50,7 +50,7 @@
 #include "RenderTreeAsText.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
-#include "ShadowRootList.h"
+#include "ShadowTree.h"
 #include "SpellChecker.h"
 #include "TextIterator.h"
 
@@ -119,6 +119,14 @@ Internals::Internals(Document* document)
     reset(document);
 }
 
+String Internals::address(Node* node)
+{
+    char buf[32];
+    sprintf(buf, "%p", node);
+
+    return String(buf);
+}
+
 bool Internals::isPreloaded(Document* document, const String& url)
 {
     if (!document)
@@ -146,14 +154,14 @@ Element* Internals::getElementByIdInShadowRoot(Node* shadowRoot, const String& i
     return toShadowRoot(shadowRoot)->getElementById(id);
 }
 
-bool Internals::isValidContentSelect(Element* contentElement, ExceptionCode& ec)
+bool Internals::isValidContentSelect(Element* insertionPoint, ExceptionCode& ec)
 {
-    if (!contentElement || !contentElement->isContentElement()) {
+    if (!insertionPoint || !isInsertionPoint(insertionPoint)) {
         ec = INVALID_ACCESS_ERR;
         return false;
     }
 
-    return toHTMLContentElement(contentElement)->isSelectValid();
+    return toInsertionPoint(insertionPoint)->isSelectValid();
 }
 
 bool Internals::attached(Node* node, ExceptionCode& ec)
@@ -203,7 +211,7 @@ Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::ensureShadowRoot(Eleme
     }
 
     if (host->hasShadowRoot())
-        return host->shadowRootList()->youngestShadowRoot();
+        return host->shadowTree()->youngestShadowRoot();
 
     return ShadowRoot::create(host, ec).get();
 }
@@ -225,7 +233,7 @@ Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::youngestShadowRoot(Ele
     if (!host->hasShadowRoot())
         return 0;
 
-    return host->shadowRootList()->youngestShadowRoot();
+    return host->shadowTree()->youngestShadowRoot();
 }
 
 Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::oldestShadowRoot(Element* host, ExceptionCode& ec)
@@ -238,7 +246,27 @@ Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::oldestShadowRoot(Eleme
     if (!host->hasShadowRoot())
         return 0;
 
-    return host->shadowRootList()->oldestShadowRoot();
+    return host->shadowTree()->oldestShadowRoot();
+}
+
+Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::youngerShadowRoot(Node* shadow, ExceptionCode& ec)
+{
+    if (!shadow || !shadow->isShadowRoot()) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return toShadowRoot(shadow)->youngerShadowRoot();
+}
+
+Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::olderShadowRoot(Node* shadow, ExceptionCode& ec)
+{
+    if (!shadow || !shadow->isShadowRoot()) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return toShadowRoot(shadow)->olderShadowRoot();
 }
 
 void Internals::removeShadowRoot(Element* host, ExceptionCode& ec)
@@ -248,7 +276,8 @@ void Internals::removeShadowRoot(Element* host, ExceptionCode& ec)
         return;
     }
 
-    host->removeShadowRoot();
+    if (host->hasShadowRoot())
+        host->shadowTree()->removeAllShadowRoots();
 }
 
 void Internals::setMultipleShadowSubtreesEnabled(bool enabled)
@@ -405,7 +434,10 @@ void Internals::reset(Document* document)
         return;
 
     observeFrame(document->frame());
-    m_settings = InternalSettings::create(document->frame(), m_settings.get());
+
+    if (m_settings)
+        m_settings->restoreTo(document->page()->settings());
+    m_settings = InternalSettings::create(document->frame());
     if (Page* page = document->page())
         page->setPagination(Page::Pagination());
 }
@@ -517,6 +549,16 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
     return length;
 }
 
+String Internals::rangeAsText(const Range* range, ExceptionCode& ec)
+{
+    if (!range) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return range->text();
+}
+
 int Internals::lastSpellCheckRequestSequence(Document* document, ExceptionCode& ec)
 {
     SpellChecker* checker = spellchecker(document);
@@ -539,6 +581,16 @@ int Internals::lastSpellCheckProcessedSequence(Document* document, ExceptionCode
     }
 
     return checker->lastProcessedSequence();
+}
+
+void Internals::setMediaPlaybackRequiresUserGesture(Document* document, bool enabled, ExceptionCode& ec)
+{
+    if (!document || !document->settings()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    document->settings()->setMediaPlaybackRequiresUserGesture(enabled);
 }
 
 Vector<String> Internals::userPreferredLanguages() const

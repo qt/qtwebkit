@@ -99,6 +99,7 @@ namespace JSC {
         MarkedAllocator& firstAllocatorWithoutDestructors() { return m_objectSpace.firstAllocator(); }
         MarkedAllocator& allocatorForObjectWithoutDestructor(size_t bytes) { return m_objectSpace.allocatorFor(bytes); }
         MarkedAllocator& allocatorForObjectWithDestructor(size_t bytes) { return m_objectSpace.destructorAllocatorFor(bytes); }
+        CopiedAllocator& storageAllocator() { return m_storageSpace.allocator(); }
         CheckedBoolean tryAllocateStorage(size_t, void**);
         CheckedBoolean tryReallocateStorage(void**, size_t, size_t);
 
@@ -136,6 +137,8 @@ namespace JSC {
         HandleStack* handleStack() { return &m_handleStack; }
 
         void getConservativeRegisterRoots(HashSet<JSCell*>& roots);
+
+        double lastGCLength() { return m_lastGCLength; }
 
     private:
         friend class CodeBlock;
@@ -235,6 +238,7 @@ namespace JSC {
         bool m_isSafeToCollect;
 
         JSGlobalData* m_globalData;
+        double m_lastGCLength;
     };
 
     bool Heap::isBusy()

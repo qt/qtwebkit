@@ -166,6 +166,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_inViewSourceMode(false)
     , m_isDisconnected(false)
     , m_excludeFromTextSearch(false)
+    , m_activeDOMObjectsAndAnimationsSuspendedCount(0)
 {
     ASSERT(page);
     AtomicString::init();
@@ -196,6 +197,11 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
 #ifndef NDEBUG
     frameCounter.increment();
 #endif
+
+    // Pause future ActiveDOMObjects if this frame is being created while the page is in a paused state.
+    Frame* parent = parentFromOwnerElement(ownerElement);
+    if (parent && parent->activeDOMObjectsAndAnimationsSuspended())
+        suspendActiveDOMObjectsAndAnimations();
 }
 
 PassRefPtr<Frame> Frame::create(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient* client)
@@ -305,6 +311,13 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
         notifyChromeClientTouchEventHandlerCountChanged();
+    }
+
+    // Suspend document if this frame was created in suspended state.
+    if (m_doc && activeDOMObjectsAndAnimationsSuspended()) {
+        m_doc->suspendScriptedAnimationControllerCallbacks();
+        m_animationController.suspendAnimationsForDocument(m_doc.get());
+        m_doc->suspendActiveDOMObjects(ActiveDOMObject::PageWillBeSuspended);
     }
 }
 
@@ -1011,6 +1024,38 @@ float Frame::frameScaleFactor() const
     return page->pageScaleFactor();
 }
 
+void Frame::suspendActiveDOMObjectsAndAnimations()
+{
+    bool wasSuspended = activeDOMObjectsAndAnimationsSuspended();
+
+    m_activeDOMObjectsAndAnimationsSuspendedCount++;
+
+    if (wasSuspended)
+        return;
+
+    if (document()) {
+        document()->suspendScriptedAnimationControllerCallbacks();
+        animation()->suspendAnimationsForDocument(document());
+        document()->suspendActiveDOMObjects(ActiveDOMObject::PageWillBeSuspended);
+    }
+}
+
+void Frame::resumeActiveDOMObjectsAndAnimations()
+{
+    ASSERT(activeDOMObjectsAndAnimationsSuspended());
+
+    m_activeDOMObjectsAndAnimationsSuspendedCount--;
+
+    if (activeDOMObjectsAndAnimationsSuspended())
+        return;
+
+    if (document()) {
+        document()->resumeActiveDOMObjects();
+        animation()->resumeAnimationsForDocument(document());
+        document()->resumeScriptedAnimationControllerCallbacks();
+    }
+}
+
 #if USE(ACCELERATED_COMPOSITING)
 void Frame::deviceOrPageScaleFactorChanged()
 {
@@ -1094,7 +1139,7 @@ DragImageRef Frame::nodeImage(Node* node)
     LayoutRect topLevelRect;
     IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), 1, ColorSpaceDeviceRGB));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
@@ -1117,7 +1162,7 @@ DragImageRef Frame::dragImageForSelection()
 
     IntRect paintingRect = enclosingIntRect(selection()->bounds());
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size()));
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), 1, ColorSpaceDeviceRGB));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());

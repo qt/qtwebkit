@@ -1,3 +1,119 @@
+2012-03-09  Jon Lee  <jonlee@apple.com>
+
+        Add support for ENABLE(LEGACY_NOTIFICATIONS)
+        https://bugs.webkit.org/show_bug.cgi?id=80497
+
+        Reviewed by Adam Barth.
+
+        Prep for b80472: Update API for Web Notifications
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-03-09  Ashod Nakashian  <ashodnakashian@yahoo.com>
+
+        Bash scripts should support LF endings only
+        https://bugs.webkit.org/show_bug.cgi?id=79509
+
+        Reviewed by David Kilzer.
+
+        * win/tools/scripts/feature-defines.sh: Modified property svn:eol-style.
+
+2012-03-05  Sam Weinig  <sam@webkit.org>
+
+        Fix the SnowLeoaprd build.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
+2012-03-05  Sam Weinig  <sam@webkit.org>
+
+        Update WebKitSystemInterface for WKCAContext additions.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
+2012-03-03  Hans Wennborg  <hans@chromium.org>
+
+        Implement Speech JavaScript API
+        https://bugs.webkit.org/show_bug.cgi?id=80019
+
+        Reviewed by Adam Barth.
+
+        Add ENABLE_SCRIPTED_SPEECH.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-03-01  Nikolas Zimmermann  <nzimmermann@rim.com>
+
+        Unreviewed, rolling out r109255.
+        http://trac.webkit.org/changeset/109255
+        https://bugs.webkit.org/show_bug.cgi?id=79932
+
+        Breaks rounded rects with dashed strokes in SVG
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
+2012-02-29  Tim Horton  <timothy_horton@apple.com>
+
+        Make use of CG rounded-rect primitives
+        https://bugs.webkit.org/show_bug.cgi?id=79932
+        <rdar://problem/9274953>
+
+        Reviewed by Simon Fraser.
+
+        Add wkCGPathAddRoundedRect.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
+2012-02-28  Jer Noble  <jer.noble@apple.com>
+
+        Full screen video volume slider has "progress bar"
+        https://bugs.webkit.org/show_bug.cgi?id=79812
+
+        Reviewed by Eric Carlson.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+        * win/include/WebKitSystemInterface/WebKitSystemInterface.h:
+        * win/lib/WebKitSystemInterface.lib:
+
+2012-02-28  Simon Fraser  <simon.fraser@apple.com>
+
+        Update WebKitSystemInterface.
+
+        Reviewed by Sam Weinig.
+        
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
+2012-02-28  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] Add an experimental SPI for plug-ins to enter sandbox
+        https://bugs.webkit.org/show_bug.cgi?id=79709
+
+        This pulls a lot of WKSI changes at once, because the script that updates it didn't
+        work for a while.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLeopard.a:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceSnowLeopard.a:
+
 2012-02-10  Adam Klein  <adamk@chromium.org>
 
         Enable MUTATION_OBSERVERS by default on all platforms

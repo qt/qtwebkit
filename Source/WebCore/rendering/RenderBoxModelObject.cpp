@@ -48,6 +48,7 @@ using namespace HTMLNames;
 
 bool RenderBoxModelObject::s_wasFloating = false;
 bool RenderBoxModelObject::s_hadLayer = false;
+bool RenderBoxModelObject::s_hadTransform = false;
 bool RenderBoxModelObject::s_layerWasSelfPainting = false;
 
 static const double cInterpolationCutoff = 800. * 800.;
@@ -220,26 +221,23 @@ static ImageQualityController* imageQualityController()
     return gImageQualityController;
 }
 
-void RenderBoxModelObject::setSelectionState(SelectionState s)
+void RenderBoxModelObject::setSelectionState(SelectionState state)
 {
-    if (selectionState() == s)
-        return;
-    
-    if (s == SelectionInside && selectionState() != SelectionNone)
+    if (state == SelectionInside && selectionState() != SelectionNone)
         return;
 
-    if ((s == SelectionStart && selectionState() == SelectionEnd)
-        || (s == SelectionEnd && selectionState() == SelectionStart))
+    if ((state == SelectionStart && selectionState() == SelectionEnd)
+        || (state == SelectionEnd && selectionState() == SelectionStart))
         RenderObject::setSelectionState(SelectionBoth);
     else
-        RenderObject::setSelectionState(s);
-    
-    // FIXME:
-    // We should consider whether it is OK propagating to ancestor RenderInlines.
+        RenderObject::setSelectionState(state);
+
+    // FIXME: We should consider whether it is OK propagating to ancestor RenderInlines.
     // This is a workaround for http://webkit.org/b/32123
-    RenderBlock* cb = containingBlock();
-    if (cb && !cb->isRenderView())
-        cb->setSelectionState(s);
+    // The containing block can be null in case of an orphaned tree.
+    RenderBlock* containingBlock = this->containingBlock();
+    if (containingBlock && !containingBlock->isRenderView())
+        containingBlock->setSelectionState(state);
 }
 
 bool RenderBoxModelObject::shouldPaintAtLowQuality(GraphicsContext* context, Image* image, const void* layer, const LayoutSize& size)
@@ -302,6 +300,7 @@ void RenderBoxModelObject::styleWillChange(StyleDifference diff, const RenderSty
 {
     s_wasFloating = isFloating();
     s_hadLayer = hasLayer();
+    s_hadTransform = hasTransform();
     if (s_hadLayer)
         s_layerWasSelfPainting = layer()->isSelfPaintingLayer();
 
@@ -352,18 +351,28 @@ void RenderBoxModelObject::styleWillChange(StyleDifference diff, const RenderSty
     RenderObject::styleWillChange(diff, newStyle);
 }
 
+void RenderBoxModelObject::ensureLayer()
+{
+    if (m_layer)
+        return;
+
+    m_layer = new (renderArena()) RenderLayer(this);
+    setHasLayer(true);
+    m_layer->insertOnlyThisLayer();
+}
+
 void RenderBoxModelObject::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderObject::styleDidChange(diff, oldStyle);
     updateBoxModelInfoFromStyle();
-    
+
     if (requiresLayer()) {
         if (!layer() && layerCreationAllowedForSubtree()) {
             if (s_wasFloating && isFloating())
                 setChildNeedsLayout(true);
-            m_layer = new (renderArena()) RenderLayer(this);
-            setHasLayer(true);
-            m_layer->insertOnlyThisLayer();
+
+            ensureLayer();
+
             if (parent() && !needsLayout() && containingBlock()) {
                 m_layer->setRepaintStatus(NeedsFullRepaint);
                 // There is only one layer to update, it is not worth using |cachedOffset| since
@@ -377,6 +386,10 @@ void RenderBoxModelObject::styleDidChange(StyleDifference diff, const RenderStyl
         m_layer->removeOnlyThisLayer(); // calls destroyLayer() which clears m_layer
         if (s_wasFloating && isFloating())
             setChildNeedsLayout(true);
+        if (s_hadTransform)
+            setNeedsLayoutAndPrefWidthsRecalc();
+        if (hasOverflowClip())
+            toRenderBox(this)->updateCachedSizeForOverflowClip();
     }
 
     if (layer()) {
@@ -537,7 +550,7 @@ int RenderBoxModelObject::pixelSnappedOffsetHeight() const
     return offsetHeight();
 }
 
-LayoutUnit RenderBoxModelObject::paddingTop(bool) const
+LayoutUnit RenderBoxModelObject::paddingTop(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingTop();
@@ -546,7 +559,7 @@ LayoutUnit RenderBoxModelObject::paddingTop(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingBottom(bool) const
+LayoutUnit RenderBoxModelObject::paddingBottom(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingBottom();
@@ -555,7 +568,7 @@ LayoutUnit RenderBoxModelObject::paddingBottom(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingLeft(bool) const
+LayoutUnit RenderBoxModelObject::paddingLeft(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingLeft();
@@ -564,7 +577,7 @@ LayoutUnit RenderBoxModelObject::paddingLeft(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingRight(bool) const
+LayoutUnit RenderBoxModelObject::paddingRight(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingRight();
@@ -573,7 +586,7 @@ LayoutUnit RenderBoxModelObject::paddingRight(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingBefore(bool) const
+LayoutUnit RenderBoxModelObject::paddingBefore(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingBefore();
@@ -582,7 +595,7 @@ LayoutUnit RenderBoxModelObject::paddingBefore(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingAfter(bool) const
+LayoutUnit RenderBoxModelObject::paddingAfter(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingAfter();
@@ -591,7 +604,7 @@ LayoutUnit RenderBoxModelObject::paddingAfter(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingStart(bool) const
+LayoutUnit RenderBoxModelObject::paddingStart(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingStart();
@@ -600,7 +613,7 @@ LayoutUnit RenderBoxModelObject::paddingStart(bool) const
     return padding.calcMinValue(w);
 }
 
-LayoutUnit RenderBoxModelObject::paddingEnd(bool) const
+LayoutUnit RenderBoxModelObject::paddingEnd(PaddingOptions) const
 {
     LayoutUnit w = 0;
     Length padding = style()->paddingEnd();
