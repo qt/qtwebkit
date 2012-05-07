@@ -439,13 +439,20 @@ AffineTransform SVGSVGElement::localCoordinateSpaceTransform(SVGLocatable::CTMSc
         transform.translate(x().value(lengthContext), y().value(lengthContext));
     } else if (mode == SVGLocatable::ScreenScope) {
         if (RenderObject* renderer = this->renderer()) {
+            FloatPoint location;
+            
+            // At the SVG/HTML boundary (aka RenderSVGRoot), we apply the localToBorderBoxTransform 
+            // to map an element from SVG viewport coordinates to CSS box coordinates.
+            // RenderSVGRoot's localToAbsolute method expects CSS box coordinates.
+            if (renderer->isSVGRoot())
+                location = toRenderSVGRoot(renderer)->localToBorderBoxTransform().mapPoint(location);
+            
             // Translate in our CSS parent coordinate space
             // FIXME: This doesn't work correctly with CSS transforms.
-            FloatPoint location = renderer->localToAbsolute(FloatPoint(), false, true);
+            location = renderer->localToAbsolute(location, false, true);
 
-            // Be careful here! localToAbsolute() includes the x/y offset coming from the viewBoxToViewTransform(), because
-            // RenderSVGRoot::localToBorderBoxTransform() (called through mapLocalToContainer(), called from localToAbsolute())
-            // also takes the viewBoxToViewTransform() into account, so we have to subtract it here (original cause of bug #27183)
+            // Be careful here! localToBorderBoxTransform() included the x/y offset coming from the viewBoxToViewTransform(),
+            // so we have to subtract it here (original cause of bug #27183)
             transform.translate(location.x() - viewBoxTransform.e(), location.y() - viewBoxTransform.f());
 
             // Respect scroll offset.
@@ -467,16 +474,18 @@ RenderObject* SVGSVGElement::createRenderer(RenderArena* arena, RenderStyle*)
     return new (arena) RenderSVGViewportContainer(this);
 }
 
-void SVGSVGElement::insertedIntoDocument()
+Node::InsertionNotificationRequest SVGSVGElement::insertedInto(Node* rootParent)
 {
-    document()->accessSVGExtensions()->addTimeContainer(this);
-    SVGStyledLocatableElement::insertedIntoDocument();
+    if (rootParent->inDocument())
+        document()->accessSVGExtensions()->addTimeContainer(this);
+    return SVGStyledLocatableElement::insertedInto(rootParent);
 }
 
-void SVGSVGElement::removedFromDocument()
+void SVGSVGElement::removedFrom(Node* rootParent)
 {
-    document()->accessSVGExtensions()->removeTimeContainer(this);
-    SVGStyledLocatableElement::removedFromDocument();
+    if (rootParent->inDocument())
+        document()->accessSVGExtensions()->removeTimeContainer(this);
+    SVGStyledLocatableElement::removedFrom(rootParent);
 }
 
 void SVGSVGElement::pauseAnimations()
@@ -541,7 +550,7 @@ FloatRect SVGSVGElement::currentViewBoxRect() const
 
     // If no viewBox is specified but non-relative width/height values, then we
     // should always synthesize a viewBox if we're embedded through a SVGImage.    
-    return FloatRect(FloatPoint(), FloatSize(intrinsicWidth.calcFloatValue(0), intrinsicHeight.calcFloatValue(0)));
+    return FloatRect(FloatPoint(), FloatSize(floatValueForLength(intrinsicWidth, 0), floatValueForLength(intrinsicHeight, 0)));
 }
 
 FloatSize SVGSVGElement::currentViewportSize() const
@@ -549,7 +558,7 @@ FloatSize SVGSVGElement::currentViewportSize() const
     Length intrinsicWidth = this->intrinsicWidth();
     Length intrinsicHeight = this->intrinsicHeight();
     if (intrinsicWidth.isFixed() && intrinsicHeight.isFixed())
-        return FloatSize(intrinsicWidth.calcFloatValue(0), intrinsicHeight.calcFloatValue(0));
+        return FloatSize(floatValueForLength(intrinsicWidth, 0), floatValueForLength(intrinsicHeight, 0));
 
     if (!renderer())
         return FloatSize();

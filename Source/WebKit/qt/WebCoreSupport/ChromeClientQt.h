@@ -171,10 +171,7 @@ public:
     virtual void setCursor(const Cursor&);
     virtual void setCursorHiddenUntilMouseMoves(bool) { }
 
-    virtual void scrollRectIntoView(const IntRect&) const { }
-
-    virtual void requestGeolocationPermissionForFrame(Frame*, Geolocation*) { }
-    virtual void cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*) { }
+    virtual void scrollRectIntoView(const LayoutRect) const { }
 
     virtual bool selectItemWritingDirectionIsNatural();
     virtual bool selectItemAlignmentFollowsMenuWritingDirection();

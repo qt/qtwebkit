@@ -33,6 +33,8 @@
 
 #include "ChromiumDataObject.h"
 #include "ClipboardMimeTypes.h"
+#include "DataTransferItem.h"
+#include "DraggedIsolatedFileSystem.h"
 #include "platform/WebData.h"
 #include "platform/WebString.h"
 #include "platform/WebURL.h"
@@ -69,57 +71,34 @@ void WebDragData::assign(const WebDragData& other)
 WebVector<WebDragData::Item> WebDragData::items() const
 {
     Vector<Item> itemList;
-    const HashSet<String>& types = m_private->types();
-    if (types.contains(mimeTypeTextPlain)) {
-        Item item;
-        item.storageType = Item::StorageTypeString;
-        item.stringType = String(mimeTypeTextPlain);
-        bool ignored;
-        item.stringData = m_private->getData(mimeTypeTextPlain, ignored);
+    for (size_t i = 0; i < m_private->length(); ++i) {
+        ChromiumDataObjectItem* originalItem = m_private->item(i).get();
+        WebDragData::Item item;
+        if (originalItem->kind() == DataTransferItem::kindString) {
+            item.storageType = Item::StorageTypeString;
+            item.stringType = originalItem->type();
+            item.stringData = originalItem->internalGetAsString();
+        } else if (originalItem->kind() == DataTransferItem::kindFile) {
+            if (originalItem->sharedBuffer()) {
+                item.storageType = Item::StorageTypeBinaryData;
+                item.binaryData = originalItem->sharedBuffer();
+            } else if (originalItem->isFilename()) {
+                item.storageType = Item::StorageTypeFilename;
+                RefPtr<WebCore::Blob> blob = originalItem->getAsFile();
+                if (blob->isFile()) {
+                    File* file = static_cast<File*>(blob.get());
+                    item.filenameData = file->path();
+                    item.displayNameData = file->name();
+                } else
+                    ASSERT_NOT_REACHED();
+            } else
+                ASSERT_NOT_REACHED();
+        } else
+            ASSERT_NOT_REACHED();
+        item.title = originalItem->title();
+        item.baseURL = originalItem->baseURL();
         itemList.append(item);
     }
-    if (types.contains(mimeTypeTextURIList)) {
-        Item item;
-        item.storageType = Item::StorageTypeString;
-        item.stringType = String(mimeTypeTextURIList);
-        bool ignored;
-        item.stringData = m_private->getData(mimeTypeURL, ignored);
-        item.title = m_private->urlTitle();
-        itemList.append(item);
-    }
-    if (types.contains(mimeTypeTextHTML)) {
-        Item item;
-        item.storageType = Item::StorageTypeString;
-        item.stringType = String(mimeTypeTextHTML);
-        bool ignored;
-        item.stringData = m_private->getData(mimeTypeTextHTML, ignored);
-        item.baseURL = m_private->htmlBaseUrl();
-        itemList.append(item);
-    }
-    if (types.contains(mimeTypeDownloadURL)) {
-        Item item;
-        item.storageType = Item::StorageTypeString;
-        item.stringType = String(mimeTypeDownloadURL);
-        bool ignored;
-        item.stringData = m_private->getData(mimeTypeDownloadURL, ignored);
-        itemList.append(item);
-    }
-    const HashMap<String, String>& customData = m_private->customData();
-    for (HashMap<String, String>::const_iterator it = customData.begin(); it != customData.end(); ++it) {
-        Item item;
-        item.storageType = Item::StorageTypeString;
-        item.stringType = it->first;
-        item.stringData = it->second;
-        itemList.append(item);
-    }
-    if (m_private->fileContent()) {
-        Item item;
-        item.storageType = Item::StorageTypeBinaryData;
-        item.binaryData = m_private->fileContent();
-        item.title = m_private->fileContentFilename();
-        itemList.append(item);
-    }
-    // We don't handle filenames here, since they are never used for dragging out.
     return itemList;
 }
 
@@ -135,19 +114,40 @@ void WebDragData::addItem(const Item& item)
     ensureMutable();
     switch (item.storageType) {
     case Item::StorageTypeString:
-        m_private->setData(item.stringType, item.stringData);
         if (String(item.stringType) == mimeTypeTextURIList)
-            m_private->setUrlTitle(item.title);
+            m_private->setURLAndTitle(item.stringData, item.title);
         else if (String(item.stringType) == mimeTypeTextHTML)
-            m_private->setHtmlBaseUrl(item.baseURL);
+            m_private->setHTMLAndBaseURL(item.stringData, item.baseURL);
+        else
+            m_private->setData(item.stringType, item.stringData);
         return;
     case Item::StorageTypeFilename:
-        m_private->addFilename(item.filenameData);
+        m_private->addFilename(item.filenameData, item.displayNameData);
         return;
     case Item::StorageTypeBinaryData:
         // This should never happen when dragging in.
         ASSERT_NOT_REACHED();
     }
+}
+
+WebString WebDragData::filesystemId() const
+{
+#if ENABLE(FILE_SYSTEM)
+    ASSERT(!isNull());
+    DraggedIsolatedFileSystem* filesystem = DraggedIsolatedFileSystem::from(m_private);
+    if (filesystem)
+        return filesystem->filesystemId();
+#endif
+    return WebString();
+}
+
+void WebDragData::setFilesystemId(const WebString& filesystemId)
+{
+#if ENABLE(FILE_SYSTEM)
+    // The ID is an opaque string, given by and validated by chromium port.
+    ensureMutable();
+    DraggedIsolatedFileSystem::provideTo(m_private, DraggedIsolatedFileSystem::supplementName(), DraggedIsolatedFileSystem::create(filesystemId));
+#endif
 }
 
 WebDragData::WebDragData(const WTF::PassRefPtr<WebCore::ChromiumDataObject>& data)
@@ -168,7 +168,6 @@ WebDragData::operator WTF::PassRefPtr<WebCore::ChromiumDataObject>() const
 
 void WebDragData::assign(WebDragDataPrivate* p)
 {
-    ASSERT(!p || p->storageMode() == ChromiumDataObject::Buffered);
     // p is already ref'd for us by the caller
     if (m_private)
         m_private->deref();

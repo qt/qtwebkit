@@ -57,6 +57,7 @@ public:
         , m_mustHandleInternally(false)
         , m_isRequestedByPlugin(false)
         , m_forceDownload(false)
+        , m_targetType(TargetIsUnspecified)
     {
     }
 
@@ -66,6 +67,7 @@ public:
         , m_mustHandleInternally(false)
         , m_isRequestedByPlugin(false)
         , m_forceDownload(false)
+        , m_targetType(TargetIsUnspecified)
     {
     }
 
@@ -75,6 +77,7 @@ public:
         , m_mustHandleInternally(false)
         , m_isRequestedByPlugin(false)
         , m_forceDownload(false)
+        , m_targetType(TargetIsUnspecified)
     {
         setHTTPReferrer(referrer);
     }
@@ -85,6 +88,7 @@ public:
         , m_mustHandleInternally(false)
         , m_isRequestedByPlugin(false)
         , m_forceDownload(false)
+        , m_targetType(TargetIsUnspecified)
     {
     }
 
@@ -110,9 +114,11 @@ public:
     void setMustHandleInternally(bool mustHandleInternally) { m_mustHandleInternally = mustHandleInternally; }
     bool mustHandleInternally() const { return m_mustHandleInternally; }
 
-    void initializePlatformRequest(BlackBerry::Platform::NetworkRequest&, bool isInitial = false) const;
+    void initializePlatformRequest(BlackBerry::Platform::NetworkRequest&, bool cookiesEnabled, bool isInitial = false, bool isRedirect = false) const;
     void setForceDownload(bool forceDownload) { m_forceDownload = true; }
     bool forceDownload() const { return m_forceDownload; }
+    void setSuggestedSaveName(const String& name) { m_suggestedSaveName = name; }
+    String suggestedSaveName() const { return m_suggestedSaveName; }
 
     // What this request is for.
     TargetType targetType() const { return m_targetType; }
@@ -120,12 +126,16 @@ public:
 
     static TargetType targetTypeFromMimeType(const String& mimeType);
 
+    void clearHTTPContentLength();
+    void clearHTTPContentType();
+
 private:
     friend class ResourceRequestBase;
 
     String m_token;
     String m_anchorText;
     String m_overrideContentType;
+    String m_suggestedSaveName;
     bool m_isXMLHTTPRequest;
     bool m_mustHandleInternally;
     bool m_isRequestedByPlugin;
@@ -142,10 +152,13 @@ private:
 struct CrossThreadResourceRequestData : public CrossThreadResourceRequestDataBase {
     String m_token;
     String m_anchorText;
+    String m_overrideContentType;
+    String m_suggestedSaveName;
     bool m_isXMLHTTPRequest;
     bool m_mustHandleInternally;
     bool m_isRequestedByPlugin;
     bool m_forceDownload;
+    ResourceRequest::TargetType m_targetType;
 };
 
 } // namespace WebCore

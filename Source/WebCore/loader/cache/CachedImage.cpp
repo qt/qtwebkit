@@ -33,6 +33,7 @@
 #include "FrameLoaderClient.h"
 #include "FrameLoaderTypes.h"
 #include "FrameView.h"
+#include "Page.h"
 #include "RenderObject.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
@@ -202,7 +203,11 @@ void CachedImage::setContainerSizeForRenderer(const RenderObject* renderer, cons
         m_image->setContainerSize(containerSize);
         return;
     }
-    m_svgImageCache->setRequestedSizeAndZoom(renderer, SVGImageCache::SizeAndZoom(containerSize, containerZoom));
+
+    // FIXME (85335): This needs to take CSS transform scale into account as well.
+    float containerScale = renderer->document()->page()->deviceScaleFactor() * renderer->document()->page()->pageScaleFactor();
+
+    m_svgImageCache->setRequestedSizeAndScales(renderer, SVGImageCache::SizeAndScales(containerSize, containerZoom, containerScale));
 #else
     UNUSED_PARAM(renderer);
     UNUSED_PARAM(containerZoom);
@@ -240,39 +245,34 @@ IntSize CachedImage::imageSizeForRenderer(const RenderObject* renderer, float mu
 
     if (!m_image)
         return IntSize();
+
+    IntSize imageSize;
+
+    if (m_image->isBitmapImage() && (renderer && renderer->shouldRespectImageOrientation() == RespectImageOrientation))
+        imageSize = static_cast<BitmapImage*>(m_image.get())->sizeRespectingOrientation();
+    else
+        imageSize = m_image->size();
+
 #if ENABLE(SVG)
     if (m_image->isSVGImage()) {
-        // SVGImages already includes the zooming in its intrinsic size.
-        SVGImageCache::SizeAndZoom sizeAndZoom = m_svgImageCache->requestedSizeAndZoom(renderer);
-        if (sizeAndZoom.size.isEmpty())
-            return m_image->size();
-        if (sizeAndZoom.zoom == 1)
-            return sizeAndZoom.size;
-        if (multiplier == 1) {
-            // Consumer wants unscaled coordinates.
-            sizeAndZoom.size.setWidth(sizeAndZoom.size.width() / sizeAndZoom.zoom);
-            sizeAndZoom.size.setHeight(sizeAndZoom.size.height() / sizeAndZoom.zoom);
-            return sizeAndZoom.size;
+        SVGImageCache::SizeAndScales sizeAndScales = m_svgImageCache->requestedSizeAndScales(renderer);
+        if (!sizeAndScales.size.isEmpty()) {
+            imageSize.setWidth(sizeAndScales.size.width() / sizeAndScales.zoom);
+            imageSize.setHeight(sizeAndScales.size.height() / sizeAndScales.zoom);
         }
-        return sizeAndZoom.size;
     }
-#else
-    UNUSED_PARAM(renderer);
 #endif
 
     if (multiplier == 1.0f)
-        return m_image->size();
+        return imageSize;
         
     // Don't let images that have a width/height >= 1 shrink below 1 when zoomed.
-    bool hasWidth = m_image->size().width() > 0;
-    bool hasHeight = m_image->size().height() > 0;
-    int width = m_image->size().width() * (m_image->hasRelativeWidth() ? 1.0f : multiplier);
-    int height = m_image->size().height() * (m_image->hasRelativeHeight() ? 1.0f : multiplier);
-    if (hasWidth)
-        width = max(1, width);
-    if (hasHeight)
-        height = max(1, height);
-    return IntSize(width, height);
+    float widthScale = m_image->hasRelativeWidth() ? 1.0f : multiplier;
+    float heightScale = m_image->hasRelativeHeight() ? 1.0f : multiplier;
+    IntSize minimumSize(imageSize.width() > 0 ? 1 : 0, imageSize.height() > 0 ? 1 : 0);
+    imageSize.scale(widthScale, heightScale);
+    imageSize.clampToMinimumSize(minimumSize);
+    return imageSize;
 }
 
 void CachedImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio)

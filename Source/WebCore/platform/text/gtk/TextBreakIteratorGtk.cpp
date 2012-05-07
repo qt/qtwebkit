@@ -26,7 +26,7 @@
 
 #include "TextBreakIterator.h"
 
-#include "GOwnPtr.h"
+#include <wtf/gobject/GOwnPtr.h>
 #include <pango/pango.h>
 using namespace std;
 
@@ -383,6 +383,11 @@ bool isTextBreak(TextBreakIterator* iterator, int offset)
     iterator->m_charIterator.previous();
     textBreakNext(iterator);
     return iterator->m_charIterator.getIndex() == index;
+}
+
+bool isWordTextBreak(TextBreakIterator*)
+{
+    return true;
 }
 
 }

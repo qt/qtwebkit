@@ -291,17 +291,21 @@ macro allocateBasicJSObject(sizeClassIndex, classInfoOffset, structure, result, 
             MarkedSpace::Subspace::preciseAllocators +
             sizeClassIndex * sizeof MarkedAllocator
         
+        const offsetOfFirstFreeCell = 
+            MarkedAllocator::m_freeList + 
+            MarkedBlock::FreeList::head
+
         # FIXME: we can get the global data in one load from the stack.
         loadp CodeBlock[cfr], scratch1
         loadp CodeBlock::m_globalData[scratch1], scratch1
         
-        # Get the object from the free list.    
-        loadp offsetOfMySizeClass + MarkedAllocator::m_firstFreeCell[scratch1], result
+        # Get the object from the free list.   
+        loadp offsetOfMySizeClass + offsetOfFirstFreeCell[scratch1], result
         btpz result, slowCase
         
         # Remove the object from the free list.
         loadp [result], scratch2
-        storep scratch2, offsetOfMySizeClass + MarkedAllocator::m_firstFreeCell[scratch1]
+        storep scratch2, offsetOfMySizeClass + offsetOfFirstFreeCell[scratch1]
     
         # Initialize the object.
         loadp classInfoOffset[scratch1], scratch2
@@ -420,30 +424,6 @@ _llint_op_mod:
 _llint_op_typeof:
     traceExecution()
     callSlowPath(_llint_slow_path_typeof)
-    dispatch(3)
-
-
-_llint_op_is_undefined:
-    traceExecution()
-    callSlowPath(_llint_slow_path_is_undefined)
-    dispatch(3)
-
-
-_llint_op_is_boolean:
-    traceExecution()
-    callSlowPath(_llint_slow_path_is_boolean)
-    dispatch(3)
-
-
-_llint_op_is_number:
-    traceExecution()
-    callSlowPath(_llint_slow_path_is_number)
-    dispatch(3)
-
-
-_llint_op_is_string:
-    traceExecution()
-    callSlowPath(_llint_slow_path_is_string)
     dispatch(3)
 
 

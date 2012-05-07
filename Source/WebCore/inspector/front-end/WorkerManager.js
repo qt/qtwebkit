@@ -98,7 +98,13 @@ WebInspector.WorkerManager._calculateWorkerInspectorTitle = function()
     var expression = "location.href";
     if (WebInspector.queryParamsObject["isSharedWorker"])
         expression += " + (this.name ? ' (' + this.name + ')' : '')";
-    RuntimeAgent.evaluate.invoke({expression:expression, doNotPauseOnExceptions:true, returnByValue: true}, evalCallback.bind(this));
+    RuntimeAgent.evaluate.invoke({expression:expression, doNotPauseOnExceptionsAndMuteConsole:true, returnByValue: true}, evalCallback.bind(this));
+    
+    /**
+     * @param {?Protocol.Error} error
+     * @param {RuntimeAgent.RemoteObject} result
+     * @param {boolean=} wasThrown
+     */
     function evalCallback(error, result, wasThrown)
     {
         if (error || wasThrown) {
@@ -189,6 +195,8 @@ WebInspector.WorkerManager.prototype = {
 
     _workerInspectorClosing: function(workerId, event)
     {
+        if (event.target.location.href === "about:blank")
+            return;
         if (this._ignoreWorkerInspectorClosing)
             return;
         delete this._workerIdToWindow[workerId];

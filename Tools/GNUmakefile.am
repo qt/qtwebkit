@@ -12,6 +12,8 @@ Programs_GtkLauncher_CPPFLAGS = \
 	$(javascriptcore_cppflags)
 
 Programs_GtkLauncher_SOURCES = \
+	Tools/GtkLauncher/LauncherInspectorWindow.c \
+	Tools/GtkLauncher/LauncherInspectorWindow.h \
 	Tools/GtkLauncher/main.c
 
 Programs_GtkLauncher_CFLAGS = \
@@ -45,7 +47,6 @@ libWebCoreInternals_la_SOURCES = \
 	Source/WebCore/testing/Internals.h \
 	Source/WebCore/testing/InternalSettings.cpp \
 	Source/WebCore/testing/InternalSettings.h \
-	Source/WebCore/testing/js/JSInternalsCustom.cpp \
 	Source/WebCore/testing/js/WebCoreTestSupport.cpp \
 	Source/WebCore/testing/js/WebCoreTestSupport.h
 
@@ -199,6 +200,11 @@ if !TARGET_WIN32
 TestNetscapePlugin_libtestnetscapeplugin_la_CPPFLAGS += -DXP_UNIX
 endif
 
+# Add MOZ_X11 only for X11 targets
+if TARGET_X11
+TestNetscapePlugin_libtestnetscapeplugin_la_CPPFLAGS += -DMOZ_X11
+endif
+
 TestNetscapePlugin_libtestnetscapeplugin_la_SOURCES = \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/DocumentOpenInDestroyStream.cpp \
 	Tools/DumpRenderTree/TestNetscapePlugIn/Tests/EvaluateJSAfterRemovingPluginElement.cpp \
@@ -236,11 +242,15 @@ TestNetscapePlugin_libtestnetscapeplugin_la_LDFLAGS = \
 CLEANFILES += TestNetscapePlugin/libtestnetscapeplugin.la
 endif
 
+check-local:
+	$(top_srcdir)/Tools/Scripts/run-gtk-tests
+
 EXTRA_DIST += \
 	Tools/gtk/common.py \
 	Tools/gtk/generate-gtkdoc \
 	Tools/gtk/gtkdoc.py \
 	Tools/Scripts/VCSUtils.pm \
+	Tools/Scripts/run-gtk-tests \
 	Tools/Scripts/webkit-build-directory \
 	Tools/Scripts/webkitdirs.pm
 
@@ -324,7 +334,7 @@ if ENABLE_WEBKIT2
 	  fi; \
 	fi
 endif
-	@(AM_V_GEN)$(PYTHON) $(srcdir)/Tools/gtk/generate-gtkdoc --rebase --virtual-root=$${DESTDIR}
+	@$(AM_V_GEN)$(PYTHON) $(srcdir)/Tools/gtk/generate-gtkdoc --rebase --virtual-root=$${DESTDIR}
 
 uninstall-local:
 	@DOC_MODULE_VERSION=`cat ./Documentation/webkitgtk/version.xml`; \

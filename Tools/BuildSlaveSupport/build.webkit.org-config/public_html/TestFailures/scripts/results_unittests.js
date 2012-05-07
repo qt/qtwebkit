@@ -36,6 +36,16 @@ unittest.kExampleResultsJSON = {
                 "expected": "IMAGE",
                 "actual": "IMAGE"
             },
+            "expected-wontfix": {
+                "expected": "IMAGE",
+                "actual": "IMAGE",
+                "wontfix": true
+            },
+            "unexpected-wontfix": {
+                "expected": "IMAGE",
+                "actual": "TEXT",
+                "wontfix": true
+            },
             "flaky-scrollbar.html": {
                 "expected": "PASS",
                 "actual": "PASS TEXT"
@@ -125,6 +135,20 @@ test("ResultAnalyzer", 35, function() {
     deepEqual(analyzer.unexpectedResults(), []);
     ok(!analyzer.succeeded());
     ok(!analyzer.flaky());
+});
+
+test("expectedFailures", 1, function() {
+    var expectedFailures = results.expectedFailures(unittest.kExampleResultsJSON);
+    deepEqual(expectedFailures, {
+        "scrollbars/custom-scrollbar-with-incomplete-style.html": {
+            "expected": "IMAGE",
+            "actual": "IMAGE"
+        },
+        "userscripts/user-script-video-document.html": {
+            "expected": "FAIL",
+            "actual": "TEXT"
+        }
+    });
 });
 
 test("unexpectedFailures", 1, function() {

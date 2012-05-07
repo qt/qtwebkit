@@ -317,10 +317,10 @@ class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskD
     def expected_failures(self):
         return self._expected_failures
 
-    def layout_test_results(self):
+    def test_results(self):
         return self._layout_test_results_reader.results()
 
-    def archive_last_layout_test_results(self, patch):
+    def archive_last_test_results(self, patch):
         return self._layout_test_results_reader.archive(patch)
 
     def build_style(self):
@@ -332,6 +332,12 @@ class CommitQueue(AbstractPatchQueue, StepSequenceErrorHandler, CommitQueueTaskD
     def report_flaky_tests(self, patch, flaky_test_results, results_archive=None):
         reporter = FlakyTestReporter(self._tool, self.name)
         reporter.report_flaky_tests(patch, flaky_test_results, results_archive)
+
+    def did_pass_testing_ews(self, patch):
+        # Currently, chromium-ews is the only testing EWS. Once there are more,
+        # should make sure they all pass.
+        status = self._tool.status_server.patch_status("chromium-ews", patch.id())
+        return status == self._pass_status
 
     # StepSequenceErrorHandler methods
 

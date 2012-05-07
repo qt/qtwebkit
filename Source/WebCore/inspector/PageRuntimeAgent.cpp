@@ -30,10 +30,11 @@
 
 #include "config.h"
 
-#include "PageRuntimeAgent.h"
-
 #if ENABLE(INSPECTOR)
 
+#include "PageRuntimeAgent.h"
+
+#include "Console.h"
 #include "InspectorPageAgent.h"
 #include "Page.h"
 #include "ScriptState.h"
@@ -51,17 +52,27 @@ PageRuntimeAgent::~PageRuntimeAgent()
 {
 }
 
-ScriptState* PageRuntimeAgent::scriptStateForFrameId(const String& frameId)
+ScriptState* PageRuntimeAgent::scriptStateForEval(ErrorString* errorString, const String* frameId)
 {
-    Frame* frame = m_pageAgent->frameForId(frameId);
-    if (!frame)
+    if (!frameId)
+        return mainWorldScriptState(m_inspectedPage->mainFrame());
+
+    Frame* frame = m_pageAgent->frameForId(*frameId);
+    if (!frame) {
+        *errorString = "Frame with given id not found.";
         return 0;
+    }
     return mainWorldScriptState(frame);
 }
 
-ScriptState* PageRuntimeAgent::getDefaultInspectedState()
+void PageRuntimeAgent::muteConsole()
 {
-    return mainWorldScriptState(m_inspectedPage->mainFrame());
+    Console::mute();
+}
+
+void PageRuntimeAgent::unmuteConsole()
+{
+    Console::unmute();
 }
 
 } // namespace WebCore

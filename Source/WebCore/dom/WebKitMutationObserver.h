@@ -79,12 +79,16 @@ public:
     ~WebKitMutationObserver();
 
     void observe(Node*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter, ExceptionCode&);
+    Vector<RefPtr<MutationRecord> > takeRecords();
     void disconnect();
     void observationStarted(MutationObserverRegistration*);
     void observationEnded(MutationObserverRegistration*);
     void enqueueMutationRecord(PassRefPtr<MutationRecord>);
+    void setHasTransientRegistration();
 
 private:
+    struct ObserverLessThan;
+
     WebKitMutationObserver(PassRefPtr<MutationCallback>);
     void deliver();
 
@@ -93,6 +97,7 @@ private:
     RefPtr<MutationCallback> m_callback;
     Vector<RefPtr<MutationRecord> > m_records;
     HashSet<MutationObserverRegistration*> m_registrations;
+    unsigned m_priority;
 };
 
 }

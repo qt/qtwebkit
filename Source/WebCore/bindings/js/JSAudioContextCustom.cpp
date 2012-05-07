@@ -51,7 +51,7 @@ void JSAudioContext::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
 EncodedJSValue JSC_HOST_CALL JSAudioContextConstructor::constructJSAudioContext(ExecState* exec)
 {
-    JSAudioContextConstructor* jsConstructor = static_cast<JSAudioContextConstructor*>(exec->callee());
+    JSAudioContextConstructor* jsConstructor = jsCast<JSAudioContextConstructor*>(exec->callee());
     if (!jsConstructor)
         return throwVMError(exec, createReferenceError(exec, "AudioContext constructor callee is unavailable"));
 
@@ -68,14 +68,19 @@ EncodedJSValue JSC_HOST_CALL JSAudioContextConstructor::constructJSAudioContext(
     
     if (!exec->argumentCount()) {
         // Constructor for default AudioContext which talks to audio hardware.
-        audioContext = AudioContext::create(document);
+        ExceptionCode ec = 0;
+        audioContext = AudioContext::create(document, ec);
+        if (ec) {
+            setDOMException(exec, ec);
+            return JSValue::encode(JSValue());
+        }
         if (!audioContext.get())
             return throwVMError(exec, createSyntaxError(exec, "audio resources unavailable for AudioContext construction"));
     } else {
         // Constructor for offline (render-target) AudioContext which renders into an AudioBuffer.
         // new AudioContext(in unsigned long numberOfChannels, in unsigned long numberOfFrames, in float sampleRate);
         if (exec->argumentCount() < 3)
-            return throwVMError(exec, createSyntaxError(exec, "Not enough arguments"));
+            return throwVMError(exec, createNotEnoughArgumentsError(exec));
 
         int32_t numberOfChannels = exec->argument(0).toInt32(exec);
         int32_t numberOfFrames = exec->argument(1).toInt32(exec);

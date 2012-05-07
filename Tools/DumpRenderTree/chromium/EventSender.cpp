@@ -279,8 +279,11 @@ EventSender::EventSender(TestShell* shell)
     bindMethod("touchMove", &EventSender::touchMove);
     bindMethod("touchStart", &EventSender::touchStart);
     bindMethod("updateTouchPoint", &EventSender::updateTouchPoint);
+    bindMethod("gestureFlingCancel", &EventSender::gestureFlingCancel);
+    bindMethod("gestureFlingStart", &EventSender::gestureFlingStart);
     bindMethod("gestureScrollBegin", &EventSender::gestureScrollBegin);
     bindMethod("gestureScrollEnd", &EventSender::gestureScrollEnd);
+    bindMethod("gestureScrollFirstPoint", &EventSender::gestureScrollFirstPoint);
     bindMethod("gestureScrollUpdate", &EventSender::gestureScrollUpdate);
     bindMethod("gestureTap", &EventSender::gestureTap);
     bindMethod("zoomPageIn", &EventSender::zoomPageIn);
@@ -877,12 +880,15 @@ void EventSender::beginDragWithFiles(const CppArgumentList& arguments, CppVarian
 {
     currentDragData.initialize();
     Vector<string> files = arguments[0].toStringVector();
+    Vector<WebString> absoluteFilenames;
     for (size_t i = 0; i < files.size(); ++i) {
         WebDragData::Item item;
         item.storageType = WebDragData::Item::StorageTypeFilename;
         item.filenameData = webkit_support::GetAbsoluteWebStringFromUTF8Path(files[i]);
         currentDragData.addItem(item);
+        absoluteFilenames.append(item.filenameData);
     }
+    currentDragData.setFilesystemId(webkit_support::RegisterIsolatedFileSystem(absoluteFilenames));
     currentDragEffectsAllowed = WebKit::WebDragOperationCopy;
 
     // Provide a drag source.
@@ -1086,6 +1092,16 @@ void EventSender::gestureTap(const CppArgumentList& arguments, CppVariant* resul
     gestureEvent(WebInputEvent::GestureTap, arguments);
 }
 
+void EventSender::gestureScrollFirstPoint(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (arguments.size() < 2 || !arguments[0].isNumber() || !arguments[1].isNumber())
+        return;
+
+    WebPoint point(arguments[0].toInt32(), arguments[1].toInt32());
+    m_currentGestureLocation = point;
+}
+
 void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& arguments)
 {
     if (arguments.size() < 2 || !arguments[0].isNumber() || !arguments[1].isNumber())
@@ -1118,6 +1134,10 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
         event.y = m_currentGestureLocation.y;
         break;
     case WebInputEvent::GestureTap:
+        if (arguments.size() >= 4) {
+            event.deltaX = static_cast<float>(arguments[2].toDouble());
+            event.deltaY = static_cast<float>(arguments[3].toDouble());
+        }
         event.x = point.x;
         event.y = point.y;
         break;
@@ -1127,6 +1147,42 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
 
     event.globalX = event.x;
     event.globalY = event.y;
+    event.timeStampSeconds = getCurrentEventTimeSec();
+    webview()->handleInputEvent(event);
+}
+
+void EventSender::gestureFlingCancel(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (!arguments.size())
+        return;
+
+    WebGestureEvent event;
+    event.type = WebInputEvent::GestureFlingCancel;
+    event.timeStampSeconds = getCurrentEventTimeSec();
+    webview()->handleInputEvent(event);
+}
+
+void EventSender::gestureFlingStart(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (arguments.size() < 4)
+        return;
+
+    for (int i = 0; i < 4; i++)
+        if (!arguments[i].isNumber())
+            return;
+
+    WebGestureEvent event;
+    event.type = WebInputEvent::GestureFlingStart;
+
+    event.x = static_cast<float>(arguments[0].toDouble());
+    event.y = static_cast<float>(arguments[1].toDouble());
+    event.globalX = event.x;
+    event.globalY = event.y;
+
+    event.deltaX = static_cast<float>(arguments[2].toDouble());
+    event.deltaY = static_cast<float>(arguments[3].toDouble());
     event.timeStampSeconds = getCurrentEventTimeSec();
     webview()->handleInputEvent(event);
 }

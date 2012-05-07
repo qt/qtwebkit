@@ -42,7 +42,7 @@ class DOMTokenList;
 class ElementRareData;
 class IntSize;
 class ShadowRoot;
-class ShadowTree;
+class ElementShadow;
 class WebKitAnimationList;
 
 enum SpellcheckAttributeState {
@@ -113,8 +113,9 @@ public:
 
     bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
-    void setAttribute(const QualifiedName&, const AtomicString& value, bool notifyChanged = true);
+    void setAttribute(const QualifiedName&, const AtomicString& value, EInUpdateStyleAttribute = NotInUpdateStyleAttribute);
     void removeAttribute(const QualifiedName&);
+    void removeAttribute(size_t index);
 
     // Typed getters and setters for language bindings.
     int getIntegralAttribute(const QualifiedName& attributeName) const;
@@ -163,6 +164,8 @@ public:
     size_t attributeCount() const;
     Attribute* attributeItem(unsigned index) const;
     Attribute* getAttributeItem(const QualifiedName&) const;
+    size_t getAttributeItemIndex(const QualifiedName& name) const { return attributeData()->getAttributeItemIndex(name); }
+    size_t getAttributeItemIndex(const String& name, bool shouldIgnoreAttributeCase) const { return attributeData()->getAttributeItemIndex(name, shouldIgnoreAttributeCase); }
 
     void scrollIntoView(bool alignToTop = true);
     void scrollIntoViewIfNeeded(bool centerIfNeeded = true);
@@ -186,7 +189,7 @@ public:
     virtual int scrollWidth();
     virtual int scrollHeight();
 
-    LayoutRect boundsInRootViewSpace();
+    IntRect boundsInRootViewSpace();
 
     PassRefPtr<ClientRectList> getClientRects();
     PassRefPtr<ClientRect> getBoundingClientRect();
@@ -197,11 +200,16 @@ public:
     void removeAttribute(const String& name);
     void removeAttributeNS(const String& namespaceURI, const String& localName);
 
+    PassRefPtr<Attr> detachAttribute(size_t index);
+
     PassRefPtr<Attr> getAttributeNode(const String& name);
     PassRefPtr<Attr> getAttributeNodeNS(const String& namespaceURI, const String& localName);
     PassRefPtr<Attr> setAttributeNode(Attr*, ExceptionCode&);
     PassRefPtr<Attr> setAttributeNodeNS(Attr*, ExceptionCode&);
     PassRefPtr<Attr> removeAttributeNode(Attr*, ExceptionCode&);
+
+    PassRefPtr<Attr> attrIfExists(const QualifiedName&);
+    PassRefPtr<Attr> ensureAttr(const QualifiedName&);
     
     virtual CSSStyleDeclaration* style();
 
@@ -236,7 +244,7 @@ public:
     virtual void attributeChanged(Attribute*);
 
     // Only called by the parser immediately after element construction.
-    void parserSetAttributes(PassOwnPtr<AttributeVector>, FragmentScriptingPermission);
+    void parserSetAttributes(const Vector<Attribute>&, FragmentScriptingPermission);
 
     ElementAttributeData* attributeData() const { return m_attributeData.get(); }
     ElementAttributeData* ensureAttributeData() const;
@@ -254,8 +262,8 @@ public:
     void recalcStyle(StyleChange = NoChange);
 
     bool hasShadowRoot() const;
-    ShadowTree* shadowTree() const;
-    ShadowTree* ensureShadowTree();
+    ElementShadow* shadow() const;
+    ElementShadow* ensureShadow();
 
     // FIXME: Remove Element::ensureShadowRoot
     // https://bugs.webkit.org/show_bug.cgi?id=77608
@@ -295,8 +303,9 @@ public:
 
     void willModifyAttribute(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue);
     void willRemoveAttribute(const QualifiedName&, const AtomicString& value);
+    void didAddAttribute(Attribute*);
     void didModifyAttribute(Attribute*);
-    void didRemoveAttribute(Attribute*);
+    void didRemoveAttribute(const QualifiedName&);
 
     LayoutSize minimumSizeForResizing() const;
     void setMinimumSizeForResizing(const LayoutSize&);
@@ -360,6 +369,7 @@ public:
     virtual bool isInRange() const { return false; }
     virtual bool isOutOfRange() const { return false; }
     virtual bool isFrameElementBase() const { return false; }
+    virtual bool isTextFieldDecoration() const { return false; }
 
     virtual bool canContainRangeEndPoint() const { return true; }
 
@@ -376,13 +386,17 @@ public:
     
 #if ENABLE(FULLSCREEN_API)
     enum {
-        ALLOW_KEYBOARD_INPUT = 1
+        ALLOW_KEYBOARD_INPUT = 1 << 0,
+        LEGACY_MOZILLA_REQUEST = 1 << 1,
     };
     
     void webkitRequestFullScreen(unsigned short flags);
     virtual bool containsFullScreenElement() const;
     virtual void setContainsFullScreenElement(bool);
     virtual void setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(bool);
+
+    // W3C API
+    void webkitRequestFullscreen();
 #endif
 
     virtual bool isSpellCheckingEnabled() const;
@@ -396,6 +410,9 @@ public:
     bool hasID() const;
     bool hasClass() const;
 
+    IntSize savedLayerScrollOffset() const;
+    void setSavedLayerScrollOffset(const IntSize&);
+
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -404,10 +421,8 @@ protected:
     }
 
     virtual void willRemove();
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
-    virtual void insertedIntoTree(bool);
-    virtual void removedFromTree(bool);
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     virtual bool willRecalcStyle(StyleChange) { return true; }
     virtual void didRecalcStyle(StyleChange) { }
@@ -429,7 +444,7 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
 
-    void setAttributeInternal(size_t index, const QualifiedName&, const AtomicString& value, bool notifyChanged = true);
+    void setAttributeInternal(size_t index, const QualifiedName&, const AtomicString& value, EInUpdateStyleAttribute);
 
 #ifndef NDEBUG
     virtual void formatForDebugger(char* buffer, unsigned length) const;
@@ -467,6 +482,8 @@ private:
 
     void updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
     void updateExtraNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
+
+    void unregisterNamedFlowContentNode();
 
 private:
     mutable OwnPtr<ElementAttributeData> m_attributeData;

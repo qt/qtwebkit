@@ -54,6 +54,14 @@ public:
     void setContainerSize(const IntSize& containerSize) { m_containerSize = containerSize; }
 
     virtual bool hasRelativeDimensions() const;
+    virtual bool hasRelativeLogicalHeight() const;
+
+    // localToBorderBoxTransform maps local SVG viewport coordinates to local CSS box coordinates.  
+    const AffineTransform& localToBorderBoxTransform() const { return m_localToBorderBoxTransform; }
+
+    // The flag is cleared at the beginning of each layout() pass. Elements then call this
+    // method during layout when they are invalidated by a filter.
+    static void addResourceForClientInvalidation(RenderSVGResourceContainer*);
 
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
@@ -86,7 +94,7 @@ private:
     virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
     virtual void computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const;
 
-    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, ApplyContainerFlipOrNot = ApplyContainerFlip, bool* wasFixed = 0) const;
     virtual bool canBeSelectionLeaf() const { return false; }
     virtual bool canHaveChildren() const { return true; }
 
@@ -96,10 +104,12 @@ private:
     RenderObjectChildList m_children;
     IntSize m_containerSize;
     FloatRect m_objectBoundingBox;
+    bool m_objectBoundingBoxValid;
     FloatRect m_strokeBoundingBox;
     FloatRect m_repaintBoundingBox;
     mutable AffineTransform m_localToParentTransform;
     AffineTransform m_localToBorderBoxTransform;
+    HashSet<RenderSVGResourceContainer*> m_resourcesNeedingToInvalidateClients;
     bool m_isLayoutSizeChanged : 1;
     bool m_needsBoundariesOrTransformUpdate : 1;
 };

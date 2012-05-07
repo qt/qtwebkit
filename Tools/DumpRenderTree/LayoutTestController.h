@@ -69,7 +69,6 @@ public:
     bool isCommandEnabled(JSStringRef name);
     void keepWebHistory();
     JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
-    JSValueRef nodesFromRect(JSContextRef, JSValueRef, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping);
     void notifyDone();
     int numberOfPages(float pageWidthInPixels, float pageHeightInPixels);
     int numberOfPendingGeolocationPermissionRequests();
@@ -77,7 +76,6 @@ public:
     int pageNumberForElementById(JSStringRef id, float pageWidthInPixels, float pageHeightInPixels);
     JSRetainPtr<JSStringRef> pageProperty(const char* propertyName, int pageNumber) const;
     JSRetainPtr<JSStringRef> pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const;
-    bool isPageBoxVisible(int pageNumber) const;
     JSStringRef pathToLocalResource(JSContextRef, JSStringRef url);
     void queueBackNavigation(int howFarBackward);
     void queueForwardNavigation(int howFarForward);
@@ -127,9 +125,8 @@ public:
     void setScrollbarPolicy(JSStringRef orientation, JSStringRef policy);
     void setEditingBehavior(const char* editingBehavior);
     void startSpeechInput(JSContextRef inputElement);
-
-    void setPageVisibility(const char* visibility) { }
-    void resetPageVisibility() { }
+    void setPageVisibility(const char*);
+    void resetPageVisibility();
 
     void waitForPolicyDelegate();
     size_t webHistoryItemCount();
@@ -312,6 +309,7 @@ public:
     void closeWebInspector();
     void evaluateInWebInspector(long callId, JSStringRef script);
     void evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
+    void evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
     void allowRoundingHacks();
 
     bool shouldStayOnPageAfterHandlingBeforeUnload() const { return m_shouldStayOnPageAfterHandlingBeforeUnload; }
@@ -328,9 +326,6 @@ public:
     void setWebViewEditable(bool);
 
     void abortModal();
-
-    bool hasSpellingMarker(int from, int length);
-    bool hasGrammarMarker(int from, int length);
 
     void dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight);
 
@@ -364,6 +359,10 @@ public:
     void setMinimumTimerInterval(double);
 
     void setTextDirection(JSStringRef);
+
+    // Custom full screen behavior.
+    void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
+    bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
 
 private:
     LayoutTestController(const std::string& testPathOrURL, const std::string& expectedPixelHash);
@@ -417,6 +416,7 @@ private:
     bool m_shouldPaintBrokenImage;
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
     bool m_areDesktopNotificationPermissionRequestsIgnored;
+    bool m_customFullScreenBehavior;
 
     std::string m_authenticationUsername;
     std::string m_authenticationPassword; 

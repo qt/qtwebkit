@@ -152,10 +152,17 @@ void HTMLBodyElement::parseAttribute(Attribute* attr)
         HTMLElement::parseAttribute(attr);
 }
 
-void HTMLBodyElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLBodyElement::insertedInto(Node* insertionPoint)
 {
-    HTMLElement::insertedIntoDocument();
+    HTMLElement::insertedInto(insertionPoint);
+    if (insertionPoint->inDocument())
+        return InsertionShouldCallDidNotifyDescendantInseretions;
+    return InsertionDone;
+}
 
+void HTMLBodyElement::didNotifyDescendantInseretions(Node* insertionPoint)
+{
+    ASSERT_UNUSED(insertionPoint, insertionPoint->inDocument());
     ASSERT(document());
 
     // FIXME: Perhaps this code should be in attach() instead of here.
@@ -174,8 +181,6 @@ void HTMLBodyElement::insertedIntoDocument()
     // But without it we hang during WebKit tests; need to fix that and remove this.
     if (FrameView* view = document()->view())
         view->scheduleRelayout();
-
-    document()->updateViewportArguments();
 }
 
 bool HTMLBodyElement::isURLAttribute(Attribute *attr) const

@@ -139,7 +139,6 @@ static const TypeExtensionPair commonMediaTypes[] = {
     { "audio/x-wav", "wav" }
 };
 
-#if ENABLE(FILE_SYSTEM)
 static const char textPlain[] = "text/plain";
 static const char textHtml[] = "text/html";
 static const char imageJpeg[] = "image/jpeg";
@@ -181,7 +180,6 @@ static const TypeExtensionPair wellKnownMimeTypes[] = {
     { "application/rdf+xml", "rdf" },
     { "application/x-shockwave-flash", "swf" },
 };
-#endif
 
 static HashSet<String>* supportedImageResourceMIMETypes;
 static HashSet<String>* supportedImageMIMETypes;
@@ -261,10 +259,6 @@ static void initializeSupportedImageMIMETypes()
         supportedImageMIMETypes->add(types[i]);
         supportedImageResourceMIMETypes->add(types[i]);
     }
-#if PLATFORM(BLACKBERRY)
-    supportedImageMIMETypes->add("image/pjpeg");
-    supportedImageResourceMIMETypes->add("image/pjpeg");
-#endif
 #endif
 }
 
@@ -296,7 +290,7 @@ static void initializeSupportedImageMIMETypesForEncoding()
         if (!mimeType.isEmpty())
             supportedImageMIMETypesForEncoding->add(mimeType);
     }
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(QT) && !USE(QT_IMAGE_DECODER))
     supportedImageMIMETypesForEncoding->add("image/png");
     supportedImageMIMETypesForEncoding->add("image/jpeg");
     supportedImageMIMETypesForEncoding->add("image/tiff");
@@ -304,6 +298,9 @@ static void initializeSupportedImageMIMETypesForEncoding()
     supportedImageMIMETypesForEncoding->add("image/ico");
 #elif USE(CAIRO)
     supportedImageMIMETypesForEncoding->add("image/png");
+#elif PLATFORM(BLACKBERRY)
+    supportedImageMIMETypesForEncoding->add("image/png");
+    supportedImageMIMETypesForEncoding->add("image/jpeg");
 #endif
 }
 
@@ -474,7 +471,6 @@ static void initializeMIMETypeRegistry()
     initializeUnsupportedTextMIMETypes();
 }
 
-#if ENABLE(FILE_SYSTEM)
 static String findMimeType(const TypeExtensionPair* pairs, unsigned numPairs, const String& extension)
 {
     if (!extension.isEmpty()) {
@@ -494,7 +490,6 @@ String MIMETypeRegistry::getWellKnownMIMETypeForExtension(const String& extensio
         return found;
     return findMimeType(commonMediaTypes, sizeof(commonMediaTypes) / sizeof(commonMediaTypes[0]), extension);
 }
-#endif
 
 String MIMETypeRegistry::getMIMETypeForPath(const String& path)
 {
@@ -514,7 +509,7 @@ bool MIMETypeRegistry::isSupportedImageMIMEType(const String& mimeType)
         return false;
     if (!supportedImageMIMETypes)
         initializeMIMETypeRegistry();
-    return supportedImageMIMETypes->contains(mimeType);
+    return supportedImageMIMETypes->contains(getNormalizedMIMEType(mimeType));
 }
 
 bool MIMETypeRegistry::isSupportedImageResourceMIMEType(const String& mimeType)
@@ -523,7 +518,7 @@ bool MIMETypeRegistry::isSupportedImageResourceMIMEType(const String& mimeType)
         return false;
     if (!supportedImageResourceMIMETypes)
         initializeMIMETypeRegistry();
-    return supportedImageResourceMIMETypes->contains(mimeType);
+    return supportedImageResourceMIMETypes->contains(getNormalizedMIMEType(mimeType));
 }
 
 bool MIMETypeRegistry::isSupportedImageMIMETypeForEncoding(const String& mimeType)
@@ -631,5 +626,76 @@ const String& defaultMIMEType()
     DEFINE_STATIC_LOCAL(const String, defaultMIMEType, ("application/octet-stream"));
     return defaultMIMEType;
 }
+
+#if PLATFORM(BLACKBERRY)
+typedef HashMap<String, String> MIMETypeAssociationMap;
+
+static const MIMETypeAssociationMap& mimeTypeAssociationMap()
+{
+    static MIMETypeAssociationMap* mimeTypeMap = 0;
+    if (mimeTypeMap)
+        return *mimeTypeMap;
+
+    mimeTypeMap = new MIMETypeAssociationMap;
+    mimeTypeMap->add("image/x-ms-bmp", "image/bmp");
+    mimeTypeMap->add("image/x-windows-bmp", "image/bmp");
+    mimeTypeMap->add("image/x-bmp", "image/bmp");
+    mimeTypeMap->add("image/x-bitmap", "image/bmp");
+    mimeTypeMap->add("image/x-ms-bitmap", "image/bmp");
+    mimeTypeMap->add("image/jpg", "image/jpeg");
+    mimeTypeMap->add("image/pjpeg", "image/jpeg");
+    mimeTypeMap->add("image/x-png", "image/png");
+    mimeTypeMap->add("image/vnd.rim.png", "image/png");
+    mimeTypeMap->add("image/ico", "image/vnd.microsoft.icon");
+    mimeTypeMap->add("image/icon", "image/vnd.microsoft.icon");
+    mimeTypeMap->add("text/ico", "image/vnd.microsoft.icon");
+    mimeTypeMap->add("application/ico", "image/vnd.microsoft.icon");
+    mimeTypeMap->add("image/x-icon", "image/vnd.microsoft.icon");
+    mimeTypeMap->add("audio/vnd.qcelp", "audio/qcelp");
+    mimeTypeMap->add("audio/qcp", "audio/qcelp");
+    mimeTypeMap->add("audio/vnd.qcp", "audio/qcelp");
+    mimeTypeMap->add("audio/wav", "audio/x-wav");
+    mimeTypeMap->add("audio/mid", "audio/midi");
+    mimeTypeMap->add("audio/sp-midi", "audio/midi");
+    mimeTypeMap->add("audio/x-mid", "audio/midi");
+    mimeTypeMap->add("audio/x-midi", "audio/midi");
+    mimeTypeMap->add("audio/x-mpeg", "audio/mpeg");
+    mimeTypeMap->add("audio/mp3", "audio/mpeg");
+    mimeTypeMap->add("audio/x-mp3", "audio/mpeg");
+    mimeTypeMap->add("audio/mpeg3", "audio/mpeg");
+    mimeTypeMap->add("audio/x-mpeg3", "audio/mpeg");
+    mimeTypeMap->add("audio/mpg3", "audio/mpeg");
+    mimeTypeMap->add("audio/mpg", "audio/mpeg");
+    mimeTypeMap->add("audio/x-mpg", "audio/mpeg");
+    mimeTypeMap->add("audio/m4a", "audio/mp4");
+    mimeTypeMap->add("audio/x-m4a", "audio/mp4");
+    mimeTypeMap->add("audio/x-mp4", "audio/mp4");
+    mimeTypeMap->add("audio/x-aac", "audio/aac");
+    mimeTypeMap->add("audio/x-amr", "audio/amr");
+    mimeTypeMap->add("audio/mpegurl", "audio/x-mpegurl");
+    mimeTypeMap->add("audio/flac", "audio/x-flac");
+    mimeTypeMap->add("video/3gp", "video/3gpp");
+    mimeTypeMap->add("video/avi", "video/x-msvideo");
+    mimeTypeMap->add("video/x-m4v", "video/mp4");
+    mimeTypeMap->add("video/x-quicktime", "video/quicktime");
+    mimeTypeMap->add("application/java", "application/java-archive");
+    mimeTypeMap->add("application/x-java-archive", "application/java-archive");
+    mimeTypeMap->add("application/x-zip-compressed", "application/zip");
+
+    return *mimeTypeMap;
+}
+#endif
+
+String MIMETypeRegistry::getNormalizedMIMEType(const String& mimeType)
+{
+#if PLATFORM(BLACKBERRY)
+    MIMETypeAssociationMap::const_iterator it = mimeTypeAssociationMap().find(mimeType);
+
+    if (it != mimeTypeAssociationMap().end())
+        return it->second;
+#endif
+    return mimeType;
+}
+
 
 } // namespace WebCore

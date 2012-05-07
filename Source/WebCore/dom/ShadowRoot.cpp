@@ -27,22 +27,20 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
-#include "CSSStyleSelector.h"
+#include "DOMSelection.h"
+#include "DOMWindow.h"
 #include "Document.h"
 #include "DocumentFragment.h"
 #include "Element.h"
+#include "ElementShadow.h"
 #include "HTMLContentElement.h"
 #include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "InsertionPoint.h"
 #include "NodeRareData.h"
-#include "ShadowTree.h"
 #include "SVGNames.h"
+#include "StyleResolver.h"
 #include "markup.h"
-
-#if ENABLE(SHADOW_DOM)
-#include "RuntimeEnabledFeatures.h"
-#endif
 
 namespace WebCore {
 
@@ -105,13 +103,7 @@ PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ExceptionCode& ec)
 
 PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPurpose purpose, ExceptionCode& ec)
 {
-#if ENABLE(SHADOW_DOM)
-    bool isMultipleShadowSubtreesEnabled = RuntimeEnabledFeatures::multipleShadowSubtreesEnabled();
-#else
-    bool isMultipleShadowSubtreesEnabled = false;
-#endif
-
-    if (!element || (!isMultipleShadowSubtreesEnabled && element->hasShadowRoot())) {
+    if (!element) {
         ec = HIERARCHY_REQUEST_ERR;
         return 0;
     }
@@ -123,11 +115,10 @@ PassRefPtr<ShadowRoot> ShadowRoot::create(Element* element, ShadowRootCreationPu
         return 0;
     }
 
-    ASSERT(purpose != CreatingUserAgentShadowRoot || !element->hasShadowRoot());
     RefPtr<ShadowRoot> shadowRoot = adoptRef(new ShadowRoot(element->document()));
 
     ec = 0;
-    element->ensureShadowTree()->addShadowRoot(element, shadowRoot, ec);
+    element->ensureShadow()->addShadowRoot(element, shadowRoot, ec);
     if (ec)
         return 0;
     ASSERT(element == shadowRoot->host());
@@ -158,6 +149,13 @@ void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
         replaceChildrenWithFragment(this, fragment.release(), ec);
 }
 
+DOMSelection* ShadowRoot::selection()
+{
+    if (document() && document()->domWindow())
+        return document()->domWindow()->getSelection();
+    return 0;
+}
+
 bool ShadowRoot::childTypeAllowed(NodeType type) const
 {
     switch (type) {
@@ -173,10 +171,10 @@ bool ShadowRoot::childTypeAllowed(NodeType type) const
     }
 }
 
-ShadowTree* ShadowRoot::tree() const
+ElementShadow* ShadowRoot::owner() const
 {
     if (host())
-        return host()->shadowTree();
+        return host()->shadow();
     return 0;
 }
 
@@ -202,10 +200,10 @@ void ShadowRoot::setApplyAuthorSheets(bool value)
 
 void ShadowRoot::attach()
 {
-    CSSStyleSelector* styleSelector = document()->styleSelector();
-    styleSelector->pushParentShadowRoot(this);
+    StyleResolver* styleResolver = document()->styleResolver();
+    styleResolver->pushParentShadowRoot(this);
     DocumentFragment::attach();
-    styleSelector->popParentShadowRoot(this);
+    styleResolver->popParentShadowRoot(this);
 }
 
 }

@@ -174,13 +174,13 @@ public:
     {
     }
 
-    virtual void onGpuMemoryAllocationChanged(size_t gpuResourceSizeInBytes)
+    virtual void onGpuMemoryAllocationChanged(Extensions3DChromium::GpuMemoryAllocationCHROMIUM allocation)
     {
         GrContext* context = m_context->grContext();
         if (!context)
             return;
 
-        if (!gpuResourceSizeInBytes) {
+        if (!allocation.gpuResourceSizeInBytes) {
             context->freeGpuResources();
             context->setTextureCacheLimits(0, 0);
         } else
@@ -318,7 +318,7 @@ PassRefPtr<ImageData> GraphicsContext3DPrivate::paintRenderingResultsToImageData
     getDrawingParameters(drawingBuffer, m_impl.get(), &framebufferId, &width, &height);
 
     RefPtr<ImageData> imageData = ImageData::create(IntSize(width, height));
-    unsigned char* pixels = imageData->data()->data()->data();
+    unsigned char* pixels = imageData->data()->data();
     size_t bufferSize = 4 * width * height;
 
     m_impl->readBackFramebuffer(pixels, bufferSize, framebufferId, width, height);
@@ -612,6 +612,8 @@ String GraphicsContext3DPrivate::getShaderInfoLog(Platform3DObject shader)
     return m_impl->getShaderInfoLog(shader);
 }
 
+DELEGATE_TO_IMPL_4(getShaderPrecisionFormat, GC3Denum, GC3Denum, GC3Dint*, GC3Dint*)
+
 String GraphicsContext3DPrivate::getShaderSource(Platform3DObject shader)
 {
     return m_impl->getShaderSource(shader);
@@ -879,6 +881,9 @@ DELEGATE_TO_IMPL_1(unmapTexSubImage2DCHROMIUM, const void*)
 
 DELEGATE_TO_IMPL_1(setVisibilityCHROMIUM, bool);
 
+DELEGATE_TO_IMPL_3(discardFramebufferEXT, GC3Denum, GC3Dsizei, const GC3Denum*);
+DELEGATE_TO_IMPL(ensureFramebufferCHROMIUM);
+
 DELEGATE_TO_IMPL_10(blitFramebufferCHROMIUM, GC3Dint, GC3Dint, GC3Dint, GC3Dint, GC3Dint, GC3Dint, GC3Dint, GC3Dint, GC3Dbitfield, GC3Denum)
 DELEGATE_TO_IMPL_5(renderbufferStorageMultisampleCHROMIUM, GC3Denum, GC3Dsizei, GC3Denum, GC3Dsizei, GC3Dsizei)
 
@@ -888,6 +893,14 @@ DELEGATE_TO_IMPL_R(getGraphicsResetStatusARB, GC3Denum)
 DELEGATE_TO_IMPL_1R(getTranslatedShaderSourceANGLE, Platform3DObject, String)
 DELEGATE_TO_IMPL_5(texImageIOSurface2DCHROMIUM, GC3Denum, GC3Dint, GC3Dint, GC3Duint, GC3Duint)
 DELEGATE_TO_IMPL_5(texStorage2DEXT, GC3Denum, GC3Dint, GC3Duint, GC3Dint, GC3Dint)
+
+DELEGATE_TO_IMPL_R(createQueryEXT, Platform3DObject)
+DELEGATE_TO_IMPL_1(deleteQueryEXT, Platform3DObject)
+DELEGATE_TO_IMPL_1R(isQueryEXT, Platform3DObject, GC3Dboolean)
+DELEGATE_TO_IMPL_2(beginQueryEXT, GC3Denum, Platform3DObject)
+DELEGATE_TO_IMPL_1(endQueryEXT, GC3Denum)
+DELEGATE_TO_IMPL_3(getQueryivEXT, GC3Denum, GC3Denum, GC3Dint*)
+DELEGATE_TO_IMPL_3(getQueryObjectuivEXT, Platform3DObject, GC3Denum, GC3Duint*)
 
 //----------------------------------------------------------------------
 // GraphicsContext3D
@@ -1026,7 +1039,6 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
     webAttributes.stencil = attrs.stencil;
     webAttributes.antialias = attrs.antialias;
     webAttributes.premultipliedAlpha = attrs.premultipliedAlpha;
-    webAttributes.canRecoverFromContextLoss = attrs.canRecoverFromContextLoss;
     webAttributes.noExtensions = attrs.noExtensions;
     webAttributes.shareResources = attrs.shareResources;
     webAttributes.preferDiscreteGPU = attrs.preferDiscreteGPU;
@@ -1145,6 +1157,7 @@ DELEGATE_TO_INTERNAL_1R(getProgramInfoLog, Platform3DObject, String)
 DELEGATE_TO_INTERNAL_3(getRenderbufferParameteriv, GC3Denum, GC3Denum, GC3Dint*)
 DELEGATE_TO_INTERNAL_3(getShaderiv, Platform3DObject, GC3Denum, GC3Dint*)
 DELEGATE_TO_INTERNAL_1R(getShaderInfoLog, Platform3DObject, String)
+DELEGATE_TO_INTERNAL_4(getShaderPrecisionFormat, GC3Denum, GC3Denum, GC3Dint*, GC3Dint*)
 DELEGATE_TO_INTERNAL_1R(getShaderSource, Platform3DObject, String)
 DELEGATE_TO_INTERNAL_1R(getString, GC3Denum, String)
 DELEGATE_TO_INTERNAL_3(getTexParameterfv, GC3Denum, GC3Denum, GC3Dfloat*)
@@ -1361,8 +1374,14 @@ public:
 
     virtual void onMemoryAllocationChanged(size_t gpuResourceSizeInBytes)
     {
+        // FIXME: Remove this once clients start using WebGraphicsMemoryAllocation exclusively.
+        onMemoryAllocationChanged(WebKit::WebGraphicsMemoryAllocation(gpuResourceSizeInBytes, true));
+    }
+
+    virtual void onMemoryAllocationChanged(WebKit::WebGraphicsMemoryAllocation allocation)
+    {
         if (m_memoryAllocationChangedCallback)
-            m_memoryAllocationChangedCallback->onGpuMemoryAllocationChanged(gpuResourceSizeInBytes);
+            m_memoryAllocationChangedCallback->onGpuMemoryAllocationChanged(Extensions3DChromium::GpuMemoryAllocationCHROMIUM(allocation.gpuResourceSizeInBytes, allocation.suggestHaveBackbuffer));
     }
 
 private:

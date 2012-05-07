@@ -16,7 +16,9 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/blackberry/skia"
     "${WEBCORE_DIR}/platform/graphics/skia"
     "${WEBCORE_DIR}/platform/network/blackberry"
-    "${WEBCORE_DIR}/websockets"
+    "${WEBCORE_DIR}/Modules/websockets"
+    "${WEBCORE_DIR}/Modules/geolocation"
+    "${WEBCORE_DIR}/Modules/vibration"
     "${WEBKIT_DIR}/blackberry/Api"
     "${WEBKIT_DIR}/blackberry/WebCoreSupport"
     "${WEBKIT_DIR}/blackberry/WebKitSupport"
@@ -35,6 +37,11 @@ IF (ENABLE_DRT)
     )
 ENDIF ()
 
+IF (ENABLE_BATTERY_STATUS)
+    LIST(APPEND WebKit_INCLUDE_DIRECTORIES ${WEBCORE_DIR}/Modules/battery)
+    LIST(APPEND WebKit_SOURCES blackberry/WebCoreSupport/BatteryClientBlackBerry.cpp)
+ENDIF ()
+
 ADD_DEFINITIONS(-DUSER_PROCESSES)
 
 LIST(APPEND WebKit_SOURCES
@@ -44,8 +51,10 @@ LIST(APPEND WebKit_SOURCES
     blackberry/Api/WebKitMIMETypeConverter.cpp
     blackberry/Api/WebKitTextCodec.cpp
     blackberry/Api/WebPage.cpp
+    blackberry/Api/WebPageCompositor.cpp
     blackberry/Api/WebPageGroupLoadDeferrer.cpp
     blackberry/Api/WebSettings.cpp
+    blackberry/Api/WebViewportArguments.cpp
     blackberry/WebCoreSupport/AboutData.cpp
     blackberry/WebCoreSupport/CacheClientBlackBerry.cpp
     blackberry/WebCoreSupport/ChromeClientBlackBerry.cpp
@@ -64,6 +73,7 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebCoreSupport/InspectorClientBlackBerry.cpp
     blackberry/WebCoreSupport/JavaScriptDebuggerBlackBerry.cpp
     blackberry/WebCoreSupport/NotificationPresenterImpl.cpp
+    blackberry/WebCoreSupport/VibrationClientBlackBerry.cpp
     blackberry/WebKitSupport/BackingStoreCompositingSurface.cpp
     blackberry/WebKitSupport/BackingStoreTile.cpp
     blackberry/WebKitSupport/BackingStoreClient.cpp
@@ -71,13 +81,11 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebKitSupport/FrameLayers.cpp
     blackberry/WebKitSupport/InPageSearchManager.cpp
     blackberry/WebKitSupport/InputHandler.cpp
-    blackberry/WebKitSupport/OutOfMemoryHandler.cpp
     blackberry/WebKitSupport/RenderQueue.cpp
     blackberry/WebKitSupport/SelectionHandler.cpp
     blackberry/WebKitSupport/SurfacePool.cpp
     blackberry/WebKitSupport/TouchEventHandler.cpp
     blackberry/WebKitSupport/FatFingers.cpp
-    blackberry/WebKitSupport/WebPageCompositor.cpp
 )
 
 IF (ENABLE_DRT)
@@ -125,6 +133,7 @@ LIST(APPEND WebKit_LIBRARIES
     ${MMR_LIBRARY}
     ${M_LIBRARY}
     ${NBUTIL_LIBRARY}
+    ${OTS_LIBRARY}
     ${PNG_LIBRARY}
     ${PPSCache_LIBRARY}
     ${SQLITE3_LIBRARY}
@@ -149,7 +158,7 @@ ENDIF ()
 
 IF (WTF_USE_ACCELERATED_COMPOSITING)
     LIST(APPEND WebKit_SOURCES
-        blackberry/WebCoreSupport/GLES2Context.cpp
+        blackberry/WebKitSupport/GLES2Context.cpp
     )
     LIST(APPEND WebKit_INCLUDE_DIRECTORIES
         "${WEBCORE_DIR}/platform/graphics/gles2"

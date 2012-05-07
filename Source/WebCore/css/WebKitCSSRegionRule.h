@@ -30,36 +30,38 @@
 #ifndef WebKitCSSRegionRule_h
 #define WebKitCSSRegionRule_h
 
-#include "CSSSelectorList.h"
-#include "CSSStyleRule.h"
-
+#include "CSSRule.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-class CSSParserSelector;
 class CSSRuleList;
+class StyleRuleRegion;
 
-class WebKitCSSRegionRule: public CSSRule {
+class WebKitCSSRegionRule : public CSSRule {
 public:
-    static PassRefPtr<WebKitCSSRegionRule> create(CSSStyleSheet* parent, Vector<OwnPtr<CSSParserSelector> >* selectors, PassRefPtr<CSSRuleList> rules)
-    {
-        return adoptRef(new WebKitCSSRegionRule(parent, selectors, rules));
-    }
+    static PassRefPtr<WebKitCSSRegionRule> create(StyleRuleRegion* rule, CSSStyleSheet* sheet) { return adoptRef(new WebKitCSSRegionRule(rule, sheet)); }
 
     ~WebKitCSSRegionRule();
 
     String cssText() const;
-    const CSSSelectorList& selectorList() const { return m_selectorList; }
-    CSSRuleList* cssRules() const { return m_ruleList.get(); }
+    CSSRuleList* cssRules() const;
+    
+    // For CSSRuleList
+    unsigned length() const;
+    CSSRule* item(unsigned index) const;
 
 private:
-    WebKitCSSRegionRule(CSSStyleSheet* parent, Vector<OwnPtr<CSSParserSelector> >* selectors, PassRefPtr<CSSRuleList> rules);
+    WebKitCSSRegionRule(StyleRuleRegion*, CSSStyleSheet* parent);
 
-    CSSSelectorList m_selectorList;
-    RefPtr<CSSRuleList> m_ruleList;
+    RefPtr<StyleRuleRegion> m_regionRule;
+    
+    mutable Vector<RefPtr<CSSRule> > m_childRuleCSSOMWrappers;
+    mutable OwnPtr<CSSRuleList> m_ruleListCSSOMWrapper;
+    
+    friend class StyleRuleBlock;
 };
 
 }

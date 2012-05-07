@@ -38,19 +38,20 @@ WebInspector.ScriptFormatter = function()
 
 /**
  * @param {Array.<number>} lineEndings
- * @param {DebuggerAgent.Location} location
+ * @param {number} lineNumber
+ * @param {number} columnNumber
  * @return {number}
  */
-WebInspector.ScriptFormatter.locationToPosition = function(lineEndings, location)
+WebInspector.ScriptFormatter.locationToPosition = function(lineEndings, lineNumber, columnNumber)
 {
-    var position = location.lineNumber ? lineEndings[location.lineNumber - 1] + 1 : 0;
-    return position + location.columnNumber;
+    var position = lineNumber ? lineEndings[lineNumber - 1] + 1 : 0;
+    return position + columnNumber;
 }
 
 /**
  * @param {Array.<number>} lineEndings
  * @param {number} position
- * @return {DebuggerAgent.Location}
+ * @return {Array.<number>}
  */
 WebInspector.ScriptFormatter.positionToLocation = function(lineEndings, position)
 {
@@ -59,13 +60,13 @@ WebInspector.ScriptFormatter.positionToLocation = function(lineEndings, position
         var columnNumber = position;
     else
         var columnNumber = position - lineEndings[lineNumber - 1] - 1;
-    return new WebInspector.DebuggerModel.Location(lineNumber, columnNumber);
+    return [lineNumber, columnNumber];
 }
 
 WebInspector.ScriptFormatter.prototype = {
     /**
      * @param {string} mimeType
-     * @param {string} content
+     * @param {?string} content
      * @param {function(string, WebInspector.FormattedSourceMapping)} callback
      */
     formatContent: function(mimeType, content, callback)
@@ -77,9 +78,6 @@ WebInspector.ScriptFormatter.prototype = {
         this._worker.postMessage({ method: method, params: parameters });
     },
 
-    /**
-     * @param {WebInspector.Event} event
-     */
     _didFormatContent: function(event)
     {
         var task = this._tasks.shift();
@@ -97,7 +95,7 @@ WebInspector.ScriptFormatter.prototype = {
     {
         if (!this._cachedWorker) {
             this._cachedWorker = new Worker("ScriptFormatterWorker.js");
-            this._cachedWorker.onmessage = this._didFormatContent.bind(this);
+            this._cachedWorker.onmessage = /** @type {function(this:Worker)} */ this._didFormatContent.bind(this);
         }
         return this._cachedWorker;
     }
@@ -127,23 +125,25 @@ WebInspector.FormattedSourceMapping = function(originalLineEndings, formattedLin
 
 WebInspector.FormattedSourceMapping.prototype = {
     /**
-     * @param {DebuggerAgent.Location} location
-     * @return {DebuggerAgent.Location}
+     * @param {number} lineNumber
+     * @param {number} columnNumber
+     * @return {Array.<number>}
      */
-    originalToFormatted: function(location)
+    originalToFormatted: function(lineNumber, columnNumber)
     {
-        var originalPosition = WebInspector.ScriptFormatter.locationToPosition(this._originalLineEndings, location);
+        var originalPosition = WebInspector.ScriptFormatter.locationToPosition(this._originalLineEndings, lineNumber, columnNumber);
         var formattedPosition = this._convertPosition(this._mapping.original, this._mapping.formatted, originalPosition);
         return WebInspector.ScriptFormatter.positionToLocation(this._formattedLineEndings, formattedPosition);
     },
 
     /**
-     * @param {DebuggerAgent.Location} location
-     * @return {DebuggerAgent.Location}
+     * @param {number} lineNumber
+     * @param {number} columnNumber
+     * @return {Array.<number>}
      */
-    formattedToOriginal: function(location)
+    formattedToOriginal: function(lineNumber, columnNumber)
     {
-        var formattedPosition = WebInspector.ScriptFormatter.locationToPosition(this._formattedLineEndings, location);
+        var formattedPosition = WebInspector.ScriptFormatter.locationToPosition(this._formattedLineEndings, lineNumber, columnNumber);
         var originalPosition = this._convertPosition(this._mapping.formatted, this._mapping.original, formattedPosition);
         return WebInspector.ScriptFormatter.positionToLocation(this._originalLineEndings, originalPosition);
     },

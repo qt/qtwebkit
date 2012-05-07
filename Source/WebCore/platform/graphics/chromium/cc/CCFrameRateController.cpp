@@ -40,7 +40,7 @@ public:
     }
     virtual ~CCFrameRateControllerTimeSourceAdapter() { }
 
-    virtual void onTimerTick() { m_frameRateController->onTimerTick(); }
+    virtual void onTimerTick() OVERRIDE { m_frameRateController->onTimerTick(); }
 private:
     explicit CCFrameRateControllerTimeSourceAdapter(CCFrameRateController* frameRateController)
             : m_frameRateController(frameRateController) { }
@@ -87,7 +87,7 @@ void CCFrameRateController::onTimerTick()
     }
 
     if (m_client)
-        m_client->beginFrame();
+        m_client->vsyncTick();
 }
 
 void CCFrameRateController::didBeginFrame()

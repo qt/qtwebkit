@@ -19,4 +19,6 @@ OTHER_FILES += \
     DesktopBehavior/tst_linkHovered.qml \
     DesktopBehavior/tst_loadHtml.qml \
     DesktopBehavior/tst_messaging.qml \
-    DesktopBehavior/tst_navigationRequested.qml
+    DesktopBehavior/tst_navigationRequested.qml \
+    DesktopBehavior/tst_singleFileupload.qml \
+    DesktopBehavior/tst_multiFileupload.qml

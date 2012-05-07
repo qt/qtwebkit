@@ -119,7 +119,7 @@ class TestExpectationSerializer(object):
         self._test_configuration_converter = test_configuration_converter
         self._parsed_expectation_to_string = dict([[parsed_expectation, expectation_string] for expectation_string, parsed_expectation in TestExpectations.EXPECTATIONS.items()])
 
-    def to_string(self, expectation_line):
+    def to_string(self, expectation_line, include_modifiers=True, include_expectations=True, include_comment=True):
         if expectation_line.is_invalid():
             return expectation_line.original_string or ''
 
@@ -135,7 +135,15 @@ class TestExpectationSerializer(object):
                 result.append(self._format_result(modifiers, expectation_line.name, expectations, expectation_line.comment))
             return "\n".join(result) if result else None
 
-        return self._format_result(" ".join(expectation_line.modifiers), expectation_line.name, " ".join(expectation_line.expectations), expectation_line.comment)
+        return self._format_result(" ".join(expectation_line.modifiers),
+                                   expectation_line.name,
+                                   " ".join(expectation_line.expectations),
+                                   expectation_line.comment,
+                                   include_modifiers, include_expectations, include_comment)
+
+    def to_csv(self, expectation_line):
+        # Note that this doesn't include the comments.
+        return '%s,%s,%s' % (expectation_line.name, ' '.join(expectation_line.modifiers), ' '.join(expectation_line.expectations))
 
     def _parsed_expectations_string(self, expectation_line):
         result = []
@@ -154,9 +162,14 @@ class TestExpectationSerializer(object):
         return ' '.join(result)
 
     @classmethod
-    def _format_result(cls, modifiers, name, expectations, comment):
-        result = "%s : %s = %s" % (modifiers.upper(), name, expectations.upper())
-        if comment is not None:
+    def _format_result(cls, modifiers, name, expectations, comment, include_modifiers=True, include_expectations=True, include_comment=True):
+        result = ''
+        if include_modifiers:
+            result += '%s : ' % modifiers.upper()
+        result += name
+        if include_expectations:
+            result += ' = %s' % expectations.upper()
+        if include_comment and comment is not None:
             result += " //%s" % comment
         return result
 
@@ -165,7 +178,9 @@ class TestExpectationSerializer(object):
         serializer = cls(test_configuration_converter)
 
         def serialize(expectation_line):
-            if not reconstitute_only_these or expectation_line in reconstitute_only_these:
+            # If reconstitute_only_these is an empty list, we want to return original_string.
+            # So we need to compare reconstitute_only_these to None, not just check if it's falsey.
+            if reconstitute_only_these is None or expectation_line in reconstitute_only_these:
                 return serializer.to_string(expectation_line)
             return expectation_line.original_string
 
@@ -393,6 +408,7 @@ class TestExpectationLine:
         expectation_line.name = test
         expectation_line.path = test
         expectation_line.parsed_expectations = set([PASS])
+        expectation_line.expectations = set(['PASS'])
         expectation_line.matching_tests = [test]
         return expectation_line
 
@@ -443,6 +459,24 @@ class TestExpectationsModel(object):
 
         return tests
 
+    def get_test_set_for_keyword(self, keyword):
+        # FIXME: get_test_set() is an awkward public interface because it requires
+        # callers to know the difference between modifiers and expectations. We
+        # should replace that with this where possible.
+        expectation_enum = TestExpectations.EXPECTATIONS.get(keyword.lower(), None)
+        if expectation_enum is not None:
+            return self._expectation_to_tests[expectation_enum]
+        modifier_enum = TestExpectations.MODIFIERS.get(keyword.lower(), None)
+        if modifier_enum is not None:
+            return self._modifier_to_tests[modifier_enum]
+
+        # We must not have an index on this modifier.
+        matching_tests = set()
+        for test, modifiers in self._test_to_modifiers.iteritems():
+            if keyword.lower() in modifiers:
+                matching_tests.add(test)
+        return matching_tests
+
     def get_tests_with_result_type(self, result_type):
         return self._result_type_to_tests[result_type]
 
@@ -456,6 +490,10 @@ class TestExpectationsModel(object):
     def has_modifier(self, test, modifier):
         return test in self._modifier_to_tests[modifier]
 
+    def has_keyword(self, test, keyword):
+        return (keyword.upper() in self.get_expectations_string(test) or
+                keyword.lower() in self.get_modifiers(test))
+
     def has_test(self, test):
         return test in self._test_to_expectation_line
 
@@ -465,21 +503,21 @@ class TestExpectationsModel(object):
     def get_expectations(self, test):
         return self._test_to_expectations[test]
 
-    def add_expectation_line(self, expectation_line, overrides_allowed):
+    def add_expectation_line(self, expectation_line, in_overrides=False, in_skipped=False):
         """Returns a list of warnings encountered while matching modifiers."""
 
         if expectation_line.is_invalid():
             return
 
         for test in expectation_line.matching_tests:
-            if self._already_seen_better_match(test, expectation_line, overrides_allowed):
+            if not in_skipped and self._already_seen_better_match(test, expectation_line, in_overrides):
                 continue
 
             self._clear_expectations_for_test(test, expectation_line)
             self._test_to_expectation_line[test] = expectation_line
-            self._add_test(test, expectation_line, overrides_allowed)
+            self._add_test(test, expectation_line, in_overrides)
 
-    def _add_test(self, test, expectation_line, overrides_allowed):
+    def _add_test(self, test, expectation_line, in_overrides):
         """Sets the expected state for a given test.
 
         This routine assumes the test has not been added before. If it has,
@@ -489,8 +527,7 @@ class TestExpectationsModel(object):
         Args:
           test: test to add
           expectation_line: expectation to add
-          overrides_allowed: whether we're parsing the regular expectations
-              or the overridding expectations"""
+          in_overrides: whether we're parsing the regular expectations or the overridding expectations"""
         self._test_to_expectations[test] = expectation_line.parsed_expectations
         for expectation in expectation_line.parsed_expectations:
             self._expectation_to_tests[expectation].add(test)
@@ -514,7 +551,7 @@ class TestExpectationsModel(object):
         else:
             self._result_type_to_tests[FAIL].add(test)
 
-        if overrides_allowed:
+        if in_overrides:
             self._overridding_tests.add(test)
 
     def _clear_expectations_for_test(self, test, expectation_line):
@@ -539,7 +576,7 @@ class TestExpectationsModel(object):
             if test in set_of_tests:
                 set_of_tests.remove(test)
 
-    def _already_seen_better_match(self, test, expectation_line, overrides_allowed):
+    def _already_seen_better_match(self, test, expectation_line, in_overrides):
         """Returns whether we've seen a better match already in the file.
 
         Returns True if we've already seen a expectation_line.name that matches more of the test
@@ -560,7 +597,7 @@ class TestExpectationsModel(object):
             # This path matches more of the test.
             return False
 
-        if overrides_allowed and test not in self._overridding_tests:
+        if in_overrides and test not in self._overridding_tests:
             # We have seen this path, but that's okay because it is
             # in the overrides and the earlier path was in the
             # expectations (not the overrides).
@@ -569,7 +606,7 @@ class TestExpectationsModel(object):
         # At this point we know we have seen a previous exact match on this
         # base path, so we need to check the two sets of modifiers.
 
-        if overrides_allowed:
+        if in_overrides:
             expectation_source = "override"
         else:
             expectation_source = "expectation"
@@ -657,8 +694,7 @@ class TestExpectations(object):
                                 IMAGE_PLUS_TEXT: ('image and text mismatch',
                                                   'image and text mismatch'),
                                 AUDIO: ('audio mismatch', 'audio mismatch'),
-                                CRASH: ('DumpRenderTree crash',
-                                        'DumpRenderTree crashes'),
+                                CRASH: ('crash', 'crashes'),
                                 TIMEOUT: ('test timed out', 'tests timed out'),
                                 MISSING: ('no expected result found',
                                           'no expected results found')}
@@ -687,7 +723,8 @@ class TestExpectations(object):
         return cls.EXPECTATIONS.get(string.lower())
 
     def __init__(self, port, tests, expectations,
-                 test_config, is_lint_mode=False, overrides=None):
+                 test_config, is_lint_mode=False, overrides=None,
+                 skipped_tests=None):
         """Loads and parses the test expectations given in the string.
         Args:
             port: handle to object containing platform-specific functionality
@@ -702,6 +739,7 @@ class TestExpectations(object):
                 entries in |expectations|. This is used by callers
                 that need to manage two sets of expectations (e.g., upstream
                 and downstream expectations).
+            skipped_tests: test paths to skip.
         """
         self._full_test_list = tests
         self._test_config = test_config
@@ -712,13 +750,14 @@ class TestExpectations(object):
         self._skipped_tests_warnings = []
 
         self._expectations = self._parser.parse(expectations)
-        self._add_expectations(self._expectations, overrides_allowed=False)
-        self._add_skipped_tests(port.skipped_tests(tests))
+        self._add_expectations(self._expectations, in_overrides=False)
 
         if overrides:
             overrides_expectations = self._parser.parse(overrides)
-            self._add_expectations(overrides_expectations, overrides_allowed=True)
+            self._add_expectations(overrides_expectations, in_overrides=True)
             self._expectations += overrides_expectations
+
+        self._add_skipped_tests(skipped_tests or [])
 
         self._has_warnings = False
         self._report_warnings()
@@ -726,6 +765,8 @@ class TestExpectations(object):
 
     # TODO(ojan): Allow for removing skipped tests when getting the list of
     # tests to run, but not when getting metrics.
+    def model(self):
+        return self._model
 
     def get_rebaselining_failures(self):
         return (self._model.get_test_set(REBASELINE, FAIL) |
@@ -809,10 +850,33 @@ class TestExpectations(object):
         if self._full_test_list:
             for test in self._full_test_list:
                 if not self._model.has_test(test):
-                    self._model.add_expectation_line(TestExpectationLine.create_passing_expectation(test), overrides_allowed=False)
+                    self._model.add_expectation_line(TestExpectationLine.create_passing_expectation(test))
 
     def has_warnings(self):
         return self._has_warnings
+
+    def remove_configuration_from_test(self, test, test_configuration):
+        expectations_to_remove = []
+        modified_expectations = []
+
+        for expectation in self._expectations:
+            if expectation.name != test or expectation.is_flaky() or not expectation.parsed_expectations:
+                continue
+            if iter(expectation.parsed_expectations).next() not in (FAIL, TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO):
+                continue
+            if test_configuration not in expectation.matching_configurations:
+                continue
+
+            expectation.matching_configurations.remove(test_configuration)
+            if expectation.matching_configurations:
+                modified_expectations.append(expectation)
+            else:
+                expectations_to_remove.append(expectation)
+
+        for expectation in expectations_to_remove:
+            self._expectations.remove(expectation)
+
+        return TestExpectationSerializer.list_to_string(self._expectations, self._parser._test_configuration_converter, modified_expectations)
 
     def remove_rebaselined_tests(self, except_these_tests):
         """Returns a copy of the expectations with the tests removed."""
@@ -821,13 +885,13 @@ class TestExpectations(object):
 
         return TestExpectationSerializer.list_to_string(filter(without_rebaseline_modifier, self._expectations))
 
-    def _add_expectations(self, expectation_list, overrides_allowed):
+    def _add_expectations(self, expectation_list, in_overrides):
         for expectation_line in expectation_list:
             if not expectation_line.expectations:
                 continue
 
             if self._is_lint_mode or self._test_config in expectation_line.matching_configurations:
-                self._model.add_expectation_line(expectation_line, overrides_allowed)
+                self._model.add_expectation_line(expectation_line, in_overrides)
 
     def _add_skipped_tests(self, tests_to_skip):
         if not tests_to_skip:
@@ -835,5 +899,7 @@ class TestExpectations(object):
         for index, test in enumerate(self._expectations, start=1):
             if test.name and test.name in tests_to_skip:
                 self._skipped_tests_warnings.append(':%d %s is also in a Skipped file.' % (index, test.name))
+
         for test_name in tests_to_skip:
-            self._model.add_expectation_line(self._parser.expectation_for_skipped_test(test_name), overrides_allowed=True)
+            expectation_line = self._parser.expectation_for_skipped_test(test_name)
+            self._model.add_expectation_line(expectation_line, in_skipped=True)

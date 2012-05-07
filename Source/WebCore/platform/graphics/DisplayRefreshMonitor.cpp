@@ -53,13 +53,16 @@ void DisplayRefreshMonitorClient::fireDisplayRefreshIfNeeded(double timestamp)
 }
 
 DisplayRefreshMonitor::DisplayRefreshMonitor(PlatformDisplayID displayID)
-    : m_timestamp(0)
+    : m_monotonicAnimationStartTime(0)
     , m_active(true)
     , m_scheduled(false)
     , m_previousFrameDone(true)
     , m_displayID(displayID)
 #if PLATFORM(MAC)
     , m_displayLink(0)
+#endif
+#if PLATFORM(BLACKBERRY)
+    , m_animationClient(0)
 #endif
 {
 }
@@ -72,15 +75,15 @@ void DisplayRefreshMonitor::refreshDisplayOnMainThread(void* data)
 
 void DisplayRefreshMonitor::notifyClients()
 {
-    double timestamp;
+    double monotonicAnimationStartTime;
     {
         MutexLocker lock(m_mutex);
         m_scheduled = false;
-        timestamp = m_timestamp;
+        monotonicAnimationStartTime = m_monotonicAnimationStartTime;
     }
 
     for (size_t i = 0; i < m_clients.size(); ++i)
-        m_clients[i]->fireDisplayRefreshIfNeeded(timestamp);
+        m_clients[i]->fireDisplayRefreshIfNeeded(monotonicAnimationStartTime);
 
     {
         MutexLocker lock(m_mutex);

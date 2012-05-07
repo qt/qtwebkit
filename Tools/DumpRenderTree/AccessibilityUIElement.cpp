@@ -150,6 +150,18 @@ static JSValueRef boundsForRangeCallback(JSContextRef context, JSObjectRef funct
     return JSValueMakeString(context, boundsDescription.get());    
 }
 
+static JSValueRef rangeForPositionCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    int x = 0, y = 0;
+    if (argumentCount == 2) {
+        x = JSValueToNumber(context, arguments[0], exception);
+        y = JSValueToNumber(context, arguments[1], exception);
+    }
+    
+    JSRetainPtr<JSStringRef> rangeDescription(Adopt, toAXElement(thisObject)->rangeForPosition(x, y));
+    return JSValueMakeString(context, rangeDescription.get());    
+}
+
 static JSValueRef stringForRangeCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     unsigned location = UINT_MAX, length = 0;
@@ -282,6 +294,15 @@ static JSValueRef selectedRowAtIndexCallback(JSContextRef context, JSObjectRef f
         indexNumber = JSValueToNumber(context, arguments[0], exception);
     
     return AccessibilityUIElement::makeJSAccessibilityUIElement(context, toAXElement(thisObject)->selectedRowAtIndex(indexNumber));
+}
+
+static JSValueRef rowAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    int indexNumber = 0;
+    if (argumentCount == 1)
+        indexNumber = JSValueToNumber(context, arguments[0], exception);
+    
+    return AccessibilityUIElement::makeJSAccessibilityUIElement(context, toAXElement(thisObject)->rowAtIndex(indexNumber));
 }
 
 static JSValueRef isEqualCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -506,6 +527,33 @@ static JSValueRef attributedStringForTextMarkerRangeContainsAttributeCallback(JS
         JSStringRelease(attribute);
     
     return result;    
+}
+
+static JSValueRef indexForTextMarkerCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    AccessibilityTextMarker* marker = 0;
+    if (argumentCount == 1)
+        marker = toTextMarker(JSValueToObject(context, arguments[0], exception));
+    
+    return JSValueMakeNumber(context, toAXElement(thisObject)->indexForTextMarker(marker));
+}
+
+static JSValueRef isTextMarkerValidCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    AccessibilityTextMarker* marker = 0;
+    if (argumentCount == 1)
+        marker = toTextMarker(JSValueToObject(context, arguments[0], exception));
+    
+    return JSValueMakeBoolean(context, toAXElement(thisObject)->isTextMarkerValid(marker));
+}
+
+static JSValueRef textMarkerForIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    int textIndex = 0;
+    if (argumentCount == 1)
+        textIndex = JSValueToNumber(context, arguments[0], exception);
+    
+    return AccessibilityTextMarker::makeJSAccessibilityTextMarker(context, toAXElement(thisObject)->textMarkerForIndex(textIndex));
 }
 
 static JSValueRef textMarkerRangeLengthCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -898,6 +946,7 @@ static JSValueRef removeNotificationListenerCallback(JSContextRef context, JSObj
 #if !PLATFORM(MAC)
 JSStringRef AccessibilityUIElement::speak() { return 0; }
 JSStringRef AccessibilityUIElement::rangeForLine(int line) { return 0; }
+JSStringRef AccessibilityUIElement::rangeForPosition(int, int) { return 0; }
 void AccessibilityUIElement::setSelectedChild(AccessibilityUIElement*) const { }
 unsigned AccessibilityUIElement::selectedChildrenCount() const { return 0; }
 AccessibilityUIElement AccessibilityUIElement::selectedChildAtIndex(unsigned) const { return 0; }
@@ -968,6 +1017,21 @@ JSStringRef AccessibilityUIElement::stringForTextMarkerRange(AccessibilityTextMa
 bool AccessibilityUIElement::attributedStringForTextMarkerRangeContainsAttribute(JSStringRef, AccessibilityTextMarkerRange*)
 {
     return false;
+}
+
+int AccessibilityUIElement::indexForTextMarker(AccessibilityTextMarker*)
+{
+    return -1;
+}
+
+bool AccessibilityUIElement::isTextMarkerValid(AccessibilityTextMarker*)
+{
+    return false;
+}
+
+AccessibilityTextMarker AccessibilityUIElement::textMarkerForIndex(int)
+{
+    return 0;
 }
 
 #endif
@@ -1052,6 +1116,7 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "lineForIndex", lineForIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "rangeForLine", rangeForLineCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "boundsForRange", boundsForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "rangeForPosition", rangeForPositionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "stringForRange", stringForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "attributedStringForRange", attributedStringForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "attributedStringRangeIsMisspelled", attributedStringRangeIsMisspelledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -1089,6 +1154,7 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "ariaOwnsElementAtIndex", ariaOwnsElementAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "ariaFlowToElementAtIndex", ariaFlowToElementAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "selectedRowAtIndex", selectedRowAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "rowAtIndex", rowAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "isEqual", isEqualCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "addNotificationListener", addNotificationListenerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "removeNotificationListener", removeNotificationListenerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -1098,7 +1164,10 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "removeSelection", removeSelectionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "textMarkerRangeForElement", textMarkerRangeForElementCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "attributedStringForTextMarkerRangeContainsAttribute", attributedStringForTextMarkerRangeContainsAttributeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "indexForTextMarker", indexForTextMarkerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "isTextMarkerValid", isTextMarkerValidCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "textMarkerRangeForMarkers", textMarkerRangeForMarkersCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "textMarkerForIndex", textMarkerForIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "startTextMarkerForTextMarkerRange", startTextMarkerForTextMarkerRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "endTextMarkerForTextMarkerRange", endTextMarkerForTextMarkerRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "accessibilityElementForTextMarker", accessibilityElementForTextMarkerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },

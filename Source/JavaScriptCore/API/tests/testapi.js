@@ -155,7 +155,7 @@ shouldBe("typeof myObject", "object");
 shouldBe("MyObject ? 1 : 0", true); // toBoolean
 shouldBe("+MyObject", 1); // toNumber
 shouldBe("(Object.prototype.toString.call(MyObject))", "[object MyObject]"); // Object.prototype.toString
-shouldBe("(MyObject.toString())", "MyObjectAsString"); // toString
+shouldBe("(MyObject.toString())", "[object MyObject]"); // toString
 shouldBe("String(MyObject)", "MyObjectAsString"); // toString
 shouldBe("MyObject - 0", 1); // toNumber
 shouldBe("MyObject.valueOf()", 1); // valueOf
@@ -166,6 +166,8 @@ shouldBe("typeof constructedObject", "object");
 shouldBe("constructedObject.value", 1);
 shouldBe("myObject instanceof MyObject", true);
 shouldBe("(new Object()) instanceof MyObject", false);
+
+shouldThrow("new MyBadConstructor()");
 
 MyObject.nullGetSet = 1;
 shouldBe("MyObject.nullGetSet", 1);
@@ -185,6 +187,8 @@ shouldBe("derived.baseOnly", 1);
 shouldBe("derived.protoOnly()", 2);
 shouldBe("derived.protoDup", 2);
 shouldBe("derived.derivedOnly", 2)
+
+shouldBe("derived.baseHardNull()", undefined)
 
 // base properties throw 1 when set; derived, 2
 shouldBe("derived.baseDup = 0", 2);

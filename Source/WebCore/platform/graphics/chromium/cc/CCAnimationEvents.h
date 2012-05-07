@@ -25,65 +25,33 @@
 #ifndef CCAnimationEvents_h
 #define CCAnimationEvents_h
 
+#include "cc/CCActiveAnimation.h"
+
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-class CCAnimationStartedEvent;
-class CCAnimationFinishedEvent;
-
-class CCAnimationEvent {
-public:
+struct CCAnimationEvent {
     enum Type { Started, Finished };
 
-    virtual ~CCAnimationEvent();
+    CCAnimationEvent(Type type, int layerId, int groupId, CCActiveAnimation::TargetProperty targetProperty, double monotonicTime)
+        : type(type)
+        , layerId(layerId)
+        , groupId(groupId)
+        , targetProperty(targetProperty)
+        , monotonicTime(monotonicTime)
+    {
+    }
 
-    virtual Type type() const = 0;
-
-    int layerId() const { return m_layerId; }
-
-    const CCAnimationStartedEvent* toAnimationStartedEvent() const;
-    const CCAnimationFinishedEvent* toAnimationFinishedEvent() const;
-
-protected:
-    CCAnimationEvent(int layerId);
-
-private:
-    int m_layerId;
+    Type type;
+    int layerId;
+    int groupId;
+    CCActiveAnimation::TargetProperty targetProperty;
+    double monotonicTime;
 };
 
-// Indicates that an animation has started on a particular layer.
-class CCAnimationStartedEvent : public CCAnimationEvent {
-public:
-    static PassOwnPtr<CCAnimationStartedEvent> create(int layerId);
-
-    virtual ~CCAnimationStartedEvent();
-
-    virtual Type type() const;
-
-private:
-    explicit CCAnimationStartedEvent(int layerId);
-};
-
-// Indicates that an animation has started on a particular layer.
-class CCAnimationFinishedEvent : public CCAnimationEvent {
-public:
-    static PassOwnPtr<CCAnimationFinishedEvent> create(int layerId, int animationId);
-
-    virtual ~CCAnimationFinishedEvent();
-
-    virtual Type type() const;
-
-    int animationId() const { return m_animationId; }
-
-private:
-    CCAnimationFinishedEvent(int layerId, int animationId);
-
-    int m_animationId;
-};
-
-typedef Vector<OwnPtr<CCAnimationEvent> > CCAnimationEventsVector;
+typedef Vector<CCAnimationEvent> CCAnimationEventsVector;
 
 } // namespace WebCore
 

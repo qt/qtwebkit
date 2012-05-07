@@ -96,7 +96,7 @@ WorkerThread::WorkerThread(const KURL& scriptURL, const String& userAgent, const
     , m_workerLoaderProxy(workerLoaderProxy)
     , m_workerReportingProxy(workerReportingProxy)
     , m_startupData(WorkerThreadStartupData::create(scriptURL, userAgent, sourceCode, startMode, contentSecurityPolicy, contentSecurityPolicyType))
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     , m_notificationClient(0)
 #endif
 {
@@ -142,6 +142,8 @@ void WorkerThread::workerThread()
         }
     }
 #if PLATFORM(CHROMIUM)
+    // The corresponding call to didStopWorkerRunLoop is in
+    // ~WorkerScriptController.
     PlatformSupport::didStartWorkerRunLoop(&m_runLoop);
 #endif
 
@@ -156,10 +158,6 @@ void WorkerThread::workerThread()
     m_startupData.clear();
 
     runEventLoop();
-
-#if PLATFORM(CHROMIUM)
-    PlatformSupport::didStopWorkerRunLoop(&m_runLoop);
-#endif
 
     ThreadIdentifier threadID = m_threadID;
 

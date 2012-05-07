@@ -22,11 +22,9 @@
 
 #if !defined(QT_NO_GRAPHICSVIEW)
 
-#include "CurrentTime.h"
 #include "FloatRect.h"
 #include "GraphicsContext.h"
 #include "Image.h"
-#include "RefCounted.h"
 #include "TranslateTransformOperation.h"
 #include "UnitBezier.h"
 #include <qgraphicseffect.h>
@@ -45,6 +43,8 @@
 #include <QtGui/qpainter.h>
 #include <QtGui/qpixmap.h>
 #include <QtGui/qpixmapcache.h>
+#include <wtf/CurrentTime.h>
+#include <wtf/RefCounted.h>
 
 #if USE(TILED_BACKING_STORE)
 #include "TiledBackingStore.h"
@@ -950,6 +950,14 @@ GraphicsLayerQt::GraphicsLayerQt(GraphicsLayerClient* client)
 
 GraphicsLayerQt::~GraphicsLayerQt()
 {
+    // Do cleanup while we can still safely call methods on the derived class.
+    willBeDestroyed();
+}
+
+void GraphicsLayerQt::willBeDestroyed()
+{
+    m_impl = nullptr;
+    GraphicsLayer::willBeDestroyed();
 }
 
 // This is the hook for WebCore compositor to know that Qt implements compositing with GraphicsLayerQt.

@@ -652,7 +652,7 @@ IconLoadDecision IconDatabase::synchronousLoadDecisionForIconURL(const String& i
         MutexLocker locker(m_urlAndIconLock);
         if (IconRecord* icon = m_iconURLToRecordMap.get(iconURL)) {
             LOG(IconDatabase, "Found expiration time on a present icon based on existing IconRecord");
-            return (int)currentTime() - icon->getTimestamp() > iconExpirationTime ? IconLoadYes : IconLoadNo;
+            return static_cast<int>(currentTime()) - static_cast<int>(icon->getTimestamp()) > iconExpirationTime ? IconLoadYes : IconLoadNo;
         }
     }
     
@@ -1895,7 +1895,7 @@ void IconDatabase::setIconURLForPageURLInSQLDatabase(const String& iconURL, cons
     
     if (!iconID) {
         LOG_ERROR("Failed to establish an ID for iconURL %s", urlForLogging(iconURL).ascii().data());
-        ASSERT(false);
+        ASSERT_NOT_REACHED();
         return;
     }
     
@@ -1912,7 +1912,7 @@ void IconDatabase::setIconIDForPageURLInSQLDatabase(int64_t iconID, const String
 
     int result = m_setIconIDForPageURLStatement->step();
     if (result != SQLResultDone) {
-        ASSERT(false);
+        ASSERT_NOT_REACHED();
         LOG_ERROR("setIconIDForPageURLQuery failed for url %s", urlForLogging(pageURL).ascii().data());
     }
 

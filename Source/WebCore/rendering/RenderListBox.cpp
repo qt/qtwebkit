@@ -32,7 +32,6 @@
 
 #include "AXObjectCache.h"
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "Document.h"
 #include "DocumentEventQueue.h"
 #include "EventHandler.h"
@@ -58,6 +57,7 @@
 #include "Scrollbar.h"
 #include "ScrollbarTheme.h"
 #include "SpatialNavigation.h"
+#include "StyleResolver.h"
 #include <math.h>
 
 using namespace std;
@@ -125,7 +125,7 @@ void RenderListBox::updateFromElement()
                 FontDescription d = itemFont.fontDescription();
                 d.setWeight(d.bolderWeight());
                 itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-                itemFont.update(document()->styleSelector()->fontSelector());
+                itemFont.update(document()->styleResolver()->fontSelector());
             }
 
             if (!text.isEmpty()) {
@@ -345,7 +345,7 @@ void RenderListBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&
 void RenderListBox::paintScrollbar(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     if (m_vBar) {
-        LayoutRect scrollRect(paintOffset.x() + width() - borderRight() - m_vBar->width(),
+        IntRect scrollRect = pixelSnappedIntRect(paintOffset.x() + width() - borderRight() - m_vBar->width(),
             paintOffset.y() + borderTop(),
             m_vBar->width(),
             height() - (borderTop() + borderBottom()));
@@ -409,7 +409,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
 
     unsigned length = itemText.length();
     const UChar* string = itemText.characters();
-    TextRun textRun(string, length, false, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), isOverride(itemStyle->unicodeBidi()), TextRun::NoRounding);
+    TextRun textRun(string, length, false, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), isOverride(itemStyle->unicodeBidi()), true, TextRun::NoRounding);
     Font itemFont = style()->font();
     LayoutRect r = itemBoundingBoxRect(paintOffset, listIndex);
     r.move(itemOffsetForAlignment(textRun, itemStyle, itemFont, r));
@@ -418,11 +418,11 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
         FontDescription d = itemFont.fontDescription();
         d.setWeight(d.bolderWeight());
         itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-        itemFont.update(document()->styleSelector()->fontSelector());
+        itemFont.update(document()->styleResolver()->fontSelector());
     }
 
     // Draw the item text
-    paintInfo.context->drawBidiText(itemFont, textRun, r.location());
+    paintInfo.context->drawBidiText(itemFont, textRun, roundedIntPoint(r.location()));
 }
 
 void RenderListBox::paintItemBackground(PaintInfo& paintInfo, const LayoutPoint& paintOffset, int listIndex)
@@ -444,7 +444,7 @@ void RenderListBox::paintItemBackground(PaintInfo& paintInfo, const LayoutPoint&
         ColorSpace colorSpace = element->renderStyle() ? element->renderStyle()->colorSpace() : style()->colorSpace();
         LayoutRect itemRect = itemBoundingBoxRect(paintOffset, listIndex);
         itemRect.intersect(controlClipRect(paintOffset));
-        paintInfo.context->fillRect(itemRect, backColor, colorSpace);
+        paintInfo.context->fillRect(pixelSnappedIntRect(itemRect), backColor, colorSpace);
     }
 }
 
@@ -490,7 +490,7 @@ void RenderListBox::panScroll(const IntPoint& panStartMousePosition)
     // FIXME: This doesn't work correctly with transforms.
     FloatPoint absOffset = localToAbsolute();
 
-    IntPoint currentMousePosition = roundedIntPoint(frame()->eventHandler()->currentMousePosition());
+    IntPoint currentMousePosition = frame()->eventHandler()->currentMousePosition();
     // We need to check if the current mouse position is out of the window. When the mouse is out of the window, the position is incoherent
     static IntPoint previousMousePosition;
     if (currentMousePosition.y() < 0)

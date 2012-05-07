@@ -40,6 +40,7 @@
 namespace WebCore {
 
 class CachedCSSStyleSheet;
+class CachedSVGDocument;
 class CachedFont;
 class CachedImage;
 class CachedRawResource;
@@ -69,6 +70,9 @@ public:
     CachedFont* requestFont(ResourceRequest&);
     CachedRawResource* requestRawResource(ResourceRequest&, const ResourceLoaderOptions&);
 
+#if ENABLE(SVG)
+    CachedSVGDocument* requestSVGDocument(ResourceRequest&);
+#endif
 #if ENABLE(XSLT)
     CachedXSLStyleSheet* requestXSLStyleSheet(ResourceRequest&);
 #endif
@@ -100,13 +104,11 @@ public:
     Document* document() const { return m_document; }
 
     void removeCachedResource(CachedResource*) const;
-
-    void loadFinishing() { m_loadFinishing = true; }
     void loadDone();
     
     void incrementRequestCount(const CachedResource*);
     void decrementRequestCount(const CachedResource*);
-    int requestCount();
+    int requestCount() const { return m_requestCount; }
 
     bool isPreloaded(const String& urlString) const;
     void clearPreloads();
@@ -147,9 +149,8 @@ private:
 
     Timer<CachedResourceLoader> m_garbageCollectDocumentResourcesTimer;
 
-    //29 bits left
+    // 30 bits left
     bool m_autoLoadImages : 1;
-    bool m_loadFinishing : 1;
     bool m_allowStaleResources : 1;
 };
 

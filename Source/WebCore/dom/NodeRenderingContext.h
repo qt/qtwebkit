@@ -36,10 +36,10 @@ class ContainerNode;
 class Document;
 class InsertionPoint;
 class Node;
-class RenderFlowThread;
+class RenderNamedFlowThread;
 class RenderObject;
 class RenderStyle;
-class ShadowTree;
+class ElementShadow;
 
 class NodeRenderingContext {
 public:
@@ -62,9 +62,10 @@ public:
 
     void hostChildrenChanged();
 
+    bool isOnUpperEncapsulationBoundary() const;
     bool isOnEncapsulationBoundary() const;
     bool hasFlowThreadParent() const { return m_parentFlowRenderer; }
-    RenderFlowThread* parentFlowRenderer() const { return m_parentFlowRenderer; }
+    RenderNamedFlowThread* parentFlowRenderer() const { return m_parentFlowRenderer; }
     void moveToFlowThreadIfNeeded();
 
 private:
@@ -82,10 +83,10 @@ private:
     AttachingPhase m_phase;
     Node* m_node;
     ContainerNode* m_parentNodeForRenderingAndStyle;
-    ShadowTree* m_visualParentShadowTree;
+    ElementShadow* m_visualParentShadow;
     InsertionPoint* m_insertionPoint;
     RefPtr<RenderStyle> m_style;
-    RenderFlowThread* m_parentFlowRenderer;
+    RenderNamedFlowThread* m_parentFlowRenderer;
     AtomicString m_flowThread;
 };
 
@@ -115,6 +116,11 @@ inline bool NodeRenderingContext::isOnEncapsulationBoundary() const
     return (m_phase == AttachingDistributed
             || m_phase == AttachingShadowChild
             || m_phase == AttachingFallbacked);
+}
+
+inline bool NodeRenderingContext::isOnUpperEncapsulationBoundary() const
+{
+    return m_phase == AttachingShadowChild;
 }
 
 class NodeRendererFactory {

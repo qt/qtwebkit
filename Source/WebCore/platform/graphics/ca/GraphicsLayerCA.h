@@ -103,7 +103,6 @@ public:
 
     virtual void setNeedsDisplay();
     virtual void setNeedsDisplayInRect(const FloatRect&);
-    virtual bool needsDisplay() const OVERRIDE { return !m_dirtyRects.isEmpty(); }
     virtual void setContentsNeedsDisplay();
     
     virtual void setContentsRect(const IntRect&);
@@ -135,7 +134,7 @@ public:
     virtual void syncCompositingState(const FloatRect&);
     virtual void syncCompositingStateForThisLayerOnly();
 
-    virtual void visibleRectChanged(const IntRect&) OVERRIDE;
+    virtual TiledBacking* tiledBacking() OVERRIDE;
 
     bool allowTiledLayer() const { return m_allowTiledLayer; }
     virtual void setAllowTiledLayer(bool b);
@@ -144,6 +143,8 @@ protected:
     virtual void setOpacityInternal(float);
 
 private:
+    virtual void willBeDestroyed();
+
     // PlatformCALayerClient overrides
     virtual void platformCALayerLayoutSublayersOfLayer(PlatformCALayer*) { }
     virtual bool platformCALayerRespondsToLayoutChanges() const { return false; }
@@ -158,7 +159,10 @@ private:
     virtual bool platformCALayerContentsOpaque() const { return contentsOpaque(); }
     virtual bool platformCALayerDrawsContent() const { return drawsContent(); }
     virtual void platformCALayerLayerDidDisplay(PlatformLayer* layer) { return layerDidDisplay(layer); }
-    virtual void platformCALayerDidCreateTiles() OVERRIDE;
+    virtual void platformCALayerDidCreateTiles(const Vector<FloatRect>& dirtyRects) OVERRIDE;
+    virtual float platformCALayerDeviceScaleFactor() OVERRIDE;
+
+    virtual double backingStoreArea() const;
 
     void updateOpacityOnLayer();
     

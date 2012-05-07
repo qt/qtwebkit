@@ -91,12 +91,14 @@ ObjCPolymorphic
 ObjCProtocol
 OmitConstructor
 Optional=|DefaultIsNullString|DefaultIsUndefined
+PassThisToCallback=*
 Reflect=*
 Replaceable
 ReplaceableConstructor
 ReturnNewObject
 StrictTypeChecking
 Supplemental=*
+TransferList=*
 TreatNullAs=NullString
 TreatReturnedNullStringAs=False|Null|Undefined
 TreatUndefinedAs=NullString

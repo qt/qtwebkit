@@ -27,6 +27,7 @@
 #include "cc/CCSolidColorLayerImpl.h"
 
 #include "CCLayerTestCommon.h"
+#include "MockCCQuadCuller.h"
 #include "cc/CCSingleThreadProxy.h"
 #include "cc/CCSolidColorDrawQuad.h"
 
@@ -42,7 +43,7 @@ TEST(CCSolidColorLayerImplTest, verifyTilingCompleteAndNoOverlap)
 {
     DebugScopedSetImplThread scopedImplThread;
 
-    CCQuadList quadList;
+    MockCCQuadCuller quadCuller;
     IntSize layerSize = IntSize(800, 600);
     IntRect visibleLayerRect = IntRect(IntPoint(), layerSize);
 
@@ -51,9 +52,10 @@ TEST(CCSolidColorLayerImplTest, verifyTilingCompleteAndNoOverlap)
     layer->setBounds(layerSize);
 
     OwnPtr<CCSharedQuadState> sharedQuadState = layer->createSharedQuadState();
-    layer->appendQuads(quadList, sharedQuadState.get());
+    bool hadMissingTiles = false;
+    layer->appendQuads(quadCuller, sharedQuadState.get(), hadMissingTiles);
 
-    verifyQuadsExactlyCoverRect(quadList, visibleLayerRect);
+    verifyQuadsExactlyCoverRect(quadCuller.quadList(), visibleLayerRect);
 }
 
 TEST(CCSolidColorLayerImplTest, verifyCorrectBackgroundColorInQuad)
@@ -62,7 +64,7 @@ TEST(CCSolidColorLayerImplTest, verifyCorrectBackgroundColorInQuad)
 
     const Color testColor = 0xFFA55AFF;
 
-    CCQuadList quadList;
+    MockCCQuadCuller quadCuller;
     IntSize layerSize = IntSize(100, 100);
     IntRect visibleLayerRect = IntRect(IntPoint(), layerSize);
 
@@ -72,10 +74,34 @@ TEST(CCSolidColorLayerImplTest, verifyCorrectBackgroundColorInQuad)
     layer->setBackgroundColor(testColor);
 
     OwnPtr<CCSharedQuadState> sharedQuadState = layer->createSharedQuadState();
-    layer->appendQuads(quadList, sharedQuadState.get());
+    bool hadMissingTiles = false;
+    layer->appendQuads(quadCuller, sharedQuadState.get(), hadMissingTiles);
 
-    ASSERT_EQ(quadList.size(), 1U);
-    EXPECT_EQ(quadList[0]->toSolidColorDrawQuad()->color(), testColor);
+    ASSERT_EQ(quadCuller.quadList().size(), 1U);
+    EXPECT_EQ(quadCuller.quadList()[0]->toSolidColorDrawQuad()->color(), testColor);
+}
+
+TEST(CCSolidColorLayerImplTest, verifyCorrectOpacityInQuad)
+{
+    DebugScopedSetImplThread scopedImplThread;
+
+    const float opacity = 0.5f;
+
+    MockCCQuadCuller quadCuller;
+    IntSize layerSize = IntSize(100, 100);
+    IntRect visibleLayerRect = IntRect(IntPoint(), layerSize);
+
+    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(0);
+    layer->setVisibleLayerRect(visibleLayerRect);
+    layer->setBounds(layerSize);
+    layer->setDrawOpacity(opacity);
+
+    OwnPtr<CCSharedQuadState> sharedQuadState = layer->createSharedQuadState();
+    bool hadMissingTiles = false;
+    layer->appendQuads(quadCuller, sharedQuadState.get(), hadMissingTiles);
+
+    ASSERT_EQ(quadCuller.quadList().size(), 1U);
+    EXPECT_EQ(opacity, quadCuller.quadList()[0]->toSolidColorDrawQuad()->opacity());
 }
 
 } // namespace

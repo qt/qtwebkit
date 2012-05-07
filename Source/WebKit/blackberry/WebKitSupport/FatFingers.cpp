@@ -110,7 +110,7 @@ bool FatFingers::isElementClickable(Element* element) const
         // Notice, B is not a hyperlink, or form control, and does not register any mouse event handler. Then B cannot
         // be clicked. Suppose B specified the CSS property "cursor: pointer". Then, B will be considered as clickable.
         return hasMousePressListener(element)
-            || computedStyle(element)->getPropertyValue(cssPropertyID("cursor")) == "pointer";
+            || CSSComputedStyleDeclaration::create(element)->getPropertyValue(cssPropertyID("cursor")) == "pointer";
     default:
         ASSERT_NOT_REACHED();
     }
@@ -306,7 +306,7 @@ bool FatFingers::findIntersectingRegions(Document* document,
 #if DEBUG_FAT_FINGERS
     IntRect fingerRect(fingerRectForPoint(frameContentPos));
     IntRect screenFingerRect = m_webPage->mapToTransformed(fingerRect);
-    log(LogLevelInfo, "fat finger rect now %s", screenFingerRect.toString().latin1().data());
+    log(LogLevelInfo, "fat finger rect now %d, %d, %d, %d", screenFingerRect.x(), screenFingerRect.y(), screenFingerRect.width(), screenFingerRect.height());
 
     // only record the first finger rect
     if (document == m_webPage->m_mainFrame->document())

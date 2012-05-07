@@ -29,6 +29,7 @@
 
 #include "BackingStore.h"
 #include "DrawingAreaInfo.h"
+#include <WebCore/FloatPoint.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
 #include <stdint.h>
@@ -47,7 +48,6 @@ namespace CoreIPC {
 }
 
 namespace WebCore {
-    class FloatPoint;
     class TransformationMatrix;
 }
 
@@ -84,17 +84,15 @@ public:
     void setSize(const WebCore::IntSize&, const WebCore::IntSize& scrollOffset);
 
     virtual void pageCustomRepresentationChanged() { }
+    virtual void waitForPossibleGeometryUpdate() { }
 
 #if USE(UI_SIDE_COMPOSITING)
     virtual void updateViewport();
     virtual WebCore::IntRect viewportVisibleRect() const { return contentsRect(); }
     virtual WebCore::IntRect contentsRect() const;
     virtual bool isBackingStoreReady() const { return true; }
-    virtual void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&) { }
-    virtual void paintLayerTree(BackingStore::PlatformGraphicsContext) { }
     LayerTreeHostProxy* layerTreeHostProxy() const { return m_layerTreeHostProxy.get(); }
-    virtual void setVisibleContentsRectForScaling(const WebCore::IntRect& visibleContentsRect, float scale) { }
-    virtual void setVisibleContentsRectForPanning(const WebCore::IntRect& visibleContentsRect, const WebCore::FloatPoint& trajectoryVector) { }
+    virtual void setVisibleContentsRect(const WebCore::IntRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectoryVector, const WebCore::FloatPoint& accurateVisibleContentsPosition = WebCore::FloatPoint()) { }
     virtual void createTileForLayer(int layerID, int tileID, const WebKit::UpdateInfo&) { }
     virtual void updateTileForLayer(int layerID, int tileID, const WebKit::UpdateInfo&) { }
     virtual void removeTileForLayer(int layerID, int tileID) { }

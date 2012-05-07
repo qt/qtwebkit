@@ -44,10 +44,15 @@ ui.urlForTest = function(testName)
     return 'http://trac.webkit.org/browser/trunk/LayoutTests/' + testName;
 }
 
-ui.urlForFlakinessDashboard = function(testNameList)
+ui.urlForFlakinessDashboard = function(opt_testNameList)
 {
-    var testsParameter = testNameList.join(',');
+    var testsParameter = opt_testNameList ? opt_testNameList.join(',') : '';
     return 'http://test-results.appspot.com/dashboards/flakiness_dashboard.html#tests=' + encodeURIComponent(testsParameter);
+}
+
+ui.urlForEmbeddedFlakinessDashboard = function(opt_testNameList)
+{
+    return ui.urlForFlakinessDashboard(opt_testNameList) + '&showChrome=false';
 }
 
 ui.rolloutReasonForTestNameList = function(testNameList)
@@ -64,24 +69,64 @@ ui.onebar = base.extends('div', {
         this.innerHTML =
             '<ul>' +
                 '<li><a href="#unexpected">Unexpected Failures</a></li>' +
-                '<li><a href="#failures">All Failures</a></li>' +
+                '<li><a href="#expected">Expected Failures</a></li>' +
                 '<li><a href="#results">Results</a></li>' +
             '</ul>' +
             '<div id="unexpected"></div>' +
-            '<div id="failures"></div>' +
+            '<div id="expected"></div>' +
             '<div id="results"></div>';
         this._tabNames = [
             'unexpected',
-            'failures',
+            'expected',
             'results',
         ]
+        this._tabIndexToSavedScrollOffset = {};
         this._tabs = $(this).tabs({
             disabled: [2],
+            show: function(event, ui) { this._restoreScrollOffset(ui.index); },
         });
+    },
+    _saveScrollOffset: function() {
+        var tabIndex = this._tabs.tabs('option', 'selected');
+        this._tabIndexToSavedScrollOffset[tabIndex] = document.body.scrollTop;
+    },
+    _restoreScrollOffset: function(tabIndex)
+    {
+        document.body.scrollTop = this._tabIndexToSavedScrollOffset[tabIndex] || 0;
+    },
+    _setupHistoryHandlers: function()
+    {
+        function currentHash() {
+            var hash = window.location.hash;
+            return (!hash || hash == '#') ? '#unexpected' : hash;
+        }
+
+        var self = this;
+        $('.ui-tabs-nav a').bind('mouseup', function(event) {
+            var href = event.target.getAttribute('href');
+            var hash = currentHash();
+            if (href != hash) {
+                self._saveScrollOffset();
+                window.location = href
+            }
+        });
+
+        window.onhashchange = function(event) {
+            var tabName = currentHash().substring(1);
+            self._selectInternal(tabName);
+        };
+
+        // When navigating from the browser chrome, we'll
+        // scroll to the #tabname contents. popstate fires before
+        // we scroll, so we can save the scroll offset first.
+        window.onpopstate = function() {
+            self._saveScrollOffset();
+        };
     },
     attach: function()
     {
         document.body.insertBefore(this, document.body.firstChild);
+        this._setupHistoryHandlers();
     },
     tabNamed: function(tabName)
     {
@@ -100,19 +145,24 @@ ui.onebar = base.extends('div', {
     {
         return this.tabNamed('unexpected');
     },
-    failures: function()
+    expected: function()
     {
-        return this.tabNamed('failures');
+        return this.tabNamed('expected');
     },
     results: function()
     {
         return this.tabNamed('results');
     },
-    select: function(tabName)
-    {
+    _selectInternal: function(tabName) {
         var tabIndex = this._tabNames.indexOf(tabName);
         this._tabs.tabs('enable', tabIndex);
         this._tabs.tabs('select', tabIndex);
+    },
+    select: function(tabName)
+    {
+        this._saveScrollOffset();
+        this._selectInternal(tabName);
+        window.location = '#' + tabName;
     }
 });
 
@@ -143,38 +193,67 @@ ui.RelativeTime = base.extends('time', {
     }
 });
 
-ui.MessageBox = base.extends('div',  {
-    init: function(title, message)
+ui.StatusArea = base.extends('div',  {
+    init: function()
     {
-        this._content = document.createElement('div');
-        this.appendChild(this._content);
-        this.addMessage(message);
+        // This is a Singleton.
+        if (ui.StatusArea._instance)
+            return ui.StatusArea._instance;
+        ui.StatusArea._instance = this;
+
+        this.className = 'status';
         document.body.appendChild(this);
-        $(this).dialog({
-            resizable: false,
-            width: $(window).width() * 0.80,  // FIXME: We should have CSS do this work for us.
-        });
-        $('.ui-dialog-title', this.parentNode).text(title);
-        $(this).bind('dialogclose', function() {
-            $(this).detach();
-        }.bind(this));
+        this._currentId = 0;
+        this._unfinishedIds = {};
+
+        this.appendChild(new ui.actions.List([new ui.actions.Close()]));
+        $(this).bind('close', this.close.bind(this));
+
+        var processing = document.createElement('div');
+        processing.className = 'process-text';
+        processing.textContent = 'Processing...';
+        this.appendChild(processing);
     },
     close: function()
     {
-        $(this).dialog('close');
+        this.style.visibility = 'hidden';
+        Array.prototype.forEach.call(this.querySelectorAll('.status-content'), function(node) {
+            node.parentNode.removeChild(node);
+        });
     },
-    addMessage: function(message)
+    addMessage: function(id, message)
     {
+        this.style.visibility = 'visible';
+        $(this).addClass('processing');
+
         var element = document.createElement('div');
         $(element).addClass('message').text(message);
-        this._content.appendChild(element);
+
+        var content = this.querySelector('#' + id);
+        if (!content) {
+            content = document.createElement('div');
+            content.id = id;
+            content.className = 'status-content';
+            this.appendChild(content);
+        }
+
+        content.appendChild(element);
+        if (element.offsetTop < this.scrollTop || element.offsetTop + element.offsetHeight > this.scrollTop + this.offsetHeight)
+            this.scrollTop = element.offsetTop;
     },
     // FIXME: It's unclear whether this code could live here or in a controller.
-    addFinalMessage: function(message)
+    addFinalMessage: function(id, message)
     {
-        this.addMessage(message);
-        this.appendChild(new ui.actions.List([new ui.actions.Close()]));
-        $(this).bind('close', this.close.bind(this));
+        this.addMessage(id, message);
+
+        delete this._unfinishedIds[id];
+        if (!Object.keys(this._unfinishedIds).length)
+            $(this).removeClass('processing');
+    },
+    newId: function() {
+        var id = 'status-content-' + ++this._currentId;
+        this._unfinishedIds[id] = 1;
+        return id;
     }
 });
 

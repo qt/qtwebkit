@@ -21,7 +21,7 @@ haveQt(5) {
     # path for QtScript when it's built as a standalone module
     QT += script
 } else {
-    INCLUDEPATH += $$PWD/../JavaScriptCore/wtf/qt/compat
+    INCLUDEPATH += $$PWD/../WTF/wtf/qt/compat
 }
 
 RESOURCES += \
@@ -39,12 +39,12 @@ SOURCES += \
     Modules/geolocation/NavigatorGeolocation.cpp \
     \
     Modules/webdatabase/AbstractDatabase.cpp \
-    Modules/webdatabase/DOMWindowSQLDatabase.cpp \
+    Modules/webdatabase/DOMWindowWebDatabase.cpp \
     Modules/webdatabase/Database.cpp \
     Modules/webdatabase/DatabaseAuthorizer.cpp \
     Modules/webdatabase/DatabaseContext.cpp \
     Modules/webdatabase/DatabaseSync.cpp \
-    Modules/webdatabase/WorkerContextSQLDatabase.cpp \
+    Modules/webdatabase/WorkerContextWebDatabase.cpp \
     \
     accessibility/AccessibilityImageMapLink.cpp \
     accessibility/AccessibilityMediaControls.cpp \
@@ -103,13 +103,14 @@ v8 {
         bindings/v8/custom/V8Uint8ArrayCustom.cpp \
         bindings/v8/custom/V8Uint16ArrayCustom.cpp \
         bindings/v8/custom/V8Uint32ArrayCustom.cpp \
+        bindings/v8/custom/V8Uint8ClampedArrayCustom.cpp \
         \
         bindings/v8/DateExtension.cpp \
         bindings/v8/DOMData.cpp \
         bindings/v8/DOMDataStore.cpp \
         bindings/v8/NPV8Object.cpp \
         bindings/v8/NPObjectWrapper.cpp \
-        bindings/v8/OptionsObject.cpp \
+        bindings/v8/Dictionary.cpp \
         bindings/v8/PageScriptDebugServer.cpp \
         bindings/v8/RetainedDOMInfo.cpp \
         bindings/v8/ScheduledAction.cpp \
@@ -130,6 +131,7 @@ v8 {
         bindings/v8/SerializedScriptValue.cpp \
         bindings/v8/V8AbstractEventListener.cpp \
         bindings/v8/V8Binding.cpp \
+        bindings/v8/V8BindingPerContextData.cpp \
         bindings/v8/V8Collection.cpp \
         bindings/v8/V8DOMMap.cpp \
         bindings/v8/V8DOMWrapper.cpp \
@@ -163,7 +165,6 @@ v8 {
         bindings/v8/custom/V8CSSStyleSheetCustom.cpp \
         bindings/v8/custom/V8CSSValueCustom.cpp \
         bindings/v8/custom/V8CanvasRenderingContext2DCustom.cpp \
-        bindings/v8/custom/V8CanvasPixelArrayCustom.cpp \
         bindings/v8/custom/V8ClipboardCustom.cpp \
         bindings/v8/custom/V8CoordinatesCustom.cpp \
         bindings/v8/custom/V8ImageDataCustom.cpp \
@@ -233,11 +234,11 @@ v8 {
         \
         bindings/v8/specialization/V8BindingState.cpp\
         \
+        bindings/v8/custom/V8NotificationCustom.cpp \
         bindings/v8/custom/V8NotificationCenterCustom.cpp \
         bindings/v8/custom/V8ConsoleCustom.cpp \
         bindings/v8/custom/V8SQLTransactionSyncCustom.cpp \
         bindings/v8/V8WorkerContextErrorHandler.cpp \
-        testing/v8/V8InternalsCustom.cpp \
         testing/v8/WebCoreTestSupport.cpp
 } else {
     SOURCES += \
@@ -245,6 +246,7 @@ v8 {
         bindings/js/CallbackFunction.cpp \
         bindings/js/DOMObjectHashTableMap.cpp \
         bindings/js/DOMWrapperWorld.cpp \
+        bindings/js/Dictionary.cpp \
         bindings/js/GCController.cpp \
         bindings/js/JSArrayBufferCustom.cpp \
         bindings/js/JSAttrCustom.cpp \
@@ -341,6 +343,7 @@ v8 {
         bindings/js/JSNodeFilterCustom.cpp \
         bindings/js/JSNodeIteratorCustom.cpp \
         bindings/js/JSNodeListCustom.cpp \
+        bindings/js/JSNotificationCustom.cpp \
         bindings/js/JSPluginElementFunctions.cpp \
         bindings/js/JSPopStateEventCustom.cpp \
         bindings/js/JSProcessingInstructionCustom.cpp \
@@ -393,16 +396,41 @@ v8 {
         bridge/qt/qt_class.cpp \
         bridge/qt/qt_instance.cpp \
         bridge/qt/qt_pixmapruntime.cpp \
-        bridge/qt/qt_runtime.cpp \
         bridge/runtime_array.cpp \
         bridge/runtime_method.cpp \
         bridge/runtime_object.cpp \
         bridge/runtime_root.cpp \
-        testing/js/JSInternalsCustom.cpp \
         testing/js/WebCoreTestSupport.cpp
+
+    haveQt(5) {
+        SOURCES += bridge/qt/qt_runtime.cpp
+    } else {
+        SOURCES += bridge/qt/qt_runtime_qt4.cpp
+    }
 }
 
 SOURCES += \
+    Modules/filesystem/DOMFilePath.cpp \
+    Modules/filesystem/DOMFileSystem.cpp \
+    Modules/filesystem/DOMFileSystemBase.cpp \
+    Modules/filesystem/DOMFileSystemSync.cpp \
+    Modules/filesystem/DOMWindowFileSystem.cpp \
+    Modules/filesystem/DirectoryEntry.cpp \
+    Modules/filesystem/DirectoryEntrySync.cpp \
+    Modules/filesystem/DirectoryReader.cpp \
+    Modules/filesystem/DirectoryReaderSync.cpp \
+    Modules/filesystem/Entry.cpp \
+    Modules/filesystem/EntryArray.cpp \
+    Modules/filesystem/EntryArraySync.cpp \
+    Modules/filesystem/EntryBase.cpp \
+    Modules/filesystem/EntrySync.cpp \
+    Modules/filesystem/FileEntry.cpp \
+    Modules/filesystem/FileEntrySync.cpp \
+    Modules/filesystem/FileWriter.cpp \
+    Modules/filesystem/FileWriterBase.cpp \
+    Modules/filesystem/FileWriterSync.cpp \
+    Modules/filesystem/LocalFileSystem.cpp \
+    Modules/filesystem/WorkerContextFileSystem.cpp \
     css/CSSAspectRatioValue.cpp \
     css/CSSBorderImageSliceValue.cpp \
     css/CSSBorderImage.cpp \
@@ -412,7 +440,6 @@ SOURCES += \
     css/CSSComputedStyleDeclaration.cpp \
     css/CSSCrossfadeValue.cpp \
     css/CSSCursorImageValue.cpp \
-    css/CSSFlexValue.cpp \
     css/CSSFontFace.cpp \
     css/CSSFontFaceRule.cpp \
     css/CSSFontFaceSrcValue.cpp \
@@ -433,7 +460,6 @@ SOURCES += \
     css/CSSParserValues.cpp \
     css/CSSPrimitiveValue.cpp \
     css/CSSProperty.cpp \
-    css/CSSPropertyLonghand.cpp \
     css/CSSPropertySourceData.cpp \
     css/CSSReflectValue.cpp \
     css/CSSRule.cpp \
@@ -441,10 +467,8 @@ SOURCES += \
     css/CSSSelector.cpp \
     css/CSSSelectorList.cpp \
     css/CSSSegmentedFontFace.cpp \
-    css/CSSStyleApplyProperty.cpp \
     css/CSSStyleDeclaration.cpp \
     css/CSSStyleRule.cpp \
-    css/CSSStyleSelector.cpp \
     css/CSSStyleSheet.cpp \
     css/CSSTimingFunctionValue.cpp \
     css/CSSUnicodeRangeValue.cpp \
@@ -454,6 +478,7 @@ SOURCES += \
     css/CSSWrapShapes.cpp \
     css/FontFeatureValue.cpp \
     css/FontValue.cpp \
+    css/LengthFunctions.cpp \
     css/MediaFeatureNames.cpp \
     css/MediaList.cpp \
     css/MediaQuery.cpp \
@@ -466,8 +491,11 @@ SOURCES += \
     css/RGBColor.cpp \
     css/SelectorChecker.cpp \
     css/ShadowValue.cpp \
+    css/StyleBuilder.cpp \
     css/StyleMedia.cpp \
     css/StylePropertySet.cpp \
+    css/StylePropertyShorthand.cpp \
+    css/StyleResolver.cpp \
     css/StyleRule.cpp \
     css/StyleSheet.cpp \
     css/StyleSheetList.cpp \
@@ -480,7 +508,6 @@ SOURCES += \
     css/WebKitCSSTransformValue.cpp \
     dom/ActiveDOMObject.cpp \
     dom/Attr.cpp \
-    dom/Attribute.cpp \
     dom/BeforeTextInsertedEvent.cpp \
     dom/BeforeUnloadEvent.cpp \
     dom/CDATASection.cpp \
@@ -494,8 +521,10 @@ SOURCES += \
     dom/Clipboard.cpp \
     dom/ClipboardEvent.cpp \
     dom/Comment.cpp \
+    dom/ComposedShadowTreeWalker.cpp \
     dom/CompositionEvent.cpp \
     dom/ContainerNode.cpp \
+    dom/ContainerNodeAlgorithms.cpp \
     dom/ContextDestructionObserver.cpp \
     dom/CustomEvent.cpp \
     dom/DecodedDataDocumentParser.cpp \
@@ -521,6 +550,7 @@ SOURCES += \
     dom/DynamicNodeList.cpp \
     dom/EditingText.cpp \
     dom/Element.cpp \
+    dom/ElementShadow.cpp \
     dom/ElementAttributeData.cpp \
     dom/EntityReference.cpp \
     dom/ErrorEvent.cpp \
@@ -569,7 +599,6 @@ SOURCES += \
     dom/Range.cpp \
     dom/RangeException.cpp \
     dom/RawDataDocumentParser.h \
-    dom/RegionNodeList.cpp \
     dom/RegisteredEventListener.cpp \
     dom/ScopedEventQueue.cpp \
     dom/ScriptedAnimationController.cpp \
@@ -580,7 +609,6 @@ SOURCES += \
     dom/SecurityContext.cpp \
     dom/SelectorQuery.cpp \
     dom/ShadowRoot.cpp \
-    dom/ShadowTree.cpp \
     dom/SpaceSplitString.cpp \
     dom/StaticNodeList.cpp \
     dom/StyledElement.cpp \
@@ -593,6 +621,7 @@ SOURCES += \
     dom/TouchList.cpp \
     dom/Traversal.cpp \
     dom/TreeScope.cpp \
+    dom/TreeScopeAdjuster.cpp \
     dom/TreeScopeAdopter.cpp \
     dom/TreeWalker.cpp \
     dom/UIEvent.cpp \
@@ -607,6 +636,7 @@ SOURCES += \
     dom/WheelEvent.cpp \
     dom/WindowEventContext.cpp \
     dom/default/PlatformMessagePortChannel.cpp \
+    editing/AlternativeTextController.cpp \
     editing/AppendNodeCommand.cpp \
     editing/ApplyBlockElementCommand.cpp \
     editing/ApplyStyleCommand.cpp \
@@ -617,6 +647,8 @@ SOURCES += \
     editing/DeleteButton.cpp \
     editing/DeleteFromTextNodeCommand.cpp \
     editing/DeleteSelectionCommand.cpp \
+    editing/DictationAlternative.cpp \
+    editing/DictationCommand.cpp \
     editing/EditCommand.cpp \
     editing/EditingStyle.cpp \
     editing/Editor.cpp \
@@ -646,13 +678,14 @@ SOURCES += \
     editing/ReplaceSelectionCommand.cpp \
     editing/SetNodeAttributeCommand.cpp \
     editing/SetSelectionCommand.cpp \
+    editing/SimplifyMarkupCommand.cpp \
     editing/SpellChecker.cpp \
     editing/SpellingCorrectionCommand.cpp \
-    editing/SpellingCorrectionController.cpp \
     editing/SplitElementCommand.cpp \
     editing/SplitTextNodeCommand.cpp \
     editing/SplitTextNodeContainingElementCommand.cpp \
     editing/TextCheckingHelper.cpp \
+    editing/TextInsertionBaseCommand.cpp \
     editing/TextIterator.cpp \
     editing/TypingCommand.cpp \
     editing/UnlinkCommand.cpp \
@@ -664,37 +697,16 @@ SOURCES += \
     fileapi/AsyncFileStream.cpp \
     fileapi/Blob.cpp \
     fileapi/BlobURL.cpp \
-    fileapi/DOMFilePath.cpp \
-    fileapi/DOMFileSystem.cpp \
-    fileapi/DOMFileSystemBase.cpp \
-    fileapi/DOMFileSystemSync.cpp \
-    fileapi/DOMWindowFileSystem.cpp \
-    fileapi/DirectoryEntry.cpp \
-    fileapi/DirectoryEntrySync.cpp \
-    fileapi/DirectoryReader.cpp \
-    fileapi/DirectoryReaderSync.cpp \
-    fileapi/Entry.cpp \
-    fileapi/EntryArray.cpp \
-    fileapi/EntryArraySync.cpp \
-    fileapi/EntryBase.cpp \
-    fileapi/EntrySync.cpp \
     fileapi/File.cpp \
-    fileapi/FileEntry.cpp \
-    fileapi/FileEntrySync.cpp \
     fileapi/FileException.cpp \
     fileapi/FileList.cpp \
     fileapi/FileReader.cpp \
     fileapi/FileReaderLoader.cpp \
     fileapi/FileReaderSync.cpp \
     fileapi/FileThread.cpp \
-    fileapi/FileWriter.cpp \
-    fileapi/FileWriterBase.cpp \
-    fileapi/FileWriterSync.cpp \
-    fileapi/LocalFileSystem.cpp \
     fileapi/OperationNotAllowedException.cpp \
     fileapi/ThreadableBlobRegistry.cpp \
     fileapi/WebKitBlobBuilder.cpp \
-    fileapi/WorkerContextFileSystem.cpp \
     history/BackForwardController.cpp \
     history/BackForwardListImpl.cpp \
     history/CachedFrame.cpp \
@@ -836,7 +848,6 @@ SOURCES += \
     html/WeekInputType.cpp \
     html/canvas/CanvasGradient.cpp \
     html/canvas/CanvasPattern.cpp \
-    html/canvas/CanvasPixelArray.cpp \
     html/canvas/CanvasRenderingContext.cpp \
     html/canvas/CanvasRenderingContext2D.cpp \
     html/canvas/CanvasStyle.cpp \
@@ -952,6 +963,7 @@ SOURCES += \
     loader/DocumentLoader.cpp \
     loader/DocumentThreadableLoader.cpp \
     loader/DocumentWriter.cpp \
+    loader/EmptyClients.cpp \
     loader/FormState.cpp \
     loader/FormSubmission.cpp \
     loader/FrameLoader.cpp \
@@ -980,12 +992,15 @@ SOURCES += \
     loader/SubresourceLoader.cpp \
     loader/TextResourceDecoder.cpp \
     loader/ThreadableLoader.cpp \
+    notifications/DOMWindowNotifications.cpp \
     notifications/Notification.cpp \
     notifications/NotificationCenter.cpp \
     notifications/NotificationController.cpp \
+    notifications/WorkerContextNotifications.cpp \
     page/animation/AnimationBase.cpp \
     page/animation/AnimationController.cpp \
     page/animation/CompositeAnimation.cpp \
+    page/animation/CSSPropertyAnimation.cpp \
     page/animation/ImplicitAnimation.cpp \
     page/animation/KeyframeAnimation.cpp \
     page/WebKitAnimation.cpp \
@@ -999,6 +1014,7 @@ SOURCES += \
     page/DOMSelection.cpp \
     page/DOMTimer.cpp \
     page/DOMWindow.cpp \
+    page/DOMWindowExtension.cpp \
     page/DOMWindowProperty.cpp \
     page/DragController.cpp \
     page/EventHandler.cpp \
@@ -1024,6 +1040,8 @@ SOURCES += \
     page/PageGroupLoadDeferrer.cpp \
     page/PageVisibilityState.cpp \
     page/Performance.cpp \
+    page/PerformanceEntry.cpp \
+    page/PerformanceEntryList.cpp \
     page/PerformanceNavigation.cpp \
     page/PerformanceTiming.cpp \
     page/PrintContext.cpp \
@@ -1034,6 +1052,7 @@ SOURCES += \
     page/SecurityPolicy.cpp \
     page/Settings.cpp \
     page/SpatialNavigation.cpp \
+    page/TouchAdjustment.cpp \
     page/SuspendableTimer.cpp \
     page/UserContentURLPattern.cpp \
     page/WindowFeatures.cpp \
@@ -1065,7 +1084,6 @@ SOURCES += \
     platform/FileIconLoader.cpp \
     platform/FileStream.cpp \
     platform/FileSystem.cpp \
-    platform/GeolocationService.cpp \
     platform/HistogramSupport.cpp \
     platform/image-decoders/qt/ImageFrameQt.cpp \
     platform/graphics/FontDescription.cpp \
@@ -1092,6 +1110,7 @@ SOURCES += \
     platform/graphics/GraphicsTypes.cpp \
     platform/graphics/Image.cpp \
     platform/graphics/ImageBuffer.cpp \
+    platform/graphics/ImageOrientation.cpp \
     platform/graphics/ImageSource.cpp \
     platform/graphics/IntRect.cpp \
     platform/graphics/Path.cpp \
@@ -1104,6 +1123,8 @@ SOURCES += \
     platform/graphics/SVGGlyph.cpp \
     platform/graphics/SimpleFontData.cpp \
     platform/graphics/StringTruncator.cpp \
+    platform/graphics/surfaces/GraphicsSurface.cpp \
+    platform/graphics/surfaces/qt/GraphicsSurfaceQt.cpp \
     platform/graphics/TextRun.cpp \
     platform/graphics/TiledBackingStore.cpp \
     platform/graphics/transforms/AffineTransform.cpp \
@@ -1128,10 +1149,10 @@ SOURCES += \
     platform/LinkHash.cpp \
     platform/Logging.cpp \
     platform/MemoryPressureHandler.cpp \
+    platform/MemoryUsageSupport.cpp \
     platform/MIMETypeRegistry.cpp \
     platform/mock/DeviceOrientationClientMock.cpp \
     platform/mock/GeolocationClientMock.cpp \
-    platform/mock/GeolocationServiceMock.cpp \
     platform/mock/ScrollbarThemeMock.cpp \
     platform/network/AuthenticationChallengeBase.cpp \
     platform/network/BlobData.cpp \
@@ -1144,6 +1165,7 @@ SOURCES += \
     platform/network/FormDataBuilder.cpp \
     platform/network/HTTPHeaderMap.cpp \
     platform/network/HTTPParsers.cpp \
+    platform/network/HTTPRequest.cpp \
     platform/network/HTTPValidation.cpp \
     platform/network/MIMEHeader.cpp \
     platform/network/NetworkStateNotifier.cpp \
@@ -1167,6 +1189,7 @@ SOURCES += \
     platform/ScrollView.cpp \
     platform/SharedBuffer.cpp \
     platform/SharedBufferChunkReader.cpp \
+    platform/StatsCounter.cpp \
     platform/sql/SQLiteAuthorizer.cpp \
     platform/sql/SQLiteDatabase.cpp \
     platform/sql/SQLiteFileSystem.cpp \
@@ -1207,6 +1230,7 @@ SOURCES += \
     rendering/EllipsisBox.cpp \
     rendering/FilterEffectRenderer.cpp \
     rendering/FixedTableLayout.cpp \
+    rendering/FlowThreadController.cpp \
     rendering/HitTestingTransformState.cpp \
     rendering/HitTestResult.cpp \
     rendering/InlineBox.cpp \
@@ -1243,6 +1267,7 @@ SOURCES += \
     rendering/RenderLayer.cpp \
     rendering/RenderLayerBacking.cpp \
     rendering/RenderLayerCompositor.cpp \
+    rendering/RenderLayerFilterInfo.cpp \
     rendering/RenderLineBoxList.cpp \
     rendering/RenderListBox.cpp \
     rendering/RenderListItem.cpp \
@@ -1250,12 +1275,17 @@ SOURCES += \
     rendering/RenderMarquee.cpp \
     rendering/RenderMenuList.cpp \
     rendering/RenderMeter.cpp \
+    rendering/RenderMultiColumnBlock.cpp \
+    rendering/RenderMultiColumnFlowThread.cpp \
+    rendering/RenderMultiColumnSet.cpp \
+    rendering/RenderNamedFlowThread.cpp \
     rendering/RenderObject.cpp \
     rendering/RenderObjectChildList.cpp \
     rendering/RenderPart.cpp \
     rendering/RenderProgress.cpp \
     rendering/RenderQuote.cpp \
     rendering/RenderRegion.cpp \
+    rendering/RenderRegionSet.cpp \
     rendering/RenderReplaced.cpp \
     rendering/RenderReplica.cpp \
     rendering/RenderRuby.cpp \
@@ -1400,6 +1430,7 @@ v8 {
         bindings/v8/PageScriptDebugServer.h \
         bindings/v8/RetainedDOMInfo.h \
         bindings/v8/RetainedObjectInfo.h \
+        bindings/v8/SafeAllocation.h \
         bindings/v8/ScheduledAction.h \
         bindings/v8/ScopedDOMDataStore.h \
         bindings/v8/ScriptCachedFrameData.h \
@@ -1537,7 +1568,7 @@ HEADERS += \
     \
     Modules/webdatabase/AbstractDatabase.h \
     Modules/webdatabase/ChangeVersionWrapper.h \
-    Modules/webdatabase/DOMWindowSQLDatabase.h \
+    Modules/webdatabase/DOMWindowWebDatabase.h \
     Modules/webdatabase/DatabaseAuthorizer.h \
     Modules/webdatabase/Database.h \
     Modules/webdatabase/DatabaseCallback.h \
@@ -1557,7 +1588,7 @@ HEADERS += \
     Modules/webdatabase/SQLTransactionCoordinator.h \
     Modules/webdatabase/SQLTransactionSync.h \
     Modules/webdatabase/SQLTransactionSyncCallback.h \
-    Modules/webdatabase/WorkerContextSQLDatabase.h \
+    Modules/webdatabase/WorkerContextWebDatabase.h \
     \
     css/CSSAspectRatioValue.h \
     css/CSSBorderImageSliceValue.h \
@@ -1568,7 +1599,6 @@ HEADERS += \
     css/CSSComputedStyleDeclaration.h \
     css/CSSCrossfadeValue.h \
     css/CSSCursorImageValue.h \
-    css/CSSFlexValue.h \
     css/CSSFontFace.h \
     css/CSSFontFaceRule.h \
     css/CSSFontFaceSource.h \
@@ -1586,20 +1616,18 @@ HEADERS += \
     css/CSSOMUtils.h \
     css/CSSPageRule.h \
     css/CSSParser.h \
+    css/CSSParserMode.h \
     css/CSSParserValues.h \
     css/CSSPrimitiveValue.h \
     css/CSSProperty.h \
-    css/CSSPropertyLonghand.h \
     css/CSSReflectValue.h \
     css/CSSRule.h \
     css/CSSRuleList.h \
     css/CSSSegmentedFontFace.h \
     css/CSSSelector.h \
     css/CSSSelectorList.h \
-    css/CSSStyleApplyProperty.h \
     css/CSSStyleDeclaration.h \
     css/CSSStyleRule.h \
-    css/CSSStyleSelector.h \
     css/CSSStyleSheet.h \
     css/CSSTimingFunctionValue.h \
     css/CSSUnicodeRangeValue.h \
@@ -1610,6 +1638,7 @@ HEADERS += \
     css/CSSWrapShapes.h \
     css/FontFeatureValue.h \
     css/FontValue.h \
+    css/LengthFunctions.h \
     css/MediaFeatureNames.h \
     css/MediaList.h \
     css/MediaQuery.h \
@@ -1622,7 +1651,10 @@ HEADERS += \
     css/SelectorChecker.h \
     css/ShadowValue.h \
     css/StyleMedia.h \
+    css/StyleBuilder.h \
     css/StylePropertySet.h \
+    css/StylePropertyShorthand.h \
+    css/StyleResolver.h \
     css/StyleRule.h \
     css/StyleSheet.h \
     css/StyleSheetList.h \
@@ -1648,7 +1680,9 @@ HEADERS += \
     dom/ClipboardEvent.h \
     dom/Clipboard.h \
     dom/Comment.h \
+    dom/ComposedShadowTreeWalker.h \
     dom/ContainerNode.h \
+    dom/ContainerNodeAlgorithms.h \
     dom/CustomEvent.h \
     dom/default/PlatformMessagePortChannel.h \
     dom/DeviceMotionClient.h \
@@ -1673,6 +1707,7 @@ HEADERS += \
     dom/DynamicNodeList.h \
     dom/EditingText.h \
     dom/Element.h \
+    dom/ElementShadow.h \
     dom/ElementAttributeData.h \
     dom/Entity.h \
     dom/EntityReference.h \
@@ -1722,7 +1757,6 @@ HEADERS += \
     dom/ScriptExecutionContext.h \
     dom/SelectorQuery.h \
     dom/ShadowRoot.h \
-    dom/ShadowTree.h \
     dom/SpaceSplitString.h \
     dom/StaticNodeList.h \
     dom/StyledElement.h \
@@ -1738,6 +1772,7 @@ HEADERS += \
     dom/Traversal.h \
     dom/TreeDepthLimit.h \
     dom/TreeScope.h \
+    dom/TreeScopeAdjuster.h \
     dom/TreeScopeAdopter.h \
     dom/TreeWalker.h \
     dom/UIEvent.h \
@@ -1749,6 +1784,7 @@ HEADERS += \
     dom/WebKitNamedFlow.h \
     dom/WebKitTransitionEvent.h \
     dom/WheelEvent.h \
+    editing/AlternativeTextController.h \
     editing/AppendNodeCommand.h \
     editing/ApplyBlockElementCommand.h \
     editing/ApplyStyleCommand.h \
@@ -1759,6 +1795,8 @@ HEADERS += \
     editing/DeleteButton.h \
     editing/DeleteFromTextNodeCommand.h \
     editing/DeleteSelectionCommand.h \
+    editing/DictationAlternative.h \
+    editing/DictationCommand.h \
     editing/EditCommand.h \
     editing/EditingStyle.h \
     editing/EditingBehavior.h \
@@ -1788,12 +1826,13 @@ HEADERS += \
     editing/ReplaceNodeWithSpanCommand.h \
     editing/ReplaceSelectionCommand.h \
     editing/SetNodeAttributeCommand.h \
+    editing/SimplifyMarkupCommand.h \
     editing/SmartReplace.h \
     editing/SpellingCorrectionCommand.h \
-    editing/SpellingCorrectionController.h \
     editing/SplitElementCommand.h \
     editing/SplitTextNodeCommand.h \
     editing/SplitTextNodeContainingElementCommand.h \
+    editing/TextInsertionBaseCommand.h \
     editing/TextIterator.h \
     editing/TypingCommand.h \
     editing/UndoStep.h \
@@ -1825,7 +1864,6 @@ HEADERS += \
     history/PageCache.h \
     html/canvas/CanvasGradient.h \
     html/canvas/CanvasPattern.h \
-    html/canvas/CanvasPixelArray.h \
     html/canvas/CanvasRenderingContext.h \
     html/canvas/CanvasRenderingContext2D.h \
     html/canvas/CanvasStyle.h \
@@ -1846,6 +1884,7 @@ HEADERS += \
     html/HTMLBaseElement.h \
     html/HTMLBaseFontElement.h \
     html/HTMLBodyElement.h \
+    html/HTMLBDIElement.h \
     html/HTMLBRElement.h \
     html/HTMLButtonElement.h \
     html/HTMLCanvasElement.h \
@@ -2076,11 +2115,12 @@ HEADERS += \
     mathml/MathMLInlineContainerElement.h \
     mathml/MathMLMathElement.h \
     mathml/MathMLTextElement.h \
+    notifications/DOMWindowNotifications.h \
     notifications/Notification.h \
     notifications/NotificationCenter.h \
     notifications/NotificationClient.h \
-    notifications/NotificationContents.h \
     notifications/NotificationController.h \
+    notifications/WorkerContextNotifications.h \
     page/animation/AnimationBase.h \
     page/animation/AnimationController.h \
     page/animation/CompositeAnimation.h \
@@ -2097,6 +2137,7 @@ HEADERS += \
     page/DOMSelection.h \
     page/DOMTimer.h \
     page/DOMWindow.h \
+    page/DOMWindowExtension.h \
     page/DragController.h \
     page/DragState.h \
     page/EventHandler.h \
@@ -2128,6 +2169,7 @@ HEADERS += \
     page/SpeechInputListener.h \
     page/SpeechInputResult.h \
     page/SpeechInputResultList.h \
+    page/TouchAdjustment.h \
     page/WebKitAnimation.h \
     page/WebKitAnimationList.h \
     page/WindowFeatures.h \
@@ -2149,12 +2191,10 @@ HEADERS += \
     platform/FileStream.h \
     platform/FileStreamClient.h \
     platform/FileSystem.h \
-    platform/GeolocationService.h \
     platform/HistogramSupport.h \
     platform/image-decoders/ImageDecoder.h \
     platform/mock/DeviceOrientationClientMock.h \
     platform/mock/GeolocationClientMock.cpp \
-    platform/mock/GeolocationServiceMock.h \
     platform/mock/ScrollbarThemeMock.h \
     platform/graphics/BitmapImage.h \
     platform/graphics/Color.h \
@@ -2213,6 +2253,7 @@ HEADERS += \
     platform/graphics/GraphicsTypes.h \
     platform/graphics/GraphicsTypes3D.h \
     platform/graphics/Image.h \
+    platform/graphics/ImageOrientation.h \
     platform/graphics/ImageSource.h \
     platform/graphics/IntPoint.h \
     platform/graphics/IntPointHash.h \
@@ -2229,6 +2270,7 @@ HEADERS += \
     platform/graphics/SegmentedFontData.h \
     platform/graphics/ShadowBlur.h \
     platform/graphics/SimpleFontData.h \
+    platform/graphics/surfaces/GraphicsSurface.h \
     platform/graphics/Tile.h \
     platform/graphics/TiledBackingStore.h \
     platform/graphics/TiledBackingStoreClient.h \
@@ -2245,6 +2287,7 @@ HEADERS += \
     platform/KillRing.h \
     platform/KURL.h \
     platform/Length.h \
+    platform/LengthBox.h \
     platform/leveldb/LevelDBComparator.h \
     platform/leveldb/LevelDBDatabase.h \
     platform/leveldb/LevelDBIterator.h \
@@ -2261,6 +2304,7 @@ HEADERS += \
     platform/Logging.h \
     platform/Language.h \
     platform/MemoryPressureHandler.h \
+    platform/MemoryUsageSupport.h \
     platform/MIMETypeRegistry.h \
     platform/network/AuthenticationChallengeBase.h \
     platform/network/AuthenticationClient.h \
@@ -2277,6 +2321,7 @@ HEADERS += \
     platform/network/FormData.h \
     platform/network/HTTPHeaderMap.h \
     platform/network/HTTPParsers.h \
+    platform/network/HTTPRequest.h \
     platform/network/HTTPValidation.h \
     platform/network/HTTPStatusCodes.h \
     platform/network/MIMESniffing.h \
@@ -2298,6 +2343,7 @@ HEADERS += \
     platform/PlatformTouchEvent.h \
     platform/PlatformTouchPoint.h \
     platform/PopupMenu.h \
+    platform/ReferrerPolicy.h \
     platform/qt/ClipboardQt.h \
     platform/qt/CookieJarQt.h \
     platform/qt/QWebPageClient.h \
@@ -2419,6 +2465,7 @@ HEADERS += \
     rendering/RenderMedia.h \
     rendering/RenderMenuList.h \
     rendering/RenderMeter.h \
+    rendering/RenderMultiColumnBlock.h \
     rendering/RenderObjectChildList.h \
     rendering/RenderObject.h \
     rendering/RenderPart.h \
@@ -2487,6 +2534,7 @@ HEADERS += \
     rendering/style/SVGRenderStyle.h \
     rendering/svg/RenderSVGBlock.h \
     rendering/svg/RenderSVGContainer.h \
+    rendering/svg/RenderSVGEllipse.h \
     rendering/svg/RenderSVGForeignObject.h \
     rendering/svg/RenderSVGGradientStop.h \
     rendering/svg/RenderSVGHiddenContainer.h \
@@ -2515,7 +2563,6 @@ HEADERS += \
     rendering/svg/RenderSVGTextPath.h \
     rendering/svg/RenderSVGTransformableContainer.h \
     rendering/svg/RenderSVGViewportContainer.h \
-    rendering/svg/SVGImageBufferTools.h \
     rendering/svg/SVGInlineFlowBox.h \
     rendering/svg/SVGInlineTextBox.h \
     rendering/svg/SVGMarkerData.h \
@@ -2596,6 +2643,7 @@ HEADERS += \
     svg/SVGAnimatedColor.h \
     svg/SVGAnimatedEnumeration.h \
     svg/SVGAnimatedInteger.h \
+    svg/SVGAnimatedIntegerOptionalInteger.h \
     svg/SVGAnimatedLength.h \
     svg/SVGAnimatedLengthList.h \
     svg/SVGAnimatedNumber.h \
@@ -2802,7 +2850,6 @@ SOURCES += \
     page/qt/EventHandlerQt.cpp \
     platform/graphics/qt/TransformationMatrixQt.cpp \
     platform/graphics/qt/ColorQt.cpp \
-    platform/graphics/qt/FontQt.cpp \
     platform/graphics/qt/FontPlatformDataQt.cpp \
     platform/graphics/qt/FloatPointQt.cpp \
     platform/graphics/qt/FloatRectQt.cpp \
@@ -2850,8 +2897,6 @@ SOURCES += \
     platform/qt/PasteboardQt.cpp \
     platform/qt/PlatformKeyboardEventQt.cpp \
     platform/qt/PlatformScreenQt.cpp \
-    platform/qt/PlatformTouchEventQt.cpp \
-    platform/qt/PlatformTouchPointQt.cpp \
     platform/qt/RenderThemeQt.cpp \
     platform/qt/RenderThemeQtMobile.cpp \
     platform/qt/ScrollbarThemeQt.cpp \
@@ -2867,14 +2912,19 @@ SOURCES += \
     platform/text/qt/TextCodecQt.cpp \
     platform/qt/WidgetQt.cpp
 
-!contains(DEFINES, WTF_USE_LIBXML2=1) {
+contains(DEFINES, WTF_USE_LIBXML2=1) {
+    HEADERS += xml/parser/XMLDocumentParserScope.h
+    SOURCES += \
+            xml/parser/XMLDocumentParserLibxml2.cpp \
+            xml/parser/XMLDocumentParserScope.cpp
+} else {
     SOURCES += xml/parser/XMLDocumentParserQt.cpp
 }
 
 contains(DEFINES, ENABLE_SMOOTH_SCROLLING=1) {
     win32-*|wince* {
-        HEADERS += platform/ScrollAnimatorWin.h
-        SOURCES += platform/ScrollAnimatorWin.cpp
+        HEADERS += platform/ScrollAnimatorNone.h
+        SOURCES += platform/ScrollAnimatorNone.cpp
     }
 }
 
@@ -3059,39 +3109,39 @@ contains(DEFINES, ENABLE_DATA_TRANSFER_ITEMS=1) {
 
 contains(DEFINES, ENABLE_FILE_SYSTEM=1) {
     HEADERS += \
-        fileapi/AsyncFileWriter.h \
-        fileapi/DirectoryEntry.h \
-        fileapi/DirectoryEntrySync.h \
-        fileapi/DirectoryReader.h \
-        fileapi/DirectoryReaderBase.h \
-        fileapi/DirectoryReaderSync.h \
-        fileapi/DOMFilePath.h \
-        fileapi/DOMFileSystem.h \
-        fileapi/DOMFileSystemBase.h \
-        fileapi/DOMFileSystemSync.h \
-        fileapi/EntriesCallback.h \
-        fileapi/Entry.h \
-        fileapi/EntryArray.h \
-        fileapi/EntryArraySync.h \
-        fileapi/EntryBase.h \
-        fileapi/EntryCallback.h \
-        fileapi/EntrySync.h \
-        fileapi/ErrorCallback.h \
-        fileapi/FileCallback.h \
-        fileapi/FileEntry.h \
-        fileapi/FileEntrySync.h \
-        fileapi/FileSystemCallback.h \
-        fileapi/FileSystemCallbacks.h \
-        fileapi/FileWriter.h \
-        fileapi/FileWriterBase.h \
-        fileapi/FileWriterBaseCallback.h \
-        fileapi/FileWriterCallback.h \
-        fileapi/FileWriterClient.h \
-        fileapi/FileWriterSync.h \
-        fileapi/WebKitFlags.h \
-        fileapi/LocalFileSystem.h \
-        fileapi/Metadata.h \
-        fileapi/MetadataCallback.h \
+        Modules/filesystem/AsyncFileWriter.h \
+        Modules/filesystem/DOMFilePath.h \
+        Modules/filesystem/DOMFileSystem.h \
+        Modules/filesystem/DOMFileSystemBase.h \
+        Modules/filesystem/DOMFileSystemSync.h \
+        Modules/filesystem/DirectoryEntry.h \
+        Modules/filesystem/DirectoryEntrySync.h \
+        Modules/filesystem/DirectoryReader.h \
+        Modules/filesystem/DirectoryReaderBase.h \
+        Modules/filesystem/DirectoryReaderSync.h \
+        Modules/filesystem/EntriesCallback.h \
+        Modules/filesystem/Entry.h \
+        Modules/filesystem/EntryArray.h \
+        Modules/filesystem/EntryArraySync.h \
+        Modules/filesystem/EntryBase.h \
+        Modules/filesystem/EntryCallback.h \
+        Modules/filesystem/EntrySync.h \
+        Modules/filesystem/ErrorCallback.h \
+        Modules/filesystem/FileCallback.h \
+        Modules/filesystem/FileEntry.h \
+        Modules/filesystem/FileEntrySync.h \
+        Modules/filesystem/FileSystemCallback.h \
+        Modules/filesystem/FileSystemCallbacks.h \
+        Modules/filesystem/FileWriter.h \
+        Modules/filesystem/FileWriterBase.h \
+        Modules/filesystem/FileWriterBaseCallback.h \
+        Modules/filesystem/FileWriterCallback.h \
+        Modules/filesystem/FileWriterClient.h \
+        Modules/filesystem/FileWriterSync.h \
+        Modules/filesystem/WebKitFlags.h \
+        Modules/filesystem/LocalFileSystem.h \
+        Modules/filesystem/Metadata.h \
+        Modules/filesystem/MetadataCallback.h \
         platform/AsyncFileSystem.h \
         platform/AsyncFileSystemCallbacks.h \
         platform/FileMetadata.h
@@ -3236,6 +3286,7 @@ contains(DEFINES, ENABLE_VIDEO=1) {
         HEADERS += \
             platform/graphics/gstreamer/GRefPtrGStreamer.h \
             platform/graphics/gstreamer/GStreamerGWorld.h \
+            platform/graphics/gstreamer/GStreamerUtilities.h \
             platform/graphics/gstreamer/GStreamerVersioning.h \
             platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h \
             platform/graphics/gstreamer/VideoSinkGStreamer.h \
@@ -3246,6 +3297,7 @@ contains(DEFINES, ENABLE_VIDEO=1) {
         SOURCES += \
             platform/graphics/gstreamer/GRefPtrGStreamer.cpp \
             platform/graphics/gstreamer/GStreamerGWorld.cpp \
+            platform/graphics/gstreamer/GStreamerUtilities.cpp \
             platform/graphics/gstreamer/GStreamerVersioning.cpp \
             platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp \
             platform/graphics/gstreamer/VideoSinkGStreamer.cpp \
@@ -3290,16 +3342,13 @@ contains(DEFINES, ENABLE_XSLT=1) {
             xml/XSLImportRule.cpp \
             xml/XSLTExtensions.cpp \
             xml/XSLImportRule.cpp \
-            xml/XSLTUnicodeSort.cpp \
-            xml/parser/XMLDocumentParserLibxml2.cpp \
-            xml/parser/XMLDocumentParserScope.cpp
+            xml/XSLTUnicodeSort.cpp
 
             HEADERS += \
                 xml/XSLImportRule.h \
                 xml/XSLTExtensions.h \
                 xml/XSLImportRule.h \
-                xml/XSLTUnicodeSort.h \
-                xml/parser/XMLDocumentParserScope.h
+                xml/XSLTUnicodeSort.h
 
     } else {
         SOURCES += \
@@ -3366,18 +3415,15 @@ contains(DEFINES, ENABLE_MATHML=1) {
         rendering/mathml/RenderMathMLUnderOver.cpp
 }
 
-# QRawFont feature added in Qt 4.8.0
+# QRawFont transition handling.
 #
-# If available, this is used to implement the fast path for text rendering
-# and measurement in WebCore. Because the feature is still undergoing
-# development, it is disabled in builds.
-#
-# exists($$[QT_INSTALL_HEADERS]/QtGui/QRawFont): HAVE_QRAWFONT=1
+# Even though QRawFont was already available in Qt 4.8, it had
+# limitations that made switching fully to it impossible.
+# We preserve the old code path when building with Qt 4.
 
-!isEmpty(HAVE_QRAWFONT) {
-    DEFINES += HAVE_QRAWFONT=1
-
+contains(DEFINES, HAVE_QRAWFONT=1) {
     SOURCES += \
+        platform/graphics/qt/FontQt.cpp \
         platform/graphics/FontFastPath.cpp \
         platform/graphics/GlyphPageTreeNode.cpp \
         platform/graphics/WidthIterator.cpp \
@@ -3386,6 +3432,22 @@ contains(DEFINES, ENABLE_MATHML=1) {
     HEADERS += \
         platform/graphics/WidthIterator.h \
         platform/graphics/SurrogatePairAwareTextIterator.h
+} else {
+    SOURCES += \
+        platform/graphics/qt/FontQt4.cpp
+}
+
+contains(DEFINES, ENABLE_DEVICE_ORIENTATION=1) {
+    HEADERS += \
+        platform/qt/DeviceMotionClientQt.h \
+        platform/qt/DeviceMotionProviderQt.h \
+        platform/qt/DeviceOrientationClientQt.h \
+        platform/qt/DeviceOrientationProviderQt.h
+    SOURCES += \
+        platform/qt/DeviceMotionClientQt.cpp \
+        platform/qt/DeviceMotionProviderQt.cpp \
+        platform/qt/DeviceOrientationClientQt.cpp \
+        platform/qt/DeviceOrientationProviderQt.cpp
 }
 
 contains(DEFINES, ENABLE_GEOLOCATION=1) {
@@ -3411,6 +3473,7 @@ contains(DEFINES, ENABLE_SVG=1) {
         rendering/style/SVGRenderStyle.cpp \
         rendering/style/SVGRenderStyleDefs.cpp \
         rendering/PointerEventsHitRules.cpp \
+        rendering/svg/RenderSVGEllipse.cpp \
         rendering/svg/RenderSVGPath.cpp \
         rendering/svg/RenderSVGRect.cpp \
         rendering/svg/RenderSVGShape.cpp \
@@ -3460,7 +3523,6 @@ contains(DEFINES, ENABLE_SVG=1) {
               rendering/svg/RenderSVGTextPath.cpp \
               rendering/svg/RenderSVGTransformableContainer.cpp \
               rendering/svg/RenderSVGViewportContainer.cpp \
-              rendering/svg/SVGImageBufferTools.cpp \
               rendering/svg/SVGInlineFlowBox.cpp \
               rendering/svg/SVGInlineTextBox.cpp \
               rendering/svg/SVGMarkerLayoutInfo.cpp \
@@ -3482,159 +3544,167 @@ contains(DEFINES, ENABLE_SVG=1) {
               rendering/svg/SVGTextMetrics.cpp \
               rendering/svg/SVGTextMetricsBuilder.cpp \
               rendering/svg/SVGTextQuery.cpp \
-              rendering/svg/SVGTextRunRenderingContext.cpp \
-              svg/SVGDocumentExtensions.cpp \
-              svg/SVGImageLoader.cpp \
-              svg/ColorDistance.cpp \
-              svg/SVGAElement.cpp \
-              svg/SVGAltGlyphDefElement.cpp \
-              svg/SVGAltGlyphElement.cpp \
-              svg/SVGAltGlyphItemElement.cpp \
-              svg/SVGAngle.cpp \
-              svg/SVGAnimateColorElement.cpp \
-              svg/SVGAnimatedAngle.cpp \
-              svg/SVGAnimatedBoolean.cpp \
-              svg/SVGAnimatedColor.cpp \
-              svg/SVGAnimatedInteger.cpp \
-              svg/SVGAnimatedLength.cpp \
-              svg/SVGAnimatedLengthList.cpp \
-              svg/SVGAnimatedNumber.cpp \
-              svg/SVGAnimatedNumberList.cpp \
-              svg/SVGAnimatedNumberOptionalNumber.cpp \
-              svg/SVGAnimatedPath.cpp \
-              svg/SVGAnimatedPointList.cpp \
-              svg/SVGAnimatedPreserveAspectRatio.cpp \
-              svg/SVGAnimatedRect.cpp \
-              svg/SVGAnimatedString.cpp \
-              svg/SVGAnimatedType.cpp \
-              svg/SVGAnimateElement.cpp \
-              svg/SVGAnimateMotionElement.cpp \
-              svg/SVGAnimateTransformElement.cpp \
-              svg/SVGAnimationElement.cpp \
-              svg/SVGCircleElement.cpp \
-              svg/SVGClipPathElement.cpp \
-              svg/SVGColor.cpp \
-              svg/SVGComponentTransferFunctionElement.cpp \
-              svg/SVGCursorElement.cpp \
-              svg/SVGDefsElement.cpp \
-              svg/SVGDescElement.cpp \
-              svg/SVGDocument.cpp \
-              svg/SVGElement.cpp \
-              svg/SVGElementInstance.cpp \
-              svg/SVGElementInstanceList.cpp \
-              svg/SVGEllipseElement.cpp \
-              svg/SVGException.cpp \
-              svg/SVGExternalResourcesRequired.cpp \
-              svg/SVGFEBlendElement.cpp \
-              svg/SVGFEColorMatrixElement.cpp \
-              svg/SVGFEComponentTransferElement.cpp \
-              svg/SVGFECompositeElement.cpp \
-              svg/SVGFEConvolveMatrixElement.cpp \
-              svg/SVGFEDiffuseLightingElement.cpp \
-              svg/SVGFEDisplacementMapElement.cpp \
-              svg/SVGFEDistantLightElement.cpp \
-              svg/SVGFEDropShadowElement.cpp \
-              svg/SVGFEFloodElement.cpp \
-              svg/SVGFEFuncAElement.cpp \
-              svg/SVGFEFuncBElement.cpp \
-              svg/SVGFEFuncGElement.cpp \
-              svg/SVGFEFuncRElement.cpp \
-              svg/SVGFEGaussianBlurElement.cpp \
-              svg/SVGFEImageElement.cpp \
-              svg/SVGFELightElement.cpp \
-              svg/SVGFEMergeElement.cpp \
-              svg/SVGFEMergeNodeElement.cpp \
-              svg/SVGFEMorphologyElement.cpp \
-              svg/SVGFEOffsetElement.cpp \
-              svg/SVGFEPointLightElement.cpp \
-              svg/SVGFESpecularLightingElement.cpp \
-              svg/SVGFESpotLightElement.cpp \
-              svg/SVGFETileElement.cpp \
-              svg/SVGFETurbulenceElement.cpp \
-              svg/SVGFilterElement.cpp \
-              svg/SVGFilterPrimitiveStandardAttributes.cpp \
-              svg/SVGFitToViewBox.cpp \
-              svg/SVGFontData.cpp \
-              svg/SVGFontElement.cpp \
-              svg/SVGFontFaceElement.cpp \
-              svg/SVGFontFaceFormatElement.cpp \
-              svg/SVGFontFaceNameElement.cpp \
-              svg/SVGFontFaceSrcElement.cpp \
-              svg/SVGFontFaceUriElement.cpp \
-              svg/SVGForeignObjectElement.cpp \
-              svg/SVGGElement.cpp \
-              svg/SVGGlyphElement.cpp \
-              svg/SVGGlyphRefElement.cpp \
-              svg/SVGGradientElement.cpp \
-              svg/SVGHKernElement.cpp \
-              svg/SVGImageElement.cpp \
-              svg/SVGLangSpace.cpp \
-              svg/SVGLength.cpp \
-              svg/SVGLengthContext.cpp \
-              svg/SVGLengthList.cpp \
-              svg/SVGLinearGradientElement.cpp \
-              svg/SVGLineElement.cpp \
-              svg/SVGLocatable.cpp \
-              svg/SVGMarkerElement.cpp \
-              svg/SVGMaskElement.cpp \
-              svg/SVGMetadataElement.cpp \
-              svg/SVGMissingGlyphElement.cpp \
-              svg/SVGMPathElement.cpp \
-              svg/SVGNumberList.cpp \
-              svg/SVGPaint.cpp \
-              svg/SVGParserUtilities.cpp \
-              svg/SVGPathBlender.cpp \
-              svg/SVGPathBuilder.cpp \
-              svg/SVGPathByteStreamBuilder.cpp \
-              svg/SVGPathByteStreamSource.cpp \
-              svg/SVGPathElement.cpp \
-              svg/SVGPathParser.cpp \
-              svg/SVGPathParserFactory.cpp \
-              svg/SVGPathSegList.cpp \
-              svg/SVGPathSegListBuilder.cpp \
-              svg/SVGPathSegListSource.cpp \
-              svg/SVGPathStringBuilder.cpp \
-              svg/SVGPathStringSource.cpp \
-              svg/SVGPathTraversalStateBuilder.cpp \
-              svg/SVGPatternElement.cpp \
-              svg/SVGPointList.cpp \
-              svg/SVGPolyElement.cpp \
-              svg/SVGPolygonElement.cpp \
-              svg/SVGPolylineElement.cpp \
-              svg/SVGPreserveAspectRatio.cpp \
-              svg/SVGRadialGradientElement.cpp \
-              svg/SVGRectElement.cpp \
-              svg/SVGScriptElement.cpp \
-              svg/SVGSetElement.cpp \
-              svg/SVGStopElement.cpp \
-              svg/SVGStringList.cpp \
-              svg/SVGStylable.cpp \
-              svg/SVGStyledElement.cpp \
-              svg/SVGStyledLocatableElement.cpp \
-              svg/SVGStyledTransformableElement.cpp \
-              svg/SVGStyleElement.cpp \
-              svg/SVGSVGElement.cpp \
-              svg/SVGSwitchElement.cpp \
-              svg/SVGSymbolElement.cpp \
-              svg/SVGTests.cpp \
-              svg/SVGTextContentElement.cpp \
-              svg/SVGTextElement.cpp \
-              svg/SVGTextPathElement.cpp \
-              svg/SVGTextPositioningElement.cpp \
-              svg/SVGTitleElement.cpp \
-              svg/SVGTransformable.cpp \
-              svg/SVGTransform.cpp \
-              svg/SVGTransformDistance.cpp \
-              svg/SVGTransformList.cpp \
-              svg/SVGTRefElement.cpp \
-              svg/SVGTSpanElement.cpp \
-              svg/SVGURIReference.cpp \
-              svg/SVGUseElement.cpp \
-              svg/SVGViewElement.cpp \
-              svg/SVGViewSpec.cpp \
-              svg/SVGVKernElement.cpp \
-              svg/SVGZoomAndPan.cpp \
-              svg/SVGZoomEvent.cpp
+              rendering/svg/SVGTextRunRenderingContext.cpp
+        use_all_in_one_files {
+            SOURCES += svg/SVGAllInOne.cpp
+        } else {
+            SOURCES += \
+                  svg/SVGDocumentExtensions.cpp \
+                  svg/ColorDistance.cpp \
+                  svg/SVGAElement.cpp \
+                  svg/SVGAltGlyphDefElement.cpp \
+                  svg/SVGAltGlyphElement.cpp \
+                  svg/SVGAltGlyphItemElement.cpp \
+                  svg/SVGAngle.cpp \
+                  svg/SVGAnimateColorElement.cpp \
+                  svg/SVGAnimatedAngle.cpp \
+                  svg/SVGAnimatedBoolean.cpp \
+                  svg/SVGAnimatedColor.cpp \
+                  svg/SVGAnimatedEnumeration.cpp \
+                  svg/SVGAnimatedInteger.cpp \
+                  svg/SVGAnimatedIntegerOptionalInteger.cpp \
+                  svg/SVGAnimatedLength.cpp \
+                  svg/SVGAnimatedLengthList.cpp \
+                  svg/SVGAnimatedNumber.cpp \
+                  svg/SVGAnimatedNumberList.cpp \
+                  svg/SVGAnimatedNumberOptionalNumber.cpp \
+                  svg/SVGAnimatedPath.cpp \
+                  svg/SVGAnimatedPointList.cpp \
+                  svg/SVGAnimatedPreserveAspectRatio.cpp \
+                  svg/SVGAnimatedRect.cpp \
+                  svg/SVGAnimatedString.cpp \
+                  svg/SVGAnimatedTransformList.cpp \
+                  svg/SVGAnimatedType.cpp \
+                  svg/SVGAnimateElement.cpp \
+                  svg/SVGAnimateMotionElement.cpp \
+                  svg/SVGAnimateTransformElement.cpp \
+                  svg/SVGAnimationElement.cpp \
+                  svg/SVGCircleElement.cpp \
+                  svg/SVGClipPathElement.cpp \
+                  svg/SVGColor.cpp \
+                  svg/SVGComponentTransferFunctionElement.cpp \
+                  svg/SVGCursorElement.cpp \
+                  svg/SVGDefsElement.cpp \
+                  svg/SVGDescElement.cpp \
+                  svg/SVGDocument.cpp \
+                  svg/SVGElement.cpp \
+                  svg/SVGElementInstance.cpp \
+                  svg/SVGElementInstanceList.cpp \
+                  svg/SVGEllipseElement.cpp \
+                  svg/SVGException.cpp \
+                  svg/SVGExternalResourcesRequired.cpp \
+                  svg/SVGFEBlendElement.cpp \
+                  svg/SVGFEColorMatrixElement.cpp \
+                  svg/SVGFEComponentTransferElement.cpp \
+                  svg/SVGFECompositeElement.cpp \
+                  svg/SVGFEConvolveMatrixElement.cpp \
+                  svg/SVGFEDiffuseLightingElement.cpp \
+                  svg/SVGFEDisplacementMapElement.cpp \
+                  svg/SVGFEDistantLightElement.cpp \
+                  svg/SVGFEDropShadowElement.cpp \
+                  svg/SVGFEFloodElement.cpp \
+                  svg/SVGFEFuncAElement.cpp \
+                  svg/SVGFEFuncBElement.cpp \
+                  svg/SVGFEFuncGElement.cpp \
+                  svg/SVGFEFuncRElement.cpp \
+                  svg/SVGFEGaussianBlurElement.cpp \
+                  svg/SVGFEImageElement.cpp \
+                  svg/SVGFELightElement.cpp \
+                  svg/SVGFEMergeElement.cpp \
+                  svg/SVGFEMergeNodeElement.cpp \
+                  svg/SVGFEMorphologyElement.cpp \
+                  svg/SVGFEOffsetElement.cpp \
+                  svg/SVGFEPointLightElement.cpp \
+                  svg/SVGFESpecularLightingElement.cpp \
+                  svg/SVGFESpotLightElement.cpp \
+                  svg/SVGFETileElement.cpp \
+                  svg/SVGFETurbulenceElement.cpp \
+                  svg/SVGFilterElement.cpp \
+                  svg/SVGFilterPrimitiveStandardAttributes.cpp \
+                  svg/SVGFitToViewBox.cpp \
+                  svg/SVGFontData.cpp \
+                  svg/SVGFontElement.cpp \
+                  svg/SVGFontFaceElement.cpp \
+                  svg/SVGFontFaceFormatElement.cpp \
+                  svg/SVGFontFaceNameElement.cpp \
+                  svg/SVGFontFaceSrcElement.cpp \
+                  svg/SVGFontFaceUriElement.cpp \
+                  svg/SVGForeignObjectElement.cpp \
+                  svg/SVGGElement.cpp \
+                  svg/SVGGlyphElement.cpp \
+                  svg/SVGGlyphRefElement.cpp \
+                  svg/SVGGradientElement.cpp \
+                  svg/SVGHKernElement.cpp \
+                  svg/SVGImageElement.cpp \
+                  svg/SVGImageLoader.cpp \
+                  svg/SVGLangSpace.cpp \
+                  svg/SVGLength.cpp \
+                  svg/SVGLengthContext.cpp \
+                  svg/SVGLengthList.cpp \
+                  svg/SVGLinearGradientElement.cpp \
+                  svg/SVGLineElement.cpp \
+                  svg/SVGLocatable.cpp \
+                  svg/SVGMarkerElement.cpp \
+                  svg/SVGMaskElement.cpp \
+                  svg/SVGMetadataElement.cpp \
+                  svg/SVGMissingGlyphElement.cpp \
+                  svg/SVGMPathElement.cpp \
+                  svg/SVGNumberList.cpp \
+                  svg/SVGPaint.cpp \
+                  svg/SVGParserUtilities.cpp \
+                  svg/SVGPathBlender.cpp \
+                  svg/SVGPathBuilder.cpp \
+                  svg/SVGPathByteStreamBuilder.cpp \
+                  svg/SVGPathByteStreamSource.cpp \
+                  svg/SVGPathElement.cpp \
+                  svg/SVGPathParser.cpp \
+                  svg/SVGPathSegList.cpp \
+                  svg/SVGPathSegListBuilder.cpp \
+                  svg/SVGPathSegListSource.cpp \
+                  svg/SVGPathStringBuilder.cpp \
+                  svg/SVGPathStringSource.cpp \
+                  svg/SVGPathTraversalStateBuilder.cpp \
+                  svg/SVGPathUtilities.cpp \
+                  svg/SVGPatternElement.cpp \
+                  svg/SVGPointList.cpp \
+                  svg/SVGPolyElement.cpp \
+                  svg/SVGPolygonElement.cpp \
+                  svg/SVGPolylineElement.cpp \
+                  svg/SVGPreserveAspectRatio.cpp \
+                  svg/SVGRadialGradientElement.cpp \
+                  svg/SVGRectElement.cpp \
+                  svg/SVGSVGElement.cpp \
+                  svg/SVGScriptElement.cpp \
+                  svg/SVGSetElement.cpp \
+                  svg/SVGStopElement.cpp \
+                  svg/SVGStringList.cpp \
+                  svg/SVGStylable.cpp \
+                  svg/SVGStyleElement.cpp \
+                  svg/SVGStyledElement.cpp \
+                  svg/SVGStyledLocatableElement.cpp \
+                  svg/SVGStyledTransformableElement.cpp \
+                  svg/SVGSwitchElement.cpp \
+                  svg/SVGSymbolElement.cpp \
+                  svg/SVGTRefElement.cpp \
+                  svg/SVGTSpanElement.cpp \
+                  svg/SVGTests.cpp \
+                  svg/SVGTextContentElement.cpp \
+                  svg/SVGTextElement.cpp \
+                  svg/SVGTextPathElement.cpp \
+                  svg/SVGTextPositioningElement.cpp \
+                  svg/SVGTitleElement.cpp \
+                  svg/SVGTransform.cpp \
+                  svg/SVGTransformDistance.cpp \
+                  svg/SVGTransformList.cpp \
+                  svg/SVGTransformable.cpp \
+                  svg/SVGURIReference.cpp \
+                  svg/SVGUseElement.cpp \
+                  svg/SVGVKernElement.cpp \
+                  svg/SVGViewElement.cpp \
+                  svg/SVGViewSpec.cpp \
+                  svg/SVGZoomAndPan.cpp \
+                  svg/SVGZoomEvent.cpp
+        }
    }
 }
 
@@ -3700,6 +3770,7 @@ contains(DEFINES, ENABLE_WEB_SOCKETS=1) {
         Modules/websockets/WebSocketDeflateFramer.cpp \
         Modules/websockets/WebSocketDeflater.cpp \
         Modules/websockets/WebSocketExtensionDispatcher.cpp \
+        Modules/websockets/WebSocketFrame.cpp \
         Modules/websockets/WebSocketHandshake.cpp \
         Modules/websockets/WebSocketHandshakeRequest.cpp \
         Modules/websockets/WebSocketHandshakeResponse.cpp \
@@ -3745,6 +3816,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLRenderbuffer.h \
         html/canvas/WebGLRenderingContext.h \
         html/canvas/WebGLShader.h \
+        html/canvas/WebGLShaderPrecisionFormat.h \
         html/canvas/WebGLSharedObject.h \
         html/canvas/EXTTextureFilterAnisotropic.h \
         html/canvas/OESStandardDerivatives.h \
@@ -3786,6 +3858,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLRenderbuffer.cpp \
         html/canvas/WebGLRenderingContext.cpp \
         html/canvas/WebGLShader.cpp \
+        html/canvas/WebGLShaderPrecisionFormat.cpp \
         html/canvas/WebGLSharedObject.cpp \
         html/canvas/EXTTextureFilterAnisotropic.cpp \
         html/canvas/OESStandardDerivatives.cpp \
@@ -3923,6 +3996,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
             ANGLE_CFLAGS += -Wno-missing-noreturn
             ANGLE_CFLAGS += -Wno-unused-function
             ANGLE_CFLAGS += -Wno-reorder
+            ANGLE_CFLAGS += -Wno-error
 
             angle_cxx.commands = $$QMAKE_CXX -c $(CXXFLAGS) $$ANGLE_CFLAGS $(INCPATH) ${QMAKE_FILE_IN} -o ${QMAKE_FILE_OUT}
             angle_cxx.output = ${QMAKE_VAR_OBJECTS_DIR}${QMAKE_FILE_BASE}$$QMAKE_EXT_OBJ
@@ -4050,6 +4124,12 @@ contains(CONFIG, opengl-shims) {
     DEFINES += QT_OPENGL_SHIMS=1
 }
 
+contains(DEFINES, WTF_USE_GRAPHICS_SURFACE=1) {
+    mac {
+        SOURCES += platform/graphics/surfaces/mac/GraphicsSurfaceMac.cpp
+        INCLUDEPATH += /System/Library/Frameworks/CoreFoundation.framework/Headers
+    }
+}
+
 # Make sure the derived sources are built
 include(DerivedSources.pri)
-

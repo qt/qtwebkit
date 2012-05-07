@@ -26,9 +26,10 @@
 #ifndef GeolocationController_h
 #define GeolocationController_h
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
 
 #include "Geolocation.h"
+#include "Page.h"
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefPtr.h>
@@ -40,7 +41,7 @@ class GeolocationError;
 class GeolocationPosition;
 class Page;
 
-class GeolocationController {
+class GeolocationController : public Supplement<Page> {
     WTF_MAKE_NONCOPYABLE(GeolocationController);
 public:
     ~GeolocationController();
@@ -60,6 +61,9 @@ public:
 
     GeolocationClient* client() { return m_client; }
 
+    static const AtomicString& supplementName();
+    static GeolocationController* from(Page* page) { return static_cast<GeolocationController*>(Supplement<Page>::from(page, supplementName())); }
+
 private:
     GeolocationController(Page*, GeolocationClient*);
 
@@ -75,6 +79,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(CLIENT_BASED_GEOLOCATION)
+#endif // ENABLE(GEOLOCATION)
 
 #endif // GeolocationController_h

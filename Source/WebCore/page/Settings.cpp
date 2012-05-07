@@ -52,13 +52,21 @@ static void setLoadsImagesAutomaticallyInAllFrames(Page* page)
         frame->document()->cachedResourceLoader()->setAutoLoadImages(page->settings()->loadsImagesAutomatically());
 }
 
+// Sets the entry in the font map for the given script. If family is the empty string, removes the entry instead.
 static inline void setGenericFontFamilyMap(ScriptFontFamilyMap& fontMap, const AtomicString& family, UScriptCode script, Page* page)
 {
     ScriptFontFamilyMap::iterator it = fontMap.find(static_cast<int>(script));
-    if (it != fontMap.end() && it->second == family)
+    if (family.isEmpty()) {
+        if (it == fontMap.end())
+            return;
+        fontMap.remove(it);
+    } else if (it != fontMap.end() && it->second == family)
         return;
-    fontMap.set(static_cast<int>(script), family);
-    page->setNeedsRecalcStyleInAllFrames();
+    else
+        fontMap.set(static_cast<int>(script), family);
+
+    if (page)
+        page->setNeedsRecalcStyleInAllFrames();
 }
 
 static inline const AtomicString& getGenericFontFamilyForScript(const ScriptFontFamilyMap& fontMap, UScriptCode script)
@@ -84,6 +92,10 @@ bool Settings::gMockScrollbarsEnabled = false;
 #if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
 bool Settings::gShouldUseHighResolutionTimers = true;
 #endif
+    
+#if USE(JSC)
+bool Settings::gShouldRespectPriorityInCSSAttributeSetters = false;
+#endif
 
 // NOTEs
 //  1) EditingMacBehavior comprises Tiger, Leopard, SnowLeopard and iOS builds, as well QtWebKit and Chromium when built on Mac;
@@ -106,8 +118,10 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
     ;
 }
 
+static const double defaultIncrementalRenderingSuppressionTimeoutInSeconds = 5;
+
 Settings::Settings(Page* page)
-    : m_page(page)
+    : m_page(0)
     , m_editableLinkBehavior(EditableLinkDefaultBehavior)
     , m_textDirectionSubmenuInclusionBehavior(TextDirectionSubmenuAutomaticallyIncluded)
     , m_passwordEchoDurationInSeconds(1)
@@ -119,7 +133,7 @@ Settings::Settings(Page* page)
     , m_validationMessageTimerMagnification(50)
     , m_minimumAccelerated2dCanvasSize(257 * 256)
     , m_layoutFallbackWidth(980)
-    , m_deviceDPI(240)
+    , m_devicePixelRatio(1.0)
     , m_maximumDecodedImageSize(numeric_limits<size_t>::max())
     , m_deviceWidth(480)
     , m_deviceHeight(854)
@@ -128,6 +142,7 @@ Settings::Settings(Page* page)
     , m_maximumHTMLParserDOMTreeDepth(defaultMaximumHTMLParserDOMTreeDepth)
     , m_isSpatialNavigationEnabled(false)
     , m_isJavaEnabled(false)
+    , m_isJavaEnabledForLocalFiles(true)
     , m_loadsImagesAutomatically(false)
     , m_loadsSiteIconsIgnoringImageLoadingSetting(false)
     , m_privateBrowsingEnabled(false)
@@ -175,6 +190,7 @@ Settings::Settings(Page* page)
     , m_acceleratedFiltersEnabled(false)
     , m_isCSSCustomFilterEnabled(false)
     , m_cssRegionsEnabled(false)
+    , m_regionBasedColumnsEnabled(false)
     // FIXME: This should really be disabled by default as it makes platforms that don't support the feature download files
     // they can't use by. Leaving enabled for now to not change existing behavior.
     , m_downloadableBinaryFontsEnabled(true)
@@ -224,7 +240,7 @@ Settings::Settings(Page* page)
     , m_scrollAnimatorEnabled(true)
 #endif
 #if ENABLE(WEB_SOCKETS)
-    , m_useHixie76WebSocketProtocol(true)
+    , m_useHixie76WebSocketProtocol(false)
 #endif
     , m_mediaPlaybackRequiresUserGesture(false)
     , m_mediaPlaybackAllowsInline(true)
@@ -246,17 +262,30 @@ Settings::Settings(Page* page)
     , m_touchEventEmulationEnabled(false)
 #endif
     , m_threadedAnimationEnabled(false)
+    , m_shouldRespectImageOrientation(false)
+    , m_wantsBalancedSetDefersLoadingBehavior(false)
+    , m_requestAnimationFrameEnabled(true)
     , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
+    , m_incrementalRenderingSuppressionTimeoutInSeconds(defaultIncrementalRenderingSuppressionTimeoutInSeconds)
 {
-    // A Frame may not have been created yet, so we initialize the AtomicString 
+    // A Frame may not have been created yet, so we initialize the AtomicString
     // hash before trying to use it.
     AtomicString::init();
+    initializeDefaultFontFamilies();
+    m_page = page; // Page is not yet fully initialized wen constructing Settings, so keeping m_page null over initializeDefaultFontFamilies() call.
 }
 
 PassOwnPtr<Settings> Settings::create(Page* page)
 {
     return adoptPtr(new Settings(page));
 } 
+
+#if !PLATFORM(MAC) && !PLATFORM(BLACKBERRY)
+void Settings::initializeDefaultFontFamilies()
+{
+    // Other platforms can set up fonts from a client, but on Mac, we want it in WebCore to share code between WebKit1 and WebKit2.
+}
+#endif
 
 const AtomicString& Settings::standardFontFamily(UScriptCode script) const
 {
@@ -421,6 +450,11 @@ void Settings::setSpatialNavigationEnabled(bool isSpatialNavigationEnabled)
 void Settings::setJavaEnabled(bool isJavaEnabled)
 {
     m_isJavaEnabled = isJavaEnabled;
+}
+
+void Settings::setJavaEnabledForLocalFiles(bool isJavaEnabledForLocalFiles)
+{
+    m_isJavaEnabledForLocalFiles = isJavaEnabledForLocalFiles;
 }
 
 void Settings::setImagesEnabled(bool areImagesEnabled)
@@ -867,5 +901,17 @@ bool Settings::mockScrollbarsEnabled()
 {
     return gMockScrollbarsEnabled;
 }
+
+#if USE(JSC)
+void Settings::setShouldRespectPriorityInCSSAttributeSetters(bool flag)
+{
+    gShouldRespectPriorityInCSSAttributeSetters = flag;
+}
+
+bool Settings::shouldRespectPriorityInCSSAttributeSetters()
+{
+    return gShouldRespectPriorityInCSSAttributeSetters;
+}
+#endif
 
 } // namespace WebCore

@@ -40,6 +40,7 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameLoaderStateMachine.h"
+#include "FrameView.h"
 #include "HistogramSupport.h"
 #include "HistoryItem.h"
 #include "Logging.h"
@@ -54,8 +55,6 @@
 using namespace std;
 
 namespace WebCore {
-
-static const double autoreleaseInterval = 3;
 
 #if PLATFORM(CHROMIUM) || !defined(NDEBUG)
 
@@ -76,25 +75,43 @@ enum ReasonFrameCannotBeInPageCache {
     QuickRedirectComing,
     IsLoadingInAPISense,
     IsStopping,
-    CanSuspendActiveDOMObjects,
+    CannotSuspendActiveDOMObjects,
     DocumentLoaderUsesApplicationCache,
     ClientDeniesCaching,
     NumberOfReasonsFramesCannotBeInPageCache,
 };
+COMPILE_ASSERT(NumberOfReasonsFramesCannotBeInPageCache <= sizeof(unsigned)*8, ReasonFrameCannotBeInPageCacheDoesNotFitInBitmap);
+
+#if PLATFORM(CHROMIUM)
+static int indexOfSingleBit(int32_t v)
+{
+    int index = 0;
+    if (v & 0xFFFF0000)
+        index = 16;
+    if (v & 0xFF00FF00)
+        index += 8;
+    if (v & 0xF0F0F0F0)
+        index += 4;
+    if (v & 0xCCCCCCCC)
+        index += 2;
+    if (v & 0xAAAAAAAA)
+        index += 1;
+    return index;
+}
+#endif // PLATFORM(CHROMIUM)
 
 static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
 {
 #ifdef NDEBUG
     UNUSED_PARAM(indentLevel);
 #endif
-    // Only bother logging for frames that have actually loaded and have content.
-    if (frame->loader()->stateMachine()->creatingInitialEmptyDocument())
-        return false;
-    KURL currentURL = frame->loader()->documentLoader() ? frame->loader()->documentLoader()->url() : KURL();
-    if (currentURL.isEmpty())
-        return false;
-    
     PCLOG("+---");
+    if (!frame->loader()->documentLoader()) {
+        PCLOG("   -There is no DocumentLoader object");
+        return 1 << NoDocumentLoader;
+    }
+
+    KURL currentURL = frame->loader()->documentLoader()->url();
     KURL newURL = frame->loader()->provisionalDocumentLoader() ? frame->loader()->provisionalDocumentLoader()->url() : KURL();
     if (!newURL.isEmpty())
         PCLOG(" Determining if frame can be cached navigating from (", currentURL.string(), ") to (", newURL.string(), "):");
@@ -102,73 +119,67 @@ static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
         PCLOG(" Determining if subframe with URL (", currentURL.string(), ") can be cached:");
      
     unsigned rejectReasons = 0;
-    
-    if (!frame->loader()->documentLoader()) {
-        PCLOG("   -There is no DocumentLoader object");
-        rejectReasons |= 1 << NoDocumentLoader;
-    } else {
-        if (!frame->loader()->documentLoader()->mainDocumentError().isNull()) {
-            PCLOG("   -Main document has an error");
-            rejectReasons |= 1 << MainDocumentError;
-        }
-        if (frame->loader()->documentLoader()->substituteData().isValid() && frame->loader()->documentLoader()->substituteData().failingURL().isEmpty()) {
-            PCLOG("   -Frame is an error page");
-            rejectReasons |= 1 << IsErrorPage;
-        }
-        if (frame->loader()->subframeLoader()->containsPlugins() && !frame->page()->settings()->pageCacheSupportsPlugins()) {
-            PCLOG("   -Frame contains plugins");
-            rejectReasons |= 1 << HasPlugins;
-        }
-        if (frame->document()->url().protocolIs("https")
-            && (frame->loader()->documentLoader()->response().cacheControlContainsNoCache()
-                || frame->loader()->documentLoader()->response().cacheControlContainsNoStore())) {
-            PCLOG("   -Frame is HTTPS, and cache control prohibits caching or storing");
-            rejectReasons |= 1 << IsHttpsAndCacheControlled;
-        }
-        if (frame->domWindow() && frame->domWindow()->hasEventListeners(eventNames().unloadEvent)) {
-            PCLOG("   -Frame has an unload event listener");
-            rejectReasons |= 1 << HasUnloadListener;
-        }
+    if (!frame->loader()->documentLoader()->mainDocumentError().isNull()) {
+        PCLOG("   -Main document has an error");
+        rejectReasons |= 1 << MainDocumentError;
+    }
+    if (frame->loader()->documentLoader()->substituteData().isValid() && frame->loader()->documentLoader()->substituteData().failingURL().isEmpty()) {
+        PCLOG("   -Frame is an error page");
+        rejectReasons |= 1 << IsErrorPage;
+    }
+    if (frame->loader()->subframeLoader()->containsPlugins() && !frame->page()->settings()->pageCacheSupportsPlugins()) {
+        PCLOG("   -Frame contains plugins");
+        rejectReasons |= 1 << HasPlugins;
+    }
+    if (frame->document()->url().protocolIs("https")
+        && (frame->loader()->documentLoader()->response().cacheControlContainsNoCache()
+            || frame->loader()->documentLoader()->response().cacheControlContainsNoStore())) {
+        PCLOG("   -Frame is HTTPS, and cache control prohibits caching or storing");
+        rejectReasons |= 1 << IsHttpsAndCacheControlled;
+    }
+    if (frame->domWindow() && frame->domWindow()->hasEventListeners(eventNames().unloadEvent)) {
+        PCLOG("   -Frame has an unload event listener");
+        rejectReasons |= 1 << HasUnloadListener;
+    }
 #if ENABLE(SQL_DATABASE)
-        if (DatabaseContext::hasOpenDatabases(frame->document())) {
-            PCLOG("   -Frame has open database handles");
-            rejectReasons |= 1 << HasDatabaseHandles;
-        }
+    if (DatabaseContext::hasOpenDatabases(frame->document())) {
+        PCLOG("   -Frame has open database handles");
+        rejectReasons |= 1 << HasDatabaseHandles;
+    }
 #endif
 #if ENABLE(SHARED_WORKERS)
-        if (SharedWorkerRepository::hasSharedWorkers(frame->document())) {
-            PCLOG("   -Frame has associated SharedWorkers");
-            rejectReasons |= 1 << HasSharedWorkers;
-        }
+    if (SharedWorkerRepository::hasSharedWorkers(frame->document())) {
+        PCLOG("   -Frame has associated SharedWorkers");
+        rejectReasons |= 1 << HasSharedWorkers;
+    }
 #endif
-        if (!frame->loader()->history()->currentItem()) {
-            PCLOG("   -No current history item");
-            rejectReasons |= 1 << NoHistoryItem;
-        }
-        if (frame->loader()->quickRedirectComing()) {
-            PCLOG("   -Quick redirect is coming");
-            rejectReasons |= 1 << QuickRedirectComing;
-        }
-        if (frame->loader()->documentLoader()->isLoadingInAPISense()) {
-            PCLOG("   -DocumentLoader is still loading in API sense");
-            rejectReasons |= 1 << IsLoadingInAPISense;
-        }
-        if (frame->loader()->documentLoader()->isStopping()) {
-            PCLOG("   -DocumentLoader is in the middle of stopping");
-            rejectReasons |= 1 << IsStopping;
-        }
-        if (!frame->document()->canSuspendActiveDOMObjects()) {
-            PCLOG("   -The document cannot suspect its active DOM Objects");
-            rejectReasons |= 1 << CanSuspendActiveDOMObjects;
-        }
-        if (!frame->loader()->documentLoader()->applicationCacheHost()->canCacheInPageCache()) {
-            PCLOG("   -The DocumentLoader uses an application cache");
-            rejectReasons |= 1 << DocumentLoaderUsesApplicationCache;
-        }
-        if (!frame->loader()->client()->canCachePage()) {
-            PCLOG("   -The client says this frame cannot be cached");
-            rejectReasons |= 1 << ClientDeniesCaching;
-        }
+    if (!frame->loader()->history()->currentItem()) {
+        PCLOG("   -No current history item");
+        rejectReasons |= 1 << NoHistoryItem;
+    }
+    if (frame->loader()->quickRedirectComing()) {
+        PCLOG("   -Quick redirect is coming");
+        rejectReasons |= 1 << QuickRedirectComing;
+    }
+    if (frame->loader()->documentLoader()->isLoadingInAPISense()) {
+        PCLOG("   -DocumentLoader is still loading in API sense");
+        rejectReasons |= 1 << IsLoadingInAPISense;
+    }
+    if (frame->loader()->documentLoader()->isStopping()) {
+        PCLOG("   -DocumentLoader is in the middle of stopping");
+        rejectReasons |= 1 << IsStopping;
+    }
+    if (!frame->document()->canSuspendActiveDOMObjects()) {
+        PCLOG("   -The document cannot suspect its active DOM Objects");
+        rejectReasons |= 1 << CannotSuspendActiveDOMObjects;
+    }
+    if (!frame->loader()->documentLoader()->applicationCacheHost()->canCacheInPageCache()) {
+        PCLOG("   -The DocumentLoader uses an application cache");
+        rejectReasons |= 1 << DocumentLoaderUsesApplicationCache;
+    }
+    if (!frame->loader()->client()->canCachePage()) {
+        PCLOG("   -The client says this frame cannot be cached");
+        rejectReasons |= 1 << ClientDeniesCaching;
     }
 
     HistogramSupport::histogramEnumeration("PageCache.FrameCacheable", !rejectReasons, 2);
@@ -203,6 +214,7 @@ enum ReasonPageCannotBeInPageCache {
     IsSameLoad,
     NumberOfReasonsPagesCannotBeInPageCache,
 };
+COMPILE_ASSERT(NumberOfReasonsPagesCannotBeInPageCache <= sizeof(unsigned)*8, ReasonPageCannotBeInPageCacheDoesNotFitInBitmap);
 
 static void logCanCachePageDecision(Page* page)
 {
@@ -264,6 +276,8 @@ static void logCanCachePageDecision(Page* page)
         }
     }
     HistogramSupport::histogramEnumeration("PageCache.PageRejectReasonCount", reasonCount, 1 + NumberOfReasonsPagesCannotBeInPageCache);
+    const bool settingsDisabledPageCache = rejectReasons & (1 << DisabledPageCache);
+    HistogramSupport::histogramEnumeration("PageCache.PageRejectReasonCountExcludingSettings", reasonCount - settingsDisabledPageCache, NumberOfReasonsPagesCannotBeInPageCache);
 
     // Report also on the frame reasons by page; this is distinct from the per frame statistics since it coalesces the
     // causes from all subframes together.
@@ -275,6 +289,20 @@ static void logCanCachePageDecision(Page* page)
             HistogramSupport::histogramEnumeration("PageCache.FrameRejectReasonByPage", i, NumberOfReasonsFramesCannotBeInPageCache);
         }
     }
+#if PLATFORM(CHROMIUM)
+    // This strangely specific histogram is particular to chromium: as of 2012-03-16, the FrameClientImpl always denies caching, so
+    // of particular interest are solitary reasons other than the frameRejectReasons. If we didn't get to the ClientDeniesCaching, we
+    // took the early exit for the boring reason NoDocumentLoader, so we should have only one reason, and not two.
+    // FIXME: remove this histogram after data is gathered.
+    if (frameReasonCount == 2) {
+        ASSERT(frameRejectReasons & (1 << ClientDeniesCaching));
+        const unsigned singleReasonForRejectingFrameOtherThanClientDeniesCaching = frameRejectReasons & ~(1 << ClientDeniesCaching);
+        COMPILE_ASSERT(NumberOfReasonsPagesCannotBeInPageCache <= 32, ReasonPageCannotBeInPageCacheDoesNotFitInInt32);
+        const int index = indexOfSingleBit(static_cast<int32_t>(singleReasonForRejectingFrameOtherThanClientDeniesCaching));
+        HistogramSupport::histogramEnumeration("PageCache.FrameRejectReasonByPageWhenSingleExcludingFrameClient", index, NumberOfReasonsPagesCannotBeInPageCache);
+    }
+#endif
+
     HistogramSupport::histogramEnumeration("PageCache.FrameRejectReasonCountByPage", frameReasonCount, 1 + NumberOfReasonsFramesCannotBeInPageCache);
 }
 
@@ -291,7 +319,7 @@ PageCache::PageCache()
     , m_size(0)
     , m_head(0)
     , m_tail(0)
-    , m_autoreleaseTimer(this, &PageCache::releaseAutoreleasedPagesNowOrReschedule)
+    , m_autoreleaseTimer(this, &PageCache::releaseAutoreleasedPagesNowDueToTimer)
 #if USE(ACCELERATED_COMPOSITING)
     , m_shouldClearBackingStores(false)
 #endif
@@ -392,6 +420,17 @@ void PageCache::markPagesForVistedLinkStyleRecalc()
         current->m_cachedPage->markForVistedLinkStyleRecalc();
 }
 
+void PageCache::markPagesForFullStyleRecalc(Page* page)
+{
+    Frame* mainFrame = page->mainFrame();
+
+    for (HistoryItem* current = m_head; current; current = current->m_next) {
+        CachedPage* cachedPage = current->m_cachedPage.get();
+        if (cachedPage->cachedMainFrame()->view()->frame() == mainFrame)
+            cachedPage->markForFullStyleRecalc();
+    }
+}
+
 void PageCache::add(PassRefPtr<HistoryItem> prpItem, Page* page)
 {
     ASSERT(prpItem);
@@ -485,19 +524,9 @@ void PageCache::removeFromLRUList(HistoryItem* item)
     }
 }
 
-void PageCache::releaseAutoreleasedPagesNowOrReschedule(Timer<PageCache>* timer)
+void PageCache::releaseAutoreleasedPagesNowDueToTimer(Timer<PageCache>*)
 {
-    double loadDelta = currentTime() - FrameLoader::timeOfLastCompletedLoad();
-    float userDelta = userIdleTime();
-    
-    // FIXME: <rdar://problem/5211190> This limit of 42 risks growing the page cache far beyond its nominal capacity.
-    if ((userDelta < 0.5 || loadDelta < 1.25) && m_autoreleaseSet.size() < 42) {
-        LOG(PageCache, "WebCorePageCache: Postponing releaseAutoreleasedPagesNowOrReschedule() - %f since last load, %f since last input, %i objects pending release", loadDelta, userDelta, m_autoreleaseSet.size());
-        timer->startOneShot(autoreleaseInterval);
-        return;
-    }
-
-    LOG(PageCache, "WebCorePageCache: Releasing page caches - %f seconds since last load, %f since last input, %i objects pending release", loadDelta, userDelta, m_autoreleaseSet.size());
+    LOG(PageCache, "WebCorePageCache: Releasing page caches - %i objects pending release", m_autoreleaseSet.size());
     releaseAutoreleasedPagesNow();
 }
 
@@ -506,6 +535,7 @@ void PageCache::releaseAutoreleasedPagesNow()
     m_autoreleaseTimer.stop();
 
     // Postpone dead pruning until all our resources have gone dead.
+    bool pruneWasEnabled = memoryCache()->pruneEnabled();
     memoryCache()->setPruneEnabled(false);
 
     CachedPageSet tmp;
@@ -516,8 +546,10 @@ void PageCache::releaseAutoreleasedPagesNow()
         (*it)->destroy();
 
     // Now do the prune.
-    memoryCache()->setPruneEnabled(true);
-    memoryCache()->prune();
+    if (pruneWasEnabled) {
+        memoryCache()->setPruneEnabled(true);
+        memoryCache()->prune();
+    }
 }
 
 void PageCache::autorelease(PassRefPtr<CachedPage> page)
@@ -526,7 +558,7 @@ void PageCache::autorelease(PassRefPtr<CachedPage> page)
     ASSERT(!m_autoreleaseSet.contains(page.get()));
     m_autoreleaseSet.add(page);
     if (!m_autoreleaseTimer.isActive())
-        m_autoreleaseTimer.startOneShot(autoreleaseInterval);
+        m_autoreleaseTimer.startOneShot(0);
 }
 
 } // namespace WebCore

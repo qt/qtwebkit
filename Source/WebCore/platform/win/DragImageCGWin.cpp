@@ -31,9 +31,9 @@
 #include "GraphicsContextCG.h"
 #include "HWndDC.h"
 #include "Image.h"
-#include "RetainPtr.h"
 
 #include <CoreGraphics/CoreGraphics.h>
+#include <wtf/RetainPtr.h>
 
 #include <windows.h>
 
@@ -120,7 +120,7 @@ exit:
     return hbmp;
 }
     
-DragImageRef createDragImageFromImage(Image* img)
+DragImageRef createDragImageFromImage(Image* img, RespectImageOrientationEnum)
 {
     HBITMAP hbmp = 0;
     HWndDC dc(0);

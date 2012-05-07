@@ -26,6 +26,8 @@
 #ifndef TiledCoreAnimationDrawingArea_h
 #define TiledCoreAnimationDrawingArea_h
 
+#if ENABLE(THREADED_SCROLLING)
+
 #include "DrawingArea.h"
 #include "LayerTreeContext.h"
 #include <WebCore/GraphicsLayerClient.h>
@@ -62,6 +64,9 @@ private:
     virtual void didInstallPageOverlay() OVERRIDE;
     virtual void didUninstallPageOverlay() OVERRIDE;
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) OVERRIDE;
+    virtual void updatePreferences() OVERRIDE;
+
+    virtual void dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>&) OVERRIDE;
 
     // WebCore::GraphicsLayerClient
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time) OVERRIDE;
@@ -75,6 +80,8 @@ private:
     virtual bool flushLayers() OVERRIDE;
 
     // Message handlers.
+    virtual void suspendPainting() OVERRIDE;
+    virtual void resumePainting() OVERRIDE;
     virtual void updateGeometry(const WebCore::IntSize& viewSize) OVERRIDE;
     virtual void setDeviceScaleFactor(float) OVERRIDE;
     virtual void setLayerHostingMode(uint32_t) OVERRIDE;
@@ -83,8 +90,6 @@ private:
 
     void createPageOverlayLayer();
     void destroyPageOverlayLayer();
-
-    bool shouldRepaintPageOverlayLayer();
 
     bool m_layerTreeStateIsFrozen;
     WebCore::LayerFlushScheduler m_layerFlushScheduler;
@@ -95,10 +100,15 @@ private:
     RetainPtr<CALayer> m_rootLayer;
     RetainPtr<CALayer> m_pendingRootCompositingLayer;
 
+    RetainPtr<CALayer> m_debugInfoLayer;
+
     OwnPtr<WebCore::GraphicsLayer> m_pageOverlayLayer;
-    WebCore::FloatPoint m_mainFrameScrollLayerPosition;
+
+    bool m_isPaintingSuspended;
 };
 
 } // namespace WebKit
+
+#endif // ENABLE(THREADED_SCROLLING)
 
 #endif // TiledCoreAnimationDrawingArea_h

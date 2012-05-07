@@ -51,10 +51,11 @@ namespace WebCore {
 
 namespace {
 
-// ChromeOS-specific filesystem type.
-const AsyncFileSystem::Type externalType = static_cast<AsyncFileSystem::Type>(WebKit::WebFileSystem::TypeExternal);
+// For isolated filesystem.
+const char isolatedPathPrefix[] = "isolated";
+
+// For external filesystem.
 const char externalPathPrefix[] = "external";
-const size_t externalPathPrefixLength = sizeof(externalPathPrefix) - 1;
 
 // Specialized callback class for createSnapshotFileAndReadMetadata.
 class SnapshotFileCallbacks : public AsyncFileSystemCallbacks {
@@ -101,7 +102,7 @@ bool AsyncFileSystem::isAvailable()
 }
 
 // static
-bool AsyncFileSystem::crackFileSystemURL(const KURL& url, AsyncFileSystem::Type& type, String& filePath)
+bool AsyncFileSystem::crackFileSystemURL(const KURL& url, FileSystemType& type, String& filePath)
 {
     if (!url.protocolIs("filesystem"))
         return false;
@@ -109,51 +110,26 @@ bool AsyncFileSystem::crackFileSystemURL(const KURL& url, AsyncFileSystem::Type&
     if (url.innerURL()) {
         String typeString = url.innerURL()->path().substring(1);
         if (typeString == temporaryPathPrefix)
-            type = Temporary;
+            type = FileSystemTypeTemporary;
         else if (typeString == persistentPathPrefix)
-            type = Persistent;
+            type = FileSystemTypePersistent;
         else if (typeString == externalPathPrefix)
-            type = externalType;
+            type = FileSystemTypeExternal;
         else
             return false;
 
         filePath = decodeURLEscapeSequences(url.path());
-    } else {
-        // FIXME: Remove this clause once http://codereview.chromium.org/7811006
-        // lands, which makes this dead code.
-        KURL originURL(ParsedURLString, url.path());
-        String path = decodeURLEscapeSequences(originURL.path());
-        if (path.isEmpty() || path[0] != '/')
-            return false;
-        path = path.substring(1);
-
-        if (path.startsWith(temporaryPathPrefix)) {
-            type = Temporary;
-            path = path.substring(temporaryPathPrefixLength);
-        } else if (path.startsWith(persistentPathPrefix)) {
-            type = Persistent;
-            path = path.substring(persistentPathPrefixLength);
-        } else if (path.startsWith(externalPathPrefix)) {
-            type = externalType;
-            path = path.substring(externalPathPrefixLength);
-        } else
-            return false;
-
-        if (path.isEmpty() || path[0] != '/')
-            return false;
-
-        filePath.swap(path);
     }
     return true;
 }
 
 // static
-bool AsyncFileSystem::isValidType(Type type)
+bool AsyncFileSystem::isValidType(FileSystemType type)
 {
-    return type == Temporary || type == Persistent || type == static_cast<Type>(WebKit::WebFileSystem::TypeExternal);
+    return type == FileSystemTypeTemporary || type == FileSystemTypePersistent || type == FileSystemTypeExternal;
 }
 
-AsyncFileSystemChromium::AsyncFileSystemChromium(AsyncFileSystem::Type type, const KURL& rootURL)
+AsyncFileSystemChromium::AsyncFileSystemChromium(FileSystemType type, const KURL& rootURL)
     : AsyncFileSystem(type)
     , m_webFileSystem(WebKit::webKitPlatformSupport()->fileSystem())
     , m_filesystemRootURL(rootURL)
@@ -161,17 +137,50 @@ AsyncFileSystemChromium::AsyncFileSystemChromium(AsyncFileSystem::Type type, con
     ASSERT(m_webFileSystem);
 }
 
+// static
+String AsyncFileSystemChromium::createIsolatedFileSystemName(const String& storageIdentifier, const String& filesystemId)
+{
+    StringBuilder filesystemName;
+    filesystemName.append(storageIdentifier);
+    filesystemName.append(":");
+    filesystemName.append(isolatedPathPrefix);
+    filesystemName.append("_");
+    filesystemName.append(filesystemId);
+    return filesystemName.toString();
+}
+
+// static
+PassOwnPtr<AsyncFileSystem> AsyncFileSystemChromium::createIsolatedFileSystem(const String& originString, const String& filesystemId)
+{
+    // The rootURL is used in succeeding filesystem requests sent to the
+    // chromium and is validated each time in the browser process.
+    StringBuilder rootURL;
+    rootURL.append("filesystem:");
+    rootURL.append(originString);
+    rootURL.append("/");
+    rootURL.append(isolatedPathPrefix);
+    rootURL.append("/");
+    rootURL.append(filesystemId);
+    rootURL.append("/");
+
+    return AsyncFileSystemChromium::create(FileSystemTypeIsolated, KURL(ParsedURLString, rootURL.toString()));
+}
+
 AsyncFileSystemChromium::~AsyncFileSystemChromium()
 {
 }
 
-String AsyncFileSystemChromium::toURL(const String& originString, const String& fullPath)
+KURL AsyncFileSystemChromium::toURL(const String& originString, const String& fullPath) const
 {
     ASSERT(!originString.isEmpty());
     if (originString == "null")
-        return String();
+        return KURL();
 
-    if (type() == externalType) {
+    // For now we don't support toURL for isolated filesystem (until we resolve the isolated filesystem lifetime issue).
+    if (type() == FileSystemTypeIsolated)
+        return KURL();
+
+    if (type() == FileSystemTypeExternal) {
         // For external filesystem originString could be different from what we have in m_filesystemRootURL.
         StringBuilder result;
         result.append("filesystem:");
@@ -179,12 +188,12 @@ String AsyncFileSystemChromium::toURL(const String& originString, const String& 
         result.append("/");
         result.append(externalPathPrefix);
         result.append(encodeWithURLEscapeSequences(fullPath));
-        return result.toString();
+        return KURL(ParsedURLString, result.toString());
     }
 
     // For regular types we can just call virtualPathToFileSystemURL which appends the fullPath to the m_filesystemRootURL that should look like 'filesystem:<origin>/<typePrefix>'.
     ASSERT(SecurityOrigin::create(m_filesystemRootURL)->toString() == originString);
-    return virtualPathToFileSystemURL(fullPath);
+    return KURL(ParsedURLString, virtualPathToFileSystemURL(fullPath));
 }
 
 void AsyncFileSystemChromium::move(const String& sourcePath, const String& destinationPath, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)

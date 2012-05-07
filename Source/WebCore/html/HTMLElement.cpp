@@ -795,6 +795,11 @@ HTMLFormElement* HTMLElement::virtualForm() const
     return findFormAncestor();
 }
 
+static inline bool elementAffectsDirectionality(const Node* node)
+{
+    return node->isHTMLElement() && (node->hasTagName(bdiTag) || toHTMLElement(node)->hasAttribute(dirAttr));
+}
+
 static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastNode = 0)
 {
     firstNode->setSelfOrAncestorHasDirAutoAttribute(flag);
@@ -805,7 +810,7 @@ static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastN
         if (node->selfOrAncestorHasDirAutoAttribute() == flag)
             return;
 
-        if (node->isHTMLElement() && toElement(node)->hasAttribute(dirAttr)) {
+        if (elementAffectsDirectionality(node)) {
             if (node == lastNode)
                 return;
             node = node->traverseNextSibling(firstNode);
@@ -824,9 +829,15 @@ void HTMLElement::childrenChanged(bool changedByParser, Node* beforeChange, Node
     adjustDirectionalityIfNeededAfterChildrenChanged(beforeChange, childCountDelta);
 }
 
+bool HTMLElement::hasDirectionAuto() const
+{
+    const AtomicString& direction = fastGetAttribute(dirAttr);
+    return (hasTagName(bdiTag) && direction == nullAtom) || equalIgnoringCase(direction, "auto");
+}
+
 TextDirection HTMLElement::directionalityIfhasDirAutoAttribute(bool& isAuto) const
 {
-    if (!(selfOrAncestorHasDirAutoAttribute() && equalIgnoringCase(getAttribute(dirAttr), "auto"))) {
+    if (!(selfOrAncestorHasDirAutoAttribute() && hasDirectionAuto())) {
         isAuto = false;
         return LTR;
     }
@@ -899,7 +910,7 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildAttributeChanged(Element
     if (renderer() && renderer()->style() && renderer()->style()->direction() != textDirection) {
         Element* elementToAdjust = this;
         for (; elementToAdjust; elementToAdjust = elementToAdjust->parentElement()) {
-            if (elementToAdjust->hasAttribute(dirAttr)) {
+            if (elementAffectsDirectionality(elementToAdjust)) {
                 elementToAdjust->setNeedsStyleRecalc();
                 return;
             }
@@ -921,7 +932,7 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Node* beforeC
     if ((!document() || document()->renderer()) && childCountDelta < 0) {
         Node* node = beforeChange ? beforeChange->traverseNextSibling() : 0;
         for (int counter = 0; node && counter < childCountDelta; counter++, node = node->traverseNextSibling()) {
-            if (node->isElementNode() && toElement(node)->hasAttribute(dirAttr))
+            if (elementAffectsDirectionality(node))
                 continue;
 
             setHasDirAutoFlagRecursively(node, false);
@@ -932,13 +943,13 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Node* beforeC
         return;
 
     Node* oldMarkedNode = beforeChange ? beforeChange->traverseNextSibling() : 0;
-    while (oldMarkedNode && oldMarkedNode->isHTMLElement() && toHTMLElement(oldMarkedNode)->hasAttribute(dirAttr))
+    while (oldMarkedNode && elementAffectsDirectionality(oldMarkedNode))
         oldMarkedNode = oldMarkedNode->traverseNextSibling(this);
     if (oldMarkedNode)
         setHasDirAutoFlagRecursively(oldMarkedNode, false);
 
     for (Element* elementToAdjust = this; elementToAdjust; elementToAdjust = elementToAdjust->parentElement()) {
-        if (elementToAdjust->isHTMLElement() && elementToAdjust->hasAttribute(dirAttr)) {
+        if (elementAffectsDirectionality(elementToAdjust)) {
             toHTMLElement(elementToAdjust)->calculateAndAdjustDirectionality();
             return;
         }
@@ -988,7 +999,7 @@ void HTMLElement::setItemValueText(const String& value, ExceptionCode& ec)
 }
 #endif
 
-void HTMLElement::addHTMLLengthToStyle(StylePropertySet* style, int propertyID, const String& value)
+void HTMLElement::addHTMLLengthToStyle(StylePropertySet* style, CSSPropertyID propertyID, const String& value)
 {
     // FIXME: This function should not spin up the CSS parser, but should instead just figure out the correct
     // length unit and make the appropriate parsed value.
@@ -1079,7 +1090,7 @@ static RGBA32 parseColorStringWithCrazyLegacyRules(const String& colorString)
 }
 
 // Color parsing that matches HTML's "rules for parsing a legacy color value"
-void HTMLElement::addHTMLColorToStyle(StylePropertySet* style, int propertyID, const String& attributeValue)
+void HTMLElement::addHTMLColorToStyle(StylePropertySet* style, CSSPropertyID propertyID, const String& attributeValue)
 {
     // An empty string doesn't apply a color. (One containing only whitespace does, which is why this check occurs before stripping.)
     if (attributeValue.isEmpty())
@@ -1096,7 +1107,7 @@ void HTMLElement::addHTMLColorToStyle(StylePropertySet* style, int propertyID, c
     if (!parsedColor.isValid())
         parsedColor.setRGB(parseColorStringWithCrazyLegacyRules(colorString));
 
-    style->setProperty(propertyID, document()->cssValuePool()->createColorValue(parsedColor.rgb()));
+    style->setProperty(propertyID, cssValuePool().createColorValue(parsedColor.rgb()));
 }
 
 void StyledElement::copyNonAttributeProperties(const Element* sourceElement)
@@ -1110,7 +1121,7 @@ void StyledElement::copyNonAttributeProperties(const Element* sourceElement)
 
     StylePropertySet* inlineStyle = ensureAttributeData()->ensureMutableInlineStyle(this);
     inlineStyle->copyPropertiesFrom(*source->inlineStyle());
-    inlineStyle->setStrictParsing(source->inlineStyle()->useStrictParsing());
+    inlineStyle->setCSSParserMode(source->inlineStyle()->cssParserMode());
 
     setIsStyleAttributeValid(source->isStyleAttributeValid());
 

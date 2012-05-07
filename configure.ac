@@ -2,14 +2,14 @@ AC_PREREQ(2.59)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [9])
-m4_define([webkit_micro_version], [0])
+m4_define([webkit_micro_version], [2])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
-m4_define([webkit_user_agent_major_version], [535])
-m4_define([webkit_user_agent_minor_version], [20])
+m4_define([webkit_user_agent_major_version], [536])
+m4_define([webkit_user_agent_minor_version], [10])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,7 +35,7 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=12:0:12
+LIBWEBKITGTK_VERSION=13:1:13
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -281,7 +281,7 @@ AC_MSG_RESULT([$with_gtk])
 
 GTK2_REQUIRED_VERSION=2.10
 GAIL2_REQUIRED_VERSION=1.8
-GTK3_REQUIRED_VERSION=3.0
+GTK3_REQUIRED_VERSION=3.4.0
 GAIL3_REQUIRED_VERSION=3.0
 
 case "$with_gtk" in
@@ -326,26 +326,11 @@ esac
 
 AC_MSG_RESULT([$with_target])
 
-AC_MSG_CHECKING([for Hildon UI extensions])
-AC_ARG_WITH(hildon,
-            AC_HELP_STRING([--with-hildon],
-                           [Use Hildon UI extensions [default=no]]),
-            [],[with_hildon="no"])
-AC_MSG_RESULT([$with_hildon])
-
-if test "$with_hildon" = "yes"; then
-    HILDON_CPPFLAGS="-DMAEMO_CHANGES"
-    PKG_CHECK_MODULES([HILDON], [hildon-1])
-    AC_SUBST([HILDON_CPPFLAGS])
-    AC_SUBST([HILDON_CFLAGS])
-    AC_SUBST([HILDON_LIBS])
-fi
-
 AC_MSG_CHECKING([the GStreamer version to use])
 AC_ARG_WITH([gstreamer],
-        [AS_HELP_STRING([--with-gstreamer=0.10|0.11], [the GStreamer version to use (default: 0.10)])],
+        [AS_HELP_STRING([--with-gstreamer=0.10|1.0], [the GStreamer version to use (default: 0.10)])],
         [case "$with_gstreamer" in
-        0.10|0.11) ;;
+        0.10|1.0) ;;
         *) AC_MSG_ERROR([invalid GStreamer version specified]) ;;
         esac],
         [with_gstreamer=0.10])
@@ -353,32 +338,32 @@ AC_MSG_RESULT([$with_gstreamer])
 
 GSTREAMER_0_10_REQUIRED_VERSION=0.10
 GSTREAMER_0_10_PLUGINS_BASE_REQUIRED_VERSION=0.10.30
-GSTREAMER_0_11_REQUIRED_VERSION=0.11
-GSTREAMER_0_11_PLUGINS_BASE_REQUIRED_VERSION=0.11.0.2
+GSTREAMER_1_0_REQUIRED_VERSION=1.0
+GSTREAMER_1_0_PLUGINS_BASE_REQUIRED_VERSION=0.11.90
 
 case "$with_gstreamer" in
-     0.10) GSTREAMER_REQUIRED_VERSION=GSTREAMER_0_10_REQUIRED_VERSION
-           GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=GSTREAMER_0_10_PLUGINS_BASE_REQUIRED_VERSION
+     0.10) GSTREAMER_REQUIRED_VERSION=$GSTREAMER_0_10_REQUIRED_VERSION
+           GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=$GSTREAMER_0_10_PLUGINS_BASE_REQUIRED_VERSION
            GST_API_VERSION=0.10
            ;;
-     0.11) GSTREAMER_REQUIRED_VERSION=GSTREAMER_0_11_REQUIRED_VERSION
-           GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=GSTREAMER_0_11_PLUGINS_BASE_REQUIRED_VERSION
-           GST_API_VERSION=0.11
+     1.0) GSTREAMER_REQUIRED_VERSION=$GSTREAMER_1_0_REQUIRED_VERSION
+           GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION=$GSTREAMER_1_0_PLUGINS_BASE_REQUIRED_VERSION
+           GST_API_VERSION=1.0
            ;;
 esac
 
 AC_SUBST([GST_API_VERSION])
-if test "$GST_API_VERSION" = "0.11"; then
+if test "$GST_API_VERSION" = "1.0"; then
 AC_DEFINE([GST_USE_UNSTABLE_API], [1], [Using unstable GStreamer API])
-AC_DEFINE([GST_API_VERSION_1],[1], [Using GStreamer 0.11])
+AC_DEFINE([GST_API_VERSION_1],[1], [Using GStreamer 1.0])
 fi
 
 # minimum base dependencies
 CAIRO_REQUIRED_VERSION=1.10
 FONTCONFIG_REQUIRED_VERSION=2.4
 FREETYPE2_REQUIRED_VERSION=9.0
-GLIB_REQUIRED_VERSION=2.31.2
-LIBSOUP_REQUIRED_VERSION=2.37.2.1
+GLIB_REQUIRED_VERSION=2.32.0
+LIBSOUP_REQUIRED_VERSION=2.37.92
 LIBXML_REQUIRED_VERSION=2.6
 PANGO_REQUIRED_VERSION=1.21.0
 
@@ -547,11 +532,10 @@ AC_ARG_WITH(accelerated_compositing,
             [], [with_accelerated_compositing="no"])
 AC_MSG_RESULT([$with_accelerated_compositing])
 
-if test "$with_accelerated_compositing" = "opengl" && test "$with_target" != "x11" ; then
-    AC_MSG_ERROR([OpenGL accelerated compositing is only available on X11 currently.])
-fi
-
 if test "$enable_webgl" = "yes" ||  test "$with_accelerated_compositing" = "opengl" ; then
+    if test "$with_target" != "x11"; then
+        AC_MSG_ERROR([OpenGL support is only available on X11 currently.])
+    fi
     AC_CHECK_HEADERS([GL/gl.h], [], AC_MSG_ERROR([OpenGL header not found]))
     AC_CHECK_HEADERS([GL/glx.h], [], AC_MSG_ERROR([GLX header not found]))
     OPENGL_LIBS="-lGL -ldl"
@@ -682,11 +666,11 @@ AC_MSG_RESULT([$enable_indexed_database])
 
 # check whether to enable the color input
 AC_MSG_CHECKING([whether to enable the color input])
-AC_ARG_ENABLE(input_color,
-              AC_HELP_STRING([--enable-input-color],
+AC_ARG_ENABLE(input_type_color,
+              AC_HELP_STRING([--enable-input-type-color],
                              [enable the color input [default=no]]),
-              [],[enable_input_color="no"])
-AC_MSG_RESULT([$enable_input_color])
+              [],[enable_input_type_color="no"])
+AC_MSG_RESULT([$enable_input_type_color])
 
 # check whether to enable the speech input API
 AC_MSG_CHECKING([whether to enable the speech input API])
@@ -955,6 +939,14 @@ AC_ARG_ENABLE(blob,
               [],[enable_blob="yes"])
 AC_MSG_RESULT([$enable_blob])
 
+# check whether to enable Legacy WebKitBlobBuilder support
+AC_MSG_CHECKING([whether to enable Legacy WebKitBlobBuilder support])
+AC_ARG_ENABLE(legacy_webkit_blob_builder,
+              AC_HELP_STRING([--enable-legacy-webkit-blob-builder],
+                             [enable support for Legacy WebKitBlobBuilder [default=yes]]),
+              [],[enable_legacy_webkit_blob_builder="yes"])
+AC_MSG_RESULT([$legacy_webkit_blob_builder])
+
 # check whether to enable Fast Mobile Scrolling support
 AC_MSG_CHECKING([whether to enable Fast Mobile Scrolling])
 AC_ARG_ENABLE(fast_mobile_scrolling,
@@ -1200,18 +1192,18 @@ fi
 
 # check if gstreamer is available
 if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
-   PKG_CHECK_MODULES([GSTREAMER],
-                     [gstreamer-$GST_API_VERSION >= $GSTREAMER_REQUIRED_VERSION
-                     gstreamer-app-$GST_API_VERSION
-                     gstreamer-audio-$GST_API_VERSION
-                     gstreamer-fft-$GST_API_VERSION
-                     gstreamer-base-$GST_API_VERSION
-                     gstreamer-interfaces-$GST_API_VERSION
-                     gstreamer-pbutils-$GST_API_VERSION
-                     gstreamer-plugins-base-$GST_API_VERSION >= $GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION
-                     gstreamer-video-$GST_API_VERSION],
-                     [have_gstreamer=yes])
-
+    gstreamer_modules="gstreamer-$GST_API_VERSION >= $GSTREAMER_REQUIRED_VERSION
+                       gstreamer-app-$GST_API_VERSION
+                       gstreamer-audio-$GST_API_VERSION
+                       gstreamer-fft-$GST_API_VERSION
+                       gstreamer-base-$GST_API_VERSION
+                       gstreamer-pbutils-$GST_API_VERSION
+                       gstreamer-plugins-base-$GST_API_VERSION >= $GSTREAMER_PLUGINS_BASE_REQUIRED_VERSION
+                       gstreamer-video-$GST_API_VERSION";
+   if test "$GST_API_VERSION" != "1.0"; then
+       gstreamer_modules="$gstreamer_modules gstreamer-interfaces-$GST_API_VERSION";
+   fi
+   PKG_CHECK_MODULES([GSTREAMER], [$gstreamer_modules], [have_gstreamer=yes])
    AC_SUBST([GSTREAMER_CFLAGS])
    AC_SUBST([GSTREAMER_LIBS])
 fi
@@ -1252,10 +1244,12 @@ if test "$enable_video" = "yes"; then
 fi
 
 # WebKit2
+# If you change the default here, please also make sure the assumptions made
+# in Tools/Scripts/webkitdirs.pm:buildAutotoolsProject still make sense.
 AC_MSG_CHECKING([whether to build Webkit2])
 AC_ARG_ENABLE(webkit2,
-    AC_HELP_STRING([--enable-webkit2], [build webkit2 [default=no]]),
-    [], [enable_webkit2="no"])
+    AC_HELP_STRING([--enable-webkit2], [build webkit2 [default=yes]]),
+    [], [enable_webkit2="yes"])
 AC_MSG_RESULT([$enable_webkit2])
 if test "$enable_webkit2" = "yes"; then
    if test "$GTK_API_VERSION" = "2.0"; then
@@ -1328,10 +1322,15 @@ AM_CONDITIONAL([USE_TEXTURE_MAPPER_CAIRO], [test "$with_accelerated_compositing"
 AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL], [test "$with_accelerated_compositing" = "opengl"])
 AM_CONDITIONAL([USE_CLUTTER], [test "$with_accelerated_compositing" = "clutter"])
 
+# These are the same now, but they will soon be separate.
+AM_CONDITIONAL([USE_GLX], [test "$with_accelerated_compositing" = "opengl" || test "$enable_webgl" = "yes"])
+AM_CONDITIONAL([USE_OPENGL], [test "$with_accelerated_compositing" = "opengl" || test "$enable_webgl" = "yes"])
+
 # WebKit feature conditionals
 AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug_features" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBGL],[test "$enable_webgl" = "yes"])
 AM_CONDITIONAL([ENABLE_BLOB],[test "$enable_blob" = "yes"])
+AM_CONDITIONAL([ENABLE_LEGACY_WEBKIT_BLOB_BUILDER],[test "$enable_legacy_webkit_blob_builder" = "yes"])
 AM_CONDITIONAL([ENABLE_METER_TAG],[test "$enable_meter_tag" = "yes"])
 AM_CONDITIONAL([ENABLE_MICRODATA],[test "$enable_microdata" = "yes"])
 AM_CONDITIONAL([ENABLE_PAGE_VISIBILITY_API],[test "$enable_page_visibility_api" = "yes"])
@@ -1352,7 +1351,7 @@ AM_CONDITIONAL([ENABLE_QUOTA],[test "$enable_quota" = "yes"])
 AM_CONDITIONAL([ENABLE_ICONDATABASE],[test "$enable_icon_database" = "yes"])
 AM_CONDITIONAL([ENABLE_IMAGE_RESIZER],[test "$enable_image_resizer" = "yes"])
 AM_CONDITIONAL([ENABLE_INDEXED_DATABASE],[test "$enable_indexed_database" = "yes"])
-AM_CONDITIONAL([ENABLE_INPUT_COLOR],[test "$enable_input_color" = "yes"])
+AM_CONDITIONAL([ENABLE_INPUT_TYPE_COLOR],[test "$enable_input_type_color" = "yes"])
 AM_CONDITIONAL([ENABLE_INPUT_SPEECH],[test "$enable_input_speech" = "yes"])
 AM_CONDITIONAL([ENABLE_SCRIPTED_SPEECH],[test "$enable_scripted_speech" = "yes"])
 AM_CONDITIONAL([ENABLE_XSLT],[test "$enable_xslt" = "yes"])
@@ -1440,6 +1439,7 @@ Build configuration:
 Features:
  WebGL                                                    : $enable_webgl
  Blob support                                             : $enable_blob
+ Legacy WebKitBlobBuilder support                         : $enable_legacy_webkit_blob_builder
  DOM mutation observer support                            : $enable_mutation_observers
  DeviceOrientation support                                : $enable_device_orientation
  Directory upload                                         : $enable_directory_upload
@@ -1475,7 +1475,7 @@ Features:
  Opcode stats                                             : $enable_opcode_stats
  Shadow DOM support                                       : $enable_shadow_dom
  SharedWorkers support                                    : $enable_shared_workers
- Color input support                                      : $enable_input_color
+ Color input support                                      : $enable_input_type_color
  Speech input support                                     : $enable_input_speech
  Scripted speech support                                  : $enable_scripted_speech
  SVG support                                              : $enable_svg
@@ -1496,7 +1496,6 @@ Features:
 GTK+ configuration:
  GTK+ version                                             : $with_gtk
  GDK target                                               : $with_target
- Hildon UI extensions                                     : $with_hildon
  GStreamer version                                        : $with_gstreamer
  Introspection support                                    : $enable_introspection
  Generate documentation                                   : $enable_gtk_doc

@@ -57,8 +57,15 @@ TYPE_NAME_FIX_MAP = {
 
 
 TYPES_WITH_RUNTIME_CAST_SET = frozenset(["Runtime.RemoteObject", "Runtime.PropertyDescriptor",
-                                         "Debugger.FunctionDetails", "Debugger.CallFrame"])
+                                         "Debugger.FunctionDetails", "Debugger.CallFrame",
+                                         # This should be a temporary hack. TimelineEvent should be created via generated C++ API.
+                                         "Timeline.TimelineEvent"])
 
+TYPES_WITH_OPEN_FIELD_LIST_SET = frozenset(["Timeline.TimelineEvent",
+                                            # InspectorStyleSheet not only creates this property but wants to read it and modify it.
+                                            "CSS.CSSProperty",
+                                            # InspectorResourceAgent needs to update mime-type.
+                                            "Network.Response"])
 
 cmdline_parser = optparse.OptionParser()
 cmdline_parser.add_option("--output_h_dir")
@@ -235,9 +242,7 @@ class RawTypes(object):
             params = cls.get_validate_method_params()
             writer.newline("static void assert%s(InspectorValue* value)\n" % params.name)
             writer.newline("{\n")
-            writer.newline("    %s v;\n" % params.var_type)
-            writer.newline("    bool castRes = value->as%s(&v);\n" % params.as_method_name)
-            writer.newline("    ASSERT_UNUSED(castRes, castRes);\n")
+            writer.newline("    ASSERT(value->type() == InspectorValue::Type%s);\n" % params.as_method_name)
             writer.newline("}\n\n\n")
 
         @classmethod
@@ -272,7 +277,6 @@ class RawTypes(object):
         def get_validate_method_params():
             class ValidateMethodParams:
                 name = "String"
-                var_type = "String"
                 as_method_name = "String"
             return ValidateMethodParams
 
@@ -309,13 +313,19 @@ class RawTypes(object):
         def get_js_bind_type():
             return "number"
 
-        @staticmethod
-        def get_validate_method_params():
-            class ValidateMethodParams:
-                name = "Int"
-                var_type = "int"
-                as_method_name = "Number"
-            return ValidateMethodParams
+        @classmethod
+        def generate_validate_method(cls, writer):
+            writer.newline("static void assertInt(InspectorValue* value)\n")
+            writer.newline("{\n")
+            writer.newline("    double v;\n")
+            writer.newline("    bool castRes = value->asNumber(&v);\n")
+            writer.newline("    ASSERT_UNUSED(castRes, castRes);\n")
+            writer.newline("    ASSERT(static_cast<double>(static_cast<int>(v)) == v);\n")
+            writer.newline("}\n\n\n")
+
+        @classmethod
+        def get_raw_validator_call_text(cls):
+            return "assertInt"
 
         @staticmethod
         def get_output_pass_model():
@@ -336,7 +346,7 @@ class RawTypes(object):
     class Number(BaseType):
         @staticmethod
         def get_getter_name():
-            return "Object"
+            return "Double"
 
         @staticmethod
         def get_setter_name():
@@ -344,15 +354,18 @@ class RawTypes(object):
 
         @staticmethod
         def get_c_initializer():
-            raise Exception("Unsupported")
+            return "0"
 
         @staticmethod
         def get_js_bind_type():
-            raise Exception("Unsupported")
+            return "number"
 
         @staticmethod
         def get_validate_method_params():
-            raise Exception("TODO")
+            class ValidateMethodParams:
+                name = "Double"
+                as_method_name = "Number"
+            return ValidateMethodParams
 
         @staticmethod
         def get_output_pass_model():
@@ -389,7 +402,6 @@ class RawTypes(object):
         def get_validate_method_params():
             class ValidateMethodParams:
                 name = "Boolean"
-                var_type = "bool"
                 as_method_name = "Boolean"
             return ValidateMethodParams
 
@@ -414,7 +426,9 @@ class RawTypes(object):
         def get_getter_name():
             return "Object"
 
-        get_setter_name = get_getter_name
+        @staticmethod
+        def get_setter_name():
+            return "Value"
 
         @staticmethod
         def get_c_initializer():
@@ -430,7 +444,10 @@ class RawTypes(object):
 
         @staticmethod
         def get_validate_method_params():
-            raise Exception("TODO")
+            class ValidateMethodParams:
+                name = "Object"
+                as_method_name = "Object"
+            return ValidateMethodParams
 
         @staticmethod
         def get_output_pass_model():
@@ -495,7 +512,9 @@ class RawTypes(object):
         def get_getter_name():
             return "Array"
 
-        get_setter_name = get_getter_name
+        @staticmethod
+        def get_setter_name():
+            return "Value"
 
         @staticmethod
         def get_c_initializer():
@@ -579,6 +598,28 @@ class CommandReturnPassModel:
         def get_set_return_condition():
             return None
 
+    class OptOutput:
+        def __init__(self, var_type):
+            self.var_type = var_type
+
+        def get_return_var_type(self):
+            return "TypeBuilder::OptOutput<%s>" % self.var_type
+
+        @staticmethod
+        def get_output_argument_prefix():
+            return "&"
+
+        @staticmethod
+        def get_output_to_raw_expression():
+            return "%s.getValue()"
+
+        def get_output_parameter_type(self):
+            return "TypeBuilder::OptOutput<%s>*" % self.var_type
+
+        @staticmethod
+        def get_set_return_condition():
+            return "%s.isAssigned()"
+
 
 class TypeModel:
     class RefPtrBased:
@@ -617,8 +658,7 @@ class TypeModel:
 
                 @staticmethod
                 def get_command_return_pass_model():
-                    # FIXME: to be replaced with OptOutput model.
-                    return CommandReturnPassModel.ByPointer(base_self.type_name)
+                    return CommandReturnPassModel.OptOutput(base_self.type_name)
 
                 @staticmethod
                 def get_input_param_type_text():
@@ -668,8 +708,7 @@ class TypeModel:
                 return self
 
             def get_command_return_pass_model(self):
-                # FIXME: to be replaced with OptOutput model.
-                return CommandReturnPassModel.ByPointer(self.base.type_name)
+                return CommandReturnPassModel.OptOutput(self.base.type_name)
 
             def get_input_param_type_text(self):
                 return "const %s* const" % self.base.type_name
@@ -1094,6 +1133,8 @@ class TypeBindings:
 
                     @classmethod
                     def request_internal_runtime_cast(cls):
+                        if cls.need_internal_runtime_cast_:
+                            return
                         cls.need_internal_runtime_cast_ = True
                         for p in cls.resolve_data_.main_properties:
                             p.param_type_binding.request_internal_runtime_cast()
@@ -1108,10 +1149,18 @@ class TypeBindings:
                                 resolve_data = class_binding_cls.resolve_data_
                                 helper.write_doc(writer)
                                 class_name = fixed_type_name.class_name
+
+                                is_open_type = (context_domain_name + "." + class_name) in TYPES_WITH_OPEN_FIELD_LIST_SET
+
                                 fixed_type_name.output_comment(writer)
                                 writer.newline("class ")
                                 writer.append(class_name)
-                                writer.append(" : public InspectorObject {\n")
+                                writer.append(" : public ")
+                                if is_open_type:
+                                    writer.append("InspectorObject")
+                                else:
+                                    writer.append("InspectorObjectBase")
+                                writer.append(" {\n")
                                 writer.newline("public:\n")
                                 ad_hoc_type_writer = writer.insert_writer("    ")
 
@@ -1151,7 +1200,7 @@ class TypeBindings:
             return *reinterpret_cast<Builder<STATE | STEP>*>(this);
         }
 
-        Builder(PassRefPtr<%s> ptr)
+        Builder(PassRefPtr</*%s*/InspectorObject> ptr)
         {
             COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
             m_result = ptr;
@@ -1166,8 +1215,8 @@ class TypeBindings:
 
                                     param_type_binding = prop_data.param_type_binding
                                     param_raw_type = param_type_binding.reduce_to_raw_type()
-                                    for param_type_opt in MethodGenerateModes.get_modes(param_type_binding):
-                                        writer.newline_multiline("""
+
+                                    writer.newline_multiline("""
         Builder<STATE | %s>& set%s(%s value)
         {
             COMPILE_ASSERT(!(STATE & %s), property_%s_already_set);
@@ -1175,13 +1224,13 @@ class TypeBindings:
             return castState<%s>();
         }
 """
-                                        % (state_enum_items[pos],
-                                           Capitalizer.lower_camel_case_to_upper(prop_name),
-                                           param_type_opt.get_c_param_type_text(param_type_binding),
-                                           state_enum_items[pos], prop_name,
-                                           param_raw_type.get_setter_name(), prop_name,
-                                           param_type_opt.get_setter_value_expression(param_type_binding, "value"),
-                                           state_enum_items[pos]))
+                                    % (state_enum_items[pos],
+                                       Capitalizer.lower_camel_case_to_upper(prop_name),
+                                       param_type_binding.get_type_model().get_input_param_type_text(),
+                                       state_enum_items[pos], prop_name,
+                                       param_raw_type.get_setter_name(), prop_name,
+                                       format_setter_value_expression(param_type_binding, "value"),
+                                       state_enum_items[pos]))
 
                                     pos += 1
 
@@ -1189,17 +1238,18 @@ class TypeBindings:
         operator RefPtr<%s>& ()
         {
             COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(%s) == sizeof(InspectorObject), cannot_cast);
             return *reinterpret_cast<RefPtr<%s>*>(&m_result);
         }
 
-        operator PassRefPtr<%s> ()
+        PassRefPtr<%s> release()
         {
-            return RefPtr<%s>(*this);
+            return RefPtr<%s>(*this).release();
         }
     };
 
 """
-                                % (class_name, class_name, class_name, class_name))
+                                % (class_name, class_name, class_name, class_name, class_name))
 
                                 writer.newline("    /*\n")
                                 writer.newline("     * Synthetic constructor:\n")
@@ -1211,9 +1261,9 @@ class TypeBindings:
                                 writer.newline_multiline(
 """    static Builder<NoFieldsSet> create()
     {
-        return Builder<NoFieldsSet>(adoptRef(new %s()));
+        return Builder<NoFieldsSet>(InspectorObject::create());
     }
-""" % class_name)
+""")
 
                                 writer.newline("    typedef TypeBuilder::StructItemTraits ItemTraits;\n")
 
@@ -1222,18 +1272,17 @@ class TypeBindings:
                                     param_type_binding = prop_data.param_type_binding
                                     setter_name = "set%s" % Capitalizer.lower_camel_case_to_upper(prop_name)
 
-                                    for param_type_opt in MethodGenerateModes.get_modes(param_type_binding):
-                                        writer.append_multiline("\n    void %s" % setter_name)
-                                        writer.append("(%s value)\n" % param_type_opt.get_c_param_type_text(param_type_binding))
-                                        writer.newline("    {\n")
-                                        writer.newline("        this->set%s(\"%s\", %s);\n"
-                                            % (param_type_binding.reduce_to_raw_type().get_setter_name(), prop_data.p["name"],
-                                               param_type_opt.get_setter_value_expression(param_type_binding, "value")))
-                                        writer.newline("    }\n")
+                                    writer.append_multiline("\n    void %s" % setter_name)
+                                    writer.append("(%s value)\n" % param_type_binding.get_type_model().get_input_param_type_text())
+                                    writer.newline("    {\n")
+                                    writer.newline("        this->set%s(\"%s\", %s);\n"
+                                        % (param_type_binding.reduce_to_raw_type().get_setter_name(), prop_data.p["name"],
+                                           format_setter_value_expression(param_type_binding, "value")))
+                                    writer.newline("    }\n")
 
 
                                     if setter_name in INSPECTOR_OBJECT_SETTER_NAMES:
-                                        writer.newline("    using InspectorObject::%s;\n\n" % setter_name)
+                                        writer.newline("    using InspectorObjectBase::%s;\n\n" % setter_name)
 
                                 if class_binding_cls.need_user_runtime_cast_:
                                     writer.newline("    static PassRefPtr<%s> runtimeCast(PassRefPtr<InspectorValue> value)\n" % class_name)
@@ -1244,8 +1293,8 @@ class TypeBindings:
                                     writer.append("#if %s\n" % VALIDATOR_IFDEF_NAME)
                                     writer.newline("        assertCorrectValue(object.get());\n")
                                     writer.append("#endif  // %s\n" % VALIDATOR_IFDEF_NAME)
-                                    writer.newline("        COMPILE_ASSERT(sizeof(%s) == sizeof(InspectorObject), type_cast_problem);\n" % class_name)
-                                    writer.newline("        return static_cast<%s*>(object.get());\n" % class_name)
+                                    writer.newline("        COMPILE_ASSERT(sizeof(%s) == sizeof(InspectorObjectBase), type_cast_problem);\n" % class_name)
+                                    writer.newline("        return static_cast<%s*>(static_cast<InspectorObjectBase*>(object.get()));\n" % class_name)
                                     writer.newline("    }\n")
                                     writer.append("\n")
 
@@ -1253,6 +1302,8 @@ class TypeBindings:
                                     writer.append("#if %s\n" % VALIDATOR_IFDEF_NAME)
                                     writer.newline("    static void assertCorrectValue(InspectorValue* value);\n")
                                     writer.append("#endif  // %s\n" % VALIDATOR_IFDEF_NAME)
+
+                                    closed_field_set = (context_domain_name + "." + class_name) not in TYPES_WITH_OPEN_FIELD_LIST_SET
 
                                     validator_writer = generate_context.validator_writer
                                     validator_writer.newline("void %s%s::assertCorrectValue(InspectorValue* value)\n" % (helper.full_name_prefix_for_impl, class_name))
@@ -1269,7 +1320,8 @@ class TypeBindings:
                                         validator_writer.newline("        %s(%s->second.get());\n" % (prop_data.param_type_binding.get_validator_call_text(), it_name))
                                         validator_writer.newline("    }\n")
 
-                                    validator_writer.newline("    int foundPropertiesCount = %s;\n" % len(resolve_data.main_properties))
+                                    if closed_field_set:
+                                        validator_writer.newline("    int foundPropertiesCount = %s;\n" % len(resolve_data.main_properties))
 
                                     for prop_data in resolve_data.optional_properties:
                                         validator_writer.newline("    {\n")
@@ -1278,12 +1330,25 @@ class TypeBindings:
                                         validator_writer.newline("        %s = object->find(\"%s\");\n" % (it_name, prop_data.p["name"]))
                                         validator_writer.newline("        if (%s != object->end()) {\n" % it_name)
                                         validator_writer.newline("            %s(%s->second.get());\n" % (prop_data.param_type_binding.get_validator_call_text(), it_name))
-                                        validator_writer.newline("            ++foundPropertiesCount;\n")
+                                        if closed_field_set:
+                                            validator_writer.newline("            ++foundPropertiesCount;\n")
                                         validator_writer.newline("        }\n")
                                         validator_writer.newline("    }\n")
 
-                                    validator_writer.newline("    ASSERT(foundPropertiesCount == object->size());\n")
+                                    if closed_field_set:
+                                        validator_writer.newline("    ASSERT(foundPropertiesCount == object->size());\n")
                                     validator_writer.newline("}\n\n\n")
+
+                                if is_open_type:
+                                    cpp_writer = generate_context.cpp_writer
+                                    writer.append("\n")
+                                    writer.newline("    // Property names for type generated as open.\n")
+                                    for prop_data in resolve_data.main_properties + resolve_data.optional_properties:
+                                        prop_name = prop_data.p["name"]
+                                        prop_field_name = Capitalizer.lower_camel_case_to_upper(prop_name)
+                                        writer.newline("    static const char* %s;\n" % (prop_field_name))
+                                        cpp_writer.newline("const char* %s%s::%s = \"%s\";\n" % (helper.full_name_prefix_for_impl, class_name, prop_field_name, prop_name))
+
 
                                 writer.newline("};\n\n")
 
@@ -1360,7 +1425,7 @@ class TypeBindings:
 
                     @staticmethod
                     def request_internal_runtime_cast():
-                        pass
+                        RawTypes.Object.request_raw_internal_runtime_cast()
 
                     @staticmethod
                     def get_code_generator():
@@ -1368,7 +1433,7 @@ class TypeBindings:
 
                     @staticmethod
                     def get_validator_call_text():
-                        raise Exception("Unsupported")
+                        return "assertObject"
 
                     @classmethod
                     def get_array_item_c_type_text(cls):
@@ -1394,7 +1459,7 @@ class TypeBindings:
 
                 class AdHocTypeContext:
                     container_full_name_prefix = "<not yet defined>"
-                    container_relative_name_prefix = "<not yet defined>"
+                    container_relative_name_prefix = ""
 
                     @staticmethod
                     def get_type_name_fix():
@@ -1430,6 +1495,8 @@ class TypeBindings:
 
                     @classmethod
                     def request_internal_runtime_cast(cls):
+                        if cls.need_internal_runtime_cast_:
+                            return
                         cls.need_internal_runtime_cast_ = True
                         cls.resolve_data_.item_type_binding.request_internal_runtime_cast()
 
@@ -1697,13 +1764,16 @@ ${frontendDomainMethodDeclarations}        void setInspectorFrontendChannel(Insp
     if (!$agentField)
         protocolErrors->pushString("${domainName} handler is not available.");
 $methodOutCode
-    ErrorString error;
 $methodInCode
-    if (!protocolErrors->length())
+    RefPtr<InspectorObject> result = InspectorObject::create();
+    ErrorString error;
+    if (!protocolErrors->length()) {
         $agentField->$methodName(&error$agentCallParams);
 
-    RefPtr<InspectorObject> result = InspectorObject::create();
-${responseCook}    sendResponse(callId, result, String::format("Some arguments of method '%s' can't be processed", "$domainName.$methodName"), protocolErrors, error);
+        if (!error.length()) {
+${responseCook}        }
+    }
+    sendResponse(callId, result, String::format("Some arguments of method '%s' can't be processed", "$domainName.$methodName"), protocolErrors, error);
 }
 """)
 
@@ -1814,11 +1884,12 @@ $methodNamesEnumContent
 """
 
 #include "config.h"
+
+#if ENABLE(INSPECTOR)
+
 #include "InspectorBackendDispatcher.h"
 #include <wtf/text/WTFString.h>
 #include <wtf/text/CString.h>
-
-#if ENABLE(INSPECTOR)
 
 #include "InspectorAgent.h"
 #include "InspectorValues.h"
@@ -1851,11 +1922,16 @@ $methodDeclarations
     InspectorFrontendChannel* m_inspectorFrontendChannel;
 $fieldDeclarations
 
+    template<typename R, typename V, typename V0>
+    static R getPropertyValueImpl(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors, V0 initial_value, bool (*as_method)(InspectorValue*, V*), const char* type_name);
+
     static int getInt(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors);
+    static double getDouble(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors);
     static String getString(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors);
     static bool getBoolean(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors);
     static PassRefPtr<InspectorObject> getObject(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors);
     static PassRefPtr<InspectorArray> getArray(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors);
+
     void sendResponse(long callId, PassRefPtr<InspectorObject> result, const String& errorMessage, PassRefPtr<InspectorArray> protocolErrors, ErrorString invocationError);
 
 };
@@ -1982,19 +2058,20 @@ void InspectorBackendDispatcherImpl::reportProtocolError(const long* const callI
         m_inspectorFrontendChannel->sendMessageToFrontend(message->toJSONString());
 }
 
-int InspectorBackendDispatcherImpl::getInt(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
+template<typename R, typename V, typename V0>
+R InspectorBackendDispatcherImpl::getPropertyValueImpl(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors, V0 initial_value, bool (*as_method)(InspectorValue*, V*), const char* type_name)
 {
     ASSERT(protocolErrors);
 
     if (valueFound)
         *valueFound = false;
 
-    int value = 0;
+    V value = initial_value;
 
     if (!object) {
         if (!valueFound) {
             // Required parameter in missing params container.
-            protocolErrors->pushString(String::format("'params' object must contain required parameter '%s' with type 'Number'.", name.utf8().data()));
+            protocolErrors->pushString(String::format("'params' object must contain required parameter '%s' with type '%s'.", name.utf8().data(), type_name));
         }
         return value;
     }
@@ -2004,152 +2081,55 @@ int InspectorBackendDispatcherImpl::getInt(InspectorObject* object, const String
 
     if (valueIterator == end) {
         if (!valueFound)
-            protocolErrors->pushString(String::format("Parameter '%s' with type 'Number' was not found.", name.utf8().data()));
+            protocolErrors->pushString(String::format("Parameter '%s' with type '%s' was not found.", name.utf8().data(), type_name));
         return value;
     }
 
-    if (!valueIterator->second->asNumber(&value))
-        protocolErrors->pushString(String::format("Parameter '%s' has wrong type. It must be 'Number'.", name.utf8().data()));
+    if (!as_method(valueIterator->second.get(), &value))
+        protocolErrors->pushString(String::format("Parameter '%s' has wrong type. It must be '%s'.", name.utf8().data(), type_name));
     else
         if (valueFound)
             *valueFound = true;
     return value;
+}
+
+struct AsMethodBridges {
+    static bool asInt(InspectorValue* value, int* output) { return value->asNumber(output); }
+    static bool asDouble(InspectorValue* value, double* output) { return value->asNumber(output); }
+    static bool asString(InspectorValue* value, String* output) { return value->asString(output); }
+    static bool asBoolean(InspectorValue* value, bool* output) { return value->asBoolean(output); }
+    static bool asObject(InspectorValue* value, RefPtr<InspectorObject>* output) { return value->asObject(output); }
+    static bool asArray(InspectorValue* value, RefPtr<InspectorArray>* output) { return value->asArray(output); }
+};
+
+int InspectorBackendDispatcherImpl::getInt(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
+{
+    return getPropertyValueImpl<int, int, int>(object, name, valueFound, protocolErrors, 0, AsMethodBridges::asInt, "Number");
+}
+
+double InspectorBackendDispatcherImpl::getDouble(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
+{
+    return getPropertyValueImpl<double, double, double>(object, name, valueFound, protocolErrors, 0, AsMethodBridges::asDouble, "Number");
 }
 
 String InspectorBackendDispatcherImpl::getString(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
 {
-    ASSERT(protocolErrors);
-
-    if (valueFound)
-        *valueFound = false;
-
-    String value = "";
-
-    if (!object) {
-        if (!valueFound) {
-            // Required parameter in missing params container.
-            protocolErrors->pushString(String::format("'params' object must contain required parameter '%s' with type 'String'.", name.utf8().data()));
-        }
-        return value;
-    }
-
-    InspectorObject::const_iterator end = object->end();
-    InspectorObject::const_iterator valueIterator = object->find(name);
-
-    if (valueIterator == end) {
-        if (!valueFound)
-            protocolErrors->pushString(String::format("Parameter '%s' with type 'String' was not found.", name.utf8().data()));
-        return value;
-    }
-
-    if (!valueIterator->second->asString(&value))
-        protocolErrors->pushString(String::format("Parameter '%s' has wrong type. It must be 'String'.", name.utf8().data()));
-    else
-        if (valueFound)
-            *valueFound = true;
-    return value;
+    return getPropertyValueImpl<String, String, String>(object, name, valueFound, protocolErrors, "", AsMethodBridges::asString, "String");
 }
 
 bool InspectorBackendDispatcherImpl::getBoolean(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
 {
-    ASSERT(protocolErrors);
-
-    if (valueFound)
-        *valueFound = false;
-
-    bool value = false;
-
-    if (!object) {
-        if (!valueFound) {
-            // Required parameter in missing params container.
-            protocolErrors->pushString(String::format("'params' object must contain required parameter '%s' with type 'Boolean'.", name.utf8().data()));
-        }
-        return value;
-    }
-
-    InspectorObject::const_iterator end = object->end();
-    InspectorObject::const_iterator valueIterator = object->find(name);
-
-    if (valueIterator == end) {
-        if (!valueFound)
-            protocolErrors->pushString(String::format("Parameter '%s' with type 'Boolean' was not found.", name.utf8().data()));
-        return value;
-    }
-
-    if (!valueIterator->second->asBoolean(&value))
-        protocolErrors->pushString(String::format("Parameter '%s' has wrong type. It must be 'Boolean'.", name.utf8().data()));
-    else
-        if (valueFound)
-            *valueFound = true;
-    return value;
+    return getPropertyValueImpl<bool, bool, bool>(object, name, valueFound, protocolErrors, false, AsMethodBridges::asBoolean, "Boolean");
 }
 
 PassRefPtr<InspectorObject> InspectorBackendDispatcherImpl::getObject(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
 {
-    ASSERT(protocolErrors);
-
-    if (valueFound)
-        *valueFound = false;
-
-    RefPtr<InspectorObject> value = InspectorObject::create();
-
-    if (!object) {
-        if (!valueFound) {
-            // Required parameter in missing params container.
-            protocolErrors->pushString(String::format("'params' object must contain required parameter '%s' with type 'Object'.", name.utf8().data()));
-        }
-        return value;
-    }
-
-    InspectorObject::const_iterator end = object->end();
-    InspectorObject::const_iterator valueIterator = object->find(name);
-
-    if (valueIterator == end) {
-        if (!valueFound)
-            protocolErrors->pushString(String::format("Parameter '%s' with type 'Object' was not found.", name.utf8().data()));
-        return value;
-    }
-
-    if (!valueIterator->second->asObject(&value))
-        protocolErrors->pushString(String::format("Parameter '%s' has wrong type. It must be 'Object'.", name.utf8().data()));
-    else
-        if (valueFound)
-            *valueFound = true;
-    return value;
+    return getPropertyValueImpl<PassRefPtr<InspectorObject>, RefPtr<InspectorObject>, InspectorObject*>(object, name, valueFound, protocolErrors, 0, AsMethodBridges::asObject, "Object");
 }
 
 PassRefPtr<InspectorArray> InspectorBackendDispatcherImpl::getArray(InspectorObject* object, const String& name, bool* valueFound, InspectorArray* protocolErrors)
 {
-    ASSERT(protocolErrors);
-
-    if (valueFound)
-        *valueFound = false;
-
-    RefPtr<InspectorArray> value = InspectorArray::create();
-
-    if (!object) {
-        if (!valueFound) {
-            // Required parameter in missing params container.
-            protocolErrors->pushString(String::format("'params' object must contain required parameter '%s' with type 'Array'.", name.utf8().data()));
-        }
-        return value;
-    }
-
-    InspectorObject::const_iterator end = object->end();
-    InspectorObject::const_iterator valueIterator = object->find(name);
-
-    if (valueIterator == end) {
-        if (!valueFound)
-            protocolErrors->pushString(String::format("Parameter '%s' with type 'Array' was not found.", name.utf8().data()));
-        return value;
-    }
-
-    if (!valueIterator->second->asArray(&value))
-        protocolErrors->pushString(String::format("Parameter '%s' has wrong type. It must be 'Array'.", name.utf8().data()));
-    else
-        if (valueFound)
-            *valueFound = true;
-    return value;
+    return getPropertyValueImpl<PassRefPtr<InspectorArray>, RefPtr<InspectorArray>, InspectorArray*>(object, name, valueFound, protocolErrors, 0, AsMethodBridges::asArray, "Array");
 }
 
 bool InspectorBackendDispatcher::getCommandName(const String& message, String* result)
@@ -2210,12 +2190,39 @@ $methods
 #if ENABLE(INSPECTOR)
 
 #include "InspectorValues.h"
-#include <PlatformString.h>
+#include <wtf/Assertions.h>
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
 
 namespace TypeBuilder {
+
+template<typename T>
+class OptOutput {
+public:
+    OptOutput() : m_assigned(false) { }
+
+    void operator=(T value)
+    {
+        m_value = value;
+        m_assigned = true;
+    }
+
+    bool isAssigned() { return m_assigned; }
+
+    T getValue()
+    {
+        ASSERT(isAssigned());
+        return m_value;
+    }
+
+private:
+    T m_value;
+    bool m_assigned;
+
+    WTF_MAKE_NONCOPYABLE(OptOutput);
+};
+
 
 // This class provides "Traits" type for the input type T. It is programmed using C++ template specialization
 // technique. By default it simply takes "ItemTraits" type from T, but it doesn't work with the base types.
@@ -2225,19 +2232,24 @@ struct ArrayItemHelper {
 };
 
 template<typename T>
-class Array : public InspectorArray {
+class Array : public InspectorArrayBase {
 private:
     Array() { }
+
+    InspectorArray* openAccessors() {
+        COMPILE_ASSERT(sizeof(InspectorArray) == sizeof(Array<T>), cannot_cast);
+        return static_cast<InspectorArray*>(static_cast<InspectorArrayBase*>(this));
+    }
 
 public:
     void addItem(PassRefPtr<T> value)
     {
-        ArrayItemHelper<T>::Traits::pushRefPtr(this, value);
+        ArrayItemHelper<T>::Traits::pushRefPtr(this->openAccessors(), value);
     }
 
     void addItem(T value)
     {
-        ArrayItemHelper<T>::Traits::pushRaw(this, value);
+        ArrayItemHelper<T>::Traits::pushRaw(this->openAccessors(), value);
     }
 
     static PassRefPtr<Array<T> > create()
@@ -2254,7 +2266,7 @@ public:
         assertCorrectValue(array.get());
 #endif  // !ASSERT_DISABLED
         COMPILE_ASSERT(sizeof(Array<T>) == sizeof(InspectorArray), type_cast_problem);
-        return static_cast<Array<T>*>(array.get());
+        return static_cast<Array<T>*>(static_cast<InspectorArrayBase*>(array.get()));
     }
 
 #if """ + VALIDATOR_IFDEF_NAME + """
@@ -2271,9 +2283,9 @@ public:
 };
 
 struct StructItemTraits {
-    static void pushRefPtr(InspectorArray* array, PassRefPtr<InspectorObject> value)
+    static void pushRefPtr(InspectorArray* array, PassRefPtr<InspectorValue> value)
     {
-        array->pushObject(value);
+        array->pushValue(value);
     }
 
     template<typename T>
@@ -2293,11 +2305,41 @@ struct ArrayItemHelper<String> {
 };
 
 template<>
+struct ArrayItemHelper<int> {
+    struct Traits {
+        static void pushRaw(InspectorArray* array, int value)
+        {
+            array->pushInt(value);
+        }
+    };
+};
+
+template<>
+struct ArrayItemHelper<InspectorValue> {
+    struct Traits {
+        static void pushRefPtr(InspectorArray* array, PassRefPtr<InspectorValue> value)
+        {
+            array->pushValue(value);
+        }
+    };
+};
+
+template<>
 struct ArrayItemHelper<InspectorObject> {
     struct Traits {
-        static void pushRefPtr(InspectorArray* array, PassRefPtr<InspectorObject> value)
+        static void pushRefPtr(InspectorArray* array, PassRefPtr<InspectorValue> value)
         {
-            array->pushObject(value);
+            array->pushValue(value);
+        }
+    };
+};
+
+template<typename T>
+struct ArrayItemHelper<TypeBuilder::Array<T> > {
+    struct Traits {
+        static void pushRefPtr(InspectorArray* array, PassRefPtr<TypeBuilder::Array<T> > value)
+        {
+            array->pushValue(value);
         }
     };
 };
@@ -2338,6 +2380,8 @@ String getEnumConstantValue(int code) {
 }
 
 } // namespace TypeBuilder
+
+$implCode
 
 #if """ + VALIDATOR_IFDEF_NAME + """
 
@@ -2422,7 +2466,6 @@ def resolve_all_types():
 global_forward_listener = resolve_all_types()
 
 
-
 def get_annotated_type_text(raw_type, annotated_type):
     if annotated_type != raw_type:
         return "/*%s*/ %s" % (annotated_type, raw_type)
@@ -2430,57 +2473,12 @@ def get_annotated_type_text(raw_type, annotated_type):
         return raw_type
 
 
-# Chooses method generate modes for a particular type. A particular setter
-# can be generated as one method with a simple parameter type,
-# as one method with a raw type name and commented annotation about expected
-# specialized type name or as overloaded method when raw and specialized
-# parameter types require different behavior.
-class MethodGenerateModes:
-    @classmethod
-    def get_modes(cls, type_binding):
-        if type_binding.get_setter_value_expression_pattern():
-            # In raw and strict modes method code is actually different.
-            return [cls.StrictParameterMode, cls.RawParameterMode]
-        else:
-            # In raw and strict modes method code is the same.
-            # Only put strict parameter type in comments.
-            return [cls.CombinedMode]
-
-    class StrictParameterMode:
-        @staticmethod
-        def get_c_param_type_text(type_binding):
-            return type_binding.get_type_model().get_input_param_type_text()
-
-        @staticmethod
-        def get_setter_value_expression(param_type_binding, value_ref):
-            pattern = param_type_binding.get_setter_value_expression_pattern()
-            if pattern:
-                return pattern % value_ref
-            else:
-                return value_ref
-
-    class RawParameterMode:
-        @staticmethod
-        def get_c_param_type_text(type_binding):
-            return type_binding.reduce_to_raw_type().get_raw_type_model().get_input_param_type_text()
-
-        @staticmethod
-        def get_setter_value_expression(param_type_binding, value_ref):
-            return value_ref
-
-    class CombinedMode:
-        @staticmethod
-        def get_c_param_type_text(type_binding):
-            return get_annotated_type_text(type_binding.reduce_to_raw_type().get_raw_type_model().get_input_param_type_text(),
-                type_binding.get_type_model().get_input_param_type_text())
-
-        @staticmethod
-        def get_setter_value_expression(param_type_binding, value_ref):
-            pattern = param_type_binding.get_setter_value_expression_pattern()
-            if pattern:
-                return pattern % value_ref
-            else:
-                return value_ref
+def format_setter_value_expression(param_type_binding, value_ref):
+    pattern = param_type_binding.get_setter_value_expression_pattern()
+    if pattern:
+        return pattern % value_ref
+    else:
+        return value_ref
 
 class Generator:
     frontend_class_field_lines = []
@@ -2504,6 +2502,7 @@ class Generator:
     type_builder_forwards = []
     validator_impl_list = []
     validator_impl_raw_types_list = []
+    type_builder_impl_list = []
 
 
     @staticmethod
@@ -2522,7 +2521,11 @@ class Generator:
             Generator.frontend_domain_class_lines,
             Generator.frontend_method_list,
             Generator.method_handler_list,
-            Generator.method_name_enum_list]
+            Generator.method_name_enum_list,
+            Generator.backend_constructor_init_list,
+            Generator.backend_virtual_setters_list,
+            Generator.backend_setters_list,
+            Generator.backend_field_list]
 
         for json_domain in json_api["domains"]:
             domain_name = json_domain["domain"]
@@ -2566,47 +2569,22 @@ class Generator:
             Generator.backend_agent_interface_list.append("        virtual ~%s() { }\n" % agent_interface_name)
             Generator.backend_agent_interface_list.append("    };\n\n")
 
-            if domain_guard:
-                for l in reversed(first_cycle_guardable_list_list):
-                    domain_guard.generate_close(l)
-            Generator.backend_js_domain_initializer_list.append("\n")
-
-        sorted_json_domains = list(json_api["domains"])
-        sorted_json_domains.sort(key=lambda o: o["domain"])
-
-        sorted_cycle_guardable_list_list = [
-            Generator.backend_constructor_init_list,
-            Generator.backend_virtual_setters_list,
-            Generator.backend_setters_list,
-            Generator.backend_field_list]
-
-        for json_domain in sorted_json_domains:
-            domain_name = json_domain["domain"]
-
-            domain_fixes = DomainNameFixes.get_fixed_data(domain_name)
-            domain_guard = domain_fixes.get_guard()
-
-            if domain_guard:
-                for l in sorted_cycle_guardable_list_list:
-                    domain_guard.generate_open(l)
-
-            agent_interface_name = Capitalizer.lower_camel_case_to_upper(domain_name) + "CommandHandler"
-
-            agent_field_name = domain_fixes.agent_field_name
             Generator.backend_constructor_init_list.append("        , m_%s(0)" % agent_field_name)
             Generator.backend_virtual_setters_list.append("    virtual void registerAgent(%s* %s) = 0;" % (agent_interface_name, agent_field_name))
             Generator.backend_setters_list.append("    virtual void registerAgent(%s* %s) { ASSERT(!m_%s); m_%s = %s; }" % (agent_interface_name, agent_field_name, agent_field_name, agent_field_name, agent_field_name))
             Generator.backend_field_list.append("    %s* m_%s;" % (agent_interface_name, agent_field_name))
 
             if domain_guard:
-                for l in reversed(sorted_cycle_guardable_list_list):
+                for l in reversed(first_cycle_guardable_list_list):
                     domain_guard.generate_close(l)
+            Generator.backend_js_domain_initializer_list.append("\n")
 
         RawTypes.generate_validate_methods(Writer(Generator.validator_impl_raw_types_list, ""))
 
     @staticmethod
     def process_event(json_event, domain_name, frontend_method_declaration_lines):
         event_name = json_event["name"]
+
         parameter_list = []
         method_line_list = []
         backend_js_event_param_list = []
@@ -2633,13 +2611,14 @@ class Generator:
                     type_model = type_model.get_optional()
                     raw_type_model = raw_type_model.get_optional()
 
-                annotated_type = get_annotated_type_text(raw_type_model.get_input_param_type_text(), type_model.get_input_param_type_text())
+                annotated_type = type_model.get_input_param_type_text()
+                mode_type_binding = param_type_binding
 
                 parameter_list.append("%s %s" % (annotated_type, parameter_name))
 
                 setter_argument = raw_type_model.get_event_setter_expression_pattern() % parameter_name
-                if raw_type_binding.get_setter_value_expression_pattern():
-                    setter_argument = raw_type_binding.get_setter_value_expression_pattern() % setter_argument
+                if mode_type_binding.get_setter_value_expression_pattern():
+                    setter_argument = mode_type_binding.get_setter_value_expression_pattern() % setter_argument
 
                 setter_code = "    paramsObject->set%s(\"%s\", %s);\n" % (setter_type, parameter_name, setter_argument)
                 if optional:
@@ -2662,6 +2641,7 @@ class Generator:
     @staticmethod
     def process_command(json_command, domain_name, agent_field_name, agent_interface_name):
         json_command_name = json_command["name"]
+
         Generator.method_name_enum_list.append("        k%s_%sCmd," % (domain_name, json_command["name"]))
         Generator.method_handler_list.append("            &InspectorBackendDispatcherImpl::%s_%s," % (domain_name, json_command_name))
         Generator.backend_method_declaration_list.append("    void %s_%s(long callId, InspectorObject* requestMessageObject);" % (domain_name, json_command_name))
@@ -2750,24 +2730,20 @@ class Generator:
                 if optional:
                     type_model = type_model.get_optional()
 
-                raw_type_model = return_type_binding.get_type_model()
-                if optional:
-                    raw_type_model = raw_type_model.get_optional()
+                code = "    %s out_%s;\n" % (type_model.get_command_return_pass_model().get_return_var_type(), json_return_name)
+                param = ", %sout_%s" % (type_model.get_command_return_pass_model().get_output_argument_prefix(), json_return_name)
+                var_name = "out_%s" % json_return_name
+                setter_argument = type_model.get_command_return_pass_model().get_output_to_raw_expression() % var_name
+                if return_type_binding.get_setter_value_expression_pattern():
+                    setter_argument = return_type_binding.get_setter_value_expression_pattern() % setter_argument
 
-                code = "    %s out_%s = %s;\n" % (raw_type.get_raw_type_model().get_command_return_pass_model().get_return_var_type(), json_return_name, initializer)
-                param = ", %sout_%s" % (raw_type.get_output_pass_model().get_argument_prefix(), json_return_name)
-                cook = "        result->set%s(\"%s\", out_%s);\n" % (setter_type, json_return_name, json_return_name)
-                if optional:
-                    # FIXME: support optional properly. Probably an additional output parameter should be in each case.
-                    # FIXME: refactor this condition; it's a hack now.
-                    var_type_text = raw_type.get_raw_type_model().get_command_return_pass_model().get_return_var_type()
-                    if var_type_text == "bool" or var_type_text.startswith("RefPtr<"):
-                        cook = ("        if (out_%s)\n    " % json_return_name) + cook
-                    else:
-                        cook = "        // FIXME: support optional here.\n" + cook
+                cook = "            result->set%s(\"%s\", %s);\n" % (setter_type, json_return_name,
+                                                                 setter_argument)
 
-                annotated_type = get_annotated_type_text(raw_type.get_raw_type_model().get_command_return_pass_model().get_return_var_type() + raw_type.get_output_pass_model().get_parameter_type_suffix(),
-                                                         type_model.get_command_return_pass_model().get_output_parameter_type())
+                set_condition_pattern = type_model.get_command_return_pass_model().get_set_return_condition()
+                if set_condition_pattern:
+                    cook = ("            if (%s)\n    " % (set_condition_pattern % var_name)) + cook
+                annotated_type = type_model.get_command_return_pass_model().get_output_parameter_type()
 
                 param_name = "out_%s" % json_return_name
                 if optional:
@@ -2783,7 +2759,7 @@ class Generator:
 
             js_reply_list = "[%s]" % join(backend_js_reply_param_list, ", ")
 
-            response_cook_text = "    if (!protocolErrors->length() && !error.length()) {\n%s    }\n" % join(response_cook_list, "")
+            response_cook_text = join(response_cook_list, "")
 
         Generator.backend_method_implementation_list.append(Templates.backend_method.substitute(None,
             domainName=domain_name, methodName=json_command_name,
@@ -2837,6 +2813,7 @@ class Generator:
 
         class InterfaceGenerateContext:
             validator_writer = "not supported in InterfaceGenerateContext"
+            cpp_writer = validator_writer
 
         for type in ad_hoc_type_list:
             generator = type.get_code_generator()
@@ -2851,6 +2828,7 @@ class Generator:
 
         class GenerateContext:
             validator_writer = Writer(Generator.validator_impl_list, "")
+            cpp_writer = Writer(Generator.type_builder_impl_list, "")
 
         def generate_all_domains_code(out, type_data_callback):
             writer = Writer(out, "")
@@ -2965,6 +2943,7 @@ typebuilder_h_file.write(Templates.typebuilder_h.substitute(None,
 
 typebuilder_cpp_file.write(Templates.typebuilder_cpp.substitute(None,
     enumConstantValues=EnumConstants.get_enum_constant_code(),
+    implCode=join(flatten_list(Generator.type_builder_impl_list), ""),
     validatorCode=join(flatten_list(Generator.validator_impl_list), "")))
 
 backend_js_file.write(Templates.backend_js.substitute(None,

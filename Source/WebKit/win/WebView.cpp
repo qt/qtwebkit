@@ -92,6 +92,8 @@
 #include <WebCore/FrameView.h>
 #include <WebCore/FrameWin.h>
 #include <WebCore/GDIObjectCounter.h>
+#include <WebCore/GeolocationController.h>
+#include <WebCore/GeolocationError.h>
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/HTMLMediaElement.h>
 #include <WebCore/HTMLNames.h>
@@ -134,15 +136,9 @@
 #include <WebCore/Settings.h>
 #include <WebCore/SimpleFontData.h>
 #include <WebCore/SystemInfo.h>
-#include <WebCore/TypingCommand.h>
 #include <WebCore/WindowMessageBroadcaster.h>
 #include <WebCore/WindowsTouch.h>
 #include <wtf/MainThread.h>
-
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-#include <WebCore/GeolocationController.h>
-#include <WebCore/GeolocationError.h>
-#endif
 
 #if USE(CG)
 #include <CoreGraphics/CGContext.h>
@@ -340,7 +336,9 @@ WebView::WebView()
     , m_viewWindow(0)
     , m_mainFrame(0)
     , m_page(0)
+#if ENABLE(INSPECTOR)
     , m_inspectorClient(0)
+#endif // ENABLE(INSPECTOR)
     , m_hasCustomDropTarget(false)
     , m_useBackForwardList(true)
     , m_userAgentOverridden(false)
@@ -713,9 +711,11 @@ HRESULT STDMETHODCALLTYPE WebView::close()
     setUIDelegate(0);
     setFormDelegate(0);
 
+#if ENABLE(INSPECTOR)
     m_inspectorClient = 0;
     if (m_webInspector)
         m_webInspector->webViewClosed();
+#endif // ENABLE(INSPECTOR)
 
     delete m_page;
     m_page = 0;
@@ -2661,18 +2661,21 @@ HRESULT STDMETHODCALLTYPE WebView::initWithFrame(
     if (SUCCEEDED(m_preferences->shouldUseHighResolutionTimers(&useHighResolutionTimer)))
         Settings::setShouldUseHighResolutionTimers(useHighResolutionTimer);
 
+#if ENABLE(INSPECTOR)
     m_inspectorClient = new WebInspectorClient(this);
+#endif // ENABLE(INSPECTOR)
 
     Page::PageClients pageClients;
     pageClients.chromeClient = new WebChromeClient(this);
     pageClients.contextMenuClient = new WebContextMenuClient(this);
     pageClients.editorClient = new WebEditorClient(this);
     pageClients.dragClient = new WebDragClient(this);
+#if ENABLE(INSPECTOR)
     pageClients.inspectorClient = m_inspectorClient;
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    pageClients.geolocationClient = new WebGeolocationClient(this);
-#endif
+#endif // ENABLE(INSPECTOR)
+
     m_page = new Page(pageClients);
+    provideGeolocationTo(m_page, new WebGeolocationClient(this));
 
     BSTR localStoragePath;
     if (SUCCEEDED(m_preferences->localStorageDatabasePath(&localStoragePath))) {
@@ -4944,6 +4947,11 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
         return hr;
     setShouldInvertColors(enabled);
 
+    hr = prefsPrivate->requestAnimationFrameEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    settings->setRequestAnimationFrameEnabled(enabled);
+
     return S_OK;
 }
 
@@ -5776,11 +5784,16 @@ bool WebView::onIMESetContext(WPARAM wparam, LPARAM)
 
 HRESULT STDMETHODCALLTYPE WebView::inspector(IWebInspector** inspector)
 {
+#if ENABLE(INSPECTOR)
     if (!m_webInspector)
         m_webInspector.adoptRef(WebInspector::createInstance(this, m_inspectorClient));
 
     return m_webInspector.copyRefTo(inspector);
+#else // !ENABLE(INSPECTOR)
+    return S_OK;
+#endif // ENABLE(INSPECTOR)
 }
+
 
 HRESULT STDMETHODCALLTYPE WebView::windowAncestryDidChange()
 {
@@ -6569,19 +6582,14 @@ HRESULT WebView::geolocationProvider(IWebGeolocationProvider** locationProvider)
 
 HRESULT WebView::geolocationDidChangePosition(IWebGeolocationPosition* position)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
     if (!m_page)
         return E_FAIL;
-    m_page->geolocationController()->positionChanged(core(position));
+    GeolocationController::from(m_page)->positionChanged(core(position));
     return S_OK;
-#else
-    return E_NOTIMPL;
-#endif
 }
 
 HRESULT WebView::geolocationDidFailWithError(IWebError* error)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
     if (!m_page)
         return E_FAIL;
     if (!error)
@@ -6594,11 +6602,8 @@ HRESULT WebView::geolocationDidFailWithError(IWebError* error)
     SysFreeString(descriptionBSTR);
 
     RefPtr<GeolocationError> geolocationError = GeolocationError::create(GeolocationError::PositionUnavailable, descriptionString);
-    m_page->geolocationController()->errorOccurred(geolocationError.get());
+    GeolocationController::from(m_page)->errorOccurred(geolocationError.get());
     return S_OK;
-#else
-    return E_NOTIMPL;
-#endif
 }
 
 HRESULT WebView::setDomainRelaxationForbiddenForURLScheme(BOOL forbidden, BSTR scheme)

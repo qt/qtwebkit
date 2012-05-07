@@ -56,7 +56,7 @@ namespace WebCore {
     struct MimeClassInfo;
     struct PluginInfo;
     struct TextCheckingResult;
-    struct ViewportArguments;
+    struct ViewportAttributes;
     struct WindowFeatures;
 }
 
@@ -82,6 +82,12 @@ namespace WebCore {
     class TransformationMatrix;
     class TranslateTransformOperation;
     struct Length;
+}
+#endif
+
+#if USE(UI_SIDE_COMPOSITING) && ENABLE(CSS_FILTERS)
+namespace WebCore {
+    class FilterOperations;
 }
 #endif
 
@@ -122,9 +128,9 @@ template<> struct ArgumentCoder<WebCore::IntSize> {
     static bool decode(ArgumentDecoder*, WebCore::IntSize&);
 };
 
-template<> struct ArgumentCoder<WebCore::ViewportArguments> {
-    static void encode(ArgumentEncoder*, const WebCore::ViewportArguments&);
-    static bool decode(ArgumentDecoder*, WebCore::ViewportArguments&);
+template<> struct ArgumentCoder<WebCore::ViewportAttributes> {
+    static void encode(ArgumentEncoder*, const WebCore::ViewportAttributes&);
+    static bool decode(ArgumentDecoder*, WebCore::ViewportAttributes&);
 };
 
 template<> struct ArgumentCoder<WebCore::MimeClassInfo> {
@@ -298,6 +304,13 @@ template<> struct ArgumentCoder<WebCore::TransformOperations> {
 template<> struct ArgumentCoder<RefPtr<WebCore::Animation> > {
     static void encode(ArgumentEncoder*, const RefPtr<WebCore::Animation>&);
     static bool decode(ArgumentDecoder*, RefPtr<WebCore::Animation>&);
+};
+#endif
+
+#if USE(UI_SIDE_COMPOSITING) && ENABLE(CSS_FILTERS)
+template<> struct ArgumentCoder<WebCore::FilterOperations> {
+    static void encode(ArgumentEncoder*, const WebCore::FilterOperations&);
+    static bool decode(ArgumentDecoder*, WebCore::FilterOperations&);
 };
 #endif
 

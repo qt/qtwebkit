@@ -54,7 +54,6 @@ void WebProcessCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) con
     encoder->encode(applicationCacheDirectory);
     encoder->encode(databaseDirectory);
     encoder->encode(localStorageDirectory);
-    encoder->encode(webInspectorLocalizedStringsPath);
     encoder->encode(urlSchemesRegistererdAsEmptyDocument);
     encoder->encode(urlSchemesRegisteredAsSecure);
     encoder->encode(urlSchemesForWhichDomainRelaxationIsForbidden);
@@ -71,7 +70,7 @@ void WebProcessCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) con
     encoder->encode(textCheckerState);
     encoder->encode(fullKeyboardAccessEnabled);
     encoder->encode(defaultRequestTimeoutInterval);
-#if USE(CFURLSTORAGESESSIONS)
+#if PLATFORM(MAC) || USE(CFURLSTORAGESESSIONS)
     encoder->encode(uiProcessBundleIdentifier);
 #endif
 #if PLATFORM(MAC)
@@ -100,7 +99,7 @@ void WebProcessCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) con
     encoder->encode(cookieStorageDirectory);
 #endif
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     encoder->encode(notificationPermissions);
 #endif
 }
@@ -116,8 +115,6 @@ bool WebProcessCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, Web
     if (!decoder->decode(parameters.databaseDirectory))
         return false;
     if (!decoder->decode(parameters.localStorageDirectory))
-        return false;
-    if (!decoder->decode(parameters.webInspectorLocalizedStringsPath))
         return false;
     if (!decoder->decode(parameters.urlSchemesRegistererdAsEmptyDocument))
         return false;
@@ -150,7 +147,7 @@ bool WebProcessCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, Web
         return false;
     if (!decoder->decode(parameters.defaultRequestTimeoutInterval))
         return false;
-#if USE(CFURLSTORAGESESSIONS)
+#if PLATFORM(MAC) || USE(CFURLSTORAGESESSIONS)
     if (!decoder->decode(parameters.uiProcessBundleIdentifier))
         return false;
 #endif
@@ -197,7 +194,7 @@ bool WebProcessCreationParameters::decode(CoreIPC::ArgumentDecoder* decoder, Web
         return false;
 #endif
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     if (!decoder->decode(parameters.notificationPermissions))
         return false;
 #endif

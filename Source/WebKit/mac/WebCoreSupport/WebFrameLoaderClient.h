@@ -124,10 +124,9 @@ private:
 
     virtual void dispatchUnableToImplementPolicy(const WebCore::ResourceError&) OVERRIDE;
 
-    virtual void dispatchWillSendSubmitEvent(WebCore::HTMLFormElement*) OVERRIDE { }
+    virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>) OVERRIDE { }
     virtual void dispatchWillSubmitForm(WebCore::FramePolicyFunction, PassRefPtr<WebCore::FormState>) OVERRIDE;
 
-    virtual void dispatchDidLoadMainResource(WebCore::DocumentLoader*) OVERRIDE;
     virtual void revertToProvisionalState(WebCore::DocumentLoader*) OVERRIDE;
     virtual void setMainDocumentError(WebCore::DocumentLoader*, const WebCore::ResourceError&) OVERRIDE;
     virtual bool dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, int length) OVERRIDE;
@@ -198,8 +197,6 @@ private:
 
     virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::KURL& url, const WTF::String& name, WebCore::HTMLFrameOwnerElement*,
                                         const WTF::String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) OVERRIDE;
-    virtual void didTransferChildFrameToNewDocument(WebCore::Page* oldPage) OVERRIDE;
-    virtual void transferLoadingResourceFromPage(WebCore::ResourceLoader*, const WebCore::ResourceRequest&, WebCore::Page* oldPage);
     virtual PassRefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&, const Vector<WTF::String>&,
                                           const Vector<WTF::String>&, const WTF::String&, bool) OVERRIDE;
     virtual void redirectDataToPlugin(WebCore::Widget* pluginWidget) OVERRIDE;

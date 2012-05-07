@@ -21,10 +21,10 @@
 #include "config.h"
 #include "webkitnetworkrequest.h"
 
-#include "GRefPtr.h"
 #include "ResourceRequest.h"
 #include "webkitglobalsprivate.h"
 #include <glib/gi18n-lib.h>
+#include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
 /**
@@ -210,7 +210,7 @@ void webkit_network_request_set_uri(WebKitNetworkRequest* request, const gchar* 
  * webkit_network_request_get_uri:
  * @request: a #WebKitNetworkRequest
  *
- * Returns: the uri of the #WebKitNetworkRequest
+ * Returns: the URI of the #WebKitNetworkRequest
  *
  * Since: 1.0.0
  */

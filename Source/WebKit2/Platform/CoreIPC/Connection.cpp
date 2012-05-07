@@ -100,15 +100,15 @@ private:
 PassRefPtr<Connection::SyncMessageState> Connection::SyncMessageState::getOrCreate(RunLoop* runLoop)
 {
     MutexLocker locker(syncMessageStateMapMutex());
-    pair<SyncMessageStateMap::iterator, bool> result = syncMessageStateMap().add(runLoop, 0);
+    SyncMessageStateMap::AddResult result = syncMessageStateMap().add(runLoop, 0);
 
-    if (!result.second) {
-        ASSERT(result.first->second);
-        return result.first->second;
+    if (!result.isNewEntry) {
+        ASSERT(result.iterator->second);
+        return result.iterator->second;
     }
 
     RefPtr<SyncMessageState> syncMessageState = adoptRef(new SyncMessageState(runLoop));
-    result.first->second = syncMessageState.get();
+    result.iterator->second = syncMessageState.get();
 
     return syncMessageState.release();
 }
@@ -666,7 +666,7 @@ void Connection::enqueueIncomingMessage(IncomingMessage& incomingMessage)
     MutexLocker locker(m_incomingMessagesLock);
     m_incomingMessages.append(incomingMessage);
 
-    m_clientRunLoop->dispatch(bind(&Connection::dispatchMessages, this));
+    m_clientRunLoop->dispatch(bind(&Connection::dispatchOneMessage, this));
 }
 
 void Connection::dispatchMessage(IncomingMessage& message)
@@ -703,21 +703,19 @@ void Connection::dispatchMessage(IncomingMessage& message)
     m_didReceiveInvalidMessage = oldDidReceiveInvalidMessage;
 }
 
-void Connection::dispatchMessages()
+void Connection::dispatchOneMessage()
 {
-    while (true) {
-        IncomingMessage incomingMessage;
+    IncomingMessage incomingMessage;
 
-        {
-            MutexLocker locker(m_incomingMessagesLock);
-            if (m_incomingMessages.isEmpty())
-                break;
+    {
+        MutexLocker locker(m_incomingMessagesLock);
+        if (m_incomingMessages.isEmpty())
+            return;
 
-            incomingMessage = m_incomingMessages.takeFirst();
-        }
-
-        dispatchMessage(incomingMessage);
+        incomingMessage = m_incomingMessages.takeFirst();
     }
+
+    dispatchMessage(incomingMessage);
 }
 
 } // namespace CoreIPC

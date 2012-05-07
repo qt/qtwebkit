@@ -48,6 +48,7 @@
 namespace WebKit {
 
 class WebAccessibilityObject;
+class WebBatteryStatusClient;
 class WebColorChooser;
 class WebColorChooserClient;
 class WebDeviceOrientationClient;
@@ -68,6 +69,7 @@ class WebNotificationPresenter;
 class WebRange;
 class WebSpeechInputController;
 class WebSpeechInputListener;
+class WebSpeechRecognizer;
 class WebStorageNamespace;
 class WebURL;
 class WebURLRequest;
@@ -116,8 +118,6 @@ public:
     // Creates a graphics context that renders to the client's WebView.
     virtual WebGraphicsContext3D* createGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
 
-    // Deprecated, use the first version of this function. If you want an offscreen context, use WebKitPlatformSupport::createOffscreenGraphicsContext3D().
-    virtual WebGraphicsContext3D* createGraphicsContext3D(const WebGraphicsContext3D::Attributes&, bool renderDirectlyToWebView) { return 0; }
 
     // Misc ----------------------------------------------------------------
 
@@ -318,11 +318,18 @@ public:
     virtual WebSpeechInputController* speechInputController(
         WebSpeechInputListener*) { return 0; }
 
+    // Access the embedder API for speech recognition services.
+    virtual WebSpeechRecognizer* speechRecognizer() { return 0; }
+
     // Device Orientation --------------------------------------------------
 
     // Access the embedder API for device orientation services.
     virtual WebDeviceOrientationClient* deviceOrientationClient() { return 0; }
 
+    // Battery Status ------------------------------------------------------
+
+    // Access the embedder API for battery status services.
+    virtual WebBatteryStatusClient* batteryStatusClient() { return 0; }
 
     // Zoom ----------------------------------------------------------------
 

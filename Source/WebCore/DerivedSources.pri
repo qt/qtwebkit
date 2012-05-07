@@ -86,6 +86,29 @@ STYLESHEETS_EMBED = \
     $$PWD/css/mobileThemeQt.css
 
 IDL_BINDINGS += \
+    $$PWD/Modules/filesystem/DOMFileSystem.idl \
+    $$PWD/Modules/filesystem/DOMFileSystemSync.idl \
+    $$PWD/Modules/filesystem/DOMWindowFileSystem.idl \
+    $$PWD/Modules/filesystem/DirectoryEntry.idl \
+    $$PWD/Modules/filesystem/DirectoryEntrySync.idl \
+    $$PWD/Modules/filesystem/DirectoryReader.idl \
+    $$PWD/Modules/filesystem/DirectoryReaderSync.idl \
+    $$PWD/Modules/filesystem/EntriesCallback.idl \
+    $$PWD/Modules/filesystem/Entry.idl \
+    $$PWD/Modules/filesystem/EntryArray.idl \
+    $$PWD/Modules/filesystem/EntryArraySync.idl \
+    $$PWD/Modules/filesystem/EntryCallback.idl \
+    $$PWD/Modules/filesystem/EntrySync.idl \
+    $$PWD/Modules/filesystem/ErrorCallback.idl \
+    $$PWD/Modules/filesystem/FileCallback.idl \
+    $$PWD/Modules/filesystem/FileEntry.idl \
+    $$PWD/Modules/filesystem/FileEntrySync.idl \
+    $$PWD/Modules/filesystem/FileSystemCallback.idl \
+    $$PWD/Modules/filesystem/FileWriter.idl \
+    $$PWD/Modules/filesystem/FileWriterCallback.idl \
+    $$PWD/Modules/filesystem/Metadata.idl \
+    $$PWD/Modules/filesystem/MetadataCallback.idl \
+    $$PWD/Modules/filesystem/WorkerContextFileSystem.idl \
     $$PWD/Modules/geolocation/Geolocation.idl \
     $$PWD/Modules/geolocation/Geoposition.idl \
     $$PWD/Modules/geolocation/NavigatorGeolocation.idl \
@@ -95,7 +118,6 @@ IDL_BINDINGS += \
     $$PWD/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
     $$PWD/Modules/indexeddb/IDBAny.idl \
     $$PWD/Modules/indexeddb/IDBCursor.idl \
-    $$PWD/Modules/indexeddb/IDBDatabaseError.idl \
     $$PWD/Modules/indexeddb/IDBDatabaseException.idl \
     $$PWD/Modules/indexeddb/IDBDatabase.idl \
     $$PWD/Modules/indexeddb/IDBFactory.idl \
@@ -106,7 +128,26 @@ IDL_BINDINGS += \
     $$PWD/Modules/indexeddb/IDBRequest.idl \
     $$PWD/Modules/indexeddb/IDBTransaction.idl \
     $$PWD/Modules/indexeddb/WorkerContextIndexedDatabase.idl \
-    $$PWD/Modules/webdatabase/DOMWindowSQLDatabase.idl \
+    $$PWD/Modules/webaudio/AudioBuffer.idl \
+    $$PWD/Modules/webaudio/AudioBufferSourceNode.idl \
+    $$PWD/Modules/webaudio/AudioChannelMerger.idl \
+    $$PWD/Modules/webaudio/AudioChannelSplitter.idl \
+    $$PWD/Modules/webaudio/AudioContext.idl \
+    $$PWD/Modules/webaudio/AudioDestinationNode.idl \
+    $$PWD/Modules/webaudio/AudioGain.idl \
+    $$PWD/Modules/webaudio/AudioGainNode.idl \
+    $$PWD/Modules/webaudio/AudioListener.idl \
+    $$PWD/Modules/webaudio/AudioNode.idl \
+    $$PWD/Modules/webaudio/AudioPannerNode.idl \
+    $$PWD/Modules/webaudio/AudioParam.idl \
+    $$PWD/Modules/webaudio/AudioProcessingEvent.idl \
+    $$PWD/Modules/webaudio/AudioSourceNode.idl \
+    $$PWD/Modules/webaudio/ConvolverNode.idl \
+    $$PWD/Modules/webaudio/DelayNode.idl \
+    $$PWD/Modules/webaudio/DOMWindowWebAudio.idl \
+    $$PWD/Modules/webaudio/JavaScriptAudioNode.idl \
+    $$PWD/Modules/webaudio/RealtimeAnalyserNode.idl \
+    $$PWD/Modules/webdatabase/DOMWindowWebDatabase.idl \
     $$PWD/Modules/webdatabase/Database.idl \
     $$PWD/Modules/webdatabase/DatabaseCallback.idl \
     $$PWD/Modules/webdatabase/DatabaseSync.idl \
@@ -121,10 +162,11 @@ IDL_BINDINGS += \
     $$PWD/Modules/webdatabase/SQLTransactionErrorCallback.idl \
     $$PWD/Modules/webdatabase/SQLTransactionSync.idl \
     $$PWD/Modules/webdatabase/SQLTransactionSyncCallback.idl \
-    $$PWD/Modules/webdatabase/WorkerContextSQLDatabase.idl \
+    $$PWD/Modules/webdatabase/WorkerContextWebDatabase.idl \
     $$PWD/Modules/websockets/CloseEvent.idl \
     $$PWD/Modules/websockets/DOMWindowWebSocket.idl \
     $$PWD/Modules/websockets/WebSocket.idl \
+    $$PWD/Modules/websockets/WorkerContextWebSocket.idl \
     $$PWD/css/Counter.idl \
     $$PWD/css/CSSCharsetRule.idl \
     $$PWD/css/CSSFontFaceRule.idl \
@@ -216,37 +258,14 @@ IDL_BINDINGS += \
     $$PWD/dom/WebKitTransitionEvent.idl \
     $$PWD/dom/WheelEvent.idl \
     $$PWD/fileapi/Blob.idl \
-    $$PWD/fileapi/DirectoryEntry.idl \
-    $$PWD/fileapi/DirectoryEntrySync.idl \
-    $$PWD/fileapi/DirectoryReader.idl \
-    $$PWD/fileapi/DirectoryReaderSync.idl \
-    $$PWD/fileapi/DOMFileSystem.idl \
-    $$PWD/fileapi/DOMFileSystemSync.idl \
-    $$PWD/fileapi/DOMWindowFileSystem.idl \
-    $$PWD/fileapi/EntriesCallback.idl \
-    $$PWD/fileapi/Entry.idl \
-    $$PWD/fileapi/EntryArray.idl \
-    $$PWD/fileapi/EntryArraySync.idl \
-    $$PWD/fileapi/EntryCallback.idl \
-    $$PWD/fileapi/EntrySync.idl \
-    $$PWD/fileapi/ErrorCallback.idl \
     $$PWD/fileapi/File.idl \
-    $$PWD/fileapi/FileCallback.idl \
-    $$PWD/fileapi/FileEntry.idl \
-    $$PWD/fileapi/FileEntrySync.idl \
     $$PWD/fileapi/FileError.idl \
     $$PWD/fileapi/FileException.idl \
     $$PWD/fileapi/FileList.idl \
     $$PWD/fileapi/FileReader.idl \
     $$PWD/fileapi/FileReaderSync.idl \
-    $$PWD/fileapi/FileSystemCallback.idl \
-    $$PWD/fileapi/FileWriter.idl \
-    $$PWD/fileapi/FileWriterCallback.idl \
     $$PWD/fileapi/OperationNotAllowedException.idl \
-    $$PWD/fileapi/Metadata.idl \
-    $$PWD/fileapi/MetadataCallback.idl \
     $$PWD/fileapi/WebKitBlobBuilder.idl \
-    $$PWD/fileapi/WorkerContextFileSystem.idl \
     $$PWD/html/canvas/ArrayBufferView.idl \
     $$PWD/html/canvas/ArrayBuffer.idl \
     $$PWD/html/canvas/DataView.idl \
@@ -275,6 +294,7 @@ IDL_BINDINGS += \
     $$PWD/html/canvas/WebGLRenderbuffer.idl \
     $$PWD/html/canvas/WebGLRenderingContext.idl \
     $$PWD/html/canvas/WebGLShader.idl \
+    $$PWD/html/canvas/WebGLShaderPrecisionFormat.idl \
     $$PWD/html/canvas/Int16Array.idl \
     $$PWD/html/canvas/WebGLTexture.idl \
     $$PWD/html/canvas/WebGLUniformLocation.idl \
@@ -375,8 +395,11 @@ IDL_BINDINGS += \
     $$PWD/inspector/ScriptProfile.idl \
     $$PWD/inspector/ScriptProfileNode.idl \
     $$PWD/loader/appcache/DOMApplicationCache.idl \
+    $$PWD/notifications/DOMWindowNotifications.idl \
     $$PWD/notifications/Notification.idl \
     $$PWD/notifications/NotificationCenter.idl \
+    $$PWD/notifications/NotificationPermissionCallback.idl \
+    $$PWD/notifications/WorkerContextNotifications.idl \
     $$PWD/page/BarInfo.idl \
     $$PWD/page/Console.idl \
     $$PWD/page/Coordinates.idl \
@@ -389,6 +412,8 @@ IDL_BINDINGS += \
     $$PWD/page/MemoryInfo.idl \
     $$PWD/page/Navigator.idl \
     $$PWD/page/Performance.idl \
+    $$PWD/page/PerformanceEntry.idl \
+    $$PWD/page/PerformanceEntryList.idl \
     $$PWD/page/PerformanceNavigation.idl \
     $$PWD/page/PerformanceTiming.idl \
     $$PWD/page/Screen.idl \
@@ -411,27 +436,6 @@ IDL_BINDINGS += \
     $$PWD/storage/StorageInfoUsageCallback.idl \
     $$PWD/testing/Internals.idl \
     $$PWD/testing/InternalSettings.idl \
-    $$PWD/webaudio/AudioBuffer.idl \
-    $$PWD/webaudio/AudioBufferSourceNode.idl \
-    $$PWD/webaudio/AudioChannelMerger.idl \
-    $$PWD/webaudio/AudioChannelSplitter.idl \
-    $$PWD/webaudio/AudioContext.idl \
-    $$PWD/webaudio/AudioDestinationNode.idl \
-    $$PWD/webaudio/AudioGain.idl \
-    $$PWD/webaudio/AudioGainNode.idl \
-    $$PWD/webaudio/AudioListener.idl \
-    $$PWD/webaudio/AudioNode.idl \
-    $$PWD/webaudio/AudioPannerNode.idl \
-    $$PWD/webaudio/AudioParam.idl \
-    $$PWD/webaudio/AudioProcessingEvent.idl \
-    $$PWD/webaudio/AudioSourceNode.idl \
-    $$PWD/webaudio/ConvolverNode.idl \
-    $$PWD/webaudio/DelayNode.idl \
-    $$PWD/webaudio/DOMWindowWebAudio.idl \
-    $$PWD/webaudio/HighPass2FilterNode.idl \
-    $$PWD/webaudio/JavaScriptAudioNode.idl \
-    $$PWD/webaudio/LowPass2FilterNode.idl \
-    $$PWD/webaudio/RealtimeAnalyserNode.idl \
     $$PWD/workers/AbstractWorker.idl \
     $$PWD/workers/DedicatedWorkerContext.idl \
     $$PWD/workers/SharedWorker.idl \
@@ -454,9 +458,8 @@ IDL_BINDINGS += \
 
 v8 {
   IDL_BINDINGS += \
-    $$PWD/html/canvas/CanvasPixelArray.idl \
-    $$PWD/storage/IDBVersionChangeEvent.idl \
-    $$PWD/storage/IDBVersionChangeRequest.idl
+    $$PWD/Modules/indexeddb/IDBVersionChangeEvent.idl \
+    $$PWD/Modules/indexeddb/IDBVersionChangeRequest.idl
 }
 
 contains(DEFINES, ENABLE_SVG=1) {
@@ -696,8 +699,10 @@ else: generator = JS
 generateBindings.commands = perl -I$$PWD/bindings/scripts $$generateBindings.script \
                             --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
                             --generator $$generator \
+                            --include $$PWD/Modules/filesystem \
                             --include $$PWD/Modules/geolocation \
                             --include $$PWD/Modules/indexeddb \
+                            --include $$PWD/Modules/webaudio \
                             --include $$PWD/Modules/webdatabase \
                             --include $$PWD/Modules/websockets \
                             --include $$PWD/dom \
@@ -708,7 +713,6 @@ generateBindings.commands = perl -I$$PWD/bindings/scripts $$generateBindings.scr
                             --include $$PWD/storage \
                             --include $$PWD/css \
                             --include $$PWD/testing \
-                            --include $$PWD/webaudio \
                             --include $$PWD/workers \
                             --outputDir ${QMAKE_FUNC_FILE_OUT_PATH} \
                             --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \

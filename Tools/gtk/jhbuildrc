@@ -15,10 +15,11 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
+import multiprocessing
 import sys
 
 __gtk_tools_directory = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(__gtk_tools_directory)
+sys.path = [__gtk_tools_directory] + sys.path
 import common
 
 build_policy = 'updated'
@@ -34,12 +35,16 @@ modules = [ 'webkitgtk-testing-dependencies', ]
 if __extra_modules != ['']:
     modules.extend(__extra_modules)
 
-checkoutroot = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Source'))
-prefix = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Root'))
+if os.environ.has_key('WEBKITOUTPUTDIR'):
+    checkoutroot = os.path.abspath(os.path.join(os.environ['WEBKITOUTPUTDIR'], 'Dependencies', 'Source'))
+    prefix = os.path.abspath(os.path.join(os.environ['WEBKITOUTPUTDIR'], 'Dependencies', 'Root'))
+else:
+    checkoutroot = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Source'))
+    prefix = os.path.abspath(common.top_level_path('WebKitBuild','Dependencies', 'Root'))
 
 nonotify = True
 notrayicon = True
-os.environ['MAKEFLAGS'] = '-j' + str(common.number_of_cpus())
+os.environ['MAKEFLAGS'] = '-j%d' % multiprocessing.cpu_count()
 
 # Use system libraries while building.
 if use_lib64:

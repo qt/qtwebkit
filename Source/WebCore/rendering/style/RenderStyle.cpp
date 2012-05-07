@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 1999 Antti Koivisto (koivisto@kde.org)
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,7 +26,6 @@
 #include "ContentData.h"
 #include "CursorList.h"
 #include "CSSPropertyNames.h"
-#include "CSSStyleSelector.h"
 #include "CSSWrapShapes.h"
 #include "FontSelector.h"
 #include "QuotesData.h"
@@ -34,6 +34,7 @@
 #include "ScaleTransformOperation.h"
 #include "ShadowData.h"
 #include "StyleImage.h"
+#include "StyleResolver.h"
 #if ENABLE(TOUCH_EVENTS)
 #include "RenderTheme.h"
 #endif
@@ -45,7 +46,7 @@ using namespace std;
 namespace WebCore {
 
 struct SameSizeAsBorderValue {
-    Color m_color;
+    RGBA32 m_color;
     unsigned m_width;
 };
 
@@ -86,11 +87,12 @@ PassRefPtr<RenderStyle> RenderStyle::createDefaultStyle()
     return adoptRef(new RenderStyle(true));
 }
 
-PassRefPtr<RenderStyle> RenderStyle::createAnonymousStyle(const RenderStyle* parentStyle)
+PassRefPtr<RenderStyle> RenderStyle::createAnonymousStyleWithDisplay(const RenderStyle* parentStyle, EDisplay display)
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::create();
     newStyle->inheritFrom(parentStyle);
     newStyle->inheritUnicodeBidiFrom(parentStyle);
+    newStyle->setDisplay(display);
     return newStyle;
 }
 
@@ -221,7 +223,7 @@ bool RenderStyle::operator==(const RenderStyle& o) const
 
 bool RenderStyle::isStyleAvailable() const
 {
-    return this != CSSStyleSelector::styleNotYetAvailable();
+    return this != StyleResolver::styleNotYetAvailable();
 }
 
 static inline int pseudoBit(PseudoId pseudo)
@@ -418,12 +420,6 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
 #endif
         }
 
-#if ENABLE(CSS_FILTERS)
-        if (rareNonInheritedData->m_filter.get() != other->rareNonInheritedData->m_filter.get()
-            && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
-            return StyleDifferenceLayout;
-        }
-#endif
 #if ENABLE(CSS_GRID_LAYOUT)
         if (rareNonInheritedData->m_grid.get() != other->rareNonInheritedData->m_grid.get()
             && rareNonInheritedData->m_gridItem.get() != other->rareNonInheritedData->m_gridItem.get())
@@ -605,6 +601,18 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
 #endif
     }
 
+#if ENABLE(CSS_FILTERS)
+    if (rareNonInheritedData->m_filter.get() != other->rareNonInheritedData->m_filter.get()
+        && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
+#if USE(ACCELERATED_COMPOSITING)
+        changedContextSensitiveProperties |= ContextSensitivePropertyFilter;
+        // Don't return; keep looking for another change.
+#else
+        return StyleDifferenceRepaintLayer;
+#endif
+    }
+#endif
+
     if (rareNonInheritedData->m_mask != other->rareNonInheritedData->m_mask
         || rareNonInheritedData->m_maskBoxImage != other->rareNonInheritedData->m_maskBoxImage)
         return StyleDifferenceRepaintLayer;
@@ -769,39 +777,70 @@ void RenderStyle::setContent(QuoteType quote, bool add)
 
     rareNonInheritedData.access()->m_content = ContentData::create(quote);
 }
-
-void RenderStyle::applyTransform(TransformationMatrix& transform, const LayoutSize& borderBoxSize, ApplyTransformOrigin applyOrigin) const
+    
+inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& transformOperations, RenderStyle::ApplyTransformOrigin applyOrigin)
 {
     // transform-origin brackets the transform with translate operations.
     // Optimize for the case where the only transform is a translation, since the transform-origin is irrelevant
     // in that case.
-    bool applyTransformOrigin = false;
-    unsigned s = rareNonInheritedData->m_transform->m_operations.operations().size();
-    unsigned i;
-    if (applyOrigin == IncludeTransformOrigin) {
-        for (i = 0; i < s; i++) {
-            TransformOperation::OperationType type = rareNonInheritedData->m_transform->m_operations.operations()[i]->getOperationType();
-            if (type != TransformOperation::TRANSLATE_X
-                    && type != TransformOperation::TRANSLATE_Y
-                    && type != TransformOperation::TRANSLATE 
-                    && type != TransformOperation::TRANSLATE_Z
-                    && type != TransformOperation::TRANSLATE_3D
-                    ) {
-                applyTransformOrigin = true;
-                break;
-            }
-        }
+    if (applyOrigin != RenderStyle::IncludeTransformOrigin)
+        return false;
+
+    unsigned size = transformOperations.size();
+    for (unsigned i = 0; i < size; ++i) {
+        TransformOperation::OperationType type = transformOperations[i]->getOperationType();
+        if (type != TransformOperation::TRANSLATE_X
+            && type != TransformOperation::TRANSLATE_Y
+            && type != TransformOperation::TRANSLATE 
+            && type != TransformOperation::TRANSLATE_Z
+            && type != TransformOperation::TRANSLATE_3D)
+            return true;
     }
+    
+    return false;
+}
 
+void RenderStyle::applyTransform(TransformationMatrix& transform, const LayoutSize& borderBoxSize, ApplyTransformOrigin applyOrigin) const
+{
+    // FIXME: when subpixel layout is supported (bug 71143) the body of this function could be replaced by
+    // applyTransform(transform, FloatRect(FloatPoint(), borderBoxSize), applyOrigin);
+    
+    const Vector<RefPtr<TransformOperation> >& transformOperations = rareNonInheritedData->m_transform->m_operations.operations();
+    bool applyTransformOrigin = requireTransformOrigin(transformOperations, applyOrigin);
+
+    if (applyTransformOrigin)
+        transform.translate3d(floatValueForLength(transformOriginX(), borderBoxSize.width()), floatValueForLength(transformOriginY(), borderBoxSize.height()), transformOriginZ());
+
+    unsigned size = transformOperations.size();
+    for (unsigned i = 0; i < size; ++i)
+        transformOperations[i]->apply(transform, borderBoxSize);
+
+    if (applyTransformOrigin)
+        transform.translate3d(-floatValueForLength(transformOriginX(), borderBoxSize.width()), -floatValueForLength(transformOriginY(), borderBoxSize.height()), -transformOriginZ()); 
+}
+
+void RenderStyle::applyTransform(TransformationMatrix& transform, const FloatRect& boundingBox, ApplyTransformOrigin applyOrigin) const
+{
+    const Vector<RefPtr<TransformOperation> >& transformOperations = rareNonInheritedData->m_transform->m_operations.operations();
+    bool applyTransformOrigin = requireTransformOrigin(transformOperations, applyOrigin);
+    
+    float offsetX = transformOriginX().type() == Percent ? boundingBox.x() : 0;
+    float offsetY = transformOriginY().type() == Percent ? boundingBox.y() : 0;
+    
     if (applyTransformOrigin) {
-        transform.translate3d(transformOriginX().calcFloatValue(borderBoxSize.width()), transformOriginY().calcFloatValue(borderBoxSize.height()), transformOriginZ());
+        transform.translate3d(floatValueForLength(transformOriginX(), boundingBox.width()) + offsetX,
+                              floatValueForLength(transformOriginY(), boundingBox.height()) + offsetY,
+                              transformOriginZ());
     }
-
-    for (i = 0; i < s; i++)
-        rareNonInheritedData->m_transform->m_operations.operations()[i]->apply(transform, borderBoxSize);
-
+    
+    unsigned size = transformOperations.size();
+    for (unsigned i = 0; i < size; ++i)
+        transformOperations[i]->apply(transform, boundingBox.size());
+    
     if (applyTransformOrigin) {
-        transform.translate3d(-transformOriginX().calcFloatValue(borderBoxSize.width()), -transformOriginY().calcFloatValue(borderBoxSize.height()), -transformOriginZ());
+        transform.translate3d(-floatValueForLength(transformOriginX(), boundingBox.width()) - offsetX,
+                              -floatValueForLength(transformOriginY(), boundingBox.height()) - offsetY,
+                              -transformOriginZ());
     }
 }
 
@@ -842,17 +881,17 @@ void RenderStyle::setBoxShadow(PassOwnPtr<ShadowData> shadowData, bool add)
     rareData->m_boxShadow = shadowData;
 }
 
-static RoundedRect::Radii calcRadiiFor(const BorderData& border, LayoutSize size)
+static RoundedRect::Radii calcRadiiFor(const BorderData& border, IntSize size, RenderView* renderView)
 {
     return RoundedRect::Radii(
-        IntSize(border.topLeft().width().calcValue(size.width()), 
-                border.topLeft().height().calcValue(size.height())),
-        IntSize(border.topRight().width().calcValue(size.width()),
-                border.topRight().height().calcValue(size.height())),
-        IntSize(border.bottomLeft().width().calcValue(size.width()), 
-                border.bottomLeft().height().calcValue(size.height())),
-        IntSize(border.bottomRight().width().calcValue(size.width()), 
-                border.bottomRight().height().calcValue(size.height())));
+        IntSize(valueForLength(border.topLeft().width(), size.width(), renderView), 
+                valueForLength(border.topLeft().height(), size.height(), renderView)),
+        IntSize(valueForLength(border.topRight().width(), size.width(), renderView),
+                valueForLength(border.topRight().height(), size.height(), renderView)),
+        IntSize(valueForLength(border.bottomLeft().width(), size.width(), renderView), 
+                valueForLength(border.bottomLeft().height(), size.height(), renderView)),
+        IntSize(valueForLength(border.bottomRight().width(), size.width(), renderView), 
+                valueForLength(border.bottomRight().height(), size.height(), renderView)));
 }
 
 static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radii& radii)
@@ -887,12 +926,13 @@ static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radi
     return factor;
 }
 
-RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
+RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, RenderView* renderView, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
-    RoundedRect roundedRect(pixelSnappedIntRect(borderRect));
+    IntRect snappedBorderRect(pixelSnappedIntRect(borderRect));
+    RoundedRect roundedRect(snappedBorderRect);
     if (hasBorderRadius()) {
-        RoundedRect::Radii radii = calcRadiiFor(surround->border, borderRect.size());
-        radii.scale(calcConstraintScaleFor(borderRect, radii));
+        RoundedRect::Radii radii = calcRadiiFor(surround->border, snappedBorderRect.size(), renderView);
+        radii.scale(calcConstraintScaleFor(snappedBorderRect, radii));
         roundedRect.includeLogicalEdges(radii, isHorizontalWritingMode(), includeLogicalLeftEdge, includeLogicalRightEdge);
     }
     return roundedRect;
@@ -1095,12 +1135,12 @@ AnimationList* RenderStyle::accessTransitions()
     return rareNonInheritedData->m_transitions.get();
 }
 
-const Animation* RenderStyle::transitionForProperty(int property) const
+const Animation* RenderStyle::transitionForProperty(CSSPropertyID property) const
 {
     if (transitions()) {
         for (size_t i = 0; i < transitions()->size(); ++i) {
             const Animation* p = transitions()->animation(i);
-            if (p->property() == cAnimateAll || p->property() == property) {
+            if (p->animationMode() == Animation::AnimateAll || p->property() == property) {
                 return p;
             }
         }
@@ -1130,10 +1170,10 @@ void RenderStyle::getShadowExtent(const ShadowData* shadow, LayoutUnit &top, Lay
             continue;
         int blurAndSpread = shadow->blur() + shadow->spread();
 
-        top = min(top, shadow->y() - blurAndSpread);
-        right = max(right, shadow->x() + blurAndSpread);
-        bottom = max(bottom, shadow->y() + blurAndSpread);
-        left = min(left, shadow->x() - blurAndSpread);
+        top = min<LayoutUnit>(top, shadow->y() - blurAndSpread);
+        right = max<LayoutUnit>(right, shadow->x() + blurAndSpread);
+        bottom = max<LayoutUnit>(bottom, shadow->y() + blurAndSpread);
+        left = min<LayoutUnit>(left, shadow->x() - blurAndSpread);
     }
 }
 
@@ -1147,8 +1187,8 @@ void RenderStyle::getShadowHorizontalExtent(const ShadowData* shadow, LayoutUnit
             continue;
         int blurAndSpread = shadow->blur() + shadow->spread();
 
-        left = min(left, shadow->x() - blurAndSpread);
-        right = max(right, shadow->x() + blurAndSpread);
+        left = min<LayoutUnit>(left, shadow->x() - blurAndSpread);
+        right = max<LayoutUnit>(right, shadow->x() + blurAndSpread);
     }
 }
 
@@ -1162,8 +1202,8 @@ void RenderStyle::getShadowVerticalExtent(const ShadowData* shadow, LayoutUnit &
             continue;
         int blurAndSpread = shadow->blur() + shadow->spread();
 
-        top = min(top, shadow->y() - blurAndSpread);
-        bottom = max(bottom, shadow->y() + blurAndSpread);
+        top = min<LayoutUnit>(top, shadow->y() - blurAndSpread);
+        bottom = max<LayoutUnit>(bottom, shadow->y() + blurAndSpread);
     }
 }
 

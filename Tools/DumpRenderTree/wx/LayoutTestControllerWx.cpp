@@ -456,6 +456,11 @@ void LayoutTestController::removeAllVisitedLinks()
     // FIXME: Implement this.
 }
 
+void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+
+}
+
 void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
 {
 
@@ -537,12 +542,6 @@ JSValueRef LayoutTestController::computedStyleIncludingVisitedInfo(JSContextRef,
     return 0;
 }
 
-JSValueRef LayoutTestController::nodesFromRect(JSContextRef context, JSValueRef value, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
-{
-    // FIXME: Implement this.
-    return 0;
-}
-
 void LayoutTestController::authenticateSession(JSStringRef, JSStringRef, JSStringRef)
 {
 }
@@ -556,18 +555,6 @@ void LayoutTestController::abortModal()
 {
 }
 
-bool LayoutTestController::hasSpellingMarker(int, int)
-{
-    // FIXME: Implement
-    return false;
-}
-
-bool LayoutTestController::hasGrammarMarker(int, int)
-{
-    // FIXME: Implement
-    return false;
-}
-
 void LayoutTestController::dumpConfigurationForViewport(int /*deviceDPI*/, int /*deviceWidth*/, int /*deviceHeight*/, int /*availableWidth*/, int /*availableHeight*/)
 {
     // FIXME: Implement
@@ -577,12 +564,6 @@ JSRetainPtr<JSStringRef> LayoutTestController::pageProperty(const char* property
 {
     // FIXME: Implement
     return 0;
-}
-
-bool LayoutTestController::isPageBoxVisible(int pageNumber) const
-{
-    // FIXME: Implement
-    return true;
 }
 
 JSRetainPtr<JSStringRef> LayoutTestController::pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const
@@ -665,4 +646,14 @@ void LayoutTestController::setBackingScaleFactor(double)
 void LayoutTestController::simulateDesktopNotificationClick(JSStringRef title)
 {
     // FIXME: Implement.
+}
+
+void LayoutTestController::resetPageVisibility()
+{
+    // FIXME: Implement this.
+}
+
+void LayoutTestController::setPageVisibility(const char*)
+{
+    // FIXME: Implement this.
 }

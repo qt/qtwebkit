@@ -39,6 +39,8 @@ public:
 
     virtual bool isTextFragment() const { return true; }
 
+    virtual bool canBeSelectionLeaf() const OVERRIDE { return node() && node()->rendererIsEditable(); }
+
     unsigned start() const { return m_start; }
     unsigned end() const { return m_end; }
 
@@ -48,13 +50,16 @@ public:
     StringImpl* contentString() const { return m_contentString.get(); }
     virtual PassRefPtr<StringImpl> originalText() const;
 
+    virtual void setText(PassRefPtr<StringImpl>, bool force = false) OVERRIDE;
+
+    virtual void transformText() OVERRIDE;
+
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
 private:
     virtual void willBeDestroyed();
 
-    virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual UChar previousCharacter() const;
     RenderBlock* blockForAccompanyingFirstLetter() const;
 
@@ -62,7 +67,6 @@ private:
     unsigned m_end;
     RefPtr<StringImpl> m_contentString;
     RenderObject* m_firstLetter;
-    bool m_allowFragmentReset;
 };
 
 inline RenderTextFragment* toRenderTextFragment(RenderObject* object)

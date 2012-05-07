@@ -65,10 +65,13 @@ public:
 
     WebCore::Element* element();
 
+    void close();
+
 protected:
     WebFullScreenManager(WebPage*);
 
     void setAnimatingFullScreen(bool);
+    void requestExitFullScreen();
 
     void didReceiveWebFullScreenManagerMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 

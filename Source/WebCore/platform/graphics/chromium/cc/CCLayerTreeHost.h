@@ -25,6 +25,7 @@
 #ifndef CCLayerTreeHost_h
 #define CCLayerTreeHost_h
 
+#include "Color.h"
 #include "GraphicsTypes3D.h"
 #include "IntRect.h"
 #include "LayerChromium.h"
@@ -36,13 +37,14 @@
 
 #include <limits>
 #include <wtf/HashMap.h>
+#include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
 class CCLayerTreeHostImpl;
+class CCLayerTreeHostImplClient;
 class CCTextureUpdater;
 class GraphicsContext3D;
 class LayerPainterChromium;
@@ -52,11 +54,13 @@ class TextureManager;
 
 class CCLayerTreeHostClient {
 public:
+    virtual void willBeginFrame() = 0;
     virtual void updateAnimations(double frameBeginTime) = 0;
     virtual void layout() = 0;
     virtual void applyScrollAndScale(const IntSize& scrollDelta, float pageScale) = 0;
     virtual PassRefPtr<GraphicsContext3D> createContext() = 0;
     virtual void didRecreateContext(bool success) = 0;
+    virtual void didCommit() = 0;
     virtual void didCommitAndDrawFrame() = 0;
     virtual void didCompleteSwapBuffers() = 0;
 
@@ -70,9 +74,11 @@ protected:
 struct CCSettings {
     CCSettings()
             : acceleratePainting(false)
-            , compositeOffscreen(false)
             , showFPSCounter(false)
             , showPlatformLayerTree(false)
+            , showPaintRects(false)
+            , showPropertyChangedRects(false)
+            , showSurfaceDamageRects(false)
             , refreshRate(0)
             , perTilePainting(false)
             , partialSwapEnabled(false)
@@ -80,9 +86,11 @@ struct CCSettings {
             , maxPartialTextureUpdates(std::numeric_limits<size_t>::max()) { }
 
     bool acceleratePainting;
-    bool compositeOffscreen;
     bool showFPSCounter;
     bool showPlatformLayerTree;
+    bool showPaintRects;
+    bool showPropertyChangedRects;
+    bool showSurfaceDamageRects;
     double refreshRate;
     bool perTilePainting;
     bool partialSwapEnabled;
@@ -102,6 +110,8 @@ struct LayerRendererCapabilities {
         , usingSwapCompleteCallback(false)
         , usingTextureUsageHint(false)
         , usingTextureStorageExtension(false)
+        , usingGpuMemoryManager(false)
+        , usingDiscardFramebuffer(false)
         , maxTextureSize(0) { }
 
     GC3Denum bestTextureFormat;
@@ -113,19 +123,28 @@ struct LayerRendererCapabilities {
     bool usingSwapCompleteCallback;
     bool usingTextureUsageHint;
     bool usingTextureStorageExtension;
+    bool usingGpuMemoryManager;
+    bool usingDiscardFramebuffer;
     int maxTextureSize;
 };
 
-class CCLayerTreeHost : public RefCounted<CCLayerTreeHost> {
+class CCLayerTreeHost : public RateLimiterClient {
+    WTF_MAKE_NONCOPYABLE(CCLayerTreeHost);
 public:
-    static PassRefPtr<CCLayerTreeHost> create(CCLayerTreeHostClient*, const CCSettings&);
+    static PassOwnPtr<CCLayerTreeHost> create(CCLayerTreeHostClient*, const CCSettings&);
     virtual ~CCLayerTreeHost();
+
+    void setSurfaceReady();
 
     // Returns true if any CCLayerTreeHost is alive.
     static bool anyLayerTreeHostInstanceExists();
 
+    static bool needsFilterContext() { return s_needsFilterContext; }
+    static void setNeedsFilterContext(bool needsFilterContext) { s_needsFilterContext = needsFilterContext; }
+
     // CCLayerTreeHost interface to CCProxy.
-    void updateAnimations(double frameBeginTime);
+    void willBeginFrame() { m_client->willBeginFrame(); }
+    void updateAnimations(double monotonicFrameBeginTime);
     void layout();
     void beginCommitOnImplThread(CCLayerTreeHostImpl*);
     void finishCommitOnImplThread(CCLayerTreeHostImpl*);
@@ -143,8 +162,9 @@ public:
     void didCommitAndDrawFrame() { m_client->didCommitAndDrawFrame(); }
     void didCompleteSwapBuffers() { m_client->didCompleteSwapBuffers(); }
     void deleteContentsTexturesOnImplThread(TextureAllocator*);
+    void acquireLayerTextures();
     // Returns false if we should abort this frame due to initialization failure.
-    bool updateLayers();
+    bool updateLayers(CCTextureUpdater&);
 
     CCLayerTreeHostClient* client() { return m_client; }
 
@@ -175,6 +195,7 @@ public:
     // virtual for testing
     virtual void setNeedsCommit();
     void setNeedsRedraw();
+    bool commitRequested() const;
 
     void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime);
 
@@ -190,18 +211,24 @@ public:
 
     void setPageScaleFactorAndLimits(float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor);
 
+    void setBackgroundColor(const Color& color) { m_backgroundColor = color; }
+
     TextureManager* contentsTextureManager() const;
+    void setContentsMemoryAllocationLimitBytes(size_t);
 
     bool visible() const { return m_visible; }
     void setVisible(bool);
 
     void startPageScaleAnimation(const IntSize& targetPosition, bool useAnchor, float scale, double durationSec);
 
-    void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&);
     void applyScrollAndScale(const CCScrollAndScaleSet&);
     void startRateLimiter(GraphicsContext3D*);
     void stopRateLimiter(GraphicsContext3D*);
 
+    // RateLimitClient implementation
+    virtual void rateLimit() OVERRIDE;
+
+    bool bufferedUpdates();
     bool requestPartialTextureUpdate();
     void deleteTextureAfterCommit(PassOwnPtr<ManagedTexture>);
 
@@ -216,20 +243,22 @@ private:
     void initializeLayerRenderer();
 
     enum PaintType { PaintVisible, PaintIdle };
-    static void paintContentsIfDirty(LayerChromium*, PaintType, const Region& occludedScreenSpace);
-    void paintLayerContents(const LayerList&, PaintType);
-    void paintMaskAndReplicaForRenderSurface(LayerChromium*, PaintType);
+    static void update(LayerChromium*, PaintType, CCTextureUpdater&, const CCOcclusionTracker*);
+    void paintLayerContents(const LayerList&, PaintType, CCTextureUpdater&);
+    void paintMasksForRenderSurface(LayerChromium*, PaintType, CCTextureUpdater&);
 
-    void updateLayers(LayerChromium*);
+    void updateLayers(LayerChromium*, CCTextureUpdater&);
     // Pre-reserve textures for any layer marked "always reserve textures"
-    void reserveTextures();
-    void clearPendingUpdate();
+    void reserveTextures(const LayerList&);
 
+    void animateLayers(double monotonicTime);
+    bool animateLayersRecursive(LayerChromium* current, double monotonicTime);
     void setAnimationEventsRecursive(const CCAnimationEventsVector&, LayerChromium*, double wallClockTime);
 
     int m_compositorIdentifier;
 
     bool m_animating;
+    bool m_needsAnimateLayers;
 
     CCLayerTreeHostClient* m_client;
 
@@ -244,8 +273,6 @@ private:
     RefPtr<LayerChromium> m_rootLayer;
     OwnPtr<TextureManager> m_contentsTextureManager;
 
-    LayerList m_updateList;
-
     CCSettings m_settings;
 
     IntSize m_viewportSize;
@@ -256,9 +283,11 @@ private:
     float m_pageScaleFactor;
     float m_minPageScaleFactor, m_maxPageScaleFactor;
     bool m_triggerIdlePaints;
+    Color m_backgroundColor;
 
     TextureList m_deleteTextureAfterCommitList;
     size_t m_partialTextureUpdateRequests;
+    static bool s_needsFilterContext;
 };
 
 }

@@ -36,6 +36,7 @@
 
 #include "Document.h"
 #include "Node.h"
+#include "QualifiedName.h"
 
 namespace WebCore {
 
@@ -63,7 +64,6 @@ void MutationObserverRegistration::resetObservation(MutationObserverOptions opti
     clearTransientRegistrations();
     m_options = options;
     m_attributeFilter = attributeFilter;
-    m_caseInsensitiveAttributeFilter.clear();
 }
 
 void MutationObserverRegistration::observedSubtreeNodeWillDetach(PassRefPtr<Node> node)
@@ -72,6 +72,7 @@ void MutationObserverRegistration::observedSubtreeNodeWillDetach(PassRefPtr<Node
         return;
 
     node->registerTransientMutationObserver(this);
+    m_observer->setHasTransientRegistration();
 
     if (!m_transientRegistrationNodes) {
         m_transientRegistrationNodes = adoptPtr(new NodeHashSet);
@@ -104,8 +105,9 @@ void MutationObserverRegistration::unregister()
     // The above line will cause this object to be deleted, so don't do any more in this function.
 }
 
-bool MutationObserverRegistration::shouldReceiveMutationFrom(Node* node, WebKitMutationObserver::MutationType type, const AtomicString& attributeName)
+bool MutationObserverRegistration::shouldReceiveMutationFrom(Node* node, WebKitMutationObserver::MutationType type, const QualifiedName* attributeName)
 {
+    ASSERT((type == WebKitMutationObserver::Attributes && attributeName) || !attributeName);
     if (!(m_options & type))
         return false;
 
@@ -115,28 +117,10 @@ bool MutationObserverRegistration::shouldReceiveMutationFrom(Node* node, WebKitM
     if (type != WebKitMutationObserver::Attributes || !(m_options & WebKitMutationObserver::AttributeFilter))
         return true;
 
-    if (m_attributeFilter.contains(attributeName))
-        return true;
+    if (!attributeName->namespaceURI().isNull())
+        return false;
 
-    if (node->document()->isHTMLDocument() && node->isHTMLElement())
-        return caseInsensitiveAttributeFilter().contains(attributeName);
-
-    return false;
-}
-
-const HashSet<AtomicString>& MutationObserverRegistration::caseInsensitiveAttributeFilter()
-{
-    if (m_caseInsensitiveAttributeFilter)
-        return *m_caseInsensitiveAttributeFilter;
-
-    m_caseInsensitiveAttributeFilter = adoptPtr(new HashSet<AtomicString>());
-    for (HashSet<AtomicString>::const_iterator iter = m_attributeFilter.begin(); iter != m_attributeFilter.end(); ++iter) {
-        AtomicString attributeNameLower = iter->lower();
-        if ((*iter) != attributeNameLower)
-             m_caseInsensitiveAttributeFilter->add(attributeNameLower);
-    }
-
-    return *m_caseInsensitiveAttributeFilter;
+    return m_attributeFilter.contains(attributeName->localName());
 }
 
 } // namespace WebCore

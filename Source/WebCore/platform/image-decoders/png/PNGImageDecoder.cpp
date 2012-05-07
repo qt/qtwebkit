@@ -361,26 +361,31 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
     // Initialize the framebuffer if needed.
     ImageFrame& buffer = m_frameBufferCache[0];
     if (buffer.status() == ImageFrame::FrameEmpty) {
+        png_structp png = m_reader->pngPtr();
         if (!buffer.setSize(scaledSize().width(), scaledSize().height())) {
-            longjmp(JMPBUF(m_reader->pngPtr()), 1);
+            longjmp(JMPBUF(png), 1);
             return;
         }
+
+        if (PNG_INTERLACE_ADAM7 == png_get_interlace_type(png, m_reader->infoPtr())) {
+            unsigned colorChannels = m_reader->hasAlpha() ? 4 : 3;
+            m_reader->createInterlaceBuffer(colorChannels * size().width() * size().height());
+            if (!m_reader->interlaceBuffer()) {
+                longjmp(JMPBUF(png), 1);
+                return;
+            }
+        }
+
         buffer.setStatus(ImageFrame::FramePartial);
         buffer.setHasAlpha(false);
         buffer.setColorProfile(m_colorProfile);
 
         // For PNGs, the frame always fills the entire image.
         buffer.setOriginalFrameRect(IntRect(IntPoint(), size()));
-
-        if (png_get_interlace_type(m_reader->pngPtr(), m_reader->infoPtr()) != PNG_INTERLACE_NONE)
-            m_reader->createInterlaceBuffer((m_reader->hasAlpha() ? 4 : 3) * size().width() * size().height());
     }
 
-    if (!rowBuffer)
-        return;
-
-    // libpng comments (pasted in here to explain what follows)
-    /*
+    /* libpng comments (here to explain what follows).
+     *
      * this function is called for every row in the image.  If the
      * image is interlacing, and you turned on the interlace handler,
      * this function will be called for every row in every pass.
@@ -389,6 +394,18 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
      * The rows and passes are called in order, so you don't really
      * need the row_num and pass, but I'm supplying them because it
      * may make your life easier.
+     */
+
+    // Nothing to do if the row is unchanged, or the row is outside
+    // the image bounds: libpng may send extra rows, ignore them to
+    // make our lives easier.
+    if (!rowBuffer)
+        return;
+    int y = !m_scaled ? rowIndex : scaledY(rowIndex);
+    if (y < 0 || y >= scaledSize().height())
+        return;
+
+    /* libpng comments (continued).
      *
      * For the non-NULL rows of interlaced images, you must call
      * png_progressive_combine_row() passing in the row and the
@@ -407,31 +424,36 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
      * old row and the new row.
      */
 
-    png_structp png = m_reader->pngPtr();
     bool hasAlpha = m_reader->hasAlpha();
     unsigned colorChannels = hasAlpha ? 4 : 3;
-    png_bytep row;
-    png_bytep interlaceBuffer = m_reader->interlaceBuffer();
-    if (interlaceBuffer) {
+    png_bytep row = rowBuffer;
+
+    if (png_bytep interlaceBuffer = m_reader->interlaceBuffer()) {
         row = interlaceBuffer + (rowIndex * colorChannels * size().width());
-        png_progressive_combine_row(png, row, rowBuffer);
-    } else
-        row = rowBuffer;
+        png_progressive_combine_row(m_reader->pngPtr(), row, rowBuffer);
+    }
 
-    // Copy the data into our buffer.
+    // Write the decoded row pixels to the frame buffer.
     int width = scaledSize().width();
-    int destY = scaledY(rowIndex);
-
-    // Check that the row is within the image bounds. LibPNG may supply an extra row.
-    if (destY < 0 || destY >= scaledSize().height())
-        return;
     bool nonTrivialAlpha = false;
+
+#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     for (int x = 0; x < width; ++x) {
         png_bytep pixel = row + (m_scaled ? m_scaledColumns[x] : x) * colorChannels;
         unsigned alpha = hasAlpha ? pixel[3] : 255;
-        buffer.setRGBA(x, destY, pixel[0], pixel[1], pixel[2], alpha);
+        buffer.setRGBA(x, y, pixel[0], pixel[1], pixel[2], alpha);
         nonTrivialAlpha |= alpha < 255;
     }
+#else
+    ASSERT(!m_scaled);
+    png_bytep pixel = row;
+    for (int x = 0; x < width; ++x, pixel += colorChannels) {
+        unsigned alpha = hasAlpha ? pixel[3] : 255;
+        buffer.setRGBA(x, y, pixel[0], pixel[1], pixel[2], alpha);
+        nonTrivialAlpha |= alpha < 255;
+    }
+#endif
+
     if (nonTrivialAlpha && !buffer.hasAlpha())
         buffer.setHasAlpha(nonTrivialAlpha);
 }

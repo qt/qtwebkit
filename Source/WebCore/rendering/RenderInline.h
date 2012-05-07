@@ -51,7 +51,7 @@ public:
 
     virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&) const;
 
-    LayoutRect linesBoundingBox() const;
+    IntRect linesBoundingBox() const;
     LayoutRect linesVisualOverflowBoundingBox() const;
 
     InlineFlowBox* createAndAppendInlineFlowBox();
@@ -130,14 +130,14 @@ private:
     virtual LayoutRect rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, LayoutUnit outlineWidth) const;
     virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed) const;
 
-    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool fixed, bool useTransforms, TransformState&, bool* wasFixed = 0) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool fixed, bool useTransforms, TransformState&, ApplyContainerFlipOrNot = ApplyContainerFlip, bool* wasFixed = 0) const;
 
     virtual VisiblePosition positionForPoint(const LayoutPoint&);
 
-    virtual LayoutRect borderBoundingBox() const
+    virtual IntRect borderBoundingBox() const
     {
-        LayoutRect boundingBox = linesBoundingBox();
-        return LayoutRect(0, 0, boundingBox.width(), boundingBox.height());
+        IntRect boundingBox = linesBoundingBox();
+        return IntRect(0, 0, boundingBox.width(), boundingBox.height());
     }
 
     virtual InlineFlowBox* createInlineFlowBox(); // Subclassed by SVG and Ruby

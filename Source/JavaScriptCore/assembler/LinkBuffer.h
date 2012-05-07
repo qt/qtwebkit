@@ -63,6 +63,7 @@ class LinkBuffer {
     typedef MacroAssemblerCodePtr CodePtr;
     typedef MacroAssembler::Label Label;
     typedef MacroAssembler::Jump Jump;
+    typedef MacroAssembler::PatchableJump PatchableJump;
     typedef MacroAssembler::JumpList JumpList;
     typedef MacroAssembler::Call Call;
     typedef MacroAssembler::DataLabelCompact DataLabelCompact;
@@ -154,9 +155,9 @@ public:
         return CodeLocationNearCall(MacroAssembler::getLinkerAddress(code(), applyOffset(call.m_label)));
     }
 
-    CodeLocationLabel locationOf(Jump jump)
+    CodeLocationLabel locationOf(PatchableJump jump)
     {
-        return CodeLocationLabel(MacroAssembler::getLinkerAddress(code(), applyOffset(jump.m_label)));
+        return CodeLocationLabel(MacroAssembler::getLinkerAddress(code(), applyOffset(jump.m_jump.m_label)));
     }
 
     CodeLocationLabel locationOf(Label label)
@@ -260,9 +261,9 @@ private:
             
             // Copy the instructions from the last jump to the current one.
             size_t regionSize = jumpsToLink[i].from() - readPtr;
-            uint16_t* copySource = reinterpret_cast<uint16_t*>(inData + readPtr);
-            uint16_t* copyEnd = reinterpret_cast<uint16_t*>(inData + readPtr + regionSize);
-            uint16_t* copyDst = reinterpret_cast<uint16_t*>(outData + writePtr);
+            uint16_t* copySource = reinterpret_cast_ptr<uint16_t*>(inData + readPtr);
+            uint16_t* copyEnd = reinterpret_cast_ptr<uint16_t*>(inData + readPtr + regionSize);
+            uint16_t* copyDst = reinterpret_cast_ptr<uint16_t*>(outData + writePtr);
             ASSERT(!(regionSize % 2));
             ASSERT(!(readPtr % 2));
             ASSERT(!(writePtr % 2));
@@ -374,6 +375,23 @@ private:
         
         for (unsigned i = 0; i < tsize; i++)
             dataLog("\t.short\t0x%x\n", tcode[i]);
+#elif CPU(ARM_TRADITIONAL)
+        //   gcc -c jit.s
+        //   objdump -D jit.o
+        static unsigned codeCount = 0;
+        unsigned int* tcode = static_cast<unsigned int*>(code);
+        size_t tsize = size / sizeof(unsigned int);
+        char nameBuf[128];
+        snprintf(nameBuf, sizeof(nameBuf), "_jsc_jit%u", codeCount++);
+        dataLog("\t.globl\t%s\n"
+                    "\t.align 4\n"
+                    "\t.code 32\n"
+                    "\t.text\n"
+                    "# %p\n"
+                    "%s:\n", nameBuf, code, nameBuf);
+
+        for (unsigned i = 0; i < tsize; i++)
+            dataLog("\t.long\t0x%x\n", tcode[i]);
 #endif
     }
 #endif

@@ -340,10 +340,14 @@ sub ParseInterface
 
 # Helpers for all CodeGenerator***.pm modules
 
-sub AvoidInclusionOfType
+sub SkipIncludeHeader
 {
     my $object = shift;
     my $type = shift;
+
+    return 1 if $primitiveTypeHash{$type};
+    return 1 if $numericTypeHash{$type};
+    return 1 if $type eq "String";
 
     # Special case: SVGPoint.h / SVGNumber.h do not exist.
     return 1 if $type eq "SVGPoint" or $type eq "SVGNumber";
@@ -445,6 +449,15 @@ sub IsSVGAnimatedType
     return 0;
 }
 
+sub GetArrayType
+{
+    my $object = shift;
+    my $type = shift;
+
+    return $1 if $type =~ /^sequence<([\w\d_\s]+)>.*/;
+    return "";
+}
+
 # Uppercase the first letter while respecting WebKit style guidelines.
 # E.g., xmlEncoding becomes XMLEncoding, but xmlllang becomes Xmllang.
 sub WK_ucfirst
@@ -505,6 +518,9 @@ sub AttributeNameForGetterAndSetter
     my ($generator, $attribute) = @_;
 
     my $attributeName = $attribute->signature->name;
+    if ($attribute->signature->extendedAttributes->{"ImplementedAs"}) {
+        $attributeName = $attribute->signature->extendedAttributes->{"ImplementedAs"};
+    }
     my $attributeType = $generator->StripModule($attribute->signature->type);
 
     # Avoid clash with C++ keyword.
@@ -590,6 +606,19 @@ sub ShouldCheckEnums
 {
     my $dataNode = shift;
     return not $dataNode->extendedAttributes->{"DoNotCheckConstants"};
+}
+
+sub GenerateConditionalString
+{
+    my $generator = shift;
+    my $node = shift;
+
+    my $conditional = $node->extendedAttributes->{"Conditional"};
+    if ($conditional) {
+        return $generator->GenerateConditionalStringFromAttributeValue($conditional);
+    } else {
+        return "";
+    }
 }
 
 sub GenerateConditionalStringFromAttributeValue

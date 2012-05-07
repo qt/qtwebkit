@@ -33,6 +33,7 @@
 #include "AccessibilityImageMapLink.h"
 #include "AccessibilityListBox.h"
 #include "AccessibilitySpinButton.h"
+#include "AccessibilityTable.h"
 #include "EventNames.h"
 #include "FloatRect.h"
 #include "Frame.h"
@@ -488,6 +489,35 @@ bool AccessibilityRenderObject::isAnchor() const
 bool AccessibilityRenderObject::isNativeTextControl() const
 {
     return m_renderer->isTextControl();
+}
+    
+bool AccessibilityRenderObject::isSearchField() const
+{
+    if (!node())
+        return false;
+    
+    HTMLInputElement* inputElement = node()->toInputElement();
+    if (!inputElement)
+        return false;
+
+    if (inputElement->isSearchField())
+        return true;
+
+    // Some websites don't label their search fields as such. However, they will
+    // use the word "search" in either the form or input type. This won't catch every case,
+    // but it will catch google.com for example.
+    
+    // Check the node name of the input type, sometimes it's "search".
+    const AtomicString& nameAttribute = getAttribute(nameAttr);
+    if (nameAttribute.contains("search", false))
+        return true;
+    
+    // Check the form action and the name, which will sometimes be "search".
+    HTMLFormElement* form = inputElement->form();
+    if (form && (form->name().contains("search", false) || form->action().contains("search", false)))
+        return true;
+    
+    return false;
 }
     
 bool AccessibilityRenderObject::isNativeImage() const
@@ -1074,7 +1104,7 @@ String AccessibilityRenderObject::textUnderElement() const
     if (!m_renderer)
         return String();
     
-    if (isFileUploadButton())
+    if (m_renderer->isFileUploadControl())
         return toRenderFileUploadControl(m_renderer)->buttonValue();
     
     Node* node = m_renderer->node();
@@ -1197,7 +1227,7 @@ String AccessibilityRenderObject::stringValue() const
     if (isTextControl())
         return text();
     
-    if (isFileUploadButton())
+    if (m_renderer->isFileUploadControl())
         return toRenderFileUploadControl(m_renderer)->fileTextValue();
     
     // FIXME: We might need to implement a value here for more types
@@ -1491,12 +1521,6 @@ LayoutRect AccessibilityRenderObject::elementRect() const
         return checkboxOrRadioRect();
     
     return boundingBoxRect();
-}
-
-LayoutSize AccessibilityRenderObject::size() const
-{
-    LayoutRect rect = elementRect();
-    return rect.size();
 }
 
 IntPoint AccessibilityRenderObject::clickPoint()
@@ -2650,7 +2674,7 @@ void AccessibilityRenderObject::setSelectedVisiblePositionRange(const VisiblePos
     }    
 }
 
-VisiblePosition AccessibilityRenderObject::visiblePositionForPoint(const LayoutPoint& point) const
+VisiblePosition AccessibilityRenderObject::visiblePositionForPoint(const IntPoint& point) const
 {
     if (!m_renderer)
         return VisiblePosition();
@@ -2675,14 +2699,14 @@ VisiblePosition AccessibilityRenderObject::visiblePositionForPoint(const LayoutP
     while (1) {
         LayoutPoint ourpoint;
 #if PLATFORM(MAC)
-        ourpoint = frameView->screenToContents(roundedIntPoint(point));
+        ourpoint = frameView->screenToContents(point);
 #else
         ourpoint = point;
 #endif
         HitTestRequest request(HitTestRequest::ReadOnly |
                                HitTestRequest::Active);
         HitTestResult result(ourpoint);
-        renderView->layer()->hitTest(request, result);
+        renderView->hitTest(request, result);
         innerNode = result.innerNode();
         if (!innerNode)
             return VisiblePosition();
@@ -2730,7 +2754,7 @@ VisiblePosition AccessibilityRenderObject::visiblePositionForIndex(unsigned inde
 // NOTE: Consider providing this utility method as AX API
 int AccessibilityRenderObject::index(const VisiblePosition& position) const
 {
-    if (!isTextControl())
+    if (position.isNull() || !isTextControl())
         return -1;
 
     if (renderObjectContainsPosition(m_renderer, position.deepEquivalent()))
@@ -2818,7 +2842,7 @@ IntRect AccessibilityRenderObject::doAXBoundsForRange(const PlainTextRange& rang
     return IntRect();
 }
 
-AccessibilityObject* AccessibilityRenderObject::accessibilityImageMapHitTest(HTMLAreaElement* area, const LayoutPoint& point) const
+AccessibilityObject* AccessibilityRenderObject::accessibilityImageMapHitTest(HTMLAreaElement* area, const IntPoint& point) const
 {
     if (!area)
         return 0;
@@ -2854,7 +2878,7 @@ AccessibilityObject* AccessibilityRenderObject::accessibilityHitTest(const IntPo
     Node* node = hitTestResult.innerNode()->shadowAncestorNode();
 
     if (node->hasTagName(areaTag)) 
-        return accessibilityImageMapHitTest(static_cast<HTMLAreaElement*>(node), roundedIntPoint(point));
+        return accessibilityImageMapHitTest(static_cast<HTMLAreaElement*>(node), point);
     
     if (node->hasTagName(optionTag))
         node = static_cast<HTMLOptionElement*>(node)->ownerSelectElement();
@@ -3250,7 +3274,7 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (node && node->hasTagName(headerTag) && !isDescendantOfElementType(articleTag) && !isDescendantOfElementType(sectionTag))
         return LandmarkBannerRole;
     if (node && node->hasTagName(footerTag) && !isDescendantOfElementType(articleTag) && !isDescendantOfElementType(sectionTag))
-        return LandmarkContentInfoRole;
+        return FooterRole;
 
     if (m_renderer->isBlockFlow())
         return GroupRole;
@@ -3528,7 +3552,23 @@ void AccessibilityRenderObject::addAttachmentChildren()
     if (!axWidget->accessibilityIsIgnored())
         m_children.append(axWidget);
 }
+
+#if PLATFORM(MAC)
+void AccessibilityRenderObject::updateAttachmentViewParents()
+{
+    // Only the unignored parent should set the attachment parent, because that's what is reflected in the AX 
+    // hierarchy to the client.
+    if (accessibilityIsIgnored())
+        return;
     
+    size_t length = m_children.size();
+    for (size_t k = 0; k < length; k++) {
+        if (m_children[k]->isAttachment())
+            m_children[k]->overrideAttachmentParent(this);
+    }
+}
+#endif
+
 void AccessibilityRenderObject::addChildren()
 {
     // If the need to add more children in addition to existing children arises, 
@@ -3566,6 +3606,10 @@ void AccessibilityRenderObject::addChildren()
     addAttachmentChildren();
     addImageMapChildren();
     addTextFieldChildren();
+
+#if PLATFORM(MAC)
+    updateAttachmentViewParents();
+#endif
 }
         
 const AtomicString& AccessibilityRenderObject::ariaLiveRegionStatus() const
@@ -3621,7 +3665,10 @@ void AccessibilityRenderObject::ariaSelectedRows(AccessibilityChildrenVector& re
 {
     // Get all the rows. 
     AccessibilityChildrenVector allRows;
-    ariaTreeRows(allRows);
+    if (isTree())
+        ariaTreeRows(allRows);
+    else if (isAccessibilityTable() && toAccessibilityTable(this)->supportsSelectedRows())
+        allRows = toAccessibilityTable(this)->rows();
 
     // Determine which rows are selected.
     bool isMulti = isMultiSelectable();

@@ -27,31 +27,26 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+import time
 import unittest
 
+from webkitpy.layout_tests.port.factory import PortFactory
 from webkitpy.layout_tests.port import server_process
-from webkitpy.common.system.executive import ScriptError
-from webkitpy.common.system.executive_mock import MockExecutive2
+from webkitpy.common.system.systemhost import SystemHost
+from webkitpy.common.system.systemhost_mock import MockSystemHost
 from webkitpy.common.system.outputcapture import OutputCapture
 
 
-def _logging_run_command(args):
-    print args
-
-
-def _throwing_run_command(args):
-    raise ScriptError("MOCK script error")
-
 
 class TrivialMockPort(object):
+    def __init__(self):
+        self.host = MockSystemHost()
+
     def results_directory(self):
         return "/mock-results"
 
     def check_for_leaks(self, process_name, process_pid):
         pass
-
-    def is_crash_reporter(self, process_name):
-        return False
 
 
 class MockFile(object):
@@ -88,26 +83,44 @@ class FakeServerProcess(server_process.ServerProcess):
 
 
 class TestServerProcess(unittest.TestCase):
+    def test_basic(self):
+        cmd = [sys.executable, '-c', 'import sys; import time; time.sleep(0.02); print "stdout"; sys.stdout.flush(); print >>sys.stderr, "stderr"']
+        host = SystemHost()
+        factory = PortFactory(host)
+        port = factory.get()
+        now = time.time()
+        proc = server_process.ServerProcess(port, 'python', cmd)
+        proc.write('')
+
+        self.assertEquals(proc.poll(), None)
+        self.assertFalse(proc.has_crashed())
+
+        # check that doing a read after an expired deadline returns
+        # nothing immediately.
+        line = proc.read_stdout_line(now - 1)
+        self.assertEquals(line, None)
+
+        line = proc.read_stdout_line(now + 1.0)
+        self.assertEquals(line.strip(), "stdout")
+
+        line = proc.read_stderr_line(now + 1.0)
+        self.assertEquals(line.strip(), "stderr")
+
+        proc.stop()
+
     def test_broken_pipe(self):
-        server_process = FakeServerProcess(port_obj=TrivialMockPort(), name="test", cmd=["test"])
+        port_obj = TrivialMockPort()
+
+        port_obj.host.platform.os_name = 'win'
+        server_process = FakeServerProcess(port_obj=port_obj, name="test", cmd=["test"])
         server_process.write("should break")
-        self.assertTrue(server_process.crashed)
+        self.assertTrue(server_process.has_crashed())
         self.assertEquals(server_process._proc, None)
         self.assertEquals(server_process.broken_pipes, [server_process.stdin])
 
-    def test_sample_process(self):
-        # Currently, sample-on-timeout only works on Darwin.
-        if sys.platform != "darwin":
-            return
-        server_process = FakeServerProcess(port_obj=TrivialMockPort(), name="test", cmd=["test"], executive=MockExecutive2(run_command_fn=_logging_run_command))
-        server_process._proc = MockProc(server_process)
-        expected_stdout = "['/usr/bin/sample', 1, 10, 10, '-file', '/mock-results/test-1.sample.txt']\n"
-        OutputCapture().assert_outputs(self, server_process._sample, expected_stdout=expected_stdout)
-
-    def test_sample_process_throws_exception(self):
-        # Currently, sample-on-timeout only works on Darwin.
-        if sys.platform != "darwin":
-            return
-        server_process = FakeServerProcess(port_obj=TrivialMockPort(), name="test", cmd=["test"], executive=MockExecutive2(run_command_fn=_throwing_run_command))
-        server_process._proc = MockProc(server_process)
-        OutputCapture().assert_outputs(self, server_process._sample)
+        port_obj.host.platform.os_name = 'mac'
+        server_process = FakeServerProcess(port_obj=port_obj, name="test", cmd=["test"])
+        server_process.write("should break")
+        self.assertTrue(server_process.has_crashed())
+        self.assertEquals(server_process._proc, None)
+        self.assertEquals(server_process.broken_pipes, [server_process.stdin])

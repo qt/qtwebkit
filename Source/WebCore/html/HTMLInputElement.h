@@ -83,7 +83,7 @@ public:
 
     bool isTextButton() const;
 
-    virtual bool isRadioButton() const;
+    bool isRadioButton() const;
     bool isTextField() const;
     bool isSearchField() const;
     bool isInputTypeHidden() const;
@@ -218,18 +218,16 @@ public:
 
 #if ENABLE(DATALIST)
     HTMLElement* list() const;
-    HTMLOptionElement* selectedOption() const;
 #endif
 
-    // These functions are public so they can be used in InputType classes.
-    // Otherwise, they would be private.
-    CheckedRadioButtons& checkedRadioButtons() const;
-    void updateCheckedRadioButtons();
+    HTMLInputElement* checkedRadioButtonForGroup() const;
+    bool isInRequiredRadioButtonGroup() const;
+
     void setValueInternal(const String&, TextFieldEventBehavior);
 
     void cacheSelectionInResponseToSetValue(int caretOffset) { cacheSelection(caretOffset, caretOffset, SelectionHasNoDirection); }
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     // For test purposes.
     void selectColorInColorChooser(const Color&);
 #endif
@@ -249,14 +247,14 @@ private:
 
     virtual void willChangeForm() OVERRIDE;
     virtual void didChangeForm() OVERRIDE;
-    virtual void insertedIntoDocument() OVERRIDE;
-    virtual void removedFromDocument() OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual bool isEnumeratable() const;
-    virtual bool isLabelable() const OVERRIDE;
+    virtual bool supportLabels() const OVERRIDE;
     virtual void updateFocusAppearance(bool restorePreviousSelection);
     virtual void aboutToUnload();
     virtual bool shouldUseInputMethod();
@@ -313,6 +311,7 @@ private:
     bool isTextType() const;
 
     virtual bool supportsPlaceholder() const;
+    virtual bool isPlaceholderEmpty() const OVERRIDE;
     virtual void updatePlaceholderText();
     virtual bool isEmptyValue() const OVERRIDE { return innerTextValue().isEmpty(); }
     virtual bool isEmptySuggestedValue() const { return suggestedValue().isEmpty(); }
@@ -340,6 +339,11 @@ private:
     void parseMaxLengthAttribute(Attribute*);
     void updateValueIfNeeded();
 
+    // Returns null if this isn't associated with any radio button group.
+    CheckedRadioButtons* checkedRadioButtons() const;
+    void addToRadioButtonGroup();
+    void removeFromRadioButtonGroup();
+
     AtomicString m_name;
     String m_valueIfDirty;
     String m_suggestedValue;
@@ -364,5 +368,4 @@ private:
 };
 
 } //namespace
-
 #endif

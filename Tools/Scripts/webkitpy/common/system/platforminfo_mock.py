@@ -28,8 +28,9 @@
 
 
 class MockPlatformInfo(object):
-    os_name = 'mac'
-    os_version = 'snowleopard'
+    def __init__(self, os_name='mac', os_version='snowleopard'):
+        self.os_name = os_name
+        self.os_version = os_version
 
     def is_mac(self):
         return self.os_name == 'mac'
@@ -39,6 +40,9 @@ class MockPlatformInfo(object):
 
     def is_win(self):
         return self.os_name == 'win'
+
+    def is_freebsd(self):
+        return self.os_name == 'freebsd'
 
     def display_name(self):
         return "MockPlatform 1.0"

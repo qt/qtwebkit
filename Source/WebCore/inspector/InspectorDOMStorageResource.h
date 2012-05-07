@@ -40,15 +40,15 @@
 
 namespace WebCore {
 
-    class Storage;
+    class StorageArea;
     class Frame;
     class InspectorFrontend;
 
     class InspectorDOMStorageResource : public EventListener {
     public:
-        static PassRefPtr<InspectorDOMStorageResource> create(Storage* domStorage, bool isLocalStorage, Frame* frame)
+        static PassRefPtr<InspectorDOMStorageResource> create(StorageArea* storageArea, bool isLocalStorage, Frame* frame)
         {
-            return adoptRef(new InspectorDOMStorageResource(domStorage, isLocalStorage, frame));
+            return adoptRef(new InspectorDOMStorageResource(storageArea, isLocalStorage, frame));
         }
 
         static const InspectorDOMStorageResource* cast(const EventListener* listener)
@@ -64,18 +64,19 @@ namespace WebCore {
         virtual bool operator==(const EventListener& listener);
 
         bool isSameHostAndType(Frame*, bool isLocalStorage) const;
-        int id() const { return m_id; }
-        Storage* domStorage() const { return m_domStorage.get(); }
+        String id() const { return m_id; }
+        StorageArea* storageArea() const { return m_storageArea.get(); }
+        Frame* frame() const { return m_frame.get(); }
 
     private:
 
-        InspectorDOMStorageResource(Storage*, bool isLocalStorage, Frame*);
+        InspectorDOMStorageResource(StorageArea*, bool isLocalStorage, Frame*);
 
-        RefPtr<Storage> m_domStorage;
+        RefPtr<StorageArea> m_storageArea;
         bool m_isLocalStorage;
         RefPtr<Frame> m_frame;
         InspectorFrontend::DOMStorage* m_frontend;
-        int m_id;
+        String m_id;
         bool m_reportingChangesToFrontend;
 
         static int s_nextUnusedId;

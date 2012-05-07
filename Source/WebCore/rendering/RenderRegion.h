@@ -37,6 +37,7 @@ namespace WebCore {
 class RenderBox;
 class RenderBoxRegionInfo;
 class RenderFlowThread;
+class RenderNamedFlowThread;
 
 class RenderRegion : public RenderReplaced {
 public:
@@ -56,8 +57,8 @@ public:
     void attachRegion();
     void detachRegion();
 
+    RenderNamedFlowThread* parentNamedFlowThread() const { return m_parentNamedFlowThread; }
     RenderFlowThread* flowThread() const { return m_flowThread; }
-    RenderFlowThread* parentFlowThread() const { return m_parentFlowThread; }
 
     // Valid regions do not create circular dependencies with other flows.
     bool isValid() const { return m_isValid; }
@@ -92,6 +93,8 @@ public:
 
     RegionState regionState() const { return isValid() ? m_regionState : RegionUndefined; }
     void setRegionState(RegionState regionState) { m_regionState = regionState; }
+    void setDispatchRegionLayoutUpdateEvent(bool value) { m_dispatchRegionLayoutUpdateEvent = value; }
+    bool shouldDispatchRegionLayoutUpdateEvent() { return m_dispatchRegionLayoutUpdateEvent; }
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 
@@ -102,10 +105,10 @@ private:
 
     RenderFlowThread* m_flowThread;
 
-    // If this RenderRegion is displayed as part of another flow,
+    // If this RenderRegion is displayed as part of another named flow,
     // we need to create a dependency tree, so that layout of the
     // regions is always done before the regions themselves.
-    RenderFlowThread* m_parentFlowThread;
+    RenderNamedFlowThread* m_parentNamedFlowThread;
     LayoutRect m_regionRect;
 
     // This map holds unique information about a block that is split across regions.
@@ -121,6 +124,7 @@ private:
     bool m_isValid;
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
+    bool m_dispatchRegionLayoutUpdateEvent;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)

@@ -24,7 +24,7 @@
 
 #include "AudioChannel.h"
 #include "AudioSourceProvider.h"
-#include "GOwnPtr.h"
+#include <wtf/gobject/GOwnPtr.h>
 #include "GRefPtrGStreamer.h"
 #include "WebKitWebAudioSourceGStreamer.h"
 #include <gst/gst.h>
@@ -57,11 +57,6 @@ AudioDestinationGStreamer::AudioDestinationGStreamer(AudioSourceProvider& provid
     , m_sampleRate(sampleRate)
     , m_isPlaying(false)
 {
-    static bool gstInitialized = false;
-    if (!gstInitialized)
-        gstInitialized = gst_init_check(0, 0, 0);
-    ASSERT_WITH_MESSAGE(gstInitialized, "GStreamer initialization failed");
-
     m_pipeline = gst_pipeline_new("play");
 
     GstElement* webkitAudioSrc = reinterpret_cast<GstElement*>(g_object_new(WEBKIT_TYPE_WEB_AUDIO_SRC,

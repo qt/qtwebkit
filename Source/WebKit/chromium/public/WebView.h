@@ -41,6 +41,7 @@ namespace WebKit {
 
 class WebAccessibilityObject;
 class WebAutofillClient;
+class WebBatteryStatus;
 class WebDevToolsAgent;
 class WebDevToolsAgentClient;
 class WebDragData;
@@ -50,10 +51,14 @@ class WebGraphicsContext3D;
 class WebNode;
 class WebPageOverlay;
 class WebPermissionClient;
+class WebPrerendererClient;
+class WebRange;
 class WebSettings;
 class WebSpellCheckClient;
 class WebString;
+class WebTextFieldDecoratorClient;
 class WebViewClient;
+struct WebActiveWheelFlingParameters;
 struct WebMediaPlayerAction;
 struct WebPluginAction;
 struct WebPoint;
@@ -102,7 +107,11 @@ public:
     virtual void setAutofillClient(WebAutofillClient*) = 0;
     virtual void setDevToolsAgentClient(WebDevToolsAgentClient*) = 0;
     virtual void setPermissionClient(WebPermissionClient*) = 0;
+    // FIXME: After the Prerendering API lands in chrome, remove this staging thunk
+    // for setPrerendererClient().
+    virtual void setPrerendererClient(WebPrerendererClient*) { }
     virtual void setSpellCheckClient(WebSpellCheckClient*) = 0;
+    virtual void addTextFieldDecoratorClient(WebTextFieldDecoratorClient*) = 0;
 
 
     // Options -------------------------------------------------------------
@@ -266,12 +275,6 @@ public:
     // Turn off auto-resize.
     virtual void disableAutoResizeMode() = 0;
 
-    // DEPRECATED
-    virtual void enableAutoResizeMode(
-        bool enable,
-        const WebSize& minSize,
-        const WebSize& maxSize) = 0;
-
     // Media ---------------------------------------------------------------
 
     // Performs the specified media player action on the node at the given location.
@@ -352,19 +355,16 @@ public:
     // Autofill  -----------------------------------------------------------
 
     // Notifies the WebView that Autofill suggestions are available for a node.
-    // |uniqueIDs| is a vector of IDs that represent the unique ID of each
-    // Autofill profile in the suggestions popup. If a unique ID is 0, then the
-    // corresponding suggestion comes from Autocomplete rather than Autofill.
-    // If a unique ID is negative, then the corresponding "suggestion" is
-    // actually a user-facing warning, e.g. explaining why Autofill is
-    // unavailable for the current form.
+    // |itemIDs| is a vector of IDs for the menu items. A positive itemID is a
+    // unique ID for the Autofill entries. Other MenuItemIDs are defined in
+    // WebAutofillClient.h
     virtual void applyAutofillSuggestions(
         const WebNode&,
         const WebVector<WebString>& names,
         const WebVector<WebString>& labels,
         const WebVector<WebString>& icons,
-        const WebVector<int>& uniqueIDs,
-        int separatorIndex) = 0;
+        const WebVector<int>& itemIDs,
+        int separatorIndex = -1) = 0;
 
     // Hides any popup (suggestions, selects...) that might be showing.
     virtual void hidePopups() = 0;
@@ -434,6 +434,10 @@ public:
     // Can be used for allocating resources that the compositor will later access.
     virtual WebGraphicsContext3D* sharedGraphicsContext3D() = 0;
 
+    // Called to inform the WebView that a wheel fling animation was started externally (for instance
+    // by the compositor) but must be completed by the WebView.
+    virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&) = 0;
+
     // Visibility -----------------------------------------------------------
 
     // Sets the visibility of the WebView.
@@ -453,11 +457,17 @@ public:
     virtual void addPageOverlay(WebPageOverlay*, int /*z-order*/) = 0;
     virtual void removePageOverlay(WebPageOverlay*) = 0;
 
+    // Battery status API support -------------------------------------------
+
+    // Updates the battery status in the BatteryClient. This also triggers the
+    // appropriate JS events (e.g. sends a 'levelchange' event to JS if the
+    // level is changed in this update from the previous update).
+    virtual void updateBatteryStatus(const WebBatteryStatus&) { }
+
     // Testing functionality for LayoutTestController -----------------------
 
     // Simulates a compositor lost context.
     virtual void loseCompositorContext(int numTimes) = 0;
-
 
 protected:
     ~WebView() {}

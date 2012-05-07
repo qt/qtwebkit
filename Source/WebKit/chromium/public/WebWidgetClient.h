@@ -56,13 +56,22 @@ public:
     virtual void didAutoResize(const WebSize& newSize) { }
 
     // Called when the compositor is enabled or disabled.
-    // The WebCompositor identifier can be used on the compositor thread to get access
-    // to the WebCompositor instance associated with this WebWidget.
-    // If there is no WebCompositor associated with this WebWidget (for example if
-    // threaded compositing is not enabled) then calling WebCompositor::fromIdentifier()
+    // The inputHandlerIdentifier can be used on the compositor thread to get access
+    // to the WebCompositorInputHandler instance associated with this WebWidget.
+    // If there is no WebCompositorInputHandler associated with this WebWidget (for example if
+    // threaded compositing is not enabled) then calling WebCompositorInputHandler::fromIdentifier()
     // for the specified identifier will return 0.
-    virtual void didActivateCompositor(int compositorIdentifier) { }
+    virtual void didActivateCompositor(int inputHandlerIdentifier) { }
     virtual void didDeactivateCompositor() { }
+
+    // Indicates to the embedder that the compositor is about to begin a
+    // frame. This is primarily to signal to flow control mechanisms that a
+    // frame is beginning, not to perform actual painting work.
+    virtual void willBeginCompositorFrame() { }
+
+    // Indicates to the embedder that the WebWidget is ready for additional
+    // input.
+    virtual void didBecomeReadyForAdditionalInput() { }
 
     // Called for compositing mode when the draw commands for a WebKit-side
     // frame have been issued.

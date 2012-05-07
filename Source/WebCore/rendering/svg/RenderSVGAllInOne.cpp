@@ -27,6 +27,7 @@
 
 #include "RenderSVGBlock.cpp"
 #include "RenderSVGContainer.cpp"
+#include "RenderSVGEllipse.cpp"
 #include "RenderSVGForeignObject.cpp"
 #include "RenderSVGGradientStop.cpp"
 #include "RenderSVGHiddenContainer.cpp"
@@ -55,7 +56,6 @@
 #include "RenderSVGTextPath.cpp"
 #include "RenderSVGTransformableContainer.cpp"
 #include "RenderSVGViewportContainer.cpp"
-#include "SVGImageBufferTools.cpp"
 #include "SVGInlineFlowBox.cpp"
 #include "SVGInlineTextBox.cpp"
 #include "SVGMarkerLayoutInfo.cpp"

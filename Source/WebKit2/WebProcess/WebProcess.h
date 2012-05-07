@@ -44,11 +44,19 @@
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 
+#if USE(SOUP)
+#include "WebSoupRequestManager.h"
+#endif
+
 #if PLATFORM(QT)
 class QNetworkAccessManager;
 #endif
 
-#if ENABLE(NOTIFICATIONS)
+#if PLATFORM(MAC)
+#include <dispatch/dispatch.h>
+#endif
+
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 #include "WebNotificationManager.h"
 #endif
 
@@ -133,7 +141,7 @@ public:
     // Geolocation
     WebGeolocationManager& geolocationManager() { return m_geolocationManager; }
     
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebNotificationManager& notificationManager() { return m_notificationManager; }
 #endif
 
@@ -147,6 +155,10 @@ public:
 #endif
 
     EventDispatcher& eventDispatcher() { return m_eventDispatcher; }
+
+#if USE(SOUP)
+    WebSoupRequestManager& soupRequestManager() { return m_soupRequestManager; }
+#endif
 
 private:
     WebProcess();
@@ -254,6 +266,7 @@ private:
 #endif
 #if PLATFORM(MAC)
     pid_t m_presenterApplicationPid;
+    dispatch_group_t m_clearResourceCachesDispatchGroup;
 #endif
 
     bool m_fullKeyboardAccessEnabled;
@@ -268,7 +281,7 @@ private:
 
     TextCheckerState m_textCheckerState;
     WebGeolocationManager m_geolocationManager;
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebNotificationManager m_notificationManager;
 #endif
     WebIconDatabaseProxy m_iconDatabaseProxy;
@@ -280,6 +293,10 @@ private:
 #if ENABLE(PLUGIN_PROCESS)
     PluginProcessConnectionManager m_pluginProcessConnectionManager;
     bool m_disablePluginProcessMessageTimeout;
+#endif
+
+#if USE(SOUP)
+    WebSoupRequestManager m_soupRequestManager;
 #endif
 
 };

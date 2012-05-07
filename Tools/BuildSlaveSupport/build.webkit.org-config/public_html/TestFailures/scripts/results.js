@@ -79,7 +79,7 @@ results.kUnknownKind = 'unknown';
 
 // Types of tests.
 results.kImageType = 'image'
-results.kTextType = 'audio'
+results.kAudioType = 'audio'
 results.kTextType = 'text'
 // FIXME: There are more types of tests.
 
@@ -210,6 +210,7 @@ results.ResultAnalyzer = base.extends(Object, {
     {
         this._actual = resultNode ? results.failureTypeList(resultNode.actual) : [];
         this._expected = resultNode ? this._addImpliedExpectations(results.failureTypeList(resultNode.expected)) : [];
+        this._wontfix = resultNode ? resultNode.wontfix : false;
     },
     _addImpliedExpectations: function(resultsList)
     {
@@ -239,6 +240,10 @@ results.ResultAnalyzer = base.extends(Object, {
     {
         return this._actual.length > 1;
     },
+    wontfix: function()
+    {
+        return this._wontfix;
+    },
     hasUnexpectedFailures: function()
     {
         var difference = {};
@@ -255,10 +260,16 @@ results.ResultAnalyzer = base.extends(Object, {
     }
 })
 
+function isExpectedFailure(resultNode)
+{
+    var analyzer = new results.ResultAnalyzer(resultNode);
+    return !analyzer.hasUnexpectedFailures() && !analyzer.succeeded() && !analyzer.flaky() && !analyzer.wontfix();
+}
+
 function isUnexpectedFailure(resultNode)
 {
     var analyzer = new results.ResultAnalyzer(resultNode);
-    return analyzer.hasUnexpectedFailures() && !analyzer.succeeded() && !analyzer.flaky();
+    return analyzer.hasUnexpectedFailures() && !analyzer.succeeded() && !analyzer.flaky() && !analyzer.wontfix();
 }
 
 function isResultNode(node)
@@ -266,11 +277,9 @@ function isResultNode(node)
     return !!node.actual;
 }
 
-results.expectedOrUnexpectedFailures = function(resultsTree)
+results.expectedFailures = function(resultsTree)
 {
-    return base.filterTree(resultsTree.tests, isResultNode, function(resultNode) {
-        return !(new results.ResultAnalyzer(resultNode).succeeded());
-    });
+    return base.filterTree(resultsTree.tests, isResultNode, isExpectedFailure);
 };
 
 results.unexpectedFailures = function(resultsTree)
@@ -300,9 +309,9 @@ function resultsByTest(resultsByBuilder, filter)
     return resultsByTest;
 }
 
-results.expectedOrUnexpectedFailuresByTest = function(resultsByBuilder)
+results.expectedFailuresByTest = function(resultsByBuilder)
 {
-    return resultsByTest(resultsByBuilder, results.expectedOrUnexpectedFailures);
+    return resultsByTest(resultsByBuilder, results.expectedFailures);
 };
 
 results.unexpectedFailuresByTest = function(resultsByBuilder)

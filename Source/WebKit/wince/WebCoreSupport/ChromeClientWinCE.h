@@ -131,14 +131,9 @@ public:
     // for this origin.
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded);
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     virtual WebCore::NotificationClient* notificationPresenter() const;
 #endif
-
-    // This can be either a synchronous or asynchronous call. The ChromeClient can display UI asking the user for permission
-    // to use Geolocation.
-    virtual void requestGeolocationPermissionForFrame(WebCore::Frame*, WebCore::Geolocation*);
-    virtual void cancelGeolocationPermissionRequestForFrame(WebCore::Frame*, WebCore::Geolocation*);
 
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>);
     // Asynchronous request to load an icon for specified filenames.

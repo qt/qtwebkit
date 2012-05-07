@@ -27,15 +27,20 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import StringIO
 
 from webkitpy.common.system.deprecated_logging import log
 from webkitpy.common.system.executive import ScriptError
 
 
 class MockProcess(object):
-    def __init__(self):
+    def __init__(self, stdout='MOCK STDOUT\n'):
         self.pid = 42
+        self.stdout = StringIO.StringIO(stdout)
+        self.stdin = StringIO.StringIO()
 
+    def wait(self):
+        return
 
 # FIXME: This should be unified with MockExecutive2
 class MockExecutive(object):
@@ -52,6 +57,7 @@ class MockExecutive(object):
         self._should_throw_when_run = should_throw_when_run or set()
         # FIXME: Once executive wraps os.getpid() we can just use a static pid for "this" process.
         self._running_pids = [os.getpid()]
+        self._proc = None
 
     def check_running_pid(self, pid):
         return pid in self._running_pids
@@ -89,9 +95,18 @@ class MockExecutive(object):
     def cpu_count(self):
         return 2
 
-    def popen(self, *args, **kwargs):
-        # FIXME: Implement logging when self._should_log is set.
-        return MockProcess()
+    def popen(self, args, cwd=None, env=None, **kwargs):
+        if self._should_log:
+            cwd_string = ""
+            if cwd:
+                cwd_string = ", cwd=%s" % cwd
+            env_string = ""
+            if env:
+                env_string = ", env=%s" % env
+            log("MOCK popen: %s%s%s" % (args, cwd_string, env_string))
+        if not self._proc:
+            self._proc = MockProcess()
+        return self._proc
 
 
 class MockExecutive2(object):

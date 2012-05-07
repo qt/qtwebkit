@@ -29,8 +29,8 @@
  */
 
 #include "config.h"
-#include "LocalizedNumberICU.h"
 
+#include "LocaleICU.h"
 #include <gtest/gtest.h>
 #include <wtf/PassOwnPtr.h>
 
@@ -38,7 +38,7 @@ using namespace WebCore;
 
 void testNumberIsReversible(const char* localeString, const char* original, const char* shouldHave = 0)
 {
-    OwnPtr<ICULocale> locale = ICULocale::create(localeString);
+    OwnPtr<LocaleICU> locale = LocaleICU::create(localeString);
     String localized = locale->convertToLocalizedNumber(original);
     if (shouldHave)
         EXPECT_TRUE(localized.contains(shouldHave));

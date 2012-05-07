@@ -54,6 +54,7 @@ namespace WebKit {
     macro(LoadsSiteIconsIgnoringImageLoadingPreference, loadsSiteIconsIgnoringImageLoadingPreference, Bool, bool, false) \
     macro(PluginsEnabled, pluginsEnabled, Bool, bool, true) \
     macro(JavaEnabled, javaEnabled, Bool, bool, true) \
+    macro(JavaEnabledForLocalFiles, javaEnabledForLocalFiles, Bool, bool, true) \
     macro(OfflineWebApplicationCacheEnabled, offlineWebApplicationCacheEnabled, Bool, bool, false) \
     macro(LocalStorageEnabled, localStorageEnabled, Bool, bool, true) \
     macro(DatabasesEnabled, databasesEnabled, Bool, bool, true) \
@@ -74,6 +75,7 @@ namespace WebKit {
     macro(CSSCustomFilterEnabled, cssCustomFilterEnabled, Bool, bool, true) \
     macro(WebGLEnabled, webGLEnabled, Bool, bool, false) \
     macro(CSSRegionsEnabled, cssRegionsEnabled, Bool, bool, true) \
+    macro(RegionBasedColumnsEnabled, regionBasedColumnsEnabled, Bool, bool, false) \
     macro(ForceFTPDirectoryListings, forceFTPDirectoryListings, Bool, bool, false) \
     macro(TabsToLinks, tabsToLinks, Bool, bool, DEFAULT_WEBKIT_TABSTOLINKS_ENABLED) \
     macro(DNSPrefetchingEnabled, dnsPrefetchingEnabled, Bool, bool, false) \
@@ -95,6 +97,7 @@ namespace WebKit {
     macro(MediaPlaybackRequiresUserGesture, mediaPlaybackRequiresUserGesture, Bool, bool, false) \
     macro(MediaPlaybackAllowsInline, mediaPlaybackAllowsInline, Bool, bool, true) \
     macro(InspectorStartsAttached, inspectorStartsAttached, Bool, bool, true) \
+    macro(InspectorUsesWebKitUserInterface, inspectorUsesWebKitUserInterface, Bool, bool, false) \
     macro(ShowsToolTipOverTruncatedText, showsToolTipOverTruncatedText, Bool, bool, false) \
     macro(MockScrollbarsEnabled, mockScrollbarsEnabled, Bool, bool, false) \
     macro(WebAudioEnabled, webAudioEnabled, Bool, bool, false) \
@@ -106,6 +109,9 @@ namespace WebKit {
     macro(ShouldDisplayCaptions, shouldDisplayCaptions, Bool, bool, false) \
     macro(ShouldDisplayTextDescriptions, shouldDisplayTextDescriptions, Bool, bool, false) \
     macro(NotificationsEnabled, notificationsEnabled, Bool, bool, true) \
+    macro(ShouldRespectImageOrientation, shouldRespectImageOrientation, Bool, bool, false) \
+    macro(WantsBalancedSetDefersLoadingBehavior, wantsBalancedSetDefersLoadingBehavior, Bool, bool, false) \
+    macro(RequestAnimationFrameEnabled, requestAnimationFrameEnabled, Bool, bool, true) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -125,7 +131,7 @@ namespace WebKit {
     macro(DefaultFontSize, defaultFontSize, UInt32, uint32_t, 16) \
     macro(DefaultFixedFontSize, defaultFixedFontSize, UInt32, uint32_t, 13) \
     macro(LayoutFallbackWidth, layoutFallbackWidth, UInt32, uint32_t, 980) \
-    macro(DeviceDPI, deviceDPI, UInt32, uint32_t, 240) \
+    macro(DevicePixelRatio, devicePixelRatio, Double, double, 1.0) \
     macro(DeviceWidth, deviceWidth, UInt32, uint32_t, 480) \
     macro(DeviceHeight, deviceHeight, UInt32, uint32_t, 854) \
     macro(PDFDisplayMode, pdfDisplayMode, UInt32, uint32_t, 1) \

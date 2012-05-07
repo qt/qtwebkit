@@ -59,13 +59,14 @@ public:
 
     void setLoadManually(bool loadManually) { m_loadManually = loadManually; }
 
-    bool haveFiredBeforeLoadEvent() const { return m_firedBeforeLoad; }
-    bool haveFiredLoadEvent() const { return m_firedLoad; }
+    bool hasPendingBeforeLoadEvent() const { return m_hasPendingBeforeLoadEvent; }
+    bool hasPendingLoadEvent() const { return m_hasPendingLoadEvent; }
 
     void dispatchPendingEvent(ImageEventSender*);
 
     static void dispatchPendingBeforeLoadEvents();
     static void dispatchPendingLoadEvents();
+    static void dispatchPendingErrorEvents();
 
 protected:
     virtual void notifyFinished(CachedResource*);
@@ -76,6 +77,7 @@ private:
 
     void dispatchPendingBeforeLoadEvent();
     void dispatchPendingLoadEvent();
+    void dispatchPendingErrorEvent();
 
     RenderImageResource* renderImageResource();
     void updateRenderer();
@@ -83,8 +85,9 @@ private:
     Element* m_element;
     CachedResourceHandle<CachedImage> m_image;
     AtomicString m_failedLoadURL;
-    bool m_firedBeforeLoad : 1;
-    bool m_firedLoad : 1;
+    bool m_hasPendingBeforeLoadEvent : 1;
+    bool m_hasPendingLoadEvent : 1;
+    bool m_hasPendingErrorEvent : 1;
     bool m_imageComplete : 1;
     bool m_loadManually : 1;
 };

@@ -30,6 +30,7 @@
 #include "cc/CCRenderSurfaceFilters.h"
 
 #include "GraphicsContext3D.h"
+#include "LengthFunctions.h"
 #include "SkBlurImageFilter.h"
 #include "SkCanvas.h"
 #include "SkColorMatrixFilter.h"
@@ -202,7 +203,7 @@ SkBitmap CCRenderSurfaceFilters::apply(const FilterOperations& filters, unsigned
         desc.fSampleCnt = 0;
         desc.fWidth = size.width();
         desc.fHeight = size.height();
-        desc.fConfig = kRGBA_8888_GrPixelConfig;
+        desc.fConfig = kSkia8888_PM_GrPixelConfig;
         // FIXME: could we use approximate match, and fix texcoords on draw
         dest = gr->lockScratchTexture(desc, GrContext::kExact_ScratchTexMatch);
         if (!dest.texture())
@@ -269,15 +270,12 @@ SkBitmap CCRenderSurfaceFilters::apply(const FilterOperations& filters, unsigned
         }
         case FilterOperation::BLUR: {
             const BlurFilterOperation* op = static_cast<const BlurFilterOperation*>(filterOperation);
-            float stdX = op->stdDeviation().calcFloatValue(0);
-            float stdY = op->stdDeviation().calcFloatValue(1);
+            float stdX = floatValueForLength(op->stdDeviation(), 0);
+            float stdY = floatValueForLength(op->stdDeviation(), 1);
             SkAutoTUnref<SkImageFilter> filter(new SkBlurImageFilter(stdX, stdY));
             SkPaint paint;
             paint.setImageFilter(filter.get());
-            paint.setColor(0xFFFFFFFF);
-            canvas.saveLayer(0, &paint);
-            canvas.drawBitmap(source, 0, 0);
-            canvas.restore();
+            canvas.drawSprite(source, 0, 0, &paint);
             break;
         }
         case FilterOperation::DROP_SHADOW: {

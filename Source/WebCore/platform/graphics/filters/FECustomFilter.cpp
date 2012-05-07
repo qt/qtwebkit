@@ -32,25 +32,21 @@
 #if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
 #include "FECustomFilter.h"
 
-#include "CachedShader.h"
 #include "CustomFilterMesh.h"
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterParameter.h"
 #include "CustomFilterProgram.h"
 #include "CustomFilterShader.h"
-#include "Document.h"
 #include "DrawingBuffer.h"
-#include "FrameView.h"
 #include "GraphicsContext3D.h"
 #include "ImageData.h"
 #include "RenderTreeAsText.h"
-#include "StyleCachedShader.h"
 #include "TextStream.h"
 #include "Texture.h"
 #include "TilingData.h"
 #include "TransformationMatrix.h"
 
-#include <wtf/ByteArray.h>
+#include <wtf/Uint8ClampedArray.h>
 
 namespace WebCore {
 
@@ -76,11 +72,11 @@ static void orthogonalProjectionMatrix(TransformationMatrix& matrix, float left,
     matrix.setM44(1.0f);
 }
 
-FECustomFilter::FECustomFilter(Filter* filter, Document* document, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
+FECustomFilter::FECustomFilter(Filter* filter, HostWindow* hostWindow, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
                                unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType meshBoxType,
                                CustomFilterOperation::MeshType meshType)
     : FilterEffect(filter)
-    , m_document(document)
+    , m_hostWindow(hostWindow)
     , m_program(program)
     , m_parameters(parameters)
     , m_meshRows(meshRows)
@@ -90,22 +86,22 @@ FECustomFilter::FECustomFilter(Filter* filter, Document* document, PassRefPtr<Cu
 {
 }
 
-PassRefPtr<FECustomFilter> FECustomFilter::create(Filter* filter, Document* document, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
+PassRefPtr<FECustomFilter> FECustomFilter::create(Filter* filter, HostWindow* hostWindow, PassRefPtr<CustomFilterProgram> program, const CustomFilterParameterList& parameters,
                                            unsigned meshRows, unsigned meshColumns, CustomFilterOperation::MeshBoxType meshBoxType,
                                            CustomFilterOperation::MeshType meshType)
 {
-    return adoptRef(new FECustomFilter(filter, document, program, parameters, meshRows, meshColumns, meshBoxType, meshType));
+    return adoptRef(new FECustomFilter(filter, hostWindow, program, parameters, meshRows, meshColumns, meshBoxType, meshType));
 }
 
 void FECustomFilter::platformApplySoftware()
 {
-    ByteArray* dstPixelArray = createPremultipliedImageResult();
+    Uint8ClampedArray* dstPixelArray = createPremultipliedImageResult();
     if (!dstPixelArray)
         return;
 
     FilterEffect* in = inputEffect(0);
     IntRect effectDrawingRect = requestedRegionOfInputImageData(in->absolutePaintRect());
-    RefPtr<ByteArray> srcPixelArray = in->asPremultipliedImage(effectDrawingRect);
+    RefPtr<Uint8ClampedArray> srcPixelArray = in->asPremultipliedImage(effectDrawingRect);
     
     IntSize newContextSize(effectDrawingRect.size());
     bool hadContext = m_context;
@@ -116,7 +112,7 @@ void FECustomFilter::platformApplySoftware()
         resizeContext(newContextSize);
     
     // Do not draw the filter if the input image cannot fit inside a single GPU texture.
-    if (m_inputTexture->tiles().numTiles() != 1)
+    if (m_inputTexture->tiles().numTilesX() != 1 || m_inputTexture->tiles().numTilesY() != 1)
         return;
     
     // The shader had compiler errors. We cannot draw anything.
@@ -133,7 +129,7 @@ void FECustomFilter::platformApplySoftware()
     m_drawingBuffer->commit();
 
     RefPtr<ImageData> imageData = m_context->paintRenderingResultsToImageData(m_drawingBuffer.get());
-    ByteArray* gpuResult = imageData->data()->data();
+    Uint8ClampedArray* gpuResult = imageData->data();
     ASSERT(gpuResult->length() == dstPixelArray->length());
     memcpy(dstPixelArray->data(), gpuResult->data(), gpuResult->length());
 }
@@ -145,8 +141,8 @@ void FECustomFilter::initializeContext(const IntSize& contextSize)
     attributes.premultipliedAlpha = false;
     
     ASSERT(!m_context.get());
-    m_context = GraphicsContext3D::create(attributes, m_document->view()->root()->hostWindow(), GraphicsContext3D::RenderOffscreen);
-    m_drawingBuffer = DrawingBuffer::create(m_context.get(), contextSize, !attributes.preserveDrawingBuffer);
+    m_context = GraphicsContext3D::create(attributes, m_hostWindow, GraphicsContext3D::RenderOffscreen);
+    m_drawingBuffer = DrawingBuffer::create(m_context.get(), contextSize, DrawingBuffer::Discard, DrawingBuffer::Alpha);
     
     m_shader = m_program->createShaderWithContext(m_context.get());
     m_mesh = CustomFilterMesh::create(m_context.get(), m_meshColumns, m_meshRows, 
@@ -167,7 +163,7 @@ void FECustomFilter::resizeContext(const IntSize& newContextSize)
 void FECustomFilter::bindVertexAttribute(int attributeLocation, unsigned size, unsigned& offset)
 {
     if (attributeLocation != -1) {
-        m_context->vertexAttribPointer(attributeLocation, 4, GraphicsContext3D::FLOAT, false, m_mesh->bytesPerVertex(), offset);
+        m_context->vertexAttribPointer(attributeLocation, size, GraphicsContext3D::FLOAT, false, m_mesh->bytesPerVertex(), offset);
         m_context->enableVertexAttribArray(attributeLocation);
     }
     offset += size * sizeof(float);
@@ -213,7 +209,7 @@ void FECustomFilter::bindProgramParameters()
     }
 }
 
-void FECustomFilter::bindProgramAndBuffers(ByteArray* srcPixelArray)
+void FECustomFilter::bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray)
 {
     m_context->useProgram(m_shader->program());
     
@@ -226,7 +222,12 @@ void FECustomFilter::bindProgramAndBuffers(ByteArray* srcPixelArray)
     
     if (m_shader->projectionMatrixLocation() != -1) {
         TransformationMatrix projectionMatrix; 
+#if PLATFORM(CHROMIUM)
+        // We flip-y the projection matrix here because Chromium will flip-y the resulting image for us.
+        orthogonalProjectionMatrix(projectionMatrix, -0.5, 0.5, 0.5, -0.5);
+#else
         orthogonalProjectionMatrix(projectionMatrix, -0.5, 0.5, -0.5, 0.5);
+#endif
         float glProjectionMatrix[16];
         projectionMatrix.toColumnMajorFloatArray(glProjectionMatrix);
         m_context->uniformMatrix4fv(m_shader->projectionMatrixLocation(), 1, false, &glProjectionMatrix[0]);

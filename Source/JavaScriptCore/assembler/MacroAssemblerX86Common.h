@@ -129,6 +129,11 @@ public:
     {
         m_assembler.addl_rm(src, dest.offset, dest.base);
     }
+
+    void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
+    {
+        m_assembler.leal_mr(imm.m_value, src, dest);
+    }
     
     void and32(RegisterID src, RegisterID dest)
     {
@@ -1348,6 +1353,12 @@ public:
         m_assembler.ret();
     }
 
+    void compare8(RelationalCondition cond, Address left, TrustedImm32 right, RegisterID dest)
+    {
+        m_assembler.cmpb_im(right.m_value, left.offset, left.base);
+        set32(x86Condition(cond), dest);
+    }
+    
     void compare32(RelationalCondition cond, RegisterID left, RegisterID right, RegisterID dest)
     {
         m_assembler.cmpl_rr(right, left);

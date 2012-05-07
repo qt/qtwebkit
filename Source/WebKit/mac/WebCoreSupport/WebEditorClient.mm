@@ -189,9 +189,6 @@ WebEditorClient::WebEditorClient(WebView *webView)
 
 WebEditorClient::~WebEditorClient()
 {
-#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-    dismissCorrectionPanel(ReasonForDismissingCorrectionPanelIgnored);
-#endif
 }
 
 bool WebEditorClient::isContinuousSpellCheckingEnabled()
@@ -375,7 +372,8 @@ DocumentFragment* WebEditorClient::documentFragmentFromAttributedString(NSAttrib
 
 void WebEditorClient::setInsertionPasteboard(const String& pasteboardName)
 {
-    [m_webView _setInsertionPasteboard:[NSPasteboard pasteboardWithName:pasteboardName]];
+    NSPasteboard *pasteboard = pasteboardName.isEmpty() ? nil : [NSPasteboard pasteboardWithName:pasteboardName];
+    [m_webView _setInsertionPasteboard:pasteboard];
 }
 
 
@@ -865,29 +863,6 @@ void WebEditorClient::updateSpellingUIWithGrammarString(const String& badGrammar
     [[NSSpellChecker sharedSpellChecker] updateSpellingPanelWithGrammarString:badGrammarPhrase detail:grammarDetailDict];
 }
 
-#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
-void WebEditorClient::showCorrectionPanel(CorrectionPanelInfo::PanelType panelType, const FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings)
-{
-    m_correctionPanel.show(m_webView, panelType, boundingBoxOfReplacedString, replacedString, replacementString, alternativeReplacementStrings);
-}
-
-void WebEditorClient::dismissCorrectionPanel(ReasonForDismissingCorrectionPanel reasonForDismissing)
-{
-    m_correctionPanel.dismiss(reasonForDismissing);
-}
-
-String WebEditorClient::dismissCorrectionPanelSoon(ReasonForDismissingCorrectionPanel reasonForDismissing)
-{
-    return m_correctionPanel.dismiss(reasonForDismissing);
-}
-
-void WebEditorClient::recordAutocorrectionResponse(EditorClient::AutocorrectionResponseType responseType, const String& replacedString, const String& replacementString)
-{
-    NSCorrectionResponse response = responseType == EditorClient::AutocorrectionReverted ? NSCorrectionResponseReverted : NSCorrectionResponseEdited;
-    CorrectionPanel::recordAutocorrectionResponse(m_webView, response, replacedString, replacementString);
-}
-#endif
-
 void WebEditorClient::updateSpellingUIWithMisspelledWord(const String& misspelledWord)
 {
     [[NSSpellChecker sharedSpellChecker] updateSpellingPanelWithMisspelledWord:misspelledWord];
@@ -966,7 +941,7 @@ void WebEditorClient::setInputMethodState(bool)
 
 - (void)perform
 {
-    _sender->didCheck(_sequence, core(_results.get(), _types));
+    _sender->didCheckSucceeded(_sequence, core(_results.get(), _types));
 }
 
 @end
@@ -977,10 +952,12 @@ void WebEditorClient::requestCheckingOfString(WebCore::SpellChecker* sender, con
 #ifndef BUILDING_ON_LEOPARD
     NSRange range = NSMakeRange(0, request.text().length());
     NSRunLoop* currentLoop = [NSRunLoop currentRunLoop];
+    int sequence = request.sequence();
+    TextCheckingTypeMask types = request.mask();
     [[NSSpellChecker sharedSpellChecker] requestCheckingOfString:request.text() range:range types:NSTextCheckingAllSystemTypes options:0 inSpellDocumentWithTag:0
                                          completionHandler:^(NSInteger, NSArray* results, NSOrthography*, NSInteger) {
             [currentLoop performSelector:@selector(perform) 
-                                  target:[[[WebEditorSpellCheckResponder alloc] initWithSender:sender sequence:request.sequence() types:request.mask() results:results] autorelease]
+                                  target:[[[WebEditorSpellCheckResponder alloc] initWithSender:sender sequence:sequence types:types results:results] autorelease]
                                 argument:nil order:0 modes:[NSArray arrayWithObject:NSDefaultRunLoopMode]];
         }];
 #endif

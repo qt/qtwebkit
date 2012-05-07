@@ -26,8 +26,9 @@
 #include "RenderThemeGtk.h"
 
 #include "CSSValueKeywords.h"
+#include "FileList.h"
 #include "FileSystem.h"
-#include "GOwnPtr.h"
+#include <wtf/gobject/GOwnPtr.h>
 #include "Gradient.h"
 #include "GraphicsContext.h"
 #include "GtkVersioning.h"
@@ -203,14 +204,14 @@ static GtkStateType gtkIconState(RenderTheme* theme, RenderObject* renderObject)
     return GTK_STATE_NORMAL;
 }
 
-void RenderThemeGtk::adjustButtonStyle(CSSStyleSelector* selector, RenderStyle* style, WebCore::Element* e) const
+void RenderThemeGtk::adjustButtonStyle(StyleResolver*, RenderStyle* style, WebCore::Element*) const
 {
     // Some layout tests check explicitly that buttons ignore line-height.
     if (style->appearance() == PushButtonPart)
         style->setLineHeight(RenderStyle::initialLineHeight());
 }
 
-void RenderThemeGtk::adjustMenuListStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeGtk::adjustMenuListStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // The tests check explicitly that select menu buttons ignore line height.
     style->setLineHeight(RenderStyle::initialLineHeight());
@@ -219,9 +220,9 @@ void RenderThemeGtk::adjustMenuListStyle(CSSStyleSelector* selector, RenderStyle
     style->resetBorderRadius();
 }
 
-void RenderThemeGtk::adjustMenuListButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeGtk::adjustMenuListButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
-    adjustMenuListStyle(selector, style, e);
+    adjustMenuListStyle(styleResolver, style, e);
 }
 
 bool RenderThemeGtk::paintMenuListButton(RenderObject* object, const PaintInfo& info, const IntRect& rect)
@@ -275,9 +276,9 @@ static GtkIconSize getIconSizeForPixelSize(gint pixelSize)
     return GTK_ICON_SIZE_DIALOG;
 }
 
-void RenderThemeGtk::adjustSearchFieldResultsButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeGtk::adjustSearchFieldResultsButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
-    adjustSearchFieldCancelButtonStyle(selector, style, e);
+    adjustSearchFieldCancelButtonStyle(styleResolver, style, e);
 }
 
 bool RenderThemeGtk::paintSearchFieldResultsButton(RenderObject* o, const PaintInfo& i, const IntRect& rect)
@@ -303,7 +304,7 @@ static void adjustSearchFieldIconStyle(RenderStyle* style)
     style->setHeight(Length(height, Fixed));
 }
 
-void RenderThemeGtk::adjustSearchFieldResultsDecorationStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeGtk::adjustSearchFieldResultsDecorationStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     adjustSearchFieldIconStyle(style);
 }
@@ -340,7 +341,7 @@ bool RenderThemeGtk::paintSearchFieldResultsDecoration(RenderObject* renderObjec
     return false;
 }
 
-void RenderThemeGtk::adjustSearchFieldCancelButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeGtk::adjustSearchFieldCancelButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     adjustSearchFieldIconStyle(style);
 }
@@ -359,7 +360,7 @@ bool RenderThemeGtk::paintSearchFieldCancelButton(RenderObject* renderObject, co
     return false;
 }
 
-void RenderThemeGtk::adjustSearchFieldStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeGtk::adjustSearchFieldStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // We cannot give a proper rendering when border radius is active, unfortunately.
     style->resetBorderRadius();
@@ -396,14 +397,14 @@ bool RenderThemeGtk::paintCapsLockIndicator(RenderObject* renderObject, const Pa
     return true;
 }
 
-void RenderThemeGtk::adjustSliderTrackStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeGtk::adjustSliderTrackStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     style->setBoxShadow(nullptr);
 }
 
-void RenderThemeGtk::adjustSliderThumbStyle(CSSStyleSelector* selector, RenderStyle* style, Element* element) const
+void RenderThemeGtk::adjustSliderThumbStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
 {
-    RenderTheme::adjustSliderThumbStyle(selector, style, element);
+    RenderTheme::adjustSliderThumbStyle(styleResolver, style, element);
     style->setBoxShadow(nullptr);
 }
 
@@ -640,7 +641,7 @@ bool RenderThemeGtk::paintMediaCurrentTime(RenderObject* renderObject, const Pai
 #endif
 
 #if ENABLE(PROGRESS_TAG)
-void RenderThemeGtk::adjustProgressBarStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeGtk::adjustProgressBarStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     style->setBoxShadow(nullptr);
 }
@@ -690,32 +691,21 @@ IntRect RenderThemeGtk::calculateProgressRect(RenderObject* renderObject, const 
 }
 #endif
 
-static bool stringByAdoptingFileSystemRepresentation(gchar* systemFilename, String& result)
-{
-    if (!systemFilename)
-        return false;
-
-    result = filenameToString(systemFilename);
-    g_free(systemFilename);
-
-    return true;
-}
-
-String RenderThemeGtk::fileListNameForWidth(const Vector<String>& filenames, const Font& font, int width, bool multipleFilesAllowed) const
+String RenderThemeGtk::fileListNameForWidth(const FileList* fileList, const Font& font, int width, bool multipleFilesAllowed) const
 {
     if (width <= 0)
         return String();
 
-    String string = fileButtonNoFileSelectedLabel();
-    if (multipleFilesAllowed)
-        string = fileButtonNoFilesSelectedLabel();
+    if (fileList->length() > 1)
+        return StringTruncator::rightTruncate(multipleFileUploadText(fileList->length()), width, font, StringTruncator::EnableRoundingHacks);
 
-    if (filenames.size() == 1) {
-        CString systemFilename = fileSystemRepresentation(filenames[0]);
-        gchar* systemBasename = g_path_get_basename(systemFilename.data());
-        stringByAdoptingFileSystemRepresentation(systemBasename, string);
-    } else if (filenames.size() > 1)
-        return StringTruncator::rightTruncate(multipleFileUploadText(filenames.size()), width, font, StringTruncator::EnableRoundingHacks);
+    String string;
+    if (fileList->length())
+        string = pathGetFileName(fileList->item(0)->path());
+    else if (multipleFilesAllowed)
+        string = fileButtonNoFilesSelectedLabel();
+    else
+        string = fileButtonNoFileSelectedLabel();
 
     return StringTruncator::centerTruncate(string, width, font, StringTruncator::EnableRoundingHacks);
 }

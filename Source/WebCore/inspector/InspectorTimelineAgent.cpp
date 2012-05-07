@@ -29,12 +29,14 @@
 */
 
 #include "config.h"
-#include "InspectorTimelineAgent.h"
 
 #if ENABLE(INSPECTOR)
 
+#include "InspectorTimelineAgent.h"
+
 #include "Event.h"
 #include "IdentifiersFactory.h"
+#include "InspectorClient.h"
 #include "InspectorCounters.h"
 #include "InspectorFrontend.h"
 #include "InspectorState.h"
@@ -172,9 +174,19 @@ void InspectorTimelineAgent::setIncludeMemoryDetails(ErrorString*, bool value)
     m_state->setBoolean(TimelineAgentState::includeMemoryDetails, value);
 }
 
+void InspectorTimelineAgent::supportsFrameInstrumentation(ErrorString*, bool* result)
+{
+    *result = m_frameInstrumentationSupport == FrameInstrumentationSupported;
+}
+
 void InspectorTimelineAgent::didBeginFrame()
 {
-    appendRecord(InspectorObject::create(), TimelineRecordType::BeginFrame, true);
+    pushCancelableRecord(InspectorObject::create(), TimelineRecordType::BeginFrame);
+}
+
+void InspectorTimelineAgent::didCancelFrame()
+{
+    cancelRecord(TimelineRecordType::BeginFrame);
 }
 
 void InspectorTimelineAgent::willCallFunction(const String& scriptName, int scriptLine)
@@ -299,11 +311,13 @@ void InspectorTimelineAgent::didScheduleResourceRequest(const String& url)
 void InspectorTimelineAgent::willSendResourceRequest(unsigned long identifier, const ResourceRequest& request)
 {
     pushGCEventRecords();
-    RefPtr<InspectorObject> record = TimelineRecordFactory::createGenericRecord(timestamp(), m_maxCallStackDepth);
+    RefPtr<InspectorObject> recordRaw = TimelineRecordFactory::createGenericRecord(timestamp(), m_maxCallStackDepth);
     String requestId = IdentifiersFactory::requestId(identifier);
-    record->setObject("data", TimelineRecordFactory::createResourceSendRequestData(requestId, request));
-    record->setString("type", TimelineRecordType::ResourceSendRequest);
-    setHeapSizeStatistic(record.get());
+    recordRaw->setObject("data", TimelineRecordFactory::createResourceSendRequestData(requestId, request));
+    recordRaw->setString("type", TimelineRecordType::ResourceSendRequest);
+    setHeapSizeStatistic(recordRaw.get());
+    // FIXME: runtimeCast is a hack. We do it because we can't build TimelineEvent directly now.
+    RefPtr<TypeBuilder::Timeline::TimelineEvent> record = TypeBuilder::Timeline::TimelineEvent::runtimeCast(recordRaw.release());
     m_frontend->eventRecorded(record.release());
 }
 
@@ -374,14 +388,22 @@ void InspectorTimelineAgent::didFireAnimationFrame()
     didCompleteCurrentRecord(TimelineRecordType::FireAnimationFrame);
 }
 
-void InspectorTimelineAgent::addRecordToTimeline(PassRefPtr<InspectorObject> prpRecord, const String& type)
+void InspectorTimelineAgent::addRecordToTimeline(PassRefPtr<InspectorObject> record, const String& type)
+{
+    commitCancelableRecords();
+    innerAddRecordToTimeline(record, type);
+}
+
+void InspectorTimelineAgent::innerAddRecordToTimeline(PassRefPtr<InspectorObject> prpRecord, const String& type)
 {
     RefPtr<InspectorObject> record(prpRecord);
     record->setString("type", type);
     setHeapSizeStatistic(record.get());
-    if (m_recordStack.isEmpty())
-        m_frontend->eventRecorded(record.release());
-    else {
+    if (m_recordStack.isEmpty()) {
+        // FIXME: runtimeCast is a hack. We do it because we can't build TimelineEvent directly now.
+        RefPtr<TypeBuilder::Timeline::TimelineEvent> recordChecked = TypeBuilder::Timeline::TimelineEvent::runtimeCast(record.release());
+        m_frontend->eventRecorded(recordChecked.release());
+    } else {
         TimelineRecordEntry parent = m_recordStack.last();
         parent.children->pushObject(record.release());
     }
@@ -421,12 +443,14 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
     }
 }
 
-InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorType type)
+InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorType type, FrameInstrumentationSupport frameInstrumentationSupport)
     : InspectorBaseAgent<InspectorTimelineAgent>("Timeline", instrumentingAgents, state)
     , m_frontend(0)
+    , m_timestampOffset(0)
     , m_id(1)
     , m_maxCallStackDepth(5)
     , m_inspectorType(type)
+    , m_frameInstrumentationSupport(frameInstrumentationSupport)
 {
 }
 
@@ -442,8 +466,42 @@ void InspectorTimelineAgent::appendRecord(PassRefPtr<InspectorObject> data, cons
 void InspectorTimelineAgent::pushCurrentRecord(PassRefPtr<InspectorObject> data, const String& type, bool captureCallStack)
 {
     pushGCEventRecords();
+    commitCancelableRecords();
     RefPtr<InspectorObject> record = TimelineRecordFactory::createGenericRecord(timestamp(), captureCallStack ? m_maxCallStackDepth : 0);
     m_recordStack.append(TimelineRecordEntry(record.release(), data, InspectorArray::create(), type));
+}
+
+void InspectorTimelineAgent::pushCancelableRecord(PassRefPtr<InspectorObject> data, const String& type)
+{
+    RefPtr<InspectorObject> record = TimelineRecordFactory::createGenericRecord(timestamp(), 0);
+    m_recordStack.append(TimelineRecordEntry(record.release(), data, 0, type, true));
+}
+
+void InspectorTimelineAgent::commitCancelableRecords()
+{
+    Vector<TimelineRecordEntry> cancelableRecords;
+    while (!m_recordStack.isEmpty()) {
+        TimelineRecordEntry entry = m_recordStack.last();
+        if (!m_recordStack.last().cancelable)
+            break;
+        m_recordStack.removeLast();
+        cancelableRecords.append(entry);
+    }
+    while (!cancelableRecords.isEmpty()) {
+        TimelineRecordEntry entry = cancelableRecords.last();
+        cancelableRecords.removeLast();
+        entry.record->setObject("data", entry.data);
+        innerAddRecordToTimeline(entry.record.release(), entry.type);
+    }
+}
+
+void InspectorTimelineAgent::cancelRecord(const String& type)
+{
+    if (m_recordStack.isEmpty())
+        return;
+    TimelineRecordEntry entry = m_recordStack.last();
+    if (entry.cancelable && entry.type == type)
+        m_recordStack.removeLast();
 }
 
 void InspectorTimelineAgent::clearRecordStack()

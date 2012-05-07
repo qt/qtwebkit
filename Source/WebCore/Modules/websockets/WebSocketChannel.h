@@ -84,6 +84,7 @@ public:
     virtual void resume() OVERRIDE;
 
     // SocketStreamHandleClient functions.
+    virtual void willOpenSocketStream(SocketStreamHandle*) OVERRIDE;
     virtual void didOpenSocketStream(SocketStreamHandle*) OVERRIDE;
     virtual void didCloseSocketStream(SocketStreamHandle*) OVERRIDE;
     virtual void didReceiveSocketStreamData(SocketStreamHandle*, const char*, int) OVERRIDE;
@@ -130,14 +131,6 @@ private:
     void resumeTimerFired(Timer<WebSocketChannel>*);
     void startClosingHandshake(int code, const String& reason);
     void closingTimerFired(Timer<WebSocketChannel>*);
-
-    enum ParseFrameResult {
-        FrameOK,
-        FrameIncomplete,
-        FrameError
-    };
-
-    ParseFrameResult parseFrame(WebSocketFrame&, const char*& frameEnd); // May modify part of m_buffer to unmask the frame.
 
     bool processFrame();
     bool processFrameHixie76();

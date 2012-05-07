@@ -36,7 +36,7 @@
 #include <WebCore/Document.h>
 #include <WebCore/KURL.h>
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 
 using namespace WebCore;
 
@@ -176,6 +176,10 @@ void WebDesktopNotificationsDelegate::requestPermission(SecurityOrigin* origin, 
         notificationDelegate()->requestNotificationPermission(org);
 }
 
+void WebDesktopNotificationsDelegate::requestPermission(SecurityOrigin*, PassRefPtr<NotificationPermissionCallback>)
+{
+}
+
 void WebDesktopNotificationsDelegate::cancelRequestsForPermission(ScriptExecutionContext* context)
 {
 }
@@ -211,4 +215,4 @@ COMPtr<IWebDesktopNotificationsDelegate> WebDesktopNotificationsDelegate::notifi
     return delegate;
 }
 
-#endif  // ENABLE(NOTIFICATIONS)
+#endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)

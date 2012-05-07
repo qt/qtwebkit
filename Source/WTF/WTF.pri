@@ -8,14 +8,16 @@
 load(features)
 
 SOURCE_DIR = $${ROOT_WEBKIT_DIR}/Source/WTF
-OLD_SOURCE_DIR = $${ROOT_WEBKIT_DIR}/Source/JavaScriptCore/wtf
 
+# FIXME: Including the root directory is a bad idea, likewise
+# no other project besides WTF should need to include WTF sub directories to build!
 INCLUDEPATH += \
-    $$OLD_SOURCE_DIR/.. \
-    $$OLD_SOURCE_DIR \
-    $$OLD_SOURCE_DIR/gobject \
-    $$OLD_SOURCE_DIR/qt \
-    $$OLD_SOURCE_DIR/unicode
+    $$SOURCE_DIR/.. \
+    $$SOURCE_DIR \
+    $$SOURCE_DIR/gobject \
+    $$SOURCE_DIR/qt \
+    $$SOURCE_DIR/unicode \
+    $$SOURCE_DIR/wtf
 
 haveQt(5) {
     mac {
@@ -39,11 +41,9 @@ v8 {
     QT += v8-private declarative
 }
 
-linux-*:!contains(DEFINES, USE_QTMULTIMEDIA=1) {
-    !contains(QT_CONFIG, no-pkg-config):system(pkg-config --exists glib-2.0 gio-2.0 gstreamer-0.10): {
-        DEFINES += ENABLE_GLIB_SUPPORT=1
-        PKGCONFIG += glib-2.0 gio-2.0
-    }
+linux-*:contains(DEFINES, WTF_USE_GSTREAMER=1) {
+    DEFINES += ENABLE_GLIB_SUPPORT=1
+    PKGCONFIG += glib-2.0 gio-2.0
 }
 
 win32-* {

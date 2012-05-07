@@ -27,13 +27,14 @@
  */
 
 #include "config.h"
+
+#if ENABLE(INSPECTOR)
+
 #include "NetworkResourcesData.h"
 
 #include "DOMImplementation.h"
 #include "SharedBuffer.h"
 #include "TextResourceDecoder.h"
-
-#if ENABLE(INSPECTOR)
 
 namespace {
 // 10MB
@@ -62,7 +63,7 @@ void NetworkResourcesData::ResourceData::setContent(const String& content)
     m_content = content;
 }
 
-unsigned NetworkResourcesData::ResourceData::purgeContent()
+unsigned NetworkResourcesData::ResourceData::removeContent()
 {
     unsigned result = 0;
     if (hasData()) {
@@ -76,8 +77,13 @@ unsigned NetworkResourcesData::ResourceData::purgeContent()
         result = 2 * m_content.length();
         m_content = String();
     }
-    m_isContentPurged = true;
     return result;
+}
+
+unsigned NetworkResourcesData::ResourceData::purgeContent()
+{
+    m_isContentPurged = true;
+    return removeContent();
 }
 
 int NetworkResourcesData::ResourceData::dataLength() const
@@ -146,6 +152,7 @@ void NetworkResourcesData::responseReceived(const String& requestId, const Strin
     resourceData->setFrameId(frameId);
     resourceData->setUrl(response.url());
     resourceData->setDecoder(createOtherResourceTextDecoder(response.mimeType(), response.textEncodingName()));
+    resourceData->setHTTPStatusCode(response.httpStatusCode());
 }
 
 void NetworkResourcesData::setResourceType(const String& requestId, InspectorPageAgent::ResourceType type)
@@ -175,6 +182,9 @@ void NetworkResourcesData::setResourceContent(const String& requestId, const Str
     if (resourceData->isContentPurged())
         return;
     if (ensureFreeSpace(dataLength) && !resourceData->isContentPurged()) {
+        // We can not be sure that we didn't try to save this request data while it was loading, so remove it, if any.
+        if (resourceData->hasContent())
+            m_contentSize -= resourceData->removeContent();
         m_requestIdsDeque.append(requestId);
         resourceData->setContent(content);
         m_contentSize += dataLength;

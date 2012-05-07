@@ -220,16 +220,8 @@ void DocumentWriter::addData(const char* bytes, size_t length)
 
 void DocumentWriter::end()
 {
-    m_frame->loader()->didEndDocument();
-    endIfNotLoadingMainResource();
-}
-
-void DocumentWriter::endIfNotLoadingMainResource()
-{
-    // FIXME: This isn't really the check we should be doing. We should re-work
-    // how we end parsing to match the model in HTML5.
-    if (m_frame->loader()->isLoadingMainResource() || !m_frame->page() || !m_frame->document())
-        return;
+    ASSERT(m_frame->page());
+    ASSERT(m_frame->document());
 
     // The parser is guaranteed to be released after this point. begin() would
     // have to be called again before we can start writing more data.
@@ -252,7 +244,6 @@ void DocumentWriter::endIfNotLoadingMainResource()
 
 void DocumentWriter::setEncoding(const String& name, bool userChosen)
 {
-    m_frame->loader()->willSetEncoding();
     m_encoding = name;
     m_encodingWasChosenByUser = userChosen;
 }

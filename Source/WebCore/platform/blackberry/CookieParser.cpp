@@ -27,9 +27,9 @@
 #include "config.h"
 #include "CookieParser.h"
 
-#include "CurrentTime.h"
 #include "Logging.h"
 #include "ParsedCookie.h"
+#include <wtf/CurrentTime.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
@@ -324,7 +324,7 @@ ParsedCookie* CookieParser::parseOneCookie(const String& cookie, unsigned start,
 
     // If no domain was provided, set it to the host
     if (!res->domain())
-        res->setDefaultDomain(m_defaultCookieURL);
+        res->setDomain(m_defaultCookieURL.host());
 
     // According to the Cookie Specificaiton (RFC6265, section 4.1.2.4 and 5.2.4, http://tools.ietf.org/html/rfc6265),
     // If no path was provided or the first character of the path value is not '/', set it to the host's path

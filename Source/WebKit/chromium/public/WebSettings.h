@@ -98,6 +98,7 @@ public:
     virtual void setWebAudioEnabled(bool) = 0;
     virtual void setExperimentalWebGLEnabled(bool) = 0;
     virtual void setExperimentalCSSRegionsEnabled(bool) = 0;
+    virtual void setExperimentalCSSCustomFilterEnabled(bool) = 0;
     virtual void setOpenGLMultisamplingEnabled(bool) = 0;
     virtual void setPrivilegedWebGLExtensionsEnabled(bool) = 0;
     virtual void setWebGLErrorsToConsoleEnabled(bool) = 0;
@@ -110,8 +111,6 @@ public:
     virtual void setAcceleratedCompositingEnabled(bool) = 0;
     virtual void setForceCompositingMode(bool) = 0;
     virtual void setMockScrollbarsEnabled(bool) = 0;
-    virtual void setCompositeToTextureEnabled(bool) = 0;
-    virtual bool compositeToTextureEnabled() const = 0;
     virtual void setAcceleratedCompositingFor3DTransformsEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForVideoEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForCanvasEnabled(bool) = 0;
@@ -138,12 +137,15 @@ public:
     virtual void setPasswordEchoDurationInSeconds(double) = 0;
     virtual void setShouldPrintBackgrounds(bool) = 0;
     virtual void setEnableScrollAnimator(bool) = 0;
+    virtual bool scrollAnimatorEnabled() const = 0;
     virtual void setHixie76WebSocketProtocolEnabled(bool) = 0;
     virtual void setVisualWordMovementEnabled(bool) = 0;
     virtual void setAcceleratedPaintingEnabled(bool) = 0;
     virtual void setPerTilePaintingEnabled(bool) = 0;
     virtual void setPartialSwapEnabled(bool) = 0;
     virtual void setThreadedAnimationEnabled(bool) = 0;
+    virtual void setViewportEnabled(bool) = 0;
+    virtual bool viewportEnabled() const = 0;
 
 protected:
     ~WebSettings() { }

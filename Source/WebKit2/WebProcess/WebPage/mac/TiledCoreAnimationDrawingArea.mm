@@ -26,11 +26,14 @@
 #import "config.h"
 #import "TiledCoreAnimationDrawingArea.h"
 
+#if ENABLE(THREADED_SCROLLING)
+
 #import "DrawingAreaProxyMessages.h"
 #import "EventDispatcher.h"
 #import "LayerHostingContext.h"
 #import "LayerTreeContext.h"
 #import "WebPage.h"
+#import "WebPageCreationParameters.h"
 #import "WebPageProxyMessages.h"
 #import "WebProcess.h"
 #import <QuartzCore/QuartzCore.h>
@@ -42,6 +45,7 @@
 #import <WebCore/RenderView.h>
 #import <WebCore/ScrollingCoordinator.h>
 #import <WebCore/ScrollingThread.h>
+#import <WebCore/ScrollingTree.h>
 #import <WebCore/Settings.h>
 #import <wtf/MainThread.h>
 
@@ -62,17 +66,15 @@ TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea(WebPage* webPage, c
     : DrawingArea(DrawingAreaTypeTiledCoreAnimation, webPage)
     , m_layerTreeStateIsFrozen(false)
     , m_layerFlushScheduler(this)
+    , m_isPaintingSuspended(!parameters.isVisible)
 {
     Page* page = webPage->corePage();
 
     // FIXME: It's weird that we're mucking around with the settings here.
     page->settings()->setForceCompositingMode(true);
-
-#if ENABLE(THREADED_SCROLLING)
     page->settings()->setScrollingCoordinatorEnabled(true);
 
     WebProcess::shared().eventDispatcher().addScrollingTreeForPage(webPage);
-#endif
 
     m_rootLayer = [CALayer layer];
 
@@ -87,13 +89,13 @@ TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea(WebPage* webPage, c
     LayerTreeContext layerTreeContext;
     layerTreeContext.contextID = m_layerHostingContext->contextID();
     m_webPage->send(Messages::DrawingAreaProxy::EnterAcceleratedCompositingMode(0, layerTreeContext));
+
+    updatePreferences();
 }
 
 TiledCoreAnimationDrawingArea::~TiledCoreAnimationDrawingArea()
 {
-#if ENABLE(THREADED_SCROLLING)
     WebProcess::shared().eventDispatcher().removeScrollingTreeForPage(m_webPage);
-#endif
 
     m_layerFlushScheduler.invalidate();
 }
@@ -109,6 +111,13 @@ void TiledCoreAnimationDrawingArea::scroll(const IntRect& scrollRect, const IntS
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(GraphicsLayer* graphicsLayer)
 {
     CALayer *rootCompositingLayer = graphicsLayer ? graphicsLayer->platformLayer() : nil;
+
+    // Since we'll always be in accelerated compositing mode, the only time that layer will be nil
+    // is when the WKView is removed from its containing window. In that case, the layer will already be
+    // removed from the layer tree hierarchy over in the UI process, so there's no reason to remove it locally.
+    // In addition, removing the layer here will cause flashes when switching between tabs.
+    if (!rootCompositingLayer)
+        return;
 
     if (m_layerTreeStateIsFrozen) {
         m_pendingRootCompositingLayer = rootCompositingLayer;
@@ -128,34 +137,16 @@ void TiledCoreAnimationDrawingArea::forceRepaint()
     [CATransaction synchronize];
 }
 
-#if ENABLE(THREADED_SCROLLING)
-static void forceRepaintAndSendMessage(uint64_t webPageID, uint64_t callbackID)
-{
-    WebPage* webPage = WebProcess::shared().webPage(webPageID);
-    if (!webPage)
-        return;
-
-    webPage->drawingArea()->forceRepaint();
-    webPage->send(Messages::WebPageProxy::VoidCallback(callbackID));
-}
-
-static void dispatchBackToMainThread(uint64_t webPageID, uint64_t callbackID)
-{
-    callOnMainThread(bind(forceRepaintAndSendMessage, webPageID, callbackID));
-}
-#endif
-
 bool TiledCoreAnimationDrawingArea::forceRepaintAsync(uint64_t callbackID)
 {
-#if ENABLE(THREADED_SCROLLING)
     if (m_layerTreeStateIsFrozen)
         return false;
 
-    ScrollingThread::dispatch(bind(dispatchBackToMainThread, m_webPage->pageID(), callbackID));
+    dispatchAfterEnsuringUpdatedScrollPosition(bind(^{
+        m_webPage->drawingArea()->forceRepaint();
+        m_webPage->send(Messages::WebPageProxy::VoidCallback(callbackID));
+    }));
     return true;
-#else
-    return false;
-#endif
 }
 
 void TiledCoreAnimationDrawingArea::setLayerTreeStateIsFrozen(bool layerTreeStateIsFrozen)
@@ -182,9 +173,7 @@ void TiledCoreAnimationDrawingArea::scheduleCompositingLayerSync()
 
 void TiledCoreAnimationDrawingArea::didInstallPageOverlay()
 {
-#if ENABLE(THREADED_SCROLLING)
     m_webPage->corePage()->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(true);
-#endif
 
     createPageOverlayLayer();
     scheduleCompositingLayerSync();
@@ -192,9 +181,8 @@ void TiledCoreAnimationDrawingArea::didInstallPageOverlay()
 
 void TiledCoreAnimationDrawingArea::didUninstallPageOverlay()
 {
-#if ENABLE(THREADED_SCROLLING)
-    m_webPage->corePage()->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(false);
-#endif
+    if (Page* page = m_webPage->corePage())
+        page->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(false);
 
     destroyPageOverlayLayer();
     scheduleCompositingLayerSync();
@@ -205,6 +193,43 @@ void TiledCoreAnimationDrawingArea::setPageOverlayNeedsDisplay(const IntRect& re
     ASSERT(m_pageOverlayLayer);
     m_pageOverlayLayer->setNeedsDisplayInRect(rect);
     scheduleCompositingLayerSync();
+}
+
+void TiledCoreAnimationDrawingArea::updatePreferences()
+{
+    bool showDebugBorders = m_webPage->corePage()->settings()->showDebugBorders();
+
+    if (showDebugBorders == !!m_debugInfoLayer)
+        return;
+
+    if (showDebugBorders) {
+        m_debugInfoLayer = [CALayer layer];
+        [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
+    } else {
+        [m_debugInfoLayer.get() removeFromSuperlayer];
+        m_debugInfoLayer = nullptr;
+    }
+
+    ScrollingThread::dispatch(bind(&ScrollingTree::setDebugRootLayer, m_webPage->corePage()->scrollingCoordinator()->scrollingTree(), m_debugInfoLayer));
+}
+
+void TiledCoreAnimationDrawingArea::dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>& functionRef)
+{
+    m_webPage->ref();
+    m_webPage->corePage()->scrollingCoordinator()->commitTreeStateIfNeeded();
+
+    if (!m_layerTreeStateIsFrozen)
+        m_layerFlushScheduler.suspend();
+
+    Function<void ()> function = functionRef;
+    ScrollingThread::dispatchBarrier(bind(^{
+        function();
+
+        if (!m_layerTreeStateIsFrozen)
+            m_layerFlushScheduler.resume();
+
+        m_webPage->deref();
+    }));
 }
 
 void TiledCoreAnimationDrawingArea::notifyAnimationStarted(const GraphicsLayer*, double)
@@ -252,9 +277,7 @@ bool TiledCoreAnimationDrawingArea::flushLayers()
     }
 
     if (m_pageOverlayLayer) {
-        if (shouldRepaintPageOverlayLayer())
-            m_pageOverlayLayer->setNeedsDisplay();
-
+        m_pageOverlayLayer->setNeedsDisplay();
         m_pageOverlayLayer->syncCompositingStateForThisLayerOnly();
     }
 
@@ -262,6 +285,33 @@ bool TiledCoreAnimationDrawingArea::flushLayers()
 
     [pool drain];
     return returnValue;
+}
+
+void TiledCoreAnimationDrawingArea::suspendPainting()
+{
+    ASSERT(!m_isPaintingSuspended);
+    m_isPaintingSuspended = true;
+
+    [m_rootLayer.get() setValue:(id)kCFBooleanTrue forKey:@"NSCAViewRenderPaused"];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"NSCAViewRenderDidPauseNotification" object:nil userInfo:[NSDictionary dictionaryWithObject:m_rootLayer.get() forKey:@"layer"]];
+
+    m_webPage->corePage()->suspendScriptedAnimations();
+}
+
+void TiledCoreAnimationDrawingArea::resumePainting()
+{
+    if (!m_isPaintingSuspended) {
+        // FIXME: We can get a call to resumePainting when painting is not suspended.
+        // This happens when sending a synchronous message to create a new page. See <rdar://problem/8976531>.
+        return;
+    }
+    m_isPaintingSuspended = false;
+
+    [m_rootLayer.get() setValue:(id)kCFBooleanFalse forKey:@"NSCAViewRenderPaused"];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"NSCAViewRenderDidResumeNotification" object:nil userInfo:[NSDictionary dictionaryWithObject:m_rootLayer.get() forKey:@"layer"]];
+
+    if (m_webPage->windowIsVisible())
+        m_webPage->corePage()->resumeScriptedAnimations();
 }
 
 void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
@@ -317,6 +367,8 @@ void TiledCoreAnimationDrawingArea::setLayerHostingMode(uint32_t opaqueLayerHost
 
         m_layerHostingContext->setRootLayer(m_rootLayer.get());
 
+        m_webPage->setLayerHostingMode(layerHostingMode);
+
         // Finally, inform the UIProcess that the context has changed.
         LayerTreeContext layerTreeContext;
         layerTreeContext.contextID = m_layerHostingContext->contextID();
@@ -326,19 +378,19 @@ void TiledCoreAnimationDrawingArea::setLayerHostingMode(uint32_t opaqueLayerHost
 
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(CALayer *layer)
 {
+    ASSERT(layer);
     ASSERT(!m_layerTreeStateIsFrozen);
 
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
 
-    if (!layer)
-        m_rootLayer.get().sublayers = nil;
-    else {
-        m_rootLayer.get().sublayers = [NSArray arrayWithObject:layer];
+    m_rootLayer.get().sublayers = [NSArray arrayWithObject:layer];
 
-        if (m_pageOverlayLayer)
-            [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
-    }
+    if (m_pageOverlayLayer)
+        [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
+
+    if (m_debugInfoLayer)
+        [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
 
     [CATransaction commit];
 }
@@ -352,10 +404,16 @@ void TiledCoreAnimationDrawingArea::createPageOverlayLayer()
     m_pageOverlayLayer->setName("page overlay content");
 #endif
 
+    m_pageOverlayLayer->setAcceleratesDrawing(true);
     m_pageOverlayLayer->setDrawsContent(true);
     m_pageOverlayLayer->setSize(m_webPage->size());
 
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+
     [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
+
+    [CATransaction commit];
 }
 
 void TiledCoreAnimationDrawingArea::destroyPageOverlayLayer()
@@ -366,20 +424,6 @@ void TiledCoreAnimationDrawingArea::destroyPageOverlayLayer()
     m_pageOverlayLayer = nullptr;
 }
 
-bool TiledCoreAnimationDrawingArea::shouldRepaintPageOverlayLayer()
-{
-    RenderLayerCompositor* renderLayerCompositor = m_webPage->corePage()->mainFrame()->contentRenderer()->compositor();
-    GraphicsLayer* scrollLayer = renderLayerCompositor->scrollLayer();
-    if (m_mainFrameScrollLayerPosition != scrollLayer->position()) {
-        m_mainFrameScrollLayerPosition = scrollLayer->position();
-        return true;
-    }
-
-    GraphicsLayer* rootGraphicsLayer = renderLayerCompositor->rootRenderLayer()->backing()->graphicsLayer();
-    if (rootGraphicsLayer->needsDisplay())
-        return true;
-   
-    return false;
-}
-
 } // namespace WebKit
+
+#endif // ENABLE(THREADED_SCROLLING)

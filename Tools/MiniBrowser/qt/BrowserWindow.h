@@ -34,6 +34,7 @@
 #include <QtQuick/QQuickView>
 
 class QQuickWebView;
+class QQuickWebViewExperimental;
 
 class BrowserWindow : public QQuickView {
     Q_OBJECT
@@ -45,6 +46,7 @@ public:
     void reload();
     void focusAddressBar();
     QQuickWebView* webView() const;
+    QQuickWebViewExperimental* webViewExperimental() const;
 
     void updateVisualMockTouchPoints(const QList<QTouchEvent::TouchPoint>& touchPoints);
 
@@ -54,10 +56,19 @@ public slots:
 protected slots:
     void screenshot();
 
+private slots:
+    void onTitleChanged(QString);
+
 private:
-    void updateUserAgentList();
+    void zoomIn();
+    void zoomOut();
+
+    virtual void keyPressEvent(QKeyEvent*);
+    virtual void wheelEvent(QWheelEvent*);
+
     WindowOptions* m_windowOptions;
-    QStringList m_userAgentList;
+    QVector<qreal> m_zoomLevels;
+    unsigned m_currentZoomLevel;
 };
 
 #endif

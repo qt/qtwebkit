@@ -27,8 +27,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import os
 import re
+import subprocess
+import time
 
+from webkitpy.common.system.crashlogs import CrashLogs
+from webkitpy.common.system.executive import ScriptError
 from webkitpy.layout_tests.port.apple import ApplePort
 from webkitpy.layout_tests.port.leakdetector import LeakDetector
 
@@ -49,6 +54,22 @@ class MacPort(ApplePort):
             # DumpRenderTree slows down noticably if we run more than about 1000 tests in a batch
             # with MallocStackLogging enabled.
             self.set_option_default("batch_size", 1000)
+
+    def _most_recent_version(self):
+        # This represents the most recently-shipping version of the operating system.
+        return self.VERSION_FALLBACK_ORDER[-2]
+
+    def should_retry_crashes(self):
+        # On Apple Mac, we retry crashes due to https://bugs.webkit.org/show_bug.cgi?id=82233
+        return True
+
+    def baseline_path(self):
+        if self.name() == self._most_recent_version():
+            # Baselines for the most recently shiping version should go into 'mac', not 'mac-foo'.
+            if self.get_option('webkit_test_runner'):
+                return self._webkit_baseline_path('mac-wk2')
+            return self._webkit_baseline_path('mac')
+        return ApplePort.baseline_path(self)
 
     def baseline_search_path(self):
         fallback_index = self.VERSION_FALLBACK_ORDER.index(self._port_name_with_version())
@@ -83,15 +104,19 @@ class MacPort(ApplePort):
     def is_lion(self):
         return self._version == "lion"
 
-    # Belongs on a Platform object.
-    def is_crash_reporter(self, process_name):
-        return re.search(r'ReportCrash', process_name)
-
     def default_child_processes(self):
         if self.is_snowleopard():
             _log.warn("Cannot run tests in parallel on Snow Leopard due to rdar://problem/10621525.")
             return 1
-        return super(MacPort, self).default_child_processes()
+
+        # FIXME: As a temporary workaround while we figure out what's going
+        # on with https://bugs.webkit.org/show_bug.cgi?id=83076, reduce by
+        # half the # of workers we run by default on bigger machines.
+        default_count = super(MacPort, self).default_child_processes()
+        if default_count >= 8:
+            cpu_count = self._executive.cpu_count()
+            return max(1, min(default_count, int(cpu_count / 2)))
+        return default_count
 
     def _build_java_test_support(self):
         java_tests_path = self._filesystem.join(self.layout_tests_dir(), "java")
@@ -128,7 +153,11 @@ class MacPort(ApplePort):
         return self._build_path('WebCore.framework/Versions/A/WebCore')
 
     def show_results_html_file(self, results_filename):
-        self._run_script('run-safari', ['--no-saved-state', '-NSOpen', results_filename])
+        # We don't use self._run_script() because we don't want to wait for the script
+        # to exit and we want the output to show up on stdout in case there are errors
+        # launching the browser.
+        self._executive.popen([self._config.script_path('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename],
+            cwd=self._config.webkit_base_dir(), stdout=file(os.devnull), stderr=file(os.devnull))
 
     # FIXME: The next two routines turn off the http locking in order
     # to work around failures on the bots caused when the slave restarts.
@@ -146,3 +175,67 @@ class MacPort(ApplePort):
 
     def release_http_lock(self):
         pass
+
+    def _get_crash_log(self, name, pid, stdout, stderr, newer_than, time_fn=None, sleep_fn=None):
+        # Note that we do slow-spin here and wait, since it appears the time
+        # ReportCrash takes to actually write and flush the file varies when there are
+        # lots of simultaneous crashes going on.
+        # FIXME: Should most of this be moved into CrashLogs()?
+        time_fn = time_fn or time.time
+        sleep_fn = sleep_fn or time.sleep
+        crash_log = ''
+        crash_logs = CrashLogs(self.host)
+        now = time_fn()
+        # FIXME: delete this after we're sure this code is working ...
+        _log.debug('looking for crash log for %s:%s' % (name, str(pid)))
+        deadline = now + 5 * int(self.get_option('child_processes', 1))
+        while not crash_log and now <= deadline:
+            crash_log = crash_logs.find_newest_log(name, pid, include_errors=True, newer_than=newer_than)
+            if not crash_log or not [line for line in crash_log.splitlines() if not line.startswith('ERROR')]:
+                sleep_fn(0.1)
+                now = time_fn()
+        if not crash_log:
+            crash_log = 'no crash log found for %s:%d' % (name, pid)
+            _log.warning(crash_log)
+        return crash_log
+
+    def sample_process(self, name, pid):
+        try:
+            hang_report = self._filesystem.join(self.results_directory(), "%s-%s.sample.txt" % (name, pid))
+            self._executive.run_command([
+                "/usr/bin/sample",
+                pid,
+                10,
+                10,
+                "-file",
+                hang_report,
+            ])
+        except ScriptError, e:
+            _log.warning('Unable to sample process.')
+
+    def _path_to_helper(self):
+        binary_name = 'LayoutTestHelper'
+        return self._build_path(binary_name)
+
+    def start_helper(self):
+        helper_path = self._path_to_helper()
+        if helper_path:
+            _log.debug("Starting layout helper %s" % helper_path)
+            # Note: Not thread safe: http://bugs.python.org/issue2320
+            self._helper = self._executive.popen([helper_path],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None)
+            is_ready = self._helper.stdout.readline()
+            if not is_ready.startswith('ready'):
+                _log.error("LayoutTestHelper failed to be ready")
+
+    def stop_helper(self):
+        if self._helper:
+            _log.debug("Stopping LayoutTestHelper")
+            try:
+                self._helper.stdin.write("x\n")
+                self._helper.stdin.close()
+                self._helper.wait()
+            except IOError, e:
+                _log.debug("IOError raised while stopping helper: %s" % str(e))
+                pass
+            self._helper = None

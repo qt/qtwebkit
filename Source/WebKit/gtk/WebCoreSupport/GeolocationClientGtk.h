@@ -21,13 +21,13 @@
 #ifndef GeolocationClientGtk_h
 #define GeolocationClientGtk_h
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
 
-#include "GRefPtr.h"
 #include "GeolocationClient.h"
 #include "GeolocationPosition.h"
 #include <geoclue/geoclue-master.h>
 #include <geoclue/geoclue-position.h>
+#include <wtf/gobject/GRefPtr.h>
 
 typedef struct _WebKitWebView WebKitWebView;
 
@@ -75,8 +75,9 @@ private:
     bool m_enableHighAccuracy;
     bool m_isUpdating;
 };
+
 } // namespace WebKit
 
-#endif // ENABLE(CLIENT_BASED_GEOLOCATION)
+#endif // ENABLE(GEOLOCATION)
 
 #endif // GeolocationClientGtk_h

@@ -35,18 +35,23 @@
 
 namespace WebCore {
 
-PassRefPtr<RateLimiter> RateLimiter::create(GraphicsContext3D* context)
+PassRefPtr<RateLimiter> RateLimiter::create(GraphicsContext3D* context, RateLimiterClient *client)
 {
-    return adoptRef(new RateLimiter(context));
+    return adoptRef(new RateLimiter(context, client));
 }
 
-RateLimiter::RateLimiter(GraphicsContext3D* context)
+RateLimiter::RateLimiter(GraphicsContext3D* context, RateLimiterClient *client)
     : m_context(context)
     , m_timer(this, &RateLimiter::rateLimitContext)
+    , m_client(client)
 {
     ASSERT(context);
     ASSERT(context->getExtensions());
     m_contextSupportsRateLimitingExtension = context->getExtensions()->supports("GL_CHROMIUM_rate_limit_offscreen_context");
+}
+
+RateLimiter::~RateLimiter()
+{
 }
 
 void RateLimiter::start()
@@ -66,6 +71,7 @@ void RateLimiter::rateLimitContext(Timer<RateLimiter>*)
 
     Extensions3DChromium* extensions = static_cast<Extensions3DChromium*>(m_context->getExtensions());
 
+    m_client->rateLimit();
     extensions->rateLimitOffscreenContextCHROMIUM();
 }
 

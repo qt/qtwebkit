@@ -138,6 +138,8 @@ public:
     JSRetainPtr<JSStringRef> pageSizeAndMarginsInPixels(int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
     bool isPageBoxVisible(int pageIndex);
 
+    void setValueForUser(JSContextRef, JSValueRef element, JSStringRef value);
+
     enum WhatToDump { RenderTree, MainFrameText, AllFramesText };
     WhatToDump whatToDump() const { return m_whatToDump; }
 
@@ -194,8 +196,15 @@ public:
 
     void overridePreference(JSStringRef preference, bool value);
 
+    // Custom full screen behavior.
+    void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
+    bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
+
     JSRetainPtr<JSStringRef> platformName();
-    
+
+    void setPageVisibility(JSStringRef state);
+    void resetPageVisibility();
+
 private:
     static const double waitToDumpWatchdogTimerInterval;
 
@@ -226,6 +235,7 @@ private:
     bool m_policyDelegatePermissive;
     
     bool m_globalFlag;
+    bool m_customFullScreenBehavior;
 
     PlatformTimerRef m_waitToDumpWatchdogTimer;
 };

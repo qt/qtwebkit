@@ -39,6 +39,7 @@ class CachedCSSStyleSheet;
 class CachedResource;
 class CachedResourceLoader;
 class KURL;
+class ScriptExecutionContext;
 class SecurityOrigin;
 struct SecurityOriginHash;
 
@@ -128,6 +129,7 @@ public:
     void evictResources();
     
     void setPruneEnabled(bool enabled) { m_pruneEnabled = enabled; }
+    bool pruneEnabled() const { return m_pruneEnabled; }
     void prune();
     void pruneToPercentage(float targetPercentLive);
 
@@ -152,6 +154,8 @@ public:
     void removeFromLiveResourcesSize(CachedResource*);
 
     static bool shouldMakeResourcePurgeableOnEviction();
+
+    static void removeUrlFromCache(ScriptExecutionContext*, const String& urlString);
 
     // Function to collect cache statistics for the caches window in the Safari Debug menu.
     Statistics getStatistics();
@@ -193,9 +197,11 @@ private:
     bool makeResourcePurgeable(CachedResource*);
     void evict(CachedResource*);
 
+    static void removeUrlFromCacheImpl(ScriptExecutionContext*, const String& urlString);
+
     bool m_disabled;  // Whether or not the cache is enabled.
     bool m_pruneEnabled;
-    bool m_inPruneDeadResources;
+    bool m_inPruneResources;
 
     unsigned m_capacity;
     unsigned m_minDeadCapacity;

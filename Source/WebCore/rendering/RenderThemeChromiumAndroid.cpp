@@ -75,7 +75,7 @@ String RenderThemeChromiumAndroid::extraDefaultStyleSheet()
         String(themeChromiumAndroidUserAgentStyleSheet, sizeof(themeChromiumAndroidUserAgentStyleSheet));
 }
 
-void RenderThemeChromiumAndroid::adjustInnerSpinButtonStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeChromiumAndroid::adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     if (PlatformSupport::layoutTestMode()) {
         // Match Chromium Linux spin button style in layout tests.
@@ -90,7 +90,7 @@ void RenderThemeChromiumAndroid::adjustInnerSpinButtonStyle(CSSStyleSelector*, R
 bool RenderThemeChromiumAndroid::paintMediaFullscreenButton(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
 #if ENABLE(VIDEO)
-    return RenderMediaControlsChromium::paintMediaControlsPart(MediaFullscreenButton, object, paintInfo, rect);
+    return RenderMediaControlsChromium::paintMediaControlsPart(MediaEnterFullscreenButton, object, paintInfo, rect);
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);

@@ -33,6 +33,7 @@
 #include "FileIconLoader.h"
 #include "FileSystem.h"
 #include "FloatRect.h"
+#include "FocusController.h"
 #include "FrameLoadRequest.h"
 #include "FrameView.h"
 #include "GtkUtilities.h"
@@ -598,6 +599,13 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     m_dirtyRegion = Region();
     m_lastDisplayTime = currentTime();
     m_repaintSoonSourceId = 0;
+
+    // We update the IM context window location here, because we want it to be
+    // synced with cursor movement. For instance, a text field can move without
+    // the selection changing.
+    Frame* focusedFrame = core(m_webView)->focusController()->focusedOrMainFrame();
+    if (focusedFrame && focusedFrame->editor()->canEdit())
+        m_webView->priv->imFilter.setCursorRect(frame->selection()->absoluteCaretBounds());
 }
 
 void ChromeClient::invalidateRootView(const IntRect&, bool immediate)
@@ -638,8 +646,12 @@ void ChromeClient::scroll(const IntSize& delta, const IntRect& rectToScroll, con
         m_dirtyRegion.unite(movedDirtyRegionInScrollRect);
     }
 
-    // Compute the scroll repaint region.
-    Region scrollRepaintRegion = subtract(rectToScroll, translate(rectToScroll, delta));
+    // Compute the scroll repaint region. We ensure that we are not subtracting areas
+    // that we've scrolled from outside the viewport from the repaint region.
+    IntRect onScreenScrollRect = rectToScroll;
+    onScreenScrollRect.intersect(IntRect(IntPoint(), enclosingIntRect(pageRect()).size()));
+    Region scrollRepaintRegion = subtract(rectToScroll, translate(onScreenScrollRect, delta));
+
     m_dirtyRegion.unite(scrollRepaintRegion);
     m_displayTimer.startOneShot(0);
 
@@ -746,7 +758,7 @@ void ChromeClient::mouseDidMoveOverElement(const HitTestResult& hit, unsigned mo
     if (Node* node = hit.innerNonSharedNode()) {
         Frame* frame = node->document()->frame();
         FrameView* view = frame ? frame->view() : 0;
-        m_webView->priv->tooltipArea = view ? view->contentsToWindow(node->getRect()) : IntRect();
+        m_webView->priv->tooltipArea = view ? view->contentsToWindow(node->getPixelSnappedRect()) : IntRect();
     } else
         m_webView->priv->tooltipArea = IntRect();
 }
@@ -860,22 +872,6 @@ void ChromeClient::setCursor(const Cursor& cursor)
 void ChromeClient::setCursorHiddenUntilMouseMoves(bool)
 {
     notImplemented();
-}
-
-void ChromeClient::requestGeolocationPermissionForFrame(Frame* frame, Geolocation* geolocation)
-{
-    WebKitWebFrame* webFrame = kit(frame);
-    GRefPtr<WebKitGeolocationPolicyDecision> policyDecision(adoptGRef(webkit_geolocation_policy_decision_new(webFrame, geolocation)));
-
-    gboolean isHandled = FALSE;
-    g_signal_emit_by_name(m_webView, "geolocation-policy-decision-requested", webFrame, policyDecision.get(), &isHandled);
-    if (!isHandled)
-        webkit_geolocation_policy_deny(policyDecision.get());
-}
-
-void ChromeClient::cancelGeolocationPermissionRequestForFrame(WebCore::Frame* frame, WebCore::Geolocation*)
-{
-    g_signal_emit_by_name(m_webView, "geolocation-policy-decision-cancelled", kit(frame));
 }
 
 bool ChromeClient::selectItemWritingDirectionIsNatural()

@@ -75,7 +75,7 @@ WebInspector.DatabaseQueryView.prototype = {
                 var text = textArray[i].toLowerCase();
                 if (text.length < prefix.length)
                     continue;
-                if (text.indexOf(prefix) !== 0)
+                if (!text.startsWith(prefix))
                     continue;
                 results.push(textArray[i]);
             }
@@ -119,8 +119,7 @@ WebInspector.DatabaseQueryView.prototype = {
 
     _enterKeyPressed: function(event)
     {
-        event.preventDefault();
-        event.stopPropagation();
+        event.consume(true);
 
         this.prompt.clearAutoComplete(true);
 
@@ -151,7 +150,9 @@ WebInspector.DatabaseQueryView.prototype = {
 
     _queryError: function(query, error)
     {
-        if (error.message)
+        if (typeof error === "string")
+            var message = error;
+        else if (error.message)
             var message = error.message;
         else if (error.code == 2)
             var message = WebInspector.UIString("Database no longer has expected version.");

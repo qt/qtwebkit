@@ -27,12 +27,13 @@
 
 #include "cc/CCDrawQuad.h"
 
-#include "cc/CCCanvasDrawQuad.h"
+#include "cc/CCCheckerboardDrawQuad.h"
 #include "cc/CCDebugBorderDrawQuad.h"
+#include "cc/CCIOSurfaceDrawQuad.h"
 #include "cc/CCLayerImpl.h"
-#include "cc/CCPluginDrawQuad.h"
 #include "cc/CCRenderSurfaceDrawQuad.h"
 #include "cc/CCSolidColorDrawQuad.h"
+#include "cc/CCTextureDrawQuad.h"
 #include "cc/CCTileDrawQuad.h"
 #include "cc/CCVideoDrawQuad.h"
 
@@ -65,10 +66,22 @@ void CCDrawQuad::setQuadVisibleRect(const IntRect& quadVisibleRect)
     m_quadVisibleRect.intersect(m_quadRect);
 }
 
+const CCCheckerboardDrawQuad* CCDrawQuad::toCheckerboardDrawQuad() const
+{
+    ASSERT(m_material == Checkerboard);
+    return static_cast<const CCCheckerboardDrawQuad*>(this);
+}
+
 const CCDebugBorderDrawQuad* CCDrawQuad::toDebugBorderDrawQuad() const
 {
     ASSERT(m_material == DebugBorder);
     return static_cast<const CCDebugBorderDrawQuad*>(this);
+}
+
+const CCIOSurfaceDrawQuad* CCDrawQuad::toIOSurfaceDrawQuad() const
+{
+    ASSERT(m_material == IOSurfaceContent);
+    return static_cast<const CCIOSurfaceDrawQuad*>(this);
 }
 
 const CCRenderSurfaceDrawQuad* CCDrawQuad::toRenderSurfaceDrawQuad() const
@@ -83,16 +96,15 @@ const CCSolidColorDrawQuad* CCDrawQuad::toSolidColorDrawQuad() const
     return static_cast<const CCSolidColorDrawQuad*>(this);
 }
 
+const CCTextureDrawQuad* CCDrawQuad::toTextureDrawQuad() const
+{
+    ASSERT(m_material == TextureContent);
+    return static_cast<const CCTextureDrawQuad*>(this);
+}
 const CCTileDrawQuad* CCDrawQuad::toTileDrawQuad() const
 {
     ASSERT(m_material == TiledContent);
     return static_cast<const CCTileDrawQuad*>(this);
-}
-
-const CCCanvasDrawQuad* CCDrawQuad::toCanvasDrawQuad() const
-{
-    ASSERT(m_material == CanvasContent);
-    return static_cast<const CCCanvasDrawQuad*>(this);
 }
 
 const CCVideoDrawQuad* CCDrawQuad::toVideoDrawQuad() const
@@ -101,10 +113,5 @@ const CCVideoDrawQuad* CCDrawQuad::toVideoDrawQuad() const
     return static_cast<const CCVideoDrawQuad*>(this);
 }
 
-const CCPluginDrawQuad* CCDrawQuad::toPluginDrawQuad() const
-{
-    ASSERT(m_material == PluginContent);
-    return static_cast<const CCPluginDrawQuad*>(this);
-}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Google Inc. All rights reserved.
+ * Copyright (C) 2009, 2012 Google Inc. All rights reserved.
  * Copyright (C) 2011 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,19 +37,19 @@
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "FormState.h"
-#include "FrameLoader.h"
 #include "FrameLoadRequest.h"
+#include "FrameLoader.h"
 #include "FrameNetworkingContextImpl.h"
 #include "FrameView.h"
-#include "HTTPParsers.h"
-#include "HistoryItem.h"
-#include "HitTestResult.h"
 #include "HTMLAppletElement.h"
 #include "HTMLFormElement.h"  // needed by FormState.h
 #include "HTMLNames.h"
+#include "HTTPParsers.h"
+#include "HistoryItem.h"
+#include "HitTestResult.h"
 #include "IntentRequest.h"
-#include "MessageEvent.h"
 #include "MIMETypeRegistry.h"
+#include "MessageEvent.h"
 #include "MouseEvent.h"
 #include "Page.h"
 #include "PlatformString.h"
@@ -59,7 +59,7 @@
 #include "ResourceHandleInternal.h"
 #include "ResourceLoader.h"
 #include "Settings.h"
-#include "StringExtras.h"
+#include "SocketStreamHandleInternal.h"
 #include "WebDOMEvent.h"
 #include "WebDataSourceImpl.h"
 #include "WebDevToolsAgentPrivate.h"
@@ -69,8 +69,6 @@
 #include "WebFrameImpl.h"
 #include "WebIntentRequest.h"
 #include "WebKit.h"
-#include "platform/WebKitPlatformSupport.h"
-#include <public/WebMimeRegistry.h>
 #include "WebNode.h"
 #include "WebPermissionClient.h"
 #include "WebPlugin.h"
@@ -78,14 +76,19 @@
 #include "WebPluginLoadObserver.h"
 #include "WebPluginParams.h"
 #include "WebSecurityOrigin.h"
-#include "platform/WebURL.h"
-#include "platform/WebURLError.h"
-#include "platform/WebVector.h"
+#include "platform/WebSocketStreamHandle.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "WindowFeatures.h"
 #include "WrappedResourceRequest.h"
 #include "WrappedResourceResponse.h"
+#include "platform/WebKitPlatformSupport.h"
+#include "platform/WebURL.h"
+#include "platform/WebURLError.h"
+#include "platform/WebVector.h"
+#include <public/WebMimeRegistry.h>
+
+#include <wtf/StringExtras.h>
 #include <wtf/text/CString.h>
 
 #if USE(V8)
@@ -107,7 +110,6 @@ enum {
 
 FrameLoaderClientImpl::FrameLoaderClientImpl(WebFrameImpl* frame)
     : m_webFrame(frame)
-    , m_hasRepresentation(false)
     , m_sentInitialResponseToPlugin(false)
     , m_nextNavigationPolicy(WebNavigationPolicyIgnore)
 {
@@ -132,10 +134,6 @@ void FrameLoaderClientImpl::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*
 {
     if (m_webFrame->client())
         m_webFrame->client()->didClearWindowObject(m_webFrame);
-
-    WebViewImpl* webview = m_webFrame->viewImpl();
-    if (webview->devToolsAgentPrivate())
-        webview->devToolsAgentPrivate()->didClearWindowObject(m_webFrame);
 }
 
 void FrameLoaderClientImpl::documentElementAvailable()
@@ -147,6 +145,9 @@ void FrameLoaderClientImpl::documentElementAvailable()
 #if USE(V8)
 void FrameLoaderClientImpl::didCreateScriptContext(v8::Handle<v8::Context> context, int extensionGroup, int worldId)
 {
+    WebViewImpl* webview = m_webFrame->viewImpl();
+    if (webview->devToolsAgentPrivate())
+        webview->devToolsAgentPrivate()->didCreateScriptContext(m_webFrame, worldId);
     if (m_webFrame->client())
         m_webFrame->client()->didCreateScriptContext(m_webFrame, context, extensionGroup, worldId);
 }
@@ -268,11 +269,6 @@ bool FrameLoaderClientImpl::hasFrameView() const
 void FrameLoaderClientImpl::makeDocumentView()
 {
     m_webFrame->createFrameView();
-}
-
-void FrameLoaderClientImpl::makeRepresentation(DocumentLoader*)
-{
-    m_hasRepresentation = true;
 }
 
 void FrameLoaderClientImpl::forceLayout()
@@ -1033,10 +1029,10 @@ void FrameLoaderClientImpl::dispatchUnableToImplementPolicy(const ResourceError&
     m_webFrame->client()->unableToImplementPolicyWithError(m_webFrame, error);
 }
 
-void FrameLoaderClientImpl::dispatchWillSendSubmitEvent(HTMLFormElement* form)
+void FrameLoaderClientImpl::dispatchWillSendSubmitEvent(PassRefPtr<FormState> prpFormState)
 {
     if (m_webFrame->client())
-        m_webFrame->client()->willSendSubmitEvent(m_webFrame, WebFormElement(form));
+        m_webFrame->client()->willSendSubmitEvent(m_webFrame, WebFormElement(prpFormState->form()));
 }
 
 void FrameLoaderClientImpl::dispatchWillSubmitForm(FramePolicyFunction function,
@@ -1045,16 +1041,6 @@ void FrameLoaderClientImpl::dispatchWillSubmitForm(FramePolicyFunction function,
     if (m_webFrame->client())
         m_webFrame->client()->willSubmitForm(m_webFrame, WebFormElement(formState->form()));
     (m_webFrame->frame()->loader()->policyChecker()->*function)(PolicyUse);
-}
-
-void FrameLoaderClientImpl::dispatchDidLoadMainResource(DocumentLoader*)
-{
-    // FIXME
-}
-
-void FrameLoaderClientImpl::revertToProvisionalState(DocumentLoader*)
-{
-    m_hasRepresentation = true;
 }
 
 void FrameLoaderClientImpl::setMainDocumentError(DocumentLoader*,
@@ -1153,18 +1139,12 @@ void FrameLoaderClientImpl::committedLoad(DocumentLoader* loader, const char* da
     }
 }
 
-void FrameLoaderClientImpl::finishedLoading(DocumentLoader* dl)
+void FrameLoaderClientImpl::finishedLoading(DocumentLoader*)
 {
     if (m_pluginWidget) {
         m_pluginWidget->didFinishLoading();
         m_pluginWidget = 0;
         m_sentInitialResponseToPlugin = false;
-    } else {
-        // This is necessary to create an empty document. See bug 634004.
-        // However, we only want to do this if makeRepresentation has been called, to
-        // match the behavior on the Mac.
-        if (m_hasRepresentation)
-            dl->writer()->setEncoding("", false);
     }
 }
 
@@ -1308,7 +1288,7 @@ bool FrameLoaderClientImpl::canShowMIMEType(const String& mimeType) const
     // mimeType strings are supposed to be ASCII, but if they are not for some
     // reason, then it just means that the mime type will fail all of these "is
     // supported" checks and go down the path of an unhandled mime type.
-    if (webKitPlatformSupport()->mimeRegistry()->supportsMIMEType(mimeType) == WebMimeRegistry::IsSupported)
+    if (WebKit::Platform::current()->mimeRegistry()->supportsMIMEType(mimeType) == WebMimeRegistry::IsSupported)
         return true;
 
     // If Chrome is started with the --disable-plugins switch, pluginData is null.
@@ -1396,7 +1376,7 @@ void FrameLoaderClientImpl::setTitle(const StringWithDirection& title, const KUR
 
 String FrameLoaderClientImpl::userAgent(const KURL& url)
 {
-    return webKitPlatformSupport()->userAgent(url);
+    return WebKit::Platform::current()->userAgent(url);
 }
 
 void FrameLoaderClientImpl::savePlatformDataToCachedFrame(CachedFrame*)
@@ -1457,33 +1437,6 @@ PassRefPtr<Frame> FrameLoaderClientImpl::createFrame(
     FrameLoadRequest frameRequest(m_webFrame->frame()->document()->securityOrigin(),
         ResourceRequest(url, referrer), name);
     return m_webFrame->createChildFrame(frameRequest, ownerElement);
-}
-
-void FrameLoaderClientImpl::didTransferChildFrameToNewDocument(Page*)
-{
-    ASSERT(m_webFrame->frame()->ownerElement());
-
-    WebFrameImpl* newParent = static_cast<WebFrameImpl*>(m_webFrame->parent());
-    if (!newParent || !newParent->client())
-        return;
-
-    // Replace the client since the old client may be destroyed when the
-    // previous page is closed.
-    m_webFrame->setClient(newParent->client());
-}
-
-void FrameLoaderClientImpl::transferLoadingResourceFromPage(ResourceLoader* loader, const ResourceRequest& request, Page* oldPage)
-{
-    assignIdentifierToInitialRequest(loader->identifier(), loader->documentLoader(), request);
-
-    WebFrameImpl* oldWebFrame = WebFrameImpl::fromFrame(oldPage->mainFrame());
-    if (oldWebFrame && oldWebFrame->client())
-        oldWebFrame->client()->removeIdentifierForRequest(loader->identifier());
-
-    ResourceHandle* handle = loader->handle();
-    WebURLLoader* webURLLoader = ResourceHandleInternal::FromResourceHandle(handle)->loader();
-    if (webURLLoader && m_webFrame->client())
-        m_webFrame->client()->didAdoptURLLoader(webURLLoader);
 }
 
 PassRefPtr<Widget> FrameLoaderClientImpl::createPlugin(
@@ -1648,5 +1601,10 @@ void FrameLoaderClientImpl::dispatchIntent(PassRefPtr<WebCore::IntentRequest> in
     m_webFrame->client()->dispatchIntent(webFrame(), intentRequest);
 }
 #endif
+
+void FrameLoaderClientImpl::dispatchWillOpenSocketStream(SocketStreamHandle* handle)
+{
+    m_webFrame->client()->willOpenSocketStream(SocketStreamHandleInternal::toWebSocketStreamHandle(handle));
+}
 
 } // namespace WebKit

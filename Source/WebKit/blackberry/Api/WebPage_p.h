@@ -21,8 +21,10 @@
 
 #include "ChromeClient.h"
 #if USE(ACCELERATED_COMPOSITING)
+#include "GLES2Context.h"
 #include "LayerRenderer.h"
 #endif
+#include "KURL.h"
 #include "PageClientBlackBerry.h"
 #include "PlatformMouseEvent.h"
 #include "ScriptSourceCode.h"
@@ -39,7 +41,6 @@ class Document;
 class Frame;
 class GeolocationControllerClientBlackBerry;
 class JavaScriptDebuggerBlackBerry;
-class KURL;
 class Node;
 class Page;
 class PluginView;
@@ -65,7 +66,7 @@ class WebPageClient;
 
 #if USE(ACCELERATED_COMPOSITING)
 class FrameLayers;
-class WebPageCompositor;
+class WebPageCompositorPrivate;
 #endif
 
 // In the client code, there is screen size and viewport.
@@ -78,15 +79,16 @@ public:
     enum LoadState { None /* on instantiation of page */, Provisional, Committed, Finished, Failed };
 
     WebPagePrivate(WebPage*, WebPageClient*, const WebCore::IntRect&);
-    virtual ~WebPagePrivate();
 
     static WebCore::Page* core(const WebPage*);
+
+    WebPageClient* client() const { return m_client; }
 
     void init(const WebString& pageGroupName);
     bool handleMouseEvent(WebCore::PlatformMouseEvent&);
     bool handleWheelEvent(WebCore::PlatformWheelEvent&);
 
-    void load(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool isInitial, bool mustHandleInternally = false, bool forceDownload = false, const char* overrideContentType = "");
+    void load(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool isInitial, bool mustHandleInternally = false, bool forceDownload = false, const char* overrideContentType = "", const char* suggestedSaveName = "");
     void loadString(const char* string, const char* baseURL, const char* mimeType, const char* failingURL = 0);
     bool executeJavaScript(const char* script, JavaScriptDataType& returnType, WebString& returnValue);
     bool executeJavaScriptInIsolatedWorld(const WebCore::ScriptSourceCode&, JavaScriptDataType& returnType, WebString& returnValue);
@@ -156,7 +158,7 @@ public:
     WebCore::IntSize absoluteVisibleOverflowSize() const;
 
     // Virtual functions inherited from PageClientBlackBerry.
-    virtual void setCursor(WebCore::PlatformCursorHandle);
+    virtual void setCursor(WebCore::PlatformCursor);
     virtual Platform::NetworkStreamFactory* networkStreamFactory();
     virtual Platform::Graphics::Window* platformWindow() const;
     virtual void setPreventsScreenDimming(bool preventDimming);
@@ -176,6 +178,9 @@ public:
     virtual double currentZoomFactor() const;
     virtual int showAlertDialog(WebPageClient::AlertType atype);
     virtual bool isActive() const;
+    virtual bool isVisible() const { return m_visible; }
+    virtual WebCore::Credential authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&);
+    virtual SaveCredentialType notifyShouldSaveCredential(bool);
 
     // Called from within WebKit via ChromeClientBlackBerry.
     void enterFullscreenForNode(WebCore::Node*);
@@ -266,7 +271,7 @@ public:
     void notifyPluginRectChanged(int id, const WebCore::IntRect& rectChanged);
 
     // Context Methods.
-    ActiveNodeContext activeNodeContext(TargetDetectionStrategy);
+    Platform::WebContext webContext(TargetDetectionStrategy);
     PassRefPtr<WebCore::Node> contextNode(TargetDetectionStrategy);
 
 #if ENABLE(VIEWPORT_REFLOW)
@@ -351,6 +356,9 @@ public:
         return m_transformationMatrix;
     }
 
+    bool compositorDrawsRootLayer() const; // Thread safe
+    void setCompositorDrawsRootLayer(bool); // WebKit thread only
+
 #if USE(ACCELERATED_COMPOSITING)
     // WebKit thread.
     bool needsOneShotDrawingSynchronization();
@@ -366,14 +374,14 @@ public:
     // Thread safe.
     void resetCompositingSurface();
     void drawLayersOnCommit(); // Including backing store blit.
-    bool drawSubLayers(const WebCore::IntRect& dstRect, const WebCore::FloatRect& contents);
-    bool drawSubLayers(); // Draw them at last known position.
 
     // Compositing thread.
     void setRootLayerCompositingThread(WebCore::LayerCompositingThread*);
-    void commitRootLayer(const WebCore::IntRect&, const WebCore::IntSize&);
-    void setIsAcceleratedCompositingActive(bool);
-    bool isAcceleratedCompositingActive() const { return m_isAcceleratedCompositingActive; }
+    void commitRootLayer(const WebCore::IntRect&, const WebCore::IntSize&, bool);
+    bool isAcceleratedCompositingActive() const { return m_compositor; }
+    WebPageCompositorPrivate* compositor() const { return m_compositor.get(); }
+    void setCompositor(PassRefPtr<WebPageCompositorPrivate>);
+    bool createCompositor();
     void destroyCompositor();
     void syncDestroyCompositorOnCompositingThread();
     void destroyLayerResources();
@@ -399,6 +407,15 @@ public:
     static WebCore::RenderLayer* enclosingFixedPositionedAncestorOrSelfIfFixedPositioned(WebCore::RenderLayer*);
 
     static WebCore::IntSize defaultMaxLayoutSize();
+    static const String& defaultUserAgent();
+
+    void setVisible(bool);
+#if ENABLE(PAGE_VISIBILITY_API)
+    void setPageVisibilityState();
+#endif
+    void notifyAppActivationStateChange(ActivationStateType);
+
+    void deferredTasksTimerFired(WebCore::Timer<WebPagePrivate>*);
 
     WebPage* m_webPage;
     WebPageClient* m_client;
@@ -412,6 +429,7 @@ public:
 #endif
 
     bool m_visible;
+    ActivationStateType m_activationState;
     bool m_shouldResetTilesWhenShown;
     bool m_userScalable;
     bool m_userPerformedManualZoom;
@@ -434,6 +452,7 @@ public:
     int m_virtualViewportHeight;
     WebCore::IntSize m_defaultLayoutSize;
     WebCore::ViewportArguments m_viewportArguments; // We keep this around since we may need to re-evaluate the arguments on rotation.
+    WebCore::ViewportArguments m_userViewportArguments; // A fallback set of Viewport Arguments supplied by the WebPageClient
     bool m_didRestoreFromPageCache;
     ViewMode m_viewMode;
     LoadState m_loadState;
@@ -492,7 +511,12 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     bool m_isAcceleratedCompositingActive;
     OwnPtr<FrameLayers> m_frameLayers; // WebKit thread only.
-    OwnPtr<WebPageCompositor> m_compositor; // Compositing thread only.
+
+    // Compositing thread only, used only when the WebKit layer created the context.
+    // If the API client created the context, this will be null.
+    OwnPtr<GLES2Context> m_ownedContext;
+
+    RefPtr<WebPageCompositorPrivate> m_compositor; // Compositing thread only.
     OwnPtr<WebCore::Timer<WebPagePrivate> > m_rootLayerCommitTimer;
     bool m_needsOneShotDrawingSynchronization;
     bool m_needsCommit;
@@ -513,6 +537,50 @@ public:
     RefPtr<WebCore::DOMWrapperWorld> m_isolatedWorld;
     bool m_hasInRegionScrollableAreas;
     bool m_updateDelegatedOverlaysDispatched;
+
+    // There is no need to initialize the following members in WebPagePrivate's constructor,
+    // because they are only used by WebPageTasks and the tasks will initialize them when
+    // being constructed.
+    bool m_wouldPopupListSelectMultiple;
+    bool m_wouldPopupListSelectSingle;
+    bool m_wouldSetDateTimeInput;
+    bool m_wouldSetColorInput;
+    bool m_wouldCancelSelection;
+    bool m_wouldLoadManualScript;
+    bool m_wouldSetFocused;
+    bool m_wouldSetPageVisibilityState;
+    Vector<bool> m_cachedPopupListSelecteds;
+    int m_cachedPopupListSelectedIndex;
+    WebString m_cachedDateTimeInput;
+    WebString m_cachedColorInput;
+    WebCore::KURL m_cachedManualScript;
+    bool m_cachedFocused;
+
+    class DeferredTaskBase {
+    public:
+        void perform(WebPagePrivate* webPagePrivate)
+        {
+            if (!(webPagePrivate->*m_isActive))
+                return;
+            performInternal(webPagePrivate);
+        }
+    protected:
+        DeferredTaskBase(WebPagePrivate* webPagePrivate, bool WebPagePrivate::*isActive)
+            : m_isActive(isActive)
+        {
+            webPagePrivate->*m_isActive = true;
+        }
+
+        virtual void performInternal(WebPagePrivate*) = 0;
+
+        bool WebPagePrivate::*m_isActive;
+    };
+
+    Vector<OwnPtr<DeferredTaskBase> > m_deferredTasks;
+    WebCore::Timer<WebPagePrivate> m_deferredTasksTimer;
+
+protected:
+    virtual ~WebPagePrivate();
 };
 }
 }

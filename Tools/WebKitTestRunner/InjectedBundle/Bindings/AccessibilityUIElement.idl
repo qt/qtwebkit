@@ -118,6 +118,7 @@ module WTR {
         AccessibilityUIElement selectedRowAtIndex(in unsigned long index);
         AccessibilityUIElement disclosedByRow();
         AccessibilityUIElement disclosedRowAtIndex(in unsigned long index);
+        AccessibilityUIElement rowAtIndex(in unsigned long index);
         int indexInTable();
         DOMString rowIndexRange();
         DOMString columnIndexRange();
@@ -131,6 +132,7 @@ module WTR {
         DOMString parameterizedAttributeNames();
         int lineForIndex(in int index);
         DOMString rangeForLine(in int index);
+        DOMString rangeForPosition(in int x, in int y);
         DOMString boundsForRange(in unsigned long location, in unsigned long length);
         DOMString stringForRange(in unsigned long location, in unsigned long length);
         DOMString attributedStringForRange(in unsigned long location, in unsigned long length);
@@ -154,7 +156,10 @@ module WTR {
         DOMString stringForTextMarkerRange(in AccessibilityTextMarkerRange range);
         int textMarkerRangeLength(in AccessibilityTextMarkerRange range);
         boolean attributedStringForTextMarkerRangeContainsAttribute(in DOMString attr, in AccessibilityTextMarkerRange range);
-        
+        int indexForTextMarker(in AccessibilityTextMarker marker);
+        boolean isTextMarkerValid(in AccessibilityTextMarker marker);
+        AccessibilityTextMarker textMarkerForIndex(in int textIndex);
+
         // Notification support.
         boolean addNotificationListener(in object callbackFunction);
         boolean removeNotificationListener();

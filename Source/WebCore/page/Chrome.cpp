@@ -50,7 +50,7 @@
 #include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #endif
 
@@ -373,7 +373,7 @@ void Chrome::mouseDidMoveOverElement(const HitTestResult& result, unsigned modif
     if (result.innerNode()) {
         Document* document = result.innerNode()->document();
         if (document && document->isDNSPrefetchEnabled())
-            ResourceHandle::prepareForURL(result.absoluteLinkURL());
+            prefetchDNS(result.absoluteLinkURL().host());
     }
     m_client->mouseDidMoveOverElement(result, modifierFlags);
 
@@ -452,7 +452,7 @@ void Chrome::enumerateChosenDirectory(FileChooser* fileChooser)
 }
 #endif
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 PassOwnPtr<ColorChooser> Chrome::createColorChooser(ColorChooserClient* client, const Color& initialColor)
 {
     return m_client->createColorChooser(client, initialColor);

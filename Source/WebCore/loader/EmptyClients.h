@@ -42,6 +42,7 @@
 #include "FrameLoaderClient.h"
 #include "FrameNetworkingContext.h"
 #include "InspectorClient.h"
+#include "Page.h"
 #include "PopupMenu.h"
 #include "ResourceError.h"
 #include "SearchPopupMenu.h"
@@ -50,7 +51,7 @@
 #include <v8.h>
 #endif
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #endif
 
@@ -200,7 +201,7 @@ public:
     virtual void enumerateChosenDirectory(FileChooser*) { }
 #endif
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) { return nullptr; }
 #endif
 
@@ -216,9 +217,6 @@ public:
     virtual void setCursorHiddenUntilMouseMoves(bool) { }
 
     virtual void scrollRectIntoView(const IntRect&) const { }
-
-    virtual void requestGeolocationPermissionForFrame(Frame*, Geolocation*) {}
-    virtual void cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*) {}
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*) {}
@@ -305,10 +303,9 @@ public:
 
     virtual void dispatchUnableToImplementPolicy(const ResourceError&) { }
 
-    virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) { }
+    virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) { }
     virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>) { }
 
-    virtual void dispatchDidLoadMainResource(DocumentLoader*) { }
     virtual void revertToProvisionalState(DocumentLoader*) { }
     virtual void setMainDocumentError(DocumentLoader*, const ResourceError&) { }
 
@@ -377,8 +374,6 @@ public:
     virtual void didRunInsecureContent(SecurityOrigin*, const KURL&) { }
     virtual void didDetectXSS(const KURL&, bool) { }
     virtual PassRefPtr<Frame> createFrame(const KURL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) { return 0; }
-    virtual void didTransferChildFrameToNewDocument(Page*) { }
-    virtual void transferLoadingResourceFromPage(ResourceLoader*, const ResourceRequest&, Page*) { }
     virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool) { return 0; }
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&) { return 0; }
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
@@ -520,14 +515,11 @@ public:
     virtual bool isAutomaticSpellingCorrectionEnabled() { return false; }
     virtual void toggleAutomaticSpellingCorrection() { }
 #endif
+#if PLATFORM(GTK)
+    virtual bool shouldShowUnicodeMenu() { return false; }
+#endif
     TextCheckerClient* textChecker() { return &m_textCheckerClient; }
 
-#if USE(AUTOCORRECTION_PANEL)
-    virtual void showCorrectionPanel(CorrectionPanelInfo::PanelType, const FloatRect&, const String&, const String&, const Vector<String>&) { }
-    virtual void dismissCorrectionPanel(ReasonForDismissingCorrectionPanel) { }
-    virtual String dismissCorrectionPanelSoon(ReasonForDismissingCorrectionPanel) { return String(); }
-    virtual void recordAutocorrectionResponse(AutocorrectionResponseType, const String&, const String&) { }
-#endif
     virtual void updateSpellingUIWithGrammarString(const String&, const GrammarDetail&) { }
     virtual void updateSpellingUIWithMisspelledWord(const String&) { }
     virtual void showSpellingUI(bool) { }
@@ -623,6 +615,8 @@ public:
     virtual DeviceOrientation* lastOrientation() const { return 0; }
     virtual void deviceOrientationControllerDestroyed() { }
 };
+
+void fillWithEmptyClients(Page::PageClients&);
 
 }
 

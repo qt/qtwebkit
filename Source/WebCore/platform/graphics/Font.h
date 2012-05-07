@@ -36,7 +36,12 @@
 #include <wtf/unicode/CharacterNames.h>
 
 #if PLATFORM(QT)
+#if HAVE(QRAWFONT)
+#include <QRawFont>
+class QTextLayout;
+#else
 #include <QFont>
+#endif
 #endif
 
 namespace WebCore {
@@ -175,7 +180,12 @@ public:
     static unsigned expansionOpportunityCount(const UChar*, size_t length, TextDirection, bool& isAfterExpansion);
 
 #if PLATFORM(QT)
+#if HAVE(QRAWFONT)
+    QRawFont rawFont() const;
+#else
     QFont font() const;
+#endif
+    QFont syntheticFont() const;
 #endif
 
     static void setShouldUseSmoothing(bool);
@@ -183,7 +193,8 @@ public:
 
     enum CodePath { Auto, Simple, Complex, SimpleWithGlyphOverflow };
     CodePath codePath(const TextRun&) const;
-
+    static CodePath characterRangeCodePath(const UChar*, unsigned len);
+    
 private:
     enum ForTextEmphasisOrNot { NotForTextEmphasis, ForTextEmphasis };
 
@@ -229,7 +240,7 @@ public:
     FontSelector* fontSelector() const;
     static bool treatAsSpace(UChar c) { return c == ' ' || c == '\t' || c == '\n' || c == noBreakSpace; }
     static bool treatAsZeroWidthSpace(UChar c) { return treatAsZeroWidthSpaceInComplexScript(c) || c == 0x200c || c == 0x200d; }
-    static bool treatAsZeroWidthSpaceInComplexScript(UChar c) { return c < 0x20 || (c >= 0x7F && c < 0xA0) || c == softHyphen || (c >= 0x200e && c <= 0x200f) || (c >= 0x202a && c <= 0x202e) || c == zeroWidthNoBreakSpace || c == objectReplacementCharacter; }
+    static bool treatAsZeroWidthSpaceInComplexScript(UChar c) { return c < 0x20 || (c >= 0x7F && c < 0xA0) || c == softHyphen || c == zeroWidthSpace || (c >= 0x200e && c <= 0x200f) || (c >= 0x202a && c <= 0x202e) || c == zeroWidthNoBreakSpace || c == objectReplacementCharacter; }
     static bool canReceiveTextEmphasis(UChar32 c);
 
     static inline UChar normalizeSpaces(UChar character)
@@ -253,6 +264,9 @@ private:
     {
         return m_fontList && m_fontList->loadingCustomFonts();
     }
+#if PLATFORM(QT) && HAVE(QRAWFONT)
+    void initFormatForTextLayout(QTextLayout*) const;
+#endif
 
     FontDescription m_fontDescription;
     mutable RefPtr<FontFallbackList> m_fontList;

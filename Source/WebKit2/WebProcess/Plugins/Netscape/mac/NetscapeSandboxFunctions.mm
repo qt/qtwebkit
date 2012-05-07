@@ -29,6 +29,7 @@
 #if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
 
 #import "PluginProcess.h"
+#import "NetscapePluginModule.h"
 #import "WebKitSystemInterface.h"
 #import <WebCore/FileSystem.h>
 #import <WebCore/SoftLinking.h>
@@ -59,22 +60,22 @@ static bool enteredSandbox;
 
 static CString readSandboxProfile()
 {
-    RetainPtr<CFURLRef> profileURL(AdoptCF, CFBundleCopyResourceURL(CFBundleGetMainBundle(), CFSTR("plugin"), CFSTR("sb"), 0));
+    RetainPtr<CFURLRef> profileURL(AdoptCF, CFBundleCopyResourceURL(CFBundleGetMainBundle(), CFSTR("com.apple.WebKit.PluginProcess"), CFSTR("sb"), 0));
     char profilePath[PATH_MAX];
     if (!CFURLGetFileSystemRepresentation(profileURL.get(), false, reinterpret_cast<UInt8*>(profilePath), sizeof(profilePath))) {
-        fprintf(stderr, "Could not get file system representation of plug-in sandbox URL\n");
+        WTFLogAlways("Could not get file system representation of plug-in sandbox URL\n");
         return CString();
     }
 
     FILE *file = fopen(profilePath, "r");
     if (!file) {
-        fprintf(stderr, "Could not open plug-in sandbox file '%s'\n", profilePath);
+        WTFLogAlways("Could not open plug-in sandbox file '%s'\n", profilePath);
         return CString();
     }
 
     struct stat fileInfo;
     if (stat(profilePath, &fileInfo)) {
-        fprintf(stderr, "Could not get plug-in sandbox file size '%s'\n", profilePath);
+        WTFLogAlways("Could not get plug-in sandbox file size '%s'\n", profilePath);
         return CString();
     }
 
@@ -82,7 +83,7 @@ static CString readSandboxProfile()
     CString result = CString::newUninitialized(fileInfo.st_size, characterBuffer);
 
     if (1 != fread(characterBuffer, fileInfo.st_size, 1, file)) {
-        fprintf(stderr, "Could not read plug-in sandbox file '%s'\n", profilePath);
+        WTFLogAlways("Could not read plug-in sandbox file '%s'\n", profilePath);
         return CString();
     }
 
@@ -99,6 +100,19 @@ NPError WKN_EnterSandbox(const char* readOnlyPaths[], const char* readWritePaths
     CString profile = readSandboxProfile();
     if (profile.isNull())
         exit(EX_NOPERM);
+
+#if !defined(BUILDING_ON_LION)
+    // Use private temporary and cache directories.
+    String systemDirectorySuffix = "com.apple.WebKit.PluginProcess+" + PluginProcess::shared().netscapePluginModule()->module()->bundleIdentifier();
+    setenv("DIRHELPER_USER_DIR_SUFFIX", fileSystemRepresentation(systemDirectorySuffix).data(), 0);
+    char temporaryDirectory[PATH_MAX];
+    if (!confstr(_CS_DARWIN_USER_TEMP_DIR, temporaryDirectory, sizeof(temporaryDirectory))) {
+        WTFLogAlways("PluginProcess: couldn't retrieve private temporary directory path: %d\n", errno);
+        exit(EX_NOPERM);
+    }
+    setenv("TMPDIR", temporaryDirectory, 1);
+#endif
+
 
     Vector<const char*> extendedReadOnlyPaths;
     if (readOnlyPaths) {
@@ -122,15 +136,12 @@ NPError WKN_EnterSandbox(const char* readOnlyPaths[], const char* readWritePaths
             extendedReadWritePaths.append(readWritePaths[i]);
     }
 
-    // FIXME: <rdar://problem/10785457> Use a custom temporary directory.
     char darwinUserTempDirectory[PATH_MAX];
     if (confstr(_CS_DARWIN_USER_TEMP_DIR, darwinUserTempDirectory, PATH_MAX) > 0)
         extendedReadWritePaths.append(darwinUserTempDirectory);
 
-    // FIXME: <rdar://problem/10792047> Use a custom cache directory.
     char darwinUserCacheDirectory[PATH_MAX];
-    size_t darwinUserCachePathSize = confstr(_CS_DARWIN_USER_CACHE_DIR, darwinUserCacheDirectory, PATH_MAX);
-    if (darwinUserCachePathSize > 0)
+    if (confstr(_CS_DARWIN_USER_CACHE_DIR, darwinUserCacheDirectory, PATH_MAX) > 0)
         extendedReadWritePaths.append(darwinUserCacheDirectory);
 
     RetainPtr<CFStringRef> cachePath(AdoptCF, WKCopyFoundationCacheDirectory());
@@ -145,12 +156,12 @@ NPError WKN_EnterSandbox(const char* readOnlyPaths[], const char* readWritePaths
     const char* sandboxParameters[] = { "HOME_DIR", homeDirectory, 0, 0 };
 
     if (!WKEnterPluginSandbox(profile.data(), sandboxParameters, extendedReadOnlyPaths.data(), extendedReadWritePaths.data())) {
-        fprintf(stderr, "Couldn't initialize sandbox profile\n");
+        WTFLogAlways("Couldn't initialize sandbox profile\n");
         exit(EX_NOPERM);
     }
 
     if (noErr != WKEnableSandboxStyleFileQuarantine()) {
-        fprintf(stderr, "Couldn't enable file quarantine\n");
+        WTFLogAlways("Couldn't enable file quarantine\n");
         exit(EX_NOPERM);
     }
 

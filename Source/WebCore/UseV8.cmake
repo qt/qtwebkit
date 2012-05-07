@@ -23,7 +23,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/DateExtension.cpp
     bindings/v8/IDBBindingUtilities.cpp
     bindings/v8/IsolatedWorld.cpp
-    bindings/v8/OptionsObject.cpp
+    bindings/v8/Dictionary.cpp
     bindings/v8/PageScriptDebugServer.cpp
     bindings/v8/RetainedDOMInfo.cpp
     bindings/v8/ScheduledAction.cpp
@@ -75,7 +75,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8CSSStyleDeclarationCustom.cpp
     bindings/v8/custom/V8CSSStyleSheetCustom.cpp
     bindings/v8/custom/V8CSSValueCustom.cpp
-    bindings/v8/custom/V8CanvasPixelArrayCustom.cpp
     bindings/v8/custom/V8CanvasRenderingContext2DCustom.cpp
     bindings/v8/custom/V8ClipboardCustom.cpp
     bindings/v8/custom/V8ConsoleCustom.cpp
@@ -137,6 +136,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8NamedNodesCollection.cpp
     bindings/v8/custom/V8NodeCustom.cpp
     bindings/v8/custom/V8NodeListCustom.cpp
+    bindings/v8/custom/V8NotificationCustom.cpp
     bindings/v8/custom/V8NotificationCenterCustom.cpp
     bindings/v8/custom/V8PerformanceCustom.cpp
     bindings/v8/custom/V8PopStateEventCustom.cpp
@@ -164,7 +164,6 @@ LIST(APPEND WebCore_SOURCES
 )
 
 LIST(APPEND WebCoreTestSupport_SOURCES
-    testing/v8/V8InternalsCustom.cpp
     testing/v8/WebCoreTestSupport.cpp
 )
 

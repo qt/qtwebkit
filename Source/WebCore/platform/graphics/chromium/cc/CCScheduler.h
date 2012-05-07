@@ -35,16 +35,33 @@ namespace WebCore {
 
 class CCThread;
 
+struct CCScheduledActionDrawAndSwapResult {
+    CCScheduledActionDrawAndSwapResult()
+            : didDraw(false)
+            , didSwap(false)
+    {
+    }
+    CCScheduledActionDrawAndSwapResult(bool didDraw, bool didSwap)
+            : didDraw(didDraw)
+            , didSwap(didSwap)
+    {
+    }
+    bool didDraw;
+    bool didSwap;
+};
+
 class CCSchedulerClient {
 public:
     virtual bool canDraw() = 0;
     virtual bool hasMoreResourceUpdates() const = 0;
 
     virtual void scheduledActionBeginFrame() = 0;
-    virtual void scheduledActionDrawAndSwap() = 0;
+    virtual CCScheduledActionDrawAndSwapResult scheduledActionDrawAndSwapIfPossible() = 0;
+    virtual CCScheduledActionDrawAndSwapResult scheduledActionDrawAndSwapForced() = 0;
     virtual void scheduledActionUpdateMoreResources() = 0;
     virtual void scheduledActionCommit() = 0;
     virtual void scheduledActionBeginContextRecreation() = 0;
+    virtual void scheduledActionAcquireLayerTexturesForMainThread() = 0;
 
 protected:
     virtual ~CCSchedulerClient() { }
@@ -60,12 +77,20 @@ public:
 
     virtual ~CCScheduler();
 
+    void setCanBeginFrame(bool);
+
     void setVisible(bool);
 
     void setNeedsCommit();
+
+    // Like setNeedsCommit(), but ensures a commit will definitely happen even if we are not visible.
+    void setNeedsForcedCommit();
+
     void setNeedsRedraw();
 
-    // As setNeedsRedraw(), but ensures the draw will definitely happen even if we are not visible.
+    void setMainThreadNeedsLayerTextures();
+
+    // Like setNeedsRedraw(), but ensures the draw will definitely happen even if we are not visible.
     void setNeedsForcedRedraw();
 
     void beginFrameComplete();
@@ -80,7 +105,7 @@ public:
     bool redrawPending() const { return m_stateMachine.redrawPending(); }
 
     // CCFrameRateControllerClient implementation
-    virtual void beginFrame();
+    virtual void vsyncTick() OVERRIDE;
 
 private:
     CCScheduler(CCSchedulerClient*, PassOwnPtr<CCFrameRateController>);

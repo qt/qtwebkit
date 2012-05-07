@@ -101,8 +101,6 @@ void WebFullScreenManager::enterFullScreenForElement(WebCore::Element* element)
 
 void WebFullScreenManager::exitFullScreenForElement(WebCore::Element* element)
 {
-    ASSERT(element);
-    ASSERT(m_element == element);
     m_page->injectedBundleFullScreenClient().exitFullScreenForElement(m_page.get(), element);
 }
 
@@ -113,7 +111,7 @@ void WebFullScreenManager::willEnterFullScreen()
     m_element->document()->updateLayout();
     m_page->forceRepaintWithoutCallback();
     m_finalFrame = screenRectOfContents(m_element.get());
-    m_page->send(Messages::WebFullScreenManagerProxy::BeganEnterFullScreen(m_initialFrame, m_finalFrame));
+    m_page->injectedBundleFullScreenClient().beganEnterFullScreen(m_page.get(), m_initialFrame, m_finalFrame);
 }
 
 void WebFullScreenManager::didEnterFullScreen()
@@ -127,7 +125,7 @@ void WebFullScreenManager::willExitFullScreen()
     ASSERT(m_element);
     m_finalFrame = screenRectOfContents(m_element.get());
     m_element->document()->webkitWillExitFullScreenForElement(m_element.get());
-    m_page->send(Messages::WebFullScreenManagerProxy::BeganExitFullScreen(m_finalFrame, m_initialFrame));
+    m_page->injectedBundleFullScreenClient().beganExitFullScreen(m_page.get(), m_finalFrame, m_initialFrame);
 }
 
 void WebFullScreenManager::didExitFullScreen()
@@ -140,6 +138,17 @@ void WebFullScreenManager::setAnimatingFullScreen(bool animating)
 {
     ASSERT(m_element);
     m_element->document()->setAnimatingFullScreen(animating);
+}
+
+void WebFullScreenManager::requestExitFullScreen()
+{
+    ASSERT(m_element);
+    m_element->document()->webkitCancelFullScreen();
+}
+
+void WebFullScreenManager::close()
+{
+    m_page->injectedBundleFullScreenClient().closeFullScreen(m_page.get());
 }
 
 } // namespace WebKit

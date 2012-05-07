@@ -80,17 +80,14 @@
 #import <WebCore/PlatformEventFactoryMac.h>
 #import <WebCore/PluginData.h>
 #import <WebCore/PrintContext.h>
-#import <WebCore/RenderLayer.h>
 #import <WebCore/RenderPart.h>
 #import <WebCore/RenderView.h>
-#import <WebCore/ReplaceSelectionCommand.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/ScriptValue.h>
 #import <WebCore/SecurityOrigin.h>
 #import <WebCore/SmartReplace.h>
 #import <WebCore/TextIterator.h>
 #import <WebCore/ThreadCheck.h>
-#import <WebCore/TypingCommand.h>
 #import <WebCore/htmlediting.h>
 #import <WebCore/markup.h>
 #import <WebCore/visible_units.h>
@@ -583,7 +580,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (RenderPart* ownerRenderer = _private->coreFrame->ownerRenderer()) {
         if (ownerRenderer->needsLayout())
             return NO;
-        *rect = ownerRenderer->absoluteClippedOverflowRect();
+        *rect = ownerRenderer->pixelSnappedAbsoluteClippedOverflowRect();
         return YES;
     }
 
@@ -632,11 +629,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     NSRect rangeRect = [self _firstRectForDOMRange:range];    
     Node *startNode = core([range startContainer]);
         
-    if (startNode && startNode->renderer()) {
-        RenderLayer *layer = startNode->renderer()->enclosingLayer();
-        if (layer)
-            layer->scrollRectToVisible(enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
-    }
+    if (startNode && startNode->renderer())
+        startNode->renderer()->scrollRectToVisible(enclosingIntRect(rangeRect), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
 }
 
 - (BOOL)_needsLayout
@@ -770,9 +764,8 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 {
     if (_private->coreFrame->selection()->isNone())
         return;
-    
-    TypingCommand::insertParagraphSeparatorInQuotedContent(_private->coreFrame->document());
-    _private->coreFrame->selection()->revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
+
+    _private->coreFrame->editor()->insertParagraphSeparatorInQuotedContent();
 }
 
 - (VisiblePosition)_visiblePositionForPoint:(NSPoint)point
@@ -1223,22 +1216,6 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     return coreFrame->layerTreeAsText();
 }
 
-- (BOOL)hasSpellingMarker:(int)from length:(int)length
-{
-    Frame* coreFrame = core(self);
-    if (!coreFrame)
-        return NO;
-    return coreFrame->editor()->selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
-}
-
-- (BOOL)hasGrammarMarker:(int)from length:(int)length
-{
-    Frame* coreFrame = core(self);
-    if (!coreFrame)
-        return NO;
-    return coreFrame->editor()->selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
-}
-
 - (id)accessibilityRoot
 {
 #if HAVE(ACCESSIBILITY)
@@ -1293,9 +1270,9 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (!root)
         return [NSArray array];
 
-    const IntRect& documentRect = root->documentRect();
-    float printWidth = root->style()->isHorizontalWritingMode() ? documentRect.width() / printScaleFactor : pageSize.width;
-    float printHeight = root->style()->isHorizontalWritingMode() ? pageSize.height : documentRect.height() / printScaleFactor;
+    const LayoutRect& documentRect = root->documentRect();
+    float printWidth = root->style()->isHorizontalWritingMode() ? static_cast<float>(documentRect.width()) / printScaleFactor : pageSize.width;
+    float printHeight = root->style()->isHorizontalWritingMode() ? pageSize.height : static_cast<float>(documentRect.height()) / printScaleFactor;
 
     PrintContext printContext(_private->coreFrame);
     printContext.computePageRectsWithPageSize(FloatSize(printWidth, printHeight), true);
@@ -1416,7 +1393,18 @@ static bool needsMicrosoftMessengerDOMDocumentWorkaround()
     Frame* coreFrame = _private->coreFrame;
     if (!coreFrame)
         return;
-    coreFrame->loader()->load(request, false);
+
+    ResourceRequest resourceRequest(request);
+    
+    // Some users of WebKit API incorrectly use "file path as URL" style requests which are invalid.
+    // By re-writing those URLs here we technically break the -[WebDataSource initialRequest] API
+    // but that is necessary to implement this quirk only at the API boundary.
+    // Note that other users of WebKit API use nil requests or requests with nil URLs, so we
+    // only implement this workaround when the request had a non-nil URL.
+    if (!resourceRequest.url().isValid() && [request URL])
+        resourceRequest.setURL([NSURL fileURLWithPath:[[request URL] absoluteString]]);
+
+    coreFrame->loader()->load(resourceRequest, false);
 }
 
 static NSURL *createUniqueWebDataURL()
@@ -1470,14 +1458,14 @@ static NSURL *createUniqueWebDataURL()
 {
     WebCoreThreadViolationCheckRoundTwo();
 
-    [self _loadHTMLString:string baseURL:baseURL unreachableURL:nil];
+    [self _loadHTMLString:string baseURL:[baseURL _webkit_URLFromURLOrPath] unreachableURL:nil];
 }
 
 - (void)loadAlternateHTMLString:(NSString *)string baseURL:(NSURL *)baseURL forUnreachableURL:(NSURL *)unreachableURL
 {
     WebCoreThreadViolationCheckRoundTwo();
 
-    [self _loadHTMLString:string baseURL:baseURL unreachableURL:unreachableURL];
+    [self _loadHTMLString:string baseURL:[baseURL _webkit_URLFromURLOrPath] unreachableURL:[unreachableURL _webkit_URLFromURLOrPath]];
 }
 
 - (void)loadArchive:(WebArchive *)archive

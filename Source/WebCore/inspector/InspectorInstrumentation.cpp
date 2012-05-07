@@ -29,9 +29,10 @@
 */
 
 #include "config.h"
-#include "InspectorInstrumentation.h"
 
 #if ENABLE(INSPECTOR)
+
+#include "InspectorInstrumentation.h"
 
 #include "CSSRule.h"
 #include "CSSStyleRule.h"
@@ -122,11 +123,11 @@ bool InspectorInstrumentation::isDebuggerPausedImpl(InstrumentingAgents* instrum
     return false;
 }
 
-void InspectorInstrumentation::willInsertDOMNodeImpl(InstrumentingAgents* instrumentingAgents, Node* node, Node* parent)
+void InspectorInstrumentation::willInsertDOMNodeImpl(InstrumentingAgents* instrumentingAgents, Node* parent)
 {
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents->inspectorDOMDebuggerAgent())
-        domDebuggerAgent->willInsertDOMNode(node, parent);
+        domDebuggerAgent->willInsertDOMNode(parent);
 #endif
 }
 
@@ -388,6 +389,12 @@ void InspectorInstrumentation::didBeginFrameImpl(InstrumentingAgents* instrument
         timelineAgent->didBeginFrame();
 }
 
+void InspectorInstrumentation::didCancelFrameImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->didCancelFrame();
+}
+
 InspectorInstrumentationCookie InspectorInstrumentation::willLayoutImpl(InstrumentingAgents* instrumentingAgents)
 {
     int timelineAgentId = 0;
@@ -400,8 +407,14 @@ InspectorInstrumentationCookie InspectorInstrumentation::willLayoutImpl(Instrume
 
 void InspectorInstrumentation::didLayoutImpl(const InspectorInstrumentationCookie& cookie)
 {
+    if (!cookie.first)
+        return;
+
     if (InspectorTimelineAgent* timelineAgent = retrieveTimelineAgent(cookie))
         timelineAgent->didLayout();
+
+    if (InspectorPageAgent* pageAgent = cookie.first->inspectorPageAgent())
+        pageAgent->didLayout();
 }
 
 InspectorInstrumentationCookie InspectorInstrumentation::willLoadXHRImpl(InstrumentingAgents* instrumentingAgents, XMLHttpRequest* request)
@@ -475,7 +488,8 @@ InspectorInstrumentationCookie InspectorInstrumentation::willMatchRuleImpl(Instr
 {
     InspectorCSSAgent* cssAgent = instrumentingAgents->inspectorCSSAgent();
     if (cssAgent) {
-        cssAgent->willMatchRule(rule->ensureCSSStyleRule());
+        RefPtr<CSSRule> cssRule = rule->createCSSOMWrapper();
+        cssAgent->willMatchRule(static_cast<CSSStyleRule*>(cssRule.get()));
         return InspectorInstrumentationCookie(instrumentingAgents, 1);
     }
 
@@ -493,7 +507,8 @@ InspectorInstrumentationCookie InspectorInstrumentation::willProcessRuleImpl(Ins
 {
     InspectorCSSAgent* cssAgent = instrumentingAgents->inspectorCSSAgent();
     if (cssAgent) {
-        cssAgent->willProcessRule(rule->ensureCSSStyleRule());
+        RefPtr<CSSRule> cssRule = rule->createCSSOMWrapper();
+        cssAgent->willProcessRule(static_cast<CSSStyleRule*>(cssRule.get()));
         return InspectorInstrumentationCookie(instrumentingAgents, 1);
     }
 
@@ -523,6 +538,26 @@ void InspectorInstrumentation::applyScreenHeightOverrideImpl(InstrumentingAgents
 {
     if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent())
         pageAgent->applyScreenHeightOverride(height);
+}
+
+bool InspectorInstrumentation::shouldApplyScreenWidthOverrideImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent()) {
+        long width = 0;
+        pageAgent->applyScreenWidthOverride(&width);
+        return !!width;
+    }
+    return false;
+}
+
+bool InspectorInstrumentation::shouldApplyScreenHeightOverrideImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent()) {
+        long height = 0;
+        pageAgent->applyScreenHeightOverride(&height);
+        return !!height;
+    }
+    return false;
 }
 
 void InspectorInstrumentation::willSendRequestImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, DocumentLoader* loader, ResourceRequest& request, const ResourceResponse& redirectResponse)
@@ -952,6 +987,21 @@ void InspectorInstrumentation::didCloseWebSocketImpl(InstrumentingAgents* instru
 {
     if (InspectorResourceAgent* resourceAgent = instrumentingAgents->inspectorResourceAgent())
         resourceAgent->didCloseWebSocket(identifier);
+}
+void InspectorInstrumentation::didReceiveWebSocketFrameImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, const WebSocketFrame& frame)
+{
+    if (InspectorResourceAgent* resourceAgent = instrumentingAgents->inspectorResourceAgent())
+        resourceAgent->didReceiveWebSocketFrame(identifier, frame);
+}
+void InspectorInstrumentation::didReceiveWebSocketFrameErrorImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, const String& errorMessage)
+{
+    if (InspectorResourceAgent* resourceAgent = instrumentingAgents->inspectorResourceAgent())
+        resourceAgent->didReceiveWebSocketFrameError(identifier, errorMessage);
+}
+void InspectorInstrumentation::didSendWebSocketFrameImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, const WebSocketFrame& frame)
+{
+    if (InspectorResourceAgent* resourceAgent = instrumentingAgents->inspectorResourceAgent())
+        resourceAgent->didSendWebSocketFrame(identifier, frame);
 }
 #endif
 

@@ -21,12 +21,13 @@
 #include "SVGPathData.h"
 
 #if ENABLE(SVG)
+#include "Path.h"
 #include "SVGCircleElement.h"
 #include "SVGEllipseElement.h"
 #include "SVGLineElement.h"
 #include "SVGNames.h"
 #include "SVGPathElement.h"
-#include "SVGPathParserFactory.h"
+#include "SVGPathUtilities.h"
 #include "SVGPolygonElement.h"
 #include "SVGPolylineElement.h"
 #include "SVGRectElement.h"
@@ -73,7 +74,7 @@ static void updatePathFromLineElement(SVGElement* element, Path& path)
 static void updatePathFromPathElement(SVGElement* element, Path& path)
 {
     ASSERT(element->hasTagName(SVGNames::pathTag));
-    SVGPathParserFactory::self()->buildPathFromByteStream(static_cast<SVGPathElement*>(element)->pathByteStream(), path);
+    buildPathFromByteStream(static_cast<SVGPathElement*>(element)->pathByteStream(), path);
 }
 
 static void updatePathFromPolygonElement(SVGElement* element, Path& path)
@@ -133,7 +134,10 @@ static void updatePathFromRectElement(SVGElement* element, Path& path)
             rx = ry;
         else if (!hasRy)
             ry = rx;
-        path.addRoundedRect(FloatRect(x, y, width, height), FloatSize(rx, ry));
+        // FIXME: We currently enforce using beziers here, as at least on CoreGraphics/Lion, as
+        // the native method uses a different line dash origin, causing svg/custom/dashOrigin.svg to fail.
+        // See bug https://bugs.webkit.org/show_bug.cgi?id=79932 which tracks this issue.
+        path.addRoundedRect(FloatRect(x, y, width, height), FloatSize(rx, ry), Path::PreferBezierRoundedRect);
         return;
     }
 

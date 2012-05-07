@@ -68,21 +68,24 @@ class MockCommitQueue(CommitQueueTaskDelegate):
     def expected_failures(self):
         return ExpectedFailures()
 
-    def layout_test_results(self):
+    def test_results(self):
         return None
 
     def report_flaky_tests(self, patch, flaky_results, results_archive):
         flaky_tests = [result.filename for result in flaky_results]
         log("report_flaky_tests: patch='%s' flaky_tests='%s' archive='%s'" % (patch.id(), flaky_tests, results_archive.filename))
 
-    def archive_last_layout_test_results(self, patch):
-        log("archive_last_layout_test_results: patch='%s'" % patch.id())
+    def archive_last_test_results(self, patch):
+        log("archive_last_test_results: patch='%s'" % patch.id())
         archive = Mock()
         archive.filename = "mock-archive-%s.zip" % patch.id()
         return archive
 
     def build_style(self):
         return "both"
+
+    def did_pass_testing_ews(self, patch):
+        return False
 
 
 class FailingTestCommitQueue(MockCommitQueue):
@@ -99,8 +102,8 @@ class FailingTestCommitQueue(MockCommitQueue):
     def _mock_test_result(self, testname):
         return test_results.TestResult(testname, [test_failures.FailureTextMismatch()])
 
-    def layout_test_results(self):
-        # Doesn't make sense to ask for the layout_test_results until the tests have run at least once.
+    def test_results(self):
+        # Doesn't make sense to ask for the test_results until the tests have run at least once.
         assert(self._test_run_counter >= 0)
         failures_for_run = self._test_failure_plan[self._test_run_counter]
         results = LayoutTestResults(map(self._mock_test_result, failures_for_run))
@@ -139,6 +142,24 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_passed: success_message='Passed tests' patch='10000'
+run_webkit_patch: ['land-attachment', '--force-clean', '--non-interactive', '--parent-command=commit-queue', 10000]
+command_passed: success_message='Landed patch' patch='10000'
+"""
+        self._run_through_task(commit_queue, expected_stderr)
+
+    def test_fast_success_case(self):
+        commit_queue = MockCommitQueue([])
+        commit_queue.did_pass_testing_ews = lambda patch: True
+        expected_stderr = """run_webkit_patch: ['clean']
+command_passed: success_message='Cleaned working directory' patch='10000'
+run_webkit_patch: ['update']
+command_passed: success_message='Updated working directory' patch='10000'
+run_webkit_patch: ['apply-attachment', '--no-update', '--non-interactive', 10000]
+command_passed: success_message='Applied patch' patch='10000'
+run_webkit_patch: ['validate-changelog', '--non-interactive', 10000]
+command_passed: success_message='ChangeLog validated' patch='10000'
+run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
+command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['land-attachment', '--force-clean', '--non-interactive', '--parent-command=commit-queue', 10000]
 command_passed: success_message='Landed patch' patch='10000'
 """
@@ -256,7 +277,7 @@ command_failed: failure_message='Unable to build without patch' script_error='MO
         ])
         # CommitQueueTask will only report flaky tests if we successfully parsed
         # results.html and returned a LayoutTestResults object, so we fake one.
-        commit_queue.layout_test_results = lambda: LayoutTestResults([])
+        commit_queue.test_results = lambda: LayoutTestResults([])
         expected_stderr = """run_webkit_patch: ['clean']
 command_passed: success_message='Cleaned working directory' patch='10000'
 run_webkit_patch: ['update']
@@ -269,7 +290,7 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK tests failure' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_passed: success_message='Passed tests' patch='10000'
 report_flaky_tests: patch='10000' flaky_tests='[]' archive='mock-archive-10000.zip'
@@ -287,10 +308,10 @@ command_passed: success_message='Landed patch' patch='10000'
             None,
             ScriptError("MOCK tests failure"),
         ])
-        commit_queue.layout_test_results = lambda: LayoutTestResults([])
+        commit_queue.test_results = lambda: LayoutTestResults([])
         # It's possible delegate to fail to archive layout tests, don't try to report
         # flaky tests when that happens.
-        commit_queue.archive_last_layout_test_results = lambda patch: None
+        commit_queue.archive_last_test_results = lambda patch: None
         expected_stderr = """run_webkit_patch: ['clean']
 command_passed: success_message='Cleaned working directory' patch='10000'
 run_webkit_patch: ['update']
@@ -339,7 +360,7 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='10000'
 """
@@ -371,10 +392,10 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--non-interactive']
 command_passed: success_message='Able to pass tests without patch' patch='10000'
 """
@@ -410,10 +431,10 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--non-interactive']
 command_failed: failure_message='Unable to pass tests without patch (tree is red?)' script_error='MOCK clean test failure' patch='10000'
 run_webkit_patch: ['land-attachment', '--force-clean', '--non-interactive', '--parent-command=commit-queue', 10000]
@@ -453,10 +474,10 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--non-interactive']
 command_failed: failure_message='Unable to pass tests without patch (tree is red?)' script_error='MOCK clean test failure' patch='10000'
 """
@@ -492,10 +513,10 @@ run_webkit_patch: ['build', '--no-clean', '--no-update', '--build-style=both']
 command_passed: success_message='Built patch' patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--no-clean', '--no-update', '--test', '--non-interactive']
 command_failed: failure_message='Patch does not pass tests' script_error='MOCK test failure again' patch='10000'
-archive_last_layout_test_results: patch='10000'
+archive_last_test_results: patch='10000'
 run_webkit_patch: ['build-and-test', '--force-clean', '--no-update', '--build', '--test', '--non-interactive']
 command_failed: failure_message='Unable to pass tests without patch (tree is red?)' script_error='MOCK clean test failure' patch='10000'
 """

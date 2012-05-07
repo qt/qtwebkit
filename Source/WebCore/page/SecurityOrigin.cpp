@@ -355,14 +355,26 @@ bool SecurityOrigin::canDisplay(const KURL& url) const
     return true;
 }
 
+SecurityOrigin::Policy SecurityOrigin::canShowNotifications() const
+{
+    if (m_universalAccess)
+        return AlwaysAllow;
+    if (isUnique())
+        return AlwaysDeny;
+    return Ask;
+}
+
 void SecurityOrigin::grantLoadLocalResources()
 {
-    // This function exists only to support backwards compatibility with older
-    // versions of WebKit. Granting privileges to some, but not all, documents
-    // in a SecurityOrigin is a security hazard because the documents without
-    // the privilege can obtain the privilege by injecting script into the
-    // documents that have been granted the privilege.
-    ASSERT(SecurityPolicy::allowSubstituteDataAccessToLocal());
+    // Granting privileges to some, but not all, documents in a SecurityOrigin
+    // is a security hazard because the documents without the privilege can
+    // obtain the privilege by injecting script into the documents that have
+    // been granted the privilege.
+    //
+    // To be backwards compatible with older versions of WebKit, we also use
+    // this function to grant the ability to load local resources to documents
+    // loaded with SubstituteData.
+    ASSERT(isUnique() || SecurityPolicy::allowSubstituteDataAccessToLocal());
     m_canLoadLocalResources = true;
 }
 
@@ -386,12 +398,15 @@ String SecurityOrigin::toString() const
 {
     if (isUnique())
         return "null";
+    if (m_protocol == "file" && m_enforceFilePathSeparation)
+        return "null";
+    return toRawString();
+}
 
-    if (m_protocol == "file") {
-        if (m_enforceFilePathSeparation)
-            return "null";
+String SecurityOrigin::toRawString() const
+{
+    if (m_protocol == "file")
         return "file://";
-    }
 
     StringBuilder result;
     result.reserveCapacity(m_protocol.length() + m_host.length() + 10);

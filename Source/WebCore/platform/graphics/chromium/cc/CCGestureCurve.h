@@ -31,18 +31,19 @@ class IntPoint;
 
 class CCGestureCurveTarget {
 public:
-    virtual void setScrollIncrement(const IntPoint&) = 0;
-    // FIXME: add interfaces for setScroll(), setPageScaleAndScroll(), etc.
-
-protected:
     virtual ~CCGestureCurveTarget() { }
+
+    virtual void scrollBy(const IntPoint&) = 0;
+    // FIXME: add interfaces for scroll(), etc.
 };
 
 class CCGestureCurve {
 public:
     virtual ~CCGestureCurve() { }
 
-    virtual bool apply(double time, CCGestureCurveTarget*) = 0;
+    virtual const char* debugName() const = 0;
+
+    virtual bool apply(double monotonicTime, CCGestureCurveTarget*) = 0;
 };
 
 } // namespace WebCore

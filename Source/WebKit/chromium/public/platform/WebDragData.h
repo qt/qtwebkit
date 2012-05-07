@@ -70,6 +70,7 @@ public:
 
         // Only valid when storageType == StorageTypeFilename.
         WebString filenameData;
+        WebString displayNameData;
 
         // Only valid when storageType == StorageTypeBinaryData.
         WebData binaryData;
@@ -101,6 +102,9 @@ public:
     WEBKIT_EXPORT WebVector<Item> items() const;
     WEBKIT_EXPORT void setItems(const WebVector<Item>&);
     WEBKIT_EXPORT void addItem(const Item&);
+
+    WEBKIT_EXPORT WebString filesystemId() const;
+    WEBKIT_EXPORT void setFilesystemId(const WebString&);
 
 #if WEBKIT_IMPLEMENTATION
     WebDragData(const WTF::PassRefPtr<WebCore::ChromiumDataObject>&);

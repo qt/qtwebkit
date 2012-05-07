@@ -31,9 +31,7 @@
 #ifndef PlatformContextSkia_h
 #define PlatformContextSkia_h
 
-#include "AffineTransform.h"
 #include "GraphicsContext.h"
-#include "Noncopyable.h"
 #include "OpaqueRegionSkia.h"
 
 #include "SkCanvas.h"
@@ -42,12 +40,12 @@
 #include "SkPaint.h"
 #include "SkPath.h"
 
+#include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
 enum CompositeOperator;
-class GraphicsContext3D;
 class Texture;
 
 // This class holds the platform-specific state for GraphicsContext. We put
@@ -93,6 +91,10 @@ public:
 
     void save();
     void restore();
+
+    void saveLayer(const SkRect* bounds, const SkPaint*);
+    void saveLayer(const SkRect* bounds, const SkPaint*, SkCanvas::SaveFlags);
+    void restoreLayer();
 
     // Begins a layer that is clipped to the image |imageBuffer| at the location
     // |rect|. This layer is implicitly restored when the next restore is
@@ -181,8 +183,8 @@ public:
     void clearImageResamplingHint();
     bool hasImageResamplingHint() const;
 
-    bool isAccelerated() const { return m_gpuContext; }
-    void setGraphicsContext3D(GraphicsContext3D*);
+    bool isAccelerated() const { return m_accelerated; }
+    void setAccelerated(bool accelerated) { m_accelerated = accelerated; }
 
     // True if this context is deferring draw calls to be executed later.
     // We need to know this for context-to-context draws, in order to know if
@@ -191,8 +193,6 @@ public:
     void setDeferred(bool deferred) { m_deferred = deferred; }
 
     void setTrackOpaqueRegion(bool track) { m_trackOpaqueRegion = track; }
-    // A transform applied to all tracked opaque paints. This is applied at the time the painting is done.
-    void setOpaqueRegionTransform(const AffineTransform& transform) { m_opaqueRegionTransform = transform; }
 
     // This will be an empty region unless tracking is enabled.
     const OpaqueRegionSkia& opaqueRegion() const { return m_opaqueRegion; }
@@ -203,6 +203,10 @@ public:
     void didDrawPoints(SkCanvas::PointMode, int numPoints, const SkPoint[], const SkPaint&);
     // For drawing operations that do not fill the entire rect.
     void didDrawBounded(const SkRect&, const SkPaint&);
+
+    // Turn off LCD text for the paint if not supported on this context.
+    void adjustTextRenderMode(SkPaint*);
+    bool couldUseLCDRenderedText();
 
 private:
     // Used when restoring and the state has an image clip. Only shows the pixels in
@@ -230,16 +234,15 @@ private:
     // Tracks the region painted opaque via the GraphicsContext.
     OpaqueRegionSkia m_opaqueRegion;
     bool m_trackOpaqueRegion;
-    AffineTransform m_opaqueRegionTransform;
 
     // Stores image sizes for a hint to compute image resampling modes.
     // Values are used in ImageSkia.cpp
     IntSize m_imageResamplingHintSrcSize;
     FloatSize m_imageResamplingHintDstSize;
     bool m_printing;
+    bool m_accelerated;
     bool m_deferred;
     bool m_drawingToImageBuffer;
-    GraphicsContext3D* m_gpuContext;
 };
 
 }

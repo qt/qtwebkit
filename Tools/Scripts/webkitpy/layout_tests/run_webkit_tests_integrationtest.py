@@ -33,6 +33,7 @@ import codecs
 import itertools
 import json
 import logging
+import platform
 import Queue
 import re
 import StringIO
@@ -42,14 +43,9 @@ import time
 import threading
 import unittest
 
-from webkitpy.common.system import path
-
-# FIXME: remove this when we fix test-webkitpy to work properly on cygwin
-# (bug 63846).
-SHOULD_TEST_PROCESSES = sys.platform not in ('cygwin', 'win32')
-
-from webkitpy.common.system import outputcapture
+from webkitpy.common.system import outputcapture, path
 from webkitpy.common.system.crashlogs_unittest import make_mock_crash_report_darwin
+from webkitpy.common.system.systemhost import SystemHost
 from webkitpy.common.host_mock import MockHost
 
 from webkitpy.layout_tests import port
@@ -73,8 +69,8 @@ def parse_args(extra_args=None, record_results=False, tests_included=False, new_
     if not new_results:
         args.append('--no-new-test-results')
 
-    if not '--child-processes' in extra_args and not '--worker-model' in extra_args:
-        args.extend(['--worker-model', 'inline'])
+    if not '--child-processes' in extra_args:
+        args.extend(['--child-processes', 1])
     args.extend(extra_args)
     if not tests_included:
         # We use the glob to test that globbing works.
@@ -263,6 +259,16 @@ class LintTest(unittest.TestCase, StreamTestingMixin):
 
 
 class MainTest(unittest.TestCase, StreamTestingMixin):
+    def setUp(self):
+        # A real PlatformInfo object is used here instead of a
+        # MockPlatformInfo because we need to actually check for
+        # Windows and Mac to skip some tests.
+        self._platform = SystemHost().platform
+
+        # FIXME: Remove this when we fix test-webkitpy to work
+        # properly on cygwin (bug 63846).
+        self.should_test_processes = not self._platform.is_win()
+
     def test_accelerated_compositing(self):
         # This just tests that we recognize the command line args
         self.assertTrue(passing_run(['--accelerated-video']))
@@ -285,25 +291,16 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         for batch in batch_tests_run:
             self.assertTrue(len(batch) <= 2, '%s had too many tests' % ', '.join(batch))
 
-    def test_child_process_1(self):
-        if SHOULD_TEST_PROCESSES:
-            _, _, regular_output, _ = logging_run(
-                ['--print', 'config', '--worker-model', 'processes', '--child-processes', '1'])
-            self.assertTrue(any(['Running 1 ' in line for line in regular_output.buflist]))
-
     def test_child_processes_2(self):
-        # This test seems to fail on win32.
-        if sys.platform == 'win32':
-            return
-        if SHOULD_TEST_PROCESSES:
+        if self.should_test_processes:
             _, _, regular_output, _ = logging_run(
-                ['--print', 'config', '--worker-model', 'processes', '--child-processes', '2'])
+                ['--print', 'config', '--child-processes', '2'])
             self.assertTrue(any(['Running 2 ' in line for line in regular_output.buflist]))
 
     def test_child_processes_min(self):
-        if SHOULD_TEST_PROCESSES:
+        if self.should_test_processes:
             _, _, regular_output, _ = logging_run(
-                ['--print', 'config', '--worker-model', 'processes', '--child-processes', '2', 'passes'],
+                ['--print', 'config', '--child-processes', '2', 'passes'],
                 tests_included=True)
             self.assertTrue(any(['Running 1 ' in line for line in regular_output.buflist]))
 
@@ -319,18 +316,17 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         # whether they are in-process or out. inline exceptions work as normal,
         # which allows us to get the full stack trace and traceback from the
         # worker. The downside to this is that it could be any error, but this
-        # is actually useful in testing, which is what --worker-model=inline is
-        # usually used for.
+        # is actually useful in testing.
         #
         # Exceptions raised in a separate process are re-packaged into
         # WorkerExceptions, which have a string capture of the stack which can
         # be printed, but don't display properly in the unit test exception handlers.
         self.assertRaises(ValueError, logging_run,
-            ['failures/expected/exception.html'], tests_included=True)
+            ['failures/expected/exception.html', '--child-processes', '1'], tests_included=True)
 
-        if SHOULD_TEST_PROCESSES:
+        if self.should_test_processes:
             self.assertRaises(run_webkit_tests.WorkerException, logging_run,
-                ['--worker-model', 'processes', 'failures/expected/exception.html'], tests_included=True)
+                ['--child-processes', '2', '--force', 'failures/expected/exception.html', 'passes/text.html'], tests_included=True)
 
     def test_full_results_html(self):
         # FIXME: verify html?
@@ -355,12 +351,12 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         # Note that this also tests running a test marked as SKIP if
         # you specify it explicitly.
         self.assertRaises(KeyboardInterrupt, logging_run,
-            ['failures/expected/keyboard.html'], tests_included=True)
-
-    def test_keyboard_interrupt_inline_worker_model(self):
-        self.assertRaises(KeyboardInterrupt, logging_run,
-            ['failures/expected/keyboard.html', '--worker-model', 'inline'],
+            ['failures/expected/keyboard.html', '--child-processes', '1'],
             tests_included=True)
+
+        if self.should_test_processes:
+            self.assertRaises(KeyboardInterrupt, logging_run,
+                ['failures/expected/keyboard.html', 'passes/text.html', '--child-processes', '2', '--force'], tests_included=True)
 
     def test_no_tests_found(self):
         res, out, err, user = logging_run(['resources'], tests_included=True)
@@ -396,6 +392,20 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         tests_to_run = ['passes/image.html', 'passes/text.html']
         tests_run = get_tests_run(['--skip-pixel-test-if-no-baseline'] + tests_to_run, tests_included=True, flatten_batches=True)
         self.assertEquals(tests_run, ['passes/image.html', 'passes/text.html'])
+
+    def test_ignore_tests(self):
+        def assert_ignored(args, tests_expected_to_run):
+            tests_to_run = ['failures/expected/image.html', 'passes/image.html']
+            tests_run = get_tests_run(args + tests_to_run, tests_included=True, flatten_batches=True)
+            self.assertEquals(tests_run, tests_expected_to_run)
+
+        assert_ignored(['-i', 'failures/expected/image.html'], ['passes/image.html'])
+        assert_ignored(['-i', 'passes'], ['failures/expected/image.html'])
+
+        # Note here that there is an expectation for failures/expected/image.html already, but
+        # it is overriden by the command line arg. This might be counter-intuitive.
+        # FIXME: This isn't currently working ...
+        # assert_ignored(['-i', 'failures/expected'], ['passes/image.html'])
 
     def test_iterations(self):
         tests_to_run = ['passes/image.html', 'passes/text.html']
@@ -569,6 +579,10 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         self.assertTrue(host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json').find('"num_regressions":0') != -1)
 
     def test_crash_log(self):
+        # FIXME: Need to rewrite these tests to not be mac-specific, or move them elsewhere.
+        # Currently CrashLog uploading only works on Darwin.
+        if not self._platform.is_mac():
+            return
         mock_crash_report = make_mock_crash_report_darwin('DumpRenderTree', 12345)
         host = MockHost()
         host.filesystem.write_text_file('/Users/mock/Library/Logs/DiagnosticReports/DumpRenderTree_2011-06-13-150719_quadzen.crash', mock_crash_report)
@@ -579,12 +593,13 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
             record_results=True,
             host=host)
         expected_crash_log = mock_crash_report
-        # Currently CrashLog uploading only works on Darwin.
-        if sys.platform != "darwin":
-            expected_crash_log = "mock-std-error-output"
         self.assertEquals(host.filesystem.read_text_file('/tmp/layout-test-results/failures/unexpected/crash-with-stderr-crash-log.txt'), expected_crash_log)
 
     def test_web_process_crash_log(self):
+        # FIXME: Need to rewrite these tests to not be mac-specific, or move them elsewhere.
+        # Currently CrashLog uploading only works on Darwin.
+        if not self._platform.is_mac():
+            return
         mock_crash_report = make_mock_crash_report_darwin('WebProcess', 12345)
         host = MockHost()
         host.filesystem.write_text_file('/Users/mock/Library/Logs/DiagnosticReports/WebProcess_2011-06-13-150719_quadzen.crash', mock_crash_report)
@@ -594,11 +609,7 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
             tests_included=True,
             record_results=True,
             host=host)
-        expected_crash_log = mock_crash_report
-        # Currently CrashLog uploading only works on Darwin.
-        if sys.platform != "darwin":
-            expected_crash_log = "mock-std-error-output"
-        self.assertEquals(host.filesystem.read_text_file('/tmp/layout-test-results/failures/unexpected/web-process-crash-with-stderr-crash-log.txt'), expected_crash_log)
+        self.assertEquals(host.filesystem.read_text_file('/tmp/layout-test-results/failures/unexpected/web-process-crash-with-stderr-crash-log.txt'), mock_crash_report)
 
     def test_exit_after_n_failures_upload(self):
         host = MockHost()
@@ -610,7 +621,22 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
             tests_included=True,
             record_results=True,
             host=host)
-        self.assertTrue('/tmp/layout-test-results/incremental_results.json' in host.filesystem.files)
+
+        # By returning False, we know that the incremental results were generated and then deleted.
+        self.assertFalse(host.filesystem.exists('/tmp/layout-test-results/incremental_results.json'))
+
+        # This checks that we report only the number of tests that actually failed.
+        self.assertEquals(res, 1)
+
+        # This checks that passes/text.html is considered SKIPped.
+        self.assertTrue('"skipped":1' in host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json'))
+
+        # This checks that we told the user we bailed out.
+        self.assertTrue('Exiting early after 1 failures. 1 tests run.\n' in regular_output.getvalue())
+
+        # This checks that neither test ran as expected.
+        # FIXME: This log message is confusing; tests that were skipped should be called out separately.
+        self.assertTrue('0 tests ran as expected, 2 didn\'t:\n' in regular_output.getvalue())
 
     def test_exit_after_n_failures(self):
         # Unexpected failures should result in tests stopping.
@@ -664,17 +690,6 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
             flatten_batches=True)
         self.assertEquals(['failures/expected/crash.html', 'passes/text.html'], tests_run)
 
-    def test_exit_after_n_crashes_inline_worker_model(self):
-        tests_run = get_tests_run([
-                'failures/unexpected/timeout.html',
-                'passes/text.html',
-                '--exit-after-n-crashes-or-timeouts', '1',
-                '--worker-model', 'inline',
-            ],
-            tests_included=True,
-            flatten_batches=True)
-        self.assertEquals(['failures/unexpected/timeout.html'], tests_run)
-
     def test_results_directory_absolute(self):
         # We run a configuration that should fail, to generate output, then
         # look for what the output results url was.
@@ -711,19 +726,17 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
     # These next tests test that we run the tests in ascending alphabetical
     # order per directory. HTTP tests are sharded separately from other tests,
     # so we have to test both.
-    def assert_run_order(self, worker_model, child_processes='1'):
-        tests_run = get_tests_run(['--worker-model', worker_model,
-            '--child-processes', child_processes, 'passes'],
+    def assert_run_order(self, child_processes='1'):
+        tests_run = get_tests_run(['--child-processes', child_processes, 'passes'],
             tests_included=True, flatten_batches=True)
         self.assertEquals(tests_run, sorted(tests_run))
 
-        tests_run = get_tests_run(['--worker-model', worker_model,
-            '--child-processes', child_processes, 'http/tests/passes'],
+        tests_run = get_tests_run(['--child-processes', child_processes, 'http/tests/passes'],
             tests_included=True, flatten_batches=True)
         self.assertEquals(tests_run, sorted(tests_run))
 
     def test_run_order__inline(self):
-        self.assert_run_order('inline')
+        self.assert_run_order()
 
     def test_tolerance(self):
         class ImageDiffTestPort(TestPort):
@@ -755,26 +768,6 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
     def test_virtual(self):
         self.assertTrue(passing_run(['passes/text.html', 'passes/args.html',
                                      'virtual/passes/text.html', 'virtual/passes/args.html']))
-
-    def test_worker_model__inline(self):
-        self.assertTrue(passing_run(['--worker-model', 'inline']))
-
-    def test_worker_model__inline_with_child_processes(self):
-        res, out, err, user = logging_run(['--worker-model', 'inline',
-                                           '--child-processes', '2'])
-        self.assertEqual(res, 0)
-        self.assertContainsLine(err, '--worker-model=inline overrides --child-processes\n')
-
-    def test_worker_model__processes(self):
-        if SHOULD_TEST_PROCESSES:
-            self.assertTrue(passing_run(['--worker-model', 'processes']))
-
-    def test_worker_model__processes_and_dry_run(self):
-        if SHOULD_TEST_PROCESSES:
-            self.assertTrue(passing_run(['--worker-model', 'processes', '--dry-run']))
-
-    def test_worker_model__unknown(self):
-        self.assertRaises(ValueError, logging_run, ['--worker-model', 'unknown'])
 
     def test_reftest_run(self):
         tests_run = get_tests_run(['passes/reftest.html'], tests_included=True, flatten_batches=True)
@@ -819,6 +812,12 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         res, buildbot_output, regular_output, user = logging_run(['--additional-platform-directory', 'foo'])
         self.assertContainsLine(regular_output, '--additional-platform-directory=foo is ignored since it is not absolute\n')
 
+    def test_additional_expectations(self):
+        host = MockHost()
+        host.filesystem.write_text_file('/tmp/overrides.txt', 'BUGX : failures/unexpected/mismatch.html = IMAGE\n')
+        self.assertTrue(passing_run(['--additional-expectations', '/tmp/overrides.txt', 'failures/unexpected/mismatch.html'],
+                                     tests_included=True, host=host))
+
     def test_no_http_and_force(self):
         # See test_run_force, using --force raises an exception.
         # FIXME: We would like to check the warnings generated.
@@ -840,8 +839,6 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         batch_tests_run_http = get_tests_run(['--http', 'LayoutTests/http', 'websocket/'], flatten_batches=True)
         self.assertTrue(MainTest.has_test_of_type(batch_tests_run_http, 'http'))
         self.assertTrue(MainTest.has_test_of_type(batch_tests_run_http, 'websocket'))
-
-MainTest = skip_if(MainTest, sys.platform == 'cygwin' and sys.version < '2.6', 'new-run-webkit-tests tests hang on Cygwin Python 2.5.2')
 
 
 class EndToEndTest(unittest.TestCase):
@@ -876,7 +873,7 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue("multiple-mismatch-success.html" not in json["tests"]["reftests"]["foo"])
         self.assertTrue("multiple-both-success.html" not in json["tests"]["reftests"]["foo"])
         self.assertEqual(json["tests"]["reftests"]["foo"]["multiple-match-failure.html"],
-            {"expected": "PASS", "ref_file": "reftests/foo/second-mismatching-ref.html", "actual": "IMAGE", 'is_reftest': True})
+            {"expected": "PASS", "ref_file": "reftests/foo/second-mismatching-ref.html", "actual": "IMAGE", "image_diff_percent": 1, 'is_reftest': True})
         self.assertEqual(json["tests"]["reftests"]["foo"]["multiple-mismatch-failure.html"],
             {"expected": "PASS", "ref_file": "reftests/foo/matching-ref.html", "actual": "IMAGE", "is_mismatch_reftest": True})
         self.assertEqual(json["tests"]["reftests"]["foo"]["multiple-both-failure.html"],

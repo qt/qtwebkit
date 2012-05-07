@@ -29,21 +29,14 @@
 #include "FloatQuad.h"
 #include "Region.h"
 #include "TransformationMatrix.h"
+#include "cc/CCLayerIterator.h"
+#include "cc/CCOverdrawMetrics.h"
 
 namespace WebCore {
 class CCLayerImpl;
 class CCRenderSurface;
 class LayerChromium;
 class RenderSurfaceChromium;
-
-template<typename RenderSurfaceType>
-class CCOcclusionTrackerDamageClientBase {
-public:
-    virtual FloatRect damageRect(const RenderSurfaceType*) const = 0;
-};
-
-typedef CCOcclusionTrackerDamageClientBase<RenderSurfaceChromium> CCOcclusionTrackerDamageClient;
-typedef CCOcclusionTrackerDamageClientBase<CCRenderSurface> CCOcclusionTrackerDamageClientImpl;
 
 // This class is used to track occlusion of layers while traversing them in a front-to-back order. As each layer is visited, one of the
 // methods in this class is called to notify it about the current target surface.
@@ -53,39 +46,37 @@ typedef CCOcclusionTrackerDamageClientBase<CCRenderSurface> CCOcclusionTrackerDa
 template<typename LayerType, typename RenderSurfaceType>
 class CCOcclusionTrackerBase {
     WTF_MAKE_NONCOPYABLE(CCOcclusionTrackerBase);
-    typedef CCOcclusionTrackerDamageClientBase<RenderSurfaceType> DamageClientType;
 public:
-    CCOcclusionTrackerBase(IntRect scissorRectInScreenSpace);
-    CCOcclusionTrackerBase(IntRect scissorRectInScreenSpace, const DamageClientType*);
+    CCOcclusionTrackerBase(IntRect scissorRectInScreenSpace, bool recordMetricsForFrame);
 
-    // Called when visiting a layer representing itself. If the target was not already current, then this indicates we have entered a new surface subtree.
-    void enterTargetRenderSurface(const RenderSurfaceType* newTarget);
-
-    // Called when visiting a layer representing a target surface. This indicates we have visited all the layers within the surface, and we may
-    // perform any surface-wide operations.
-    void finishedTargetRenderSurface(const LayerType*, const RenderSurfaceType* finishedTarget);
-
-    // Called when visiting a layer representing a contributing surface. This  indicates that we are leaving our current surface, and
-    // entering the new one. We then perform any operations required for merging results from the child subtree into its parent.
-    void leaveToTargetRenderSurface(const RenderSurfaceType* newTarget);
-
-    // Add the layer's occlusion to the tracked state.
-    void markOccludedBehindLayer(const LayerType*);
+    // Called at the beginning of each step in the CCLayerIterator's front-to-back traversal.
+    void enterLayer(const CCLayerIteratorPosition<LayerType>&);
+    // Called at the end of each step in the CCLayerIterator's front-to-back traversal.
+    void leaveLayer(const CCLayerIteratorPosition<LayerType>&);
 
     // Returns true if the given rect in content space for the layer is fully occluded in either screen space or the layer's target surface.
     bool occluded(const LayerType*, const IntRect& contentRect) const;
     // Gives an unoccluded sub-rect of |contentRect| in the content space of the layer. Used when considering occlusion for a layer that paints/draws something.
     IntRect unoccludedContentRect(const LayerType*, const IntRect& contentRect) const;
 
-    // FIXME: Remove this when paint tracking is on for paint culling.
-    void setUsePaintTracking(bool use) { m_usePaintTracking = use; }
+    // Gives an unoccluded sub-rect of |contentRect| in the content space of the surface. Used when considering occlusion for a contributing surface
+    // that is rendering into another target surface.
+    IntRect unoccludedContributingSurfaceContentRect(const RenderSurfaceType*, bool forReplica, const IntRect& contentRect) const;
 
-    // FIXME: Remove these in future, they are to make CLs for transitioning to this easier.
-    const Region& currentOcclusionInScreenSpace() const;
-    const Region& currentOcclusionInTargetSurface() const;
+    // Report operations for recording overdraw metrics.
+    CCOverdrawMetrics& overdrawMetrics() const { return *m_overdrawMetrics.get(); }
+
+    // Gives the region of the screen that is not occluded by something opaque.
+    Region computeVisibleRegionInScreen() const { return subtract(Region(m_scissorRectInScreenSpace), m_stack.last().occlusionInScreen); }
+
+    void setMinimumTrackingSize(const IntSize& size) { m_minimumTrackingSize = size; }
+
+    static IntSize preferredMinimumTrackingSize() { return IntSize(160, 160); }
 
 protected:
     struct StackObject {
+        StackObject() : surface(0) { }
+        StackObject(const RenderSurfaceType* surface) : surface(surface) { }
         const RenderSurfaceType* surface;
         Region occlusionInScreen;
         Region occlusionInTarget;
@@ -104,9 +95,23 @@ protected:
     virtual IntRect layerScissorRectInTargetSurface(const LayerType*) const;
 
 private:
+    // Called when visiting a layer representing itself. If the target was not already current, then this indicates we have entered a new surface subtree.
+    void enterTargetRenderSurface(const RenderSurfaceType* newTarget);
+
+    // Called when visiting a layer representing a target surface. This indicates we have visited all the layers within the surface, and we may
+    // perform any surface-wide operations.
+    void finishedTargetRenderSurface(const LayerType*, const RenderSurfaceType* finishedTarget);
+
+    // Called when visiting a layer representing a contributing surface. This indicates that we are leaving our current surface, and
+    // entering the new one. We then perform any operations required for merging results from the child subtree into its parent.
+    void leaveToTargetRenderSurface(const RenderSurfaceType* newTarget);
+
+    // Add the layer's occlusion to the tracked state.
+    void markOccludedBehindLayer(const LayerType*);
+
     IntRect m_scissorRectInScreenSpace;
-    const DamageClientType* m_surfaceDamageClient;
-    bool m_usePaintTracking; // FIXME: Remove this when paint tracking is on for paint culling.
+    OwnPtr<CCOverdrawMetrics> m_overdrawMetrics;
+    IntSize m_minimumTrackingSize;
 };
 
 typedef CCOcclusionTrackerBase<LayerChromium, RenderSurfaceChromium> CCOcclusionTracker;

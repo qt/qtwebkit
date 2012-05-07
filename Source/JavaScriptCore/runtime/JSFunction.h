@@ -24,6 +24,7 @@
 #ifndef JSFunction_h
 #define JSFunction_h
 
+#include "InternalFunction.h"
 #include "JSObject.h"
 
 namespace JSC {
@@ -54,8 +55,7 @@ namespace JSC {
     public:
         typedef JSNonFinalObject Base;
 
-        JS_EXPORT_PRIVATE static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeFunction nativeFunction, NativeFunction nativeConstructor = callHostFunctionAsConstructor);
-        static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeExecutable* nativeExecutable);
+        JS_EXPORT_PRIVATE static JSFunction* create(ExecState*, JSGlobalObject*, int length, const Identifier& name, NativeFunction nativeFunction, Intrinsic = NoIntrinsic, NativeFunction nativeConstructor = callHostFunctionAsConstructor);
 
         static JSFunction* create(ExecState* exec, FunctionExecutable* executable, ScopeChainNode* scopeChain)
         {
@@ -154,12 +154,9 @@ namespace JSC {
         WriteBarrier<ScopeChainNode> m_scopeChain;
     };
 
-    JSFunction* asFunction(JSValue);
-
-    inline JSFunction* asFunction(JSValue value)
+    inline bool JSValue::isFunction() const
     {
-        ASSERT(asObject(value)->inherits(&JSFunction::s_info));
-        return static_cast<JSFunction*>(asObject(value));
+        return isCell() && (asCell()->inherits(&JSFunction::s_info) || asCell()->inherits(&InternalFunction::s_info));
     }
 
 } // namespace JSC

@@ -1,3 +1,343 @@
+2012-05-05  Dean Jackson  <dino@apple.com>
+
+        Add new Setting/Preference to disable requestAnimationFrame
+        https://bugs.webkit.org/show_bug.cgi?id=85693
+
+        Reviewed by Simon Fraser.
+
+        Exposes a new WebPreference: WebKitRequestAnimationFrameEnabled.
+        The default value is true. The majority of applications will leave
+        it this way.
+
+        * Interfaces/IWebPreferencesPrivate.idl:
+        * WebPreferenceKeysPrivate.h:
+        * WebPreferences.cpp:
+        (WebPreferences::initializeDefaultSettings):
+        (WebPreferences::setRequestAnimationFrameEnabled):
+        (WebPreferences::requestAnimationFrameEnabled):
+        * WebPreferences.h:
+        (WebPreferences):
+        * WebView.cpp:
+        (WebView::notifyPreferencesChanged):
+
+2012-05-04  Nate Chapin  <japhet@chromium.org>
+
+        Don't require FrameLoaderClient to manufacture a commitData() call for empty documents.
+        https://bugs.webkit.org/show_bug.cgi?id=85533
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebFrameLoaderClient::finishedLoading):
+
+2012-04-27  Jon Lee  <jonlee@apple.com>
+
+        Migrate permission functions to Notification from NotificationCenter
+        https://bugs.webkit.org/show_bug.cgi?id=80485
+        <rdar://problem/10965458>
+
+        Reviewed by Jian Li.
+
+        * WebCoreSupport/WebDesktopNotificationsDelegate.cpp:
+        (WebDesktopNotificationsDelegate::requestPermission):
+        * WebCoreSupport/WebDesktopNotificationsDelegate.h:
+        (WebDesktopNotificationsDelegate): Add stub implementation of requestPermission.
+
+2012-04-23  Jon Honeycutt  <jhoneycutt@apple.com>
+
+        FrameLoaderClient::dispatchWillSendSubmitEvent() should be given more
+        information about the form being submitted
+        https://bugs.webkit.org/show_bug.cgi?id=84297
+
+        Reviewed by Andy Estes.
+
+        * WebFrame.h:
+        Fix function stub for new parameter.
+
+2012-05-01  Ryosuke Niwa  <rniwa@webkit.org>
+
+        *Command.h files shouldn't be exported to WebKit layer
+        https://bugs.webkit.org/show_bug.cgi?id=74778
+
+        Reviewed by Eric Seidel.
+
+        * WebView.cpp:
+
+2012-04-20  Emil A Eklund  <eae@chromium.org>
+
+        [win] Update windows platform code to use pixel snapped values
+        https://bugs.webkit.org/show_bug.cgi?id=84283
+
+        Reviewed by Eric Seidel.
+
+        * AccessibleBase.cpp:
+        (AccessibleBase::accLocation):
+
+2012-04-18  Vivek Galatage  <vivekgalatage@gmail.com>
+
+        Web Inspector: Disabling Inspector causes build failure on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=83557
+
+        Reviewed by Pavel Feldman.
+
+        The calls to inspector APIs are not put under ENABLE(INSPECTOR) guard.
+        This change brings all such API calls under the guard.
+
+        * WebCoreSupport/WebInspectorClient.cpp:
+        * WebInspector.cpp:
+        * WebNodeHighlight.cpp:
+        (WebNodeHighlight::WebNodeHighlight):
+        (WebNodeHighlight::update):
+        * WebNodeHighlight.h:
+        (WebNodeHighlight):
+        * WebView.cpp:
+        (WebView::WebView):
+        (WebView::close):
+        (WebView::initWithFrame):
+        (WebView::inspector):
+        * WebView.h:
+        (WebView):
+
+2012-04-11  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r113836.
+        http://trac.webkit.org/changeset/113836
+        https://bugs.webkit.org/show_bug.cgi?id=83705
+
+        Broke all the WebKit2 inspector tests (Requested by andersca
+        on #webkit).
+
+        * WebCoreSupport/WebInspectorClient.cpp:
+        (registerWindowClass):
+        * WebInspector.cpp:
+        (WebInspector::setTimelineProfilingEnabled):
+        * WebNodeHighlight.cpp:
+        (WebNodeHighlight::WebNodeHighlight):
+        (WebNodeHighlight::update):
+        * WebNodeHighlight.h:
+        (WebNodeHighlight):
+        * WebView.cpp:
+        (WebView::WebView):
+        (WebView::close):
+        (WebView::initWithFrame):
+        (WebView::inspector):
+        * WebView.h:
+        (WebView):
+
+2012-04-11  Vivek Galatage  <vivekgalatage@gmail.com>
+
+        Web Inspector: Disabling Inspector causes build failure on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=83557
+
+        Reviewed by Pavel Feldman.
+
+        The calls to inspector APIs are not put under ENABLE(INSPECTOR) guard.
+        This change brings all such API calls under the guard.
+        
+        * WebCoreSupport/WebInspectorClient.cpp:
+        * WebInspector.cpp:
+        * WebNodeHighlight.cpp:
+        (WebNodeHighlight::WebNodeHighlight):
+        (WebNodeHighlight::update):
+        * WebNodeHighlight.h:
+        (WebNodeHighlight):
+        * WebView.cpp:
+        (WebView::WebView):
+        (WebView::close):
+        (WebView::initWithFrame):
+        (WebView::inspector):
+        * WebView.h:
+        (WebView):
+
+2012-03-30  Mark Pilgrim  <pilgrim@chromium.org>
+
+        GEOLOCATION should be implemented as Page Supplement
+        https://bugs.webkit.org/show_bug.cgi?id=82228
+
+        Reviewed by Adam Barth.
+
+        Geolocation is now a Supplement in Page so the interface
+        has changed for setting up the page's geolocation client
+        initially and accessing the controller later.
+
+        * WebView.cpp:
+        (WebView::initWithFrame):
+        (WebView::geolocationDidChangePosition):
+        (WebView::geolocationDidFailWithError):
+
+2012-03-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r112553.
+        http://trac.webkit.org/changeset/112553
+        https://bugs.webkit.org/show_bug.cgi?id=82638
+
+        It made all tests crash on Qt WK2 (Requested by Ossy_away on
+        #webkit).
+
+        * WebView.cpp:
+        (WebView::initWithFrame):
+        (WebView::geolocationDidChangePosition):
+        (WebView::geolocationDidFailWithError):
+
+2012-03-29  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        HashMap<>::add should return a more descriptive object
+        https://bugs.webkit.org/show_bug.cgi?id=71063
+
+        Reviewed by Ryosuke Niwa.
+
+        Update code to use AddResult instead of a pair.
+
+        * WebKitCOMAPI.cpp:
+        (classFactory):
+
+2012-03-29  Mark Pilgrim  <pilgrim@chromium.org>
+
+        GEOLOCATION should be implemented as Page Supplement
+        https://bugs.webkit.org/show_bug.cgi?id=82228
+
+        Reviewed by Adam Barth.
+
+        Geolocation is now a Supplement in Page so the interface
+        has changed for setting up the page's geolocation client
+        initially and accessing the controller later.
+
+        * WebView.cpp:
+        (WebView::initWithFrame):
+        (WebView::geolocationDidChangePosition):
+        (WebView::geolocationDidFailWithError):
+
+2012-03-28  Nate Chapin  <japhet@chromium.org>
+
+        Remove dispatchDidLoadMainResource callback, since no
+        port implements it.
+        https://bugs.webkit.org/show_bug.cgi?id=82539
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        * WebCoreSupport/WebFrameLoaderClient.h:
+        (WebFrameLoaderClient):
+
+2012-03-26  Adam Barth  <abarth@webkit.org>
+
+        FrameLoader::shouldAllowNavigation uses Frame for context rather than Document
+        https://bugs.webkit.org/show_bug.cgi?id=81020
+
+        Reviewed by Eric Seidel.
+
+        Update call site to new function name.
+
+        * WebFrame.cpp:
+        (WebFrame::dispatchWillSubmitForm):
+
+2012-03-22  Anders Carlsson  <andersca@apple.com>
+
+        ASSERT(!needsLayout) in RenderView.cpp when visiting http://www.panic.com/blog/
+        https://bugs.webkit.org/show_bug.cgi?id=81953
+        <rdar://problem/11086998>
+
+        Reviewed by Sam Weinig.
+
+        Update for changes to WebCore.
+
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::LayerClient::platformCALayerDidCreateTiles):
+
+2012-03-20  Steve Falkenburg  <sfalken@apple.com>
+
+        Move WTF-related Windows project files out of JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=80680
+
+        Reviewed by Jessie Berlin.
+
+        * WebKit.vcproj/WebKit.sln:
+
+2012-03-20  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Convert hasSpellingMarker to use Internals interface.
+        https://bugs.webkit.org/show_bug.cgi?id=81300
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove hasSpellingMarker interface support, since it can support in the cross-port
+        way through the Internals interface.
+
+        * Interfaces/IWebFramePrivate.idl:
+
+2012-03-19  Adam Barth  <abarth@webkit.org>
+
+        Remove support for "magic" iframe
+        https://bugs.webkit.org/show_bug.cgi?id=81590
+
+        Reviewed by Eric Seidel.
+
+        Remove FrameLoaderClient methods that no longer exist.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        * WebCoreSupport/WebFrameLoaderClient.h:
+        (WebFrameLoaderClient):
+
+2012-03-19  Anders Carlsson  <andersca@apple.com>
+
+        Fix Windows build.
+
+        * FullscreenVideoController.cpp:
+        (FullscreenVideoController::LayerClient::platformCALayerDeviceScaleFactor):
+
+2012-03-13  Jon Lee  <jonlee@apple.com>
+
+        Separate NOTIFICATIONS and LEGACY_NOTIFICATIONS
+        https://bugs.webkit.org/show_bug.cgi?id=80922
+        <rdar://problem/11035082>
+
+        Reviewed by Jian Li.
+
+        You can include either NOTIFICATIONS or LEGACY_NOTIFICATIONS and have a complete API.
+        LEGACY_NOTIFICATIONS should cover all of the previous functionality, and NOTIFICATIONS will cover the
+        new API. Therefore, APIs that are common between the two will have:
+        #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+
+        This patch initially sets both to be exactly the same. As other bugs with patches begin to migrate to
+        the new API, the defines will begin to split. This allows ports to decide which set of APIs to include.
+
+        Update everything to be #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+        * WebCoreSupport/WebChromeClient.cpp:
+        (WebChromeClient::WebChromeClient):
+        * WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient):
+        * WebCoreSupport/WebDesktopNotificationsDelegate.cpp:
+        * WebCoreSupport/WebDesktopNotificationsDelegate.h:
+
+2012-03-13  Adam Barth  <abarth@webkit.org> && Benjamin Poulain  <bpoulain@apple.com>
+
+        Always enable ENABLE(CLIENT_BASED_GEOLOCATION)
+        https://bugs.webkit.org/show_bug.cgi?id=78853
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient):
+        * WebCoreSupport/WebGeolocationClient.cpp:
+        (WebGeolocationClient::lastPosition):
+        * WebGeolocationPosition.cpp:
+        (WebGeolocationPosition::initWithTimestamp):
+        (core):
+        * WebGeolocationPosition.h:
+        (WebGeolocationPosition):
+        (WebGeolocationPosition::impl):
+        * WebView.cpp:
+        (WebView::initWithFrame):
+        (WebView::geolocationDidChangePosition):
+        (WebView::geolocationDidFailWithError):
+
+2012-03-12  Jessie Berlin  <jberlin@apple.com>
+
+        More Windows build fixing.
+
+        * MarshallingHelpers.cpp:
+        * WebDatabaseManager.cpp:
+
 2012-03-09  Jon Lee  <jonlee@apple.com>
 
         Rename NotificationPresenter to NotificationClient

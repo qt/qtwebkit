@@ -460,10 +460,6 @@ void WebFrameLoaderClient::dispatchShow()
         ui->webViewShow(webView);
 }
 
-void WebFrameLoaderClient::dispatchDidLoadMainResource(DocumentLoader*)
-{
-}
-
 void WebFrameLoaderClient::setMainDocumentError(DocumentLoader*, const ResourceError& error)
 {
     if (!m_manualLoader)
@@ -521,13 +517,8 @@ void WebFrameLoaderClient::committedLoad(DocumentLoader* loader, const char* dat
     m_manualLoader->didReceiveData(data, length);
 }
 
-void WebFrameLoaderClient::finishedLoading(DocumentLoader* loader)
+void WebFrameLoaderClient::finishedLoading(DocumentLoader*)
 {
-    // Telling the frame we received some data and passing 0 as the data is our
-    // way to get work done that is normally done when the first bit of data is
-    // received, even for the case of a document with no data (like about:blank)
-    committedLoad(loader, 0, 0);
-
     if (!m_manualLoader)
         return;
 
@@ -760,33 +751,6 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& url, const Strin
     if (!result)
         return 0;
     return result.release();
-}
-
-void WebFrameLoaderClient::didTransferChildFrameToNewDocument(Page*)
-{
-    Frame* coreFrame = core(m_webFrame);
-    ASSERT(coreFrame);
-    WebView* webView = kit(coreFrame->page());
-    if (m_webFrame->webView() != webView)
-        m_webFrame->setWebView(webView);
-}
-
-void WebFrameLoaderClient::transferLoadingResourceFromPage(ResourceLoader* loader, const ResourceRequest& request, Page* oldPage)
-{
-    assignIdentifierToInitialRequest(loader->identifier(), loader->documentLoader(), request);
-
-    WebView* oldWebView = kit(oldPage);
-    if (!oldWebView)
-        return;
-
-    COMPtr<IWebResourceLoadDelegate> oldResourceLoadDelegate;
-    if (FAILED(oldWebView->resourceLoadDelegate(&oldResourceLoadDelegate)))
-        return;
-
-    COMPtr<IWebResourceLoadDelegatePrivate2> oldResourceLoadDelegatePrivate2(Query, oldResourceLoadDelegate);
-    if (!oldResourceLoadDelegatePrivate2)
-        return;
-    oldResourceLoadDelegatePrivate2->removeIdentifierForRequest(oldWebView, loader->identifier());
 }
 
 PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& URL, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer)

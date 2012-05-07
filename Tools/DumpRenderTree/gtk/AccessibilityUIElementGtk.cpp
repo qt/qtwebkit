@@ -27,13 +27,13 @@
 #include "config.h"
 #include "AccessibilityUIElement.h"
 
-#include "GOwnPtr.h"
-#include "GRefPtr.h"
 #include "WebCoreSupport/DumpRenderTreeSupportGtk.h"
 #include <JavaScriptCore/JSStringRef.h>
 #include <atk/atk.h>
 #include <gtk/gtk.h>
 #include <wtf/Assertions.h>
+#include <wtf/gobject/GOwnPtr.h>
+#include <wtf/gobject/GRefPtr.h>
 
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement element)
     : m_element(element)
@@ -697,6 +697,11 @@ AccessibilityUIElement AccessibilityUIElement::ariaFlowToElementAtIndex(unsigned
 }
 
 AccessibilityUIElement AccessibilityUIElement::selectedRowAtIndex(unsigned index)
+{
+    return 0;
+}
+
+AccessibilityUIElement AccessibilityUIElement::rowAtIndex(unsigned index)
 {
     return 0;
 }

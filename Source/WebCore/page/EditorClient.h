@@ -27,7 +27,6 @@
 #ifndef EditorClient_h
 #define EditorClient_h
 
-#include "SpellingCorrectionController.h"
 #include "EditorInsertAction.h"
 #include "FloatRect.h"
 #include "TextAffinity.h"
@@ -140,19 +139,11 @@ public:
     virtual void toggleAutomaticSpellingCorrection() = 0;
 #endif
 
-    virtual TextCheckerClient* textChecker() = 0;
-
-    enum AutocorrectionResponseType {
-        AutocorrectionEdited,
-        AutocorrectionReverted
-    };
-
-#if USE(AUTOCORRECTION_PANEL)
-    virtual void showCorrectionPanel(CorrectionPanelInfo::PanelType, const FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacmentString, const Vector<String>& alternativeReplacementStrings) = 0;
-    virtual void dismissCorrectionPanel(ReasonForDismissingCorrectionPanel) = 0;
-    virtual String dismissCorrectionPanelSoon(ReasonForDismissingCorrectionPanel) = 0;
-    virtual void recordAutocorrectionResponse(AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
+#if PLATFORM(GTK)
+    virtual bool shouldShowUnicodeMenu() = 0;
 #endif
+
+    virtual TextCheckerClient* textChecker() = 0;
 
     virtual void updateSpellingUIWithGrammarString(const String&, const GrammarDetail& detail) = 0;
     virtual void updateSpellingUIWithMisspelledWord(const String&) = 0;

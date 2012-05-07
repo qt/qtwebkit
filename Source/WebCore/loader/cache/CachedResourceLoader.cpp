@@ -117,7 +117,6 @@ CachedResourceLoader::CachedResourceLoader(Document* document)
     , m_requestCount(0)
     , m_garbageCollectDocumentResourcesTimer(this, &CachedResourceLoader::garbageCollectDocumentResourcesTimerFired)
     , m_autoLoadImages(true)
-    , m_loadFinishing(false)
     , m_allowStaleResources(false)
 {
 }
@@ -227,6 +226,13 @@ CachedScript* CachedResourceLoader::requestScript(ResourceRequest& request, cons
 CachedXSLStyleSheet* CachedResourceLoader::requestXSLStyleSheet(ResourceRequest& request)
 {
     return static_cast<CachedXSLStyleSheet*>(requestResource(CachedResource::XSLStyleSheet, request, String(), defaultCachedResourceOptions()));
+}
+#endif
+
+#if ENABLE(SVG)
+CachedSVGDocument* CachedResourceLoader::requestSVGDocument(ResourceRequest& request)
+{
+    return static_cast<CachedSVGDocument*>(requestResource(CachedResource::SVGDocumentResource, request, request.url(), defaultCachedResourceOptions()));
 }
 #endif
 
@@ -501,7 +507,11 @@ CachedResource* CachedResourceLoader::loadResource(CachedResource::Type type, Re
         resource->setInCache(true);
     
     resource->setLoadPriority(priority);
+    
+    bool wasPruneEnabled = memoryCache()->pruneEnabled();
+    memoryCache()->setPruneEnabled(false);
     resource->load(this, options);
+    memoryCache()->setPruneEnabled(wasPruneEnabled);
     
     if (!inCache) {
         resource->setOwningCachedResourceLoader(this);
@@ -537,18 +547,13 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         return Reload;
     }
 
-    if (existingResource->type() == CachedResource::RawResource && !static_cast<CachedRawResource*>(existingResource)->canReuse())
+    if (existingResource->type() == CachedResource::RawResource && !static_cast<CachedRawResource*>(existingResource)->canReuse(request))
          return Reload;
 
     // Certain requests (e.g., XHRs) might have manually set headers that require revalidation.
     // FIXME: In theory, this should be a Revalidate case. In practice, the MemoryCache revalidation path assumes a whole bunch
     // of things about how revalidation works that manual headers violate, so punt to Reload instead.
     if (request.isConditional())
-        return Reload;
-
-    // Re-using resources in the case of a Range header is very simple if the headers are identical and
-    // much tougher if they aren't.
-    if (existingResource->resourceRequest().httpHeaderField("Range") != request.httpHeaderField("Range"))
         return Reload;
     
     // Don't reload resources while pasting.
@@ -675,8 +680,6 @@ void CachedResourceLoader::removeCachedResource(CachedResource* resource) const
 
 void CachedResourceLoader::loadDone()
 {
-    m_loadFinishing = false;
-
     RefPtr<Document> protect(m_document);
     if (frame())
         frame()->loader()->loadDone();
@@ -740,13 +743,6 @@ void CachedResourceLoader::decrementRequestCount(const CachedResource* res)
 
     --m_requestCount;
     ASSERT(m_requestCount > -1);
-}
-
-int CachedResourceLoader::requestCount()
-{
-    if (m_loadFinishing)
-         return m_requestCount + 1;
-    return m_requestCount;
 }
     
 void CachedResourceLoader::preload(CachedResource::Type type, ResourceRequest& request, const String& charset, bool referencedFromBody)

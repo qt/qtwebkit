@@ -22,9 +22,9 @@
 
 #if USE(UI_SIDE_COMPOSITING)
 #include "GraphicsLayer.h"
+#include "ShareableSurface.h"
 #include "TextureMapper.h"
-
-#include "stdio.h"
+#include "TextureMapperGL.h"
 
 using namespace WebCore;
 
@@ -32,7 +32,7 @@ namespace WebKit {
 
 void LayerBackingStoreTile::swapBuffers(WebCore::TextureMapper* textureMapper)
 {
-    if (!m_backBuffer)
+    if (!m_surface)
         return;
 
     FloatRect targetRect(m_targetRect);
@@ -49,20 +49,19 @@ void LayerBackingStoreTile::swapBuffers(WebCore::TextureMapper* textureMapper)
         shouldReset = true;
     }
 
-    QImage qImage = m_backBuffer->createQImage();
-
     if (shouldReset)
-        texture->reset(m_sourceRect.size(), qImage.hasAlphaChannel() ? BitmapTexture::SupportsAlpha : 0);
+        texture->reset(m_targetRect.size(), m_surface->flags() & ShareableBitmap::SupportsAlpha ? BitmapTexture::SupportsAlpha : 0);
 
-    texture->updateContents(qImage.constBits(), m_sourceRect);
-    m_backBuffer.clear();
+    m_surface->copyToTexture(texture, m_sourceRect, m_surfaceOffset);
+    m_surface.clear();
 }
 
-void LayerBackingStoreTile::setBackBuffer(const WebCore::IntRect& targetRect, const WebCore::IntRect& sourceRect, ShareableBitmap* buffer)
+void LayerBackingStoreTile::setBackBuffer(const IntRect& targetRect, const IntRect& sourceRect, PassRefPtr<ShareableSurface> buffer, const IntPoint& offset)
 {
     m_sourceRect = sourceRect;
     m_targetRect = targetRect;
-    m_backBuffer = buffer;
+    m_surfaceOffset = offset;
+    m_surface = buffer;
 }
 
 void LayerBackingStore::createTile(int id, float scale)
@@ -73,14 +72,15 @@ void LayerBackingStore::createTile(int id, float scale)
 
 void LayerBackingStore::removeTile(int id)
 {
-    m_tiles.remove(id);
+    m_tilesToRemove.append(id);
 }
 
-void LayerBackingStore::updateTile(int id, const IntRect& sourceRect, const IntRect& targetRect, ShareableBitmap* backBuffer)
+
+void LayerBackingStore::updateTile(int id, const IntRect& sourceRect, const IntRect& targetRect, PassRefPtr<ShareableSurface> backBuffer, const IntPoint& offset)
 {
     HashMap<int, LayerBackingStoreTile>::iterator it = m_tiles.find(id);
     ASSERT(it != m_tiles.end());
-    it->second.setBackBuffer(targetRect, sourceRect, backBuffer);
+    it->second.setBackBuffer(targetRect, sourceRect, backBuffer, offset);
 }
 
 PassRefPtr<BitmapTexture> LayerBackingStore::texture() const
@@ -119,27 +119,23 @@ void LayerBackingStore::paintToTextureMapper(TextureMapper* textureMapper, const
             continue;
 
         tilesToPaint.prepend(&tile);
-        coveredRect.unite(tile.rect());
     }
-
-    bool shouldClip = !targetRect.contains(coveredRect);
-
-    if (shouldClip)
-        textureMapper->beginClip(transform, targetRect);
 
     for (size_t i = 0; i < tilesToPaint.size(); ++i)
         tilesToPaint[i]->paint(textureMapper, transform, opacity, mask);
-
-    if (shouldClip)
-        textureMapper->endClip();
 }
 
-void LayerBackingStore::swapBuffers(TextureMapper* textureMapper)
+void LayerBackingStore::commitTileOperations(TextureMapper* textureMapper)
 {
-    HashMap<int, LayerBackingStoreTile>::iterator end = m_tiles.end();
-    for (HashMap<int, LayerBackingStoreTile>::iterator it = m_tiles.begin(); it != end; ++it)
+    Vector<int>::iterator tilesToRemoveEnd = m_tilesToRemove.end();
+    for (Vector<int>::iterator it = m_tilesToRemove.begin(); it != tilesToRemoveEnd; ++it)
+        m_tiles.remove(*it);
+    m_tilesToRemove.clear();
+
+    HashMap<int, LayerBackingStoreTile>::iterator tilesEnd = m_tiles.end();
+    for (HashMap<int, LayerBackingStoreTile>::iterator it = m_tiles.begin(); it != tilesEnd; ++it)
         it->second.swapBuffers(textureMapper);
 }
 
-}
+} // namespace WebKit
 #endif

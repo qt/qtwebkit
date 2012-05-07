@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 Google Inc. All rights reserved.
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -34,14 +34,15 @@
 
 #include "ExceptionCode.h"
 #include "Notification.h"
-#include "NotificationContents.h"
 #include "ScriptExecutionContext.h"
+#include "Timer.h"
+#include "VoidCallback.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 
 namespace WebCore {
 
@@ -52,6 +53,7 @@ class NotificationCenter : public RefCounted<NotificationCenter>, public ActiveD
 public:
     static PassRefPtr<NotificationCenter> create(ScriptExecutionContext*, NotificationClient*);
 
+#if ENABLE(LEGACY_NOTIFICATIONS)
     PassRefPtr<Notification> createHTMLNotification(const String& URI, ExceptionCode& ec)
     {
         if (!client()) {
@@ -64,32 +66,52 @@ public:
         }
         return Notification::create(scriptExecutionContext()->completeURL(URI), scriptExecutionContext(), ec, this);
     }
+#endif
 
+#if ENABLE(LEGACY_NOTIFICATIONS)
     PassRefPtr<Notification> createNotification(const String& iconURI, const String& title, const String& body, ExceptionCode& ec)
     {
         if (!client()) {
             ec = INVALID_STATE_ERR;
             return 0;
         }
-        NotificationContents contents(iconURI.isEmpty() ? KURL() : scriptExecutionContext()->completeURL(iconURI), title, body);
-        return Notification::create(contents, scriptExecutionContext(), ec, this);
+        return Notification::create(title, body, iconURI, scriptExecutionContext(), ec, this);
     }
+#endif
 
     NotificationClient* client() const { return m_client; }
 
+#if ENABLE(LEGACY_NOTIFICATIONS)
     int checkPermission();
     void requestPermission(PassRefPtr<VoidCallback>);
+#endif
 
-    void disconnectFrame();
+    virtual void stop() OVERRIDE;
 
 private:
     NotificationCenter(ScriptExecutionContext*, NotificationClient*);
 
+    class NotificationRequestCallback : public RefCounted<NotificationRequestCallback> {
+    public:
+        static PassRefPtr<NotificationRequestCallback> createAndStartTimer(NotificationCenter*, PassRefPtr<VoidCallback>);
+        void startTimer();
+        void timerFired(Timer<NotificationRequestCallback>*);
+    private:
+        NotificationRequestCallback(NotificationCenter*, PassRefPtr<VoidCallback>);
+
+        RefPtr<NotificationCenter> m_notificationCenter;
+        Timer<NotificationRequestCallback> m_timer;
+        RefPtr<VoidCallback> m_callback;
+    };
+
+    void requestTimedOut(NotificationRequestCallback*);
+
     NotificationClient* m_client;
+    HashSet<RefPtr<NotificationRequestCallback> > m_callbacks;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(NOTIFICATIONS)
+#endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 
 #endif // NotificationCenter_h

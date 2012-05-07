@@ -31,13 +31,18 @@
 #include "config.h"
 #include "HistogramSupport.h"
 
-#include "PlatformSupport.h"
+#include <public/Platform.h>
 
 namespace WebCore {
 
 void HistogramSupport::histogramEnumeration(const char* name, int sample, int boundaryValue)
 {
-    PlatformSupport::histogramEnumeration(name, sample, boundaryValue);
+    WebKit::Platform::current()->histogramEnumeration(name, sample, boundaryValue);
+}
+
+void HistogramSupport::histogramCustomCounts(const char* name, int sample, int min, int max, int bucketCount)
+{
+    WebKit::Platform::current()->histogramCustomCounts(name, sample, min, max, bucketCount);
 }
 
 } // namespace WebCore

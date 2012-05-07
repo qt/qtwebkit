@@ -128,6 +128,13 @@
 namespace WebCore {
 namespace IDBLevelDBCoding {
 
+#ifndef INT64_MAX
+#define INT64_MAX 0x7fffffffffffffffLL
+#endif
+#ifndef INT32_MAX
+#define INT32_MAX 0x7fffffffL
+#endif
+
 static const unsigned char kIDBKeyNullTypeByte = 0;
 static const unsigned char kIDBKeyStringTypeByte = 1;
 static const unsigned char kIDBKeyDateTypeByte = 2;
@@ -150,13 +157,8 @@ static const unsigned char kIndexFreeListTypeByte = 151;
 static const unsigned char kObjectStoreNamesTypeByte = 200;
 static const unsigned char kIndexNamesKeyTypeByte = 201;
 
-#ifndef INT64_MAX
-#define INT64_MAX 0x7fffffffffffffffLL
-#endif
-#ifndef INT32_MAX
-#define INT32_MAX 0x7fffffffL
-#endif
-
+static const int64_t kObjectMetaDataTypeMaximum = INT64_MAX;
+static const unsigned char kIndexMetaDataTypeMaximum = 255;
 
 Vector<char> encodeByte(unsigned char c)
 {
@@ -173,6 +175,19 @@ Vector<char> maxIDBKey()
 Vector<char> minIDBKey()
 {
     return encodeByte(kIDBKeyMinKeyTypeByte);
+}
+
+Vector<char> encodeBool(bool b)
+{
+    Vector<char> ret(1);
+    ret.append(b ? 1 : 0);
+    return ret;
+}
+
+bool decodeBool(const char* begin, const char* end)
+{
+    ASSERT(begin < end);
+    return *begin;
 }
 
 Vector<char> encodeInt(int64_t n)
@@ -374,16 +389,15 @@ void encodeIDBKey(const IDBKey& key, Vector<char>& into)
         ASSERT_NOT_REACHED();
         into.append(encodeByte(kIDBKeyNullTypeByte));
         return;
-    case IDBKey::ArrayType:
-        {
-            into.append(encodeByte(kIDBKeyArrayTypeByte));
-            size_t length = key.array().size();
-            into.append(encodeVarInt(length));
-            for (size_t i = 0; i < length; ++i)
-                encodeIDBKey(*key.array()[i], into);
-            ASSERT_UNUSED(previousSize, into.size() > previousSize);
-            return;
-        }
+    case IDBKey::ArrayType: {
+        into.append(encodeByte(kIDBKeyArrayTypeByte));
+        size_t length = key.array().size();
+        into.append(encodeVarInt(length));
+        for (size_t i = 0; i < length; ++i)
+            encodeIDBKey(*key.array()[i], into);
+        ASSERT_UNUSED(previousSize, into.size() > previousSize);
+        return;
+    }
     case IDBKey::StringType:
         into.append(encodeByte(kIDBKeyStringTypeByte));
         into.append(encodeStringWithLength(key.string()));
@@ -418,52 +432,48 @@ const char* decodeIDBKey(const char* p, const char* limit, RefPtr<IDBKey>& found
         foundKey = IDBKey::createInvalid();
         return p;
 
-    case kIDBKeyArrayTypeByte:
-        {
-            int64_t length;
-            p = decodeVarInt(p, limit, length);
+    case kIDBKeyArrayTypeByte: {
+        int64_t length;
+        p = decodeVarInt(p, limit, length);
+        if (!p)
+            return 0;
+        if (length < 0)
+            return 0;
+        IDBKey::KeyArray array;
+        while (length--) {
+            RefPtr<IDBKey> key;
+            p = decodeIDBKey(p, limit, key);
             if (!p)
                 return 0;
-            if (length < 0)
-                return 0;
-            IDBKey::KeyArray array;
-            while (length--) {
-                RefPtr<IDBKey> key;
-                p = decodeIDBKey(p, limit, key);
-                if (!p)
-                    return 0;
-                array.append(key);
-            }
-            foundKey = IDBKey::createArray(array);
-            return p;
+            array.append(key);
         }
-    case kIDBKeyStringTypeByte:
-        {
-            String s;
-            p = decodeStringWithLength(p, limit, s);
-            if (!p)
-                return 0;
-            foundKey = IDBKey::createString(s);
-            return p;
-        }
-    case kIDBKeyDateTypeByte:
-        {
-            double d;
-            p = decodeDouble(p, limit, &d);
-            if (!p)
-                return 0;
-            foundKey = IDBKey::createDate(d);
-            return p;
-        }
-    case kIDBKeyNumberTypeByte:
-        {
-            double d;
-            p = decodeDouble(p, limit, &d);
-            if (!p)
-                return 0;
-            foundKey = IDBKey::createNumber(d);
-            return p;
-        }
+        foundKey = IDBKey::createArray(array);
+        return p;
+    }
+    case kIDBKeyStringTypeByte: {
+        String s;
+        p = decodeStringWithLength(p, limit, s);
+        if (!p)
+            return 0;
+        foundKey = IDBKey::createString(s);
+        return p;
+    }
+    case kIDBKeyDateTypeByte: {
+        double d;
+        p = decodeDouble(p, limit, &d);
+        if (!p)
+            return 0;
+        foundKey = IDBKey::createDate(d);
+        return p;
+    }
+    case kIDBKeyNumberTypeByte: {
+        double d;
+        p = decodeDouble(p, limit, &d);
+        if (!p)
+            return 0;
+        foundKey = IDBKey::createNumber(d);
+        return p;
+    }
     }
 
     ASSERT_NOT_REACHED();
@@ -484,37 +494,35 @@ const char* extractEncodedIDBKey(const char* start, const char* limit, Vector<ch
     case kIDBKeyMinKeyTypeByte:
         *result = encodeByte(type);
         return p;
-    case kIDBKeyArrayTypeByte:
-        {
-            int64_t length;
-            p = decodeVarInt(p, limit, length);
+    case kIDBKeyArrayTypeByte: {
+        int64_t length;
+        p = decodeVarInt(p, limit, length);
+        if (!p)
+            return 0;
+        if (length < 0)
+            return 0;
+        result->clear();
+        result->append(start, p - start);
+        while (length--) {
+            Vector<char> subkey;
+            p = extractEncodedIDBKey(p, limit, &subkey);
             if (!p)
                 return 0;
-            if (length < 0)
-                return 0;
-            result->clear();
-            result->append(start, p - start);
-            while (length--) {
-                Vector<char> subkey;
-                p = extractEncodedIDBKey(p, limit, &subkey);
-                if (!p)
-                    return 0;
-                result->append(subkey);
-            }
-            return p;
+            result->append(subkey);
         }
-    case kIDBKeyStringTypeByte:
-        {
-            int64_t length;
-            p = decodeVarInt(p, limit, length);
-            if (!p)
-                return 0;
-            if (p + length * 2 > limit)
-                return 0;
-            result->clear();
-            result->append(start, p - start + length * 2);
-            return p + length * 2;
-        }
+        return p;
+    }
+    case kIDBKeyStringTypeByte: {
+        int64_t length;
+        p = decodeVarInt(p, limit, length);
+        if (!p)
+            return 0;
+        if (p + length * 2 > limit)
+            return 0;
+        result->clear();
+        result->append(start, p - start + length * 2);
+        return p + length * 2;
+    }
     case kIDBKeyDateTypeByte:
     case kIDBKeyNumberTypeByte:
         if (p + sizeof(double) > limit)
@@ -564,43 +572,41 @@ int compareEncodedIDBKeys(const char*& p, const char* limitA, const char*& q, co
     case kIDBKeyMinKeyTypeByte:
         // Null type or max type; no payload to compare.
         return 0;
-    case kIDBKeyArrayTypeByte:
-        {
-            int64_t lengthA, lengthB;
-            p = decodeVarInt(p, limitA, lengthA);
-            if (!p)
-                return 0;
-            q = decodeVarInt(q, limitB, lengthB);
-            if (!q)
-                return 0;
-            if (lengthA < 0 || lengthB < 0)
-                return 0;
-            for (int64_t i = 0; i < lengthA && i < lengthB; ++i) {
-                if (int cmp = compareEncodedIDBKeys(p, limitA, q, limitB))
-                    return cmp;
-            }
-            if (lengthA < lengthB)
-                return -1;
-            if (lengthA > lengthB)
-                return 1;
+    case kIDBKeyArrayTypeByte: {
+        int64_t lengthA, lengthB;
+        p = decodeVarInt(p, limitA, lengthA);
+        if (!p)
             return 0;
+        q = decodeVarInt(q, limitB, lengthB);
+        if (!q)
+            return 0;
+        if (lengthA < 0 || lengthB < 0)
+            return 0;
+        for (int64_t i = 0; i < lengthA && i < lengthB; ++i) {
+            if (int cmp = compareEncodedIDBKeys(p, limitA, q, limitB))
+                return cmp;
         }
+        if (lengthA < lengthB)
+            return -1;
+        if (lengthA > lengthB)
+            return 1;
+        return 0;
+    }
     case kIDBKeyStringTypeByte:
         return compareEncodedStringsWithLength(p, limitA, q, limitB);
     case kIDBKeyDateTypeByte:
-    case kIDBKeyNumberTypeByte:
-        {
-            double d, e;
-            p = decodeDouble(p, limitA, &d);
-            ASSERT(p);
-            q = decodeDouble(q, limitB, &e);
-            ASSERT(q);
-            if (d < e)
-                return -1;
-            if (d > e)
-                return 1;
-            return 0;
-        }
+    case kIDBKeyNumberTypeByte: {
+        double d, e;
+        p = decodeDouble(p, limitA, &d);
+        ASSERT(p);
+        q = decodeDouble(q, limitB, &e);
+        ASSERT(q);
+        if (d < e)
+            return -1;
+        if (d > e)
+            return 1;
+        return 0;
+    }
     }
 
     ASSERT_NOT_REACHED();
@@ -1010,12 +1016,12 @@ Vector<char> ObjectStoreMetaDataKey::encode(int64_t databaseId, int64_t objectSt
 
 Vector<char> ObjectStoreMetaDataKey::encodeMaxKey(int64_t databaseId)
 {
-    return encode(databaseId, INT64_MAX, INT64_MAX);
+    return encode(databaseId, INT64_MAX, kObjectMetaDataTypeMaximum);
 }
 
 Vector<char> ObjectStoreMetaDataKey::encodeMaxKey(int64_t databaseId, int64_t objectStoreId)
 {
-    return encode(databaseId, objectStoreId, INT64_MAX);
+    return encode(databaseId, objectStoreId, kObjectMetaDataTypeMaximum);
 }
 
 int64_t ObjectStoreMetaDataKey::objectStoreId() const
@@ -1085,7 +1091,12 @@ Vector<char> IndexMetaDataKey::encode(int64_t databaseId, int64_t objectStoreId,
 
 Vector<char> IndexMetaDataKey::encodeMaxKey(int64_t databaseId, int64_t objectStoreId)
 {
-    return encode(databaseId, objectStoreId, INT64_MAX, 255);
+    return encode(databaseId, objectStoreId, INT64_MAX, kIndexMetaDataTypeMaximum);
+}
+
+Vector<char> IndexMetaDataKey::encodeMaxKey(int64_t databaseId, int64_t objectStoreId, int64_t indexId)
+{
+    return encode(databaseId, objectStoreId, indexId, kIndexMetaDataTypeMaximum);
 }
 
 int IndexMetaDataKey::compare(const IndexMetaDataKey& other)

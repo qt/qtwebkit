@@ -172,14 +172,6 @@ PassRefPtr<Frame> FrameLoaderClientWinCE::createFrame(const KURL& url, const Str
     return m_webView->createFrame(url, name, ownerElement, referrer, allowsScrolling, marginWidth, marginHeight);
 }
 
-void FrameLoaderClientWinCE::didTransferChildFrameToNewDocument(Page*)
-{
-}
-
-void FrameLoaderClientWinCE::transferLoadingResourceFromPage(ResourceLoader*, const WebCore::ResourceRequest&, Page*)
-{
-}
-
 void FrameLoaderClientWinCE::redirectDataToPlugin(Widget* pluginWidget)
 {
     ASSERT(!m_pluginView);
@@ -404,11 +396,6 @@ void FrameLoaderClientWinCE::cancelPolicyCheck()
     notImplemented();
 }
 
-void FrameLoaderClientWinCE::dispatchDidLoadMainResource(DocumentLoader*)
-{
-    notImplemented();
-}
-
 void FrameLoaderClientWinCE::revertToProvisionalState(DocumentLoader*)
 {
     notImplemented();
@@ -456,12 +443,10 @@ String FrameLoaderClientWinCE::generatedMIMETypeForURLScheme(const String&) cons
     return String();
 }
 
-void FrameLoaderClientWinCE::finishedLoading(DocumentLoader* documentLoader)
+void FrameLoaderClientWinCE::finishedLoading(DocumentLoader*)
 {
-    if (!m_pluginView) {
-        documentLoader->writer()->setEncoding(m_response.textEncodingName(), false);
+    if (!m_pluginView)
         return;
-    }
 
     m_pluginView->didFinishLoading();
     m_pluginView = 0;

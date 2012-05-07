@@ -13,7 +13,8 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/wtf/gobject"
     "${WEBCORE_DIR}/platform/efl"
     "${WEBCORE_DIR}/platform/graphics/cairo"
-    ${Cairo_INCLUDE_DIRS}
+    "${WEBCORE_DIR}/platform/graphics/efl"
+    ${CAIRO_INCLUDE_DIRS}
     ${ECORE_X_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
     ${EFLDEPS_INCLUDE_DIRS}
@@ -43,6 +44,12 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
 )
 ENDIF()
 
+IF (ENABLE_VIDEO_TRACK)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/html/track"
+  )
+ENDIF ()
+
 IF (WTF_USE_FREETYPE)
   LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/freetype"
@@ -56,6 +63,15 @@ IF (WTF_USE_PANGO)
   )
   LIST(APPEND WebKit_LIBRARIES
     ${Pango_LIBRARIES}
+  )
+ENDIF ()
+
+IF (ENABLE_NETWORK_INFO)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/Modules/networkinfo"
+  )
+  LIST(APPEND WebKit_SOURCES
+    efl/WebCoreSupport/NetworkInfoClientEfl.cpp
   )
 ENDIF ()
 
@@ -80,6 +96,7 @@ LIST(APPEND WebKit_SOURCES
     efl/WebCoreSupport/StorageTrackerClientEfl.cpp
     efl/WebCoreSupport/InspectorClientEfl.cpp
     efl/WebCoreSupport/NotificationPresenterClientEfl.cpp
+    efl/WebCoreSupport/PageClientEfl.cpp
 
     efl/ewk/ewk_auth.cpp
     efl/ewk/ewk_auth_soup.cpp
@@ -90,6 +107,7 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_js.cpp
     efl/ewk/ewk_main.cpp
     efl/ewk/ewk_network.cpp
+    efl/ewk/ewk_security_origin.cpp
     efl/ewk/ewk_security_policy.cpp
     efl/ewk/ewk_settings.cpp
     efl/ewk/ewk_tiled_backing_store.cpp
@@ -103,7 +121,7 @@ LIST(APPEND WebKit_SOURCES
 )
 
 LIST(APPEND WebKit_LIBRARIES
-    ${Cairo_LIBRARIES}
+    ${CAIRO_LIBRARIES}
     ${ECORE_X_LIBRARIES}
     ${EFLDEPS_LIBRARIES}
     ${FREETYPE_LIBRARIES}
@@ -126,6 +144,10 @@ IF (ENABLE_VIBRATION)
     )
 ENDIF ()
 
+IF (ENABLE_BATTERY_STATUS)
+    LIST(APPEND WebKit_INCLUDE_DIRECTORIES ${WEBCORE_DIR}/Modules/battery)
+    LIST(APPEND WebKit_SOURCES efl/WebCoreSupport/BatteryClientEfl.cpp)
+ENDIF ()
 
 SET(WebKit_THEME_DEFINITION "")
 IF (ENABLE_PROGRESS_TAG)
@@ -237,6 +259,7 @@ SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_logging.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_main.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_network.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_security_origin.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_security_policy.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_settings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_view.h

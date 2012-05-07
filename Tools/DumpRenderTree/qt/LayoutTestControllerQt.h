@@ -239,11 +239,11 @@ public slots:
     void setMockSpeechInputDumpRect(bool flag);
     void startSpeechInput(const QString& inputElement);
 
+    void setPageVisibility(const char*);
+    void resetPageVisibility();
+
     // Empty stub method to keep parity with object model exposed by global LayoutTestController.
     void abortModal() {}
-    bool hasSpellingMarker(int from, int length);
-
-    QVariantList nodesFromRect(const QWebElement& document, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping);
 
     void addURLToRedirect(const QString& origin, const QString& destination);
 
@@ -261,8 +261,8 @@ public slots:
 
     void setEditingBehavior(const QString& editingBehavior);
 
+    void evaluateScriptInIsolatedWorldAndReturnValue(int worldID, const QString& script);
     void evaluateScriptInIsolatedWorld(int worldID, const QString& script);
-    bool isPageBoxVisible(int pageIndex);
     QString pageSizeAndMarginsInPixels(int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
     QString pageProperty(const QString& propertyName, int pageNumber);
     void addUserStyleSheet(const QString& sourceCode);

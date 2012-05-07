@@ -28,6 +28,8 @@
 
 #if ENABLE(THREADED_SCROLLING)
 
+#include <wtf/MainThread.h>
+
 namespace WebCore {
 
 ScrollingThread::ScrollingThread()
@@ -55,6 +57,17 @@ void ScrollingThread::dispatch(const Function<void()>& function)
     shared().wakeUpRunLoop();
 }
 
+static void callFunctionOnMainThread(const Function<void()>* function)
+{
+    callOnMainThread(*function);
+    delete function;
+}
+
+void ScrollingThread::dispatchBarrier(const Function<void()>& function)
+{
+    dispatch(bind(callFunctionOnMainThread, new Function<void()>(function)));
+}
+
 ScrollingThread& ScrollingThread::shared()
 {
     DEFINE_STATIC_LOCAL(ScrollingThread, scrollingThread, ());
@@ -66,11 +79,12 @@ void ScrollingThread::createThreadIfNeeded()
     if (m_threadIdentifier)
         return;
 
-    m_threadIdentifier = createThread(threadCallback, this, "WebCore: Scrolling");
-
     // Wait for the thread to initialize the run loop.
     {
         MutexLocker locker(m_initializeRunLoopConditionMutex);
+
+        m_threadIdentifier = createThread(threadCallback, this, "WebCore: Scrolling");
+        
 #if PLATFORM(MAC)
         while (!m_threadRunLoop)
             m_initializeRunLoopCondition.wait(m_initializeRunLoopConditionMutex);

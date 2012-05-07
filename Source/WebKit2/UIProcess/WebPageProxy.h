@@ -92,7 +92,7 @@ namespace WebCore {
     class ProtectionSpace;
     struct FileChooserSettings;
     struct TextCheckingResult;
-    struct ViewportArguments;
+    struct ViewportAttributes;
     struct WindowFeatures;
 }
 
@@ -153,6 +153,10 @@ class WebGestureEvent;
 
 typedef GenericCallback<WKStringRef, StringImpl*> StringCallback;
 typedef GenericCallback<WKSerializedScriptValueRef, WebSerializedScriptValue*> ScriptValueCallback;
+
+#if PLATFORM(GTK)
+typedef GenericCallback<WKErrorRef> PrintFinishedCallback;
+#endif
 
 #if ENABLE(TOUCH_EVENTS)
 struct QueuedTouchEvents {
@@ -235,7 +239,9 @@ public:
     WebFullScreenManagerProxy* fullScreenManager();
 #endif
 
+#if ENABLE(CONTEXT_MENUS)
     void initializeContextMenuClient(const WKPageContextMenuClient*);
+#endif
     void initializeFindClient(const WKPageFindClient*);
     void initializeFormClient(const WKPageFormClient*);
     void initializeLoaderClient(const WKPageLoaderClient*);
@@ -254,6 +260,7 @@ public:
     void loadHTMLString(const String& htmlString, const String& baseURL);
     void loadAlternateHTMLString(const String& htmlString, const String& baseURL, const String& unreachableURL);
     void loadPlainTextString(const String& string);
+    void loadWebArchiveData(const WebData*);
 
     void stopLoading();
     void reload(bool reloadFromOrigin);
@@ -267,7 +274,7 @@ public:
     void tryRestoreScrollPosition();
     void didChangeBackForwardList(WebBackForwardListItem* addedItem, Vector<RefPtr<APIObject> >* removedItems);
     void shouldGoToBackForwardListItem(uint64_t itemID, bool& shouldGoToBackForwardListItem);
-    void willGoToBackForwardListItem(uint64_t itemID);
+    void willGoToBackForwardListItem(uint64_t itemID, CoreIPC::ArgumentDecoder* arguments);
 
     String activeURL() const;
     String provisionalURL() const;
@@ -373,7 +380,6 @@ public:
     PlatformWidget viewWidget();
 #endif
 #if USE(TILED_BACKING_STORE)
-    void setFixedVisibleContentRect(const WebCore::IntRect&);
     void setViewportSize(const WebCore::IntSize&);
 #endif
 
@@ -386,7 +392,7 @@ public:
 #if ENABLE(TOUCH_EVENTS)
     void handleTouchEvent(const NativeWebTouchEvent&);
 #if PLATFORM(QT)
-    void handlePotentialActivation(const WebCore::IntPoint&);
+    void handlePotentialActivation(const WebCore::IntPoint& touchPoint, const WebCore::IntSize& touchArea);
 #endif
 #endif
 
@@ -462,8 +468,9 @@ public:
     void registerWebProcessAccessibilityToken(const CoreIPC::DataReference&);
     // Called by the UI process when it is ready to send its tokens to the web process.
     void registerUIProcessAccessibilityTokens(const CoreIPC::DataReference& elemenToken, const CoreIPC::DataReference& windowToken);
-    bool writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes);
     bool readSelectionFromPasteboard(const String& pasteboardName);
+    String stringSelectionForPasteboard();
+    PassRefPtr<WebCore::SharedBuffer> dataSelectionForPasteboard(const String& pasteboardType);
     void makeFirstResponder();
 #endif
 
@@ -511,12 +518,14 @@ public:
     void dragEntered(WebCore::DragData*, const String& dragStorageName = String());
     void dragUpdated(WebCore::DragData*, const String& dragStorageName = String());
     void dragExited(WebCore::DragData*, const String& dragStorageName = String());
-    void performDrag(WebCore::DragData*, const String& dragStorageName, const SandboxExtension::Handle&);
+    void performDrag(WebCore::DragData*, const String& dragStorageName, const SandboxExtension::Handle&, const SandboxExtension::HandleArray&);
 
     void didPerformDragControllerAction(WebCore::DragSession);
     void dragEnded(const WebCore::IntPoint& clientPosition, const WebCore::IntPoint& globalPosition, uint64_t operation);
 #if PLATFORM(MAC)
     void setDragImage(const WebCore::IntPoint& clientPosition, const ShareableBitmap::Handle& dragImageHandle, bool isLinkDrag);
+    void setPromisedData(const String& pasteboardName, const SharedMemory::Handle& imageHandle, uint64_t imageSize, const String& filename, const String& extension,
+                         const String& title, const String& url, const String& visibleURL, const SharedMemory::Handle& archiveHandle, uint64_t archiveSize);
 #endif
 #if PLATFORM(WIN)
     void startDragDrop(const WebCore::IntPoint& imagePoint, const WebCore::IntPoint& dragPoint, uint64_t okEffect, const HashMap<UINT, Vector<String> >& dataMap, uint64_t fileSize, const String& pathname, const SharedMemory::Handle& fileContentHandle, const WebCore::IntSize& dragImageSize, const SharedMemory::Handle& dragImageHandle, bool isLinkDrag);
@@ -528,6 +537,7 @@ public:
     void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
     void processDidBecomeUnresponsive();
+    void interactionOccurredWhileProcessUnresponsive();
     void processDidBecomeResponsive();
     void processDidCrash();
 
@@ -545,6 +555,11 @@ public:
     bool isValidEditCommand(WebEditCommandProxy*);
     void registerEditCommand(PassRefPtr<WebEditCommandProxy>, UndoOrRedo);
 
+#if PLATFORM(MAC)
+    void registerKeypressCommandName(const String& name) { m_knownKeypressCommandNames.add(name); }
+    bool isValidKeypressCommandName(const String& name) const { return m_knownKeypressCommandNames.contains(name); }
+#endif
+
     WebProcessProxy* process() const;
     PlatformProcessIdentifier processIdentifier() const;
 
@@ -560,8 +575,10 @@ public:
 
     void preferencesDidChange();
 
+#if ENABLE(CONTEXT_MENUS)
     // Called by the WebContextMenuProxy.
     void contextMenuItemSelected(const WebContextMenuItemData&);
+#endif
 
     // Called by the WebOpenPanelResultListenerProxy.
     void didChooseFilesForOpenPanel(const Vector<String>&);
@@ -570,7 +587,7 @@ public:
     WebPageCreationParameters creationParameters() const;
 
 #if PLATFORM(QT)
-    void findZoomableAreaForPoint(const WebCore::IntPoint&);
+    void findZoomableAreaForPoint(const WebCore::IntPoint&, const WebCore::IntSize&);
     void didReceiveMessageFromNavigatorQtObject(const String&);
     void handleDownloadRequest(DownloadProxy*);
 #endif
@@ -597,7 +614,7 @@ public:
     void drawRectToPDF(WebFrameProxy*, const PrintInfo&, const WebCore::IntRect&, PassRefPtr<DataCallback>);
     void drawPagesToPDF(WebFrameProxy*, const PrintInfo&, uint32_t first, uint32_t count, PassRefPtr<DataCallback>);
 #elif PLATFORM(GTK)
-    void drawPagesForPrinting(WebFrameProxy*, const PrintInfo&, PassRefPtr<VoidCallback>);
+    void drawPagesForPrinting(WebFrameProxy*, const PrintInfo&, PassRefPtr<PrintFinishedCallback>);
 #endif
 
     const String& pendingAPIRequestURL() const { return m_pendingAPIRequestURL; }
@@ -605,7 +622,7 @@ public:
     void flashBackingStoreUpdates(const Vector<WebCore::IntRect>& updateRects);
 
 #if PLATFORM(MAC)
-    void handleCorrectionPanelResult(const String& result);
+    void handleAlternativeTextUIResult(const String& result);
 #endif
 
     static void setDebugPaintFlags(WKPageDebugPaintFlags flags) { s_debugPaintFlags = flags; }
@@ -715,7 +732,7 @@ private:
     void screenToWindow(const WebCore::IntPoint& screenPoint, WebCore::IntPoint& windowPoint);
     void windowToScreen(const WebCore::IntRect& viewRect, WebCore::IntRect& result);
     void runBeforeUnloadConfirmPanel(const String& message, uint64_t frameID, bool& shouldClose);
-    void didChangeViewportProperties(const WebCore::ViewportArguments&);
+    void didChangeViewportProperties(const WebCore::ViewportAttributes&);
     void pageDidScroll();
     void runOpenPanel(uint64_t frameID, const WebCore::FileChooserSettings&);
     void printFrame(uint64_t frameID);
@@ -734,7 +751,7 @@ private:
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
     void requestNotificationPermission(uint64_t notificationID, const String& originString);
-    void showNotification(const String& title, const String& body, const String& iconURL, const String& replaceID, const String& originString, uint64_t notificationID);
+    void showNotification(const String& title, const String& body, const String& iconURL, const String& tag, const String& originString, uint64_t notificationID);
     
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
@@ -785,9 +802,11 @@ private:
     void setPopupMenuSelectedIndex(int32_t);
 #endif
 
+#if ENABLE(CONTEXT_MENUS)
     // Context Menu.
     void showContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
     void internalShowContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::ArgumentDecoder*);
+#endif
 
     // Search popup results
     void saveRecentSearches(const String&, const Vector<String>&);
@@ -835,6 +854,9 @@ private:
     void scriptValueCallback(const CoreIPC::DataReference&, uint64_t);
     void computedPagesCallback(const Vector<WebCore::IntRect>&, double totalScaleFactorForPrinting, uint64_t);
     void validateCommandCallback(const String&, bool, int, uint64_t);
+#if PLATFORM(GTK)
+    void printFinishedCallback(const WebCore::ResourceError&, uint64_t);
+#endif
 
     void focusedFrameChanged(uint64_t frameID);
     void frameSetLargestFrameChanged(uint64_t frameID);
@@ -866,7 +888,7 @@ private:
 
     void clearLoadDependentCallbacks();
 
-    void performDragControllerAction(DragControllerAction, WebCore::DragData*, const String& dragStorageName, const SandboxExtension::Handle&);
+    void performDragControllerAction(DragControllerAction, WebCore::DragData*, const String& dragStorageName, const SandboxExtension::Handle&, const SandboxExtension::HandleArray&);
 
     void updateBackingStoreDiscardableState();
 
@@ -876,6 +898,11 @@ private:
 
     void setRenderTreeSize(uint64_t treeSize) { m_renderTreeSize = treeSize; }
 
+#if PLUGIN_ARCHITECTURE(X11)
+    void createPluginContainer(uint64_t& windowID);
+    void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID);
+#endif
+
     PageClient* m_pageClient;
     WebLoaderClient m_loaderClient;
     WebPolicyClient m_policyClient;
@@ -883,7 +910,9 @@ private:
     WebResourceLoadClient m_resourceLoadClient;
     WebUIClient m_uiClient;
     WebFindClient m_findClient;
+#if ENABLE(CONTEXT_MENUS)
     WebPageContextMenuClient m_contextMenuClient;
+#endif
 
     OwnPtr<DrawingAreaProxy> m_drawingArea;
     RefPtr<WebProcessProxy> m_process;
@@ -912,8 +941,15 @@ private:
     HashMap<uint64_t, RefPtr<ScriptValueCallback> > m_scriptValueCallbacks;
     HashMap<uint64_t, RefPtr<ComputedPagesCallback> > m_computedPagesCallbacks;
     HashMap<uint64_t, RefPtr<ValidateCommandCallback> > m_validateCommandCallbacks;
+#if PLATFORM(GTK)
+    HashMap<uint64_t, RefPtr<PrintFinishedCallback> > m_printFinishedCallbacks;
+#endif
 
     HashSet<WebEditCommandProxy*> m_editCommandSet;
+
+#if PLATFORM(MAC)
+    HashSet<String> m_knownKeypressCommandNames;
+#endif
 
     RefPtr<WebPopupMenuProxy> m_activePopupMenu;
     RefPtr<WebContextMenuProxy> m_activeContextMenu;
@@ -1043,6 +1079,10 @@ private:
 
 #if PLATFORM(QT)
     WTF::HashSet<RefPtr<QtRefCountedNetworkRequestData> > m_applicationSchemeRequests;
+#endif
+
+#if ENABLE(PAGE_VISIBILITY_API)
+    WebCore::PageVisibilityState m_visibilityState;
 #endif
 };
 

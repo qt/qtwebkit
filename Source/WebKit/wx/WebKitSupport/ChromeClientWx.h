@@ -34,11 +34,13 @@
 #include "IntRect.h"
 #include "WebView.h"
 
+using namespace WebKit;
+
 namespace WebCore {
 
 class ChromeClientWx : public ChromeClient {
 public:
-    ChromeClientWx(wxWebView*);
+    ChromeClientWx(WebView*);
     virtual ~ChromeClientWx();
     virtual void chromeDestroyed();
 
@@ -136,9 +138,6 @@ public:
 
     virtual void scrollRectIntoView(const IntRect&) const { }
 
-    virtual void requestGeolocationPermissionForFrame(Frame*, Geolocation*);
-    virtual void cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*) { }
-
     virtual bool selectItemWritingDirectionIsNatural();
     virtual bool selectItemAlignmentFollowsMenuWritingDirection();
     virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const;
@@ -151,7 +150,7 @@ public:
     virtual bool hasOpenedPopup() const;
 
 private:
-    wxWebView* m_webView;
+    WebView* m_webView;
 };
 
 }

@@ -146,18 +146,18 @@ WebInspector.CSSSelectorProfileView.prototype = {
 
     rebuildGridItems: function()
     {
-        this.dataGrid.removeChildren();
+        this.dataGrid.rootNode().removeChildren();
 
         var children = this.profile.children;
         var count = children.length;
 
         for (var index = 0; index < count; ++index)
-            this.dataGrid.appendChild(children[index]);
+            this.dataGrid.rootNode().appendChild(children[index]);
     },
 
     refreshData: function()
     {
-        var child = this.dataGrid.children[0];
+        var child = this.dataGrid.rootNode().children[0];
         while (child) {
             child.refresh();
             child = child.traverseNextNode(false, null, true);
@@ -257,8 +257,7 @@ WebInspector.CSSSelectorProfileView.prototype = {
 
         this.refreshShowAsPercents();
 
-        event.preventDefault();
-        event.stopPropagation();
+        event.consume(true);
     }
 }
 
@@ -266,6 +265,7 @@ WebInspector.CSSSelectorProfileView.prototype.__proto__ = WebInspector.View.prot
 
 /**
  * @constructor
+ * @extends {WebInspector.ProfileType}
  */
 WebInspector.CSSSelectorProfileType = function()
 {
@@ -349,6 +349,25 @@ WebInspector.CSSSelectorProfileType.prototype = {
     createView: function(profile)
     {
         return new WebInspector.CSSSelectorProfileView(profile);
+    },
+
+    /**
+     * @override
+     * @return {WebInspector.ProfileHeader}
+     */
+    createTemporaryProfile: function()
+    {
+        return new WebInspector.ProfileHeader(WebInspector.CSSSelectorProfileType.TypeId, WebInspector.UIString("Recording\u2026"));
+    },
+
+    /**
+     * @override
+     * @param {ProfilerAgent.ProfileHeader} profile
+     * @return {WebInspector.ProfileHeader}
+     */
+    createProfile: function(profile)
+    {
+        return new WebInspector.ProfileHeader(profile.typeId, profile.title, profile.uid);
     }
 }
 

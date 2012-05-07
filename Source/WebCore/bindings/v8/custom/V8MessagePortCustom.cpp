@@ -30,7 +30,7 @@
 
 #include "config.h"
 
-#include "ArrayBuffer.h"
+#include <wtf/ArrayBuffer.h>
 #include "ExceptionCode.h"
 #include "MessagePort.h"
 #include "SerializedScriptValue.h"
@@ -56,7 +56,8 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
         SerializedScriptValue::create(args[0],
                                       &portArray,
                                       extendedTransfer ? &arrayBufferArray : 0,
-                                      didThrow);
+                                      didThrow,
+                                      args.GetIsolate());
     if (didThrow)
         return v8::Undefined();
     ExceptionCode ec = 0;

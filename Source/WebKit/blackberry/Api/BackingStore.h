@@ -20,6 +20,7 @@
 #define BackingStore_h
 
 #include "BlackBerryGlobal.h"
+#include <BlackBerryPlatformGraphics.h>
 
 namespace WebCore {
 class ChromeClientBlackBerry;
@@ -40,7 +41,7 @@ namespace WebKit {
 
 class WebPage;
 class WebPagePrivate;
-class WebPageCompositor;
+class WebPageCompositorPrivate;
 class BackingStorePrivate;
 class BackingStoreClient;
 
@@ -74,11 +75,16 @@ public:
 
     bool isDirectRenderingToWindow() const;
 
+    void createBackingStoreMemory();
+    void releaseBackingStoreMemory();
+
+    void drawContents(BlackBerry::Platform::Graphics::Drawable*, double /*scale*/, const BlackBerry::Platform::IntRect&);
+
 private:
     friend class BlackBerry::WebKit::BackingStoreClient;
     friend class BlackBerry::WebKit::WebPage;
     friend class BlackBerry::WebKit::WebPagePrivate; // FIXME: For now, we expose our internals to WebPagePrivate. See PR #120301.
-    friend class BlackBerry::WebKit::WebPageCompositor;
+    friend class BlackBerry::WebKit::WebPageCompositorPrivate;
     friend class WebCore::ChromeClientBlackBerry;
     friend class WebCore::FrameLoaderClientBlackBerry;
     friend class WebCore::GLES2Context;

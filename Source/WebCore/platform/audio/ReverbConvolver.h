@@ -30,6 +30,7 @@
 #define ReverbConvolver_h
 
 #include "AudioArray.h"
+#include "DirectConvolver.h"
 #include "FFTConvolver.h"
 #include "ReverbAccumulationBuffer.h"
 #include "ReverbConvolverStage.h"
@@ -62,6 +63,7 @@ public:
     bool useBackgroundThreads() const { return m_useBackgroundThreads; }
     void backgroundThreadEntry();
 
+    size_t latencyFrames() const;
 private:
     Vector<OwnPtr<ReverbConvolverStage> > m_stages;
     Vector<OwnPtr<ReverbConvolverStage> > m_backgroundStages;

@@ -118,7 +118,7 @@ private:
     virtual bool canStartSelection() const { return false; }
 
     virtual bool isEnumeratable() const { return true; }
-    virtual bool isLabelable() const OVERRIDE { return true; }
+    virtual bool supportLabels() const OVERRIDE { return true; }
 
     virtual bool saveFormControlState(String& value) const;
     virtual void restoreFormControlState(const String&);
@@ -142,7 +142,7 @@ private:
     void typeAheadFind(KeyboardEvent*);
     void saveLastSelection();
 
-    virtual void insertedIntoTree(bool);
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
 
     virtual bool isOptionalFormControl() const { return !isRequiredFormControl(); }
     virtual bool isRequiredFormControl() const;

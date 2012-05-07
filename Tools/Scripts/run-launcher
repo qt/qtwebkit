@@ -65,14 +65,16 @@ if (isQt()) {
 
     if (isGtk()) {
         if (isWK2()) {
-            $launcherPath = catdir($launcherPath, "Programs", "MiniBrowser");
+            unshift(@ARGV, catdir($launcherPath, "Programs", "MiniBrowser"));
         } else {
-            $launcherPath = catdir($launcherPath, "Programs", "GtkLauncher");
+            unshift(@ARGV, catdir($launcherPath, "Programs", "GtkLauncher"));
         }
+        $launcherPath = catdir(sourceDir(), "Tools", "gtk", "run-with-jhbuild");
     }
     
     if (isEfl()) {
-        $launcherPath = catdir($launcherPath, "bin", "EWebLauncher");
+        unshift(@ARGV, catdir($launcherPath, "bin", "EWebLauncher"));
+        $launcherPath = catdir(sourceDir(), "Tools", "efl", "run-with-jhbuild");
     }
     
     if (isWx()) {

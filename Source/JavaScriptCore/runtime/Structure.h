@@ -50,6 +50,7 @@ namespace JSC {
     class PropertyNameArrayData;
     class StructureChain;
     class SlotVisitor;
+    class JSString;
 
     class Structure : public JSCell {
     public:
@@ -101,6 +102,8 @@ namespace JSC {
         bool isFrozen(JSGlobalData&);
         bool isExtensible() const { return !m_preventExtensions; }
         bool didTransition() const { return m_didTransition; }
+        bool shouldGrowPropertyStorage() { return propertyStorageCapacity() == propertyStorageSize(); }
+        JS_EXPORT_PRIVATE size_t suggestedNewPropertyStorageSize(); 
 
         Structure* flattenDictionaryStructure(JSGlobalData&, JSObject*);
 
@@ -168,6 +171,13 @@ namespace JSC {
         void setEnumerationCache(JSGlobalData&, JSPropertyNameIterator* enumerationCache); // Defined in JSPropertyNameIterator.h.
         JSPropertyNameIterator* enumerationCache(); // Defined in JSPropertyNameIterator.h.
         void getPropertyNamesFromStructure(JSGlobalData&, PropertyNameArray&, EnumerationMode);
+
+        JSString* objectToStringValue() { return m_objectToStringValue.get(); }
+
+        void setObjectToStringValue(JSGlobalData& globalData, const JSCell* owner, JSString* value)
+        {
+            m_objectToStringValue.set(globalData, owner, value);
+        }
 
         bool staticFunctionsReified()
         {
@@ -289,6 +299,8 @@ namespace JSC {
 
         uint32_t m_propertyStorageCapacity;
 
+        WriteBarrier<JSString> m_objectToStringValue;
+
         // m_offset does not account for anonymous slots
         int m_offset;
 
@@ -406,7 +418,7 @@ namespace JSC {
     {
 #if ENABLE(GC_VALIDATION)
         ASSERT(globalData.isInitializingObject());
-        globalData.setInitializingObject(false);
+        globalData.setInitializingObjectClass(0);
         if (structure)
 #endif
             m_structure.setEarlyValue(globalData, this, structure);

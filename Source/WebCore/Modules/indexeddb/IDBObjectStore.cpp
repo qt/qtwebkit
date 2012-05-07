@@ -78,16 +78,16 @@ IDBTransaction* IDBObjectStore::transaction() const
     return m_transaction.get();
 }
 
-PassRefPtr<IDBRequest> IDBObjectStore::get(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec)
+PassRefPtr<IDBRequest> IDBObjectStore::get(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, ExceptionCode& ec)
 {
     IDB_TRACE("IDBObjectStore::get");
-    if (key && (key->type() == IDBKey::InvalidType)) {
+
+    if (!keyRange) {
         ec = IDBDatabaseException::DATA_ERR;
         return 0;
     }
-
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
-    m_backend->get(key, request, m_transaction->backend(), ec);
+    m_backend->get(keyRange, request, m_transaction->backend(), ec);
     if (ec) {
         request->markEarlyDeath();
         return 0;
@@ -95,11 +95,32 @@ PassRefPtr<IDBRequest> IDBObjectStore::get(ScriptExecutionContext* context, Pass
     return request.release();
 }
 
-PassRefPtr<IDBRequest> IDBObjectStore::add(ScriptExecutionContext* context, PassRefPtr<SerializedScriptValue> value, PassRefPtr<IDBKey> key, ExceptionCode& ec)
+PassRefPtr<IDBRequest> IDBObjectStore::get(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBObjectStore::get");
+    if (!key || (key->type() == IDBKey::InvalidType)) {
+        ec = IDBDatabaseException::DATA_ERR;
+        return 0;
+    }
+
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+    return get(context, keyRange.release(), ec);
+}
+
+PassRefPtr<IDBRequest> IDBObjectStore::add(ScriptExecutionContext* context, PassRefPtr<SerializedScriptValue> prpValue, PassRefPtr<IDBKey> key, ExceptionCode& ec)
 {
     IDB_TRACE("IDBObjectStore::add");
     if (key && (key->type() == IDBKey::InvalidType)) {
         ec = IDBDatabaseException::DATA_ERR;
+        return 0;
+    }
+
+    RefPtr<SerializedScriptValue> value = prpValue;
+    if (value->blobURLs().size() > 0) {
+        // FIXME: Add Blob/File/FileList support
+        ec = DATA_CLONE_ERR;
         return 0;
     }
 
@@ -112,11 +133,18 @@ PassRefPtr<IDBRequest> IDBObjectStore::add(ScriptExecutionContext* context, Pass
     return request.release();
 }
 
-PassRefPtr<IDBRequest> IDBObjectStore::put(ScriptExecutionContext* context, PassRefPtr<SerializedScriptValue> value, PassRefPtr<IDBKey> key, ExceptionCode& ec)
+PassRefPtr<IDBRequest> IDBObjectStore::put(ScriptExecutionContext* context, PassRefPtr<SerializedScriptValue> prpValue, PassRefPtr<IDBKey> key, ExceptionCode& ec)
 {
     IDB_TRACE("IDBObjectStore::put");
     if (key && (key->type() == IDBKey::InvalidType)) {
         ec = IDBDatabaseException::DATA_ERR;
+        return 0;
+    }
+
+    RefPtr<SerializedScriptValue> value = prpValue;
+    if (value->blobURLs().size() > 0) {
+        // FIXME: Add Blob/File/FileList support
+        ec = DATA_CLONE_ERR;
         return 0;
     }
 
@@ -175,7 +203,7 @@ PassRefPtr<IDBRequest> IDBObjectStore::clear(ScriptExecutionContext* context, Ex
     return request.release();
 }
 
-PassRefPtr<IDBIndex> IDBObjectStore::createIndex(const String& name, const String& keyPath, const OptionsObject& options, ExceptionCode& ec)
+PassRefPtr<IDBIndex> IDBObjectStore::createIndex(const String& name, const String& keyPath, const Dictionary& options, ExceptionCode& ec)
 {
     IDB_TRACE("IDBObjectStore::createIndex");
     if (!IDBIsValidKeyPath(keyPath)) {
@@ -244,6 +272,15 @@ PassRefPtr<IDBRequest> IDBObjectStore::openCursor(ScriptExecutionContext* contex
         return 0;
     }
     return request.release();
+}
+
+PassRefPtr<IDBRequest> IDBObjectStore::openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, unsigned short direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBObjectStore::openCursor");
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+    return openCursor(context, keyRange.release(), ec);
 }
 
 PassRefPtr<IDBRequest> IDBObjectStore::count(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> range, ExceptionCode& ec)

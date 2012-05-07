@@ -32,7 +32,6 @@
 #define DOMDataStore_h
 
 #include "V8DOMMap.h"
-#include "V8Node.h"
 
 #include <v8.h>
 #include <wtf/HashMap.h>
@@ -68,9 +67,6 @@ namespace WebCore {
             ActiveDOMNodeMap,
             DOMObjectMap,
             ActiveDOMObjectMap,
-#if ENABLE(SVG)
-            DOMSVGElementInstanceMap
-#endif
         };
 
         DOMDataStore();
@@ -85,9 +81,6 @@ namespace WebCore {
         DOMNodeMapping& activeDomNodeMap() { return *m_activeDomNodeMap; }
         DOMWrapperMap<void>& domObjectMap() { return *m_domObjectMap; }
         DOMWrapperMap<void>& activeDomObjectMap() { return *m_activeDomObjectMap; }
-#if ENABLE(SVG)
-        DOMWrapperMap<SVGElementInstance>& domSvgElementInstanceMap() { return *m_domSvgElementInstanceMap; }
-#endif
 
         // Need by V8GCController.
         static void weakActiveDOMObjectCallback(v8::Persistent<v8::Value> v8Object, void* domObject);
@@ -95,17 +88,11 @@ namespace WebCore {
 
     protected:
         static void weakDOMObjectCallback(v8::Persistent<v8::Value> v8Object, void* domObject);
-#if ENABLE(SVG)
-        static void weakSVGElementInstanceCallback(v8::Persistent<v8::Value> v8Object, void* domObject);
-#endif
-        
+
         DOMNodeMapping* m_domNodeMap;
         DOMNodeMapping* m_activeDomNodeMap;
         DOMWrapperMap<void>* m_domObjectMap;
         DOMWrapperMap<void>* m_activeDomObjectMap;
-#if ENABLE(SVG)
-        DOMWrapperMap<SVGElementInstance>* m_domSvgElementInstanceMap;
-#endif
     };
 
 } // namespace WebCore

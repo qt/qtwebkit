@@ -19,6 +19,7 @@
 #include "config.h"
 #include "WebSettings.h"
 
+#include "MIMETypeRegistry.h"
 #include "WebSettings_p.h"
 
 #include "WebString.h"
@@ -43,6 +44,7 @@ DEFINE_STATIC_LOCAL(String, BlackBerryInitialScale, ("BlackBerryInitialScale"));
 DEFINE_STATIC_LOCAL(String, BlackBerryLinksHandledExternallyEnabled, ("BlackBerryLinksHandledExternallyEnabled"));
 DEFINE_STATIC_LOCAL(String, BlackBerryMaxPluginInstances, ("BlackBerryMaxPluginInstances"));
 DEFINE_STATIC_LOCAL(String, BlackBerryOverZoomColor, ("BlackBerryOverZoomColor"));
+DEFINE_STATIC_LOCAL(String, BlackBerryOverScrollImagePath, ("BlackBerryOverScrollImagePath"));
 DEFINE_STATIC_LOCAL(String, BlackBerryRenderAnimationsOnScrollOrZoomEnabled, ("BlackBerryRenderAnimationsOnScrollOrZoomEnabled"));
 DEFINE_STATIC_LOCAL(String, BlackBerryScrollbarsEnabled, ("BlackBerryScrollbarsEnabled"));
 DEFINE_STATIC_LOCAL(String, BlackBerryTextReflowMode, ("BlackBerryTextReflowMode"));
@@ -83,65 +85,6 @@ DEFINE_STATIC_LOCAL(String, WebKitUserStyleSheet, ("WebKitUserStyleSheet"));
 DEFINE_STATIC_LOCAL(String, WebKitUserStyleSheetLocation, ("WebKitUserStyleSheetLocation"));
 DEFINE_STATIC_LOCAL(String, WebKitWebSocketsEnabled, ("WebKitWebSocketsEnabled"));
 DEFINE_STATIC_LOCAL(String, WebKitXSSAuditorEnabled, ("WebKitXSSAuditorEnabled"));
-
-// FIXME: We should consider moving all the mime type code into its own object.
-
-typedef HashMap<String, WebString> MIMETypeAssociationMap;
-
-static const MIMETypeAssociationMap& mimeTypeAssociationMap()
-{
-    static MIMETypeAssociationMap* mimeTypeMap = 0;
-    if (mimeTypeMap)
-        return *mimeTypeMap;
-
-    mimeTypeMap = new MIMETypeAssociationMap;
-    mimeTypeMap->add("image/x-ms-bmp", "image/bmp");
-    mimeTypeMap->add("image/x-windows-bmp", "image/bmp");
-    mimeTypeMap->add("image/x-bmp", "image/bmp");
-    mimeTypeMap->add("image/x-bitmap", "image/bmp");
-    mimeTypeMap->add("image/x-ms-bitmap", "image/bmp");
-    mimeTypeMap->add("image/jpg", "image/jpeg");
-    mimeTypeMap->add("image/pjpeg", "image/jpeg");
-    mimeTypeMap->add("image/x-png", "image/png");
-    mimeTypeMap->add("image/vnd.rim.png", "image/png");
-    mimeTypeMap->add("image/ico", "image/vnd.microsoft.icon");
-    mimeTypeMap->add("image/icon", "image/vnd.microsoft.icon");
-    mimeTypeMap->add("text/ico", "image/vnd.microsoft.icon");
-    mimeTypeMap->add("application/ico", "image/vnd.microsoft.icon");
-    mimeTypeMap->add("image/x-icon", "image/vnd.microsoft.icon");
-    mimeTypeMap->add("audio/vnd.qcelp", "audio/qcelp");
-    mimeTypeMap->add("audio/qcp", "audio/qcelp");
-    mimeTypeMap->add("audio/vnd.qcp", "audio/qcelp");
-    mimeTypeMap->add("audio/wav", "audio/x-wav");
-    mimeTypeMap->add("audio/mid", "audio/midi");
-    mimeTypeMap->add("audio/sp-midi", "audio/midi");
-    mimeTypeMap->add("audio/x-mid", "audio/midi");
-    mimeTypeMap->add("audio/x-midi", "audio/midi");
-    mimeTypeMap->add("audio/x-mpeg", "audio/mpeg");
-    mimeTypeMap->add("audio/mp3", "audio/mpeg");
-    mimeTypeMap->add("audio/x-mp3", "audio/mpeg");
-    mimeTypeMap->add("audio/mpeg3", "audio/mpeg");
-    mimeTypeMap->add("audio/x-mpeg3", "audio/mpeg");
-    mimeTypeMap->add("audio/mpg3", "audio/mpeg");
-    mimeTypeMap->add("audio/mpg", "audio/mpeg");
-    mimeTypeMap->add("audio/x-mpg", "audio/mpeg");
-    mimeTypeMap->add("audio/m4a", "audio/mp4");
-    mimeTypeMap->add("audio/x-m4a", "audio/mp4");
-    mimeTypeMap->add("audio/x-mp4", "audio/mp4");
-    mimeTypeMap->add("audio/x-aac", "audio/aac");
-    mimeTypeMap->add("audio/x-amr", "audio/amr");
-    mimeTypeMap->add("audio/mpegurl", "audio/x-mpegurl");
-    mimeTypeMap->add("audio/flac", "audio/x-flac");
-    mimeTypeMap->add("video/3gp", "video/3gpp");
-    mimeTypeMap->add("video/avi", "video/x-msvideo");
-    mimeTypeMap->add("video/x-m4v", "video/mp4");
-    mimeTypeMap->add("video/x-quicktime", "video/quicktime");
-    mimeTypeMap->add("application/java", "application/java-archive");
-    mimeTypeMap->add("application/x-java-archive", "application/java-archive");
-    mimeTypeMap->add("application/x-zip-compressed", "application/zip");
-
-    return *mimeTypeMap;
-}
 
 static HashSet<String>* s_supportedObjectMIMETypes;
 
@@ -210,6 +153,7 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setDouble(BlackBerryInitialScale, -1);
     settings->m_private->setUnsigned(BlackBerryMaxPluginInstances, 1);
     settings->m_private->setUnsigned(BlackBerryOverZoomColor, WebCore::Color::white);
+    settings->m_private->setString(BlackBerryOverScrollImagePath, "");
     settings->m_private->setBoolean(BlackBerryScrollbarsEnabled, true);
 
     // FIXME: We should detect whether we are embedded in a browser or an email client and default to TextReflowEnabledOnlyForBlockZoom and TextReflowEnabled, respectively.
@@ -254,14 +198,7 @@ bool WebSettings::isSupportedObjectMIMEType(const WebString& mimeType)
     if (!s_supportedObjectMIMETypes)
         return false;
 
-    return s_supportedObjectMIMETypes->contains(getNormalizedMIMEType(mimeType));
-}
-
-WebString WebSettings::getNormalizedMIMEType(const WebString& type)
-{
-    MIMETypeAssociationMap::const_iterator i = mimeTypeAssociationMap().find(type);
-
-    return i == mimeTypeAssociationMap().end() ? type : i->second;
+    return s_supportedObjectMIMETypes->contains(MIMETypeRegistry::getNormalizedMIMEType(mimeType));
 }
 
 bool WebSettings::xssAuditorEnabled() const
@@ -396,17 +333,10 @@ void WebSettings::setStandardFontFamily(const char* standardFontFamily)
 
 WebString WebSettings::userAgentString() const
 {
-    // FIXME: Is this the best place for this assertion. Why can't we just return an empty string
-    // and let the caller decide how to handle it?
-
-    // The default user agent string is empty. We rely upon the client to set this for us.
-    // We check this by asserting if the client has not done so before the first time it is needed.
-    String userAgentString = m_private->getString(BlackBerryUserAgentString);
-    ASSERT(!userAgentString.isEmpty());
-    return userAgentString;
+    return m_private->getString(BlackBerryUserAgentString);
 }
 
-void WebSettings::setUserAgentString(const char* userAgentString)
+void WebSettings::setUserAgentString(const WebString& userAgentString)
 {
     m_private->setString(BlackBerryUserAgentString, userAgentString);
 }
@@ -731,6 +661,16 @@ unsigned WebSettings::overZoomColor() const
 void WebSettings::setOverZoomColor(unsigned color)
 {
     m_private->setUnsigned(BlackBerryOverZoomColor, color);
+}
+
+WebString WebSettings::overScrollImagePath() const
+{
+    return m_private->getString(BlackBerryOverScrollImagePath);
+}
+
+void WebSettings::setOverScrollImagePath(const char* path)
+{
+    m_private->setString(BlackBerryOverScrollImagePath, path);
 }
 
 unsigned WebSettings::backgroundColor() const

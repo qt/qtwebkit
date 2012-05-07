@@ -29,7 +29,6 @@
 
 #include "RenderMathMLUnderOver.h"
 
-#include "FontSelector.h"
 #include "MathMLNames.h"
 
 namespace WebCore {
@@ -67,10 +66,7 @@ RenderBoxModelObject* RenderMathMLUnderOver::base() const
 
 void RenderMathMLUnderOver::addChild(RenderObject* child, RenderObject* beforeChild)
 {    
-    RenderMathMLBlock* row = new (renderArena()) RenderMathMLBlock(node());
-    RefPtr<RenderStyle> rowStyle = createBlockStyle();
-    row->setStyle(rowStyle.release());
-    row->setIsAnonymous(true);
+    RenderBlock* row = createAnonymousBlock();
     
     // look through the children for rendered elements counting the blocks so we know what child
     // we are adding
@@ -131,20 +127,10 @@ inline int getOffsetHeight(RenderObject* obj)
 {
     if (obj->isBoxModelObject()) {
         RenderBoxModelObject* box = toRenderBoxModelObject(obj);
-        return box->offsetHeight();
+        return box->pixelSnappedOffsetHeight();
     }
    
     return 0;
-}
-
-void RenderMathMLUnderOver::stretchToHeight(int height)
-{
-    RenderBoxModelObject* base = this->base();
-    if (base && base->isRenderMathMLBlock()) {
-        RenderMathMLBlock* block = toRenderMathMLBlock(base);
-        block->stretchToHeight(height);
-        setNeedsLayout(true);
-    }
 }
 
 void RenderMathMLUnderOver::layout() 
@@ -185,7 +171,7 @@ void RenderMathMLUnderOver::layout()
         // base row wrapper
         base = firstChild();
         if (base) {
-            LayoutUnit baseHeight = getOffsetHeight(base);
+            int baseHeight = getOffsetHeight(base);
             // actual base
             base = base->firstChild();
             if (!base || !base->isBoxModelObject())
@@ -226,7 +212,7 @@ void RenderMathMLUnderOver::layout()
                 // We need to calculate the baseline of the base versus the start of the under block and
                 // adjust the placement of the under block.
                 
-                LayoutUnit baseHeight = getOffsetHeight(base);
+                int baseHeight = getOffsetHeight(base);
                 // actual base
                 base = base->firstChild();
                 if (!base || !base->isBoxModelObject())

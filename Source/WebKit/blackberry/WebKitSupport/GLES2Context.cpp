@@ -42,6 +42,8 @@
 
 #include <GLES2/gl2.h>
 
+using BlackBerry::Platform::Graphics::Window;
+
 namespace BlackBerry {
 namespace WebKit {
 
@@ -72,8 +74,10 @@ PassOwnPtr<GLES2Context> GLES2Context::create(WebPagePrivate* page)
 GLES2Context::GLES2Context(WebPagePrivate* page)
     : m_window(0)
 {
-    if (page->m_client->window()->windowUsage() == Platform::Graphics::Window::GLES2Usage)
-        m_window = page->m_client->window();
+    if (Window* window = page->m_client->window()) {
+        if (window->windowUsage() == Window::GLES2Usage)
+            m_window = window;
+    }
 }
 
 GLES2Context::~GLES2Context()
@@ -104,14 +108,19 @@ bool GLES2Context::swapBuffers()
 {
     ASSERT(glGetError() == GL_NO_ERROR);
 
-#if ENABLE_COMPOSITING_SURFACE
-    // Because we are rendering compositing contents into an off-screen pixmap and
-    // we need to blend the pixmap with the web page window surface we have to call
-    // glFinish() here.
-    glFinish();
+    // If there's a window the backing store will swap it when the time is right.
+    // Return early because there might be an unused but non-null compositing surface
+    if (m_window)
+        return true;
 
-    if (BackingStoreCompositingSurface* surface = compositingSurface())
+#if ENABLE_COMPOSITING_SURFACE
+    if (BackingStoreCompositingSurface* surface = compositingSurface()) {
+        // Because we are rendering compositing contents into an off-screen pixmap and
+        // we need to blend the pixmap with the web page window surface we have to call
+        // glFinish() here.
+        glFinish();
         surface->swapBuffers();
+    }
 #endif
 
     return true;

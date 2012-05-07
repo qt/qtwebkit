@@ -30,13 +30,15 @@
 #ifndef CSSPrimitiveValueMappings_h
 #define CSSPrimitiveValueMappings_h
 
-#include "ColorSpace.h"
+#include "CSSCalculationValue.h"
 #include "CSSPrimitiveValue.h"
+#include "ColorSpace.h"
 #include "CSSValueKeywords.h"
 #include "FontDescription.h"
 #include "FontSmoothingMode.h"
 #include "GraphicsTypes.h"
 #include "Length.h"
+#include "LineClampValue.h"
 #include "Path.h"
 #include "RenderStyleConstants.h"
 #include "SVGRenderStyleDefs.h"
@@ -86,13 +88,6 @@ template<> inline CSSPrimitiveValue::operator unsigned short() const
     return 0;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(int i)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_NUMBER;
-    m_value.num = static_cast<double>(i);
-}
-
 template<> inline CSSPrimitiveValue::operator int() const
 {
     if (m_primitiveUnitType == CSS_NUMBER)
@@ -100,13 +95,6 @@ template<> inline CSSPrimitiveValue::operator int() const
 
     ASSERT_NOT_REACHED();
     return 0;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(unsigned i)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_NUMBER;
-    m_value.num = static_cast<double>(i);
 }
 
 template<> inline CSSPrimitiveValue::operator unsigned() const
@@ -133,6 +121,25 @@ template<> inline CSSPrimitiveValue::operator float() const
 
     ASSERT_NOT_REACHED();
     return 0.0f;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineClampValue i)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = i.isPercentage() ? CSS_PERCENTAGE : CSS_NUMBER;
+    m_value.num = static_cast<double>(i.value());
+}
+
+template<> inline CSSPrimitiveValue::operator LineClampValue() const
+{
+    if (m_primitiveUnitType == CSS_NUMBER)
+        return LineClampValue(clampTo<int>(m_value.num), LineClampLineCount);
+
+    if (m_primitiveUnitType == CSS_PERCENTAGE)
+        return LineClampValue(clampTo<int>(m_value.num), LineClampPercentage);
+
+    ASSERT_NOT_REACHED();
+    return LineClampValue();
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColumnSpan columnSpan)
@@ -361,16 +368,14 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ControlPart e)
         case ListboxPart:
             m_value.ident = CSSValueListbox;
             break;
-        case ListButtonPart:
-#if ENABLE(DATALIST)
-            m_value.ident = CSSValueListButton;
-#endif
-            break;
         case ListItemPart:
             m_value.ident = CSSValueListitem;
             break;
-        case MediaFullscreenButtonPart:
-            m_value.ident = CSSValueMediaFullscreenButton;
+        case MediaEnterFullscreenButtonPart:
+            m_value.ident = CSSValueMediaEnterFullscreenButton;
+            break;
+        case MediaExitFullscreenButtonPart:
+            m_value.ident = CSSValueMediaExitFullscreenButton;
             break;
         case MediaPlayButtonPart:
             m_value.ident = CSSValueMediaPlayButton;
@@ -1289,6 +1294,53 @@ template<> inline CSSPrimitiveValue::operator EFlexDirection() const
     }
 }
 
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexLinePack e)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (e) {
+    case LinePackStart:
+        m_value.ident = CSSValueStart;
+        break;
+    case LinePackEnd:
+        m_value.ident = CSSValueEnd;
+        break;
+    case LinePackCenter:
+        m_value.ident = CSSValueCenter;
+        break;
+    case LinePackJustify:
+        m_value.ident = CSSValueJustify;
+        break;
+    case LinePackDistribute:
+        m_value.ident = CSSValueDistribute;
+        break;
+    case LinePackStretch:
+        m_value.ident = CSSValueStretch;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator EFlexLinePack() const
+{
+    switch (m_value.ident) {
+    case CSSValueStart:
+        return LinePackStart;
+    case CSSValueEnd:
+        return LinePackEnd;
+    case CSSValueCenter:
+        return LinePackCenter;
+    case CSSValueJustify:
+        return LinePackJustify;
+    case CSSValueDistribute:
+        return LinePackDistribute;
+    case CSSValueStretch:
+        return LinePackStretch;
+    default:
+        ASSERT_NOT_REACHED();
+        return LinePackStretch;
+    }
+}
+
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFlexWrap e)
     : CSSValue(PrimitiveClass)
 {
@@ -1335,9 +1387,6 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFloat e)
         case RightFloat:
             m_value.ident = CSSValueRight;
             break;
-        case PositionedFloat:
-            m_value.ident = CSSValueWebkitPositioned;
-            break;
     }
 }
 
@@ -1351,8 +1400,6 @@ template<> inline CSSPrimitiveValue::operator EFloat() const
         case CSSValueNone:
         case CSSValueCenter:  // Non-standard CSS value
             return NoFloat;
-        case CSSValueWebkitPositioned:
-            return PositionedFloat;
         default:
             ASSERT_NOT_REACHED();
             return NoFloat;
@@ -3647,11 +3694,11 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(WrapFlow wrapFlow)
     case WrapFlowBoth:
         m_value.ident = CSSValueBoth;
         break;
-    case WrapFlowLeft:
-        m_value.ident = CSSValueLeft;
+    case WrapFlowStart:
+        m_value.ident = CSSValueStart;
         break;
-    case WrapFlowRight:
-        m_value.ident = CSSValueRight;
+    case WrapFlowEnd:
+        m_value.ident = CSSValueEnd;
         break;
     case WrapFlowMaximum:
         m_value.ident = CSSValueMaximum;
@@ -3669,10 +3716,10 @@ template<> inline CSSPrimitiveValue::operator WrapFlow() const
         return WrapFlowAuto;
     case CSSValueBoth:
         return WrapFlowBoth;
-    case CSSValueLeft:
-        return WrapFlowLeft;
-    case CSSValueRight:
-        return WrapFlowRight;
+    case CSSValueStart:
+        return WrapFlowStart;
+    case CSSValueEnd:
+        return WrapFlowEnd;
     case CSSValueMaximum:
         return WrapFlowMaximum;
     case CSSValueClear:
@@ -3710,18 +3757,35 @@ template<> inline CSSPrimitiveValue::operator WrapThrough() const
     }
 }
 
-enum LengthConversion { UnsupportedConversion = 0, FixedConversion = 1, AutoConversion = 2, PercentConversion = 4, FractionConversion = 8};
+enum LengthConversion {
+    AnyConversion = ~0,
+    FixedIntegerConversion = 1 << 0,
+    FixedFloatConversion = 1 << 1,
+    AutoConversion = 1 << 2,
+    PercentConversion = 1 << 3,
+    FractionConversion = 1 << 4,
+    CalculatedConversion = 1 << 5,
+    ViewportPercentageConversion = 1 << 6
+};
+
 template<int supported> Length CSSPrimitiveValue::convertToLength(RenderStyle* style, RenderStyle* rootStyle, double multiplier, bool computingFontSize)
 {
-    if ((supported & FixedConversion) && isLength())
+    if ((supported & (FixedIntegerConversion | FixedFloatConversion)) && isFontRelativeLength() && (!style || !rootStyle))
+        return Length(Undefined);
+    if ((supported & FixedIntegerConversion) && isLength())
         return computeLength<Length>(style, rootStyle, multiplier, computingFontSize);
+    if ((supported & FixedFloatConversion) && isLength())
+        return Length(computeLength<double>(style, rootStyle, multiplier), Fixed);
     if ((supported & PercentConversion) && isPercentage())
         return Length(getDoubleValue(), Percent);
     if ((supported & FractionConversion) && isNumber())
         return Length(getDoubleValue() * 100.0, Percent);
     if ((supported & AutoConversion) && getIdent() == CSSValueAuto)
         return Length(Auto);
-    ASSERT_NOT_REACHED();
+    if ((supported & CalculatedConversion) && isCalculated())
+        return Length(cssCalcValue()->toCalcValue(style, rootStyle, multiplier));
+    if ((supported & ViewportPercentageConversion) && isViewportPercentageLength())
+        return viewportPercentageLength();
     return Length(Undefined);
 }
 

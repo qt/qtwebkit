@@ -272,8 +272,8 @@ WorkerMessagingProxy::~WorkerMessagingProxy()
 void WorkerMessagingProxy::startWorkerContext(const KURL& scriptURL, const String& userAgent, const String& sourceCode, WorkerThreadStartMode startMode)
 {
     RefPtr<DedicatedWorkerThread> thread = DedicatedWorkerThread::create(scriptURL, userAgent, sourceCode, *this, *this, startMode,
-                                                                         m_scriptExecutionContext->contentSecurityPolicy()->policy(),
-                                                                         m_scriptExecutionContext->contentSecurityPolicy()->headerType());
+                                                                         m_scriptExecutionContext->contentSecurityPolicy()->deprecatedHeader(),
+                                                                         m_scriptExecutionContext->contentSecurityPolicy()->deprecatedHeaderType());
     workerThreadCreated(thread);
     thread->start();
     InspectorInstrumentation::didStartWorkerContext(m_scriptExecutionContext.get(), this, scriptURL);
@@ -296,13 +296,14 @@ void WorkerMessagingProxy::postMessageToWorkerContext(PassRefPtr<SerializedScrip
         m_queuedEarlyTasks.append(MessageWorkerContextTask::create(message, channels));
 }
 
-void WorkerMessagingProxy::postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
+bool WorkerMessagingProxy::postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
 {
     if (m_askedToTerminate)
-        return;
+        return false;
 
     ASSERT(m_workerThread);
     m_workerThread->runLoop().postTaskForMode(task, mode);
+    return true;
 }
 
 void WorkerMessagingProxy::postTaskToLoader(PassOwnPtr<ScriptExecutionContext::Task> task)

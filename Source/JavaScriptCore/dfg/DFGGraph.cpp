@@ -27,6 +27,7 @@
 #include "DFGGraph.h"
 
 #include "CodeBlock.h"
+#include <wtf/BoundsCheckedPointer.h>
 
 #if ENABLE(DFG_JIT)
 
@@ -83,13 +84,13 @@ static void printWhiteSpace(unsigned amount)
         dataLog(" ");
 }
 
-void Graph::dumpCodeOrigin(NodeIndex nodeIndex)
+void Graph::dumpCodeOrigin(NodeIndex prevNodeIndex, NodeIndex nodeIndex)
 {
-    if (!nodeIndex)
+    if (prevNodeIndex == NoNode)
         return;
     
     Node& currentNode = at(nodeIndex);
-    Node& previousNode = at(nodeIndex - 1);
+    Node& previousNode = at(prevNodeIndex);
     if (previousNode.codeOrigin.inlineCallFrame == currentNode.codeOrigin.inlineCallFrame)
         return;
     
@@ -120,7 +121,7 @@ void Graph::dumpCodeOrigin(NodeIndex nodeIndex)
 void Graph::dump(NodeIndex nodeIndex)
 {
     Node& node = at(nodeIndex);
-    NodeType op = static_cast<NodeType>(node.op);
+    NodeType op = node.op();
 
     unsigned refCount = node.refCount();
     bool skipped = !refCount;
@@ -130,7 +131,6 @@ void Graph::dump(NodeIndex nodeIndex)
         --refCount;
     }
     
-    dumpCodeOrigin(nodeIndex);
     printWhiteSpace((node.codeOrigin.inlineDepth() - 1) * 2);
 
     // Example/explanation of dataflow dump output
@@ -157,26 +157,41 @@ void Graph::dump(NodeIndex nodeIndex)
         dataLog("-");
     dataLog(">\t%s(", opName(op));
     bool hasPrinted = false;
-    if (node.flags & NodeHasVarArgs) {
+    if (node.flags() & NodeHasVarArgs) {
         for (unsigned childIdx = node.firstChild(); childIdx < node.firstChild() + node.numChildren(); childIdx++) {
             if (hasPrinted)
                 dataLog(", ");
             else
                 hasPrinted = true;
-            dataLog("@%u", m_varArgChildren[childIdx].index());
+            dataLog("%s@%u%s",
+                    useKindToString(m_varArgChildren[childIdx].useKind()),
+                    m_varArgChildren[childIdx].index(),
+                    predictionToAbbreviatedString(at(childIdx).prediction()));
         }
     } else {
-        if (!!node.child1())
-            dataLog("@%u", node.child1().index());
-        if (!!node.child2())
-            dataLog(", @%u", node.child2().index());
-        if (!!node.child3())
-            dataLog(", @%u", node.child3().index());
+        if (!!node.child1()) {
+            dataLog("%s@%u%s",
+                    useKindToString(node.child1().useKind()),
+                    node.child1().index(),
+                    predictionToAbbreviatedString(at(node.child1()).prediction()));
+        }
+        if (!!node.child2()) {
+            dataLog(", %s@%u%s",
+                    useKindToString(node.child2().useKind()),
+                    node.child2().index(),
+                    predictionToAbbreviatedString(at(node.child2()).prediction()));
+        }
+        if (!!node.child3()) {
+            dataLog(", %s@%u%s",
+                    useKindToString(node.child3().useKind()),
+                    node.child3().index(),
+                    predictionToAbbreviatedString(at(node.child3()).prediction()));
+        }
         hasPrinted = !!node.child1();
     }
 
-    if (node.arithNodeFlags()) {
-        dataLog("%s%s", hasPrinted ? ", " : "", arithNodeFlagsAsString(node.arithNodeFlags()));
+    if (node.flags()) {
+        dataLog("%s%s", hasPrinted ? ", " : "", nodeFlagsAsString(node.flags()));
         hasPrinted = true;
     }
     if (node.hasVarNumber()) {
@@ -253,8 +268,6 @@ void Graph::dump(NodeIndex nodeIndex)
             dataLog("  predicting %s, double ratio %lf%s", predictionToString(node.variableAccessData()->prediction()), node.variableAccessData()->doubleVoteRatio(), node.variableAccessData()->shouldUseDoubleFormat() ? ", forcing double" : "");
         else if (node.hasHeapPrediction())
             dataLog("  predicting %s", predictionToString(node.getHeapPrediction()));
-        else if (node.hasVarNumber())
-            dataLog("  predicting %s", predictionToString(getGlobalVarPrediction(node.varNumber())));
     }
     
     dataLog("\n");
@@ -262,6 +275,7 @@ void Graph::dump(NodeIndex nodeIndex)
 
 void Graph::dump()
 {
+    NodeIndex lastNodeIndex = NoNode;
     for (size_t b = 0; b < m_blocks.size(); ++b) {
         BasicBlock* block = m_blocks[b].get();
         dataLog("Block #%u (bc#%u): %s%s\n", (int)b, block->bytecodeBegin, block->isReachable ? "" : " (skipped)", block->isOSRTarget ? " (OSR target)" : "");
@@ -280,8 +294,11 @@ void Graph::dump()
         dataLog("  var links: ");
         dumpOperands(block->variablesAtHead, WTF::dataFile());
         dataLog("\n");
-        for (size_t i = 0; i < block->size(); ++i)
+        for (size_t i = 0; i < block->size(); ++i) {
+            dumpCodeOrigin(lastNodeIndex, block->at(i));
             dump(block->at(i));
+            lastNodeIndex = block->at(i);
+        }
         dataLog("  vars after: ");
         if (block->cfaHasVisited)
             dumpOperands(block->valuesAtTail, WTF::dataFile());
@@ -294,7 +311,7 @@ void Graph::dump()
 // FIXME: Convert this to be iterative, not recursive.
 #define DO_TO_CHILDREN(node, thingToDo) do {                            \
         Node& _node = (node);                                           \
-        if (_node.flags & NodeHasVarArgs) {                             \
+        if (_node.flags() & NodeHasVarArgs) {                           \
             for (unsigned _childIdx = _node.firstChild();               \
                  _childIdx < _node.firstChild() + _node.numChildren();  \
                  _childIdx++)                                           \

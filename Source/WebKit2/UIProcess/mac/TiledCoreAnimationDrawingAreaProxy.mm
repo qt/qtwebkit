@@ -26,6 +26,8 @@
 #import "config.h"
 #import "TiledCoreAnimationDrawingAreaProxy.h"
 
+#if ENABLE(THREADED_SCROLLING)
+
 #import "DrawingAreaMessages.h"
 #import "DrawingAreaProxyMessages.h"
 #import "LayerTreeContext.h"
@@ -56,6 +58,14 @@ void TiledCoreAnimationDrawingAreaProxy::deviceScaleFactorDidChange()
     m_webPageProxy->process()->send(Messages::DrawingArea::SetDeviceScaleFactor(m_webPageProxy->deviceScaleFactor()), m_webPageProxy->pageID());
 }
 
+void TiledCoreAnimationDrawingAreaProxy::visibilityDidChange()
+{
+    if (!m_webPageProxy->isViewVisible())
+        m_webPageProxy->process()->send(Messages::DrawingArea::SuspendPainting(), m_webPageProxy->pageID());
+    else
+        m_webPageProxy->process()->send(Messages::DrawingArea::ResumePainting(), m_webPageProxy->pageID());
+}
+
 void TiledCoreAnimationDrawingAreaProxy::layerHostingModeDidChange()
 {
     m_webPageProxy->process()->send(Messages::DrawingArea::SetLayerHostingMode(m_webPageProxy->layerHostingMode()), m_webPageProxy->pageID());
@@ -72,6 +82,12 @@ void TiledCoreAnimationDrawingAreaProxy::sizeDidChange()
         return;
 
     sendUpdateGeometry();
+}
+
+void TiledCoreAnimationDrawingAreaProxy::waitForPossibleGeometryUpdate()
+{
+    if (!m_isWaitingForDidUpdateGeometry)
+        return;
 
     if (m_webPageProxy->process()->isLaunching())
         return;
@@ -119,3 +135,5 @@ void TiledCoreAnimationDrawingAreaProxy::sendUpdateGeometry()
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(THREADED_SCROLLING)

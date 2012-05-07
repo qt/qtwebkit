@@ -44,9 +44,6 @@ WebInspector.SourceFrame = function(url)
     var textViewerDelegate = new WebInspector.TextViewerDelegateForSourceFrame(this);
     this._textViewer = new WebInspector.TextViewer(this._textModel, WebInspector.platform(), this._url, textViewerDelegate);
 
-    this._editButton = new WebInspector.StatusBarButton(WebInspector.UIString("Edit"), "edit-source-status-bar-item");
-    this._editButton.addEventListener("click", this._editButtonClicked.bind(this), this);
-
     this._currentSearchResultIndex = -1;
     this._searchResults = [];
 
@@ -54,12 +51,7 @@ WebInspector.SourceFrame = function(url)
     this._rowMessages = {};
     this._messageBubbles = {};
 
-    if (WebInspector.experimentsSettings.sourceFrameAlwaysEditable.isEnabled())
-        this.startEditing();
-}
-
-WebInspector.SourceFrame.Events = {
-    Loaded: "loaded"
+    this._textViewer.readOnly = !this.canEditSource();
 }
 
 WebInspector.SourceFrame.createSearchRegex = function(query)
@@ -86,8 +78,6 @@ WebInspector.SourceFrame.prototype = {
     {
         this._ensureContentLoaded();
         this._textViewer.show(this.element);
-        if (this._wasHiddenWhileEditing)
-            this.setReadOnly(false);
     },
 
     willHide: function()
@@ -98,20 +88,11 @@ WebInspector.SourceFrame.prototype = {
 
         this._clearLineHighlight();
         this._clearLineToReveal();
-        
-        if (!this._textViewer.readOnly)
-            this._wasHiddenWhileEditing = true;
-        this.setReadOnly(true);
     },
 
-    focus: function()
+    defaultFocusedElement: function()
     {
-        this._textViewer.focus();
-    },
-
-    get statusBarItems()
-    {
-        return WebInspector.experimentsSettings.sourceFrameAlwaysEditable.isEnabled() ? [] : [this._editButton.element];
+        return this._textViewer.defaultFocusedElement();
     },
 
     get loaded()
@@ -137,6 +118,9 @@ WebInspector.SourceFrame.prototype = {
         }
     },
 
+    /**
+     * @param {function(?string, boolean, string)} callback
+     */
     requestContent: function(callback)
     {
     },
@@ -216,33 +200,8 @@ WebInspector.SourceFrame.prototype = {
         delete this._lineToReveal;
     },
 
-    _saveViewerState: function()
-    {
-        this._viewerState = {
-            textModelContent: this._textModel.text,
-            messages: this._messages,
-            diffLines: this._diffLines,
-        };
-    },
-
-    _restoreViewerState: function()
-    {
-        if (!this._viewerState)
-            return;
-        this._textModel.setText(null, this._viewerState.textModelContent);
-
-        this._messages = this._viewerState.messages;
-        this._diffLines = this._viewerState.diffLines;
-        this._setTextViewerDecorations();
-
-        delete this._viewerState;
-    },
-
     beforeTextChanged: function()
     {
-        if (!this._viewerState)
-            this._saveViewerState();
-
         WebInspector.searchController.cancelSearch();
         this.clearMessages();
     },
@@ -251,12 +210,17 @@ WebInspector.SourceFrame.prototype = {
     {
     },
 
-    setContent: function(mimeType, content)
+    /**
+     * @param {?string} content
+     * @param {boolean} contentEncoded
+     * @param {string} mimeType
+     */
+    setContent: function(content, contentEncoded, mimeType)
     {
         this._textViewer.mimeType = mimeType;
 
         this._loaded = true;
-        this._textModel.setText(null, content);
+        this._textModel.setText(content || "");
 
         this._textViewer.beginUpdates();
 
@@ -277,13 +241,12 @@ WebInspector.SourceFrame.prototype = {
             delete this._delayedFindSearchMatches;
         }
 
-        this.dispatchEventToListeners(WebInspector.SourceFrame.Events.Loaded);
+        this.onTextViewerContentLoaded();
 
         this._textViewer.endUpdates();
-
-        if (!this.canEditSource())
-            this._editButton.disabled = true;
     },
+
+    onTextViewerContentLoaded: function() {},
 
     _setTextViewerDecorations: function()
     {
@@ -521,25 +484,9 @@ WebInspector.SourceFrame.prototype = {
         WebInspector.populateResourceContextMenu(contextMenu, this._url, lineNumber);
     },
 
-    suggestedFileName: function()
-    {
-    },
-
     inheritScrollPositions: function(sourceFrame)
     {
         this._textViewer.inheritScrollPositions(sourceFrame._textViewer);
-    },
-
-    _editButtonClicked: function()
-    {
-        if (!this.canEditSource())
-            return;
-
-        const shouldStartEditing = !this._editButton.toggled;
-        if (shouldStartEditing)
-            this.startEditing();
-        else
-            this.commitEditing();
     },
 
     canEditSource: function()
@@ -547,71 +494,25 @@ WebInspector.SourceFrame.prototype = {
         return false;
     },
 
-    startEditing: function()
-    {
-        if (!this.canEditSource())
-            return false;
-
-        if (this._commitEditingInProgress)
-            return false;
-
-        this.setReadOnly(false);
-        return true;
-    },
-
     commitEditing: function()
     {
-        if (!this._viewerState) {
-            // No editing was actually done.
-            this.setReadOnly(true);
-            return;
+        function callback(error)
+        {
+            this.didEditContent(error, this._textModel.text);
         }
-
-        this._commitEditingInProgress = true;
-        this._textViewer.readOnly = true;
-        this._editButton.toggled = false;
-        this.editContent(this._textModel.text, this.didEditContent.bind(this));
+        this.editContent(this._textModel.text, callback.bind(this));
     },
 
-    didEditContent: function(error)
+    didEditContent: function(error, content)
     {
-        this._commitEditingInProgress = false;
-        this._textViewer.readOnly = false;
-
         if (error) {
-            if (error.message)
-                WebInspector.log(error.message, WebInspector.ConsoleMessage.MessageLevel.Error, true);
+            WebInspector.log(error, WebInspector.ConsoleMessage.MessageLevel.Error, true);
             return;
         }
-
-        delete this._viewerState;
     },
 
     editContent: function(newContent, callback)
     {
-    },
-
-    cancelEditing: function()
-    {
-        if (WebInspector.experimentsSettings.sourceFrameAlwaysEditable.isEnabled())
-            return false;
-
-        this._restoreViewerState();
-        this.setReadOnly(true);
-        return true;
-    },
-
-    get readOnly()
-    {
-        return this._textViewer.readOnly;
-    },
-
-    setReadOnly: function(readOnly)
-    {
-        if (readOnly && WebInspector.experimentsSettings.sourceFrameAlwaysEditable.isEnabled())
-            return;
-        this._textViewer.readOnly = readOnly;
-        this._editButton.toggled = !readOnly;
     }
 }
 
@@ -628,11 +529,6 @@ WebInspector.TextViewerDelegateForSourceFrame = function(sourceFrame)
 }
 
 WebInspector.TextViewerDelegateForSourceFrame.prototype = {
-    doubleClick: function(lineNumber)
-    {
-        this._sourceFrame.startEditing(lineNumber);
-    },
-
     beforeTextChanged: function()
     {
         this._sourceFrame.beforeTextChanged();
@@ -648,11 +544,6 @@ WebInspector.TextViewerDelegateForSourceFrame.prototype = {
         this._sourceFrame.commitEditing();
     },
 
-    cancelEditing: function()
-    {
-        return this._sourceFrame.cancelEditing();
-    },
-
     populateLineGutterContextMenu: function(contextMenu, lineNumber)
     {
         this._sourceFrame.populateLineGutterContextMenu(contextMenu, lineNumber);
@@ -661,11 +552,6 @@ WebInspector.TextViewerDelegateForSourceFrame.prototype = {
     populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
         this._sourceFrame.populateTextAreaContextMenu(contextMenu, lineNumber);
-    },
-
-    suggestedFileName: function()
-    {
-        return this._sourceFrame.suggestedFileName();
     }
 }
 

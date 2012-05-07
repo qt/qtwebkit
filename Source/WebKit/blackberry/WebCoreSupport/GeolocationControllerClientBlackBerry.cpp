@@ -66,7 +66,7 @@ void GeolocationControllerClientBlackBerry::requestPermission(Geolocation* locat
     Frame* frame = location->frame();
     if (!frame)
         return;
-    m_webPagePrivate->m_page->chrome()->requestGeolocationPermissionForFrame(frame, location);
+    m_webPagePrivate->m_page->chrome()->client()->requestGeolocationPermissionForFrame(frame, location);
 }
 
 void GeolocationControllerClientBlackBerry::cancelPermissionRequest(Geolocation* location)
@@ -74,7 +74,7 @@ void GeolocationControllerClientBlackBerry::cancelPermissionRequest(Geolocation*
     Frame* frame = location->frame();
     if (!frame)
         return;
-    m_webPagePrivate->m_page->chrome()->cancelGeolocationPermissionRequestForFrame(frame, location);
+    m_webPagePrivate->m_page->chrome()->client()->cancelGeolocationPermissionRequestForFrame(frame, location);
 }
 
 void GeolocationControllerClientBlackBerry::onLocationUpdate(double timestamp, double latitude, double longitude, double accuracy, double altitude, bool altitudeValid,
@@ -82,13 +82,13 @@ void GeolocationControllerClientBlackBerry::onLocationUpdate(double timestamp, d
 {
     m_lastPosition = GeolocationPosition::create(timestamp, latitude, longitude, accuracy, altitudeValid, altitude, altitudeAccuracyValid,
                                                  altitudeAccuracy, headingValid, heading, speedValid, speed);
-    m_webPagePrivate->m_page->geolocationController()->positionChanged(m_lastPosition.get());
+    GeolocationController::from(m_webPagePrivate->m_page)->positionChanged(m_lastPosition.get());
 }
 
 void GeolocationControllerClientBlackBerry::onLocationError(const char* errorStr)
 {
     RefPtr<GeolocationError> error = GeolocationError::create(GeolocationError::PositionUnavailable, String::fromUTF8(errorStr));
-    m_webPagePrivate->m_page->geolocationController()->errorOccurred(error.get());
+    GeolocationController::from(m_webPagePrivate->m_page)->errorOccurred(error.get());
 }
 
 void GeolocationControllerClientBlackBerry::onPermission(void* context, bool isAllowed)

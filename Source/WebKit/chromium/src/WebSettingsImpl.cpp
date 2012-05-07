@@ -47,9 +47,9 @@ namespace WebKit {
 
 WebSettingsImpl::WebSettingsImpl(Settings* settings)
     : m_settings(settings)
-    , m_compositeToTextureEnabled(false)
     , m_showFPSCounter(false)
     , m_showPlatformLayerTree(false)
+    , m_viewportEnabled(false)
 {
     ASSERT(settings);
 }
@@ -298,6 +298,11 @@ void WebSettingsImpl::setExperimentalCSSRegionsEnabled(bool enabled)
     m_settings->setCSSRegionsEnabled(enabled);
 }
 
+void WebSettingsImpl::setExperimentalCSSCustomFilterEnabled(bool enabled)
+{
+    m_settings->setCSSCustomFilterEnabled(enabled);
+}
+
 void WebSettingsImpl::setOpenGLMultisamplingEnabled(bool enabled)
 {
     m_settings->setOpenGLMultisamplingEnabled(enabled);
@@ -347,11 +352,6 @@ void WebSettingsImpl::setForceCompositingMode(bool enabled)
 void WebSettingsImpl::setMockScrollbarsEnabled(bool enabled)
 {
     m_settings->setMockScrollbarsEnabled(enabled);
-}
-
-void WebSettingsImpl::setCompositeToTextureEnabled(bool enabled)
-{
-    m_compositeToTextureEnabled = enabled;
 }
 
 void WebSettingsImpl::setAcceleratedCompositingFor3DTransformsEnabled(bool enabled)
@@ -492,6 +492,15 @@ void WebSettingsImpl::setEnableScrollAnimator(bool enabled)
 #endif
 }
 
+bool WebSettingsImpl::scrollAnimatorEnabled() const
+{
+#if ENABLE(SMOOTH_SCROLLING)
+    return m_settings->scrollAnimatorEnabled();
+#else
+    return false;
+#endif
+}
+
 void WebSettingsImpl::setHixie76WebSocketProtocolEnabled(bool enabled)
 {
 #if ENABLE(WEB_SOCKETS)
@@ -551,6 +560,11 @@ void WebSettingsImpl::setPartialSwapEnabled(bool enabled)
 void WebSettingsImpl::setThreadedAnimationEnabled(bool enabled)
 {
     m_settings->setThreadedAnimationEnabled(enabled);
+}
+
+void WebSettingsImpl::setViewportEnabled(bool enabled)
+{
+    m_viewportEnabled = enabled;
 }
 
 } // namespace WebKit

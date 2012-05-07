@@ -33,14 +33,14 @@
 
 #include "IsolatedWorld.h"
 #include "ScriptSourceCode.h" // for WebCore::ScriptSourceCode
-#include "V8DOMWindow.h"
-#include "V8Proxy.h"
+#include "SharedPersistent.h"
 #include "V8Utilities.h"
 #include <v8.h>
 
 namespace WebCore {
 
 class SecurityOrigin;
+class V8BindingPerContextData;
 class V8Proxy;
 
 // V8IsolatedContext
@@ -77,8 +77,8 @@ public:
     //
     static V8IsolatedContext* getEntered()
     {
-        // This is a temporary performance optimization.   Essentially,
-        // GetHiddenValue is too slow for this code path.  We need to get the
+        // This is a temporary performance optimization. Essentially,
+        // GetHiddenValue is too slow for this code path. We need to get the
         // V8 team to add a real property to v8::Context for isolated worlds.
         // Until then, we optimize the common case of not having any isolated
         // worlds at all.
@@ -86,7 +86,7 @@ public:
             return 0;
         if (!v8::Context::InContext())
             return 0;
-        return reinterpret_cast<V8IsolatedContext*>(getGlobalObject(v8::Context::GetEntered())->GetPointerFromInternalField(V8DOMWindow::enteredIsolatedWorldIndex));
+        return isolatedContext();
     }
 
     v8::Handle<v8::Context> context() { return m_context->get(); }
@@ -96,6 +96,8 @@ public:
 
     SecurityOrigin* securityOrigin() const { return m_securityOrigin.get(); }
     void setSecurityOrigin(PassRefPtr<SecurityOrigin>);
+
+    V8BindingPerContextData* perContextData() { return m_perContextData.get(); }
 
 private:
     static v8::Handle<v8::Object> getGlobalObject(v8::Handle<v8::Context> context)
@@ -107,6 +109,8 @@ private:
     // to be destroyed.
     static void contextWeakReferenceCallback(v8::Persistent<v8::Value> object, void* isolatedContext);
 
+    static V8IsolatedContext* isolatedContext();
+
     // The underlying v8::Context. This object is keep on the heap as
     // long as |m_context| has not been garbage collected.
     RefPtr<SharedPersistent<v8::Context> > m_context;
@@ -116,6 +120,8 @@ private:
     RefPtr<SecurityOrigin> m_securityOrigin;
 
     Frame* m_frame;
+
+    OwnPtr<V8BindingPerContextData> m_perContextData;
 };
 
 } // namespace WebCore

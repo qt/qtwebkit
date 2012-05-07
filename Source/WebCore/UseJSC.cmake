@@ -11,10 +11,21 @@ LIST(APPEND WebCore_IDL_INCLUDES
     bindings/js
 )
 
+IF (PORT MATCHES "BlackBerry")
+    LIST(APPEND WebCore_IDL_INCLUDES
+        testing/js
+    )
+    LIST(APPEND WebCore_IDL_FILES
+        testing/Internals.idl
+        testing/InternalSettings.idl
+    )
+ENDIF ()
+
 LIST(APPEND WebCore_SOURCES
     bindings/js/CallbackFunction.cpp
     bindings/js/DOMObjectHashTableMap.cpp
     bindings/js/DOMWrapperWorld.cpp
+    bindings/js/Dictionary.cpp
     bindings/js/GCController.cpp
     bindings/js/JSArrayBufferCustom.cpp
     bindings/js/JSAttrCustom.cpp
@@ -109,6 +120,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/js/JSNodeFilterCustom.cpp
     bindings/js/JSNodeIteratorCustom.cpp
     bindings/js/JSNodeListCustom.cpp
+    bindings/js/JSNotificationCustom.cpp
     bindings/js/JSPluginElementFunctions.cpp
     bindings/js/JSPopStateEventCustom.cpp
     bindings/js/JSProcessingInstructionCustom.cpp
@@ -169,7 +181,6 @@ LIST(APPEND WebCore_SOURCES
 )
 
 LIST(APPEND WebCoreTestSupport_SOURCES
-    testing/js/JSInternalsCustom.cpp
     testing/js/WebCoreTestSupport.cpp
 )
 
@@ -199,6 +210,7 @@ IF (ENABLE_INDEXED_DATABASE)
         bindings/js/IDBBindingUtilities.cpp
         bindings/js/JSIDBAnyCustom.cpp
         bindings/js/JSIDBKeyCustom.cpp
+        bindings/js/JSIDBVersionChangeRequestCustom.cpp
     )
 ENDIF ()
 
@@ -219,6 +231,16 @@ IF (ENABLE_WORKERS)
     )
 ENDIF ()
 
+IF (ENABLE_VIDEO_TRACK)
+    LIST(APPEND WebCore_SOURCES
+        bindings/js/JSTextTrackCueCustom.cpp
+        bindings/js/JSTextTrackCustom.cpp
+        bindings/js/JSTextTrackListCustom.cpp
+        bindings/js/JSTrackCustom.cpp
+        bindings/js/JSTrackEventCustom.cpp
+    )
+ENDIF ()
+
 IF (ENABLE_SHARED_WORKERS)
     LIST(APPEND WebCore_SOURCES
         bindings/js/JSSharedWorkerCustom.cpp
@@ -228,6 +250,7 @@ ENDIF ()
 IF (ENABLE_NOTIFICATIONS)
     LIST(APPEND WebCore_SOURCES
         bindings/js/JSDesktopNotificationsCustom.cpp
+        bindings/js/JSNotificationsCustom.cpp
     )
 ENDIF ()
 
@@ -251,6 +274,16 @@ ENDIF ()
 IF (ENABLE_WEBGL)
     LIST(APPEND WebCore_SOURCES
         bindings/js/JSWebGLRenderingContextCustom.cpp
+    )
+ENDIF ()
+
+IF (ENABLE_WEB_AUDIO)
+    LIST(APPEND WebCore_SOURCES
+        bindings/js/JSAudioBufferSourceNodeCustom.cpp
+        bindings/js/JSAudioContextCustom.cpp
+        bindings/js/JSConvolverNodeCustom.cpp
+        bindings/js/JSJavaScriptAudioNodeCustom.cpp
+        bindings/js/JSWaveShaperNodeCustom.cpp
     )
 ENDIF ()
 

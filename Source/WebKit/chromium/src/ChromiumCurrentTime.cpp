@@ -38,12 +38,12 @@ namespace WTF {
 
 double currentTime()
 {
-    return WebKit::webKitPlatformSupport()->currentTime();
+    return WebKit::Platform::current()->currentTime();
 }
 
 double monotonicallyIncreasingTime()
 {
-    return WebKit::webKitPlatformSupport()->monotonicallyIncreasingTime();
+    return WebKit::Platform::current()->monotonicallyIncreasingTime();
 }
 
 }  // namespace WTF

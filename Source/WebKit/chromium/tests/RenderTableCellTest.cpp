@@ -91,23 +91,10 @@ TEST_F(RenderTableCellDeathTest, CanSetColumn)
     EXPECT_EQ(columnIndex, m_cell->col());
 }
 
-TEST_F(RenderTableCellDeathTest, CanSetRow)
-{
-    static const unsigned rowIndex = 10;
-    m_cell->setRow(rowIndex);
-    EXPECT_EQ(rowIndex, m_cell->row());
-}
-
 TEST_F(RenderTableCellDeathTest, CanSetColumnToMaxColumnIndex)
 {
     m_cell->setCol(maxColumnIndex);
     EXPECT_EQ(maxColumnIndex, m_cell->col());
-}
-
-TEST_F(RenderTableCellDeathTest, CanSetRowToMaxRowIndex)
-{
-    m_cell->setRow(maxRowIndex);
-    EXPECT_EQ(maxRowIndex, m_cell->row());
 }
 
 // FIXME: Re-enable these tests once ASSERT_DEATH is supported for Android.
@@ -119,19 +106,9 @@ TEST_F(RenderTableCellDeathTest, CrashIfColumnOverflowOnSetting)
     ASSERT_DEATH(m_cell->setCol(maxColumnIndex + 1), "");
 }
 
-TEST_F(RenderTableCellDeathTest, CrashIfRowOverflowOnSetting)
-{
-    ASSERT_DEATH(m_cell->setRow(maxRowIndex + 1), "");
-}
-
 TEST_F(RenderTableCellDeathTest, CrashIfSettingUnsetColumnIndex)
 {
     ASSERT_DEATH(m_cell->setCol(unsetColumnIndex), "");
-}
-
-TEST_F(RenderTableCellDeathTest, CrashIfSettingUnsetRowIndex)
-{
-    ASSERT_DEATH(m_cell->setRow(unsetRowIndex), "");
 }
 
 #endif

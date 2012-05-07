@@ -24,6 +24,7 @@
 #include "BackingStoreClient.h"
 #include "BackingStore_p.h"
 #include "CString.h"
+#include "ColorChooser.h"
 #include "DatabaseTracker.h"
 #include "Document.h"
 #include "DumpRenderTreeClient.h"
@@ -68,6 +69,8 @@
 #define DEBUG_OVERFLOW_DETECTION 0
 
 using namespace BlackBerry::WebKit;
+
+using BlackBerry::Platform::Graphics::Window;
 
 namespace WebCore {
 
@@ -151,7 +154,11 @@ void ChromeClientBlackBerry::setWindowRect(const FloatRect&)
 
 FloatRect ChromeClientBlackBerry::windowRect()
 {
-    const IntSize windowSize = m_webPagePrivate->m_client->window()->windowSize();
+    IntSize windowSize;
+
+    if (Window* window = m_webPagePrivate->m_client->window())
+        windowSize = window->windowSize();
+
     return FloatRect(0, 0, windowSize.width(), windowSize.height());
 }
 
@@ -273,6 +280,12 @@ bool ChromeClientBlackBerry::selectItemAlignmentFollowsMenuWritingDirection()
     return true;
 }
 
+bool ChromeClientBlackBerry::hasOpenedPopup() const
+{
+    notImplemented();
+    return false;
+}
+
 PassRefPtr<PopupMenu> ChromeClientBlackBerry::createPopupMenu(PopupMenuClient* client) const
 {
     return adoptRef(new PopupMenuBlackBerry(client));
@@ -371,17 +384,23 @@ IntRect ChromeClientBlackBerry::windowResizerRect() const
     return IntRect();
 }
 
-IntPoint ChromeClientBlackBerry::screenToWindow(const IntPoint& screenPos) const
+IntPoint ChromeClientBlackBerry::screenToRootView(const IntPoint& screenPos) const
 {
-    IntPoint windowPoint = m_webPagePrivate->m_client->window()->windowLocation();
+    IntPoint windowPoint;
+    if (Window* window = m_webPagePrivate->m_client->window())
+        windowPoint = window->windowLocation();
+
     windowPoint.move(-screenPos.x(), -screenPos.y());
     return windowPoint;
 }
 
-IntRect ChromeClientBlackBerry::windowToScreen(const IntRect& windowRect) const
+IntRect ChromeClientBlackBerry::rootViewToScreen(const IntRect& windowRect) const
 {
     IntRect windowPoint(windowRect);
-    IntPoint location(m_webPagePrivate->m_client->window()->windowLocation());
+    IntPoint location;
+    if (Window* window = m_webPagePrivate->m_client->window())
+        location = window->windowLocation();
+
     windowPoint.move(location.x(), location.y());
     return windowPoint;
 }
@@ -458,26 +477,6 @@ void ChromeClientBlackBerry::exceededDatabaseQuota(Frame* frame, const String& n
 #endif
 }
 
-void ChromeClientBlackBerry::requestGeolocationPermissionForFrame(Frame* frame, Geolocation* geolocation)
-{
-    if (!m_webPagePrivate->m_webSettings->isGeolocationEnabled()) {
-        geolocation->setIsAllowed(false);
-        return;
-    }
-    DOMWindow* window = frame->domWindow();
-    if (!window)
-        return;
-
-    CString latinOrigin = frameOrigin(frame);
-
-    m_webPagePrivate->m_client->requestGeolocationPermission(m_webPagePrivate->m_geolocationClient, geolocation, latinOrigin.data(), latinOrigin.length());
-}
-
-void ChromeClientBlackBerry::cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation* geolocation)
-{
-    m_webPagePrivate->m_client->cancelGeolocationPermission(m_webPagePrivate->m_geolocationClient, geolocation);
-}
-
 void ChromeClientBlackBerry::runOpenPanel(Frame*, PassRefPtr<FileChooser> chooser)
 {
     SharedArray<WebString> initialFiles;
@@ -533,12 +532,12 @@ void ChromeClientBlackBerry::contentsSizeChanged(Frame* frame, const IntSize& si
     m_webPagePrivate->contentsSizeChanged(size);
 }
 
-void ChromeClientBlackBerry::invalidateWindow(const IntRect& updateRect, bool immediate)
+void ChromeClientBlackBerry::invalidateRootView(const IntRect& updateRect, bool immediate)
 {
     m_webPagePrivate->m_backingStore->d->repaint(updateRect, false /*contentChanged*/, immediate);
 }
 
-void ChromeClientBlackBerry::invalidateContentsAndWindow(const IntRect& updateRect, bool immediate)
+void ChromeClientBlackBerry::invalidateContentsAndRootView(const IntRect& updateRect, bool immediate)
 {
     m_webPagePrivate->m_backingStore->d->repaint(updateRect, true /*contentChanged*/, immediate);
 }
@@ -546,7 +545,7 @@ void ChromeClientBlackBerry::invalidateContentsAndWindow(const IntRect& updateRe
 void ChromeClientBlackBerry::invalidateContentsForSlowScroll(const IntSize& delta, const IntRect& updateRect, bool immediate, const ScrollView* scrollView)
 {
     if (scrollView != m_webPagePrivate->m_mainFrame->view())
-        invalidateContentsAndWindow(updateRect, true /*immediate*/);
+        invalidateContentsAndRootView(updateRect, true /*immediate*/);
     else {
         BackingStoreClient* backingStoreClientForFrame = m_webPagePrivate->backingStoreClientForFrame(m_webPagePrivate->m_mainFrame);
         ASSERT(backingStoreClientForFrame);
@@ -574,7 +573,7 @@ void ChromeClientBlackBerry::scroll(const IntSize& delta, const IntRect& scrollV
 void ChromeClientBlackBerry::scrollableAreasDidChange()
 {
     typedef HashSet<ScrollableArea*> ScrollableAreaSet;
-    const ScrollableAreaSet* scrollableAreas = m_webPagePrivate->m_page->scrollableAreaSet();
+    const ScrollableAreaSet* scrollableAreas = m_webPagePrivate->m_mainFrame->view()->scrollableAreas();
 
     bool hasAtLeastOneInRegionScrollableArea = false;
     ScrollableAreaSet::iterator end = scrollableAreas->end();
@@ -747,5 +746,11 @@ bool ChromeClientBlackBerry::allowsAcceleratedCompositing() const
     return true;
 }
 #endif
+
+PassOwnPtr<ColorChooser> ChromeClientBlackBerry::createColorChooser(ColorChooserClient*, const Color&)
+{
+    return nullptr;
+}
+
 
 } // namespace WebCore

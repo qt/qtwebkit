@@ -106,12 +106,12 @@ void LayoutTestController::display()
     notImplemented();
 }
 
-static WTF::String jsStringRefToWebCoreString(JSStringRef str)
+static String jsStringRefToWebCoreString(JSStringRef str)
 {
     size_t strArrSize = JSStringGetMaximumUTF8CStringSize(str);
     OwnArrayPtr<char> strArr = adoptArrayPtr(new char[strArrSize]);
     JSStringGetUTF8CString(str, strArr.get(), strArrSize);
-    return WTF::String::fromUTF8(strArr.get());
+    return String::fromUTF8(strArr.get());
 }
 
 void LayoutTestController::execCommand(JSStringRef name, JSStringRef value)
@@ -119,8 +119,8 @@ void LayoutTestController::execCommand(JSStringRef name, JSStringRef value)
     if (!mainFrame)
         return;
 
-    WTF::String nameStr = jsStringRefToWebCoreString(name);
-    WTF::String valueStr = jsStringRefToWebCoreString(value);
+    String nameStr = jsStringRefToWebCoreString(name);
+    String valueStr = jsStringRefToWebCoreString(value);
 
     mainFrame->editor()->command(nameStr).execute(valueStr);
 }
@@ -130,7 +130,7 @@ bool LayoutTestController::isCommandEnabled(JSStringRef name)
     if (!mainFrame)
         return false;
 
-    WTF::String nameStr = jsStringRefToWebCoreString(name);
+    String nameStr = jsStringRefToWebCoreString(name);
 
     return mainFrame->editor()->command(nameStr).isEnabled();
 }
@@ -301,7 +301,7 @@ void LayoutTestController::setUserStyleSheetEnabled(bool flag)
 
 void LayoutTestController::setUserStyleSheetLocation(JSStringRef path)
 {
-    WTF::String pathStr = jsStringRefToWebCoreString(path);
+    String pathStr = jsStringRefToWebCoreString(path);
     BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setUserStyleSheetLocation(pathStr.utf8().data());
 }
 
@@ -437,7 +437,7 @@ void LayoutTestController::disableImageLoading()
 
 JSRetainPtr<JSStringRef> LayoutTestController::counterValueForElementById(JSStringRef id)
 {
-    WTF::String idStr = jsStringRefToWebCoreString(id);
+    String idStr = jsStringRefToWebCoreString(id);
     WebCore::Element* coreElement = mainFrame->document()->getElementById(AtomicString(idStr));
     if (!coreElement)
         return 0;
@@ -455,8 +455,8 @@ void LayoutTestController::overridePreference(JSStringRef key, JSStringRef value
     if (!mainFrame)
         return;
 
-    WTF::String keyStr = jsStringRefToWebCoreString(key);
-    WTF::String valueStr = jsStringRefToWebCoreString(value);
+    String keyStr = jsStringRefToWebCoreString(key);
+    String valueStr = jsStringRefToWebCoreString(value);
 
     if (keyStr == "WebKitUsesPageCachePreferenceKey")
         BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->settings()->setMaximumPagesInCache(1);
@@ -481,7 +481,7 @@ void LayoutTestController::setMockGeolocationPosition(double latitude, double lo
 
 void LayoutTestController::setMockGeolocationError(int code, JSStringRef message)
 {
-    WTF::String messageStr = jsStringRefToWebCoreString(message);
+    String messageStr = jsStringRefToWebCoreString(message);
     DumpRenderTreeSupport::setMockGeolocationError(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page(), code, messageStr);
 }
 
@@ -498,6 +498,14 @@ void LayoutTestController::closeWebInspector()
 void LayoutTestController::evaluateInWebInspector(long callId, JSStringRef script)
 {
     UNUSED_PARAM(callId);
+    UNUSED_PARAM(script);
+    notImplemented();
+}
+
+void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+    UNUSED_PARAM(worldID);
+    UNUSED_PARAM(globalObject);
     UNUSED_PARAM(script);
     notImplemented();
 }
@@ -539,12 +547,6 @@ int LayoutTestController::numberOfPages(float, float)
 {
     notImplemented();
     return -1;
-}
-
-bool LayoutTestController::isPageBoxVisible(int) const
-{
-    notImplemented();
-    return false;
 }
 
 void LayoutTestController::setScrollbarPolicy(JSStringRef, JSStringRef)
@@ -715,20 +717,6 @@ void LayoutTestController::resumeAnimations() const
         mainFrame->animation()->resumeAnimations();
 }
 
-bool LayoutTestController::hasSpellingMarker(int from, int length)
-{
-    if (!mainFrame)
-        return false;
-
-    return mainFrame->editor()->selectionStartHasMarkerFor(WebCore::DocumentMarker::Spelling, from, length);
-}
-
-JSValueRef LayoutTestController::nodesFromRect(JSContextRef context, JSValueRef value, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
-{
-    notImplemented();
-    return JSValueMakeUndefined(context);
-}
-
 void LayoutTestController::setSerializeHTTPLoads(bool)
 {
     // FIXME: Implement if needed for https://bugs.webkit.org/show_bug.cgi?id=50758.
@@ -806,14 +794,6 @@ int LayoutTestController::numberOfPendingGeolocationPermissionRequests()
     return DumpRenderTreeSupport::numberOfPendingGeolocationPermissionRequests(BlackBerry::WebKit::DumpRenderTree::currentInstance()->page());
 }
 
-bool LayoutTestController::hasGrammarMarker(int from, int length)
-{
-    if (!mainFrame)
-        return false;
-
-    return mainFrame->editor()->selectionStartHasMarkerFor(WebCore::DocumentMarker::Grammar, from, length);
-}
-
 void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
 {
     if (!mainFrame)
@@ -826,14 +806,17 @@ bool LayoutTestController::findString(JSContextRef context, JSStringRef target, 
 {
     WebCore::FindOptions options = 0;
 
+    String nameStr = jsStringRefToWebCoreString(target);
+
     JSRetainPtr<JSStringRef> lengthPropertyName(Adopt, JSStringCreateWithUTF8CString("length"));
-    JSValueRef lengthValue = JSObjectGetProperty(context, optionsArray, lengthPropertyName.get(), 0);
-    if (!JSValueIsNumber(context, lengthValue))
-        return false;
+    size_t length = 0;
+    if (optionsArray) {
+        JSValueRef lengthValue = JSObjectGetProperty(context, optionsArray, lengthPropertyName.get(), 0);
+        if (!JSValueIsNumber(context, lengthValue))
+            return false;
+        length = static_cast<size_t>(JSValueToNumber(context, lengthValue, 0));
+    }
 
-    WTF::String nameStr = jsStringRefToWebCoreString(target);
-
-    size_t length = static_cast<size_t>(JSValueToNumber(context, lengthValue, 0));
     for (size_t i = 0; i < length; ++i) {
         JSValueRef value = JSObjectGetPropertyAtIndex(context, optionsArray, i, 0);
         if (!JSValueIsString(context, value))
@@ -854,7 +837,10 @@ bool LayoutTestController::findString(JSContextRef context, JSStringRef target, 
         else if (JSStringIsEqualToUTF8CString(optionName.get(), "StartInSelection"))
             options |= WebCore::StartInSelection;
     }
-    return BlackBerry::WebKit::DumpRenderTree::currentInstance()->findString(nameStr, options);
+
+    // Our layout tests assume find will wrap and highlight all matches.
+    return BlackBerry::WebKit::DumpRenderTree::currentInstance()->page()->findNextString(nameStr.utf8().data(),
+        !(options & WebCore::Backwards), !(options & WebCore::CaseInsensitive), true /* wrap */, true /* highlightAllMatches */);
 }
 
 void LayoutTestController::deleteLocalStorageForOrigin(JSStringRef URL)
@@ -905,3 +891,12 @@ void LayoutTestController::simulateDesktopNotificationClick(JSStringRef title)
 {
 }
 
+void LayoutTestController::resetPageVisibility()
+{
+    notImplemented();
+}
+
+void LayoutTestController::setPageVisibility(const char*)
+{
+    notImplemented();
+}

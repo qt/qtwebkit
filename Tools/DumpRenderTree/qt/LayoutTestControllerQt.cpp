@@ -910,14 +910,14 @@ void LayoutTestController::startSpeechInput(const QString& inputElement)
     // See https://bugs.webkit.org/show_bug.cgi?id=39485.
 }
 
+void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(int worldID, const QString& script)
+{
+    // FIXME: Implement.
+}
+
 void LayoutTestController::evaluateScriptInIsolatedWorld(int worldID, const QString& script)
 {
     DumpRenderTreeSupportQt::evaluateScriptInIsolatedWorld(m_drt->webPage()->mainFrame(), worldID, script);
-}
-
-bool LayoutTestController::isPageBoxVisible(int pageIndex)
-{
-    return DumpRenderTreeSupportQt::isPageBoxVisible(m_drt->webPage()->mainFrame(), pageIndex);
 }
 
 QString LayoutTestController::pageSizeAndMarginsInPixels(int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft)
@@ -941,17 +941,6 @@ void LayoutTestController::removeAllVisitedLinks()
     QWebHistory* history = m_drt->webPage()->history();
     history->clear();
     DumpRenderTreeSupportQt::dumpVisitedLinksCallbacks(true);
-}
-
-bool LayoutTestController::hasSpellingMarker(int, int)
-{
-    // FIXME: Implement.
-    return false;
-}
-
-QVariantList LayoutTestController::nodesFromRect(const QWebElement& document, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
-{
-    return DumpRenderTreeSupportQt::nodesFromRect(document, x, y, top, right, bottom, left, ignoreClipping);
 }
 
 void LayoutTestController::addURLToRedirect(const QString& origin, const QString& destination)
@@ -987,6 +976,16 @@ void LayoutTestController::observeStorageTrackerNotifications(unsigned number)
 void LayoutTestController::syncLocalStorage()
 {
     // FIXME: Implement.
+}
+
+void LayoutTestController::resetPageVisibility()
+{
+    // FIXME: Implement this.
+}
+
+void LayoutTestController::setPageVisibility(const char*)
+{
+    // FIXME: Implement this.
 }
 
 QString LayoutTestController::layerTreeAsText()

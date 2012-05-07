@@ -68,6 +68,7 @@ protected:
 
     virtual void paintIntoRect(GraphicsContext*, const LayoutRect&);
     virtual void paint(PaintInfo&, const LayoutPoint&);
+    virtual void layout();
 
     virtual void intrinsicSizeChanged()
     {
@@ -90,11 +91,9 @@ private:
     virtual void notifyFinished(CachedResource*);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
 
-    virtual LayoutUnit computeReplacedLogicalWidth(bool includeMaxWidth = true) const;
-
     IntSize imageSizeForError(CachedImage*) const;
     void imageDimensionsChanged(bool imageSizeChanged, const IntRect* = 0);
-    bool updateIntrinsicSizeIfNeeded(const LayoutSize&, bool imageSizeChanged);
+    bool updateIntrinsicSizeIfNeeded(const IntSize&, bool imageSizeChanged);
 
     void paintAreaElementFocusRing(PaintInfo&);
 

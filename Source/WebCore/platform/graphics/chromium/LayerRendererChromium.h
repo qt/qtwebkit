@@ -34,17 +34,12 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
-#include "ContentLayerChromium.h"
 #include "FloatQuad.h"
 #include "IntRect.h"
-#include "LayerChromium.h"
+#include "TextureCopier.h"
+#include "TextureUploader.h"
 #include "TrackingTextureAllocator.h"
-#include "VideoLayerChromium.h"
-#include "cc/CCCanvasLayerImpl.h"
-#include "cc/CCHeadsUpDisplay.h"
 #include "cc/CCLayerTreeHost.h"
-#include "cc/CCPluginLayerImpl.h"
-#include "cc/CCVideoLayerImpl.h"
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
@@ -53,22 +48,30 @@
 
 namespace WebCore {
 
-class CCHeadsUpDisplay;
-class CCLayerImpl;
+class CCCheckerboardDrawQuad;
+class CCDebugBorderDrawQuad;
+class CCDrawQuad;
+class CCIOSurfaceDrawQuad;
 class CCRenderPass;
+class CCRenderSurfaceDrawQuad;
+class CCSolidColorDrawQuad;
+class CCTextureDrawQuad;
+class CCTileDrawQuad;
+class CCVideoDrawQuad;
 class GeometryBinding;
 class GraphicsContext3D;
-class TrackingTextureAllocator;
+class LayerRendererGpuMemoryAllocationChangedCallbackAdapter;
 class LayerRendererSwapBuffersCompleteCallbackAdapter;
+class ScopedEnsureFramebufferAllocation;
 
 class LayerRendererChromiumClient {
 public:
     virtual const IntSize& viewportSize() const = 0;
     virtual const CCSettings& settings() const = 0;
-    virtual CCLayerImpl* rootLayer() = 0;
-    virtual const CCLayerImpl* rootLayer() const = 0;
     virtual void didLoseContext() = 0;
     virtual void onSwapBuffersComplete() = 0;
+    virtual void setFullRootLayerDamage() = 0;
+    virtual void setContentsMemoryAllocationLimitBytes(size_t) = 0;
 };
 
 // Class that handles drawing of composited render layers using GL.
@@ -77,16 +80,10 @@ class LayerRendererChromium {
 public:
     static PassOwnPtr<LayerRendererChromium> create(LayerRendererChromiumClient*, PassRefPtr<GraphicsContext3D>);
 
-    // Must be called in order to allow the LayerRendererChromium to destruct
-    void close();
-
     ~LayerRendererChromium();
 
     const CCSettings& settings() const { return m_client->settings(); }
     const LayerRendererCapabilities& capabilities() const { return m_capabilities; }
-
-    CCLayerImpl* rootLayer() { return m_client->rootLayer(); }
-    const CCLayerImpl* rootLayer() const { return m_client->rootLayer(); }
 
     GraphicsContext3D* context();
     bool contextSupportsMapSub() const { return m_capabilities.usingMapSub; }
@@ -97,15 +94,18 @@ public:
 
     void viewportChanged();
 
-    void beginDrawingFrame();
+    void beginDrawingFrame(CCRenderSurface* defaultRenderSurface);
     void drawRenderPass(const CCRenderPass*);
     void finishDrawingFrame();
+
+    void drawHeadsUpDisplay(ManagedTexture*, const IntSize& hudSize);
 
     // waits for rendering to finish
     void finish();
 
+    void doNoOp();
     // puts backbuffer onscreen
-    void swapBuffers(const IntRect& subBuffer);
+    bool swapBuffers(const IntRect& subBuffer);
 
     static void debugGLCall(GraphicsContext3D*, const char* command, const char* file, int line);
 
@@ -114,39 +114,18 @@ public:
 
     const GeometryBinding* sharedGeometry() const { return m_sharedGeometry.get(); }
     const FloatQuad& sharedGeometryQuad() const { return m_sharedGeometryQuad; }
-    const LayerChromium::BorderProgram* borderProgram();
-    const CCHeadsUpDisplay::Program* headsUpDisplayProgram();
-    const CCRenderSurface::Program* renderSurfaceProgram();
-    const CCRenderSurface::ProgramAA* renderSurfaceProgramAA();
-    const CCRenderSurface::MaskProgram* renderSurfaceMaskProgram();
-    const CCRenderSurface::MaskProgramAA* renderSurfaceMaskProgramAA();
-    const CCTiledLayerImpl::Program* tilerProgram();
-    const CCTiledLayerImpl::ProgramOpaque* tilerProgramOpaque();
-    const CCTiledLayerImpl::ProgramAA* tilerProgramAA();
-    const CCTiledLayerImpl::ProgramSwizzle* tilerProgramSwizzle();
-    const CCTiledLayerImpl::ProgramSwizzleOpaque* tilerProgramSwizzleOpaque();
-    const CCTiledLayerImpl::ProgramSwizzleAA* tilerProgramSwizzleAA();
-    const CCCanvasLayerImpl::Program* canvasLayerProgram();
-    const CCPluginLayerImpl::Program* pluginLayerProgram();
-    const CCPluginLayerImpl::ProgramFlip* pluginLayerProgramFlip();
-    const CCPluginLayerImpl::TexRectProgram* pluginLayerTexRectProgram();
-    const CCPluginLayerImpl::TexRectProgramFlip* pluginLayerTexRectProgramFlip();
-    const CCVideoLayerImpl::RGBAProgram* videoLayerRGBAProgram();
-    const CCVideoLayerImpl::YUVProgram* videoLayerYUVProgram();
-    const CCVideoLayerImpl::NativeTextureProgram* videoLayerNativeTextureProgram();
-    const CCVideoLayerImpl::StreamTextureProgram* streamTextureLayerProgram();
+
 
     void getFramebufferPixels(void *pixels, const IntRect&);
+    bool getFramebufferTexture(ManagedTexture*, const IntRect& deviceRect);
 
     TextureManager* renderSurfaceTextureManager() const { return m_renderSurfaceTextureManager.get(); }
+    TextureCopier* textureCopier() const { return m_textureCopier.get(); }
+    TextureUploader* textureUploader() const { return m_textureUploader.get(); }
     TextureAllocator* renderSurfaceTextureAllocator() const { return m_renderSurfaceTextureAllocator.get(); }
     TextureAllocator* contentsTextureAllocator() const { return m_contentsTextureAllocator.get(); }
 
-    CCHeadsUpDisplay* headsUpDisplay() { return m_headsUpDisplay.get(); }
-
     void setScissorToRect(const IntRect&);
-
-    String layerTreeAsText() const;
 
     bool isContextLost();
 
@@ -159,20 +138,27 @@ public:
                           float width, float height, float opacity, const FloatQuad&,
                           int matrixLocation, int alphaLocation, int quadLocation);
 
-private:
+protected:
+    friend class LayerRendererGpuMemoryAllocationChangedCallbackAdapter;
+    void discardFramebuffer();
+    void ensureFramebuffer();
+    bool isFramebufferDiscarded() const { return m_isFramebufferDiscarded; }
+
     LayerRendererChromium(LayerRendererChromiumClient*, PassRefPtr<GraphicsContext3D>);
     bool initialize();
 
+private:
     void drawQuad(const CCDrawQuad*, const FloatRect& surfaceDamageRect);
+    void drawCheckerboardQuad(const CCCheckerboardDrawQuad*);
     void drawDebugBorderQuad(const CCDebugBorderDrawQuad*);
+    void drawBackgroundFilters(const CCRenderSurfaceDrawQuad*);
     void drawRenderSurfaceQuad(const CCRenderSurfaceDrawQuad*);
     void drawSolidColorQuad(const CCSolidColorDrawQuad*);
+    void drawTextureQuad(const CCTextureDrawQuad*);
+    void drawIOSurfaceQuad(const CCIOSurfaceDrawQuad*);
     void drawTileQuad(const CCTileDrawQuad*);
-    void drawCanvasQuad(const CCCanvasDrawQuad*);
     void drawVideoQuad(const CCVideoDrawQuad*);
-    void drawPluginQuad(const CCPluginDrawQuad*);
 
-    ManagedTexture* getOffscreenLayerTexture();
     void copyPlaneToTexture(const CCVideoDrawQuad*, const void* plane, int index);
     bool copyFrameToTextures(const CCVideoDrawQuad*);
     template<class Program> void drawSingleTextureVideoQuad(const CCVideoDrawQuad*, Program*, float widthScaleFactor, Platform3DObject textureId, GC3Denum target);
@@ -181,25 +167,23 @@ private:
     void drawRGBA(const CCVideoDrawQuad*);
     void drawYUV(const CCVideoDrawQuad*);
 
-    void copyOffscreenTextureToDisplay();
-
     void setDrawViewportRect(const IntRect&, bool flipY);
 
+    // The current drawing target is either a RenderSurface or ManagedTexture. Use these functions to switch to a new drawing target.
     bool useRenderSurface(CCRenderSurface*);
+    bool useManagedTexture(ManagedTexture*, const IntRect& viewportRect);
+    bool isCurrentRenderSurface(CCRenderSurface*);
+
+    bool bindFramebufferToTexture(ManagedTexture*, const IntRect& viewportRect);
+
     void clearRenderSurface(CCRenderSurface*, CCRenderSurface* rootRenderSurface, const FloatRect& surfaceDamageRect);
 
     void releaseRenderSurfaceTextures();
 
     bool makeContextCurrent();
 
-    static bool compareLayerZ(const RefPtr<CCLayerImpl>&, const RefPtr<CCLayerImpl>&);
-
-    void dumpRenderSurfaces(TextStream&, int indent, const CCLayerImpl*) const;
-
     bool initializeSharedObjects();
     void cleanupSharedObjects();
-
-    void clearRenderSurfacesOnCCLayerImplRecursive(CCLayerImpl*);
 
     friend class LayerRendererSwapBuffersCompleteCallbackAdapter;
     void onSwapBuffersComplete();
@@ -212,40 +196,99 @@ private:
     TransformationMatrix m_windowMatrix;
 
     CCRenderSurface* m_currentRenderSurface;
+    ManagedTexture* m_currentManagedTexture;
     unsigned m_offscreenFramebufferId;
 
-    // Store values that are shared between instances of each layer type
-    // associated with this instance of the compositor. Since there can be
-    // multiple instances of the compositor running in the same renderer process
-    // we cannot store these values in static variables.
     OwnPtr<GeometryBinding> m_sharedGeometry;
-    OwnPtr<LayerChromium::BorderProgram> m_borderProgram;
-    OwnPtr<CCHeadsUpDisplay::Program> m_headsUpDisplayProgram;
-    OwnPtr<CCTiledLayerImpl::Program> m_tilerProgram;
-    OwnPtr<CCTiledLayerImpl::ProgramOpaque> m_tilerProgramOpaque;
-    OwnPtr<CCTiledLayerImpl::ProgramSwizzle> m_tilerProgramSwizzle;
-    OwnPtr<CCTiledLayerImpl::ProgramSwizzleOpaque> m_tilerProgramSwizzleOpaque;
-    OwnPtr<CCTiledLayerImpl::ProgramAA> m_tilerProgramAA;
-    OwnPtr<CCTiledLayerImpl::ProgramSwizzleAA> m_tilerProgramSwizzleAA;
-    OwnPtr<CCCanvasLayerImpl::Program> m_canvasLayerProgram;
-    OwnPtr<CCPluginLayerImpl::Program> m_pluginLayerProgram;
-    OwnPtr<CCPluginLayerImpl::ProgramFlip> m_pluginLayerProgramFlip;
-    OwnPtr<CCPluginLayerImpl::TexRectProgram> m_pluginLayerTexRectProgram;
-    OwnPtr<CCPluginLayerImpl::TexRectProgramFlip> m_pluginLayerTexRectProgramFlip;
-    OwnPtr<CCRenderSurface::MaskProgram> m_renderSurfaceMaskProgram;
-    OwnPtr<CCRenderSurface::Program> m_renderSurfaceProgram;
-    OwnPtr<CCRenderSurface::MaskProgramAA> m_renderSurfaceMaskProgramAA;
-    OwnPtr<CCRenderSurface::ProgramAA> m_renderSurfaceProgramAA;
-    OwnPtr<CCVideoLayerImpl::RGBAProgram> m_videoLayerRGBAProgram;
-    OwnPtr<CCVideoLayerImpl::YUVProgram> m_videoLayerYUVProgram;
-    OwnPtr<CCVideoLayerImpl::NativeTextureProgram> m_videoLayerNativeTextureProgram;
-    OwnPtr<CCVideoLayerImpl::StreamTextureProgram> m_streamTextureLayerProgram;
+
+    // This block of bindings defines all of the programs used by the compositor itself.
+
+    // Tiled layer shaders.
+    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexAlpha> TileProgram;
+    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexClampAlphaAA> TileProgramAA;
+    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexClampSwizzleAlphaAA> TileProgramSwizzleAA;
+    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexOpaque> TileProgramOpaque;
+    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexSwizzleAlpha> TileProgramSwizzle;
+    typedef ProgramBinding<VertexShaderTile, FragmentShaderRGBATexSwizzleOpaque> TileProgramSwizzleOpaque;
+    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderCheckerboard> TileCheckerboardProgram;
+
+    // Render surface shaders.
+    // CCRenderSurface::drawLayers() needs to see these programs currently.
+    // FIXME: Draw with a quad type for render surfaces and get rid of this friendlyness.
+    friend class CCRenderSurface;
+    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderRGBATexAlpha> RenderSurfaceProgram;
+    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderRGBATexAlphaMask> RenderSurfaceMaskProgram;
+    typedef ProgramBinding<VertexShaderQuad, FragmentShaderRGBATexAlphaAA> RenderSurfaceProgramAA;
+    typedef ProgramBinding<VertexShaderQuad, FragmentShaderRGBATexAlphaMaskAA> RenderSurfaceMaskProgramAA;
+
+    // Texture shaders.
+    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexAlpha> TextureProgram;
+    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexFlipAlpha> TextureProgramFlip;
+    typedef ProgramBinding<VertexShaderPosTexTransform, FragmentShaderRGBATexRectFlipAlpha> TextureIOSurfaceProgram;
+
+    // Video shaders.
+    typedef ProgramBinding<VertexShaderVideoTransform, FragmentShaderOESImageExternal> VideoStreamTextureProgram;
+    typedef ProgramBinding<VertexShaderPosTexYUVStretch, FragmentShaderYUVVideo> VideoYUVProgram;
+
+    // Special purpose / effects shaders.
+    typedef ProgramBinding<VertexShaderPos, FragmentShaderColor> SolidColorProgram;
+
+    // Debugging shaders.
+    typedef ProgramBinding<VertexShaderPosTex, FragmentShaderRGBATexSwizzleAlpha> HeadsUpDisplayProgram;
+
+
+    const TileProgram* tileProgram();
+    const TileProgramOpaque* tileProgramOpaque();
+    const TileProgramAA* tileProgramAA();
+    const TileProgramSwizzle* tileProgramSwizzle();
+    const TileProgramSwizzleOpaque* tileProgramSwizzleOpaque();
+    const TileProgramSwizzleAA* tileProgramSwizzleAA();
+    const TileCheckerboardProgram* tileCheckerboardProgram();
+
+    const RenderSurfaceProgram* renderSurfaceProgram();
+    const RenderSurfaceProgramAA* renderSurfaceProgramAA();
+    const RenderSurfaceMaskProgram* renderSurfaceMaskProgram();
+    const RenderSurfaceMaskProgramAA* renderSurfaceMaskProgramAA();
+
+    const TextureProgram* textureProgram();
+    const TextureProgramFlip* textureProgramFlip();
+    const TextureIOSurfaceProgram* textureIOSurfaceProgram();
+
+    const VideoYUVProgram* videoYUVProgram();
+    const VideoStreamTextureProgram* videoStreamTextureProgram();
+
+    const SolidColorProgram* solidColorProgram();
+
+    const HeadsUpDisplayProgram* headsUpDisplayProgram();
+
+    OwnPtr<TileProgram> m_tileProgram;
+    OwnPtr<TileProgramOpaque> m_tileProgramOpaque;
+    OwnPtr<TileProgramAA> m_tileProgramAA;
+    OwnPtr<TileProgramSwizzle> m_tileProgramSwizzle;
+    OwnPtr<TileProgramSwizzleOpaque> m_tileProgramSwizzleOpaque;
+    OwnPtr<TileProgramSwizzleAA> m_tileProgramSwizzleAA;
+    OwnPtr<TileCheckerboardProgram> m_tileCheckerboardProgram;
+
+    OwnPtr<RenderSurfaceProgram> m_renderSurfaceProgram;
+    OwnPtr<RenderSurfaceProgramAA> m_renderSurfaceProgramAA;
+    OwnPtr<RenderSurfaceMaskProgram> m_renderSurfaceMaskProgram;
+    OwnPtr<RenderSurfaceMaskProgramAA> m_renderSurfaceMaskProgramAA;
+
+    OwnPtr<TextureProgram> m_textureProgram;
+    OwnPtr<TextureProgramFlip> m_textureProgramFlip;
+    OwnPtr<TextureIOSurfaceProgram> m_textureIOSurfaceProgram;
+
+    OwnPtr<VideoYUVProgram> m_videoYUVProgram;
+    OwnPtr<VideoStreamTextureProgram> m_videoStreamTextureProgram;
+
+    OwnPtr<SolidColorProgram> m_solidColorProgram;
+    OwnPtr<HeadsUpDisplayProgram> m_headsUpDisplayProgram;
 
     OwnPtr<TextureManager> m_renderSurfaceTextureManager;
+    OwnPtr<AcceleratedTextureCopier> m_textureCopier;
+    OwnPtr<AcceleratedTextureUploader> m_textureUploader;
     OwnPtr<TrackingTextureAllocator> m_contentsTextureAllocator;
     OwnPtr<TrackingTextureAllocator> m_renderSurfaceTextureAllocator;
-
-    OwnPtr<CCHeadsUpDisplay> m_headsUpDisplay;
 
     RefPtr<GraphicsContext3D> m_context;
 
@@ -254,7 +297,9 @@ private:
     FloatQuad m_sharedGeometryQuad;
 
     bool m_isViewportChanged;
+    bool m_isFramebufferDiscarded;
 };
+
 
 // Setting DEBUG_GL_CALLS to 1 will call glGetError() after almost every GL
 // call made by the compositor. Useful for debugging rendering issues but
@@ -262,7 +307,7 @@ private:
 #define DEBUG_GL_CALLS 0
 
 #if DEBUG_GL_CALLS && !defined ( NDEBUG )
-#define GLC(context, x) { (x), LayerRendererChromium::debugGLCall(context, #x, __FILE__, __LINE__); }
+#define GLC(context, x) (x, LayerRendererChromium::debugGLCall(&*context, #x, __FILE__, __LINE__))
 #else
 #define GLC(context, x) (x)
 #endif

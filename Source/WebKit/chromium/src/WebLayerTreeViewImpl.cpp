@@ -41,13 +41,13 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebLayerTreeViewImpl> WebLayerTreeViewImpl::create(WebLayerTreeViewClient* client, const WebLayer& root, const WebLayerTreeView::Settings& settings)
+PassOwnPtr<WebLayerTreeViewImpl> WebLayerTreeViewImpl::create(WebLayerTreeViewClient* client, const WebLayer& root, const WebLayerTreeView::Settings& settings)
 {
-    RefPtr<WebLayerTreeViewImpl> host = adoptRef(new WebLayerTreeViewImpl(client, settings));
+    OwnPtr<WebLayerTreeViewImpl> host = adoptPtr(new WebLayerTreeViewImpl(client, settings));
     if (!host->initialize())
-        return 0;
+        return nullptr;
     host->setRootLayer(root);
-    return host;
+    return host.release();
 }
 
 WebLayerTreeViewImpl::WebLayerTreeViewImpl(WebLayerTreeViewClient* client, const WebLayerTreeView::Settings& settings) 
@@ -60,28 +60,28 @@ WebLayerTreeViewImpl::~WebLayerTreeViewImpl()
 {
 }
 
-void WebLayerTreeViewImpl::updateAnimations(double frameBeginTime)
+void WebLayerTreeViewImpl::willBeginFrame()
 {
-    if (m_client)
-        m_client->updateAnimations(frameBeginTime);
+    m_client->willBeginFrame();
+}
+
+void WebLayerTreeViewImpl::updateAnimations(double monotonicFrameBeginTime)
+{
+    m_client->updateAnimations(monotonicFrameBeginTime);
 }
 
 void WebLayerTreeViewImpl::layout()
 {
-    if (m_client)
-        m_client->layout();
+    m_client->layout();
 }
 
 void WebLayerTreeViewImpl::applyScrollAndScale(const WebCore::IntSize& scrollDelta, float pageScale)
 {
-    if (m_client)
-        m_client->applyScrollAndScale(WebSize(scrollDelta), pageScale);
+    m_client->applyScrollAndScale(WebSize(scrollDelta), pageScale);
 }
 
 PassRefPtr<GraphicsContext3D> WebLayerTreeViewImpl::createContext()
 {
-    if (!m_client)
-        return 0;
     OwnPtr<WebGraphicsContext3D> webContext = adoptPtr(m_client->createContext3D());
     if (!webContext)
         return 0;
@@ -91,26 +91,27 @@ PassRefPtr<GraphicsContext3D> WebLayerTreeViewImpl::createContext()
 
 void WebLayerTreeViewImpl::didRecreateContext(bool success)
 {
-    if (m_client)
-        m_client->didRebindGraphicsContext(success);
+    m_client->didRebindGraphicsContext(success);
+}
+
+void WebLayerTreeViewImpl::didCommit()
+{
+    m_client->didCommit();
 }
 
 void WebLayerTreeViewImpl::didCommitAndDrawFrame()
 {
-    if (m_client)
-        m_client->didCommitAndDrawFrame();
+    m_client->didCommitAndDrawFrame();
 }
 
 void WebLayerTreeViewImpl::didCompleteSwapBuffers()
 {
-    if (m_client)
-        m_client->didCompleteSwapBuffers();
+    m_client->didCompleteSwapBuffers();
 }
 
 void WebLayerTreeViewImpl::scheduleComposite()
 {
-    if (m_client)
-        m_client->scheduleComposite();
+    m_client->scheduleComposite();
 }
 
 } // namespace WebKit

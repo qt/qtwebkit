@@ -26,6 +26,7 @@
 #include "AXObjectCache.h"
 #include "AccessibilityObject.h"
 #include "AnimationController.h"
+#include "CSSComputedStyleDeclaration.h"
 #include "DOMWrapperWorld.h"
 #include "Document.h"
 #include "EditorClientGtk.h"
@@ -41,6 +42,7 @@
 #include "GeolocationPosition.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
+#include "JSCSSStyleDeclaration.h"
 #include "JSDOMWindow.h"
 #include "JSDocument.h"
 #include "JSElement.h"
@@ -54,6 +56,7 @@
 #include "RenderListItem.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
+#include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
@@ -111,22 +114,6 @@ void DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(bool enabled)
 bool DumpRenderTreeSupportGtk::selectTrailingWhitespaceEnabled()
 {
     return s_selectTrailingWhitespaceEnabled;
-}
-
-JSValueRef DumpRenderTreeSupportGtk::nodesFromRect(JSContextRef context, JSValueRef value, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
-{
-    JSLock lock(SilenceAssertionsOnly);
-    ExecState* exec = toJS(context);
-    if (!value)
-        return JSValueMakeUndefined(context);
-    JSValue jsValue = toJS(exec, value);
-    if (!jsValue.inherits(&JSDocument::s_info))
-       return JSValueMakeUndefined(context);
-
-    JSDocument* jsDocument = static_cast<JSDocument*>(asObject(jsValue));
-    Document* document = jsDocument->impl();
-    RefPtr<NodeList> nodes = document->nodesFromRect(x, y, top, right, bottom, left, ignoreClipping);
-    return toRef(exec, toJS(exec, jsDocument->globalObject(), nodes.get()));
 }
 
 /**
@@ -281,24 +268,6 @@ CString DumpRenderTreeSupportGtk::pageProperty(WebKitWebFrame* frame, const char
         return CString();
 
     return PrintContext::pageProperty(coreFrame, propertyName, pageNumber).utf8();
-}
-
-/**
- * isPageBoxVisible
- * @frame: a #WebKitWebFrame
- * @pageNumber: number of a page 
- *
- * Return value: TRUE if a page box is visible. 
- */
-bool DumpRenderTreeSupportGtk::isPageBoxVisible(WebKitWebFrame* frame, int pageNumber)
-{
-    g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), false);
-
-    Frame* coreFrame = core(frame);
-    if (!coreFrame)
-        return false;
-
-    return coreFrame->document()->isPageBoxVisible(pageNumber); 
 }
 
 /**
@@ -622,6 +591,11 @@ bool DumpRenderTreeSupportGtk::selectedRange(WebKitWebView* webView, int* start,
     return true;
 }
 
+void DumpRenderTreeSupportGtk::setDefersLoading(WebKitWebView* webView, bool defers)
+{
+    core(webView)->setDefersLoading(defers);
+}
+
 void DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(WebKitWebView* webView, bool enabled)
 {
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
@@ -634,6 +608,11 @@ void DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(WebKitWebView* webVie
 void DumpRenderTreeSupportGtk::whiteListAccessFromOrigin(const gchar* sourceOrigin, const gchar* destinationProtocol, const gchar* destinationHost, bool allowDestinationSubdomains)
 {
     SecurityPolicy::addOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
+}
+
+void DumpRenderTreeSupportGtk::removeWhiteListAccessFromOrigin(const char* sourceOrigin, const char* destinationProtocol, const char* destinationHost, bool allowDestinationSubdomains)
+{
+    SecurityPolicy::removeOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
 }
 
 void DumpRenderTreeSupportGtk::resetOriginAccessWhiteLists()
@@ -679,7 +658,7 @@ void DumpRenderTreeSupportGtk::dumpConfigurationForViewport(WebKitWebView* webVi
     ViewportAttributes attrs = computeViewportAttributes(arguments, /* default layout width for non-mobile pages */ 980, deviceWidth, deviceHeight, deviceDPI, IntSize(availableWidth, availableHeight));
     restrictMinimumScaleFactorToViewportSize(attrs, IntSize(availableWidth, availableHeight));
     restrictScaleFactorToInitialScaleIfNotUserScalable(attrs);
-    fprintf(stdout, "viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", attrs.layoutSize.width(), attrs.layoutSize.height(), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
+    fprintf(stdout, "viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", static_cast<int>(attrs.layoutSize.width()), static_cast<int>(attrs.layoutSize.height()), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
 }
 
 void DumpRenderTreeSupportGtk::clearOpener(WebKitWebFrame* frame)
@@ -696,13 +675,6 @@ unsigned int DumpRenderTreeSupportGtk::workerThreadCount()
 #else
     return 0;
 #endif
-}
-
-bool DumpRenderTreeSupportGtk::webkitWebFrameSelectionHasSpellingMarker(WebKitWebFrame *frame, gint from, gint length)
-{
-    g_return_val_if_fail(WEBKIT_IS_WEB_FRAME(frame), FALSE);
-
-    return core(frame)->editor()->selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
 }
 
 bool DumpRenderTreeSupportGtk::findString(WebKitWebView* webView, const gchar* targetString, WebKitFindOptions findOptions)
@@ -814,24 +786,24 @@ void DumpRenderTreeSupportGtk::scalePageBy(WebKitWebView* webView, float scaleFa
 
 void DumpRenderTreeSupportGtk::resetGeolocationClientMock(WebKitWebView* webView)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+#if ENABLE(GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
     mock->reset();
 #endif
 }
 
 void DumpRenderTreeSupportGtk::setMockGeolocationPermission(WebKitWebView* webView, bool allowed)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+#if ENABLE(GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
     mock->setPermission(allowed);
 #endif
 }
 
 void DumpRenderTreeSupportGtk::setMockGeolocationPosition(WebKitWebView* webView, double latitude, double longitude, double accuracy)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+#if ENABLE(GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
 
     double timestamp = g_get_real_time() / 1000000.0;
     mock->setPosition(GeolocationPosition::create(timestamp, latitude, longitude, accuracy));
@@ -840,8 +812,8 @@ void DumpRenderTreeSupportGtk::setMockGeolocationPosition(WebKitWebView* webView
 
 void DumpRenderTreeSupportGtk::setMockGeolocationError(WebKitWebView* webView, int errorCode, const gchar* errorMessage)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+#if ENABLE(GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
 
     GeolocationError::ErrorCode code;
     switch (errorCode) {
@@ -860,11 +832,9 @@ void DumpRenderTreeSupportGtk::setMockGeolocationError(WebKitWebView* webView, i
 
 int DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(WebKitWebView* webView)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(core(webView)->geolocationController()->client());
+#if ENABLE(GEOLOCATION)
+    GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
     return mock->numberOfPendingPermissionRequests();
-#else
-    return 0;
 #endif
 }
 
@@ -906,9 +876,30 @@ bool DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(WebKitWeb
     return inputElement->isTextField() && !inputElement->isPasswordField() && inputElement->shouldAutocomplete();
 }
 
+JSValueRef DumpRenderTreeSupportGtk::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef nodeObject)
+{
+    JSC::ExecState* exec = toJS(context);
+    if (!nodeObject)
+        return JSValueMakeUndefined(context);
+
+    JSValue jsValue = toJS(exec, nodeObject);
+    if (!jsValue.inherits(&JSElement::s_info))
+        return JSValueMakeUndefined(context);
+
+    JSElement* jsElement = static_cast<JSElement*>(asObject(jsValue));
+    Element* element = jsElement->impl();
+    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(element, true);
+    return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
+}
+
 void DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary()
 {
 #if ENABLE(MUTATION_OBSERVERS)
     WebKitMutationObserver::deliverAllMutations();
 #endif
+}
+
+void DumpRenderTreeSupportGtk::setDomainRelaxationForbiddenForURLScheme(bool forbidden, const char* urlScheme)
+{
+    SchemeRegistry::setDomainRelaxationForbiddenForURLScheme(forbidden, String::fromUTF8(urlScheme));
 }

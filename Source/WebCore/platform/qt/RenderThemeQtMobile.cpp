@@ -23,7 +23,6 @@
 #include "config.h"
 #include "RenderThemeQtMobile.h"
 
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "Color.h"
 #include "Document.h"
@@ -35,15 +34,17 @@
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PaintInfo.h"
-#include "PassRefPtr.h"
 #include "QWebPageClient.h"
 #include "RenderBox.h"
 #if ENABLE(PROGRESS_TAG)
 #include "RenderProgress.h"
 #endif
+#include "StyleResolver.h"
+
+#include <wtf/PassRefPtr.h>
+
 #include <QColor>
 #include <QFile>
-#include <QFontMetrics>
 #include <QPainter>
 #include <QPixmapCache>
 
@@ -56,7 +57,7 @@ static const int arrowBoxWidth = 26;
 static const int frameWidth = 2;
 static const int checkBoxWidth = 21;
 static const int radioWidth = 21;
-static const int sliderSize = 19;
+static const int sliderSize = 20;
 static const int buttonHeightRatio = 1.5;
 
 static const float multipleComboDotsOffsetFactor = 1.8;
@@ -465,13 +466,16 @@ void StylePainterMobile::drawComboBox(const QRect& rect, bool multiple, bool ena
     painter->drawPixmap(targetRect.toRect(), pic);
 }
 
-void StylePainterMobile::drawProgress(const QRect& rect, double progress, bool leftToRight, bool animated) const
+void StylePainterMobile::drawProgress(const QRect& rect, double progress, bool leftToRight, bool animated, bool vertical) const
 {
-    const int border = rect.height() / 4;
-    const QRect targetRect = rect.adjusted(0, border, 0, -border);
+    const int horizontalBorder = (vertical ? rect.width() / 4 : 0);
+    const int verticalBorder = (vertical ? 0 : rect.height() / 4);
+    const QRect targetRect = rect.adjusted(horizontalBorder, verticalBorder, -horizontalBorder, -verticalBorder);
 
     QPixmap result;
-    const QSize imageSize = sizeForPainterScale(targetRect);
+    QSize imageSize = sizeForPainterScale(targetRect);
+    if (vertical)
+        qSwap(imageSize.rheight(), imageSize.rwidth());
     KeyIdentifier id;
     id.type = KeyIdentifier::Progress;
     id.width = imageSize.width();
@@ -516,7 +520,9 @@ void StylePainterMobile::drawProgress(const QRect& rect, double progress, bool l
         }
         insertIntoCache(id, result);
     }
-    painter->drawPixmap(targetRect, result);
+    QTransform transform;
+    transform.rotate(-90);
+    painter->drawPixmap(targetRect, vertical ? result.transformed(transform) : result);
 }
 
 void StylePainterMobile::drawSliderThumb(const QRect & rect, bool pressed) const
@@ -574,7 +580,6 @@ int RenderThemeQtMobile::popupInternalPaddingBottom(RenderStyle* style) const
 void RenderThemeQtMobile::computeSizeBasedOnStyle(RenderStyle* renderStyle) const
 {
     QSize size(0, 0);
-    const QFontMetrics fm(renderStyle->font().font());
 
     switch (renderStyle->appearance()) {
     case TextAreaPart:
@@ -607,11 +612,10 @@ void RenderThemeQtMobile::computeSizeBasedOnStyle(RenderStyle* renderStyle) cons
     }
     case PushButtonPart:
     case SquareButtonPart:
-    case ListButtonPart:
     case DefaultButtonPart:
     case ButtonPart:
     case MenulistPart: {
-        const int height = fm.height() * buttonHeightRatio * renderStyle->effectiveZoom();
+        const int height = renderStyle->fontMetrics().height() * buttonHeightRatio * renderStyle->effectiveZoom();
         size = QSize(renderStyle->width().value(), height);
         break;
     }
@@ -626,7 +630,7 @@ void RenderThemeQtMobile::computeSizeBasedOnStyle(RenderStyle* renderStyle) cons
         renderStyle->setMinHeight(Length(size.height(), Fixed));
 }
 
-void RenderThemeQtMobile::adjustButtonStyle(CSSStyleSelector* selector, RenderStyle* style, Element*) const
+void RenderThemeQtMobile::adjustButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Ditch the border.
     style->resetBorder();
@@ -669,7 +673,7 @@ bool RenderThemeQtMobile::paintButton(RenderObject* o, const PaintInfo& i, const
     return false;
 }
 
-void RenderThemeQtMobile::adjustTextFieldStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
+void RenderThemeQtMobile::adjustTextFieldStyle(StyleResolver*, RenderStyle* style, Element*) const
 {
     // Resetting the style like this leads to differences like:
     // - RenderTextControl {INPUT} at (2,2) size 168x25 [bgcolor=#FFFFFF] border: (2px inset #000000)]
@@ -717,9 +721,9 @@ bool RenderThemeQtMobile::paintTextField(RenderObject* o, const PaintInfo& i, co
     return false;
 }
 
-void RenderThemeQtMobile::adjustMenuListStyle(CSSStyleSelector* selector, RenderStyle* style, Element* e) const
+void RenderThemeQtMobile::adjustMenuListStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e) const
 {
-    RenderThemeQt::adjustMenuListStyle(selector, style, e);
+    RenderThemeQt::adjustMenuListStyle(styleResolver, style, e);
     style->setPaddingLeft(Length(menuListPadding, Fixed));
 }
 
@@ -801,10 +805,14 @@ bool RenderThemeQtMobile::paintSliderTrack(RenderObject* o, const PaintInfo& pi,
     const double max = slider->maximum();
     const double progress = (max - min > 0) ? (slider->valueAsNumber() - min) / (max - min) : 0;
 
-    // Render the spin buttons for LTR or RTL accordingly.
-    const int groovePadding = r.height() * sliderGrooveBorderRatio;
-    const QRect rect(r);
-    p.drawProgress(rect.adjusted(0, groovePadding, 0, -groovePadding), progress, o->style()->isLeftToRightDirection());
+    QRect rect(r);
+    const bool vertical = (o->style()->appearance() == SliderVerticalPart);
+    const int groovePadding = vertical ? r.width() * sliderGrooveBorderRatio : r.height() * sliderGrooveBorderRatio;
+    if (vertical)
+        rect.adjust(groovePadding, 0, -groovePadding, 0);
+    else
+        rect.adjust(0, groovePadding, 0, -groovePadding);
+    p.drawProgress(rect, progress, o->style()->isLeftToRightDirection(), /*animated = */ false, vertical);
 
     return false;
 }

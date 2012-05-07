@@ -27,16 +27,16 @@
 #include "RenderSVGInlineText.h"
 
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "FloatConversion.h"
 #include "FloatQuad.h"
 #include "RenderBlock.h"
 #include "RenderSVGRoot.h"
 #include "RenderSVGText.h"
 #include "Settings.h"
-#include "SVGImageBufferTools.h"
 #include "SVGInlineTextBox.h"
+#include "SVGRenderingContext.h"
 #include "SVGRootInlineBox.h"
+#include "StyleResolver.h"
 #include "VisiblePosition.h"
 
 namespace WebCore {
@@ -87,7 +87,8 @@ void RenderSVGInlineText::willBeDestroyed()
     if (affectedAttributes.isEmpty())
         return;
 
-    textRenderer->rebuildLayoutAttributes(affectedAttributes);
+    if (!documentBeingDestroyed())
+        textRenderer->rebuildLayoutAttributes(affectedAttributes);
 }
 
 void RenderSVGInlineText::setTextInternal(PassRefPtr<StringImpl> text)
@@ -99,7 +100,7 @@ void RenderSVGInlineText::setTextInternal(PassRefPtr<StringImpl> text)
     // the RenderSVGInlineText objects, and thus needs to be rebuild. The latter will assure that the
     // SVGTextLayoutAttributes associated with the RenderSVGInlineText will be updated.
     if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this)) {
-        textRenderer->textDOMChanged();
+        textRenderer->invalidateTextPositioningElements();
         textRenderer->layoutAttributesChanged(this);
     }
 }
@@ -147,13 +148,13 @@ LayoutRect RenderSVGInlineText::localCaretRect(InlineBox* box, int caretOffset, 
 
     // Use the edge of the selection rect to determine the caret rect.
     if (static_cast<unsigned>(caretOffset) < textBox->start() + textBox->len()) {
-        IntRect rect = textBox->localSelectionRect(caretOffset, caretOffset + 1);
-        int x = box->isLeftToRightDirection() ? rect.x() : rect.maxX();
+        LayoutRect rect = textBox->localSelectionRect(caretOffset, caretOffset + 1);
+        LayoutUnit x = box->isLeftToRightDirection() ? rect.x() : rect.maxX();
         return LayoutRect(x, rect.y(), caretWidth, rect.height());
     }
 
-    IntRect rect = textBox->localSelectionRect(caretOffset - 1, caretOffset);
-    int x = box->isLeftToRightDirection() ? rect.maxX() : rect.x();
+    LayoutRect rect = textBox->localSelectionRect(caretOffset - 1, caretOffset);
+    LayoutUnit x = box->isLeftToRightDirection() ? rect.maxX() : rect.x();
     return LayoutRect(x, rect.y(), caretWidth, rect.height());
 }
 
@@ -165,7 +166,7 @@ FloatRect RenderSVGInlineText::floatLinesBoundingBox() const
     return boundingBox;
 }
 
-LayoutRect RenderSVGInlineText::linesBoundingBox() const
+IntRect RenderSVGInlineText::linesBoundingBox() const
 {
     return enclosingIntRect(floatLinesBoundingBox());
 }
@@ -253,12 +254,12 @@ void RenderSVGInlineText::computeNewScaledFontForStyle(RenderObject* renderer, c
     Document* document = renderer->document();
     ASSERT(document);
     
-    CSSStyleSelector* styleSelector = document->styleSelector();
-    ASSERT(styleSelector);
+    StyleResolver* styleResolver = document->styleResolver();
+    ASSERT(styleResolver);
 
     // Alter font-size to the right on-screen value to avoid scaling the glyphs themselves, except when GeometricPrecision is specified
     AffineTransform ctm;
-    SVGImageBufferTools::calculateTransformationToOutermostSVGCoordinateSystem(renderer, ctm);
+    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(renderer, ctm);
     scalingFactor = narrowPrecisionToFloat(sqrt((pow(ctm.xScale(), 2) + pow(ctm.yScale(), 2)) / 2));
     if (scalingFactor == 1 || !scalingFactor || style->fontDescription().textRenderingMode() == GeometricPrecision) {
         scalingFactor = 1;
@@ -269,10 +270,10 @@ void RenderSVGInlineText::computeNewScaledFontForStyle(RenderObject* renderer, c
     FontDescription fontDescription(style->fontDescription());
 
     // FIXME: We need to better handle the case when we compute very small fonts below (below 1pt).
-    fontDescription.setComputedSize(CSSStyleSelector::getComputedSizeFromSpecifiedSize(document, scalingFactor, fontDescription.isAbsoluteSize(), fontDescription.computedSize(), DoNotUseSmartMinimumForFontSize));
+    fontDescription.setComputedSize(StyleResolver::getComputedSizeFromSpecifiedSize(document, scalingFactor, fontDescription.isAbsoluteSize(), fontDescription.computedSize(), DoNotUseSmartMinimumForFontSize));
 
     scaledFont = Font(fontDescription, 0, 0);
-    scaledFont.update(styleSelector->fontSelector());
+    scaledFont.update(styleResolver->fontSelector());
 }
 
 }

@@ -20,42 +20,125 @@
 import subprocess
 import os
 import sys
-import time
+import optparse
+import re
+from signal import alarm, signal, SIGALRM, SIGKILL
 from gi.repository import Gio, GLib
 
-TIMEOUT=180 # seconds
+class SkippedTest:
+    def __init__(self, test, reason, bug=None, test_cases=[]):
+        self.test = test
+        self.reason = reason
+        self.bug = bug
+        self.test_cases = test_cases
+
+    def __str__(self):
+        skipped_test_str = "%s" % self.test
+        if self.test_cases:
+            skipped_test_str += " [%s]" % ", ".join(self.test_cases)
+        skipped_test_str += ": %s " % self.reason
+        if self.bug is not None:
+            skipped_test_str += "(https://bugs.webkit.org/show_bug.cgi?id=%d)" % self.bug
+        return skipped_test_str
+
+class TestTimeout(Exception):
+    pass
 
 class TestRunner:
 
-    TEST_DIRS = [ "unittests", "WebKit2APITests" ]
-    # FIXME: https://bugs.webkit.org/show_bug.cgi?id=74717
-    SKIPPED = [ "unittests/testdownload", "unittests/testwebview", "unittests/testwebresource",
-                # WebKit2APITests/TestDownloads is consistently timing
-                # out on the 32bit release and 64bit debug bots.
-                # https://bugs.webkit.org/show_bug.cgi?id=76910
-                "WebKit2APITests/TestDownloads" ]
+    TEST_DIRS = [ "unittests", "WebKit2APITests", "TestWebKitAPI/WTF", "TestWebKitAPI/WebKit2" ]
 
-    def __init__(self):
+    SKIPPED = [
+        SkippedTest("unittests/testdownload",
+                    "Test fails in GTK Linux 64-bit Release bot",
+                    82329,
+                    ["/webkit/download/not-found"]),
+        SkippedTest("unittests/testwebview",
+                    "Test times out in GTK Linux 64-bit Release bot",
+                    82328,
+                    ["/webkit/webview/icon-uri"]),
+        SkippedTest("unittests/testwebresource",
+                    "Test fails in GTK Linux 64-bit Release bot",
+                    82330,
+                    ["/webkit/webresource/sub_resource_loading"]),
+        SkippedTest("unittests/testwebinspector",
+                    "Test is flaky in GTK Linux 32-bit Release bot",
+                    82869,
+                    ["/webkit/webinspector/close-and-inspect"]),
+        SkippedTest("WebKit2APITests/TestWebKitWebView",
+                    "Test is flaky in GTK Linux 32-bit Release bot",
+                    82866,
+                    ["/webkit2/WebKitWebView/mouse-target"]),
+        SkippedTest("WebKit2APITests/TestResources",
+                    "Test is flaky in GTK Linux 32-bit Release bot",
+                    82868,
+                    ["/webkit2/WebKitWebView/resources"]),
+        SkippedTest("TestWebKitAPI/WebKit2/TestWKConnection",
+                    "Test times out",
+                    84959),
+        SkippedTest("TestWebKitAPI/WebKit2/TestRestoreSessionStateContainingFormData",
+                    "Session State is not implemented in GTK+ port",
+                    84960),
+        SkippedTest("TestWebKitAPI/WebKit2/TestSpacebarScrolling",
+                    "Test fails",
+                    84961),
+        SkippedTest("TestWebKitAPI/WebKit2/TestNewFirstVisuallyNonEmptyLayoutFrames",
+                    "Test fails",
+                    85037),
+        SkippedTest("TestWebKitAPI/WebKit2/TestMouseMoveAfterCrash",
+                    "Test is flaky",
+                    85066)
+    ]
+
+    def __init__(self, options, tests=[]):
 
         # FIXME: webkit-build-directory --configuration always returns
         # Release because we never call set-webkit-configuration.
         #build_directory_script = os.path.join(os.path.dirname(__file__), "webkit-build-directory")
         #build_directory = self._executive.run_command([build_directory_script, "--configuration"]).rstrip()
 
-        def is_valid_build_directory(build_dir):
-            return os.path.exists(os.path.join(build_dir, ".libs"))
+        self._options = options
+        self._gtk_tools_directory = os.path.join(self._get_top_level_directory(), "Tools", "gtk")
+        self._programs_path = os.path.join(self._get_build_directory(), "Programs")
+        self._tests = self._get_tests(tests)
+        self._skipped_tests = TestRunner.SKIPPED
 
-        script_dir = os.path.dirname(__file__)
-        top_level = os.path.normpath(os.path.join(script_dir, "..", ".."))
+        # These SPI daemons need to be active for the accessibility tests to work.
+        self._spi_registryd = None
+        self._spi_bus_launcher = None
+
+        # run-gtk-tests may be run during make distcheck, which doesn't include jhbuild.
+        self._jhbuild_path = os.path.join(self._gtk_tools_directory, "run-with-jhbuild")
+        if not os.path.exists(self._jhbuild_path):
+            self._jhbuild_path = None
+
+    def _get_top_level_directory(self):
+        return os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    def _get_build_directory(self):
+        top_level = self._get_top_level_directory()
+        if self._options.release:
+            return os.path.join(top_level, 'WebKitBuild', 'Release')
+        if self._options.debug:
+            return os.path.join(top_level, 'WebKitBuild', 'Debug')
+
         build_directory = os.path.join(top_level, 'WebKitBuild', 'Release')
-        if not is_valid_build_directory(build_directory):
-            build_directory = os.path.join(top_level, 'WebKitBuild', 'Debug')
+        if os.path.exists(os.path.join(build_directory, '.libs')):
+            return build_directory
+        build_directory = os.path.join(top_level, 'WebKitBuild', 'Debug')
+        if os.path.exists(os.path.join(build_directory, '.libs')):
+            return build_directory
+        build_directory = os.path.join(top_level, '_build')
+        if os.path.exists(os.path.join(build_directory, '.libs')):
+            return build_directory
 
-        self._a11y_registryd = None
-        self._timed_out = False
-        self._gtk_tools_directory = os.path.join(top_level, "Tools", "gtk")
-        self._programs_path = os.path.join(build_directory, "Programs")
-        self._tests = []
+        return os.path.join(top_level, 'WebKitBuild')
+
+    def _get_tests(self, tests):
+        if tests:
+            return tests
+
+        tests = []
         for test_dir in self.TEST_DIRS:
             absolute_test_dir = os.path.join(self._programs_path, test_dir)
             if not os.path.isdir(absolute_test_dir):
@@ -63,126 +146,251 @@ class TestRunner:
             for test_file in os.listdir(absolute_test_dir):
                 if not test_file.lower().startswith("test"):
                     continue
-                test_relative_path = os.path.join(test_dir, test_file)
-                if test_relative_path in self.SKIPPED:
-                    sys.stdout.write("Skipping test %s\n" % (test_relative_path))
-                    sys.stdout.flush()
-                    continue
-
-                test_path = os.path.join(self._programs_path, test_relative_path)
+                test_path = os.path.join(self._programs_path, test_dir, test_file)
                 if os.path.isfile(test_path) and os.access(test_path, os.X_OK):
-                    self._tests.append(test_path)
+                    tests.append(test_path)
+        return tests
 
-    def _lookup_atspi2_binary(self, jhbuild_path, filename):
-        process = subprocess.Popen([jhbuild_path ,'pkg-config', '--variable=exec_prefix', 'atspi-2'], stdout=subprocess.PIPE)
+    def _create_process(self, command, stdout=None, stderr=None, env=os.environ):
+        if self._jhbuild_path:
+            command.insert(0, self._jhbuild_path)
+        return subprocess.Popen(command, stdout=stdout, stderr=stderr, env=env)
+
+    def _lookup_atspi2_binary(self, filename):
+        process = self._create_process(['pkg-config', '--variable=exec_prefix', 'atspi-2'], stdout=subprocess.PIPE)
         stdout = process.communicate()[0]
         exec_prefix = stdout.rstrip('\r\n')
-        paths_to_check = [ 'libexec',
-                           'lib/at-spi2-core',
-                           'lib32/at-spi2-core',
-                           'lib64/at-spi2-core' ]
-        for path in paths_to_check:
+        for path in [ 'libexec', 'lib/at-spi2-core', 'lib32/at-spi2-core', 'lib64/at-spi2-core' ]:
             filepath = os.path.join(exec_prefix, path, filename)
             if os.path.isfile(filepath):
                 return filepath
 
         return None
 
-    def _run_command_when_dbus_service_appears(self, service_name, handler):
-        def on_name_appeared(*args):
-            handler()
-
-        def on_name_vanished(*args):
-            pass
-
-        Gio.bus_watch_name(Gio.BusType.SESSION, service_name,
-                           Gio.BusNameWatcherFlags.NONE, on_name_appeared, on_name_vanished)
-
-
-    def _check_if_tests_have_timed_out(self):
-        if time.time() - self._start_time <= TIMEOUT:
+    def _start_accessibility_daemons(self):
+        if not self._jhbuild_path:
             return False
-        sys.stdout.write("Tests timed out after %d seconds\n" % TIMEOUT)
-        sys.stdout.flush()
-        self._timed_out = True
+
+        spi_bus_launcher_path = self._lookup_atspi2_binary('at-spi-bus-launcher')
+        spi_registryd_path = self._lookup_atspi2_binary('at-spi2-registryd')
+        if not spi_bus_launcher_path or not spi_registryd_path:
+            return False
+
+        try:
+            self._ally_bus_launcher = self._create_process([spi_bus_launcher_path], env=self._test_env)
+        except:
+            sys.stderr.write("Failed to launch the accessibility bus\n")
+            sys.stderr.flush()
+            return False
+
+        # We need to wait until the SPI bus is launched before trying to start the SPI
+        # registry, so we spin a main loop until the bus name appears on DBus.
+        loop = GLib.MainLoop()
+        Gio.bus_watch_name(Gio.BusType.SESSION, 'org.a11y.Bus', Gio.BusNameWatcherFlags.NONE,
+                           lambda *args: loop.quit(), None)
+        loop.run()
+
+        try:
+            self._spi_registryd = self._create_process([spi_registryd_path], env=self._test_env)
+        except:
+            sys.stderr.write("Failed to launch the accessibility registry\n")
+            sys.stderr.flush()
+            return False
+
         return True
 
-    def _ensure_accessibility_daemon_is_running(self, jhbuild_path, test_env):
-        a11y_registryd_path = self._lookup_atspi2_binary(jhbuild_path, 'at-spi2-registryd')
-        if a11y_registryd_path:
-            try:
-                self._a11y_registryd = subprocess.Popen([a11y_registryd_path], env=test_env)
-            except:
-                sys.stderr.write("Failed to run the accessibility registry\n")
-                sys.stderr.flush()
-                self._a11y_registryd = None
+    def _setup_testing_environment(self):
+        self._test_env = os.environ
+        self._test_env["DISPLAY"] = self._options.display
+        self._test_env["WEBKIT_INSPECTOR_PATH"] = os.path.abspath(os.path.join(self._programs_path, 'resources', 'inspector'))
+        self._test_env['GSETTINGS_BACKEND'] = 'memory'
+        self._test_env["TEST_WEBKIT_API_WEBKIT2_RESOURCES_PATH"] = os.path.join(self._get_top_level_directory(), "Tools", "TestWebKitAPI", "Tests", "WebKit2")
+        self._test_env["TEST_WEBKIT_API_WEBKIT2_INJECTED_BUNDLE_PATH"] = os.path.abspath(os.path.join(self._get_build_directory(), "Libraries"))
+        self._test_env["WEBKIT_EXEC_PATH"] = self._programs_path
 
-    def run(self):
+        try:
+            self._xvfb = self._create_process(["Xvfb", self._options.display, "-screen", "0", "800x600x24", "-nolisten", "tcp"],
+                                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except Exception as e:
+            sys.stderr.write("Failed to run Xvfb: %s\n", e)
+            sys.stderr.flush()
+            return False
+
+        # If we cannot start the accessibility daemons, we can just skip the accessibility tests.
+        if not self._start_accessibility_daemons():
+            print "Could not start accessibility bus, so skipping TestWebKitAccessibility"
+            self._skipped_tests.append(SkippedTest("WebKit2APITests/TestWebKitAccessibility",
+                                                   "Could not start accessibility bus"))
+        return True
+
+    def _tear_down_testing_environment(self):
+        if self._spi_registryd:
+            self._spi_registryd.terminate()
+        if self._spi_bus_launcher:
+            self._spi_bus_launcher.terminate()
+        self._xvfb.kill();
+
+    def _find_skipped_test(self, test):
+        for skipped in self._skipped_tests:
+            if test.endswith(skipped.test):
+                return skipped
+        return None
+
+    def _test_cases_to_skip(self, test):
+        if self._options.skipped_action != 'skip':
+            return []
+
+        skipped = self._find_skipped_test(test)
+        if skipped is not None:
+            return skipped.test_cases
+        return []
+
+    def _should_run_test(self, test):
+        # Skipped test are ignored, run all tests.
+        if self._options.skipped_action == 'ignore':
+            return True
+
+        skipped = self._find_skipped_test(test)
+        # By default skipped test are skipped, run them only when there are specific test cases failing.
+        if self._options.skipped_action == 'skip':
+            return skipped is None or skipped.test_cases
+
+        # Run only skipped tests.
+        return skipped is not None
+
+    def _get_child_pid_from_test_output(self, output):
+        if not output:
+            return -1
+        match = re.search(r'\(pid=(?P<child_pid>[0-9]+)\)', output)
+        if not match:
+            return -1
+        return int(match.group('child_pid'))
+
+    def _kill_process(self, pid):
+        try:
+            os.kill(pid, SIGKILL)
+        except OSError:
+            # Process already died.
+            pass
+
+    def _run_test_command(self, command, timeout=-1):
+        def alarm_handler(signum, frame):
+            raise TestTimeout
+
+        p = self._create_process(command, stdout=subprocess.PIPE, env=self._test_env)
+        if timeout > 0:
+            signal(SIGALRM, alarm_handler)
+            alarm(timeout)
+
+        stdout = ""
+        try:
+            stdout = p.communicate()[0]
+            if timeout > 0:
+                alarm(0)
+            sys.stdout.write(stdout)
+            sys.stdout.flush()
+        except TestTimeout:
+            self._kill_process(p.pid)
+            child_pid = self._get_child_pid_from_test_output(stdout)
+            if child_pid > 0:
+                self._kill_process(child_pid)
+            raise
+
+        return not p.returncode
+
+    def _run_test_glib(self, test):
+        tester_command = ['gtester']
+        if self._options.verbose:
+            tester_command.append('--verbose')
+        for test_case in self._test_cases_to_skip(test):
+            tester_command.extend(['-s', test_case])
+        tester_command.append(test)
+
+        return self._run_test_command(tester_command, self._options.timeout)
+
+    def _run_test_google(self, test):
+        tester_command = [test, "--gtest_throw_on_failure"]
+        skipped_tests_cases = self._test_cases_to_skip(test)
+        if skipped_tests_cases:
+            tester_command.append("--gtest_filter=-%s" % ":".join(skipped_tests_cases))
+
+        return self._run_test_command(tester_command, self._options.timeout)
+
+    def _run_test(self, test):
+        if "unittests" in test or "WebKit2APITests" in test:
+            return self._run_test_glib(test)
+
+        if "TestWebKitAPI" in test:
+            return self._run_test_google(test)
+
+        return False
+
+    def run_tests(self):
         if not self._tests:
             sys.stderr.write("ERROR: tests not found in %s.\n" % (self._programs_path))
             sys.stderr.flush()
             return 1
 
-        test_env = os.environ
-        test_env["DISPLAY"] = ":55"
-        test_env["WEBKIT_INSPECTOR_PATH"] = os.path.abspath(os.path.join(self._programs_path, 'resources', 'inspector'))
-        test_env['GSETTINGS_BACKEND'] = 'memory'
-
-        failed_tests = []
-
-        jhbuild_path = os.path.join(self._gtk_tools_directory, "run-with-jhbuild")
-
-        # Make sure the accessibility bus is launched.
-        a11y_bus_launcher_path = self._lookup_atspi2_binary(jhbuild_path, 'at-spi-bus-launcher')
-        assert(a11y_bus_launcher_path)
-        try:
-            a11y_bus_launcher = subprocess.Popen([a11y_bus_launcher_path], env=test_env)
-        except:
-            sys.stderr.write("Failed to launch the accessibility bus\n")
-            sys.stderr.flush()
+        if not self._setup_testing_environment():
             return 1
 
-        loop = GLib.MainLoop()
-        self._start_time = time.time()
+        # Remove skipped tests now instead of when we find them, because
+        # some tests might be skipped while setting up the test environment.
+        self._tests = [test for test in self._tests if self._should_run_test(test)]
 
-        def run_tests():
-            self._ensure_accessibility_daemon_is_running(jhbuild_path, test_env)
-
+        failed_tests = []
+        timed_out_tests = []
+        try:
             for test in self._tests:
-                process = subprocess.Popen([jhbuild_path ,'gtester', test], env=test_env)
-                if process.wait():
+                success = True
+                try:
+                    success = self._run_test(test)
+                except TestTimeout:
+                    sys.stdout.write("TEST: %s: TIMEOUT\n" % test)
+                    sys.stdout.flush()
+                    timed_out_tests.append(test)
+
+                if not success:
                     failed_tests.append(test)
+        finally:
+            self._tear_down_testing_environment()
 
-                if self._check_if_tests_have_timed_out():
-                    break
+        if failed_tests:
+            names = [test.replace(self._programs_path, '', 1) for test in failed_tests]
+            sys.stdout.write("Tests failed: %s\n" % ", ".join(names))
+            sys.stdout.flush()
 
-            if self._a11y_registryd:
-                self._a11y_registryd.terminate()
+        if timed_out_tests:
+            names = [test.replace(self._programs_path, '', 1) for test in timed_out_tests]
+            sys.stdout.write("Tests that timed out: %s\n" % ", ".join(names))
+            sys.stdout.flush()
 
-            a11y_bus_launcher.terminate()
+        if self._skipped_tests and self._options.skipped_action == 'skip':
+            sys.stdout.write("Tests skipped:\n%s\n" % "\n".join([str(skipped) for skipped in self._skipped_tests]))
+            sys.stdout.flush()
 
-            if failed_tests:
-                names = [os.path.basename(t) for t in failed_tests]
-                sys.stdout.write("Tests failed: %s\n" % ", ".join(names))
-                sys.stdout.flush()
-
-            loop.quit()
-
-        self._run_command_when_dbus_service_appears("org.a11y.Bus", run_tests)
-        loop.run()
-
-        return len(failed_tests) or int(self._timed_out)
+        return len(failed_tests)
 
 if __name__ == "__main__":
-    try:
-        xvfb = subprocess.Popen(["Xvfb", ":55", "-screen", "0", "800x600x24", "-nolisten", "tcp"],
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except:
-        sys.stderr.write("Failed to run Xvfb\n")
-        sys.stderr.flush()
-        sys.exit(1)
+    option_parser = optparse.OptionParser(usage='usage: %prog [options] [test...]')
+    option_parser.add_option('-r', '--release',
+                             action='store_true', dest='release',
+                             help='Run in Release')
+    option_parser.add_option('-d', '--debug',
+                             action='store_true', dest='debug',
+                             help='Run in Debug')
+    option_parser.add_option('-v', '--verbose',
+                             action='store_true', dest='verbose',
+                             help='Run gtester in verbose mode')
+    option_parser.add_option('--display', action='store', dest='display', default=':55',
+                             help='Display to run Xvfb')
+    option_parser.add_option('--skipped', action='store', dest='skipped_action',
+                             choices=['skip', 'ignore', 'only'], default='skip',
+                             metavar='skip|ignore|only',
+                             help='Specifies how to treat the skipped tests')
+    option_parser.add_option('-t', '--timeout',
+                             action='store', type='int', dest='timeout', default=10,
+                             help='Time in seconds until a test times out')
+    options, args = option_parser.parse_args()
 
-    try:
-        sys.exit(TestRunner().run())
-    finally:
-        xvfb.kill()
+    sys.exit(TestRunner(options, args).run_tests())

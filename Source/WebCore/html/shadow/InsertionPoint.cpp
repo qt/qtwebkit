@@ -31,8 +31,8 @@
 #include "config.h"
 #include "InsertionPoint.h"
 
+#include "ElementShadow.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 
 namespace WebCore {
 
@@ -48,11 +48,10 @@ InsertionPoint::~InsertionPoint()
 
 void InsertionPoint::attach()
 {
-    TreeScope* scope = treeScope();
-    if (scope->isShadowRoot()) {
-        ShadowRoot* root = toShadowRoot(scope);
+    if (isShadowBoundary()) {
+        ShadowRoot* root = toShadowRoot(treeScope()->rootNode());
         if (doesSelectFromHostChildren()) {
-            distributeHostChildren(root->tree());
+            distributeHostChildren(root->owner());
             attachDistributedNode();
         } else if (!root->olderShadowRoot()->assignedTo()) {
             ASSERT(!root->olderShadowRoot()->attached());
@@ -66,17 +65,18 @@ void InsertionPoint::attach()
 
 void InsertionPoint::detach()
 {
-    if (ShadowRoot* root = toShadowRoot(shadowTreeRootNode())) {
-        ShadowTree* tree = root->tree();
+    ShadowRoot* root = toShadowRoot(shadowTreeRootNode());
+    if (root && isActive()) {
+        ElementShadow* shadow = root->owner();
 
         if (doesSelectFromHostChildren())
-            clearDistribution(tree);
+            clearDistribution(shadow);
         else if (ShadowRoot* assignedShadowRoot = assignedFrom())
             clearAssignment(assignedShadowRoot);
 
         // When shadow element is detached, shadow tree should be recreated to re-calculate selector for
         // other insertion points.
-        tree->setNeedsReattachHostChildrenAndShadow();
+        shadow->setNeedsReattachHostChildrenAndShadow();
     }
 
     ASSERT(m_selections.isEmpty());
@@ -85,11 +85,11 @@ void InsertionPoint::detach()
 
 ShadowRoot* InsertionPoint::assignedFrom() const
 {
-    TreeScope* scope = treeScope();
-    if (!scope->isShadowRoot())
+    Node* treeScopeRoot = treeScope()->rootNode();
+    if (!treeScopeRoot->isShadowRoot())
         return 0;
 
-    ShadowRoot* olderShadowRoot = toShadowRoot(scope)->olderShadowRoot();
+    ShadowRoot* olderShadowRoot = toShadowRoot(treeScopeRoot)->olderShadowRoot();
     if (olderShadowRoot && olderShadowRoot->assignedTo() == this)
         return olderShadowRoot;
     return 0;
@@ -97,9 +97,19 @@ ShadowRoot* InsertionPoint::assignedFrom() const
 
 bool InsertionPoint::isShadowBoundary() const
 {
-    if (TreeScope* scope = treeScope())
-        return scope->isShadowRoot();
-    return false;
+    return treeScope()->rootNode()->isShadowRoot() && isActive();
+}
+
+bool InsertionPoint::isActive() const
+{
+    const Node* node = parentNode();
+    while (node) {
+        if (WebCore::isInsertionPoint(node))
+            return false;
+
+        node = node->parentNode();
+    }
+    return true;
 }
 
 bool InsertionPoint::rendererIsNeeded(const NodeRenderingContext& context)
@@ -107,17 +117,23 @@ bool InsertionPoint::rendererIsNeeded(const NodeRenderingContext& context)
     return !isShadowBoundary() && HTMLElement::rendererIsNeeded(context);
 }
 
-inline void InsertionPoint::distributeHostChildren(ShadowTree* tree)
+inline void InsertionPoint::distributeHostChildren(ElementShadow* shadow)
 {
-    HTMLContentSelector* selector = tree->ensureSelector();
-    selector->unselect(&m_selections);
-    selector->select(this, &m_selections);
+    if (!shadow->selector().isSelecting()) {
+        // If HTMLContentSelector is not int selecting phase, it means InsertionPoint is attached from
+        // non-ElementShadow node. To run distribute algorithm, we have to reattach ElementShadow.
+        shadow->setNeedsReattachHostChildrenAndShadow();
+        return;
+    }
+
+    shadow->selector().populateIfNecessary(shadow->host());
+    shadow->selector().unselect(&m_selections);
+    shadow->selector().select(this, &m_selections);
 }
 
-inline void InsertionPoint::clearDistribution(ShadowTree* tree)
+inline void InsertionPoint::clearDistribution(ElementShadow* shadow)
 {
-    if (HTMLContentSelector* selector = tree->selector())
-        selector->unselect(&m_selections);
+    shadow->selector().unselect(&m_selections);
 }
 
 inline void InsertionPoint::attachDistributedNode()

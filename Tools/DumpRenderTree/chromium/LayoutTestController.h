@@ -289,6 +289,7 @@ public:
     void setAllowFileAccessFromFileURLs(const CppArgumentList&, CppVariant*);
     void setAllowRunningOfInsecureContent(const CppArgumentList&, CppVariant*);
 
+    void evaluateScriptInIsolatedWorldAndReturnValue(const CppArgumentList&, CppVariant*);
     void evaluateScriptInIsolatedWorld(const CppArgumentList&, CppVariant*);
     void setIsolatedWorldSecurityOrigin(const CppArgumentList&, CppVariant*);
 
@@ -339,9 +340,6 @@ public:
     // printing.
     void hasCustomPageSizeStyle(const CppArgumentList&, CppVariant*);
 
-    // Returns the visibililty status of a page box for printing
-    void isPageBoxVisible(const CppArgumentList&, CppVariant*);
-
     // Gets the page-related property for printed content
     void pageProperty(const CppArgumentList&, CppVariant*);
 
@@ -385,7 +383,6 @@ public:
     void loseCompositorContext(const CppArgumentList& args, CppVariant* result);
 
     void markerTextForListItem(const CppArgumentList&, CppVariant*);
-    void hasSpellingMarker(const CppArgumentList&, CppVariant*);
     void findString(const CppArgumentList&, CppVariant*);
 
     void setMinimumTimerInterval(const CppArgumentList&, CppVariant*);
@@ -491,6 +488,9 @@ public:
 
     bool testRepaint() const { return m_testRepaint; }
     bool sweepHorizontally() const { return m_sweepHorizontally; }
+
+    void setHasCustomFullScreenBehavior(const CppArgumentList&, CppVariant*);
+    bool hasCustomFullScreenBehavior() const { return m_hasCustomFullScreenBehavior; }
 
     // Called by the webview delegate when the toplevel frame load is done.
     void locationChangeDone();
@@ -706,6 +706,10 @@ private:
     WebKit::WebArrayBufferView m_audioData;
 
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
+
+    // If true, calls to WebViewHost::enter/exitFullScreenNow will not result in 
+    // calls to Document::will/did/Enter/ExitFullScreen.
+    bool m_hasCustomFullScreenBehavior;
 };
 
 #endif // LayoutTestController_h

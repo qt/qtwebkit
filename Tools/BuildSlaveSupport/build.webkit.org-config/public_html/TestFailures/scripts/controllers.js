@@ -32,26 +32,38 @@ var kCheckoutUnavailableMessage = 'Failed! Garden-o-matic needs a local server t
 // FIXME: Where should this function go?
 function rebaselineWithStatusUpdates(failureInfoList)
 {
-    var statusView = new ui.MessageBox('Rebaseline', 'Performing rebaseline...');
+    // FIXME: If a test is a reftest, webkit-patch rebaseline-test should error out
+    // and we should alert (modal dialog?) the user.
+    var statusView = new ui.StatusArea('Rebaseline');
+    var id = statusView.newId();
+
+    var testNames = base.uniquifyArray(failureInfoList.map(function(failureInfo) { return failureInfo.testName; }));
+    var testName = testNames.length == 1 ? testNames[0] : testNames.length + ' tests';
+    statusView.addMessage(id, 'Performing rebaseline of ' + testName + '...');
 
     checkout.rebaseline(failureInfoList, function() {
-        statusView.addFinalMessage('Rebaseline done! Please land with "webkit-patch land-cowboy".');
+        statusView.addFinalMessage(id, 'Rebaseline done! Please land with "webkit-patch land-cowboy".');
     }, function(failureInfo) {
-        statusView.addMessage(failureInfo.testName + ' on ' + ui.displayNameForBuilder(failureInfo.builderName));
+        statusView.addMessage(id, failureInfo.testName + ' on ' + ui.displayNameForBuilder(failureInfo.builderName));
     }, function() {
-        statusView.addFinalMessage(kCheckoutUnavailableMessage);
+        statusView.addFinalMessage(id, kCheckoutUnavailableMessage);
     });
 }
 
 // FIXME: Where should this function go?
 function updateExpectationsWithStatusUpdates(failureInfoList)
 {
-    var statusView = new ui.MessageBox('Expectations Update', 'Updating expectations...');
+    var statusView = new ui.StatusArea('Expectations Update');
+    var id = statusView.newId();
+
+    var testNames = base.uniquifyArray(failureInfoList.map(function(failureInfo) { return failureInfo.testName; }));
+    var testName = testNames.length == 1 ? testNames[0] : testNames.length + ' tests';
+    statusView.addMessage(id, 'Updating expectations of ' + testName + '...');
 
     checkout.updateExpectations(failureInfoList, function() {
-        statusView.addFinalMessage('Expectations update done! Please land with "webkit-patch land-cowboy".');
+        statusView.addFinalMessage(id, 'Expectations update done! Please land with "webkit-patch land-cowboy".');
     }, function() {
-        statusView.addFinalMessage(kCheckoutUnavailableMessage);
+        statusView.addFinalMessage(id, kCheckoutUnavailableMessage);
     });
 }
 
@@ -104,8 +116,8 @@ controllers.ExpectedFailures = base.extends(Object, {
     },
     update: function()
     {
-        var expectedOrUnexpectedFailures = results.expectedOrUnexpectedFailuresByTest(this._model.resultsByBuilder);
-        var failingTestsList = Object.keys(expectedOrUnexpectedFailures);
+        var expectedFailures = results.expectedFailuresByTest(this._model.resultsByBuilder);
+        var failingTestsList = Object.keys(expectedFailures);
 
         $(this._view).empty();
         base.forEachDirectory(failingTestsList, function(label, testsFailingInDirectory) {
@@ -122,7 +134,7 @@ controllers.ExpectedFailures = base.extends(Object, {
             fetchResultsURLs: results.fetchResultsURLs
         });
         var failuresByTest = base.filterDictionary(
-            results.expectedOrUnexpectedFailuresByTest(this._model.resultsByBuilder),
+            results.expectedFailuresByTest(this._model.resultsByBuilder),
             function(key) {
                 return failingTestsList.indexOf(key) != -1;
             });
@@ -256,7 +268,7 @@ controllers.UnexpectedFailures = base.extends(FailureStreamController, {
 });
 
 controllers.Failures = base.extends(FailureStreamController, {
-    _resultsFilter: results.expectedOrUnexpectedFailuresByTest,
+    _resultsFilter: results.expectedFailuresByTest,
 
     _keyFor: function(failureAnalysis)
     {

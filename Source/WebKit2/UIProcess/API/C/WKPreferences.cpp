@@ -158,6 +158,16 @@ bool WKPreferencesGetJavaEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->javaEnabled();
 }
 
+void WKPreferencesSetJavaEnabledForLocalFiles(WKPreferencesRef preferencesRef, bool javaEnabledForLocalFiles)
+{
+    toImpl(preferencesRef)->setJavaEnabledForLocalFiles(javaEnabledForLocalFiles);
+}
+
+bool WKPreferencesGetJavaEnabledForLocalFiles(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->javaEnabledForLocalFiles();
+}
+
 void WKPreferencesSetJavaScriptCanOpenWindowsAutomatically(WKPreferencesRef preferencesRef, bool javaScriptCanOpenWindowsAutomatically)
 {
     toImpl(preferencesRef)->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
@@ -416,6 +426,16 @@ void WKPreferencesSetCSSRegionsEnabled(WKPreferencesRef preferencesRef, bool fla
 bool WKPreferencesGetCSSRegionsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->cssRegionsEnabled();
+}
+
+void WKPreferencesSetRegionBasedColumnsEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setRegionBasedColumnsEnabled(flag);
+}
+
+bool WKPreferencesGetRegionBasedColumnsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->regionBasedColumnsEnabled();
 }
 
 void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef, bool flag)
@@ -678,6 +698,16 @@ bool WKPreferencesGetApplicationChromeModeEnabled(WKPreferencesRef preferencesRe
     return toImpl(preferencesRef)->applicationChromeMode();
 }
 
+void WKPreferencesSetInspectorUsesWebKitUserInterface(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setInspectorUsesWebKitUserInterface(enabled);
+}
+
+bool WKPreferencesGetInspectorUsesWebKitUserInterface(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->inspectorUsesWebKitUserInterface();
+}
+
 void WKPreferencesSetSuppressesIncrementalRendering(WKPreferencesRef preferencesRef, bool enabled)
 {
     toImpl(preferencesRef)->setSuppressesIncrementalRendering(enabled);
@@ -686,16 +716,6 @@ void WKPreferencesSetSuppressesIncrementalRendering(WKPreferencesRef preferences
 bool WKPreferencesGetSuppressesIncrementalRendering(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->suppressesIncrementalRendering();
-}
-
-void WKPreferencesSetSuppressIncrementalRendering(WKPreferencesRef preferencesRef, bool enabled)
-{
-    WKPreferencesSetSuppressesIncrementalRendering(preferencesRef, enabled);
-}
-
-bool WKPreferencesGetSuppressIncrementalRendering(WKPreferencesRef preferencesRef)
-{
-    return WKPreferencesGetSuppressesIncrementalRendering(preferencesRef);
 }
 
 void WKPreferencesSetBackspaceKeyNavigationEnabled(WKPreferencesRef preferencesRef, bool enabled)
@@ -756,6 +776,26 @@ void WKPreferencesSetNotificationsEnabled(WKPreferencesRef preferencesRef, bool 
 bool WKPreferencesGetNotificationsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->notificationsEnabled();
+}
+
+void WKPreferencesSetShouldRespectImageOrientation(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setShouldRespectImageOrientation(enabled);
+}
+
+bool WKPreferencesGetShouldRespectImageOrientation(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->shouldRespectImageOrientation();
+}
+
+void WKPreferencesSetRequestAnimationFrameEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setRequestAnimationFrameEnabled(flag);
+}
+
+bool WKPreferencesGetRequestAnimationFrameEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->requestAnimationFrameEnabled();
 }
 
 void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef)

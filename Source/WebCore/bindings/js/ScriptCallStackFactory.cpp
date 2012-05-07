@@ -70,7 +70,7 @@ PassRefPtr<ScriptCallStack> createScriptCallStack(JSC::ExecState* exec, size_t m
         exec->interpreter()->retrieveLastCaller(callFrame, signedLineNumber, sourceID, urlString, function);
         UString functionName;
         if (function)
-            functionName = asFunction(function)->name(exec);
+            functionName = jsCast<JSFunction*>(function)->name(exec);
         else {
             // Caller is unknown, but if frames is empty we should still add the frame, because
             // something called us, and gave us arguments.
@@ -90,7 +90,7 @@ PassRefPtr<ScriptCallStack> createScriptCallStackForInspector(JSC::ExecState* ex
 {
     size_t maxStackSize = 1;
     if (InspectorInstrumentation::hasFrontends()) {
-        ScriptExecutionContext* scriptExecutionContext = static_cast<JSDOMGlobalObject*>(exec->lexicalGlobalObject())->scriptExecutionContext();
+        ScriptExecutionContext* scriptExecutionContext = jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject())->scriptExecutionContext();
         if (InspectorInstrumentation::hasFrontendForScriptContext(scriptExecutionContext))
             maxStackSize = ScriptCallStack::maxCallStackSizeToCapture;
     }

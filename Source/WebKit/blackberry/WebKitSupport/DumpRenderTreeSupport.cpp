@@ -40,13 +40,11 @@ using namespace JSC;
 
 bool DumpRenderTreeSupport::s_linksIncludedInTabChain = true;
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
 GeolocationClientMock* toGeolocationClientMock(GeolocationClient* client)
 {
      ASSERT(getenv("drtRun"));
      return static_cast<GeolocationClientMock*>(client);
 }
-#endif
 
 DumpRenderTreeSupport::DumpRenderTreeSupport()
 {
@@ -93,31 +91,23 @@ void DumpRenderTreeSupport::dumpConfigurationForViewport(Frame* mainFrame, int d
     restrictMinimumScaleFactorToViewportSize(attrs, IntSize(availableWidth, availableHeight));
     restrictScaleFactorToInitialScaleIfNotUserScalable(attrs);
 
-    fprintf(stdout, "viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", attrs.layoutSize.width(), attrs.layoutSize.height(), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
+    fprintf(stdout, "viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", static_cast<int>(attrs.layoutSize.width()), static_cast<int>(attrs.layoutSize.height()), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
 }
 
 int DumpRenderTreeSupport::numberOfPendingGeolocationPermissionRequests(WebPage* webPage)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage(webPage)->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController(corePage(webPage))->client());
     return mockClient->numberOfPendingPermissionRequests();
-#else
-    UNUSED_PARAM(webPage);
-    return -1;
-#endif
 }
 
 void DumpRenderTreeSupport::resetGeolocationMock(WebPage* webPage)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage(webPage)->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage(webPage))->client());
     mockClient->reset();
-#endif
 }
 
 void DumpRenderTreeSupport::setMockGeolocationError(WebPage* webPage, int errorCode, const String message)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
     GeolocationError::ErrorCode code = GeolocationError::PositionUnavailable;
     switch (errorCode) {
     case PositionError::PERMISSION_DENIED:
@@ -128,25 +118,20 @@ void DumpRenderTreeSupport::setMockGeolocationError(WebPage* webPage, int errorC
         break;
     }
 
-    GeolocationClientMock* mockClient = static_cast<GeolocationClientMock*>(corePage(webPage)->geolocationController()->client());
+    GeolocationClientMock* mockClient = static_cast<GeolocationClientMock*>(GeolocationController::from(corePage(webPage))->client());
     mockClient->setError(GeolocationError::create(code, message));
-#endif
 }
 
 void DumpRenderTreeSupport::setMockGeolocationPermission(WebPage* webPage, bool allowed)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage(webPage)->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage(webPage))->client());
     mockClient->setPermission(allowed);
-#endif
 }
 
 void DumpRenderTreeSupport::setMockGeolocationPosition(WebPage* webPage, double latitude, double longitude, double accuracy)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage(webPage)->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage(webPage))->client());
     mockClient->setPosition(GeolocationPosition::create(currentTime(), latitude, longitude, accuracy));
-#endif
 }
 
 void DumpRenderTreeSupport::scalePageBy(WebPage* webPage, float scaleFactor, float x, float y)
@@ -165,7 +150,7 @@ JSValueRef DumpRenderTreeSupport::computedStyleIncludingVisitedInfo(JSContextRef
         return JSValueMakeUndefined(context);
     JSElement* jsElement = static_cast<JSElement*>(asObject(jsValue));
     Element* element = jsElement->impl();
-    RefPtr<CSSComputedStyleDeclaration> style = computedStyle(element, true);
+    RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(element, true);
     return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
 }
 

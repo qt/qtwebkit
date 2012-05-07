@@ -59,19 +59,22 @@ bool JSFunction::isHostFunctionNonInline() const
     return isHostFunction();
 }
 
-JSFunction* JSFunction::create(ExecState* exec, JSGlobalObject* globalObject, int length, const Identifier& name, NativeFunction nativeFunction, NativeFunction nativeConstructor)
+JSFunction* JSFunction::create(ExecState* exec, JSGlobalObject* globalObject, int length, const Identifier& name, NativeFunction nativeFunction, Intrinsic intrinsic, NativeFunction nativeConstructor)
 {
-    NativeExecutable* executable = exec->globalData().getHostFunction(nativeFunction, nativeConstructor);
+    NativeExecutable* executable;
+#if !ENABLE(JIT)
+    UNUSED_PARAM(intrinsic);
+#else
+    if (intrinsic != NoIntrinsic && exec->globalData().canUseJIT()) {
+        ASSERT(nativeConstructor == callHostFunctionAsConstructor);
+        executable = exec->globalData().getHostFunction(nativeFunction, intrinsic);
+    } else
+#endif
+        executable = exec->globalData().getHostFunction(nativeFunction, nativeConstructor);
+
     JSFunction* function = new (NotNull, allocateCell<JSFunction>(*exec->heap())) JSFunction(exec, globalObject, globalObject->functionStructure());
     // Can't do this during initialization because getHostFunction might do a GC allocation.
     function->finishCreation(exec, executable, length, name);
-    return function;
-}
-
-JSFunction* JSFunction::create(ExecState* exec, JSGlobalObject* globalObject, int length, const Identifier& name, NativeExecutable* nativeExecutable)
-{
-    JSFunction* function = new (NotNull, allocateCell<JSFunction>(*exec->heap())) JSFunction(exec, globalObject, globalObject->functionStructure());
-    function->finishCreation(exec, nativeExecutable, length, name);
     return function;
 }
 
@@ -172,21 +175,21 @@ CallType JSFunction::getCallData(JSCell* cell, CallData& callData)
 
 JSValue JSFunction::argumentsGetter(ExecState* exec, JSValue slotBase, const Identifier&)
 {
-    JSFunction* thisObj = asFunction(slotBase);
+    JSFunction* thisObj = jsCast<JSFunction*>(slotBase);
     ASSERT(!thisObj->isHostFunction());
     return exec->interpreter()->retrieveArgumentsFromVMCode(exec, thisObj);
 }
 
 JSValue JSFunction::callerGetter(ExecState* exec, JSValue slotBase, const Identifier&)
 {
-    JSFunction* thisObj = asFunction(slotBase);
+    JSFunction* thisObj = jsCast<JSFunction*>(slotBase);
     ASSERT(!thisObj->isHostFunction());
     JSValue caller = exec->interpreter()->retrieveCallerFromVMCode(exec, thisObj);
 
     // See ES5.1 15.3.5.4 - Function.caller may not be used to retrieve a strict caller.
     if (!caller.isObject() || !asObject(caller)->inherits(&JSFunction::s_info))
         return caller;
-    JSFunction* function = asFunction(caller);
+    JSFunction* function = jsCast<JSFunction*>(caller);
     if (function->isHostFunction() || !function->jsExecutable()->isStrictMode())
         return caller;
     return throwTypeError(exec, "Function.caller used to retrieve strict caller");
@@ -194,7 +197,7 @@ JSValue JSFunction::callerGetter(ExecState* exec, JSValue slotBase, const Identi
 
 JSValue JSFunction::lengthGetter(ExecState*, JSValue slotBase, const Identifier&)
 {
-    JSFunction* thisObj = asFunction(slotBase);
+    JSFunction* thisObj = jsCast<JSFunction*>(slotBase);
     ASSERT(!thisObj->isHostFunction());
     return jsNumber(thisObj->jsExecutable()->parameterCount());
 }
@@ -369,46 +372,55 @@ bool JSFunction::defineOwnProperty(JSObject* object, ExecState* exec, const Iden
         // following the rules set out in ECMA-262 8.12.9.
         PropertySlot slot;
         thisObject->methodTable()->getOwnPropertySlot(thisObject, exec, propertyName, slot);
-    } else if (propertyName == exec->propertyNames().arguments || propertyName == exec->propertyNames().length || propertyName == exec->propertyNames().caller) {
-        if (!object->isExtensible()) {
-            if (throwException)
-                throwError(exec, createTypeError(exec, "Attempting to define property on object that is not extensible."));
-            return false;
+        return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
+    }
+
+    bool valueCheck;
+    if (propertyName == exec->propertyNames().arguments) {
+        if (thisObject->jsExecutable()->isStrictMode()) {
+            if (!Base::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor))
+                thisObject->putDirectAccessor(exec->globalData(), propertyName, thisObject->globalObject()->throwTypeErrorGetterSetter(exec), DontDelete | DontEnum | Accessor);
+            return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
         }
-        if (descriptor.configurablePresent() && descriptor.configurable()) {
-            if (throwException)
-                throwError(exec, createTypeError(exec, "Attempting to configurable attribute of unconfigurable property."));
-            return false;
+        valueCheck = !descriptor.value() || sameValue(exec, descriptor.value(), exec->interpreter()->retrieveArgumentsFromVMCode(exec, thisObject));
+    } else if (propertyName == exec->propertyNames().caller) {
+        if (thisObject->jsExecutable()->isStrictMode()) {
+            if (!Base::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor))
+                thisObject->putDirectAccessor(exec->globalData(), propertyName, thisObject->globalObject()->throwTypeErrorGetterSetter(exec), DontDelete | DontEnum | Accessor);
+            return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
         }
-        if (descriptor.enumerablePresent() && descriptor.enumerable()) {
-            if (throwException)
-                throwError(exec, createTypeError(exec, "Attempting to change enumerable attribute of unconfigurable property."));
-            return false;
-        }
-        if (descriptor.isAccessorDescriptor()) {
-            if (throwException)
-                throwError(exec, createTypeError(exec, "Attempting to change access mechanism for an unconfigurable property."));
-            return false;
-        }
-        if (descriptor.writablePresent() && descriptor.writable()) {
-            if (throwException)
-                throwError(exec, createTypeError(exec, "Attempting to change writable attribute of unconfigurable property."));
-            return false;
-        }
-        if (!descriptor.value())
-            return true;
-        if (propertyName == exec->propertyNames().arguments && sameValue(exec, descriptor.value(), exec->interpreter()->retrieveArgumentsFromVMCode(exec, thisObject)))
-            return true;
-        if (propertyName == exec->propertyNames().length && sameValue(exec, descriptor.value(), jsNumber(thisObject->jsExecutable()->parameterCount())))
-            return true;
-        if (propertyName == exec->propertyNames().caller && sameValue(exec, descriptor.value(), exec->interpreter()->retrieveCallerFromVMCode(exec, thisObject)))
-            return true;
+        valueCheck = !descriptor.value() || sameValue(exec, descriptor.value(), exec->interpreter()->retrieveCallerFromVMCode(exec, thisObject));
+    } else if (propertyName == exec->propertyNames().length)
+        valueCheck = !descriptor.value() || sameValue(exec, descriptor.value(), jsNumber(thisObject->jsExecutable()->parameterCount()));
+    else
+        return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
+     
+    if (descriptor.configurablePresent() && descriptor.configurable()) {
+        if (throwException)
+            throwError(exec, createTypeError(exec, "Attempting to configurable attribute of unconfigurable property."));
+        return false;
+    }
+    if (descriptor.enumerablePresent() && descriptor.enumerable()) {
+        if (throwException)
+            throwError(exec, createTypeError(exec, "Attempting to change enumerable attribute of unconfigurable property."));
+        return false;
+    }
+    if (descriptor.isAccessorDescriptor()) {
+        if (throwException)
+            throwError(exec, createTypeError(exec, "Attempting to change access mechanism for an unconfigurable property."));
+        return false;
+    }
+    if (descriptor.writablePresent() && descriptor.writable()) {
+        if (throwException)
+            throwError(exec, createTypeError(exec, "Attempting to change writable attribute of unconfigurable property."));
+        return false;
+    }
+    if (!valueCheck) {
         if (throwException)
             throwError(exec, createTypeError(exec, "Attempting to change value of a readonly property."));
         return false;
     }
-
-    return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
+    return true;
 }
 
 // ECMA 13.2.2 [[Construct]]

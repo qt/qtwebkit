@@ -417,9 +417,6 @@ static const unsigned WKNVAllowedToEnterSandbox = 74658;
 
 // WKNVSandboxFunctions = 74659 is defined in NetscapeSandboxFunctions.h
 
-// The Core Animation render server port.
-static const unsigned WKNVCALayerRenderServerPort = 71879;
-
 #endif
 
 static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
@@ -551,23 +548,9 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
            break;
 
        case NPNVToolkit: {
-#if PLATFORM(GTK)
-           *reinterpret_cast<uint32_t*>(value) = 2;
-#else
-           const uint32_t expectedGTKToolKitVersion = 2;
-
-           // Set the expected GTK version if we know that this plugin needs it or if the plugin call us
-           // with a null instance. The latter is the case with NSPluginWrapper plugins.
-           bool requiresGTKToolKitVersion;
-           if (!npp)
-               requiresGTKToolKitVersion = true;
-           else {
-               RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
-               requiresGTKToolKitVersion = plugin->quirks().contains(PluginQuirks::RequiresGTKToolKit);
-           }
-
-           *reinterpret_cast<uint32_t*>(value) = requiresGTKToolKitVersion ? expectedGTKToolKitVersion : 0;
-#endif
+           // Gtk based plugins need to be assured about the toolkit version.
+           const uint32_t expectedGtkToolKitVersion = 2;
+           *reinterpret_cast<uint32_t*>(value) = expectedGtkToolKitVersion;
            break;
        }
 
@@ -706,12 +689,6 @@ static void NPN_ReleaseObject(NPObject *npObject)
 
 static bool NPN_Invoke(NPP npp, NPObject *npObject, NPIdentifier methodName, const NPVariant* arguments, uint32_t argumentCount, NPVariant* result)
 {
-    if (RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp)) {
-        bool returnValue;
-        if (plugin->tryToShortCircuitInvoke(npObject, methodName, arguments, argumentCount, returnValue, *result))
-            return returnValue;
-    }
-
     if (npObject->_class->invoke)
         return npObject->_class->invoke(npObject, methodName, arguments, argumentCount, result);
 

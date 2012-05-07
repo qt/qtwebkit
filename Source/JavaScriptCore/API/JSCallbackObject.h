@@ -89,7 +89,7 @@ struct JSCallbackObjectData : WeakHandleOwner {
         void setPrivateProperty(JSGlobalData& globalData, JSCell* owner, const Identifier& propertyName, JSValue value)
         {
             WriteBarrier<Unknown> empty;
-            m_propertyMap.add(propertyName.impl(), empty).first->second.set(globalData, owner, value);
+            m_propertyMap.add(propertyName.impl(), empty).iterator->second.set(globalData, owner, value);
         }
         
         void deletePrivateProperty(const Identifier& propertyName)
@@ -174,6 +174,8 @@ private:
     static UString className(const JSObject*);
 
     static void destroy(JSCell*);
+
+    static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
 
     static bool getOwnPropertySlot(JSCell*, ExecState*, const Identifier&, PropertySlot&);
     static bool getOwnPropertyDescriptor(JSObject*, ExecState*, const Identifier&, PropertyDescriptor&);

@@ -37,7 +37,6 @@
 #include "JIT.h"
 #include "JITDriver.h"
 #include "JSActivation.h"
-#include "JSByteArray.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSPropertyNameIterator.h"
 #include "JSStaticScopeObject.h"
@@ -189,7 +188,7 @@ LLINT_SLOW_PATH_DECL(trace_prologue)
 
 static void traceFunctionPrologue(ExecState* exec, const char* comment, CodeSpecializationKind kind)
 {
-    JSFunction* callee = asFunction(exec->callee());
+    JSFunction* callee = jsCast<JSFunction*>(exec->callee());
     FunctionExecutable* executable = callee->jsExecutable();
     CodeBlock* codeBlock = &executable->generatedBytecodeFor(kind);
     dataLog("%p / %p: in %s of function %p, executable %p; numVars = %u, numParameters = %u, numCalleeRegisters = %u, caller = %p.\n",
@@ -316,22 +315,22 @@ LLINT_SLOW_PATH_DECL(entry_osr)
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_call)
 {
-    return entryOSR(exec, pc, &asFunction(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForCall), "entry_osr_function_for_call", Prologue);
+    return entryOSR(exec, pc, &jsCast<JSFunction*>(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForCall), "entry_osr_function_for_call", Prologue);
 }
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_construct)
 {
-    return entryOSR(exec, pc, &asFunction(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForConstruct), "entry_osr_function_for_construct", Prologue);
+    return entryOSR(exec, pc, &jsCast<JSFunction*>(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForConstruct), "entry_osr_function_for_construct", Prologue);
 }
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_call_arityCheck)
 {
-    return entryOSR(exec, pc, &asFunction(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForCall), "entry_osr_function_for_call_arityCheck", ArityCheck);
+    return entryOSR(exec, pc, &jsCast<JSFunction*>(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForCall), "entry_osr_function_for_call_arityCheck", ArityCheck);
 }
 
 LLINT_SLOW_PATH_DECL(entry_osr_function_for_construct_arityCheck)
 {
-    return entryOSR(exec, pc, &asFunction(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForConstruct), "entry_osr_function_for_construct_arityCheck", ArityCheck);
+    return entryOSR(exec, pc, &jsCast<JSFunction*>(exec->callee())->jsExecutable()->generatedBytecodeFor(CodeForConstruct), "entry_osr_function_for_construct_arityCheck", ArityCheck);
 }
 
 LLINT_SLOW_PATH_DECL(loop_osr)
@@ -452,7 +451,7 @@ LLINT_SLOW_PATH_DECL(slow_path_create_arguments)
 LLINT_SLOW_PATH_DECL(slow_path_create_this)
 {
     LLINT_BEGIN();
-    JSFunction* constructor = asFunction(exec->callee());
+    JSFunction* constructor = jsCast<JSFunction*>(exec->callee());
     
 #if !ASSERT_DISABLED
     ConstructData constructData;
@@ -700,31 +699,6 @@ LLINT_SLOW_PATH_DECL(slow_path_typeof)
 {
     LLINT_BEGIN();
     LLINT_RETURN(jsTypeStringForValue(exec, LLINT_OP_C(2).jsValue()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_undefined)
-{
-    LLINT_BEGIN();
-    JSValue v = LLINT_OP_C(2).jsValue();
-    LLINT_RETURN(jsBoolean(v.isCell() ? v.asCell()->structure()->typeInfo().masqueradesAsUndefined() : v.isUndefined()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_boolean)
-{
-    LLINT_BEGIN();
-    LLINT_RETURN(jsBoolean(LLINT_OP_C(2).jsValue().isBoolean()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_number)
-{
-    LLINT_BEGIN();
-    LLINT_RETURN(jsBoolean(LLINT_OP_C(2).jsValue().isNumber()));
-}
-
-LLINT_SLOW_PATH_DECL(slow_path_is_string)
-{
-    LLINT_BEGIN();
-    LLINT_RETURN(jsBoolean(isJSString(LLINT_OP_C(2).jsValue())));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_is_object)
@@ -982,9 +956,6 @@ inline JSValue getByVal(ExecState* exec, JSValue baseValue, JSValue subscript)
         if (isJSString(baseValue) && asString(baseValue)->canGetIndex(i))
             return asString(baseValue)->getIndex(exec, i);
         
-        if (isJSByteArray(baseValue) && asByteArray(baseValue)->canAccessIndex(i))
-            return asByteArray(baseValue)->getIndex(exec, i);
-        
         return baseValue.get(exec, i);
     }
     
@@ -1015,7 +986,7 @@ LLINT_SLOW_PATH_DECL(slow_path_get_argument_by_val)
 LLINT_SLOW_PATH_DECL(slow_path_get_by_pname)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(getByVal(exec, LLINT_OP(2).jsValue(), LLINT_OP(3).jsValue()));
+    LLINT_RETURN(getByVal(exec, LLINT_OP_C(2).jsValue(), LLINT_OP_C(3).jsValue()));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_put_by_val)
@@ -1035,18 +1006,6 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_val)
             else
                 JSArray::putByIndex(jsArray, exec, i, value, exec->codeBlock()->isStrictMode());
             LLINT_END();
-        }
-        if (isJSByteArray(baseValue)
-            && asByteArray(baseValue)->canAccessIndex(i)) {
-            JSByteArray* jsByteArray = asByteArray(baseValue);
-            if (value.isInt32()) {
-                jsByteArray->setIndex(i, value.asInt32());
-                LLINT_END();
-            }
-            if (value.isNumber()) {
-                jsByteArray->setIndex(i, value.asNumber());
-                LLINT_END();
-            }
         }
         baseValue.putByIndex(exec, i, value, exec->codeBlock()->isStrictMode());
         LLINT_END();
@@ -1254,7 +1213,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
 {
     ExecState* exec = execCallee->callerFrame();
     JSGlobalData& globalData = exec->globalData();
-    
+
     execCallee->setScopeChain(exec->scopeChain());
     execCallee->setCodeBlock(0);
     execCallee->clearReturnPC();
@@ -1266,6 +1225,8 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
         ASSERT(callType != CallTypeJS);
     
         if (callType == CallTypeHost) {
+            NativeCallFrameTracer tracer(&globalData, execCallee);
+            execCallee->setCallee(asObject(callee));
             globalData.hostCallReturnValue = JSValue::decode(callData.native.function(execCallee));
             
             LLINT_CALL_RETURN(execCallee, pc, reinterpret_cast<void*>(getHostCallReturnValue));
@@ -1287,6 +1248,8 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
     ASSERT(constructType != ConstructTypeJS);
     
     if (constructType == ConstructTypeHost) {
+        NativeCallFrameTracer tracer(&globalData, execCallee);
+        execCallee->setCallee(asObject(callee));
         globalData.hostCallReturnValue = JSValue::decode(constructData.native.function(execCallee));
 
         LLINT_CALL_RETURN(execCallee, pc, reinterpret_cast<void*>(getHostCallReturnValue));
@@ -1310,7 +1273,7 @@ inline SlowPathReturnType setUpCall(ExecState* execCallee, Instruction* pc, Code
     if (!calleeAsFunctionCell)
         return handleHostCall(execCallee, pc, calleeAsValue, kind);
     
-    JSFunction* callee = asFunction(calleeAsFunctionCell);
+    JSFunction* callee = jsCast<JSFunction*>(calleeAsFunctionCell);
     ScopeChainNode* scope = callee->scopeUnchecked();
     JSGlobalData& globalData = *scope->globalData;
     execCallee->setScopeChain(scope);

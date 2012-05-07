@@ -25,7 +25,7 @@
 
 (function () {
 
-module("iu");
+module("ui");
 
 var kExampleResultsByTest = {
     "scrollbars/custom-scrollbar-with-incomplete-style.html": {
@@ -45,6 +45,31 @@ var kExampleResultsByTest = {
         }
     }
 }
+
+test("ui.onebar", 3, function() {
+    if (window.location.hash) {
+        window.location.hash = '';
+    }
+
+    onebar = new ui.onebar();
+    onebar.attach();
+    equal(onebar.innerHTML,
+        '<ul class="ui-tabs-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all">' +
+            '<li class="ui-state-default ui-corner-top ui-tabs-selected ui-state-active"><a href="#unexpected">Unexpected Failures</a></li>' +
+            '<li class="ui-state-default ui-corner-top"><a href="#expected">Expected Failures</a></li>' +
+            '<li class="ui-state-default ui-corner-top ui-state-disabled"><a href="#results">Results</a></li>' +
+        '</ul>' +
+        '<div id="unexpected" class="ui-tabs-panel ui-widget-content ui-corner-bottom"></div>' +
+        '<div id="expected" class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide"></div>' +
+        '<div id="results" class="ui-tabs-panel ui-widget-content ui-corner-bottom ui-tabs-hide"></div>');
+
+    onebar.select('expected');
+    equal(window.location.hash, '#expected');
+    onebar.select('unexpected');
+    equal(window.location.hash, '#unexpected');
+
+    $(onebar).detach();
+});
 
 test("results.ResultsGrid", 1, function() {
     var grid = new ui.results.ResultsGrid()
@@ -119,17 +144,57 @@ test("time", 6, function() {
     equal(time.date().getTime(), tenMinutesAgo.getTime());
 });
 
-test("MessageBox", 1, function() {
-    var messageBox = new ui.MessageBox('The Title', 'First message');
-    messageBox.addMessage('Second Message');
-    equal(messageBox.outerHTML,
-        '<div class="ui-dialog-content ui-widget-content" style="width: auto; min-height: 132px; height: auto; " scrolltop="0" scrollleft="0">' +
-            '<div>' +
-                '<div class="message">First message</div>' +
+test("StatusArea", 3, function() {
+    var statusArea = new ui.StatusArea();
+    var id = statusArea.newId();
+    statusArea.addMessage(id, 'First Message');
+    statusArea.addMessage(id, 'Second Message');
+    equal(statusArea.outerHTML,
+        '<div class="status processing" style="visibility: visible; ">' +
+            '<ul class="actions"><li><button class="action">Close</button></li></ul>' +
+            '<div class="process-text">Processing...</div>' +
+            '<div id="status-content-1" class="status-content">' +
+                '<div class="message">First Message</div>' +
                 '<div class="message">Second Message</div>' +
             '</div>' +
         '</div>');
-    messageBox.close();
+
+    var secondStatusArea = new ui.StatusArea();
+    var secondId = secondStatusArea.newId();
+    secondStatusArea.addMessage(secondId, 'First Message second id');
+
+    equal(statusArea.outerHTML,
+        '<div class="status processing" style="visibility: visible; ">' +
+            '<ul class="actions"><li><button class="action">Close</button></li></ul>' +
+            '<div class="process-text">Processing...</div>' +
+            '<div id="status-content-1" class="status-content">' +
+                '<div class="message">First Message</div>' +
+                '<div class="message">Second Message</div>' +
+            '</div>' +
+            '<div id="status-content-2" class="status-content">' +
+                '<div class="message">First Message second id</div>' +
+            '</div>' +
+        '</div>');
+
+    statusArea.addFinalMessage(id, 'Final Message 1');
+    statusArea.addFinalMessage(secondId, 'Final Message 2');
+
+    equal(statusArea.outerHTML,
+        '<div class="status" style="visibility: visible; ">' +
+            '<ul class="actions"><li><button class="action">Close</button></li></ul>' +
+            '<div class="process-text">Processing...</div>' +
+            '<div id="status-content-1" class="status-content">' +
+                '<div class="message">First Message</div>' +
+                '<div class="message">Second Message</div>' +
+                '<div class="message">Final Message 1</div>' +
+            '</div>' +
+            '<div id="status-content-2" class="status-content">' +
+                '<div class="message">First Message second id</div>' +
+                '<div class="message">Final Message 2</div>' +
+            '</div>' +
+        '</div>');
+
+    statusArea.close();
 });
 
 })();

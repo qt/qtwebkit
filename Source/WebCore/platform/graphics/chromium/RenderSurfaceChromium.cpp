@@ -42,6 +42,9 @@ RenderSurfaceChromium::RenderSurfaceChromium(LayerChromium* owningLayer)
     , m_maskLayer(0)
     , m_skipsDraw(false)
     , m_drawOpacity(1)
+    , m_drawOpacityIsAnimating(false)
+    , m_targetSurfaceTransformsAreAnimating(false)
+    , m_screenSpaceTransformsAreAnimating(false)
     , m_nearestAncestorThatMovesPixels(0)
 {
 }
@@ -59,6 +62,11 @@ FloatRect RenderSurfaceChromium::drawableContentRect() const
         drawableContentRect.unite(m_replicaDrawTransform.mapRect(localContentRect));
 
     return drawableContentRect;
+}
+
+bool RenderSurfaceChromium::hasReplica() const
+{
+    return m_owningLayer->replicaLayer();
 }
 
 }

@@ -29,9 +29,10 @@
  */
 
 #include "config.h"
-#include "WorkerDebuggerAgent.h"
 
 #if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#include "WorkerDebuggerAgent.h"
+
 #include "ScriptDebugServer.h"
 #include "WorkerContext.h"
 #include "WorkerThread.h"
@@ -121,6 +122,16 @@ void WorkerDebuggerAgent::stopListeningScriptDebugServer()
 WorkerScriptDebugServer& WorkerDebuggerAgent::scriptDebugServer()
 {
     return m_scriptDebugServer;
+}
+
+void WorkerDebuggerAgent::muteConsole()
+{
+    // We don't need to mute console for workers.
+}
+
+void WorkerDebuggerAgent::unmuteConsole()
+{
+    // We don't need to mute console for workers.
 }
 
 } // namespace WebCore

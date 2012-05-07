@@ -68,38 +68,31 @@ void RenderMathMLSubSup::addChild(RenderObject* child, RenderObject* beforeChild
     // Note: The RenderMathMLBlock only allows element children to be added.
     Element* childElement = toElement(child->node());
 
-    if (!childElement->previousElementSibling()) {
+    if (childElement && !childElement->previousElementSibling()) {
         // Position 1 is always the base of the msub/msup/msubsup.
-        RenderMathMLBlock* wrapper = new (renderArena()) RenderMathMLBlock(node());
-        RefPtr<RenderStyle> wrapperStyle = RenderStyle::create();
-        wrapperStyle->inheritFrom(style());
-        wrapperStyle->setDisplay(INLINE_BLOCK);
-        wrapperStyle->setVerticalAlign(BASELINE);
-        wrapper->setStyle(wrapperStyle.release());
-        RenderMathMLBlock::addChild(wrapper, firstChild());
-        wrapper->addChild(child);
+        RenderBlock* baseWrapper = createAlmostAnonymousBlock(INLINE_BLOCK);
+        RenderMathMLBlock::addChild(baseWrapper, firstChild());
+        baseWrapper->addChild(child);
             
         // Make sure we have a script block for rendering.
         if (m_kind == SubSup && !m_scripts) {
-            m_scripts = new (renderArena()) RenderMathMLBlock(node());
-            RefPtr<RenderStyle> scriptsStyle = RenderStyle::create();
-            scriptsStyle->inheritFrom(style());
-            scriptsStyle->setDisplay(INLINE_BLOCK);
+            RefPtr<RenderStyle> scriptsStyle = RenderStyle::createAnonymousStyleWithDisplay(style(), INLINE_BLOCK);
             scriptsStyle->setVerticalAlign(TOP);
             scriptsStyle->setMarginLeft(Length(gSubsupScriptMargin, Fixed));
             scriptsStyle->setTextAlign(LEFT);
             // Set this wrapper's font-size for its line-height & baseline position.
             scriptsStyle->setBlendedFontSize(static_cast<int>(0.75 * style()->fontSize()));
-            m_scripts->setStyle(scriptsStyle.release());
+            m_scripts = new (renderArena()) RenderMathMLBlock(node());
+            m_scripts->setStyle(scriptsStyle);
             RenderMathMLBlock::addChild(m_scripts, beforeChild);
         }
     } else {
         if (m_kind == SubSup) {
-            RenderBlock* script = new (renderArena()) RenderMathMLBlock(node());
-            RefPtr<RenderStyle> scriptStyle = RenderStyle::create();
-            scriptStyle->inheritFrom(m_scripts->style());
-            scriptStyle->setDisplay(BLOCK);
-            script->setStyle(scriptStyle.release());
+            ASSERT(childElement);
+            if (!childElement)
+                return;
+
+            RenderBlock* script = m_scripts->createAlmostAnonymousBlock();
 
             // The order is always backwards so the first script is the subscript and the superscript 
             // is last. That means the superscript is the first to render vertically.
@@ -121,13 +114,6 @@ RenderMathMLOperator* RenderMathMLSubSup::unembellishedOperator()
     if (!base || !base->isRenderMathMLBlock())
         return 0;
     return toRenderMathMLBlock(base)->unembellishedOperator();
-}
-
-void RenderMathMLSubSup::stretchToHeight(int height)
-{
-    RenderBoxModelObject* base = this->base();
-    if (base && base->isRenderMathMLBlock())
-        toRenderMathMLBlock(base)->stretchToHeight(height);
 }
 
 void RenderMathMLSubSup::layout()
@@ -175,15 +161,15 @@ void RenderMathMLSubSup::layout()
         basePaddingTop = 0;
     }
     
-    setChildNeedsLayout(true, false);
+    setChildNeedsLayout(true, MarkOnlyThis);
     
     RenderObject* baseWrapper = firstChild();
     baseWrapper->style()->setPaddingTop(Length(basePaddingTop, Fixed));
-    baseWrapper->setNeedsLayout(true, false);
+    baseWrapper->setNeedsLayout(true, MarkOnlyThis);
     
     superscriptWrapper->style()->setPaddingBottom(Length(superPaddingBottom, Fixed));
-    superscriptWrapper->setNeedsLayout(true, false);
-    m_scripts->setNeedsLayout(true, false);
+    superscriptWrapper->setNeedsLayout(true, MarkOnlyThis);
+    m_scripts->setNeedsLayout(true, MarkOnlyThis);
     
     RenderBlock::layout();
 }

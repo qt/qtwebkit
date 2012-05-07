@@ -59,7 +59,7 @@ public:
     // be used on any other thread.
     static PassRefPtr<GraphicsContext3D> createGraphicsContextFromWebContext(PassOwnPtr<WebKit::WebGraphicsContext3D>, GraphicsContext3D::RenderStyle, bool preserveDrawingBuffer = false);
 
-    ~GraphicsContext3DPrivate();
+    virtual ~GraphicsContext3DPrivate();
 
     // Helper function to provide access to the lower-level WebGraphicsContext3D,
     // which is needed for subordinate contexts like WebGL's to share resources
@@ -164,6 +164,7 @@ public:
     void getRenderbufferParameteriv(GC3Denum target, GC3Denum pname, GC3Dint* value);
     void getShaderiv(Platform3DObject, GC3Denum pname, GC3Dint* value);
     String getShaderInfoLog(Platform3DObject);
+    void getShaderPrecisionFormat(GC3Denum shaderType, GC3Denum precisionType, GC3Dint* range, GC3Dint* precision);
 
     String getShaderSource(Platform3DObject);
     String getString(GC3Denum name);
@@ -282,6 +283,10 @@ public:
     // GL_CHROMIUM_set_visibility
     void setVisibilityCHROMIUM(bool);
 
+    // GL_EXT_discard_framebuffer
+    virtual void discardFramebufferEXT(GC3Denum target, GC3Dsizei numAttachments, const GC3Denum* attachments);
+    virtual void ensureFramebufferCHROMIUM();
+
     // GL_CHROMIUM_gpu_memory_manager
     void setGpuMemoryAllocationChangedCallbackCHROMIUM(PassOwnPtr<Extensions3DChromium::GpuMemoryAllocationChangedCallbackCHROMIUM>);
 
@@ -306,6 +311,15 @@ public:
 
     // GL_EXT_texture_storage
     void texStorage2DEXT(GC3Denum target, GC3Dint levels, GC3Duint internalformat, GC3Dint width, GC3Dint height);
+
+    // GL_EXT_occlusion_query
+    Platform3DObject createQueryEXT();
+    void deleteQueryEXT(Platform3DObject);
+    GC3Dboolean isQueryEXT(Platform3DObject);
+    void beginQueryEXT(GC3Denum, Platform3DObject);
+    void endQueryEXT(GC3Denum);
+    void getQueryivEXT(GC3Denum, GC3Denum, GC3Dint*);
+    void getQueryObjectuivEXT(Platform3DObject, GC3Denum, GC3Duint*);
 
 private:
     GraphicsContext3DPrivate(PassOwnPtr<WebKit::WebGraphicsContext3D>, bool preserveDrawingBuffer);

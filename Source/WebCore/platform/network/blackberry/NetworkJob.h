@@ -67,9 +67,7 @@ public:
     void updateDeferLoadingCount(int delta);
     virtual void notifyStatusReceived(int status, const char* message);
     void handleNotifyStatusReceived(int status, const String& message);
-    virtual void notifyWMLOverride();
-    void handleNotifyWMLOverride() { m_response.setIsWML(true); }
-    virtual void notifyHeaderReceived(const char* key, const char* value);
+    virtual void notifyHeadersReceived(BlackBerry::Platform::NetworkRequest::HeaderList& headers);
     virtual void notifyMultipartHeaderReceived(const char* key, const char* value);
     // Exists only to resolve ambiguity between char* and String parameters
     void notifyStringHeaderReceived(const String& key, const String& value);
@@ -145,7 +143,7 @@ private:
 
     bool isError(int statusCode)
     {
-        return statusCode < 0 || (!m_isXHR && (400 <= statusCode && statusCode < 600));
+        return statusCode < 0 || (400 <= statusCode && statusCode < 600);
     }
 
 private:
@@ -174,7 +172,6 @@ private:
     bool m_dataReceived;
     bool m_responseSent;
     bool m_callingClient;
-    bool m_isXHR; // FIXME - After 7.0, remove this. Only the Qt port reports HTTP error statuses as didFails, so we probably shouldn't.
     bool m_needsRetryAsFTPDirectory;
     bool m_isOverrideContentType;
 

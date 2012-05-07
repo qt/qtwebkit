@@ -34,6 +34,7 @@
 #import "FloatConversion.h"
 #import "GraphicsContext.h"
 #import "GraphicsLayerCA.h"
+#import "LengthFunctions.h"
 #import "WebLayer.h"
 #import "WebTiledLayer.h"
 #import "WebTileCacheLayer.h"
@@ -238,7 +239,10 @@ PlatformCALayer::~PlatformCALayer()
     setOwner(0);
     
     // Remove the owner pointer from the delegate in case there is a pending animationStarted event.
-    [static_cast<WebAnimationDelegate*>(m_delegate.get()) setOwner:nil];        
+    [static_cast<WebAnimationDelegate*>(m_delegate.get()) setOwner:nil];
+
+    if (m_layerType == LayerTypeTileCacheLayer)
+        [static_cast<WebTileCacheLayer *>(m_layer.get()) invalidate];
 }
 
 PlatformCALayer* PlatformCALayer::platformCALayer(void* platformLayer)
@@ -708,7 +712,13 @@ void PlatformCALayer::setOpacity(float value)
 void PlatformCALayer::setFilters(const FilterOperations& filters)
 {
     if (!filters.size()) {
-        [m_layer.get() setFilters:0];
+        BEGIN_BLOCK_OBJC_EXCEPTIONS
+        [m_layer.get() setFilters:nil];
+        [m_layer.get() setShadowOffset:CGSizeZero];
+        [m_layer.get() setShadowColor:nil];
+        [m_layer.get() setShadowRadius:0];
+        [m_layer.get() setShadowOpacity:0];
+        END_BLOCK_OBJC_EXCEPTIONS
         return;
     }
     
@@ -823,7 +833,7 @@ void PlatformCALayer::setFilters(const FilterOperations& filters)
             const BlurFilterOperation* op = static_cast<const BlurFilterOperation*>(filterOperation);
             CIFilter* caFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
             [caFilter setDefaults];
-            [caFilter setValue:[NSNumber numberWithFloat:op->stdDeviation().calcFloatValue(0)] forKey:@"inputRadius"];
+            [caFilter setValue:[NSNumber numberWithFloat:floatValueForLength(op->stdDeviation(), 0)] forKey:@"inputRadius"];
             [caFilter setName:filterName];
             [array.get() addObject:caFilter];
             break;
@@ -956,13 +966,13 @@ void PlatformCALayer::setContentsScale(float value)
 #endif
 }
 
-void PlatformCALayer::visibleRectChanged(const IntRect& visibleRect)
+TiledBacking* PlatformCALayer::tiledBacking()
 {
     if (m_layerType != LayerTypeTileCacheLayer)
-        return;
+        return 0;
 
     WebTileCacheLayer *tileCacheLayer = static_cast<WebTileCacheLayer *>(m_layer.get());
-    [tileCacheLayer visibleRectChanged:visibleRect];
+    return [tileCacheLayer tiledBacking];
 }
 
 #if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)

@@ -61,9 +61,12 @@ SocketStreamHandleInternal::~SocketStreamHandleInternal()
 
 void SocketStreamHandleInternal::connect(const KURL& url)
 {
-    m_socket = adoptPtr(webKitPlatformSupport()->createSocketStreamHandle());
+    m_socket = adoptPtr(WebKit::Platform::current()->createSocketStreamHandle());
     LOG(Network, "connect");
     ASSERT(m_socket);
+    ASSERT(m_handle);
+    if (m_handle->m_client)
+        m_handle->m_client->willOpenSocketStream(m_handle);
     m_socket->connect(url, this);
 }
 
@@ -89,7 +92,8 @@ int SocketStreamHandleInternal::send(const char* data, int len)
 void SocketStreamHandleInternal::close()
 {
     LOG(Network, "close");
-    m_socket->close();
+    if (m_socket)
+        m_socket->close();
 }
     
 void SocketStreamHandleInternal::didOpenStream(WebSocketStreamHandle* socketHandle, int maxPendingSendAllowed)

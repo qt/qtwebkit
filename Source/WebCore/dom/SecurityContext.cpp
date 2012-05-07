@@ -34,7 +34,8 @@
 namespace WebCore {
 
 SecurityContext::SecurityContext()
-    : m_haveInitializedSecurityOrigin(false)
+    : m_mayDisplaySeamlessWithParent(false)
+    , m_haveInitializedSecurityOrigin(false)
     , m_sandboxFlags(SandboxNone)
 {
 }
@@ -49,7 +50,7 @@ void SecurityContext::setSecurityOrigin(PassRefPtr<SecurityOrigin> securityOrigi
     m_haveInitializedSecurityOrigin = true;
 }
 
-void SecurityContext::setContentSecurityPolicy(PassRefPtr<ContentSecurityPolicy> contentSecurityPolicy)
+void SecurityContext::setContentSecurityPolicy(PassOwnPtr<ContentSecurityPolicy> contentSecurityPolicy)
 {
     m_contentSecurityPolicy = contentSecurityPolicy;
 }

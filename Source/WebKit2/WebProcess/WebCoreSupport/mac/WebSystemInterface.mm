@@ -115,6 +115,8 @@ void InitWebCoreSystemInterface(void)
         INIT(SetHTTPCookiesForURL);
         INIT(DeleteHTTPCookie);
 
+        INIT(SetMetadataURL);
+        
 #if !defined(BUILDING_ON_SNOW_LEOPARD)
         INIT(IOSurfaceContextCreate);
         INIT(IOSurfaceContextCreateImage);
@@ -163,6 +165,19 @@ void InitWebCoreSystemInterface(void)
 #if !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
         INIT(GetMacOSXVersionString);
         INIT(ExecutableWasLinkedOnOrBeforeLion);
+#endif
+
+#if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
+        INIT(CGPathAddRoundedRect);
+#endif
+
+#if PLATFORM(MAC) && !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION) && !PLATFORM(IOS)
+        INIT(FilterIsManagedSession);
+        INIT(FilterCreateInstance);
+        INIT(FilterRelease);
+        INIT(FilterWasBlocked);
+        INIT(FilterAddData);
+        INIT(FilterDataComplete);
 #endif
 
     });

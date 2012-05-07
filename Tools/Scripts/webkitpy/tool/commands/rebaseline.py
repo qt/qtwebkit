@@ -38,15 +38,17 @@ from webkitpy.common.net.buildbot import BuildBot
 from webkitpy.common.net.layouttestresults import LayoutTestResults
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.user import User
+from webkitpy.common.system.zipfileset import ZipFileSet
 from webkitpy.layout_tests.controllers.test_result_writer import TestResultWriter
 from webkitpy.layout_tests.models import test_failures
+from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.models.test_expectations import TestExpectations
 from webkitpy.layout_tests.port import builders
 from webkitpy.tool.grammar import pluralize
 from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
 
 
-_baseline_suffix_list = ['png', 'txt']
+_baseline_suffix_list = ['png', 'wav', 'txt']
 
 
 # FIXME: Should TestResultWriter know how to compute this string?
@@ -57,28 +59,45 @@ def _baseline_name(fs, test_name, suffix):
 class RebaselineTest(AbstractDeclarativeCommand):
     name = "rebaseline-test"
     help_text = "Rebaseline a single test from a buildbot.  (Currently works only with build.chromium.org buildbots.)"
-    argument_names = "BUILDER_NAME TEST_NAME [PLATFORM_TO_MOVE_EXISTING_BASELINES_TO]"
+    argument_names = "BUILDER_NAME TEST_NAME [PLATFORMS_TO_MOVE_EXISTING_BASELINES_TO]"
 
-    def _results_url(self, builder_name):
+    def __init__(self, options=None, **kwargs):
+        super(RebaselineTest, self).__init__(options, **kwargs)
+        self._zip_file_sets = {}
+
+    def _results_zip_url(self, builder_name):
         # FIXME: Generalize this command to work with non-build.chromium.org builders.
-        builder = self._tool.chromium_buildbot().builder_with_name(builder_name)
-        return builder.accumulated_results_url()
+        return self._tool.chromium_buildbot().builder_with_name(builder_name).accumulated_results_url().replace('results/layout-test-results', 'layout-test-results.zip')
 
     def _baseline_directory(self, builder_name):
         port = self._tool.port_factory.get_from_builder_name(builder_name)
         return port.baseline_path()
 
-    def _copy_existing_baseline(self, platform_to_move_existing_baselines_to, test_name, suffix):
-        port = self._tool.port_factory.get(platform_to_move_existing_baselines_to)
-        old_baseline = port.expected_filename(test_name, "." + suffix)
-        if not self._tool.filesystem.exists(old_baseline):
-            print("No existing baseline for %s." % test_name)
-            return
+    def _copy_existing_baseline(self, platforms_to_move_existing_baselines_to, test_name, suffix):
+        old_baselines = []
+        new_baselines = []
 
-        new_baseline = self._tool.filesystem.join(port.baseline_path(), self._file_name_for_expected_result(test_name, suffix))
-        if self._tool.filesystem.exists(new_baseline):
-            print("Existing baseline at %s, not copying over it." % new_baseline)
-        else:
+        # Need to gather all the baseline paths before modifying the filesystem since
+        # the modifications can affect the results of port.expected_filename.
+        for platform in platforms_to_move_existing_baselines_to:
+            port = self._tool.port_factory.get(platform)
+            old_baseline = port.expected_filename(test_name, "." + suffix)
+            if not self._tool.filesystem.exists(old_baseline):
+                print("No existing baseline for %s." % test_name)
+                continue
+
+            new_baseline = self._tool.filesystem.join(port.baseline_path(), self._file_name_for_expected_result(test_name, suffix))
+            if self._tool.filesystem.exists(new_baseline):
+                print("Existing baseline at %s, not copying over it." % new_baseline)
+                continue
+
+            old_baselines.append(old_baseline)
+            new_baselines.append(new_baseline)
+
+        for i in range(len(old_baselines)):
+            old_baseline = old_baselines[i]
+            new_baseline = new_baselines[i]
+
             print("Copying baseline from %s to %s." % (old_baseline, new_baseline))
             self._tool.filesystem.maybe_make_directory(self._tool.filesystem.dirname(new_baseline))
             self._tool.filesystem.copyfile(old_baseline, new_baseline)
@@ -94,6 +113,17 @@ class RebaselineTest(AbstractDeclarativeCommand):
         if not self._tool.scm().exists(target_baseline):
             self._tool.scm().add(target_baseline)
 
+    def _update_expectations_file(self, builder_name, test_name):
+        port = self._tool.port_factory.get_from_builder_name(builder_name)
+        expectationsString = port.test_expectations()
+        expectations = TestExpectations(port, None, expectationsString, port.test_configuration())
+
+        for test_configuration in port.all_test_configurations():
+            if test_configuration.version == port.test_configuration().version:
+                expectationsString = expectations.remove_configuration_from_test(test_name, test_configuration)
+
+        self._tool.filesystem.write_text_file(port.path_to_test_expectations_file(), expectationsString)
+
     def _test_root(self, test_name):
         return os.path.splitext(test_name)[0]
 
@@ -103,27 +133,47 @@ class RebaselineTest(AbstractDeclarativeCommand):
     def _file_name_for_expected_result(self, test_name, suffix):
         return "%s-expected.%s" % (self._test_root(test_name), suffix)
 
-    def _rebaseline_test(self, builder_name, test_name, platform_to_move_existing_baselines_to, suffix):
-        results_url = self._results_url(builder_name)
+    def _zip_file_set(self, url):
+        return ZipFileSet(url)
+
+    def _fetch_baseline(self, builder_name, test_name, suffix):
+        # FIXME: See https://bugs.webkit.org/show_bug.cgi?id=84762 ... fetching the whole
+        # zip file and then extracting individual results is much slower than just fetching
+        # the result directly from the buildbot, but it guarantees that we are getting correct results.
+        member_name = self._file_name_for_actual_result(test_name, suffix)
+        zip_url = self._results_zip_url(builder_name)
+        if not builder_name in self._zip_file_sets:
+            print "Retrieving " + zip_url
+            self._zip_file_sets[builder_name] = self._zip_file_set(zip_url)
+
+        try:
+            data = self._zip_file_sets[builder_name].read('layout-test-results/' + member_name)
+            print "  Found " + member_name
+            return data
+        except KeyError, e:
+            return None
+
+    def _rebaseline_test(self, builder_name, test_name, platforms_to_move_existing_baselines_to, suffix):
         baseline_directory = self._baseline_directory(builder_name)
 
-        source_baseline = "%s/%s" % (results_url, self._file_name_for_actual_result(test_name, suffix))
         target_baseline = self._tool.filesystem.join(baseline_directory, self._file_name_for_expected_result(test_name, suffix))
 
-        if platform_to_move_existing_baselines_to:
-            self._copy_existing_baseline(platform_to_move_existing_baselines_to, test_name, suffix)
+        if platforms_to_move_existing_baselines_to:
+            self._copy_existing_baseline(platforms_to_move_existing_baselines_to, test_name, suffix)
 
-        print "Retrieving %s." % source_baseline
-        self._save_baseline(self._tool.web.get_binary(source_baseline, convert_404_to_None=True), target_baseline)
+        self._save_baseline(self._fetch_baseline(builder_name, test_name, suffix), target_baseline)
+
+    def _rebaseline_test_and_update_expectations(self, builder_name, test_name, platforms_to_move_existing_baselines_to):
+        for suffix in _baseline_suffix_list:
+            self._rebaseline_test(builder_name, test_name, platforms_to_move_existing_baselines_to, suffix)
+        self._update_expectations_file(builder_name, test_name)
 
     def execute(self, options, args, tool):
-        for suffix in _baseline_suffix_list:
-            if len(args) > 2:
-                platform_to_move_existing_baselines_to = args[2]
-            else:
-                platform_to_move_existing_baselines_to = None
-
-            self._rebaseline_test(args[0], args[1], platform_to_move_existing_baselines_to, suffix)
+        if len(args) > 2:
+            platforms_to_move_existing_baselines_to = args[2:]
+        else:
+            platforms_to_move_existing_baselines_to = None
+        self._rebaseline_test_and_update_expectations(args[0], args[1], platforms_to_move_existing_baselines_to)
 
 
 class OptimizeBaselines(AbstractDeclarativeCommand):

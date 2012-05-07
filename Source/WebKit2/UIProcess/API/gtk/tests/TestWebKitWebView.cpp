@@ -332,6 +332,14 @@ static void testWebViewCreateReadyClose(UIClientTest* test, gconstpointer)
     g_assert_cmpint(events[2], ==, UIClientTest::Close);
 }
 
+static gboolean checkMimeTypeForFilter(GtkFileFilter* filter, const gchar* mimeType)
+{
+    GtkFileFilterInfo filterInfo;
+    filterInfo.contains = GTK_FILE_FILTER_MIME_TYPE;
+    filterInfo.mime_type = mimeType;
+    return gtk_file_filter_filter(filter, &filterInfo);
+}
+
 static void testWebViewJavaScriptDialogs(UIClientTest* test, gconstpointer)
 {
     static const char* htmlOnLoadFormat = "<html><body onLoad=\"%s\"></body></html>";
@@ -452,6 +460,252 @@ static void testWebViewZoomLevel(WebViewTest* test, gconstpointer)
     g_assert_cmpfloat(webkit_web_view_get_zoom_level(test->m_webView), ==, 2.5);
 }
 
+static void testWebViewRunJavaScript(WebViewTest* test, gconstpointer)
+{
+    static const char* html = "<html><body><a id='WebKitLink' href='http://www.webkitgtk.org/' title='WebKitGTK+ Title'>WebKitGTK+ Website</a></body></html>";
+    test->loadHtml(html, 0);
+    test->waitUntilLoadFinished();
+
+    GOwnPtr<GError> error;
+    WebKitJavascriptResult* javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.getElementById('WebKitLink').title;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    GOwnPtr<char> valueString(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "WebKitGTK+ Title");
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.getElementById('WebKitLink').href;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "http://www.webkitgtk.org/");
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.getElementById('WebKitLink').textContent", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    valueString.set(WebViewTest::javascriptResultToCString(javascriptResult));
+    g_assert_cmpstr(valueString.get(), ==, "WebKitGTK+ Website");
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("a = 25;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert_cmpfloat(WebViewTest::javascriptResultToNumber(javascriptResult), ==, 25);
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("a = 2.5;", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert_cmpfloat(WebViewTest::javascriptResultToNumber(javascriptResult), ==, 2.5);
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("a = true", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(WebViewTest::javascriptResultToBoolean(javascriptResult));
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("a = false", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(!WebViewTest::javascriptResultToBoolean(javascriptResult));
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("a = null", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(WebViewTest::javascriptResultIsNull(javascriptResult));
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("function Foo() { a = 25; } Foo();", &error.outPtr());
+    g_assert(javascriptResult);
+    g_assert(!error.get());
+    g_assert(WebViewTest::javascriptResultIsUndefined(javascriptResult));
+
+    javascriptResult = test->runJavaScriptAndWaitUntilFinished("foo();", &error.outPtr());
+    g_assert(!javascriptResult);
+    g_assert_error(error.get(), WEBKIT_JAVASCRIPT_ERROR, WEBKIT_JAVASCRIPT_ERROR_SCRIPT_FAILED);
+}
+
+class FileChooserTest: public UIClientTest {
+public:
+    MAKE_GLIB_TEST_FIXTURE(FileChooserTest);
+
+    FileChooserTest()
+    {
+        g_signal_connect(m_webView, "run-file-chooser", G_CALLBACK(runFileChooserCallback), this);
+    }
+
+    static gboolean runFileChooserCallback(WebKitWebView*, WebKitFileChooserRequest* request, FileChooserTest* test)
+    {
+        test->runFileChooser(request);
+        return TRUE;
+    }
+
+    void runFileChooser(WebKitFileChooserRequest* request)
+    {
+        assertObjectIsDeletedWhenTestFinishes(G_OBJECT(request));
+        m_fileChooserRequest = request;
+        g_main_loop_quit(m_mainLoop);
+    }
+
+    WebKitFileChooserRequest* clickMouseButtonAndWaitForFileChooserRequest(int x, int y)
+    {
+        clickMouseButton(x, y);
+        g_main_loop_run(m_mainLoop);
+        return m_fileChooserRequest.get();
+    }
+
+private:
+    GRefPtr<WebKitFileChooserRequest> m_fileChooserRequest;
+};
+
+static void testWebViewFileChooserRequest(FileChooserTest* test, gconstpointer)
+{
+    test->showInWindowAndWaitUntilMapped();
+    static const char* fileChooserHTMLFormat = "<html><body><input style='position:absolute;left:0;top:0;margin:0;padding:0' type='file' %s/></body></html>";
+
+    // Multiple selections not allowed, no MIME filtering.
+    GOwnPtr<char> simpleFileUploadHTML(g_strdup_printf(fileChooserHTMLFormat, ""));
+    test->loadHtml(simpleFileUploadHTML.get(), 0);
+    test->waitUntilLoadFinished();
+    WebKitFileChooserRequest* fileChooserRequest = test->clickMouseButtonAndWaitForFileChooserRequest(5, 5);
+    g_assert(!webkit_file_chooser_request_get_select_multiple(fileChooserRequest));
+
+    const gchar* const* mimeTypes = webkit_file_chooser_request_get_mime_types(fileChooserRequest);
+    g_assert(!mimeTypes);
+    GtkFileFilter* filter = webkit_file_chooser_request_get_mime_types_filter(fileChooserRequest);
+    g_assert(!filter);
+    const gchar* const* selectedFiles = webkit_file_chooser_request_get_selected_files(fileChooserRequest);
+    g_assert(!selectedFiles);
+    webkit_file_chooser_request_cancel(fileChooserRequest);
+
+    // Multiple selections allowed, no MIME filtering, some pre-selected files.
+    GOwnPtr<char> multipleSelectionFileUploadHTML(g_strdup_printf(fileChooserHTMLFormat, "multiple"));
+    test->loadHtml(multipleSelectionFileUploadHTML.get(), 0);
+    test->waitUntilLoadFinished();
+    fileChooserRequest = test->clickMouseButtonAndWaitForFileChooserRequest(5, 5);
+    g_assert(webkit_file_chooser_request_get_select_multiple(fileChooserRequest));
+
+    mimeTypes = webkit_file_chooser_request_get_mime_types(fileChooserRequest);
+    g_assert(!mimeTypes);
+    filter = webkit_file_chooser_request_get_mime_types_filter(fileChooserRequest);
+    g_assert(!filter);
+    selectedFiles = webkit_file_chooser_request_get_selected_files(fileChooserRequest);
+    g_assert(!selectedFiles);
+
+    // Select some files.
+    const gchar* filesToSelect[4] = { "/foo", "/foo/bar", "/foo/bar/baz", 0 };
+    webkit_file_chooser_request_select_files(fileChooserRequest, filesToSelect);
+
+    // Check the files that have been just selected.
+    selectedFiles = webkit_file_chooser_request_get_selected_files(fileChooserRequest);
+    g_assert(selectedFiles);
+    g_assert_cmpstr(selectedFiles[0], ==, "/foo");
+    g_assert_cmpstr(selectedFiles[1], ==, "/foo/bar");
+    g_assert_cmpstr(selectedFiles[2], ==, "/foo/bar/baz");
+    g_assert(!selectedFiles[3]);
+
+    // Perform another request to check if the list of files selected
+    // in the previous step appears now as part of the new request.
+    fileChooserRequest = test->clickMouseButtonAndWaitForFileChooserRequest(5, 5);
+    selectedFiles = webkit_file_chooser_request_get_selected_files(fileChooserRequest);
+    g_assert(selectedFiles);
+    g_assert_cmpstr(selectedFiles[0], ==, "/foo");
+    g_assert_cmpstr(selectedFiles[1], ==, "/foo/bar");
+    g_assert_cmpstr(selectedFiles[2], ==, "/foo/bar/baz");
+    g_assert(!selectedFiles[3]);
+    webkit_file_chooser_request_cancel(fileChooserRequest);
+
+    // Multiple selections not allowed, only accept images, audio and video files..
+    GOwnPtr<char> mimeFilteredFileUploadHTML(g_strdup_printf(fileChooserHTMLFormat, "accept='audio/*,video/*,image/*'"));
+    test->loadHtml(mimeFilteredFileUploadHTML.get(), 0);
+    test->waitUntilLoadFinished();
+    fileChooserRequest = test->clickMouseButtonAndWaitForFileChooserRequest(5, 5);
+    g_assert(!webkit_file_chooser_request_get_select_multiple(fileChooserRequest));
+
+    mimeTypes = webkit_file_chooser_request_get_mime_types(fileChooserRequest);
+    g_assert(mimeTypes);
+    g_assert_cmpstr(mimeTypes[0], ==, "audio/*");
+    g_assert_cmpstr(mimeTypes[1], ==, "video/*");
+    g_assert_cmpstr(mimeTypes[2], ==, "image/*");
+    g_assert(!mimeTypes[3]);
+
+    filter = webkit_file_chooser_request_get_mime_types_filter(fileChooserRequest);
+    g_assert(GTK_IS_FILE_FILTER(filter));
+    g_assert(checkMimeTypeForFilter(filter, "audio/*"));
+    g_assert(checkMimeTypeForFilter(filter, "video/*"));
+    g_assert(checkMimeTypeForFilter(filter, "image/*"));
+
+    selectedFiles = webkit_file_chooser_request_get_selected_files(fileChooserRequest);
+    g_assert(!selectedFiles);
+    webkit_file_chooser_request_cancel(fileChooserRequest);
+}
+
+class FullScreenClientTest: public WebViewTest {
+public:
+    MAKE_GLIB_TEST_FIXTURE(FullScreenClientTest);
+
+    enum FullScreenEvent {
+        None,
+        Enter,
+        Leave
+    };
+
+    static gboolean viewEnterFullScreenCallback(WebKitWebView*, FullScreenClientTest* test)
+    {
+        test->m_event = Enter;
+        g_main_loop_quit(test->m_mainLoop);
+        return FALSE;
+    }
+
+    static gboolean viewLeaveFullScreenCallback(WebKitWebView*, FullScreenClientTest* test)
+    {
+        test->m_event = Leave;
+        g_main_loop_quit(test->m_mainLoop);
+        return FALSE;
+    }
+
+    FullScreenClientTest()
+        : m_event(None)
+    {
+        webkit_settings_set_enable_fullscreen(webkit_web_view_get_settings(m_webView), TRUE);
+        g_signal_connect(m_webView, "enter-fullscreen", G_CALLBACK(viewEnterFullScreenCallback), this);
+        g_signal_connect(m_webView, "leave-fullscreen", G_CALLBACK(viewLeaveFullScreenCallback), this);
+    }
+
+    ~FullScreenClientTest()
+    {
+        g_signal_handlers_disconnect_matched(m_webView, G_SIGNAL_MATCH_DATA, 0, 0, 0, 0, this);
+    }
+
+    void requestFullScreenAndWaitUntilEnteredFullScreen()
+    {
+        m_event = None;
+        webkit_web_view_run_javascript(m_webView, "document.documentElement.webkitRequestFullScreen();", 0, 0);
+        g_main_loop_run(m_mainLoop);
+    }
+
+    static gboolean leaveFullScreenIdle(FullScreenClientTest* test)
+    {
+        test->keyStroke(GDK_KEY_Escape);
+        return FALSE;
+    }
+
+    void leaveFullScreenAndWaitUntilLeftFullScreen()
+    {
+        m_event = None;
+        g_idle_add(reinterpret_cast<GSourceFunc>(leaveFullScreenIdle), this);
+        g_main_loop_run(m_mainLoop);
+    }
+
+    FullScreenEvent m_event;
+};
+
+static void testWebViewFullScreen(FullScreenClientTest* test, gconstpointer)
+{
+    test->showInWindowAndWaitUntilMapped();
+    test->loadHtml("<html><body>FullScreen test</body></html>", 0);
+    test->waitUntilLoadFinished();
+    test->requestFullScreenAndWaitUntilEnteredFullScreen();
+    g_assert_cmpint(test->m_event, ==, FullScreenClientTest::Enter);
+    test->leaveFullScreenAndWaitUntilLeftFullScreen();
+    g_assert_cmpint(test->m_event, ==, FullScreenClientTest::Leave);
+}
+
 void beforeAll()
 {
     WebViewTest::add("WebKitWebView", "default-context", testWebViewDefaultContext);
@@ -463,6 +717,9 @@ void beforeAll()
     UIClientTest::add("WebKitWebView", "window-properties", testWebViewWindowProperties);
     UIClientTest::add("WebKitWebView", "mouse-target", testWebViewMouseTarget);
     WebViewTest::add("WebKitWebView", "zoom-level", testWebViewZoomLevel);
+    WebViewTest::add("WebKitWebView", "run-javascript", testWebViewRunJavaScript);
+    FileChooserTest::add("WebKitWebView", "file-chooser-request", testWebViewFileChooserRequest);
+    FullScreenClientTest::add("WebKitWebView", "fullscreen", testWebViewFullScreen);
 }
 
 void afterAll()

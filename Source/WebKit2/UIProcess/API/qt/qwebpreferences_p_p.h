@@ -29,6 +29,7 @@ public:
 
     enum WebAttribute {
         AutoLoadImages,
+        FullScreenEnabled,
         JavascriptEnabled,
         PluginsEnabled,
         OfflineWebApplicationCacheEnabled,
@@ -36,7 +37,8 @@ public:
         XSSAuditingEnabled,
         FrameFlatteningEnabled,
         PrivateBrowsingEnabled,
-        DnsPrefetchEnabled
+        DnsPrefetchEnabled,
+        DeveloperExtrasEnabled
     };
 
     enum FontFamily {
@@ -59,6 +61,7 @@ public:
     void setAttribute(WebAttribute attr, bool enable);
     bool testAttribute(WebAttribute attr) const;
 
+    void initializeDefaultFontSettings();
     void setFontFamily(FontFamily which, const QString& family);
     QString fontFamily(FontFamily which) const;
 

@@ -111,9 +111,7 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
     // FIXME: This should really be configurable; we shouldn't just blindly allow read access to the UI process bundle.
     parameters.uiProcessBundleResourcePath = [[NSBundle mainBundle] resourcePath];
 
-#if USE(CFURLSTORAGESESSIONS)
     parameters.uiProcessBundleIdentifier = String([[NSBundle mainBundle] bundleIdentifier]);
-#endif
     
     // Listen for enhanced accessibility changes and propagate them to the WebProcess.
     m_enhancedAccessibilityObserver = [[NSNotificationCenter defaultCenter] addObserverForName:WebKitApplicationDidChangeAccessibilityEnhancedUserInterfaceNotification object:nil queue:[NSOperationQueue currentQueue] usingBlock:^(NSNotification *note) {
@@ -201,6 +199,16 @@ void WebContext::getPasteboardUniqueName(String& pasteboardName)
 void WebContext::getPasteboardColor(const String& pasteboardName, WebCore::Color& color)
 {
     color = PlatformPasteboard(pasteboardName).color();    
+}
+
+void WebContext::getPasteboardURL(const String& pasteboardName, WTF::String& urlString)
+{
+    urlString = PlatformPasteboard(pasteboardName).url().string();
+}
+
+void WebContext::addPasteboardTypes(const String& pasteboardName, const Vector<String>& pasteboardTypes)
+{
+    PlatformPasteboard(pasteboardName).addTypes(pasteboardTypes);
 }
 
 void WebContext::setPasteboardTypes(const String& pasteboardName, const Vector<String>& pasteboardTypes)

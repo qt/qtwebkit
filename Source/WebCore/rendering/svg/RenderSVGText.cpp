@@ -6,6 +6,7 @@
  * Copyright (C) 2008 Rob Buis <buis@kde.org>
  * Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
  * Copyright (C) Research In Motion Limited 2010-2012. All rights reserved.
+ * Copyright (C) 2012 Google Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -104,7 +105,7 @@ void RenderSVGText::computeFloatRectForRepaint(RenderBoxModelObject* repaintCont
     SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
 }
 
-void RenderSVGText::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool /* fixed */, bool /* useTransforms */, TransformState& transformState, bool* wasFixed) const
+void RenderSVGText::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool /* fixed */, bool /* useTransforms */, TransformState& transformState, ApplyContainerFlipOrNot, bool* wasFixed) const
 {
     SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
 }
@@ -177,10 +178,12 @@ void RenderSVGText::layoutAttributesWillBeDestroyed(RenderSVGInlineText* text, V
         affectedAttributes.append(next);
 }
 
-void RenderSVGText::textDOMChanged()
+void RenderSVGText::invalidateTextPositioningElements()
 {
-    if (m_needsPositioningValuesUpdate)
-        return;
+    // Clear the text positioning elements. This should be called when either the children
+    // of a DOM text element have changed, or the length of the text in any child element
+    // has changed. Failure to clear may leave us with invalid elements, as other code paths
+    // do not always cause the position elements to be marked invalid before use.
     m_layoutAttributesBuilder.clearTextPositioningElements();
 }
 
@@ -330,7 +333,7 @@ void RenderSVGText::paint(PaintInfo& paintInfo, const LayoutPoint&)
     PaintInfo blockInfo(paintInfo);
     GraphicsContextStateSaver stateSaver(*blockInfo.context);
     blockInfo.applyTransform(localToParentTransform());
-    RenderBlock::paint(blockInfo, IntPoint());
+    RenderBlock::paint(blockInfo, LayoutPoint());
 }
 
 FloatRect RenderSVGText::strokeBoundingBox() const

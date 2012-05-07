@@ -26,6 +26,7 @@
 #ifndef WKBundlePage_h
 #define WKBundlePage_h
 
+#include <JavaScriptCore/JavaScript.h>
 #include <WebKit2/WKBase.h>
 #include <WebKit2/WKEvent.h>
 #include <WebKit2/WKFindOptions.h>
@@ -101,35 +102,45 @@ typedef void (*WKBundlePageDidClearWindowObjectForFrameCallback)(WKBundlePageRef
 typedef void (*WKBundlePageDidCancelClientRedirectForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, const void *clientInfo);
 typedef void (*WKBundlePageWillPerformClientRedirectForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, WKURLRef url, double delay, double date, const void *clientInfo);
 typedef void (*WKBundlePageDidHandleOnloadEventsForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef frame, const void *clientInfo);
+typedef bool (*WKBundlePageShouldGoToBackForwardListItemCallback)(WKBundlePageRef page, WKBundleBackForwardListItemRef item, WKTypeRef* userData, const void *clientInfo);
+typedef void (*WKBundlePageGlobalObjectIsAvailableForFrameCallback)(WKBundlePageRef page, WKBundleFrameRef, WKBundleScriptWorldRef, const void* clientInfo);
+typedef void (*WKBundlePageWillDisconnectDOMWindowExtensionFromGlobalObjectCallback)(WKBundlePageRef page, WKBundleDOMWindowExtensionRef, const void* clientInfo);
+typedef void (*WKBundlePageDidReconnectDOMWindowExtensionToGlobalObjectCallback)(WKBundlePageRef page, WKBundleDOMWindowExtensionRef, const void* clientInfo);
+typedef void (*WKBundlePageWillDestroyGlobalObjectForDOMWindowExtensionCallback)(WKBundlePageRef page, WKBundleDOMWindowExtensionRef, const void* clientInfo);
 
 struct WKBundlePageLoaderClient {
-    int                                                                 version;
-    const void *                                                        clientInfo;
+    int                                                                     version;
+    const void *                                                            clientInfo;
 
     // Version 0.
-    WKBundlePageDidStartProvisionalLoadForFrameCallback                 didStartProvisionalLoadForFrame;
-    WKBundlePageDidReceiveServerRedirectForProvisionalLoadForFrameCallback    didReceiveServerRedirectForProvisionalLoadForFrame;
-    WKBundlePageDidFailProvisionalLoadWithErrorForFrameCallback         didFailProvisionalLoadWithErrorForFrame;
-    WKBundlePageDidCommitLoadForFrameCallback                           didCommitLoadForFrame;
-    WKBundlePageDidFinishDocumentLoadForFrameCallback                   didFinishDocumentLoadForFrame;
-    WKBundlePageDidFinishLoadForFrameCallback                           didFinishLoadForFrame;
-    WKBundlePageDidFailLoadWithErrorForFrameCallback                    didFailLoadWithErrorForFrame;
-    WKBundlePageDidSameDocumentNavigationForFrameCallback               didSameDocumentNavigationForFrame;
-    WKBundlePageDidReceiveTitleForFrameCallback                         didReceiveTitleForFrame;
-    WKBundlePageDidFirstLayoutForFrameCallback                          didFirstLayoutForFrame;
-    WKBundlePageDidFirstVisuallyNonEmptyLayoutForFrameCallback          didFirstVisuallyNonEmptyLayoutForFrame;
-    WKBundlePageDidRemoveFrameFromHierarchyCallback                     didRemoveFrameFromHierarchy;
-    WKBundlePageDidDisplayInsecureContentForFrameCallback               didDisplayInsecureContentForFrame;
-    WKBundlePageDidRunInsecureContentForFrameCallback                   didRunInsecureContentForFrame;
-    WKBundlePageDidClearWindowObjectForFrameCallback                    didClearWindowObjectForFrame;
-    WKBundlePageDidCancelClientRedirectForFrameCallback                 didCancelClientRedirectForFrame;
-    WKBundlePageWillPerformClientRedirectForFrameCallback               willPerformClientRedirectForFrame;
-    WKBundlePageDidHandleOnloadEventsForFrameCallback                   didHandleOnloadEventsForFrame;
+    WKBundlePageDidStartProvisionalLoadForFrameCallback                     didStartProvisionalLoadForFrame;
+    WKBundlePageDidReceiveServerRedirectForProvisionalLoadForFrameCallback  didReceiveServerRedirectForProvisionalLoadForFrame;
+    WKBundlePageDidFailProvisionalLoadWithErrorForFrameCallback             didFailProvisionalLoadWithErrorForFrame;
+    WKBundlePageDidCommitLoadForFrameCallback                               didCommitLoadForFrame;
+    WKBundlePageDidFinishDocumentLoadForFrameCallback                       didFinishDocumentLoadForFrame;
+    WKBundlePageDidFinishLoadForFrameCallback                               didFinishLoadForFrame;
+    WKBundlePageDidFailLoadWithErrorForFrameCallback                        didFailLoadWithErrorForFrame;
+    WKBundlePageDidSameDocumentNavigationForFrameCallback                   didSameDocumentNavigationForFrame;
+    WKBundlePageDidReceiveTitleForFrameCallback                             didReceiveTitleForFrame;
+    WKBundlePageDidFirstLayoutForFrameCallback                              didFirstLayoutForFrame;
+    WKBundlePageDidFirstVisuallyNonEmptyLayoutForFrameCallback              didFirstVisuallyNonEmptyLayoutForFrame;
+    WKBundlePageDidRemoveFrameFromHierarchyCallback                         didRemoveFrameFromHierarchy;
+    WKBundlePageDidDisplayInsecureContentForFrameCallback                   didDisplayInsecureContentForFrame;
+    WKBundlePageDidRunInsecureContentForFrameCallback                       didRunInsecureContentForFrame;
+    WKBundlePageDidClearWindowObjectForFrameCallback                        didClearWindowObjectForFrame;
+    WKBundlePageDidCancelClientRedirectForFrameCallback                     didCancelClientRedirectForFrame;
+    WKBundlePageWillPerformClientRedirectForFrameCallback                   willPerformClientRedirectForFrame;
+    WKBundlePageDidHandleOnloadEventsForFrameCallback                       didHandleOnloadEventsForFrame;
 
     // Version 1.
-    WKBundlePageDidLayoutForFrameCallback                               didLayoutForFrame;
-    WKBundlePageDidNewFirstVisuallyNonEmptyLayoutCallback               didNewFirstVisuallyNonEmptyLayout;
-    WKBundlePageDidDetectXSSForFrameCallback                            didDetectXSSForFrame;
+    WKBundlePageDidLayoutForFrameCallback                                   didLayoutForFrame;
+    WKBundlePageDidNewFirstVisuallyNonEmptyLayoutCallback                   didNewFirstVisuallyNonEmptyLayout;
+    WKBundlePageDidDetectXSSForFrameCallback                                didDetectXSSForFrame;
+    WKBundlePageShouldGoToBackForwardListItemCallback                       shouldGoToBackForwardListItem;
+    WKBundlePageGlobalObjectIsAvailableForFrameCallback                     globalObjectIsAvailableForFrame;
+    WKBundlePageWillDisconnectDOMWindowExtensionFromGlobalObjectCallback    willDisconnectDOMWindowExtensionFromGlobalObject;
+    WKBundlePageDidReconnectDOMWindowExtensionToGlobalObjectCallback        didReconnectDOMWindowExtensionToGlobalObject;
+    WKBundlePageWillDestroyGlobalObjectForDOMWindowExtensionCallback        willDestroyGlobalObjectForDOMWindowExtension;
 };
 typedef struct WKBundlePageLoaderClient WKBundlePageLoaderClient;
 
@@ -272,20 +283,26 @@ typedef void (*WKBundlePageTextDidChangeInTextFieldCallback)(WKBundlePageRef pag
 typedef void (*WKBundlePageTextDidChangeInTextAreaCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlTextAreaElementHandle, WKBundleFrameRef frame, const void* clientInfo);
 typedef bool (*WKBundlePageShouldPerformActionInTextFieldCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlInputElementHandle, WKInputFieldActionType actionType, WKBundleFrameRef frame, const void* clientInfo);
 typedef void (*WKBundlePageWillSubmitFormCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlFormElementHandle, WKBundleFrameRef frame, WKBundleFrameRef sourceFrame, WKDictionaryRef values, WKTypeRef* userData, const void* clientInfo);
+typedef void (*WKBundlePageWillSendSubmitEventCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlFormElementHandle, WKBundleFrameRef frame, WKBundleFrameRef sourceFrame, WKDictionaryRef values, const void* clientInfo);
 
 struct WKBundlePageFormClient {
     int                                                                 version;
     const void *                                                        clientInfo;
+    
+    // Version 0.
     WKBundlePageTextFieldDidBeginEditingCallback                        textFieldDidBeginEditing;
     WKBundlePageTextFieldDidEndEditingCallback                          textFieldDidEndEditing;
     WKBundlePageTextDidChangeInTextFieldCallback                        textDidChangeInTextField;
     WKBundlePageTextDidChangeInTextAreaCallback                         textDidChangeInTextArea;
     WKBundlePageShouldPerformActionInTextFieldCallback                  shouldPerformActionInTextField;
     WKBundlePageWillSubmitFormCallback                                  willSubmitForm;
+    
+    // Version 1.
+    WKBundlePageWillSendSubmitEventCallback                             willSendSubmitEvent;
 };
 typedef struct WKBundlePageFormClient WKBundlePageFormClient;
 
-enum { kWKBundlePageFormClientCurrentVersion = 0 };
+enum { kWKBundlePageFormClientCurrentVersion = 1 };
 
 // ContextMenu client
 typedef void (*WKBundlePageGetContextMenuFromDefaultContextMenuCallback)(WKBundlePageRef page, WKBundleHitTestResultRef hitTestResult, WKArrayRef defaultMenu, WKArrayRef* newMenu, WKTypeRef* userData, const void* clientInfo);
@@ -303,17 +320,27 @@ enum { kWKBundlePageContextMenuClientCurrentVersion = 0 };
 typedef bool (*WKBundlePageSupportsFullScreen)(WKBundlePageRef page, WKFullScreenKeyboardRequestType requestType);
 typedef void (*WKBundlePageEnterFullScreenForElement)(WKBundlePageRef page, WKBundleNodeHandleRef element);
 typedef void (*WKBundlePageExitFullScreenForElement)(WKBundlePageRef page, WKBundleNodeHandleRef element);
+typedef void (*WKBundlePageBeganEnterFullScreen)(WKBundlePageRef page, WKRect initialFrame, WKRect finalFrame);
+typedef void (*WKBundlePageBeganExitFullScreen)(WKBundlePageRef page, WKRect initialFrame, WKRect finalFrame);
+typedef void (*WKBundlePageCloseFullScreen)(WKBundlePageRef page);
 
 struct WKBundlePageFullScreenClient {
     int                                                                 version;
     const void *                                                        clientInfo;
+
+    // Version 0:
     WKBundlePageSupportsFullScreen                                      supportsFullScreen;
     WKBundlePageEnterFullScreenForElement                               enterFullScreenForElement;
     WKBundlePageExitFullScreenForElement                                exitFullScreenForElement;
+
+    // Version 1:
+    WKBundlePageBeganEnterFullScreen                                    beganEnterFullScreen;
+    WKBundlePageBeganExitFullScreen                                     beganExitFullScreen;
+    WKBundlePageCloseFullScreen                                         closeFullScreen;
 };
 typedef struct WKBundlePageFullScreenClient WKBundlePageFullScreenClient;
 
-enum { kWKBundlePageFullScreenClientCurrentVersion = 0 };
+enum { kWKBundlePageFullScreenClientCurrentVersion = 1 };
 
 WK_EXPORT void WKBundlePageWillEnterFullScreen(WKBundlePageRef page);
 WK_EXPORT void WKBundlePageDidEnterFullScreen(WKBundlePageRef page);

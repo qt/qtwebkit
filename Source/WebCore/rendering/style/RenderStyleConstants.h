@@ -63,7 +63,8 @@ enum StyleDifference {
 enum StyleDifferenceContextSensitiveProperty {
     ContextSensitivePropertyNone = 0,
     ContextSensitivePropertyTransform = (1 << 0),
-    ContextSensitivePropertyOpacity = (1 << 1)
+    ContextSensitivePropertyOpacity = (1 << 1),
+    ContextSensitivePropertyFilter = (1 << 2)
 };
 
 // Static pseudo styles. Dynamic ones are produced on the fly.
@@ -97,7 +98,7 @@ enum EPosition {
 };
 
 enum EFloat {
-    NoFloat, LeftFloat, RightFloat, PositionedFloat
+    NoFloat, LeftFloat, RightFloat
 };
 
 enum EMarginCollapse { MCOLLAPSE, MSEPARATE, MDISCARD };
@@ -171,6 +172,7 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 enum EFlexPack { PackStart, PackEnd, PackCenter, PackJustify, PackDistribute };
 enum EFlexAlign { AlignAuto, AlignStart, AlignEnd, AlignCenter, AlignStretch, AlignBaseline };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
+enum EFlexLinePack { LinePackStart, LinePackEnd, LinePackCenter, LinePackJustify, LinePackDistribute, LinePackStretch };
 enum EFlexWrap { FlexWrapNone, FlexWrap, FlexWrapReverse };
 
 enum ETextSecurity {
@@ -458,7 +460,7 @@ enum LineSnap { LineSnapNone, LineSnapBaseline, LineSnapContain };
 
 enum LineAlign { LineAlignNone, LineAlignEdges };
 
-enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowLeft, WrapFlowRight, WrapFlowMaximum, WrapFlowClear };
+enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowStart, WrapFlowEnd, WrapFlowMaximum, WrapFlowClear };
 
 enum WrapThrough { WrapThroughWrap, WrapThroughNone };
 

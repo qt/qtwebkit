@@ -26,6 +26,8 @@
 #ifndef ContextMenuController_h
 #define ContextMenuController_h
 
+#if ENABLE(CONTEXT_MENUS)
+
 #include "HitTestResult.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
@@ -85,6 +87,9 @@ namespace WebCore {
         void createAndAppendTextDirectionSubMenu(ContextMenuItem&);
         void createAndAppendSubstitutionsSubMenu(ContextMenuItem&);
         void createAndAppendTransformationsSubMenu(ContextMenuItem&);
+#if PLATFORM(GTK)
+        void createAndAppendUnicodeSubMenu(ContextMenuItem&);
+#endif
 
         Page* m_page;
         ContextMenuClient* m_client;
@@ -95,4 +100,5 @@ namespace WebCore {
 
 }
 
+#endif // ENABLE(CONTEXT_MENUS)
 #endif

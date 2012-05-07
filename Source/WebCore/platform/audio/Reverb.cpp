@@ -51,6 +51,7 @@ using namespace VectorMath;
 
 // Empirical gain calibration tested across many impulse responses to ensure perceived volume is same as dry (unprocessed) signal
 const float GainCalibration = -58;
+const float GainCalibrationSampleRate = 44100;
 
 // A minimum power value to when normalizing a silent (or very quiet) impulse response
 const float MinPower = 0.000125f;
@@ -78,6 +79,10 @@ static float calculateNormalizationScale(AudioBus* response)
     float scale = 1 / power;
 
     scale *= powf(10, GainCalibration * 0.05f); // calibrate to make perceived volume same as unprocessed
+
+    // Scale depends on sample-rate.
+    if (response->sampleRate())
+        scale *= GainCalibrationSampleRate / response->sampleRate();
 
     // True-stereo compensation
     if (response->numberOfChannels() == 4)
@@ -226,6 +231,11 @@ void Reverb::reset()
 {
     for (size_t i = 0; i < m_convolvers.size(); ++i)
         m_convolvers[i]->reset();
+}
+
+size_t Reverb::latencyFrames() const
+{
+    return !m_convolvers.isEmpty() ? m_convolvers.first()->latencyFrames() : 0;
 }
 
 } // namespace WebCore

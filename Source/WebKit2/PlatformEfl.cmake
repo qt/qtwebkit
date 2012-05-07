@@ -7,7 +7,6 @@ LIST(APPEND WebKit2_LINK_FLAGS
 
 LIST(APPEND WebKit2_SOURCES
     Platform/efl/ModuleEfl.cpp
-    Platform/efl/RunLoopEfl.cpp
     Platform/efl/WorkQueueEfl.cpp
     Platform/unix/SharedMemoryUnix.cpp
 
@@ -32,6 +31,7 @@ LIST(APPEND WebKit2_SOURCES
 
     UIProcess/efl/TextCheckerEfl.cpp
     UIProcess/efl/WebContextEfl.cpp
+    UIProcess/efl/WebFullScreenManagerProxyEfl.cpp
     UIProcess/efl/WebInspectorEfl.cpp
     UIProcess/efl/WebPageProxyEfl.cpp
     UIProcess/efl/WebPreferencesEfl.cpp
@@ -71,7 +71,7 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/Downloads/efl"
     "${WEBKIT2_DIR}/WebProcess/efl"
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/efl"
-    ${Cairo_INCLUDE_DIRS}
+    ${CAIRO_INCLUDE_DIRS}
     ${ECORE_X_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
     ${EFLDEPS_INCLUDE_DIRS}
@@ -84,7 +84,7 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
 )
 
 LIST(APPEND WebKit2_LIBRARIES
-    ${Cairo_LIBRARIES}
+    ${CAIRO_LIBRARIES}
     ${ECORE_X_LIBRARIES}
     ${EFLDEPS_LIBRARIES}
     ${Freetype_LIBRARIES}
@@ -103,7 +103,7 @@ LIST (APPEND WebProcess_SOURCES
 )
 
 LIST (APPEND WebProcess_LIBRARIES
-    ${Cairo_LIBRARIES}
+    ${CAIRO_LIBRARIES}
     ${ECORE_X_LIBRARIES}
     ${EDJE_LIBRARIES}
     ${EFLDEPS_LIBRARIES}

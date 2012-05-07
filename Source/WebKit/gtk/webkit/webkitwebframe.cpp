@@ -51,7 +51,6 @@
 #include "RenderListItem.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
-#include "ReplaceSelectionCommand.h"
 #include "ScriptController.h"
 #include "SubstituteData.h"
 #include "TextIterator.h"
@@ -113,6 +112,7 @@ enum {
     RESOURCE_LOAD_FINISHED,
     RESOURCE_CONTENT_LENGTH_RECEIVED,
     RESOURCE_LOAD_FAILED,
+    INSECURE_CONTENT_RUN,
 
     LAST_SIGNAL
 };
@@ -431,6 +431,28 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
             G_TYPE_NONE, 2,
             WEBKIT_TYPE_WEB_RESOURCE,
             G_TYPE_POINTER);
+
+    /**
+     * WebKitWebFrame::insecure-content-run:
+     * @web_frame: the #WebKitWebFrame the response was received for.
+     * @security_origin: the #WebKitSecurityOrigin.
+     * @url: the url of the insecure content.
+     *
+     * Invoked when insecure content is run from a secure page. This happens
+     * when a page loaded via HTTPS loads a stylesheet, script, image or
+     * iframe from an unencrypted HTTP URL.
+     *
+     * Since: 1.10.0
+     */
+    webkit_web_frame_signals[INSECURE_CONTENT_RUN] = g_signal_new("insecure-content-run",
+            G_TYPE_FROM_CLASS(frameClass),
+            G_SIGNAL_RUN_LAST,
+            0,
+            0, 0,
+            webkit_marshal_VOID__OBJECT_STRING,
+            G_TYPE_NONE, 2,
+            WEBKIT_TYPE_SECURITY_ORIGIN,
+            G_TYPE_STRING);
 
     /*
      * implementations of virtual methods

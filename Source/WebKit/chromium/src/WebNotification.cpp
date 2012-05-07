@@ -31,7 +31,7 @@
 #include "config.h"
 #include "WebNotification.h"
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 
 #include "Event.h"
 #include "Notification.h"
@@ -88,13 +88,13 @@ WebURL WebNotification::iconURL() const
 WebString WebNotification::title() const
 {
     ASSERT(!isHTML());
-    return m_private->contents().title;
+    return m_private->title();
 }
 
 WebString WebNotification::body() const
 {
     ASSERT(!isHTML());
-    return m_private->contents().body;
+    return m_private->body();
 }
 
 WebTextDirection WebNotification::direction() const
@@ -106,7 +106,7 @@ WebTextDirection WebNotification::direction() const
 
 WebString WebNotification::replaceId() const
 {
-    return m_private->replaceId();
+    return m_private->tag();
 }
 
 void WebNotification::detachPresenter()
@@ -116,7 +116,10 @@ void WebNotification::detachPresenter()
 
 void WebNotification::dispatchDisplayEvent()
 {
+#if ENABLE(LEGACY_NOTIFICATIONS)
     dispatchEvent("display");
+#endif
+    dispatchEvent("show");
 }
 
 void WebNotification::dispatchErrorEvent(const WebKit::WebString& /* errorMessage */)
@@ -174,4 +177,4 @@ void WebNotification::assign(WebNotificationPrivate* p)
 
 } // namespace WebKit
 
-#endif // ENABLE(NOTIFICATIONS)
+#endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)

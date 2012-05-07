@@ -43,9 +43,8 @@ using namespace HTMLNames;
 
 RenderTableCell::RenderTableCell(Node* node)
     : RenderBlock(node)
-    , m_row(unsetRowIndex)
-    , m_cellWidthChanged(false)
     , m_column(unsetColumnIndex)
+    , m_cellWidthChanged(false)
     , m_hasAssociatedTableCellElement(node && (node->hasTagName(tdTag) || node->hasTagName(thTag)))
     , m_intrinsicPaddingBefore(0)
     , m_intrinsicPaddingAfter(0)
@@ -95,7 +94,7 @@ LayoutUnit RenderTableCell::logicalHeightForRowSizing() const
 {
     LayoutUnit adjustedLogicalHeight = logicalHeight() - (intrinsicPaddingBefore() + intrinsicPaddingAfter());
 
-    LayoutUnit styleLogicalHeight = style()->logicalHeight().calcValue(0);
+    LayoutUnit styleLogicalHeight = valueForLength(style()->logicalHeight(), 0, view());
     if (document()->inQuirksMode() || style()->boxSizing() == BORDER_BOX) {
         // Explicit heights use the border box in quirks mode.
         // Don't adjust height.
@@ -143,7 +142,7 @@ Length RenderTableCell::styleOrColLogicalWidth() const
         // Percentages don't need to be handled since they're always treated this way (even when specified on the cells).
         // See Bugzilla bug 8126 for details.
         if (colWidthSum.isFixed() && colWidthSum.value() > 0)
-            colWidthSum = Length(max<LayoutUnit>(0, colWidthSum.value() - borderAndPaddingLogicalWidth()), Fixed);
+            colWidthSum = Length(max(0.0f, colWidthSum.value() - borderAndPaddingLogicalWidth()), Fixed);
         return colWidthSum;
     }
 
@@ -191,53 +190,47 @@ void RenderTableCell::layout()
     setCellWidthChanged(false);
 }
 
-LayoutUnit RenderTableCell::paddingTop(PaddingOptions paddingOption) const
+LayoutUnit RenderTableCell::paddingTop() const
 {
-    LayoutUnit result = RenderBlock::paddingTop();
-    if (paddingOption == ExcludeIntrinsicPadding || !isHorizontalWritingMode())
+    LayoutUnit result = computedCSSPaddingTop();
+    if (!isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == TopToBottomWritingMode ? intrinsicPaddingBefore() : intrinsicPaddingAfter());
 }
 
-LayoutUnit RenderTableCell::paddingBottom(PaddingOptions paddingOption) const
+LayoutUnit RenderTableCell::paddingBottom() const
 {
-    LayoutUnit result = RenderBlock::paddingBottom();
-    if (paddingOption == ExcludeIntrinsicPadding || !isHorizontalWritingMode())
+    LayoutUnit result = computedCSSPaddingBottom();
+    if (!isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == TopToBottomWritingMode ? intrinsicPaddingAfter() : intrinsicPaddingBefore());
 }
 
-LayoutUnit RenderTableCell::paddingLeft(PaddingOptions paddingOption) const
+LayoutUnit RenderTableCell::paddingLeft() const
 {
-    LayoutUnit result = RenderBlock::paddingLeft();
-    if (paddingOption == ExcludeIntrinsicPadding || isHorizontalWritingMode())
+    LayoutUnit result = computedCSSPaddingLeft();
+    if (isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == LeftToRightWritingMode ? intrinsicPaddingBefore() : intrinsicPaddingAfter());
     
 }
 
-LayoutUnit RenderTableCell::paddingRight(PaddingOptions paddingOption) const
+LayoutUnit RenderTableCell::paddingRight() const
 {   
-    LayoutUnit result = RenderBlock::paddingRight();
-    if (paddingOption == ExcludeIntrinsicPadding || isHorizontalWritingMode())
+    LayoutUnit result = computedCSSPaddingRight();
+    if (isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == LeftToRightWritingMode ? intrinsicPaddingAfter() : intrinsicPaddingBefore());
 }
 
-LayoutUnit RenderTableCell::paddingBefore(PaddingOptions paddingOption) const
+LayoutUnit RenderTableCell::paddingBefore() const
 {
-    LayoutUnit result = RenderBlock::paddingBefore();
-    if (paddingOption == ExcludeIntrinsicPadding)
-        return result;
-    return result + intrinsicPaddingBefore();
+    return computedCSSPaddingBefore() + intrinsicPaddingBefore();
 }
 
-LayoutUnit RenderTableCell::paddingAfter(PaddingOptions paddingOption) const
+LayoutUnit RenderTableCell::paddingAfter() const
 {
-    LayoutUnit result = RenderBlock::paddingAfter();
-    if (paddingOption == ExcludeIntrinsicPadding)
-        return result;
-    return result + intrinsicPaddingAfter();
+    return computedCSSPaddingAfter() + intrinsicPaddingAfter();
 }
 
 void RenderTableCell::setOverrideHeightFromRowHeight(LayoutUnit rowHeight)
@@ -296,9 +289,8 @@ LayoutRect RenderTableCell::clippedOverflowRectForRepaint(RenderBoxModelObject* 
             right = max(right, below->borderHalfRight(true));
         }
     }
-    left = max(left, -minXVisualOverflow());
-    top = max(top, -minYVisualOverflow());
-    LayoutRect r(-left, - top, left + max(width() + right, maxXVisualOverflow()), top + max(height() + bottom, maxYVisualOverflow()));
+    LayoutPoint location(max<LayoutUnit>(left, -minXVisualOverflow()), max<LayoutUnit>(top, -minYVisualOverflow()));
+    LayoutRect r(-location.x(), -location.y(), location.x() + max(width() + right, maxXVisualOverflow()), location.y() + max(height() + bottom, maxYVisualOverflow()));
 
     if (RenderView* v = view()) {
         // FIXME: layoutDelta needs to be applied in parts before/after transforms and
@@ -328,18 +320,19 @@ LayoutUnit RenderTableCell::cellBaselinePosition() const
     LayoutUnit firstLineBaseline = firstLineBoxBaseline();
     if (firstLineBaseline != -1)
         return firstLineBaseline;
-    return paddingBefore() + borderBefore() + contentLogicalHeight(IncludeIntrinsicPadding);
+    return paddingBefore() + borderBefore() + contentLogicalHeight();
 }
 
 void RenderTableCell::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     ASSERT(style()->display() == TABLE_CELL);
+    ASSERT(!row() || row()->rowIndexWasSet());
 
     RenderBlock::styleDidChange(diff, oldStyle);
     setHasBoxDecorations(true);
 
-    if (parent() && section() && oldStyle && style()->height() != oldStyle->height() && rowWasSet())
-        section()->rowLogicalHeightChanged(row());
+    if (parent() && section() && oldStyle && style()->height() != oldStyle->height())
+        section()->rowLogicalHeightChanged(rowIndex());
 
     // If border was changed, notify table.
     if (parent()) {
@@ -604,7 +597,7 @@ CollapsedBorderValue RenderTableCell::computeCollapsedBeforeBorder(IncludeBorder
     
     // Now check row groups.
     RenderTableSection* currSection = section();
-    if (!row()) {
+    if (!rowIndex()) {
         // (5) Our row group's before border.
         result = chooseBorder(result, CollapsedBorderValue(currSection->style()->borderBefore(), includeColor ? currSection->style()->visitedDependentColor(beforeColorProperty) : Color(), BROWGROUP));
         if (!result.exists())
@@ -682,7 +675,7 @@ CollapsedBorderValue RenderTableCell::computeCollapsedAfterBorder(IncludeBorderC
     
     // Now check row groups.
     RenderTableSection* currSection = section();
-    if (row() + rowSpan() >= currSection->numRows()) {
+    if (rowIndex() + rowSpan() >= currSection->numRows()) {
         // (5) Our row group's after border.
         result = chooseBorder(result, CollapsedBorderValue(currSection->style()->borderAfter(), includeColor ? currSection->style()->visitedDependentColor(afterColorProperty) : Color(), BROWGROUP));
         if (!result.exists())
@@ -1116,6 +1109,14 @@ void RenderTableCell::scrollbarsChanged(bool horizontalScrollbarChanged, bool ve
         setIntrinsicPaddingAfter(newAfterPadding);
     } else
         setIntrinsicPaddingAfter(intrinsicPaddingAfter() - scrollbarHeight);
+}
+
+RenderTableCell* RenderTableCell::createAnonymousWithParentRenderer(const RenderObject* parent)
+{
+    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), TABLE_CELL);
+    RenderTableCell* newCell = new (parent->renderArena()) RenderTableCell(parent->document() /* is anonymous */);
+    newCell->setStyle(newStyle.release());
+    return newCell;
 }
 
 } // namespace WebCore

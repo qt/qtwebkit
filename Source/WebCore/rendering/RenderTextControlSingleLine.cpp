@@ -25,7 +25,6 @@
 #include "RenderTextControlSingleLine.h"
 
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "Chrome.h"
 #include "Frame.h"
@@ -43,6 +42,7 @@
 #include "SearchPopupMenu.h"
 #include "Settings.h"
 #include "SimpleFontData.h"
+#include "StyleResolver.h"
 #include "TextControlInnerElements.h"
 
 using namespace std;
@@ -213,13 +213,7 @@ void RenderTextControlSingleLine::layout()
     // and type=search if the text height is taller than the contentHeight()
     // because of compability.
 
-    LayoutUnit oldHeight = height();
-    computeLogicalHeight();
-
-    LayoutUnit oldWidth = width();
-    computeLogicalWidth();
-
-    bool relayoutChildren = oldHeight != height() || oldWidth != width();
+    RenderBlock::layoutBlock(false);
 
     RenderBox* innerTextRenderer = innerTextElement()->renderBox();
     ASSERT(innerTextRenderer);
@@ -234,7 +228,8 @@ void RenderTextControlSingleLine::layout()
     LayoutUnit heightLimit = (inputElement()->isSearchField() || !container) ? height() : contentHeight();
     if (currentHeight > heightLimit) {
         if (desiredHeight != currentHeight)
-            relayoutChildren = true;
+            setNeedsLayout(true, MarkOnlyThis);
+
         innerTextRenderer->style()->setHeight(Length(desiredHeight, Fixed));
         m_desiredInnerTextHeight = desiredHeight;
         if (innerBlockRenderer)
@@ -246,15 +241,17 @@ void RenderTextControlSingleLine::layout()
         LayoutUnit containerHeight = containerRenderer->height();
         if (containerHeight > heightLimit) {
             containerRenderer->style()->setHeight(Length(heightLimit, Fixed));
-            relayoutChildren = true;
+            setNeedsLayout(true, MarkOnlyThis);
         } else if (containerRenderer->height() < contentHeight()) {
             containerRenderer->style()->setHeight(Length(contentHeight(), Fixed));
-            relayoutChildren = true;
+            setNeedsLayout(true, MarkOnlyThis);
         } else
             containerRenderer->style()->setHeight(Length(containerHeight, Fixed));
     }
 
-    RenderBlock::layoutBlock(relayoutChildren);
+    // If we need another layout pass, we have changed one of children's height so we need to relayout them.
+    if (needsLayout())
+        RenderBlock::layoutBlock(true);
 
     // Center the child block vertically
     currentHeight = innerTextRenderer->height();
@@ -282,6 +279,7 @@ void RenderTextControlSingleLine::layout()
     if (RenderBox* placeholderBox = placeholderElement ? placeholderElement->renderBox() : 0) {
         placeholderBox->style()->setWidth(Length(innerTextRenderer->width() - placeholderBox->borderAndPaddingWidth(), Fixed));
         placeholderBox->style()->setHeight(Length(innerTextRenderer->height() - placeholderBox->borderAndPaddingHeight(), Fixed));
+        bool placeholderBoxHadLayout = placeholderBox->everHadLayout();
         placeholderBox->layoutIfNeeded();
         LayoutPoint textOffset = innerTextRenderer->location();
         if (innerBlockElement() && innerBlockElement()->renderBox())
@@ -289,6 +287,12 @@ void RenderTextControlSingleLine::layout()
         if (containerRenderer)
             textOffset += toLayoutSize(containerRenderer->location());
         placeholderBox->setLocation(textOffset);
+
+        if (!placeholderBoxHadLayout && placeholderBox->checkForRepaintDuringLayout()) {
+            // This assumes a shadow tree without floats. If floats are added, the
+            // logic should be shared with RenderBlock::layoutBlockChild.
+            placeholderBox->repaint();
+        }
     }
 }
 
@@ -370,7 +374,7 @@ bool RenderTextControlSingleLine::hasControlClip() const
 LayoutRect RenderTextControlSingleLine::controlClipRect(const LayoutPoint& additionalOffset) const
 {
     ASSERT(hasControlClip());
-    LayoutRect clipRect = LayoutRect(containerElement()->renderBox()->frameRect());
+    LayoutRect clipRect = unionRect(contentBoxRect(), containerElement()->renderBox()->frameRect());
     clipRect.moveBy(additionalOffset);
     return clipRect;
 }
@@ -670,7 +674,7 @@ void RenderTextControlSingleLine::setTextFromItem(unsigned listIndex)
 
 FontSelector* RenderTextControlSingleLine::fontSelector() const
 {
-    return document()->styleSelector()->fontSelector();
+    return document()->styleResolver()->fontSelector();
 }
 
 HostWindow* RenderTextControlSingleLine::hostWindow() const

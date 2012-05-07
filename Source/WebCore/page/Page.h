@@ -49,12 +49,15 @@ namespace JSC {
 
 namespace WebCore {
 
+    class AlternativeTextClient;
     class BackForwardController;
     class BackForwardList;
     class Chrome;
     class ChromeClient;
+#if ENABLE(CONTEXT_MENUS)
     class ContextMenuClient;
     class ContextMenuController;
+#endif
     class Document;
     class DragCaretController;
     class DragClient;
@@ -63,8 +66,6 @@ namespace WebCore {
     class FocusController;
     class Frame;
     class FrameSelection;
-    class GeolocationClient;
-    class GeolocationController;
     class HaltablePlugin;
     class HistoryItem;
     class InspectorClient;
@@ -90,6 +91,16 @@ namespace WebCore {
 
     float deviceScaleFactor(Frame*);
 
+    struct ArenaSize {
+        ArenaSize(size_t treeSize, size_t allocated)
+            : treeSize(treeSize)
+            , allocated(allocated)
+        {
+        }
+        size_t treeSize;
+        size_t allocated;
+    };
+
     class Page : public Supplementable<Page> {
         WTF_MAKE_NONCOPYABLE(Page);
         friend class Settings;
@@ -103,17 +114,21 @@ namespace WebCore {
             PageClients();
             ~PageClients();
 
+            AlternativeTextClient* alternativeTextClient;
             ChromeClient* chromeClient;
+#if ENABLE(CONTEXT_MENUS)
             ContextMenuClient* contextMenuClient;
+#endif
             EditorClient* editorClient;
             DragClient* dragClient;
             InspectorClient* inspectorClient;
-            GeolocationClient* geolocationClient;
             RefPtr<BackForwardList> backForwardClient;
         };
 
         Page(PageClients&);
         ~Page();
+
+        ArenaSize renderTreeSize() const;
 
         void setNeedsRecalcStyleInAllFrames();
 
@@ -166,9 +181,6 @@ namespace WebCore {
 #endif
 #if ENABLE(INSPECTOR)
         InspectorController* inspectorController() const { return m_inspectorController.get(); }
-#endif
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-        GeolocationController* geolocationController() const { return m_geolocationController.get(); }
 #endif
 #if ENABLE(POINTER_LOCK)
         PointerLockController* pointerLockController() const { return m_pointerLockController.get(); }
@@ -267,11 +279,13 @@ namespace WebCore {
         // Notifications when the Page starts and stops being presented via a native window.
         void didMoveOnscreen();
         void willMoveOffscreen();
+        bool isOnscreen() const { return m_isOnscreen; }
 
         void windowScreenDidChange(PlatformDisplayID);
         
         void suspendScriptedAnimations();
         void resumeScriptedAnimations();
+        bool scriptedAnimationsSuspended() const { return m_scriptedAnimationsSuspended; }
         
         void userStyleSheetLocationChanged();
         const String& userStyleSheet() const;
@@ -325,11 +339,17 @@ namespace WebCore {
         void setRelevantRepaintedObjectsCounterThreshold(uint64_t);
         void startCountingRelevantRepaintedObjects();
         void resetRelevantPaintedObjectCounter();
-        void addRelevantRepaintedObject(RenderObject*, const IntRect& objectPaintRect);
-        void addRelevantUnpaintedObject(RenderObject*, const IntRect& objectPaintRect);
+        void addRelevantRepaintedObject(RenderObject*, const LayoutRect& objectPaintRect);
+        void addRelevantUnpaintedObject(RenderObject*, const LayoutRect& objectPaintRect);
 
         void suspendActiveDOMObjectsAndAnimations();
         void resumeActiveDOMObjectsAndAnimations();
+#ifndef NDEBUG
+        void setIsPainting(bool painting) { m_isPainting = painting; }
+        bool isPainting() const { return m_isPainting; }
+#endif
+
+        AlternativeTextClient* alternativeTextClient() const { return m_alternativeTextClient; }
 
     private:
         void initGroup();
@@ -358,9 +378,6 @@ namespace WebCore {
 #if ENABLE(INSPECTOR)
         OwnPtr<InspectorController> m_inspectorController;
 #endif
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-        OwnPtr<GeolocationController> m_geolocationController;
-#endif
 #if ENABLE(POINTER_LOCK)
         OwnPtr<PointerLockController> m_pointerLockController;
 #endif
@@ -384,6 +401,7 @@ namespace WebCore {
 
         bool m_tabKeyCyclesThroughElements;
         bool m_defersLoading;
+        unsigned m_defersLoadingCallCount;
 
         bool m_inLowQualityInterpolationMode;
         bool m_cookieEnabled;
@@ -419,6 +437,7 @@ namespace WebCore {
         double m_minimumTimerInterval;
 
         bool m_isEditable;
+        bool m_isOnscreen;
 
 #if ENABLE(PAGE_VISIBILITY_API)
         PageVisibilityState m_visibilityState;
@@ -429,6 +448,12 @@ namespace WebCore {
         Region m_relevantPaintedRegion;
         Region m_relevantUnpaintedRegion;
         bool m_isCountingRelevantRepaintedObjects;
+#ifndef NDEBUG
+        bool m_isPainting;
+#endif
+        AlternativeTextClient* m_alternativeTextClient;
+
+        bool m_scriptedAnimationsSuspended;
     };
 
 } // namespace WebCore

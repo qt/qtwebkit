@@ -34,6 +34,7 @@
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
 #include <WebCore/Color.h>
+#include <WebCore/KURL.h>
 #include <WebCore/Page.h>
 #include <WebCore/PlatformPasteboard.h>
 
@@ -155,11 +156,8 @@ PassRefPtr<WebCore::SharedBuffer> WebPlatformStrategies::bufferForType(const Str
 
 void WebPlatformStrategies::getPathnamesForType(Vector<String>& pathnames, const String& pasteboardType, const String& pasteboardName)
 {
-    // FIXME: this needs to be replaced with the code below, once we resolve the sandboxing issue.
-    // WebProcess::shared().connection()->sendSync(Messages::WebContext::GetPasteboardPathnamesForType(pasteboardName, pasteboardType),
-    //                                             Messages::WebContext::GetPasteboardPathnamesForType::Reply(pathnames), 0);
-    
-    PlatformPasteboard(pasteboardName).getPathnamesForType(pathnames, pasteboardType);
+    WebProcess::shared().connection()->sendSync(Messages::WebContext::GetPasteboardPathnamesForType(pasteboardName, pasteboardType),
+                                                Messages::WebContext::GetPasteboardPathnamesForType::Reply(pathnames), 0);
 }
 
 String WebPlatformStrategies::stringForType(const String& pasteboardType, const String& pasteboardName)
@@ -197,6 +195,19 @@ Color WebPlatformStrategies::color(const String& pasteboardName)
     WebProcess::shared().connection()->sendSync(Messages::WebContext::GetPasteboardColor(pasteboardName),
                                                 Messages::WebContext::GetPasteboardColor::Reply(color), 0);
     return color;
+}
+
+KURL WebPlatformStrategies::url(const String& pasteboardName)
+{
+    String urlString;
+    WebProcess::shared().connection()->sendSync(Messages::WebContext::GetPasteboardURL(pasteboardName),
+                                                Messages::WebContext::GetPasteboardURL::Reply(urlString), 0);
+    return KURL(ParsedURLString, urlString);
+}
+
+void WebPlatformStrategies::addTypes(const Vector<String>& pasteboardTypes, const String& pasteboardName)
+{
+    WebProcess::shared().connection()->send(Messages::WebContext::AddPasteboardTypes(pasteboardName, pasteboardTypes), 0);
 }
 
 void WebPlatformStrategies::setTypes(const Vector<String>& pasteboardTypes, const String& pasteboardName)

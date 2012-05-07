@@ -39,8 +39,6 @@
 #include "FrameNetworkingContextGtk.h"
 #include "FrameTree.h"
 #include "FrameView.h"
-#include "GOwnPtr.h"
-#include "GRefPtr.h"
 #include "GtkPluginWidget.h"
 #include "HTMLAppletElement.h"
 #include "HTMLFormElement.h"
@@ -65,13 +63,15 @@
 #include "ScriptController.h"
 #include "Settings.h"
 #include "webkiterror.h"
+#include "webkitfavicondatabase.h"
+#include "webkitfavicondatabaseprivate.h"
 #include "webkitglobals.h"
 #include "webkitglobalsprivate.h"
-#include "webkiticondatabase.h"
 #include "webkitnetworkrequest.h"
 #include "webkitnetworkrequestprivate.h"
 #include "webkitnetworkresponse.h"
 #include "webkitnetworkresponseprivate.h"
+#include "webkitsecurityoriginprivate.h"
 #include "webkitviewportattributes.h"
 #include "webkitviewportattributesprivate.h"
 #include "webkitwebdatasourceprivate.h"
@@ -91,6 +91,8 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 #include <stdio.h>
+#include <wtf/gobject/GOwnPtr.h>
+#include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
 
@@ -104,7 +106,6 @@ FrameLoaderClient::FrameLoaderClient(WebKitWebFrame* frame)
     , m_loadingErrorPage(false)
     , m_pluginView(0)
     , m_hasSentResponseToPlugin(false)
-    , m_hasRepresentation(false)
 {
     ASSERT(m_frame);
 }
@@ -531,35 +532,6 @@ PassRefPtr<Frame> FrameLoaderClient::createFrame(const KURL& url, const String& 
     return childFrame.release();
 }
 
-void FrameLoaderClient::didTransferChildFrameToNewDocument(WebCore::Page*)
-{
-    ASSERT(m_frame);
-
-    // Update the frame's webview to the new parent's webview.
-    Frame* coreFrame = core(m_frame);
-    WebKitWebView* webView = getViewFromFrame(m_frame);
-
-    Frame* parentCoreFrame = coreFrame->tree()->parent();
-    WebKitWebFrame* parentKitFrame = kit(parentCoreFrame);
-    WebKitWebView* parentWebView = getViewFromFrame(parentKitFrame);
-    if (webView != parentWebView)
-        m_frame->priv->webView = parentWebView;
-
-    ASSERT(core(getViewFromFrame(m_frame)) == coreFrame->page());
-}
-
-void FrameLoaderClient::transferLoadingResourceFromPage(WebCore::ResourceLoader* loader, const WebCore::ResourceRequest& request, WebCore::Page* oldPage)
-{
-    ASSERT(oldPage != core(m_frame)->page());
-
-    GOwnPtr<gchar> identifierString(toString(loader->identifier()));
-    ASSERT(!webkit_web_view_get_resource(getViewFromFrame(m_frame), identifierString.get()));
-
-    assignIdentifierToInitialRequest(loader->identifier(), loader->documentLoader(), request);
-
-    webkit_web_view_remove_resource(kit(oldPage), identifierString.get());
-}
-
 void FrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
 {
     ASSERT(!m_pluginView);
@@ -625,7 +597,7 @@ void FrameLoaderClient::didPerformFirstNavigation() const
 
 void FrameLoaderClient::registerForIconNotification(bool shouldRegister)
 {
-    notImplemented();
+    webkitWebViewRegisterForIconNotification(getViewFromFrame(m_frame), shouldRegister);
 }
 
 void FrameLoaderClient::setMainFrameDocumentReady(bool ready)
@@ -682,19 +654,14 @@ void FrameLoaderClient::didDisplayInsecureContent()
     notImplemented();
 }
 
-void FrameLoaderClient::didRunInsecureContent(SecurityOrigin*, const KURL&)
+void FrameLoaderClient::didRunInsecureContent(SecurityOrigin* coreOrigin, const KURL& url)
 {
-    notImplemented();
+    g_signal_emit_by_name(m_frame, "insecure-content-run", kit(coreOrigin), url.string().utf8().data());
 }
 
 void FrameLoaderClient::didDetectXSS(const KURL&, bool)
 {
     notImplemented();
-}
-
-void FrameLoaderClient::makeRepresentation(WebCore::DocumentLoader*)
-{
-    m_hasRepresentation = true;
 }
 
 void FrameLoaderClient::forceLayout()
@@ -802,18 +769,14 @@ void FrameLoaderClient::dispatchDidReceiveIcon()
     if (m_loadingErrorPage)
         return;
 
-    const gchar* frameURI = webkit_web_frame_get_uri(m_frame);
-    WebKitIconDatabase* database = webkit_get_icon_database();
-    g_signal_emit_by_name(database, "icon-loaded", m_frame, frameURI);
-
+    // IconController loads icons only for the main frame.
     WebKitWebView* webView = getViewFromFrame(m_frame);
+    ASSERT(m_frame == webkit_web_view_get_main_frame(webView));
 
-    // Avoid reporting favicons for non-main frames.
-    if (m_frame != webkit_web_view_get_main_frame(webView))
-        return;
-
-    g_object_notify(G_OBJECT(webView), "icon-uri");
-    g_signal_emit_by_name(webView, "icon-loaded", webkit_web_view_get_icon_uri(webView));
+    const char* frameURI = webkit_web_frame_get_uri(m_frame);
+    WebKitFaviconDatabase* database = webkit_get_favicon_database();
+    webkitFaviconDatabaseDispatchDidReceiveIcon(database, frameURI);
+    webkitWebViewIconLoaded(database, frameURI, webView);
 }
 
 void FrameLoaderClient::dispatchDidStartProvisionalLoad()
@@ -914,16 +877,6 @@ void FrameLoaderClient::cancelPolicyCheck()
         webkit_web_policy_decision_cancel(m_policyDecision);
 }
 
-void FrameLoaderClient::dispatchDidLoadMainResource(WebCore::DocumentLoader*)
-{
-    notImplemented();
-}
-
-void FrameLoaderClient::revertToProvisionalState(WebCore::DocumentLoader*)
-{
-    m_hasRepresentation = true;
-}
-
 void FrameLoaderClient::willChangeTitle(WebCore::DocumentLoader*)
 {
     notImplemented();
@@ -966,14 +919,9 @@ String FrameLoaderClient::generatedMIMETypeForURLScheme(const String&) const
     return String();
 }
 
-void FrameLoaderClient::finishedLoading(WebCore::DocumentLoader* documentLoader)
+void FrameLoaderClient::finishedLoading(WebCore::DocumentLoader*)
 {
-    if (!m_pluginView) {
-        // This is necessary to create an empty document,
-        // but it has to be skipped in the provisional phase.
-        if (m_hasRepresentation)
-            documentLoader->writer()->setEncoding("", false);
-    } else {
+    if (m_pluginView) {
         m_pluginView->didFinishLoading();
         m_pluginView = 0;
         m_hasSentResponseToPlugin = false;

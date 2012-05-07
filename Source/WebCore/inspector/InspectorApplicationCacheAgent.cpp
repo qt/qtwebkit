@@ -24,9 +24,10 @@
  */
 
 #include "config.h"
-#include "InspectorApplicationCacheAgent.h"
 
 #if ENABLE(INSPECTOR)
+
+#include "InspectorApplicationCacheAgent.h"
 
 #include "ApplicationCacheHost.h"
 #include "DocumentLoader.h"
@@ -103,9 +104,9 @@ void InspectorApplicationCacheAgent::networkStateChanged()
     m_frontend->networkStateUpdated(isNowOnline);
 }
 
-void InspectorApplicationCacheAgent::getFramesWithManifests(ErrorString*, RefPtr<InspectorArray>& result)
+void InspectorApplicationCacheAgent::getFramesWithManifests(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::ApplicationCache::FrameWithManifest> >& result)
 {
-    result = InspectorArray::create();
+    result = TypeBuilder::Array<TypeBuilder::ApplicationCache::FrameWithManifest>::create();
 
     Frame* mainFrame = m_pageAgent->mainFrame();
     for (Frame* frame = mainFrame; frame; frame = frame->tree()->traverseNext(mainFrame)) {
@@ -117,11 +118,11 @@ void InspectorApplicationCacheAgent::getFramesWithManifests(ErrorString*, RefPtr
         ApplicationCacheHost::CacheInfo info = host->applicationCacheInfo();
         String manifestURL = info.m_manifest.string();
         if (!manifestURL.isEmpty()) {
-            RefPtr<InspectorObject> value = InspectorObject::create();
-            value->setString("frameId", m_pageAgent->frameId(frame));
-            value->setString("manifestURL", manifestURL);
-            value->setNumber("status", host->status());
-            result->pushObject(value);
+            RefPtr<TypeBuilder::ApplicationCache::FrameWithManifest> value = TypeBuilder::ApplicationCache::FrameWithManifest::create()
+                .setFrameId(m_pageAgent->frameId(frame))
+                .setManifestURL(manifestURL)
+                .setStatus(host->status());
+            result->addItem(value);
         }
     }
 }
@@ -145,7 +146,7 @@ void InspectorApplicationCacheAgent::getManifestForFrame(ErrorString* errorStrin
     *manifestURL = info.m_manifest.string();
 }
 
-void InspectorApplicationCacheAgent::getApplicationCacheForFrame(ErrorString* errorString, const String& frameId, RefPtr<InspectorObject>& applicationCache)
+void InspectorApplicationCacheAgent::getApplicationCacheForFrame(ErrorString* errorString, const String& frameId, RefPtr<TypeBuilder::ApplicationCache::ApplicationCache>& applicationCache)
 {
     DocumentLoader* documentLoader = assertFrameWithDocumentLoader(errorString, frameId);
     if (!documentLoader)
@@ -160,35 +161,31 @@ void InspectorApplicationCacheAgent::getApplicationCacheForFrame(ErrorString* er
     applicationCache = buildObjectForApplicationCache(resources, info);
 }
 
-PassRefPtr<InspectorObject> InspectorApplicationCacheAgent::buildObjectForApplicationCache(const ApplicationCacheHost::ResourceInfoList& applicationCacheResources, const ApplicationCacheHost::CacheInfo& applicationCacheInfo)
+PassRefPtr<TypeBuilder::ApplicationCache::ApplicationCache> InspectorApplicationCacheAgent::buildObjectForApplicationCache(const ApplicationCacheHost::ResourceInfoList& applicationCacheResources, const ApplicationCacheHost::CacheInfo& applicationCacheInfo)
 {
-    RefPtr<InspectorObject> value = InspectorObject::create();
-    value->setNumber("size", applicationCacheInfo.m_size);
-    value->setString("manifestURL", applicationCacheInfo.m_manifest.string());
-    value->setNumber("creationTime", applicationCacheInfo.m_creationTime);
-    value->setNumber("updateTime", applicationCacheInfo.m_updateTime);
-    value->setArray("resources", buildArrayForApplicationCacheResources(applicationCacheResources));
-    return value;
+    return TypeBuilder::ApplicationCache::ApplicationCache::create()
+        .setManifestURL(applicationCacheInfo.m_manifest.string())
+        .setSize(applicationCacheInfo.m_size)
+        .setCreationTime(applicationCacheInfo.m_creationTime)
+        .setUpdateTime(applicationCacheInfo.m_updateTime)
+        .setResources(buildArrayForApplicationCacheResources(applicationCacheResources))
+        .release();
 }
 
-PassRefPtr<InspectorArray> InspectorApplicationCacheAgent::buildArrayForApplicationCacheResources(const ApplicationCacheHost::ResourceInfoList& applicationCacheResources)
+PassRefPtr<TypeBuilder::Array<TypeBuilder::ApplicationCache::ApplicationCacheResource> > InspectorApplicationCacheAgent::buildArrayForApplicationCacheResources(const ApplicationCacheHost::ResourceInfoList& applicationCacheResources)
 {
-    RefPtr<InspectorArray> resources = InspectorArray::create();
+    RefPtr<TypeBuilder::Array<TypeBuilder::ApplicationCache::ApplicationCacheResource> > resources = TypeBuilder::Array<TypeBuilder::ApplicationCache::ApplicationCacheResource>::create();
 
     ApplicationCacheHost::ResourceInfoList::const_iterator end = applicationCacheResources.end();
     ApplicationCacheHost::ResourceInfoList::const_iterator it = applicationCacheResources.begin();
     for (int i = 0; it != end; ++it, i++)
-        resources->pushObject(buildObjectForApplicationCacheResource(*it));
+        resources->addItem(buildObjectForApplicationCacheResource(*it));
 
     return resources;
 }
 
-PassRefPtr<InspectorObject> InspectorApplicationCacheAgent::buildObjectForApplicationCacheResource(const ApplicationCacheHost::ResourceInfo& resourceInfo)
+PassRefPtr<TypeBuilder::ApplicationCache::ApplicationCacheResource> InspectorApplicationCacheAgent::buildObjectForApplicationCacheResource(const ApplicationCacheHost::ResourceInfo& resourceInfo)
 {
-    RefPtr<InspectorObject> value = InspectorObject::create();
-    value->setString("url", resourceInfo.m_resource.string());
-    value->setNumber("size", resourceInfo.m_size);
-
     String types;
     if (resourceInfo.m_isMaster)
         types.append("Master ");
@@ -205,7 +202,10 @@ PassRefPtr<InspectorObject> InspectorApplicationCacheAgent::buildObjectForApplic
     if (resourceInfo.m_isExplicit)
         types.append("Explicit ");
 
-    value->setString("type", types);
+    RefPtr<TypeBuilder::ApplicationCache::ApplicationCacheResource> value = TypeBuilder::ApplicationCache::ApplicationCacheResource::create()
+        .setUrl(resourceInfo.m_resource.string())
+        .setSize(static_cast<int>(resourceInfo.m_size))
+        .setType(types);
     return value;
 }
 

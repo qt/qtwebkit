@@ -223,6 +223,20 @@ void DrawingAreaImpl::setPageOverlayNeedsDisplay(const IntRect& rect)
     setNeedsDisplay(rect);
 }
 
+void DrawingAreaImpl::setPageOverlayOpacity(float value)
+{
+    if (m_layerTreeHost)
+        m_layerTreeHost->setPageOverlayOpacity(value);
+}
+
+bool DrawingAreaImpl::pageOverlayShouldApplyFadeWhenPainting() const
+{
+    if (m_layerTreeHost && !m_layerTreeHost->pageOverlayShouldApplyFadeWhenPainting())
+        return false;
+
+    return true;
+}
+
 void DrawingAreaImpl::pageCustomRepresentationChanged()
 {
     if (!m_alwaysUseCompositing)
@@ -327,7 +341,9 @@ void DrawingAreaImpl::updateBackingStoreState(uint64_t stateID, bool respondImme
 
         if (m_layerTreeHost) {
             m_layerTreeHost->deviceScaleFactorDidChange();
-            m_layerTreeHost->sizeDidChange(size);
+            // Use the previously set page size instead of the argument.
+            // It gets adjusted properly when using the fixed layout mode.
+            m_layerTreeHost->sizeDidChange(m_webPage->size());
         } else
             m_dirtyRegion = m_webPage->bounds();
     } else {
@@ -434,7 +450,12 @@ void DrawingAreaImpl::resumePainting()
     // FIXME: We shouldn't always repaint everything here.
     setNeedsDisplay(m_webPage->bounds());
 
+#if PLATFORM(MAC)
+    if (m_webPage->windowIsVisible())
+        m_webPage->corePage()->resumeScriptedAnimations();
+#else
     m_webPage->corePage()->resumeScriptedAnimations();
+#endif
 }
 
 void DrawingAreaImpl::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLayer)
@@ -675,5 +696,17 @@ void DrawingAreaImpl::didReceiveLayerTreeHostMessage(CoreIPC::Connection* connec
 }
 #endif
 
+#if PLATFORM(MAC)
+void DrawingAreaImpl::setLayerHostingMode(uint32_t opaqueLayerHostingMode)
+{
+    LayerHostingMode layerHostingMode = static_cast<LayerHostingMode>(opaqueLayerHostingMode);
+    m_webPage->setLayerHostingMode(layerHostingMode);
+
+    if (!m_layerTreeHost)
+        return;
+
+    m_layerTreeHost->setLayerHostingMode(layerHostingMode);
+}
+#endif
 
 } // namespace WebKit

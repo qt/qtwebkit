@@ -116,8 +116,9 @@ def build(bld):
         webcore_dirs.extend(['Source/WebKit/wx', 'Source/WebKit/wx/WebKitSupport'])
     
     wk_includes = ['.',
+                    os.path.join(wk_root, 'Source', 'WTF'),
+                    os.path.join(wk_root, 'Source', 'WTF', 'wtf'),
                     os.path.join(wk_root, 'Source', 'JavaScriptCore'),
-                    os.path.join(wk_root, 'Source', 'JavaScriptCore', 'wtf', 'text'),
                     os.path.join(wk_root, 'Source', 'WebCore'),
                     os.path.join(wk_root, 'Source', 'WebCore', 'DerivedSources'),
                     os.path.join(wk_root, 'Source', 'WebCore', 'platform', 'image-decoders'),
@@ -159,7 +160,7 @@ def build(bld):
             webcore_sources['wx-win'] = [
                    'Source/WebCore/platform/graphics/win/GlyphPageTreeNodeCairoWin.cpp',
                    'Source/WebCore/platform/graphics/win/TransformationMatrixWin.cpp',
-                   'Source/WebCore/platform/ScrollAnimatorWin.cpp',
+                   'Source/WebCore/platform/ScrollAnimatorNone.cpp',
                    # wxTimer on Windows has a bug that causes it to eat crashes in callbacks
                    # so we need to use the Win port's implementation until the wx bug fix is
                    # widely available (it was fixed in 2.8.10).
@@ -208,7 +209,6 @@ def build(bld):
 
     import TaskGen
 
-    # FIXME: Does this need to be Source/JavaScriptCore?
     bld.add_subdirs('Source/JavaScriptCore')
 
     if sys.platform.startswith('darwin'):
@@ -216,21 +216,26 @@ def build(bld):
         TaskGen.task_gen.mappings['.m'] = TaskGen.task_gen.mappings['.cxx']
 
     features = [Options.options.port.lower()]
-    exclude_patterns = ['*AllInOne.cpp', '*CFNet.cpp', '*Chromium*.cpp', 
-            '*Efl.cpp', '*Gtk.cpp', '*Mac.cpp', '*None.cpp', '*Qt.cpp', '*Safari.cpp',
-            'test*bindings.*', '*WinCE.cpp', "WebDOMCanvas*.cpp", "WebDOMSVG*.cpp"]
-    if Options.options.port == 'wx':
-        features.append('curl')
-        exclude_patterns.append('*Win.cpp')
-        
+    thisport = Options.options.port
+    
+    exclude_patterns = ['*AllInOne.cpp', '*None.cpp',]
+
     if sys.platform.startswith('darwin'):
         features.append('cf')
-        
-    else:
-        exclude_patterns.append('*CF.cpp')
 
+    # exclude the filename patterns for all other ports.
+    exclude_patterns.extend(get_port_excludes(Options.options.port))
+            
+    if Options.options.port == 'wx':
+        features.append('curl')
+        exclude_patterns.extend(['*CFNet.cpp', 'test*bindings.*', "WebDOMCanvas*.cpp", "WebDOMSVG*.cpp"])
+        
     full_dirs = get_dirs_for_features(wk_root, features=features, dirs=webcore_dirs)
 
+    # make sure we don't use the CF networking engine
+    if Options.options.port == 'wx' and sys.platform.startswith('darwin'):
+        full_dirs.remove('Source/WebCore/platform/network/cf')
+        
     jscore_dir = os.path.join(wk_root, 'Source', 'JavaScriptCore')
     for item in os.listdir(jscore_dir):
         fullpath = os.path.join(jscore_dir, item)
@@ -239,8 +244,6 @@ def build(bld):
 
     wk_includes.append('Source')
     wk_includes.append(os.path.join(jscore_dir, 'collector', 'handles'))
-    wk_includes.append(os.path.join(jscore_dir, 'wtf', 'unicode'))
-    wk_includes.append(os.path.join(jscore_dir, 'wtf', 'unicode', 'icu'))
     wk_includes += common_includes + full_dirs
     if sys.platform.startswith('darwin'):
         wk_includes.append(os.path.join(webcore_dir, 'icu'))
@@ -338,7 +341,8 @@ def build(bld):
         excludes.append('WebGLContextEvent.cpp')
         excludes.append('FileSystemPOSIX.cpp')
         excludes.append('SharedBufferPOSIX.cpp')
-        
+        excludes.append('TouchAdjustment.cpp')
+        excludes.append('DNSResolveQueue.cpp')
         
         # These files appear not to build with older versions of ICU
         excludes.append('LocalizedNumberICU.cpp')

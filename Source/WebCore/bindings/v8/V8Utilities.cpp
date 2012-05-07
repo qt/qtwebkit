@@ -31,7 +31,7 @@
 #include "config.h"
 #include "V8Utilities.h"
 
-#include "ArrayBuffer.h"
+#include <wtf/ArrayBuffer.h>
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
@@ -182,11 +182,6 @@ void transferHiddenDependency(v8::Handle<v8::Object> object,
 Frame* callingOrEnteredFrame()
 {
     return V8BindingState::Only()->activeFrame();
-}
-
-bool shouldAllowNavigation(Frame* frame)
-{
-    return V8BindingSecurity::shouldAllowNavigation(V8BindingState::Only(), frame);
 }
 
 KURL completeURL(const String& relativeURL)

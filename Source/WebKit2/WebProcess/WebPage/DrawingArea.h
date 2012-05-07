@@ -29,6 +29,7 @@
 #include "DrawingAreaInfo.h"
 #include <WebCore/FloatPoint.h>
 #include <WebCore/IntRect.h>
+#include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
 
@@ -44,6 +45,7 @@ namespace WebCore {
 
 namespace WebKit {
 
+class LayerTreeHost;
 class WebPage;
 struct WebPageCreationParameters;
 
@@ -69,13 +71,18 @@ public:
     virtual bool forceRepaintAsync(uint64_t callbackID) { return false; }
     virtual void setLayerTreeStateIsFrozen(bool) { }
     virtual bool layerTreeStateIsFrozen() const { return false; }
+    virtual LayerTreeHost* layerTreeHost() const { return 0; }
 
     virtual void didInstallPageOverlay() { }
     virtual void didUninstallPageOverlay() { }
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) { }
+    virtual void setPageOverlayOpacity(float) { }
+    // If this function returns false, PageOverlay should apply opacity when painting.
+    virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return true; }
     virtual void pageCustomRepresentationChanged() { }
 
     virtual void setPaintingEnabled(bool) { }
+    virtual void updatePreferences() { }
 
 #if USE(ACCELERATED_COMPOSITING)
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) = 0;
@@ -90,6 +97,8 @@ public:
     virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&) = 0;
 #endif
 
+    virtual void dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>&);
+
 protected:
     DrawingArea(DrawingAreaType, WebPage*);
 
@@ -103,12 +112,12 @@ private:
     virtual void didUpdate() { }
     virtual void suspendPainting() { }
     virtual void resumePainting() { }
+    virtual void setLayerHostingMode(uint32_t) { }
 
 #if PLATFORM(MAC)
     // Used by TiledCoreAnimationDrawingArea.
     virtual void updateGeometry(const WebCore::IntSize& viewSize) { }
     virtual void setDeviceScaleFactor(float) { }
-    virtual void setLayerHostingMode(uint32_t) { }
 #endif
 };
 

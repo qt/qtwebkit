@@ -12,10 +12,12 @@ DESTDIR = $$ROOT_BUILD_DIR/bin
 load(features)
 
 WEBKIT += wtf webcore
+!v8: WEBKIT += javascriptcore
 
 INCLUDEPATH += \
     $$PWD/.. \
-    $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/WebCoreSupport
+    $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/WebCoreSupport \
+    $${ROOT_WEBKIT_DIR}/Source/WTF
 
 QT = core gui network testlib webkit
 macx: QT += xml
@@ -35,7 +37,7 @@ HEADERS += \
     testplugin.h
 
 SOURCES += \
-    $${ROOT_WEBKIT_DIR}/Source/JavaScriptCore/wtf/Assertions.cpp \
+    $${ROOT_WEBKIT_DIR}/Source/WTF/wtf/Assertions.cpp \
     $$PWD/../WorkQueue.cpp \
     DumpRenderTreeQt.cpp \
     EventSenderQt.cpp \

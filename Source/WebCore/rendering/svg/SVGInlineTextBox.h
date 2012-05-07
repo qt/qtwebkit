@@ -47,7 +47,7 @@ public:
 
     void paintSelectionBackground(PaintInfo&);
     virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom);
-    virtual IntRect localSelectionRect(int startPosition, int endPosition);
+    virtual LayoutRect localSelectionRect(int startPosition, int endPosition);
 
     bool mapStartEndPositionsIntoFragmentCoordinates(const SVGTextFragment&, int& startPosition, int& endPosition) const;
 
@@ -56,6 +56,8 @@ public:
     void clearTextFragments() { m_textFragments.clear(); }
     Vector<SVGTextFragment>& textFragments() { return m_textFragments; }
     const Vector<SVGTextFragment>& textFragments() const { return m_textFragments; }
+
+    void dirtyLineBoxes() OVERRIDE;
 
     bool startsNewTextChunk() const { return m_startsNewTextChunk; }
     void setStartsNewTextChunk(bool newTextChunk) { m_startsNewTextChunk = newTextChunk; }

@@ -55,6 +55,9 @@ class FileSystem(object):
     def abspath(self, path):
         return os.path.abspath(path)
 
+    def realpath(self, path):
+        return os.path.realpath(path)
+
     def path_to_module(self, module_name):
         """A wrapper for all calls to __file__ to allow easy unit testing."""
         # FIXME: This is the only use of sys in this file. It's possible this function should move elsewhere.
@@ -201,6 +204,8 @@ class FileSystem(object):
             f.write(contents)
 
     def open_text_file_for_reading(self, path):
+        # Note: There appears to be an issue with the returned file objects
+        # not being seekable. See http://stackoverflow.com/questions/1510188/can-seek-and-tell-work-with-utf-8-encoded-documents-in-python .
         return codecs.open(path, 'r', 'utf8')
 
     def open_text_file_for_writing(self, path):

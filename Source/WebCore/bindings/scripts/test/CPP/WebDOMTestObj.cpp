@@ -21,17 +21,17 @@
 #include "config.h"
 #include "WebDOMTestObj.h"
 
+#include "Dictionary.h"
 #include "Document.h"
 #include "HTMLNames.h"
 #include "IDBKey.h"
 #include "KURL.h"
-#include "OptionsObject.h"
 #include "SVGPoint.h"
 #include "SerializedScriptValue.h"
 #include "TestObj.h"
+#include "WebDOMDictionary.h"
 #include "WebDOMDocument.h"
 #include "WebDOMIDBKey.h"
-#include "WebDOMOptionsObject.h"
 #include "WebDOMSVGPoint.h"
 #include "WebDOMString.h"
 #include "WebDOMa.h"
@@ -581,6 +581,22 @@ void WebDOMTestObj::setImmutablePoint(const WebDOMSVGPoint& newImmutablePoint)
     impl()->setImmutablePoint(toWebCore(newImmutablePoint));
 }
 
+int WebDOMTestObj::strawberry() const
+{
+    if (!impl())
+        return 0;
+
+    return impl()->blueberry();
+}
+
+void WebDOMTestObj::setStrawberry(int newStrawberry)
+{
+    if (!impl())
+        return;
+
+    impl()->setBlueberry(newStrawberry);
+}
+
 float WebDOMTestObj::strictFloat() const
 {
     if (!impl())
@@ -704,7 +720,7 @@ void WebDOMTestObj::idbKey(const WebDOMIDBKey& key)
     impl()->idbKey(toWebCore(key));
 }
 
-void WebDOMTestObj::optionsObject(const WebDOMOptionsObject& oo, const WebDOMOptionsObject& ooo)
+void WebDOMTestObj::optionsObject(const WebDOMDictionary& oo, const WebDOMDictionary& ooo)
 {
     if (!impl())
         return;

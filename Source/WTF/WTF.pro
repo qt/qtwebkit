@@ -10,7 +10,7 @@ include(WTF.pri)
 
 CONFIG += staticlib
 
-VPATH += $$PWD/../JavaScriptCore/wtf
+VPATH += $$PWD/wtf
 
 HEADERS += \
     Alignment.h \
@@ -26,7 +26,6 @@ HEADERS += \
     BloomFilter.h \
     BoundsCheckedPointer.h \
     BumpPointerAllocator.h \
-    ByteArray.h \
     CheckedArithmetic.h \
     Compiler.h \
     CryptographicallyRandomNumber.h \
@@ -168,7 +167,6 @@ SOURCES += \
     ArrayBufferView.cpp \
     Assertions.cpp \
     BitVector.cpp \
-    ByteArray.cpp \
     CryptographicallyRandomNumber.cpp \
     CurrentTime.cpp \
     DateMath.cpp \

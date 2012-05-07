@@ -52,13 +52,13 @@ public:
     static PassRefPtr<File> createWithRelativePath(const String& path, const String& relativePath);
 #endif
 
-#if ENABLE(FILE_SYSTEM)
     // Create a file with a name exposed to the author (via File.name and associated DOM properties) that differs from the one provided in the path.
     static PassRefPtr<File> createWithName(const String& path, const String& name)
     {
+        if (name.isEmpty())
+            return adoptRef(new File(path));
         return adoptRef(new File(path, name));
     }
-#endif
 
     virtual unsigned long long size() const;
     virtual bool isFile() const { return true; }
@@ -74,19 +74,12 @@ public:
     // Note that this involves synchronous file operation. Think twice before calling this function.
     void captureSnapshot(long long& snapshotSize, double& snapshotModificationTime) const;
 
-    // FIXME: obsolete attributes. To be removed.
-    const String& fileName() const { return name(); }
-    unsigned long long fileSize() const { return size(); }
-
 private:
     File(const String& path);
 
     // For deserialization.
     File(const String& path, const KURL& srcURL, const String& type);
-
-#if ENABLE(FILE_SYSTEM)
     File(const String& path, const String& name);
-#endif
 
     String m_path;
     String m_name;

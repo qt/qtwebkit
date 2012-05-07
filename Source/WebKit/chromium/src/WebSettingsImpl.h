@@ -90,6 +90,7 @@ public:
     virtual void setWebAudioEnabled(bool);
     virtual void setExperimentalWebGLEnabled(bool);
     virtual void setExperimentalCSSRegionsEnabled(bool);
+    virtual void setExperimentalCSSCustomFilterEnabled(bool);
     virtual void setOpenGLMultisamplingEnabled(bool);
     virtual void setPrivilegedWebGLExtensionsEnabled(bool);
     virtual void setWebGLErrorsToConsoleEnabled(bool);
@@ -102,8 +103,6 @@ public:
     virtual void setAcceleratedCompositingEnabled(bool);
     virtual void setForceCompositingMode(bool);
     virtual void setMockScrollbarsEnabled(bool);
-    virtual void setCompositeToTextureEnabled(bool);
-    virtual bool compositeToTextureEnabled() const { return m_compositeToTextureEnabled; }
     virtual void setAcceleratedCompositingFor3DTransformsEnabled(bool);
     virtual void setAcceleratedCompositingForVideoEnabled(bool);
     virtual void setAcceleratedCompositingForPluginsEnabled(bool);
@@ -130,6 +129,7 @@ public:
     virtual void setPasswordEchoDurationInSeconds(double);
     virtual void setShouldPrintBackgrounds(bool);
     virtual void setEnableScrollAnimator(bool);
+    virtual bool scrollAnimatorEnabled() const;
     virtual void setHixie76WebSocketProtocolEnabled(bool);
     virtual void setVisualWordMovementEnabled(bool);
     virtual void setShouldDisplaySubtitles(bool);
@@ -139,12 +139,14 @@ public:
     virtual void setPerTilePaintingEnabled(bool);
     virtual void setPartialSwapEnabled(bool);
     virtual void setThreadedAnimationEnabled(bool);
+    virtual void setViewportEnabled(bool);
+    virtual bool viewportEnabled() const { return m_viewportEnabled; }
 
 private:
     WebCore::Settings* m_settings;
-    bool m_compositeToTextureEnabled;
     bool m_showFPSCounter;
     bool m_showPlatformLayerTree;
+    bool m_viewportEnabled;
 };
 
 } // namespace WebKit

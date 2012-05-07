@@ -93,7 +93,6 @@ public:
     virtual void cancelPolicyCheck();
     virtual void dispatchUnableToImplementPolicy(const ResourceError&) { notImplemented(); }
     virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>);
-    virtual void dispatchDidLoadMainResource(DocumentLoader*) { notImplemented(); }
     virtual void revertToProvisionalState(DocumentLoader*) { notImplemented(); }
     virtual void setMainDocumentError(DocumentLoader*, const ResourceError&);
     virtual void postProgressStartedNotification();
@@ -148,7 +147,6 @@ public:
     virtual void dispatchDidBecomeFrameset(bool) { }
     virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceRequest&, const ResourceResponse&);
     virtual PassRefPtr<Frame> createFrame(const KURL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int);
-    virtual void didTransferChildFrameToNewDocument(Page*);
     virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool);
     virtual void redirectDataToPlugin(Widget*);
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&) { notImplemented(); return 0; }
@@ -164,20 +162,13 @@ public:
     virtual void loadIconExternally(const String& originalPageUrl, const String& finalPageUrl, const String& iconUrl);
 
     virtual void didDetectXSS(const KURL&, bool) { }
-    virtual void transferLoadingResourceFromPage(ResourceLoader*, const ResourceRequest&, Page*);
-    virtual void didTransferChildFrameToNewDocument() { notImplemented(); };
     virtual void dispatchDidChangeIcons(IconType) { notImplemented(); };
-    virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) { notImplemented(); };
+    virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>);
 
     virtual void willDeferLoading();
     virtual void didResumeLoading();
-    virtual void authenticationChallenge(const String& realm, String& username, String& password);
 
     virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext();
-
-     // Schedule a script that was loaded manually by the user (eg. a
-     // bookmarklet) while page loading was deferred.
-    void setDeferredManualScript(const KURL&);
 
     void readyToRender(bool pageIsVisuallyNonEmpty);
 
@@ -200,14 +191,10 @@ private:
     PolicyAction decidePolicyForExternalLoad(const ResourceRequest &, bool isFragmentScroll);
     void delayPolicyCheckUntilFragmentExists(const String& fragment, FramePolicyFunction);
 
-    void deferredJobsTimerFired(Timer<FrameLoaderClientBlackBerry>*);
-
     Frame* m_frame;
     ResourceError m_loadError;
     BlackBerry::WebKit::WebPagePrivate* m_webPagePrivate;
 
-    Timer<FrameLoaderClientBlackBerry>* m_deferredJobsTimer;
-    KURL m_deferredManualScript;
     Geolocation* m_geolocation;
     bool m_sentReadyToRender;
 

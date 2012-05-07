@@ -30,6 +30,7 @@
 
 #include "Image.h"
 #include "Color.h"
+#include "ImageOrientation.h"
 #include "IntSize.h"
 
 #if PLATFORM(MAC)
@@ -41,15 +42,18 @@ OBJC_CLASS NSImage;
 typedef struct HBITMAP__ *HBITMAP;
 #endif
 
+#if PLATFORM(WX)
+class wxBitmap;
+#endif
+
 namespace WebCore {
     struct FrameData;
 }
 
 namespace WTF {
-    // FIXME: This declaration gives FrameData a default constructor that zeroes
-    // all its data members, even though FrameData's default constructor defined
-    // below does not zero all its data members. One of these must be wrong!
-    template<> struct VectorTraits<WebCore::FrameData> : public SimpleClassVectorTraits { };
+    template<> struct VectorTraits<WebCore::FrameData> : public SimpleClassVectorTraits {
+        static const bool canInitializeWithMemset = false; // Not all FrameData members initialize to 0.
+    };
 }
 
 namespace WebCore {
@@ -65,6 +69,7 @@ struct FrameData {
 public:
     FrameData()
         : m_frame(0)
+        , m_orientation(DefaultImageOrientation)
         , m_duration(0)
         , m_haveMetadata(false)
         , m_isComplete(false)
@@ -82,6 +87,7 @@ public:
     bool clear(bool clearMetadata);
 
     NativeImagePtr m_frame;
+    ImageOrientation m_orientation;
     float m_duration;
     bool m_haveMetadata : 1;
     bool m_isComplete : 1;
@@ -108,11 +114,12 @@ public:
     }
     ~BitmapImage();
     
-    virtual bool isBitmapImage() const { return true; }
+    virtual bool isBitmapImage() const;
 
-    virtual bool hasSingleSecurityOrigin() const { return true; }
+    virtual bool hasSingleSecurityOrigin() const;
 
     virtual IntSize size() const;
+    IntSize sizeRespectingOrientation() const;
     IntSize currentFrameSize() const;
     virtual bool getHotSpot(IntPoint&) const;
 
@@ -124,8 +131,8 @@ public:
     // automatically pause once all observers no longer want to render the image anywhere.
     virtual void stopAnimation();
     virtual void resetAnimation();
-    
-    virtual unsigned decodedSize() const { return m_decodedSize; }
+
+    virtual unsigned decodedSize() const;
 
 #if PLATFORM(MAC)
     // Accessors for native image formats.
@@ -142,24 +149,34 @@ public:
 #if PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS))
     static PassRefPtr<BitmapImage> create(HBITMAP);
 #endif
+#if PLATFORM(WX)
+    static PassRefPtr<BitmapImage> create(const wxBitmap& bitmap)
+    {
+        return adoptRef(new BitmapImage(bitmap));
+    }
+#endif
 #if PLATFORM(WIN)
     virtual bool getHBITMAP(HBITMAP);
     virtual bool getHBITMAPOfSize(HBITMAP, LPSIZE);
+#endif
+
+#if USE(CAIRO)
+    static PassRefPtr<BitmapImage> create(cairo_surface_t*);
 #endif
 
 #if PLATFORM(GTK)
     virtual GdkPixbuf* getGdkPixbuf();
 #endif
 
-    virtual NativeImagePtr nativeImageForCurrentFrame() { return frameAtIndex(currentFrame()); }
+    virtual NativeImagePtr nativeImageForCurrentFrame();
     bool frameHasAlphaAtIndex(size_t);
-    virtual bool currentFrameHasAlpha() { return frameHasAlphaAtIndex(currentFrame()); }
+    virtual bool currentFrameHasAlpha();
+
+    ImageOrientation currentFrameOrientation();
+    ImageOrientation frameOrientationAtIndex(size_t);
 
 #if !ASSERT_DISABLED
-    virtual bool notSolidColor()
-    {
-        return size().width() != 1 || size().height() != 1 || frameCount() > 1;
-    }
+    virtual bool notSolidColor();
 #endif
 
 protected:
@@ -171,11 +188,15 @@ protected:
 
     BitmapImage(NativeImagePtr, ImageObserver* = 0);
     BitmapImage(ImageObserver* = 0);
+#if PLATFORM(WX)
+    BitmapImage(const wxBitmap&);
+#endif
 
 #if PLATFORM(WIN)
     virtual void drawFrameMatchingSourceSize(GraphicsContext*, const FloatRect& dstRect, const IntSize& srcSize, ColorSpace styleColorSpace, CompositeOperator);
 #endif
     virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator);
+    void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, RespectImageOrientationEnum);
 
 #if (OS(WINCE) && !PLATFORM(QT))
     virtual void drawPattern(GraphicsContext*, const FloatRect& srcRect, const AffineTransform& patternTransform,
@@ -190,6 +211,8 @@ protected:
 
     // Decodes and caches a frame. Never accessed except internally.
     void cacheFrame(size_t index);
+    // Called before accessing m_frames[index]. Returns false on index out of bounds.
+    bool ensureFrameIsCached(size_t index);
 
     // Called to invalidate cached data.  When |destroyAll| is true, we wipe out
     // the entire frame buffer cache and tell the image source to destroy
@@ -239,22 +262,12 @@ protected:
     // changed.
     void checkForSolidColor();
     
-    virtual bool mayFillWithSolidColor()
-    {
-        if (!m_checkedForSolidColor && frameCount() > 0) {
-            checkForSolidColor();
-            // WINCE PORT: checkForSolidColor() doesn't set m_checkedForSolidColor until
-            // it gets enough information to make final decision.
-#if !OS(WINCE)
-            ASSERT(m_checkedForSolidColor);
-#endif
-        }
-        return m_isSolidColor && m_currentFrame == 0;
-    }
-    virtual Color solidColor() const { return m_solidColor; }
+    virtual bool mayFillWithSolidColor();
+    virtual Color solidColor() const;
     
     ImageSource m_source;
     mutable IntSize m_size; // The size to use for the overall image (will just be the size of the first image).
+    mutable IntSize m_sizeRespectingOrientation;
     
     size_t m_currentFrame; // The index of the current frame of animation.
     Vector<FrameData> m_frames; // An array of the cached frames of the animation. We have to ref frames to pin them in the cache.

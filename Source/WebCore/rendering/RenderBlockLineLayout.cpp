@@ -123,18 +123,18 @@ inline void LineWidth::updateAvailableWidth()
 
 inline void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::FloatingObject* newFloat)
 {
-    int height = m_block->logicalHeight();
+    LayoutUnit height = m_block->logicalHeight();
     if (height < m_block->logicalTopForFloat(newFloat) || height >= m_block->logicalBottomForFloat(newFloat))
         return;
 
     if (newFloat->type() == RenderBlock::FloatingObject::FloatLeft) {
         m_left = m_block->pixelSnappedLogicalRightForFloat(newFloat);
         if (m_isFirstLine && m_block->style()->isLeftToRightDirection())
-            m_left += m_block->textIndentOffset();
+            m_left += floorToInt(m_block->textIndentOffset());
     } else {
         m_right = m_block->pixelSnappedLogicalLeftForFloat(newFloat);
         if (m_isFirstLine && !m_block->style()->isLeftToRightDirection())
-            m_right -= m_block->textIndentOffset();
+            m_right -= floorToInt(m_block->textIndentOffset());
     }
 
     computeAvailableWidthFromLeftAndRight();
@@ -159,8 +159,8 @@ void LineWidth::fitBelowFloats()
     ASSERT(!m_committedWidth);
     ASSERT(!fitsOnLine());
 
-    int floatLogicalBottom;
-    int lastFloatLogicalBottom = m_block->logicalHeight();
+    LayoutUnit floatLogicalBottom;
+    LayoutUnit lastFloatLogicalBottom = m_block->logicalHeight();
     float newLineWidth = m_availableWidth;
     float newLineLeft = m_left;
     float newLineRight = m_right;
@@ -522,7 +522,7 @@ RootInlineBox* RenderBlock::constructLine(BidiRunList<BidiRun>& bidiRuns, const 
             InlineTextBox* text = toInlineTextBox(box);
             text->setStart(r->m_start);
             text->setLen(r->m_stop - r->m_start);
-            text->m_dirOverride = r->dirOverride(visuallyOrdered);
+            text->setDirOverride(r->dirOverride(visuallyOrdered));
             if (r->m_hasHyphen)
                 text->setHasHyphen(true);
         }
@@ -654,7 +654,7 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
             glyphOverflow.computeBounds = true; 
     }
     
-    int hyphenWidth = 0;
+    LayoutUnit hyphenWidth = 0;
     if (toInlineTextBox(run->m_box)->hasHyphen()) {
         const Font& font = renderer->style(lineInfo.isFirstLine())->font();
         hyphenWidth = measureHyphenWidth(renderer, font);
@@ -662,14 +662,14 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
     run->m_box->setLogicalWidth(renderer->width(run->m_start, run->m_stop - run->m_start, xPos, lineInfo.isFirstLine(), &fallbackFonts, &glyphOverflow) + hyphenWidth);
     if (!fallbackFonts.isEmpty()) {
         ASSERT(run->m_box->isText());
-        GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.add(toInlineTextBox(run->m_box), make_pair(Vector<const SimpleFontData*>(), GlyphOverflow())).first;
+        GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.add(toInlineTextBox(run->m_box), make_pair(Vector<const SimpleFontData*>(), GlyphOverflow())).iterator;
         ASSERT(it->second.first.isEmpty());
         copyToVector(fallbackFonts, it->second.first);
         run->m_box->parent()->clearDescendantsHaveSameLineHeightAndBaseline();
     }
     if ((glyphOverflow.top || glyphOverflow.bottom || glyphOverflow.left || glyphOverflow.right)) {
         ASSERT(run->m_box->isText());
-        GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.add(toInlineTextBox(run->m_box), make_pair(Vector<const SimpleFontData*>(), GlyphOverflow())).first;
+        GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.add(toInlineTextBox(run->m_box), make_pair(Vector<const SimpleFontData*>(), GlyphOverflow())).iterator;
         it->second.second = glyphOverflow;
         run->m_box->clearKnownToHaveNoOverflow();
     }
@@ -1096,8 +1096,8 @@ public:
     void updateRepaintRangeFromBox(RootInlineBox* box, LayoutUnit paginationDelta = 0)
     {
         m_usesRepaintBounds = true;
-        m_repaintLogicalTop = min(m_repaintLogicalTop, box->logicalTopVisualOverflow() + min(paginationDelta, zeroLayoutUnit));
-        m_repaintLogicalBottom = max(m_repaintLogicalBottom, box->logicalBottomVisualOverflow() + max(paginationDelta, zeroLayoutUnit));
+        m_repaintLogicalTop = min(m_repaintLogicalTop, box->logicalTopVisualOverflow() + min(paginationDelta, ZERO_LAYOUT_UNIT));
+        m_repaintLogicalBottom = max(m_repaintLogicalBottom, box->logicalBottomVisualOverflow() + max(paginationDelta, ZERO_LAYOUT_UNIT));
     }
     
     bool endLineMatched() const { return m_endLineMatched; }
@@ -1109,8 +1109,8 @@ public:
     LineInfo& lineInfo() { return m_lineInfo; }
     const LineInfo& lineInfo() const { return m_lineInfo; }
 
-    int endLineLogicalTop() const { return m_endLineLogicalTop; }
-    void setEndLineLogicalTop(int logicalTop) { m_endLineLogicalTop = logicalTop; }
+    LayoutUnit endLineLogicalTop() const { return m_endLineLogicalTop; }
+    void setEndLineLogicalTop(LayoutUnit logicalTop) { m_endLineLogicalTop = logicalTop; }
 
     RootInlineBox* endLine() const { return m_endLine; }
     void setEndLine(RootInlineBox* line) { m_endLine = line; }
@@ -1129,7 +1129,7 @@ private:
     RootInlineBox* m_endLine;
     LineInfo m_lineInfo;
     unsigned m_floatIndex;
-    int m_endLineLogicalTop;
+    LayoutUnit m_endLineLogicalTop;
     bool m_endLineMatched;
     bool m_checkForFloatsFromLastLine;
     
@@ -1171,8 +1171,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     // determineStartPosition can change the fullLayout flag we have to do this here. Failure to call
     // determineStartPosition first will break fast/repaint/line-flow-with-floats-9.html.
     if (layoutState.isFullLayout() && hasInlineChild && !selfNeedsLayout()) {
-        setNeedsLayout(true, false);  // Mark ourselves as needing a full layout. This way we'll repaint like
-        // we're supposed to.
+        setNeedsLayout(true, MarkOnlyThis); // Mark as needing a full layout to force us to repaint.
         RenderView* v = view();
         if (v && !v->doingFullRepaint() && hasLayer()) {
             // Because we waited until we were already inside layout to discover
@@ -1400,19 +1399,19 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
         // This has to be done before adding in the bottom border/padding, or the float will
         // include the padding incorrectly. -dwh
         if (layoutState.checkForFloatsFromLastLine()) {
-            int bottomVisualOverflow = lastRootBox()->logicalBottomVisualOverflow();
-            int bottomLayoutOverflow = lastRootBox()->logicalBottomLayoutOverflow();
+            LayoutUnit bottomVisualOverflow = lastRootBox()->logicalBottomVisualOverflow();
+            LayoutUnit bottomLayoutOverflow = lastRootBox()->logicalBottomLayoutOverflow();
             TrailingFloatsRootInlineBox* trailingFloatsLineBox = new (renderArena()) TrailingFloatsRootInlineBox(this);
             m_lineBoxes.appendLineBox(trailingFloatsLineBox);
             trailingFloatsLineBox->setConstructed();
             GlyphOverflowAndFallbackFontsMap textBoxDataMap;
             VerticalPositionCache verticalPositionCache;
-            int blockLogicalHeight = logicalHeight();
+            LayoutUnit blockLogicalHeight = logicalHeight();
             trailingFloatsLineBox->alignBoxesInBlockDirection(blockLogicalHeight, textBoxDataMap, verticalPositionCache);
             trailingFloatsLineBox->setLineTopBottomPositions(blockLogicalHeight, blockLogicalHeight, blockLogicalHeight, blockLogicalHeight);
             trailingFloatsLineBox->setPaginatedLineWidth(availableLogicalWidthForContent(blockLogicalHeight));
-            IntRect logicalLayoutOverflow(0, blockLogicalHeight, 1, bottomLayoutOverflow - blockLogicalHeight);
-            IntRect logicalVisualOverflow(0, blockLogicalHeight, 1, bottomVisualOverflow - blockLogicalHeight);
+            LayoutRect logicalLayoutOverflow(0, blockLogicalHeight, 1, bottomLayoutOverflow - blockLogicalHeight);
+            LayoutRect logicalVisualOverflow(0, blockLogicalHeight, 1, bottomVisualOverflow - blockLogicalHeight);
             trailingFloatsLineBox->setOverflowFromLogicalRects(logicalLayoutOverflow, logicalVisualOverflow, trailingFloatsLineBox->lineTop(), trailingFloatsLineBox->lineBottom());
         }
 
@@ -1487,11 +1486,11 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
                 RenderBox* box = toRenderBox(o);
 
                 if (relayoutChildren || box->hasRelativeDimensions())
-                    o->setChildNeedsLayout(true, false);
+                    o->setChildNeedsLayout(true, MarkOnlyThis);
 
                 // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
                 if (relayoutChildren && box->needsPreferredWidthsRecalculation())
-                    o->setPreferredLogicalWidthsDirty(true, false);
+                    o->setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
 
                 if (o->isPositioned())
                     o->containingBlock()->insertPositionedObject(box);
@@ -1517,7 +1516,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
     // Expand the last line to accommodate Ruby and emphasis marks.
     int lastLineAnnotationsAdjustment = 0;
     if (lastRootBox()) {
-        int lowestAllowedPosition = max(lastRootBox()->lineBottom(), logicalHeight() + paddingAfter());
+        LayoutUnit lowestAllowedPosition = max(lastRootBox()->lineBottom(), logicalHeight() + paddingAfter());
         if (!style()->isFlippedLinesWritingMode())
             lastLineAnnotationsAdjustment = lastRootBox()->computeUnderAnnotationAdjustment(lowestAllowedPosition);
         else
@@ -1557,7 +1556,7 @@ void RenderBlock::checkFloatsInCleanLine(RootInlineBox* line, Vector<FloatWithRe
             LayoutUnit floatTop = isHorizontalWritingMode() ? floats[floatIndex].rect.y() : floats[floatIndex].rect.x();
             LayoutUnit floatHeight = isHorizontalWritingMode() ? max(floats[floatIndex].rect.height(), newSize.height())
                                                                  : max(floats[floatIndex].rect.width(), newSize.width());
-            floatHeight = min(floatHeight, numeric_limits<LayoutUnit>::max() - floatTop);
+            floatHeight = min(floatHeight, MAX_LAYOUT_UNIT - floatTop);
             line->markDirty();
             markLinesDirtyInBlockRange(line->lineBottomWithLeading(), floatTop + floatHeight, line);
             floats[floatIndex].rect.setSize(newSize);
@@ -1758,7 +1757,7 @@ bool RenderBlock::checkPaginationAndFloatsAtEndLine(LineLayoutState& layoutState
     while (RootInlineBox* nextLine = lastLine->nextRootBox())
         lastLine = nextLine;
 
-    LayoutUnit logicalBottom = lastLine->lineBottomWithLeading() + abs(lineDelta);
+    LayoutUnit logicalBottom = lastLine->lineBottomWithLeading() + absoluteValue(lineDelta);
 
     const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
     FloatingObjectSetIterator end = floatingObjectSet.end();
@@ -1948,6 +1947,7 @@ static inline float textWidth(RenderText* text, unsigned from, unsigned len, con
     run.setCharactersLength(text->textLength() - from);
     ASSERT(run.charactersLength() >= run.length());
 
+    run.setCharacterScanForCodePath(!text->canUseSimpleFontCodePath());
     run.setAllowTabs(!collapseWhiteSpace);
     run.setXPos(xPos);
     return font.width(run);
@@ -2666,7 +2666,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
 
 void RenderBlock::addOverflowFromInlineChildren()
 {
-    LayoutUnit endPadding = hasOverflowClip() ? paddingEnd() : zeroLayoutUnit;
+    LayoutUnit endPadding = hasOverflowClip() ? paddingEnd() : ZERO_LAYOUT_UNIT;
     // FIXME: Need to find another way to do this, since scrollbars could show when we don't want them to.
     if (hasOverflowClip() && !endPadding && node() && node()->rendererIsEditable() && node() == node()->rootEditableElement() && style()->isLeftToRightDirection())
         endPadding = 1;
@@ -2690,8 +2690,8 @@ void RenderBlock::checkLinesForTextOverflow()
     const Font& font = style()->font();
     DEFINE_STATIC_LOCAL(AtomicString, ellipsisStr, (&horizontalEllipsis, 1));
     const Font& firstLineFont = firstLineStyle()->font();
-    LayoutUnit firstLineEllipsisWidth = firstLineFont.width(constructTextRun(this, firstLineFont, &horizontalEllipsis, 1, firstLineStyle()));
-    LayoutUnit ellipsisWidth = (font == firstLineFont) ? firstLineEllipsisWidth : font.width(constructTextRun(this, font, &horizontalEllipsis, 1, style()));
+    int firstLineEllipsisWidth = firstLineFont.width(constructTextRun(this, firstLineFont, &horizontalEllipsis, 1, firstLineStyle()));
+    int ellipsisWidth = (font == firstLineFont) ? firstLineEllipsisWidth : font.width(constructTextRun(this, font, &horizontalEllipsis, 1, style()));
 
     // For LTR text truncation, we want to get the right edge of our padding box, and then we want to see
     // if the right edge of a line box exceeds that.  For RTL, we use the left edge of the padding box and
@@ -2750,7 +2750,7 @@ bool RenderBlock::positionNewFloatOnLine(FloatingObject* newFloat, FloatingObjec
             RenderBox* o = f->m_renderer;
             setLogicalTopForChild(o, logicalTopForChild(o) + marginBeforeForChild(o) + paginationStrut);
             if (o->isRenderBlock())
-                toRenderBlock(o)->setChildNeedsLayout(true, false);
+                toRenderBlock(o)->setChildNeedsLayout(true, MarkOnlyThis);
             o->layoutIfNeeded();
             // Save the old logical top before calling removePlacedObject which will set
             // isPlaced to false. Otherwise it will trigger an assert in logicalTopForFloat.

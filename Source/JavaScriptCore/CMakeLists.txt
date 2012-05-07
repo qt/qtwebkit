@@ -17,7 +17,7 @@ SET(JavaScriptCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/runtime"
     "${JAVASCRIPTCORE_DIR}/tools"
     "${JAVASCRIPTCORE_DIR}/yarr"
-    "${JAVASCRIPTCORE_DIR}/wtf"
+    "${WTF_DIR}"
     "${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}"
     "${CMAKE_SOURCE_DIR}/Source"
 )
@@ -58,7 +58,6 @@ SET(JavaScriptCore_SOURCES
     bytecompiler/NodesCodegen.cpp
 
     dfg/DFGAbstractState.cpp
-    dfg/DFGArithNodeFlagsInferencePhase.cpp
     dfg/DFGAssemblyHelpers.cpp
     dfg/DFGByteCodeParser.cpp
     dfg/DFGCapabilities.cpp
@@ -66,9 +65,10 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGCorrectableJumpPoint.cpp
     dfg/DFGCSEPhase.cpp
     dfg/DFGDriver.cpp
+    dfg/DFGFixupPhase.cpp
     dfg/DFGGraph.cpp
     dfg/DFGJITCompiler.cpp
-    dfg/DFGNode.cpp
+    dfg/DFGNodeFlags.cpp
     dfg/DFGOSREntry.cpp
     dfg/DFGOSRExit.cpp
     dfg/DFGOSRExitCompiler.cpp
@@ -85,17 +85,21 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGThunks.cpp
     dfg/DFGVirtualRegisterAllocationPhase.cpp
 
+    heap/BlockAllocator.cpp
     heap/CopiedSpace.cpp
+    heap/ConservativeRoots.cpp
     heap/DFGCodeBlocks.cpp
-    heap/Heap.cpp
-    heap/HandleHeap.cpp
+    heap/HandleSet.cpp
     heap/HandleStack.cpp
+    heap/Heap.cpp
     heap/MachineStackMarker.cpp
     heap/MarkedAllocator.cpp
     heap/MarkedBlock.cpp
     heap/MarkedSpace.cpp
-    heap/ConservativeRoots.cpp
     heap/MarkStack.cpp
+    heap/WeakSet.cpp
+    heap/WeakHandleOwner.cpp
+    heap/WeakBlock.cpp
 
     debugger/Debugger.cpp
     debugger/DebuggerActivation.cpp
@@ -163,7 +167,6 @@ SET(JavaScriptCore_SOURCES
     runtime/JSActivation.cpp
     runtime/JSAPIValueWrapper.cpp
     runtime/JSArray.cpp
-    runtime/JSByteArray.cpp
     runtime/JSCell.cpp
     runtime/JSDateMath.cpp
     runtime/JSFunction.cpp
@@ -179,6 +182,7 @@ SET(JavaScriptCore_SOURCES
     runtime/JSPropertyNameIterator.cpp
     runtime/JSStaticScopeObject.cpp
     runtime/JSString.cpp
+    runtime/JSStringJoiner.cpp
     runtime/JSValue.cpp
     runtime/JSVariableObject.cpp
     runtime/JSWrapperObject.cpp
@@ -200,6 +204,8 @@ SET(JavaScriptCore_SOURCES
     runtime/RegExp.cpp
     runtime/RegExpCache.cpp
     runtime/RegExpConstructor.cpp
+    runtime/RegExpCachedResult.cpp
+    runtime/RegExpMatchesArray.cpp
     runtime/RegExpObject.cpp
     runtime/RegExpPrototype.cpp
     runtime/ScopeChain.cpp
@@ -217,6 +223,7 @@ SET(JavaScriptCore_SOURCES
     tools/CodeProfile.cpp
     tools/CodeProfiling.cpp
 
+    yarr/YarrCanonicalizeUCS2.cpp
     yarr/YarrPattern.cpp
     yarr/YarrInterpreter.cpp
     yarr/YarrJIT.cpp
@@ -295,7 +302,6 @@ ENDIF ()
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 
-ADD_SUBDIRECTORY(wtf)
 ADD_SUBDIRECTORY(shell)
 
 WEBKIT_WRAP_SOURCELIST(${JavaScriptCore_SOURCES})
@@ -303,6 +309,7 @@ INCLUDE_DIRECTORIES(${JavaScriptCore_INCLUDE_DIRECTORIES})
 ADD_DEFINITIONS(-DBUILDING_JavaScriptCore)
 ADD_LIBRARY(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARY_TYPE} ${JavaScriptCore_HEADERS} ${JavaScriptCore_SOURCES})
 TARGET_LINK_LIBRARIES(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARIES})
+SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")
 SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
 
 IF (JavaScriptCore_LINK_FLAGS)

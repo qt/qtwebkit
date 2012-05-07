@@ -21,7 +21,7 @@
 #include "config.h"
 #include "GeolocationClientGtk.h"
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
 
 #include "Chrome.h"
 #include "ChromeClient.h"
@@ -29,6 +29,8 @@
 #include "GeolocationController.h"
 #include "GeolocationError.h"
 #include "GeolocationPosition.h"
+#include "webkitgeolocationpolicydecisionprivate.h"
+#include "webkitwebframeprivate.h"
 #include "webkitwebviewprivate.h"
 #include <glib/gi18n-lib.h>
 
@@ -138,12 +140,18 @@ WebCore::GeolocationPosition* GeolocationClient::lastPosition()
 
 void GeolocationClient::requestPermission(WebCore::Geolocation* geolocation)
 {
-    core(m_webView)->chrome()->client()->requestGeolocationPermissionForFrame(geolocation->frame(), geolocation);
+    WebKitWebFrame* webFrame = kit(geolocation->frame());
+    GRefPtr<WebKitGeolocationPolicyDecision> policyDecision(adoptGRef(webkit_geolocation_policy_decision_new(webFrame, geolocation)));
+
+    gboolean isHandled = FALSE;
+    g_signal_emit_by_name(m_webView, "geolocation-policy-decision-requested", webFrame, policyDecision.get(), &isHandled);
+    if (!isHandled)
+        webkit_geolocation_policy_deny(policyDecision.get());
 }
 
 void GeolocationClient::cancelPermissionRequest(WebCore::Geolocation* geolocation)
 {
-    core(m_webView)->chrome()->client()->cancelGeolocationPermissionRequestForFrame(geolocation->frame(), geolocation);
+    g_signal_emit_by_name(m_webView, "geolocation-policy-decision-cancelled", kit(geolocation->frame()));
 }
 
 void GeolocationClient::positionChanged(GeocluePosition*, GeocluePositionFields fields, int timestamp, double latitude, double longitude, double altitude, GeoclueAccuracy* accuracy)
@@ -167,15 +175,15 @@ void GeolocationClient::updatePosition()
 {
     m_lastPosition = WebCore::GeolocationPosition::create(static_cast<double>(m_timestamp), m_latitude, m_longitude, m_accuracy,
                                                           true, m_altitude, true, m_altitudeAccuracy, false, 0, false, 0);
-    core(m_webView)->geolocationController()->positionChanged(m_lastPosition.get());
+    WebCore::GeolocationController::from(core(m_webView))->positionChanged(m_lastPosition.get());
 }
 
 void GeolocationClient::errorOccured(const char* message)
 {
     RefPtr<WebCore::GeolocationError> error = WebCore::GeolocationError::create(WebCore::GeolocationError::PositionUnavailable, message);
-    core(m_webView)->geolocationController()->errorOccurred(error.get());
+    WebCore::GeolocationController::from(core(m_webView))->errorOccurred(error.get());
 }
 
 }
 
-#endif // ENABLE(CLIENT_BASED_GEOLOCATION)
+#endif // ENABLE(GEOLOCATION)

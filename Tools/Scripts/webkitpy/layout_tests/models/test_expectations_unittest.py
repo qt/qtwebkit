@@ -225,12 +225,6 @@ SKIP : failures/expected/image.html""", is_lint_mode=True)
             'BUG_TEST DEBUG : failures/expected/text.html = TEXT\nBUG_TEST DEBUG : failures/expected/text.html = TEXT',
             is_lint_mode=True)
 
-    def test_error_on_different_graphics_type(self):
-        # parse_exp uses a CPU port. Assert errors on GPU show up in lint mode.
-        self.assertRaises(ParseError, self.parse_exp,
-            'BUG_TEST GPU : failures/expected/text.html = TEXT\nBUG_TEST GPU : failures/expected/text.html = TEXT',
-            is_lint_mode=True)
-
     def test_overrides(self):
         self.parse_exp("BUG_EXP: failures/expected/text.html = TEXT",
                        "BUG_OVERRIDE : failures/expected/text.html = IMAGE")
@@ -266,19 +260,41 @@ SKIP : failures/expected/image.html""", is_lint_mode=True)
                                                      'failures/expected/text.html') in
                          self._exp.get_tests_with_result_type(SKIP))
 
-    def test_add_skipped_tests(self):
-        port = MockHost().port_factory.get('qt')
-        port._filesystem.files[port._filesystem.join(port.layout_tests_dir(), 'platform/qt/Skipped')] = 'failures/expected/text.html'
-        port._filesystem.files[port._filesystem.join(port.layout_tests_dir(), 'failures/expected/text.html')] = 'foo'
-        expectations = TestExpectations(port, tests=['failures/expected/text.html'], expectations='', test_config=port.test_configuration())
-        self.assertEquals(expectations.get_modifiers('failures/expected/text.html'), [TestExpectationParser.DUMMY_BUG_MODIFIER, TestExpectationParser.SKIP_MODIFIER])
-        self.assertEquals(expectations.get_expectations('failures/expected/text.html'), set([PASS]))
 
-    def test_add_skipped_tests_duplicate(self):
+class SkippedTests(Base):
+    def check(self, expectations, overrides, skips, lint=False):
         port = MockHost().port_factory.get('qt')
-        port._filesystem.files[port._filesystem.join(port.layout_tests_dir(), 'platform/qt/Skipped')] = 'failures/expected/text.html'
-        port._filesystem.files[port._filesystem.join(port.layout_tests_dir(), 'failures/expected/text.html')] = 'foo'
-        self.assertRaises(ParseError, TestExpectations, port, tests=['failures/expected/text.html'], expectations='BUGX : failures/expected/text.html = text\n', test_config=port.test_configuration(), is_lint_mode=True)
+        port._filesystem.write_text_file(port._filesystem.join(port.layout_tests_dir(), 'failures/expected/text.html'), 'foo')
+        exp = TestExpectations(port, tests=['failures/expected/text.html'],
+                               expectations=expectations, overrides=overrides, is_lint_mode=lint,
+                               test_config=port.test_configuration(), skipped_tests=set(skips))
+
+        # Check that the expectation is for BUG_DUMMY SKIP : ... = PASS
+        self.assertEquals(exp.get_modifiers('failures/expected/text.html'),
+                          [TestExpectationParser.DUMMY_BUG_MODIFIER, TestExpectationParser.SKIP_MODIFIER])
+        self.assertEquals(exp.get_expectations('failures/expected/text.html'), set([PASS]))
+
+    def test_skipped_tests_work(self):
+        self.check(expectations='', overrides=None, skips=['failures/expected/text.html'])
+
+    def test_duplicate_skipped_test_fails_lint(self):
+        self.assertRaises(ParseError, self.check, expectations='BUGX : failures/expected/text.html = text\n', overrides=None, skips=['failures/expected/text.html'], lint=True)
+
+    def test_skipped_file_overrides_expectations(self):
+        self.check(expectations='BUGX : failures/expected/text.html = TEXT\n', overrides=None,
+                   skips=['failures/expected/text.html'])
+
+    def test_skipped_dir_overrides_expectations(self):
+        self.check(expectations='BUGX : failures/expected/text.html = TEXT\n', overrides=None,
+                   skips=['failures/expected'])
+
+    def test_skipped_file_overrides_overrides(self):
+        self.check(expectations='', overrides='BUGX : failures/expected/text.html = TEXT\n',
+                   skips=['failures/expected/text.html'])
+
+    def test_skipped_dir_overrides_overrides(self):
+        self.check(expectations='', overrides='BUGX : failures/expected/text.html = TEXT\n',
+                   skips=['failures/expected'])
 
 
 class ExpectationSyntaxTests(Base):
@@ -384,6 +400,53 @@ BUGX : failures/expected/text.html = TEXT
     def test_macro_overrides(self):
         self.assert_bad_expectations("BUG_TEST WIN : passes/text.html = PASS\n"
                                      "BUG_TEST XP : passes/text.html = TEXT\n")
+
+
+class RemoveConfigurationsTest(Base):
+    def test_remove(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        expectations = TestExpectations(test_port,
+             tests=self.get_basic_tests(),
+             expectations="""BUGX LINUX WIN RELEASE : failures/expected/foo.html = TEXT
+BUGY WIN MAC DEBUG : failures/expected/foo.html = CRASH
+""",
+             test_config=test_config,
+             is_lint_mode=False,
+             overrides=None)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+
+        self.assertEqual("""BUGX LINUX VISTA WIN7 RELEASE : failures/expected/foo.html = TEXT
+BUGY WIN MAC DEBUG : failures/expected/foo.html = CRASH
+""", actual_expectations)
+
+    def test_remove_line(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        expectations = TestExpectations(test_port,
+             tests=None,
+             expectations="""BUGX WIN RELEASE : failures/expected/foo.html = TEXT
+BUGY WIN DEBUG : failures/expected/foo.html = CRASH
+""",
+             test_config=test_config,
+             is_lint_mode=False,
+             overrides=None)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-vista', None).test_configuration())
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
+
+        self.assertEqual("""BUGY WIN DEBUG : failures/expected/foo.html = CRASH
+""", actual_expectations)
 
 
 class RebaseliningTest(Base):
@@ -525,12 +588,10 @@ class TestExpectationSerializerTests(unittest.TestCase):
         expectation_line.name = 'test/name/for/realz.html'
         expectation_line.parsed_expectations = set([IMAGE])
         self.assertEqual(self._serializer.to_string(expectation_line), None)
-        expectation_line.matching_configurations = set([TestConfiguration('xp', 'x86', 'release', 'cpu')])
-        self.assertEqual(self._serializer.to_string(expectation_line), 'BUGX XP RELEASE CPU : test/name/for/realz.html = IMAGE')
-        expectation_line.matching_configurations = set([TestConfiguration('xp', 'x86', 'release', 'cpu'), TestConfiguration('xp', 'x86', 'release', 'gpu')])
+        expectation_line.matching_configurations = set([TestConfiguration('xp', 'x86', 'release')])
         self.assertEqual(self._serializer.to_string(expectation_line), 'BUGX XP RELEASE : test/name/for/realz.html = IMAGE')
-        expectation_line.matching_configurations = set([TestConfiguration('xp', 'x86', 'release', 'cpu'), TestConfiguration('xp', 'x86', 'debug', 'gpu')])
-        self.assertEqual(self._serializer.to_string(expectation_line), 'BUGX XP RELEASE CPU : test/name/for/realz.html = IMAGE\nBUGX XP DEBUG GPU : test/name/for/realz.html = IMAGE')
+        expectation_line.matching_configurations = set([TestConfiguration('xp', 'x86', 'release'), TestConfiguration('xp', 'x86', 'debug')])
+        self.assertEqual(self._serializer.to_string(expectation_line), 'BUGX XP : test/name/for/realz.html = IMAGE')
 
     def test_parsed_expectations_string(self):
         expectation_line = TestExpectationLine()
@@ -610,13 +671,12 @@ class TestExpectationSerializerTests(unittest.TestCase):
             if reconstitute:
                 reconstitute_only_these.append(expectation_line)
 
-        add_line(set([TestConfiguration('xp', 'x86', 'release', 'cpu')]), False)
-        add_line(set([TestConfiguration('xp', 'x86', 'release', 'cpu'), TestConfiguration('xp', 'x86', 'release', 'gpu')]), True)
-        add_line(set([TestConfiguration('xp', 'x86', 'release', 'cpu'), TestConfiguration('xp', 'x86', 'debug', 'gpu')]), False)
+        add_line(set([TestConfiguration('xp', 'x86', 'release')]), True)
+        add_line(set([TestConfiguration('xp', 'x86', 'release'), TestConfiguration('xp', 'x86', 'debug')]), False)
         serialized = TestExpectationSerializer.list_to_string(lines, self._converter)
-        self.assertEquals(serialized, "BUGX XP RELEASE CPU : Yay = IMAGE\nBUGX XP RELEASE : Yay = IMAGE\nBUGX XP RELEASE CPU : Yay = IMAGE\nBUGX XP DEBUG GPU : Yay = IMAGE")
+        self.assertEquals(serialized, "BUGX XP RELEASE : Yay = IMAGE\nBUGX XP : Yay = IMAGE")
         serialized = TestExpectationSerializer.list_to_string(lines, self._converter, reconstitute_only_these=reconstitute_only_these)
-        self.assertEquals(serialized, "Nay\nBUGX XP RELEASE : Yay = IMAGE\nNay")
+        self.assertEquals(serialized, "BUGX XP RELEASE : Yay = IMAGE\nNay")
 
     def test_string_whitespace_stripping(self):
         self.assert_round_trip('\n', '')

@@ -38,24 +38,24 @@ class CCThread;
 // in face of millisecond-precision delayed callbacks and random queueing delays.
 class CCDelayBasedTimeSource : public CCTimeSource, CCTimerClient {
 public:
-    static PassRefPtr<CCDelayBasedTimeSource> create(double intervalMs, CCThread*);
+    static PassRefPtr<CCDelayBasedTimeSource> create(double intervalSeconds, CCThread*);
 
     virtual ~CCDelayBasedTimeSource() { }
 
-    virtual void setClient(CCTimeSourceClient* client) { m_client = client; }
+    virtual void setClient(CCTimeSourceClient* client) OVERRIDE { m_client = client; }
 
-    virtual void setActive(bool);
-    virtual bool active() const { return m_state != STATE_INACTIVE; }
+    virtual void setActive(bool) OVERRIDE;
+    virtual bool active() const OVERRIDE { return m_state != STATE_INACTIVE; }
 
     // CCTimerClient implementation.
-    virtual void onTimerFired();
+    virtual void onTimerFired() OVERRIDE;
 
     // Virtual for testing.
-    virtual double monotonicallyIncreasingTimeMs() const;
+    virtual double monotonicallyIncreasingTime() const;
 
 protected:
-    CCDelayBasedTimeSource(double intervalMs, CCThread*);
-    void postNextTickTask(double nowMs);
+    CCDelayBasedTimeSource(double interval, CCThread*);
+    void postNextTickTask(double now);
 
     enum State {
         STATE_INACTIVE,
@@ -64,7 +64,7 @@ protected:
     };
     CCTimeSourceClient* m_client;
     bool m_hasTickTarget;
-    double m_intervalMs;
+    double m_intervalSeconds;
     double m_tickTarget;
     State m_state;
     CCThread* m_thread;

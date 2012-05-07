@@ -28,7 +28,7 @@
 
 #include "V8AudioContext.h"
 
-#include "ArrayBuffer.h"
+#include <wtf/ArrayBuffer.h>
 #include "AudioBuffer.h"
 #include "AudioContext.h"
 #include "Frame.h"
@@ -61,14 +61,17 @@ v8::Handle<v8::Value> V8AudioContext::constructorCallback(const v8::Arguments& a
     
     if (!args.Length()) {
         // Constructor for default AudioContext which talks to audio hardware.
-        audioContext = AudioContext::create(document);
+        ExceptionCode ec = 0;
+        audioContext = AudioContext::create(document, ec);
+        if (ec)
+            return throwError(ec);
         if (!audioContext.get())
             return throwError("audio resources unavailable for AudioContext construction", V8Proxy::SyntaxError);
     } else {
         // Constructor for offline (render-target) AudioContext which renders into an AudioBuffer.
         // new AudioContext(in unsigned long numberOfChannels, in unsigned long numberOfFrames, in float sampleRate);
         if (args.Length() < 3)
-            return throwError("Not enough arguments", V8Proxy::SyntaxError);
+            return V8Proxy::throwNotEnoughArgumentsError();
 
         bool ok = false;
 

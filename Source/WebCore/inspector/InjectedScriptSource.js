@@ -422,9 +422,9 @@ InjectedScript.prototype = {
 
         // FireBug's array detection.
         try {
-            if (isFinite(obj.length) && typeof obj.splice === "function")
+            if (typeof obj.splice === "function" && isFinite(obj.length))
                 return "array";
-            if (isFinite(obj.length) && typeof obj.callee === "function") // arguments.
+            if (Object.prototype.toString.call(obj) === "[object Arguments]" && isFinite(obj.length)) // arguments.
                 return "array";
         } catch (e) {
         }
@@ -577,7 +577,7 @@ function CommandLineAPI(commandLineAPIImpl, callFrame)
 
 CommandLineAPI.members_ = [
     "$", "$$", "$x", "dir", "dirxml", "keys", "values", "profile", "profileEnd",
-    "monitorEvents", "unmonitorEvents", "inspect", "copy", "clear"
+    "monitorEvents", "unmonitorEvents", "inspect", "copy", "clear", "getEventListeners"
 ];
 
 function CommandLineAPIImpl()
@@ -683,6 +683,11 @@ CommandLineAPIImpl.prototype = {
     clear: function()
     {
         InjectedScriptHost.clearConsoleMessages();
+    },
+
+    getEventListeners: function(node)
+    {
+        return InjectedScriptHost.getEventListeners(node);
     },
 
     _inspectedObject: function(num)

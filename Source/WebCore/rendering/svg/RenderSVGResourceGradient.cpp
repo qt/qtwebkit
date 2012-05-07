@@ -29,8 +29,8 @@
 #include "GraphicsContext.h"
 #include "RenderSVGShape.h"
 #include "RenderSVGText.h"
-#include "SVGImageBufferTools.h"
 #include "SVGRenderSupport.h"
+#include "SVGRenderingContext.h"
 #include <wtf/UnusedParam.h>
 
 namespace WebCore {
@@ -68,11 +68,11 @@ static inline bool createMaskAndSwapContextForTextGradient(GraphicsContext*& con
     ASSERT(textRootBlock);
 
     AffineTransform absoluteTransform;
-    SVGImageBufferTools::calculateTransformationToOutermostSVGCoordinateSystem(textRootBlock, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(textRootBlock, absoluteTransform);
 
     FloatRect repaintRect = textRootBlock->repaintRectInLocalCoordinates();
     OwnPtr<ImageBuffer> maskImage;
-    if (!SVGImageBufferTools::createImageBuffer(repaintRect, absoluteTransform, maskImage, ColorSpaceDeviceRGB, Unaccelerated))
+    if (!SVGRenderingContext::createImageBuffer(repaintRect, absoluteTransform, maskImage, ColorSpaceDeviceRGB, Unaccelerated))
         return false;
 
     GraphicsContext* maskImageContext = maskImage->context();
@@ -95,10 +95,10 @@ static inline AffineTransform clipToTextMask(GraphicsContext* context,
     ASSERT(textRootBlock);
 
     AffineTransform absoluteTransform;
-    SVGImageBufferTools::calculateTransformationToOutermostSVGCoordinateSystem(textRootBlock, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(textRootBlock, absoluteTransform);
 
     targetRect = textRootBlock->repaintRectInLocalCoordinates();
-    SVGImageBufferTools::clipToImageBuffer(context, absoluteTransform, targetRect, imageBuffer);
+    SVGRenderingContext::clipToImageBuffer(context, absoluteTransform, targetRect, imageBuffer, false);
 
     AffineTransform matrix;
     if (boundingBoxMode) {
@@ -140,7 +140,7 @@ bool RenderSVGResourceGradient::applyResource(RenderObject* object, RenderStyle*
     if (gradientUnits() == SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX && objectBoundingBox.isEmpty())
         return false;
 
-    OwnPtr<GradientData>& gradientData = m_gradientMap.add(object, nullptr).first->second;
+    OwnPtr<GradientData>& gradientData = m_gradientMap.add(object, nullptr).iterator->second;
     if (!gradientData)
         gradientData = adoptPtr(new GradientData);
 

@@ -27,13 +27,13 @@
 
 #include "Attribute.h"
 #include "Document.h"
+#include "ElementShadow.h"
 #include "FormDataList.h"
 #include "HTMLNames.h"
 #include "HTMLSelectElement.h"
 #include "HTMLOptionElement.h"
 #include "SSLKeyGenerator.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 #include "Text.h"
 #include <wtf/StdLibExtras.h>
 
@@ -81,7 +81,7 @@ inline HTMLKeygenElement::HTMLKeygenElement(const QualifiedName& tagName, Docume
     RefPtr<HTMLSelectElement> select = KeygenSelectElement::create(document);
     ExceptionCode ec = 0;
     for (size_t i = 0; i < keys.size(); ++i) {
-        RefPtr<HTMLOptionElement> option = HTMLOptionElement::create(document, this->form());
+        RefPtr<HTMLOptionElement> option = HTMLOptionElement::create(document);
         select->appendChild(option, ec);
         option->appendChild(Text::create(document, keys[i]), ec);
     }
@@ -132,8 +132,8 @@ void HTMLKeygenElement::reset()
 HTMLSelectElement* HTMLKeygenElement::shadowSelect() const
 {
     ASSERT(hasShadowRoot());
-    ShadowRoot* shadow = shadowTree()->oldestShadowRoot();
-    return shadow ? toHTMLSelectElement(shadow->firstChild()) : 0;
+    ShadowRoot* root = this->shadow()->oldestShadowRoot();
+    return root ? toHTMLSelectElement(root->firstChild()) : 0;
 }
 
 } // namespace

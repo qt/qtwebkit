@@ -27,17 +27,18 @@
 #include "NodeRenderingContext.h"
 
 #include "ContainerNode.h"
+#include "ElementShadow.h"
+#include "FlowThreadController.h"
 #include "HTMLContentElement.h"
 #include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "HTMLShadowElement.h"
 #include "Node.h"
-#include "RenderFlowThread.h"
 #include "RenderFullScreen.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 
 #if ENABLE(SVG)
 #include "SVGNames.h"
@@ -54,7 +55,7 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
     : m_phase(AttachingNotInTree)
     , m_node(node)
     , m_parentNodeForRenderingAndStyle(0)
-    , m_visualParentShadowTree(0)
+    , m_visualParentShadow(0)
     , m_insertionPoint(0)
     , m_style(0)
     , m_parentFlowRenderer(0)
@@ -71,12 +72,12 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
 
     if (parent->isElementNode() || parent->isShadowRoot()) {
         if (parent->isElementNode() && toElement(parent)->hasShadowRoot())
-            m_visualParentShadowTree = toElement(parent)->shadowTree();
+            m_visualParentShadow = toElement(parent)->shadow();
         else if (parent->isShadowRoot())
-            m_visualParentShadowTree = toShadowRoot(parent)->tree();
+            m_visualParentShadow = toShadowRoot(parent)->owner();
 
-        if (m_visualParentShadowTree) {
-            if ((m_insertionPoint = m_visualParentShadowTree->insertionPointFor(m_node))) {
+        if (m_visualParentShadow) {
+            if ((m_insertionPoint = m_visualParentShadow->insertionPointFor(m_node))) {
                 if (toShadowRoot(m_insertionPoint->shadowTreeRootNode())->isUsedForRendering()) {
                     m_phase = AttachingDistributed;
                     m_parentNodeForRenderingAndStyle = NodeRenderingContext(m_insertionPoint).parentNodeForRenderingAndStyle();
@@ -100,7 +101,11 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
                 m_phase = AttachingNotFallbacked;
             else
                 m_phase = AttachingFallbacked;
-            m_parentNodeForRenderingAndStyle = NodeRenderingContext(parent).parentNodeForRenderingAndStyle();
+
+            if (toInsertionPoint(parent)->isActive())
+                m_parentNodeForRenderingAndStyle = NodeRenderingContext(parent).parentNodeForRenderingAndStyle();
+            else
+                m_parentNodeForRenderingAndStyle = parent;
             return;
         }
     }
@@ -113,7 +118,7 @@ NodeRenderingContext::NodeRenderingContext(Node* node, RenderStyle* style)
     : m_phase(Calculating)
     , m_node(node)
     , m_parentNodeForRenderingAndStyle(0)
-    , m_visualParentShadowTree(0)
+    , m_visualParentShadow(0)
     , m_insertionPoint(0)
     , m_style(style)
     , m_parentFlowRenderer(0)
@@ -201,7 +206,7 @@ static inline RenderObject* firstRendererOf(Node* node)
             return node->renderer();
         }
 
-        if (isInsertionPoint(node)) {
+        if (isInsertionPoint(node) && toInsertionPoint(node)->isActive()) {
             if (RenderObject* first = firstRendererOfInsertionPoint(toInsertionPoint(node)))
                 return first;
         }
@@ -219,7 +224,7 @@ static inline RenderObject* lastRendererOf(Node* node)
                 continue;
             return node->renderer();
         }
-        if (isInsertionPoint(node)) {
+        if (isInsertionPoint(node) && toInsertionPoint(node)->isActive()) {
             if (RenderObject* last = lastRendererOfInsertionPoint(toInsertionPoint(node)))
                 return last;
         }
@@ -288,8 +293,8 @@ RenderObject* NodeRenderingContext::parentRenderer() const
 
 void NodeRenderingContext::hostChildrenChanged()
 {
-    if (m_phase == AttachingNotDistributed && m_visualParentShadowTree)
-        m_visualParentShadowTree->hostChildrenChanged();
+    if (m_phase == AttachingNotDistributed && m_visualParentShadow)
+        m_visualParentShadow->hostChildrenChanged();
 }
 
 bool NodeRenderingContext::shouldCreateRenderer() const
@@ -317,6 +322,10 @@ void NodeRenderingContext::moveToFlowThreadIfNeeded()
     if (!m_node->isElementNode() || !m_style || m_style->flowThread().isEmpty())
         return;
 
+    // FIXME: Do not collect elements if they are in shadow tree.
+    if (m_node->isInShadowTree())
+        return;
+
 #if ENABLE(SVG)
     // Allow only svg root elements to be directly collected by a render flow thread.
     if (m_node->isSVGElement()
@@ -326,7 +335,9 @@ void NodeRenderingContext::moveToFlowThreadIfNeeded()
 
     m_flowThread = m_style->flowThread();
     ASSERT(m_node->document()->renderView());
-    m_parentFlowRenderer = m_node->document()->renderView()->ensureRenderFlowThreadWithName(m_flowThread);
+    FlowThreadController* flowThreadController = m_node->document()->renderView()->flowThreadController();
+    m_parentFlowRenderer = flowThreadController->ensureRenderFlowThreadWithName(m_flowThread);
+    flowThreadController->registerNamedFlowContentNode(m_node, m_parentFlowRenderer);
 }
 
 NodeRendererFactory::NodeRendererFactory(Node* node)

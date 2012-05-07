@@ -55,13 +55,17 @@
 #include <Evas.h>
 #include <wtf/text/CString.h>
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 #include "NotificationPresenterClientEfl.h"
 #endif
 
 #if ENABLE(SQL_DATABASE)
 #include "DatabaseDetails.h"
 #include "DatabaseTracker.h"
+#endif
+
+#if ENABLE(INPUT_TYPE_COLOR)
+#include "ColorChooserEfl.h"
 #endif
 
 using namespace WebCore;
@@ -302,7 +306,7 @@ bool ChromeClientEfl::shouldInterruptJavaScript()
 
 KeyboardUIMode ChromeClientEfl::keyboardUIMode()
 {
-    return KeyboardAccessTabsToLinks;
+    return ewk_view_setting_include_links_in_focus_chain_get(m_view) ? KeyboardAccessTabsToLinks : KeyboardAccessDefault;
 }
 
 IntRect ChromeClientEfl::windowResizerRect() const
@@ -339,7 +343,7 @@ IntPoint ChromeClientEfl::screenToRootView(const IntPoint& point) const
 
 PlatformPageClient ChromeClientEfl::platformPageClient() const
 {
-    return m_view;
+    return EWKPrivate::corePageClient(m_view);
 }
 
 void ChromeClientEfl::scrollbarsModeDidChange() const
@@ -417,11 +421,30 @@ void ChromeClientEfl::exceededDatabaseQuota(Frame* frame, const String& database
 }
 #endif
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 NotificationClient* ChromeClientEfl::notificationPresenter() const
 {
     notImplemented();
     return 0;
+}
+#endif
+
+#if ENABLE(INPUT_TYPE_COLOR)
+PassOwnPtr<ColorChooser> ChromeClientEfl::createColorChooser(ColorChooserClient* colorChooserClient, const Color& initialColor)
+{
+    ewk_view_color_chooser_new(m_view, colorChooserClient, initialColor);
+
+    return adoptPtr(new ColorChooserEfl(this));
+}
+
+void ChromeClientEfl::removeColorChooser()
+{
+    ewk_view_color_chooser_destroy(m_view);
+}
+
+void ChromeClientEfl::updateColorChooser(const Color& color)
+{
+    ewk_view_color_chooser_changed(m_view, color);
 }
 #endif
 
@@ -460,17 +483,6 @@ void ChromeClientEfl::setCursor(const Cursor&)
 }
 
 void ChromeClientEfl::setCursorHiddenUntilMouseMoves(bool)
-{
-    notImplemented();
-}
-
-void ChromeClientEfl::requestGeolocationPermissionForFrame(Frame*, Geolocation*)
-{
-    // See the comment in WebCore/page/ChromeClient.h
-    notImplemented();
-}
-
-void ChromeClientEfl::cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*)
 {
     notImplemented();
 }

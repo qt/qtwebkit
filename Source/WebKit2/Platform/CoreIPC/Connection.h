@@ -46,7 +46,7 @@
 class QSocketNotifier;
 #endif
 
-#if PLATFORM(QT) || PLATFORM(GTK)
+#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
 #include "PlatformProcessIdentifier.h"
 #endif
 
@@ -238,7 +238,7 @@ private:
     // Called on the listener thread.
     void dispatchConnectionDidClose();
     void dispatchMessage(IncomingMessage&);
-    void dispatchMessages();
+    void dispatchOneMessage();
     void dispatchSyncMessage(MessageID, ArgumentDecoder*);
     void didFailToSendSyncMessage();
 

@@ -115,7 +115,7 @@ WebInspector.ElementsPanel.prototype = {
         return [this.crumbsElement];
     },
 
-    get defaultFocusedElement()
+    defaultFocusedElement: function()
     {
         return this.treeOutline.element;
     },
@@ -349,7 +349,7 @@ WebInspector.ElementsPanel.prototype = {
                 return null;
 
             var resource = WebInspector.resourceTreeModel.resourceForURL(anchor.href);
-            if (!resource || resource.type !== WebInspector.Resource.Type.Image)
+            if (!resource || resource.type !== WebInspector.resourceTypes.Image)
                 return null;
 
             anchor.removeAttribute("title");
@@ -391,6 +391,10 @@ WebInspector.ElementsPanel.prototype = {
         }
     },
 
+    /**
+     * @param {Element} anchor
+     * @param {WebInspector.Popover} popover
+     */
     _showPopover: function(anchor, popover)
     {
         var listItem = anchor.enclosingNodeOrSelfWithNodeNameInArray(["li"]);
@@ -1110,6 +1114,9 @@ WebInspector.ElementsPanel.prototype = {
 
     setSearchingForNode: function(enabled)
     {
+        /**
+         * @param {?Protocol.Error} error
+         */
         function callback(error)
         {
             if (!error)

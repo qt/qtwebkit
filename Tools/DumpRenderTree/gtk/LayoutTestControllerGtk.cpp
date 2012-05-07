@@ -120,13 +120,7 @@ void LayoutTestController::keepWebHistory()
 
 JSValueRef LayoutTestController::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
 {
-    // FIXME: Implement this.
-    return JSValueMakeUndefined(context);
-}
-
-JSValueRef LayoutTestController::nodesFromRect(JSContextRef context, JSValueRef value, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
-{
-    return DumpRenderTreeSupportGtk::nodesFromRect(context, value, x, y, top, right, bottom, left, ignoreClipping);
+    return DumpRenderTreeSupportGtk::computedStyleIncludingVisitedInfo(context, value);
 }
 
 JSRetainPtr<JSStringRef> LayoutTestController::layerTreeAsText() const
@@ -153,11 +147,6 @@ JSRetainPtr<JSStringRef> LayoutTestController::pageProperty(const char* property
 {
     JSRetainPtr<JSStringRef> propertyValue(Adopt, JSStringCreateWithUTF8CString(DumpRenderTreeSupportGtk::pageProperty(mainFrame, propertyName, pageNumber).data()));
     return propertyValue;
-}
-
-bool LayoutTestController::isPageBoxVisible(int pageNumber) const
-{
-    return DumpRenderTreeSupportGtk::isPageBoxVisible(mainFrame, pageNumber);
 }
 
 JSRetainPtr<JSStringRef> LayoutTestController::pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const
@@ -292,7 +281,10 @@ void LayoutTestController::addOriginAccessWhitelistEntry(JSStringRef sourceOrigi
 
 void LayoutTestController::removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef protocol, JSStringRef host, bool includeSubdomains)
 {
-    // FIXME: implement
+    GOwnPtr<gchar> sourceOriginGChar(JSStringCopyUTF8CString(sourceOrigin));
+    GOwnPtr<gchar> protocolGChar(JSStringCopyUTF8CString(protocol));
+    GOwnPtr<gchar> hostGChar(JSStringCopyUTF8CString(host));
+    DumpRenderTreeSupportGtk::removeWhiteListAccessFromOrigin(sourceOriginGChar.get(), protocolGChar.get(), hostGChar.get(), includeSubdomains);
 }
 
 void LayoutTestController::setMainFrameIsFirstResponder(bool flag)
@@ -747,19 +739,22 @@ void LayoutTestController::syncLocalStorage()
     // FIXME: implement
 }
 
-void LayoutTestController::setDomainRelaxationForbiddenForURLScheme(bool, JSStringRef)
+void LayoutTestController::setDomainRelaxationForbiddenForURLScheme(bool forbidden, JSStringRef scheme)
 {
-    // FIXME: implement
+    GOwnPtr<gchar> urlScheme(JSStringCopyUTF8CString(scheme));
+    DumpRenderTreeSupportGtk::setDomainRelaxationForbiddenForURLScheme(forbidden, urlScheme.get());
 }
 
 void LayoutTestController::goBack()
 {
-    // FIXME: implement to enable loader/navigation-while-deferring-loads.html
+    WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
+    webkit_web_view_go_back(webView);
 }
 
-void LayoutTestController::setDefersLoading(bool)
+void LayoutTestController::setDefersLoading(bool defers)
 {
-    // FIXME: implement to enable loader/navigation-while-deferring-loads.html
+    WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
+    DumpRenderTreeSupportGtk::setDefersLoading(webView, defers);
 }
 
 void LayoutTestController::setAppCacheMaximumSize(unsigned long long size)
@@ -922,6 +917,11 @@ void LayoutTestController::evaluateInWebInspector(long callId, JSStringRef scrip
     g_free(scriptString);
 }
 
+void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
+{
+    // FIXME: Implement this.
+}
+
 void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
 {
     // FIXME: Implement this.
@@ -982,16 +982,6 @@ void LayoutTestController::abortModal()
 {
 }
 
-bool LayoutTestController::hasSpellingMarker(int from, int length)
-{
-    return DumpRenderTreeSupportGtk::webkitWebFrameSelectionHasSpellingMarker(mainFrame, from, length);
-}
-
-bool LayoutTestController::hasGrammarMarker(int from, int length)
-{
-    return false;
-}
-
 void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
 {
     WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
@@ -1037,4 +1027,14 @@ void LayoutTestController::setBackingScaleFactor(double)
 
 void LayoutTestController::simulateDesktopNotificationClick(JSStringRef title)
 {
+}
+
+void LayoutTestController::resetPageVisibility()
+{
+    // FIXME: Implement this.
+}
+
+void LayoutTestController::setPageVisibility(const char*)
+{
+    // FIXME: Implement this.
 }

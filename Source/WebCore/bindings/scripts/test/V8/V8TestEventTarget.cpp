@@ -38,7 +38,7 @@ namespace WebCore {
 
 WrapperTypeInfo V8TestEventTarget::info = { V8TestEventTarget::GetTemplate, V8TestEventTarget::derefObject, 0, 0 };
 
-namespace TestEventTargetInternal {
+namespace TestEventTargetV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
@@ -46,7 +46,7 @@ static v8::Handle<v8::Value> itemCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.TestEventTarget.item");
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
     TestEventTarget* imp = V8TestEventTarget::toNative(args.Holder());
     ExceptionCode ec = 0;
     {
@@ -55,10 +55,10 @@ static v8::Handle<v8::Value> itemCallback(const v8::Arguments& args)
         ec = INDEX_SIZE_ERR;
         goto fail;
     }
-    return toV8(imp->item(index));
+    return toV8(imp->item(index), args.GetIsolate());
     }
     fail:
-    V8Proxy::setDOMException(ec);
+    V8Proxy::setDOMException(ec, args.GetIsolate());
     return v8::Handle<v8::Value>();
 }
 
@@ -88,7 +88,7 @@ static v8::Handle<v8::Value> dispatchEventCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.TestEventTarget.dispatchEvent");
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
     TestEventTarget* imp = V8TestEventTarget::toNative(args.Holder());
     ExceptionCode ec = 0;
     {
@@ -99,16 +99,16 @@ static v8::Handle<v8::Value> dispatchEventCallback(const v8::Arguments& args)
     return v8Boolean(result);
     }
     fail:
-    V8Proxy::setDOMException(ec);
+    V8Proxy::setDOMException(ec, args.GetIsolate());
     return v8::Handle<v8::Value>();
 }
 
-} // namespace TestEventTargetInternal
+} // namespace TestEventTargetV8Internal
 
 static const BatchedCallback TestEventTargetCallbacks[] = {
-    {"item", TestEventTargetInternal::itemCallback},
-    {"addEventListener", TestEventTargetInternal::addEventListenerCallback},
-    {"removeEventListener", TestEventTargetInternal::removeEventListenerCallback},
+    {"item", TestEventTargetV8Internal::itemCallback},
+    {"addEventListener", TestEventTargetV8Internal::addEventListenerCallback},
+    {"removeEventListener", TestEventTargetV8Internal::removeEventListenerCallback},
 };
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v8::Persistent<v8::FunctionTemplate> desc)
@@ -133,7 +133,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v
     const int dispatchEventArgc = 1;
     v8::Handle<v8::FunctionTemplate> dispatchEventArgv[dispatchEventArgc] = { V8Event::GetRawTemplate() };
     v8::Handle<v8::Signature> dispatchEventSignature = v8::Signature::New(desc, dispatchEventArgc, dispatchEventArgv);
-    proto->Set(v8::String::New("dispatchEvent"), v8::FunctionTemplate::New(TestEventTargetInternal::dispatchEventCallback, v8::Handle<v8::Value>(), dispatchEventSignature));
+    proto->Set(v8::String::New("dispatchEvent"), v8::FunctionTemplate::New(TestEventTargetV8Internal::dispatchEventCallback, v8::Handle<v8::Value>(), dispatchEventSignature));
 
     // Custom toString template
     desc->Set(getToStringName(), getToStringTemplate());
@@ -173,20 +173,19 @@ bool V8TestEventTarget::HasInstance(v8::Handle<v8::Value> value)
 }
 
 
-v8::Handle<v8::Object> V8TestEventTarget::wrapSlow(TestEventTarget* impl)
+v8::Handle<v8::Object> V8TestEventTarget::wrapSlow(PassRefPtr<TestEventTarget> impl, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
     V8Proxy* proxy = 0;
-    wrapper = V8DOMWrapper::instantiateV8Object(proxy, &info, impl);
+    wrapper = V8DOMWrapper::instantiateV8Object(proxy, &info, impl.get());
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
-    impl->ref();
     v8::Persistent<v8::Object> wrapperHandle = v8::Persistent<v8::Object>::New(wrapper);
 
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();
-    getDOMObjectMap().set(impl, wrapperHandle);
+    V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapperHandle, isolate);
     return wrapper;
 }
 

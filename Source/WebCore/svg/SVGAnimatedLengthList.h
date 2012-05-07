@@ -39,17 +39,19 @@ DEFINE_ANIMATED_PROPERTY(AnimatedLengthList, OwnerType, DOMAttribute, DOMAttribu
 class SVGAnimationElement;
 
 class SVGAnimatedLengthListAnimator : public SVGAnimatedTypeAnimator {
-    
 public:
     SVGAnimatedLengthListAnimator(SVGAnimationElement*, SVGElement*);
     virtual ~SVGAnimatedLengthListAnimator() { }
     
     virtual PassOwnPtr<SVGAnimatedType> constructFromString(const String&);
-    
-    virtual void calculateFromAndToValues(OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, const String& fromString, const String& toString);
-    virtual void calculateFromAndByValues(OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, const String& fromString, const String& byString);
-    virtual void calculateAnimatedValue(float percentage, unsigned repeatCount,
-                                        OwnPtr<SVGAnimatedType>& fromValue, OwnPtr<SVGAnimatedType>& toValue, OwnPtr<SVGAnimatedType>& animatedValue);
+    virtual PassOwnPtr<SVGAnimatedType> startAnimValAnimation(const SVGElementAnimatedPropertyList&);
+    virtual void stopAnimValAnimation(const SVGElementAnimatedPropertyList&);
+    virtual void resetAnimValToBaseVal(const SVGElementAnimatedPropertyList&, SVGAnimatedType*);
+    virtual void animValWillChange(const SVGElementAnimatedPropertyList&);
+    virtual void animValDidChange(const SVGElementAnimatedPropertyList&);
+
+    virtual void addAnimatedTypes(SVGAnimatedType*, SVGAnimatedType*);
+    virtual void calculateAnimatedValue(float percentage, unsigned repeatCount, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*, SVGAnimatedType*);
     virtual float calculateDistance(const String& fromString, const String& toString);
     
 private:

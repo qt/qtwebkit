@@ -34,6 +34,7 @@
 #include "ManagedTexture.h"
 #include "PlatformCanvas.h"
 #include "ScrollbarTheme.h"
+#include "cc/CCQuadCuller.h"
 
 namespace WebCore {
 
@@ -51,11 +52,17 @@ CCScrollbarLayerImpl::CCScrollbarLayerImpl(int id)
 
 void CCScrollbarLayerImpl::willDraw(LayerRendererChromium* layerRenderer)
 {
+    CCLayerImpl::willDraw(layerRenderer);
+
     if (bounds().isEmpty() || contentBounds().isEmpty())
         return;
 
     if (!m_texture)
         m_texture = ManagedTexture::create(layerRenderer->renderSurfaceTextureManager());
+
+    // The context could have been lost since the last frame and the old texture
+    // manager may no longer be valid.
+    m_texture->setTextureManager(layerRenderer->renderSurfaceTextureManager());
 
     IntSize textureSize = contentBounds();
     if (!m_texture->reserve(textureSize, GraphicsContext3D::RGBA))
@@ -78,7 +85,7 @@ void CCScrollbarLayerImpl::willDraw(LayerRendererChromium* layerRenderer)
     }
 }
 
-void CCScrollbarLayerImpl::appendQuads(CCQuadList& quadList, const CCSharedQuadState* sharedQuadState)
+void CCScrollbarLayerImpl::appendQuads(CCQuadCuller& quadList, const CCSharedQuadState* sharedQuadState, bool&)
 {
     if (!m_texture->isReserved())
         return;
@@ -89,6 +96,8 @@ void CCScrollbarLayerImpl::appendQuads(CCQuadList& quadList, const CCSharedQuadS
 
 void CCScrollbarLayerImpl::didDraw()
 {
+    CCLayerImpl::didDraw();
+
     m_texture->unreserve();
 }
 

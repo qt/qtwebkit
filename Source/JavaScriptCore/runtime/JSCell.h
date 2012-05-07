@@ -178,7 +178,7 @@ namespace JSC {
     {
 #if ENABLE(GC_VALIDATION)
         ASSERT(globalData.isInitializingObject());
-        globalData.setInitializingObject(false);
+        globalData.setInitializingObjectClass(0);
 #else
         UNUSED_PARAM(globalData);
 #endif
@@ -328,9 +328,8 @@ namespace JSC {
     void* allocateCell(Heap& heap)
     {
 #if ENABLE(GC_VALIDATION)
-        ASSERT(sizeof(T) == T::s_info.cellSize);
         ASSERT(!heap.globalData()->isInitializingObject());
-        heap.globalData()->setInitializingObject(true);
+        heap.globalData()->setInitializingObjectClass(&T::s_info);
 #endif
         JSCell* result = 0;
         if (NeedsDestructor<T>::value)
@@ -351,14 +350,27 @@ namespace JSC {
     template<typename To, typename From>
     inline To jsCast(From* from)
     {
-        ASSERT(from->inherits(&WTF::RemovePointer<To>::Type::s_info));
+        ASSERT(!from || from->JSCell::inherits(&WTF::RemovePointer<To>::Type::s_info));
         return static_cast<To>(from);
+    }
+
+    template<typename To>
+    inline To jsCast(JSValue from)
+    {
+        ASSERT(from.isCell() && from.asCell()->JSCell::inherits(&WTF::RemovePointer<To>::Type::s_info));
+        return static_cast<To>(from.asCell());
     }
 
     template<typename To, typename From>
     inline To jsDynamicCast(From* from)
     {
         return from->inherits(&WTF::RemovePointer<To>::Type::s_info) ? static_cast<To>(from) : 0;
+    }
+
+    template<typename To>
+    inline To jsDynamicCast(JSValue from)
+    {
+        return from.isCell() && from.asCell()->inherits(&WTF::RemovePointer<To>::Type::s_info) ? static_cast<To>(from.asCell()) : 0;
     }
 
 } // namespace JSC

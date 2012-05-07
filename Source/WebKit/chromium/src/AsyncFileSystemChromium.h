@@ -47,14 +47,17 @@ class KURL;
 
 class AsyncFileSystemChromium : public AsyncFileSystem {
 public:
-    static PassOwnPtr<AsyncFileSystem> create(AsyncFileSystem::Type type, const KURL& rootURL)
+    static PassOwnPtr<AsyncFileSystem> create(FileSystemType type, const KURL& rootURL)
     {
         return adoptPtr(new AsyncFileSystemChromium(type, rootURL));
     }
 
+    static String createIsolatedFileSystemName(const String& storageIdentifier, const String& filesystemId);
+    static PassOwnPtr<AsyncFileSystem> createIsolatedFileSystem(const String& originString, const String& filesystemId);
+
     virtual ~AsyncFileSystemChromium();
 
-    virtual String toURL(const String& originString, const String& fullPath);
+    virtual KURL toURL(const String& originString, const String& fullPath) const;
     virtual void move(const String& sourcePath, const String& destinationPath, PassOwnPtr<AsyncFileSystemCallbacks>);
     virtual void copy(const String& sourcePath, const String& destinationPath, PassOwnPtr<AsyncFileSystemCallbacks>);
     virtual void remove(const String& path, PassOwnPtr<AsyncFileSystemCallbacks>);
@@ -69,7 +72,7 @@ public:
     virtual void createSnapshotFileAndReadMetadata(const String& path, PassOwnPtr<AsyncFileSystemCallbacks>);
 
 protected:
-    AsyncFileSystemChromium(AsyncFileSystem::Type, const KURL& rootURL);
+    AsyncFileSystemChromium(FileSystemType, const KURL& rootURL);
 
     PassOwnPtr<AsyncFileSystemCallbacks> createSnapshotFileCallback(const KURL& internalBlobURL, PassOwnPtr<AsyncFileSystemCallbacks>) const;
 

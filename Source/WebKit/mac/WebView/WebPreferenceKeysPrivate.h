@@ -119,6 +119,9 @@
 #define WebKitShouldDisplayTextDescriptionsPreferenceKey @"WebKitShouldDisplayTextDescriptions"
 #define WebKitNotificationsEnabledKey @"WebKitNotificationsEnabled"
 #define WebKitSuppressesIncrementalRenderingKey @"WebKitSuppressesIncrementalRendering"
+#define WebKitRegionBasedColumnsEnabledKey @"WebKitRegionBasedColumnsEnabled"
+#define WebKitShouldRespectImageOrientationKey @"WebKitShouldRespectImageOrientation"
+#define WebKitRequestAnimationFrameEnabledPreferenceKey @"WebKitRequestAnimationFrameEnabled"
 
 // These are private both because callers should be using the cover methods and because the
 // cover methods themselves are private.
@@ -134,6 +137,8 @@
 #define WebKitEditingBehaviorPreferenceKey @"WebKitEditingBehavior"
 #define WebKitUsePreHTML5ParserQuirksKey @"WebKitUsePreHTML5ParserQuirks"
 #define WebKitBackspaceKeyNavigationEnabledKey @"WebKitBackspaceKeyNavigationEnabled"
+#define WebKitIncrementalRenderingSuppressionTimeoutInSecondsKey @"WebKitIncrementalRenderingSuppressionTimeoutInSeconds"
+#define WebKitWantsBalancedSetDefersLoadingBehaviorKey @"WebKitWantsBalancedSetDefersLoadingBehavior"
 
 // CoreGraphics deferred updates are disabled if WebKitEnableCoalescedUpdatesPreferenceKey is set
 // to NO, or has no value.  For compatibility with Mac OS X 10.4.6, deferred updates are OFF by

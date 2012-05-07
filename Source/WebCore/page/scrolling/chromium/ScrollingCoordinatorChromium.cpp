@@ -81,13 +81,31 @@ static GraphicsLayer* scrollLayerForFrameView(FrameView* frameView)
 #endif
 }
 
-static void scrollbarLayerDidChange(Scrollbar* scrollbar, LayerChromium* scrollLayer, GraphicsLayer* scrollbarGraphicsLayer)
+static void scrollbarLayerDidChange(Scrollbar* scrollbar, LayerChromium* scrollLayer, GraphicsLayer* scrollbarGraphicsLayer, FrameView* frameView)
 {
     ASSERT(scrollbar);
-    ASSERT(scrollLayer);
     ASSERT(scrollbarGraphicsLayer);
 
-    if (scrollbar->isCustomScrollbar() || !CCProxy::hasImplThread()) {
+    if (!scrollLayer) {
+        // FIXME: sometimes we get called before setScrollLayer, workaround by finding the scroll layout ourselves.
+        scrollLayer = scrollLayerForFrameView(frameView)->platformLayer();
+        ASSERT(scrollLayer);
+    }
+
+    // Root layer non-overlay scrollbars should be marked opaque to disable
+    // blending.
+    bool isOpaqueRootScrollbar = !frameView->parent() && !scrollbar->isOverlayScrollbar();
+    if (!scrollbarGraphicsLayer->contentsOpaque())
+        scrollbarGraphicsLayer->setContentsOpaque(isOpaqueRootScrollbar);
+
+    // Only certain platforms support the way that scrollbars are currently
+    // being painted on the impl thread. For example, Cocoa is not threadsafe.
+    bool platformSupported = false;
+#if OS(LINUX)
+    platformSupported = true;
+#endif
+
+    if (scrollbar->isCustomScrollbar() || !CCProxy::hasImplThread() || !platformSupported) {
         scrollbarGraphicsLayer->setContentsToMedia(0);
         scrollbarGraphicsLayer->setDrawsContent(true);
         return;
@@ -96,6 +114,7 @@ static void scrollbarLayerDidChange(Scrollbar* scrollbar, LayerChromium* scrollL
     RefPtr<ScrollbarLayerChromium> scrollbarLayer = ScrollbarLayerChromium::create(scrollbar, scrollLayer->id());
     scrollbarGraphicsLayer->setContentsToMedia(scrollbarLayer.get());
     scrollbarGraphicsLayer->setDrawsContent(false);
+    scrollbarLayer->setOpaque(scrollbarGraphicsLayer->contentsOpaque());
 }
 
 void ScrollingCoordinator::frameViewHorizontalScrollbarLayerDidChange(FrameView* frameView, GraphicsLayer* horizontalScrollbarLayer)
@@ -103,11 +122,7 @@ void ScrollingCoordinator::frameViewHorizontalScrollbarLayerDidChange(FrameView*
     if (!horizontalScrollbarLayer || !coordinatesScrollingForFrameView(frameView))
         return;
 
-    LayerChromium* scrollLayer = m_private->scrollLayer();
-    if (!scrollLayer) // FIXME: sometimes we get called before setScrollLayer, workaround by finding the scroll layout ourselves.
-        scrollLayer = scrollLayerForFrameView(frameView)->platformLayer();
-
-    scrollbarLayerDidChange(frameView->horizontalScrollbar(), scrollLayer, horizontalScrollbarLayer);
+    scrollbarLayerDidChange(frameView->horizontalScrollbar(), m_private->scrollLayer(), horizontalScrollbarLayer, frameView);
 }
 
 void ScrollingCoordinator::frameViewVerticalScrollbarLayerDidChange(FrameView* frameView, GraphicsLayer* verticalScrollbarLayer)
@@ -115,11 +130,7 @@ void ScrollingCoordinator::frameViewVerticalScrollbarLayerDidChange(FrameView* f
     if (!verticalScrollbarLayer || !coordinatesScrollingForFrameView(frameView))
         return;
 
-    LayerChromium* scrollLayer = m_private->scrollLayer();
-    if (!scrollLayer) // FIXME: sometimes we get called before setScrollLayer, workaround by finding the scroll layout ourselves.
-        scrollLayer = scrollLayerForFrameView(frameView)->platformLayer();
-
-    scrollbarLayerDidChange(frameView->verticalScrollbar(), scrollLayer, verticalScrollbarLayer);
+    scrollbarLayerDidChange(frameView->verticalScrollbar(), m_private->scrollLayer(), verticalScrollbarLayer, frameView);
 }
 
 void ScrollingCoordinator::setScrollLayer(GraphicsLayer* scrollLayer)
@@ -133,9 +144,7 @@ void ScrollingCoordinator::setNonFastScrollableRegion(const Region& region)
         layer->setNonFastScrollableRegion(region);
 }
 
-void ScrollingCoordinator::setScrollParameters(ScrollElasticity horizontalScrollElasticity, ScrollElasticity verticalScrollElasticity,
-                                               bool hasEnabledHorizontalScrollbar, bool hasEnabledVerticalScrollbar,
-                                               const IntRect& viewportRect, const IntSize& contentsSize)
+void ScrollingCoordinator::setScrollParameters(const ScrollParameters&)
 {
     // FIXME: Implement!
 }

@@ -26,6 +26,7 @@
 #ifndef LayerTreeHost_h
 #define LayerTreeHost_h
 
+#include "LayerTreeContext.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -44,7 +45,6 @@ class GraphicsLayer;
 
 namespace WebKit {
 
-class LayerTreeContext;
 class UpdateInfo;
 class WebPage;
 
@@ -75,13 +75,14 @@ public:
     virtual void didInstallPageOverlay() = 0;
     virtual void didUninstallPageOverlay() = 0;
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) = 0;
+    virtual void setPageOverlayOpacity(float) { }
+    virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return true; }
 
     virtual void pauseRendering() { }
     virtual void resumeRendering() { }
 
-#if USE(TILED_BACKING_STORE)
-    virtual void setVisibleContentsRectForScaling(const WebCore::IntRect&, float scale) { }
-    virtual void setVisibleContentsRectForPanning(const WebCore::IntRect&, const WebCore::FloatPoint&) { }
+#if USE(UI_SIDE_COMPOSITING)
+    virtual void setVisibleContentsRect(const WebCore::IntRect&, float scale, const WebCore::FloatPoint&) { }
     virtual void setVisibleContentsRectForLayer(int layerID, const WebCore::IntRect&) { }
     virtual void renderNextFrame() { }
     virtual void purgeBackingStores() { }
@@ -92,13 +93,16 @@ public:
     virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&) = 0;
 #endif
 
+#if PLATFORM(MAC)
+    virtual void setLayerHostingMode(LayerHostingMode) { }
+#endif
+
 protected:
     explicit LayerTreeHost(WebPage*);
 
     WebPage* m_webPage;
 
-
-#if USE(TILED_BACKING_STORE)
+#if USE(UI_SIDE_COMPOSITING)
     bool m_waitingForUIProcess;
 #endif
 };

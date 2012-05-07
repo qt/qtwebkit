@@ -26,6 +26,8 @@
 #ifndef StyleFlexibleBoxData_h
 #define StyleFlexibleBoxData_h
 
+#include "Length.h"
+
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -42,10 +44,9 @@ public:
         return !(*this == o);
     }
 
-    float m_widthPositiveFlex;
-    float m_widthNegativeFlex;
-    float m_heightPositiveFlex;
-    float m_heightNegativeFlex;
+    float m_positiveFlex;
+    float m_negativeFlex;
+    Length m_preferredSize;
 
     int m_flexOrder;
 
@@ -54,6 +55,7 @@ public:
     unsigned m_flexItemAlign : 3; // EFlexAlign
     unsigned m_flexDirection : 2; // EFlexDirection
     unsigned m_flexWrap : 2; // EFlexWrap
+    unsigned m_flexLinePack : 3; // EFlexLinePack
 
 private:
     StyleFlexibleBoxData();

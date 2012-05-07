@@ -36,7 +36,7 @@ namespace WebCore {
 
 WrapperTypeInfo V8TestMediaQueryListListener::info = { V8TestMediaQueryListListener::GetTemplate, V8TestMediaQueryListListener::derefObject, 0, 0 };
 
-namespace TestMediaQueryListListenerInternal {
+namespace TestMediaQueryListListenerV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
@@ -44,17 +44,17 @@ static v8::Handle<v8::Value> methodCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.TestMediaQueryListListener.method");
     if (args.Length() < 1)
-        return throwError("Not enough arguments", V8Proxy::TypeError);
+        return V8Proxy::throwNotEnoughArgumentsError();
     TestMediaQueryListListener* imp = V8TestMediaQueryListListener::toNative(args.Holder());
     EXCEPTION_BLOCK(RefPtr<MediaQueryListListener>, listener, MediaQueryListListener::create(MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined)));
     imp->method(listener);
     return v8::Handle<v8::Value>();
 }
 
-} // namespace TestMediaQueryListListenerInternal
+} // namespace TestMediaQueryListListenerV8Internal
 
 static const BatchedCallback TestMediaQueryListListenerCallbacks[] = {
-    {"method", TestMediaQueryListListenerInternal::methodCallback},
+    {"method", TestMediaQueryListListenerV8Internal::methodCallback},
 };
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestMediaQueryListListenerTemplate(v8::Persistent<v8::FunctionTemplate> desc)
@@ -110,20 +110,19 @@ bool V8TestMediaQueryListListener::HasInstance(v8::Handle<v8::Value> value)
 }
 
 
-v8::Handle<v8::Object> V8TestMediaQueryListListener::wrapSlow(TestMediaQueryListListener* impl)
+v8::Handle<v8::Object> V8TestMediaQueryListListener::wrapSlow(PassRefPtr<TestMediaQueryListListener> impl, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
     V8Proxy* proxy = 0;
-    wrapper = V8DOMWrapper::instantiateV8Object(proxy, &info, impl);
+    wrapper = V8DOMWrapper::instantiateV8Object(proxy, &info, impl.get());
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
-    impl->ref();
     v8::Persistent<v8::Object> wrapperHandle = v8::Persistent<v8::Object>::New(wrapper);
 
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();
-    getDOMObjectMap().set(impl, wrapperHandle);
+    V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapperHandle, isolate);
     return wrapper;
 }
 

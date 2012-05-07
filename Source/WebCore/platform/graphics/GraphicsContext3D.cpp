@@ -202,7 +202,7 @@ bool GraphicsContext3D::extractImageData(ImageData* imageData,
     int height = imageData->height();
     int dataBytes = width * height * 4;
     data.resize(dataBytes);
-    if (!packPixels(imageData->data()->data()->data(),
+    if (!packPixels(imageData->data()->data(),
                     SourceFormatRGBA8,
                     width,
                     height,
@@ -471,8 +471,8 @@ void unpackOneRowOfABGR8ToRGBA8(const uint8_t* source, uint8_t* destination, uns
 
 void unpackOneRowOfBGRA8ToRGBA8(const uint8_t* source, uint8_t* destination, unsigned int pixelsPerRow)
 {
-    const uint32_t* source32 = reinterpret_cast<const uint32_t*>(source);
-    uint32_t* destination32 = reinterpret_cast<uint32_t*>(destination);
+    const uint32_t* source32 = reinterpret_cast_ptr<const uint32_t*>(source);
+    uint32_t* destination32 = reinterpret_cast_ptr<uint32_t*>(destination);
     for (unsigned int i = 0; i < pixelsPerRow; ++i) {
         uint32_t bgra = source32[i];
 #if CPU(BIG_ENDIAN)
@@ -1348,7 +1348,7 @@ static void doPacking(const void* sourceData,
         break;
     }
     default:
-        ASSERT(false);
+        ASSERT_NOT_REACHED();
     }
 }
 

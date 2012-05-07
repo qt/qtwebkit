@@ -159,7 +159,7 @@ bool EditorClientBlackBerry::shouldBeginEditing(Range* range)
     if (m_webPagePrivate->m_dumpRenderTree)
         return m_webPagePrivate->m_dumpRenderTree->shouldBeginEditingInDOMRange(range);
 
-    return m_webPagePrivate->m_inputHandler->shouldAcceptInputFocus();
+    return true;
 }
 
 bool EditorClientBlackBerry::shouldEndEditing(Range* range)
@@ -257,7 +257,7 @@ void EditorClientBlackBerry::didSetSelectionTypesForPasteboard()
     notImplemented();
 }
 
-void EditorClientBlackBerry::registerCommandForUndo(PassRefPtr<EditCommand> command)
+void EditorClientBlackBerry::registerUndoStep(PassRefPtr<UndoStep> step)
 {
     // Remove the oldest item if we've reached the maximum capacity for the stack.
     if (m_undoStack.size() == maximumUndoStackDepth)
@@ -266,12 +266,12 @@ void EditorClientBlackBerry::registerCommandForUndo(PassRefPtr<EditCommand> comm
     if (!m_inRedo)
         m_redoStack.clear();
 
-    m_undoStack.append(command);
+    m_undoStack.append(step);
 }
 
-void EditorClientBlackBerry::registerCommandForRedo(PassRefPtr<EditCommand> command)
+void EditorClientBlackBerry::registerRedoStep(PassRefPtr<UndoStep> step)
 {
-    m_redoStack.append(command);
+    m_redoStack.append(step);
 }
 
 void EditorClientBlackBerry::clearUndoRedoOperations()
@@ -304,7 +304,7 @@ void EditorClientBlackBerry::undo()
 {
     if (canUndo()) {
         EditCommandStack::iterator back = --m_undoStack.end();
-        RefPtr<EditCommand> command(*back);
+        RefPtr<UndoStep> command(*back);
         m_undoStack.remove(back);
 
         // Unapply will call us back to push this command onto the redo stack.
@@ -316,7 +316,7 @@ void EditorClientBlackBerry::redo()
 {
     if (canRedo()) {
         EditCommandStack::iterator back = --m_redoStack.end();
-        RefPtr<EditCommand> command(*back);
+        RefPtr<UndoStep> command(*back);
         m_redoStack.remove(back);
 
         ASSERT(!m_inRedo);
@@ -464,6 +464,8 @@ void EditorClientBlackBerry::handleKeyboardEvent(KeyboardEvent* event)
     String commandName = interpretKeyEvent(event);
 
     if (!commandName.isEmpty()) {
+        // Hot key handling. Cancel processing mode.
+        m_webPagePrivate->m_inputHandler->setProcessingChange(false);
         if (frame->editor()->command(commandName).execute())
             event->setDefaultHandled();
         return;

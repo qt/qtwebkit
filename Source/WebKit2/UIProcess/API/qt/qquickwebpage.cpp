@@ -23,18 +23,18 @@
 
 #include "LayerTreeHostProxy.h"
 #include "QtWebPageEventHandler.h"
+#include "QtWebPageSGNode.h"
 #include "TransformationMatrix.h"
 #include "WebLayerTreeRenderer.h"
+#include "WebPageProxy.h"
 #include "qquickwebpage_p_p.h"
 #include "qquickwebview_p.h"
-#include <QPolygonF>
 #include <QtQuick/QQuickCanvas>
-#include <QtQuick/QSGGeometryNode>
-#include <QtQuick/QSGMaterial>
-#include <private/qsgrendernode_p.h>
+
+using namespace WebKit;
 
 QQuickWebPage::QQuickWebPage(QQuickWebView* viewportItem)
-    : QQuickItem(viewportItem)
+    : QQuickItem(viewportItem->contentItem())
     , d(new QQuickWebPagePrivate(this, viewportItem))
 {
     setFlag(ItemHasContents);
@@ -66,97 +66,15 @@ void QQuickWebPagePrivate::initialize(WebKit::WebPageProxy* webPageProxy)
     eventHandler.reset(new QtWebPageEventHandler(toAPI(webPageProxy), q, viewportItem));
 }
 
-void QQuickWebPagePrivate::setDrawingAreaSize(const QSize& size)
-{
-    DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
-    if (!drawingArea)
-        return;
-    drawingArea->setSize(WebCore::IntSize(size), WebCore::IntSize());
-}
-
 void QQuickWebPagePrivate::paint(QPainter* painter)
 {
-    if (webPageProxy->drawingArea())
-        webPageProxy->drawingArea()->paintLayerTree(painter);
+    if (!webPageProxy->drawingArea())
+        return;
+
+    LayerTreeHostProxy* layerTreeHostProxy = webPageProxy->drawingArea()->layerTreeHostProxy();
+    if (layerTreeHostProxy->layerTreeRenderer())
+        layerTreeHostProxy->layerTreeRenderer()->paintToGraphicsContext(painter);
 }
-
-struct PageProxyNode : public QSGRenderNode {
-    PageProxyNode(PassRefPtr<WebLayerTreeRenderer> renderer)
-        : m_renderer(renderer)
-        , m_scale(1)
-    {
-    }
-
-    virtual StateFlags changedStates()
-    {
-        return StateFlags(StencilState) | ColorState | BlendState;
-    }
-
-    virtual void render(const RenderState&)
-    {
-        QMatrix4x4 renderMatrix = matrix() ? *matrix() : QMatrix4x4();
-
-        // Have to apply render scale manualy because it is not applied on page item.
-        // http://trac.webkit.org/changeset/104450
-        renderMatrix.scale(m_scale);
-
-        // FIXME: Support non-rectangular clippings.
-        layerTreeRenderer()->paintToCurrentGLContext(renderMatrix, inheritedOpacity(), clipRect());
-    }
-
-    ~PageProxyNode()
-    {
-        layerTreeRenderer()->purgeGLResources();
-    }
-
-    WebLayerTreeRenderer* layerTreeRenderer() const { return m_renderer.get(); }
-    void setScale(float scale) { m_scale = scale; }
-
-private:
-    QRectF clipRect() const
-    {
-        // Start with an invalid rect.
-        QRectF resultRect(0, 0, -1, -1);
-
-        for (const QSGClipNode* clip = clipList(); clip; clip = clip->clipList()) {
-            QMatrix4x4 clipMatrix;
-            if (clip->matrix())
-                clipMatrix = *clip->matrix();
-            QRectF currentClip;
-
-            if (clip->isRectangular())
-                currentClip = clipMatrix.mapRect(clip->clipRect());
-            else {
-                const QSGGeometry* geometry = clip->geometry();
-                // Assume here that clipNode has only coordinate data.
-                const QSGGeometry::Point2D* geometryPoints = geometry->vertexDataAsPoint2D();
-
-                // Clip region should be at least triangle to make valid clip.
-                if (geometry->vertexCount() < 3)
-                    continue;
-
-                QPolygonF polygon;
-
-                for (int i = 0; i < geometry->vertexCount(); i++)
-                    polygon.append(clipMatrix.map(QPoint(geometryPoints[i].x, geometryPoints[i].y)));
-                currentClip = polygon.boundingRect();
-            }
-
-            if (currentClip.isEmpty())
-                continue;
-
-            if (resultRect.isValid())
-                resultRect &= currentClip;
-            else
-                resultRect = currentClip;
-        }
-
-        return resultRect;
-    }
-
-    RefPtr<WebLayerTreeRenderer> m_renderer;
-    float m_scale;
-};
 
 QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
 {
@@ -166,21 +84,16 @@ QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
     LayerTreeHostProxy* layerTreeHostProxy = d->webPageProxy->drawingArea()->layerTreeHostProxy();
     WebLayerTreeRenderer* renderer = layerTreeHostProxy->layerTreeRenderer();
 
-    PageProxyNode* node = static_cast<PageProxyNode*>(oldNode);
-
-    if (node && node->layerTreeRenderer() != renderer) {
-        // This means that LayerTreeHostProxy was deleted and recreated while old paint node survived.
-        // This could happen if web process have crashed. In this case we have to recreate paint node.
-        delete node;
-        node = 0;
-    }
-
+    QtWebPageSGNode* node = static_cast<QtWebPageSGNode*>(oldNode);
+    if (!node)
+        node = new QtWebPageSGNode();
+    node->setRenderer(renderer);
     renderer->syncRemoteContent();
 
-    if (!node)
-        node = new PageProxyNode(renderer);
-
     node->setScale(d->contentsScale);
+    QColor backgroundColor = d->webPageProxy->drawsTransparentBackground() ? Qt::transparent : Qt::white;
+    QRectF backgroundRect(QPointF(0, 0), d->contentsSize);
+    node->setBackground(backgroundRect, backgroundColor);
 
     return node;
 }
@@ -197,7 +110,6 @@ void QQuickWebPage::setContentsSize(const QSizeF& size)
 
     d->contentsSize = size;
     d->updateSize();
-    d->setDrawingAreaSize(d->contentsSize.toSize());
 }
 
 const QSizeF& QQuickWebPage::contentsSize() const
@@ -234,6 +146,9 @@ void QQuickWebPagePrivate::updateSize()
     QSizeF scaledSize = contentsSize * contentsScale;
     q->setSize(scaledSize);
     viewportItem->updateContentsSize(scaledSize);
+    DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
+    if (drawingArea && drawingArea->layerTreeHostProxy())
+        drawingArea->layerTreeHostProxy()->setContentsSize(WebCore::FloatSize(contentsSize.width(), contentsSize.height()));
 }
 
 QQuickWebPagePrivate::~QQuickWebPagePrivate()

@@ -26,7 +26,7 @@
 #include "config.h"
 #include "CSSGradientValue.h"
 
-#include "CSSStyleSelector.h"
+#include "CSSCalculationValue.h"
 #include "CSSValueKeywords.h"
 #include "GeneratorGeneratedImage.h"
 #include "Gradient.h"
@@ -36,6 +36,7 @@
 #include "NodeRenderStyle.h"
 #include "PlatformString.h"
 #include "RenderObject.h"
+#include "StyleResolver.h"
 
 using namespace std;
 
@@ -114,7 +115,7 @@ void CSSGradientValue::addStops(Gradient* gradient, RenderObject* renderer, Rend
         // We have to resolve colors.
         for (unsigned i = 0; i < m_stops.size(); i++) {
             const CSSGradientColorStop& stop = m_stops[i];
-            Color color = renderer->document()->styleSelector()->colorFromPrimitiveValue(stop.m_color.get());
+            Color color = renderer->document()->styleResolver()->colorFromPrimitiveValue(stop.m_color.get());
 
             float offset;
             if (stop.m_position->isPercentage())
@@ -147,17 +148,21 @@ void CSSGradientValue::addStops(Gradient* gradient, RenderObject* renderer, Rend
     for (size_t i = 0; i < numStops; ++i) {
         const CSSGradientColorStop& stop = m_stops[i];
 
-        stops[i].color = renderer->document()->styleSelector()->colorFromPrimitiveValue(stop.m_color.get());
+        stops[i].color = renderer->document()->styleResolver()->colorFromPrimitiveValue(stop.m_color.get());
 
         if (stop.m_position) {
             if (stop.m_position->isPercentage())
                 stops[i].offset = stop.m_position->getFloatValue(CSSPrimitiveValue::CSS_PERCENTAGE) / 100;
-            else if (stop.m_position->isLength()) {
-                float length = stop.m_position->computeLength<float>(style, rootStyle, style->effectiveZoom());
+            else if (stop.m_position->isLength() || stop.m_position->isCalculatedPercentageWithLength()) {
                 if (!computedGradientLength) {
                     FloatSize gradientSize(gradientStart - gradientEnd);
                     gradientLength = gradientSize.diagonalLength();
                 }
+                float length;
+                if (stop.m_position->isLength())
+                    length = stop.m_position->computeLength<float>(style, rootStyle, style->effectiveZoom());
+                else 
+                    length = stop.m_position->cssCalcValue()->toCalcValue(style, rootStyle, style->effectiveZoom())->evaluate(gradientLength);
                 stops[i].offset = (gradientLength > 0) ? length / gradientLength : 0;
             } else {
                 ASSERT_NOT_REACHED();
@@ -365,8 +370,12 @@ static float positionFromValue(CSSPrimitiveValue* value, RenderStyle* style, Ren
     if (value->isNumber())
         return value->getFloatValue() * zoomFactor;
 
+    int edgeDistance = isHorizontal ? size.width() : size.height();
     if (value->isPercentage())
-        return value->getFloatValue() / 100.f * (isHorizontal ? size.width() : size.height());
+        return value->getFloatValue() / 100.f * edgeDistance;
+
+    if (value->isCalculatedPercentageWithLength())
+        return value->cssCalcValue()->toCalcValue(style, rootStyle, style->effectiveZoom())->evaluate(edgeDistance);
 
     switch (value->getIdent()) {
     case CSSValueTop:

@@ -34,6 +34,7 @@ Rectangle {
     // Do not define anchors or an initial size here! This would mess up with QSGView::SizeRootObjectToView.
 
     property alias webview: webView
+    color: "#333"
 
     signal pageTitleChanged(string title)
     signal newWindow(string url)
@@ -302,16 +303,44 @@ Rectangle {
         onUrlChanged: {
             addressLine.text = url
             if (options.printLoadedUrls)
-                console.log("Loaded:", webView.url);
+                console.log("Loaded:", webView.url.toString());
             forceActiveFocus();
         }
 
+        experimental.devicePixelRatio: 1.5
+        experimental.preferences.fullScreenEnabled: true
+        experimental.preferredMinimumContentsWidth: 980
         experimental.itemSelector: ItemSelector { }
         experimental.alertDialog: AlertDialog { }
         experimental.confirmDialog: ConfirmDialog { }
         experimental.promptDialog: PromptDialog { }
         experimental.authenticationDialog: AuthenticationDialog { }
         experimental.proxyAuthenticationDialog: ProxyAuthenticationDialog { }
+        experimental.filePicker: FilePicker { }
+        experimental.preferences.developerExtrasEnabled: true
+        experimental.databaseQuotaDialog: Item {
+            Timer {
+                interval: 1
+                running: true
+                onTriggered: {
+                    var size = model.expectedUsage / 1024 / 1024
+                    console.log("Creating database '" + model.displayName + "' of size " + size.toFixed(2) + " MB for " + model.origin.scheme + "://" + model.origin.host + ":" + model.origin.port)
+                    model.accept(model.expectedUsage)
+                }
+            }
+        }
+        experimental.onEnterFullScreenRequested : {
+            navigationBar.visible = false;
+            Window.showFullScreen();
+        }
+        experimental.onExitFullScreenRequested : {
+            Window.showNormal();
+            navigationBar.visible = true;
+        }
+    }
+
+    ScrollIndicator {
+        flickableItem: webView
     }
 
     ViewportInfoItem {

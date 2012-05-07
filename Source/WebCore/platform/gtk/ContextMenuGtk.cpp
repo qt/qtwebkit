@@ -18,9 +18,12 @@
  */
 
 #include "config.h"
+
+#if ENABLE(CONTEXT_MENUS)
+
 #include "ContextMenu.h"
 
-#include "GOwnPtr.h"
+#include <wtf/gobject/GOwnPtr.h>
 #include <gtk/gtk.h>
 
 namespace WebCore {
@@ -113,3 +116,5 @@ PlatformMenuDescription platformMenuDescription(Vector<ContextMenuItem>& subMenu
 }
 
 }
+
+#endif // ENABLE(CONTEXT_MENUS)

@@ -40,41 +40,34 @@ public:
     {
         return reinterpret_cast<TestEventTarget*>(object->GetPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
-    inline static v8::Handle<v8::Object> wrap(TestEventTarget*);
+    inline static v8::Handle<v8::Object> wrap(TestEventTarget*, v8::Isolate* = 0);
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static v8::Handle<v8::Value> indexedPropertyGetter(uint32_t, const v8::AccessorInfo&);
     static v8::Handle<v8::Value> namedPropertyGetter(v8::Local<v8::String>, const v8::AccessorInfo&);
     static const int eventListenerCacheIndex = v8DefaultWrapperInternalFieldCount + 0;
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 1;
-    static v8::Handle<v8::Object> existingWrapper(TestEventTarget*);
-
 private:
-    static v8::Handle<v8::Object> wrapSlow(TestEventTarget*);
+    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestEventTarget>, v8::Isolate*);
 };
 
-ALWAYS_INLINE v8::Handle<v8::Object> V8TestEventTarget::existingWrapper(TestEventTarget* impl)
+v8::Handle<v8::Object> V8TestEventTarget::wrap(TestEventTarget* impl, v8::Isolate* isolate)
 {
-    return getDOMObjectMap().get(impl);
-}
-
-v8::Handle<v8::Object> V8TestEventTarget::wrap(TestEventTarget* impl)
-{
-        v8::Handle<v8::Object> wrapper = existingWrapper(impl);
+        v8::Handle<v8::Object> wrapper = getDOMObjectMap(isolate).get(impl);
         if (!wrapper.IsEmpty())
             return wrapper;
-    return V8TestEventTarget::wrapSlow(impl);
+    return V8TestEventTarget::wrapSlow(impl, isolate);
 }
 
-inline v8::Handle<v8::Value> toV8(TestEventTarget* impl)
+inline v8::Handle<v8::Value> toV8(TestEventTarget* impl, v8::Isolate* isolate = 0)
 {
     if (!impl)
         return v8::Null();
-    return V8TestEventTarget::wrap(impl);
+    return V8TestEventTarget::wrap(impl, isolate);
 }
-inline v8::Handle<v8::Value> toV8(PassRefPtr< TestEventTarget > impl)
+inline v8::Handle<v8::Value> toV8(PassRefPtr< TestEventTarget > impl, v8::Isolate* isolate = 0)
 {
-    return toV8(impl.get());
+    return toV8(impl.get(), isolate);
 }
 
 }

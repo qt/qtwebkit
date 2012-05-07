@@ -30,14 +30,64 @@
 
 /**
  * @constructor
+ * @param {WebInspector.UISourceCode} uiSourceCode
+ * @param {number} lineNumber
+ * @param {number} columnNumber
+ */
+WebInspector.UILocation = function(uiSourceCode, lineNumber, columnNumber)
+{
+    this.uiSourceCode = uiSourceCode;
+    this.lineNumber = lineNumber;
+    this.columnNumber = columnNumber;
+}
+
+/**
+ * @interface
+ */
+WebInspector.LiveLocation = function()
+{
+}
+
+WebInspector.LiveLocation.prototype = {
+    update: function(rawLocation) { },
+
+    dispose: function() { }
+}
+
+/**
+ * @interface
+ */
+WebInspector.SourceMapping = function()
+{
+}
+
+WebInspector.SourceMapping.prototype = {
+    /**
+     * @param {DebuggerAgent.Location} rawLocation
+     * @return {WebInspector.UILocation}
+     */
+    rawLocationToUILocation: function(rawLocation) { },
+
+    /**
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     * @param {number} lineNumber
+     * @param {number} columnNumber
+     * @return {DebuggerAgent.Location}
+     */
+    uiLocationToRawLocation: function(uiSourceCode, lineNumber, columnNumber) { }
+}
+
+/**
+ * @constructor
  * @extends {WebInspector.Object}
+ * @implements {WebInspector.SourceMapping}
  */
 WebInspector.ScriptMapping = function()
 {
 }
 
 WebInspector.ScriptMapping.Events = {
-    UISourceCodeListChanged: "us-source-code-list-changed"
+    UISourceCodeListChanged: "ui-source-code-list-changed"
 }
 
 WebInspector.ScriptMapping.prototype = {
@@ -69,18 +119,24 @@ WebInspector.ScriptMapping.prototype.__proto__ = WebInspector.Object.prototype;
  */
 WebInspector.MainScriptMapping = function()
 {
-    this._rawSourceCodes = [];
-    this._rawSourceCodeForScriptId = {};
-    this._rawSourceCodeForURL = {};
-    this._rawSourceCodeForDocumentURL = {};
-    this._rawSourceCodeForUISourceCode = new Map();
-    this._formatter = new WebInspector.ScriptFormatter();
-    this._formatSource = false;
-    this._liveLocationsForScriptId = {};
+    this._mappings = [];
+
+    this._resourceMapping = new WebInspector.ResourceScriptMapping();
+    this._mappings.push(this._resourceMapping);
+    this._compilerMapping = new WebInspector.CompilerScriptMapping();
+    this._mappings.push(this._compilerMapping);
+    this._snippetsMapping = new WebInspector.SnippetsScriptMapping();
+    this._mappings.push(this._snippetsMapping);
+
+    for (var i = 0; i < this._mappings.length; ++i)
+        this._mappings[i].addEventListener(WebInspector.ScriptMapping.Events.UISourceCodeListChanged, this._handleUISourceCodeListChanged, this);
+
+    this._mappingForScriptId = {};
+    this._mappingForUISourceCode = new Map();
 }
 
 WebInspector.MainScriptMapping.Events = {
-    UISourceCodeListChanged: "us-source-code-list-changed"
+    UISourceCodeListChanged: "ui-source-code-list-changed"
 }
 
 WebInspector.MainScriptMapping.prototype = {
@@ -90,8 +146,7 @@ WebInspector.MainScriptMapping.prototype = {
      */
     rawLocationToUILocation: function(rawLocation)
     {
-        var rawSourceCode = this._rawSourceCodeForScriptId[rawLocation.scriptId];
-        return rawSourceCode.rawLocationToUILocation(rawLocation);
+        return this._mappingForScriptId[rawLocation.scriptId].rawLocationToUILocation(rawLocation);
     },
 
     /**
@@ -102,38 +157,7 @@ WebInspector.MainScriptMapping.prototype = {
      */
     uiLocationToRawLocation: function(uiSourceCode, lineNumber, columnNumber)
     {
-        var rawSourceCode = this._rawSourceCodeForUISourceCode.get(uiSourceCode);
-        return rawSourceCode.uiLocationToRawLocation(uiSourceCode, lineNumber, columnNumber);
-    },
-
-    /**
-     * @param {DebuggerAgent.Location} rawLocation
-     * @param {function(WebInspector.UILocation)} updateDelegate
-     * @return {WebInspector.LiveLocation}
-     */
-    createLiveLocation: function(rawLocation, updateDelegate)
-    {
-        return new WebInspector.LiveLocation(this, rawLocation, updateDelegate);
-    },
-
-    _registerLiveLocation: function(scriptId, liveLocation)
-    {
-        this._liveLocationsForScriptId[scriptId].push(liveLocation)
-        liveLocation._update();
-    },
-
-    _unregisterLiveLocation: function(scriptId, liveLocation)
-    {
-        this._liveLocationsForScriptId[scriptId].remove(liveLocation);
-    },
-
-    _updateLiveLocations: function(scriptIds)
-    {
-        for (var i = 0; i < scriptIds.length; ++i) {
-            var liveLocations = this._liveLocationsForScriptId[scriptIds[i]];
-            for (var j = 0; j < liveLocations.length; ++j)
-                liveLocations[j]._update();
-        }
+        return this._mappingForUISourceCode.get(uiSourceCode).uiLocationToRawLocation(uiSourceCode, lineNumber, columnNumber);
     },
 
     /**
@@ -142,8 +166,8 @@ WebInspector.MainScriptMapping.prototype = {
     uiSourceCodeList: function()
     {
         var result = [];
-        for (var i = 0; i < this._rawSourceCodes.length; ++i) {
-            var uiSourceCodeList = this._rawSourceCodes[i].uiSourceCodeList();
+        for (var i = 0; i < this._mappings.length; ++i) {
+            var uiSourceCodeList = this._mappings[i].uiSourceCodeList();
             for (var j = 0; j < uiSourceCodeList.length; ++j)
                 result.push(uiSourceCodeList[j]);
         }
@@ -155,37 +179,28 @@ WebInspector.MainScriptMapping.prototype = {
      */
     addScript: function(script)
     {
-        this._liveLocationsForScriptId[script.scriptId] = [];
+        var mapping = this._mappingForScript(script);
+        this._mappingForScriptId[script.scriptId] = mapping;
+        mapping.addScript(script);
+    },
 
-        var resource = null;
-        var isInlineScript = false;
-        if (script.isInlineScript()) {
-            resource = WebInspector.networkManager.inflightResourceForURL(script.sourceURL) || WebInspector.resourceForURL(script.sourceURL);
-            if (resource && resource.type === WebInspector.Resource.Type.Document) {
-                isInlineScript = true;
-                var rawSourceCode = this._rawSourceCodeForDocumentURL[script.sourceURL];
-                if (rawSourceCode) {
-                    rawSourceCode.addScript(script);
-                    this._bindScriptToRawSourceCode(script, rawSourceCode);
-                    return;
-                }
-            }
+    /**
+     * @param {WebInspector.Script} script
+     * @return {WebInspector.ScriptMapping}
+     */
+    _mappingForScript: function(script)
+    {
+        if (WebInspector.experimentsSettings.snippetsSupport.isEnabled()) {
+            if (WebInspector.snippetsModel.snippetIdForSourceURL(script.sourceURL))
+                return this._snippetsMapping;
         }
 
-        var compilerSourceMapping = null;
-        if (WebInspector.settings.sourceMapsEnabled.get() && script.sourceMapURL)
-            compilerSourceMapping = new WebInspector.ClosureCompilerSourceMapping(script.sourceMapURL, script.sourceURL);
+        if (WebInspector.settings.sourceMapsEnabled.get() && script.sourceMapURL) {
+            if (this._compilerMapping.loadSourceMapForScript(script))
+                return this._compilerMapping;
+        }
 
-        var rawSourceCode = new WebInspector.RawSourceCode(script.scriptId, script, resource, this._formatter, this._formatSource, compilerSourceMapping);
-        this._rawSourceCodes.push(rawSourceCode);
-        this._bindScriptToRawSourceCode(script, rawSourceCode);
-
-        if (isInlineScript)
-            this._rawSourceCodeForDocumentURL[script.sourceURL] = rawSourceCode;
-
-        if (rawSourceCode.uiSourceCodeList().length)
-            this._uiSourceCodeListChanged(rawSourceCode, [], rawSourceCode.uiSourceCodeList());
-        rawSourceCode.addEventListener(WebInspector.RawSourceCode.Events.UISourceCodeListChanged, this._handleUISourceCodeListChanged, this);
+        return this._resourceMapping;
     },
 
     /**
@@ -193,38 +208,15 @@ WebInspector.MainScriptMapping.prototype = {
      */
     _handleUISourceCodeListChanged: function(event)
     {
-        var rawSourceCode = /** @type {WebInspector.RawSourceCode} */ event.target;
-        var oldUISourceCodeList = /** @type {Array.<WebInspector.UISourceCode>} */ event.data["oldUISourceCodeList"];
-        this._uiSourceCodeListChanged(rawSourceCode, oldUISourceCodeList, rawSourceCode.uiSourceCodeList());
-    },
+        var scriptMapping = /** @type {WebInspector.ScriptMapping} */ event.target;
+        var removedItems = /** @type {Array.<WebInspector.UISourceCode>} */ event.data["removedItems"];
+        var addedItems = /** @type {Array.<WebInspector.UISourceCode>} */ event.data["addedItems"];
 
-    /**
-     * @param {WebInspector.RawSourceCode} rawSourceCode
-     * @param {Array.<WebInspector.UISourceCode>} removedItems
-     * @param {Array.<WebInspector.UISourceCode>} addedItems
-     */
-    _uiSourceCodeListChanged: function(rawSourceCode, removedItems, addedItems)
-    {
         for (var i = 0; i < removedItems.length; ++i)
-            this._rawSourceCodeForUISourceCode.remove(removedItems[i]);
+            this._mappingForUISourceCode.remove(removedItems[i]);
         for (var i = 0; i < addedItems.length; ++i)
-            this._rawSourceCodeForUISourceCode.put(addedItems[i], rawSourceCode);
-        this.dispatchEventToListeners(WebInspector.ScriptMapping.Events.UISourceCodeListChanged, { removedItems: removedItems, addedItems: addedItems });
-
-        var scriptIds = [];
-        for (var i = 0; i < rawSourceCode._scripts.length; ++i)
-            scriptIds.push(rawSourceCode._scripts[i].scriptId);
-        this._updateLiveLocations(scriptIds);
-    },
-
-    /**
-     * @param {WebInspector.Script} script
-     * @param {WebInspector.RawSourceCode} rawSourceCode
-     */
-    _bindScriptToRawSourceCode: function(script, rawSourceCode)
-    {
-        this._rawSourceCodeForScriptId[script.scriptId] = rawSourceCode;
-        this._rawSourceCodeForURL[script.sourceURL] = rawSourceCode;
+            this._mappingForUISourceCode.put(addedItems[i], scriptMapping);
+        this.dispatchEventToListeners(WebInspector.MainScriptMapping.Events.UISourceCodeListChanged, event.data);
     },
 
     /**
@@ -232,12 +224,7 @@ WebInspector.MainScriptMapping.prototype = {
      */
     setFormatSource: function(formatSource)
     {
-        if (this._formatSource === formatSource)
-            return;
-
-        this._formatSource = formatSource;
-        for (var i = 0; i < this._rawSourceCodes.length; ++i)
-            this._rawSourceCodes[i].setFormatted(this._formatSource);
+        this._resourceMapping.setFormatSource(formatSource);
     },
 
     /**
@@ -245,56 +232,17 @@ WebInspector.MainScriptMapping.prototype = {
      */
     forceUpdateSourceMapping: function(rawLocation)
     {
-        var rawSourceCode = this._rawSourceCodeForScriptId[rawLocation.scriptId];
-        rawSourceCode.forceUpdateSourceMapping();
+        if (this._mappingForScriptId[rawLocation.scriptId] === this._resourceMapping)
+            this._resourceMapping.forceUpdateSourceMapping(rawLocation);
     },
 
     reset: function()
     {
-        for (var i = 0; i < this._rawSourceCodes.length; ++i) {
-            var rawSourceCode = this._rawSourceCodes[i];
-            this._uiSourceCodeListChanged(rawSourceCode, rawSourceCode.uiSourceCodeList(), []);
-            rawSourceCode.removeAllListeners();
-        }
-        this._rawSourceCodes = [];
-        this._rawSourceCodeForScriptId = {};
-        this._rawSourceCodeForURL = {};
-        this._rawSourceCodeForDocumentURL = {};
-        this._rawSourceCodeForUISourceCode.clear();
-        this._liveLocationsForScriptId = {};
+        for (var i = 0; i < this._mappings.length; ++i)
+            this._mappings[i].reset();
+        this._mappingForScriptId = {};
+        this._mappingForUISourceCode = new Map();
     }
 }
 
 WebInspector.MainScriptMapping.prototype.__proto__ = WebInspector.Object.prototype;
-
-/**
- * @constructor
- * @param {WebInspector.MainScriptMapping} scriptMapping
- * @param {DebuggerAgent.Location} rawLocation
- * @param {function(WebInspector.UILocation)} updateDelegate
- */
-WebInspector.LiveLocation = function(scriptMapping, rawLocation, updateDelegate)
-{
-    this._scriptMapping = scriptMapping;
-    this._rawLocation = rawLocation;
-    this._updateDelegate = updateDelegate;
-}
-
-WebInspector.LiveLocation.prototype = {
-    init: function()
-    {
-        this._scriptMapping._registerLiveLocation(this._rawLocation.scriptId, this);
-    },
-
-    dispose: function()
-    {
-        this._scriptMapping._unregisterLiveLocation(this._rawLocation.scriptId, this);
-    },
-
-    _update: function()
-    {
-        var uiLocation = this._scriptMapping.rawLocationToUILocation(this._rawLocation);
-        if (uiLocation)
-            this._updateDelegate(uiLocation);
-    }
-}

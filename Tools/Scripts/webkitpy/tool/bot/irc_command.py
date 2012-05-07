@@ -33,7 +33,6 @@ import re
 from webkitpy.common.config import irc as config_irc
 from webkitpy.common.config import urls
 from webkitpy.common.config.committers import CommitterList
-from webkitpy.common.checkout.changelog import parse_bug_id
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.tool.bot.queueengine import TerminateQueue
 from webkitpy.tool.grammar import join_with_separators
@@ -41,7 +40,7 @@ from webkitpy.tool.grammar import join_with_separators
 
 def _post_error_and_check_for_bug_url(tool, nicks_string, exception):
     tool.irc().post("%s" % exception)
-    bug_id = parse_bug_id(exception.output)
+    bug_id = urls.parse_bug_id(exception.output)
     if bug_id:
         bug_url = tool.bugs.bug_url_for_bug_id(bug_id)
         tool.irc().post("%s: Ugg...  Might have created %s" % (nicks_string, bug_url))
@@ -51,16 +50,6 @@ def _post_error_and_check_for_bug_url(tool, nicks_string, exception):
 class IRCCommand(object):
     def execute(self, nick, args, tool, sheriff):
         raise NotImplementedError, "subclasses must implement"
-
-
-class LastGreenRevision(IRCCommand):
-    def execute(self, nick, args, tool, sheriff):
-        if not args:
-            return "%s: Usage: last-green-revision BUILDER_NAME" % nick
-        result = tool.buildbot.last_green_revision(' '.join(args))
-        for line in result.split('\n'):
-            if line:
-                tool.irc().post("%s: %s" % (nick, line))
 
 
 class Restart(IRCCommand):
@@ -258,7 +247,6 @@ class CreateBug(IRCCommand):
 visible_commands = {
     "help": Help,
     "hi": Hi,
-    "last-green-revision": LastGreenRevision,
     "restart": Restart,
     "rollout": Rollout,
     "whois": Whois,

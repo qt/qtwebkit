@@ -52,9 +52,17 @@ class WebPluginSiteDataManager;
 class WebProcessProxy;
 struct PluginProcessCreationParameters;
 
-class PluginProcessProxy : CoreIPC::Connection::Client, ProcessLauncher::Client {
+#if PLUGIN_ARCHITECTURE(X11)
+struct RawPluginMetaData {
+    String name;
+    String description;
+    String mimeDescription;
+};
+#endif
+
+class PluginProcessProxy : public RefCounted<PluginProcessProxy>, CoreIPC::Connection::Client, ProcessLauncher::Client {
 public:
-    static PassOwnPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginModuleInfo&);
+    static PassRefPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginModuleInfo&);
     ~PluginProcessProxy();
 
     const PluginModuleInfo& pluginInfo() const { return m_pluginInfo; }
@@ -78,6 +86,10 @@ public:
 
     // Creates a property list in ~/Library/Preferences that contains all the MIME types supported by the plug-in.
     static bool createPropertyListFile(const PluginModuleInfo&);
+#endif
+
+#if PLUGIN_ARCHITECTURE(X11)
+    static bool scanPlugin(const String& pluginPath, RawPluginMetaData& result);
 #endif
 
 private:

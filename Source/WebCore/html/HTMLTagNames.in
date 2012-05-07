@@ -15,7 +15,7 @@ audio wrapperOnlyIfMediaIsAvailable, conditional=VIDEO, constructorNeedsCreatedB
 b interfaceName=HTMLElement
 base
 basefont interfaceName=HTMLBaseFontElement
-bdi interfaceName=HTMLElement
+bdi interfaceName=HTMLBDIElement, JSInterfaceName=HTMLElement
 bdo interfaceName=HTMLElement
 bgsound interfaceName=HTMLElement
 big interfaceName=HTMLElement
@@ -83,7 +83,7 @@ mark interfaceName=HTMLElement
 marquee
 menu
 meta
-meter interfaceName=HTMLMeterElement, constructorNeedsFormElement, conditional=METER_TAG
+meter interfaceName=HTMLMeterElement, conditional=METER_TAG
 nav interfaceName=HTMLElement
 nobr interfaceName=HTMLElement
 noembed interfaceName=HTMLElement
@@ -92,14 +92,14 @@ nolayer interfaceName=HTMLElement
 object constructorNeedsFormElement, constructorNeedsCreatedByParser
 ol interfaceName=HTMLOListElement
 optgroup interfaceName=HTMLOptGroupElement
-option constructorNeedsFormElement
+option
 output constructorNeedsFormElement
 shadow interfaceName=HTMLShadowElement, conditional=SHADOW_DOM, runtimeConditional=shadowDOM
 p interfaceName=HTMLParagraphElement
 param
 plaintext interfaceName=HTMLElement
 pre
-progress interfaceName=HTMLProgressElement, constructorNeedsFormElement, conditional=PROGRESS_TAG
+progress interfaceName=HTMLProgressElement, conditional=PROGRESS_TAG
 q interfaceName=HTMLQuoteElement
 rp interfaceName=HTMLElement
 rt interfaceName=HTMLElement

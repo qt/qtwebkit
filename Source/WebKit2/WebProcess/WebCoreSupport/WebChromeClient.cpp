@@ -30,6 +30,7 @@
 #include "DrawingArea.h"
 #include "InjectedBundleNavigationAction.h"
 #include "InjectedBundleUserMessageCoders.h"
+#include "LayerTreeHost.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebFrame.h"
 #include "WebFrameLoaderClient.h"
@@ -438,10 +439,14 @@ void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) con
         return;
 
 #if PLATFORM(QT)
-    m_page->send(Messages::WebPageProxy::DidChangeContentsSize(size));
-
-    if (m_page->useFixedLayout())
+    if (m_page->useFixedLayout()) {
+        // The below method updates the size().
         m_page->resizeToContentsIfNeeded();
+        m_page->drawingArea()->layerTreeHost()->sizeDidChange(m_page->size());
+    }
+
+    m_page->send(Messages::WebPageProxy::DidChangeContentsSize(m_page->size()));
+
 #endif
 
     FrameView* frameView = frame->view();
@@ -585,16 +590,6 @@ bool WebChromeClient::paintCustomOverhangArea(GraphicsContext* context, const In
     return true;
 }
 
-void WebChromeClient::requestGeolocationPermissionForFrame(Frame*, Geolocation*)
-{
-    notImplemented();
-}
-
-void WebChromeClient::cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*)
-{
-    notImplemented();
-}
-
 void WebChromeClient::runOpenPanel(Frame* frame, PassRefPtr<FileChooser> prpFileChooser)
 {
     if (m_page->activeOpenPanelResultListener())
@@ -714,26 +709,16 @@ void WebChromeClient::exitFullScreenForElement(WebCore::Element* element)
 }
 #endif
 
-void WebChromeClient::dispatchViewportPropertiesDidChange(const ViewportArguments& args) const
+void WebChromeClient::dispatchViewportPropertiesDidChange(const ViewportArguments&) const
 {
-    m_page->send(Messages::WebPageProxy::DidChangeViewportProperties(args));
-
 #if USE(TILED_BACKING_STORE)
-    // When viewport properties change, recalculate and set the new recommended layout size in case of fixed layout rendering.
-    // Viewport properties have no impact on zero sized fixed viewports.
-    if (m_page->useFixedLayout() && !m_page->viewportSize().isEmpty()) {
-        Settings* settings = m_page->corePage()->settings();
+    if (!m_page->useFixedLayout())
+        return;
 
-        int minimumLayoutFallbackWidth = std::max(settings->layoutFallbackWidth(), m_page->viewportSize().width());
-
-        IntSize targetLayoutSize = computeViewportAttributes(m_page->corePage()->viewportArguments(),
-            minimumLayoutFallbackWidth, settings->deviceWidth(), settings->deviceHeight(),
-            settings->deviceDPI(), m_page->viewportSize()).layoutSize;
-        m_page->setResizesToContentsUsingLayoutSize(targetLayoutSize);
-    }
+    m_page->sendViewportAttributesChanged();
 #endif
 }
-    
+
 void WebChromeClient::notifyScrollerThumbIsVisibleInRect(const IntRect& scrollerThumb)
 {
     m_page->send(Messages::WebPageProxy::NotifyScrollerThumbIsVisibleInRect(scrollerThumb));

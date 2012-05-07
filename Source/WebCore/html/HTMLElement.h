@@ -90,6 +90,7 @@ public:
 
     HTMLFormElement* findFormAncestor() const;
 
+    bool hasDirectionAuto() const;
     TextDirection directionalityIfhasDirAutoAttribute(bool& isAuto) const;
 
 #if ENABLE(MICRODATA)
@@ -102,12 +103,13 @@ public:
 #endif
 
     virtual bool isInsertionPoint() const { return false; }
+    virtual bool isLabelable() const { return false; }
 
 protected:
     HTMLElement(const QualifiedName& tagName, Document*);
 
-    void addHTMLLengthToStyle(StylePropertySet*, int propertyID, const String& value);
-    void addHTMLColorToStyle(StylePropertySet*, int propertyID, const String& color);
+    void addHTMLLengthToStyle(StylePropertySet*, CSSPropertyID, const String& value);
+    void addHTMLColorToStyle(StylePropertySet*, CSSPropertyID, const String& color);
 
     void applyAlignmentAttributeToStyle(Attribute*, StylePropertySet*);
     void applyBorderAttributeToStyle(Attribute*, StylePropertySet*);

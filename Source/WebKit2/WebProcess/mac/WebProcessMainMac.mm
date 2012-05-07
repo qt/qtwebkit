@@ -84,7 +84,7 @@ int WebProcessMain(const CommandLine& commandLine)
     if (clientExecutable.isEmpty()) {
         kern_return_t kr = bootstrap_look_up(bootstrap_port, serviceName.utf8().data(), &serverPort);
         if (kr) {
-            fprintf(stderr, "bootstrap_look_up result: %s (%x)\n", mach_error_string(kr), kr);
+            WTFLogAlways("bootstrap_look_up result: %s (%x)\n", mach_error_string(kr), kr);
             return 2;
         }
     }
@@ -96,7 +96,7 @@ int WebProcessMain(const CommandLine& commandLine)
         // Make it possible to look up.
         serviceName = String::format("com.apple.WebKit.WebProcess-%d", getpid());
         if (kern_return_t kr = bootstrap_register2(bootstrap_port, const_cast<char*>(serviceName.utf8().data()), publishedService, 0)) {
-            fprintf(stderr, "Failed to register service name \"%s\". %s (%x)\n", serviceName.utf8().data(), mach_error_string(kr), kr);
+            WTFLogAlways("Failed to register service name \"%s\". %s (%x)\n", serviceName.utf8().data(), mach_error_string(kr), kr);
             return EXIT_FAILURE;
         }
 
@@ -118,12 +118,16 @@ int WebProcessMain(const CommandLine& commandLine)
         posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETPGROUP);
 
         int spawnResult = posix_spawn(0, command.data(), &fileActions, &attributes, const_cast<char**>(args), environmentVariables.environmentPointer());
+
+        posix_spawnattr_destroy(&attributes);
+        posix_spawn_file_actions_destroy(&fileActions);
+
         if (spawnResult)
             return 2;
 
         mach_msg_empty_rcv_t message;
         if (kern_return_t kr = mach_msg(&message.header, MACH_RCV_MSG, 0, sizeof(message), publishedService, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL)) {
-            fprintf(stderr, "Failed to receive port from the UI process. %s (%x)\n", mach_error_string(kr), kr);
+            WTFLogAlways("Failed to receive port from the UI process. %s (%x)\n", mach_error_string(kr), kr);
             return EXIT_FAILURE;
         }
 
@@ -132,7 +136,7 @@ int WebProcessMain(const CommandLine& commandLine)
         mach_port_type_t portType;
         kern_return_t kr = mach_port_type(mach_task_self(), serverPort, &portType);
         if (kr || !(portType & MACH_PORT_TYPE_SEND)) {
-            fprintf(stderr, "Failed to obtain send right for port received from the UI process.\n");
+            WTFLogAlways("Failed to obtain send right for port received from the UI process.\n");
             return EXIT_FAILURE;
         }
     }

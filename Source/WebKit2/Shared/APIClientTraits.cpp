@@ -26,6 +26,7 @@
 #include "config.h"
 #include "APIClientTraits.h"
 
+#include "WKBundle.h"
 #include "WKBundlePage.h"
 
 namespace WebKit {
@@ -38,6 +39,11 @@ const size_t APIClientTraits<WKBundlePageLoaderClient>::interfaceSizesByVersion[
 const size_t APIClientTraits<WKBundlePageResourceLoadClient>::interfaceSizesByVersion[] = {
     offsetof(WKBundlePageResourceLoadClient, shouldCacheResponse),
     sizeof(WKBundlePageResourceLoadClient)
+};
+
+const size_t APIClientTraits<WKBundlePageFullScreenClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageFullScreenClient, beganEnterFullScreen),
+    sizeof(WKBundlePageFullScreenClient)
 };
     
 const size_t APIClientTraits<WKPageContextMenuClient>::interfaceSizesByVersion[] = {
@@ -55,4 +61,9 @@ const size_t APIClientTraits<WKPageUIClient>::interfaceSizesByVersion[] = {
     sizeof(WKPageUIClient)
 };
     
+const size_t APIClientTraits<WKBundlePageFormClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageFormClient, willSendSubmitEvent),
+    sizeof(WKBundlePageFormClient)
+};
+
 } // namespace WebKit

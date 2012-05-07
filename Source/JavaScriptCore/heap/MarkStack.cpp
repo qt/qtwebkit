@@ -486,16 +486,6 @@ void* SlotVisitor::allocateNewSpace(void* ptr, size_t bytes)
     return CopiedSpace::allocateFromBlock(m_copyBlock, bytes);
 }
 
-void SlotVisitor::copy(void** ptr, size_t bytes)
-{
-    void* newPtr = 0;
-    if (!(newPtr = allocateNewSpace(*ptr, bytes)))
-        return;
-
-    memcpy(newPtr, *ptr, bytes);
-    *ptr = newPtr;
-}
-
 void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsigned length)
 {
     void* oldPtr = *ptr;
@@ -503,7 +493,7 @@ void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsig
     if (newPtr) {
         size_t jsValuesOffset = static_cast<size_t>(reinterpret_cast<char*>(values) - static_cast<char*>(oldPtr));
 
-        JSValue* newValues = reinterpret_cast<JSValue*>(static_cast<char*>(newPtr) + jsValuesOffset);
+        JSValue* newValues = reinterpret_cast_ptr<JSValue*>(static_cast<char*>(newPtr) + jsValuesOffset);
         for (unsigned i = 0; i < length; i++) {
             JSValue& value = values[i];
             newValues[i] = value;

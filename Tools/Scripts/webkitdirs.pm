@@ -1,4 +1,4 @@
-# Copyright (C) 2005, 2006, 2007, 2010, 2012 Apple Inc. All rights reserved.
+# Copyright (C) 2005, 2006, 2007, 2010, 2011, 2012 Apple Inc. All rights reserved.
 # Copyright (C) 2009 Google Inc. All rights reserved.
 # Copyright (C) 2011 Research In Motion Limited. All rights reserved.
 #
@@ -56,6 +56,7 @@ BEGIN {
        &cmakeBasedPortName
        &currentSVNRevision
        &debugSafari
+       &nmPath
        &passedConfiguration
        &printHelpAndExitForRunAndDebugWebKitAppIfNeeded
        &productDir
@@ -81,6 +82,7 @@ my $configurationForVisualStudio;
 my $configurationProductDir;
 my $sourceDir;
 my $currentSVNRevision;
+my $nmPath;
 my $osXVersion;
 my $generateDsym;
 my $isQt;
@@ -311,13 +313,9 @@ sub determineArchitecture
         if ($architecture) {
             chomp $architecture;
         } else {
-            if (isLeopard()) {
-                $architecture = `arch`;
-            } else {
-                my $supports64Bit = `sysctl -n hw.optional.x86_64`;
-                chomp $supports64Bit;
-                $architecture = $supports64Bit ? 'x86_64' : `arch`;
-            }
+            my $supports64Bit = `sysctl -n hw.optional.x86_64`;
+            chomp $supports64Bit;
+            $architecture = $supports64Bit ? 'x86_64' : `arch`;
             chomp $architecture;
         }
     }
@@ -930,6 +928,7 @@ sub blackberryCMakeArguments()
     if ($cpu eq "a9") {
         $cpu = $arch . "v7le";
         push @cmakeExtraOptions, '-DTARGETING_PLAYBOOK=1';
+        push @cmakeExtraOptions, '-DENABLE_GLES2=1';
     }
 
     my $stageDir = $ENV{"STAGE_DIR"};
@@ -956,6 +955,7 @@ sub blackberryCMakeArguments()
 
     push @cmakeExtraOptions, "-DCMAKE_SKIP_RPATH='ON'" if isDarwin();
     push @cmakeExtraOptions, "-DENABLE_DRT=1" if $ENV{"ENABLE_DRT"};
+    push @cmakeExtraOptions, "-DENABLE_GLES2=1" if $ENV{"ENABLE_GLES2"};
 
     my @includeSystemDirectories;
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "grskia", "skia");
@@ -965,6 +965,7 @@ sub blackberryCMakeArguments()
     push @includeSystemDirectories, $stageInc;
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "platform");
     push @includeSystemDirectories, File::Spec->catdir($stageInc, "browser", "qsk");
+    push @includeSystemDirectories, File::Spec->catdir($stageInc, "ots");
 
     my @cxxFlags;
     push @cxxFlags, "-Wl,-rpath-link,$stageLib";
@@ -979,7 +980,6 @@ sub blackberryCMakeArguments()
     }
 
     my @cmakeArgs;
-    push @cmakeArgs, "-DPUBLIC_BUILD=0";
     push @cmakeArgs, '-DCMAKE_SYSTEM_NAME="QNX"';
     push @cmakeArgs, "-DCMAKE_SYSTEM_PROCESSOR=\"$cpuDir\"";
     push @cmakeArgs, '-DCMAKE_SYSTEM_VERSION="1"';
@@ -1152,7 +1152,7 @@ sub determineIsChromiumNinja()
 
     my $hasUpToDateNinjabuild = 0;
     if (-e "out/$config/build.ninja") {
-        my $statNinja = stat("out/$config/build.ninja");
+        my $statNinja = stat("out/$config/build.ninja")->mtime;
 
         my $statXcode = 0;
         if (-e 'Source/WebKit/chromium/WebKit.xcodeproj') {
@@ -1161,7 +1161,7 @@ sub determineIsChromiumNinja()
 
         my $statMake = 0;
         if (-e 'Makefile.chromium') {
-          $statXcode = stat('Makefile.chromium')->mtime;
+          $statMake = stat('Makefile.chromium')->mtime;
         }
 
         $hasUpToDateNinjabuild = $statNinja > $statXcode && $statNinja > $statMake;
@@ -1308,6 +1308,23 @@ sub isPerianInstalled()
     return 0;
 }
 
+sub determineNmPath()
+{
+    return if $nmPath;
+
+    if (isAppleMacWebKit()) {
+        $nmPath = `xcrun -find nm`;
+        chomp $nmPath;
+    }
+    $nmPath = "nm" if !$nmPath;
+}
+
+sub nmPath()
+{
+    determineNmPath();
+    return $nmPath;
+}
+
 sub determineOSXVersion()
 {
     return if $osXVersion;
@@ -1331,11 +1348,6 @@ sub osXVersion()
 {
     determineOSXVersion();
     return $osXVersion;
-}
-
-sub isLeopard()
-{
-    return isDarwin() && osXVersion()->{"minor"} == 5;
 }
 
 sub isSnowLeopard()
@@ -1792,14 +1804,6 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
     print "Calling autogen.sh in " . $dir . "\n\n";
     print "Installation prefix directory: $prefix\n" if(defined($prefix));
 
-    # Save md5sum for jhbuild-related files.
-    foreach my $file (qw(jhbuildrc jhbuild.modules)) {
-        my $path = join('/', $sourceDir, 'Tools', 'gtk', $file);
-        open(SUM, ">$file.md5sum");
-        print SUM getMD5HashForFile($path);
-        close(SUM);
-    }
-
     # Only for WebKit, write the autogen.sh arguments to a file so that we can detect
     # when they change and automatically re-run it.
     if ($project eq 'WebKit') {
@@ -1828,6 +1832,35 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
     }
 }
 
+sub getJhbuildPath()
+{
+    return join('/', baseProductDir(), "Dependencies");
+}
+
+sub jhbuildConfigurationChanged()
+{
+    foreach my $file (qw(jhbuildrc.md5sum jhbuild.modules.md5sum)) {
+        my $path = join('/', getJhbuildPath(), $file);
+        if (! -e $path) {
+            return 1;
+        }
+
+        # Get the md5 sum of the file we're testing.
+        $file =~ m/(.+)\.md5sum/;
+        my $actualFile = join('/', $sourceDir, 'Tools', 'gtk', $1);
+        my $currentSum = getMD5HashForFile($actualFile);
+
+        # Get our previous record.
+        open(PREVIOUS_MD5, $path);
+        chomp(my $previousSum = <PREVIOUS_MD5>);
+        close(PREVIOUS_MD5);
+
+        if ($previousSum ne $currentSum) {
+            return 1;
+        }
+    }
+}
+
 sub mustReRunAutogen($@)
 {
     my ($sourceDir, $filename, @currentArguments) = @_;
@@ -1849,27 +1882,6 @@ sub mustReRunAutogen($@)
         print "Previous autogen arguments were: $previousArguments\n\n";
         print "New autogen arguments are: $joinedCurrentArguments\n";
         return 1;
-    }
-
-    # Now check jhbuild configuration for changes.
-    foreach my $file (qw(jhbuildrc.md5sum jhbuild.modules.md5sum)) {
-        if (! -e $file) {
-            return 1;
-        }
-
-        # Get the md5 sum of the file we're testing.
-        $file =~ m/(.+)\.md5sum/;
-        my $actualFile = join('/', $sourceDir, 'Tools', 'gtk', $1);
-        my $currentSum = getMD5HashForFile($actualFile);
-
-        # Get our previous record.
-        open(PREVIOUS_MD5, $file);
-        chomp(my $previousSum = <PREVIOUS_MD5>);
-        close(PREVIOUS_MD5);
-
-        if ($previousSum ne $currentSum) {
-            return 1;
-        }
     }
 
     return 0;
@@ -1898,11 +1910,6 @@ sub buildAutotoolsProject($@)
         return 0;
     }
 
-    # We might need to update jhbuild dependencies.
-    if (checkForArgumentAndRemoveFromArrayRef("--update-gtk", \@buildParams)) {
-        system("perl", "$sourceDir/Tools/Scripts/update-webkitgtk-libs") == 0 or die $!;
-    }
-
     my @buildArgs = ();
     my $makeArgs = $ENV{"WebKitMakeArguments"} || "";
     for my $i (0 .. $#buildParams) {
@@ -1925,6 +1932,8 @@ sub buildAutotoolsProject($@)
     # WebKit is the default target, so we don't need to specify anything.
     if ($project eq "JavaScriptCore") {
         $makeArgs .= " jsc";
+    } elsif ($project eq "WTF") {
+        $makeArgs .= " libWTF.la";
     }
 
     $prefix = $ENV{"WebKitInstallationPrefix"} if !defined($prefix);
@@ -1936,6 +1945,44 @@ sub buildAutotoolsProject($@)
         push @buildArgs, "--enable-debug";
     } else {
         push @buildArgs, "--disable-debug";
+    }
+
+    # We might need to update jhbuild dependencies.
+    my $needUpdate = 0;
+    if (jhbuildConfigurationChanged()) {
+        # If the configuration changed, dependencies may have been removed.
+        # Since we lack a granular way of uninstalling those we wipe out the
+        # jhbuild root and start from scratch.
+        my $jhbuildPath = getJhbuildPath();
+        if (system("rm -rf $jhbuildPath/Root") ne 0) {
+            die "Cleaning jhbuild root failed!";
+        }
+
+        if (system("perl $sourceDir/Tools/jhbuild/jhbuild-wrapper --gtk clean") ne 0) {
+            die "Cleaning jhbuild modules failed!";
+        }
+
+        $needUpdate = 1;
+    }
+
+    if (checkForArgumentAndRemoveFromArrayRef("--update-gtk", \@buildArgs)) {
+        $needUpdate = 1;
+    }
+
+    if ($needUpdate) {
+        # Force autogen to run, to catch the possibly updated libraries.
+        system("rm -f previous-autogen-arguments.txt");
+
+        system("perl", "$sourceDir/Tools/Scripts/update-webkitgtk-libs") == 0 or die $!;
+    }
+
+    # Save md5sum for jhbuild-related files.
+    foreach my $file (qw(jhbuildrc jhbuild.modules)) {
+        my $source = join('/', $sourceDir, "Tools", "gtk", $file);
+        my $destination = join('/', getJhbuildPath(), $file);
+        open(SUM, ">$destination" . ".md5sum");
+        print SUM getMD5HashForFile($source);
+        close(SUM);
     }
 
     # If GNUmakefile exists, don't run autogen.sh unless its arguments
@@ -1953,9 +2000,7 @@ sub buildAutotoolsProject($@)
 
     if ($project eq 'WebKit' && !isCrossCompilation()) {
         my @docGenerationOptions = ($runWithJhbuild, "$gtkScriptsPath/generate-gtkdoc", "--skip-html");
-        if ($debug) {
-            push(@docGenerationOptions, "--debug");
-        }
+        push(@docGenerationOptions, productDir());
 
         if (system(@docGenerationOptions)) {
             die "\n gtkdoc did not build without warnings\n";
@@ -1963,6 +2008,14 @@ sub buildAutotoolsProject($@)
     }
 
     return 0;
+}
+
+sub jhbuildWrapperPrefixIfNeeded()
+{
+    if (isEfl()) {
+        return File::Spec->catfile(sourceDir(), "Tools", "efl", "run-with-jhbuild");
+    }
+    return "";
 }
 
 sub generateBuildSystemFromCMakeProject
@@ -1990,7 +2043,8 @@ sub generateBuildSystemFromCMakeProject
 
     # We call system("cmake @args") instead of system("cmake", @args) so that @args is
     # parsed for shell metacharacters.
-    my $returnCode = system("cmake @args");
+    my $wrapper = jhbuildWrapperPrefixIfNeeded() . " ";
+    my $returnCode = system($wrapper . "cmake @args");
 
     chdir($originalWorkingDirectory);
     return $returnCode;
@@ -2009,7 +2063,8 @@ sub buildCMakeGeneratedProject($)
 
     # We call system("cmake @args") instead of system("cmake", @args) so that @args is
     # parsed for shell metacharacters. In particular, $makeArgs may contain such metacharacters.
-    return system("cmake @args");
+    my $wrapper = jhbuildWrapperPrefixIfNeeded() . " ";
+    return system($wrapper . "cmake @args");
 }
 
 sub cleanCMakeGeneratedProject()
@@ -2033,6 +2088,7 @@ sub buildCMakeProjectOrExit($$$$@)
     exit($returnCode) if $returnCode;
     $returnCode = exitStatus(buildCMakeGeneratedProject($makeArgs));
     exit($returnCode) if $returnCode;
+    return 0;
 }
 
 sub cmakeBasedPortArguments()
@@ -2274,8 +2330,8 @@ sub buildGtkProject
 {
     my ($project, $clean, @buildArgs) = @_;
 
-    if ($project ne "WebKit" and $project ne "JavaScriptCore") {
-        die "Unsupported project: $project. Supported projects: WebKit, JavaScriptCore\n";
+    if ($project ne "WebKit" and $project ne "JavaScriptCore" and $project ne "WTF") {
+        die "Unsupported project: $project. Supported projects: WebKit, JavaScriptCore, WTF\n";
     }
 
     return buildAutotoolsProject($project, $clean, @buildArgs);
@@ -2294,19 +2350,7 @@ sub buildChromiumMakefile($$@)
         $makeArgs = $1 if /^--makeargs=(.*)/i;
     }
     $makeArgs = "-j$numCpus" if not $makeArgs;
-    my $command = "";
-
-    # Building the WebKit Chromium port for Android requires us to cross-
-    # compile, which will be set up by Chromium's envsetup.sh. The script itself
-    # will verify that the installed NDK is indeed available.
-    if (isChromiumAndroid()) {
-        $command .= "bash -c \"source " . sourceDir() . "/Source/WebKit/chromium/build/android/envsetup.sh && ";
-        $ENV{ANDROID_NDK_ROOT} = sourceDir() . "/Source/WebKit/chromium/android-ndk-r7";
-        $ENV{WEBKIT_ANDROID_BUILD} = 1;
-    }
-
-    $command .= "make -fMakefile.chromium $makeArgs BUILDTYPE=$config $target";
-    $command .= "\"" if isChromiumAndroid();
+    my $command .= "make -fMakefile.chromium $makeArgs BUILDTYPE=$config $target";
 
     print "$command\n";
     return system $command;
@@ -2435,7 +2479,7 @@ EOF
 sub argumentsForRunAndDebugMacWebKitApp()
 {
     my @args = @ARGV;
-    push @args, ("-ApplePersistenceIgnoreState", "YES") if isLion() && checkForArgumentAndRemoveFromArrayRef("--no-saved-state", \@args);
+    push @args, ("-ApplePersistenceIgnoreState", "YES") if !isSnowLeopard() && checkForArgumentAndRemoveFromArrayRef("--no-saved-state", \@args);
     return @args;
 }
 

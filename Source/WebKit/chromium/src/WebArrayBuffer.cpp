@@ -31,8 +31,8 @@
 #include "config.h"
 #include "WebArrayBuffer.h"
 
-#include "ArrayBuffer.h"
 #include "V8ArrayBuffer.h"
+#include <wtf/ArrayBuffer.h>
 #include <wtf/PassOwnPtr.h>
 
 using namespace WebCore;
@@ -73,6 +73,14 @@ unsigned WebArrayBuffer::byteLength() const
 v8::Handle<v8::Value> WebArrayBuffer::toV8Value()
 {
     return V8ArrayBuffer::wrap(m_private.get());
+}
+
+WebArrayBuffer* WebArrayBuffer::createFromV8Value(v8::Handle<v8::Value> value)
+{
+    if (!V8ArrayBuffer::HasInstance(value))
+        return 0;
+    WTF::ArrayBuffer* buffer = V8ArrayBuffer::toNative(value->ToObject());
+    return new WebArrayBuffer(buffer);
 }
 #endif
 

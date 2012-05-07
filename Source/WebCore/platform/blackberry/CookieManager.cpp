@@ -33,7 +33,6 @@
 
 #include "CookieDatabaseBackingStore.h"
 #include "CookieParser.h"
-#include "CurrentTime.h"
 #include "FileSystem.h"
 #include "Logging.h"
 #include "WebSettings.h"
@@ -42,6 +41,7 @@
 #include <BlackBerryPlatformMessageClient.h>
 #include <BlackBerryPlatformNavigatorHandler.h>
 #include <stdlib.h>
+#include <wtf/CurrentTime.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
@@ -167,10 +167,12 @@ bool CookieManager::shouldRejectForSecurityReason(const ParsedCookie* cookie, co
     if (!cookie->domain().length())
         return true;
 
-    if (!cookie->hasDefaultDomain()) {
+    // If an explicitly specified value does not start with a dot, the user agent supplies. (RFC 2965 3.2.2)
+    // Domain: Defaults to the effective request-host. There is no dot at the beginning of request-host. (RFC 2965 3.3.1)
+    if (cookie->domain()[0] == '.') {
         // Check if the domain contains an embedded dot.
-        int dotPosition = cookie->domain().find(".", 1);
-        if (dotPosition == -1 || static_cast<unsigned int>(dotPosition) == cookie->domain().length()) {
+        size_t dotPosition = cookie->domain().find(".", 1);
+        if (dotPosition == notFound || dotPosition == cookie->domain().length()) {
             LOG_ERROR("Cookie %s is rejected because its domain does not contain an embedded dot.\n", cookie->toString().utf8().data());
             return true;
         }
@@ -182,7 +184,7 @@ bool CookieManager::shouldRejectForSecurityReason(const ParsedCookie* cookie, co
     // a.b.com matches b.com, a.b.com matches .B.com and a.b.com matches .A.b.Com
     // and so on.
     String hostDomainName = url.host();
-    hostDomainName = hostDomainName.startsWith(".") ? hostDomainName : "." + hostDomainName;
+    hostDomainName = hostDomainName.startsWith('.') ? hostDomainName : "." + hostDomainName;
     if (!hostDomainName.endsWith(cookie->domain(), false)) {
         LOG_ERROR("Cookie %s is rejected because its domain does not domain match the URL %s\n", cookie->toString().utf8().data(), url.string().utf8().data());
         return true;
@@ -575,7 +577,7 @@ void CookieManager::initiateCookieLimitCleanUp()
         CookieLog("CookieManager - Starting a timer for cookie cleanup");
         m_limitTimer.startOneShot(s_delayToStartCookieCleanup);
     } else {
-#if !NDEBUG
+#ifndef NDEBUG
         CookieLog("CookieManager - Cookie cleanup timer already running");
 #endif
     }

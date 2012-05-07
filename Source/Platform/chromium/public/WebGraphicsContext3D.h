@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,6 +32,7 @@
 #define WebGraphicsContext3D_h
 
 #include "WebCommon.h"
+#include "WebGraphicsMemoryAllocation.h"
 #include "WebNonCopyable.h"
 #include "WebString.h"
 
@@ -129,7 +130,10 @@ public:
 
     class WebGraphicsMemoryAllocationChangedCallbackCHROMIUM {
     public:
+        // FIXME: Remove this once we switch to WebGraphicsMemoryAllocation version.
         virtual void onMemoryAllocationChanged(size_t gpuResourceSizeInBytes) = 0;
+        // FIXME: Make this pure virtual once we implement everywhere.
+        virtual void onMemoryAllocationChanged(WebGraphicsMemoryAllocation) { }
 
     protected:
         virtual ~WebGraphicsMemoryAllocationChangedCallbackCHROMIUM() { }
@@ -155,6 +159,11 @@ public:
 
     // GL_CHROMIUM_gpu_memory_manager - sets callback to observe changes to memory allocation limits.
     virtual void setMemoryAllocationChangedCallbackCHROMIUM(WebGraphicsMemoryAllocationChangedCallbackCHROMIUM* callback) { }
+
+    // GL_EXT_discard_framebuffer - discard/ensure existance of surface backbuffer.
+    // FIXME: make these pure virtual once they are implemented by clients.
+    virtual void discardFramebufferEXT(WGC3Denum target, WGC3Dsizei numAttachments, const WGC3Denum* attachments) { }
+    virtual void ensureFramebufferCHROMIUM() { }
 
     // Query whether it is built on top of compliant GLES2 implementation.
     virtual bool isGLES2Compliant() = 0;
@@ -277,10 +286,7 @@ public:
     virtual void getRenderbufferParameteriv(WGC3Denum target, WGC3Denum pname, WGC3Dint* value) = 0;
     virtual void getShaderiv(WebGLId shader, WGC3Denum pname, WGC3Dint* value) = 0;
     virtual WebString getShaderInfoLog(WebGLId shader) = 0;
-
-    // TBD
-    // void glGetShaderPrecisionFormat (GLenum shadertype, GLenum precisiontype, GLint* range, GLint* precision);
-
+    virtual void getShaderPrecisionFormat(WGC3Denum shadertype, WGC3Denum precisiontype, WGC3Dint* range, WGC3Dint* precision) = 0;
     virtual WebString getShaderSource(WebGLId shader) = 0;
     virtual WebString getString(WGC3Denum name) = 0;
     virtual void getTexParameterfv(WGC3Denum target, WGC3Denum pname, WGC3Dfloat* value) = 0;
@@ -398,6 +404,14 @@ public:
     virtual void texStorage2DEXT(WGC3Denum target, WGC3Dint levels, WGC3Duint internalformat,
                                  WGC3Dint width, WGC3Dint height) { }
 
+    // GL_EXT_occlusion_query
+    virtual WebGLId createQueryEXT() { return 0; }
+    virtual void deleteQueryEXT(WebGLId query) { }
+    virtual WGC3Dboolean isQueryEXT(WebGLId query) { return false; }
+    virtual void beginQueryEXT(WGC3Denum target, WebGLId query) { }
+    virtual void endQueryEXT(WGC3Denum target) { }
+    virtual void getQueryivEXT(WGC3Denum target, WGC3Denum pname, WGC3Dint* params) { }
+    virtual void getQueryObjectuivEXT(WebGLId query, WGC3Denum pname, WGC3Duint* params) { }
 
 #if WEBKIT_USING_SKIA
     GrGLInterface* createGrGLInterface();

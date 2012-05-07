@@ -34,7 +34,7 @@
 #include "BaseClickableWithKeyInputType.h"
 #include "ColorChooserClient.h"
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
 
 namespace WebCore {
 
@@ -58,6 +58,7 @@ private:
     virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
     virtual void handleDOMActivateEvent(Event*) OVERRIDE;
     virtual void detach() OVERRIDE;
+    virtual bool shouldRespectListAttribute() OVERRIDE;
 
     Color valueAsColor() const;
     void endColorChooser();
@@ -69,6 +70,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(INPUT_COLOR)
+#endif // ENABLE(INPUT_TYPE_COLOR)
 
 #endif // ColorInputType_h

@@ -103,6 +103,8 @@ public:
     }
 
     static const JSC::ClassInfo s_info;
+    static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, const JSC::Identifier&, JSC::PropertySlot&);
+    static bool getOwnPropertyDescriptor(JSC::JSObject*, JSC::ExecState*, const JSC::Identifier&, JSC::PropertyDescriptor&);
     static JSC::Structure* createStructure(JSC::JSGlobalData& globalData, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
     {
         return JSC::Structure::create(globalData, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), &s_info);
@@ -111,7 +113,7 @@ public:
 private:
     JSTestSerializedScriptValueInterfacePrototype(JSC::JSGlobalData& globalData, JSC::JSGlobalObject*, JSC::Structure* structure) : JSC::JSNonFinalObject(globalData, structure) { }
 protected:
-    static const unsigned StructureFlags = JSC::OverridesVisitChildren | Base::StructureFlags;
+    static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | JSC::OverridesVisitChildren | Base::StructureFlags;
 };
 
 class JSTestSerializedScriptValueInterfaceConstructor : public DOMConstructorObject {
@@ -141,6 +143,10 @@ protected:
     static JSC::ConstructType getConstructData(JSC::JSCell*, JSC::ConstructData&);
 };
 
+// Functions
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestSerializedScriptValueInterfacePrototypeFunctionAcceptTransferList(JSC::ExecState*);
+JSC::EncodedJSValue JSC_HOST_CALL jsTestSerializedScriptValueInterfacePrototypeFunctionMultiTransferList(JSC::ExecState*);
 // Attributes
 
 JSC::JSValue jsTestSerializedScriptValueInterfaceValue(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
@@ -148,6 +154,7 @@ void setJSTestSerializedScriptValueInterfaceValue(JSC::ExecState*, JSC::JSObject
 JSC::JSValue jsTestSerializedScriptValueInterfaceReadonlyValue(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 JSC::JSValue jsTestSerializedScriptValueInterfaceCachedValue(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 void setJSTestSerializedScriptValueInterfaceCachedValue(JSC::ExecState*, JSC::JSObject*, JSC::JSValue);
+JSC::JSValue jsTestSerializedScriptValueInterfacePorts(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 JSC::JSValue jsTestSerializedScriptValueInterfaceCachedReadonlyValue(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 JSC::JSValue jsTestSerializedScriptValueInterfaceConstructor(JSC::ExecState*, JSC::JSValue, const JSC::Identifier&);
 

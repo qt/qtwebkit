@@ -25,7 +25,7 @@
 
 #import <WebCore/NotificationClient.h>
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 #import <WebCore/Notification.h>
 #import <wtf/HashMap.h>
 #import <wtf/RefPtr.h>
@@ -34,11 +34,13 @@
 
 namespace WebCore {
 class Notification;
+class NotificationPermissionCallback;
 class ScriptExecutionContext;
 class VoidCallback;
 }
 
 @class WebNotification;
+@class WebNotificationPolicyListener;
 @class WebView;
 
 class WebNotificationClient : public WebCore::NotificationClient {
@@ -52,12 +54,21 @@ private:
     virtual void clearNotifications(WebCore::ScriptExecutionContext*) OVERRIDE;
     virtual void notificationObjectDestroyed(WebCore::Notification*) OVERRIDE;
     virtual void notificationControllerDestroyed() OVERRIDE;
+#if ENABLE(LEGACY_NOTIFICATIONS)
     virtual void requestPermission(WebCore::ScriptExecutionContext*, PassRefPtr<WebCore::VoidCallback>) OVERRIDE;
+#endif
+#if ENABLE(NOTIFICATIONS)
+    virtual void requestPermission(WebCore::ScriptExecutionContext*, PassRefPtr<WebCore::NotificationPermissionCallback>) OVERRIDE;
+#endif
     virtual void cancelRequestsForPermission(WebCore::ScriptExecutionContext*) OVERRIDE { }
     virtual WebCore::NotificationClient::Permission checkPermission(WebCore::ScriptExecutionContext*) OVERRIDE;
 
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    void requestPermission(WebCore::ScriptExecutionContext*, WebNotificationPolicyListener *);
+#endif
+
     WebView *m_webView;
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     HashMap<RefPtr<WebCore::Notification>, RetainPtr<WebNotification> > m_notificationMap;
     
     typedef HashMap<RefPtr<WebCore::ScriptExecutionContext>, Vector<RetainPtr<WebNotification> > > NotificationContextMap;

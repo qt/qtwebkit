@@ -59,7 +59,7 @@ public:
         : MetaAllocator(32) // round up all allocations to 32 bytes
     {
         m_reservation = PageReservation::reserveWithGuardPages(fixedPoolSize, OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
-#if !ENABLE(CLASSIC_INTERPRETER)
+#if !(ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
         if (!m_reservation)
             CRASH();
 #endif
@@ -126,8 +126,13 @@ double ExecutableAllocator::memoryPressureMultiplier(size_t addedMemoryUsage)
     size_t bytesAllocated = statistics.bytesAllocated + addedMemoryUsage;
     if (bytesAllocated >= statistics.bytesReserved)
         bytesAllocated = statistics.bytesReserved;
-    return static_cast<double>(statistics.bytesReserved) /
-        (statistics.bytesReserved - bytesAllocated);
+    double result = 1.0;
+    size_t divisor = statistics.bytesReserved - bytesAllocated;
+    if (divisor)
+        result = static_cast<double>(statistics.bytesReserved) / divisor;
+    if (result < 1.0)
+        result = 1.0;
+    return result;
 }
 
 PassRefPtr<ExecutableMemoryHandle> ExecutableAllocator::allocate(JSGlobalData& globalData, size_t sizeInBytes, void* ownerUID, JITCompilationEffort effort)

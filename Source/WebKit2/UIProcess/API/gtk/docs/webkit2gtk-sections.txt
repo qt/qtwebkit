@@ -28,6 +28,7 @@ webkit_web_context_get_default
 webkit_web_context_get_cache_model
 webkit_web_context_set_cache_model
 webkit_web_context_download_uri
+webkit_web_context_get_cookie_manager
 
 <SUBSECTION Standard>
 WebKitWebContextClass
@@ -49,8 +50,6 @@ webkit_web_context_get_type
 WebKitWebView
 WebKitLoadEvent
 WebKitPolicyDecisionType
-WebKitScriptDialog
-WebKitScriptDialogType
 
 <SUBSECTION Editing Commands>
 WEBKIT_EDITING_COMMAND_CUT
@@ -89,11 +88,27 @@ webkit_web_view_can_execute_editing_command
 webkit_web_view_can_execute_editing_command_finish
 webkit_web_view_execute_editing_command
 webkit_web_view_get_find_controller
+webkit_web_view_get_javascript_global_context
+webkit_web_view_run_javascript
+webkit_web_view_run_javascript_finish
+
+<SUBSECTION WebKitJavascriptResult>
+WebKitJavascriptResult
+webkit_javascript_result_ref
+webkit_javascript_result_unref
+webkit_javascript_result_get_global_context
+webkit_javascript_result_get_value
+
+<SUBSECTION WebKitScriptDialog>
+WebKitScriptDialog
+WebKitScriptDialogType
 webkit_script_dialog_get_dialog_type
 webkit_script_dialog_get_message
 webkit_script_dialog_confirm_set_confirmed
 webkit_script_dialog_prompt_get_default_text
 webkit_script_dialog_prompt_set_text
+webkit_web_view_get_main_resource
+webkit_web_view_get_subresources
 
 <SUBSECTION Standard>
 WebKitWebViewClass
@@ -103,10 +118,12 @@ WEBKIT_TYPE_WEB_VIEW
 WEBKIT_WEB_VIEW_CLASS
 WEBKIT_IS_WEB_VIEW_CLASS
 WEBKIT_WEB_VIEW_GET_CLASS
+WEBKIT_TYPE_JAVASCRIPT_RESULT
 WEBKIT_TYPE_SCRIPT_DIALOG
 
 <SUBSECTION Private>
 webkit_web_view_get_type
+webkit_javascript_result_get_type
 webkit_script_dialog_get_type
 WebKitWebViewPrivate
 </SECTION>
@@ -232,6 +249,8 @@ webkit_settings_get_enable_webgl
 webkit_settings_set_enable_webgl
 webkit_settings_get_zoom_text_only
 webkit_settings_set_zoom_text_only
+webkit_settings_get_javascript_can_access_clipboard
+webkit_settings_set_javascript_can_access_clipboard
 
 <SUBSECTION Standard>
 WebKitSettingsClass
@@ -458,19 +477,71 @@ webkit_print_operation_get_type
 </SECTION>
 
 <SECTION>
+<FILE>WebKitWebResource</FILE>
+WebKitWebResource
+webkit_web_resource_get_uri
+webkit_web_resource_get_response
+webkit_web_resource_get_data
+webkit_web_resource_get_data_finish
+
+<SUBSECTION Standard>
+WebKitWebResourceClass
+WEBKIT_TYPE_WEB_RESOURCE
+WEBKIT_WEB_RESOURCE
+WEBKIT_IS_WEB_RESOURCE
+WEBKIT_WEB_RESOURCE_CLASS
+WEBKIT_IS_WEB_RESOURCE_CLASS
+WEBKIT_WEB_RESOURCE_GET_CLASS
+
+<SUBSECTION Private>
+WebKitWebResourcePrivate
+webkit_web_resource_get_type
+</SECTION>
+
+<SECTION>
 <FILE>WebKitError</FILE>
 WEBKIT_NETWORK_ERROR
 WEBKIT_PLUGIN_ERROR
 WEBKIT_POLICY_ERROR
 WEBKIT_DOWNLOAD_ERROR
+WEBKIT_PRINT_ERROR
+WEBKIT_JAVASCRIPT_ERROR
 WebKitNetworkError
 WebKitPluginError
 WebKitPolicyError
 WebKitDownloadError
+WebKitPrintError
+WebKitJavascriptError
 webkit_network_error_quark
 webkit_plugin_error_quark
 webkit_policy_error_quark
 webkit_download_error_quark
+webkit_print_error_quark
+webkit_javascript_error_quark
+</SECTION>
+
+<SECTION>
+<FILE>WebKitFileChooserRequest</FILE>
+WebKitFileChooserRequest
+webkit_file_chooser_request_get_mime_types
+webkit_file_chooser_request_get_mime_types_filter
+webkit_file_chooser_request_get_select_multiple
+webkit_file_chooser_request_select_files
+webkit_file_chooser_request_get_selected_files
+webkit_file_chooser_request_cancel
+
+<SUBSECTION Standard>
+WebKitFileChooserRequestClass
+WEBKIT_TYPE_FILE_CHOOSER_REQUEST
+WEBKIT_FILE_CHOOSER_REQUEST
+WEBKIT_IS_FILE_CHOOSER_REQUEST
+WEBKIT_FILE_CHOOSER_REQUEST_CLASS
+WEBKIT_IS_FILE_CHOOSER_REQUEST_CLASS
+WEBKIT_FILE_CHOOSER_REQUEST_GET_CLASS
+
+<SUBSECTION Private>
+WebKitFileChooserRequestPrivate
+webkit_file_chooser_request_get_type
 </SECTION>
 
 <SECTION>
@@ -499,4 +570,30 @@ WEBKIT_FIND_CONTROLLER_GET_CLASS
 <SUBSECTION Private>
 WebKitFindControllerPrivate
 webkit_find_controller_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitCookieManager</FILE>
+WebKitCookieManager
+WebKitCookieAcceptPolicy
+webkit_cookie_manager_set_accept_policy
+webkit_cookie_manager_get_accept_policy
+webkit_cookie_manager_get_accept_policy_finish
+webkit_cookie_manager_get_domains_with_cookies
+webkit_cookie_manager_get_domains_with_cookies_finish
+webkit_cookie_manager_delete_cookies_for_domain
+webkit_cookie_manager_delete_all_cookies
+
+<SUBSECTION Standard>
+WebKitCookieManagerClass
+WEBKIT_TYPE_COOKIE_MANAGER
+WEBKIT_COOKIE_MANAGER
+WEBKIT_IS_COOKIE_MANAGER
+WEBKIT_COOKIE_MANAGER_CLASS
+WEBKIT_IS_COOKIE_MANAGER_CLASS
+WEBKIT_COOKIE_MANAGER_GET_CLASS
+
+<SUBSECTION Private>
+WebKitCookieManagerPrivate
+webkit_cookie_manager_get_type
 </SECTION>

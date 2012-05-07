@@ -32,8 +32,10 @@
 #import "WebViewData.h"
 
 #import "DOMCSSStyleDeclarationInternal.h"
+#import "DOMDocumentInternal.h"
 #import "DOMNodeInternal.h"
 #import "DOMRangeInternal.h"
+#import "WebAlternativeTextClient.h"
 #import "WebApplicationCache.h"
 #import "WebBackForwardListInternal.h"
 #import "WebBaseNetscapePluginView.h"
@@ -70,6 +72,7 @@
 #import "WebInspector.h"
 #import "WebInspectorClient.h"
 #import "WebKitErrors.h"
+#import "WebKitFullScreenListener.h"
 #import "WebKitLogging.h"
 #import "WebKitNSStringExtras.h"
 #import "WebKitStatisticsPrivate.h"
@@ -129,6 +132,8 @@
 #import <WebCore/FrameTree.h>
 #import <WebCore/FrameView.h>
 #import <WebCore/GCController.h>
+#import <WebCore/GeolocationController.h>
+#import <WebCore/GeolocationError.h>
 #import <WebCore/HTMLMediaElement.h>
 #import <WebCore/HTMLNames.h>
 #import <WebCore/HistoryItem.h>
@@ -186,11 +191,6 @@
 
 #if ENABLE(DASHBOARD_SUPPORT)
 #import <WebKit/WebDashboardRegion.h>
-#endif
-
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-#import <WebCore/GeolocationController.h>
-#import <WebCore/GeolocationError.h>
 #endif
 
 #if ENABLE(GLIB_SUPPORT)
@@ -689,6 +689,13 @@ static NSString *leakOutlookQuirksUserScriptContents()
         outlookQuirksScriptContents, KURL(), nullptr, nullptr, InjectAtDocumentEnd, InjectInAllFrames);
 }
 
+static bool shouldRespectPriorityInCSSAttributeSetters()
+{
+    static bool isIAdProducerNeedingAttributeSetterQuirk = !WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_CSS_ATTRIBUTE_SETTERS_IGNORING_PRIORITY)
+        && [[[NSBundle mainBundle] bundleIdentifier] isEqualToString:@"com.apple.iAdProducer"];
+    return isIAdProducerNeedingAttributeSetterQuirk;
+}
+
 - (void)_commonInitializationWithFrameName:(NSString *)frameName groupName:(NSString *)groupName
 {
     WebCoreThreadViolationCheckRoundTwo();
@@ -729,6 +736,8 @@ static NSString *leakOutlookQuirksUserScriptContents()
         // Initialize our platform strategies.
         WebPlatformStrategies::initialize();
         Settings::setDefaultMinDOMTimerInterval(0.004);
+        
+        Settings::setShouldRespectPriorityInCSSAttributeSetters(shouldRespectPriorityInCSSAttributeSetters());
 
         didOneTimeInitialization = true;
     }
@@ -739,11 +748,12 @@ static NSString *leakOutlookQuirksUserScriptContents()
     pageClients.editorClient = new WebEditorClient(self);
     pageClients.dragClient = new WebDragClient(self);
     pageClients.inspectorClient = new WebInspectorClient(self);
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    pageClients.geolocationClient = new WebGeolocationClient(self);
-#endif
+    pageClients.alternativeTextClient = new WebAlternativeTextClient(self);
     _private->page = new Page(pageClients);
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(GEOLOCATION)
+    WebCore::provideGeolocationTo(_private->page, new WebGeolocationClient(self));
+#endif
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebCore::provideNotification(_private->page, new WebNotificationClient(self));
 #endif
 #if ENABLE(DEVICE_ORIENTATION)
@@ -838,6 +848,7 @@ static NSString *leakOutlookQuirksUserScriptContents()
     _private = [[WebViewPrivate alloc] init];
     [self _commonInitializationWithFrameName:frameName groupName:groupName];
     [self setMaintainsBackForwardList: YES];
+    _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
     return self;
 }
 
@@ -1508,7 +1519,9 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings->setMediaPlaybackRequiresUserGesture([preferences mediaPlaybackRequiresUserGesture]);
     settings->setMediaPlaybackAllowsInline([preferences mediaPlaybackAllowsInline]);
     settings->setSuppressesIncrementalRendering([preferences suppressesIncrementalRendering]);
+    settings->setRegionBasedColumnsEnabled([preferences regionBasedColumnsEnabled]);
     settings->setBackspaceKeyNavigationEnabled([preferences backspaceKeyNavigationEnabled]);
+    settings->setWantsBalancedSetDefersLoadingBehavior([preferences wantsBalancedSetDefersLoadingBehavior]);
     settings->setMockScrollbarsEnabled([preferences mockScrollbarsEnabled]);
 
 #if ENABLE(VIDEO_TRACK)
@@ -1517,7 +1530,13 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings->setShouldDisplayTextDescriptions([preferences shouldDisplayTextDescriptions]);
 #endif
 
+    settings->setShouldRespectImageOrientation([preferences shouldRespectImageOrientation]);
     settings->setNeedsIsLoadingInAPISenseQuirk([self _needsIsLoadingInAPISenseQuirk]);
+    settings->setRequestAnimationFrameEnabled([preferences requestAnimationFrameEnabled]);
+    
+    NSTimeInterval timeout = [preferences incrementalRenderingSuppressionTimeoutInSeconds];
+    if (timeout > 0)
+        settings->setIncrementalRenderingSuppressionTimeoutInSeconds(timeout);
 
     // Application Cache Preferences are stored on the global cache storage manager, not in Settings.
     [WebApplicationCache setDefaultOriginQuota:[preferences applicationCacheDefaultOriginQuota]];
@@ -1833,6 +1852,20 @@ static inline IMP getMethod(id o, SEL s)
     }
 
     [NSApp setWindowsNeedUpdate:YES];
+
+#if ENABLE(FULLSCREEN_API)
+    Document* document = core([frame DOMDocument]);
+    if (Element* element = document ? document->webkitCurrentFullScreenElement() : 0) {
+        SEL selector = @selector(webView:closeFullScreenWithListener:);
+        if (_private->UIDelegate && [_private->UIDelegate respondsToSelector:selector]) {
+            WebKitFullScreenListener *listener = [[WebKitFullScreenListener alloc] initWithElement:element];
+            CallUIDelegate(self, selector, listener);
+            [listener release];
+        } else if (_private->newFullscreenController && [_private->newFullscreenController isFullScreen]) {
+            [_private->newFullscreenController close];
+        }
+    }
+#endif
 }
 
 - (void)_didCommitLoadForFrame:(WebFrame *)frame
@@ -2036,7 +2069,7 @@ static inline IMP getMethod(id o, SEL s)
             [regionValues release];
         }
 
-        WebDashboardRegion *webRegion = [[WebDashboardRegion alloc] initWithRect:region.bounds clip:region.clip type:type];
+        WebDashboardRegion *webRegion = [[WebDashboardRegion alloc] initWithRect:pixelSnappedIntRect(region.bounds) clip:pixelSnappedIntRect(region.clip) type:type];
         [regionValues addObject:webRegion];
         [webRegion release];
     }
@@ -2497,7 +2530,7 @@ static inline IMP getMethod(id o, SEL s)
     NSMutableArray* rectsArray = [[NSMutableArray alloc] initWithCapacity:repaintRects.size()];
     
     for (unsigned i = 0; i < repaintRects.size(); ++i)
-        [rectsArray addObject:[NSValue valueWithRect:repaintRects[i]]];
+        [rectsArray addObject:[NSValue valueWithRect:pixelSnappedIntRect(repaintRects[i])]];
 
     return [rectsArray autorelease];
 }
@@ -2882,7 +2915,7 @@ static PassOwnPtr<Vector<String> > toStringVector(NSArray* patterns)
     _private->customDeviceScaleFactor = customScaleFactor;
 
     if (oldScaleFactor != [self _deviceScaleFactor])
-        _private->page->setDeviceScaleFactor(customScaleFactor);
+        _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
 }
 
 - (NSUInteger)markAllMatchesForText:(NSString *)string caseSensitive:(BOOL)caseFlag highlight:(BOOL)highlight limit:(NSUInteger)limit
@@ -3945,6 +3978,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     _private->hostWindow = [hostWindow retain];
     for (Frame* frame = coreFrame; frame; frame = frame->tree()->traverseNext(coreFrame))
         [[[kit(frame) frameView] documentView] viewDidMoveToHostWindow];
+    _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
 }
 
 - (NSWindow *)hostWindow
@@ -4234,7 +4268,13 @@ static WebFrame *incrementFrame(WebFrame *frame, WebFindOptions options = 0)
 
 - (void)setMainFrameURL:(NSString *)URLString
 {
-    [[self mainFrame] loadRequest: [NSURLRequest requestWithURL: [NSURL _web_URLWithDataAsString: URLString]]];
+    NSURL *url;
+    if ([URLString hasPrefix:@"/"])
+        url = [NSURL fileURLWithPath:URLString];
+    else
+        url = [NSURL _web_URLWithDataAsString:URLString];
+
+    [[self mainFrame] loadRequest:[NSURLRequest requestWithURL:url]];
 }
 
 - (NSString *)mainFrameURL
@@ -5484,7 +5524,7 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSValue jsValu
     WebFrame *webFrame = [self _selectedOrMainFrame];
     Frame* coreFrame = core(webFrame);
     if (coreFrame)
-        coreFrame->editor()->handleCorrectionPanelResult(result);
+        coreFrame->editor()->handleAlternativeTextUIResult(result);
 }
 #endif
 
@@ -5611,6 +5651,17 @@ FOR_EACH_RESPONDER_SELECTOR(FORWARD)
     return coreFrame->selection()->isAll(CanCrossEditingBoundary);
 }
 
+- (void)_simplifyMarkup:(DOMNode *)startNode endNode:(DOMNode *)endNode
+{
+    Frame* coreFrame = core([self mainFrame]);
+    if (!coreFrame || !startNode)
+        return;
+    Node* coreStartNode= core(startNode);
+    if (coreStartNode->document() != coreFrame->document())
+        return;
+    return coreFrame->editor()->simplifyMarkup(coreStartNode, core(endNode));    
+}
+
 @end
 
 static WebFrameView *containingFrameView(NSView *view)
@@ -5628,13 +5679,18 @@ static WebFrameView *containingFrameView(NSView *view)
         return _private->customDeviceScaleFactor;
 
     NSWindow *window = [self window];
+    NSWindow *hostWindow = [self hostWindow];
 #if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD)
     if (window)
         return [window backingScaleFactor];
+    if (hostWindow)
+        return [hostWindow backingScaleFactor];
     return [[NSScreen mainScreen] backingScaleFactor];
 #else
     if (window)
         return [window userSpaceScaleFactor];
+    if (hostWindow)
+        return [hostWindow userSpaceScaleFactor];
     return [[NSScreen mainScreen] userSpaceScaleFactor];
 #endif
 }
@@ -6286,14 +6342,9 @@ bool LayerFlushController::flushLayers()
 #if ENABLE(FULLSCREEN_API)
 - (BOOL)_supportsFullScreenForElement:(const WebCore::Element*)element withKeyboard:(BOOL)withKeyboard
 {
-    if (withKeyboard)
-        return NO;
-
     if (![[WebPreferences standardPreferences] fullScreenEnabled])
         return NO;
 
-    // FIXME: If the element is in an IFrame, we should ensure it has 
-    // an AllowsFullScreen=YES attribute before allowing fullscreen access.
     return YES;
 }
 
@@ -6387,20 +6438,20 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
 
 - (void)_geolocationDidChangePosition:(WebGeolocationPosition *)position
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     if (_private && _private->page)
-        _private->page->geolocationController()->positionChanged(core(position));
-#endif
+        WebCore::GeolocationController::from(_private->page)->positionChanged(core(position));
+#endif // ENABLE(GEOLOCATION)
 }
 
 - (void)_geolocationDidFailWithError:(NSError *)error
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     if (_private && _private->page) {
         RefPtr<GeolocationError> geolocatioError = GeolocationError::create(GeolocationError::PositionUnavailable, [error localizedDescription]);
-        _private->page->geolocationController()->errorOccurred(geolocatioError.get());
+        WebCore::GeolocationController::from(_private->page)->errorOccurred(geolocatioError.get());
     }
-#endif
+#endif // ENABLE(GEOLOCATION)
 }
 
 @end
@@ -6457,25 +6508,6 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
     Element* element = jsElement->impl();
     RefPtr<CSSComputedStyleDeclaration> style = CSSComputedStyleDeclaration::create(element, true);
     return toRef(exec, toJS(exec, jsElement->globalObject(), style.get()));
-}
-
-@end
-
-@implementation WebView (WebViewPrivateNodesFromRect)
-
-- (JSValueRef)_nodesFromRect:(JSContextRef)context forDocument:(JSValueRef)value x:(int)x  y:(int)y top:(unsigned)top right:(unsigned)right bottom:(unsigned)bottom left:(unsigned)left ignoreClipping:(BOOL)ignoreClipping
-{
-    JSLock lock(SilenceAssertionsOnly);
-    ExecState* exec = toJS(context);
-    if (!value)
-        return JSValueMakeUndefined(context);
-    JSValue jsValue = toJS(exec, value);
-    if (!jsValue.inherits(&JSDocument::s_info))
-        return JSValueMakeUndefined(context);
-    JSDocument* jsDocument = static_cast<JSDocument*>(asObject(jsValue));
-    Document* document = jsDocument->impl();
-    RefPtr<NodeList> nodes = document->nodesFromRect(x, y, top, right, bottom, left, ignoreClipping);
-    return toRef(exec, toJS(exec, jsDocument->globalObject(), nodes.get()));
 }
 
 @end

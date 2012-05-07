@@ -69,6 +69,16 @@ namespace WebCore {
     String contextMenuItemTagDelete();
     String contextMenuItemTagInputMethods();
     String contextMenuItemTagUnicode();
+    String contextMenuItemTagUnicodeInsertLRMMark();
+    String contextMenuItemTagUnicodeInsertRLMMark();
+    String contextMenuItemTagUnicodeInsertLREMark();
+    String contextMenuItemTagUnicodeInsertRLEMark();
+    String contextMenuItemTagUnicodeInsertLROMark();
+    String contextMenuItemTagUnicodeInsertRLOMark();
+    String contextMenuItemTagUnicodeInsertPDFMark();
+    String contextMenuItemTagUnicodeInsertZWSMark();
+    String contextMenuItemTagUnicodeInsertZWJMark();
+    String contextMenuItemTagUnicodeInsertZWNJMark();
 #endif
 #if PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL)
     String contextMenuItemTagSelectAll();
@@ -141,7 +151,7 @@ namespace WebCore {
     String AXHeadingText();
     String AXDefinitionListTermText();
     String AXDefinitionListDefinitionText();
-
+    String AXFooterRoleDescriptionText();
 #if PLATFORM(MAC)
     String AXARIAContentGroupText(const String& ariaType);
 #endif
@@ -201,6 +211,13 @@ namespace WebCore {
     String validationMessageRangeUnderflowText(const String& minimum);
     String validationMessageRangeOverflowText(const String& maximum);
     String validationMessageStepMismatchText(const String& base, const String& step);
+#if ENABLE(CALENDAR_PICKER)
+    String calendarTodayText();
+    String calendarClearText();
+    String dateFormatYearText();
+    String dateFormatMonthText();
+    String dateFormatDayInMonthText();
+#endif
 
 #if !PLATFORM(CHROMIUM)
 #define WEB_UI_STRING(string, description) WebCore::localizedString(string)

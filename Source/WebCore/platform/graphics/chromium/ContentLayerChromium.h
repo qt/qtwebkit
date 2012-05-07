@@ -41,7 +41,6 @@ namespace WebCore {
 
 class LayerTilerChromium;
 class LayerTextureUpdater;
-class Region;
 
 class ContentLayerDelegate {
 public:
@@ -58,19 +57,19 @@ public:
 
     void clearDelegate() { m_delegate = 0; }
 
-    virtual bool drawsContent() const;
-    virtual void paintContentsIfDirty(const Region& occludedScreenSpace);
-    virtual void idlePaintContentsIfDirty(const Region& occludedScreenSpace);
+    virtual bool drawsContent() const OVERRIDE;
+    virtual void update(CCTextureUpdater&, const CCOcclusionTracker*) OVERRIDE;
+    virtual void idleUpdate(CCTextureUpdater&, const CCOcclusionTracker*) OVERRIDE;
 
-    virtual void setOpaque(bool);
+    virtual void setOpaque(bool) OVERRIDE;
 
 protected:
     explicit ContentLayerChromium(ContentLayerDelegate*);
 
 
 private:
-    virtual LayerTextureUpdater* textureUpdater() const { return m_textureUpdater.get(); }
-    virtual void createTextureUpdaterIfNeeded();
+    virtual LayerTextureUpdater* textureUpdater() const OVERRIDE { return m_textureUpdater.get(); }
+    virtual void createTextureUpdaterIfNeeded() OVERRIDE;
 
     ContentLayerDelegate* m_delegate;
     RefPtr<LayerTextureUpdater> m_textureUpdater;

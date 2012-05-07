@@ -77,11 +77,15 @@ void RenderMedia::layout()
     controlsRenderer->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
     controlsRenderer->style()->setHeight(Length(newSize.height(), Fixed));
     controlsRenderer->style()->setWidth(Length(newSize.width(), Fixed));
-    controlsRenderer->setNeedsLayout(true, false);
+    controlsRenderer->setNeedsLayout(true, MarkOnlyThis);
     controlsRenderer->layout();
     setChildNeedsLayout(false);
 
     statePusher.pop();
+}
+
+void RenderMedia::paintReplaced(PaintInfo&, const LayoutPoint&)
+{
 }
 
 } // namespace WebCore

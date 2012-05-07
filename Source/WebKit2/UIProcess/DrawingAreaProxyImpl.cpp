@@ -127,6 +127,11 @@ void DrawingAreaProxyImpl::deviceScaleFactorDidChange()
     backingStoreStateDidChange(RespondImmediately);
 }
 
+void DrawingAreaProxyImpl::layerHostingModeDidChange()
+{
+    m_webPageProxy->process()->send(Messages::DrawingArea::SetLayerHostingMode(m_webPageProxy->layerHostingMode()), m_webPageProxy->pageID());
+}
+
 void DrawingAreaProxyImpl::visibilityDidChange()
 {
     if (!m_webPageProxy->isViewVisible()) {
@@ -348,29 +353,12 @@ void DrawingAreaProxyImpl::didReceiveLayerTreeHostProxyMessage(CoreIPC::Connecti
         m_layerTreeHostProxy->didReceiveLayerTreeHostProxyMessage(connection, messageID, arguments);
 }
 
-void DrawingAreaProxyImpl::setVisibleContentsRectForScaling(const WebCore::IntRect& visibleContentsRect, float scale)
+void DrawingAreaProxyImpl::setVisibleContentsRect(const WebCore::IntRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectoryVector, const WebCore::FloatPoint& accurateVisibleContentsPosition)
 {
     if (m_layerTreeHostProxy)
-        m_layerTreeHostProxy->setVisibleContentsRectForScaling(visibleContentsRect, scale);
+        m_layerTreeHostProxy->setVisibleContentsRect(visibleContentsRect, scale, trajectoryVector, accurateVisibleContentsPosition);
 }
 
-void DrawingAreaProxyImpl::setVisibleContentsRectForPanning(const WebCore::IntRect& visibleContentsRect, const WebCore::FloatPoint& trajectoryVector)
-{
-    if (m_layerTreeHostProxy)
-        m_layerTreeHostProxy->setVisibleContentsRectForPanning(visibleContentsRect, trajectoryVector);
-}
-
-void DrawingAreaProxyImpl::paintLayerTree(BackingStore::PlatformGraphicsContext context)
-{
-    if (m_layerTreeHostProxy)
-        m_layerTreeHostProxy->paintToGraphicsContext(context);
-}
-
-void DrawingAreaProxyImpl::paintToCurrentGLContext(const TransformationMatrix& matrix, float opacity, const FloatRect& clipRect)
-{
-    if (m_layerTreeHostProxy)
-        m_layerTreeHostProxy->paintToCurrentGLContext(matrix, opacity, clipRect);
-}
 #endif
 
 void DrawingAreaProxyImpl::exitAcceleratedCompositingMode()

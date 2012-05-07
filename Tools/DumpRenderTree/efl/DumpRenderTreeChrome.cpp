@@ -34,6 +34,7 @@
 #include "LayoutTestController.h"
 #include "NotImplemented.h"
 #include "WebCoreSupport/DumpRenderTreeSupportEfl.h"
+#include "WebCoreTestSupport.h"
 #include "WorkQueue.h"
 #include "ewk_private.h" // FIXME: create some WebCoreSupport/DumpRenderTree.cpp instead
 
@@ -43,6 +44,10 @@
 #include <Evas.h>
 #include <cstdio>
 #include <wtf/NotFound.h>
+
+using namespace WebCore;
+
+HashMap<unsigned long, CString> DumpRenderTreeChrome::m_dumpAssignedUrls;
 
 PassOwnPtr<DumpRenderTreeChrome> DumpRenderTreeChrome::create(Evas* evas)
 {
@@ -86,12 +91,30 @@ Evas_Object* DumpRenderTreeChrome::createView() const
 
     ewk_view_theme_set(view, DATA_DIR"/default.edj");
 
+    evas_object_smart_callback_add(view, "load,resource,failed", onResourceLoadFailed, 0);
+    evas_object_smart_callback_add(view, "load,resource,finished", onResourceLoadFinished, 0);
     evas_object_smart_callback_add(view, "load,started", onLoadStarted, 0);
-    evas_object_smart_callback_add(view, "load,finished", onLoadFinished, 0);
     evas_object_smart_callback_add(view, "title,changed", onTitleChanged, 0);
     evas_object_smart_callback_add(view, "window,object,cleared", onWindowObjectCleared, m_gcController.get());
     evas_object_smart_callback_add(view, "statusbar,text,set", onStatusbarTextSet, 0);
     evas_object_smart_callback_add(view, "load,document,finished", onDocumentLoadFinished, 0);
+    evas_object_smart_callback_add(view, "resource,request,new", onNewResourceRequest, 0);
+    evas_object_smart_callback_add(view, "resource,request,willsend", onWillSendRequest, 0);
+    evas_object_smart_callback_add(view, "resource,response,received", onResponseReceived, 0);
+    evas_object_smart_callback_add(view, "onload,event", onWebViewOnloadEvent, 0);
+    evas_object_smart_callback_add(view, "mixedcontent,run", onInsecureContentRun, 0);
+    evas_object_smart_callback_add(view, "mixedcontent,displayed", onInsecureContentDisplayed, 0);
+    evas_object_smart_callback_add(view, "frame,created", onFrameCreated, 0);
+
+    Evas_Object* mainFrame = ewk_view_frame_main_get(view);
+    evas_object_smart_callback_add(mainFrame, "load,provisional", onFrameProvisionalLoad, 0);
+    evas_object_smart_callback_add(mainFrame, "load,committed", onFrameLoadCommitted, 0);
+    evas_object_smart_callback_add(mainFrame, "load,finished", onFrameLoadFinished, 0);
+    evas_object_smart_callback_add(mainFrame, "load,error", onFrameLoadError, 0);
+    evas_object_smart_callback_add(mainFrame, "redirect,cancelled", onFrameRedirectCancelled, 0);
+    evas_object_smart_callback_add(mainFrame, "redirect,load,provisional", onFrameRedirectForProvisionalLoad, 0);
+    evas_object_smart_callback_add(mainFrame, "redirect,requested", onFrameRedirectRequested, 0);
+    evas_object_smart_callback_add(mainFrame, "xss,detected", onDidDetectXSS, 0);
 
     return view;
 }
@@ -126,6 +149,15 @@ bool DumpRenderTreeChrome::initialize()
 
     m_mainFrame = ewk_view_frame_main_get(m_mainView);
 
+    char* drtTemp = getenv("DUMPRENDERTREE_TEMP");
+    if (drtTemp) {
+        char path[2048];
+        eina_str_join(path, sizeof(path), '/', drtTemp, "LocalStorage");
+        ewk_settings_local_storage_path_set(path);
+        eina_str_join(path, sizeof(path), '/', drtTemp, "Databases");
+        ewk_settings_web_database_path_set(path);
+    }
+
     return true;
 }
 
@@ -144,6 +176,21 @@ Evas_Object* DumpRenderTreeChrome::mainView() const
     return m_mainView;
 }
 
+static inline const char* defaultEditingBehavior()
+{
+    return
+#if OS(DARWIN)
+    "mac";
+#elif OS(WINDOWS)
+    "win";
+#elif OS(UNIX)
+    "unix";
+#else
+    // Fallback
+    "mac";
+#endif
+}
+
 void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
 {
     Vector<Evas_Object*>::iterator it = m_extraViews.begin();
@@ -153,6 +200,9 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
 
     ewk_settings_icon_database_clear();
     ewk_settings_icon_database_path_set(0);
+
+    ewk_settings_web_database_clear();
+    ewk_settings_web_database_default_quota_set(5 * 1024 * 1024);
 
     ewk_view_setting_private_browsing_set(mainView(), EINA_FALSE);
     ewk_view_setting_spatial_navigation_set(mainView(), EINA_FALSE);
@@ -174,17 +224,118 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     ewk_view_setting_enable_plugins_set(mainView(), EINA_TRUE);
     ewk_view_setting_scripts_can_open_windows_set(mainView(), EINA_TRUE);
     ewk_view_setting_scripts_can_close_windows_set(mainView(), EINA_TRUE);
+    ewk_view_setting_auto_load_images_set(mainView(), EINA_TRUE);
+    ewk_view_setting_user_stylesheet_set(mainView(), 0);
+    ewk_view_setting_enable_xss_auditor_set(browser->mainView(), EINA_TRUE);
+    ewk_view_setting_enable_developer_extras_set(browser->mainView(), EINA_FALSE);
+    ewk_view_setting_minimum_timer_interval_set(browser->mainView(), 0.010); // 10 milliseconds (DOMTimer::s_minDefaultTimerInterval)
+    ewk_view_setting_enable_webgl_set(mainView(), EINA_TRUE);
+    ewk_view_setting_enable_hyperlink_auditing_set(mainView(), EINA_FALSE);
+    ewk_view_setting_include_links_in_focus_chain_set(mainView(), EINA_TRUE);
 
     ewk_view_zoom_set(mainView(), 1.0, 0, 0);
     ewk_view_scale_set(mainView(), 1.0, 0, 0);
+    ewk_view_text_zoom_set(mainView(), 1.0);
 
     ewk_history_clear(ewk_view_history_get(mainView()));
 
     ewk_cookies_clear();
     ewk_cookies_policy_set(EWK_COOKIE_JAR_ACCEPT_NO_THIRD_PARTY);
 
+    ewk_security_policy_whitelist_origin_reset();
+
     DumpRenderTreeSupportEfl::clearFrameName(mainFrame());
     DumpRenderTreeSupportEfl::clearOpener(mainFrame());
+    DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled(mainView(), true);
+    DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(mainView(), true);
+    DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled(mainView(), false);
+    DumpRenderTreeSupportEfl::setSelectTrailingWhitespaceEnabled(mainView(), false);
+    DumpRenderTreeSupportEfl::setDefersLoading(mainView(), false);
+    DumpRenderTreeSupportEfl::setEditingBehavior(mainView(), defaultEditingBehavior());
+    DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(mainView(), false);
+    DumpRenderTreeSupportEfl::setLoadsSiteIconsIgnoringImageLoadingSetting(mainView(), false);
+}
+
+static CString pathSuitableForTestResult(const char* uriString)
+{
+    if (!uriString)
+        return CString();
+
+    KURL uri = KURL(ParsedURLString, uriString);
+
+    if (!uri.isLocalFile())
+        return uri.string().utf8();
+
+    String pathString = uri.path();
+    size_t indexBaseName = pathString.reverseFind('/');
+    String baseName;
+    if (indexBaseName == notFound)
+        baseName = pathString;
+    else
+        baseName = pathString.substring(indexBaseName + 1);
+
+    String dirName;
+    if (indexBaseName != notFound) {
+        size_t indexDirName = pathString.reverseFind('/', indexBaseName - 1);
+        if (indexDirName != notFound)
+            dirName = pathString.substring(indexDirName + 1, indexBaseName - indexDirName - 1);
+    }
+
+    String ret = dirName + "/" + baseName;
+    return ret.utf8();
+}
+
+static CString urlSuitableForTestResult(const char* uriString)
+{
+    KURL uri = KURL(ParsedURLString, uriString);
+    if (!uri.isLocalFile())
+        return CString(uriString);
+
+    unsigned startIndex = uri.pathAfterLastSlash();
+    return uri.string().substring(startIndex).utf8();
+}
+
+static CString descriptionSuitableForTestResult(Ewk_Frame_Resource_Request* request)
+{
+    String ret = "<NSURLRequest URL ";
+    ret += pathSuitableForTestResult(request->url).data();
+    ret += ", main document URL ";
+    ret += urlSuitableForTestResult(request->first_party).data();
+    ret += ", http method ";
+    ret += request->http_method ? String(request->http_method) : "(none)";
+    ret += ">";
+
+    return ret.utf8();
+}
+
+static CString descriptionSuitableForTestResult(const Ewk_Frame_Resource_Response* response)
+{
+    if (!response)
+        return CString("(null)");
+
+    String ret = "<NSURLResponse ";
+    ret += pathSuitableForTestResult(response->url).data();
+    ret += ", http status code ";
+    ret += String::number(response->status_code);
+    ret += ">";
+
+    return ret.utf8();
+}
+
+static CString descriptionSuitableForTestResult(Ewk_Frame_Load_Error* error)
+{
+    String ret = "<NSError domain ";
+    ret += error->domain;
+    ret += ", code ";
+    ret += String::number(error->code);
+    if (error->failing_url && *error->failing_url != '\0') {
+        ret += ", failing URL \"";
+        ret += error->failing_url;
+        ret += "\"";
+    }
+    ret += ">";
+
+    return ret.utf8();
 }
 
 // Smart Callbacks
@@ -210,12 +361,13 @@ void DumpRenderTreeChrome::onWindowObjectCleared(void* userData, Evas_Object*, v
                         controllerName.get(),
                         makeEventSender(objectClearedInfo->context, !DumpRenderTreeSupportEfl::frameParent(objectClearedInfo->frame)),
                         kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete, 0);
+
+    WebCoreTestSupport::injectInternalsObject(objectClearedInfo->context);
 }
 
-void DumpRenderTreeChrome::onLoadStarted(void*, Evas_Object* view, void*)
+void DumpRenderTreeChrome::onLoadStarted(void*, Evas_Object* view, void* eventInfo)
 {
-    // FIXME: we actually need the frame related to this event
-    Evas_Object* frame = ewk_view_frame_main_get(view);
+    Evas_Object* frame = static_cast<Evas_Object*>(eventInfo);
 
     // Make sure we only set this once per test. If it gets cleared, and then set again, we might
     // end up doing two dumps for one test.
@@ -223,24 +375,16 @@ void DumpRenderTreeChrome::onLoadStarted(void*, Evas_Object* view, void*)
         topLoadingFrame = frame;
 }
 
-Eina_Bool DumpRenderTreeChrome::processWork(void* data)
+Eina_Bool DumpRenderTreeChrome::processWork(void*)
 {
-    Evas_Object* frame = static_cast<Evas_Object*>(data);
-
     if (WorkQueue::shared()->processWork() && !gLayoutTestController->waitToDump())
         dump();
 
     return ECORE_CALLBACK_CANCEL;
 }
 
-void DumpRenderTreeChrome::onLoadFinished(void*, Evas_Object* view, void*)
+void DumpRenderTreeChrome::topLoadingFrameLoadFinished()
 {
-    // FIXME: we actually need the frame related to this event
-    Evas_Object* frame = ewk_view_frame_main_get(view);
-
-    if (topLoadingFrame != frame)
-        return;
-
     topLoadingFrame = 0;
 
     WorkQueue::shared()->setFrozen(true);
@@ -248,7 +392,7 @@ void DumpRenderTreeChrome::onLoadFinished(void*, Evas_Object* view, void*)
         return;
 
     if (WorkQueue::shared()->count())
-        ecore_idler_add(processWork, frame);
+        ecore_idler_add(processWork, 0 /*frame*/);
     else
         dump();
 }
@@ -262,9 +406,13 @@ void DumpRenderTreeChrome::onStatusbarTextSet(void*, Evas_Object*, void* eventIn
     printf("UI DELEGATE STATUS CALLBACK: setStatusText:%s\n", statusbarText);
 }
 
-void DumpRenderTreeChrome::onTitleChanged(void*, Evas_Object*, void*)
+void DumpRenderTreeChrome::onTitleChanged(void*, Evas_Object*, void* eventInfo)
 {
-    notImplemented();
+    if (!gLayoutTestController->dumpTitleChanges())
+        return;
+
+    const char* titleText = static_cast<const char*>(eventInfo);
+    printf("TITLE CHANGED: %s\n", titleText);
 }
 
 void DumpRenderTreeChrome::onDocumentLoadFinished(void*, Evas_Object*, void* eventInfo)
@@ -279,4 +427,202 @@ void DumpRenderTreeChrome::onDocumentLoadFinished(void*, Evas_Object*, void* eve
         if (pendingFrameUnloadEvents)
             printf("%s - has %u onunload handler(s)\n", frameName.utf8().data(), pendingFrameUnloadEvents);
     }
+}
+
+void DumpRenderTreeChrome::onWillSendRequest(void*, Evas_Object*, void* eventInfo)
+{
+    Ewk_Frame_Resource_Messages* messages = static_cast<Ewk_Frame_Resource_Messages*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
+        printf("%s - willSendRequest %s redirectResponse %s\n",
+               m_dumpAssignedUrls.contains(messages->request->identifier) ? m_dumpAssignedUrls.get(messages->request->identifier).data() : "<unknown>",
+               descriptionSuitableForTestResult(messages->request).data(),
+               descriptionSuitableForTestResult(messages->redirect_response).data());
+
+    if (!done && gLayoutTestController->willSendRequestReturnsNull()) {
+        // As requested by the LayoutTestController, don't perform the request.
+        messages->request->url = 0;
+        return;
+    }
+
+    if (!done && gLayoutTestController->willSendRequestReturnsNullOnRedirect() && messages->redirect_response) {
+        printf("Returning null for this redirect\n");
+        messages->request->url = 0;
+        return;
+    }
+
+    KURL url = KURL(ParsedURLString, messages->request->url);
+
+    if (url.isValid()
+        && url.protocolIsInHTTPFamily()
+        && url.host() != "127.0.0.1"
+        && url.host() != "255.255.255.255"
+        && url.host().lower() != "localhost") {
+        printf("Blocked access to external URL %s\n", messages->request->url);
+        messages->request->url = 0;
+        return;
+    }
+
+    const std::string& destination = gLayoutTestController->redirectionDestinationForURL(url.string().utf8().data());
+    if (destination.length())
+        messages->request->url = strdup(destination.c_str());
+}
+
+void DumpRenderTreeChrome::onWebViewOnloadEvent(void*, Evas_Object*, void* eventInfo)
+{
+    const Evas_Object* frame = static_cast<Evas_Object*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didHandleOnloadEventsForFrame\n", frameName.utf8().data());
+    }
+}
+
+void DumpRenderTreeChrome::onInsecureContentRun(void*, Evas_Object*, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks())
+        printf("didRunInsecureContent\n");
+}
+
+void DumpRenderTreeChrome::onInsecureContentDisplayed(void*, Evas_Object*, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks())
+        printf("didDisplayInsecureContent\n");
+}
+
+void DumpRenderTreeChrome::onFrameCreated(void*, Evas_Object*, void* eventInfo)
+{
+    Evas_Object* frame = static_cast<Evas_Object*>(eventInfo);
+
+    evas_object_smart_callback_add(frame, "load,provisional", onFrameProvisionalLoad, 0);
+    evas_object_smart_callback_add(frame, "load,committed", onFrameLoadCommitted, 0);
+    evas_object_smart_callback_add(frame, "load,finished", onFrameLoadFinished, 0);
+    evas_object_smart_callback_add(frame, "load,error", onFrameLoadError, 0);
+    evas_object_smart_callback_add(frame, "redirect,cancelled", onFrameRedirectCancelled, 0);
+    evas_object_smart_callback_add(frame, "redirect,load,provisional", onFrameRedirectForProvisionalLoad, 0);
+    evas_object_smart_callback_add(frame, "redirect,requested", onFrameRedirectRequested, 0);
+    evas_object_smart_callback_add(frame, "xss,detected", onDidDetectXSS, 0);
+}
+
+void DumpRenderTreeChrome::onFrameProvisionalLoad(void*, Evas_Object* frame, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didStartProvisionalLoadForFrame\n", frameName.utf8().data());
+    }
+}
+
+void DumpRenderTreeChrome::onFrameLoadCommitted(void*, Evas_Object* frame, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didCommitLoadForFrame\n", frameName.utf8().data());
+    }
+}
+
+void DumpRenderTreeChrome::onFrameLoadFinished(void*, Evas_Object* frame, void* eventInfo)
+{
+    const Ewk_Frame_Load_Error* error = static_cast<Ewk_Frame_Load_Error*>(eventInfo);
+
+    // EFL port emits both "load,finished" and "load,error" signals in error case.
+    // Error case is therefore already handled in onFrameLoadError() and we don't need
+    // to handle it here.
+    if (error)
+        return;
+
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didFinishLoadForFrame\n", frameName.utf8().data());
+    }
+
+    if (frame == topLoadingFrame)
+        topLoadingFrameLoadFinished();
+}
+
+void DumpRenderTreeChrome::onFrameLoadError(void*, Evas_Object* frame, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didFailLoadWithError\n", frameName.utf8().data());
+    }
+
+    if (frame == topLoadingFrame)
+        topLoadingFrameLoadFinished();
+}
+
+void DumpRenderTreeChrome::onFrameRedirectCancelled(void*, Evas_Object* frame, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didCancelClientRedirectForFrame\n", frameName.utf8().data());
+    }
+}
+
+void DumpRenderTreeChrome::onFrameRedirectForProvisionalLoad(void*, Evas_Object* frame, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didReceiveServerRedirectForProvisionalLoadForFrame\n", frameName.utf8().data());
+    }
+}
+
+void DumpRenderTreeChrome::onFrameRedirectRequested(void*, Evas_Object* frame, void* eventInfo)
+{
+    const char* url = static_cast<const char*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - willPerformClientRedirectToURL: %s \n", frameName.utf8().data(), pathSuitableForTestResult(url).data());
+    }
+}
+
+void DumpRenderTreeChrome::onDidDetectXSS(void*, Evas_Object* view, void*)
+{
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks())
+        printf("didDetectXSS\n");
+}
+
+void DumpRenderTreeChrome::onResponseReceived(void*, Evas_Object*, void* eventInfo)
+{
+    Ewk_Frame_Resource_Response* response = static_cast<Ewk_Frame_Resource_Response*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpResourceLoadCallbacks()) {
+        CString responseDescription(descriptionSuitableForTestResult(response));
+        printf("%s - didReceiveResponse %s\n",
+               m_dumpAssignedUrls.contains(response->identifier) ? m_dumpAssignedUrls.get(response->identifier).data() : "<unknown>",
+               responseDescription.data());
+    }
+
+    if (!done && gLayoutTestController->dumpResourceResponseMIMETypes()) {
+        printf("%s has MIME type %s\n",
+               KURL(ParsedURLString, response->url).lastPathComponent().utf8().data(),
+               response->mime_type);
+    }
+}
+
+void DumpRenderTreeChrome::onResourceLoadFinished(void*, Evas_Object*, void* eventInfo)
+{
+    unsigned long identifier = *static_cast<unsigned long*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
+        printf("%s - didFinishLoading\n",
+               (m_dumpAssignedUrls.contains(identifier) ? m_dumpAssignedUrls.take(identifier).data() : "<unknown>"));
+}
+
+void DumpRenderTreeChrome::onResourceLoadFailed(void*, Evas_Object*, void* eventInfo)
+{
+    Ewk_Frame_Load_Error* error = static_cast<Ewk_Frame_Load_Error*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
+        printf("%s - didFailLoadingWithError: %s\n",
+               (m_dumpAssignedUrls.contains(error->resource_identifier) ? m_dumpAssignedUrls.take(error->resource_identifier).data() : "<unknown>"),
+               descriptionSuitableForTestResult(error).data());
+}
+
+void DumpRenderTreeChrome::onNewResourceRequest(void*, Evas_Object*, void* eventInfo)
+{
+    Ewk_Frame_Resource_Request* request = static_cast<Ewk_Frame_Resource_Request*>(eventInfo);
+
+    if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
+        m_dumpAssignedUrls.add(request->identifier, pathSuitableForTestResult(request->url));
 }

@@ -113,8 +113,6 @@ namespace WebCore {
         RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
         RenderPart* ownerRenderer() const; // Renderer for the element that contains this frame.
 
-        void transferChildFrameToNewDocument();
-
 #if ENABLE(PAGE_VISIBILITY_API)
         void dispatchVisibilityStateChangeEvent();
 #endif
@@ -181,9 +179,9 @@ namespace WebCore {
         DragImageRef nodeImage(Node*);
         DragImageRef dragImageForSelection();
 
-        VisiblePosition visiblePositionForPoint(const LayoutPoint& framePoint);
+        VisiblePosition visiblePositionForPoint(const IntPoint& framePoint);
         Document* documentAtPoint(const IntPoint& windowPoint);
-        PassRefPtr<Range> rangeForPoint(const LayoutPoint& framePoint);
+        PassRefPtr<Range> rangeForPoint(const IntPoint& framePoint);
 
         String searchForLabelsAboveCell(RegularExpression*, HTMLTableCellElement*, size_t* resultDistanceFromStartOfCell);
         String searchForLabelsBeforeElement(const Vector<String>& labels, Element*, size_t* resultDistance, bool* resultIsInCellAbove);

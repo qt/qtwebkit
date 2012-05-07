@@ -36,53 +36,64 @@ namespace WebCore {
 
 using namespace MathMLNames;
 
-RenderMathMLRow::RenderMathMLRow(Element* element)
-    : RenderMathMLBlock(element)
+RenderMathMLRow::RenderMathMLRow(Node* node)
+    : RenderMathMLBlock(node)
 {
 }
 
-void RenderMathMLRow::layout() 
+// FIXME: Change all these createAnonymous... routines to return a PassOwnPtr<>.
+RenderMathMLRow* RenderMathMLRow::createAnonymousWithParentRenderer(const RenderObject* parent)
 {
-    RenderBlock::layout();
-    
-    LayoutUnit maxHeight = 0;
+    RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), INLINE_BLOCK);
+    RenderMathMLRow* newMRow = new (parent->renderArena()) RenderMathMLRow(parent->document() /* is anonymous */);
+    newMRow->setStyle(newStyle.release());
+    return newMRow;
+}
 
-    // Calculate the non-operator max height of the row.
-    for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
-        if (current->isRenderMathMLBlock()) {
-            RenderMathMLBlock* block = toRenderMathMLBlock(current);
-            if (!block->unembellishedOperator() && block->offsetHeight() > maxHeight)
-                maxHeight = block->offsetHeight();
-        } else if (current->isBoxModelObject()) {
-            RenderBoxModelObject* box = toRenderBoxModelObject(current);
-            // Check to see if this box has a larger height.
-            if (box->offsetHeight() > maxHeight)
-                maxHeight = box->offsetHeight();
+void RenderMathMLRow::computePreferredLogicalWidths()
+{
+    ASSERT(preferredLogicalWidthsDirty() && needsLayout());
+    
+    computeChildrenPreferredLogicalHeights();
+    int stretchLogicalHeight = 0;
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->isRenderMathMLBlock()) {
+            RenderMathMLOperator* renderMo = toRenderMathMLBlock(child)->unembellishedOperator();
+            // FIXME: Only skip renderMo if it is stretchy.
+            if (renderMo)
+                continue;
+        }
+        stretchLogicalHeight = max<int>(stretchLogicalHeight, roundToInt(preferredLogicalHeightAfterSizing(child)));
+    }
+    if (!stretchLogicalHeight)
+        stretchLogicalHeight = style()->fontSize();
+    
+    // Set the sizes of (possibly embellished) stretchy operator children.
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->isRenderMathMLBlock()) {
+            RenderMathMLOperator* renderMo = toRenderMathMLBlock(child)->unembellishedOperator();
+            if (renderMo)
+                renderMo->stretchToHeight(stretchLogicalHeight);
         }
     }
     
-    if (!maxHeight)
-        maxHeight = style()->fontSize();
+    RenderMathMLBlock::computePreferredLogicalWidths();
     
-    // Stretch everything to the same height (blocks can ignore the request).
-    if (maxHeight > 0) {
-        bool didStretch = false;
-        for (RenderObject* current = firstChild(); current; current = current->nextSibling()) {
-            if (current->isRenderMathMLBlock()) {
-                RenderMathMLBlock* block = toRenderMathMLBlock(current);
-                block->stretchToHeight(maxHeight);
-                didStretch = true;
-            }
-        }
-        if (didStretch) {
-            setNeedsLayout(true);
-            setPreferredLogicalWidthsDirty(true, false);
-            RenderBlock::layout();
-        }
-    }
+    // Shrink our logical width to its probable value now without triggering unnecessary relayout of our children.
+    ASSERT(needsLayout() && logicalWidth() >= maxPreferredLogicalWidth());
+    setLogicalWidth(maxPreferredLogicalWidth());
+}
+
+void RenderMathMLRow::layout()
+{
+    // Our computePreferredLogicalWidths() may change our logical width and then layout our children, which
+    // RenderBlock::layout()'s relayoutChildren logic isn't expecting.
+    if (preferredLogicalWidthsDirty())
+        computePreferredLogicalWidths();
     
-}    
-    
+    RenderMathMLBlock::layout();
+}
+
 }
 
 #endif // ENABLE(MATHML)

@@ -27,6 +27,7 @@
 #define CCRenderPass_h
 
 #include "cc/CCDrawQuad.h"
+#include "cc/CCOcclusionTracker.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
@@ -35,23 +36,18 @@ namespace WebCore {
 class CCLayerImpl;
 class CCRenderSurface;
 class CCSharedQuadState;
+class Color;
 
-typedef Vector<OwnPtr<CCDrawQuad> > CCQuadList;
+// A list of CCDrawQuad objects, sorted internally in front-to-back order.
+class CCQuadList : public Vector<OwnPtr<CCDrawQuad> > {
+public:
+    typedef reverse_iterator backToFrontIterator;
+    typedef const_reverse_iterator constBackToFrontIterator;
 
-struct CCOverdrawCounts {
-    CCOverdrawCounts()
-       : m_pixelsDrawnOpaque(0)
-       , m_pixelsDrawnTransparent(0)
-       , m_pixelsCulled(0)
-    {
-    }
-    // Count of pixels that are opaque (and thus occlude). Ideally this is no more
-    // than wiewport width x height.
-    float m_pixelsDrawnOpaque;
-    // Count of pixels that are possibly transparent, and cannot occlude.
-    float m_pixelsDrawnTransparent;
-    // Count of pixels not drawn as they are occluded by somthing opaque.
-    float m_pixelsCulled;
+    inline backToFrontIterator backToFrontBegin() { return rbegin(); }
+    inline backToFrontIterator backToFrontEnd() { return rend(); }
+    inline constBackToFrontIterator backToFrontBegin() const { return rbegin(); }
+    inline constBackToFrontIterator backToFrontEnd() const { return rend(); }
 };
 
 class CCRenderPass {
@@ -59,11 +55,9 @@ class CCRenderPass {
 public:
     static PassOwnPtr<CCRenderPass> create(CCRenderSurface*);
 
-    void appendQuadsForLayer(CCLayerImpl*);
-    void appendQuadsForRenderSurfaceLayer(CCLayerImpl*);
-
-    // Passing in 0 for CCOverdrawCounts is valid, and disables performing overdraw calculations.
-    void optimizeQuads(bool haveDamageRect, const FloatRect& damageRect, CCOverdrawCounts*);
+    void appendQuadsForLayer(CCLayerImpl*, CCOcclusionTrackerImpl*, bool& hadMissingTiles);
+    void appendQuadsForRenderSurfaceLayer(CCLayerImpl*, CCOcclusionTrackerImpl*);
+    void appendQuadsToFillScreen(CCLayerImpl* rootLayer, const Color& screenBackgroundColor, const CCOcclusionTrackerImpl&);
 
     const CCQuadList& quadList() const { return m_quadList; }
     CCRenderSurface* targetSurface() const { return m_targetSurface; }

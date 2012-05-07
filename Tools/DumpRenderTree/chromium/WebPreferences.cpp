@@ -111,7 +111,6 @@ void WebPreferences::reset()
     hyperlinkAuditingEnabled = false;
     acceleratedCompositingForVideoEnabled = false;
     acceleratedCompositingEnabled = false;
-    compositeToTexture = false;
     accelerated2dCanvasEnabled = false;
     deferred2dCanvasEnabled = false;
     acceleratedPaintingEnabled = false;
@@ -119,6 +118,7 @@ void WebPreferences::reset()
     hixie76WebSocketProtocolEnabled = true;
     perTilePaintingEnabled = false;
     mockScrollbarsEnabled = false;
+    cssCustomFilterEnabled = false;
 }
 
 static void setStandardFontFamilyWrapper(WebSettings* settings, const WebKit::WebString& font, UScriptCode script)
@@ -195,6 +195,7 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setDeveloperExtrasEnabled(developerExtrasEnabled);
     settings->setExperimentalWebGLEnabled(experimentalWebGLEnabled);
     settings->setExperimentalCSSRegionsEnabled(experimentalCSSRegionsEnabled);
+    settings->setExperimentalCSSCustomFilterEnabled(cssCustomFilterEnabled);
     settings->setJavaEnabled(javaEnabled);
     settings->setJavaScriptCanAccessClipboard(javaScriptCanAccessClipboard);
     settings->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
@@ -218,7 +219,6 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setCaretBrowsingEnabled(caretBrowsingEnabled);
     settings->setAcceleratedCompositingEnabled(acceleratedCompositingEnabled);
     settings->setAcceleratedCompositingForVideoEnabled(acceleratedCompositingForVideoEnabled);
-    settings->setCompositeToTextureEnabled(compositeToTexture);
     settings->setForceCompositingMode(forceCompositingMode);
     settings->setAccelerated2dCanvasEnabled(accelerated2dCanvasEnabled);
     settings->setDeferred2dCanvasEnabled(deferred2dCanvasEnabled);

@@ -2433,8 +2433,8 @@ def check_for_null(clean_lines, line_number, file_state, error):
     if search(r'\bgdk_pixbuf_save_to\w+\b', line):
         return
 
-    # Don't warn about NULL usage in gtk_widget_style_get(). See Bug 51758.
-    if search(r'\bgtk_widget_style_get\(\w+\b', line):
+    # Don't warn about NULL usage in gtk_widget_style_get() or gtk_style_context_get_style. See Bug 51758
+    if search(r'\bgtk_widget_style_get\(\w+\b', line) or search(r'\bgtk_style_context_get_style\(\w+\b', line):
         return
 
     # Don't warn about NULL usage in soup_server_new(). See Bug 77890.
@@ -2776,8 +2776,11 @@ def check_include_line(filename, file_extension, clean_lines, line_number, inclu
          if previous_match:
             previous_header_type = include_state.header_types[previous_line_number]
             if previous_header_type == _OTHER_HEADER and previous_line.strip() > line.strip():
-                error(line_number, 'build/include_order', 4,
-                      'Alphabetical sorting problem.')
+                # This type of error is potentially a problem with this line or the previous one,
+                # so if the error is filtered for one line, report it for the next. This is so that
+                # we properly handle patches, for which only modified lines produce errors.
+                if not error(line_number - 1, 'build/include_order', 4, 'Alphabetical sorting problem.'):
+                    error(line_number, 'build/include_order', 4, 'Alphabetical sorting problem.')
 
     if error_message:
         if file_extension == 'h':
@@ -3106,6 +3109,7 @@ def check_identifier_name_in_declaration(filename, line_number, line, file_state
                 and not (filename.find('gtk') >= 0 and modified_identifier.startswith('webkit_') >= 0)
                 and not modified_identifier.startswith('tst_')
                 and not modified_identifier.startswith('webkit_dom_object_')
+                and not modified_identifier.startswith('webkit_soup')
                 and not modified_identifier.startswith('NPN_')
                 and not modified_identifier.startswith('NPP_')
                 and not modified_identifier.startswith('NP_')

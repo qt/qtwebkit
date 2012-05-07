@@ -21,6 +21,7 @@
 #include "config.h"
 #include "RenderFileUploadControl.h"
 
+#include "ElementShadow.h"
 #include "FileList.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
@@ -32,7 +33,6 @@
 #include "RenderText.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 #include "TextRun.h"
 #include "VisiblePosition.h"
 #include <math.h>
@@ -52,6 +52,7 @@ const int buttonShadowHeight = 2;
 
 RenderFileUploadControl::RenderFileUploadControl(HTMLInputElement* input)
     : RenderBlock(input)
+    , m_canReceiveDroppedFiles(input->canReceiveDroppedFiles())
 {
 }
 
@@ -72,8 +73,12 @@ void RenderFileUploadControl::updateFromElement()
         // updateFromElement() eventually.
         if (button->disabled() != newDisabled)
             button->setDisabled(newDisabled);
-        
-        button->setActive(input->canReceiveDroppedFiles());
+
+        bool newCanReceiveDroppedFilesState = input->canReceiveDroppedFiles();
+        if (m_canReceiveDroppedFiles != newCanReceiveDroppedFilesState) {
+            m_canReceiveDroppedFiles = newCanReceiveDroppedFilesState;
+            button->setActive(newCanReceiveDroppedFilesState);
+        }
     }
 
     // This only supports clearing out the files, but that's OK because for
@@ -86,13 +91,13 @@ void RenderFileUploadControl::updateFromElement()
 
 static int nodeWidth(Node* node)
 {
-    return node ? node->renderBox()->width() : zeroLayoutUnit;
+    return node ? node->renderBox()->pixelSnappedWidth() : 0;
 }
 
 int RenderFileUploadControl::maxFilenameWidth() const
 {
     HTMLInputElement* input = static_cast<HTMLInputElement*>(node());
-    return max(0, contentWidth() - nodeWidth(uploadButton()) - afterButtonSpacing
+    return max(0, contentBoxRect().pixelSnappedWidth() - nodeWidth(uploadButton()) - afterButtonSpacing
         - (input->icon() ? iconWidth + iconFilenameSpacing : 0));
 }
 
@@ -104,7 +109,7 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
     // Push a clip.
     GraphicsContextStateSaver stateSaver(*paintInfo.context, false);
     if (paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseChildBlockBackgrounds) {
-        LayoutRect clipRect(paintOffset.x() + borderLeft(), paintOffset.y() + borderTop(),
+        IntRect clipRect = pixelSnappedIntRect(paintOffset.x() + borderLeft(), paintOffset.y() + borderTop(),
                          width() - borderLeft() - borderRight(), height() - borderBottom() - borderTop() + buttonShadowHeight);
         if (clipRect.isEmpty())
             return;
@@ -142,7 +147,7 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
         paintInfo.context->setFillColor(style()->visitedDependentColor(CSSPropertyColor), style()->colorSpace());
         
         // Draw the filename
-        paintInfo.context->drawBidiText(font, textRun, LayoutPoint(textX, textY));
+        paintInfo.context->drawBidiText(font, textRun, IntPoint(roundToInt(textX), roundToInt(textY)));
         
         if (input->icon()) {
             // Determine where the icon should be placed
@@ -154,7 +159,7 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
                 iconX = contentLeft + contentWidth() - buttonWidth - afterButtonSpacing - iconWidth;
 
             // Draw the file icon
-            input->icon()->paint(paintInfo.context, LayoutRect(iconX, iconY, iconWidth, iconHeight));
+            input->icon()->paint(paintInfo.context, IntRect(roundToInt(iconX), roundToInt(iconY), iconWidth, iconHeight));
         }
     }
 
@@ -220,7 +225,7 @@ HTMLInputElement* RenderFileUploadControl::uploadButton() const
 
     ASSERT(input->hasShadowRoot());
 
-    Node* buttonNode = input->shadowTree()->oldestShadowRoot()->firstChild();
+    Node* buttonNode = input->shadow()->oldestShadowRoot()->firstChild();
     return buttonNode && buttonNode->isHTMLElement() && buttonNode->hasTagName(inputTag) ? static_cast<HTMLInputElement*>(buttonNode) : 0;
 }
 
@@ -236,7 +241,7 @@ String RenderFileUploadControl::fileTextValue() const
 {
     HTMLInputElement* input = static_cast<HTMLInputElement*>(node());
     ASSERT(input->files());
-    return theme()->fileListNameForWidth(input->files()->paths(), style()->font(), maxFilenameWidth(), input->multiple());
+    return theme()->fileListNameForWidth(input->files(), style()->font(), maxFilenameWidth(), input->multiple());
 }
     
 } // namespace WebCore

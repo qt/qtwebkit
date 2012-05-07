@@ -28,13 +28,13 @@
 
 #include "EditingBehavior.h"
 #include "FileSystem.h"
-#include "GOwnPtr.h"
 #include "KURL.h"
 #include "PluginDatabase.h"
 #include "webkitenumtypes.h"
 #include "webkitglobalsprivate.h"
 #include "webkitversion.h"
 #include "webkitwebsettingsprivate.h"
+#include <wtf/gobject/GOwnPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
 #include <glib/gi18n-lib.h>
@@ -754,6 +754,8 @@ static void webkit_web_settings_class_init(WebKitWebSettingsClass* klass)
      * right-clicks that are handled by the page itself.
      *
      * Since: 1.1.18
+     *
+     * Deprecated: 1.10: Use #WebKitWebView::context-menu signal instead.
      */
     g_object_class_install_property(gobject_class,
                                     PROP_ENABLE_DEFAULT_CONTEXT_MENU,

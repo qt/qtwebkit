@@ -332,6 +332,9 @@ using namespace std;
 #define NSAccessibilityVisitedLinkSearchKey @"AXVisitedLinkSearchKey"
 #endif
 
+#define NSAccessibilityTextMarkerIsValidParameterizedAttribute @"AXTextMarkerIsValid"
+#define NSAccessibilityIndexForTextMarkerParameterizedAttribute @"AXIndexForTextMarker"
+#define NSAccessibilityTextMarkerForIndexParameterizedAttribute @"AXTextMarkerForIndex"
 
 @interface NSObject (WebKitAccessibilityArrayCategory)
 
@@ -566,12 +569,20 @@ static id textMarkerRangeFromMarkers(id textMarker1, id textMarker2)
     return AXTextMarkerRange(textMarker1, textMarker2);
 }
 
+// When modifying attributed strings, the range can come from a source which may provide faulty information (e.g. the spell checker).
+// To protect against such cases the range should be validated before adding or removing attributes.
+static BOOL AXAttributedStringRangeIsValid(NSAttributedString* attrString, NSRange range)
+{
+    return (range.location < [attrString length] && NSMaxRange(range) <= [attrString length]);
+}
+
 static void AXAttributeStringSetFont(NSMutableAttributedString* attrString, NSString* attribute, NSFont* font, NSRange range)
 {
-    NSDictionary* dict;
+    if (!AXAttributedStringRangeIsValid(attrString, range))
+        return;
     
     if (font) {
-        dict = [NSDictionary dictionaryWithObjectsAndKeys:
+        NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:
             [font fontName]                             , NSAccessibilityFontNameKey,
             [font familyName]                           , NSAccessibilityFontFamilyKey,
             [font displayName]                          , NSAccessibilityVisibleNameKey,
@@ -609,6 +620,9 @@ static CGColorRef CreateCGColorIfDifferent(NSColor* nsColor, CGColorRef existing
 
 static void AXAttributeStringSetColor(NSMutableAttributedString* attrString, NSString* attribute, NSColor* color, NSRange range)
 {
+    if (!AXAttributedStringRangeIsValid(attrString, range))
+        return;
+
     if (color) {
         CGColorRef existingColor = (CGColorRef) [attrString attribute:attribute atIndex:range.location effectiveRange:nil];
         CGColorRef cgColor = CreateCGColorIfDifferent(color, existingColor);
@@ -622,6 +636,9 @@ static void AXAttributeStringSetColor(NSMutableAttributedString* attrString, NSS
 
 static void AXAttributeStringSetNumber(NSMutableAttributedString* attrString, NSString* attribute, NSNumber* number, NSRange range)
 {
+    if (!AXAttributedStringRangeIsValid(attrString, range))
+        return;
+
     if (number)
         [attrString addAttribute:attribute value:number range:range];
     else
@@ -692,6 +709,9 @@ static void AXAttributeStringSetStyle(NSMutableAttributedString* attrString, Ren
 
 static void AXAttributeStringSetBlockquoteLevel(NSMutableAttributedString* attrString, RenderObject* renderer, NSRange range)
 {
+    if (!AXAttributedStringRangeIsValid(attrString, range))
+        return;
+
     AccessibilityObject* obj = renderer->document()->axObjectCache()->getOrCreate(renderer);
     int quoteLevel = obj->blockquoteLevel();
     
@@ -743,6 +763,9 @@ static void AXAttributeStringSetHeadingLevel(NSMutableAttributedString* attrStri
     if (!renderer)
         return;
     
+    if (!AXAttributedStringRangeIsValid(attrString, range))
+        return;
+    
     // Sometimes there are objects between the text and the heading. 
     // In those cases the parent hierarchy should be queried to see if there is a heading level.
     int parentHeadingLevel = 0;
@@ -761,6 +784,9 @@ static void AXAttributeStringSetHeadingLevel(NSMutableAttributedString* attrStri
 
 static void AXAttributeStringSetElement(NSMutableAttributedString* attrString, NSString* attribute, AccessibilityObject* object, NSRange range)
 {
+    if (!AXAttributedStringRangeIsValid(attrString, range))
+        return;
+
     if (object && object->isAccessibilityRenderObject()) {
         // make a serializable AX object
         
@@ -1406,7 +1432,7 @@ static NSMutableArray* convertToNSArray(const AccessibilityObject::Accessibility
 
 - (NSValue *)position
 {
-    LayoutRect rect = m_object->elementRect();
+    IntRect rect = pixelSnappedIntRect(m_object->elementRect());
     NSPoint point;
     
     FrameView* frameView = m_object->documentFrameView();
@@ -1549,7 +1575,8 @@ static const AccessibilityRoleMap& createAccessibilityRoleMap()
         { LabelRole, NSAccessibilityGroupRole },
         { DivRole, NSAccessibilityGroupRole },
         { FormRole, NSAccessibilityGroupRole },
-        { SpinButtonRole, NSAccessibilityIncrementorRole }
+        { SpinButtonRole, NSAccessibilityIncrementorRole },
+        { FooterRole, NSAccessibilityGroupRole }
     };
     AccessibilityRoleMap& roleMap = *new AccessibilityRoleMap;
     
@@ -1580,6 +1607,8 @@ static NSString* roleValueToNSString(AccessibilityRole value)
 {
     if (m_object->isPasswordField())
         return NSAccessibilitySecureTextFieldSubrole;
+    if (m_object->isSearchField())
+        return NSAccessibilitySearchFieldSubrole;
     
     if (m_object->isAttachment()) {
         NSView* attachView = [self attachmentView];
@@ -1614,6 +1643,8 @@ static NSString* roleValueToNSString(AccessibilityRole value)
             return @"AXLandmarkBanner";
         case LandmarkComplementaryRole:
             return @"AXLandmarkComplementary";
+        // Footer roles should appear as content info types.
+        case FooterRole:
         case LandmarkContentInfoRole:
             return @"AXLandmarkContentInfo";
         case LandmarkMainRole:
@@ -1726,6 +1757,8 @@ static NSString* roleValueToNSString(AccessibilityRole value)
                 return AXDefinitionListTermText();
             case DefinitionListDefinitionRole:
                 return AXDefinitionListDefinitionText();
+            case FooterRole:
+                return AXFooterRoleDescriptionText();
         }
     }        
     
@@ -2015,7 +2048,7 @@ static NSString* roleValueToNSString(AccessibilityRole value)
         return [NSNumber numberWithBool: m_object->isEnabled()];
 
     if ([attributeName isEqualToString: NSAccessibilitySizeAttribute]) {
-        LayoutSize s = m_object->size();
+        IntSize s = m_object->pixelSnappedSize();
         return [NSValue valueWithSize: NSMakeSize(s.width(), s.height())];
     }
 
@@ -2486,6 +2519,7 @@ static NSString* roleValueToNSString(AccessibilityRole value)
     static NSArray* paramAttrs = nil;
     static NSArray* textParamAttrs = nil;
     static NSArray* tableParamAttrs = nil;
+    static NSArray* webAreaParamAttrs = nil;
     if (paramAttrs == nil) {
         paramAttrs = [[NSArray alloc] initWithObjects:
                       @"AXUIElementForTextMarker",
@@ -2541,6 +2575,14 @@ static NSString* roleValueToNSString(AccessibilityRole value)
         tableParamAttrs = [[NSArray alloc] initWithArray:tempArray];
         [tempArray release];
     }
+    if (!webAreaParamAttrs) {
+        NSMutableArray* tempArray = [[NSMutableArray alloc] initWithArray:paramAttrs];
+        [tempArray addObject:NSAccessibilityTextMarkerForIndexParameterizedAttribute];
+        [tempArray addObject:NSAccessibilityTextMarkerIsValidParameterizedAttribute];
+        [tempArray addObject:NSAccessibilityIndexForTextMarkerParameterizedAttribute];
+        webAreaParamAttrs = [[NSArray alloc] initWithArray:tempArray];
+        [tempArray release];
+    }
     
     if (m_object->isPasswordField())
         return [NSArray array];
@@ -2557,6 +2599,9 @@ static NSString* roleValueToNSString(AccessibilityRole value)
     if (m_object->isMenuRelated())
         return nil;
 
+    if (m_object->isWebArea())
+        return webAreaParamAttrs;
+    
     return paramAttrs;
 }
 
@@ -2748,6 +2793,48 @@ static RenderObject* rendererForView(NSView* view)
     return [self doAXAttributedStringForTextMarkerRange:[self textMarkerRangeFromVisiblePositions:visiblePosRange.start endPosition:visiblePosRange.end]];
 }
 
+- (NSRange)_convertToNSRange:(Range*)range
+{
+    NSRange result = NSMakeRange(NSNotFound, 0);
+    if (!range || !range->startContainer())
+        return result;
+
+    Document* document = m_object->document();
+    if (!document)
+        return result;
+
+    size_t location;
+    size_t length;
+    TextIterator::getLocationAndLengthFromRange(document->documentElement(), range, location, length);
+    result.location = location;
+    result.length = length;
+
+    return result;
+}
+
+- (NSInteger)_indexForTextMarker:(id)marker
+{
+    if (!marker)
+        return NSNotFound;
+    
+    VisibleSelection selection([self visiblePositionForTextMarker:marker]);    
+    return [self _convertToNSRange:selection.toNormalizedRange().get()].location;
+}
+
+- (id)_textMarkerForIndex:(NSInteger)textIndex
+{
+    Document* document = m_object->document();
+    if (!document)
+        return nil;
+    
+    PassRefPtr<Range> textRange = TextIterator::rangeFromLocationAndLength(document->documentElement(), textIndex, 0);
+    if (!textRange || !textRange->boundaryPointsValid())
+        return nil;
+
+    VisiblePosition position(textRange->startPosition());
+    return [self textMarkerForVisiblePosition:position];
+}
+
 // The RTF representation of the text associated with this accessibility object that is
 // specified by the given range.
 - (NSData*)doAXRTFForRange:(NSRange)range
@@ -2839,6 +2926,17 @@ static RenderObject* rendererForView(NSView* view)
         return convertToNSArray(results);
     }
 
+    if ([attribute isEqualToString:NSAccessibilityTextMarkerIsValidParameterizedAttribute]) {
+        VisiblePosition pos = [self visiblePositionForTextMarker:textMarker];
+        return [NSNumber numberWithBool:!pos.isNull()];
+    }
+    if ([attribute isEqualToString:NSAccessibilityIndexForTextMarkerParameterizedAttribute]) {
+        return [NSNumber numberWithInteger:[self _indexForTextMarker:textMarker]];
+    }
+    if ([attribute isEqualToString:NSAccessibilityTextMarkerForIndexParameterizedAttribute]) {
+        return [self _textMarkerForIndex:[number integerValue]];
+    }
+    
     if ([attribute isEqualToString:@"AXUIElementForTextMarker"]) {
         VisiblePosition visiblePos = [self visiblePositionForTextMarker:(textMarker)];
         AccessibilityObject* axObject = m_object->accessibilityObjectForPosition(visiblePos);

@@ -48,6 +48,15 @@ namespace BlackBerry {
 namespace WebKit {
 namespace DOMSupport {
 
+void visibleTextQuads(const VisibleSelection& selection, Vector<FloatQuad>& quads)
+{
+    if (!selection.isRange())
+        return;
+    ASSERT(selection.firstRange());
+
+    visibleTextQuads(*(selection.firstRange()), quads, true /* useSelectionHeight */);
+}
+
 void visibleTextQuads(const Range& range, Vector<FloatQuad>& quads, bool useSelectionHeight)
 {
     // Range::textQuads includes hidden text, which we don't want.
@@ -165,7 +174,7 @@ bool isColorInputField(const Element* element)
 
     const HTMLInputElement* inputElement = static_cast<const HTMLInputElement*>(element);
 
-#if ENABLE(INPUT_COLOR)
+#if ENABLE(INPUT_TYPE_COLOR)
     if (inputElement->isColorControl())
         return true;
 #endif
@@ -285,7 +294,7 @@ VisibleSelection visibleSelectionForRangeInputElement(Element* element, int star
 Node* DOMContainerNodeForPosition(const Position& position)
 {
     Node* nodeAtPos = position.containerNode();
-    if (nodeAtPos->isInShadowTree())
+    if (nodeAtPos && nodeAtPos->isInShadowTree())
         nodeAtPos = nodeAtPos->shadowAncestorNode();
 
     return nodeAtPos;
@@ -293,8 +302,14 @@ Node* DOMContainerNodeForPosition(const Position& position)
 
 bool isPositionInNode(Node* node, const Position& position)
 {
-    int offset = 0;
+    if (!node)
+        return false;
+
     Node* domNodeAtPos = DOMContainerNodeForPosition(position);
+    if (!domNodeAtPos)
+        return false;
+
+    int offset = 0;
     if (domNodeAtPos == position.containerNode())
         offset = position.computeOffsetInContainerNode();
 
@@ -304,9 +319,52 @@ bool isPositionInNode(Node* node, const Position& position)
     return rangeForNode->isPointInRange(domNodeAtPos, offset, ec);
 }
 
-bool matchesReservedStringPreventingAutocomplete(AtomicString& string)
+static bool matchesReservedStringEmail(const AtomicString& string)
 {
-    if (string.contains("email", false /* caseSensitive */)
+    return string.contains("email", false /* caseSensitive */);
+}
+
+static bool matchesReservedStringUrl(const AtomicString& string)
+{
+    return equalIgnoringCase("url", string);
+}
+
+bool elementIdOrNameIndicatesEmail(const HTMLInputElement* inputElement)
+{
+    if (!inputElement)
+        return false;
+
+    if (matchesReservedStringEmail(inputElement->getIdAttribute()))
+        return true;
+
+    if (inputElement->fastHasAttribute(HTMLNames::nameAttr)) {
+        if (matchesReservedStringEmail(inputElement->fastGetAttribute(HTMLNames::nameAttr)))
+            return true;
+    }
+
+    return false;
+}
+
+bool elementIdOrNameIndicatesUrl(const HTMLInputElement* inputElement)
+{
+    if (!inputElement)
+        return false;
+
+    if (matchesReservedStringUrl(inputElement->getIdAttribute()))
+        return true;
+
+    if (inputElement->fastHasAttribute(HTMLNames::nameAttr)) {
+        if (matchesReservedStringUrl(inputElement->fastGetAttribute(HTMLNames::nameAttr)))
+            return true;
+    }
+
+    return false;
+}
+
+static bool matchesReservedStringPreventingAutocomplete(const AtomicString& string)
+{
+    if (matchesReservedStringEmail(string)
+        || matchesReservedStringUrl(string)
         || string.contains("user", false /* caseSensitive */)
         || string.contains("name", false /* caseSensitive */)
         || string.contains("login", false /* caseSensitive */))
@@ -333,6 +391,48 @@ bool elementIdOrNameIndicatesNoAutocomplete(const Element* element)
             return true;
     }
 
+    return false;
+}
+
+bool elementPatternIndicatesNumber(const HTMLInputElement* inputElement)
+{
+    return elementPatternMatches("[0-9]", inputElement);
+}
+
+bool elementPatternIndicatesHexadecimal(const HTMLInputElement* inputElement)
+{
+    return elementPatternMatches("[0-9a-fA-F]", inputElement);
+}
+
+bool elementPatternMatches(const char* pattern, const HTMLInputElement* inputElement)
+{
+    WTF::String patternString(pattern);
+    if (!inputElement || patternString.isEmpty())
+        return false;
+
+    if (inputElement->fastHasAttribute(HTMLNames::patternAttr)) {
+        WTF::String patternAttribute = inputElement->fastGetAttribute(HTMLNames::patternAttr);
+        if (patternAttribute.startsWith(patternString)) {
+            // The pattern is for hexadecimal, make sure nothing else is permitted.
+
+            // Check if it was an exact match.
+            if (patternAttribute.length() == patternString.length())
+                return true;
+
+            // Check for *
+            if (patternAttribute.length() == patternString.length() + 1 && patternAttribute[patternString.length()] == '*')
+                return true;
+
+            // Is the regex specifying a character count?
+            if (patternAttribute[patternString.length()] != '{' || !patternAttribute.endsWith('}'))
+                return false;
+
+            // Make sure the number in the regex is actually a number.
+            unsigned count = 0;
+            patternString = patternString + "{%d}";
+            return (sscanf(patternAttribute.latin1().data(), patternString.latin1().data() + '\0', &count) == 1) && count > 0;
+        }
+    }
     return false;
 }
 

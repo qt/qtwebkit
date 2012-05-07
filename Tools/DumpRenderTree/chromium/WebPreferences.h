@@ -104,7 +104,6 @@ struct WebPreferences {
     bool caretBrowsingEnabled;
     bool acceleratedCompositingForVideoEnabled;
     bool acceleratedCompositingEnabled;
-    bool compositeToTexture;
     bool forceCompositingMode;
     bool accelerated2dCanvasEnabled;
     bool deferred2dCanvasEnabled;
@@ -112,6 +111,7 @@ struct WebPreferences {
     bool hixie76WebSocketProtocolEnabled;
     bool perTilePaintingEnabled;
     bool mockScrollbarsEnabled;
+    bool cssCustomFilterEnabled;
 
     WebPreferences() { reset(); }
     void reset();

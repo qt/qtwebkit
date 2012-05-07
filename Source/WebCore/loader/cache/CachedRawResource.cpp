@@ -72,6 +72,10 @@ void CachedRawResource::didAddClient(CachedResourceClient* c)
 {
     if (m_response.isNull() || !hasClient(c))
         return;
+    // The calls to the client can result in events running, potentially causing
+    // this resource to be evicted from the cache and all clients to be removed,
+    // so a protector is necessary.
+    CachedResourceHandle<CachedRawResource> protect(this);
     CachedRawResourceClient* client = static_cast<CachedRawResourceClient*>(c);
     client->responseReceived(this, m_response);
     if (!hasClient(c))
@@ -122,14 +126,36 @@ void CachedRawResource::setDefersLoading(bool defers)
         m_loader->setDefersLoading(defers);
 }
 
-bool CachedRawResource::canReuse() const
+bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
 {
     if (m_options.shouldBufferData == DoNotBufferData)
         return false;
 
-    if (m_resourceRequest.httpMethod() != "GET")
+    if (m_resourceRequest.httpMethod() != newRequest.httpMethod())
         return false;
 
+    if (m_resourceRequest.httpBody() != newRequest.httpBody())
+        return false;
+
+    if (m_resourceRequest.allowCookies() != newRequest.allowCookies())
+        return false;
+
+    // Ensure all headers match the existing headers before continuing.
+    // Note that only headers set by our client will be present in either
+    // ResourceRequest, since SubresourceLoader creates a separate copy
+    // for its purposes.
+    // FIXME: There might be some headers that shouldn't block reuse.
+    const HTTPHeaderMap& newHeaders = newRequest.httpHeaderFields();
+    const HTTPHeaderMap& oldHeaders = m_resourceRequest.httpHeaderFields();
+    if (newHeaders.size() != oldHeaders.size())
+        return false;
+
+    HTTPHeaderMap::const_iterator end = newHeaders.end();
+    for (HTTPHeaderMap::const_iterator i = newHeaders.begin(); i != end; ++i) {
+        AtomicString headerName = i->first;
+        if (i->second != oldHeaders.get(headerName))
+            return false;
+    }
     return true;
 }
 

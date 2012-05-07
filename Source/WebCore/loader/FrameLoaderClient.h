@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,6 +63,7 @@ namespace WebCore {
     class AuthenticationChallenge;
     class CachedFrame;
     class Color;
+    class DOMWindowExtension;
     class DOMWrapperWorld;
     class DocumentLoader;
     class Element;
@@ -95,6 +97,7 @@ namespace WebCore {
     class ResourceResponse;
     class SecurityOrigin;
     class SharedBuffer;
+    class SocketStreamHandle;
     class StringWithDirection;
     class SubstituteData;
     class Widget;
@@ -174,10 +177,9 @@ namespace WebCore {
 
         virtual void dispatchUnableToImplementPolicy(const ResourceError&) = 0;
 
-        virtual void dispatchWillSendSubmitEvent(HTMLFormElement*) = 0;
+        virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) = 0;
         virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>) = 0;
 
-        virtual void dispatchDidLoadMainResource(DocumentLoader*) = 0;
         virtual void revertToProvisionalState(DocumentLoader*) = 0;
         virtual void setMainDocumentError(DocumentLoader*, const ResourceError&) = 0;
 
@@ -256,10 +258,7 @@ namespace WebCore {
         virtual bool canCachePage() const = 0;
         virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceResponse&) = 0;
 
-        virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement,
-                                   const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) = 0;
-        virtual void didTransferChildFrameToNewDocument(Page* oldPage) = 0;
-        virtual void transferLoadingResourceFromPage(ResourceLoader*, const ResourceRequest&, Page* oldPage) = 0;
+        virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) = 0;
         virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) = 0;
         virtual void redirectDataToPlugin(Widget* pluginWidget) = 0;
 
@@ -331,6 +330,13 @@ namespace WebCore {
 #if ENABLE(WEB_INTENTS)
         virtual void dispatchIntent(PassRefPtr<IntentRequest>) = 0;
 #endif
+
+        virtual void dispatchWillOpenSocketStream(SocketStreamHandle*) { }
+
+        virtual void dispatchGlobalObjectAvailable(DOMWrapperWorld*) { }
+        virtual void dispatchWillDisconnectDOMWindowExtensionFromGlobalObject(DOMWindowExtension*) { }
+        virtual void dispatchDidReconnectDOMWindowExtensionToGlobalObject(DOMWindowExtension*) { }
+        virtual void dispatchWillDestroyGlobalObjectForDOMWindowExtension(DOMWindowExtension*) { }
     };
 
 } // namespace WebCore

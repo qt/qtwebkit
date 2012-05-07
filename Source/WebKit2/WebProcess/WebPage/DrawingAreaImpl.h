@@ -55,11 +55,14 @@ private:
     virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
     virtual void setLayerTreeStateIsFrozen(bool);
     virtual bool layerTreeStateIsFrozen() const { return m_layerTreeStateIsFrozen; }
+    virtual LayerTreeHost* layerTreeHost() const { return m_layerTreeHost.get(); }
     virtual void forceRepaint();
 
     virtual void didInstallPageOverlay();
     virtual void didUninstallPageOverlay();
     virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&);
+    virtual void setPageOverlayOpacity(float);
+    virtual bool pageOverlayShouldApplyFadeWhenPainting() const;
 
     virtual void setPaintingEnabled(bool);
 
@@ -68,6 +71,10 @@ private:
 
 #if PLATFORM(WIN)
     virtual void scheduleChildWindowGeometryUpdate(const WindowGeometry&);
+#endif
+
+#if PLATFORM(MAC)
+    virtual void setLayerHostingMode(uint32_t) OVERRIDE;
 #endif
 
 #if USE(UI_SIDE_COMPOSITING)

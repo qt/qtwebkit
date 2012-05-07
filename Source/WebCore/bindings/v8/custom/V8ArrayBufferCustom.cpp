@@ -29,7 +29,7 @@
  */
 
 #include "config.h"
-#include "ArrayBuffer.h"
+#include <wtf/ArrayBuffer.h>
 
 #include "ExceptionCode.h"
 #include "V8Binding.h"
@@ -73,7 +73,8 @@ v8::Handle<v8::Value> V8ArrayBuffer::constructorCallback(const v8::Arguments& ar
         return throwError("ArrayBuffer size is not a small enough positive integer.", V8Proxy::RangeError);
     // Transform the holder into a wrapper object for the array.
     V8DOMWrapper::setDOMWrapper(args.Holder(), &info, buffer.get());
-    return toV8(buffer.release(), args.Holder());
+    V8DOMWrapper::setJSWrapperForDOMObject(buffer.release(), v8::Persistent<v8::Object>::New(args.Holder()));
+    return args.Holder();
 }
 
 } // namespace WebCore

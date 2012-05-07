@@ -83,6 +83,8 @@ PassRefPtr<DOMStringList> IDBObjectStoreBackendImpl::indexNames() const
     return indexNames.release();
 }
 
+// FIXME: This can be removed once all ports have been updated to call
+// the IDBKeyRange version. https://bugs.webkit.org/show_bug.cgi?id=84285
 void IDBObjectStoreBackendImpl::get(PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCallbacks> prpCallbacks, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
 {
     IDB_TRACE("IDBObjectStoreBackendImpl::get");
@@ -91,6 +93,36 @@ void IDBObjectStoreBackendImpl::get(PassRefPtr<IDBKey> prpKey, PassRefPtr<IDBCal
     RefPtr<IDBCallbacks> callbacks = prpCallbacks;
     if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::getInternal, objectStore, key, callbacks)))
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
+}
+
+void IDBObjectStoreBackendImpl::get(PassRefPtr<IDBKeyRange> prpKeyRange, PassRefPtr<IDBCallbacks> prpCallbacks, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBObjectStoreBackendImpl::get");
+    RefPtr<IDBObjectStoreBackendImpl> objectStore = this;
+    RefPtr<IDBKeyRange> keyRange = prpKeyRange;
+    RefPtr<IDBCallbacks> callbacks = prpCallbacks;
+    if (!transaction->scheduleTask(createCallbackTask(&IDBObjectStoreBackendImpl::getByRangeInternal, objectStore, keyRange, callbacks)))
+        ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
+}
+
+void IDBObjectStoreBackendImpl::getByRangeInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKeyRange> keyRange, PassRefPtr<IDBCallbacks> callbacks)
+{
+    IDB_TRACE("IDBObjectStoreBackendImpl::getByRangeInternal");
+    RefPtr<IDBBackingStore::Cursor> backingStoreCursor = objectStore->m_backingStore->openObjectStoreCursor(objectStore->m_databaseId, objectStore->id(), keyRange.get(), IDBCursor::NEXT);
+    if (!backingStoreCursor) {
+        callbacks->onSuccess(SerializedScriptValue::undefinedValue());
+        return;
+    }
+
+    String wireData = objectStore->m_backingStore->getObjectStoreRecord(objectStore->m_databaseId, objectStore->id(), *backingStoreCursor->key());
+    if (wireData.isNull()) {
+        callbacks->onSuccess(SerializedScriptValue::undefinedValue());
+        backingStoreCursor->close();
+        return;
+    }
+
+    callbacks->onSuccess(SerializedScriptValue::createFromWire(wireData));
+    backingStoreCursor->close();
 }
 
 void IDBObjectStoreBackendImpl::getInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKey> key, PassRefPtr<IDBCallbacks> callbacks)
@@ -223,6 +255,10 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
         if (autoIncrement) {
             if (!key) {
                 RefPtr<IDBKey> autoIncKey = objectStore->genAutoIncrementKey();
+                if (!autoIncKey->valid()) {
+                    callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::DATA_ERR, "Maximum key generator value reached."));
+                    return;
+                }
                 if (hasKeyPath) {
                     RefPtr<SerializedScriptValue> valueAfterInjection = injectKeyIntoKeyPath(autoIncKey, value, objectStore->m_keyPath);
                     ASSERT(valueAfterInjection);
@@ -596,7 +632,7 @@ void IDBObjectStoreBackendImpl::count(PassRefPtr<IDBKeyRange> range, PassRefPtr<
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
 }
 
-void IDBObjectStoreBackendImpl::countInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKeyRange> range, PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBTransactionBackendInterface> transaction)
+void IDBObjectStoreBackendImpl::countInternal(ScriptExecutionContext*, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBKeyRange> range, PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBTransactionBackendInterface>)
 {
     IDB_TRACE("IDBObjectStoreBackendImpl::countInternal");
     uint32_t count = 0;
@@ -647,10 +683,15 @@ void IDBObjectStoreBackendImpl::addIndexToMap(ScriptExecutionContext*, PassRefPt
 
 PassRefPtr<IDBKey> IDBObjectStoreBackendImpl::genAutoIncrementKey()
 {
+    const int64_t kMaxGeneratorValue = 9007199254740992LL; // Maximum integer storable as ECMAScript number.
+    if (m_autoIncrementNumber > kMaxGeneratorValue)
+        return IDBKey::createInvalid();
     if (m_autoIncrementNumber > 0)
         return IDBKey::createNumber(m_autoIncrementNumber++);
 
-    m_autoIncrementNumber = static_cast<int>(m_backingStore->nextAutoIncrementNumber(m_databaseId, id()));
+    m_autoIncrementNumber = m_backingStore->nextAutoIncrementNumber(m_databaseId, id());
+    if (m_autoIncrementNumber > kMaxGeneratorValue)
+        return IDBKey::createInvalid();
     return IDBKey::createNumber(m_autoIncrementNumber++);
 }
 

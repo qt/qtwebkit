@@ -38,6 +38,7 @@ class PlatformWheelEvent;
 class ScrollAnimator;
 #if USE(ACCELERATED_COMPOSITING)
 class GraphicsLayer;
+class TiledBacking;
 #endif
 
 class ScrollableArea {
@@ -91,7 +92,12 @@ public:
     virtual void setScrollbarOverlayStyle(ScrollbarOverlayStyle);
     ScrollbarOverlayStyle scrollbarOverlayStyle() const { return static_cast<ScrollbarOverlayStyle>(m_scrollbarOverlayStyle); }
 
+    // This getter will create a ScrollAnimator if it doesn't already exist.
     ScrollAnimator* scrollAnimator() const;
+
+    // This getter will return null if the ScrollAnimator hasn't been created yet.
+    ScrollAnimator* existingScrollAnimator() const { return m_scrollAnimator.get(); }
+
     const IntPoint& scrollOrigin() const { return m_scrollOrigin; }
     bool scrollOriginChanged() const { return m_scrollOriginChanged; }
 
@@ -161,6 +167,10 @@ public:
     virtual bool scheduleAnimation() { return false; }
     void serviceScrollAnimations();
 
+#if USE(ACCELERATED_COMPOSITING)
+    virtual TiledBacking* tiledBacking() { return 0; }
+#endif
+
 protected:
     ScrollableArea();
     virtual ~ScrollableArea();
@@ -195,14 +205,16 @@ private:
     virtual void setScrollOffset(const IntPoint&) = 0;
 
     mutable OwnPtr<ScrollAnimator> m_scrollAnimator;
-    bool m_constrainsScrollingToContentEdge : 1;
+    unsigned m_constrainsScrollingToContentEdge : 1;
 
-    bool m_inLiveResize : 1;
+    unsigned m_inLiveResize : 1;
 
     unsigned m_verticalScrollElasticity : 2; // ScrollElasticity
     unsigned m_horizontalScrollElasticity : 2; // ScrollElasticity
 
     unsigned m_scrollbarOverlayStyle : 2; // ScrollbarOverlayStyle
+
+    unsigned m_scrollOriginChanged : 1;
 
     // There are 8 possible combinations of writing mode and direction. Scroll origin will be non-zero in the x or y axis
     // if there is any reversed direction or writing-mode. The combinations are:
@@ -216,8 +228,6 @@ private:
     // vertical-rl / ltr            YES                     NO
     // vertical-rl / rtl            YES                     YES
     IntPoint m_scrollOrigin;
-
-    bool m_scrollOriginChanged;
 };
 
 } // namespace WebCore

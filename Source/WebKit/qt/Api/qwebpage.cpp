@@ -45,9 +45,11 @@
 #include "ContextMenu.h"
 #include "ContextMenuClientQt.h"
 #include "ContextMenuController.h"
+#if ENABLE(DEVICE_ORIENTATION)
 #include "DeviceMotionClientQt.h"
 #include "DeviceOrientationClientMock.h"
 #include "DeviceOrientationClientQt.h"
+#endif
 #include "DocumentLoader.h"
 #include "DragClientQt.h"
 #include "DragController.h"
@@ -64,16 +66,16 @@
 #include "FrameLoaderClientQt.h"
 #include "FrameTree.h"
 #include "FrameView.h"
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
 #include "GeolocationClientMock.h"
 #include "GeolocationClientQt.h"
-#endif // CLIENT_BASED_GEOLOCATION
+#include "GeolocationController.h"
+#endif
 #include "GeolocationPermissionClientQt.h"
 #include "HTMLFormElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
-#include "HashMap.h"
 #include "HitTestResult.h"
 #include "Image.h"
 #include "InitWebCoreQt.h"
@@ -100,7 +102,6 @@
 #include "PluginPackage.h"
 #include "ProgressTracker.h"
 #include "QtPlatformPlugin.h"
-#include "RefPtr.h"
 #include "RenderTextControl.h"
 #include "RenderThemeQt.h"
 #include "SchemeRegistry.h"
@@ -314,7 +315,7 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
     , inspectorIsInternalOnly(false)
     , m_lastDropAction(Qt::IgnoreAction)
 {
-#if ENABLE(DEVICE_ORIENTATION) || ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION) || ENABLE(DEVICE_ORIENTATION)
     bool useMock = QWebPagePrivate::drtRun;
 #endif
 
@@ -326,13 +327,16 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
     pageClients.editorClient = new EditorClientQt(q);
     pageClients.dragClient = new DragClientQt(q);
     pageClients.inspectorClient = new InspectorClientQt(q);
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    if (useMock)
-        pageClients.geolocationClient = new GeolocationClientMock;
-    else
-        pageClients.geolocationClient = new GeolocationClientQt(q);
-#endif
     page = new Page(pageClients);
+#if ENABLE(GEOLOCATION)
+    if (useMock) {
+        // In case running in DumpRenderTree mode set the controller to mock provider.
+        GeolocationClientMock* mock = new GeolocationClientMock;
+        WebCore::provideGeolocationTo(page, mock);
+        mock->setController(WebCore::GeolocationController::from(page));
+    } else
+        WebCore::provideGeolocationTo(page, new GeolocationClientQt(q));
+#endif
 #if ENABLE(DEVICE_ORIENTATION)
     if (useMock)
         WebCore::provideDeviceOrientationTo(page, new DeviceOrientationClientMock);
@@ -340,7 +344,7 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
         WebCore::provideDeviceOrientationTo(page, new DeviceOrientationClientQt);
     WebCore::provideDeviceMotionTo(page, new DeviceMotionClientQt);
 #endif
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebCore::provideNotification(page, NotificationPresenterClientQt::notificationPresenter());
 #endif
 
@@ -351,19 +355,18 @@ QWebPagePrivate::QWebPagePrivate(QWebPage *qq)
     // as expected out of the box, we use a default group similar to what other ports are doing.
     page->setGroupName("Default Group");
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    // In case running in DumpRenderTree mode set the controller to mock provider.
-    if (QWebPagePrivate::drtRun)
-        static_cast<GeolocationClientMock*>(pageClients.geolocationClient)->setController(page->geolocationController());
-#endif
     settings = new QWebSettings(page->settings());
+
+#if ENABLE(WEB_SOCKETS)
+    page->settings()->setUseHixie76WebSocketProtocol(false);
+#endif
 
     history.d = new QWebHistoryPrivate(static_cast<WebCore::BackForwardListImpl*>(page->backForwardList()));
     memset(actions, 0, sizeof(actions));
 
     PageGroup::setShouldTrackVisitedLinks(true);
     
-#if ENABLE(NOTIFICATIONS)    
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     NotificationPresenterClientQt::notificationPresenter()->addClient();
 #endif
 }
@@ -387,7 +390,7 @@ QWebPagePrivate::~QWebPagePrivate()
     if (inspector)
         inspector->setPage(0);
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     NotificationPresenterClientQt::notificationPresenter()->removeClient();
 #endif
 }
@@ -1346,7 +1349,7 @@ bool QWebPagePrivate::touchEvent(QTouchEvent* event)
     event->setAccepted(true);
 
     // Return whether the default action was cancelled in the JS event handler
-    return frame->eventHandler()->handleTouchEvent(PlatformTouchEvent(event));
+    return frame->eventHandler()->handleTouchEvent(convertTouchEvent(event));
 #else
     event->ignore();
     return false;
@@ -1391,7 +1394,7 @@ QVariant QWebPage::inputMethodQuery(Qt::InputMethodQuery property) const
         case Qt::ImFont: {
             if (renderTextControl) {
                 RenderStyle* renderStyle = renderTextControl->style();
-                return QVariant(QFont(renderStyle->font().font()));
+                return QVariant(QFont(renderStyle->font().syntheticFont()));
             }
             return QVariant(QFont());
         }
@@ -1564,7 +1567,7 @@ IntPoint QWebPagePrivate::TouchAdjuster::findCandidatePointForTouch(const IntPoi
     int x = touchPoint.x();
     int y = touchPoint.y();
 
-    RefPtr<NodeList> intersectedNodes = document->nodesFromRect(x, y, m_topPadding, m_rightPadding, m_bottomPadding, m_leftPadding, false);
+    RefPtr<NodeList> intersectedNodes = document->nodesFromRect(x, y, m_topPadding, m_rightPadding, m_bottomPadding, m_leftPadding, false /*ignoreClipping*/, false /*allowShadowContent*/);
     if (!intersectedNodes)
         return IntPoint();
 
@@ -1584,7 +1587,7 @@ IntPoint QWebPagePrivate::TouchAdjuster::findCandidatePointForTouch(const IntPoi
         if (!currentElement || (!isClickableElement(currentElement, 0) && !isValidFrameOwner(currentElement)))
             continue;
 
-        IntRect currentElementBoundingRect = currentElement->getRect();
+        IntRect currentElementBoundingRect = currentElement->getPixelSnappedRect();
         currentElementBoundingRect.intersect(touchRect);
 
         if (currentElementBoundingRect.isEmpty())
@@ -1632,6 +1635,7 @@ IntPoint QWebPagePrivate::TouchAdjuster::findCandidatePointForTouch(const IntPoi
    \value FindWrapsAroundDocument Makes findText() restart from the beginning of the document if the end
    was reached and the text was not found.
    \value HighlightAllOccurrences Highlights all existing occurrences of a specific string.
+       (This value was introduced in 4.6.)
 */
 
 /*!
@@ -2149,7 +2153,7 @@ void QWebPage::setFeaturePermission(QWebFrame* frame, Feature feature, Permissio
 {
     switch (feature) {
     case Notifications:
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
         if (policy == PermissionGrantedByUser)
             NotificationPresenterClientQt::notificationPresenter()->allowNotificationForFrame(frame->d->frame);
 #endif
@@ -2529,7 +2533,7 @@ QWebPage::ViewportAttributes QWebPage::viewportAttributesForSize(const QSize& av
     WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(conf);
 
     result.m_isValid = true;
-    result.m_size = conf.layoutSize;
+    result.m_size = QSizeF(conf.layoutSize.width(), conf.layoutSize.height());
     result.m_initialScaleFactor = conf.initialScale;
     result.m_minimumScaleFactor = conf.minimumScale;
     result.m_maximumScaleFactor = conf.maximumScale;

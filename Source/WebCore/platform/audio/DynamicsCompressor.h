@@ -78,12 +78,13 @@ public:
     float sampleRate() const { return m_sampleRate; }
     float nyquist() const { return m_sampleRate / 2; }
 
+    double tailTime() const { return 0; }
+    double latencyTime() const { return m_compressor.latencyFrames() / static_cast<double>(sampleRate()); }
+
 protected:
     unsigned m_numberOfChannels;
 
     // m_parameters holds the tweakable compressor parameters.
-    // FIXME: expose some of the most important ones (such as threshold, attack, release)
-    // as DynamicsCompressorNode attributes.
     float m_parameters[ParamLast];
     void initializeParameters();
 

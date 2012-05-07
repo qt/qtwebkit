@@ -53,7 +53,6 @@ public:
     static void setSelectTrailingWhitespaceEnabled(bool);
     static bool selectTrailingWhitespaceEnabled();
 
-    static JSValueRef nodesFromRect(JSContextRef context, JSValueRef value, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping);
     static void dumpConfigurationForViewport(WebKitWebView* webView, gint deviceDPI, gint deviceWidth, gint deviceHeight, gint availableWidth, gint availableHeight);
 
     static void clearOpener(WebKitWebFrame*);
@@ -66,7 +65,6 @@ public:
     static int pageNumberForElementById(WebKitWebFrame*, const char* id, float pageWidth, float pageHeight);
     static int numberOfPagesForFrame(WebKitWebFrame*, float pageWidth, float pageHeight);
     static WTF::CString pageProperty(WebKitWebFrame*, const char* propertyName, int pageNumber);
-    static bool isPageBoxVisible(WebKitWebFrame*, int pageNumber);
     static WTF::CString pageSizeAndMarginsInPixels(WebKitWebFrame*, int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
     static void addUserStyleSheet(WebKitWebFrame*, const char* sourceCode, bool allFrames);
     static guint getPendingUnloadEventCount(WebKitWebFrame*);
@@ -84,6 +82,7 @@ public:
     static void setValueForUser(JSContextRef, JSValueRef, JSStringRef);
     static bool shouldClose(WebKitWebFrame*);
     static bool elementDoesAutoCompleteForElementWithId(WebKitWebFrame*, JSStringRef);
+    static JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
 
     // WebKitWebView
     static void executeCoreCommandByName(WebKitWebView*, const gchar* name, const gchar* value);
@@ -93,6 +92,7 @@ public:
     static void setMinimumTimerInterval(WebKitWebView*, double);
     static void rectangleForSelection(WebKitWebFrame*, cairo_rectangle_int_t*);
     static void scalePageBy(WebKitWebView*, float, float, float);
+    static void setDefersLoading(WebKitWebView*, bool);
     static void setSmartInsertDeleteEnabled(WebKitWebView*, bool);
 
     // Accessibility
@@ -114,9 +114,9 @@ public:
     static unsigned long gcCountJavascriptObjects();
 
     static void whiteListAccessFromOrigin(const gchar* sourceOrigin, const gchar* destinationProtocol, const gchar* destinationHost, bool allowDestinationSubdomains);
+    static void removeWhiteListAccessFromOrigin(const char* sourceOrigin, const char* destinationProtocol, const char* destinationHost, bool allowDestinationSubdomains);
     static void resetOriginAccessWhiteLists();
     static unsigned int workerThreadCount();
-    static bool webkitWebFrameSelectionHasSpellingMarker(WebKitWebFrame*, gint from, gint length);
 
     static void resetGeolocationClientMock(WebKitWebView*);
     static void setMockGeolocationPermission(WebKitWebView*, bool allowed);
@@ -128,6 +128,7 @@ public:
     static void setPageCacheSupportsPlugins(WebKitWebView*, bool enabled);
 
     static void deliverAllMutationsIfNecessary();
+    static void setDomainRelaxationForbiddenForURLScheme(bool forbidden, const char* urlScheme);
 
 private:
     static bool s_drtRun;

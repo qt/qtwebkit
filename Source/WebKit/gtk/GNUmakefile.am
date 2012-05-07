@@ -1,8 +1,3 @@
-
-# Programs to run the WebKitGtk unit tests
-GTESTER = gtester
-GTESTER_REPORT = gtester-report
-
 lib_LTLIBRARIES += \
 	libwebkitgtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la
 
@@ -57,7 +52,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPF
 	$(javascriptcore_cppflags) \
 	$(webkitgtk_cppflags) \
 	-fno-strict-aliasing \
-	$(HILDON_CPPFLAGS) \
 	$(CLUTTER_CFLAGS) \
 	$(CLUTTER_GTK_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
@@ -67,7 +61,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_CPPF
 	$(GLIB_CFLAGS) \
 	$(GSTREAMER_CFLAGS) \
 	$(GTK_CFLAGS) \
-	$(HILDON_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
 	$(LIBXML_CFLAGS) \
 	$(LIBXSLT_CFLAGS) \
@@ -86,7 +79,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_LIBA
 	libWebCore.la \
 	libWebCoreGtk.la \
 	libjavascriptcoregtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \
-	$(webcore_ldflags) \
 	$(CAIRO_LIBS) \
 	$(CLUTTER_LIBS) \
 	$(CLUTTER_GTK_LIBS) \
@@ -98,7 +90,6 @@ libwebkitgtk_@WEBKITGTK_API_MAJOR_VERSION@_@WEBKITGTK_API_MINOR_VERSION@_la_LIBA
 	$(GLIB_LIBS) \
 	$(GSTREAMER_LIBS) \
 	$(GTK_LIBS) \
-	$(HILDON_LIBS) \
 	$(JPEG_LIBS) \
 	$(LIBSOUP_LIBS) \
 	$(LIBXML_LIBS) \
@@ -121,6 +112,7 @@ webkitgtk_static_h_api += \
 	$(srcdir)/Source/WebKit/gtk/webkit/webkitdefines.h \
 	$(srcdir)/Source/WebKit/gtk/webkit/webkitdownload.h \
 	$(srcdir)/Source/WebKit/gtk/webkit/webkiterror.h \
+	$(srcdir)/Source/WebKit/gtk/webkit/webkitfavicondatabase.h \
 	$(srcdir)/Source/WebKit/gtk/webkit/webkitgeolocationpolicydecision.h \
 	$(srcdir)/Source/WebKit/gtk/webkit/webkitglobals.h \
 	$(srcdir)/Source/WebKit/gtk/webkit/webkithittestresult.h \
@@ -215,10 +207,18 @@ webkitgtk_sources += \
 	Source/WebKit/gtk/WebCoreSupport/InspectorClientGtk.cpp \
 	Source/WebKit/gtk/WebCoreSupport/InspectorClientGtk.h \
 	Source/WebKit/gtk/WebCoreSupport/PasteboardHelperGtk.h \
+	Source/WebKit/gtk/WebCoreSupport/PlatformStrategiesGtk.h \
+	Source/WebKit/gtk/WebCoreSupport/PlatformStrategiesGtk.cpp \
+	Source/WebKit/gtk/WebCoreSupport/UserMediaClientGtk.cpp \
+	Source/WebKit/gtk/WebCoreSupport/UserMediaClientGtk.h \
+	Source/WebKit/gtk/WebCoreSupport/WebViewInputMethodFilter.cpp \
+	Source/WebKit/gtk/WebCoreSupport/WebViewInputMethodFilter.h \
 	Source/WebKit/gtk/webkit/webkitapplicationcache.cpp \
 	Source/WebKit/gtk/webkit/webkitdownload.cpp \
 	Source/WebKit/gtk/webkit/webkitdownloadprivate.h \
 	Source/WebKit/gtk/webkit/webkiterror.cpp \
+	Source/WebKit/gtk/webkit/webkitfavicondatabase.cpp \
+	Source/WebKit/gtk/webkit/webkitfavicondatabaseprivate.h \
 	Source/WebKit/gtk/webkit/webkitgeolocationpolicydecision.cpp \
 	Source/WebKit/gtk/webkit/webkitgeolocationpolicydecisionprivate.h \
 	Source/WebKit/gtk/webkit/webkitglobals.cpp \
@@ -405,7 +405,6 @@ dist_resources_DATA = \
 	$(shell ls $(srcdir)/Source/WebKit/gtk/resources/*.html)
 
 # Build unit tests
-noinst_PROGRAMS += $(TEST_PROGS)
 webkit_tests_cflags = \
 	-fno-strict-aliasing \
 	-I$(srcdir)/Source/JavaScriptCore/ForwardingHeaders \
@@ -434,12 +433,14 @@ webkit_tests_ldflags = \
 	-no-install \
 	-no-fast-install
 
-TEST_PROGS += \
+noinst_PROGRAMS += \
 	Programs/unittests/testapplicationcache \
+	Programs/unittests/testcontextmenu \
 	Programs/unittests/testdomdocument \
 	Programs/unittests/testdomdomwindow \
 	Programs/unittests/testdomnode \
 	Programs/unittests/testhttpbackend \
+	Programs/unittests/testfavicondatabase \
 	Programs/unittests/testloading \
 	Programs/unittests/testglobals \
 	Programs/unittests/testmimehandling \
@@ -468,6 +469,11 @@ Programs_unittests_testapplicationcache_CFLAGS = $(webkit_tests_cflags)
 Programs_unittests_testapplicationcache_LDADD = $(webkit_tests_ldadd)
 Programs_unittests_testapplicationcache_LDFLAGS = $(webkit_tests_ldflags)
 
+Programs_unittests_testcontextmenu_SOURCES = Source/WebKit/gtk/tests/testcontextmenu.c
+Programs_unittests_testcontextmenu_CFLAGS = $(webkit_tests_cflags)
+Programs_unittests_testcontextmenu_LDADD = $(webkit_tests_ldadd)
+Programs_unittests_testcontextmenu_LDFLAGS = $(webkit_tests_ldflags)
+
 Programs_unittests_testdomdocument_SOURCES = Source/WebKit/gtk/tests/testdomdocument.c
 Programs_unittests_testdomdocument_CFLAGS = $(webkit_tests_cflags)
 Programs_unittests_testdomdocument_LDADD = $(webkit_tests_ldadd)
@@ -487,6 +493,11 @@ Programs_unittests_testhttpbackend_SOURCES = Source/WebKit/gtk/tests/testhttpbac
 Programs_unittests_testhttpbackend_CFLAGS = $(webkit_tests_cflags)
 Programs_unittests_testhttpbackend_LDADD = $(webkit_tests_ldadd)
 Programs_unittests_testhttpbackend_LDFLAGS = $(webkit_tests_ldflags)
+
+Programs_unittests_testfavicondatabase_SOURCES = Source/WebKit/gtk/tests/testfavicondatabase.c Source/WebKit/gtk/tests/test_utils.c
+Programs_unittests_testfavicondatabase_CFLAGS = $(webkit_tests_cflags)
+Programs_unittests_testfavicondatabase_LDADD = $(webkit_tests_ldadd)
+Programs_unittests_testfavicondatabase_LDFLAGS = $(webkit_tests_ldflags)
 
 Programs_unittests_testglobals_SOURCES = Source/WebKit/gtk/tests/testglobals.c
 Programs_unittests_testglobals_CFLAGS = $(webkit_tests_cflags)
@@ -612,22 +623,3 @@ install-data-local: po-install-data-local
 installdirs-data-local: po-installdirs-data-local
 uninstall-local: po-uninstall-local
 
-# Run all tests in cwd
-# FIXME: we should run this under xvfb
-test: $(TEST_PROGS)
-	$(GTESTER) --verbose $(TEST_PROGS);
-
-# test-report: run tests in cwd and generate report
-# full-report: run tests in cwd with -m perf and -m slow and generate report
-# perf-report: run tests in cwd with -m perf and generate report
-test-report full-report perf-report: $(TEST_PROGS)
-	@ case $@ in \
-	  test-report) test_options="-k";; \
-	  full-report) test_options="-k -m=perf";; \
-	  perf-report) test_options="-k -m=perf -m=slow";; \
-	  esac ; \
-	  $(GTESTER) --verbose $$test_options -o test-report.xml $(TEST_PROGS); \
-	  $(GTESTER_REPORT) test-report.xml > test-report.html ;
-
-.PHONY: test test-report perf-report full-report
-check-local: test

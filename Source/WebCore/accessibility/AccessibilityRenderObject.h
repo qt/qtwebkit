@@ -73,6 +73,7 @@ public:
     virtual bool isNativeImage() const;
     virtual bool isPasswordField() const;
     virtual bool isNativeTextControl() const;
+    virtual bool isSearchField() const;
     virtual bool isWebArea() const;
     virtual bool isFileUploadButton() const;
     virtual bool isInputImage() const;
@@ -154,7 +155,7 @@ public:
     void updateAccessibilityRole();
     
     // Should be called on the root accessibility object to kick off a hit test.
-    virtual AccessibilityObject* accessibilityHitTest(const LayoutPoint&) const;
+    virtual AccessibilityObject* accessibilityHitTest(const IntPoint&) const;
 
     virtual Element* actionElement() const;
     Element* mouseButtonListener() const;
@@ -165,7 +166,6 @@ public:
     
     virtual LayoutRect boundingBoxRect() const;
     virtual LayoutRect elementRect() const;
-    virtual LayoutSize size() const;
     virtual IntPoint clickPoint();
     
     void setRenderer(RenderObject* renderer) { m_renderer = renderer; }
@@ -239,7 +239,7 @@ public:
     virtual bool isARIAGrabbed();
     virtual void determineARIADropEffects(Vector<String>&);
     
-    virtual VisiblePosition visiblePositionForPoint(const LayoutPoint&) const;
+    virtual VisiblePosition visiblePositionForPoint(const IntPoint&) const;
     virtual VisiblePosition visiblePositionForIndex(unsigned indexValue, bool lastIndexOK) const;    
     virtual int index(const VisiblePosition&) const;
 
@@ -306,7 +306,10 @@ private:
     void addTextFieldChildren();
     void addImageMapChildren();
     void addAttachmentChildren();
-    
+#if PLATFORM(MAC)
+    void updateAttachmentViewParents();
+#endif
+
     void ariaSelectedRows(AccessibilityChildrenVector&);
     
     bool elementAttributeValue(const QualifiedName&) const;

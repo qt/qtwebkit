@@ -32,6 +32,7 @@ public:
     ~QWebPreferences();
 
     Q_PROPERTY(bool autoLoadImages READ autoLoadImages WRITE setAutoLoadImages NOTIFY autoLoadImagesChanged FINAL)
+    Q_PROPERTY(bool fullScreenEnabled READ fullScreenEnabled WRITE setFullScreenEnabled NOTIFY fullScreenEnabledChanged FINAL)
     Q_PROPERTY(bool javascriptEnabled READ javascriptEnabled WRITE setJavascriptEnabled NOTIFY javascriptEnabledChanged FINAL)
     Q_PROPERTY(bool pluginsEnabled READ pluginsEnabled WRITE setPluginsEnabled NOTIFY pluginsEnabledChanged FINAL)
     Q_PROPERTY(bool offlineWebApplicationCacheEnabled READ offlineWebApplicationCacheEnabled WRITE setOfflineWebApplicationCacheEnabled NOTIFY offlineWebApplicationCacheEnabledChanged FINAL)
@@ -41,6 +42,7 @@ public:
     Q_PROPERTY(bool dnsPrefetchEnabled READ dnsPrefetchEnabled WRITE setDnsPrefetchEnabled NOTIFY dnsPrefetchEnabledChanged FINAL)
     Q_PROPERTY(bool navigatorQtObjectEnabled READ navigatorQtObjectEnabled WRITE setNavigatorQtObjectEnabled NOTIFY navigatorQtObjectEnabledChanged FINAL)
     Q_PROPERTY(bool frameFlatteningEnabled READ frameFlatteningEnabled WRITE setFrameFlatteningEnabled NOTIFY frameFlatteningEnabledChanged FINAL)
+    Q_PROPERTY(bool developerExtrasEnabled READ developerExtrasEnabled WRITE setDeveloperExtrasEnabled NOTIFY developerExtrasEnabledChanged FINAL)
 
     Q_PROPERTY(QString standardFontFamily READ standardFontFamily WRITE setStandardFontFamily NOTIFY standardFontFamilyChanged FINAL)
     Q_PROPERTY(QString fixedFontFamily READ fixedFontFamily WRITE setFixedFontFamily NOTIFY fixedFontFamilyChanged FINAL)
@@ -55,6 +57,9 @@ public:
 
     bool autoLoadImages() const;
     void setAutoLoadImages(bool enable);
+
+    bool fullScreenEnabled() const;
+    void setFullScreenEnabled(bool enable);
 
     bool javascriptEnabled() const;
     void setJavascriptEnabled(bool enable);
@@ -82,6 +87,9 @@ public:
 
     bool frameFlatteningEnabled() const;
     void setFrameFlatteningEnabled(bool enable);
+
+    bool developerExtrasEnabled() const;
+    void setDeveloperExtrasEnabled(bool enable);
 
     QString standardFontFamily() const;
     void setStandardFontFamily(const QString& family);
@@ -113,6 +121,7 @@ public:
 Q_SIGNALS:
     void autoLoadImagesChanged();
     void pluginsEnabledChanged();
+    void fullScreenEnabledChanged();
     void javascriptEnabledChanged();
     void offlineWebApplicationCacheEnabledChanged();
     void localStorageEnabledChanged();
@@ -121,6 +130,7 @@ Q_SIGNALS:
     void dnsPrefetchEnabledChanged();
     void navigatorQtObjectEnabledChanged();
     void frameFlatteningEnabledChanged();
+    void developerExtrasEnabledChanged();
 
     void standardFontFamilyChanged();
     void fixedFontFamilyChanged();

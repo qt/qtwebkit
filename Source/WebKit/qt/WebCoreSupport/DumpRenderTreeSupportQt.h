@@ -196,8 +196,6 @@ public:
 
     static void setCustomPolicyDelegate(bool enabled, bool permissive);
 
-    static bool isPageBoxVisible(QWebFrame* frame, int pageIndex);
-
     static QString pageSizeAndMarginsInPixels(QWebFrame* frame, int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
     static QString pageProperty(QWebFrame* frame, const QString& propertyName, int pageNumber);
     static void addUserStyleSheet(QWebPage* page, const QString& sourceCode);
@@ -206,7 +204,6 @@ public:
 
     static void scalePageBy(QWebFrame*, float scale, const QPoint& origin);
 
-    static QVariantList nodesFromRect(const QWebElement& document, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping);
     static QString responseMimeType(QWebFrame*);
     static void clearOpener(QWebFrame*);
     static void addURLToRedirect(const QString& origin, const QString& destination);
@@ -235,6 +232,8 @@ public:
 
     static bool defaultHixie76WebSocketProtocolEnabled();
     static void setHixie76WebSocketProtocolEnabled(QWebPage*, bool);
+
+    static QImage paintPagesWithBoundaries(QWebFrame*);
 };
 
 #endif

@@ -150,6 +150,11 @@ public:
         m_assembler.movs_r(dest, m_assembler.lsl(dest, imm.m_value & 0x1f));
     }
 
+    void lshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        m_assembler.movs_r(dest, m_assembler.lsl(src, imm.m_value & 0x1f));
+    }
+
     void mul32(RegisterID src, RegisterID dest)
     {
         if (src == dest) {
@@ -178,6 +183,11 @@ public:
     void or32(TrustedImm32 imm, RegisterID dest)
     {
         m_assembler.orrs_r(dest, dest, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
+    }
+
+    void or32(TrustedImm32 imm, RegisterID src, RegisterID dest)
+    {
+        m_assembler.orrs_r(dest, src, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
     }
 
     void or32(RegisterID op1, RegisterID op2, RegisterID dest)
@@ -216,6 +226,11 @@ public:
     void urshift32(TrustedImm32 imm, RegisterID dest)
     {
         m_assembler.movs_r(dest, m_assembler.lsr(dest, imm.m_value & 0x1f));
+    }
+    
+    void urshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
+    {
+        m_assembler.movs_r(dest, m_assembler.lsr(src, imm.m_value & 0x1f));
     }
 
     void sub32(RegisterID src, RegisterID dest)
@@ -257,6 +272,14 @@ public:
             m_assembler.mvns_r(dest, dest);
         else
             m_assembler.eors_r(dest, dest, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
+    }
+
+    void xor32(TrustedImm32 imm, RegisterID src, RegisterID dest)
+    {
+        if (imm.m_value == -1)
+            m_assembler.mvns_r(dest, src);
+        else    
+            m_assembler.eors_r(dest, src, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
     }
 
     void countLeadingZeros32(RegisterID src, RegisterID dest)
@@ -353,10 +376,7 @@ public:
 
     void store32(TrustedImm32 imm, ImplicitAddress address)
     {
-        if (imm.m_isPointer)
-            m_assembler.ldr_un_imm(ARMRegisters::S1, imm.m_value);
-        else
-            move(imm, ARMRegisters::S1);
+        move(imm, ARMRegisters::S1);
         store32(ARMRegisters::S1, address);
     }
 
@@ -369,10 +389,7 @@ public:
     void store32(TrustedImm32 imm, void* address)
     {
         m_assembler.ldr_un_imm(ARMRegisters::S0, reinterpret_cast<ARMWord>(address));
-        if (imm.m_isPointer)
-            m_assembler.ldr_un_imm(ARMRegisters::S1, imm.m_value);
-        else
-            m_assembler.moveImm(imm.m_value, ARMRegisters::S1);
+        m_assembler.moveImm(imm.m_value, ARMRegisters::S1);
         m_assembler.dtr_u(false, ARMRegisters::S1, ARMRegisters::S0, 0);
     }
 
@@ -400,10 +417,7 @@ public:
 
     void move(TrustedImm32 imm, RegisterID dest)
     {
-        if (imm.m_isPointer)
-            m_assembler.ldr_un_imm(dest, imm.m_value);
-        else
-            m_assembler.moveImm(imm.m_value, dest);
+        m_assembler.moveImm(imm.m_value, dest);
     }
 
     void move(RegisterID src, RegisterID dest)
@@ -456,16 +470,11 @@ public:
 
     Jump branch32(RelationalCondition cond, RegisterID left, TrustedImm32 right, int useConstantPool = 0)
     {
-        if (right.m_isPointer) {
-            m_assembler.ldr_un_imm(ARMRegisters::S0, right.m_value);
-            m_assembler.cmp_r(left, ARMRegisters::S0);
-        } else {
-            ARMWord tmp = (right.m_value == 0x80000000) ? ARMAssembler::INVALID_IMM : m_assembler.getOp2(-right.m_value);
-            if (tmp != ARMAssembler::INVALID_IMM)
-                m_assembler.cmn_r(left, tmp);
-            else
-                m_assembler.cmp_r(left, m_assembler.getImm(right.m_value, ARMRegisters::S0));
-        }
+        ARMWord tmp = (right.m_value == 0x80000000) ? ARMAssembler::INVALID_IMM : m_assembler.getOp2(-right.m_value);
+        if (tmp != ARMAssembler::INVALID_IMM)
+            m_assembler.cmn_r(left, tmp);
+        else
+            m_assembler.cmp_r(left, m_assembler.getImm(right.m_value, ARMRegisters::S0));
         return Jump(m_assembler.jmp(ARMCondition(cond), useConstantPool));
     }
 
@@ -627,6 +636,13 @@ public:
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 
+    Jump branchSub32(ResultCondition cond, RegisterID op1, RegisterID op2, RegisterID dest)
+    {
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        m_assembler.subs_r(dest, op1, op2);
+        return Jump(m_assembler.jmp(ARMCondition(cond)));
+    }
+
     Jump branchNeg32(ResultCondition cond, RegisterID srcDest)
     {
         ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
@@ -685,6 +701,12 @@ public:
         m_assembler.cmp_r(left, m_assembler.getImm(right.m_value, ARMRegisters::S0));
         m_assembler.mov_r(dest, ARMAssembler::getOp2(0));
         m_assembler.mov_r(dest, ARMAssembler::getOp2(1), ARMCondition(cond));
+    }
+
+    void compare8(RelationalCondition cond, Address left, TrustedImm32 right, RegisterID dest)
+    {
+        load8(left, ARMRegisters::S1);
+        compare32(cond, ARMRegisters::S1, right, dest);
     }
 
     void test32(ResultCondition cond, RegisterID reg, TrustedImm32 mask, RegisterID dest)

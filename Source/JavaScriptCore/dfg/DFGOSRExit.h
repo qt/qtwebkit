@@ -35,9 +35,9 @@
 #include "DFGCorrectableJumpPoint.h"
 #include "DFGExitProfile.h"
 #include "DFGGPRInfo.h"
-#include "DFGOperands.h"
 #include "MacroAssembler.h"
 #include "MethodOfGettingAValueProfile.h"
+#include "Operands.h"
 #include "ValueProfile.h"
 #include "ValueRecovery.h"
 #include <wtf/Vector.h>
@@ -93,6 +93,7 @@ struct OSRExit {
     CorrectableJumpPoint m_check;
     NodeIndex m_nodeIndex;
     CodeOrigin m_codeOrigin;
+    CodeOrigin m_codeOriginForExitProfile;
     
     unsigned m_recoveryIndex;
     

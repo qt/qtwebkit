@@ -58,6 +58,9 @@ class WebNotificationManagerProxy;
 class WebPageGroup;
 class WebPageProxy;
 class WebResourceCacheManagerProxy;
+#if USE(SOUP)
+class WebSoupRequestManagerProxy;
+#endif
 struct StatisticsData;
 struct WebProcessCreationParameters;
     
@@ -161,6 +164,9 @@ public:
     WebNotificationManagerProxy* notificationManagerProxy() const { return m_notificationManagerProxy.get(); }
     WebPluginSiteDataManager* pluginSiteDataManager() const { return m_pluginSiteDataManager.get(); }
     WebResourceCacheManagerProxy* resourceCacheManagerProxy() const { return m_resourceCacheManagerProxy.get(); }
+#if USE(SOUP)
+    WebSoupRequestManagerProxy* soupRequestManagerProxy() const { return m_soupRequestManagerProxy.get(); }
+#endif
 
     struct Statistics {
         unsigned wkViewCount;
@@ -173,14 +179,6 @@ public:
     void setIconDatabasePath(const String&);
     String iconDatabasePath() const;
     void setLocalStorageDirectory(const String& dir) { m_overrideLocalStorageDirectory = dir; }
-
-    String overrideWebInspectorBaseDirectory() const { return m_overrideWebInspectorBaseDirectory; }
-    void setOverrideWebInspectorBaseDirectory(const String& path) { m_overrideWebInspectorBaseDirectory = path; }
-
-    String overrideWebInspectorPagePath() const { return m_overrideWebInspectorPagePath; }
-    void setOverrideWebInspectorPagePath(const String& path) { m_overrideWebInspectorPagePath = path; }
-
-    void setOverrideWebInspectorLocalizedStringsPath(const String& path) { m_overrideWebInspectorLocalizedStringsPath = path; }
 
     void ensureWebProcess();
     void warmInitialProcess();
@@ -234,6 +232,8 @@ private:
     void getPasteboardChangeCount(const String& pasteboardName, uint64_t& changeCount);
     void getPasteboardUniqueName(String& pasteboardName);
     void getPasteboardColor(const String& pasteboardName, WebCore::Color&);
+    void getPasteboardURL(const String& pasteboardName, WTF::String&);
+    void addPasteboardTypes(const String& pasteboardName, const Vector<String>& pasteboardTypes);
     void setPasteboardTypes(const String& pasteboardName, const Vector<String>& pasteboardTypes);
     void setPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, const Vector<String>& pathnames);
     void setPasteboardStringForType(const String& pasteboardName, const String& pasteboardType, const String&);
@@ -302,6 +302,9 @@ private:
     RefPtr<WebNotificationManagerProxy> m_notificationManagerProxy;
     RefPtr<WebPluginSiteDataManager> m_pluginSiteDataManager;
     RefPtr<WebResourceCacheManagerProxy> m_resourceCacheManagerProxy;
+#if USE(SOUP)
+    RefPtr<WebSoupRequestManagerProxy> m_soupRequestManagerProxy;
+#endif
 
 #if PLATFORM(WIN)
     bool m_shouldPaintNativeControls;
@@ -315,9 +318,6 @@ private:
     String m_overrideDatabaseDirectory;
     String m_overrideIconDatabasePath;
     String m_overrideLocalStorageDirectory;
-    String m_overrideWebInspectorBaseDirectory;
-    String m_overrideWebInspectorPagePath;
-    String m_overrideWebInspectorLocalizedStringsPath;
 
     bool m_processTerminationEnabled;
     

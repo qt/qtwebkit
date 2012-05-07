@@ -37,9 +37,9 @@ from webkitpy.common.memoized import memoized
 # * specifiers -- a set of specifiers, representing configurations covered by this builder.
 _exact_matches = {
     # These builders are on build.chromium.org.
-    "Webkit Win": {"port_name": "chromium-win-xp", "specifiers": set(["xp", "release", "cpu"])},
+    "Webkit Win": {"port_name": "chromium-win-xp", "specifiers": set(["xp", "release"])},
     "Webkit Vista": {"port_name": "chromium-win-vista", "specifiers": set(["vista"])},
-    "Webkit Win7": {"port_name": "chromium-win-win7", "specifiers": set(["win7", "cpu"])},
+    "Webkit Win7": {"port_name": "chromium-win-win7", "specifiers": set(["win7"])},
     "Webkit Win (dbg)(1)": {"port_name": "chromium-win-xp", "specifiers": set(["win", "debug"])},
     "Webkit Win (dbg)(2)": {"port_name": "chromium-win-xp", "specifiers": set(["win", "debug"])},
     "Webkit Linux": {"port_name": "chromium-linux-x86_64", "specifiers": set(["linux", "x86_64", "release"])},
@@ -50,7 +50,7 @@ _exact_matches = {
     "Webkit Mac10.5 (dbg)(2)": {"port_name": "chromium-mac-leopard", "specifiers": set(["leopard", "debug"])},
     "Webkit Mac10.6": {"port_name": "chromium-mac-snowleopard", "specifiers": set(["snowleopard"])},
     "Webkit Mac10.6 (dbg)": {"port_name": "chromium-mac-snowleopard", "specifiers": set(["snowleopard", "debug"])},
-    "Webkit Mac10.7": {"port_name": "chromium-mac-lion", "specifiers": set(["lion"]), "move_overwritten_baselines_to": "chromium-mac-snowleopard"},
+    "Webkit Mac10.7": {"port_name": "chromium-mac-lion", "specifiers": set(["lion"])},
 
     # These builders are on build.webkit.org.
     "GTK Linux 32-bit Debug": {"port_name": "gtk", "specifiers": set(["gtk"])},
@@ -60,6 +60,7 @@ _exact_matches = {
     "Qt Linux Release": {"port_name": "qt-linux", "specifiers": set(["win", "linux", "mac"])},
     "Windows XP Debug (Tests)": {"port_name": "win-xp", "specifiers": set(["win"])},
     "Windows 7 Release (WebKit2 Tests)": {"port_name": "win-future-wk2", "specifiers": set(["wk2"])},
+    "EFL Linux Release": {"port_name": "efl", "specifiers": set(["efl"])},
 }
 
 
@@ -123,5 +124,5 @@ def builder_path_for_port_name(port_name):
     builder_path_from_name(builder_name_for_port_name(port_name))
 
 
-def fallback_port_name_for_new_port(builder_name):
-    return _exact_matches[builder_name].get("move_overwritten_baselines_to")
+def fallback_port_names_for_new_port(builder_name):
+    return _exact_matches[builder_name].get("move_overwritten_baselines_to", [])

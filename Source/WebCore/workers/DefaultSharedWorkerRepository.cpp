@@ -77,7 +77,7 @@ public:
 
     // WorkerLoaderProxy
     virtual void postTaskToLoader(PassOwnPtr<ScriptExecutionContext::Task>);
-    virtual void postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task>, const String&);
+    virtual bool postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task>, const String&);
 
     // WorkerReportingProxy
     virtual void postExceptionToWorkerObject(const String& errorMessage, int lineNumber, const String& sourceURL);
@@ -151,12 +151,13 @@ void SharedWorkerProxy::postTaskToLoader(PassOwnPtr<ScriptExecutionContext::Task
     document->postTask(task);
 }
 
-void SharedWorkerProxy::postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
+bool SharedWorkerProxy::postTaskForModeToWorkerContext(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
 {
     if (isClosing())
-        return;
+        return false;
     ASSERT(m_thread);
     m_thread->runLoop().postTaskForMode(task, mode);
+    return true;
 }
 
 static void postExceptionTask(ScriptExecutionContext* context, const String& errorMessage, int lineNumber, const String& sourceURL)
@@ -321,8 +322,8 @@ void SharedWorkerScriptLoader::notifyFinished()
         InspectorInstrumentation::scriptImported(m_worker->scriptExecutionContext(), m_scriptLoader->identifier(), m_scriptLoader->script());
         DefaultSharedWorkerRepository::instance().workerScriptLoaded(*m_proxy, m_worker->scriptExecutionContext()->userAgent(m_scriptLoader->url()),
                                                                      m_scriptLoader->script(), m_port.release(),
-                                                                     m_worker->scriptExecutionContext()->contentSecurityPolicy()->policy(),
-                                                                     m_worker->scriptExecutionContext()->contentSecurityPolicy()->headerType());
+                                                                     m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeader(),
+                                                                     m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeaderType());
     }
     m_worker->unsetPendingActivity(m_worker.get());
     this->deref(); // This frees this object - must be the last action in this function.

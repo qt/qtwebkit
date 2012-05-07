@@ -28,6 +28,7 @@
 #include "ProtectionSpaceHash.h"
 #include "SQLiteStatement.h"
 #include <BlackBerryPlatformClient.h>
+#include <BlackBerryPlatformEncryptor.h>
 
 #define HANDLE_SQL_EXEC_FAILURE(statement, returnValue, ...) \
     if (statement) { \
@@ -37,13 +38,11 @@
 
 namespace WebCore {
 
-CredentialBackingStore* CredentialBackingStore::instance()
+CredentialBackingStore& credentialBackingStore()
 {
-    static CredentialBackingStore* backingStore = 0;
-    if (!backingStore) {
-        backingStore = new CredentialBackingStore;
-        backingStore->open(pathByAppendingComponent(BlackBerry::Platform::Client::get()->getApplicationDataDirectory().c_str(), "/credentials.db"));
-    }
+    DEFINE_STATIC_LOCAL(CredentialBackingStore, backingStore, ());
+    if (!backingStore.m_database.isOpen())
+        backingStore.open(pathByAppendingComponent(BlackBerry::Platform::Client::get()->getApplicationDataDirectory().c_str(), "/credentials.db"));
     return backingStore;
 }
 
@@ -63,6 +62,27 @@ CredentialBackingStore::CredentialBackingStore()
 
 CredentialBackingStore::~CredentialBackingStore()
 {
+    delete m_addLoginStatement;
+    m_addLoginStatement = 0;
+    delete m_updateLoginStatement;
+    m_updateLoginStatement = 0;
+    delete m_hasLoginStatement;
+    m_hasLoginStatement = 0;
+    delete m_getLoginStatement;
+    m_getLoginStatement = 0;
+    delete m_getLoginByURLStatement;
+    m_getLoginByURLStatement = 0;
+    delete m_removeLoginStatement;
+    m_removeLoginStatement = 0;
+    delete m_addNeverRememberStatement;
+    m_addNeverRememberStatement = 0;
+    delete m_hasNeverRememberStatement;
+    m_hasNeverRememberStatement = 0;
+    delete m_getNeverRememberStatement;
+    m_getNeverRememberStatement = 0;
+    delete m_removeNeverRememberStatement;
+    m_removeNeverRememberStatement = 0;
+
     if (m_database.isOpen())
         m_database.close();
 }
@@ -134,33 +154,6 @@ bool CredentialBackingStore::open(const String& dbPath)
         false, "Failed to prepare removeNeverRemember statement");
 
     return true;
-}
-
-void CredentialBackingStore::close()
-{
-    delete m_addLoginStatement;
-    m_addLoginStatement = 0;
-    delete m_updateLoginStatement;
-    m_updateLoginStatement = 0;
-    delete m_hasLoginStatement;
-    m_hasLoginStatement = 0;
-    delete m_getLoginStatement;
-    m_getLoginStatement = 0;
-    delete m_getLoginByURLStatement;
-    m_getLoginByURLStatement = 0;
-    delete m_removeLoginStatement;
-    m_removeLoginStatement = 0;
-    delete m_addNeverRememberStatement;
-    m_addNeverRememberStatement = 0;
-    delete m_hasNeverRememberStatement;
-    m_hasNeverRememberStatement = 0;
-    delete m_getNeverRememberStatement;
-    m_getNeverRememberStatement = 0;
-    delete m_removeNeverRememberStatement;
-    m_removeNeverRememberStatement = 0;
-
-    if (m_database.isOpen())
-        m_database.close();
 }
 
 bool CredentialBackingStore::addLogin(const KURL& url, const ProtectionSpace& protectionSpace, const Credential& credential)
@@ -404,7 +397,7 @@ bool CredentialBackingStore::clearLogins()
     ASSERT(m_database.isOpen());
     ASSERT(m_database.tableExists("logins"));
 
-    HANDLE_SQL_EXEC_FAILURE(!m_database.executeCommand("DELETE * FROM logins"),
+    HANDLE_SQL_EXEC_FAILURE(!m_database.executeCommand("DELETE FROM logins"),
         false, "Failed to clear table logins");
 
     return true;
@@ -415,7 +408,7 @@ bool CredentialBackingStore::clearNeverRemember()
     ASSERT(m_database.isOpen());
     ASSERT(m_database.tableExists("never_remember"));
 
-    HANDLE_SQL_EXEC_FAILURE(!m_database.executeCommand("DELETE * FROM never_remember"),
+    HANDLE_SQL_EXEC_FAILURE(!m_database.executeCommand("DELETE FROM never_remember"),
         false, "Failed to clear table never_remember");
 
     return true;
@@ -423,16 +416,16 @@ bool CredentialBackingStore::clearNeverRemember()
 
 String CredentialBackingStore::encryptedString(const String& plainText) const
 {
-    // FIXME: Need encrypt plainText here
-    notImplemented();
-    return plainText;
+    std::string cipherText;
+    BlackBerry::Platform::Encryptor::encryptString(std::string(plainText.latin1().data()), &cipherText);
+    return String(cipherText.c_str());
 }
 
 String CredentialBackingStore::decryptedString(const String& cipherText) const
 {
-    // FIXME: Need decrypt cipherText here
-    notImplemented();
-    return cipherText;
+    std::string plainText;
+    BlackBerry::Platform::Encryptor::decryptString(std::string(cipherText.latin1().data()), &plainText);
+    return String(plainText.c_str());
 }
 
 } // namespace WebCore

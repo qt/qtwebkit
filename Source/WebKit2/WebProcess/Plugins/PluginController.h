@@ -85,9 +85,6 @@ public:
     // Evaluates the given script string in the context of the given NPObject.
     virtual bool evaluate(NPObject*, const String& scriptString, NPVariant* result, bool allowPopups) = 0;
 
-    // Tries to short circuit the NPN_Invoke call with the given parameters. Returns true on success.
-    virtual bool tryToShortCircuitInvoke(NPObject*, NPIdentifier methodName, const NPVariant* arguments, uint32_t argumentCount, bool& returnValue, NPVariant& result) = 0;
-
     // Set the statusbar text.
     virtual void setStatusbarText(const String&) = 0;
 
@@ -145,6 +142,12 @@ public:
 
     // Decrements a counter that, when it reaches 0, stops preventing the plug-in from being destroyed.
     virtual void unprotectPluginFromDestruction() = 0;
+
+#if PLUGIN_ARCHITECTURE(X11)
+    // Create a plugin container for windowed plugins
+    virtual uint64_t createPluginContainer() = 0;
+    virtual void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID) = 0;
+#endif
 
     // Helper class for delaying destruction of a plug-in.
     class PluginDestructionProtector {

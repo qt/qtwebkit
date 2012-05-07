@@ -30,7 +30,6 @@
 #include "CSSParser.h"
 #include "CSSProperty.h"
 #include "CSSPropertyNames.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 #include "Document.h"
@@ -45,6 +44,7 @@
 #include "RenderObject.h"
 #include "RenderText.h"
 #include "StylePropertySet.h"
+#include "StyleResolver.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "htmlediting.h"
@@ -704,12 +704,13 @@ static bool containsNonEditableRegion(Node* node)
     return false;
 }
 
-void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, Node* node, Node* pastEndNode)
+void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, PassRefPtr<Node> startNode, PassRefPtr<Node> pastEndNode)
 {
     if (m_removeOnly)
         return;
 
-    for (RefPtr<Node> next; node && node != pastEndNode; node = next.get()) {
+    RefPtr<Node> node = startNode;
+    for (RefPtr<Node> next; node && node != pastEndNode; node = next) {
         next = node->traverseNextNode();
 
         if (!node->renderer() || !node->rendererIsEditable())
@@ -719,10 +720,10 @@ void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, Node* n
             // This is a plaintext-only region. Only proceed if it's fully selected.
             // pastEndNode is the node after the last fully selected node, so if it's inside node then
             // node isn't fully selected.
-            if (pastEndNode && pastEndNode->isDescendantOf(node))
+            if (pastEndNode && pastEndNode->isDescendantOf(node.get()))
                 break;
             // Add to this element's inline style and skip over its contents.
-            HTMLElement* element = toHTMLElement(node);
+            HTMLElement* element = toHTMLElement(node.get());
             RefPtr<StylePropertySet> inlineStyle = element->ensureInlineStyle()->copy();
             inlineStyle->merge(style->style());
             setNodeAttribute(element, styleAttr, inlineStyle->asText());
@@ -730,13 +731,13 @@ void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, Node* n
             continue;
         }
         
-        if (isBlock(node))
+        if (isBlock(node.get()))
             continue;
         
         if (node->childNodeCount()) {
-            if (node->contains(pastEndNode) || containsNonEditableRegion(node) || !node->parentNode()->rendererIsEditable())
+            if (node->contains(pastEndNode.get()) || containsNonEditableRegion(node.get()) || !node->parentNode()->rendererIsEditable())
                 continue;
-            if (editingIgnoresContent(node)) {
+            if (editingIgnoresContent(node.get())) {
                 next = node->traverseNextSibling();
                 continue;
             }
@@ -745,7 +746,7 @@ void ApplyStyleCommand::applyInlineStyleToNodeRange(EditingStyle* style, Node* n
         RefPtr<Node> runStart = node;
         RefPtr<Node> runEnd = node;
         Node* sibling = node->nextSibling();
-        while (sibling && sibling != pastEndNode && !sibling->contains(pastEndNode)
+        while (sibling && sibling != pastEndNode && !sibling->contains(pastEndNode.get())
                && (!isBlock(sibling) || sibling->hasTagName(brTag))
                && !containsNonEditableRegion(sibling)) {
             runEnd = sibling;
@@ -1062,8 +1063,7 @@ void ApplyStyleCommand::removeInlineStyle(EditingStyle* style, const Position &s
                     // Since elem must have been fully selected, and it is at the end
                     // of the selection, it is clear we can set the new e offset to
                     // the max range offset of prev.
-                    ASSERT(s.anchorType() == Position::PositionIsAfterAnchor
-                           || s.offsetInContainerNode() >= lastOffsetInNode(s.containerNode()));
+                    ASSERT(s.anchorType() == Position::PositionIsAfterAnchor || !offsetIsBeforeLastNodeOffset(s.offsetInContainerNode(), s.containerNode()));
                     e = lastPositionInOrAfterNode(prev.get());
                 }
             }
@@ -1226,7 +1226,7 @@ bool ApplyStyleCommand::mergeEndWithNextIfIdentical(const Position& start, const
     int endOffset = end.computeOffsetInContainerNode();
 
     if (isAtomicNode(endNode)) {
-        if (endOffset < lastOffsetInNode(endNode))
+        if (offsetIsBeforeLastNodeOffset(endOffset, endNode))
             return false;
 
         unsigned parentLastOffset = end.deprecatedNode()->parentNode()->childNodes()->length() - 1;

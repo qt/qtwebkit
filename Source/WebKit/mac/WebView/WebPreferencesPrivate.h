@@ -274,12 +274,14 @@ extern NSString *WebPreferencesChangedInternalNotification;
 - (void)setHixie76WebSocketProtocolEnabled:(BOOL)flag;
 - (BOOL)isHixie76WebSocketProtocolEnabled;
 
-// Deprecated. You should use [setS|s]uppressesIncrementalRendering in WebPreferences.h instead.
-- (void)setSuppressIncrementalRendering:(BOOL)flag;
-- (BOOL)suppressIncrementalRendering;
+- (void)setRegionBasedColumnsEnabled:(BOOL)flag;
+- (BOOL)regionBasedColumnsEnabled;
 
 - (void)setBackspaceKeyNavigationEnabled:(BOOL)flag;
 - (BOOL)backspaceKeyNavigationEnabled;
+
+- (void)setWantsBalancedSetDefersLoadingBehavior:(BOOL)flag;
+- (BOOL)wantsBalancedSetDefersLoadingBehavior;
 
 - (void)setShouldDisplaySubtitles:(BOOL)flag;
 - (BOOL)shouldDisplaySubtitles;
@@ -292,5 +294,14 @@ extern NSString *WebPreferencesChangedInternalNotification;
 
 - (void)setNotificationsEnabled:(BOOL)flag;
 - (BOOL)notificationsEnabled;
+
+- (void)setShouldRespectImageOrientation:(BOOL)flag;
+- (BOOL)shouldRespectImageOrientation;
+
+- (BOOL)requestAnimationFrameEnabled;
+- (void)setRequestAnimationFrameEnabled:(BOOL)enabled;
+
+- (void)setIncrementalRenderingSuppressionTimeoutInSeconds:(NSTimeInterval)timeout;
+- (NSTimeInterval)incrementalRenderingSuppressionTimeoutInSeconds;
 
 @end

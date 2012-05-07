@@ -389,7 +389,7 @@ void XMLHttpRequest::callReadyStateChangeListener()
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willChangeXHRReadyState(scriptExecutionContext(), this);
 
     if (m_async || (m_state <= OPENED || m_state == DONE))
-        m_progressEventThrottle.dispatchEvent(XMLHttpRequestProgressEvent::create(eventNames().readystatechangeEvent), m_state == DONE ? FlushProgressEvent : DoNotFlushProgressEvent);
+        m_progressEventThrottle.dispatchReadyStateChangeEvent(XMLHttpRequestProgressEvent::create(eventNames().readystatechangeEvent), m_state == DONE ? FlushProgressEvent : DoNotFlushProgressEvent);
 
     InspectorInstrumentation::didChangeXHRReadyState(cookie);
 
@@ -899,9 +899,9 @@ void XMLHttpRequest::setRequestHeader(const AtomicString& name, const String& va
 
 void XMLHttpRequest::setRequestHeaderInternal(const AtomicString& name, const String& value)
 {
-    pair<HTTPHeaderMap::iterator, bool> result = m_requestHeaders.add(name, value);
-    if (!result.second)
-        result.first->second += ", " + value;
+    HTTPHeaderMap::AddResult result = m_requestHeaders.add(name, value);
+    if (!result.isNewEntry)
+        result.iterator->second += ", " + value;
 }
 
 String XMLHttpRequest::getRequestHeader(const AtomicString& name) const

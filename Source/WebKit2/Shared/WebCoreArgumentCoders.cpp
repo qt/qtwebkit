@@ -61,6 +61,10 @@
 #include <WebCore/TranslateTransformOperation.h>
 #endif
 
+#if USE(UI_SIDE_COMPOSITING) && ENABLE(CSS_FILTERS)
+#include <WebCore/FilterOperations.h>
+#endif
+
 using namespace WebCore;
 using namespace WebKit;
 
@@ -142,15 +146,14 @@ bool ArgumentCoder<IntSize>::decode(ArgumentDecoder* decoder, IntSize& intSize)
     return SimpleArgumentCoder<IntSize>::decode(decoder, intSize);
 }
 
-
-void ArgumentCoder<ViewportArguments>::encode(ArgumentEncoder* encoder, const ViewportArguments& viewportArguments)
+void ArgumentCoder<ViewportAttributes>::encode(ArgumentEncoder* encoder, const ViewportAttributes& viewportAttributes)
 {
-    SimpleArgumentCoder<ViewportArguments>::encode(encoder, viewportArguments);
+    SimpleArgumentCoder<ViewportAttributes>::encode(encoder, viewportAttributes);
 }
 
-bool ArgumentCoder<ViewportArguments>::decode(ArgumentDecoder* decoder, ViewportArguments& viewportArguments)
+bool ArgumentCoder<ViewportAttributes>::decode(ArgumentDecoder* decoder, ViewportAttributes& viewportAttributes)
 {
-    return SimpleArgumentCoder<ViewportArguments>::decode(decoder, viewportArguments);
+    return SimpleArgumentCoder<ViewportAttributes>::decode(decoder, viewportAttributes);
 }
 
 void ArgumentCoder<MimeClassInfo>::encode(ArgumentEncoder* encoder, const MimeClassInfo& mimeClassInfo)
@@ -1085,7 +1088,7 @@ void ArgumentCoder<RefPtr<Animation> >::encode(ArgumentEncoder* encoder, const R
     encodeBoolAndValue(encoder, animation->isIterationCountSet(), animation->iterationCount());
     encodeBoolAndValue(encoder, animation->isNameSet(), animation->name());
     encodeBoolAndEnumValue(encoder, animation->isPlayStateSet(), animation->playState());
-    encodeBoolAndValue(encoder, animation->isPropertySet(), animation->property());
+    encodeBoolAndValue(encoder, animation->isPropertySet(), static_cast<int>(animation->property()));
     encodeBoolAndValue<RefPtr<TimingFunction> >(encoder, animation->isTimingFunctionSet(), animation->timingFunction());
     encoder->encodeBool(animation->isNoneAnimation());
 }
@@ -1163,7 +1166,7 @@ bool ArgumentCoder<RefPtr<Animation> >::decode(ArgumentDecoder* decoder, RefPtr<
     if (isPlayStateSet)
         animation->setPlayState(playState);
     if (isPropertySet)
-        animation->setProperty(property);
+        animation->setProperty(static_cast<CSSPropertyID>(property));
     if (isTimingFunctionSet)
         animation->setTimingFunction(timingFunction);
 
@@ -1240,6 +1243,110 @@ bool ArgumentCoder<KeyframeValueList>::decode(ArgumentDecoder* decoder, WebCore:
     return true;
 }
 
+#endif
+
+#if USE(UI_SIDE_COMPOSITING) && ENABLE(CSS_FILTERS)
+void ArgumentCoder<WebCore::FilterOperations>::encode(ArgumentEncoder* encoder, const WebCore::FilterOperations& filters)
+{
+    encoder->encodeUInt32(filters.size());
+    for (size_t i = 0; i < filters.size(); ++i) {
+        const FilterOperation* filter = filters.at(i);
+        FilterOperation::OperationType type = filter->getOperationType();
+        encoder->encodeEnum(type);
+        switch (type) {
+        case FilterOperation::GRAYSCALE:
+        case FilterOperation::SEPIA:
+        case FilterOperation::SATURATE:
+        case FilterOperation::HUE_ROTATE:
+            encoder->encodeDouble(static_cast<const BasicColorMatrixFilterOperation*>(filter)->amount());
+            break;
+        case FilterOperation::INVERT:
+        case FilterOperation::BRIGHTNESS:
+        case FilterOperation::CONTRAST:
+        case FilterOperation::OPACITY:
+            encoder->encodeDouble(static_cast<const BasicComponentTransferFilterOperation*>(filter)->amount());
+            break;
+        case FilterOperation::BLUR:
+            ArgumentCoder<Length>::encode(encoder, static_cast<const BlurFilterOperation*>(filter)->stdDeviation());
+            break;
+        case FilterOperation::DROP_SHADOW: {
+            const DropShadowFilterOperation* shadow = static_cast<const DropShadowFilterOperation*>(filter);
+            ArgumentCoder<IntPoint>::encode(encoder, shadow->location());
+            encoder->encodeInt32(shadow->stdDeviation());
+            ArgumentCoder<Color>::encode(encoder, shadow->color());
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+
+bool ArgumentCoder<WebCore::FilterOperations>::decode(ArgumentDecoder* decoder, WebCore::FilterOperations& filters)
+{
+    uint32_t size;
+    if (!decoder->decodeUInt32(size))
+        return false;
+
+    Vector<RefPtr<FilterOperation> >& operations = filters.operations();
+
+    for (size_t i = 0; i < size; ++i) {
+        FilterOperation::OperationType type;
+        RefPtr<FilterOperation> filter;
+        if (!decoder->decodeEnum(type))
+            return false;
+
+        switch (type) {
+        case FilterOperation::GRAYSCALE:
+        case FilterOperation::SEPIA:
+        case FilterOperation::SATURATE:
+        case FilterOperation::HUE_ROTATE: {
+            double value;
+            if (!decoder->decodeDouble(value))
+                return false;
+            filter = BasicColorMatrixFilterOperation::create(value, type);
+            break;
+        }
+        case FilterOperation::INVERT:
+        case FilterOperation::BRIGHTNESS:
+        case FilterOperation::CONTRAST:
+        case FilterOperation::OPACITY: {
+            double value;
+            if (!decoder->decodeDouble(value))
+                return false;
+            filter = BasicComponentTransferFilterOperation::create(value, type);
+            break;
+        }
+        case FilterOperation::BLUR: {
+            Length length;
+            if (!ArgumentCoder<Length>::decode(decoder, length))
+                return false;
+            filter = BlurFilterOperation::create(length, type);
+            break;
+        }
+        case FilterOperation::DROP_SHADOW: {
+            IntPoint location;
+            int32_t stdDeviation;
+            Color color;
+            if (!ArgumentCoder<IntPoint>::decode(decoder, location))
+                return false;
+            if (!decoder->decodeInt32(stdDeviation))
+                return false;
+            if (!ArgumentCoder<Color>::decode(decoder, color))
+                return false;
+            filter = DropShadowFilterOperation::create(location, stdDeviation, color, type);
+            break;
+        }
+        default:
+            break;
+        }
+
+        if (filter)
+            operations.append(filter);
+    }
+
+    return true;
+}
 #endif
 
 #endif

@@ -56,7 +56,6 @@ public:
 
     static void addSupportedObjectPluginMIMEType(const char*);
     static bool isSupportedObjectMIMEType(const WebString&);
-    static WebString getNormalizedMIMEType(const WebString&);
 
     bool xssAuditorEnabled() const;
     void setXSSAuditorEnabled(bool);
@@ -95,7 +94,7 @@ public:
     bool downloadableBinaryFontsEnabled() const;
 
     WebString userAgentString() const;
-    void setUserAgentString(const char*);
+    void setUserAgentString(const WebString&);
 
     WebString defaultTextEncodingName() const;
     void setDefaultTextEncodingName(const char*);
@@ -193,6 +192,9 @@ public:
 
     unsigned overZoomColor() const;
     void setOverZoomColor(unsigned);
+
+    WebString overScrollImagePath() const;
+    void setOverScrollImagePath(const char*);
 
     unsigned backgroundColor() const;
     void setBackgroundColor(unsigned);

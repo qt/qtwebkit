@@ -34,11 +34,9 @@
 #include "ChromeClient.h"
 #include "CSSParser.h"
 #include "CSSRule.h"
-#include "CSSRuleList.h"
 #include "CSSSelector.h"
 #include "CSSSelectorList.h"
 #include "CSSStyleRule.h"
-#include "CSSStyleSelector.h"
 #include "CSSStyleSheet.h"
 #include "ChildNodeList.h"
 #include "ClassNodeList.h"
@@ -49,6 +47,7 @@
 #include "DocumentType.h"
 #include "DynamicNodeList.h"
 #include "Element.h"
+#include "ElementShadow.h"
 #include "Event.h"
 #include "EventContext.h"
 #include "EventDispatchMediator.h"
@@ -85,10 +84,11 @@
 #include "RenderView.h"
 #include "ScopedEventQueue.h"
 #include "SelectorQuery.h"
+#include "Settings.h"
 #include "ShadowRoot.h"
-#include "ShadowTree.h"
 #include "StaticNodeList.h"
 #include "StorageEvent.h"
+#include "StyleResolver.h"
 #include "TagNodeList.h"
 #include "Text.h"
 #include "TextEvent.h"
@@ -106,6 +106,10 @@
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
+
+#if ENABLE(INSPECTOR)
+#include "InspectorController.h"
+#endif
 
 #if ENABLE(SVG)
 #include "SVGElementInstance.h"
@@ -181,9 +185,9 @@ void Node::dumpStatistics()
 
                 // Tag stats
                 Element* element = static_cast<Element*>(node);
-                pair<HashMap<String, size_t>::iterator, bool> result = perTagCount.add(element->tagName(), 1);
-                if (!result.second)
-                    result.first->second++;
+                HashMap<String, size_t>::AddResult result = perTagCount.add(element->tagName(), 1);
+                if (!result.isNewEntry)
+                    result.iterator->second++;
 
                 if (ElementAttributeData* attributeData = element->attributeData()) {
                     attributes += attributeData->length();
@@ -303,7 +307,7 @@ void Node::stopIgnoringLeaks()
 #endif
 }
 
-Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2)
+Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2, Document* doc)
 {
     StyleChange ch = NoInherit;
     EDisplay display1 = s1 ? s1->display() : NONE;
@@ -316,7 +320,12 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2)
     bool colSpan1 = s1 && s1->columnSpan();
     bool colSpan2 = s2 && s2->columnSpan();
     
-    if (display1 != display2 || fl1 != fl2 || colSpan1 != colSpan2 || (s1 && s2 && !s1->contentDataEquivalent(s2)))
+    bool specifiesColumns1 = s1 && (!s1->hasAutoColumnCount() || !s1->hasAutoColumnWidth());
+    bool specifiesColumns2 = s2 && (!s2->hasAutoColumnCount() || !s2->hasAutoColumnWidth());
+
+    if (display1 != display2 || fl1 != fl2 || colSpan1 != colSpan2 
+        || (specifiesColumns1 != specifiesColumns2 && doc->settings()->regionBasedColumnsEnabled())
+        || (s1 && s2 && !s1->contentDataEquivalent(s2)))
         ch = Detach;
     else if (!s1 || !s2)
         ch = Inherit;
@@ -712,6 +721,14 @@ bool Node::isContentRichlyEditable()
     return rendererIsEditable(RichlyEditable);
 }
 
+void Node::inspect()
+{
+#if ENABLE(INSPECTOR)
+    if (document() && document()->page())
+        document()->page()->inspectorController()->inspect(this);
+#endif
+}
+
 bool Node::rendererIsEditable(EditableLevel editableLevel) const
 {
     if (document()->frame() && document()->frame()->page() && document()->frame()->page()->isEditable() && !shadowTreeRootNode())
@@ -818,7 +835,7 @@ bool Node::hasNonEmptyBoundingBox() const
 
 inline static ShadowRoot* oldestShadowRootFor(const Node* node)
 {
-    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadowTree()->oldestShadowRoot() : 0;
+    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadow()->oldestShadowRoot() : 0;
 }
 
 inline void Node::setStyleChange(StyleChangeType changeType)
@@ -940,22 +957,22 @@ static void removeNodeListCacheIfPossible(Node* node, NodeRareData* data)
     node->treeScope()->removeNodeListCache();
 }
 
+// FIXME: Move this function to Document
 void Node::registerDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
 {
+    ASSERT(isDocumentNode());
     NodeRareData* data = ensureRareData();
-    // We haven't been receiving notifications while there were no registered lists, so the cache is invalid now.
-    if (data->nodeLists() && (!treeScope() || !treeScope()->hasNodeListCaches()))
-        data->nodeLists()->invalidateCaches();
-
-    data->ensureNodeLists(this)->m_listsWithCaches.add(list);
+    data->ensureNodeLists(this)->m_listsInvalidatedAtDocument.add(list);
 }
 
+// FIXME: Move this function to Document
 void Node::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
 {
+    ASSERT(isDocumentNode());
     ASSERT(hasRareData());
     ASSERT(rareData()->nodeLists());
     NodeRareData* data = rareData();
-    data->nodeLists()->m_listsWithCaches.remove(list);
+    data->nodeLists()->m_listsInvalidatedAtDocument.remove(list);
     removeNodeListCacheIfPossible(this, data);
 }
 
@@ -974,7 +991,8 @@ void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& at
         && attrName != itempropAttr
         && attrName != itemtypeAttr
 #endif
-        && attrName != nameAttr)
+        && attrName != nameAttr
+        && attrName != forAttr)
         return;
 
     if (!treeScope()->hasNodeListCaches())
@@ -989,7 +1007,6 @@ void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& at
             continue;
 
         data->nodeLists()->invalidateCachesThatDependOnAttributes();
-        removeNodeListCacheIfPossible(node, data);
     }
 }
 
@@ -1008,25 +1025,7 @@ void Node::invalidateNodeListsCacheAfterChildrenChanged()
             continue;
 
         data->nodeLists()->invalidateCaches();
-
-        NodeListsNodeData::NodeListSet::iterator end = data->nodeLists()->m_listsWithCaches.end();
-        for (NodeListsNodeData::NodeListSet::iterator it = data->nodeLists()->m_listsWithCaches.begin(); it != end; ++it)
-            (*it)->invalidateCache();
-
-        removeNodeListCacheIfPossible(node, data);
     }
-}
-
-void Node::notifyLocalNodeListsLabelChanged()
-{
-    if (!hasRareData())
-        return;
-    NodeRareData* data = rareData();
-    if (!data->nodeLists())
-        return;
-
-    if (data->nodeLists()->m_labelsNodeListCache)
-        data->nodeLists()->m_labelsNodeListCache->invalidateCache();
 }
 
 void Node::removeCachedClassNodeList(ClassNodeList* list, const String& className)
@@ -1037,16 +1036,6 @@ void Node::removeCachedClassNodeList(ClassNodeList* list, const String& classNam
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_classNodeListCache.get(className));
     data->m_classNodeListCache.remove(className);
-}
-
-void Node::removeCachedRegionNodeList(RegionNodeList* list, const AtomicString& flowName)
-{
-    ASSERT(rareData());
-    ASSERT(rareData()->nodeLists());
-
-    NodeListsNodeData* data = rareData()->nodeLists();
-    ASSERT_UNUSED(list, list == data->m_regionNodeListCache.get(flowName));
-    data->m_regionNodeListCache.remove(flowName);
 }
 
 void Node::removeCachedNameNodeList(NameNodeList* list, const String& nodeName)
@@ -1445,7 +1434,7 @@ bool Node::rendererIsNeeded(const NodeRenderingContext& context)
 
 RenderObject* Node::createRenderer(RenderArena*, RenderStyle*)
 {
-    ASSERT(false);
+    ASSERT_NOT_REACHED();
     return 0;
 }
     
@@ -1617,18 +1606,18 @@ PassRefPtr<NodeList> Node::getElementsByTagName(const AtomicString& localName)
     if (localName.isNull())
         return 0;
 
-    String name = localName;
+    AtomicString localNameAtom = localName;
+
+    NodeListsNodeData::TagNodeListCache::AddResult result = ensureRareData()->ensureNodeLists(this)->m_tagNodeListCache.add(localNameAtom, 0);
+    if (!result.isNewEntry)
+        return PassRefPtr<TagNodeList>(result.iterator->second);
+
+    RefPtr<TagNodeList> list;
     if (document()->isHTMLDocument())
-        name = localName.lower();
-
-    AtomicString localNameAtom = name;
-
-    pair<NodeListsNodeData::TagNodeListCache::iterator, bool> result = ensureRareData()->ensureNodeLists(this)->m_tagNodeListCache.add(localNameAtom, 0);
-    if (!result.second)
-        return PassRefPtr<TagNodeList>(result.first->second);
-
-    RefPtr<TagNodeList> list = TagNodeList::create(this, starAtom, localNameAtom);
-    result.first->second = list.get();
+        list = HTMLTagNodeList::create(this, starAtom, localNameAtom);
+    else
+        list = TagNodeList::create(this, starAtom, localNameAtom);
+    result.iterator->second = list.get();
     return list.release();   
 }
 
@@ -1640,54 +1629,38 @@ PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceU
     if (namespaceURI == starAtom)
         return getElementsByTagName(localName);
 
-    String name = localName;
-    if (document()->isHTMLDocument())
-        name = localName.lower();
+    AtomicString localNameAtom = localName;
 
-    AtomicString localNameAtom = name;
-
-    pair<NodeListsNodeData::TagNodeListCacheNS::iterator, bool> result
+    NodeListsNodeData::TagNodeListCacheNS::AddResult result
         = ensureRareData()->ensureNodeLists(this)->m_tagNodeListCacheNS.add(QualifiedName(nullAtom, localNameAtom, namespaceURI).impl(), 0);
-    if (!result.second)
-        return PassRefPtr<TagNodeList>(result.first->second);
+    if (!result.isNewEntry)
+        return PassRefPtr<TagNodeList>(result.iterator->second);
 
     RefPtr<TagNodeList> list = TagNodeList::create(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localNameAtom);
-    result.first->second = list.get();
+    result.iterator->second = list.get();
     return list.release();
 }
 
 PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 {
-    pair<NodeListsNodeData::NameNodeListCache::iterator, bool> result = ensureRareData()->ensureNodeLists(this)->m_nameNodeListCache.add(elementName, 0);
-    if (!result.second)
-        return PassRefPtr<NodeList>(result.first->second);
+    NodeListsNodeData::NameNodeListCache::AddResult result = ensureRareData()->ensureNodeLists(this)->m_nameNodeListCache.add(elementName, 0);
+    if (!result.isNewEntry)
+        return PassRefPtr<NodeList>(result.iterator->second);
 
     RefPtr<NameNodeList> list = NameNodeList::create(this, elementName);
-    result.first->second = list.get();
+    result.iterator->second = list.get();
     return list.release();
 }
 
 PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
 {
-    pair<NodeListsNodeData::ClassNodeListCache::iterator, bool> result
+    NodeListsNodeData::ClassNodeListCache::AddResult result
         = ensureRareData()->ensureNodeLists(this)->m_classNodeListCache.add(classNames, 0);
-    if (!result.second)
-        return PassRefPtr<NodeList>(result.first->second);
+    if (!result.isNewEntry)
+        return PassRefPtr<NodeList>(result.iterator->second);
 
     RefPtr<ClassNodeList> list = ClassNodeList::create(this, classNames);
-    result.first->second = list.get();
-    return list.release();
-}
-
-PassRefPtr<NodeList> Node::getRegionsByContentNode(const AtomicString& flowName)
-{
-    pair<NodeListsNodeData::RegionNodeListCache::iterator, bool> result
-    = ensureRareData()->ensureNodeLists(this)->m_regionNodeListCache.add(flowName, 0);
-    if (!result.second)
-        return PassRefPtr<NodeList>(result.first->second);
-    
-    RefPtr<RegionNodeList> list = RegionNodeList::create(this, flowName);
-    result.first->second = list.get();
+    result.iterator->second = list.get();
     return list.release();
 }
 
@@ -1697,11 +1670,9 @@ PassRefPtr<Element> Node::querySelector(const String& selectors, ExceptionCode& 
         ec = SYNTAX_ERR;
         return 0;
     }
-    bool strictParsing = !document()->inQuirksMode();
-    CSSParser p(strictParsing);
-
+    CSSParser parser(document());
     CSSSelectorList querySelectorList;
-    p.parseSelector(selectors, document(), querySelectorList);
+    parser.parseSelector(selectors, querySelectorList);
 
     if (!querySelectorList.first() || querySelectorList.hasUnknownPseudoElements()) {
         ec = SYNTAX_ERR;
@@ -1724,11 +1695,9 @@ PassRefPtr<NodeList> Node::querySelectorAll(const String& selectors, ExceptionCo
         ec = SYNTAX_ERR;
         return 0;
     }
-    bool strictParsing = !document()->inQuirksMode();
-    CSSParser p(strictParsing);
-
+    CSSParser p(document());
     CSSSelectorList querySelectorList;
-    p.parseSelector(selectors, document(), querySelectorList);
+    p.parseSelector(selectors, querySelectorList);
 
     if (!querySelectorList.first() || querySelectorList.hasUnknownPseudoElements()) {
         ec = SYNTAX_ERR;
@@ -2117,10 +2086,10 @@ unsigned short Node::compareDocumentPosition(Node* otherNode)
             // the same nodeType are inserted into or removed from the direct container. This would be the case, for example, 
             // when comparing two attributes of the same element, and inserting or removing additional attributes might change 
             // the order between existing attributes.
-            Attribute* attr = owner1->attributeItem(i);
-            if (attr1->attr() == attr)
+            Attribute* attribute = owner1->attributeItem(i);
+            if (attr1->qualifiedName() == attribute->name())
                 return DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC | DOCUMENT_POSITION_FOLLOWING;
-            if (attr2->attr() == attr)
+            if (attr2->qualifiedName() == attribute->name())
                 return DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC | DOCUMENT_POSITION_PRECEDING;
         }
         
@@ -2329,22 +2298,22 @@ void Node::showTreeForThisAcrossFrame() const
 
 void NodeListsNodeData::invalidateCaches()
 {
-    if (m_labelsNodeListCache)
-        m_labelsNodeListCache->invalidateCache();
     TagNodeListCache::const_iterator tagCacheEnd = m_tagNodeListCache.end();
     for (TagNodeListCache::const_iterator it = m_tagNodeListCache.begin(); it != tagCacheEnd; ++it)
         it->second->invalidateCache();
     TagNodeListCacheNS::const_iterator tagCacheNSEnd = m_tagNodeListCacheNS.end();
     for (TagNodeListCacheNS::const_iterator it = m_tagNodeListCacheNS.begin(); it != tagCacheNSEnd; ++it)
         it->second->invalidateCache();
-    RegionNodeListCache::const_iterator regionListCacheEnd = m_regionNodeListCache.end();
-    for (RegionNodeListCache::const_iterator it = m_regionNodeListCache.begin(); it != regionListCacheEnd; ++it)
-        it->second->invalidateCache();
     invalidateCachesThatDependOnAttributes();
 }
 
 void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
 {
+    // Used by labels and region node lists on document.
+    NodeListsNodeData::NodeListSet::iterator end = m_listsInvalidatedAtDocument.end();
+    for (NodeListsNodeData::NodeListSet::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
+        (*it)->invalidateCache();
+
     ClassNodeListCache::iterator classCacheEnd = m_classNodeListCache.end();
     for (ClassNodeListCache::iterator it = m_classNodeListCache.begin(); it != classCacheEnd; ++it)
         it->second->invalidateCache();
@@ -2364,7 +2333,7 @@ void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
 
 bool NodeListsNodeData::isEmpty() const
 {
-    if (!m_listsWithCaches.isEmpty())
+    if (!m_listsInvalidatedAtDocument.isEmpty())
         return false;
 
     if (!m_tagNodeListCache.isEmpty())
@@ -2379,8 +2348,6 @@ bool NodeListsNodeData::isEmpty() const
     if (!m_microDataItemListCache.isEmpty())
         return false;
 #endif
-    if (!m_regionNodeListCache.isEmpty())
-        return false;
 
     if (m_labelsNodeListCache)
         return false;
@@ -2416,14 +2383,19 @@ ScriptExecutionContext* Node::scriptExecutionContext() const
     return document();
 }
 
-void Node::insertedIntoDocument()
+Node::InsertionNotificationRequest Node::insertedInto(Node* insertionPoint)
 {
-    setFlag(InDocumentFlag);
+    ASSERT(insertionPoint->inDocument() || isContainerNode());
+    if (insertionPoint->inDocument())
+        setFlag(InDocumentFlag);
+    return InsertionDone;
 }
 
-void Node::removedFromDocument()
+void Node::removedFrom(Node* insertionPoint)
 {
-    clearFlag(InDocumentFlag);
+    ASSERT(insertionPoint->inDocument() || isContainerNode());
+    if (insertionPoint->inDocument())
+        clearFlag(InDocumentFlag);
 }
 
 void Node::didMoveToNewDocument(Document* oldDocument)
@@ -2467,11 +2439,6 @@ static inline HashSet<SVGElementInstance*> instancesForSVGElement(Node* node)
 }
 #endif
 
-static inline bool isTouchEventType(const AtomicString& eventType)
-{
-    return eventType == eventNames().touchstartEvent || eventType == eventNames().touchmoveEvent || eventType == eventNames().touchendEvent || eventType == eventNames().touchcancelEvent;
-}
-
 static inline bool tryAddEventListener(Node* targetNode, const AtomicString& eventType, PassRefPtr<EventListener> listener, bool useCapture)
 {
     if (!targetNode->EventTarget::addEventListener(eventType, listener, useCapture))
@@ -2481,7 +2448,7 @@ static inline bool tryAddEventListener(Node* targetNode, const AtomicString& eve
         document->addListenerTypeIfNeeded(eventType);
         if (eventType == eventNames().mousewheelEvent)
             document->didAddWheelEventHandler();
-        else if (isTouchEventType(eventType))
+        else if (eventNames().isTouchEventType(eventType))
             document->didAddTouchEventHandler();
     }
         
@@ -2532,7 +2499,7 @@ static inline bool tryRemoveEventListener(Node* targetNode, const AtomicString& 
     if (Document* document = targetNode->document()) {
         if (eventType == eventNames().mousewheelEvent)
             document->didRemoveWheelEventHandler();
-        else if (isTouchEventType(eventType))
+        else if (eventNames().isTouchEventType(eventType))
             document->didRemoveTouchEventHandler();
     }
     
@@ -2613,17 +2580,18 @@ HashSet<MutationObserverRegistration*>* Node::transientMutationObserverRegistry(
     return hasRareData() ? rareData()->transientMutationObserverRegistry() : 0;
 }
 
-void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, Node* fromNode, WebKitMutationObserver::MutationType type, const AtomicString& attributeName)
+void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, Node* fromNode, WebKitMutationObserver::MutationType type, const QualifiedName* attributeName)
 {
+    ASSERT((type == WebKitMutationObserver::Attributes && attributeName) || !attributeName);
     if (Vector<OwnPtr<MutationObserverRegistration> >* registry = fromNode->mutationObserverRegistry()) {
         const size_t size = registry->size();
         for (size_t i = 0; i < size; ++i) {
             MutationObserverRegistration* registration = registry->at(i).get();
             if (registration->shouldReceiveMutationFrom(this, type, attributeName)) {
                 MutationRecordDeliveryOptions deliveryOptions = registration->deliveryOptions();
-                pair<HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::iterator, bool> result = observers.add(registration->observer(), deliveryOptions);
-                if (!result.second)
-                    result.first->second |= deliveryOptions;
+                HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::AddResult result = observers.add(registration->observer(), deliveryOptions);
+                if (!result.isNewEntry)
+                    result.iterator->second |= deliveryOptions;
 
             }
         }
@@ -2634,16 +2602,17 @@ void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, 
             MutationObserverRegistration* registration = *iter;
             if (registration->shouldReceiveMutationFrom(this, type, attributeName)) {
                 MutationRecordDeliveryOptions deliveryOptions = registration->deliveryOptions();
-                pair<HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::iterator, bool> result = observers.add(registration->observer(), deliveryOptions);
-                if (!result.second)
-                    result.first->second |= deliveryOptions;
+                HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::AddResult result = observers.add(registration->observer(), deliveryOptions);
+                if (!result.isNewEntry)
+                    result.iterator->second |= deliveryOptions;
             }
         }
     }
 }
 
-void Node::getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, WebKitMutationObserver::MutationType type, const AtomicString& attributeName)
+void Node::getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, WebKitMutationObserver::MutationType type, const QualifiedName* attributeName)
 {
+    ASSERT((type == WebKitMutationObserver::Attributes && attributeName) || !attributeName);
     collectMatchingObserversForMutation(observers, this, type, attributeName);
     for (Node* node = parentNode(); node; node = node->parentNode())
         collectMatchingObserversForMutation(observers, node, type, attributeName);
@@ -2772,6 +2741,16 @@ void Node::dispatchScopedEventDispatchMediator(PassRefPtr<EventDispatchMediator>
 bool Node::dispatchEvent(PassRefPtr<Event> event)
 {
     return EventDispatcher::dispatchEvent(this, EventDispatchMediator::create(event));
+}
+
+void Node::dispatchRegionLayoutUpdateEvent()
+{
+    ASSERT(!eventDispatchForbidden());
+
+    if (!document()->hasListenerType(Document::REGIONLAYOUTUPDATE_LISTENER))
+        return;
+
+    dispatchScopedEvent(UIEvent::create(eventNames().webkitRegionLayoutUpdateEvent, true, true, document()->defaultView(), 0));
 }
 
 void Node::dispatchSubtreeModifiedEvent()

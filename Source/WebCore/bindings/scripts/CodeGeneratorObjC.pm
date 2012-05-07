@@ -269,23 +269,6 @@ sub ReadPublicInterfaces
     $interfaceAvailabilityVersion = "WEBKIT_VERSION_LATEST" if $newPublicClass;
 }
 
-sub GenerateConditionalString
-{
-    my $node = shift;
-    my $conditional = $node->extendedAttributes->{"Conditional"};
-    if ($conditional) {
-        if ($conditional =~ /&/) {
-            return "ENABLE(" . join(") && ENABLE(", split(/&/, $conditional)) . ")";
-        } elsif ($conditional =~ /\|/) {
-            return "ENABLE(" . join(") || ENABLE(", split(/\|/, $conditional)) . ")";
-        } else {
-            return "ENABLE(" . $conditional . ")";
-        }
-    } else {
-        return "";
-    }
-}
-
 # Params: 'domClass' struct
 sub GenerateInterface
 {
@@ -464,6 +447,34 @@ sub IsNativeObjCType
     return 0;
 }
 
+sub SkipFunction
+{
+    my $function = shift;
+
+    return 1 if $codeGenerator->GetArrayType($function->signature->type);
+
+    foreach my $param (@{$function->parameters}) {
+        return 1 if $codeGenerator->GetArrayType($param->type);
+    }
+
+    return 0;
+}
+
+sub SkipAttribute
+{
+    my $attribute = shift;
+
+    return 1 if $codeGenerator->GetArrayType($attribute->signature->type);
+
+    # This is for DynamicsCompressorNode.idl
+    if ($attribute->signature->name eq "release") {
+        return 1;
+    }
+
+    return 0;
+}
+
+
 sub GetObjCType
 {
     my $type = shift;
@@ -528,7 +539,8 @@ sub AddForwardDeclarationsForType
     my $type = $codeGenerator->StripModule(shift);
     my $public = shift;
 
-    return if $codeGenerator->IsNonPointerType($type) ;
+    return if $codeGenerator->IsNonPointerType($type);
+    return if $codeGenerator->GetArrayType($type);
 
     my $class = GetClassName($type);
 
@@ -550,6 +562,7 @@ sub AddIncludesForType
     my $type = $codeGenerator->StripModule(shift);
 
     return if $codeGenerator->IsNonPointerType($type);
+    return if $codeGenerator->GetArrayType($type);
 
     if (IsNativeObjCType($type)) {
         if ($type eq "Color") {
@@ -621,7 +634,7 @@ sub AddIncludesForType
     $implIncludes{"NameNodeList.h"} = 1 if $type eq "NodeList";
 
     # Default, include the same named file (the implementation) and the same name prefixed with "DOM". 
-    $implIncludes{"$type.h"} = 1 if not $codeGenerator->AvoidInclusionOfType($type);
+    $implIncludes{"$type.h"} = 1 if not $codeGenerator->SkipIncludeHeader($type);
     $implIncludes{"DOM${type}Internal.h"} = 1;
 }
 
@@ -771,6 +784,7 @@ sub GenerateHeader
     # - Add attribute getters/setters.
     if ($numAttributes > 0) {
         foreach my $attribute (@{$dataNode->attributes}) {
+            next if SkipAttribute($attribute);
             my $attributeName = $attribute->signature->name;
 
             if ($attributeName eq "id" or $attributeName eq "hash" or $attributeName eq "description") {
@@ -825,7 +839,7 @@ sub GenerateHeader
                 push(@headerAttributes, $property) if $public;
                 push(@privateHeaderAttributes, $property) unless $public;
             } else {
-                my $attributeConditionalString = GenerateConditionalString($attribute->signature);
+                my $attributeConditionalString = $codeGenerator->GenerateConditionalString($attribute->signature);
                 if ($attributeConditionalString) {
                     push(@headerAttributes, "#if ${attributeConditionalString}\n") if $public;
                     push(@privateHeaderAttributes, "#if ${attributeConditionalString}\n") unless $public;
@@ -860,6 +874,7 @@ sub GenerateHeader
     # - Add functions.
     if ($numFunctions > 0) {
         foreach my $function (@{$dataNode->functions}) {
+            next if SkipFunction($function);
             my $functionName = $function->signature->name;
 
             my $returnType = GetObjCType($function->signature->type);
@@ -920,7 +935,7 @@ sub GenerateHeader
                 AddForwardDeclarationsForType($type, $public) unless $public and $needsDeprecatedVersion;
             }
 
-            my $functionConditionalString = GenerateConditionalString($function->signature);
+            my $functionConditionalString = $codeGenerator->GenerateConditionalString($function->signature);
             if ($functionConditionalString) {
                 push(@headerFunctions, "#if ${functionConditionalString}\n") if $public;
                 push(@privateHeaderFunctions, "#if ${functionConditionalString}\n") unless $public;
@@ -1093,7 +1108,7 @@ sub GenerateImplementation
     # - INCLUDES -
     push(@implContentHeader, "\n#import \"config.h\"\n");
 
-    my $conditionalString = GenerateConditionalString($dataNode);
+    my $conditionalString = $codeGenerator->GenerateConditionalString($dataNode);
     push(@implContentHeader, "\n#if ${conditionalString}\n\n") if $conditionalString;
 
     push(@implContentHeader, "#import \"DOMInternal.h\"\n\n");
@@ -1118,7 +1133,7 @@ sub GenerateImplementation
     if ($interfaceName =~ /(\w+)(Abs|Rel)$/) {
         $implIncludes{"$1.h"} = 1;
     } else {
-        if (!$codeGenerator->AvoidInclusionOfType($implClassName)) {
+        if (!$codeGenerator->SkipIncludeHeader($implClassName)) {
             $implIncludes{"$implClassName.h"} = 1 ;
         } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($implClassName)) {
             my $includeType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($implClassName);
@@ -1182,6 +1197,7 @@ sub GenerateImplementation
     # - Attributes
     if ($numAttributes > 0) {
         foreach my $attribute (@{$dataNode->attributes}) {
+            next if SkipAttribute($attribute);
             AddIncludesForType($attribute->signature->type);
 
             my $idlType = $codeGenerator->StripModule($attribute->signature->type);
@@ -1329,7 +1345,7 @@ sub GenerateImplementation
                 my $type = $attribute->signature->type;
                 if ($codeGenerator->IsSVGTypeNeedingTearOff($type) and not $implClassName =~ /List$/) {
                     my $idlTypeWithNamespace = GetSVGTypeWithNamespace($type);
-                    $implIncludes{"$type.h"} = 1 if not $codeGenerator->AvoidInclusionOfType($type);
+                    $implIncludes{"$type.h"} = 1 if not $codeGenerator->SkipIncludeHeader($type);
                     if ($codeGenerator->IsSVGTypeWithWritablePropertiesNeedingTearOff($type) and not defined $attribute->signature->extendedAttributes->{"Immutable"}) {
                         $idlTypeWithNamespace =~ s/SVGPropertyTearOff</SVGStaticPropertyTearOff<$implClassNameWithNamespace, /;
                         $implIncludes{"SVGStaticPropertyTearOff.h"} = 1;
@@ -1363,7 +1379,7 @@ sub GenerateImplementation
                 $getterContent = $getterContentHead . $getterContentTail;
             }
 
-            my $attributeConditionalString = GenerateConditionalString($attribute->signature);
+            my $attributeConditionalString = $codeGenerator->GenerateConditionalString($attribute->signature);
             push(@implContent, "#if ${attributeConditionalString}\n") if $attributeConditionalString;
             push(@implContent, $getterSig);
             push(@implContent, "{\n");
@@ -1478,6 +1494,7 @@ sub GenerateImplementation
     # - Functions
     if ($numFunctions > 0) {
         foreach my $function (@{$dataNode->functions}) {
+            next if SkipFunction($function);
             AddIncludesForType($function->signature->type);
 
             my $functionName = $function->signature->name;
@@ -1692,7 +1709,7 @@ sub GenerateImplementation
                 }
             }
 
-            my $conditionalString = GenerateConditionalString($function->signature);
+            my $conditionalString = $codeGenerator->GenerateConditionalString($function->signature);
             push(@implContent, "\n#if ${conditionalString}\n") if $conditionalString;
 
             push(@implContent, "$functionSig\n");

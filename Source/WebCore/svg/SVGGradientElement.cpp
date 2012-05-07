@@ -25,7 +25,6 @@
 #include "SVGGradientElement.h"
 
 #include "Attribute.h"
-#include "CSSStyleSelector.h"
 #include "RenderSVGHiddenContainer.h"
 #include "RenderSVGPath.h"
 #include "RenderSVGResourceLinearGradient.h"
@@ -35,6 +34,7 @@
 #include "SVGStopElement.h"
 #include "SVGTransformList.h"
 #include "SVGTransformable.h"
+#include "StyleResolver.h"
 
 namespace WebCore {
 
@@ -91,9 +91,7 @@ void SVGGradientElement::parseAttribute(Attribute* attr)
 
     if (attr->name() == SVGNames::gradientTransformAttr) {
         SVGTransformList newList;
-        if (!SVGTransformable::parseTransformAttribute(newList, attr->value()))
-            newList.clear();
-
+        newList.parse(attr->value());
         detachAnimatedGradientTransformListWrappers(newList.size());
         setGradientTransformBaseValue(newList);
         return;

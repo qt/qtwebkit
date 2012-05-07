@@ -70,11 +70,14 @@ bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingCo
     return childContext.isOnEncapsulationBoundary() && HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
 }
 
-void HTMLTextFormControlElement::insertedIntoDocument()
+Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(Node* insertionPoint)
 {
-    HTMLFormControlElement::insertedIntoDocument();
+    HTMLFormControlElement::insertedInto(insertionPoint);
+    if (!insertionPoint->inDocument())
+        return InsertionDone;
     String initialValue = value();
     setTextAsOfLastFormControlChangeEvent(initialValue.isNull() ? emptyString() : initialValue);
+    return InsertionDone;
 }
 
 void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode)
@@ -470,7 +473,7 @@ void HTMLTextFormControlElement::setInnerTextValue(const String& value)
         innerTextElement()->setInnerText(value, ec);
         ASSERT(!ec);
 
-        if (value.endsWith("\n") || value.endsWith("\r")) {
+        if (value.endsWith('\n') || value.endsWith('\r')) {
             innerTextElement()->appendChild(HTMLBRElement::create(document()), ec);
             ASSERT(!ec);
         }

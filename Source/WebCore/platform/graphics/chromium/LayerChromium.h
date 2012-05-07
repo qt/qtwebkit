@@ -43,6 +43,8 @@
 #include "RenderSurfaceChromium.h"
 #include "ShaderChromium.h"
 #include "TransformationMatrix.h"
+#include "cc/CCLayerAnimationController.h"
+#include "cc/CCOcclusionTracker.h"
 
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -54,8 +56,7 @@
 
 namespace WebCore {
 
-class CCAnimationEvent;
-class CCLayerAnimationController;
+struct CCAnimationEvent;
 class CCLayerAnimationDelegate;
 class CCLayerImpl;
 class CCLayerTreeHost;
@@ -65,11 +66,19 @@ class ScrollbarLayerChromium;
 
 // Base class for composited layers. Special layer types are derived from
 // this class.
-class LayerChromium : public RefCounted<LayerChromium> {
+class LayerChromium : public RefCounted<LayerChromium>, public CCLayerAnimationControllerClient {
 public:
     static PassRefPtr<LayerChromium> create();
 
     virtual ~LayerChromium();
+
+    // CCLayerAnimationControllerClient implementation
+    virtual int id() const OVERRIDE { return m_layerId; }
+    virtual void setOpacityFromAnimation(float) OVERRIDE;
+    virtual float opacity() const OVERRIDE { return m_opacity; }
+    virtual void setTransformFromAnimation(const TransformationMatrix&) OVERRIDE;
+    virtual const TransformationMatrix& transform() const OVERRIDE { return m_transform; }
+    virtual const IntSize& bounds() const OVERRIDE { return m_bounds; }
 
     const LayerChromium* rootLayer() const;
     LayerChromium* parent() const;
@@ -90,11 +99,7 @@ public:
     void setBackgroundColor(const Color&);
     Color backgroundColor() const { return m_backgroundColor; }
 
-    void setBackgroundCoversViewport(bool);
-    bool backgroundCoversViewport() const { return m_backgroundCoversViewport; }
-
     void setBounds(const IntSize&);
-    const IntSize& bounds() const { return m_bounds; }
     virtual IntSize contentBounds() const { return bounds(); }
 
     void setMasksToBounds(bool);
@@ -108,10 +113,15 @@ public:
     virtual bool needsDisplay() const { return m_needsDisplay; }
 
     void setOpacity(float);
-    float opacity() const { return m_opacity; }
+    bool opacityIsAnimating() const;
 
     void setFilters(const FilterOperations&);
     const FilterOperations& filters() const { return m_filters; }
+
+    // Background filters are filters applied to what is behind this layer, when they are viewed through non-opaque
+    // regions in this layer. They are used through the WebLayer interface, and are not exposed to HTML.
+    void setBackgroundFilters(const FilterOperations&);
+    const FilterOperations& backgroundFilters() const { return m_backgroundFilters; }
 
     virtual void setOpaque(bool);
     bool opaque() const { return m_opaque; }
@@ -123,7 +133,7 @@ public:
     const TransformationMatrix& sublayerTransform() const { return m_sublayerTransform; }
 
     void setTransform(const TransformationMatrix&);
-    const TransformationMatrix& transform() const { return m_transform; }
+    bool transformIsAnimating() const;
 
     const IntRect& visibleLayerRect() const { return m_visibleLayerRect; }
     void setVisibleLayerRect(const IntRect& visibleLayerRect) { m_visibleLayerRect = visibleLayerRect; }
@@ -134,7 +144,12 @@ public:
     void setScrollable(bool);
     void setShouldScrollOnMainThread(bool);
     void setHaveWheelEventHandlers(bool);
+    const Region& nonFastScrollableRegion() { return m_nonFastScrollableRegion; }
     void setNonFastScrollableRegion(const Region&);
+    void setNonFastScrollableRegionChanged() { m_nonFastScrollableRegionChanged = true; }
+
+    void setDrawCheckerboardForMissingTiles(bool);
+    bool drawCheckerboardForMissingTiles() const { return m_drawCheckerboardForMissingTiles; }
 
     IntSize scrollDelta() const { return IntSize(); }
 
@@ -161,11 +176,9 @@ public:
 
     // These methods typically need to be overwritten by derived classes.
     virtual bool drawsContent() const { return m_isDrawable; }
-    virtual void paintContentsIfDirty(const Region& /* occludedScreenSpace */) { }
-    virtual void idlePaintContentsIfDirty(const Region& /* occludedScreenSpace */) { }
-    virtual void updateCompositorResources(GraphicsContext3D*, CCTextureUpdater&) { }
+    virtual void update(CCTextureUpdater&, const CCOcclusionTracker*) { }
+    virtual void idleUpdate(CCTextureUpdater&, const CCOcclusionTracker*) { }
     virtual void setIsMask(bool) { }
-    virtual void unreserveContentsTexture() { }
     virtual void bindContentsTexture() { }
     virtual void protectVisibleTileTextures() { }
     virtual bool needsContentsScale() const { return false; }
@@ -176,20 +189,26 @@ public:
 
     virtual void pushPropertiesTo(CCLayerImpl*);
 
-    typedef ProgramBinding<VertexShaderPos, FragmentShaderColor> BorderProgram;
-
-    int id() const { return m_layerId; }
-
     void clearRenderSurface() { m_renderSurface.clear(); }
     RenderSurfaceChromium* renderSurface() const { return m_renderSurface.get(); }
     void createRenderSurface();
 
     float drawOpacity() const { return m_drawOpacity; }
     void setDrawOpacity(float opacity) { m_drawOpacity = opacity; }
+
+    bool drawOpacityIsAnimating() const { return m_drawOpacityIsAnimating; }
+    void setDrawOpacityIsAnimating(bool drawOpacityIsAnimating) { m_drawOpacityIsAnimating = drawOpacityIsAnimating; }
+
     const IntRect& clipRect() const { return m_clipRect; }
     void setClipRect(const IntRect& clipRect) { m_clipRect = clipRect; }
     RenderSurfaceChromium* targetRenderSurface() const { return m_targetRenderSurface; }
     void setTargetRenderSurface(RenderSurfaceChromium* surface) { m_targetRenderSurface = surface; }
+
+    bool drawTransformIsAnimating() const { return m_drawTransformIsAnimating; }
+    void setDrawTransformIsAnimating(bool animating) { m_drawTransformIsAnimating = animating; }
+    bool screenSpaceTransformIsAnimating() const { return m_screenSpaceTransformIsAnimating; }
+    void setScreenSpaceTransformIsAnimating(bool animating) { m_screenSpaceTransformIsAnimating = animating; }
+
     // This moves from layer space, with origin in the center to target space with origin in the top left
     const TransformationMatrix& drawTransform() const { return m_drawTransform; }
     void setDrawTransform(const TransformationMatrix& matrix) { m_drawTransform = matrix; }
@@ -204,7 +223,7 @@ public:
     // Returns true if any of the layer's descendants has content to draw.
     bool descendantDrawsContent();
 
-    CCLayerTreeHost* layerTreeHost() const { return m_layerTreeHost.get(); }
+    CCLayerTreeHost* layerTreeHost() const { return m_layerTreeHost; }
 
     // Reserve any textures needed for this layer.
     virtual void reserveTextures() { }
@@ -216,8 +235,8 @@ public:
     void pauseAnimation(int animationId, double timeOffset);
     void removeAnimation(int animationId);
 
-    void suspendAnimations(double time);
-    void resumeAnimations();
+    void suspendAnimations(double monotonicTime);
+    void resumeAnimations(double monotonicTime);
 
     CCLayerAnimationController* layerAnimationController() { return m_layerAnimationController.get(); }
     void setLayerAnimationController(PassOwnPtr<CCLayerAnimationController>);
@@ -226,9 +245,10 @@ public:
 
     bool hasActiveAnimation() const;
 
-    void setAnimationEvent(const CCAnimationEvent&, double wallClockTime);
+    virtual void notifyAnimationStarted(const CCAnimationEvent&, double wallClockTime);
+    virtual void notifyAnimationFinished(double wallClockTime);
 
-    virtual Region opaqueContentsRegion() const { return Region(); };
+    virtual Region visibleContentOpaqueRegion() const;
 
     virtual ScrollbarLayerChromium* toScrollbarLayerChromium() { return 0; }
 
@@ -243,6 +263,9 @@ protected:
 
     // This flag is set when layer need repainting/updating.
     bool m_needsDisplay;
+
+    // Tracks whether this layer may have changed stacking order with its siblings.
+    bool m_stackingOrderChanged;
 
     // The update rect is the region of the compositor resource that was actually updated by the compositor.
     // For layers that may do updating outside the compositor's control (i.e. plugin layers), this information
@@ -271,7 +294,10 @@ private:
     Vector<RefPtr<LayerChromium> > m_children;
     LayerChromium* m_parent;
 
-    RefPtr<CCLayerTreeHost> m_layerTreeHost;
+    // LayerChromium instances have a weak pointer to their CCLayerTreeHost.
+    // This pointer value is nil when a LayerChromium is not in a tree and is
+    // updated via setLayerTreeHost() if a layer moves between trees.
+    CCLayerTreeHost* m_layerTreeHost;
 
     OwnPtr<CCLayerAnimationController> m_layerAnimationController;
 
@@ -287,12 +313,12 @@ private:
     FloatPoint m_position;
     FloatPoint m_anchorPoint;
     Color m_backgroundColor;
-    bool m_backgroundCoversViewport;
     Color m_debugBorderColor;
     float m_debugBorderWidth;
     String m_debugName;
     float m_opacity;
     FilterOperations m_filters;
+    FilterOperations m_backgroundFilters;
     float m_anchorPointZ;
     bool m_isDrawable;
     bool m_masksToBounds;
@@ -302,6 +328,7 @@ private:
     bool m_isNonCompositedContent;
     bool m_preserves3D;
     bool m_alwaysReserveTextures;
+    bool m_drawCheckerboardForMissingTiles;
 
     TransformationMatrix m_transform;
     TransformationMatrix m_sublayerTransform;
@@ -312,10 +339,13 @@ private:
     // Transient properties.
     OwnPtr<RenderSurfaceChromium> m_renderSurface;
     float m_drawOpacity;
+    bool m_drawOpacityIsAnimating;
     IntRect m_clipRect;
     RenderSurfaceChromium* m_targetRenderSurface;
     TransformationMatrix m_drawTransform;
     TransformationMatrix m_screenSpaceTransform;
+    bool m_drawTransformIsAnimating;
+    bool m_screenSpaceTransformIsAnimating;
     IntRect m_drawableContentRect;
     float m_contentsScale;
 

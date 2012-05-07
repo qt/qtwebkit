@@ -63,6 +63,9 @@ public:
 
     virtual void setVisibilityCHROMIUM(bool visible) { }
 
+    virtual void discardFramebufferEXT(WGC3Denum target, WGC3Dsizei numAttachments, const WGC3Denum* attachments) { }
+    virtual void ensureFramebufferCHROMIUM() { }
+
     virtual void setMemoryAllocationChangedCallbackCHROMIUM(WebGraphicsMemoryAllocationChangedCallbackCHROMIUM* callback) { }
 
     virtual WebString getRequestableExtensionsCHROMIUM() { return WebString(); }
@@ -155,7 +158,7 @@ public:
     }
 
     virtual WebString getShaderInfoLog(WebGLId shader) { return WebString(); }
-
+    virtual void getShaderPrecisionFormat(WGC3Denum shadertype, WGC3Denum precisiontype, WGC3Dint* range, WGC3Dint* precision) { }
     virtual WebString getShaderSource(WebGLId shader) { return WebString(); }
     virtual WebString getString(WGC3Denum name) { return WebString(); }
     virtual void getTexParameterfv(WGC3Denum target, WGC3Denum pname, WGC3Dfloat* value) { }
@@ -254,6 +257,14 @@ public:
 
     virtual void texStorage2DEXT(WGC3Denum target, WGC3Dint levels, WGC3Duint internalformat,
                                  WGC3Dint width, WGC3Dint height) { }
+
+    virtual WebGLId createQueryEXT() { return 1; }
+    virtual void deleteQueryEXT(WebGLId) { }
+    virtual GC3Dboolean isQueryEXT(WebGLId) { return true; }
+    virtual void beginQueryEXT(GC3Denum, WebGLId) { }
+    virtual void endQueryEXT(GC3Denum) { }
+    virtual void getQueryivEXT(GC3Denum, GC3Denum, GC3Dint*) { }
+    virtual void getQueryObjectuivEXT(WebGLId, GC3Denum, GC3Duint*) { }
 
 protected:
     Attributes m_attrs;

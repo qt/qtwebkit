@@ -56,6 +56,7 @@
             'type': 'executable',
             'dependencies': [
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support_gfx',
+                '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
             ],
             'include_dirs': [
                 '<(source_dir)/JavaScriptCore',
@@ -66,7 +67,9 @@
             ],
             'conditions': [
                 ['OS=="android"', {
-                    'toolsets': ['host'],
+                    # FIXME: Re-enable building ImageDiff after the dependencies
+                    # for host have been fixed, as this broke per the WTF move.
+                    'type': 'none',
                 }],
             ],
         },
@@ -77,10 +80,11 @@
             'dependencies': [
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:inspector_resources',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit',
-                '<(source_dir)/JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf_config',
+                '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
                 '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
                 '<(chromium_src_dir)/third_party/icu/icu.gyp:icuuc',
                 '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
+                '<(chromium_src_dir)/base/base.gyp:test_support_base',
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:blob',
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_user_agent',
@@ -89,7 +93,6 @@
                 '<(chromium_src_dir)',
                 '<(source_dir)/WebKit/chromium/public',
                 '<(source_dir)/JavaScriptCore',
-                '<(source_dir)/JavaScriptCore/wtf', # wtf/text/*.h refers headers in wtf/ without wtf/.
                 '<(DEPTH)',
             ],
             'defines': [
@@ -229,7 +232,9 @@
                 }],
                 ['OS=="android"', {
                     'dependencies': [
-                        'ImageDiff#host',
+                        # FIXME: Re-enable building ImageDiff on Android.
+                        # https://bugs.webkit.org/show_bug.cgi?id=82039
+                        #'ImageDiff#host',
                     ],
                     'sources/': [
                         ['include', 'chromium/TestShellLinux\\.cpp$'],
@@ -253,8 +258,7 @@
                         '<(source_dir)/WebKit/chromium/public',
                     ],
                     'dependencies': [
-                        '<(source_dir)/JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:wtf',
-                        '<(source_dir)/WTF/WTF.gyp/WTF.gyp:newwtf',
+                        '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
                     ],
                 }],
                 ['inside_chromium_build==0', {
@@ -320,8 +324,8 @@
                         '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn/win/TestNetscapePlugin.def',
                         '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn/win/TestNetscapePlugin.rc',
                     ],
-                    # The .rc file requires that the name of the dll is npTestNetscapePlugin.dll.
-                    'product_name': 'npTestNetscapePlugin',
+                    # The .rc file requires that the name of the dll is npTestNetscapePlugIn.dll.
+                    'product_name': 'npTestNetscapePlugIn',
                 }],
             ],
         },

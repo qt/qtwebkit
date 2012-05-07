@@ -79,13 +79,13 @@
 #include "DOMUtilitiesPrivate.h"
 #include "DOMWindow.h"
 #include "Document.h"
-#include "DocumentFragment.h" // Only needed for ReplaceSelectionCommand.h :(
 #include "DocumentLoader.h"
 #include "DocumentMarker.h"
 #include "DocumentMarkerController.h"
 #include "Editor.h"
 #include "EventHandler.h"
 #include "EventListenerWrapper.h"
+#include "FileSystemType.h"
 #include "FocusController.h"
 #include "FontCache.h"
 #include "FormState.h"
@@ -109,7 +109,6 @@
 #include "Node.h"
 #include "Page.h"
 #include "PageOverlay.h"
-#include "painting/GraphicsContextBuilder.h"
 #include "Performance.h"
 #include "PlatformSupport.h"
 #include "PluginDocument.h"
@@ -120,7 +119,6 @@
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
-#include "ReplaceSelectionCommand.h"
 #include "ResourceHandle.h"
 #include "ResourceRequest.h"
 #include "SchemeRegistry.h"
@@ -142,6 +140,7 @@
 #include "WebDOMEvent.h"
 #include "WebDOMEventListener.h"
 #include "WebDataSourceImpl.h"
+#include "WebDevToolsAgentPrivate.h"
 #include "WebDocument.h"
 #include "WebFindOptions.h"
 #include "WebFormElement.h"
@@ -153,19 +152,21 @@
 #include "WebPerformance.h"
 #include "WebPlugin.h"
 #include "WebPluginContainerImpl.h"
-#include "platform/WebPoint.h"
 #include "WebRange.h"
-#include "platform/WebRect.h"
 #include "WebScriptSource.h"
 #include "WebSecurityOrigin.h"
-#include "platform/WebSize.h"
-#include "platform/WebURLError.h"
-#include "platform/WebVector.h"
 #include "WebViewImpl.h"
 #include "XPathResult.h"
 #include "markup.h"
+#include "painting/GraphicsContextBuilder.h"
+#include "platform/WebPoint.h"
+#include "platform/WebRect.h"
+#include "platform/WebSize.h"
+#include "platform/WebURLError.h"
+#include "platform/WebVector.h"
 
 #include <algorithm>
+#include <public/Platform.h>
 #include <wtf/CurrentTime.h>
 
 #if USE(V8)
@@ -827,7 +828,7 @@ void WebFrameImpl::executeScriptInIsolatedWorld(
             sourcesIn[i].code, sourcesIn[i].url, position));
     }
 
-    m_frame->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup);
+    m_frame->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup, 0);
 }
 
 void WebFrameImpl::setIsolatedWorldSecurityOrigin(int worldID, const WebSecurityOrigin& securityOrigin)
@@ -894,6 +895,37 @@ v8::Handle<v8::Value> WebFrameImpl::executeScriptAndReturnValue(const WebScriptS
     return m_frame->script()->executeScript(ScriptSourceCode(source.code, source.url, position)).v8Value();
 }
 
+void WebFrameImpl::executeScriptInIsolatedWorld(
+    int worldID, const WebScriptSource* sourcesIn, unsigned numSources,
+    int extensionGroup, WebVector<v8::Local<v8::Value> >* results)
+{
+    Vector<ScriptSourceCode> sources;
+
+    for (unsigned i = 0; i < numSources; ++i) {
+        TextPosition position(OrdinalNumber::fromOneBasedInt(sourcesIn[i].startLine), OrdinalNumber::first());
+        sources.append(ScriptSourceCode(sourcesIn[i].code, sourcesIn[i].url, position));
+    }
+
+    if (results) {
+        Vector<ScriptValue> scriptResults;
+        m_frame->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup, &scriptResults);
+        WebVector<v8::Local<v8::Value> > v8Results(scriptResults.size());
+        for (unsigned i = 0; i < scriptResults.size(); i++)
+            v8Results[i] = v8::Local<v8::Value>::New(scriptResults[i].v8Value());
+        results->swap(v8Results);
+    } else
+        m_frame->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup, 0);
+}
+
+// Call the function with the given receiver and arguments, bypassing canExecuteScripts.
+v8::Handle<v8::Value> WebFrameImpl::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function,
+                                                                     v8::Handle<v8::Object> receiver,
+                                                                     int argc,
+                                                                     v8::Handle<v8::Value> argv[])
+{
+    return m_frame->script()->callFunctionEvenIfScriptDisabled(function, receiver, argc, argv).v8Value();
+}
+
 // Returns the V8 context for this frame, or an empty handle if there is none.
 v8::Local<v8::Context> WebFrameImpl::mainWorldScriptContext() const
 {
@@ -907,7 +939,7 @@ v8::Handle<v8::Value> WebFrameImpl::createFileSystem(WebFileSystem::Type type,
                                                      const WebString& name,
                                                      const WebString& path)
 {
-    return toV8(DOMFileSystem::create(frame()->document(), name, AsyncFileSystemChromium::create(static_cast<AsyncFileSystem::Type>(type), KURL(ParsedURLString, path.utf8().data()))));
+    return toV8(DOMFileSystem::create(frame()->document(), name, AsyncFileSystemChromium::create(static_cast<FileSystemType>(type), KURL(ParsedURLString, path.utf8().data()))));
 }
 
 v8::Handle<v8::Value> WebFrameImpl::createFileEntry(WebFileSystem::Type type,
@@ -916,7 +948,7 @@ v8::Handle<v8::Value> WebFrameImpl::createFileEntry(WebFileSystem::Type type,
                                                     const WebString& filePath,
                                                     bool isDirectory)
 {
-    RefPtr<DOMFileSystemBase> fileSystem = DOMFileSystem::create(frame()->document(), fileSystemName, AsyncFileSystemChromium::create(static_cast<AsyncFileSystem::Type>(type), KURL(ParsedURLString, fileSystemPath.utf8().data())));
+    RefPtr<DOMFileSystemBase> fileSystem = DOMFileSystem::create(frame()->document(), fileSystemName, AsyncFileSystemChromium::create(static_cast<FileSystemType>(type), KURL(ParsedURLString, fileSystemPath.utf8().data())));
     if (isDirectory)
         return toV8(DirectoryEntry::create(fileSystem, filePath));
     return toV8(FileEntry::create(fileSystem, filePath));
@@ -1189,7 +1221,7 @@ size_t WebFrameImpl::characterIndexForPoint(const WebPoint& webPoint) const
 
     IntPoint point = frame()->view()->windowToContents(webPoint);
     HitTestResult result = frame()->eventHandler()->hitTestResultAtPoint(point, false);
-    RefPtr<Range> range = frame()->rangeForPoint(result.point());
+    RefPtr<Range> range = frame()->rangeForPoint(result.roundedPoint());
     if (!range)
         return notFound;
 
@@ -1378,6 +1410,13 @@ void WebFrameImpl::selectRange(const WebPoint& start, const WebPoint& end)
 
     if (frame()->selection()->shouldChangeSelection(selection))
         frame()->selection()->setSelection(selection, CharacterGranularity);
+}
+
+void WebFrameImpl::selectRange(const WebRange& webRange)
+{
+    RefPtr<Range> range = static_cast<PassRefPtr<Range> >(webRange);
+    if (range)
+        frame()->selection()->setSelectedRange(range.get(), WebCore::VP_DEFAULT_AFFINITY, false);
 }
 
 VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& point)
@@ -1974,13 +2013,13 @@ WebFrameImpl::WebFrameImpl(WebFrameClient* client)
     , m_identifier(generateFrameIdentifier())
     , m_inSameDocumentHistoryLoad(false)
 {
-    PlatformSupport::incrementStatsCounter(webFrameActiveCount);
+    WebKit::Platform::current()->incrementStatsCounter(webFrameActiveCount);
     frameCount++;
 }
 
 WebFrameImpl::~WebFrameImpl()
 {
-    PlatformSupport::decrementStatsCounter(webFrameActiveCount);
+    WebKit::Platform::current()->decrementStatsCounter(webFrameActiveCount);
     frameCount--;
 
     cancelPendingScopingEffort();
@@ -2045,35 +2084,6 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(
     return childFrame.release();
 }
 
-void WebFrameImpl::layout()
-{
-    // layout this frame
-    FrameView* view = m_frame->view();
-    if (view)
-        view->updateLayoutAndStyleIfNeededRecursive();
-}
-
-void WebFrameImpl::paintWithContext(GraphicsContext& gc, const WebRect& rect)
-{
-    IntRect dirtyRect(rect);
-    gc.save();
-    if (m_frame->document() && frameView()) {
-        gc.clip(dirtyRect);
-        frameView()->paint(&gc, dirtyRect);
-        if (viewImpl()->pageOverlays())
-            viewImpl()->pageOverlays()->paintWebFrame(gc);
-    } else
-        gc.fillRect(dirtyRect, Color::white, ColorSpaceDeviceRGB);
-    gc.restore();
-}
-
-void WebFrameImpl::paint(WebCanvas* canvas, const WebRect& rect)
-{
-    if (rect.isEmpty())
-        return;
-    paintWithContext(GraphicsContextBuilder(canvas).context(), rect);
-}
-
 void WebFrameImpl::createFrameView()
 {
     ASSERT(m_frame); // If m_frame doesn't exist, we probably didn't init properly.
@@ -2083,6 +2093,9 @@ void WebFrameImpl::createFrameView()
     m_frame->createView(webView->size(), Color::white, webView->isTransparent(),  webView->fixedLayoutSize(), isMainFrame ? webView->isFixedLayoutModeEnabled() : 0);
     if (webView->shouldAutoResize() && isMainFrame)
         m_frame->view()->enableAutoSizeMode(true, webView->minAutoSize(), webView->maxAutoSize());
+
+    if (isMainFrame && webView->devToolsAgentPrivate())
+        webView->devToolsAgentPrivate()->mainFrameViewCreated(this);
 }
 
 WebFrameImpl* WebFrameImpl::fromFrame(Frame* frame)

@@ -49,10 +49,10 @@ public:
 
     // reimps from TextureMapper
     virtual void drawTexture(const BitmapTexture&, const FloatRect&, const TransformationMatrix&, float opacity, const BitmapTexture* maskTexture);
-    virtual void drawTexture(uint32_t texture, Flags, const FloatSize&, const FloatRect&, const TransformationMatrix&, float opacity, const BitmapTexture* maskTexture);
+    virtual void drawTexture(uint32_t texture, Flags, const IntSize& textureSize, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture);
     virtual void bindSurface(BitmapTexture* surface);
     virtual void beginClip(const TransformationMatrix&, const FloatRect&);
-    virtual void beginPainting();
+    virtual void beginPainting(PaintFlags = 0);
     virtual void endPainting();
     virtual void endClip();
     virtual IntSize maxTextureSize() { return IntSize(2000, 2000); }
@@ -62,75 +62,98 @@ public:
     void setGraphicsContext(GraphicsContext* context) { m_context = context; }
     GraphicsContext* graphicsContext() { return m_context; }
     virtual bool isOpenGLBacked() const { return true; }
-    void platformUpdateContents(NativeImagePtr, const IntRect&, const IntRect&, BitmapTexture::PixelFormat);
+    void platformUpdateContents(NativeImagePtr, const IntRect&, const IntRect&);
     virtual AccelerationMode accelerationMode() const { return OpenGLMode; }
 
+#if ENABLE(CSS_FILTERS)
+    void drawFiltered(const BitmapTexture& sourceTexture, const BitmapTexture& contentTexture, const FilterOperation&);
+#endif
+
+
 private:
+
+    struct ClipState {
+        IntRect scissorBox;
+        int stencilIndex;
+        ClipState(const IntRect& scissors = IntRect(), int stencil = 1)
+            : scissorBox(scissors)
+            , stencilIndex(stencil)
+        { }
+    };
+
+    class ClipStack {
+    public:
+        void push();
+        void pop();
+        void apply();
+        inline ClipState& current() { return clipState; }
+        void init(const IntRect&);
+
+    private:
+        ClipState clipState;
+        Vector<ClipState> clipStack;
+    };
+
     bool beginScissorClip(const TransformationMatrix&, const FloatRect&);
+    void bindDefaultSurface();
+    ClipStack& clipStack();
     inline TextureMapperGLData& data() { return *m_data; }
     TextureMapperGLData* m_data;
     GraphicsContext* m_context;
+    ClipStack m_clipStack;
     friend class BitmapTextureGL;
 };
 
 class BitmapTextureGL : public BitmapTexture {
 public:
-    virtual void destroy();
     virtual IntSize size() const;
     virtual bool isValid() const;
+    virtual bool canReuseWith(const IntSize& contentsSize, Flags = 0);
     virtual void didReset();
     void bind();
     void initializeStencil();
-    ~BitmapTextureGL() { destroy(); }
+    ~BitmapTextureGL();
     virtual uint32_t id() const { return m_id; }
-    inline FloatSize relativeSize() const { return m_relativeSize; }
+    uint32_t textureTarget() const { return GL_TEXTURE_2D; }
+    IntSize textureSize() const { return m_textureSize; }
     void setTextureMapper(TextureMapperGL* texmap) { m_textureMapper = texmap; }
-    void updateContents(Image*, const IntRect&, const IntRect&, PixelFormat);
-    void updateContents(const void*, const IntRect&);
+    void updateContents(Image*, const IntRect&, const IntPoint&);
+    virtual void updateContents(const void*, const IntRect& target, const IntPoint& sourceOffset, int bytesPerLine);
+    virtual bool isBackedByOpenGL() const { return true; }
+
+#if ENABLE(CSS_FILTERS)
+    virtual PassRefPtr<BitmapTexture> applyFilters(const BitmapTexture& contentTexture, const FilterOperations&);
+#endif
 
 private:
     GLuint m_id;
-    FloatSize m_relativeSize;
     IntSize m_textureSize;
     IntRect m_dirtyRect;
     GLuint m_fbo;
     GLuint m_rbo;
-    bool m_surfaceNeedsReset;
+    bool m_shouldClear;
     TextureMapperGL* m_textureMapper;
+    TextureMapperGL::ClipStack m_clipStack;
     BitmapTextureGL()
         : m_id(0)
         , m_fbo(0)
         , m_rbo(0)
-        , m_surfaceNeedsReset(true)
+        , m_shouldClear(true)
         , m_textureMapper(0)
     {
     }
 
+    void clearIfNeeded();
+    void createFboIfNeeded();
+
     friend class TextureMapperGL;
 };
 
-// An offscreen buffer to be rendered by software.
-static inline int nextPowerOfTwo(int num)
-{
-    for (int i = 0x10000000; i > 0; i >>= 1) {
-        if (num == i)
-            return num;
-        if (num & i)
-            return (i << 1);
-    }
-    return 1;
-}
-
-static inline IntSize nextPowerOfTwo(const IntSize& size)
-{
-    return IntSize(nextPowerOfTwo(size.width()), nextPowerOfTwo(size.height()));
-}
-
 typedef uint64_t ImageUID;
 ImageUID uidForImage(Image*);
+BitmapTextureGL* toBitmapTextureGL(BitmapTexture*);
 
-};
-
+}
 #endif
 
 #endif

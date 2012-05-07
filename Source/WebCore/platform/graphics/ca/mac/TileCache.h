@@ -28,6 +28,7 @@
 
 #include "IntPointHash.h"
 #include "IntRect.h"
+#include "TiledBacking.h"
 #include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
@@ -44,7 +45,7 @@ class FloatRect;
 class IntPoint;
 class IntRect;
 
-class TileCache {
+class TileCache : public TiledBacking {
     WTF_MAKE_NONCOPYABLE(TileCache);
 
 public:
@@ -55,7 +56,7 @@ public:
 
     void setNeedsDisplay();
     void setNeedsDisplayInRect(const IntRect&);
-    void drawLayer(WebTileLayer*, CGContextRef);
+    void drawLayer(WebTileLayer *, CGContextRef);
 
     void setScale(CGFloat);
 
@@ -63,32 +64,35 @@ public:
     void setAcceleratesDrawing(bool);
 
     CALayer *tileContainerLayer() const { return m_tileContainerLayer.get(); }
-    void visibleRectChanged(const IntRect&);
 
-    float tileDebugBorderWidth() const { return m_tileDebugBorderWidth; }
     void setTileDebugBorderWidth(float);
-
-    CGColorRef tileDebugBorderColor() const { return m_tileDebugBorderColor.get(); }
     void setTileDebugBorderColor(CGColorRef);
 
 private:
-    typedef IntPoint TileIndex;
-
     TileCache(WebTileCacheLayer*, const IntSize& tileSize);
+
+    // TiledBacking member functions.
+    virtual void visibleRectChanged(const IntRect&) OVERRIDE;
+    virtual void setIsInWindow(bool) OVERRIDE;
+    virtual void setCanHaveScrollbars(bool) OVERRIDE;
 
     IntRect bounds() const;
 
+    typedef IntPoint TileIndex;
     IntRect rectForTileIndex(const TileIndex&) const;
     void getTileIndexRangeForRect(const IntRect&, TileIndex& topLeft, TileIndex& bottomRight);
 
-    void scheduleTileRevalidation();
+    IntRect tileCoverageRect() const;
+
+    void scheduleTileRevalidation(double interval);
     void tileRevalidationTimerFired(Timer<TileCache>*);
     void revalidateTiles();
 
     WebTileLayer* tileLayerAtIndex(const TileIndex&) const;
-    RetainPtr<WebTileLayer> createTileLayer();
+    RetainPtr<WebTileLayer> createTileLayer(const IntRect&);
 
     bool shouldShowRepaintCounters() const;
+    void drawRepaintCounter(WebTileLayer *, CGContextRef);
 
     WebTileCacheLayer* m_tileCacheLayer;
     RetainPtr<CALayer> m_tileContainerLayer;
@@ -101,7 +105,10 @@ private:
     IntRect m_tileCoverageRect;
 
     CGFloat m_scale;
+    CGFloat m_deviceScaleFactor;
 
+    bool m_isInWindow;
+    bool m_canHaveScrollbars;
     bool m_acceleratesDrawing;
 
     RetainPtr<CGColorRef> m_tileDebugBorderColor;

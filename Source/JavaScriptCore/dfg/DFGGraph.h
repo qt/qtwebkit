@@ -29,11 +29,11 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
+#include "DFGArgumentPosition.h"
 #include "DFGAssemblyHelpers.h"
 #include "DFGBasicBlock.h"
 #include "DFGNode.h"
 #include "MethodOfGettingAValueProfile.h"
-#include "PredictionTracker.h"
 #include "RegisterFile.h"
 #include <wtf/BitVector.h>
 #include <wtf/HashMap.h>
@@ -84,11 +84,11 @@ public:
     using Vector<Node, 64>::operator[];
     using Vector<Node, 64>::at;
     
-    Node& operator[](NodeUse nodeUse) { return at(nodeUse.index()); }
-    const Node& operator[](NodeUse nodeUse) const { return at(nodeUse.index()); }
+    Node& operator[](Edge nodeUse) { return at(nodeUse.index()); }
+    const Node& operator[](Edge nodeUse) const { return at(nodeUse.index()); }
     
-    Node& at(NodeUse nodeUse) { return at(nodeUse.index()); }
-    const Node& at(NodeUse nodeUse) const { return at(nodeUse.index()); }
+    Node& at(Edge nodeUse) { return at(nodeUse.index()); }
+    const Node& at(Edge nodeUse) const { return at(nodeUse.index()); }
     
     // Mark a node as being referenced.
     void ref(NodeIndex nodeIndex)
@@ -98,7 +98,7 @@ public:
         if (node.ref())
             refChildren(nodeIndex);
     }
-    void ref(NodeUse nodeUse)
+    void ref(Edge nodeUse)
     {
         ref(nodeUse.index());
     }
@@ -108,7 +108,7 @@ public:
         if (at(nodeIndex).deref())
             derefChildren(nodeIndex);
     }
-    void deref(NodeUse nodeUse)
+    void deref(Edge nodeUse)
     {
         deref(nodeUse.index());
     }
@@ -118,7 +118,7 @@ public:
         if (!node.child1())
             return;
         deref(node.child1());
-        node.children.child1() = NodeUse();
+        node.children.child1() = Edge();
     }
 
     void clearAndDerefChild2(Node& node)
@@ -126,7 +126,7 @@ public:
         if (!node.child2())
             return;
         deref(node.child2());
-        node.children.child2() = NodeUse();
+        node.children.child2() = Edge();
     }
 
     void clearAndDerefChild3(Node& node)
@@ -134,7 +134,7 @@ public:
         if (!node.child3())
             return;
         deref(node.child3());
-        node.children.child3() = NodeUse();
+        node.children.child3() = Edge();
     }
 
     // CodeBlock is optional, but may allow additional information to be dumped (e.g. Identifier names).
@@ -143,20 +143,10 @@ public:
 
     // Dump the code origin of the given node as a diff from the code origin of the
     // preceding node.
-    void dumpCodeOrigin(NodeIndex);
+    void dumpCodeOrigin(NodeIndex, NodeIndex);
 
     BlockIndex blockIndexForBytecodeOffset(Vector<BlockIndex>& blocks, unsigned bytecodeBegin);
 
-    bool predictGlobalVar(unsigned varNumber, PredictedType prediction)
-    {
-        return m_predictions.predictGlobalVar(varNumber, prediction);
-    }
-    
-    PredictedType getGlobalVarPrediction(unsigned varNumber)
-    {
-        return m_predictions.getGlobalVarPrediction(varNumber);
-    }
-    
     PredictedType getJSConstantPrediction(Node& node)
     {
         return predictionFromValue(node.valueOfJSConstant(m_codeBlock));
@@ -164,7 +154,7 @@ public:
     
     bool addShouldSpeculateInteger(Node& add)
     {
-        ASSERT(add.op == ValueAdd || add.op == ArithAdd || add.op == ArithSub);
+        ASSERT(add.op() == ValueAdd || add.op() == ArithAdd || add.op() == ArithSub);
         
         Node& left = at(add.child1());
         Node& right = at(add.child2());
@@ -179,7 +169,7 @@ public:
     
     bool negateShouldSpeculateInteger(Node& negate)
     {
-        ASSERT(negate.op == ArithNegate);
+        ASSERT(negate.op() == ArithNegate);
         return at(negate.child1()).shouldSpeculateInteger() && negate.canSpeculateInteger();
     }
     
@@ -242,7 +232,7 @@ public:
     {
         JSCell* function = getJSFunction(valueOfJSConstant(nodeIndex));
         ASSERT(function);
-        return asFunction(function);
+        return jsCast<JSFunction*>(function);
     }
 
     static const char *opName(NodeType);
@@ -301,7 +291,7 @@ public:
         Node& node = at(nodeIndex);
         CodeBlock* profiledBlock = baselineCodeBlockFor(node.codeOrigin);
         
-        if (node.op == GetLocal) {
+        if (node.op() == GetLocal) {
             return MethodOfGettingAValueProfile::fromLazyOperand(
                 profiledBlock,
                 LazyOperandValueProfileKey(
@@ -351,11 +341,12 @@ public:
     CodeBlock* m_profiledBlock;
 
     Vector< OwnPtr<BasicBlock> , 8> m_blocks;
-    Vector<NodeUse, 16> m_varArgChildren;
+    Vector<Edge, 16> m_varArgChildren;
     Vector<StorageAccessData> m_storageAccessData;
     Vector<ResolveGlobalData> m_resolveGlobalData;
     Vector<NodeIndex, 8> m_arguments;
     SegmentedVector<VariableAccessData, 16> m_variableAccessData;
+    SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     SegmentedVector<StructureSet, 16> m_structureSet;
     SegmentedVector<StructureTransitionData, 8> m_structureTransitionData;
     BitVector m_preservedVars;
@@ -388,8 +379,6 @@ private:
     // When a node's refCount goes from 0 to 1, it must (logically) recursively ref all of its children, and vice versa.
     void refChildren(NodeIndex);
     void derefChildren(NodeIndex);
-
-    PredictionTracker m_predictions;
 };
 
 class GetBytecodeBeginForBlock {

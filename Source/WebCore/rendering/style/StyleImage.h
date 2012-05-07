@@ -62,10 +62,12 @@ public:
     virtual void removeClient(RenderObject*) = 0;
     virtual PassRefPtr<Image> image(RenderObject*, const IntSize&) const = 0;
     virtual WrappedImagePtr data() const = 0;
+    virtual float imageScaleFactor() const { return 1; }
 
     ALWAYS_INLINE bool isCachedImage() const { return m_isCachedImage; }
     ALWAYS_INLINE bool isPendingImage() const { return m_isPendingImage; }
     ALWAYS_INLINE bool isGeneratedImage() const { return m_isGeneratedImage; }
+    ALWAYS_INLINE bool isCachedImageSet() const { return m_isCachedImageSet; }
     
     static  bool imagesEquivalent(StyleImage* image1, StyleImage* image2)
     {
@@ -82,11 +84,13 @@ protected:
         : m_isCachedImage(false)
         , m_isPendingImage(false)
         , m_isGeneratedImage(false)
+        , m_isCachedImageSet(false)
     {
     }
     bool m_isCachedImage:1;
     bool m_isPendingImage:1;
     bool m_isGeneratedImage:1;
+    bool m_isCachedImageSet:1;
 };
 
 }

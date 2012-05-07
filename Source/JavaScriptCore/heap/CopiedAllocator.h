@@ -39,8 +39,7 @@ public:
     bool wasLastAllocation(void*, size_t);
     void startedCopying();
     void resetCurrentBlock(CopiedBlock*);
-    void resetLastAllocation(void*);
-    size_t currentUtilization();
+    size_t currentCapacity();
 
 private:
     CopiedBlock* currentBlock() { return m_currentBlock; }
@@ -92,14 +91,9 @@ inline void CopiedAllocator::resetCurrentBlock(CopiedBlock* newBlock)
     m_currentOffset = static_cast<char*>(newBlock->m_offset);
 }
 
-inline size_t CopiedAllocator::currentUtilization()
+inline size_t CopiedAllocator::currentCapacity()
 {
-    return static_cast<size_t>(m_currentOffset - m_currentBlock->payload());
-}
-
-inline void CopiedAllocator::resetLastAllocation(void* ptr)
-{
-    m_currentOffset = static_cast<char*>(ptr);
+    return m_currentBlock->capacity();
 }
 
 } // namespace JSC

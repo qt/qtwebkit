@@ -75,7 +75,7 @@ String ScriptDebugServer::setBreakpoint(const String& sourceID, const ScriptBrea
         return "";
     SourceIdToBreakpointsMap::iterator it = m_sourceIdToBreakpoints.find(sourceIDValue);
     if (it == m_sourceIdToBreakpoints.end())
-        it = m_sourceIdToBreakpoints.set(sourceIDValue, LineToBreakpointMap()).first;
+        it = m_sourceIdToBreakpoints.set(sourceIDValue, LineToBreakpointMap()).iterator;
     if (it->second.contains(scriptBreakpoint.lineNumber + 1))
         return "";
     it->second.set(scriptBreakpoint.lineNumber + 1, scriptBreakpoint);
@@ -211,7 +211,7 @@ void ScriptDebugServer::dispatchDidPause(ScriptDebugListener* listener)
     JSValue jsCallFrame;
     {
         if (m_currentCallFrame->isValid() && globalObject->inherits(&JSDOMGlobalObject::s_info)) {
-            JSDOMGlobalObject* domGlobalObject = static_cast<JSDOMGlobalObject*>(globalObject);
+            JSDOMGlobalObject* domGlobalObject = jsCast<JSDOMGlobalObject*>(globalObject);
             JSLock lock(SilenceAssertionsOnly);
             jsCallFrame = toJS(state, domGlobalObject, m_currentCallFrame.get());
         } else
@@ -236,8 +236,10 @@ void ScriptDebugServer::dispatchDidParseSource(const ListenerSet& listeners, Sou
     script.startColumn = sourceProvider->startPosition().m_column.zeroBasedInt();
     script.isContentScript = isContentScript;
 
+#if ENABLE(INSPECTOR)
     if (script.url.isEmpty())
         script.url = ContentSearchUtils::findSourceURL(script.source);
+#endif
 
     int sourceLength = script.source.length();
     int lineCount = 1;

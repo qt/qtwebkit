@@ -28,7 +28,6 @@
 #include "AXObjectCache.h"
 #include "AccessibilityMenuList.h"
 #include "CSSFontSelector.h"
-#include "CSSStyleSelector.h"
 #include "Chrome.h"
 #include "FontCache.h"
 #include "Frame.h"
@@ -43,6 +42,8 @@
 #include "RenderBR.h"
 #include "RenderScrollbar.h"
 #include "RenderTheme.h"
+#include "Settings.h"
+#include "StyleResolver.h"
 #include "TextRun.h"
 #include <math.h>
 
@@ -161,7 +162,7 @@ void RenderMenuList::updateOptionsWidth()
             // Add in the option's text indent.  We can't calculate percentage values for now.
             float optionWidth = 0;
             if (RenderStyle* optionStyle = element->renderStyle())
-                optionWidth += optionStyle->textIndent().calcMinValue(0);
+                optionWidth += minimumValueForLength(optionStyle->textIndent(), 0, view());
             if (!text.isEmpty())
                 optionWidth += style()->font().width(text);
             maxOptionWidth = max(maxOptionWidth, optionWidth);
@@ -307,8 +308,11 @@ void RenderMenuList::showPopup()
     // Compute the top left taking transforms into account, but use
     // the actual width of the element to size the popup.
     FloatPoint absTopLeft = localToAbsolute(FloatPoint(), false, true);
-    LayoutRect absBounds = absoluteBoundingBoxRectIgnoringTransforms();
-    absBounds.setLocation(roundedLayoutPoint(absTopLeft));
+    IntRect absBounds = absoluteBoundingBoxRectIgnoringTransforms();
+    int scale = document()->page()->settings()->defaultDeviceScaleFactor();
+    if (scale && scale != 1)
+        absBounds.scale(scale);
+    absBounds.setLocation(roundedIntPoint(absTopLeft));
     HTMLSelectElement* select = toHTMLSelectElement(node());
     m_popup->show(absBounds, document()->view(), select->optionToListIndex(select->selectedIndex()));
 }
@@ -507,13 +511,13 @@ int RenderMenuList::clientInsetRight() const
     return 0;
 }
 
-int RenderMenuList::clientPaddingLeft() const
+LayoutUnit RenderMenuList::clientPaddingLeft() const
 {
     return paddingLeft() + m_innerBlock->paddingLeft();
 }
 
 const int endOfLinePadding = 2;
-int RenderMenuList::clientPaddingRight() const
+LayoutUnit RenderMenuList::clientPaddingRight() const
 {
     if (style()->appearance() == MenulistPart || style()->appearance() == MenulistButtonPart) {
         // For these appearance values, the theme applies padding to leave room for the
@@ -572,7 +576,7 @@ void RenderMenuList::setTextFromItem(unsigned listIndex)
 
 FontSelector* RenderMenuList::fontSelector() const
 {
-    return document()->styleSelector()->fontSelector();
+    return document()->styleResolver()->fontSelector();
 }
 
 }

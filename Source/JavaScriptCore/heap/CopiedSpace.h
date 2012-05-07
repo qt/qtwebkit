@@ -35,6 +35,7 @@
 #include <wtf/HashSet.h>
 #include <wtf/OSAllocator.h>
 #include <wtf/PageAllocationAligned.h>
+#include <wtf/PageBlock.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/ThreadingPrimitives.h>
 
@@ -65,8 +66,11 @@ public:
 
     bool contains(void*, CopiedBlock*&);
 
-    size_t totalMemoryAllocated() { return m_totalMemoryAllocated; }
-    size_t totalMemoryUtilized() { return m_totalMemoryUtilized; }
+    size_t size();
+    size_t capacity();
+
+    void freeAllBlocks();
+    bool isPagedOut(double deadline);
 
     static CopiedBlock* blockFor(void*);
 
@@ -97,7 +101,6 @@ private:
     HashSet<CopiedBlock*> m_toSpaceSet;
 
     Mutex m_toSpaceLock;
-    Mutex m_memoryStatsLock;
 
     DoublyLinkedList<HeapBlock>* m_toSpace;
     DoublyLinkedList<HeapBlock>* m_fromSpace;
@@ -106,9 +109,6 @@ private:
     DoublyLinkedList<HeapBlock> m_blocks2;
     DoublyLinkedList<HeapBlock> m_oversizeBlocks;
    
-    size_t m_totalMemoryAllocated;
-    size_t m_totalMemoryUtilized;
-
     bool m_inCopyingPhase;
 
     Mutex m_loanedBlocksLock; 
@@ -116,8 +116,6 @@ private:
     size_t m_numberOfLoanedBlocks;
 
     static const size_t s_maxAllocationSize = 32 * KB;
-    static const size_t s_pageSize = 4 * KB;
-    static const size_t s_pageMask = ~(s_pageSize - 1);
     static const size_t s_initialBlockNum = 16;
     static const size_t s_blockMask = ~(HeapBlock::s_blockSize - 1);
 };

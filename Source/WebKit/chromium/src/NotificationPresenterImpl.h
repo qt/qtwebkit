@@ -37,7 +37,7 @@
 #include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h>
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 
 namespace WebKit {
 
@@ -56,7 +56,12 @@ public:
     virtual void notificationObjectDestroyed(WebCore::Notification* object);
     virtual void notificationControllerDestroyed();
     virtual WebCore::NotificationClient::Permission checkPermission(WebCore::ScriptExecutionContext*);
-    virtual void requestPermission(WebCore::ScriptExecutionContext* , WTF::PassRefPtr<WebCore::VoidCallback> callback);
+#if ENABLE(LEGACY_NOTIFICATIONS)
+    virtual void requestPermission(WebCore::ScriptExecutionContext*, WTF::PassRefPtr<WebCore::VoidCallback> callback);
+#endif
+#if ENABLE(NOTIFICATIONS)
+    virtual void requestPermission(WebCore::ScriptExecutionContext*, WTF::PassRefPtr<WebCore::NotificationPermissionCallback> callback) { }
+#endif
     virtual void cancelRequestsForPermission(WebCore::ScriptExecutionContext*) {}
 
 private:
@@ -66,6 +71,6 @@ private:
 
 } // namespace WebKit
 
-#endif // ENABLE(NOTIFICATIONS)
+#endif // ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 
 #endif

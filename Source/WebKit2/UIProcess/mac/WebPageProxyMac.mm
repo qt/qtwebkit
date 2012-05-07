@@ -38,6 +38,7 @@
 #import "TextChecker.h"
 #import "WebPageMessages.h"
 #import "WebProcessProxy.h"
+#import <WebCore/SharedBuffer.h>
 #import <WebKitSystemInterface.h>
 #import <wtf/text/StringConcatenate.h>
 
@@ -256,15 +257,30 @@ bool WebPageProxy::executeKeypressCommands(const Vector<WebCore::KeypressCommand
     return result;
 }
 
-bool WebPageProxy::writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes)
+String WebPageProxy::stringSelectionForPasteboard()
+{
+    String value;
+    if (!isValid())
+        return value;
+    
+    const double messageTimeout = 20;
+    process()->sendSync(Messages::WebPage::GetStringSelectionForPasteboard(), Messages::WebPage::GetStringSelectionForPasteboard::Reply(value), m_pageID, messageTimeout);
+    return value;
+}
+
+PassRefPtr<WebCore::SharedBuffer> WebPageProxy::dataSelectionForPasteboard(const String& pasteboardType)
 {
     if (!isValid())
-        return false;
-
-    bool result = false;
+        return 0;
+    SharedMemory::Handle handle;
+    uint64_t size = 0;
     const double messageTimeout = 20;
-    process()->sendSync(Messages::WebPage::WriteSelectionToPasteboard(pasteboardName, pasteboardTypes), Messages::WebPage::WriteSelectionToPasteboard::Reply(result), m_pageID, messageTimeout);
-    return result;
+    process()->sendSync(Messages::WebPage::GetDataSelectionForPasteboard(pasteboardType),
+                                                Messages::WebPage::GetDataSelectionForPasteboard::Reply(handle, size), m_pageID, messageTimeout);
+    if (handle.isNull())
+        return 0;
+    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(handle, SharedMemory::ReadOnly);
+    return SharedBuffer::create(static_cast<unsigned char *>(sharedMemoryBuffer->data()), size);
 }
 
 bool WebPageProxy::readSelectionFromPasteboard(const String& pasteboardName)
@@ -285,6 +301,20 @@ void WebPageProxy::setDragImage(const WebCore::IntPoint& clientPosition, const S
         return;
     
     m_pageClient->setDragImage(clientPosition, dragImage.release(), isLinkDrag);
+}
+
+void WebPageProxy::setPromisedData(const String& pasteboardName, const SharedMemory::Handle& imageHandle, uint64_t imageSize, const String& filename, const String& extension,
+                                   const String& title, const String& url, const String& visibleURL, const SharedMemory::Handle& archiveHandle, uint64_t archiveSize)
+{
+    RefPtr<SharedMemory> sharedMemoryImage = SharedMemory::create(imageHandle, SharedMemory::ReadOnly);
+    RefPtr<SharedBuffer> imageBuffer = SharedBuffer::create(static_cast<unsigned char*>(sharedMemoryImage->data()), imageSize);
+    RefPtr<SharedBuffer> archiveBuffer;
+    
+    if (!archiveHandle.isNull()) {
+        RefPtr<SharedMemory> sharedMemoryArchive = SharedMemory::create(archiveHandle, SharedMemory::ReadOnly);;
+        archiveBuffer = SharedBuffer::create(static_cast<unsigned char*>(sharedMemoryArchive->data()), archiveSize);
+    }
+    m_pageClient->setPromisedData(pasteboardName, imageBuffer, filename, extension, title, url, visibleURL, archiveBuffer);
 }
 
 void WebPageProxy::performDictionaryLookupAtLocation(const WebCore::FloatPoint& point)
@@ -372,6 +402,8 @@ void WebPageProxy::setPluginComplexTextInputState(uint64_t pluginComplexTextInpu
 
 void WebPageProxy::executeSavedCommandBySelector(const String& selector, bool& handled)
 {
+    MESSAGE_CHECK(isValidKeypressCommandName(selector));
+
     handled = m_pageClient->executeSavedCommandBySelector(selector);
 }
 

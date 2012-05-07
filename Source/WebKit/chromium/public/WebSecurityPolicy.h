@@ -31,8 +31,8 @@
 #ifndef WebSecurityPolicy_h
 #define WebSecurityPolicy_h
 
-#include "WebReferrerPolicy.h"
 #include "platform/WebCommon.h"
+#include "platform/WebReferrerPolicy.h"
 
 namespace WebKit {
 
@@ -63,6 +63,10 @@ public:
 
     // Registers a non-HTTP URL scheme which can be sent CORS requests. 
     WEBKIT_EXPORT static void registerURLSchemeAsCORSEnabled(const WebString&);
+
+    // Registers a URL scheme as strictly empty documents, allowing them to
+    // commit synchronously.
+    WEBKIT_EXPORT static void registerURLSchemeAsEmptyDocument(const WebString&);
 
     // Support for whitelisting access to origins beyond the same-origin policy.
     WEBKIT_EXPORT static void addOriginAccessWhitelistEntry(

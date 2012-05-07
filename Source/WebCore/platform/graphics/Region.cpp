@@ -67,14 +67,38 @@ Vector<IntRect> Region::rects() const
 
 bool Region::contains(const Region& region) const
 {
+    if (!m_bounds.contains(region.m_bounds))
+        return false;
+
     return WebCore::intersect(region, *this) == region;
 }
 
 bool Region::contains(const IntPoint& point) const
 {
-    // FIXME: This is inefficient. We should be able to iterate over the spans and find
-    // out if the region contains the point.
-    return contains(IntRect(point, IntSize(1, 1)));
+    if (!m_bounds.contains(point))
+        return false;
+
+    for (Shape::SpanIterator span = m_shape.spans_begin(), end = m_shape.spans_end(); span != end && span + 1 != end; ++span) {
+        int y = span->y;
+        int maxY = (span + 1)->y;
+
+        if (y > point.y())
+            break;
+        if (maxY <= point.y())
+            continue;
+
+        for (Shape::SegmentIterator segment = m_shape.segments_begin(span), end = m_shape.segments_end(span); segment != end && segment + 1 != end; segment += 2) {
+            int x = *segment;
+            int maxX = *(segment + 1);
+
+            if (x > point.x())
+                break;
+            if (maxX > point.x())
+                return true;
+        }
+    }
+
+    return false;
 }
 
 bool Region::intersects(const Region& region) const
@@ -479,6 +503,11 @@ void Region::unite(const Region& region)
 
 void Region::subtract(const Region& region)
 {
+    if (region.isEmpty())
+        return;
+    if (!m_bounds.intersects(region.m_bounds))
+        return;
+
     Shape subtractedShape = Shape::subtractShapes(m_shape, region.m_shape);
 
     m_shape.swap(subtractedShape);

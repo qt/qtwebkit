@@ -100,12 +100,13 @@
 
 #include <QAction>
 #include <QMenu>
+#include <QPainter>
 
 using namespace WebCore;
 
 QMap<int, QWebScriptWorld*> m_worldMap;
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
 GeolocationClientMock* toGeolocationClientMock(GeolocationClient* client)
 {
      ASSERT(QWebPagePrivate::drtRun);
@@ -530,7 +531,7 @@ void DumpRenderTreeSupportQt::setMediaType(QWebFrame* frame, const QString& type
     WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
     WebCore::FrameView* view = coreFrame->view();
     view->setMediaType(type);
-    coreFrame->document()->styleSelectorChanged(RecalcStyleImmediately);
+    coreFrame->document()->styleResolverChanged(RecalcStyleImmediately);
     view->layout();
 }
 
@@ -790,7 +791,7 @@ void DumpRenderTreeSupportQt::dumpSetAcceptsEditing(bool b)
 
 void DumpRenderTreeSupportQt::dumpNotification(bool b)
 {
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     NotificationPresenterClientQt::dumpNotification = b;
 #endif
 }
@@ -810,8 +811,8 @@ QString DumpRenderTreeSupportQt::viewportAsText(QWebPage* page, int deviceDPI, c
 
     QString res;
     res = res.sprintf("viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n",
-            conf.layoutSize.width(),
-            conf.layoutSize.height(),
+            static_cast<int>(conf.layoutSize.width()),
+            static_cast<int>(conf.layoutSize.height()),
             conf.initialScale,
             conf.minimumScale,
             conf.maximumScale,
@@ -838,34 +839,34 @@ void DumpRenderTreeSupportQt::setMockDeviceOrientation(QWebPage* page, bool canP
 
 void DumpRenderTreeSupportQt::resetGeolocationMock(QWebPage* page)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     Page* corePage = QWebPagePrivate::core(page);
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage)->client());
     mockClient->reset();
 #endif
 }
 
 void DumpRenderTreeSupportQt::setMockGeolocationPermission(QWebPage* page, bool allowed)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     Page* corePage = QWebPagePrivate::core(page);
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage)->client());
     mockClient->setPermission(allowed);
 #endif
 }
 
 void DumpRenderTreeSupportQt::setMockGeolocationPosition(QWebPage* page, double latitude, double longitude, double accuracy)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     Page* corePage = QWebPagePrivate::core(page);
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage)->client());
     mockClient->setPosition(GeolocationPosition::create(currentTime(), latitude, longitude, accuracy));
 #endif
 }
 
 void DumpRenderTreeSupportQt::setMockGeolocationError(QWebPage* page, int errorCode, const QString& message)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     Page* corePage = QWebPagePrivate::core(page);
 
     GeolocationError::ErrorCode code = GeolocationError::PositionUnavailable;
@@ -878,16 +879,16 @@ void DumpRenderTreeSupportQt::setMockGeolocationError(QWebPage* page, int errorC
         break;
     }
 
-    GeolocationClientMock* mockClient = static_cast<GeolocationClientMock*>(corePage->geolocationController()->client());
+    GeolocationClientMock* mockClient = static_cast<GeolocationClientMock*>(GeolocationController::from(corePage)->client());
     mockClient->setError(GeolocationError::create(code, message));
 #endif
 }
 
 int DumpRenderTreeSupportQt::numberOfPendingGeolocationPermissionRequests(QWebPage* page)
 {
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
     Page* corePage = QWebPagePrivate::core(page);
-    GeolocationClientMock* mockClient = toGeolocationClientMock(corePage->geolocationController()->client());
+    GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController::from(corePage)->client());
     return mockClient->numberOfPendingPermissionRequests();
 #else
     return -1;
@@ -961,12 +962,6 @@ void DumpRenderTreeSupportQt::evaluateScriptInIsolatedWorld(QWebFrame* frame, in
 #endif
 }
 
-bool DumpRenderTreeSupportQt::isPageBoxVisible(QWebFrame* frame, int pageIndex)
-{
-    WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
-    return coreFrame->document()->isPageBoxVisible(pageIndex);
-}
-
 QString DumpRenderTreeSupportQt::pageSizeAndMarginsInPixels(QWebFrame* frame, int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft)
 {
     WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
@@ -987,30 +982,9 @@ void DumpRenderTreeSupportQt::addUserStyleSheet(QWebPage* page, const QString& s
 
 void DumpRenderTreeSupportQt::simulateDesktopNotificationClick(const QString& title)
 {
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     NotificationPresenterClientQt::notificationPresenter()->notificationClicked(title);
 #endif
-}
-
-QVariantList DumpRenderTreeSupportQt::nodesFromRect(const QWebElement& document, int x, int y, unsigned top, unsigned right, unsigned bottom, unsigned left, bool ignoreClipping)
-{
-    QVariantList res;
-    WebCore::Element* webElement = document.m_element;
-    if (!webElement)
-        return res;
-
-    Document* doc = webElement->document();
-    if (!doc)
-        return res;
-    RefPtr<NodeList> nodes = doc->nodesFromRect(x, y, top, right, bottom, left, ignoreClipping);
-    for (unsigned i = 0; i < nodes->length(); i++) {
-        // QWebElement will be null if the Node is not an HTML Element
-        if (nodes->item(i)->isHTMLElement())
-            res << QVariant::fromValue(QWebElement(nodes->item(i)));
-        else
-            res << QVariant::fromValue(QDRTNode(nodes->item(i)));
-    }
-    return res;
 }
 
 void DumpRenderTreeSupportQt::setDefersLoading(QWebPage* page, bool flag)
@@ -1232,6 +1206,49 @@ void DumpRenderTreeSupportQt::setHixie76WebSocketProtocolEnabled(QWebPage* page,
     UNUSED_PARAM(page);
     UNUSED_PARAM(enabled);
 #endif
+}
+
+QImage DumpRenderTreeSupportQt::paintPagesWithBoundaries(QWebFrame* qframe)
+{
+    Frame* frame = QWebFramePrivate::core(qframe);
+    PrintContext printContext(frame);
+
+    QRect rect = frame->view()->frameRect();
+
+    IntRect pageRect(0, 0, rect.width(), rect.height());
+
+    printContext.begin(pageRect.width(), pageRect.height());
+    float pageHeight = 0;
+    printContext.computePageRects(pageRect, /* headerHeight */ 0, /* footerHeight */ 0, /* userScaleFactor */ 1.0, pageHeight);
+
+    QPainter painter;
+    int pageCount = printContext.pageCount();
+    // pages * pageHeight and 1px line between each page
+    int totalHeight = pageCount * (pageRect.height() + 1) - 1;
+    QImage image(pageRect.width(), totalHeight, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    painter.begin(&image);
+
+    GraphicsContext ctx(&painter);
+    for (int i = 0; i < printContext.pageCount(); ++i) {
+        printContext.spoolPage(ctx, i, pageRect.width());
+        // translate to next page coordinates
+        ctx.translate(0, pageRect.height() + 1);
+
+        // if there is a next page, draw a blue line between these two
+        if (i + 1 < printContext.pageCount()) {
+            ctx.save();
+            ctx.setStrokeColor(Color(0, 0, 255), ColorSpaceDeviceRGB);
+            ctx.setFillColor(Color(0, 0, 255), ColorSpaceDeviceRGB);
+            ctx.drawLine(IntPoint(0, -1), IntPoint(pageRect.width(), -1));
+            ctx.restore();
+        }
+    }
+
+    painter.end();
+    printContext.end();
+
+    return image;
 }
 
 // Provide a backward compatibility with previously exported private symbols as of QtWebKit 4.6 release

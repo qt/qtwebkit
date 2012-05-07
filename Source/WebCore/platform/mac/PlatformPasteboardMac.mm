@@ -20,11 +20,12 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #import "config.h"
 #import "Color.h"
+#import "KURL.h"
 #import "PlatformPasteboard.h"
 
 namespace WebCore {
@@ -64,6 +65,9 @@ void PlatformPasteboard::getPathnamesForType(Vector<String>& pathnames, const St
 
 String PlatformPasteboard::stringForType(const String& pasteboardType)
 {
+    if (pasteboardType == String(NSURLPboardType))
+        return [[NSURL URLFromPasteboard:m_pasteboard.get()] absoluteString];
+
     return [m_pasteboard.get() stringForType:pasteboardType];
 }
 
@@ -90,6 +94,11 @@ Color PlatformPasteboard::color()
                     (int)([color blueComponent] * 255.0 + 0.5), (int)([color alphaComponent] * 255.0 + 0.5));    
 }
 
+KURL PlatformPasteboard::url()
+{
+    return [NSURL URLFromPasteboard:m_pasteboard.get()];
+}
+
 void PlatformPasteboard::copy(const String& fromPasteboard)
 {
     NSPasteboard* pasteboard = [NSPasteboard pasteboardWithName:fromPasteboard];
@@ -100,6 +109,15 @@ void PlatformPasteboard::copy(const String& fromPasteboard)
         NSString* type = [types objectAtIndex:i];
         [m_pasteboard.get() setData:[pasteboard dataForType:type] forType:type];
     }    
+}
+
+void PlatformPasteboard::addTypes(const Vector<String>& pasteboardTypes)
+{
+    RetainPtr<NSMutableArray> types(AdoptNS, [[NSMutableArray alloc] init]);
+    for (size_t i = 0; i < pasteboardTypes.size(); ++i)
+        [types.get() addObject:pasteboardTypes[i]];
+
+    [m_pasteboard.get() addTypes:types.get() owner:nil];
 }
 
 void PlatformPasteboard::setTypes(const Vector<String>& pasteboardTypes)
@@ -131,7 +149,10 @@ void PlatformPasteboard::setPathnamesForType(const Vector<String>& pathnames, co
 
 void PlatformPasteboard::setStringForType(const String& string, const String& pasteboardType)
 {
-    [m_pasteboard.get() setString:string forType:pasteboardType];
+    if (pasteboardType == String(NSURLPboardType))
+        [[NSURL URLWithString:string] writeToPasteboard:m_pasteboard.get()];
+    else
+        [m_pasteboard.get() setString:string forType:pasteboardType];
 }
 
 }

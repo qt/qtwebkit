@@ -34,7 +34,7 @@
 #include "AccessibilityObject.h"
 #include "Document.h"
 #include "FrameView.h"
-#include "GOwnPtr.h"
+#include <wtf/gobject/GOwnPtr.h>
 #include "HostWindow.h"
 #include "InlineTextBox.h"
 #include "NotImplemented.h"
@@ -240,7 +240,7 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     }
 
     if (!style->textIndent().isUndefined()) {
-        int indentation = style->textIndent().calcValue(object->size().width());
+        int indentation = valueForLength(style->textIndent(), object->size().width(), renderer->view());
         buffer.set(g_strdup_printf("%i", indentation));
         result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_INDENT), buffer.get());
     }

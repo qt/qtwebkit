@@ -48,7 +48,7 @@ SVGViewSpec::SVGViewSpec(SVGElement* contextElement)
 
 void SVGViewSpec::setTransform(const String& transform)
 {
-    SVGTransformable::parseTransformAttribute(m_transform, transform);
+    m_transform.parse(transform);
 }
 
 void SVGViewSpec::setViewBoxString(const String& viewBoxStr)
@@ -63,7 +63,9 @@ void SVGViewSpec::setViewBoxString(const String& viewBoxStr)
 
 void SVGViewSpec::setPreserveAspectRatioString(const String& preserve)
 {
-    SVGPreserveAspectRatio::parsePreserveAspectRatio(this, preserve);
+    SVGPreserveAspectRatio preserveAspectRatio;
+    preserveAspectRatio.parse(preserve);
+    setPreserveAspectRatioBaseValue(preserveAspectRatio);
 }
 
 void SVGViewSpec::setViewTargetString(const String& viewTargetString)
@@ -140,10 +142,10 @@ bool SVGViewSpec::parseViewSpec(const String& viewSpec)
             if (currViewSpec >= end || *currViewSpec != '(')
                 return false;
             currViewSpec++;
-            bool result = false; 
-            setPreserveAspectRatioBaseValue(SVGPreserveAspectRatio::parsePreserveAspectRatio(currViewSpec, end, false, result));
-            if (!result)
+            SVGPreserveAspectRatio preserveAspectRatio;
+            if (!preserveAspectRatio.parse(currViewSpec, end, false))
                 return false;
+            setPreserveAspectRatioBaseValue(preserveAspectRatio);
             if (currViewSpec >= end || *currViewSpec != ')')
                 return false;
             currViewSpec++;

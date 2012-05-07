@@ -30,7 +30,9 @@
 namespace WebCore {
 
 class FormDataList;
+class HTMLFieldSetElement;
 class HTMLFormElement;
+class HTMLLegendElement;
 class ValidationMessage;
 class ValidityState;
 
@@ -49,6 +51,8 @@ public:
     void setFormMethod(const String&);
     bool formNoValidate() const;
 
+    void updateAncestors() const;
+
     virtual void reset() { }
 
     virtual bool formControlValueMatchesRenderer() const { return m_valueMatchesRenderer; }
@@ -60,7 +64,7 @@ public:
     virtual void dispatchFormControlChangeEvent();
     virtual void dispatchFormControlInputEvent();
 
-    virtual bool disabled() const { return m_disabled; }
+    virtual bool disabled() const;
     void setDisabled(bool);
 
     virtual bool isFocusable() const;
@@ -80,7 +84,6 @@ public:
     virtual bool isEnabledFormControl() const { return !disabled(); }
     virtual bool isReadOnlyFormControl() const { return readOnly(); }
 
-    virtual bool isRadioButton() const { return false; }
     virtual bool canTriggerImplicitSubmission() const { return false; }
 
     // Override in derived classes to get the encoded name=value pair for submitting.
@@ -105,6 +108,8 @@ public:
     bool hasAutofocused() { return m_hasAutofocused; }
     void setAutofocused() { m_hasAutofocused = true; }
 
+    static HTMLFormControlElement* enclosingFormControlElement(Node*);
+
     using TreeShared<ContainerNode>::ref;
     using TreeShared<ContainerNode>::deref;
 
@@ -113,11 +118,10 @@ protected:
 
     virtual void parseAttribute(Attribute*) OVERRIDE;
     virtual void requiredAttributeChanged();
+    virtual void disabledAttributeChanged();
     virtual void attach();
-    virtual void insertedIntoTree(bool deep);
-    virtual void removedFromTree(bool deep);
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
     virtual bool supportsFocus() const;
@@ -146,7 +150,10 @@ private:
     virtual bool isValidFormControlElement();
     String visibleValidationMessage() const;
 
+    mutable HTMLFieldSetElement* m_fieldSetAncestor;
+    mutable HTMLLegendElement* m_legendAncestor;
     OwnPtr<ValidationMessage> m_validationMessage;
+    mutable bool m_ancestorsValid : 1;
     bool m_disabled : 1;
     bool m_readOnly : 1;
     bool m_required : 1;
@@ -165,6 +172,7 @@ private:
     bool m_wasChangedSinceLastFormControlChangeEvent : 1;
 
     bool m_hasAutofocused : 1;
+    mutable bool m_hasDataListAncestor : 1;
 };
 
 } // namespace

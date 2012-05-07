@@ -54,6 +54,8 @@ def determine_result_type(failure_list):
         return test_expectations.CRASH
     elif FailureTimeout in failure_types:
         return test_expectations.TIMEOUT
+    elif FailureEarlyExit in failure_types:
+        return test_expectations.SKIP
     elif (FailureMissingResult in failure_types or
           FailureMissingImage in failure_types or
           FailureMissingImageHash in failure_types or
@@ -85,8 +87,7 @@ class TestFailure(object):
         """Creates a TestFailure object from the specified string."""
         return cPickle.loads(s)
 
-    @staticmethod
-    def message():
+    def message(self):
         """Returns a string describing the failure in more detail."""
         raise NotImplementedError
 
@@ -113,8 +114,7 @@ class FailureTimeout(TestFailure):
     def __init__(self, is_reftest=False):
         self.is_reftest = is_reftest
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Test timed out"
 
     def driver_needs_restart(self):
@@ -122,14 +122,16 @@ class FailureTimeout(TestFailure):
 
 
 class FailureCrash(TestFailure):
-    """DumpRenderTree crashed."""
-    def __init__(self, is_reftest=False):
+    """DumpRenderTree/WebKitTestRunner crashed."""
+    def __init__(self, is_reftest=False, process_name='DumpRenderTree', pid=None):
+        self.process_name = process_name
+        self.pid = pid
         self.is_reftest = is_reftest
 
-    @staticmethod
-    def message():
-        # FIXME: This is wrong for WebKit2 (which uses WebKitTestRunner).
-        return "DumpRenderTree crashed"
+    def message(self):
+        if self.pid:
+            return "%s (pid %d) crashed" % (self.process_name, self.pid)
+        return self.process_name + " crashed"
 
     def driver_needs_restart(self):
         return True
@@ -138,32 +140,28 @@ class FailureCrash(TestFailure):
 class FailureMissingResult(TestFailure):
     """Expected result was missing."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "No expected results found"
 
 
 class FailureTextMismatch(TestFailure):
     """Text diff output failed."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Text diff mismatch"
 
 
 class FailureMissingImageHash(TestFailure):
     """Actual result hash was missing."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "No expected image hash found"
 
 
 class FailureMissingImage(TestFailure):
     """Actual result image was missing."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "No expected image found"
 
 
@@ -172,16 +170,14 @@ class FailureImageHashMismatch(TestFailure):
     def __init__(self, diff_percent=0):
         self.diff_percent = diff_percent
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Image mismatch"
 
 
 class FailureImageHashIncorrect(TestFailure):
     """Actual result hash is incorrect."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Images match, expected image hash incorrect. "
 
 
@@ -190,9 +186,9 @@ class FailureReftestMismatch(TestFailure):
 
     def __init__(self, reference_filename=None):
         self.reference_filename = reference_filename
+        self.diff_percent = None
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Mismatch with reference"
 
 
@@ -202,8 +198,7 @@ class FailureReftestMismatchDidNotOccur(TestFailure):
     def __init__(self, reference_filename=None):
         self.reference_filename = reference_filename
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Mismatch with the reference did not occur"
 
 
@@ -213,25 +208,27 @@ class FailureReftestNoImagesGenerated(TestFailure):
     def __init__(self, reference_filename=None):
         self.reference_filename = reference_filename
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Reftest didn't generate pixel results."
 
 
 class FailureMissingAudio(TestFailure):
     """Actual result image was missing."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "No expected audio found"
 
 
 class FailureAudioMismatch(TestFailure):
     """Audio files didn't match."""
 
-    @staticmethod
-    def message():
+    def message(self):
         return "Audio mismatch"
+
+
+class FailureEarlyExit(TestFailure):
+    def message(self):
+        return "Skipped due to early exit"
 
 
 # Convenient collection of all failure classes for anything that might
@@ -240,4 +237,6 @@ ALL_FAILURE_CLASSES = (FailureTimeout, FailureCrash, FailureMissingResult,
                        FailureTextMismatch, FailureMissingImageHash,
                        FailureMissingImage, FailureImageHashMismatch,
                        FailureImageHashIncorrect, FailureReftestMismatch,
-                       FailureReftestMismatchDidNotOccur, FailureReftestNoImagesGenerated)
+                       FailureReftestMismatchDidNotOccur, FailureReftestNoImagesGenerated,
+                       FailureMissingAudio, FailureAudioMismatch,
+                       FailureEarlyExit)

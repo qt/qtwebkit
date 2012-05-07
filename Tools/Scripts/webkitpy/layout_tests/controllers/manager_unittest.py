@@ -214,13 +214,11 @@ class ManagerTest(unittest.TestCase):
         host = MockHost()
         port = host.port_factory.get(port_name=options.platform, options=options)
         run_webkit_tests._set_up_derived_options(port, options)
-        printer = printing.Printer(port, options, StringIO.StringIO(), StringIO.StringIO(), configure_logging=False)
+        printer = printing.Printer(port, options, StringIO.StringIO(), StringIO.StringIO())
         manager = LockCheckingManager(port, options, printer)
         manager.collect_tests(args)
         manager.parse_expectations()
-        result_summary = manager.set_up_run()
-        num_unexpected_results = manager.run(result_summary)
-        manager.clean_up_run()
+        num_unexpected_results = manager.run()
         printer.cleanup()
         tester.assertEquals(num_unexpected_results, 0)
 
@@ -231,7 +229,8 @@ class ManagerTest(unittest.TestCase):
         manager = Manager(port=port, options=MockOptions(), printer=Mock())
 
         manager._options = MockOptions(exit_after_n_failures=None, exit_after_n_crashes_or_timeouts=None)
-        result_summary = ResultSummary(expectations=Mock(), test_files=[])
+        manager._test_files = ['foo/bar.html', 'baz.html']
+        result_summary = ResultSummary(expectations=Mock(), test_files=manager._test_files)
         result_summary.unexpected_failures = 100
         result_summary.unexpected_crashes = 50
         result_summary.unexpected_timeouts = 50
@@ -246,6 +245,9 @@ class ManagerTest(unittest.TestCase):
         # Interrupt if we've exceeded either limit:
         manager._options.exit_after_n_crashes_or_timeouts = 10
         self.assertRaises(TestRunInterruptedException, manager._interrupt_if_at_failure_limits, result_summary)
+
+        self.assertEquals(result_summary.results['foo/bar.html'].type, test_expectations.SKIP)
+        self.assertEquals(result_summary.results['baz.html'].type, test_expectations.SKIP)
 
         manager._options.exit_after_n_crashes_or_timeouts = None
         manager._options.exit_after_n_failures = 10
@@ -387,9 +389,15 @@ class ResultSummaryTest(unittest.TestCase):
         return test_names, result_summary.ResultSummary(expectations, test_names), expectations
 
     # FIXME: Use this to test more of summarize_results. This was moved from printing_unittest.py.
-    def get_unexpected_results(self, port, expected, passing, flaky):
-        tests = ['passes/text.html', 'failures/expected/timeout.html', 'failures/expected/crash.html']
+    def summarized_results(self, port, expected, passing, flaky, extra_tests=[], extra_expectations=None):
+        tests = ['passes/text.html', 'failures/expected/timeout.html', 'failures/expected/crash.html', 'failures/expected/wontfix.html']
+        if extra_tests:
+            tests.extend(extra_tests)
+
         expectations = ''
+        if extra_expectations:
+            expectations += extra_expectations
+
         paths, rs, exp = self.get_result_summary(port, tests, expectations)
         if expected:
             rs.add(self.get_result('passes/text.html', test_expectations.PASS), expected)
@@ -403,6 +411,10 @@ class ResultSummaryTest(unittest.TestCase):
             rs.add(self.get_result('passes/text.html', test_expectations.TIMEOUT), expected)
             rs.add(self.get_result('failures/expected/timeout.html', test_expectations.CRASH), expected)
             rs.add(self.get_result('failures/expected/crash.html', test_expectations.TIMEOUT), expected)
+
+        for test in extra_tests:
+            rs.add(self.get_result(test, test_expectations.CRASH), expected)
+
         retry = rs
         if flaky:
             paths, retry, exp = self.get_result_summary(port, tests, expectations)
@@ -410,20 +422,29 @@ class ResultSummaryTest(unittest.TestCase):
             retry.add(self.get_result('failures/expected/timeout.html'), True)
             retry.add(self.get_result('failures/expected/crash.html'), True)
         unexpected_results = manager.summarize_results(port, exp, rs, retry, test_timings={}, only_unexpected=True, interrupted=False)
-        return unexpected_results
+        expected_results = manager.summarize_results(port, exp, rs, retry, test_timings={}, only_unexpected=False, interrupted=False)
+        return expected_results, unexpected_results
 
     def test_no_svn_revision(self):
         host = MockHost()
         port = host.port_factory.get('test')
-        results = self.get_unexpected_results(port, expected=False, passing=False, flaky=False)
-        self.assertTrue('revision' not in results)
+        expected_results, unexpected_results = self.summarized_results(port, expected=False, passing=False, flaky=False)
+        self.assertTrue('revision' not in unexpected_results)
 
     def test_svn_revision(self):
         host = MockHost()
         port = host.port_factory.get('test')
         port._options.builder_name = 'dummy builder'
-        results = self.get_unexpected_results(port, expected=False, passing=False, flaky=False)
-        self.assertTrue('revision' in results)
+        expected_results, unexpected_results = self.summarized_results(port, expected=False, passing=False, flaky=False)
+        self.assertTrue('revision' in unexpected_results)
+
+    def test_summarized_results_wontfix(self):
+        host = MockHost()
+        port = host.port_factory.get('test')
+        port._options.builder_name = 'dummy builder'
+        port._filesystem.write_text_file(port._filesystem.join(port.layout_tests_dir(), "failures/expected/wontfix.html"), "Dummy test contents")
+        expected_results, unexpected_results = self.summarized_results(port, expected=False, passing=False, flaky=False, extra_tests=['failures/expected/wontfix.html'], extra_expectations='BUGX WONTFIX : failures/expected/wontfix.html = FAIL\n')
+        self.assertTrue(expected_results['tests']['failures']['expected']['wontfix.html']['wontfix'])
 
 if __name__ == '__main__':
     port_testcase.main()

@@ -19,6 +19,7 @@ dotted
 dashed
 solid
 double
+
 //
 // CSS_PROP_FONT:
 //
@@ -505,6 +506,14 @@ column-reverse
 // wrap
 wrap-reverse
 
+// CSS_PROP_FLEX_LINE_PACK
+// start
+// end
+// center
+// justify
+// distribute
+// stretch
+
 // CSS_PROP_MARQUEE_DIRECTION
 forwards
 backwards
@@ -611,10 +620,10 @@ button-bevel
 default-button
 inner-spin-button
 -webkit-input-speech-button
-list-button
 listbox
 listitem
-media-fullscreen-button
+media-enter-fullscreen-button
+media-exit-fullscreen-button
 media-fullscreen-volume-slider
 media-fullscreen-volume-slider-thumb
 media-mute-button
@@ -866,9 +875,6 @@ off
 //optimizeSpeed
 optimizeQuality
 -webkit-optimize-contrast
-
-// Positioned Floats
--webkit-positioned
 
 // -webkit-wrap-shape
 nonzero

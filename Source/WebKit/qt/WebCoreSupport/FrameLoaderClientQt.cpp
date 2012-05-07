@@ -212,7 +212,6 @@ FrameLoaderClientQt::FrameLoaderClientQt()
     , m_webFrame(0)
     , m_pluginView(0)
     , m_hasSentResponseToPlugin(false)
-    , m_hasRepresentation(false)
     , m_isOriginatingLoad(false)
 {
 }
@@ -312,11 +311,6 @@ void FrameLoaderClientQt::dispatchDidBecomeFrameset(bool)
 {
 }
 
-void FrameLoaderClientQt::makeRepresentation(DocumentLoader*)
-{
-    m_hasRepresentation = true;
-}
-
 
 void FrameLoaderClientQt::forceLayout()
 {
@@ -397,7 +391,7 @@ void FrameLoaderClientQt::dispatchDidChangeLocationWithinPage()
 }
 
 #if USE(V8)
-void FrameLoaderClientQt::didCreateScriptContext(v8::Handle<v8::Context>, int)
+void FrameLoaderClientQt::didCreateScriptContext(v8::Handle<v8::Context>, int, int)
 {
 }
 void FrameLoaderClientQt::willReleaseScriptContext(v8::Handle<v8::Context>, int)
@@ -567,17 +561,6 @@ void FrameLoaderClientQt::dispatchWillSubmitForm(FramePolicyFunction function,
 }
 
 
-void FrameLoaderClientQt::dispatchDidLoadMainResource(DocumentLoader*)
-{
-}
-
-
-void FrameLoaderClientQt::revertToProvisionalState(DocumentLoader*)
-{
-    m_hasRepresentation = true;
-}
-
-
 void FrameLoaderClientQt::postProgressStartedNotification()
 {
     if (m_webFrame && m_frame->page())
@@ -631,16 +614,10 @@ void FrameLoaderClientQt::didChangeTitle(DocumentLoader*)
 }
 
 
-void FrameLoaderClientQt::finishedLoading(DocumentLoader* loader)
+void FrameLoaderClientQt::finishedLoading(DocumentLoader*)
 {
-    if (!m_pluginView) {
-        // This is necessary to create an empty document. See bug 634004.
-        // However, we only want to do this if makeRepresentation has been called,
-        // to match the behavior on the Mac.
-        if (m_hasRepresentation)
-            loader->writer()->setEncoding("", false);
+    if (!m_pluginView)
         return;
-    }
     if (m_pluginView->isPluginView())
         m_pluginView->didFinishLoading();
     m_pluginView = 0;
@@ -1364,28 +1341,6 @@ PassRefPtr<Frame> FrameLoaderClientQt::createFrame(const KURL& url, const String
         return 0;
 
     return frameData.frame.release();
-}
-
-void FrameLoaderClientQt::didTransferChildFrameToNewDocument(Page*)
-{
-    ASSERT(m_frame->ownerElement());
-
-    if (!m_webFrame)
-        return;
-
-    Frame* parentFrame = m_webFrame->d->frame->tree()->parent();
-    ASSERT(parentFrame);
-
-    if (QWebFrame* parent = QWebFramePrivate::kit(parentFrame)) {
-        m_webFrame->d->setPage(parent->page());
-
-        if (m_webFrame->parent() != qobject_cast<QObject*>(parent))
-            m_webFrame->setParent(parent);
-    }
-}
-
-void FrameLoaderClientQt::transferLoadingResourceFromPage(ResourceLoader*, const ResourceRequest&, Page*)
-{
 }
 
 ObjectContentType FrameLoaderClientQt::objectContentType(const KURL& url, const String& mimeTypeIn, bool shouldPreferPlugInsForImages)

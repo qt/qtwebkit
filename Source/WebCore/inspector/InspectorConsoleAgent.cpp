@@ -24,9 +24,10 @@
 
 
 #include "config.h"
-#include "InspectorConsoleAgent.h"
 
 #if ENABLE(INSPECTOR)
+#include "InspectorConsoleAgent.h"
+
 #include "InstrumentingAgents.h"
 #include "Console.h"
 #include "ConsoleMessage.h"
@@ -145,6 +146,14 @@ void InspectorConsoleAgent::addMessageToConsole(MessageSource source, MessageTyp
     if (!developerExtrasEnabled())
         return;
     addConsoleMessage(adoptPtr(new ConsoleMessage(source, type, level, message, scriptId, lineNumber)));
+}
+
+Vector<unsigned> InspectorConsoleAgent::consoleMessageArgumentCounts()
+{
+    Vector<unsigned> result(m_consoleMessages.size());
+    for (size_t i = 0; i < m_consoleMessages.size(); i++)
+        result[i] = m_consoleMessages[i]->argumentCount();
+    return result;
 }
 
 void InspectorConsoleAgent::startTiming(const String& title)

@@ -31,9 +31,11 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
-namespace WebCore {
+#if ENABLE(CSS_FILTERS)
+#include "FilterOperations.h"
+#endif
 
-typedef void* ShaderType;
+namespace WebCore {
 
 class BitmapTexture;
 class TextureMapperShaderManager;
@@ -44,13 +46,6 @@ public:
     GLuint vertexAttrib() { return m_vertexAttrib; }
 
     virtual ~TextureMapperShaderProgram();
-
-    template<class T>
-    static ShaderType shaderType()
-    {
-        static int type = 0;
-        return &type;
-    }
 
     virtual void prepare(float opacity, const BitmapTexture*) { }
     GLint matrixVariable() const { return m_matrixVariable; }
@@ -74,6 +69,35 @@ protected:
     GLint m_opacityVariable;
 };
 
+#if ENABLE(CSS_FILTERS)
+class StandardFilterProgram : public RefCounted<StandardFilterProgram> {
+public:
+    virtual ~StandardFilterProgram();
+    virtual void prepare(const FilterOperation&);
+    static PassRefPtr<StandardFilterProgram> create(FilterOperation::OperationType);
+    GLuint vertexAttrib() const { return m_vertexAttrib; }
+    GLuint texCoordAttrib() const { return m_texCoordAttrib; }
+    GLuint textureUniform() const { return m_textureUniformLocation; }
+private:
+    StandardFilterProgram(FilterOperation::OperationType);
+    GLuint m_id;
+    GLuint m_vertexShader;
+    GLuint m_fragmentShader;
+    GLuint m_vertexAttrib;
+    GLuint m_texCoordAttrib;
+    GLuint m_textureUniformLocation;
+    union {
+        GLuint amount;
+        GLuint stddev;
+        struct {
+            GLuint stddev;
+            GLuint color;
+            GLuint offset;
+        } shadow;
+    } m_uniformLocations;
+};
+#endif
+
 class TextureMapperShaderProgramSimple : public TextureMapperShaderProgram {
 public:
     static PassRefPtr<TextureMapperShaderProgramSimple> create();
@@ -89,7 +113,6 @@ class TextureMapperShaderProgramOpacityAndMask : public TextureMapperShaderProgr
 public:
     static PassRefPtr<TextureMapperShaderProgramOpacityAndMask> create();
     virtual void prepare(float opacity, const BitmapTexture*);
-    GLint maskMatrixVariable() const { return m_maskMatrixVariable; }
     GLint maskTextureVariable() const { return m_maskTextureVariable; }
 
 private:
@@ -97,31 +120,57 @@ private:
     virtual const char* vertexShaderSource() const;
     virtual const char* fragmentShaderSource() const;
     TextureMapperShaderProgramOpacityAndMask();
-    GLint m_maskMatrixVariable;
     GLint m_maskTextureVariable;
 };
 
 class TextureMapperShaderManager {
 public:
+    enum ShaderType {
+        Invalid = 0, // HashMaps do not like 0 as a key.
+        Simple,
+        OpacityAndMask
+    };
+
     TextureMapperShaderManager();
     virtual ~TextureMapperShaderManager();
 
-    template<class T>
-    PassRefPtr<T> getShaderProgram()
+#if ENABLE(CSS_FILTERS)
+    PassRefPtr<StandardFilterProgram> getShaderForFilter(const FilterOperation&);
+#endif
+
+    PassRefPtr<TextureMapperShaderProgram> getShaderProgram(ShaderType shaderType)
     {
-        ShaderType shaderType = TextureMapperShaderProgram::shaderType<T>();
+        RefPtr<TextureMapperShaderProgram> program;
+        if (shaderType == Invalid)
+            return program;
+
         TextureMapperShaderProgramMap::iterator it = m_textureMapperShaderProgramMap.find(shaderType);
         if (it != m_textureMapperShaderProgramMap.end())
-            return static_cast<T*>(it->second.get());
+            return it->second;
 
-        RefPtr<T> t = T::create();
-        m_textureMapperShaderProgramMap.add(shaderType, t);
-        return t;
+        switch (shaderType) {
+        case Simple:
+            program = TextureMapperShaderProgramSimple::create();
+            break;
+        case OpacityAndMask:
+            program = TextureMapperShaderProgramOpacityAndMask::create();
+            break;
+        case Invalid:
+            ASSERT_NOT_REACHED();
+        }
+        m_textureMapperShaderProgramMap.add(shaderType, program);
+        return program;
     }
 
 private:
-    typedef HashMap<ShaderType, RefPtr<TextureMapperShaderProgram> > TextureMapperShaderProgramMap;
+    typedef HashMap<ShaderType, RefPtr<TextureMapperShaderProgram>, DefaultHash<int>::Hash, HashTraits<int> > TextureMapperShaderProgramMap;
     TextureMapperShaderProgramMap m_textureMapperShaderProgramMap;
+
+#if ENABLE(CSS_FILTERS)
+    typedef HashMap<FilterOperation::OperationType, RefPtr<StandardFilterProgram>, DefaultHash<int>::Hash, HashTraits<int> > FilterMap;
+    FilterMap m_filterMap;
+#endif
+
 };
 
 }

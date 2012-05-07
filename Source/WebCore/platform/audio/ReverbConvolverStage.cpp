@@ -44,18 +44,25 @@ namespace WebCore {
 using namespace VectorMath;
 
 ReverbConvolverStage::ReverbConvolverStage(const float* impulseResponse, size_t responseLength, size_t reverbTotalLatency, size_t stageOffset, size_t stageLength,
-                                           size_t fftSize, size_t renderPhase, size_t renderSliceSize, ReverbAccumulationBuffer* accumulationBuffer)
-    : m_fftKernel(fftSize)
-    , m_accumulationBuffer(accumulationBuffer)
+                                           size_t fftSize, size_t renderPhase, size_t renderSliceSize, ReverbAccumulationBuffer* accumulationBuffer, bool directMode)
+    : m_accumulationBuffer(accumulationBuffer)
     , m_accumulationReadIndex(0)
     , m_inputReadIndex(0)
     , m_impulseResponseLength(responseLength)
+    , m_directMode(directMode)
 {
     ASSERT(impulseResponse);
     ASSERT(accumulationBuffer);
-    
-    m_fftKernel.doPaddedFFT(impulseResponse + stageOffset, stageLength);
-    m_convolver = adoptPtr(new FFTConvolver(fftSize));
+
+    if (!m_directMode) {
+        m_fftKernel = adoptPtr(new FFTFrame(fftSize));
+        m_fftKernel->doPaddedFFT(impulseResponse + stageOffset, stageLength);
+        m_fftConvolver = adoptPtr(new FFTConvolver(fftSize));
+    } else {
+        m_directKernel = adoptPtr(new AudioFloatArray(fftSize / 2));
+        m_directKernel->copyToRange(impulseResponse + stageOffset, 0, fftSize / 2);
+        m_directConvolver = adoptPtr(new DirectConvolver(renderSliceSize));
+    }
     m_temporaryBuffer.allocate(renderSliceSize);
 
     // The convolution stage at offset stageOffset needs to have a corresponding delay to cancel out the offset.
@@ -63,9 +70,11 @@ ReverbConvolverStage::ReverbConvolverStage(const float* impulseResponse, size_t 
 
     // But, the FFT convolution itself incurs fftSize / 2 latency, so subtract this out...
     size_t halfSize = fftSize / 2;
-    ASSERT(totalDelay >= halfSize);
-    if (totalDelay >= halfSize)
-        totalDelay -= halfSize;
+    if (!m_directMode) {
+        ASSERT(totalDelay >= halfSize);
+        if (totalDelay >= halfSize)
+            totalDelay -= halfSize;
+    }
 
     // We divide up the total delay, into pre and post delay sections so that we can schedule at exactly the moment when the FFT will happen.
     // This is coordinated with the other stages, so they don't all do their FFTs at the same time...
@@ -78,7 +87,9 @@ ReverbConvolverStage::ReverbConvolverStage(const float* impulseResponse, size_t 
     m_preReadWriteIndex = 0;
     m_framesProcessed = 0; // total frames processed so far
 
-    m_preDelayBuffer.allocate(m_preDelayLength < fftSize ? fftSize : m_preDelayLength);
+    size_t delayBufferSize = m_preDelayLength < fftSize ? fftSize : m_preDelayLength;
+    delayBufferSize = delayBufferSize < renderSliceSize ? renderSliceSize : delayBufferSize;
+    m_preDelayBuffer.allocate(delayBufferSize);
 }
 
 void ReverbConvolverStage::processInBackground(ReverbConvolver* convolver, size_t framesToProcess)
@@ -133,7 +144,10 @@ void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
         // Now, run the convolution (into the delay buffer).
         // An expensive FFT will happen every fftSize / 2 frames.
         // We process in-place here...
-        m_convolver->process(&m_fftKernel, preDelayedSource, temporaryBuffer, framesToProcess);
+        if (!m_directMode)
+            m_fftConvolver->process(m_fftKernel.get(), preDelayedSource, temporaryBuffer, framesToProcess);
+        else
+            m_directConvolver->process(m_directKernel.get(), preDelayedSource, temporaryBuffer, framesToProcess);
 
         // Now accumulate into reverb's accumulation buffer.
         m_accumulationBuffer->accumulate(temporaryBuffer, framesToProcess, &m_accumulationReadIndex, m_postDelayLength);
@@ -154,7 +168,10 @@ void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
 
 void ReverbConvolverStage::reset()
 {
-    m_convolver->reset();
+    if (!m_directMode)
+        m_fftConvolver->reset();
+    else
+        m_directConvolver->reset();
     m_preDelayBuffer.zero();
     m_accumulationReadIndex = 0;
     m_inputReadIndex = 0;

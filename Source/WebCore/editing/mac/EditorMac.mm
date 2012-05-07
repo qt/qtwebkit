@@ -30,19 +30,25 @@
 #import "ClipboardMac.h"
 #import "CachedResourceLoader.h"
 #import "DocumentFragment.h"
+#import "DOMRangeInternal.h"
 #import "EditingText.h"
 #import "Editor.h"
 #import "EditorClient.h"
 #import "Frame.h"
 #import "FrameView.h"
+#import "HTMLConverter.h"
 #import "HTMLNames.h"
+#import "LegacyWebArchive.h"
 #import "Pasteboard.h"
 #import "PasteboardStrategy.h"
 #import "PlatformStrategies.h"
+#import "Range.h"
 #import "RenderBlock.h"
 #import "RuntimeApplicationChecks.h"
 #import "Sound.h"
+#import "TypingCommand.h"
 #import "htmlediting.h"
+#import "WebNSAttributedStringExtras.h"
 
 namespace WebCore {
 
@@ -51,7 +57,7 @@ using namespace HTMLNames;
 PassRefPtr<Clipboard> Editor::newGeneralClipboard(ClipboardAccessPolicy policy, Frame* frame)
 {
     return ClipboardMac::create(Clipboard::CopyAndPaste,
-        policy == ClipboardWritable ? platformStrategies()->pasteboardStrategy()->uniqueName() : String(NSGeneralPboard), policy, frame);
+        policy == ClipboardWritable ? platformStrategies()->pasteboardStrategy()->uniqueName() : String(NSGeneralPboard), policy, ClipboardMac::CopyAndPasteGeneric, frame);
 }
 
 void Editor::showFontPanel()
@@ -95,6 +101,14 @@ void Editor::pasteWithPasteboard(Pasteboard* pasteboard, bool allowPlainText)
     }
 #endif
     m_frame->editor()->client()->setInsertionPasteboard(String());
+}
+
+bool Editor::insertParagraphSeparatorInQuotedContent()
+{
+    // FIXME: Why is this missing calls to canEdit, canEditRichly, etc...
+    TypingCommand::insertParagraphSeparatorInQuotedContent(m_frame->document());
+    revealSelectionAfterEditingOperation();
+    return true;
 }
 
 static RenderStyle* styleForSelectionStart(Frame* frame, Node *&nodeToRemove)
@@ -291,7 +305,7 @@ void Editor::takeFindStringFromSelection()
 void Editor::writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes)
 {
     Pasteboard pasteboard(pasteboardName);
-    pasteboard.writeSelectionForTypes(pasteboardTypes, selectedRange().get(), true, m_frame);
+    pasteboard.writeSelectionForTypes(pasteboardTypes, true, m_frame);
 }
     
 void Editor::readSelectionFromPasteboard(const String& pasteboardName)
@@ -301,6 +315,16 @@ void Editor::readSelectionFromPasteboard(const String& pasteboardName)
         pasteWithPasteboard(&pasteboard, true);
     else
         pasteAsPlainTextWithPasteboard(&pasteboard);   
+}
+
+String Editor::stringSelectionForPasteboard()
+{
+    return Pasteboard::getStringSelection(m_frame);
+}
+
+PassRefPtr<SharedBuffer> Editor::dataSelectionForPasteboard(const String& pasteboardType)
+{
+    return Pasteboard::getDataSelection(m_frame, pasteboardType);
 }
 
 } // namespace WebCore

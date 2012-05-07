@@ -45,6 +45,7 @@ public:
     const HTMLContentSelectionList* selections() const { return &m_selections; }
     bool hasSelection() const { return m_selections.first(); }
     bool isShadowBoundary() const;
+    bool isActive() const;
 
     virtual const AtomicString& select() const = 0;
     virtual bool isSelectValid() const = 0;
@@ -61,8 +62,8 @@ protected:
     virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
 
 private:
-    void distributeHostChildren(ShadowTree*);
-    void clearDistribution(ShadowTree*);
+    void distributeHostChildren(ElementShadow*);
+    void clearDistribution(ElementShadow*);
     void attachDistributedNode();
 
     void assignShadowRoot(ShadowRoot*);
@@ -71,7 +72,7 @@ private:
     HTMLContentSelectionList m_selections;
 };
 
-inline bool isInsertionPoint(Node* node)
+inline bool isInsertionPoint(const Node* node)
 {
     if (!node)
         return true;
@@ -86,6 +87,12 @@ inline InsertionPoint* toInsertionPoint(Node* node)
 {
     ASSERT(isInsertionPoint(node));
     return static_cast<InsertionPoint*>(node);
+}
+
+inline const InsertionPoint* toInsertionPoint(const Node* node)
+{
+    ASSERT(isInsertionPoint(node));
+    return static_cast<const InsertionPoint*>(node);
 }
 
 inline bool isShadowBoundary(Node* node)

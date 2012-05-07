@@ -28,7 +28,11 @@
 #include "KURL.h"
 #include "PopupMenu.h"
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(INPUT_TYPE_COLOR)
+#include "ColorChooser.h"
+#endif
+
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 #include "NotificationClient.h"
 #endif
 
@@ -114,7 +118,7 @@ public:
     virtual void exceededDatabaseQuota(Frame*, const String&);
 #endif
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     virtual WebCore::NotificationClient* notificationPresenter() const;
 #endif
 
@@ -138,6 +142,12 @@ public:
     virtual void exitFullScreenForElement(WebCore::Element*);
 #endif
 
+#if ENABLE(INPUT_TYPE_COLOR)
+    virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&);
+    virtual void removeColorChooser();
+    virtual void updateColorChooser(const Color&);
+#endif
+
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
     virtual void loadIconForFiles(const Vector<String>&, FileIconLoader*);
     virtual void formStateDidChange(const Node*);
@@ -147,8 +157,6 @@ public:
 
     virtual void scrollRectIntoView(const IntRect&) const { }
 
-    virtual void requestGeolocationPermissionForFrame(Frame*, Geolocation*);
-    virtual void cancelGeolocationPermissionRequestForFrame(Frame*, Geolocation*);
     virtual void cancelGeolocationPermissionForFrame(Frame*, Geolocation*);
 
     virtual void invalidateContents(const IntRect&, bool);

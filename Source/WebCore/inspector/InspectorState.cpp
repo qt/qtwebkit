@@ -27,9 +27,10 @@
  */
 
 #include "config.h"
-#include "InspectorState.h"
 
 #if ENABLE(INSPECTOR)
+
+#include "InspectorState.h"
 
 #include "InspectorStateClient.h"
 
@@ -96,6 +97,15 @@ long InspectorState::getLong(const String& propertyName)
 {
     InspectorObject::iterator it = m_properties->find(propertyName);
     long value = 0;
+    if (it != m_properties->end())
+        it->second->asNumber(&value);
+    return value;
+}
+
+double InspectorState::getDouble(const String& propertyName)
+{
+    InspectorObject::iterator it = m_properties->find(propertyName);
+    double value = 0;
     if (it != m_properties->end())
         it->second->asNumber(&value);
     return value;

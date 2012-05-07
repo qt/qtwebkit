@@ -29,6 +29,7 @@
 
 #include "Document.h"
 #include "DocumentFragment.h"
+#include "Element.h"
 #include "ExceptionCode.h"
 #include "TreeScope.h"
 #include <wtf/DoublyLinkedList.h>
@@ -36,10 +37,11 @@
 namespace WebCore {
 
 class Document;
+class DOMSelection;
 class HTMLContentElement;
 class HTMLContentSelector;
 class InsertionPoint;
-class ShadowTree;
+class ElementShadow;
 
 class ShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
     friend class WTF::DoublyLinkedListNode<ShadowRoot>;
@@ -69,12 +71,14 @@ public:
     void setApplyAuthorSheets(bool);
 
     Element* host() const { return shadowHost(); }
-    ShadowTree* tree() const;
+    ElementShadow* owner() const;
 
     String innerHTML() const;
     void setInnerHTML(const String&, ExceptionCode&);
 
     Element* activeElement() const;
+
+    DOMSelection* selection();
 
     ShadowRoot* youngerShadowRoot() const { return prev(); }
     ShadowRoot* olderShadowRoot() const { return next(); }
@@ -122,8 +126,8 @@ inline bool ShadowRoot::isUsedForRendering() const
 
 inline Element* ShadowRoot::activeElement() const
 {
-    if (document()->isHTMLDocument())
-        return treeScope()->activeElement();
+    if (Node* node = treeScope()->focusedNode())
+        return node->isElementNode() ? toElement(node) : 0;
     return 0;
 }
 
@@ -136,18 +140,6 @@ inline const ShadowRoot* toShadowRoot(const Node* node)
 inline ShadowRoot* toShadowRoot(Node* node)
 {
     return const_cast<ShadowRoot*>(toShadowRoot(static_cast<const Node*>(node)));
-}
-
-inline ShadowRoot* toShadowRoot(TreeScope* scope)
-{
-    ASSERT(!scope || scope->isShadowRoot());
-    return static_cast<ShadowRoot*>(scope);
-}
-
-// Put this TreeScope method here to inline it.
-inline bool TreeScope::isShadowRoot() const
-{
-    return m_rootNode->isShadowRoot();
 }
 
 } // namespace

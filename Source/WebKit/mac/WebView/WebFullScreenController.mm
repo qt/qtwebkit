@@ -150,12 +150,17 @@ static IntRect screenRectOfContents(Element* element)
     _element = element;
 }
 
+- (BOOL)isFullScreen
+{
+    return _isFullScreen;
+}
+
 #pragma mark -
 #pragma mark NSWindowController overrides
 
 - (void)cancelOperation:(id)sender
 {
-    [self performSelector:@selector(exitFullScreen) withObject:nil afterDelay:0];
+    [self performSelector:@selector(requestExitFullScreen) withObject:nil afterDelay:0];
 }
 
 #pragma mark -
@@ -290,6 +295,13 @@ static IntRect screenRectOfContents(Element* element)
         [_scaleAnimation.get() stopAnimation];
 }
 
+- (void)requestExitFullScreen
+{
+    if (!_element)
+        return;
+    _element->document()->webkitCancelFullScreen();
+}
+
 - (void)exitFullScreen
 {
     if (!_isFullScreen)
@@ -319,7 +331,7 @@ static IntRect screenRectOfContents(Element* element)
 #endif
     // If the user has moved the fullScreen window into a new space, temporarily change
     // the collectionBehavior of the webView's window so that it is pulled into the active space:
-    if (![webWindow isOnActiveSpace]) {
+    if (!([webWindow respondsToSelector:@selector(isOnActiveSpace)] ? [webWindow isOnActiveSpace] : YES)) {
         NSWindowCollectionBehavior behavior = [webWindow collectionBehavior];
         [webWindow setCollectionBehavior:NSWindowCollectionBehaviorCanJoinAllSpaces];
         [webWindow orderWindow:NSWindowBelow relativeTo:[[self window] windowNumber]];
@@ -365,7 +377,9 @@ static IntRect screenRectOfContents(Element* element)
     
     [_backgroundWindow.get() orderOut:self];
     [_backgroundWindow.get() setFrame:NSZeroRect display:YES];
-    
+
+    [[_webView window] makeKeyAndOrderFront:self];
+
     NSEnableScreenUpdates();
 }
 
@@ -422,7 +436,7 @@ static IntRect screenRectOfContents(Element* element)
         [NSApp setPresentationOptions:options];
     else
 #endif
-        SetSystemUIMode(_isFullScreen ? kUIModeNormal : kUIModeAllHidden, 0);
+        SetSystemUIMode(_isFullScreen ? kUIModeAllHidden : kUIModeNormal, 0);
 }
 
 #pragma mark -
@@ -440,7 +454,8 @@ static IntRect screenRectOfContents(Element* element)
     [otherView setFrame:[view frame]];        
     [otherView setAutoresizingMask:[view autoresizingMask]];
     [otherView removeFromSuperview];
-    [[view superview] replaceSubview:view with:otherView];
+    [[view superview] addSubview:otherView positioned:NSWindowAbove relativeTo:view];
+    [view removeFromSuperview];
     [CATransaction commit];
 }
 
@@ -456,6 +471,9 @@ static RetainPtr<NSWindow> createBackgroundFullscreenWindow(NSRect frame)
 static NSRect windowFrameFromApparentFrames(NSRect screenFrame, NSRect initialFrame, NSRect finalFrame)
 {
     NSRect initialWindowFrame;
+    if (!NSWidth(initialFrame) || !NSWidth(finalFrame) || !NSHeight(initialFrame) || !NSHeight(finalFrame))
+        return screenFrame;
+
     CGFloat xScale = NSWidth(screenFrame) / NSWidth(finalFrame);
     CGFloat yScale = NSHeight(screenFrame) / NSHeight(finalFrame);
     CGFloat xTrans = NSMinX(screenFrame) - NSMinX(finalFrame);

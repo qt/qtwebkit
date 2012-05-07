@@ -29,7 +29,6 @@
 #include "MutationObserverRegistration.h"
 #include "NameNodeList.h"
 #include "QualifiedName.h"
-#include "RegionNodeList.h"
 #include "TagNodeList.h"
 #include "WebKitMutationObserver.h"
 #include <wtf/HashSet.h>
@@ -52,7 +51,7 @@ struct NodeListsNodeData {
     WTF_MAKE_NONCOPYABLE(NodeListsNodeData); WTF_MAKE_FAST_ALLOCATED;
 public:
     typedef HashSet<DynamicSubtreeNodeList*> NodeListSet;
-    NodeListSet m_listsWithCaches;
+    NodeListSet m_listsInvalidatedAtDocument;
 
     typedef HashMap<String, ClassNodeList*> ClassNodeListCache;
     ClassNodeListCache m_classNodeListCache;
@@ -73,14 +72,11 @@ public:
 
     LabelsNodeList* m_labelsNodeListCache;
 
-    typedef HashMap<AtomicString, RegionNodeList*> RegionNodeListCache;
-    RegionNodeListCache m_regionNodeListCache;
- 
     static PassOwnPtr<NodeListsNodeData> create()
     {
         return adoptPtr(new NodeListsNodeData);
     }
-    
+
     void invalidateCaches();
     void invalidateCachesThatDependOnAttributes();
 

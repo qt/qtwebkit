@@ -41,6 +41,7 @@
 #include "LayerRendererChromium.h"
 #include "PlatformSupport.h"
 #include "cc/CCLayerTreeHost.h"
+#include <public/Platform.h>
 #include <wtf/CurrentTime.h>
 
 namespace WebCore {
@@ -61,8 +62,8 @@ public:
         m_delegate->paintContents(context, contentRect);
         double paintEnd = currentTime();
         double pixelsPerSec = (contentRect.width() * contentRect.height()) / (paintEnd - paintStart);
-        PlatformSupport::histogramCustomCounts("Renderer4.AccelContentPaintDurationMS", (paintEnd - paintStart) * 1000, 0, 120, 30);
-        PlatformSupport::histogramCustomCounts("Renderer4.AccelContentPaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
+        WebKit::Platform::current()->histogramCustomCounts("Renderer4.AccelContentPaintDurationMS", (paintEnd - paintStart) * 1000, 0, 120, 30);
+        WebKit::Platform::current()->histogramCustomCounts("Renderer4.AccelContentPaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
     }
 private:
     explicit ContentLayerPainter(ContentLayerDelegate* delegate)
@@ -93,32 +94,29 @@ bool ContentLayerChromium::drawsContent() const
     return TiledLayerChromium::drawsContent() && m_delegate;
 }
 
-void ContentLayerChromium::paintContentsIfDirty(const Region& occludedScreenSpace)
+void ContentLayerChromium::update(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion)
 {
     updateTileSizeAndTilingOption();
     createTextureUpdaterIfNeeded();
 
     IntRect layerRect;
 
-    // Always call prepareToUpdate() but with an empty layer rectangle when
+    // Always call updateLayerRect() but with an empty layer rectangle when
     // layer doesn't draw contents.
     if (drawsContent())
         layerRect = visibleLayerRect();
 
-    prepareToUpdate(layerRect, occludedScreenSpace);
+    updateLayerRect(updater, layerRect, occlusion);
     m_needsDisplay = false;
 }
 
-void ContentLayerChromium::idlePaintContentsIfDirty(const Region& occludedScreenSpace)
+void ContentLayerChromium::idleUpdate(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion)
 {
     if (!drawsContent())
         return;
 
-    const IntRect& layerRect = visibleLayerRect();
-    if (layerRect.isEmpty())
-        return;
-
-    prepareToUpdateIdle(layerRect, occludedScreenSpace);
+    const IntRect layerRect = visibleLayerRect();
+    idleUpdateLayerRect(updater, layerRect, occlusion);
     if (needsIdlePaint(layerRect))
         setNeedsCommit();
 }

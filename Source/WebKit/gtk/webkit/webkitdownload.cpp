@@ -22,8 +22,6 @@
 #include "webkitdownload.h"
 
 #include "ErrorsGtk.h"
-#include "GRefPtr.h"
-#include "Noncopyable.h"
 #include "NotImplemented.h"
 #include "ResourceHandleClient.h"
 #include "ResourceHandleInternal.h"
@@ -39,6 +37,8 @@
 #include "webkitnetworkresponseprivate.h"
 #include <glib/gi18n-lib.h>
 #include <glib/gstdio.h>
+#include <wtf/Noncopyable.h>
+#include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
 #ifdef ERROR
@@ -561,7 +561,7 @@ void webkit_download_cancel(WebKitDownload* download)
  * Convenience method to retrieve the URI from the
  * #WebKitNetworkRequest which is being downloaded.
  *
- * Returns: the uri
+ * Returns: the URI
  *
  * Since: 1.1.2
  */

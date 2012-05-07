@@ -27,12 +27,13 @@
 #include "cc/CCLayerTreeHost.h"
 
 #include "CCAnimationTestCommon.h"
+#include "CCOcclusionTrackerTestCommon.h"
+#include "CCTiledLayerTestCommon.h"
 #include "CompositorFakeWebGraphicsContext3D.h"
 #include "ContentLayerChromium.h"
 #include "FilterOperations.h"
 #include "GraphicsContext3DPrivate.h"
 #include "LayerChromium.h"
-#include "Region.h"
 #include "TextureManager.h"
 #include "WebCompositor.h"
 #include "WebKit.h"
@@ -44,10 +45,10 @@
 #include "cc/CCScopedThreadProxy.h"
 #include "cc/CCTextureUpdater.h"
 #include "cc/CCThreadTask.h"
-#include "platform/WebKitPlatformSupport.h"
 #include "platform/WebThread.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <public/Platform.h>
 #include <wtf/MainThread.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
@@ -64,8 +65,10 @@ class TestHooks : public CCLayerAnimationDelegate {
 public:
     virtual void beginCommitOnCCThread(CCLayerTreeHostImpl*) { }
     virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl*) { }
+    virtual void prepareToDrawOnCCThread(CCLayerTreeHostImpl*) { }
     virtual void drawLayersOnCCThread(CCLayerTreeHostImpl*) { }
     virtual void animateLayers(CCLayerTreeHostImpl*, double monotonicTime) { }
+    virtual void willAnimateLayers(CCLayerTreeHostImpl*, double monotonicTime) { }
     virtual void applyScrollAndScale(const IntSize&, float) { }
     virtual void updateAnimations(double monotonicTime) { }
     virtual void layout() { }
@@ -74,7 +77,7 @@ public:
 
     // Implementation of CCLayerAnimationDelegate
     virtual void notifyAnimationStarted(double time) { }
-    virtual void notifyAnimationFinished(int animationId) { }
+    virtual void notifyAnimationFinished(double time) { }
 };
 
 // Adapts CCLayerTreeHostImpl for test. Runs real code, then invokes test hooks.
@@ -97,15 +100,23 @@ public:
         m_testHooks->commitCompleteOnCCThread(this);
     }
 
-    virtual void drawLayers()
+    virtual bool prepareToDraw(FrameData& frame)
     {
-        CCLayerTreeHostImpl::drawLayers();
+        bool result = CCLayerTreeHostImpl::prepareToDraw(frame);
+        m_testHooks->prepareToDrawOnCCThread(this);
+        return result;
+    }
+
+    virtual void drawLayers(const FrameData& frame)
+    {
+        CCLayerTreeHostImpl::drawLayers(frame);
         m_testHooks->drawLayersOnCCThread(this);
     }
 
 protected:
     virtual void animateLayers(double monotonicTime, double wallClockTime)
     {
+        m_testHooks->willAnimateLayers(this, monotonicTime);
         CCLayerTreeHostImpl::animateLayers(monotonicTime, wallClockTime);
         m_testHooks->animateLayers(this, monotonicTime);
     }
@@ -123,13 +134,13 @@ private:
 // Adapts CCLayerTreeHost for test. Injects MockLayerTreeHostImpl.
 class MockLayerTreeHost : public CCLayerTreeHost {
 public:
-    static PassRefPtr<MockLayerTreeHost> create(TestHooks* testHooks, CCLayerTreeHostClient* client, PassRefPtr<LayerChromium> rootLayer, const CCSettings& settings)
+    static PassOwnPtr<MockLayerTreeHost> create(TestHooks* testHooks, CCLayerTreeHostClient* client, PassRefPtr<LayerChromium> rootLayer, const CCSettings& settings)
     {
         // For these tests, we will enable threaded animations.
         CCSettings settingsCopy = settings;
         settingsCopy.threadedAnimationEnabled = true;
 
-        RefPtr<MockLayerTreeHost> layerTreeHost = adoptRef(new MockLayerTreeHost(testHooks, client, settingsCopy));
+        OwnPtr<MockLayerTreeHost> layerTreeHost(adoptPtr(new MockLayerTreeHost(testHooks, client, settingsCopy)));
         bool success = layerTreeHost->initialize();
         EXPECT_TRUE(success);
         layerTreeHost->setRootLayer(rootLayer);
@@ -203,7 +214,7 @@ private:
     }
 
     Vector<WebGLId> m_textures;
-    HashSet<WebGLId> m_usedTextures;
+    HashSet<WebGLId, DefaultHash<WebGLId>::Hash, UnsignedWithZeroKeyHashTraits<WebGLId> > m_usedTextures;
 };
 
 // Implementation of CCLayerTreeHost callback interface.
@@ -214,22 +225,26 @@ public:
         return adoptPtr(new MockLayerTreeHostClient(testHooks));
     }
 
-    virtual void updateAnimations(double monotonicTime)
+    virtual void willBeginFrame() OVERRIDE
+    {
+    }
+
+    virtual void updateAnimations(double monotonicTime) OVERRIDE
     {
         m_testHooks->updateAnimations(monotonicTime);
     }
 
-    virtual void layout()
+    virtual void layout() OVERRIDE
     {
         m_testHooks->layout();
     }
 
-    virtual void applyScrollAndScale(const IntSize& scrollDelta, float scale)
+    virtual void applyScrollAndScale(const IntSize& scrollDelta, float scale) OVERRIDE
     {
         m_testHooks->applyScrollAndScale(scrollDelta, scale);
     }
 
-    virtual PassRefPtr<GraphicsContext3D> createContext()
+    virtual PassRefPtr<GraphicsContext3D> createContext() OVERRIDE
     {
         GraphicsContext3D::Attributes attrs;
         WebGraphicsContext3D::Attributes webAttrs;
@@ -239,21 +254,25 @@ public:
         return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), GraphicsContext3D::RenderDirectlyToHostWindow);
     }
 
-    virtual void didCommitAndDrawFrame()
+    virtual void didCommit() OVERRIDE
+    {
+    }
+
+    virtual void didCommitAndDrawFrame() OVERRIDE
     {
         m_testHooks->didCommitAndDrawFrame();
     }
 
-    virtual void didCompleteSwapBuffers()
+    virtual void didCompleteSwapBuffers() OVERRIDE
     {
     }
 
-    virtual void didRecreateContext(bool succeeded)
+    virtual void didRecreateContext(bool succeeded) OVERRIDE
     {
         m_testHooks->didRecreateContext(succeeded);
     }
 
-    virtual void scheduleComposite()
+    virtual void scheduleComposite() OVERRIDE
     {
     }
 
@@ -300,6 +319,11 @@ public:
         callOnMainThread(CCLayerTreeHostTest::dispatchSetNeedsCommit, this);
     }
 
+    void AcquireLayerTextures()
+    {
+        callOnMainThread(CCLayerTreeHostTest::dispatchAcquireLayerTextures, this);
+    }
+
     void postSetNeedsRedrawToMainThread()
     {
         callOnMainThread(CCLayerTreeHostTest::dispatchSetNeedsRedraw, this);
@@ -340,7 +364,7 @@ protected:
     static void onEndTest(void* self)
     {
         ASSERT(isMainThread());
-        webKitPlatformSupport()->currentThread()->exitRunLoop();
+        WebKit::Platform::current()->currentThread()->exitRunLoop();
     }
 
     static void dispatchSetNeedsAnimate(void* self)
@@ -358,7 +382,7 @@ protected:
         CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
         ASSERT(test);
         if (test->m_layerTreeHost && test->m_layerTreeHost->rootLayer())
-            addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 0, 0, 1);
+            addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 0, 0, 0.5, false);
     }
 
     static void dispatchAddAnimation(void* self)
@@ -367,7 +391,7 @@ protected:
         CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
         ASSERT(test);
         if (test->m_layerTreeHost && test->m_layerTreeHost->rootLayer())
-            addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 10, 0, 1);
+            addOpacityTransitionToLayer(*test->m_layerTreeHost->rootLayer(), 10, 0, 0.5, true);
     }
 
     static void dispatchSetNeedsAnimateAndCommit(void* self)
@@ -388,6 +412,15 @@ protected:
         ASSERT_TRUE(test);
         if (test->m_layerTreeHost)
             test->m_layerTreeHost->setNeedsCommit();
+    }
+
+    static void dispatchAcquireLayerTextures(void* self)
+    {
+      ASSERT(isMainThread());
+      CCLayerTreeHostTest* test = static_cast<CCLayerTreeHostTest*>(self);
+      ASSERT_TRUE(test);
+      if (test->m_layerTreeHost)
+          test->m_layerTreeHost->acquireLayerTextures();
     }
 
     static void dispatchSetNeedsRedraw(void* self)
@@ -464,7 +497,7 @@ protected:
     virtual void runTest(bool threaded)
     {
         if (threaded) {
-            m_webThread = adoptPtr(webKitPlatformSupport()->createThread("CCLayerTreeHostTest"));
+            m_webThread = adoptPtr(WebKit::Platform::current()->createThread("CCLayerTreeHostTest"));
             WebCompositor::initialize(m_webThread.get());
         } else
             WebCompositor::initialize(0);
@@ -473,10 +506,10 @@ protected:
         m_mainThreadProxy = CCScopedThreadProxy::create(CCProxy::mainThread());
 
         m_beginTask = new BeginTask(this);
-        webKitPlatformSupport()->currentThread()->postDelayedTask(m_beginTask, 0); // postDelayedTask takes ownership of the task
+        WebKit::Platform::current()->currentThread()->postDelayedTask(m_beginTask, 0); // postDelayedTask takes ownership of the task
         m_timeoutTask = new TimeoutTask(this);
-        webKitPlatformSupport()->currentThread()->postDelayedTask(m_timeoutTask, 5000);
-        webKitPlatformSupport()->currentThread()->enterRunLoop();
+        WebKit::Platform::current()->currentThread()->postDelayedTask(m_timeoutTask, 5000);
+        WebKit::Platform::current()->currentThread()->enterRunLoop();
 
         if (m_layerTreeHost && m_layerTreeHost->rootLayer())
             m_layerTreeHost->rootLayer()->setLayerTreeHost(0);
@@ -498,7 +531,7 @@ protected:
 
     CCSettings m_settings;
     OwnPtr<MockLayerTreeHostClient> m_client;
-    RefPtr<CCLayerTreeHost> m_layerTreeHost;
+    OwnPtr<CCLayerTreeHost> m_layerTreeHost;
 
 private:
     bool m_beginning;
@@ -520,6 +553,7 @@ void CCLayerTreeHostTest::doBeginTest()
     m_layerTreeHost = MockLayerTreeHost::create(this, m_client.get(), rootLayer, m_settings);
     ASSERT_TRUE(m_layerTreeHost);
     rootLayer->setLayerTreeHost(m_layerTreeHost.get());
+    m_layerTreeHost->setSurfaceReady();
 
     m_beginning = true;
     beginTest();
@@ -806,6 +840,134 @@ TEST_F(CCLayerTreeHostTestSetNeedsRedraw, runMultiThread)
     runTestThreaded();
 }
 
+
+// beginLayerWrite should prevent draws from executing until a commit occurs
+class CCLayerTreeHostTestWriteLayersRedraw : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestWriteLayersRedraw()
+        : m_numCommits(0)
+        , m_numDraws(0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+        AcquireLayerTextures();
+        postSetNeedsRedrawToMainThread(); // should be inhibited without blocking
+        postSetNeedsCommitToMainThread();
+    }
+
+    virtual void drawLayersOnCCThread(CCLayerTreeHostImpl* impl)
+    {
+        EXPECT_EQ(1, impl->sourceFrameNumber());
+        m_numDraws++;
+    }
+
+    virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl*)
+    {
+        m_numCommits++;
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+        EXPECT_EQ(0, m_numDraws);
+        EXPECT_EQ(1, m_numCommits);
+    }
+
+private:
+    int m_numCommits;
+    int m_numDraws;
+};
+
+TEST_F(CCLayerTreeHostTestWriteLayersRedraw, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// Verify that when resuming visibility, requesting layer write permission
+// will not deadlock the main thread even though there are not yet any
+// scheduled redraws. This behavior is critical for reliably surviving tab
+// switching. There are no failure conditions to this test, it just passes
+// by not timing out.
+class CCLayerTreeHostTestWriteLayersAfterVisible : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestWriteLayersAfterVisible()
+        : m_numCommits(0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postSetNeedsCommitToMainThread();
+    }
+
+    virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl*)
+    {
+        m_numCommits++;
+        if (m_numCommits == 2)
+            endTest();
+        else {
+            postSetVisibleToMainThread(false);
+            postSetVisibleToMainThread(true);
+            AcquireLayerTextures();
+            postSetNeedsCommitToMainThread();
+        }
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+    int m_numCommits;
+};
+
+TEST_F(CCLayerTreeHostTestWriteLayersAfterVisible, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// A compositeAndReadback while invisible should force a normal commit without assertion.
+class CCLayerTreeHostTestCompositeAndReadbackWhileInvisible : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestCompositeAndReadbackWhileInvisible()
+        : m_numCommits(0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+    }
+
+    virtual void didCommitAndDrawFrame()
+    {
+        m_numCommits++;
+        if (m_numCommits == 1) {
+            m_layerTreeHost->setVisible(false);
+            m_layerTreeHost->setNeedsCommit();
+            m_layerTreeHost->setNeedsCommit();
+            OwnArrayPtr<char> pixels(adoptArrayPtr(new char[4]));
+            m_layerTreeHost->compositeAndReadback(static_cast<void*>(pixels.get()), IntRect(0, 0, 1, 1));
+        } else
+            endTest();
+
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+    int m_numCommits;
+};
+
+TEST_F(CCLayerTreeHostTestCompositeAndReadbackWhileInvisible, runMultiThread)
+{
+    runTestThreaded();
+}
+
+
 // Trigger a frame with setNeedsCommit. Then, inside the resulting animate
 // callback, requet another frame using setNeedsAnimate. End the test when
 // animate gets called yet-again, indicating that the proxy is correctly
@@ -853,7 +1015,6 @@ public:
     CCLayerTreeHostTestAddAnimation()
         : m_numAnimates(0)
         , m_receivedAnimationStartedNotification(false)
-        , m_receivedAnimationFinishedNotification(false)
         , m_startTime(0)
         , m_firstMonotonicTime(0)
     {
@@ -878,7 +1039,6 @@ public:
         EXPECT_LT(0, m_firstMonotonicTime);
         EXPECT_NE(m_startTime, m_firstMonotonicTime);
         EXPECT_TRUE(m_receivedAnimationStartedNotification);
-        EXPECT_TRUE(m_receivedAnimationFinishedNotification);
         endTest();
     }
 
@@ -888,11 +1048,6 @@ public:
         m_startTime = wallClockTime;
     }
 
-    virtual void notifyAnimationFinished(int)
-    {
-        m_receivedAnimationFinishedNotification = true;
-    }
-
     virtual void afterTest()
     {
     }
@@ -900,7 +1055,6 @@ public:
 private:
     int m_numAnimates;
     bool m_receivedAnimationStartedNotification;
-    bool m_receivedAnimationFinishedNotification;
     double m_startTime;
     double m_firstMonotonicTime;
 };
@@ -943,6 +1097,153 @@ private:
 };
 
 TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// Ensures that animations continue to be ticked when we are backgrounded.
+class CCLayerTreeHostTestAddAnimationWithTimingFunction : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestAddAnimationWithTimingFunction()
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postAddAnimationToMainThread();
+    }
+
+    virtual void animateLayers(CCLayerTreeHostImpl* layerTreeHostImpl, double monotonicTime)
+    {
+        const CCFloatAnimationCurve* curve = m_layerTreeHost->rootLayer()->layerAnimationController()->getActiveAnimation(0, CCActiveAnimation::Opacity)->curve()->toFloatAnimationCurve();
+        float startOpacity = curve->getValue(0);
+        float endOpacity = curve->getValue(curve->duration());
+        float linearlyInterpolatedOpacity = 0.25 * endOpacity + 0.75 * startOpacity;
+        double time = curve->duration() * 0.25;
+        // If the linear timing function associated with this animation was not picked up,
+        // then the linearly interpolated opacity would be different because of the
+        // default ease timing function.
+        EXPECT_FLOAT_EQ(linearlyInterpolatedOpacity, curve->getValue(time));
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+};
+
+TEST_F(CCLayerTreeHostTestAddAnimationWithTimingFunction, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// Ensures that when opacity is being animated, this value does not cause the subtree to be skipped.
+class CCLayerTreeHostTestDoNotSkipLayersWithAnimatedOpacity : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestDoNotSkipLayersWithAnimatedOpacity()
+    {
+    }
+
+    virtual void beginTest()
+    {
+        m_layerTreeHost->rootLayer()->setDrawOpacity(1);
+        m_layerTreeHost->setViewportSize(IntSize(10, 10));
+        m_layerTreeHost->rootLayer()->setOpacity(0);
+        postAddAnimationToMainThread();
+    }
+
+    virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl*)
+    {
+        // If the subtree was skipped when preparing to draw, the layer's draw opacity
+        // will not have been updated. It should be set to 0 due to the animation.
+        // Without the animation, the layer will be skipped since it has zero opacity.
+        EXPECT_EQ(0, m_layerTreeHost->rootLayer()->drawOpacity());
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+    }
+};
+
+TEST_F(CCLayerTreeHostTestDoNotSkipLayersWithAnimatedOpacity, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// Ensures that main thread animations have their start times synchronized with impl thread animations.
+class CCLayerTreeHostTestSynchronizeAnimationStartTimes : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestSynchronizeAnimationStartTimes()
+        : m_layerTreeHostImpl(0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postAddAnimationToMainThread();
+    }
+
+    // This is guaranteed to be called before CCLayerTreeHostImpl::animateLayers.
+    virtual void willAnimateLayers(CCLayerTreeHostImpl* layerTreeHostImpl, double monotonicTime)
+    {
+        m_layerTreeHostImpl = layerTreeHostImpl;
+    }
+
+    virtual void notifyAnimationStarted(double time)
+    {
+        EXPECT_TRUE(m_layerTreeHostImpl);
+
+        CCLayerAnimationController* controllerImpl = m_layerTreeHostImpl->rootLayer()->layerAnimationController();
+        CCLayerAnimationController* controller = m_layerTreeHost->rootLayer()->layerAnimationController();
+        CCActiveAnimation* animationImpl = controllerImpl->getActiveAnimation(0, CCActiveAnimation::Opacity);
+        CCActiveAnimation* animation = controller->getActiveAnimation(0, CCActiveAnimation::Opacity);
+
+        EXPECT_EQ(animationImpl->startTime(), animation->startTime());
+
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+    CCLayerTreeHostImpl* m_layerTreeHostImpl;
+};
+
+TEST_F(CCLayerTreeHostTestSynchronizeAnimationStartTimes, runMultiThread)
+{
+    runTestThreaded();
+}
+
+// Ensures that main thread animations have their start times synchronized with impl thread animations.
+class CCLayerTreeHostTestAnimationFinishedEvents : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestAnimationFinishedEvents()
+    {
+    }
+
+    virtual void beginTest()
+    {
+        postAddInstantAnimationToMainThread();
+    }
+
+    virtual void notifyAnimationFinished(double time)
+    {
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+};
+
+TEST_F(CCLayerTreeHostTestAnimationFinishedEvents, runMultiThread)
 {
     runTestThreaded();
 }
@@ -1096,6 +1397,38 @@ TEST_F(CCLayerTreeHostTestScrollMultipleRedraw, DISABLED_runMultiThread)
     runTestThreaded();
 }
 
+// This test verifies that properties on the layer tree host are commited to the impl side.
+class CCLayerTreeHostTestCommit : public CCLayerTreeHostTest {
+public:
+
+    CCLayerTreeHostTestCommit() { }
+
+    virtual void beginTest()
+    {
+        m_layerTreeHost->setViewportSize(IntSize(20, 20));
+        m_layerTreeHost->setBackgroundColor(Color::gray);
+        m_layerTreeHost->setPageScaleFactorAndLimits(5, 5, 5);
+
+        postSetNeedsCommitToMainThread();
+    }
+
+    virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl* impl)
+    {
+        EXPECT_EQ(IntSize(20, 20), impl->viewportSize());
+        EXPECT_EQ(Color::gray, impl->backgroundColor());
+        EXPECT_EQ(5, impl->pageScale());
+
+        endTest();
+    }
+
+    virtual void afterTest() { }
+};
+
+TEST_F(CCLayerTreeHostTestCommit, runTest)
+{
+    runTest(true);
+}
+
 // Verifies that startPageScaleAnimation events propagate correctly from CCLayerTreeHost to
 // CCLayerTreeHostImpl in the MT compositor.
 class CCLayerTreeHostTestStartPageScaleAnimation : public CCLayerTreeHostTest {
@@ -1230,25 +1563,16 @@ public:
     int idlePaintContentsCount() { return m_idlePaintContentsCount; }
     void resetPaintContentsCount() { m_paintContentsCount = 0; m_idlePaintContentsCount = 0;}
 
-    int updateCount() { return m_updateCount; }
-    void resetUpdateCount() { m_updateCount = 0; }
-
-    virtual void paintContentsIfDirty(const Region& occludedScreenSpace)
+    virtual void update(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion) OVERRIDE
     {
-        ContentLayerChromium::paintContentsIfDirty(occludedScreenSpace);
+        ContentLayerChromium::update(updater, occlusion);
         m_paintContentsCount++;
     }
 
-    virtual void idlePaintContentsIfDirty(const Region& occluded)
+    virtual void idleUpdate(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion) OVERRIDE
     {
-        ContentLayerChromium::idlePaintContentsIfDirty(occluded);
+        ContentLayerChromium::idleUpdate(updater, occlusion);
         m_idlePaintContentsCount++;
-    }
-
-    virtual void updateCompositorResources(GraphicsContext3D* context, CCTextureUpdater& updater)
-    {
-        ContentLayerChromium::updateCompositorResources(context, updater);
-        m_updateCount++;
     }
 
 private:
@@ -1256,7 +1580,6 @@ private:
         : ContentLayerChromium(delegate)
         , m_paintContentsCount(0)
         , m_idlePaintContentsCount(0)
-        , m_updateCount(0)
     {
         setBounds(IntSize(10, 10));
         setIsDrawable(true);
@@ -1264,7 +1587,6 @@ private:
 
     int m_paintContentsCount;
     int m_idlePaintContentsCount;
-    int m_updateCount;
 };
 
 // Layer opacity change during paint should not prevent compositor resources from being updated during commit.
@@ -1291,16 +1613,11 @@ public:
 
     virtual void afterTest()
     {
-        // paintContentsIfDirty() should have been called once.
+        // update() should have been called once.
         EXPECT_EQ(1, m_updateCheckLayer->paintContentsCount());
 
-        // idlePaintContentsIfDirty() should have been called once
+        // idleUpdate() should have been called once
         EXPECT_EQ(1, m_updateCheckLayer->idlePaintContentsCount());
-
-        // updateCompositorResources() should have been called the same
-        // amout of times as paintContentsIfDirty().
-        EXPECT_EQ(m_updateCheckLayer->paintContentsCount(),
-                  m_updateCheckLayer->updateCount());
 
         // clear m_updateCheckLayer so CCLayerTreeHost dies.
         m_updateCheckLayer.clear();
@@ -1330,7 +1647,8 @@ public:
         IntSize viewportSize(10, 10);
         layerTreeHost()->setViewportSize(viewportSize);
 
-        layerTreeHost()->updateLayers();
+        CCTextureUpdater updater;
+        layerTreeHost()->updateLayers(updater);
 
         EXPECT_EQ(viewportSize, layerTreeHost()->viewportSize());
         EXPECT_EQ(TextureManager::highLimitBytes(viewportSize), layerTreeHost()->contentsTextureManager()->maxMemoryLimitBytes());
@@ -1457,6 +1775,18 @@ TEST_F(CCLayerTreeHostTestAtomicCommit, runMultiThread)
     runTest(true);
 }
 
+static void setLayerPropertiesForTesting(LayerChromium* layer, LayerChromium* parent, const TransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
+{
+    layer->removeAllChildren();
+    if (parent)
+        parent->addChild(layer);
+    layer->setTransform(transform);
+    layer->setAnchorPoint(anchor);
+    layer->setPosition(position);
+    layer->setBounds(bounds);
+    layer->setOpaque(opaque);
+}
+
 class CCLayerTreeHostTestAtomicCommitWithPartialUpdate : public CCLayerTreeHostTest {
 public:
     CCLayerTreeHostTestAtomicCommitWithPartialUpdate()
@@ -1471,10 +1801,11 @@ public:
     virtual void beginTest()
     {
         m_layerTreeHost->setRootLayer(m_parent);
-        m_layerTreeHost->setViewportSize(IntSize(10, 10));
-        m_parent->addChild(m_child);
-        m_child->setOpacity(0.5);
-        m_child->setBounds(IntSize(20, 20));
+        m_layerTreeHost->setViewportSize(IntSize(10, 20));
+
+        TransformationMatrix identityMatrix;
+        setLayerPropertiesForTesting(m_parent.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 20), true);
+        setLayerPropertiesForTesting(m_child.get(), m_parent.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(0, 10), IntSize(10, 10), false);
 
         postSetNeedsCommitToMainThread();
         postSetNeedsRedrawToMainThread();
@@ -1518,12 +1849,28 @@ public:
             EXPECT_EQ(3, context->numTextures());
             // Number of textures used for commit should still be two.
             EXPECT_EQ(2, context->numUsedTextures());
-            // First texture should not have been used.
-            EXPECT_FALSE(context->usedTexture(context->texture(0)));
-            // Second texture should have been used.
-            EXPECT_TRUE(context->usedTexture(context->texture(1)));
-            // New textures should have been used.
+            // First texture should have been used.
+            EXPECT_TRUE(context->usedTexture(context->texture(0)));
+            // Second texture should not have been used.
+            EXPECT_FALSE(context->usedTexture(context->texture(1)));
+            // Third texture should have been used.
             EXPECT_TRUE(context->usedTexture(context->texture(2)));
+
+            context->resetUsedTextures();
+            break;
+        case 3:
+            // Number of textures should be two.
+            EXPECT_EQ(2, context->numTextures());
+            // No textures should be used for commit.
+            EXPECT_EQ(0, context->numUsedTextures());
+
+            context->resetUsedTextures();
+            break;
+        case 4:
+            // Number of textures should be two.
+            EXPECT_EQ(2, context->numTextures());
+            // Number of textures used for commit should be one.
+            EXPECT_EQ(1, context->numUsedTextures());
 
             context->resetUsedTextures();
             break;
@@ -1537,10 +1884,14 @@ public:
     {
         CompositorFakeWebGraphicsContext3DWithTextureTracking* context = static_cast<CompositorFakeWebGraphicsContext3DWithTextureTracking*>(GraphicsContext3DPrivate::extractWebGraphicsContext3D(impl->context()));
 
-        // Number of textures used for drawing should always be two.
-        EXPECT_EQ(2, context->numUsedTextures());
+        // Number of textures used for drawing should two except for frame 4
+        // where the viewport only contains one layer.
+        if (impl->frameNumber() == 4)
+            EXPECT_EQ(1, context->numUsedTextures());
+        else
+            EXPECT_EQ(2, context->numUsedTextures());
 
-        if (impl->frameNumber() < 3) {
+        if (impl->frameNumber() < 5) {
             context->resetUsedTextures();
             postSetNeedsAnimateAndCommitToMainThread();
             postSetNeedsRedrawToMainThread();
@@ -1560,6 +1911,13 @@ public:
             // Damage part of layers.
             m_parent->setNeedsDisplayRect(FloatRect(0, 0, 5, 5));
             m_child->setNeedsDisplayRect(FloatRect(0, 0, 5, 5));
+            break;
+        case 3:
+            m_child->setNeedsDisplay();
+            m_layerTreeHost->setViewportSize(IntSize(10, 10));
+            break;
+        case 4:
+            m_layerTreeHost->setViewportSize(IntSize(10, 20));
             break;
         default:
             ASSERT_NOT_REACHED();
@@ -1593,12 +1951,14 @@ class TestLayerChromium : public LayerChromium {
 public:
     static PassRefPtr<TestLayerChromium> create() { return adoptRef(new TestLayerChromium()); }
 
-    virtual void paintContentsIfDirty(const Region& occludedScreenSpace)
+    virtual void update(CCTextureUpdater&, const CCOcclusionTracker* occlusion) OVERRIDE
     {
-        m_occludedScreenSpace = occludedScreenSpace;
+        // Gain access to internals of the CCOcclusionTracker.
+        const TestCCOcclusionTracker* testOcclusion = static_cast<const TestCCOcclusionTracker*>(occlusion);
+        m_occludedScreenSpace = testOcclusion ? testOcclusion->occlusionInScreenSpace() : Region();
     }
 
-    virtual bool drawsContent() const { return true; }
+    virtual bool drawsContent() const OVERRIDE { return true; }
 
     const Region& occludedScreenSpace() const { return m_occludedScreenSpace; }
     void clearOccludedScreenSpace() { m_occludedScreenSpace = Region(); }
@@ -1609,16 +1969,9 @@ private:
     Region m_occludedScreenSpace;
 };
 
-static void setLayerPropertiesForTesting(TestLayerChromium* layer, LayerChromium* parent, const TransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
+static void setTestLayerPropertiesForTesting(TestLayerChromium* layer, LayerChromium* parent, const TransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
 {
-    layer->removeAllChildren();
-    if (parent)
-        parent->addChild(layer);
-    layer->setTransform(transform);
-    layer->setAnchorPoint(anchor);
-    layer->setPosition(position);
-    layer->setBounds(bounds);
-    layer->setOpaque(opaque);
+    setLayerPropertiesForTesting(layer, parent, transform, anchor, position, bounds, opaque);
     layer->clearOccludedScreenSpace();
 }
 
@@ -1646,81 +1999,82 @@ public:
         // positioned on the screen.
 
         // The child layer is rotated and the grandChild is opaque, but clipped to the child and rootLayer
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), false);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), false);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        CCTextureUpdater updater;
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // If the child layer is opaque, then it adds to the occlusion seen by the rootLayer.
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
+        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
         setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
         setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 30, 70, 70), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 30, 170, 170), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // Add a second child to the root layer and the regions should merge
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(70, 20), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(70, 20), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 30, 70, 70), child2->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 30, 170, 170), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 20, 70, 80), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 20, 170, 180), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(2u, rootLayer->occludedScreenSpace().rects().size());
 
         // Move the second child to be sure.
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 30, 70, 70), child2->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 30, 170, 170), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 30, 90, 70), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 30, 190, 170), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(2u, rootLayer->occludedScreenSpace().rects().size());
 
         // If the child layer has a mask on it, then it shouldn't contribute to occlusion on stuff below it
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
+        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
         setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
         setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
         setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
@@ -1729,20 +2083,20 @@ public:
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // If the child layer with a mask is below child2, then child2 should contribute to occlusion on everything, and child shouldn't contribute to the rootLayer
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
+        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
         setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
         setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
         setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
@@ -1751,62 +2105,62 @@ public:
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), grandChild->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 40, 90, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 40, 190, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(2u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // If the child layer has a non-opaque drawOpacity, then it shouldn't contribute to occlusion on stuff below it
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         child->setMaskLayer(0);
         child->setOpacity(0.5);
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // If the child layer with non-opaque drawOpacity is below child2, then child2 should contribute to occlusion on everything, and child shouldn't contribute to the rootLayer
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
 
         child->setMaskLayer(0);
         child->setOpacity(0.5);
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), grandChild->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 40, 90, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 40, 190, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(2u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // Kill the layerTreeHost immediately.
@@ -1845,10 +2199,10 @@ public:
 
         // If the child layer has a filter that changes alpha values, and is below child2, then child2 should contribute to occlusion on everything,
         // and child shouldn't contribute to the rootLayer
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
 
         {
             FilterOperations filters;
@@ -1858,24 +2212,25 @@ public:
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        CCTextureUpdater updater;
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, child2->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), grandChild->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 40, 90, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 40, 190, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(2u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // If the child layer has a filter that moves pixels/changes alpha, and is below child2, then child should not inherit occlusion from outside its subtree,
         // and should not contribute to the rootLayer
-        setLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
-        setLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
-        setLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(rootLayer.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
+        setTestLayerPropertiesForTesting(child.get(), rootLayer.get(), childTransform, FloatPoint(0, 0), FloatPoint(30, 30), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
+        setTestLayerPropertiesForTesting(child2.get(), rootLayer.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 70), IntSize(500, 500), true);
 
         {
             FilterOperations filters;
@@ -1885,22 +2240,23 @@ public:
 
         m_layerTreeHost->setRootLayer(rootLayer);
         m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers();
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, child2->occludedScreenSpace().rects().size());
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
         EXPECT_EQ(0u, grandChild->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(30, 40, 70, 60), child->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(30, 40, 170, 160), child->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, child->occludedScreenSpace().rects().size());
-        EXPECT_EQ_RECT(IntRect(10, 70, 90, 30), rootLayer->occludedScreenSpace().bounds());
+        EXPECT_EQ_RECT(IntRect(10, 70, 190, 130), rootLayer->occludedScreenSpace().bounds());
         EXPECT_EQ(1u, rootLayer->occludedScreenSpace().rects().size());
 
         // Kill the layerTreeHost immediately.
         m_layerTreeHost->setRootLayer(0);
         m_layerTreeHost.clear();
 
+        CCLayerTreeHost::setNeedsFilterContext(false);
         endTest();
     }
 
@@ -1928,10 +2284,10 @@ public:
         for (int i = 0; i < numSurfaces; ++i) {
             layers.append(TestLayerChromium::create());
             if (!i) {
-                setLayerPropertiesForTesting(layers.last().get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
+                setTestLayerPropertiesForTesting(layers.last().get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(200, 200), true);
                 layers.last()->createRenderSurface();
             } else {
-                setLayerPropertiesForTesting(layers.last().get(), layers[layers.size()-2].get(), identityMatrix, FloatPoint(0, 0), FloatPoint(1, 1), IntSize(100-i, 100-i), true);
+                setTestLayerPropertiesForTesting(layers.last().get(), layers[layers.size()-2].get(), identityMatrix, FloatPoint(0, 0), FloatPoint(1, 1), IntSize(200-i, 200-i), true);
                 layers.last()->setMasksToBounds(true);
                 layers.last()->setReplicaLayer(replica.get()); // Make it have a RenderSurface
             }
@@ -1939,16 +2295,17 @@ public:
 
         for (int i = 1; i < numSurfaces; ++i) {
             children.append(TestLayerChromium::create());
-            setLayerPropertiesForTesting(children.last().get(), layers[i].get(), identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(500, 500), false);
+            setTestLayerPropertiesForTesting(children.last().get(), layers[i].get(), identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(500, 500), false);
         }
 
         m_layerTreeHost->setRootLayer(layers[0].get());
         m_layerTreeHost->setViewportSize(layers[0]->bounds());
-        m_layerTreeHost->updateLayers();
+        CCTextureUpdater updater;
+        m_layerTreeHost->updateLayers(updater);
         m_layerTreeHost->commitComplete();
 
         for (int i = 0; i < numSurfaces-1; ++i) {
-            IntRect expectedOcclusion(i+1, i+1, 100-i-1, 100-i-1);
+            IntRect expectedOcclusion(i+1, i+1, 200-i-1, 200-i-1);
 
             EXPECT_EQ_RECT(expectedOcclusion, layers[i]->occludedScreenSpace().bounds());
             EXPECT_EQ(1u, layers[i]->occludedScreenSpace().rects().size());
@@ -2032,6 +2389,59 @@ public:
 };
 
 TEST_F(CCLayerTreeHostTestSetRepeatedLostContext, runMultiThread)
+{
+    runTestThreaded();
+}
+
+class CCLayerTreeHostTestFractionalScroll : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestFractionalScroll()
+        : m_scrollAmount(1.75, 0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+        m_layerTreeHost->rootLayer()->setScrollable(true);
+        postSetNeedsCommitToMainThread();
+    }
+
+    virtual void drawLayersOnCCThread(CCLayerTreeHostImpl* impl)
+    {
+        CCLayerImpl* root = impl->rootLayer();
+        root->setMaxScrollPosition(IntSize(100, 100));
+
+        // Check that a fractional scroll delta is correctly accumulated over multiple commits.
+        if (impl->frameNumber() == 1) {
+            EXPECT_EQ(root->scrollPosition(), IntPoint(0, 0));
+            EXPECT_EQ(root->scrollDelta(), FloatSize(0, 0));
+            postSetNeedsCommitToMainThread();
+        } else if (impl->frameNumber() == 2) {
+            EXPECT_EQ(root->scrollPosition(), flooredIntPoint(m_scrollAmount));
+            EXPECT_EQ(root->scrollDelta(), FloatSize(fmod(m_scrollAmount.width(), 1), 0));
+            postSetNeedsCommitToMainThread();
+        } else if (impl->frameNumber() == 3) {
+            EXPECT_EQ(root->scrollPosition(), flooredIntPoint(m_scrollAmount + m_scrollAmount));
+            EXPECT_EQ(root->scrollDelta(), FloatSize(fmod(2 * m_scrollAmount.width(), 1), 0));
+            endTest();
+        }
+        root->scrollBy(m_scrollAmount);
+    }
+
+    virtual void applyScrollAndScale(const IntSize& scrollDelta, float scale)
+    {
+        IntPoint position = m_layerTreeHost->rootLayer()->scrollPosition();
+        m_layerTreeHost->rootLayer()->setScrollPosition(position + scrollDelta);
+    }
+
+    virtual void afterTest()
+    {
+    }
+private:
+    FloatSize m_scrollAmount;
+};
+
+TEST_F(CCLayerTreeHostTestFractionalScroll, runMultiThread)
 {
     runTestThreaded();
 }

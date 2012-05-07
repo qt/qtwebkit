@@ -118,12 +118,12 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         window.open(url, "_blank");
     },
 
-    canSaveAs: function(fileName, content)
+    canSave: function()
     {
         return true;
     },
 
-    saveAs: function(fileName, content)
+    save: function(url, content, forceSaveAs)
     {
         var builder = new WebKitBlobBuilder();
         builder.append(content);
@@ -135,6 +135,15 @@ WebInspector.InspectorFrontendHostStub.prototype = {
             window.location = this.result;
         }
         fr.readAsDataURL(blob);
+    },
+
+    canAppend: function()
+    {
+        return false;
+    },
+
+    append: function(url, content)
+    {
     },
 
     sendMessageToBackend: function(message)
@@ -167,3 +176,4 @@ var InspectorFrontendHost = new WebInspector.InspectorFrontendHostStub();
 Preferences.localizeUI = false;
 
 }
+

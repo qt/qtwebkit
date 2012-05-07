@@ -70,16 +70,6 @@ bool WebUserMediaRequest::video() const
     return m_private->video();
 }
 
-bool WebUserMediaRequest::cameraPreferenceUser() const
-{
-    return m_private->cameraPreferenceUser();
-}
-
-bool WebUserMediaRequest::cameraPreferenceEnvironment() const
-{
-    return m_private->cameraPreferenceEnvironment();
-}
-
 WebSecurityOrigin WebUserMediaRequest::securityOrigin() const
 {
     ASSERT(m_private->scriptExecutionContext());
@@ -100,24 +90,6 @@ void WebUserMediaRequest::requestSucceeded(const WebVector<WebMediaStreamSource>
     for (size_t i = 0; i < videoSources.size(); ++i) {
         MediaStreamSource* curr = videoSources[i];
         video.append(curr);
-    }
-
-    m_private->succeed(audio, video);
-}
-
-// FIXME: Cleanup when the chromium code has switched to the split sources implementation.
-void WebUserMediaRequest::requestSucceeded(const WebVector<WebMediaStreamSource>& sources)
-{
-    if (m_private.isNull())
-        return;
-
-    MediaStreamSourceVector audio, video;
-    for (size_t i = 0; i < sources.size(); ++i) {
-        MediaStreamSource* curr = sources[i];
-        if (curr->type() == MediaStreamSource::TypeAudio)
-            audio.append(curr);
-        else if (curr->type() == MediaStreamSource::TypeVideo)
-            video.append(curr);
     }
 
     m_private->succeed(audio, video);

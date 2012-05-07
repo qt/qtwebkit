@@ -68,13 +68,10 @@ private:
     
     void timerFired(Timer<SMILTimeContainer>*);
     void startTimer(SMILTime fireTime, SMILTime minimumDelay = 0);
-    void updateAnimations(SMILTime elapsed);
+    void updateAnimations(SMILTime elapsed, bool seekToTime = false);
     
     void updateDocumentOrderIndexes();
     void sortByPriority(Vector<SVGSMILElement*>& smilElements, SMILTime elapsed);
-    
-    typedef pair<SVGElement*, QualifiedName> ElementAttributePair;
-    String baseValueFor(ElementAttributePair);
     
     double m_beginTime;
     double m_pauseTime;
@@ -87,9 +84,6 @@ private:
 
     typedef HashSet<SVGSMILElement*> TimingElementSet;
     TimingElementSet m_scheduledAnimations;
-    
-    typedef HashMap<ElementAttributePair, String> BaseValueMap;
-    BaseValueMap m_savedBaseValues;
 
     SVGSVGElement* m_ownerSVGElement;
 };

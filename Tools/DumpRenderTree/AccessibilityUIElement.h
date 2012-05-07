@@ -177,6 +177,7 @@ public:
     AccessibilityUIElement selectedRowAtIndex(unsigned);
     AccessibilityUIElement disclosedByRow();
     AccessibilityUIElement disclosedRowAtIndex(unsigned);
+    AccessibilityUIElement rowAtIndex(unsigned);
 
     // ARIA specific
     AccessibilityUIElement ariaOwnsElementAtIndex(unsigned);
@@ -190,6 +191,7 @@ public:
     // Parameterized attributes
     int lineForIndex(int);
     JSStringRef rangeForLine(int);
+    JSStringRef rangeForPosition(int x, int y);
     JSStringRef boundsForRange(unsigned location, unsigned length);
     void setSelectedTextRange(unsigned location, unsigned length);
     JSStringRef stringForRange(unsigned location, unsigned length);
@@ -216,7 +218,10 @@ public:
     JSStringRef stringForTextMarkerRange(AccessibilityTextMarkerRange*);
     int textMarkerRangeLength(AccessibilityTextMarkerRange*);
     bool attributedStringForTextMarkerRangeContainsAttribute(JSStringRef, AccessibilityTextMarkerRange*);
-
+    int indexForTextMarker(AccessibilityTextMarker*);
+    bool isTextMarkerValid(AccessibilityTextMarker*);
+    AccessibilityTextMarker textMarkerForIndex(int);
+    
     void scrollToMakeVisible();
     void scrollToMakeVisibleWithSubFocus(int x, int y, int width, int height);
     void scrollToGlobalPoint(int x, int y);

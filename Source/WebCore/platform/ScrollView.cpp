@@ -319,6 +319,9 @@ IntPoint ScrollView::minimumScrollPosition() const
 
 IntPoint ScrollView::adjustScrollPositionWithinRange(const IntPoint& scrollPoint) const
 {
+    if (!constrainsScrollingToContentEdge())
+        return scrollPoint;
+
     IntPoint newScrollPosition = scrollPoint.shrunkTo(maximumScrollPosition());
     newScrollPosition = newScrollPosition.expandedTo(minimumScrollPosition());
     return newScrollPosition;
@@ -326,6 +329,13 @@ IntPoint ScrollView::adjustScrollPositionWithinRange(const IntPoint& scrollPoint
 
 int ScrollView::scrollSize(ScrollbarOrientation orientation) const
 {
+    // If no scrollbars are present, it does not indicate content is not be scrollable.
+    if (!m_horizontalScrollbar && !m_verticalScrollbar && !prohibitsScrolling()) {
+        IntSize scrollSize = m_contentsSize - visibleContentRect().size();
+        scrollSize.clampNegativeToZero();
+        return orientation == HorizontalScrollbar ? scrollSize.width() : scrollSize.height();
+    }
+
     Scrollbar* scrollbar = ((orientation == HorizontalScrollbar) ? m_horizontalScrollbar : m_verticalScrollbar).get();
     return scrollbar ? (scrollbar->totalSize() - scrollbar->visibleSize()) : 0;
 }
@@ -362,6 +372,7 @@ void ScrollView::scrollTo(const IntSize& newOffset)
 
     repaintFixedElementsAfterScrolling();
     scrollContents(scrollDelta);
+    updateFixedElementsAfterScrolling();
 }
 
 int ScrollView::scrollPosition(Scrollbar* scrollbar) const
@@ -590,7 +601,13 @@ void ScrollView::updateScrollbars(const IntSize& desiredOffset)
             invalidateScrollCornerRect(oldScrollCornerRect);
     }
 
-    IntPoint adjustedScrollPosition = adjustScrollPositionWithinRange(IntPoint(desiredOffset));
+    IntPoint adjustedScrollPosition = IntPoint(desiredOffset);
+
+    if (ScrollAnimator* scrollAnimator = existingScrollAnimator()) {
+        if (!scrollAnimator->isRubberBandInProgress())
+            adjustedScrollPosition = adjustScrollPositionWithinRange(adjustedScrollPosition);
+    }
+
     if (adjustedScrollPosition != scrollPosition() || scrollOriginChanged()) {
         ScrollableArea::scrollToOffsetWithoutAnimation(adjustedScrollPosition + IntSize(scrollOrigin().x(), scrollOrigin().y()));
         resetScrollOriginChanged();

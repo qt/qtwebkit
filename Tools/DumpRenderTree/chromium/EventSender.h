@@ -97,8 +97,11 @@ public:
     void touchStart(const CppArgumentList&, CppVariant*);
     void updateTouchPoint(const CppArgumentList&, CppVariant*);
 
+    void gestureFlingCancel(const CppArgumentList&, CppVariant*);
+    void gestureFlingStart(const CppArgumentList&, CppVariant*);
     void gestureScrollBegin(const CppArgumentList&, CppVariant*);
     void gestureScrollEnd(const CppArgumentList&, CppVariant*);
+    void gestureScrollFirstPoint(const CppArgumentList&, CppVariant*);
     void gestureScrollUpdate(const CppArgumentList&, CppVariant*);
     void gestureTap(const CppArgumentList&, CppVariant*);
     void gestureEvent(WebKit::WebInputEvent::Type, const CppArgumentList&);

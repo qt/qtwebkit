@@ -55,7 +55,7 @@ private:
     virtual bool isViewFocused();
     virtual bool isViewVisible();
     virtual bool isViewInWindow();
-    virtual LayerHostingMode layerHostingMode();
+    virtual LayerHostingMode viewLayerHostingMode() OVERRIDE;
 
     virtual void processDidCrash();
     virtual void pageClosed();
@@ -63,7 +63,7 @@ private:
     virtual void toolTipChanged(const String& oldToolTip, const String& newToolTip);
     virtual void setCursor(const WebCore::Cursor&);
     virtual void setCursorHiddenUntilMouseMoves(bool);
-    virtual void didChangeViewportProperties(const WebCore::ViewportArguments&);
+    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
 
     virtual void registerEditCommand(PassRefPtr<WebEditCommandProxy>, WebPageProxy::UndoOrRedo);
     virtual void clearAllEditCommands();
@@ -72,6 +72,8 @@ private:
     virtual bool interpretKeyEvent(const NativeWebKeyboardEvent&, Vector<WebCore::KeypressCommand>&);
     virtual bool executeSavedCommandBySelector(const String& selector);
     virtual void setDragImage(const WebCore::IntPoint& clientPosition, PassRefPtr<ShareableBitmap> dragImage, bool isLinkDrag);
+    virtual void setPromisedData(const String& pasteboardName, PassRefPtr<WebCore::SharedBuffer> imageBuffer, const String& filename, const String& extension, const String& title,
+                                 const String& url, const String& visibleUrl, PassRefPtr<WebCore::SharedBuffer> archiveBuffer);
     virtual void updateTextInputState(bool updateSecureInputState);
     virtual void resetTextInputState();
 
@@ -118,10 +120,10 @@ private:
     virtual void didPerformDictionaryLookup(const String&, double scaleFactor, const DictionaryPopupInfo&);
     virtual void dismissDictionaryLookupPanel();
 
-    virtual void showCorrectionPanel(WebCore::CorrectionPanelInfo::PanelType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings);
-    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingCorrectionPanel);
-    virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingCorrectionPanel);
-    virtual void recordAutocorrectionResponse(WebCore::EditorClient::AutocorrectionResponseType, const String& replacedString, const String& replacementString);
+    virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings);
+    virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingAlternativeText);
+    virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText);
+    virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponseType, const String& replacedString, const String& replacementString);
 
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle);
 

@@ -32,6 +32,7 @@ QWebPreferences* QWebPreferencesPrivate::createPreferences(QQuickWebViewPrivate*
 {
     QWebPreferences* prefs = new QWebPreferences;
     prefs->d->webViewPrivate = webViewPrivate;
+    prefs->d->initializeDefaultFontSettings();
     return prefs;
 }
 
@@ -40,6 +41,10 @@ bool QWebPreferencesPrivate::testAttribute(QWebPreferencesPrivate::WebAttribute 
     switch (attr) {
     case AutoLoadImages:
         return WKPreferencesGetLoadsImagesAutomatically(preferencesRef());
+#if ENABLE(FULLSCREEN_API)
+    case FullScreenEnabled:
+        return WKPreferencesGetFullScreenEnabled(preferencesRef());
+#endif
     case JavascriptEnabled:
         return WKPreferencesGetJavaScriptEnabled(preferencesRef());
     case PluginsEnabled:
@@ -56,6 +61,8 @@ bool QWebPreferencesPrivate::testAttribute(QWebPreferencesPrivate::WebAttribute 
         return WKPreferencesGetDNSPrefetchingEnabled(preferencesRef());
     case FrameFlatteningEnabled:
         return WKPreferencesGetFrameFlatteningEnabled(preferencesRef());
+    case DeveloperExtrasEnabled:
+        return WKPreferencesGetDeveloperExtrasEnabled(preferencesRef());
     default:
         ASSERT_NOT_REACHED();
         return false;
@@ -68,6 +75,11 @@ void QWebPreferencesPrivate::setAttribute(QWebPreferencesPrivate::WebAttribute a
     case AutoLoadImages:
         WKPreferencesSetLoadsImagesAutomatically(preferencesRef(), enable);
         break;
+#if ENABLE(FULLSCREEN_API)
+    case FullScreenEnabled:
+        WKPreferencesSetFullScreenEnabled(preferencesRef(), enable);
+        break;
+#endif
     case JavascriptEnabled:
         WKPreferencesSetJavaScriptEnabled(preferencesRef(), enable);
         break;
@@ -91,10 +103,36 @@ void QWebPreferencesPrivate::setAttribute(QWebPreferencesPrivate::WebAttribute a
         break;
     case FrameFlatteningEnabled:
         WKPreferencesSetFrameFlatteningEnabled(preferencesRef(), enable);
+    case DeveloperExtrasEnabled:
+        WKPreferencesSetDeveloperExtrasEnabled(preferencesRef(), enable);
         break;
     default:
         ASSERT_NOT_REACHED();
     }
+}
+
+void QWebPreferencesPrivate::initializeDefaultFontSettings()
+{
+    setFontSize(MinimumFontSize, 0);
+    setFontSize(DefaultFontSize, 16);
+    setFontSize(DefaultFixedFontSize, 13);
+
+    QFont defaultFont;
+    defaultFont.setStyleHint(QFont::Serif);
+    setFontFamily(StandardFont, defaultFont.defaultFamily());
+    setFontFamily(SerifFont, defaultFont.defaultFamily());
+
+    defaultFont.setStyleHint(QFont::Fantasy);
+    setFontFamily(FantasyFont, defaultFont.defaultFamily());
+
+    defaultFont.setStyleHint(QFont::Cursive);
+    setFontFamily(CursiveFont, defaultFont.defaultFamily());
+
+    defaultFont.setStyleHint(QFont::SansSerif);
+    setFontFamily(SansSerifFont, defaultFont.defaultFamily());
+
+    defaultFont.setStyleHint(QFont::Monospace);
+    setFontFamily(FixedFont, defaultFont.defaultFamily());
 }
 
 void QWebPreferencesPrivate::setFontFamily(QWebPreferencesPrivate::FontFamily which, const QString& family)
@@ -208,6 +246,25 @@ void QWebPreferences::setAutoLoadImages(bool enable)
     emit autoLoadImagesChanged();
 }
 
+bool QWebPreferences::fullScreenEnabled() const
+{
+#if ENABLE(FULLSCREEN_API)
+    return d->testAttribute(QWebPreferencesPrivate::FullScreenEnabled);
+#else
+    return false;
+#endif
+}
+
+void QWebPreferences::setFullScreenEnabled(bool enable)
+{
+#if ENABLE(FULLSCREEN_API)
+    d->setAttribute(QWebPreferencesPrivate::FullScreenEnabled, enable);
+    emit fullScreenEnabledChanged();
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
 bool QWebPreferences::javascriptEnabled() const
 {
     return d->testAttribute(QWebPreferencesPrivate::JavascriptEnabled);
@@ -283,6 +340,17 @@ void QWebPreferences::setDnsPrefetchEnabled(bool enable)
 {
     d->setAttribute(QWebPreferencesPrivate::DnsPrefetchEnabled, enable);
     emit dnsPrefetchEnabledChanged();
+}
+
+bool QWebPreferences::developerExtrasEnabled() const
+{
+    return d->testAttribute(QWebPreferencesPrivate::DeveloperExtrasEnabled);
+}
+
+void QWebPreferences::setDeveloperExtrasEnabled(bool enable)
+{
+    d->setAttribute(QWebPreferencesPrivate::DeveloperExtrasEnabled, enable);
+    emit developerExtrasEnabledChanged();
 }
 
 bool QWebPreferences::navigatorQtObjectEnabled() const

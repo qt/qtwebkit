@@ -32,6 +32,7 @@
 #include "AnimationBase.h"
 #include "AnimationControllerPrivate.h"
 #include "CSSParser.h"
+#include "CSSPropertyAnimation.h"
 #include "CompositeAnimation.h"
 #include "EventNames.h"
 #include "Frame.h"
@@ -113,6 +114,26 @@ double AnimationControllerPrivate::updateAnimations(SetChanged callSetChanged/* 
         m_frame->document()->updateStyleIfNeeded();
 
     return timeToNextService;
+}
+
+void AnimationControllerPrivate::updateAnimationTimerForRenderer(RenderObject* renderer)
+{
+    static double previousTimeToNextService = 0;
+    double timeToNextService = 0;
+
+    RefPtr<CompositeAnimation> compAnim = m_compositeAnimations.get(renderer);
+    if (!compAnim->suspended() && compAnim->hasAnimations())
+        timeToNextService = compAnim->timeToNextService();
+
+    if (m_animationTimer.isActive()) {
+        if (previousTimeToNextService < timeToNextService)
+            return;
+
+        m_animationTimer.stop();
+    }
+
+    previousTimeToNextService = timeToNextService;
+    m_animationTimer.startOneShot(timeToNextService);
 }
 
 void AnimationControllerPrivate::updateAnimationTimer(SetChanged callSetChanged/* = DoNotCallSetChanged*/)
@@ -517,7 +538,7 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     RefPtr<RenderStyle> blendedStyle = rendererAnimations->animate(renderer, oldStyle, newStyle);
 
     if (renderer->parent() || newStyle->animations() || (oldStyle && oldStyle->animations())) {
-        m_data->updateAnimationTimer();
+        m_data->updateAnimationTimerForRenderer(renderer);
 #if ENABLE(REQUEST_ANIMATION_FRAME)
         if (FrameView* view = renderer->document()->view())
             view->scheduleAnimation();
@@ -527,7 +548,7 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     if (blendedStyle != newStyle) {
         // If the animations/transitions change opacity or transform, we need to update
         // the style to impose the stacking rules. Note that this is also
-        // done in CSSStyleSelector::adjustRenderStyle().
+        // done in StyleResolver::adjustRenderStyle().
         if (blendedStyle->hasAutoZIndex() && (blendedStyle->opacity() < 1.0f || blendedStyle->hasTransform()))
             blendedStyle->setZIndex(0);
     }
@@ -609,7 +630,7 @@ void AnimationController::endAnimationUpdate()
 bool AnimationController::supportsAcceleratedAnimationOfProperty(CSSPropertyID property)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    return AnimationBase::animationOfPropertyIsAccelerated(property);
+    return CSSPropertyAnimation::animationOfPropertyIsAccelerated(property);
 #else
     UNUSED_PARAM(property);
     return false;

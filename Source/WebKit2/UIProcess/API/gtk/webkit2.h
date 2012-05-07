@@ -25,21 +25,25 @@
 
 #include <webkit2/WebKitBackForwardList.h>
 #include <webkit2/WebKitBackForwardListItem.h>
+#include <webkit2/WebKitCookieManager.h>
 #include <webkit2/WebKitDefines.h>
 #include <webkit2/WebKitDownload.h>
 #include <webkit2/WebKitEditingCommands.h>
 #include <webkit2/WebKitEnumTypes.h>
 #include <webkit2/WebKitError.h>
+#include <webkit2/WebKitFileChooserRequest.h>
 #include <webkit2/WebKitFindController.h>
 #include <webkit2/WebKitHitTestResult.h>
+#include <webkit2/WebKitJavascriptResult.h>
 #include <webkit2/WebKitPrintOperation.h>
 #include <webkit2/WebKitScriptDialog.h>
 #include <webkit2/WebKitSettings.h>
 #include <webkit2/WebKitURIRequest.h>
 #include <webkit2/WebKitURIResponse.h>
 #include <webkit2/WebKitWebContext.h>
-#include <webkit2/WebKitWebViewBase.h>
+#include <webkit2/WebKitWebResource.h>
 #include <webkit2/WebKitWebView.h>
+#include <webkit2/WebKitWebViewBase.h>
 #include <webkit2/WebKitWindowProperties.h>
 
 #undef __WEBKIT2_H_INSIDE__

@@ -39,19 +39,33 @@ public:
     InPageSearchManager(WebPagePrivate*);
     ~InPageSearchManager();
 
-    bool findNextString(const String& text, bool forward);
+    bool findNextString(const String&, WebCore::FindOptions, bool wrap, bool highlightAllMatches);
     void frameUnloaded(const WebCore::Frame*);
 
 private:
-    void clearTextMatches();
-    void setMarkerActive(WebCore::Range*, bool);
-    bool findAndMarkText(const String&, WebCore::Range*, WebCore::Frame*, const WebCore::FindOptions&);
-    bool shouldSearchForText(const String&);
+    class DeferredScopeStringMatches;
+    friend class DeferredScopeStringMatches;
 
+    void clearTextMatches();
+    void setActiveMatchAndMarker(PassRefPtr<WebCore::Range>);
+    bool findAndMarkText(const String&, WebCore::Range*, WebCore::Frame*, const WebCore::FindOptions&, bool);
+    bool shouldSearchForText(const String&);
+    void scopeStringMatches(const String& text, bool reset, WebCore::Frame* scopingFrame = 0);
+    void scopeStringMatchesSoon(WebCore::Frame* scopingFrame, const String& text, bool reset);
+    void callScopeStringMatches(DeferredScopeStringMatches* caller, WebCore::Frame* scopingFrame, const String& text, bool reset);
+    void cancelPendingScopingEffort();
+
+    Vector<DeferredScopeStringMatches*> m_deferredScopingWork;
     WebPagePrivate* m_webPage;
     RefPtr<WebCore::Range> m_activeMatch;
+    RefPtr<WebCore::Range> m_resumeScopingFromRange;
     String m_activeSearchString;
     int m_activeMatchCount;
+    bool m_scopingComplete;
+    bool m_scopingCaseInsensitive;
+    bool m_locatingActiveMatch;
+    bool m_highlightAllMatches;
+    int m_activeMatchIndex;
 };
 
 }

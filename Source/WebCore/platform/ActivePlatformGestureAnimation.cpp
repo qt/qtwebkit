@@ -30,26 +30,57 @@
 #include "PlatformGestureCurve.h"
 #include "PlatformGestureCurveTarget.h"
 
+#if PLATFORM(CHROMIUM)
+#include "TraceEvent.h"
+#endif
+
 namespace WebCore {
 
-PassOwnPtr<ActivePlatformGestureAnimation> ActivePlatformGestureAnimation::create(double startTime, PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target)
+PassOwnPtr<ActivePlatformGestureAnimation> ActivePlatformGestureAnimation::create(PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target)
 {
-    return adoptPtr(new ActivePlatformGestureAnimation(startTime, curve, target));
+    return adoptPtr(new ActivePlatformGestureAnimation(curve, target));
+}
+
+PassOwnPtr<ActivePlatformGestureAnimation> ActivePlatformGestureAnimation::create(PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target, double startTime)
+{
+    return adoptPtr(new ActivePlatformGestureAnimation(curve, target, startTime));
 }
 
 ActivePlatformGestureAnimation::~ActivePlatformGestureAnimation()
 {
+#if PLATFORM(CHROMIUM)
+    TRACE_EVENT_ASYNC_END0("input", "GestureAnimation", this);
+#endif
 }
 
-ActivePlatformGestureAnimation::ActivePlatformGestureAnimation(double startTime, PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target)
-    : m_startTime(startTime)
+ActivePlatformGestureAnimation::ActivePlatformGestureAnimation(PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target)
+    : m_startTime(0)
+    , m_waitingForFirstTick(true)
     , m_curve(curve)
     , m_target(target)
 {
+#if PLATFORM(CHROMIUM)
+    TRACE_EVENT_ASYNC_BEGIN1("input", "GestureAnimation", this, "curve", m_curve->debugName());
+#endif
+}
+
+ActivePlatformGestureAnimation::ActivePlatformGestureAnimation(PassOwnPtr<PlatformGestureCurve> curve, PlatformGestureCurveTarget* target, double startTime)
+    : m_startTime(startTime)
+    , m_waitingForFirstTick(false)
+    , m_curve(curve)
+    , m_target(target)
+{
+#if PLATFORM(CHROMIUM)
+    TRACE_EVENT_ASYNC_BEGIN1("input", "GestureAnimation", this, "curve", m_curve->debugName());
+#endif
 }
 
 bool ActivePlatformGestureAnimation::animate(double time)
 {
+    if (m_waitingForFirstTick) {
+        m_startTime = time;
+        m_waitingForFirstTick = false;
+    }
     // All PlatformGestureCurves assume zero-based time, so we subtract
     // the animation start time before passing to the curve.
     return m_curve->apply(time - m_startTime, m_target);

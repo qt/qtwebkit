@@ -26,7 +26,8 @@
 
 #include "GraphicsLayerTextureMapper.h"
 #include "ImageBuffer.h"
-#include "MathExtras.h"
+
+#include <wtf/MathExtras.h>
 
 namespace WebCore {
 
@@ -130,7 +131,9 @@ void TextureMapperLayer::updateBackingStore(TextureMapper* textureMapper, Graphi
     image = imageBuffer->copyImage(CopyBackingStore);
 #endif
 
-    static_cast<TextureMapperTiledBackingStore*>(m_backingStore.get())->updateContents(textureMapper, image.get(), m_size, dirtyRect, BitmapTexture::BGRAFormat);
+    static_cast<TextureMapperTiledBackingStore*>(m_backingStore.get())->updateContents(textureMapper, image.get(), m_size, dirtyRect);
+    m_state.needsDisplay = false;
+    m_state.needsDisplayRect = IntRect();
 }
 
 void TextureMapperLayer::paint()
@@ -146,10 +149,10 @@ void TextureMapperLayer::paint()
 void TextureMapperLayer::paintSelf(const TextureMapperPaintOptions& options)
 {
     // We apply the following transform to compensate for painting into a surface, and then apply the offset so that the painting fits in the target rect.
-    TransformationMatrix transform =
-            TransformationMatrix(options.transform)
-            .multiply(m_transform.combined())
-            .translate(options.offset.width(), options.offset.height());
+    TransformationMatrix transform;
+    transform.translate(options.offset.width(), options.offset.height());
+    transform.multiply(options.transform);
+    transform.multiply(m_transform.combined());
 
     float opacity = options.opacity;
     RefPtr<BitmapTexture> mask = options.mask;
@@ -213,6 +216,23 @@ IntRect TextureMapperLayer::intermediateSurfaceRect(const TransformationMatrix& 
     return rect;
 }
 
+TextureMapperLayer::ContentsLayerCount TextureMapperLayer::countPotentialLayersWithContents() const
+{
+    int selfLayersWithContents = (m_state.drawsContent ? 1 : 0) + (m_contentsLayer ? 1 : 0);
+    int potentialLayersWithContents = selfLayersWithContents + m_children.size();
+
+    if (!potentialLayersWithContents)
+        return NoLayersWithContent;
+
+    if (potentialLayersWithContents > 1)
+        return MultipleLayersWithContents;
+
+    if (m_children.isEmpty())
+        return SingleLayerWithContents;
+
+    return m_children.first()->countPotentialLayersWithContents();
+}
+
 bool TextureMapperLayer::shouldPaintToIntermediateSurface() const
 {
 #if ENABLE(CSS_FILTERS)
@@ -220,7 +240,7 @@ bool TextureMapperLayer::shouldPaintToIntermediateSurface() const
         return true;
 #endif
     bool hasOpacity = m_opacity < 0.99;
-    bool hasChildren = !m_children.isEmpty();
+    bool canHaveMultipleLayersWithContent = countPotentialLayersWithContents() == MultipleLayersWithContents;
     bool hasReplica = !!m_state.replicaLayer;
     bool hasMask = !!m_state.maskLayer;
 
@@ -230,13 +250,13 @@ bool TextureMapperLayer::shouldPaintToIntermediateSurface() const
 
     // We should use an intermediate surface when blending several items with an ancestor opacity.
     // Tested by compositing/reflections/reflection-opacity.html
-    if (hasOpacity && (hasChildren || hasReplica))
+    if (hasOpacity && (canHaveMultipleLayersWithContent || hasReplica))
         return true;
 
     // We should use an intermediate surface with a masked ancestor.
     // In the case of replicas the mask is applied before replicating.
     // Tested by compositing/masks/masked-ancestor.html
-    if (hasMask && hasChildren && !hasReplica)
+    if (hasMask && canHaveMultipleLayersWithContent && !hasReplica)
         return true;
 
     return false;
@@ -286,8 +306,7 @@ static PassRefPtr<BitmapTexture> applyFilters(const FilterOperations& filters, T
         filterSurface = textureMapper->acquireTextureFromPool(targetRect.size());
     }
 
-    filterSurface->applyFilters(*source, filters);
-    return filterSurface;
+    return filterSurface->applyFilters(*source, filters);
 }
 #endif
 
@@ -318,8 +337,7 @@ void TextureMapperLayer::paintRecursive(const TextureMapperPaintOptions& options
     options.textureMapper->bindSurface(surface.get());
     paintOptions.opacity = 1;
 
-    // We have to use combinedForChildren() and not combined(), otherwise preserve-3D doesn't work.
-    paintOptions.transform = m_transform.combinedForChildren().inverse();
+    paintOptions.transform = m_transform.combined().inverse();
     paintOptions.offset = -IntSize(surfaceRect.x(), surfaceRect.y());
 
     paintSelfAndChildrenWithReplica(paintOptions);
@@ -333,10 +351,11 @@ void TextureMapperLayer::paintRecursive(const TextureMapperPaintOptions& options
 #endif
 
     options.textureMapper->bindSurface(options.surface.get());
-    TransformationMatrix targetTransform =
-            TransformationMatrix(options.transform)
-                .multiply(m_transform.combined())
-                .translate(options.offset.width(), options.offset.height());
+    TransformationMatrix targetTransform;
+    targetTransform.translate(options.offset.width(), options.offset.height());
+    targetTransform.multiply(options.transform);
+    targetTransform.multiply(m_transform.combined());
+
     options.textureMapper->drawTexture(*surface.get(), surfaceRect, targetTransform, opacity, maskTexture.get());
 }
 
@@ -424,8 +443,10 @@ void TextureMapperLayer::syncCompositingStateSelf(GraphicsLayerTextureMapper* gr
     m_state.childrenTransform = graphicsLayer->childrenTransform();
     m_state.opacity = graphicsLayer->opacity();
 #if ENABLE(CSS_FILTERS)
-    m_state.filters = graphicsLayer->filters();
+    if (changeMask & FilterChange)
+        m_state.filters = graphicsLayer->filters();
 #endif
+    m_fixedToViewport = graphicsLayer->fixedToViewport();
 
     m_state.needsDisplay = m_state.needsDisplay || graphicsLayer->needsDisplay();
     if (!m_state.needsDisplay)
@@ -508,6 +529,29 @@ void TextureMapperLayer::syncCompositingState(GraphicsLayerTextureMapper* graphi
         for (int i = m_children.size() - 1; i >= 0; --i)
             m_children[i]->syncCompositingState(0, textureMapper, options);
     }
+}
+
+bool TextureMapperLayer::isAncestorFixedToViewport() const
+{
+    for (TextureMapperLayer* parent = m_parent; parent; parent = parent->m_parent) {
+        if (parent->m_fixedToViewport)
+            return true;
+    }
+
+    return false;
+}
+
+void TextureMapperLayer::setScrollPositionDeltaIfNeeded(const IntPoint& delta)
+{
+    // delta is the difference between the scroll offset in the ui process and the scroll offset
+    // in the web process. We add this delta to the position of fixed layers, to make
+    // sure that they do not move while scrolling. We need to reset this delta to fixed layers
+    // that have an ancestor which is also a fixed layer, because the delta will be added to the ancestor.
+    if (isAncestorFixedToViewport())
+        m_scrollPositionDelta = IntPoint();
+    else
+        m_scrollPositionDelta = delta;
+    m_transform.setPosition(m_state.pos + m_scrollPositionDelta);
 }
 
 }

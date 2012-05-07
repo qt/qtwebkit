@@ -35,6 +35,7 @@ from webkitpy.layout_tests.port import Port, Driver, DriverOutput
 from webkitpy.layout_tests.port.base import VirtualTestSuite
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.common.system.filesystem_mock import MockFileSystem
+from webkitpy.common.system.crashlogs import CrashLogs
 
 
 # This sets basic expectations for a test. Each individual expectation
@@ -371,9 +372,6 @@ class TestPort(Port):
     def default_child_processes(self):
         return 1
 
-    def default_worker_model(self):
-        return 'inline'
-
     def worker_startup_delay_secs(self):
         return 0
 
@@ -401,11 +399,12 @@ class TestPort(Port):
     def webkit_base(self):
         return '/test.checkout'
 
-    def skipped_tests(self, test_list):
+    def skipped_layout_tests(self, test_list):
         # This allows us to test the handling Skipped files, both with a test
         # that actually passes, and a test that does fail.
         return set(['failures/expected/skip_text.html',
-                    'failures/unexpected/skip_pass.html'])
+                    'failures/unexpected/skip_pass.html',
+                    'virtual/skipped'])
 
     def name(self):
         return self._name
@@ -462,12 +461,10 @@ class TestPort(Port):
         test_configurations = []
         for version, architecture in self._all_systems():
             for build_type in self._all_build_types():
-                for graphics_type in self._all_graphics_types():
-                    test_configurations.append(TestConfiguration(
-                        version=version,
-                        architecture=architecture,
-                        build_type=build_type,
-                        graphics_type=graphics_type))
+                test_configurations.append(TestConfiguration(
+                    version=version,
+                    architecture=architecture,
+                    build_type=build_type))
         return test_configurations
 
     def _all_systems(self):
@@ -482,9 +479,6 @@ class TestPort(Port):
     def _all_build_types(self):
         return ('debug', 'release')
 
-    def _all_graphics_types(self):
-        return ('cpu', 'gpu')
-
     def configuration_specifier_macros(self):
         """To avoid surprises when introducing new macros, these are intentionally fixed in time."""
         return {'mac': ['leopard', 'snowleopard'], 'win': ['xp', 'vista', 'win7'], 'linux': ['lucid']}
@@ -495,6 +489,7 @@ class TestPort(Port):
     def virtual_test_suites(self):
         return [
             VirtualTestSuite('virtual/passes', 'passes', ['--virtual-arg']),
+            VirtualTestSuite('virtual/skipped', 'failures/expected', ['--virtual-arg2']),
         ]
 
 class TestDriver(Driver):
@@ -524,13 +519,22 @@ class TestDriver(Driver):
         if test.actual_audio:
             audio = base64.b64decode(test.actual_audio)
         crashed_process_name = None
+        crashed_pid = None
         if test.crash:
             crashed_process_name = self._port.driver_name()
+            crashed_pid = 1
         elif test.web_process_crash:
             crashed_process_name = 'WebProcess'
-        return DriverOutput(actual_text, test.actual_image,
-            test.actual_checksum, audio, crash=test.crash or test.web_process_crash,
-            crashed_process_name=crashed_process_name,
+            crashed_pid = 2
+
+        crash_log = ''
+        if crashed_process_name:
+            crash_logs = CrashLogs(self._port.host)
+            crash_log = crash_logs.find_newest_log(crashed_process_name, None) or ''
+
+        return DriverOutput(actual_text, test.actual_image, test.actual_checksum, audio,
+            crash=test.crash or test.web_process_crash, crashed_process_name=crashed_process_name,
+            crashed_pid=crashed_pid, crash_log=crash_log,
             test_time=time.time() - start_time, timeout=test.timeout, error=test.error)
 
     def start(self, pixel_tests, per_test_args):

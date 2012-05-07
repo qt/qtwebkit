@@ -40,16 +40,15 @@ GraphicsContext3DPrivate::GraphicsContext3DPrivate(GraphicsContext3D* context, H
     : m_context(context)
     , m_window(window)
 #if PLATFORM(GTK)
-    , m_glContext(GLContext::createSharingContext(GLContext::getContextForWidget(m_window->platformPageClient())))
+    , m_glContext(GLContext::createOffscreenContext(GLContext::getContextForWidget(m_window->platformPageClient())))
 #else
-    , m_glContext(GLContext::createContext(0, 0))
+    , m_glContext(GLContext::createOffscreenContext())
 #endif
 {
 }
 
 GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 {
-    GLContext::removeActiveContext(m_glContext);
 }
 
 bool GraphicsContext3DPrivate::makeContextCurrent()
@@ -87,7 +86,8 @@ void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper
 
     TextureMapperGL* texmapGL = static_cast<TextureMapperGL*>(textureMapper);
     TextureMapperGL::Flags flags = TextureMapperGL::ShouldFlipTexture | (m_context->m_attrs.alpha ? TextureMapperGL::SupportsBlending : 0);
-    texmapGL->drawTexture(m_context->m_texture, flags, FloatSize(1, 1), targetRect, matrix, opacity, mask);
+    IntSize textureSize(m_context->m_currentWidth, m_context->m_currentHeight);
+    texmapGL->drawTexture(m_context->m_texture, flags, textureSize, targetRect, matrix, opacity, mask);
 }
 #endif // USE(ACCELERATED_COMPOSITING)
 

@@ -138,6 +138,16 @@ Color WebPlatformStrategies::color(const String& pasteboardName)
     return PlatformPasteboard(pasteboardName).color();    
 }
 
+KURL WebPlatformStrategies::url(const String& pasteboardName)
+{
+    return PlatformPasteboard(pasteboardName).url();
+}
+
+void WebPlatformStrategies::addTypes(const Vector<String>& pasteboardTypes, const String& pasteboardName)
+{
+    PlatformPasteboard(pasteboardName).addTypes(pasteboardTypes);
+}
+
 void WebPlatformStrategies::setTypes(const Vector<String>& pasteboardTypes, const String& pasteboardName)
 {
     PlatformPasteboard(pasteboardName).setTypes(pasteboardTypes);

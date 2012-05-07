@@ -59,16 +59,16 @@ public:
     CCLayerImpl* scrollLayer() const { return m_scrollLayer; }
     void setScrollLayer(CCLayerImpl* scrollLayer) { m_scrollLayer = scrollLayer; }
 
-    virtual void willDraw(LayerRendererChromium*);
-    virtual void appendQuads(CCQuadList&, const CCSharedQuadState*);
-    virtual void didDraw();
+    virtual void willDraw(LayerRendererChromium*) OVERRIDE;
+    virtual void appendQuads(CCQuadCuller&, const CCSharedQuadState*, bool& hadMissingTiles) OVERRIDE;
+    virtual void didDraw() OVERRIDE;
 
 protected:
     explicit CCScrollbarLayerImpl(int id);
 
-private:
-    void paint(GraphicsContext*);
+    virtual void paint(GraphicsContext*);
 
+private:
     CCLayerImpl* m_scrollLayer;
     OwnPtr<ManagedTexture> m_texture;
 

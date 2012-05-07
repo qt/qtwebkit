@@ -21,12 +21,14 @@
 #include "config.h"
 #include "WebViewTest.h"
 
+#include <JavaScriptCore/JSRetainPtr.h>
 #include <WebCore/GOwnPtrGtk.h>
 
 WebViewTest::WebViewTest()
     : m_webView(WEBKIT_WEB_VIEW(g_object_ref_sink(webkit_web_view_new())))
     , m_mainLoop(g_main_loop_new(0, TRUE))
     , m_parentWindow(0)
+    , m_javascriptResult(0)
 {
     assertObjectIsDeletedWhenTestFinishes(G_OBJECT(m_webView));
 }
@@ -35,6 +37,8 @@ WebViewTest::~WebViewTest()
 {
     if (m_parentWindow)
         gtk_widget_destroy(m_parentWindow);
+    if (m_javascriptResult)
+        webkit_javascript_result_unref(m_javascriptResult);
     g_object_unref(m_webView);
     g_main_loop_unref(m_mainLoop);
 }
@@ -74,15 +78,7 @@ void WebViewTest::loadRequest(WebKitURIRequest* request)
 
 void WebViewTest::replaceContent(const char* html, const char* contentURI, const char* baseURI)
 {
-    // FIXME: The active uri should be the contentURI,
-    // but WebPageProxy doesn't return the unreachableURL
-    // when the page has been loaded with AlternateHTML()
-    // See https://bugs.webkit.org/show_bug.cgi?id=75465.
-#if 0
     m_activeURI = contentURI;
-#else
-    m_activeURI = "about:blank";
-#endif
     webkit_web_view_replace_content(m_webView, html, contentURI, baseURI);
 }
 
@@ -200,5 +196,144 @@ void WebViewTest::mouseMoveTo(int x, int y, unsigned int mouseModifiers)
     event->motion.x_root = xRoot;
     event->motion.y_root = yRoot;
     gtk_main_do_event(event.get());
+}
+
+void WebViewTest::clickMouseButton(int x, int y, unsigned int button, unsigned int mouseModifiers)
+{
+    doMouseButtonEvent(GDK_BUTTON_PRESS, x, y, button, mouseModifiers);
+    doMouseButtonEvent(GDK_BUTTON_RELEASE, x, y, button, mouseModifiers);
+}
+
+void WebViewTest::keyStroke(unsigned int keyVal, unsigned int keyModifiers)
+{
+    g_assert(m_parentWindow);
+    GtkWidget* viewWidget = GTK_WIDGET(m_webView);
+    g_assert(gtk_widget_get_realized(viewWidget));
+
+    GOwnPtr<GdkEvent> event(gdk_event_new(GDK_KEY_PRESS));
+    event->key.keyval = keyVal;
+
+    event->key.time = GDK_CURRENT_TIME;
+    event->key.window = gtk_widget_get_window(viewWidget);
+    g_object_ref(event->key.window);
+    gdk_event_set_device(event.get(), gdk_device_manager_get_client_pointer(gdk_display_get_device_manager(gtk_widget_get_display(viewWidget))));
+    event->key.state = keyModifiers;
+
+    // When synthesizing an event, an invalid hardware_keycode value can cause it to be badly processed by GTK+.
+    GOwnPtr<GdkKeymapKey> keys;
+    int keysCount;
+    if (gdk_keymap_get_entries_for_keyval(gdk_keymap_get_default(), keyVal, &keys.outPtr(), &keysCount))
+        event->key.hardware_keycode = keys.get()[0].keycode;
+
+    gtk_main_do_event(event.get());
+    event->key.type = GDK_KEY_RELEASE;
+    gtk_main_do_event(event.get());
+}
+
+void WebViewTest::doMouseButtonEvent(GdkEventType eventType, int x, int y, unsigned int button, unsigned int mouseModifiers)
+{
+    g_assert(m_parentWindow);
+    GtkWidget* viewWidget = GTK_WIDGET(m_webView);
+    g_assert(gtk_widget_get_realized(viewWidget));
+
+    GOwnPtr<GdkEvent> event(gdk_event_new(eventType));
+    event->button.window = gtk_widget_get_window(viewWidget);
+    g_object_ref(event->button.window);
+
+    event->button.time = GDK_CURRENT_TIME;
+    event->button.x = x;
+    event->button.y = y;
+    event->button.axes = 0;
+    event->button.state = mouseModifiers;
+    event->button.button = button;
+
+    event->button.device = gdk_device_manager_get_client_pointer(gdk_display_get_device_manager(gtk_widget_get_display(viewWidget)));
+
+    int xRoot, yRoot;
+    gdk_window_get_root_coords(gtk_widget_get_window(viewWidget), x, y, &xRoot, &yRoot);
+    event->button.x_root = xRoot;
+    event->button.y_root = yRoot;
+    gtk_main_do_event(event.get());
+}
+
+static void runJavaScriptReadyCallback(GObject*, GAsyncResult* result, WebViewTest* test)
+{
+    test->m_javascriptResult = webkit_web_view_run_javascript_finish(test->m_webView, result, test->m_javascriptError);
+    g_main_loop_quit(test->m_mainLoop);
+}
+
+WebKitJavascriptResult* WebViewTest::runJavaScriptAndWaitUntilFinished(const char* javascript, GError** error)
+{
+    if (m_javascriptResult)
+        webkit_javascript_result_unref(m_javascriptResult);
+    m_javascriptResult = 0;
+    m_javascriptError = error;
+    webkit_web_view_run_javascript(m_webView, javascript, reinterpret_cast<GAsyncReadyCallback>(runJavaScriptReadyCallback), this);
+    g_main_loop_run(m_mainLoop);
+
+    return m_javascriptResult;
+}
+
+static char* jsValueToCString(JSGlobalContextRef context, JSValueRef value)
+{
+    g_assert(value);
+    g_assert(JSValueIsString(context, value));
+
+    JSRetainPtr<JSStringRef> stringValue(Adopt, JSValueToStringCopy(context, value, 0));
+    g_assert(stringValue);
+
+    size_t cStringLength = JSStringGetMaximumUTF8CStringSize(stringValue.get());
+    char* cString = static_cast<char*>(g_malloc(cStringLength));
+    JSStringGetUTF8CString(stringValue.get(), cString, cStringLength);
+    return cString;
+}
+
+char* WebViewTest::javascriptResultToCString(WebKitJavascriptResult* javascriptResult)
+{
+    JSGlobalContextRef context = webkit_javascript_result_get_global_context(javascriptResult);
+    g_assert(context);
+    return jsValueToCString(context, webkit_javascript_result_get_value(javascriptResult));
+}
+
+double WebViewTest::javascriptResultToNumber(WebKitJavascriptResult* javascriptResult)
+{
+    JSGlobalContextRef context = webkit_javascript_result_get_global_context(javascriptResult);
+    g_assert(context);
+    JSValueRef value = webkit_javascript_result_get_value(javascriptResult);
+    g_assert(value);
+    g_assert(JSValueIsNumber(context, value));
+
+    return JSValueToNumber(context, value, 0);
+}
+
+bool WebViewTest::javascriptResultToBoolean(WebKitJavascriptResult* javascriptResult)
+{
+    JSGlobalContextRef context = webkit_javascript_result_get_global_context(javascriptResult);
+    g_assert(context);
+    JSValueRef value = webkit_javascript_result_get_value(javascriptResult);
+    g_assert(value);
+    g_assert(JSValueIsBoolean(context, value));
+
+    return JSValueToBoolean(context, value);
+}
+
+bool WebViewTest::javascriptResultIsNull(WebKitJavascriptResult* javascriptResult)
+{
+    JSGlobalContextRef context = webkit_javascript_result_get_global_context(javascriptResult);
+    g_assert(context);
+    JSValueRef value = webkit_javascript_result_get_value(javascriptResult);
+    g_assert(value);
+
+    return JSValueIsNull(context, value);
+}
+
+bool WebViewTest::javascriptResultIsUndefined(WebKitJavascriptResult* javascriptResult)
+{
+    JSGlobalContextRef context = webkit_javascript_result_get_global_context(javascriptResult);
+    g_assert(context);
+    JSValueRef value = webkit_javascript_result_get_value(javascriptResult);
+    g_assert(value);
+
+    return JSValueIsUndefined(context, value);
 }
 

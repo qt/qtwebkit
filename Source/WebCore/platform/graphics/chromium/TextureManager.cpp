@@ -39,6 +39,8 @@ namespace WebCore {
 namespace {
 size_t memoryLimitBytes(size_t viewportMultiplier, const IntSize& viewportSize, size_t minMegabytes, size_t maxMegabytes)
 {
+    if (!viewportMultiplier)
+        return maxMegabytes * 1024 * 1024;
     if (viewportSize.isEmpty())
         return minMegabytes * 1024 * 1024;
     return max(minMegabytes * 1024 * 1024, min(maxMegabytes * 1024 * 1024, viewportMultiplier * TextureManager::memoryUseBytes(viewportSize, GraphicsContext3D::RGBA)));
@@ -48,12 +50,13 @@ size_t memoryLimitBytes(size_t viewportMultiplier, const IntSize& viewportSize, 
 size_t TextureManager::highLimitBytes(const IntSize& viewportSize)
 {
     size_t viewportMultiplier, minMegabytes, maxMegabytes;
-    viewportMultiplier = 12;
 #if OS(ANDROID)
-    minMegabytes = 24;
-    maxMegabytes = 40;
+    viewportMultiplier = 16;
+    minMegabytes = 32;
+    maxMegabytes = 64;
 #else
-    minMegabytes = 64;
+    viewportMultiplier = 0;
+    minMegabytes = 0;
     maxMegabytes = 128;
 #endif
     return memoryLimitBytes(viewportMultiplier, viewportSize, minMegabytes, maxMegabytes);
@@ -62,23 +65,15 @@ size_t TextureManager::highLimitBytes(const IntSize& viewportSize)
 size_t TextureManager::reclaimLimitBytes(const IntSize& viewportSize)
 {
     size_t viewportMultiplier, minMegabytes, maxMegabytes;
-    viewportMultiplier = 6;
 #if OS(ANDROID)
-    minMegabytes = 9;
+    viewportMultiplier = 8;
+    minMegabytes = 16;
     maxMegabytes = 32;
 #else
-    minMegabytes = 32;
+    viewportMultiplier = 0;
+    minMegabytes = 0;
     maxMegabytes = 64;
 #endif
-    return memoryLimitBytes(viewportMultiplier, viewportSize, minMegabytes, maxMegabytes);
-}
-
-size_t TextureManager::lowLimitBytes(const IntSize& viewportSize)
-{
-    size_t viewportMultiplier, minMegabytes, maxMegabytes;
-    viewportMultiplier = 1;
-    minMegabytes = 2;
-    maxMegabytes = 3;
     return memoryLimitBytes(viewportMultiplier, viewportSize, minMegabytes, maxMegabytes);
 }
 
@@ -108,6 +103,20 @@ TextureManager::~TextureManager()
 {
     for (HashSet<ManagedTexture*>::iterator it = m_registeredTextures.begin(); it != m_registeredTextures.end(); ++it)
         (*it)->clearManager();
+}
+
+void TextureManager::setMemoryAllocationLimitBytes(size_t memoryLimitBytes)
+{
+    setMaxMemoryLimitBytes(memoryLimitBytes);
+#if defined(OS_ANDROID)
+    // On android, we are setting the preferred memory limit to half of our
+    // maximum allocation, because we would like to stay significantly below
+    // the absolute memory limit whenever we can. Specifically, by limitting
+    // prepainting only to the halfway memory mark.
+    setPreferredMemoryLimitBytes(memoryLimitBytes / 2);
+#else
+    setPreferredMemoryLimitBytes(memoryLimitBytes);
+#endif
 }
 
 void TextureManager::setMaxMemoryLimitBytes(size_t memoryLimitBytes)

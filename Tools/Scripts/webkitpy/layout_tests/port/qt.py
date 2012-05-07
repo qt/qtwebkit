@@ -38,7 +38,7 @@ import webkit
 from webkitpy.common.memoized import memoized
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port.webkit import WebKitPort
-
+from webkitpy.layout_tests.port.xvfbdriver import XvfbDriver
 
 _log = logging.getLogger(__name__)
 
@@ -74,12 +74,15 @@ class QtPort(WebKitPort):
         configurations = []
         for version in self.ALL_VERSIONS:
             for build_type in self.ALL_BUILD_TYPES:
-                configurations.append(TestConfiguration(version=version, architecture='x86', build_type=build_type, graphics_type='cpu'))
+                configurations.append(TestConfiguration(version=version, architecture='x86', build_type=build_type))
         return configurations
 
     def _build_driver(self):
         # The Qt port builds DRT as part of the main build step
         return True
+
+    def _driver_class(self):
+        return XvfbDriver
 
     def _path_to_driver(self):
         return self._build_path('bin/%s' % self.driver_name())
@@ -132,13 +135,14 @@ class QtPort(WebKitPort):
                 search_paths.add('qt-5.0-wk1')
         return search_paths
 
-    def _runtime_feature_list(self):
-        return None
-
     def setup_environ_for_server(self, server_name=None):
         clean_env = WebKitPort.setup_environ_for_server(self, server_name)
         clean_env['QTWEBKIT_PLUGIN_PATH'] = self._build_path('lib/plugins')
         self._copy_value_from_environ_if_set(clean_env, 'QT_DRT_WEBVIEW_MODE')
+        self._copy_value_from_environ_if_set(clean_env, 'DYLD_IMAGE_SUFFIX')
+        self._copy_value_from_environ_if_set(clean_env, 'QT_WEBKIT_LOG')
+        self._copy_value_from_environ_if_set(clean_env, 'DISABLE_NI_WARNING')
+        self._copy_value_from_environ_if_set(clean_env, 'QT_WEBKIT_PAUSE_UI_PROCESS')
         return clean_env
 
     # FIXME: We should find a way to share this implmentation with Gtk,

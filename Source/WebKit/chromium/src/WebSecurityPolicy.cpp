@@ -68,6 +68,11 @@ void WebSecurityPolicy::registerURLSchemeAsCORSEnabled(const WebString& scheme)
     SchemeRegistry::registerURLSchemeAsCORSEnabled(scheme);
 }
 
+void WebSecurityPolicy::registerURLSchemeAsEmptyDocument(const WebString& scheme)
+{
+    SchemeRegistry::registerURLSchemeAsEmptyDocument(scheme);
+}
+
 void WebSecurityPolicy::addOriginAccessWhitelistEntry(
     const WebURL& sourceOrigin,
     const WebString& destinationProtocol,
@@ -102,7 +107,7 @@ bool WebSecurityPolicy::shouldHideReferrer(const WebURL& url, const WebString& r
 
 WebString WebSecurityPolicy::generateReferrerHeader(WebReferrerPolicy referrerPolicy, const WebURL& url, const WebString& referrer)
 {
-    return SecurityPolicy::generateReferrerHeader(static_cast<SecurityPolicy::ReferrerPolicy>(referrerPolicy), url, referrer);
+    return SecurityPolicy::generateReferrerHeader(static_cast<ReferrerPolicy>(referrerPolicy), url, referrer);
 }
 
 void WebSecurityPolicy::registerURLSchemeAsNotAllowingJavascriptURLs(const WebString& scheme)

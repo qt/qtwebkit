@@ -31,16 +31,18 @@
 #include "config.h"
 #include "SocketStreamHandle.h"
 
-#include "GOwnPtr.h"
 #include "KURL.h"
 #include "Logging.h"
-#include "NotFound.h"
 #include "NotImplemented.h"
 #include "SocketStreamError.h"
 #include "SocketStreamHandleClient.h"
-#include "Vector.h"
+
 #include <gio/gio.h>
 #include <glib.h>
+
+#include <wtf/NotFound.h>
+#include <wtf/Vector.h>
+#include <wtf/gobject/GOwnPtr.h>
 #include <wtf/text/CString.h>
 
 #define READ_BUFFER_SIZE 1024
@@ -242,7 +244,8 @@ static void connectedCallback(GSocketClient* client, GAsyncResult* result, void*
     // The SocketStreamHandle has been deactivated, so just close the connection, ignoring errors.
     SocketStreamHandle* handle = getHandleFromId(id);
     if (!handle) {
-        g_io_stream_close(G_IO_STREAM(socketConnection), 0, &error.outPtr());
+        if (socketConnection)
+            g_io_stream_close(G_IO_STREAM(socketConnection), 0, 0);
         return;
     }
 

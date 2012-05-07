@@ -25,6 +25,7 @@
 #include "BackingStore.h"
 #include "DrawingAreaProxy.h"
 #include "Region.h"
+#include "SurfaceUpdateInfo.h"
 #include "WebLayerTreeInfo.h"
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/GraphicsLayer.h>
@@ -47,24 +48,27 @@ class LayerTreeHostProxy {
 public:
     LayerTreeHostProxy(DrawingAreaProxy*);
     virtual ~LayerTreeHostProxy();
-    void syncCompositingLayerState(const WebLayerInfo&);
+    void setCompositingLayerState(WebLayerID, const WebLayerInfo&);
+    void setCompositingLayerChildren(WebLayerID, const Vector<WebLayerID>&);
+#if ENABLE(CSS_FILTERS)
+    void setCompositingLayerFilters(WebLayerID, const WebCore::FilterOperations&);
+#endif
     void deleteCompositingLayer(WebLayerID);
     void setRootCompositingLayer(WebLayerID);
     void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float opacity, const WebCore::FloatRect& clip);
-    void paintToGraphicsContext(BackingStore::PlatformGraphicsContext);
     void purgeGLResources();
-    void setVisibleContentsRectForScaling(const WebCore::IntRect&, float);
-    void setVisibleContentsRectForPanning(const WebCore::IntRect&, const WebCore::FloatPoint&);
+    void setContentsSize(const WebCore::FloatSize&);
+    void setVisibleContentsRect(const WebCore::IntRect&, float scale, const WebCore::FloatPoint& trajectory, const WebCore::FloatPoint& accurateVisibleContentsPosition);
     void didRenderFrame();
-    void createTileForLayer(int layerID, int tileID, const WebKit::UpdateInfo&);
-    void updateTileForLayer(int layerID, int tileID, const WebKit::UpdateInfo&);
+    void createTileForLayer(int layerID, int tileID, const WebCore::IntRect&, const SurfaceUpdateInfo&);
+    void updateTileForLayer(int layerID, int tileID, const WebCore::IntRect&, const SurfaceUpdateInfo&);
     void removeTileForLayer(int layerID, int tileID);
     void createDirectlyCompositedImage(int64_t, const WebKit::ShareableBitmap::Handle&);
     void destroyDirectlyCompositedImage(int64_t);
     void didReceiveLayerTreeHostProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     void updateViewport();
     void renderNextFrame();
+    void didChangeScrollPosition(const WebCore::IntPoint& position);
     void purgeBackingStores();
     WebLayerTreeRenderer* layerTreeRenderer() const { return m_renderer.get(); }
 
@@ -73,6 +77,9 @@ protected:
 
     DrawingAreaProxy* m_drawingAreaProxy;
     RefPtr<WebLayerTreeRenderer> m_renderer;
+#if USE(GRAPHICS_SURFACE)
+    HashMap<uint32_t, RefPtr<ShareableSurface> > m_surfaces;
+#endif
 };
 
 }

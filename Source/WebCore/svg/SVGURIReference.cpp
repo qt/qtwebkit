@@ -62,12 +62,47 @@ String SVGURIReference::fragmentIdentifierFromIRIString(const String& url, Docum
     return emptyString();
 }
 
-Element* SVGURIReference::targetElementFromIRIString(const String& iri, Document* document, String* fragmentIdentifier)
+static inline KURL urlFromIRIStringWithFragmentIdentifier(const String& url, Document* document, String& fragmentIdentifier)
 {
-    String id = fragmentIdentifierFromIRIString(iri, document);
+    ASSERT(document);
+    size_t startOfFragmentIdentifier = url.find('#');
+    if (startOfFragmentIdentifier == notFound)
+        return KURL();
+
+    // Exclude the '#' character when determining the fragmentIdentifier.
+    fragmentIdentifier = url.substring(startOfFragmentIdentifier + 1);
+    if (startOfFragmentIdentifier) {
+        KURL base(document->baseURI(), url.substring(0, startOfFragmentIdentifier));
+        return KURL(base, url.substring(startOfFragmentIdentifier));
+    }
+
+    return KURL(document->baseURI(), url.substring(startOfFragmentIdentifier));
+}
+
+Element* SVGURIReference::targetElementFromIRIString(const String& iri, Document* document, String* fragmentIdentifier, Document* externalDocument)
+{
+    // If there's no fragment identifier contained within the IRI string, we can't lookup an element.
+    String id;
+    KURL url = urlFromIRIStringWithFragmentIdentifier(iri, document, id);
+    if (url == KURL())
+        return 0;
+
     if (fragmentIdentifier)
         *fragmentIdentifier = id;
-    // FIXME: Handle external references (Bug 65344).
+
+    if (id.isEmpty())
+        return 0;
+
+    if (externalDocument) {
+        // Enforce that the referenced url matches the url of the document that we've loaded for it!
+        ASSERT(equalIgnoringFragmentIdentifier(url, externalDocument->url()));
+        return externalDocument->getElementById(id);
+    }
+
+    // Exit early if the referenced url is external, and we have no externalDocument given.
+    if (isExternalURIReference(iri, document))
+        return 0;
+
     return document->getElementById(id);
 }
 

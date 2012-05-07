@@ -39,7 +39,6 @@
 #include "Page.h"
 #include "RenderBoxModelObject.h"
 #include "RenderInline.h"
-#include "RenderLayer.h"
 #include "RenderObject.h"
 
 namespace WebCore {
@@ -55,7 +54,7 @@ inline LayoutPoint ownerFrameToMainFrameOffset(const RenderObject* o)
 
     Frame* mainFrame = containingFrame->page()->mainFrame();
 
-    LayoutPoint mainFramePoint = mainFrame->view()->rootViewToContents(containingFrame->view()->contentsToRootView(IntPoint()));
+    LayoutPoint mainFramePoint = mainFrame->view()->windowToContents(containingFrame->view()->contentsToWindow(IntPoint()));
     return mainFramePoint;
 }
 
@@ -95,6 +94,8 @@ inline bool strikes(const LayoutRect& a, const LayoutRect& b)
 
 inline void shiftXEdgesToContainIfStrikes(LayoutRect& rect, const LayoutRect& other)
 {
+    if (rect.isEmpty())
+        return;
     LayoutUnit leftSide = rect.x();
     LayoutUnit rightSide = rect.maxX();
 
@@ -138,15 +139,22 @@ Path pathForRenderer(RenderObject* o)
     ASSERT(o);
     Path path;
 
-    Vector<LayoutRect> rects;
+    Vector<IntRect> rects;
     o->addFocusRingRects(rects, /* acc. offset */ ownerFrameToMainFrameOffset(o));
+
+    if (rects.isEmpty())
+        return path;
 
     // The basic idea is to allow up to three different boxes in order to highlight
     // text with line breaks more nicer than using a bounding box.
 
     // Merge all center boxes (all but the first and the last).
     LayoutRect mid;
-    for (size_t i = 1; i < rects.size() - 1; ++i)
+
+    // Set the end value to integer. It ensures that no unsigned int overflow occurs
+    // in the test expression, in case of empty rects vector.
+    int end = rects.size() - 1;
+    for (int i = 1; i < end; ++i)
         mid.uniteIfNonZero(rects.at(i));
 
     Vector<LayoutRect> drawableRects;
@@ -156,6 +164,9 @@ Path pathForRenderer(RenderObject* o)
 
     // Add the first box, but merge it with the center boxes if it intersects.
     if (rects.size() && !rects.first().isEmpty()) {
+        // Adjust center boxes to boundary of first
+        if (drawableRects.size())
+            shiftXEdgesToContainIfStrikes(drawableRects.last(), rects.first());
         if (drawableRects.size() && drawableRects.last().intersects(rects.first()))
             drawableRects.last().unite(rects.first());
         else
@@ -164,17 +175,13 @@ Path pathForRenderer(RenderObject* o)
 
     // Add the last box, but merge it with the center boxes if it intersects.
     if (rects.size() > 1 && !rects.last().isEmpty()) {
+        // Adjust center boxes to boundary of last
+        if (drawableRects.size())
+            shiftXEdgesToContainIfStrikes(drawableRects.last(), rects.last());
         if (drawableRects.size() && drawableRects.last().intersects(rects.last()))
             drawableRects.last().unite(rects.last());
         else
             drawableRects.append(rects.last());
-    }
-
-    // Adjust middle to boundaries of first and last.
-    if (drawableRects.size() == 3) {
-        LayoutRect& middle = drawableRects.at(1);
-        shiftXEdgesToContainIfStrikes(middle, drawableRects.at(0));
-        shiftXEdgesToContainIfStrikes(middle, drawableRects.at(2));
     }
 
     for (size_t i = 0; i < drawableRects.size(); ++i) {

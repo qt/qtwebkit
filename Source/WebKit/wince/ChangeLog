@@ -1,3 +1,96 @@
+2012-05-04  Nate Chapin  <japhet@chromium.org>
+
+        Don't require FrameLoaderClient to manufacture a commitData() call for empty documents.
+        https://bugs.webkit.org/show_bug.cgi?id=85533
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/FrameLoaderClientWinCE.cpp:
+        (WebKit::FrameLoaderClientWinCE::finishedLoading):
+
+2012-04-18  Jon Honeycutt  <jhoneycutt@apple.com>
+
+        FrameLoaderClient::dispatchWillSendSubmitEvent() should be given more
+        information about the form being submitted
+        https://bugs.webkit.org/show_bug.cgi?id=84297
+
+        Reviewed by Andy Estes.
+
+        * WebCoreSupport/FrameLoaderClientWinCE.h:
+        (WebKit::FrameLoaderClientWinCE::dispatchWillSendSubmitEvent):
+        Updated method declaration.
+
+2012-03-30  Patrick Gansterer  <paroga@webkit.org>
+
+        [WinCE] Correct <wtf/*.h> include paths.
+        https://bugs.webkit.org/show_bug.cgi?id=82713
+
+        Reviewed by Eric Seidel.
+
+        Modify the #include declarations for several WinCE-related files
+        so that the wtf types are included using the full path.
+
+        * WebView.cpp:
+        * WebView.h:
+
+2012-03-28  Nate Chapin  <japhet@chromium.org>
+
+        Remove dispatchDidLoadMainResource callback, since no
+        port implements it.
+        https://bugs.webkit.org/show_bug.cgi?id=82539
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/FrameLoaderClientWinCE.cpp:
+        (WebKit):
+        * WebCoreSupport/FrameLoaderClientWinCE.h:
+        (FrameLoaderClientWinCE):
+
+2012-03-19  Adam Barth  <abarth@webkit.org>
+
+        Remove support for "magic" iframe
+        https://bugs.webkit.org/show_bug.cgi?id=81590
+
+        Reviewed by Eric Seidel.
+
+        Remove FrameLoaderClient methods that no longer exist.
+
+        * WebCoreSupport/FrameLoaderClientWinCE.cpp:
+        (WebKit):
+        * WebCoreSupport/FrameLoaderClientWinCE.h:
+        (FrameLoaderClientWinCE):
+
+2012-03-13  Jon Lee  <jonlee@apple.com>
+
+        Separate NOTIFICATIONS and LEGACY_NOTIFICATIONS
+        https://bugs.webkit.org/show_bug.cgi?id=80922
+        <rdar://problem/11035082>
+
+        Reviewed by Jian Li.
+
+        You can include either NOTIFICATIONS or LEGACY_NOTIFICATIONS and have a complete API.
+        LEGACY_NOTIFICATIONS should cover all of the previous functionality, and NOTIFICATIONS will cover the
+        new API. Therefore, APIs that are common between the two will have:
+        #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+
+        This patch initially sets both to be exactly the same. As other bugs with patches begin to migrate to
+        the new API, the defines will begin to split. This allows ports to decide which set of APIs to include.
+
+        Update everything to be #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+        * WebCoreSupport/ChromeClientWinCE.h:
+        (ChromeClientWinCE):
+
+2012-03-13  Adam Barth  <abarth@webkit.org> && Benjamin Poulain  <bpoulain@apple.com>
+
+        Always enable ENABLE(CLIENT_BASED_GEOLOCATION)
+        https://bugs.webkit.org/show_bug.cgi?id=78853
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/ChromeClientWinCE.cpp:
+        * WebCoreSupport/ChromeClientWinCE.h:
+        (ChromeClientWinCE):
+
 2012-03-09  Jon Lee  <jonlee@apple.com>
 
         Rename NotificationPresenter to NotificationClient

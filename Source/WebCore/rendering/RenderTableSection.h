@@ -73,7 +73,7 @@ public:
 
     void setCellLogicalWidths();
     int calcRowLogicalHeight();
-    int layoutRows(int logicalHeight);
+    void layoutRows();
 
     RenderTable* table() const { return toRenderTable(parent()); }
 
@@ -152,11 +152,19 @@ public:
 
     void rowLogicalHeightChanged(unsigned rowIndex);
 
-    unsigned rowIndexForRenderer(const RenderTableRow*) const;
-
     void removeCachedCollapsedBorders(const RenderTableCell*);
     void setCachedCollapsedBorder(const RenderTableCell*, CollapsedBorderSide, CollapsedBorderValue);
     CollapsedBorderValue& cachedCollapsedBorder(const RenderTableCell*, CollapsedBorderSide);
+
+    // distributeExtraLogicalHeightToRows methods return the *consumed* extra logical height.
+    // FIXME: We may want to introduce a structure holding the in-flux layout information.
+    int distributeExtraLogicalHeightToRows(int extraLogicalHeight);
+
+    static RenderTableSection* createAnonymousWithParentRenderer(const RenderObject*);
+    virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const OVERRIDE
+    {
+        return createAnonymousWithParentRenderer(parent);
+    }
 
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
@@ -185,12 +193,9 @@ private:
 
     void ensureRows(unsigned);
 
-    // Those methods return the remaining extra logical height.
-    // FIXME: We may want to introduce a structure holding the in-flux layout information.
-    int distributeExtraLogicalHeightToRows(int extraLogicalHeight);
-    int distributeExtraLogicalHeightToPercentRows(int extraLogicalHeight, int totalPercent);
-    int distributeExtraLogicalHeightToAutoRows(int extraLogicalHeight, unsigned autoRowsCount);
-    int distributeRemainingExtraLogicalHeight(int extraLogicalHeight);
+    void distributeExtraLogicalHeightToPercentRows(int& extraLogicalHeight, int totalPercent);
+    void distributeExtraLogicalHeightToAutoRows(int& extraLogicalHeight, unsigned autoRowsCount);
+    void distributeRemainingExtraLogicalHeight(int& extraLogicalHeight);
 
     bool hasOverflowingCell() const { return m_overflowingCells.size() || m_forceSlowPaintPathWithOverflowingCell; }
 

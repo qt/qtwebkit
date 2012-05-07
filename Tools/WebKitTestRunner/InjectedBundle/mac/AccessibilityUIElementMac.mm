@@ -326,6 +326,17 @@ PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::disclosedRowAtIndex(u
 
     return 0;
 }
+    
+PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::rowAtIndex(unsigned index)
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    NSArray* rows = [m_element accessibilityAttributeValue:NSAccessibilityRowsAttribute];
+    if (index < [rows count])
+        return AccessibilityUIElement::create([rows objectAtIndex:index]);
+    END_AX_OBJC_EXCEPTIONS
+    
+    return 0;
+}
 
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::selectedChildAtIndex(unsigned index) const
 {
@@ -832,11 +843,21 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::rangeForLine(int line)
 {
     BEGIN_AX_OBJC_EXCEPTIONS
     id value = [m_element accessibilityAttributeValue:NSAccessibilityRangeForLineParameterizedAttribute forParameter:[NSNumber numberWithInt:line]];
-    if ([value isKindOfClass:[NSValue class]]) {
+    if ([value isKindOfClass:[NSValue class]])
         return [NSStringFromRange([value rangeValue]) createJSStringRef];
-    }
     END_AX_OBJC_EXCEPTIONS
     
+    return 0;
+}
+
+JSRetainPtr<JSStringRef> AccessibilityUIElement::rangeForPosition(int x, int y)
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    id value = [m_element accessibilityAttributeValue:NSAccessibilityRangeForPositionParameterizedAttribute forParameter:[NSValue valueWithPoint:NSMakePoint(x, y)]];
+    if ([value isKindOfClass:[NSValue class]])
+        return [NSStringFromRange([value rangeValue]) createJSStringRef];
+    END_AX_OBJC_EXCEPTIONS
+
     return 0;
 }
 
@@ -1392,6 +1413,37 @@ bool AccessibilityUIElement::attributedStringForTextMarkerRangeContainsAttribute
     
     return false;
 }
+    
+int AccessibilityUIElement::indexForTextMarker(AccessibilityTextMarker* marker)
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    NSNumber* indexNumber = [m_element accessibilityAttributeValue:@"AXIndexForTextMarker" forParameter:(id)marker->platformTextMarker()];
+    return [indexNumber intValue];
+    END_AX_OBJC_EXCEPTIONS
+    
+    return -1;
+}
+
+bool AccessibilityUIElement::isTextMarkerValid(AccessibilityTextMarker* textMarker)
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    NSNumber* validNumber = [m_element accessibilityAttributeValue:@"AXTextMarkerIsValid" forParameter:(id)textMarker->platformTextMarker()];
+    return [validNumber boolValue];
+    END_AX_OBJC_EXCEPTIONS
+    
+    return false;
+}
+
+PassRefPtr<AccessibilityTextMarker> AccessibilityUIElement::textMarkerForIndex(int textIndex)
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    id textMarker = [m_element accessibilityAttributeValue:@"AXTextMarkerForIndex" forParameter:[NSNumber numberWithInteger:textIndex]];
+    return AccessibilityTextMarker::create(textMarker);
+    END_AX_OBJC_EXCEPTIONS
+    
+    return 0;                                                                          
+}
+
 
 } // namespace WTR
 

@@ -11,6 +11,7 @@
  *  Copyright (C) 2009 Movial Creative Technologies Inc.
  *  Copyright (C) 2009 Bobby Powers
  *  Copyright (C) 2010 Joone Hur <joone@kldp.org>
+ *  Copyright (C) 2012 Igalia S.L.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -58,16 +59,16 @@
 #include "FrameLoaderClient.h"
 #include "FrameLoaderTypes.h"
 #include "FrameView.h"
+#include "GOwnPtrGtk.h"
 #include "GeolocationClientGtk.h"
 #include "GeolocationClientMock.h"
-#include "GOwnPtrGtk.h"
+#include "GeolocationController.h"
 #include "GraphicsContext.h"
 #include "GtkUtilities.h"
 #include "GtkVersioning.h"
 #include "HTMLNames.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
-#include "IconDatabase.h"
 #include "InspectorClientGtk.h"
 #include "MemoryCache.h"
 #include "MouseEventWithHitTestResults.h"
@@ -86,6 +87,7 @@
 #include "webkitdownload.h"
 #include "webkitdownloadprivate.h"
 #include "webkitenumtypes.h"
+#include "webkitfavicondatabase.h"
 #include "webkitgeolocationpolicydecision.h"
 #include "webkitglobalsprivate.h"
 #include "webkithittestresultprivate.h"
@@ -115,6 +117,10 @@
 #if ENABLE(DEVICE_ORIENTATION)
 #include "DeviceMotionClientGtk.h"
 #include "DeviceOrientationClientGtk.h"
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+#include "UserMediaClientGtk.h"
 #endif
 
 /**
@@ -214,6 +220,7 @@ enum {
     RESOURCE_LOAD_FAILED,
     ENTERING_FULLSCREEN,
     LEAVING_FULLSCREEN,
+    CONTEXT_MENU,
 
     LAST_SIGNAL
 };
@@ -266,8 +273,7 @@ G_DEFINE_TYPE_WITH_CODE(WebKitWebView, webkit_web_view, GTK_TYPE_CONTAINER,
 static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GParamSpec* pspec, WebKitWebView* webView);
 static void webkit_web_view_set_window_features(WebKitWebView* webView, WebKitWebWindowFeatures* webWindowFeatures);
 
-static GtkIMContext* webkit_web_view_get_im_context(WebKitWebView*);
-
+#if ENABLE(CONTEXT_MENUS)
 static void PopupMenuPositionFunc(GtkMenu* menu, gint *x, gint *y, gboolean *pushIn, gpointer userData)
 {
     WebKitWebView* view = WEBKIT_WEB_VIEW(userData);
@@ -291,6 +297,7 @@ static void PopupMenuPositionFunc(GtkMenu* menu, gint *x, gint *y, gboolean *pus
 
     *pushIn = FALSE;
 }
+#endif
 
 static Node* getFocusedNode(Frame* frame)
 {
@@ -299,6 +306,7 @@ static Node* getFocusedNode(Frame* frame)
     return 0;
 }
 
+#if ENABLE(CONTEXT_MENUS)
 static void contextMenuItemActivated(GtkMenuItem* item, ContextMenuController* controller)
 {
     ContextMenuItem contextItem(item);
@@ -318,23 +326,36 @@ static void contextMenuConnectActivate(GtkMenuItem* item, ContextMenuController*
     g_signal_connect(item, "activate", G_CALLBACK(contextMenuItemActivated), controller);
 }
 
-static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webView, const PlatformMouseEvent& event)
+static MouseEventWithHitTestResults prepareMouseEventForFrame(Frame* frame, const PlatformMouseEvent& event)
+{
+    HitTestRequest request(HitTestRequest::Active);
+    IntPoint point = frame->view()->windowToContents(event.position());
+    return frame->document()->prepareMouseEvent(request, point, event);
+}
+
+// Check enable-default-context-menu setting for compatibility.
+static bool defaultContextMenuEnabled(WebKitWebView* webView)
+{
+    gboolean enableDefaultContextMenu;
+    g_object_get(webkit_web_view_get_settings(webView), "enable-default-context-menu", &enableDefaultContextMenu, NULL);
+    return enableDefaultContextMenu;
+}
+
+static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webView, const PlatformMouseEvent& event, bool triggeredWithKeyboard)
 {
     Page* page = core(webView);
     page->contextMenuController()->clearContextMenu();
     Frame* focusedFrame;
     Frame* mainFrame = page->mainFrame();
     gboolean mousePressEventResult = FALSE;
+    GRefPtr<WebKitHitTestResult> hitTestResult;
 
     if (!mainFrame->view())
         return FALSE;
 
     mainFrame->view()->setCursor(pointerCursor());
     if (page->frameCount()) {
-        HitTestRequest request(HitTestRequest::Active);
-        IntPoint point = mainFrame->view()->windowToContents(event.position());
-        MouseEventWithHitTestResults mev = mainFrame->document()->prepareMouseEvent(request, point, event);
-
+        MouseEventWithHitTestResults mev = prepareMouseEventForFrame(mainFrame, event);
         Frame* targetFrame = EventHandler::subframeForHitTestResult(mev);
         if (!targetFrame)
             targetFrame = mainFrame;
@@ -344,12 +365,13 @@ static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webVie
             page->focusController()->setFocusedFrame(targetFrame);
             focusedFrame = targetFrame;
         }
+        if (focusedFrame == mainFrame)
+            hitTestResult = adoptGRef(kit(mev.hitTestResult()));
     } else
         focusedFrame = mainFrame;
 
     if (focusedFrame->view() && focusedFrame->eventHandler()->handleMousePressEvent(event))
         mousePressEventResult = TRUE;
-
 
     bool handledEvent = focusedFrame->eventHandler()->sendContextMenuEvent(event);
     if (!handledEvent)
@@ -363,37 +385,42 @@ static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webVie
     if (!coreMenu)
         return mousePressEventResult;
 
-    // If we reach here, it's because WebCore is going to show the
-    // default context menu. We check our setting to figure out
-    // whether we want it or not.
-    WebKitWebSettings* settings = webkit_web_view_get_settings(webView);
-    gboolean enableDefaultContextMenu;
-    g_object_get(settings, "enable-default-context-menu", &enableDefaultContextMenu, NULL);
-
-    if (!enableDefaultContextMenu)
-        return FALSE;
-
-    GtkMenu* menu = GTK_MENU(coreMenu->platformDescription());
-    if (!menu)
-        return FALSE;
+    GtkMenu* defaultMenu = coreMenu->platformDescription();
+    ASSERT(defaultMenu);
 
     // We connect the "activate" signal here rather than in ContextMenuGtk to avoid
     // a layering violation. ContextMenuGtk should not know about the ContextMenuController.
-    gtk_container_foreach(GTK_CONTAINER(menu), (GtkCallback)contextMenuConnectActivate, controller);
+    gtk_container_foreach(GTK_CONTAINER(defaultMenu), reinterpret_cast<GtkCallback>(contextMenuConnectActivate), controller);
 
-    g_signal_emit(webView, webkit_web_view_signals[POPULATE_POPUP], 0, menu);
+    if (!hitTestResult) {
+        MouseEventWithHitTestResults mev = prepareMouseEventForFrame(focusedFrame, event);
+        hitTestResult = adoptGRef(kit(mev.hitTestResult()));
+    }
+
+    gboolean handled;
+    g_signal_emit(webView, webkit_web_view_signals[CONTEXT_MENU], 0, defaultMenu, hitTestResult.get(), triggeredWithKeyboard, &handled);
+    if (handled)
+        return TRUE;
+
+    // Return now if default context menu is disabled by enable-default-context-menu setting.
+    // Check enable-default-context-menu setting for compatibility.
+    if (!defaultContextMenuEnabled(webView))
+        return FALSE;
+
+    // Emit populate-popup signal for compatibility.
+    g_signal_emit(webView, webkit_web_view_signals[POPULATE_POPUP], 0, defaultMenu);
 
     // If the context menu is now empty, don't show it.
-    GOwnPtr<GList> items(gtk_container_get_children(GTK_CONTAINER(menu)));
+    GOwnPtr<GList> items(gtk_container_get_children(GTK_CONTAINER(defaultMenu)));
     if (!items)
         return FALSE;
 
     WebKitWebViewPrivate* priv = webView->priv;
-    priv->currentMenu = menu;
+    priv->currentMenu = defaultMenu;
     priv->lastPopupXPosition = event.globalPosition().x();
     priv->lastPopupYPosition = event.globalPosition().y();
 
-    gtk_menu_popup(menu, 0, 0, &PopupMenuPositionFunc, webView, event.button() + 1, gtk_get_current_event_time());
+    gtk_menu_popup(defaultMenu, 0, 0, &PopupMenuPositionFunc, webView, event.button() + 1, gtk_get_current_event_time());
     return TRUE;
 }
 
@@ -404,7 +431,7 @@ static IntPoint getLocationForKeyboardGeneratedContextMenu(Frame* frame)
     if (!selection->selection().isNonOrphanedCaretOrRange()
          || (selection->selection().isCaret() && !selection->selection().isContentEditable())) {
         if (Node* focusedNode = getFocusedNode(frame))
-            return focusedNode->getRect().location();
+            return focusedNode->getPixelSnappedRect().location();
 
         // There was no selection and no focused node, so just put the context
         // menu into the corner of the view, offset slightly.
@@ -434,8 +461,9 @@ static gboolean webkit_web_view_popup_menu_handler(GtkWidget* widget)
 
     IntPoint globalPoint(convertWidgetPointToScreenPoint(widget, location));
     PlatformMouseEvent event(location, globalPoint, RightButton, PlatformEvent::MousePressed, 0, false, false, false, false, gtk_get_current_event_time());
-    return webkit_web_view_forward_context_menu_event(WEBKIT_WEB_VIEW(widget), event);
+    return webkit_web_view_forward_context_menu_event(WEBKIT_WEB_VIEW(widget), event, true);
 }
+#endif // ENABLE(CONTEXT_MENUS)
 
 static void setHorizontalAdjustment(WebKitWebView* webView, GtkAdjustment* adjustment)
 {
@@ -551,7 +579,7 @@ static void webkit_web_view_get_property(GObject* object, guint prop_id, GValue*
         g_value_set_string(value, webkit_web_view_get_icon_uri(webView));
         break;
     case PROP_IM_CONTEXT:
-        g_value_set_object(value, webkit_web_view_get_im_context(webView));
+        g_value_set_object(value, webView->priv->imFilter.context());
         break;
     case PROP_VIEW_MODE:
         g_value_set_enum(value, webkit_web_view_get_view_mode(webView));
@@ -680,42 +708,15 @@ static gboolean webkit_web_view_draw(GtkWidget* widget, cairo_t* cr)
 
 static gboolean webkit_web_view_key_press_event(GtkWidget* widget, GdkEventKey* event)
 {
-    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-
-    Frame* frame = core(webView)->focusController()->focusedOrMainFrame();
-    PlatformKeyboardEvent keyboardEvent(event);
-
-    if (!frame->view())
-        return FALSE;
-
-    if (frame->eventHandler()->keyEvent(keyboardEvent))
+    if (WEBKIT_WEB_VIEW(widget)->priv->imFilter.filterKeyEvent(event))
         return TRUE;
-
-    /* Chain up to our parent class for binding activation */
     return GTK_WIDGET_CLASS(webkit_web_view_parent_class)->key_press_event(widget, event);
 }
 
 static gboolean webkit_web_view_key_release_event(GtkWidget* widget, GdkEventKey* event)
 {
-    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-
-    // GTK+ IM contexts often require us to filter key release events, which
-    // WebCore does not do by default, so we filter the event here. We only block
-    // the event if we don't have a pending composition, because that means we
-    // are using a context like 'simple' which marks every keystroke as filtered.
-    WebKit::EditorClient* client = static_cast<WebKit::EditorClient*>(core(webView)->editorClient());
-    if (gtk_im_context_filter_keypress(webView->priv->imContext.get(), event) && !client->hasPendingComposition())
+    if (WEBKIT_WEB_VIEW(widget)->priv->imFilter.filterKeyEvent(event))
         return TRUE;
-
-    Frame* frame = core(webView)->focusController()->focusedOrMainFrame();
-    if (!frame->view())
-        return FALSE;
-
-    PlatformKeyboardEvent keyboardEvent(event);
-    if (frame->eventHandler()->keyEvent(keyboardEvent))
-        return TRUE;
-
-    /* Chain up to our parent class for binding activation */
     return GTK_WIDGET_CLASS(webkit_web_view_parent_class)->key_release_event(widget, event);
 }
 
@@ -734,16 +735,17 @@ static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventBu
     int count = priv->clickCounter.clickCountForGdkButtonEvent(widget, event);
     platformEvent.setClickCount(count);
 
+#if ENABLE(CONTEXT_MENUS)
     if (event->button == 3)
-        return webkit_web_view_forward_context_menu_event(webView, PlatformMouseEvent(event));
+        return webkit_web_view_forward_context_menu_event(webView, PlatformMouseEvent(event), false);
+#endif
 
     Frame* frame = core(webView)->mainFrame();
     if (!frame->view())
         return FALSE;
 
+    priv->imFilter.notifyMouseButtonPress();
     gboolean result = frame->eventHandler()->handleMousePressEvent(platformEvent);
-    // Handle the IM context when a mouse press fires
-    static_cast<WebKit::EditorClient*>(core(webView)->editorClient())->handleInputMethodMousePress();
 
 #if PLATFORM(X11)
     /* Copy selection to the X11 selection clipboard */
@@ -766,15 +768,6 @@ static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventBu
 static gboolean webkit_web_view_button_release_event(GtkWidget* widget, GdkEventButton* event)
 {
     WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-
-    Frame* focusedFrame = core(webView)->focusController()->focusedFrame();
-
-    if (focusedFrame && focusedFrame->editor()->canEdit()) {
-#ifdef MAEMO_CHANGES
-        WebKitWebViewPrivate* priv = webView->priv;
-        hildon_gtk_im_context_filter_event(priv->imContext.get(), (GdkEvent*)event);
-#endif
-    }
 
     Frame* mainFrame = core(webView)->mainFrame();
     if (mainFrame->view())
@@ -941,20 +934,20 @@ static gboolean webkit_web_view_focus_in_event(GtkWidget* widget, GdkEventFocus*
     // TODO: Improve focus handling as suggested in
     // http://bugs.webkit.org/show_bug.cgi?id=16910
     GtkWidget* toplevel = gtk_widget_get_toplevel(widget);
-    if (widgetIsOnscreenToplevelWindow(toplevel) && gtk_window_has_toplevel_focus(GTK_WINDOW(toplevel))) {
-        WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-        FocusController* focusController = core(webView)->focusController();
+    if (!widgetIsOnscreenToplevelWindow(toplevel) || !gtk_window_has_toplevel_focus(GTK_WINDOW(toplevel)))
+        return GTK_WIDGET_CLASS(webkit_web_view_parent_class)->focus_in_event(widget, event);
 
-        focusController->setActive(true);
+    WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
+    FocusController* focusController = core(webView)->focusController();
 
-        if (focusController->focusedFrame())
-            focusController->setFocused(true);
-        else
-            focusController->setFocusedFrame(core(webView)->mainFrame());
+    focusController->setActive(true);
+    if (focusController->focusedFrame())
+        focusController->setFocused(true);
+    else
+        focusController->setFocusedFrame(core(webView)->mainFrame());
 
-        if (focusController->focusedFrame()->editor()->canEdit())
-            gtk_im_context_focus_in(webView->priv->imContext.get());
-    }
+    if (focusController->focusedFrame()->editor()->canEdit())
+        webView->priv->imFilter.notifyFocusedIn();
     return GTK_WIDGET_CLASS(webkit_web_view_parent_class)->focus_in_event(widget, event);
 }
 
@@ -964,15 +957,12 @@ static gboolean webkit_web_view_focus_out_event(GtkWidget* widget, GdkEventFocus
 
     // We may hit this code while destroying the widget, and we might
     // no longer have a page, then.
-    Page* page = core(webView);
-    if (page) {
+    if (Page* page = core(webView)) {
         page->focusController()->setActive(false);
         page->focusController()->setFocused(false);
     }
 
-    if (webView->priv->imContext)
-        gtk_im_context_focus_out(webView->priv->imContext.get());
-
+    webView->priv->imFilter.notifyFocusedOut();
     return GTK_WIDGET_CLASS(webkit_web_view_parent_class)->focus_out_event(widget, event);
 }
 
@@ -1035,8 +1025,6 @@ static void webkit_web_view_realize(GtkWidget* widget)
 #else
     gtk_style_context_set_background(gtk_widget_get_style_context(widget), window);
 #endif
-
-    gtk_im_context_set_client_window(priv->imContext.get(), window);
 }
 
 #ifdef GTK_API_VERSION_2
@@ -1581,7 +1569,7 @@ static gboolean webkit_web_view_query_tooltip(GtkWidget *widget, gint x, gint y,
                 String title = static_cast<Element*>(titleNode)->title();
                 if (!title.isEmpty()) {
                     if (FrameView* view = coreFrame->view()) {
-                        GdkRectangle area = view->contentsToWindow(node->getRect());
+                        GdkRectangle area = view->contentsToWindow(node->getPixelSnappedRect());
                         gtk_tooltip_set_tip_area(tooltip, &area);
                     }
                     gtk_tooltip_set_text(tooltip, title.utf8().data());
@@ -1617,12 +1605,6 @@ static gboolean webkit_web_view_show_help(GtkWidget* widget, GtkWidgetHelpType h
     return GTK_WIDGET_CLASS(webkit_web_view_parent_class)->show_help(widget, help_type);
 }
 #endif
-
-static GtkIMContext* webkit_web_view_get_im_context(WebKitWebView* webView)
-{
-    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
-    return GTK_IM_CONTEXT(webView->priv->imContext.get());
-}
 
 static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
 {
@@ -2012,11 +1994,11 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             0,
             g_signal_accumulator_true_handled,
             NULL,
-            webkit_marshal_BOOLEAN__OBJECT_STRING_POINTER,
+            webkit_marshal_BOOLEAN__OBJECT_STRING_BOXED,
             G_TYPE_BOOLEAN, 3,
             WEBKIT_TYPE_WEB_FRAME,
             G_TYPE_STRING,
-            G_TYPE_POINTER);
+            G_TYPE_ERROR);
 
     /**
      * WebKitWebView::load-finished:
@@ -2100,6 +2082,8 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * When a context menu is about to be displayed this signal is emitted.
      *
      * Add menu items to #menu to extend the context menu.
+     *
+     * Deprecated: 1.10: Use #WebKitWebView::context-menu signal instead.
      */
     webkit_web_view_signals[POPULATE_POPUP] = g_signal_new("populate-popup",
             G_TYPE_FROM_CLASS(webViewClass),
@@ -2814,11 +2798,46 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
             G_SIGNAL_RUN_LAST,
             0,
             0, 0,
-            webkit_marshal_VOID__OBJECT_OBJECT_POINTER,
+            webkit_marshal_VOID__OBJECT_OBJECT_BOXED,
             G_TYPE_NONE, 3,
             WEBKIT_TYPE_WEB_FRAME,
             WEBKIT_TYPE_WEB_RESOURCE,
-            G_TYPE_POINTER);
+            G_TYPE_ERROR);
+
+    /**
+     * WebKitWebView::context-menu:
+     * @web_view: the object which received the signal
+     * @default_menu: the default context menu
+     * @hit_test_result: a #WebKitHitTestResult with the context of the current position.
+     * @triggered_with_keyboard: %TRUE if the context menu was triggered using the keyboard
+     *
+     * Emmited when a context menu is about to be displayed to give the application
+     * a chance to create and handle its own context menu. If you only want to add custom
+     * options to the default context menu you can simply modify the given @default_menu.
+     *
+     * When @triggered_with_keyboard is %TRUE the coordinates of the given @hit_test_result should be
+     * used to position the popup menu. When the context menu has been triggered by a
+     * mouse event you could either use the @hit_test_result coordinates or pass %NULL
+     * to the #GtkMenuPositionFunc parameter of gtk_menu_popup() function.
+     * Note that coordinates of @hit_test_result are relative to @web_view window.
+     *
+     * If your application will create and display its own popup menu, %TRUE should be returned.
+     * Note that when the context menu is handled by the application, the #WebKitWebSettings:enable-default-context-menu
+     * setting will be ignored and the #WebKitWebView::populate-popup signal won't be emitted.
+     * If you don't want any context menu to be shown, you can simply connect to this signal
+     * and return %TRUE without doing anything else.
+     *
+     * Since: 1.10
+     */
+    webkit_web_view_signals[CONTEXT_MENU] = g_signal_new("context-menu",
+            G_TYPE_FROM_CLASS(webViewClass),
+            G_SIGNAL_RUN_LAST,
+            0, 0, 0,
+            webkit_marshal_BOOLEAN__OBJECT_OBJECT_BOOLEAN,
+            G_TYPE_BOOLEAN, 3,
+            GTK_TYPE_WIDGET,
+            WEBKIT_TYPE_HIT_TEST_RESULT,
+            G_TYPE_BOOLEAN);
 
     /*
      * implementations of virtual methods
@@ -2870,7 +2889,11 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
     widgetClass->get_preferred_width = webkit_web_view_get_preferred_width;
     widgetClass->get_preferred_height = webkit_web_view_get_preferred_height;
 #endif
+#if ENABLE(CONTEXT_MENUS)
     widgetClass->popup_menu = webkit_web_view_popup_menu_handler;
+#else
+    widgetClass->popup_menu = NULL;
+#endif
     widgetClass->grab_focus = webkit_web_view_grab_focus;
     widgetClass->focus_in_event = webkit_web_view_focus_in_event;
     widgetClass->focus_out_event = webkit_web_view_focus_out_event;
@@ -3347,6 +3370,9 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     coreSettings->setEnableScrollAnimator(settingsPrivate->enableSmoothScrolling);
 #endif
 
+    // Use mock scrollbars if in DumpRenderTree mode (i.e. testing layout tests).
+    coreSettings->setMockScrollbarsEnabled(DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled());
+
     if (Page* page = core(webView))
         page->setTabKeyCyclesThroughElements(settingsPrivate->tabKeyCyclesThroughElements);
 
@@ -3497,33 +3523,41 @@ static void webkit_web_view_init(WebKitWebView* webView)
     // members, which ensures they are initialized properly.
     new (priv) WebKitWebViewPrivate();
 
-    priv->imContext = adoptGRef(gtk_im_multicontext_new());
+    priv->imFilter.setWebView(webView);
 
     Page::PageClients pageClients;
     pageClients.chromeClient = new WebKit::ChromeClient(webView);
+#if ENABLE(CONTEXT_MENUS)
     pageClients.contextMenuClient = new WebKit::ContextMenuClient(webView);
+#endif
     pageClients.editorClient = new WebKit::EditorClient(webView);
     pageClients.dragClient = new WebKit::DragClient(webView);
     pageClients.inspectorClient = new WebKit::InspectorClient(webView);
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled())
-        pageClients.geolocationClient = new GeolocationClientMock;
-    else
-        pageClients.geolocationClient = new WebKit::GeolocationClient(webView);
-#endif
-
     priv->corePage = new Page(pageClients);
 
+#if ENABLE(GEOLOCATION)
+    if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
+        GeolocationClientMock* mock = new GeolocationClientMock;
+        WebCore::provideGeolocationTo(priv->corePage, mock);
+        mock->setController(GeolocationController::from(priv->corePage));
+    } else
+        WebCore::provideGeolocationTo(priv->corePage, new WebKit::GeolocationClient(webView));
+#endif
 #if ENABLE(DEVICE_ORIENTATION)
     WebCore::provideDeviceMotionTo(priv->corePage, new DeviceMotionClientGtk);
     WebCore::provideDeviceOrientationTo(priv->corePage, new DeviceOrientationClientGtk);
 #endif
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
-    if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled())
-        static_cast<GeolocationClientMock*>(pageClients.geolocationClient)->setController(priv->corePage->geolocationController());
+#if ENABLE(MEDIA_STREAM)
+    WebCore::provideUserMediaTo(priv->corePage, new UserMediaClientGtk);
 #endif
+
+    if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
+        // Set some testing-specific settings
+        priv->corePage->settings()->setInteractiveFormValidationEnabled(true);
+        priv->corePage->settings()->setValidationMessageTimerMagnification(-1);
+    }
 
     // Pages within a same session need to be linked together otherwise some functionalities such
     // as visited link coloration (across pages) and changing popup window location will not work.
@@ -3541,7 +3575,6 @@ static void webkit_web_view_init(WebKitWebView* webView)
     priv->viewportAttributes->priv->webView = webView;
 
     gtk_widget_set_can_focus(GTK_WIDGET(webView), TRUE);
-    gtk_widget_set_double_buffered(GTK_WIDGET(webView), FALSE);
 
     priv->mainFrame = WEBKIT_WEB_FRAME(webkit_web_frame_new(webView));
     priv->lastPopupXPosition = priv->lastPopupYPosition = -1;
@@ -5061,6 +5094,8 @@ const gchar* webkit_web_view_get_icon_uri(WebKitWebView* webView)
  * Returns: (transfer full): a new reference to a #GdkPixbuf, or %NULL
  *
  * Since: 1.3.13
+ *
+ * Deprecated: 1.8: Use webkit_web_view_try_get_favicon_pixbuf() instead.
  */
 GdkPixbuf* webkit_web_view_get_icon_pixbuf(WebKitWebView* webView)
 {
@@ -5071,7 +5106,36 @@ GdkPixbuf* webkit_web_view_get_icon_pixbuf(WebKitWebView* webView)
     return webkit_icon_database_get_icon_pixbuf(database, pageURI);
 }
 
+/**
+ * webkit_web_view_try_get_favicon_pixbuf:
+ * @web_view: the #WebKitWebView object
+ * @width: the desired width for the icon
+ * @height: the desired height for the icon
+ *
+ * Obtains a #GdkPixbuf of the favicon for the given
+ * #WebKitWebView. This will return %NULL is there is no icon for the
+ * current #WebKitWebView or if the icon is in the database but not
+ * available at the moment of this call. Use
+ * webkit_web_view_get_icon_uri() if you need to distinguish these
+ * cases.  Usually you want to connect to WebKitWebView::icon-loaded
+ * and call this method in the callback.
+ *
+ * See also webkit_favicon_database_try_get_favicon_pixbuf(). Contrary
+ * to this function the icon database one returns the URL of the page
+ * containing the icon.
+ *
+ * Returns: (transfer full): a new reference to a #GdkPixbuf, or %NULL
+ *
+ * Since: 1.8
+ */
+GdkPixbuf* webkit_web_view_try_get_favicon_pixbuf(WebKitWebView* webView, guint width, guint height)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
 
+    const gchar* pageURI = webkit_web_view_get_uri(webView);
+    WebKitFaviconDatabase* database = webkit_get_favicon_database();
+    return webkit_favicon_database_try_get_favicon_pixbuf(database, pageURI, width, height);
+}
 
 /**
  * webkit_web_view_get_dom_document:
@@ -5138,6 +5202,31 @@ void webViewExitFullscreen(WebKitWebView* webView)
         priv->fullscreenVideoController->exitFullscreen();
 #endif
 }
+
+#if ENABLE(ICONDATABASE)
+void webkitWebViewIconLoaded(WebKitFaviconDatabase* database, const char* frameURI, WebKitWebView* webView)
+{
+    // Since we definitely have an icon the WebView doesn't need to
+    // listen for notifications any longer.
+    webkitWebViewRegisterForIconNotification(webView, false);
+
+    // webkit_web_view_get_icon_uri() properly updates the "icon-uri" property.
+    g_object_notify(G_OBJECT(webView), "icon-uri");
+    g_signal_emit(webView, webkit_web_view_signals[ICON_LOADED], 0, webkit_web_view_get_icon_uri(webView));
+}
+
+void webkitWebViewRegisterForIconNotification(WebKitWebView* webView, bool shouldRegister)
+{
+    WebKitFaviconDatabase* database = webkit_get_favicon_database();
+    if (shouldRegister) {
+        if (!g_signal_handler_is_connected(database, webView->priv->iconLoadedHandler))
+            webView->priv->iconLoadedHandler = g_signal_connect(database, "icon-loaded",
+                                                                G_CALLBACK(webkitWebViewIconLoaded), webView);
+    } else
+        if (g_signal_handler_is_connected(database, webView->priv->iconLoadedHandler))
+            g_signal_handler_disconnect(database, webView->priv->iconLoadedHandler);
+}
+#endif
 
 namespace WebKit {
 

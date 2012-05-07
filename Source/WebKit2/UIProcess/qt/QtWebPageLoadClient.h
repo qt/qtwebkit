@@ -21,29 +21,37 @@
 #ifndef QtWebPageLoadClient_h
 #define QtWebPageLoadClient_h
 
-#include "QtWebError.h"
-#include <QtCore/QString>
-#include <QtCore/QUrl>
+#include <QtGlobal>
 #include <WKPage.h>
 
+QT_BEGIN_NAMESPACE
+class QUrl;
+QT_END_NAMESPACE
+
 class QQuickWebView;
+
+namespace WebKit {
+
+class WebPageProxy;
 
 class QtWebPageLoadClient {
 public:
     QtWebPageLoadClient(WKPageRef, QQuickWebView*);
 
     int loadProgress() const { return m_loadProgress; }
+    void completeLoadWhenProcessDidCrashIfNeeded();
 
 private:
-    void didStartProvisionalLoadForFrame(const QUrl&);
-    void didCommitLoadForFrame();
-    void didSameDocumentNavigationForFrame();
-    void didReceiveTitleForFrame();
-    void didFirstVisuallyNonEmptyLayoutForFrame();
+    void didStartProvisionalLoad(const QUrl&);
+    void didCommitLoad();
+    void didSameDocumentNavigation();
+    void didReceiveTitle();
+    void didFirstVisuallyNonEmptyLayout();
     void didChangeBackForwardList();
 
     void dispatchLoadSucceeded();
     void dispatchLoadFailed(WKErrorRef);
+
     void setLoadProgress(int);
 
     // WKPageLoadClient callbacks.
@@ -61,7 +69,10 @@ private:
     static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef, WKArrayRef, const void *clientInfo);
 
     QQuickWebView* m_webView;
+    WebPageProxy* m_webPageProxy;
     int m_loadProgress;
 };
+
+} // namespace Webkit
 
 #endif // QtWebPageLoadClient_h

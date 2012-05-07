@@ -48,12 +48,7 @@ using namespace WebCore;
 
 - (void)dealloc
 {
-    if (!isMainThread()) {
-        TileCache* tileCache = _tileCache.leakPtr();
-        dispatch_async(dispatch_get_main_queue(), ^{
-            delete tileCache;
-        });
-    }
+    ASSERT(!_tileCache);
 
     [super dealloc];
 }
@@ -111,24 +106,21 @@ using namespace WebCore;
     return _tileCache->tileContainerLayer();
 }
 
-- (void)visibleRectChanged:(const IntRect&)visibleRect
+- (WebCore::TiledBacking*)tiledBacking
 {
-    _tileCache->visibleRectChanged(visibleRect);
+    return _tileCache.get();
 }
 
-- (CGColorRef)borderColor
+- (void)invalidate
 {
-    return _tileCache->tileDebugBorderColor();
+    ASSERT(isMainThread());
+    ASSERT(_tileCache);
+    _tileCache = nullptr;
 }
 
 - (void)setBorderColor:(CGColorRef)borderColor
 {
     _tileCache->setTileDebugBorderColor(borderColor);
-}
-
-- (CGFloat)borderWidth
-{
-    return _tileCache->tileDebugBorderWidth();
 }
 
 - (void)setBorderWidth:(CGFloat)borderWidth

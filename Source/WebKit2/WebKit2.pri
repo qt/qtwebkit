@@ -27,6 +27,8 @@ INCLUDEPATH += \
     $$SOURCE_DIR/UIProcess/API/qt \
     $$SOURCE_DIR/UIProcess/Authentication \
     $$SOURCE_DIR/UIProcess/Downloads \
+    $$SOURCE_DIR/UIProcess/InspectorServer \
+    $$SOURCE_DIR/UIProcess/InspectorServer/qt \
     $$SOURCE_DIR/UIProcess/Launcher \
     $$SOURCE_DIR/UIProcess/Notifications \
     $$SOURCE_DIR/UIProcess/Plugins \
@@ -58,6 +60,8 @@ INCLUDEPATH += \
 
 # The WebKit2 Qt APIs depend on qwebkitglobal.h, which lives in WebKit
 INCLUDEPATH += $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/Api
+
+INCLUDEPATH += $${ROOT_WEBKIT_DIR}/Source/WTF/wtf/qt
 
 INCLUDEPATH += $$WEBKIT2_GENERATED_SOURCES_DIR
 

@@ -44,12 +44,14 @@ public:
 
     static bool isSMILElement(Node*);
 
+    bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(Attribute*) OVERRIDE;
-    virtual void attributeChanged(Attribute*) OVERRIDE;
-    virtual void insertedIntoDocument();
-    virtual void removedFromDocument();
+    virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
+    virtual void removedFrom(Node*) OVERRIDE;
     
     virtual bool hasValidAttributeType() = 0;
+    virtual void animationAttributeChanged() = 0;
 
     SMILTimeContainer* timeContainer() const { return m_timeContainer.get(); }
 
@@ -74,8 +76,6 @@ public:
 
     FillMode fill() const;
 
-    String xlinkHref() const;
-
     SMILTime dur() const;
     SMILTime repeatDur() const;
     SMILTime repeatCount() const;
@@ -89,7 +89,8 @@ public:
     SMILTime previousIntervalBegin() const { return m_previousIntervalBegin; }
     SMILTime simpleDuration() const;
 
-    void progress(SMILTime elapsed, SVGSMILElement* resultsElement);
+    void seekToIntervalCorrespondingToTime(SMILTime elapsed);
+    void progress(SMILTime elapsed, SVGSMILElement* resultsElement, bool seekToTime);
     SMILTime nextProgressTime() const;
 
     void reset();
@@ -105,7 +106,7 @@ public:
     void setDocumentOrderIndex(unsigned index) { m_documentOrderIndex = index; }
 
     virtual bool isAdditive() const = 0;
-    virtual void resetToBaseValue(const String&) = 0;
+    virtual void resetToBaseValue() = 0;
     virtual void applyResultsToTarget() = 0;
 
 protected:
@@ -115,7 +116,7 @@ protected:
     void setInactive() { m_activeState = Inactive; }
 
     // Sub-classes may need to take action when the target is changed.
-    virtual void targetElementDidChange(SVGElement*) { }
+    virtual void targetElementWillChange(SVGElement* currentTarget, SVGElement* newTarget);
     virtual void endedActiveInterval();
 
 private:
@@ -129,7 +130,7 @@ private:
     
     SMILTime findInstanceTime(BeginOrEnd, SMILTime minimumTime, bool equalsMinimumOK) const;
     void resolveFirstInterval();
-    void resolveNextInterval();
+    void resolveNextInterval(bool notifyDependents);
     void resolveInterval(bool first, SMILTime& beginResult, SMILTime& endResult) const;
     SMILTime resolveActiveEnd(SMILTime resolvedBegin, SMILTime resolvedEnd) const;
     SMILTime repeatingDuration() const;

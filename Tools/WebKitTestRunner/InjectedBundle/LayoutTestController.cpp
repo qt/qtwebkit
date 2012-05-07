@@ -32,6 +32,7 @@
 #include "PlatformWebView.h"
 #include "StringFunctions.h"
 #include "TestController.h"
+#include <WebCore/PageVisibilityState.h>
 #include <WebKit2/WKBundleBackForwardList.h>
 #include <WebKit2/WKBundleFrame.h>
 #include <WebKit2/WKBundleFramePrivate.h>
@@ -43,6 +44,7 @@
 #include <WebKit2/WKRetainPtr.h>
 #include <WebKit2/WebKit2.h>
 #include <wtf/HashMap.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WTR {
 
@@ -107,6 +109,7 @@ LayoutTestController::LayoutTestController()
     , m_policyDelegateEnabled(false)
     , m_policyDelegatePermissive(false)
     , m_globalFlag(false)
+    , m_customFullScreenBehavior(false)
 {
     platformInitialize();
 }
@@ -130,7 +133,8 @@ void LayoutTestController::display()
 
 void LayoutTestController::dumpAsText(bool dumpPixels)
 {
-    m_whatToDump = MainFrameText;
+    if (m_whatToDump < MainFrameText)
+        m_whatToDump = MainFrameText;
     m_dumpPixels = dumpPixels;
 }
 
@@ -158,7 +162,8 @@ void LayoutTestController::waitToDumpWatchdogTimerFired()
 {
     invalidateWaitToDumpWatchdogTimer();
     const char* message = "FAIL: Timed out waiting for notifyDone to be called\n";
-    InjectedBundle::shared().os() << message << "\n";
+    InjectedBundle::shared().stringBuilder()->append(message);
+    InjectedBundle::shared().stringBuilder()->append("\n");
     InjectedBundle::shared().done();
 }
 
@@ -429,6 +434,15 @@ bool LayoutTestController::isPageBoxVisible(int pageIndex)
     return WKBundleIsPageBoxVisible(InjectedBundle::shared().bundle(), mainFrame, pageIndex);
 }
 
+void LayoutTestController::setValueForUser(JSContextRef context, JSValueRef element, JSStringRef value)
+{
+    if (!element || !JSValueIsObject(context, element))
+        return;
+
+    WKRetainPtr<WKBundleNodeHandleRef> nodeHandle(AdoptWK, WKBundleNodeHandleCreate(context, const_cast<JSObjectRef>(element)));
+    WKBundleNodeHandleSetHTMLInputElementValueForUser(nodeHandle.get(), toWK(value).get());
+}
+
 unsigned LayoutTestController::windowCount()
 {
     return InjectedBundle::shared().pageCount();
@@ -448,23 +462,31 @@ void LayoutTestController::makeWindowObject(JSContextRef context, JSObjectRef wi
 
 void LayoutTestController::showWebInspector()
 {
+#if ENABLE(INSPECTOR)
     WKBundleInspectorShow(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()));
+#endif // ENABLE(INSPECTOR)
 }
 
 void LayoutTestController::closeWebInspector()
 {
+#if ENABLE(INSPECTOR)
     WKBundleInspectorClose(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()));
+#endif // ENABLE(INSPECTOR)
 }
 
 void LayoutTestController::evaluateInWebInspector(long callID, JSStringRef script)
 {
+#if ENABLE(INSPECTOR)
     WKRetainPtr<WKStringRef> scriptWK = toWK(script);
     WKBundleInspectorEvaluateScriptForTest(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), callID, scriptWK.get());
+#endif // ENABLE(INSPECTOR)
 }
 
 void LayoutTestController::setJavaScriptProfilingEnabled(bool enabled)
 {
+#if ENABLE(INSPECTOR)
     WKBundleInspectorSetJavaScriptProfilingEnabled(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), enabled);
+#endif // ENABLE(INSPECTOR)
 }
 
 typedef WTF::HashMap<unsigned, WKRetainPtr<WKBundleScriptWorldRef> > WorldMap;
@@ -493,7 +515,7 @@ void LayoutTestController::evaluateScriptInIsolatedWorld(JSContextRef context, u
     if (!worldID)
         world.adopt(WKBundleScriptWorldCreateWorld());
     else {
-        WKRetainPtr<WKBundleScriptWorldRef>& worldSlot = worldMap().add(worldID, 0).first->second;
+        WKRetainPtr<WKBundleScriptWorldRef>& worldSlot = worldMap().add(worldID, 0).iterator->second;
         if (!worldSlot)
             worldSlot.adopt(WKBundleScriptWorldCreateWorld());
         world = worldSlot;
@@ -525,9 +547,27 @@ void LayoutTestController::setShouldStayOnPageAfterHandlingBeforeUnload(bool sho
     InjectedBundle::shared().postNewBeforeUnloadReturnValue(!shouldStayOnPage);
 }
 
+void LayoutTestController::setPageVisibility(JSStringRef state)
+{
+    WKStringRef visibilityStateKey = toWK(state).get();
+    WebCore::PageVisibilityState visibilityState = WebCore::PageVisibilityStateVisible;
+
+    if (WKStringIsEqualToUTF8CString(visibilityStateKey, "hidden"))
+        visibilityState = WebCore::PageVisibilityStateHidden;
+    else if (WKStringIsEqualToUTF8CString(visibilityStateKey, "prerender"))
+        visibilityState = WebCore::PageVisibilityStatePrerender;
+
+    WKBundleSetPageVisibilityState(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), visibilityState, /* isInitialState */ false);
+}
+
+void LayoutTestController::resetPageVisibility()
+{
+    WKBundleSetPageVisibilityState(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), WebCore::PageVisibilityStateVisible, /* isInitialState */ true);
+}
+
 void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
 {
-    InjectedBundle::shared().os() << toSTD(adoptWK(WKBundlePageViewportConfigurationAsText(InjectedBundle::shared().page()->page(), deviceDPI, deviceWidth, deviceHeight, availableWidth, availableHeight)));
+    InjectedBundle::shared().stringBuilder()->append(toWTFString(adoptWK(WKBundlePageViewportConfigurationAsText(InjectedBundle::shared().page()->page(), deviceDPI, deviceWidth, deviceHeight, availableWidth, availableHeight))));
 }
 
 typedef WTF::HashMap<unsigned, JSValueRef> CallbackMap;
@@ -538,7 +578,7 @@ static CallbackMap& callbackMap()
 }
 
 enum {
-    AddChromeInputFieldCallbackID,
+    AddChromeInputFieldCallbackID = 1,
     RemoveChromeInputFieldCallbackID,
     FocusWebViewCallbackID,
     SetBackingScaleFactorCallbackID

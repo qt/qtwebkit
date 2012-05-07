@@ -2,6 +2,7 @@
     Copyright (C) 1999 Lars Knoll (knoll@kde.org)
     Copyright (C) 2006, 2008 Apple Inc. All rights reserved.
     Copyright (C) 2011 Rik Cabanier (cabanier@adobe.com)
+    Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -23,6 +24,7 @@
 #define Length_h
 
 #include "AnimationUtilities.h"
+#include "LayoutTypes.h"
 #include <wtf/Assertions.h>
 #include <wtf/FastAllocBase.h>
 #include <wtf/Forward.h>
@@ -32,10 +34,7 @@
 
 namespace WebCore {
 
-const int intMaxForLength = 0x7ffffff; // max value for a 28-bit int
-const int intMinForLength = (-0x7ffffff - 1); // min value for a 28-bit int
-
-enum LengthType { Auto, Relative, Percent, Fixed, Intrinsic, MinIntrinsic, Calculated, Undefined };
+enum LengthType { Auto, Relative, Percent, Fixed, Intrinsic, MinIntrinsic, Calculated, ViewportPercentageWidth, ViewportPercentageHeight, ViewportPercentageMin, Undefined };
  
 class CalculationValue;    
     
@@ -54,6 +53,11 @@ public:
 
     Length(int v, LengthType t, bool q = false)
         : m_intValue(v), m_quirk(q), m_type(t), m_isFloat(false)
+    {
+    }
+    
+    Length(FractionalLayoutUnit v, LengthType t, bool q = false)
+        : m_floatValue(v.toFloat()), m_quirk(q), m_type(t), m_isFloat(true)
     {
     }
     
@@ -105,8 +109,13 @@ public:
         return *this;
     }
     
-    int value() const
+    inline float value() const
     {
+        return getFloatValue();
+    }
+
+     int intValue() const
+     {
         if (isCalculated()) {
             ASSERT_NOT_REACHED();
             return 0;
@@ -153,76 +162,16 @@ public:
         m_isFloat = true;    
     }
 
+    void setValue(LengthType t, FractionalLayoutUnit value)
+    {
+        m_type = t;
+        m_floatValue = value;
+        m_isFloat = true;    
+    }
+
     void setValue(float value)
     {
         *this = Length(value, Fixed);
-    }
-
-    int calcValue(int maxValue, bool roundPercentages = false) const
-    {
-        switch (type()) {
-            case Fixed:
-            case Percent:
-            case Calculated:
-                return calcMinValue(maxValue, roundPercentages);
-            case Auto:
-                return maxValue;
-            case Relative:
-            case Intrinsic:
-            case MinIntrinsic:
-            case Undefined:
-                ASSERT_NOT_REACHED();
-                return 0;
-        }
-        ASSERT_NOT_REACHED();
-        return 0;
-    }
-
-    int calcMinValue(int maxValue, bool roundPercentages = false) const
-    {
-        switch (type()) {
-            case Fixed:
-                return value();
-            case Percent:
-                if (roundPercentages)
-                    return static_cast<int>(round(maxValue * percent() / 100.0f));
-                // Don't remove the extra cast to float. It is needed for rounding on 32-bit Intel machines that use the FPU stack.
-                return static_cast<int>(static_cast<float>(maxValue * percent() / 100.0f));
-            case Calculated:
-                return nonNanCalculatedValue(maxValue);
-            case Auto:
-                return 0;
-            case Relative:
-            case Intrinsic:
-            case MinIntrinsic:
-            case Undefined:
-                ASSERT_NOT_REACHED();
-                return 0;
-        }
-        ASSERT_NOT_REACHED();
-        return 0;
-    }
-
-    float calcFloatValue(int maxValue) const
-    {
-        switch (type()) {
-            case Fixed:
-                return getFloatValue();
-            case Percent:
-                return static_cast<float>(maxValue * percent() / 100.0f);
-            case Auto:
-                return static_cast<float>(maxValue);
-            case Calculated:
-                return nonNanCalculatedValue(maxValue);                
-            case Relative:
-            case Intrinsic:
-            case MinIntrinsic:
-            case Undefined:
-                ASSERT_NOT_REACHED();
-                return 0;
-        }
-        ASSERT_NOT_REACHED();
-        return 0;
     }
 
     bool isUndefined() const { return type() == Undefined; }
@@ -261,7 +210,7 @@ public:
     bool isPercent() const { return type() == Percent || type() == Calculated; }
     bool isFixed() const { return type() == Fixed; }
     bool isIntrinsicOrAuto() const { return type() == Auto || type() == MinIntrinsic || type() == Intrinsic; }
-    bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated; }
+    bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated || isViewportPercentage(); }
     bool isCalculated() const { return type() == Calculated; }
 
     Length blend(const Length& from, double progress) const
@@ -288,19 +237,29 @@ public:
         return Length(WebCore::blend(fromValue, toValue, progress), resultType);
     }
 
+    float getFloatValue() const
+    {
+        ASSERT(!isUndefined());
+        return m_isFloat ? m_floatValue : m_intValue;
+    }
+    float nonNanCalculatedValue(int maxValue) const;
+
+    bool isViewportPercentage() const
+    {
+        LengthType lengthType = type();
+        return lengthType >= ViewportPercentageWidth && lengthType <= ViewportPercentageMin;
+    }
+    float viewportPercentageLength() const
+    {
+        ASSERT(isViewportPercentage());
+        return getFloatValue();
+    }
 private:
     int getIntValue() const
     {
         ASSERT(!isUndefined());
         return m_isFloat ? static_cast<int>(m_floatValue) : m_intValue;
     }
-
-    float getFloatValue() const
-    {
-        ASSERT(!isUndefined());
-        return m_isFloat ? m_floatValue : m_intValue;
-    }
-
     void initFromLength(const Length &length) 
     {
         m_quirk = length.m_quirk;
@@ -315,8 +274,7 @@ private:
         if (isCalculated())
             incrementCalculatedRef();
     }
-    
-    float nonNanCalculatedValue(int maxValue) const;
+
     int calculationHandle() const
     {
         ASSERT(isCalculated());

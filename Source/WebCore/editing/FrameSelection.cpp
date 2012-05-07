@@ -50,7 +50,6 @@
 #include "InlineTextBox.h"
 #include "Page.h"
 #include "Range.h"
-#include "RenderLayer.h"
 #include "RenderText.h"
 #include "RenderTextControl.h"
 #include "RenderTheme.h"
@@ -76,7 +75,7 @@ using namespace HTMLNames;
 
 static inline LayoutUnit NoXPosForVerticalArrowNavigation()
 {
-    return std::numeric_limits<LayoutUnit>::min();
+    return MIN_LAYOUT_UNIT;
 }
 
 CaretBase::CaretBase(CaretVisibility visibility)
@@ -641,12 +640,15 @@ VisiblePosition FrameSelection::modifyMovingRight(TextGranularity granularity)
         } else
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).right(true);
         break;
-    case WordGranularity:
-        if (visualWordMovementEnabled()
-            || (m_frame && m_frame->editor()->behavior().shouldMoveLeftRightByWordInVisualOrder())) {
-            pos = rightWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()));
-            break;
-        }
+    case WordGranularity: {
+#if USE(ICU_UNICODE)
+        // Visual word movement relies on isWordTextBreak which is not implemented in WinCE and QT.
+        // https://bugs.webkit.org/show_bug.cgi?id=81136.
+        bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor()->behavior().shouldSkipSpaceWhenMovingRight();
+        pos = rightWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
+        break;
+#endif
+    }
     case SentenceGranularity:
     case LineGranularity:
     case ParagraphGranularity:
@@ -808,12 +810,13 @@ VisiblePosition FrameSelection::modifyMovingLeft(TextGranularity granularity)
         else
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).left(true);
         break;
-    case WordGranularity:
-        if (visualWordMovementEnabled()
-            || (m_frame && m_frame->editor()->behavior().shouldMoveLeftRightByWordInVisualOrder())) {
-            pos = leftWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()));
-            break;
-        }
+    case WordGranularity: {
+#if USE(ICU_UNICODE)
+        bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor()->behavior().shouldSkipSpaceWhenMovingRight();
+        pos = leftWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
+        break;
+#endif
+    }
     case SentenceGranularity:
     case LineGranularity:
     case ParagraphGranularity:
@@ -982,9 +985,9 @@ bool FrameSelection::modify(EAlteration alter, SelectionDirection direction, Tex
 }
 
 // FIXME: Maybe baseline would be better?
-static bool absoluteCaretY(const VisiblePosition &c, LayoutUnit &y)
+static bool absoluteCaretY(const VisiblePosition &c, int &y)
 {
-    LayoutRect rect = c.absoluteCaretBounds();
+    IntRect rect = c.absoluteCaretBounds();
     if (rect.isEmpty())
         return false;
     y = rect.y() + rect.height() / 2;
@@ -1023,12 +1026,12 @@ bool FrameSelection::modify(EAlteration alter, unsigned verticalDistance, Vertic
         break;
     }
 
-    LayoutUnit startY;
+    int startY;
     if (!absoluteCaretY(pos, startY))
         return false;
     if (direction == DirectionUp)
         startY = -startY;
-    LayoutUnit lastY = startY;
+    int lastY = startY;
 
     VisiblePosition result;
     VisiblePosition next;
@@ -1040,12 +1043,12 @@ bool FrameSelection::modify(EAlteration alter, unsigned verticalDistance, Vertic
 
         if (next.isNull() || next == p)
             break;
-        LayoutUnit nextY;
+        int nextY;
         if (!absoluteCaretY(next, nextY))
             break;
         if (direction == DirectionUp)
             nextY = -nextY;
-        if (nextY - startY > static_cast<LayoutUnit>(verticalDistance))
+        if (nextY - startY > static_cast<int>(verticalDistance))
             break;
         if (nextY >= lastY) {
             lastY = nextY;
@@ -1242,11 +1245,11 @@ LayoutRect FrameSelection::localCaretRect()
     return localCaretRectWithoutUpdate();
 }
 
-LayoutRect CaretBase::absoluteBoundsForLocalRect(Node* node, const LayoutRect& rect) const
+IntRect CaretBase::absoluteBoundsForLocalRect(Node* node, const LayoutRect& rect) const
 {
     RenderObject* caretPainter = caretRenderer(node);
     if (!caretPainter)
-        return LayoutRect();
+        return IntRect();
     
     LayoutRect localRect(rect);
     if (caretPainter->isBox())
@@ -1254,7 +1257,7 @@ LayoutRect CaretBase::absoluteBoundsForLocalRect(Node* node, const LayoutRect& r
     return caretPainter->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
 }
 
-LayoutRect FrameSelection::absoluteCaretBounds()
+IntRect FrameSelection::absoluteCaretBounds()
 {
     recomputeCaretRect();
     return m_absCaretBounds;
@@ -1270,7 +1273,7 @@ static LayoutRect repaintRectForCaret(LayoutRect caret)
     return caret;
 }
 
-LayoutRect CaretBase::caretRepaintRect(Node* node) const
+IntRect CaretBase::caretRepaintRect(Node* node) const
 {
     return absoluteBoundsForLocalRect(node, repaintRectForCaret(localCaretRectWithoutUpdate()));
 }
@@ -1292,19 +1295,22 @@ bool FrameSelection::recomputeCaretRect()
     if (oldRect == newRect && !m_absCaretBoundsDirty)
         return false;
 
-    LayoutRect oldAbsCaretBounds = m_absCaretBounds;
+    IntRect oldAbsCaretBounds = m_absCaretBounds;
     // FIXME: Rename m_caretRect to m_localCaretRect.
     m_absCaretBounds = absoluteBoundsForLocalRect(m_selection.start().deprecatedNode(), localCaretRectWithoutUpdate());
     m_absCaretBoundsDirty = false;
     
     if (oldAbsCaretBounds == m_absCaretBounds)
         return false;
-        
-    LayoutRect oldAbsoluteCaretRepaintBounds = m_absoluteCaretRepaintBounds;
+
+#if ENABLE(TEXT_CARET)
+    IntRect oldAbsoluteCaretRepaintBounds = m_absoluteCaretRepaintBounds;
+#endif
+
     // We believe that we need to inflate the local rect before transforming it to obtain the repaint bounds.
     m_absoluteCaretRepaintBounds = caretRepaintRect(m_selection.start().deprecatedNode());
 
-#if ENABLE(TEXT_CARET)    
+#if ENABLE(TEXT_CARET)
     if (RenderView* view = toRenderView(m_frame->document()->renderer())) {
         // FIXME: make caret repainting container-aware.
         view->repaintRectangleInViewAndCompositedLayers(oldAbsoluteCaretRepaintBounds, false);
@@ -1469,7 +1475,7 @@ bool FrameSelection::contains(const LayoutPoint& point)
     HitTestRequest request(HitTestRequest::ReadOnly |
                            HitTestRequest::Active);
     HitTestResult result(point);
-    document->renderView()->layer()->hitTest(request, result);
+    document->renderView()->hitTest(request, result);
     Node* innerNode = result.innerNode();
     if (!innerNode || !innerNode->renderer())
         return false;
@@ -1626,7 +1632,7 @@ void FrameSelection::focusedOrActiveStateChanged()
     // Update for caps lock state
     m_frame->eventHandler()->capsLockStateMayHaveChanged();
 
-    // Because CSSStyleSelector::checkOneSelector() and
+    // Because StyleResolver::checkOneSelector() and
     // RenderTheme::isFocused() check if the frame is active, we have to
     // update style and theme state that depended on those.
     if (Node* node = m_frame->document()->focusedNode()) {
@@ -1945,10 +1951,8 @@ void FrameSelection::revealSelection(const ScrollAlignment& alignment, bool reve
         // FIXME: This code only handles scrolling the startContainer's layer, but
         // the selection rect could intersect more than just that.
         // See <rdar://problem/4799899>.
-        if (RenderLayer* layer = start.deprecatedNode()->renderer()->enclosingLayer()) {
-            layer->scrollRectToVisible(rect, alignment, alignment);
+        if (start.deprecatedNode()->renderer()->scrollRectToVisible(rect, alignment, alignment))
             updateAppearance();
-        }
     }
 }
 

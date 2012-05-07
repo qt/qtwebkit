@@ -229,6 +229,18 @@ public:
         branchTestPtr(cond, reg).linkTo(target, this);
     }
 
+#if !CPU(ARM_THUMB2)
+    PatchableJump patchableBranchPtrWithPatch(RelationalCondition cond, Address left, DataLabelPtr& dataLabel, TrustedImmPtr initialRightValue = TrustedImmPtr(0))
+    {
+        return PatchableJump(branchPtrWithPatch(cond, left, dataLabel, initialRightValue));
+    }
+
+    PatchableJump patchableJump()
+    {
+        return PatchableJump(jump());
+    }
+#endif
+
     void jump(Label target)
     {
         jump().linkTo(target, this);
@@ -529,7 +541,6 @@ public:
     
     bool shouldBlind(ImmPtr imm)
     { 
-        ASSERT(!inUninterruptedSequence());
 #if !defined(NDEBUG)
         UNUSED_PARAM(imm);
         // Debug always blind all constants, if only so we know
@@ -636,7 +647,6 @@ public:
 #if ENABLE(JIT_CONSTANT_BLINDING)
     bool shouldBlind(Imm32 imm)
     { 
-        ASSERT(!inUninterruptedSequence());
 #if !defined(NDEBUG)
         UNUSED_PARAM(imm);
         // Debug always blind all constants, if only so we know
@@ -699,8 +709,11 @@ public:
 
     BlindedImm32 additionBlindedConstant(Imm32 imm)
     {
+        // The addition immediate may be used as a pointer offset. Keep aligned based on "imm".
+        static uint32_t maskTable[4] = { 0xfffffffc, 0xffffffff, 0xfffffffe, 0xffffffff };
+
         uint32_t baseValue = imm.asTrustedImm32().m_value;
-        uint32_t key = keyForConstant(baseValue);
+        uint32_t key = keyForConstant(baseValue) & maskTable[baseValue & 3];
         if (key > baseValue)
             key = key - baseValue;
         return BlindedImm32(baseValue - key, key);
@@ -828,9 +841,17 @@ public:
             store32(blind.value1, dest);
             xor32(blind.value2, dest);
 #else
-            RegisterID scratchRegister = (RegisterID)scratchRegisterForBlinding();
-            loadXorBlindedConstant(xorBlindConstant(imm), scratchRegister);
-            store32(scratchRegister, dest);
+            if (RegisterID scratchRegister = (RegisterID)scratchRegisterForBlinding()) {
+                loadXorBlindedConstant(xorBlindConstant(imm), scratchRegister);
+                store32(scratchRegister, dest);
+            } else {
+                // If we don't have a scratch register available for use, we'll just 
+                // place a random number of nops.
+                uint32_t nopCount = random() & 3;
+                while (nopCount--)
+                    nop();
+                store32(imm.asTrustedImm32(), dest);
+            }
 #endif
         } else
             store32(imm.asTrustedImm32(), dest);

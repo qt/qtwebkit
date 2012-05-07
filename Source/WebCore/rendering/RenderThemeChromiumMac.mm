@@ -19,6 +19,8 @@
  */
 
 #import "config.h"
+
+#import "CalendarPickerMac.h"
 #import "LocalCurrentGraphicsContext.h"
 #import "RenderThemeChromiumMac.h"
 #import "PaintInfo.h"
@@ -69,6 +71,11 @@ PassRefPtr<RenderTheme> RenderTheme::themeForPage(Page*)
 PassRefPtr<RenderTheme> RenderThemeChromiumMac::create()
 {
     return adoptRef(new RenderThemeChromiumMac);
+}
+
+bool RenderThemeChromiumMac::supportsDataListUI(const AtomicString& type) const
+{
+    return RenderThemeChromiumCommon::supportsDataListUI(type);
 }
 
 bool RenderThemeChromiumMac::usesTestModeFocusRingColor() const
@@ -190,6 +197,12 @@ String RenderThemeChromiumMac::extraDefaultStyleSheet()
            String(themeChromiumUserAgentStyleSheet, sizeof(themeChromiumUserAgentStyleSheet));
 }
 
+#if ENABLE(CALENDAR_PICKER)
+CString RenderThemeChromiumMac::extraCalendarPickerStyleSheet()
+{
+    return CString(calendarPickerMacCss, WTF_ARRAY_LENGTH(calendarPickerMacCss));
+}
+#endif
 
 bool RenderThemeChromiumMac::paintMediaVolumeSliderContainer(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
@@ -211,7 +224,7 @@ bool RenderThemeChromiumMac::paintMediaSliderThumb(RenderObject* object, const P
     return RenderMediaControlsChromium::paintMediaControlsPart(MediaSliderThumb, object, paintInfo, rect);
 }
 
-LayoutPoint RenderThemeChromiumMac::volumeSliderOffsetFromMuteButton(RenderBox* muteButtonBox, const LayoutSize& size) const
+IntPoint RenderThemeChromiumMac::volumeSliderOffsetFromMuteButton(RenderBox* muteButtonBox, const IntSize& size) const
 {
     return RenderTheme::volumeSliderOffsetFromMuteButton(muteButtonBox, size);
 }

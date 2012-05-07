@@ -35,14 +35,14 @@
  * @param {string} source
  * @param {string} level
  * @param {string} message
- * @param {WebInspector.DebuggerPresentationModel.Linkifier} linkifier
+ * @param {WebInspector.Linkifier} linkifier
  * @param {string=} type
  * @param {string=} url
  * @param {number=} line
  * @param {number=} repeatCount
  * @param {Array.<RuntimeAgent.RemoteObject>=} parameters
  * @param {ConsoleAgent.StackTrace=} stackTrace
- * @param {WebInspector.Resource=} request
+ * @param {WebInspector.NetworkRequest=} request
  */
 WebInspector.ConsoleMessageImpl = function(source, level, message, linkifier, type, url, line, repeatCount, parameters, stackTrace, request)
 {
@@ -91,7 +91,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             }
         } else if (this.source === WebInspector.ConsoleMessage.MessageSource.Network) {
             if (this._request) {
-                this._stackTrace = this._request.stackTrace;
+                this._stackTrace = this._request.initiator.stackTrace;
                 if (this._request.initiator && this._request.initiator.url) {
                     this.url = this._request.initiator.url;
                     this.line = this._request.initiator.lineNumber;
@@ -128,9 +128,11 @@ WebInspector.ConsoleMessageImpl.prototype = {
             }
         }
 
-        if (this._anchorElement)
-            this._formattedMessage.appendChild(this._anchorElement);
         this._formattedMessage.appendChild(this._messageElement);
+        if (this._anchorElement) {
+            this._formattedMessage.appendChild(document.createTextNode(" "));
+            this._formattedMessage.appendChild(this._anchorElement);
+        }
         
         var dumpStackTrace = !!this._stackTrace && this._stackTrace.length && (this.source === WebInspector.ConsoleMessage.MessageSource.Network || this.level === WebInspector.ConsoleMessage.MessageLevel.Error || this.type === WebInspector.ConsoleMessage.MessageType.Trace);
         if (dumpStackTrace) {
@@ -282,6 +284,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             if (!treeOutline.children[0].hasChildren)
                 treeOutline.element.addStyleClass("single-node");
             elem.appendChild(treeOutline.element);
+            treeOutline.element.treeElementForTest = treeOutline.children[0];
         }
         object.pushNodeToFrontend(printNode.bind(this));
     },
@@ -433,7 +436,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             matchRanges.push({ offset: match.index, length: match[0].length });
             match = regexObject.exec(text);
         }
-        highlightSearchResults(element, matchRanges);
+        WebInspector.highlightSearchResults(element, matchRanges);
     },
 
     matchesRegex: function(regexObject)
@@ -494,6 +497,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             content.appendChild(messageTextElement);
 
             if (frame.url) {
+                content.appendChild(document.createTextNode(" "));
                 var urlElement = this._linkifyCallFrame(frame);
                 content.appendChild(urlElement);
             }
@@ -594,12 +598,12 @@ WebInspector.ConsoleMessageImpl.prototype = {
         return this._messageText;
     },
 
-    get location()
+    location: function()
     {
         // FIXME(62725): stack trace line/column numbers are one-based.
         var lineNumber = this.stackTrace ? this.stackTrace[0].lineNumber - 1 : this.line - 1;
         var columnNumber = this.stackTrace ? this.stackTrace[0].columnNumber - 1 : 0;
-        return new WebInspector.DebuggerModel.Location(lineNumber, columnNumber);
+        return WebInspector.debuggerModel.createRawLocationByURL(this.url, lineNumber, columnNumber);
     },
 
     isEqual: function(msg)

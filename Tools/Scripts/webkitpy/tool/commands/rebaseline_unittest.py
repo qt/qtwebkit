@@ -36,58 +36,95 @@ from webkitpy.common.system.executive_mock import MockExecutive
 
 
 class TestRebaseline(unittest.TestCase):
+    def stub_rebaseline_test_command_and_tool(self):
+
+        class FakeZipFileSet(object):
+            contents = {}
+
+            def read(self, member):
+                return self.contents[member]
+
+        command = RebaselineTest()
+        tool = MockTool()
+        command.bind_to_tool(tool)
+        command._zip_file_set = lambda url: FakeZipFileSet()
+        return (command, tool)
+
     def test_tests_to_update(self):
         command = Rebaseline()
         command.bind_to_tool(MockTool())
         build = Mock()
         OutputCapture().assert_outputs(self, command._tests_to_update, [build])
 
+    def test_rebaseline_updates_expectations_file_noop(self):
+        command, tool = self.stub_rebaseline_test_command_and_tool()
+        lion_port = tool.port_factory.get_from_builder_name("Webkit Mac10.7")
+        tool.filesystem.write_text_file(lion_port.path_to_test_expectations_file(), """BUGB MAC LINUX XP DEBUG : fast/dom/Window/window-postmessage-clone-really-deep-array.html = PASS
+BUGA DEBUG : fast/css/large-list-of-rules-crash.html = TEXT
+""")
+        tool.filesystem.write_text_file(os.path.join(lion_port.layout_tests_dir(), "fast/dom/Window/window-postmessage-clone-really-deep-array.html"), "Dummy test contents")
+        tool.filesystem.write_text_file(os.path.join(lion_port.layout_tests_dir(), "fast/css/large-list-of-rules-crash.html"), "Dummy test contents")
+        tool.filesystem.write_text_file(os.path.join(lion_port.layout_tests_dir(), "userscripts/another-test.html"), "Dummy test contents")
+
+        expected_stdout = "Retrieving http://example.com/f/builders/Webkit Mac10.7/layout-test-results.zip\n"
+        OutputCapture().assert_outputs(self, command._rebaseline_test_and_update_expectations, ["Webkit Mac10.7", "userscripts/another-test.html", None], expected_stdout=expected_stdout)
+
+        new_expectations = tool.filesystem.read_text_file(lion_port.path_to_test_expectations_file())
+        self.assertEqual(new_expectations, """BUGB MAC LINUX XP DEBUG : fast/dom/Window/window-postmessage-clone-really-deep-array.html = PASS
+BUGA DEBUG : fast/css/large-list-of-rules-crash.html = TEXT
+""")
+
+    def test_rebaseline_updates_expectations_file(self):
+        command, tool = self.stub_rebaseline_test_command_and_tool()
+
+        lion_port = tool.port_factory.get_from_builder_name("Webkit Mac10.7")
+        tool.filesystem.write_text_file(lion_port.path_to_test_expectations_file(), "BUGX MAC : userscripts/another-test.html = IMAGE\nBUGZ LINUX : userscripts/another-test.html = IMAGE\n")
+        tool.filesystem.write_text_file(os.path.join(lion_port.layout_tests_dir(), "userscripts/another-test.html"), "Dummy test contents")
+
+        expected_stdout = "Retrieving http://example.com/f/builders/Webkit Mac10.7/layout-test-results.zip\n"
+        OutputCapture().assert_outputs(self, command._rebaseline_test_and_update_expectations, ["Webkit Mac10.7", "userscripts/another-test.html", None], expected_stdout=expected_stdout)
+
+        new_expectations = tool.filesystem.read_text_file(lion_port.path_to_test_expectations_file())
+        self.assertEqual(new_expectations, "BUGX LEOPARD SNOWLEOPARD : userscripts/another-test.html = IMAGE\nBUGZ LINUX : userscripts/another-test.html = IMAGE\n")
+
     def test_rebaseline_test(self):
-        command = RebaselineTest()
-        command.bind_to_tool(MockTool())
-        expected_stdout = "Retrieving http://example.com/f/builders/Webkit Linux/results/layout-test-results/userscripts/another-test-actual.txt.\n"
+        command, _ = self.stub_rebaseline_test_command_and_tool()
+        expected_stdout = "Retrieving http://example.com/f/builders/Webkit Linux/layout-test-results.zip\n"
         OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Linux", "userscripts/another-test.html", None, "txt"], expected_stdout=expected_stdout)
 
     def test_rebaseline_and_copy_test(self):
-        command = RebaselineTest()
-        tool = MockTool()
-        command.bind_to_tool(tool)
+        command, tool = self.stub_rebaseline_test_command_and_tool()
 
         lion_port = tool.port_factory.get_from_builder_name("Webkit Mac10.7")
         tool.filesystem.write_text_file(os.path.join(lion_port.layout_tests_dir(), "userscripts/another-test-expected.txt"), "Dummy expected result")
 
         expected_stdout = """Copying baseline from /mock-checkout/LayoutTests/userscripts/another-test-expected.txt to /mock-checkout/LayoutTests/platform/chromium-mac-snowleopard/userscripts/another-test-expected.txt.
-Retrieving http://example.com/f/builders/Webkit Mac10.7/results/layout-test-results/userscripts/another-test-actual.txt.
+Retrieving http://example.com/f/builders/Webkit Mac10.7/layout-test-results.zip
 """
-        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", "chromium-mac-snowleopard", "txt"], expected_stdout=expected_stdout)
+        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", ["chromium-mac-snowleopard"], "txt"], expected_stdout=expected_stdout)
 
     def test_rebaseline_and_copy_test_no_existing_result(self):
-        command = RebaselineTest()
-        tool = MockTool()
-        command.bind_to_tool(tool)
+        command, _ = self.stub_rebaseline_test_command_and_tool()
 
         expected_stdout = """No existing baseline for userscripts/another-test.html.
-Retrieving http://example.com/f/builders/Webkit Mac10.7/results/layout-test-results/userscripts/another-test-actual.txt.
+Retrieving http://example.com/f/builders/Webkit Mac10.7/layout-test-results.zip
 """
-        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", "chromium-mac-snowleopard", "txt"], expected_stdout=expected_stdout)
+        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", ["chromium-mac-snowleopard"], "txt"], expected_stdout=expected_stdout)
 
     def test_rebaseline_and_copy_test_with_lion_result(self):
-        command = RebaselineTest()
-        tool = MockTool()
-        command.bind_to_tool(tool)
+        command, tool = self.stub_rebaseline_test_command_and_tool()
 
         lion_port = tool.port_factory.get_from_builder_name("Webkit Mac10.7")
         tool.filesystem.write_text_file(os.path.join(lion_port.baseline_path(), "userscripts/another-test-expected.txt"), "Dummy expected result")
 
         expected_stdout = """Copying baseline from /mock-checkout/LayoutTests/platform/chromium-mac/userscripts/another-test-expected.txt to /mock-checkout/LayoutTests/platform/chromium-mac-snowleopard/userscripts/another-test-expected.txt.
-Retrieving http://example.com/f/builders/Webkit Mac10.7/results/layout-test-results/userscripts/another-test-actual.txt.
+Copying baseline from /mock-checkout/LayoutTests/platform/chromium-mac/userscripts/another-test-expected.txt to /mock-checkout/LayoutTests/platform/chromium-mac-leopard/userscripts/another-test-expected.txt.
+Retrieving http://example.com/f/builders/Webkit Mac10.7/layout-test-results.zip
 """
-        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", "chromium-mac-snowleopard", "txt"], expected_stdout=expected_stdout)
+        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", ["chromium-mac-snowleopard", "chromium-mac-leopard"], "txt"], expected_stdout=expected_stdout)
 
     def test_rebaseline_and_copy_no_overwrite_test(self):
-        command = RebaselineTest()
-        tool = MockTool()
-        command.bind_to_tool(tool)
+        command, tool = self.stub_rebaseline_test_command_and_tool()
 
         lion_port = tool.port_factory.get_from_builder_name("Webkit Mac10.7")
         tool.filesystem.write_text_file(os.path.join(lion_port.baseline_path(), "userscripts/another-test-expected.txt"), "Dummy expected result")
@@ -96,9 +133,9 @@ Retrieving http://example.com/f/builders/Webkit Mac10.7/results/layout-test-resu
         tool.filesystem.write_text_file(os.path.join(snowleopard_port.baseline_path(), "userscripts/another-test-expected.txt"), "Dummy expected result")
 
         expected_stdout = """Existing baseline at /mock-checkout/LayoutTests/platform/chromium-mac-snowleopard/userscripts/another-test-expected.txt, not copying over it.
-Retrieving http://example.com/f/builders/Webkit Mac10.7/results/layout-test-results/userscripts/another-test-actual.txt.
+Retrieving http://example.com/f/builders/Webkit Mac10.7/layout-test-results.zip
 """
-        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", "chromium-mac-snowleopard", "txt"], expected_stdout=expected_stdout)
+        OutputCapture().assert_outputs(self, command._rebaseline_test, ["Webkit Mac10.7", "userscripts/another-test.html", ["chromium-mac-snowleopard"], "txt"], expected_stdout=expected_stdout)
 
     def test_rebaseline_expectations(self):
         command = RebaselineExpectations()
@@ -166,5 +203,5 @@ MOCK run_command: ['echo', 'rebaseline-test', 'Webkit Win', 'userscripts/images.
             "MOCK run_command: ['echo', 'optimize-baselines', 'userscripts/another-test.html'], cwd=/mock-checkout\n"
             "MOCK run_command: ['echo', 'optimize-baselines', 'userscripts/images.svg'], cwd=/mock-checkout\n")
 
-        command._tests_to_rebaseline = lambda port: [] if not port.name().find('-gpu-') == -1 else ['userscripts/another-test.html', 'userscripts/images.svg']
+        command._tests_to_rebaseline = lambda port: ['userscripts/another-test.html', 'userscripts/images.svg']
         OutputCapture().assert_outputs(self, command.execute, [MockOptions(optimize=True), [], tool], expected_stdout=expected_stdout_with_optimize, expected_stderr=expected_stderr_with_optimize)

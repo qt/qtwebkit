@@ -66,9 +66,9 @@
 #include "Navigator.h"
 #include "NodeList.h"
 #include "Page.h"
+#include "PageCache.h"
 #include "PageGroup.h"
 #include "RegularExpression.h"
-#include "RenderLayer.h"
 #include "RenderPart.h"
 #include "RenderTableCell.h"
 #include "RenderTextControl.h"
@@ -521,7 +521,7 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
     m_doc->setPrinting(printing);
     view()->adjustMediaTypeForPrinting(printing);
 
-    m_doc->styleSelectorChanged(RecalcStyleImmediately);
+    m_doc->styleResolverChanged(RecalcStyleImmediately);
     if (printing)
         view()->forceLayoutForPagination(pageSize, originalPageSize, maximumShrinkRatio, shouldAdjustViewSize);
     else {
@@ -593,8 +593,10 @@ void Frame::injectUserScriptsForWorld(DOMWrapperWorld* world, const UserScriptVe
 
 void Frame::clearDOMWindow()
 {
-    if (m_domWindow)
+    if (m_domWindow) {
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
         m_domWindow->clear();
+    }
     m_domWindow = 0;
 }
 
@@ -659,8 +661,10 @@ void Frame::clearTimers()
 
 void Frame::setDOMWindow(DOMWindow* domWindow)
 {
-    if (m_domWindow)
+    if (m_domWindow) {
+        InspectorInstrumentation::frameWindowDiscarded(this, m_domWindow.get());
         m_domWindow->clear();
+    }
     m_domWindow = domWindow;
 }
 
@@ -687,11 +691,6 @@ void Frame::willDetachPage()
     if (Frame* parent = tree()->parent())
         parent->loader()->checkLoadComplete();
 
-#if ENABLE(NOTIFICATIONS)
-    if (m_domWindow)
-        m_domWindow->resetNotifications();
-#endif
-
     HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
     for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
         (*it)->willDetachPage();
@@ -717,62 +716,6 @@ void Frame::disconnectOwnerElement()
     m_ownerElement = 0;
 }
 
-// The frame is moved in DOM, potentially to another page.
-void Frame::transferChildFrameToNewDocument()
-{
-    ASSERT(m_ownerElement);
-    Frame* newParent = m_ownerElement->document()->frame();
-    ASSERT(newParent);
-    bool didTransfer = false;
-
-    // Switch page.
-    Page* newPage = newParent->page();
-    Page* oldPage = m_page;
-    if (m_page != newPage) {
-        if (m_page) {
-            if (m_page->focusController()->focusedFrame() == this)
-                m_page->focusController()->setFocusedFrame(0);
-
-             m_page->decrementFrameCount();
-        }
-
-        if (m_domWindow) {
-#if ENABLE(NOTIFICATIONS)
-            m_domWindow->resetNotifications();
-#endif
-        }
-
-        HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
-        for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
-            (*it)->willDetachPage();
-
-        m_page = newPage;
-
-        if (newPage)
-            newPage->incrementFrameCount();
-
-        didTransfer = true;
-    }
-
-    // Update the frame tree.
-    didTransfer = newParent->tree()->transferChild(this) || didTransfer;
-
-    // Avoid unnecessary calls to client and frame subtree if the frame ended
-    // up on the same page and under the same parent frame.
-    if (didTransfer) {
-        // Let external clients update themselves.
-        loader()->client()->didTransferChildFrameToNewDocument(oldPage);
-
-        // Update resource tracking now that frame could be in a different page.
-        if (oldPage != newPage)
-            loader()->transferLoadingResourcesFromPage(oldPage);
-
-        // Do the same for all the children.
-        for (Frame* child = tree()->firstChild(); child; child = child->tree()->nextSibling())
-            child->transferChildFrameToNewDocument();
-    }
-}
-
 String Frame::documentTypeString() const
 {
     if (DocumentType* doctype = document()->doctype())
@@ -786,7 +729,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
     return document() ? document()->displayStringModifiedByEncoding(str) : str;
 }
 
-VisiblePosition Frame::visiblePositionForPoint(const LayoutPoint& framePoint)
+VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
 {
     HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, true);
     Node* node = result.innerNonSharedNode();
@@ -806,7 +749,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     if (!view())
         return 0;
 
-    LayoutPoint pt = view()->windowToContents(point);
+    IntPoint pt = view()->windowToContents(point);
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
@@ -814,7 +757,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     return result.innerNode() ? result.innerNode()->document() : 0;
 }
 
-PassRefPtr<Range> Frame::rangeForPoint(const LayoutPoint& framePoint)
+PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
 {
     VisiblePosition position = visiblePositionForPoint(framePoint);
     if (position.isNull())
@@ -1011,7 +954,7 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     }
 
     if (page->mainFrame() == this)
-        page->backForward()->markPagesForFullStyleRecalc();
+        pageCache()->markPagesForFullStyleRecalc(page);
 }
 
 float Frame::frameScaleFactor() const
@@ -1148,7 +1091,7 @@ DragImageRef Frame::nodeImage(Node* node)
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get());
+    return createDragImageFromImage(image.get(), renderer->shouldRespectImageOrientation());
 }
 
 DragImageRef Frame::dragImageForSelection()

@@ -21,24 +21,24 @@
 #ifndef QtPageClient_h
 #define QtPageClient_h
 
-#include "DrawingAreaProxy.h"
-#include "LayerTreeContext.h"
 #include "PageClient.h"
-#include "ShareableBitmap.h"
-#include "ViewportArguments.h"
 
-class QtWebPageEventHandler;
-class QtWebUndoController;
 class QQuickWebView;
 
-using namespace WebKit;
+namespace WebKit {
 
-class QtPageClient : public WebKit::PageClient {
+class DrawingAreaProxy;
+class LayerTreeContext;
+class QtWebPageEventHandler;
+class QtWebUndoController;
+class ShareableBitmap;
+
+class QtPageClient : public PageClient {
 public:
     QtPageClient();
     ~QtPageClient();
 
-    void initialize(QQuickWebView*, QtWebPageEventHandler*, QtWebUndoController*);
+    void initialize(QQuickWebView*, QtWebPageEventHandler*, WebKit::QtWebUndoController*);
 
     // QQuickWebView.
     virtual void setViewNeedsDisplay(const WebCore::IntRect&);
@@ -48,7 +48,7 @@ public:
     virtual void didReceiveMessageFromNavigatorQtObject(const String&);
     virtual void pageDidRequestScroll(const WebCore::IntPoint&);
     virtual void didChangeContentsSize(const WebCore::IntSize&);
-    virtual void didChangeViewportProperties(const WebCore::ViewportArguments&);
+    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
     virtual void processDidCrash();
     virtual void didRelaunchProcess();
     virtual PassOwnPtr<DrawingAreaProxy> createDrawingAreaProxy();
@@ -98,12 +98,16 @@ public:
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&);
     virtual void updateTextInputState();
     virtual void doneWithGestureEvent(const WebGestureEvent&, bool wasEventHandled);
+#if ENABLE(TOUCH_EVENTS)
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled);
+#endif
 
 private:
     QQuickWebView* m_webView;
     QtWebPageEventHandler* m_eventHandler;
     QtWebUndoController* m_undoController;
 };
+
+} // namespace WebKit
 
 #endif /* QtPageClient_h */

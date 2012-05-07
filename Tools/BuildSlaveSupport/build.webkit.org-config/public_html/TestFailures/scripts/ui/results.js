@@ -78,9 +78,22 @@ ui.results.ImageResult = base.extends('img', {
     }
 });
 
+ui.results.AudioResult = base.extends('audio', {
+    init: function(url)
+    {
+        this.className = 'audio-result';
+        this.src = url;
+        this.controls = 'controls';
+    }
+});
+
 function constructorForResultType(type)
 {
-    return (type == results.kImageType) ? ui.results.ImageResult : ui.results.TextResult;
+    if (type == results.kImageType)
+        return ui.results.ImageResult;
+    if (type == results.kAudioType)
+        return ui.results.AudioResult;
+    return ui.results.TextResult;
 }
 
 ui.results.ResultsGrid = base.extends('div', {
@@ -119,6 +132,7 @@ ui.results.ResultsGrid = base.extends('div', {
         var resultsURLsByTypeAndKind = {};
 
         resultsURLsByTypeAndKind[results.kImageType] = {};
+        resultsURLsByTypeAndKind[results.kAudioType] = {};
         resultsURLsByTypeAndKind[results.kTextType] = {};
 
         resultsURLs.forEach(function(url) {
@@ -156,13 +170,55 @@ ui.results.ResultsDetails = base.extends('div', {
         this._delegate.fetchResultsURLs(this._failureInfo, function(resultsURLs) {
             var resultsGrid = new ui.results.ResultsGrid();
             resultsGrid.addResults(resultsURLs);
+
             $(this).empty().append(
                 new ui.actions.List([
                     new ui.actions.Previous(),
                     new ui.actions.Next()
                 ])).append(resultsGrid);
+
+
         }.bind(this));
     },
+});
+
+function isAnyReftest(testName, resultsByTest)
+{
+    return Object.keys(resultsByTest[testName]).map(function(builder) {
+        return resultsByTest[testName][builder];
+    }).some(function(resultNode) {
+        return resultNode.is_reftest || resultNode.is_mismatch_reftest
+    });
+}
+
+ui.results.FlakinessData = base.extends('iframe', {
+    init: function()
+    {
+        this.className = 'flakiness-iframe';
+        this.src = ui.urlForEmbeddedFlakinessDashboard();
+        this.addEventListener('load', function() {
+            window.addEventListener('message', this._handleMessage.bind(this));
+        });
+    },
+    _handleMessage: function(event) {
+        if (!this.contentWindow)
+            return;
+
+        // Check for null event.origin so that the unittests can get past this point.
+        // FIXME: Is this safe? In practice, there's no meaningful harm that can come from
+        // a malicious page sending us heightChanged commands, so it doesn't really matter.
+        if (event.origin !== 'null' && event.origin != 'http://test-results.appspot.com') {
+            console.log('Invalid origin: ' + event.origin);
+            return;
+        }
+
+        if (event.data.command != 'heightChanged') {
+            console.log('Unknown postMessage command: ' + event.data);
+            return;
+        }
+
+        this.style.height = event.data.height + 'px';
+    }
 });
 
 ui.results.TestSelector = base.extends('div', {
@@ -170,73 +226,133 @@ ui.results.TestSelector = base.extends('div', {
     {
         this.className = 'test-selector';
         this._delegate = delegate;
-        this._length = 0;
 
-        Object.keys(resultsByTest).sort().forEach(function(testName) {
-            var link = document.createElement('a');
-            $(link).attr('href', '#').text(testName);
+        var topPanel = document.createElement('div');
+        topPanel.className = 'top-panel';
+        this.appendChild(topPanel);
+
+        this._appendResizeHandle();
+
+        var bottomPanel = document.createElement('div');
+        bottomPanel.className = 'bottom-panel';
+        this.appendChild(bottomPanel);
+
+        this._flakinessData = new ui.results.FlakinessData();
+        this.appendChild(this._flakinessData);
+
+        var testNames = Object.keys(resultsByTest);
+        testNames.sort().forEach(function(testName) {
+            var nonLinkTitle = document.createElement('a');
+            nonLinkTitle.classList.add('non-link-title');
+            nonLinkTitle.textContent = testName;
+
+            var linkTitle = document.createElement('a');
+            linkTitle.classList.add('link-title');
+            linkTitle.setAttribute('href', ui.urlForFlakinessDashboard([testName]))
+            linkTitle.textContent = testName;
 
             var header = document.createElement('h3');
-            $(header).append(new ui.actions.List([
-                new ui.actions.Rebaseline().makeDefault(),
-            ])).append(link);
-            this.appendChild(header);
-            this.appendChild(this._delegate.contentForTest(testName));
-            ++this._length; // There doesn't seem to be any good way to get this information from accordion.
+            header.appendChild(nonLinkTitle);
+            header.appendChild(linkTitle);
+            header.addEventListener('click', this._showResults.bind(this, header));
+            topPanel.appendChild(header);
         }, this);
 
-        $(this).accordion({
-            collapsible: true,
-            autoHeight: false,
-        });
-        $(this).accordion('activate', false);
+        // If we have a small amount of content, don't show the resize handler.
+        // Otherwise, set the minHeight so that the percentage height of the 
+        // topPanel is not too small.
+        if (testNames.length <= 4)
+            this.removeChild(this.querySelector('.resize-handle'));
+        else
+            topPanel.style.minHeight = '100px';
+    },
+    _appendResizeHandle: function()
+    {
+        var resizeHandle = document.createElement('div');
+        resizeHandle.className = 'resize-handle';
+        this.appendChild(resizeHandle);
+
+        resizeHandle.addEventListener('mousedown', function(event) {
+            this._is_resizing = true;
+            event.preventDefault();
+        }.bind(this));
+
+        var cancelResize = function(event) { this._is_resizing = false; }.bind(this);
+        this.addEventListener('mouseup', cancelResize);
+        // FIXME: Use addEventListener once WebKit adds support for mouseleave/mouseenter.
+        $(window).bind('mouseleave', cancelResize);
+
+        this.addEventListener('mousemove', function(event) {
+            if (!this._is_resizing)
+                return;
+            var mouseY = event.clientY + document.body.scrollTop - this.offsetTop;
+            var percentage = 100 * mouseY / this.offsetHeight;
+            document.querySelector('.top-panel').style.maxHeight = percentage + '%';
+        }.bind(this))
+    },
+    _showResults: function(header)
+    {
+        if (!header)
+            return false;
+
+        var activeHeader = this.querySelector('.active')
+        if (activeHeader)
+            activeHeader.classList.remove('active');
+        header.classList.add('active');
+
+        var testName = this.currentTestName();
+        this._flakinessData.src = ui.urlForEmbeddedFlakinessDashboard([testName]);
+
+        var bottomPanel = this.querySelector('.bottom-panel')
+        bottomPanel.innerHTML = '';
+        bottomPanel.appendChild(this._delegate.contentForTest(testName));
+
+        var topPanel = this.querySelector('.top-panel');
+        topPanel.scrollTop = header.offsetTop;
+        if (header.offsetTop - topPanel.scrollTop < header.offsetHeight)
+            topPanel.scrollTop = topPanel.scrollTop - header.offsetHeight;
+
+        var resultsDetails = this.querySelectorAll('.results-detail');
+        if (resultsDetails.length)
+            resultsDetails[0].show();
+        setTimeout(function() {
+            Array.prototype.forEach.call(resultsDetails, function(resultsDetail) {
+                resultsDetail.show();
+            });
+        }, kResultsPrefetchDelayMS);
+
+        return true;
     },
     nextResult: function()
     {
-        var activeIndex = $(this).accordion('option', 'active');
-        if ($('.builder-selector', this)[activeIndex].nextResult())
+        if (this.querySelector('.builder-selector').nextResult())
             return true;
         return this.nextTest();
     },
     previousResult: function()
     {
-        var activeIndex = $(this).accordion('option', 'active');
-        if ($('.builder-selector', this)[activeIndex].previousResult())
+        if (this.querySelector('.builder-selector').previousResult())
             return true;
         return this.previousTest();
     },
     nextTest: function()
     {
-        var nextIndex = $(this).accordion('option', 'active') + 1;
-        if (nextIndex >= this._length) {
-            $(this).accordion('option', 'active', false);
-            return false;
-        }
-        $(this).accordion('option', 'active', nextIndex);
-        $('.builder-selector', this)[nextIndex].firstResult();
-        return true;
+        return this._showResults(this.querySelector('.active').nextSibling);
     },
     previousTest: function()
     {
-        var previousIndex = $(this).accordion('option', 'active') - 1;
-        if (previousIndex < 0) {
-            $(this).accordion('option', 'active', false);
-            return false;
-        }
-        $(this).accordion('option', 'active', previousIndex);
-        $('.builder-selector', this)[previousIndex].lastResult();
-        return true;
+        var succeeded = this._showResults(this.querySelector('.active').previousSibling);
+        if (succeeded)
+            this.querySelector('.builder-selector').lastResult();
+        return succeeded;
     },
     firstResult: function()
     {
-        $(this).accordion('option', 'active', 0);
-        var builderSelector = $('.builder-selector', this)[0];
-        builderSelector && builderSelector.firstResult();
+        this._showResults(this.querySelector('h3'));
     },
     currentTestName: function()
     {
-        var currentIndex = $(this).accordion('option', 'active');
-        return $('h3 a', this)[currentIndex].textContent;
+        return this.querySelector('.active .non-link-title').textContent;
     }
 });
 
@@ -296,7 +412,15 @@ ui.results.View = base.extends('div', {
     },
     contentForTest: function(testName)
     {
+        var rebaselineAction;
+        if (isAnyReftest(testName, this._resultsByTest))
+            rebaselineAction = $('<div class="non-action-button">Reftests cannot be rebaselined. Email webkit-gardening@chromium.org if unsure how to fix this.</div>');
+        else
+            rebaselineAction = new ui.actions.List([new ui.actions.Rebaseline().makeDefault()]);
+        $(rebaselineAction).addClass('rebaseline-action');
+
         var builderSelector = new ui.results.BuilderSelector(this, testName, this._resultsByTest[testName]);
+        $(builderSelector).append(rebaselineAction).append($('<br style="clear:both">'));
         $(builderSelector).bind('tabsselect', function(event, ui) {
             // We will probably have pre-fetched the tab already, but we need to make sure.
             ui.panel.show();
@@ -313,18 +437,6 @@ ui.results.View = base.extends('div', {
         $(this).empty();
         this._resultsByTest = resultsByTest;
         this._testSelector = new ui.results.TestSelector(this, resultsByTest);
-        $(this._testSelector).bind("accordionchangestart", function(event, ui) {
-            // Prefetch the first results from the network.
-            var resultsDetails = $('.results-detail', ui.newContent);
-            if (resultsDetails.length)
-                resultsDetails[0].show();
-            // Prefetch the rest kResultsPrefetchDelayMS later.
-            setTimeout(function() {
-                resultsDetails.each(function() {
-                    this.show();
-                });
-            }, kResultsPrefetchDelayMS);
-        });
         this.appendChild(this._testSelector);
     },
     fetchResultsURLs: function(failureInfo, callback)

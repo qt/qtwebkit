@@ -51,11 +51,18 @@ public:
         COMMIT_STATE_WAITING_FOR_FIRST_DRAW,
     };
 
+    enum TextureState {
+        LAYER_TEXTURE_STATE_UNLOCKED,
+        LAYER_TEXTURE_STATE_ACQUIRED_BY_MAIN_THREAD,
+        LAYER_TEXTURE_STATE_ACQUIRED_BY_IMPL_THREAD,
+    };
+
     enum ContextState {
         CONTEXT_ACTIVE,
         CONTEXT_LOST,
         CONTEXT_RECREATING,
     };
+
     bool commitPending() const
     {
         return m_commitState != COMMIT_STATE_IDLE;
@@ -68,8 +75,10 @@ public:
         ACTION_BEGIN_FRAME,
         ACTION_BEGIN_UPDATE_MORE_RESOURCES,
         ACTION_COMMIT,
-        ACTION_DRAW,
-        ACTION_BEGIN_CONTEXT_RECREATION
+        ACTION_DRAW_IF_POSSIBLE,
+        ACTION_DRAW_FORCED,
+        ACTION_BEGIN_CONTEXT_RECREATION,
+        ACTION_ACQUIRE_LAYER_TEXTURES_FOR_MAIN_THREAD,
     };
     Action nextAction() const;
     void updateState(Action);
@@ -94,10 +103,17 @@ public:
     // we are not visible.
     void setNeedsForcedRedraw();
 
+    // Indicates whether ACTION_DRAW_IF_POSSIBLE drew to the screen or not.
+    void didDrawIfPossibleCompleted(bool success);
+
     // Indicates that a new commit flow needs to be performed, either to pull
     // updates from the main thread to the impl, or to push deltas from the impl
     // thread to main.
     void setNeedsCommit();
+
+    // As setNeedsCommit(), but ensures the beginFrame will definitely happen even if
+    // we are not visible.
+    void setNeedsForcedCommit();
 
     // Call this only in response to receiving an ACTION_BEGIN_FRAME
     // from nextState. Indicates that all painting is complete and that
@@ -108,6 +124,15 @@ public:
     // from nextState. Indicates that the specific update request completed.
     void beginUpdateMoreResourcesComplete(bool morePending);
 
+    // Request exclusive access to the textures that back single buffered
+    // layers on behalf of the main thread. Upon acqusition,
+    // ACTION_DRAW_IF_POSSIBLE will not draw until the main thread releases the
+    // textures to the impl thread by committing the layers.
+    void setMainThreadNeedsLayerTextures();
+
+    // Indicates whether we can successfully begin a frame at this time.
+    void setCanBeginFrame(bool can) { m_canBeginFrame = can; }
+
     // Indicates whether drawing would, at this time, make sense.
     // canDraw can be used to supress flashes or checkerboarding
     // when such behavior would be undesirable.
@@ -117,7 +142,11 @@ public:
     void didRecreateContext();
 
 protected:
+    bool shouldDrawForced() const;
+    bool drawSuspendedUntilCommit() const;
+    bool scheduledToDraw() const;
     bool shouldDraw() const;
+    bool shouldAcquireLayerTexturesForMainThread() const;
     bool hasDrawnThisFrame() const;
 
     CommitState m_commitState;
@@ -127,10 +156,15 @@ protected:
     bool m_needsRedraw;
     bool m_needsForcedRedraw;
     bool m_needsCommit;
+    bool m_needsForcedCommit;
+    bool m_mainThreadNeedsLayerTextures;
     bool m_updateMoreResourcesPending;
     bool m_insideVSync;
     bool m_visible;
+    bool m_canBeginFrame;
     bool m_canDraw;
+    bool m_drawIfPossibleFailed;
+    TextureState m_textureState;
     ContextState m_contextState;
 };
 

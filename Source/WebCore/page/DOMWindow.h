@@ -56,7 +56,6 @@ namespace WebCore {
     class MediaQueryList;
     class Navigator;
     class Node;
-    class NotificationCenter;
     class Page;
     class Performance;
     class PostMessageTimer;
@@ -95,6 +94,8 @@ namespace WebCore {
         void unregisterProperty(DOMWindowProperty*);
 
         void clear();
+        void suspendForPageCache();
+        void resumeFromPageCache();
 
         PassRefPtr<MediaQueryList> matchMedia(const String&);
 
@@ -251,7 +252,7 @@ namespace WebCore {
 
         // WebKit animation extensions
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-        int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>, Element*);
+        int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
         void webkitCancelAnimationFrame(int id);
         void webkitCancelRequestAnimationFrame(int id) { webkitCancelAnimationFrame(id); }
 #endif
@@ -353,13 +354,8 @@ namespace WebCore {
         // HTML 5 key/value storage
         Storage* sessionStorage(ExceptionCode&) const;
         Storage* localStorage(ExceptionCode&) const;
-
-#if ENABLE(NOTIFICATIONS)
-        NotificationCenter* webkitNotifications() const;
-        // Renders webkitNotifications object safely inoperable, disconnects
-        // if from embedder-provided NotificationClient.
-        void resetNotifications();
-#endif
+        Storage* optionalSessionStorage() const { return m_sessionStorage.get(); }
+        Storage* optionalLocalStorage() const { return m_localStorage.get(); }
 
 #if ENABLE(QUOTA)
         StorageInfo* webkitStorageInfo() const;
@@ -412,10 +408,15 @@ namespace WebCore {
             PrepareDialogFunction = 0, void* functionContext = 0);
         bool isInsecureScriptAccess(DOMWindow* activeWindow, const String& urlString);
 
+        void clearDOMWindowProperties();
+        void disconnectDOMWindowProperties();
+        void reconnectDOMWindowProperties();
+
         RefPtr<SecurityOrigin> m_securityOrigin;
         KURL m_url;
 
         bool m_shouldPrintWhenFinishedLoading;
+        bool m_suspendedForPageCache;
 
         HashSet<DOMWindowProperty*> m_properties;
 
@@ -442,10 +443,6 @@ namespace WebCore {
         mutable RefPtr<Storage> m_sessionStorage;
         mutable RefPtr<Storage> m_localStorage;
         mutable RefPtr<DOMApplicationCache> m_applicationCache;
-
-#if ENABLE(NOTIFICATIONS)
-        mutable RefPtr<NotificationCenter> m_notifications;
-#endif
 
 #if ENABLE(WEB_TIMING)
         mutable RefPtr<Performance> m_performance;

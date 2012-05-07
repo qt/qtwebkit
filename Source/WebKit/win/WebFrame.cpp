@@ -1556,6 +1556,10 @@ void WebFrame::cancelPolicyCheck()
     d->m_policyFunction = 0;
 }
 
+void WebFrame::dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>)
+{
+}
+
 void WebFrame::dispatchWillSubmitForm(FramePolicyFunction function, PassRefPtr<FormState> formState)
 {
     Frame* coreFrame = core(this);
@@ -1578,7 +1582,7 @@ void WebFrame::dispatchWillSubmitForm(FramePolicyFunction function, PassRefPtr<F
 
     COMPtr<IPropertyBag> formValuesPropertyBag(AdoptCOM, COMPropertyBag<String>::createInstance(formValuesMap));
 
-    COMPtr<WebFrame> sourceFrame(kit(formState->sourceFrame()));
+    COMPtr<WebFrame> sourceFrame(kit(formState->sourceDocument()->frame()));
     if (SUCCEEDED(formDelegate->willSubmitForm(this, sourceFrame.get(), formElement.get(), formValuesPropertyBag.get(), setUpPolicyListener(function).get())))
         return;
 

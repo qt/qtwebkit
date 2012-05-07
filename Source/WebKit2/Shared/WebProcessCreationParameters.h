@@ -57,7 +57,6 @@ struct WebProcessCreationParameters {
     String applicationCacheDirectory;    
     String databaseDirectory;
     String localStorageDirectory;
-    String webInspectorLocalizedStringsPath;
 
     Vector<String> urlSchemesRegistererdAsEmptyDocument;
     Vector<String> urlSchemesRegisteredAsSecure;
@@ -86,7 +85,7 @@ struct WebProcessCreationParameters {
 
     double defaultRequestTimeoutInterval;
 
-#if USE(CFURLSTORAGESESSIONS)
+#if PLATFORM(MAC) || USE(CFURLSTORAGESESSIONS)
     String uiProcessBundleIdentifier;
 #endif
 
@@ -123,7 +122,7 @@ struct WebProcessCreationParameters {
     String cookieStorageDirectory;
 #endif
 
-#if ENABLE(NOTIFICATIONS)
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     HashMap<String, bool> notificationPermissions;
 #endif
 };

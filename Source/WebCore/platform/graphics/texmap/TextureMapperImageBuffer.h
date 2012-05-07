@@ -30,16 +30,14 @@ class BitmapTextureImageBuffer : public BitmapTexture {
     friend class TextureMapperImageBuffer;
 public:
     static PassRefPtr<BitmapTexture> create() { return adoptRef(new BitmapTextureImageBuffer); }
-    ~BitmapTextureImageBuffer() { destroy(); }
-    virtual void destroy() { m_image.clear(); }
     virtual IntSize size() const { return m_image->internalSize(); }
     virtual void didReset();
     virtual bool isValid() const { return m_image; }
     inline GraphicsContext* graphicsContext() { return m_image ? m_image->context() : 0; }
-    virtual void updateContents(Image*, const IntRect&, const IntRect&, PixelFormat);
-    void updateContents(const void* data, const IntRect& targetRect);
+    virtual void updateContents(Image*, const IntRect&, const IntPoint&);
+    virtual void updateContents(const void*, const IntRect& target, const IntPoint& sourceOffset, int bytesPerLine);
 #if ENABLE(CSS_FILTERS)
-    void applyFilters(const BitmapTexture&, const FilterOperations&);
+    PassRefPtr<BitmapTexture> applyFilters(const BitmapTexture&, const FilterOperations&);
 #endif
 
 private:

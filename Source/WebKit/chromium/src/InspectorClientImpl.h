@@ -63,6 +63,13 @@ public:
     virtual void clearBrowserCache();
     virtual bool canClearBrowserCookies();
     virtual void clearBrowserCookies();
+
+    virtual bool canOverrideDeviceMetrics();
+    virtual void overrideDeviceMetrics(int, int, float, bool);
+    virtual void autoZoomPageToFitWidth();
+
+    virtual bool supportsFrameInstrumentation();
+
 private:
     WebDevToolsAgentImpl* devToolsAgent();
 

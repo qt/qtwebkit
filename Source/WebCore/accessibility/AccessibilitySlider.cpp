@@ -102,7 +102,7 @@ const AtomicString& AccessibilitySlider::getAttribute(const QualifiedName& attri
     return element()->getAttribute(attribute);
 }
     
-AccessibilityObject* AccessibilitySlider::elementAccessibilityHitTest(const LayoutPoint& point) const
+AccessibilityObject* AccessibilitySlider::elementAccessibilityHitTest(const IntPoint& point) const
 {
     if (m_children.size()) {
         ASSERT(m_children.size() == 1);
@@ -176,11 +176,6 @@ LayoutRect AccessibilitySliderThumb::elementRect() const
     if (!sliderRenderer || !sliderRenderer->isSlider())
         return LayoutRect();
     return sliderThumbElementOf(sliderRenderer->node())->getRect();
-}
-
-LayoutSize AccessibilitySliderThumb::size() const
-{
-    return elementRect().size();
 }
 
 bool AccessibilitySliderThumb::accessibilityIsIgnored() const

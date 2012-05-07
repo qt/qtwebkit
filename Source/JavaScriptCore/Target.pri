@@ -71,8 +71,12 @@ SOURCES += \
     heap/CopiedSpace.cpp \
     heap/ConservativeRoots.cpp \
     heap/DFGCodeBlocks.cpp \
-    heap/HandleHeap.cpp \
+    heap/WeakSet.cpp \
+    heap/WeakHandleOwner.cpp \
+    heap/WeakBlock.cpp \
+    heap/HandleSet.cpp \
     heap/HandleStack.cpp \
+    heap/BlockAllocator.cpp \
     heap/Heap.cpp \
     heap/MachineStackMarker.cpp \
     heap/MarkStack.cpp \
@@ -86,16 +90,16 @@ SOURCES += \
     debugger/Debugger.cpp \
     dfg/DFGAbstractState.cpp \
     dfg/DFGAssemblyHelpers.cpp \
-    dfg/DFGArithNodeFlagsInferencePhase.cpp \
     dfg/DFGByteCodeParser.cpp \
     dfg/DFGCapabilities.cpp \
     dfg/DFGCFAPhase.cpp \
     dfg/DFGCorrectableJumpPoint.cpp \
     dfg/DFGCSEPhase.cpp \
     dfg/DFGDriver.cpp \
+    dfg/DFGFixupPhase.cpp \
     dfg/DFGGraph.cpp \
     dfg/DFGJITCompiler.cpp \
-    dfg/DFGNode.cpp \
+    dfg/DFGNodeFlags.cpp \
     dfg/DFGOperations.cpp \
     dfg/DFGOSREntry.cpp \
     dfg/DFGOSRExit.cpp \
@@ -171,7 +175,6 @@ SOURCES += \
     runtime/JSActivation.cpp \
     runtime/JSAPIValueWrapper.cpp \
     runtime/JSArray.cpp \
-    runtime/JSByteArray.cpp \
     runtime/JSCell.cpp \
     runtime/JSDateMath.cpp \
     runtime/JSFunction.cpp \
@@ -187,6 +190,7 @@ SOURCES += \
     runtime/JSPropertyNameIterator.cpp \
     runtime/JSStaticScopeObject.cpp \
     runtime/JSString.cpp \
+    runtime/JSStringJoiner.cpp \
     runtime/JSValue.cpp \
     runtime/JSVariableObject.cpp \
     runtime/JSWrapperObject.cpp \
@@ -205,6 +209,8 @@ SOURCES += \
     runtime/PropertyNameArray.cpp \
     runtime/PropertySlot.cpp \
     runtime/RegExpConstructor.cpp \
+    runtime/RegExpCachedResult.cpp \
+    runtime/RegExpMatchesArray.cpp \
     runtime/RegExp.cpp \
     runtime/RegExpObject.cpp \
     runtime/RegExpPrototype.cpp \

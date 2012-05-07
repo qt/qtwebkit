@@ -306,6 +306,10 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, const Ident
     bool isArrayIndex;
     unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < thisObject->d->numArguments) {
+        // If the property is not yet present on the object, and is not yet marked as deleted, then add it now.
+        PropertySlot slot;
+        if ((!thisObject->d->deletedArguments || !thisObject->d->deletedArguments[i]) && !JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot))
+            object->putDirect(exec->globalData(), propertyName, thisObject->argument(i).get(), 0);
         if (!Base::defineOwnProperty(object, exec, propertyName, descriptor, shouldThrow))
             return false;
 
@@ -331,35 +335,16 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, const Ident
                     thisObject->d->deletedArguments[i] = true;
             }
         }
-
         return true;
     }
 
     if (propertyName == exec->propertyNames().length && !thisObject->d->overrodeLength) {
+        thisObject->putDirect(exec->globalData(), propertyName, jsNumber(thisObject->d->numArguments), DontEnum);
         thisObject->d->overrodeLength = true;
-        if (!descriptor.isAccessorDescriptor()) {
-            if (!descriptor.value())
-                descriptor.setValue(jsNumber(thisObject->d->numArguments));
-            if (!descriptor.configurablePresent())
-                descriptor.setConfigurable(true);
-        }
-        if (!descriptor.configurablePresent())
-            descriptor.setConfigurable(true);
-    }
-
-    if (propertyName == exec->propertyNames().callee && !thisObject->d->overrodeCallee) {
+    } else if (propertyName == exec->propertyNames().callee && !thisObject->d->overrodeCallee) {
+        thisObject->putDirect(exec->globalData(), propertyName, thisObject->d->callee.get(), DontEnum);
         thisObject->d->overrodeCallee = true;
-        if (!descriptor.isAccessorDescriptor()) {
-            if (!descriptor.value())
-                descriptor.setValue(thisObject->d->callee.get());
-            if (!descriptor.configurablePresent())
-                descriptor.setConfigurable(true);
-        }
-        if (!descriptor.configurablePresent())
-            descriptor.setConfigurable(true);
-    }
-
-    if (propertyName == exec->propertyNames().caller && thisObject->d->isStrictMode)
+    } else if (propertyName == exec->propertyNames().caller && thisObject->d->isStrictMode)
         thisObject->createStrictModeCallerIfNecessary(exec);
 
     return Base::defineOwnProperty(object, exec, propertyName, descriptor, shouldThrow);

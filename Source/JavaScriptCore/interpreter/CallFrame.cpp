@@ -81,7 +81,7 @@ bool CallFrame::isInlineCallFrameSlow()
     JSCell* calleeAsFunctionCell = getJSFunction(callee());
     if (!calleeAsFunctionCell)
         return false;
-    JSFunction* calleeAsFunction = asFunction(calleeAsFunctionCell);
+    JSFunction* calleeAsFunction = jsCast<JSFunction*>(calleeAsFunctionCell);
     return calleeAsFunction->executable() != codeBlock()->ownerExecutable();
 }
 
@@ -182,5 +182,12 @@ CallFrame* CallFrame::trueCallerFrame()
     return machineCaller->trueCallFrame(returnPC())->removeHostCallFrameFlag();
 }
 #endif
+
+Register* CallFrame::frameExtentInternal()
+{
+    CodeBlock* codeBlock = this->codeBlock();
+    ASSERT(codeBlock);
+    return registers() + codeBlock->m_numCalleeRegisters;
+}
 
 }

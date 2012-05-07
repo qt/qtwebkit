@@ -49,7 +49,10 @@ public:
 
     bool needsReordering() const { return m_needsReordering; }
 
-    void textDOMChanged();
+    // Call this method when either the children of a DOM text element have changed, or the length of
+    // the text in any child element has changed.
+    void invalidateTextPositioningElements();
+
     void layoutAttributesChanged(RenderObject*);
     void layoutAttributesWillBeDestroyed(RenderSVGInlineText*, Vector<SVGTextLayoutAttributes*>& affectedAttributes);
     void rebuildLayoutAttributes(bool performFullRebuild = false);
@@ -75,7 +78,7 @@ private:
     virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
     virtual void computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect&, bool fixed = false) const;
 
-    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, bool* wasFixed = 0) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, ApplyContainerFlipOrNot = ApplyContainerFlip, bool* wasFixed = 0) const;
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
 
     virtual FloatRect objectBoundingBox() const { return frameRect(); }

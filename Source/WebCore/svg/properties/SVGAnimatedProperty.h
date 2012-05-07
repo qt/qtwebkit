@@ -34,6 +34,8 @@ class SVGAnimatedProperty : public RefCounted<SVGAnimatedProperty> {
 public:
     SVGElement* contextElement() const { return m_contextElement.get(); }
     const QualifiedName& attributeName() const { return m_attributeName; }
+    AnimatedPropertyType animatedPropertyType() const { return m_animatedPropertyType; }
+    bool isAnimating() const { return m_isAnimating; }
 
     void commitChange()
     {
@@ -43,10 +45,9 @@ public:
     }
 
     virtual bool isAnimatedListTearOff() const { return false; }
-    virtual void updateAnimVal(void*) { ASSERT_NOT_REACHED(); }
 
     // Caching facilities.
-    typedef HashMap<SVGAnimatedPropertyDescription, RefPtr<SVGAnimatedProperty>, SVGAnimatedPropertyDescriptionHash, SVGAnimatedPropertyDescriptionHashTraits> Cache;
+    typedef HashMap<SVGAnimatedPropertyDescription, SVGAnimatedProperty*, SVGAnimatedPropertyDescriptionHash, SVGAnimatedPropertyDescriptionHashTraits> Cache;
 
     virtual ~SVGAnimatedProperty()
     {
@@ -59,6 +60,9 @@ public:
                 break;
             }
         }
+
+        // Assure that animationEnded() was called, if animationStarted() was called before.
+        ASSERT(!m_isAnimating);
     }
 
     // lookupOrCreateWrapper & helper methods.
@@ -82,10 +86,10 @@ public:
             SVGAnimatedPropertyDescription key(element, info->propertyIdentifier);
             RefPtr<SVGAnimatedProperty> wrapper = animatedPropertyCache()->get(key);
             if (!wrapper) {
-                wrapper = TearOffType::create(element, info->attributeName, property);
-                animatedPropertyCache()->set(key, wrapper);
+                wrapper = TearOffType::create(element, info->attributeName, info->animatedPropertyType, property);
+                animatedPropertyCache()->set(key, wrapper.get());
             }
-            return static_pointer_cast<TearOffType>(wrapper).release();
+            return static_pointer_cast<TearOffType>(wrapper);
         }
     };
 
@@ -113,7 +117,7 @@ public:
         {
             ASSERT(info);
             SVGAnimatedPropertyDescription key(const_cast<SVGElement*>(element), info->propertyIdentifier);
-            return static_pointer_cast<TearOffType>(animatedPropertyCache()->get(key)).get();
+            return static_cast<TearOffType*>(animatedPropertyCache()->get(key));
         }
     };
 
@@ -124,9 +128,11 @@ public:
     }
 
 protected:
-    SVGAnimatedProperty(SVGElement* contextElement, const QualifiedName& attributeName)
+    SVGAnimatedProperty(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType)
         : m_contextElement(contextElement)
         , m_attributeName(attributeName)
+        , m_animatedPropertyType(animatedPropertyType)
+        , m_isAnimating(false)
     {
     }
 
@@ -139,6 +145,10 @@ private:
 
     RefPtr<SVGElement> m_contextElement;
     const QualifiedName& m_attributeName;
+    AnimatedPropertyType m_animatedPropertyType;
+
+protected:
+    bool m_isAnimating;
 };
 
 }

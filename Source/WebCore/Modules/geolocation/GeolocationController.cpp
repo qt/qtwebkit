@@ -25,11 +25,11 @@
 
 #include "config.h"
 #include "GeolocationController.h"
-#include "GeolocationPosition.h"
 
-#if ENABLE(CLIENT_BASED_GEOLOCATION)
+#if ENABLE(GEOLOCATION)
 
 #include "GeolocationClient.h"
+#include "GeolocationPosition.h"
 
 namespace WebCore {
 
@@ -125,6 +125,17 @@ GeolocationPosition* GeolocationController::lastPosition()
     return m_client->lastPosition();
 }
 
+const AtomicString& GeolocationController::supplementName()
+{
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("GeolocationController"));
+    return name;
+}
+
+void provideGeolocationTo(Page* page, GeolocationClient* client)
+{
+    Supplement<Page>::provideTo(page, GeolocationController::supplementName(), GeolocationController::create(page, client));
+}
+    
 } // namespace WebCore
 
-#endif // ENABLE(CLIENT_BASED_GEOLOCATION)
+#endif // ENABLE(GEOLOCATION)

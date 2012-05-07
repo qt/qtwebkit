@@ -44,6 +44,7 @@
 
 namespace WebCore {
 class Event;
+class InspectorClient;
 class InspectorFrontend;
 class InspectorState;
 class InstrumentingAgents;
@@ -57,9 +58,11 @@ class InspectorTimelineAgent : public InspectorBaseAgent<InspectorTimelineAgent>
     WTF_MAKE_NONCOPYABLE(InspectorTimelineAgent);
 public:
     enum InspectorType { PageInspector, WorkerInspector };
-    static PassOwnPtr<InspectorTimelineAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorType type)
+    enum FrameInstrumentationSupport { FrameInstrumentationNotSupported, FrameInstrumentationSupported };
+
+    static PassOwnPtr<InspectorTimelineAgent> create(InstrumentingAgents* instrumentingAgents, InspectorState* state, InspectorType type, FrameInstrumentationSupport frameInstrumentationSupport)
     {
-        return adoptPtr(new InspectorTimelineAgent(instrumentingAgents, state, type));
+        return adoptPtr(new InspectorTimelineAgent(instrumentingAgents, state, type, frameInstrumentationSupport));
     }
 
     ~InspectorTimelineAgent();
@@ -71,6 +74,7 @@ public:
     virtual void start(ErrorString*, const int* maxCallStackDepth);
     virtual void stop(ErrorString*);
     virtual void setIncludeMemoryDetails(ErrorString*, bool);
+    virtual void supportsFrameInstrumentation(ErrorString*, bool*);
 
     int id() const { return m_id; }
 
@@ -84,6 +88,7 @@ public:
     void didDispatchEvent();
 
     void didBeginFrame();
+    void didCancelFrame();
 
     void willLayout();
     void didLayout();
@@ -133,25 +138,29 @@ public:
 
 private:
     struct TimelineRecordEntry {
-        TimelineRecordEntry(PassRefPtr<InspectorObject> record, PassRefPtr<InspectorObject> data, PassRefPtr<InspectorArray> children, const String& type)
-            : record(record), data(data), children(children), type(type)
+        TimelineRecordEntry(PassRefPtr<InspectorObject> record, PassRefPtr<InspectorObject> data, PassRefPtr<InspectorArray> children, const String& type, bool cancelable = false)
+            : record(record), data(data), children(children), type(type), cancelable(cancelable)
         {
         }
         RefPtr<InspectorObject> record;
         RefPtr<InspectorObject> data;
         RefPtr<InspectorArray> children;
         String type;
+        bool cancelable;
     };
         
-    InspectorTimelineAgent(InstrumentingAgents*, InspectorState*, InspectorType);
+    InspectorTimelineAgent(InstrumentingAgents*, InspectorState*, InspectorType, FrameInstrumentationSupport);
 
     void pushCurrentRecord(PassRefPtr<InspectorObject>, const String& type, bool captureCallStack);
     void setHeapSizeStatistic(InspectorObject* record);
         
     void didCompleteCurrentRecord(const String& type);
     void appendRecord(PassRefPtr<InspectorObject> data, const String& type, bool captureCallStack);
-
+    void pushCancelableRecord(PassRefPtr<InspectorObject>, const String& type);
+    void commitCancelableRecords();
+    void cancelRecord(const String& type);
     void addRecordToTimeline(PassRefPtr<InspectorObject>, const String& type);
+    void innerAddRecordToTimeline(PassRefPtr<InspectorObject>, const String& type);
 
     void pushGCEventRecords();
     void clearRecordStack();
@@ -178,6 +187,7 @@ private:
     GCEvents m_gcEvents;
     int m_maxCallStackDepth;
     InspectorType m_inspectorType;
+    FrameInstrumentationSupport m_frameInstrumentationSupport;
 };
 
 } // namespace WebCore

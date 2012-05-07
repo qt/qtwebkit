@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -97,8 +97,31 @@ struct NodeIndexTraits {
 
 enum UseKind {
     UntypedUse,
+    DoubleUse,
     LastUseKind // Must always be the last entry in the enum, as it is used to denote the number of enum elements.
 };
+
+inline const char* useKindToString(UseKind useKind)
+{
+    switch (useKind) {
+    case UntypedUse:
+        return "";
+    case DoubleUse:
+        return "d";
+    default:
+        ASSERT_NOT_REACHED();
+        return 0;
+    }
+}
+
+inline bool isX86()
+{
+#if CPU(X86_64) || CPU(X86)
+    return true;
+#else
+    return false;
+#endif
+}
 
 } } // namespace JSC::DFG
 

@@ -62,11 +62,10 @@ public:
     static size_t highLimitBytes(const IntSize& viewportSize);
     // Preferred texture size limit given the viewport size.
     static size_t reclaimLimitBytes(const IntSize& viewportSize);
-    // The maximum texture memory usage when asked to release textures.
-    static size_t lowLimitBytes(const IntSize& viewport);
 
     static size_t memoryUseBytes(const IntSize&, GC3Denum format);
 
+    void setMemoryAllocationLimitBytes(size_t);
     void setMaxMemoryLimitBytes(size_t);
     size_t maxMemoryLimitBytes() { return m_maxMemoryLimitBytes; }
     void setPreferredMemoryLimitBytes(size_t);

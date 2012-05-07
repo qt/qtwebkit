@@ -29,11 +29,13 @@
  */
 
 #include "config.h"
-#include "InspectorFrontendClientLocal.h"
 
 #if ENABLE(INSPECTOR)
 
+#include "InspectorFrontendClientLocal.h"
+
 #include "Chrome.h"
+#include "Document.h"
 #include "FloatRect.h"
 #include "Frame.h"
 #include "FrameLoadRequest.h"
@@ -52,6 +54,7 @@
 #include "UserGestureIndicator.h"
 #include "WindowFeatures.h"
 #include <wtf/Deque.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 

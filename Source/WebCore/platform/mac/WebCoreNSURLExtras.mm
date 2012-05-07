@@ -53,7 +53,7 @@ static inline BOOL isLookalikeCharacter(int charCode)
 {
     // This function treats the following as unsafe, lookalike characters:
     // any non-printable character, any character considered as whitespace that isn't already converted to a space by ICU, 
-    // and any ignorable character.
+    // any ignorable character, and emoji characters related to locks.
     
     // We also considered the characters in Mozilla's blacklist (http://kb.mozillazine.org/Network.IDN.blacklist_chars), 
     // and included all of these characters that ICU can encode.
@@ -66,6 +66,7 @@ static inline BOOL isLookalikeCharacter(int charCode)
         case 0x01C3: /* LATIN LETTER RETROFLEX CLICK */
         case 0x0251: /* LATIN SMALL LETTER ALPHA */
         case 0x0261: /* LATIN SMALL LETTER SCRIPT G */
+        case 0x0335: /* COMBINING SHORT STROKE OVERLAY */
         case 0x0337: /* COMBINING SHORT SOLIDUS OVERLAY */
         case 0x0338: /* COMBINING LONG SOLIDUS OVERLAY */
         case 0x05B4: /* HEBREW POINT HIRIQ */
@@ -103,6 +104,11 @@ static inline BOOL isLookalikeCharacter(int charCode)
         case 0xFE3F: /* PRESENTATION FORM FOR VERTICAL LEFT ANGLE BRACKET */
         case 0xFE5D: /* SMALL LEFT TORTOISE SHELL BRACKET */
         case 0xFE5E: /* SMALL RIGHT TORTOISE SHELL BRACKET */
+        case 0x1F50F: /* LOCK WITH INK PEN */
+        case 0x1F510: /* CLOSED LOCK WITH KEY */
+        case 0x1F511: /* KEY */
+        case 0x1F512: /* LOCK */
+        case 0x1F513: /* OPEN LOCK */
             return YES;
         default:
             return NO;

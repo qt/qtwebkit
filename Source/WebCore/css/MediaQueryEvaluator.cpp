@@ -31,7 +31,6 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "CSSPrimitiveValue.h"
-#include "CSSStyleSelector.h"
 #include "CSSValueList.h"
 #include "FloatRect.h"
 #include "Frame.h"
@@ -43,9 +42,10 @@
 #include "MediaQueryExp.h"
 #include "NodeRenderStyle.h"
 #include "Page.h"
+#include "PlatformScreen.h"
 #include "RenderView.h"
 #include "RenderStyle.h"
-#include "PlatformScreen.h"
+#include "StyleResolver.h"
 #include <wtf/HashMap.h>
 
 #if ENABLE(3D_RENDERING) && USE(ACCELERATED_COMPOSITING)
@@ -130,19 +130,19 @@ static bool applyRestrictor(MediaQuery::Restrictor r, bool value)
     return r == MediaQuery::Not ? !value : value;
 }
 
-bool MediaQueryEvaluator::eval(const MediaList* mediaList, CSSStyleSelector* styleSelector) const
+bool MediaQueryEvaluator::eval(const MediaQuerySet* querySet, StyleResolver* styleResolver) const
 {
-    if (!mediaList)
+    if (!querySet)
         return true;
 
-    const Vector<MediaQuery*>& queries = mediaList->mediaQueries();
+    const Vector<OwnPtr<MediaQuery> >& queries = querySet->queryVector();
     if (!queries.size())
         return true; // empty query list evaluates to true
 
     // iterate over queries, stop if any of them eval to true (OR semantics)
     bool result = false;
     for (size_t i = 0; i < queries.size() && !result; ++i) {
-        MediaQuery* query = queries.at(i);
+        MediaQuery* query = queries[i].get();
 
         if (query->ignored())
             continue;
@@ -154,8 +154,8 @@ bool MediaQueryEvaluator::eval(const MediaList* mediaList, CSSStyleSelector* sty
             size_t j = 0;
             for (; j < exps->size(); ++j) {
                 bool exprResult = eval(exps->at(j).get());
-                if (styleSelector && exps->at(j)->isViewportDependent())
-                    styleSelector->addViewportDependentMediaQueryResult(exps->at(j).get(), exprResult);
+                if (styleResolver && exps->at(j)->isViewportDependent())
+                    styleResolver->addViewportDependentMediaQueryResult(exps->at(j).get(), exprResult);
                 if (!exprResult)
                     break;
             }
