@@ -380,12 +380,10 @@ IntSize CCLayerTreeHostImpl::contentSize() const
 bool CCLayerTreeHostImpl::prepareToDraw(FrameData& frame)
 {
     TRACE_EVENT("CCLayerTreeHostImpl::prepareToDraw", this, 0);
+    ASSERT(canDraw());
 
     frame.renderPasses.clear();
     frame.renderSurfaceLayerList.clear();
-
-    if (!m_rootLayerImpl)
-        return false;
 
     if (!calculateRenderPasses(frame.renderPasses, frame.renderSurfaceLayerList)) {
         // We're missing textures on an animating layer. Request a commit.
@@ -405,10 +403,7 @@ void CCLayerTreeHostImpl::setContentsMemoryAllocationLimitBytes(size_t bytes)
 void CCLayerTreeHostImpl::drawLayers(const FrameData& frame)
 {
     TRACE_EVENT("CCLayerTreeHostImpl::drawLayers", this, 0);
-    ASSERT(m_layerRenderer);
-
-    if (!m_rootLayerImpl)
-        return;
+    ASSERT(canDraw());
 
     // FIXME: use the frame begin time from the overall compositor scheduler.
     // This value is currently inaccessible because it is up in Chromium's
@@ -531,10 +526,10 @@ void CCLayerTreeHostImpl::setVisible(bool visible)
     m_timeSourceClientAdapter->setActive(shouldTickInBackground);
 }
 
-bool CCLayerTreeHostImpl::initializeLayerRenderer(PassRefPtr<GraphicsContext3D> context)
+bool CCLayerTreeHostImpl::initializeLayerRenderer(PassRefPtr<GraphicsContext3D> context, PassOwnPtr<TextureUploader> uploader)
 {
     OwnPtr<LayerRendererChromium> layerRenderer;
-    layerRenderer = LayerRendererChromium::create(this, context);
+    layerRenderer = LayerRendererChromium::create(this, context, uploader);
 
     // Since we now have a new context/layerRenderer, we cannot continue to use the old
     // resources (i.e. renderSurfaces and texture IDs).

@@ -50,7 +50,6 @@
 #include "WebWorkerClientImpl.h"
 #include "WebWorkerRunLoop.h"
 #include "platform/WebAudioBus.h"
-#include "platform/WebClipboard.h"
 #include "platform/WebCookie.h"
 #include "platform/WebCookieJar.h"
 #include "platform/WebData.h"
@@ -81,9 +80,7 @@
 #include "platform/android/WebThemeEngine.h"
 #endif
 
-#if WEBKIT_USING_SKIA
 #include "NativeImageSkia.h"
-#endif
 
 #include "AsyncFileSystemChromium.h"
 #include "BitmapImage.h"
@@ -101,6 +98,7 @@
 
 #include "Worker.h"
 #include "WorkerContextProxy.h"
+#include <public/WebClipboard.h>
 #include <public/WebMimeRegistry.h>
 #include <wtf/Assertions.h>
 
@@ -224,11 +222,7 @@ void PlatformSupport::clipboardWriteImage(NativeImagePtr image,
                                          const KURL& sourceURL,
                                          const String& title)
 {
-#if WEBKIT_USING_SKIA
     WebImage webImage(image->bitmap());
-#else
-    WebImage webImage(image);
-#endif
     webKitPlatformSupport()->clipboard()->writeImage(webImage, sourceURL, title);
 }
 
@@ -404,14 +398,9 @@ int PlatformSupport::writeToFile(PlatformFileHandle handle, const char* data, in
 }
 
 #if ENABLE(FILE_SYSTEM)
-String PlatformSupport::createIsolatedFileSystemName(const String& storageIdentifier, const String& filesystemId)
+PassOwnPtr<AsyncFileSystem> PlatformSupport::createAsyncFileSystem()
 {
-    return AsyncFileSystemChromium::createIsolatedFileSystemName(storageIdentifier, filesystemId);
-}
-
-PassOwnPtr<AsyncFileSystem> PlatformSupport::createIsolatedFileSystem(const String& originString, const String& filesystemId)
-{
-    return AsyncFileSystemChromium::createIsolatedFileSystem(originString, filesystemId);
+    return AsyncFileSystemChromium::create();
 }
 #endif
 
@@ -558,17 +547,6 @@ NPObject* PlatformSupport::pluginScriptableObject(Widget* widget)
 
 // Resources ------------------------------------------------------------------
 
-PassRefPtr<Image> PlatformSupport::loadPlatformImageResource(const char* name)
-{
-    const WebData& resource = webKitPlatformSupport()->loadResource(name);
-    if (resource.isEmpty())
-        return Image::nullImage();
-
-    RefPtr<Image> image = BitmapImage::create();
-    image->setData(resource, true);
-    return image;
-}
-
 #if ENABLE(WEB_AUDIO)
 
 PassOwnPtr<AudioBus> PlatformSupport::decodeAudioFileData(const char* data, size_t size, double sampleRate)
@@ -688,11 +666,7 @@ void PlatformSupport::paintScrollbarThumb(
     webThemeScrollbarInfo.visibleSize = scrollbarInfo.visibleSize;
     webThemeScrollbarInfo.totalSize = scrollbarInfo.totalSize;
 
-#if WEBKIT_USING_SKIA
     WebKit::WebCanvas* webCanvas = gc->platformContext()->canvas();
-#else
-    WebKit::WebCanvas* webCanvas = gc->platformContext();
-#endif
     webKitPlatformSupport()->themeEngine()->paintScrollbarThumb(
         webCanvas,
         static_cast<WebThemeEngine::State>(state),
@@ -810,28 +784,6 @@ void PlatformSupport::paintThemePart(
 }
 
 #endif
-
-// Trace Event ----------------------------------------------------------------
-
-const unsigned char* PlatformSupport::getTraceCategoryEnabledFlag(const char* categoryName)
-{
-    return webKitPlatformSupport()->getTraceCategoryEnabledFlag(categoryName);
-}
-int PlatformSupport::addTraceEvent(char phase,
-                                   const unsigned char* categoryEnabledFlag,
-                                   const char* name,
-                                   unsigned long long id,
-                                   int numArgs,
-                                   const char** argNames,
-                                   const unsigned char* argTypes,
-                                   const unsigned long long* argValues,
-                                   int thresholdBeginId,
-                                   long long threshold,
-                                   unsigned char flags)
-{
-    return webKitPlatformSupport()->addTraceEvent(
-        phase, categoryEnabledFlag, name, id, numArgs, argNames, argTypes, argValues,  thresholdBeginId, threshold, flags);
-}
 
 // Visited Links --------------------------------------------------------------
 

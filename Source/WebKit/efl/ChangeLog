@@ -1,3 +1,221 @@
+2012-05-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move resumeAnimations to use Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=86063
+
+        Reviewed by Alexey Proskuryakov.
+
+        Remove resumeAnimations functions, because it is able to work in the 
+        cross-port way through the Internals interface.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-10  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL][DRT] Editor doesn't cancel composition as change of value
+        https://bugs.webkit.org/show_bug.cgi?id=85122
+
+        Reviewed by Martin Robinson.
+
+        IME composition should be cancelled when the value of input element is changed programmatically.
+        However, EFL port doesn't cancel as change of value.
+        Therefore, this patch will fix the bug.
+
+        * WebCoreSupport/EditorClientEfl.cpp:
+        (WebCore::EditorClientEfl::respondToChangedSelection):
+
+2012-05-10  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        [EFL][DRT] ewk_view_paint_contents may trigger assertion failure
+        https://bugs.webkit.org/show_bug.cgi?id=85058
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Fixing assertion failure triggered in media/media-fragment cases.
+        The assertion is hit because of a race between scheduleRelayout() and
+        the EWK's idle tiling painting. This is exposed by test cases
+        that rapidly insert child nodes to the document which lead to
+        scheduleRelayout() calls. Using the general purpose defensive
+        layout function, not causing any extra relayout work if there's
+        nothing to be done, but still avoiding the assertion failure if
+        layout is needed.
+
+        * ewk/ewk_view.cpp:
+        (ewk_view_paint):
+        (ewk_view_paint_contents):
+
+2012-05-10  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r116633.
+        http://trac.webkit.org/changeset/116633
+        https://bugs.webkit.org/show_bug.cgi?id=86093
+
+        Breaks EFL tests (Requested by kov on #webkit).
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-10  Alexander Shalamov  <alexander.shalamov@intel.com>
+
+        [EFL] LayoutTestController needs implementation of setTabKeyCyclesThroughElements
+        https://bugs.webkit.org/show_bug.cgi?id=82864
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add missing implementation for setTabKeyCyclesThroughElements to EFL's
+        DumpRenderTreeSupport.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setTabKeyCyclesThroughElements):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-10  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] Clear added user style sheets before a new testcase execution.
+        https://bugs.webkit.org/show_bug.cgi?id=84792
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add a helper function for clearing of the added user style sheets.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::clearUserStyleSheets):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-09  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move suspendAnimations to use Internals interface.
+        https://bugs.webkit.org/show_bug.cgi?id=85986
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove suspendAnimations functions, because it is able to work in the 
+        cross-port way through the Internals interface.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-09  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][DRT] EFL's DRT needs to support LayoutTestController.dumpIconChanges()
+        https://bugs.webkit.org/show_bug.cgi?id=84435
+
+        Reviewed by Antonio Gomes.
+
+        Emit a "icon,changed" signal on the frame when its favion changed.
+        Clarify that the "icon,loaded" signal is only emitted for the main
+        frame.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidReceiveIcon):
+        (WebCore::FrameLoaderClientEfl::dispatchDidChangeIcons):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_icon_changed):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_private.h:
+
+2012-05-09  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] LayoutTestController addUserScript implementation
+        https://bugs.webkit.org/show_bug.cgi?id=84718
+
+        Reviewed by Antonio Gomes.
+
+        Added helper functions for adding/clearing of user scripts.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::addUserScript):
+        (DumpRenderTreeSupportEfl::clearUserScripts):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-08  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL][DRT] Implement TextInputController.
+        https://bugs.webkit.org/show_bug.cgi?id=78559
+
+        Reviewed by Martin Robinson.
+
+        TextInputController has been created for an input emulation purpose in DRT.
+        However, not like other ports, EFL doesn't have it.
+        Therefore, this patch will enable EFL port to have an input emulation in DRT.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setComposition):
+        (DumpRenderTreeSupportEfl::hasComposition):
+        (DumpRenderTreeSupportEfl::compositionRange):
+        (DumpRenderTreeSupportEfl::confirmComposition):
+        (DumpRenderTreeSupportEfl::firstRectForCharacterRange):
+        (DumpRenderTreeSupportEfl::selectedRange):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-04-23  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [EFL] Pass a WTF::String directly from DRT to ewebkit when possible
+        https://bugs.webkit.org/show_bug.cgi?id=84634
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Drop unnecessary const char* -> WTF::String conversions by
+        creating String objects directly in LayoutTestController out of
+        JSStringRef's and passing them to DumpRenderTreeSupportEfl.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setValueForUser):
+        (DumpRenderTreeSupportEfl::addUserStyleSheet):
+        (DumpRenderTreeSupportEfl::findString):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-08  Krzysztof Czech  <k.czech@samsung.com>
+
+        [EFL] Update documentation of ewk_frame_contents_alternate_set and ewk_view_zoom_range_set.
+        https://bugs.webkit.org/show_bug.cgi?id=84588
+
+        Reviewed by Eric Seidel.
+
+        In ewk_frame_contents_alternate_set, param unreachableUri is required, must not be 0.
+        In ewk_view_zoom_range_set, function returns EINA_FALSE only on failure,
+        not when zoom range is changed.
+
+        * ewk/ewk_frame.h:
+        * ewk/ewk_view.h:
+
+2012-05-07  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] Page caching permission from EFL's FrameLoaderClient
+        https://bugs.webkit.org/show_bug.cgi?id=85620
+
+        Reviewed by Gustavo Noronha Silva.
+
+        FrameLoaderClientEfl::canCachePage() returns true.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::canCachePage):
+
+2012-05-07  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        [EFL] Icon database path may be NULL when a new path was set.
+        https://bugs.webkit.org/show_bug.cgi?id=82456
+
+        Reviewed by Andreas Kling.
+
+        ewk_settings_icon_database_path_set calls asynchronous method WebCore::iconDatabase().open().
+        There is no notification when the new path is set by WebCore.
+        Moreover ewk_settings_icon_database_path_set keeps the new path in a local variable.
+
+        To retrieve path to icon database ewk_settings_icon_database_path_get can be called.
+        It first checks flags whether icon databse is opened and enabled. There is possibility
+        that icon database has been set through API but it hasn't been opened by WebCore yet.
+        So as a result ewk_settings_icon_database_path_get returns NULL because WebCore hasn't
+        set an appropriate flag yet.
+
+        It may happen while icon database set/get sequences.
+        Information whether icon database is opened/enabled should be exposed by separate API.
+
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_icon_database_path_get): Skip checking whether icon database is opened, enabled.
+        * ewk/ewk_settings.h:
+
 2012-05-07  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
 
         [EFL][DRT] Implement LayoutTestController::execCommand

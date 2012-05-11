@@ -27,6 +27,7 @@
 #include "QtDownloadManager.h"
 #include "QtViewportInteractionEngine.h"
 #include "QtWebContext.h"
+#include "QtWebError.h"
 #include "QtWebIconDatabaseClient.h"
 #include "QtWebPageEventHandler.h"
 #include "QtWebPageLoadClient.h"
@@ -52,10 +53,14 @@
 #include "qwebviewportinfo_p.h"
 
 #include <JavaScriptCore/InitializeThreading.h>
+#include <JavaScriptCore/JSBase.h>
+#include <JavaScriptCore/JSRetainPtr.h>
 #include <QDateTime>
+#include <QtQml/QJSValue>
+#include <WKOpenPanelResultListener.h>
+#include <WKSerializedScriptValue.h>
 #include <WebCore/IntPoint.h>
 #include <WebCore/IntRect.h>
-#include <WKOpenPanelResultListener.h>
 #include <wtf/Assertions.h>
 #include <wtf/MainThread.h>
 #include <wtf/text/WTFString.h>
@@ -67,6 +72,105 @@ static bool s_flickableViewportEnabled = true;
 static const int kAxisLockSampleCount = 5;
 static const qreal kAxisLockVelocityThreshold = 300;
 static const qreal kAxisLockVelocityDirectionThreshold = 50;
+
+struct JSCallbackClosure {
+    QPointer<QObject> receiver;
+    QByteArray method;
+    QJSValue value;
+};
+
+static inline QString toQString(JSStringRef string)
+{
+    return QString(reinterpret_cast<const QChar*>(JSStringGetCharactersPtr(string)), JSStringGetLength(string));
+}
+
+static inline QJSValue toQJSValue(JSStringRef string)
+{
+    return QJSValue(toQString(string));
+}
+
+static QJSValue buildQJSValue(QJSEngine* engine, JSGlobalContextRef context, JSValueRef value, int depth)
+{
+    QJSValue var;
+    JSValueRef exception = 0;
+
+    if (depth > 10)
+        return var;
+
+    switch (JSValueGetType(context, value)) {
+    case kJSTypeBoolean:
+        var = QJSValue(JSValueToBoolean(context, value));
+        break;
+    case kJSTypeNumber:
+        {
+            double number = JSValueToNumber(context, value, &exception);
+            if (!exception)
+                var = QJSValue(number);
+        }
+        break;
+    case kJSTypeString:
+        {
+            JSRetainPtr<JSStringRef> string = JSValueToStringCopy(context, value, &exception);
+            if (!exception)
+                var = toQJSValue(string.get());
+        }
+        break;
+    case kJSTypeObject:
+        {
+            JSObjectRef obj = JSValueToObject(context, value, &exception);
+
+            JSPropertyNameArrayRef names = JSObjectCopyPropertyNames(context, obj);
+            size_t length = JSPropertyNameArrayGetCount(names);
+
+            var = engine->newObject();
+
+            for (size_t i = 0; i < length; ++i) {
+                JSRetainPtr<JSStringRef> name = JSPropertyNameArrayGetNameAtIndex(names, i);
+                JSValueRef property = JSObjectGetProperty(context, obj, name.get(), &exception);
+
+                if (!exception) {
+                    QJSValue value = buildQJSValue(engine, context, property, depth + 1);
+                    var.setProperty(toQString(name.get()), value);
+                }
+            }
+        }
+        break;
+    }
+    return var;
+}
+
+static void javaScriptCallback(WKSerializedScriptValueRef valueRef, WKErrorRef, void* data)
+{
+    JSCallbackClosure* closure = reinterpret_cast<JSCallbackClosure*>(data);
+
+    if (closure->method.size())
+        QMetaObject::invokeMethod(closure->receiver, closure->method);
+    else {
+        QJSValue function = closure->value;
+
+        // If a callable function is supplied, we build a JavaScript value accessible
+        // in the QML engine, and calls the function with that.
+        if (function.isCallable()) {
+            QJSValue var;
+            if (valueRef) {
+                // FIXME: Slow but OK for now.
+                JSGlobalContextRef context = JSGlobalContextCreate(0);
+
+                JSValueRef exception = 0;
+                JSValueRef value = WKSerializedScriptValueDeserialize(valueRef, context, &exception);
+                var = buildQJSValue(function.engine(), context, value, /* depth */ 0);
+
+                JSGlobalContextRelease(context);
+            }
+
+            QList<QJSValue> args;
+            args.append(var);
+            function.call(args);
+        }
+    }
+
+    delete closure;
+}
 
 static QQuickWebViewPrivate* createPrivateObject(QQuickWebView* publicObject)
 {
@@ -162,6 +266,7 @@ QQuickWebViewPrivate::QQuickWebViewPrivate(QQuickWebView* viewport)
     , m_navigatorQtObjectEnabled(false)
     , m_renderToOffscreenBuffer(false)
     , m_dialogActive(false)
+    , m_loadProgress(0)
 {
     viewport->setClip(true);
     viewport->setPixelAligned(true);
@@ -230,20 +335,72 @@ QPointF QQuickWebViewPrivate::pageItemPos()
     \qmlsignal WebView::loadingChanged(WebLoadRequest request)
 */
 
+void QQuickWebViewPrivate::provisionalLoadDidStart(const QUrl& url)
+{
+    Q_Q(QQuickWebView);
+
+    QWebLoadRequest loadRequest(url, QQuickWebView::LoadStartedStatus);
+    emit q->loadingChanged(&loadRequest);
+}
+
+void QQuickWebViewPrivate::loadDidCommit()
+{
+    Q_Q(QQuickWebView);
+    ASSERT(q->loading());
+
+    emit q->navigationHistoryChanged();
+    emit q->urlChanged();
+    emit q->titleChanged();
+}
+
+void QQuickWebViewPrivate::didSameDocumentNavigation()
+{
+    Q_Q(QQuickWebView);
+
+    emit q->navigationHistoryChanged();
+    emit q->urlChanged();
+}
+
+void QQuickWebViewPrivate::titleDidChange()
+{
+    Q_Q(QQuickWebView);
+
+    emit q->titleChanged();
+}
+
+void QQuickWebViewPrivate::loadProgressDidChange(int loadProgress)
+{
+    Q_Q(QQuickWebView);
+
+    if (!loadProgress)
+        setIcon(QUrl());
+
+    m_loadProgress = loadProgress;
+
+    emit q->loadProgressChanged();
+}
+
+void QQuickWebViewPrivate::backForwardListDidChange()
+{
+    navigationHistory->d->reset();
+}
+
 void QQuickWebViewPrivate::loadDidSucceed()
 {
     Q_Q(QQuickWebView);
     ASSERT(!q->loading());
+
     QWebLoadRequest loadRequest(q->url(), QQuickWebView::LoadSucceededStatus);
     emit q->loadingChanged(&loadRequest);
 }
 
-void QQuickWebViewPrivate::onComponentComplete()
+void QQuickWebViewPrivate::loadDidFail(const QtWebError& error)
 {
-    if (m_deferedUrlToLoad.isEmpty())
-        return;
+    Q_Q(QQuickWebView);
+    ASSERT(!q->loading());
 
-    q_ptr->setUrl(m_deferedUrlToLoad);
+    QWebLoadRequest loadRequest(error.url(), QQuickWebView::LoadFailedStatus, error.description(), static_cast<QQuickWebView::ErrorDomain>(error.type()), error.errorCode());
+    emit q->loadingChanged(&loadRequest);
 }
 
 void QQuickWebViewPrivate::setNeedsDisplay()
@@ -269,18 +426,22 @@ void QQuickWebViewPrivate::_q_onIconChangedForPageURL(const QUrl& pageURL, const
     setIcon(iconURL);
 }
 
-void QQuickWebViewPrivate::didChangeBackForwardList()
-{
-    navigationHistory->d->reset();
-}
-
 void QQuickWebViewPrivate::processDidCrash()
 {
-    pageView->eventHandler()->resetGestureRecognizers();
-    pageLoadClient->completeLoadWhenProcessDidCrashIfNeeded();
+    Q_Q(QQuickWebView);
 
     QUrl url(KURL(WebCore::ParsedURLString, webPageProxy->urlAtProcessExit()));
     qWarning("WARNING: The web process experienced a crash on '%s'.", qPrintable(url.toString(QUrl::RemoveUserInfo)));
+
+    pageView->eventHandler()->resetGestureRecognizers();
+
+    // Check if loading was ongoing, when process crashed.
+    if (m_loadProgress > 0 && m_loadProgress < 100) {
+        QWebLoadRequest loadRequest(url, QQuickWebView::LoadFailedStatus, QLatin1String("The web process crashed."), QQuickWebView::InternalErrorDomain, 0);
+
+        loadProgressDidChange(100);
+        emit q->loadingChanged(&loadRequest);
+    }
 }
 
 void QQuickWebViewPrivate::didRelaunchProcess()
@@ -328,7 +489,7 @@ void QQuickWebViewPrivate::_q_onReceivedResponseFromDownload(QWebDownloadItem* d
         return;
 
     Q_Q(QQuickWebView);
-    QDeclarativeEngine::setObjectOwnership(downloadItem, QDeclarativeEngine::JavaScriptOwnership);
+    QQmlEngine::setObjectOwnership(downloadItem, QQmlEngine::JavaScriptOwnership);
     emit q->experimental()->downloadRequested(downloadItem);
 }
 
@@ -626,7 +787,6 @@ void QQuickWebViewLegacyPrivate::setZoomFactor(qreal factor)
 QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate(QQuickWebView* viewport)
     : QQuickWebViewPrivate(viewport)
     , pageIsSuspended(true)
-    , loadSuccessDispatchIsPending(false)
 {
     // Disable mouse events on the flickable web view so we do not
     // select text during pan gestures on platforms which send both
@@ -689,44 +849,16 @@ void QQuickWebViewFlickablePrivate::onComponentComplete()
 
     _q_resume();
 
-    if (loadSuccessDispatchIsPending) {
-        QQuickWebViewPrivate::loadDidSucceed();
-        loadSuccessDispatchIsPending = false;
-    }
-
     // Trigger setting of correct visibility flags after everything was allocated and initialized.
     _q_onVisibleChanged();
-
-    QQuickWebViewPrivate::onComponentComplete();
-}
-
-void QQuickWebViewFlickablePrivate::loadDidSucceed()
-{
-    if (interactionEngine)
-        QQuickWebViewPrivate::loadDidSucceed();
-    else
-        loadSuccessDispatchIsPending = true;
-}
-
-void QQuickWebViewFlickablePrivate::loadDidCommit()
-{
-    // Due to entering provisional load before committing, we
-    // might actually be suspended here.
-}
-
-void QQuickWebViewFlickablePrivate::didFinishFirstNonEmptyLayout()
-{
 }
 
 void QQuickWebViewFlickablePrivate::didChangeViewportProperties(const WebCore::ViewportAttributes& newAttributes)
 {
     Q_Q(QQuickWebView);
 
-    QSize viewportSize = q->boundingRect().size().toSize();
-
     // FIXME: Revise these when implementing fit-to-width.
     WebCore::ViewportAttributes attr = newAttributes;
-    WebCore::restrictMinimumScaleFactorToViewportSize(attr, viewportSize);
     WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(attr);
 
     // FIXME: Resetting here can reset more than needed. For instance it will end deferrers.
@@ -814,8 +946,20 @@ void QQuickWebViewFlickablePrivate::pageDidRequestScroll(const QPoint& pos)
 void QQuickWebViewFlickablePrivate::didChangeContentsSize(const QSize& newSize)
 {
     Q_Q(QQuickWebView);
+    QSize viewportSize = q->boundingRect().size().toSize();
+
     pageView->setContentsSize(newSize);
     q->experimental()->viewportInfo()->didUpdateContentsSize();
+
+    float minimumScale = WebCore::computeMinimumScaleFactorForContentContained(attributes, viewportSize, newSize);
+
+    if (!qFuzzyCompare(minimumScale, attributes.minimumScale)) {
+        interactionEngine->setCSSScaleBounds(minimumScale, attributes.maximumScale);
+        q->experimental()->viewportInfo()->didUpdateViewportConstraints();
+
+        if (!interactionEngine->hadUserInteraction() && !pageIsSuspended)
+            interactionEngine->setCSSScale(minimumScale);
+    }
 }
 
 /*!
@@ -955,13 +1099,13 @@ void QQuickWebViewExperimental::postMessage(const QString& message)
     d->context->postMessageToNavigatorQtObject(d->webPageProxy.get(), message);
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::alertDialog() const
+QQmlComponent* QQuickWebViewExperimental::alertDialog() const
 {
     Q_D(const QQuickWebView);
     return d->alertDialog;
 }
 
-void QQuickWebViewExperimental::setAlertDialog(QDeclarativeComponent* alertDialog)
+void QQuickWebViewExperimental::setAlertDialog(QQmlComponent* alertDialog)
 {
     Q_D(QQuickWebView);
     if (d->alertDialog == alertDialog)
@@ -970,13 +1114,13 @@ void QQuickWebViewExperimental::setAlertDialog(QDeclarativeComponent* alertDialo
     emit alertDialogChanged();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::confirmDialog() const
+QQmlComponent* QQuickWebViewExperimental::confirmDialog() const
 {
     Q_D(const QQuickWebView);
     return d->confirmDialog;
 }
 
-void QQuickWebViewExperimental::setConfirmDialog(QDeclarativeComponent* confirmDialog)
+void QQuickWebViewExperimental::setConfirmDialog(QQmlComponent* confirmDialog)
 {
     Q_D(QQuickWebView);
     if (d->confirmDialog == confirmDialog)
@@ -990,7 +1134,7 @@ QWebNavigationHistory* QQuickWebViewExperimental::navigationHistory() const
     return d_ptr->navigationHistory.get();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::promptDialog() const
+QQmlComponent* QQuickWebViewExperimental::promptDialog() const
 {
     Q_D(const QQuickWebView);
     return d->promptDialog;
@@ -1004,7 +1148,7 @@ QWebPreferences* QQuickWebViewExperimental::preferences() const
     return d->preferences.get();
 }
 
-void QQuickWebViewExperimental::setPromptDialog(QDeclarativeComponent* promptDialog)
+void QQuickWebViewExperimental::setPromptDialog(QQmlComponent* promptDialog)
 {
     Q_D(QQuickWebView);
     if (d->promptDialog == promptDialog)
@@ -1013,13 +1157,13 @@ void QQuickWebViewExperimental::setPromptDialog(QDeclarativeComponent* promptDia
     emit promptDialogChanged();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::authenticationDialog() const
+QQmlComponent* QQuickWebViewExperimental::authenticationDialog() const
 {
     Q_D(const QQuickWebView);
     return d->authenticationDialog;
 }
 
-void QQuickWebViewExperimental::setAuthenticationDialog(QDeclarativeComponent* authenticationDialog)
+void QQuickWebViewExperimental::setAuthenticationDialog(QQmlComponent* authenticationDialog)
 {
     Q_D(QQuickWebView);
     if (d->authenticationDialog == authenticationDialog)
@@ -1028,13 +1172,13 @@ void QQuickWebViewExperimental::setAuthenticationDialog(QDeclarativeComponent* a
     emit authenticationDialogChanged();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::proxyAuthenticationDialog() const
+QQmlComponent* QQuickWebViewExperimental::proxyAuthenticationDialog() const
 {
     Q_D(const QQuickWebView);
     return d->proxyAuthenticationDialog;
 }
 
-void QQuickWebViewExperimental::setProxyAuthenticationDialog(QDeclarativeComponent* proxyAuthenticationDialog)
+void QQuickWebViewExperimental::setProxyAuthenticationDialog(QQmlComponent* proxyAuthenticationDialog)
 {
     Q_D(QQuickWebView);
     if (d->proxyAuthenticationDialog == proxyAuthenticationDialog)
@@ -1042,13 +1186,13 @@ void QQuickWebViewExperimental::setProxyAuthenticationDialog(QDeclarativeCompone
     d->proxyAuthenticationDialog = proxyAuthenticationDialog;
     emit proxyAuthenticationDialogChanged();
 }
-QDeclarativeComponent* QQuickWebViewExperimental::certificateVerificationDialog() const
+QQmlComponent* QQuickWebViewExperimental::certificateVerificationDialog() const
 {
     Q_D(const QQuickWebView);
     return d->certificateVerificationDialog;
 }
 
-void QQuickWebViewExperimental::setCertificateVerificationDialog(QDeclarativeComponent* certificateVerificationDialog)
+void QQuickWebViewExperimental::setCertificateVerificationDialog(QQmlComponent* certificateVerificationDialog)
 {
     Q_D(QQuickWebView);
     if (d->certificateVerificationDialog == certificateVerificationDialog)
@@ -1057,13 +1201,13 @@ void QQuickWebViewExperimental::setCertificateVerificationDialog(QDeclarativeCom
     emit certificateVerificationDialogChanged();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::itemSelector() const
+QQmlComponent* QQuickWebViewExperimental::itemSelector() const
 {
     Q_D(const QQuickWebView);
     return d->itemSelector;
 }
 
-void QQuickWebViewExperimental::setItemSelector(QDeclarativeComponent* itemSelector)
+void QQuickWebViewExperimental::setItemSelector(QQmlComponent* itemSelector)
 {
     Q_D(QQuickWebView);
     if (d->itemSelector == itemSelector)
@@ -1072,13 +1216,13 @@ void QQuickWebViewExperimental::setItemSelector(QDeclarativeComponent* itemSelec
     emit itemSelectorChanged();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::filePicker() const
+QQmlComponent* QQuickWebViewExperimental::filePicker() const
 {
     Q_D(const QQuickWebView);
     return d->filePicker;
 }
 
-void QQuickWebViewExperimental::setFilePicker(QDeclarativeComponent* filePicker)
+void QQuickWebViewExperimental::setFilePicker(QQmlComponent* filePicker)
 {
     Q_D(QQuickWebView);
     if (d->filePicker == filePicker)
@@ -1087,13 +1231,13 @@ void QQuickWebViewExperimental::setFilePicker(QDeclarativeComponent* filePicker)
     emit filePickerChanged();
 }
 
-QDeclarativeComponent* QQuickWebViewExperimental::databaseQuotaDialog() const
+QQmlComponent* QQuickWebViewExperimental::databaseQuotaDialog() const
 {
     Q_D(const QQuickWebView);
     return d->databaseQuotaDialog;
 }
 
-void QQuickWebViewExperimental::setDatabaseQuotaDialog(QDeclarativeComponent* databaseQuotaDialog)
+void QQuickWebViewExperimental::setDatabaseQuotaDialog(QQmlComponent* databaseQuotaDialog)
 {
     Q_D(QQuickWebView);
     if (d->databaseQuotaDialog == databaseQuotaDialog)
@@ -1171,7 +1315,25 @@ void QQuickWebViewExperimental::setDevicePixelRatio(double devicePixelRatio)
     emit devicePixelRatioChanged();
 }
 
-QQuickUrlSchemeDelegate* QQuickWebViewExperimental::schemeDelegates_At(QDeclarativeListProperty<QQuickUrlSchemeDelegate>* property, int index)
+/*!
+    \internal
+
+    \qmlmethod void WebViewExperimental::evaluateJavaScript(string script [, function(result)])
+
+    \brief Evaluates the specified JavaScript and, if supplied, calls a function with the result.
+*/
+
+void QQuickWebViewExperimental::evaluateJavaScript(const QString& script, const QJSValue& value)
+{
+    JSCallbackClosure* closure = new JSCallbackClosure;
+
+    closure->receiver = this;
+    closure->value = value;
+
+    d_ptr->webPageProxy.get()->runJavaScriptInMainFrame(script, ScriptValueCallback::create(closure, javaScriptCallback));
+}
+
+QQuickUrlSchemeDelegate* QQuickWebViewExperimental::schemeDelegates_At(QQmlListProperty<QQuickUrlSchemeDelegate>* property, int index)
 {
     const QObjectList children = property->object->children();
     if (index < children.count())
@@ -1179,7 +1341,7 @@ QQuickUrlSchemeDelegate* QQuickWebViewExperimental::schemeDelegates_At(QDeclarat
     return 0;
 }
 
-void QQuickWebViewExperimental::schemeDelegates_Append(QDeclarativeListProperty<QQuickUrlSchemeDelegate>* property, QQuickUrlSchemeDelegate *scheme)
+void QQuickWebViewExperimental::schemeDelegates_Append(QQmlListProperty<QQuickUrlSchemeDelegate>* property, QQuickUrlSchemeDelegate *scheme)
 {
     QObject* schemeParent = property->object;
     scheme->setParent(schemeParent);
@@ -1191,12 +1353,12 @@ void QQuickWebViewExperimental::schemeDelegates_Append(QDeclarativeListProperty<
     d->webPageProxy->registerApplicationScheme(scheme->scheme());
 }
 
-int QQuickWebViewExperimental::schemeDelegates_Count(QDeclarativeListProperty<QQuickUrlSchemeDelegate>* property)
+int QQuickWebViewExperimental::schemeDelegates_Count(QQmlListProperty<QQuickUrlSchemeDelegate>* property)
 {
     return property->object->children().count();
 }
 
-void QQuickWebViewExperimental::schemeDelegates_Clear(QDeclarativeListProperty<QQuickUrlSchemeDelegate>* property)
+void QQuickWebViewExperimental::schemeDelegates_Clear(QQmlListProperty<QQuickUrlSchemeDelegate>* property)
 {
     const QObjectList children = property->object->children();
     for (int index = 0; index < children.count(); index++) {
@@ -1206,9 +1368,9 @@ void QQuickWebViewExperimental::schemeDelegates_Clear(QDeclarativeListProperty<Q
     }
 }
 
-QDeclarativeListProperty<QQuickUrlSchemeDelegate> QQuickWebViewExperimental::schemeDelegates()
+QQmlListProperty<QQuickUrlSchemeDelegate> QQuickWebViewExperimental::schemeDelegates()
 {
-    return QDeclarativeListProperty<QQuickUrlSchemeDelegate>(schemeParent, 0,
+    return QQmlListProperty<QQuickUrlSchemeDelegate>(schemeParent, 0,
             QQuickWebViewExperimental::schemeDelegates_Append,
             QQuickWebViewExperimental::schemeDelegates_Count,
             QQuickWebViewExperimental::schemeDelegates_At,
@@ -1336,11 +1498,6 @@ void QQuickWebView::setUrl(const QUrl& url)
     if (url.isEmpty())
         return;
 
-    if (!isComponentComplete()) {
-        d->m_deferedUrlToLoad = url;
-        return;
-    }
-
     d->webPageProxy->loadURL(url.toString());
 }
 
@@ -1360,7 +1517,7 @@ QUrl QQuickWebView::icon() const
 int QQuickWebView::loadProgress() const
 {
     Q_D(const QQuickWebView);
-    return d->pageLoadClient->loadProgress();
+    return d->loadProgress();
 }
 
 bool QQuickWebView::canGoBack() const
@@ -1725,24 +1882,14 @@ void QQuickWebView::setZoomFactor(qreal factor)
     d->setZoomFactor(factor);
 }
 
-struct JSCallbackClosure {
-    QPointer<QObject> receiver;
-    QByteArray method;
-};
-
-static void javaScriptCallback(WKSerializedScriptValueRef, WKErrorRef, void* context)
-{
-    JSCallbackClosure* closure = reinterpret_cast<JSCallbackClosure*>(context);
-    QMetaObject::invokeMethod(closure->receiver, closure->method);
-    delete closure;
-}
-
 void QQuickWebView::runJavaScriptInMainFrame(const QString &script, QObject *receiver, const char *method)
 {
     Q_D(QQuickWebView);
+
     JSCallbackClosure* closure = new JSCallbackClosure;
     closure->receiver = receiver;
     closure->method = method;
+
     d->webPageProxy.get()->runJavaScriptInMainFrame(script, ScriptValueCallback::create(closure, javaScriptCallback));
 }
 

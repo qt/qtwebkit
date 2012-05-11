@@ -152,6 +152,11 @@ class BugzillaQueries(object):
 
     def _fetch_bugs_from_advanced_query(self, query):
         results_page = self._load_query(query)
+        # Some simple searches can return a single result.
+        results_url = results_page.geturl()
+        if results_url.find("/show_bug.cgi?id=") != -1:
+            bug_id = int(results_url.split("=")[-1])
+            return [self._fetch_bug(bug_id)]
         if not self._parse_result_count(results_page):
             return []
         # Bugzilla results pages have an "XML" submit button at the bottom
@@ -493,6 +498,7 @@ class Bugzilla(object):
             self.browser.select_form(name="login")
             self.browser['Bugzilla_login'] = username
             self.browser['Bugzilla_password'] = password
+            self.browser.find_control("Bugzilla_restrictlogin").items[0].selected = False
             response = self.browser.submit()
 
             match = re.search("<title>(.+?)</title>", response.read())

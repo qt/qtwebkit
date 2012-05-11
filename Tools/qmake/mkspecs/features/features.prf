@@ -78,9 +78,15 @@ haveQt(5) {
 # Tiled Backing Store support
 !contains(DEFINES, WTF_USE_TILED_BACKING_STORE=.): DEFINES += WTF_USE_TILED_BACKING_STORE=1
 
+# Turn on legacy viewport adaption
+!contains(DEFINES, WTF_USE_LEGACY_VIEWPORT_ADAPTION=.): DEFINES += WTF_USE_LEGACY_VIEWPORT_ADAPTION=1
+
 # Nescape plugins support (NPAPI)
 !contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=.) {
-    unix:haveQt(4)|win32-*:!embedded:!wince*: {
+    haveQt(5):xlibAvailable() {
+        DEFINES += ENABLE_NETSCAPE_PLUGIN_API=1
+        CONFIG += plugin_backend_xlib
+    } else: unix|win32-*:!embedded:!wince* {
         DEFINES += ENABLE_NETSCAPE_PLUGIN_API=1
     }
 }

@@ -1717,10 +1717,6 @@ static JSValueRef setPageVisibilityCallback(JSContextRef context, JSObjectRef fu
 
 static JSValueRef resetPageVisibilityCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
-    // Has mac & windows implementation
-    if (argumentCount < 1)
-        return JSValueMakeUndefined(context);
-
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
     controller->resetPageVisibility();
     return JSValueMakeUndefined(context);
@@ -1863,20 +1859,6 @@ static JSValueRef numberOfActiveAnimationsCallback(JSContextRef context, JSObjec
 
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
     return JSValueMakeNumber(context, controller->numberOfActiveAnimations());
-}
-
-static JSValueRef suspendAnimationsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    controller->suspendAnimations();
-    return JSValueMakeUndefined(context);
-}
-
-static JSValueRef resumeAnimationsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    controller->resumeAnimations();
-    return JSValueMakeUndefined(context);
 }
 
 static JSValueRef waitForPolicyDelegateCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t, const JSValueRef[], JSValueRef*)
@@ -2354,8 +2336,6 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "markerTextForListItem", markerTextForListItemCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "notifyDone", notifyDoneCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "numberOfActiveAnimations", numberOfActiveAnimationsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "suspendAnimations", suspendAnimationsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "resumeAnimations", resumeAnimationsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "overridePreference", overridePreferenceCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "pageNumberForElementById", pageNumberForElementByIdCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "pageSizeAndMarginsInPixels", pageSizeAndMarginsInPixelsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },

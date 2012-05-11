@@ -65,6 +65,7 @@ my (
     $geolocationSupport,
     $highDPICanvasSupport,
     $icondatabaseSupport,
+    $iframeSeamlessSupport,
     $imageResizerSupport,
     $indexedDatabaseSupport,
     $inputSpeechSupport,
@@ -190,6 +191,9 @@ my @features = (
 
     { option => "icon-database", desc => "Toggle Icondatabase support",
       define => "ENABLE_ICONDATABASE", default => 1, value => \$icondatabaseSupport },
+
+    { option => "iframe-seamless", desc => "Toggle iframe seamless attribute support",
+      define => "ENABLE_IFRAME_SEAMLESS", default => 1, value => \$iframeSeamlessSupport },
 
     { option => "indexed-database", desc => "Toggle Indexed Database support",
       define => "ENABLE_INDEXED_DATABASE", default => 0, value => \$indexedDatabaseSupport },
@@ -333,7 +337,7 @@ my @features = (
       define => "ENABLE_VIDEO_TRACK", default => (isAppleWebKit() || isGtk() || isEfl()), value => \$videoTrackSupport },
 
     { option => "webgl", desc => "Toggle WebGL support",
-      define => "ENABLE_WEBGL", default => isAppleMacWebKit(), value => \$webglSupport },
+      define => "ENABLE_WEBGL", default => (isAppleMacWebKit() || isGtk()), value => \$webglSupport },
 
     { option => "web-audio", desc => "Toggle Web Audio support",
       define => "ENABLE_WEB_AUDIO", default => 0, value => \$webAudioSupport },

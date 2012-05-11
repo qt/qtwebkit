@@ -389,6 +389,7 @@ public:
             if (!s_ancestorLineboxDirtySet)
                 s_ancestorLineboxDirtySet = new RenderObjectAncestorLineboxDirtySet;
             s_ancestorLineboxDirtySet->add(this);
+            setNeedsLayout(true);
         } else if (s_ancestorLineboxDirtySet) {
             s_ancestorLineboxDirtySet->remove(this);
             if (s_ancestorLineboxDirtySet->isEmpty()) {
@@ -417,7 +418,6 @@ public:
     virtual bool isSVGGradientStop() const { return false; }
     virtual bool isSVGHiddenContainer() const { return false; }
     virtual bool isSVGPath() const { return false; }
-    virtual bool isSVGRect() const { return false; }
     virtual bool isSVGShape() const { return false; }
     virtual bool isSVGText() const { return false; }
     virtual bool isSVGTextPath() const { return false; }
@@ -713,7 +713,7 @@ public:
     
     virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const;
 
-    void getTextDecorationColors(int decorations, Color& underline, Color& overline, Color& linethrough, bool quirksMode = false);
+    void getTextDecorationColors(int decorations, Color& underline, Color& overline, Color& linethrough, bool quirksMode = false, bool firstlineStyle = false);
 
     // Return the RenderBox in the container chain which is responsible for painting this object, or 0
     // if painting is root-relative. This is the container that should be passed to the 'forRepaint'
@@ -765,6 +765,12 @@ public:
     // If multiple-column layout results in applying an offset to the given point, add the same
     // offset to the given size.
     virtual void adjustForColumns(LayoutSize&, const LayoutPoint&) const { }
+    LayoutSize offsetForColumns(const LayoutPoint& point) const
+    {
+        LayoutSize offset;
+        adjustForColumns(offset, point);
+        return offset;
+    }
 
     virtual unsigned int length() const { return 1; }
 

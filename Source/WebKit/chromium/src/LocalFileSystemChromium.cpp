@@ -41,7 +41,6 @@
 #include "FileSystemType.h"
 #include "PlatformString.h"
 #include "WebFileError.h"
-#include "platform/WebFileSystem.h"
 #include "WebFileSystemCallbacksImpl.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
@@ -51,6 +50,7 @@
 #include "WorkerContext.h"
 #include "WorkerFileSystemCallbacksBridge.h"
 #include "WorkerThread.h"
+#include <public/WebFileSystem.h>
 #include <wtf/Threading.h>
 
 using namespace WebKit;
@@ -194,7 +194,7 @@ static void openFileSystemHelper(ScriptExecutionContext* context, FileSystemType
         if (webView->permissionClient() && !webView->permissionClient()->allowFileSystem(webFrame))
             allowed = false;
         else
-            webFrame->client()->openFileSystem(webFrame, static_cast<WebFileSystem::Type>(type), size, create == CreateIfNotPresent, new WebFileSystemCallbacksImpl(callbacks, type));
+            webFrame->client()->openFileSystem(webFrame, static_cast<WebFileSystem::Type>(type), size, create == CreateIfNotPresent, new WebFileSystemCallbacksImpl(callbacks));
     } else {
 #if ENABLE(WORKERS)
         WorkerContext* workerContext = static_cast<WorkerContext*>(context);
@@ -203,7 +203,7 @@ static void openFileSystemHelper(ScriptExecutionContext* context, FileSystemType
         if (!allowFileSystemForWorker(webWorker->commonClient()))
             allowed = false;
         else
-            openFileSystemForWorker(webWorker->commonClient(), static_cast<WebFileSystem::Type>(type), size, create == CreateIfNotPresent, new WebFileSystemCallbacksImpl(callbacks, type, context, synchronousType), synchronousType);
+            openFileSystemForWorker(webWorker->commonClient(), static_cast<WebFileSystem::Type>(type), size, create == CreateIfNotPresent, new WebFileSystemCallbacksImpl(callbacks, context, synchronousType), synchronousType);
 
 #else
         ASSERT_NOT_REACHED();

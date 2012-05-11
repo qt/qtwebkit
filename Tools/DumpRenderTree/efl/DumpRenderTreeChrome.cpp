@@ -33,6 +33,7 @@
 #include "GCController.h"
 #include "LayoutTestController.h"
 #include "NotImplemented.h"
+#include "TextInputController.h"
 #include "WebCoreSupport/DumpRenderTreeSupportEfl.h"
 #include "WebCoreTestSupport.h"
 #include "WorkQueue.h"
@@ -107,6 +108,7 @@ Evas_Object* DumpRenderTreeChrome::createView() const
     evas_object_smart_callback_add(view, "frame,created", onFrameCreated, 0);
 
     Evas_Object* mainFrame = ewk_view_frame_main_get(view);
+    evas_object_smart_callback_add(mainFrame, "icon,changed", onFrameIconChanged, 0);
     evas_object_smart_callback_add(mainFrame, "load,provisional", onFrameProvisionalLoad, 0);
     evas_object_smart_callback_add(mainFrame, "load,committed", onFrameLoadCommitted, 0);
     evas_object_smart_callback_add(mainFrame, "load,finished", onFrameLoadFinished, 0);
@@ -166,6 +168,14 @@ Vector<Evas_Object*> DumpRenderTreeChrome::extraViews() const
     return m_extraViews;
 }
 
+void DumpRenderTreeChrome::clearExtraViews()
+{
+    Vector<Evas_Object*>::iterator it = m_extraViews.begin();
+    for (; it != m_extraViews.end(); ++it)
+        evas_object_del(*it);
+    m_extraViews.clear();
+}
+
 Evas_Object* DumpRenderTreeChrome::mainFrame() const
 {
     return m_mainFrame;
@@ -193,16 +203,13 @@ static inline const char* defaultEditingBehavior()
 
 void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
 {
-    Vector<Evas_Object*>::iterator it = m_extraViews.begin();
-    for (; it != m_extraViews.end(); ++it)
-        evas_object_del(*it);
-    m_extraViews.clear();
-
     ewk_settings_icon_database_clear();
     ewk_settings_icon_database_path_set(0);
 
     ewk_settings_web_database_clear();
     ewk_settings_web_database_default_quota_set(5 * 1024 * 1024);
+
+    ewk_settings_memory_cache_clear();
 
     ewk_view_setting_private_browsing_set(mainView(), EINA_FALSE);
     ewk_view_setting_spatial_navigation_set(mainView(), EINA_FALSE);
@@ -236,6 +243,7 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     ewk_view_zoom_set(mainView(), 1.0, 0, 0);
     ewk_view_scale_set(mainView(), 1.0, 0, 0);
     ewk_view_text_zoom_set(mainView(), 1.0);
+    ewk_view_visibility_state_set(mainView(), EWK_PAGE_VISIBILITY_STATE_VISIBLE, true);
 
     ewk_history_clear(ewk_view_history_get(mainView()));
 
@@ -246,6 +254,8 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
 
     DumpRenderTreeSupportEfl::clearFrameName(mainFrame());
     DumpRenderTreeSupportEfl::clearOpener(mainFrame());
+    DumpRenderTreeSupportEfl::clearUserScripts(mainView());
+    DumpRenderTreeSupportEfl::clearUserStyleSheets(mainView());
     DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled(mainView(), true);
     DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(mainView(), true);
     DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled(mainView(), false);
@@ -356,10 +366,16 @@ void DumpRenderTreeChrome::onWindowObjectCleared(void* userData, Evas_Object*, v
     gcController->makeWindowObject(objectClearedInfo->context, objectClearedInfo->windowObject, &exception);
     ASSERT(!exception);
 
-    JSRetainPtr<JSStringRef> controllerName(JSStringCreateWithUTF8CString("eventSender"));
+    JSRetainPtr<JSStringRef> controllerName(Adopt, JSStringCreateWithUTF8CString("eventSender"));
     JSObjectSetProperty(objectClearedInfo->context, objectClearedInfo->windowObject,
                         controllerName.get(),
                         makeEventSender(objectClearedInfo->context, !DumpRenderTreeSupportEfl::frameParent(objectClearedInfo->frame)),
+                        kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete, 0);
+
+    JSRetainPtr<JSStringRef> textInputControllerName(JSStringCreateWithUTF8CString("textInputController"));
+    JSObjectSetProperty(objectClearedInfo->context, objectClearedInfo->windowObject,
+                        textInputControllerName.get(),
+                        makeTextInputController(objectClearedInfo->context),
                         kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete, 0);
 
     WebCoreTestSupport::injectInternalsObject(objectClearedInfo->context);
@@ -404,6 +420,14 @@ void DumpRenderTreeChrome::onStatusbarTextSet(void*, Evas_Object*, void* eventIn
 
     const char* statusbarText = static_cast<const char*>(eventInfo);
     printf("UI DELEGATE STATUS CALLBACK: setStatusText:%s\n", statusbarText);
+}
+
+void DumpRenderTreeChrome::onFrameIconChanged(void*, Evas_Object* frame, void*)
+{
+    if (!done && gLayoutTestController->dumpIconChanges()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didChangeIcons\n", frameName.utf8().data());
+    }
 }
 
 void DumpRenderTreeChrome::onTitleChanged(void*, Evas_Object*, void* eventInfo)
@@ -494,6 +518,7 @@ void DumpRenderTreeChrome::onFrameCreated(void*, Evas_Object*, void* eventInfo)
 {
     Evas_Object* frame = static_cast<Evas_Object*>(eventInfo);
 
+    evas_object_smart_callback_add(frame, "icon,changed", onFrameIconChanged, 0);
     evas_object_smart_callback_add(frame, "load,provisional", onFrameProvisionalLoad, 0);
     evas_object_smart_callback_add(frame, "load,committed", onFrameLoadCommitted, 0);
     evas_object_smart_callback_add(frame, "load,finished", onFrameLoadFinished, 0);

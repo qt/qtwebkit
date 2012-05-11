@@ -142,8 +142,7 @@ public:
     static int writeToFile(PlatformFileHandle, const char* data, int length);
 
 #if ENABLE(FILE_SYSTEM)
-    static String createIsolatedFileSystemName(const String& storageIdentifier, const String& filesystemId);
-    static PassOwnPtr<AsyncFileSystem> createIsolatedFileSystem(const String& originString, const String& filesystemId);
+    static PassOwnPtr<AsyncFileSystem> createAsyncFileSystem();
 #endif
 
     // Font ---------------------------------------------------------------
@@ -197,8 +196,6 @@ public:
     static bool popupsAllowed(NPP);
 
     // Resources ----------------------------------------------------------
-    static PassRefPtr<Image> loadPlatformImageResource(const char* name);
-
 #if ENABLE(WEB_AUDIO)
     static PassOwnPtr<AudioBus> decodeAudioFileData(const char* data, size_t, double sampleRate);
 #endif
@@ -367,20 +364,6 @@ public:
     // Paint the given the given theme part.
     static void paintThemePart(GraphicsContext*, ThemePart, ThemePaintState, const IntRect&, const ThemePaintExtraParams*);
 #endif
-
-    // Trace Event --------------------------------------------------------
-    static const unsigned char* getTraceCategoryEnabledFlag(const char* categoryName);
-    static int addTraceEvent(char phase,
-                             const unsigned char* categoryEnabledFlag,
-                             const char* name,
-                             unsigned long long id,
-                             int numArgs,
-                             const char** argNames,
-                             const unsigned char* argTypes,
-                             const unsigned long long* argValues,
-                             int thresholdBeginId,
-                             long long threshold,
-                             unsigned char flags);
 
     // Visited links ------------------------------------------------------
     static LinkHash visitedLinkHash(const UChar* url, unsigned length);

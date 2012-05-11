@@ -54,7 +54,6 @@
 #include <WebCore/ProtectionSpace.h>
 #include <WebCore/ProxyServer.h>
 #include <WebCore/RenderEmbeddedObject.h>
-#include <WebCore/RenderLayer.h>
 #include <WebCore/ResourceLoadScheduler.h>
 #include <WebCore/ScriptValue.h>
 #include <WebCore/ScrollView.h>
@@ -504,6 +503,13 @@ void PluginView::initializePlugin()
     setWindowIsVisible(m_webPage->windowIsVisible());
     setWindowIsFocused(m_webPage->windowIsFocused());
 #endif
+
+    if (wantsWheelEvents()) {
+        if (Frame* frame = m_pluginElement->document()->frame()) {
+            if (FrameView* frameView = frame->view())
+                frameView->setNeedsLayout();
+        }
+    }
 }
 
 #if PLATFORM(MAC)
@@ -576,6 +582,15 @@ Scrollbar* PluginView::verticalScrollbar()
         return 0;
 
     return m_plugin->verticalScrollbar();
+}
+
+bool PluginView::wantsWheelEvents()
+{
+    // The plug-in can be null here if it failed to initialize.
+    if (!m_isInitialized || !m_plugin)
+        return 0;
+    
+    return m_plugin->wantsWheelEvents();
 }
 
 void PluginView::setFrameRect(const WebCore::IntRect& rect)
@@ -652,7 +667,7 @@ void PluginView::handleEvent(Event* event)
             frame()->eventHandler()->setCapturingMouseEventsNode(0);
 
         didHandleEvent = m_plugin->handleMouseEvent(static_cast<const WebMouseEvent&>(*currentEvent));
-    } else if (event->type() == eventNames().mousewheelEvent && currentEvent->type() == WebEvent::Wheel) {
+    } else if (event->type() == eventNames().mousewheelEvent && currentEvent->type() == WebEvent::Wheel && m_plugin->wantsWheelEvents()) {
         // We have a wheel event.
         didHandleEvent = m_plugin->handleWheelEvent(static_cast<const WebWheelEvent&>(*currentEvent));
     } else if (event->type() == eventNames().mouseoverEvent && currentEvent->type() == WebEvent::MouseMove) {
@@ -752,9 +767,8 @@ IntRect PluginView::clipRectInWindowCoordinates() const
 
     Frame* frame = this->frame();
 
-    // Get the window clip rect for the enclosing layer (in window coordinates).
-    RenderLayer* layer = m_pluginElement->renderer()->enclosingLayer();
-    IntRect windowClipRect = frame->view()->windowClipRectForLayer(layer, true);
+    // Get the window clip rect for the plugin element (in window coordinates).
+    IntRect windowClipRect = frame->view()->windowClipRectForFrameOwner(m_pluginElement.get(), true);
 
     // Intersect the two rects to get the view clip rect in window coordinates.
     frameRectInWindowCoordinates.intersect(windowClipRect);
@@ -1111,7 +1125,7 @@ void PluginView::pluginProcessCrashed()
         return;
         
     RenderEmbeddedObject* renderer = toRenderEmbeddedObject(m_pluginElement->renderer());
-    renderer->setShowsCrashedPluginIndicator();
+    renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginCrashed);
     
     Widget::invalidate();
 }

@@ -36,6 +36,7 @@
 #include <BlackBerryPlatformMessage.h>
 
 namespace WebCore {
+class AutofillManager;
 class DOMWrapperWorld;
 class Document;
 class Frame;
@@ -48,6 +49,7 @@ class RenderLayer;
 class RenderObject;
 class ScrollView;
 class TransformationMatrix;
+class PagePopupBlackBerry;
 template<typename T> class Timer;
 }
 
@@ -189,6 +191,7 @@ public:
     void overflowExceedsContentsSize() { m_overflowExceedsContentsSize = true; }
     void layoutFinished();
     void setNeedTouchEvents(bool);
+    void notifyPopupAutofillDialog(const Vector<String>&, const WebCore::IntRect&);
 
     // Called according to our heuristic or from setLoadState depending on whether we have a virtual viewport.
     void zoomToInitialScaleOnLoad();
@@ -398,6 +401,8 @@ public:
     void addBackingStoreClientForFrame(const WebCore::Frame*, BackingStoreClient*);
     void removeBackingStoreClientForFrame(const WebCore::Frame*);
 
+    void setParentPopup(WebCore::PagePopupBlackBerry* webPopup);
+
     // Clean up any document related data we might be holding.
     void clearDocumentData(const WebCore::Document*);
 
@@ -579,6 +584,12 @@ public:
     Vector<OwnPtr<DeferredTaskBase> > m_deferredTasks;
     WebCore::Timer<WebPagePrivate> m_deferredTasksTimer;
 
+    // The popup that opened in this webpage
+    WebCore::PagePopupBlackBerry* m_selectPopup;
+    // The popup that owned this webpage
+    WebCore::PagePopupBlackBerry* m_parentPopup;
+
+    RefPtr<WebCore::AutofillManager> m_autofillManager;
 protected:
     virtual ~WebPagePrivate();
 };

@@ -19,6 +19,7 @@
 #include "config.h"
 #include "FrameLoaderClientBlackBerry.h"
 
+#include "AutofillManager.h"
 #include "BackForwardController.h"
 #include "BackForwardListImpl.h"
 #include "BackingStoreClient.h"
@@ -276,8 +277,10 @@ void FrameLoaderClientBlackBerry::doPendingFragmentScroll()
 
 void FrameLoaderClientBlackBerry::dispatchDecidePolicyForNewWindowAction(FramePolicyFunction function, const NavigationAction&, const ResourceRequest& request, PassRefPtr<FormState>, const String& frameName)
 {
-    if (request.isRequestedByPlugin() && ScriptController::processingUserGesture() && !m_webPagePrivate->m_pluginMayOpenNewTab)
+    if (ScriptController::processingUserGesture() && !m_webPagePrivate->m_pluginMayOpenNewTab) {
         (m_frame->loader()->policyChecker()->*function)(PolicyIgnore);
+        return;
+    }
 
     // A new window can never be a fragment scroll.
     PolicyAction decision = decidePolicyForExternalLoad(request, false);
@@ -702,10 +705,12 @@ void FrameLoaderClientBlackBerry::dispatchDidFailProvisionalLoad(const ResourceE
 
 void FrameLoaderClientBlackBerry::dispatchWillSubmitForm(FramePolicyFunction function, PassRefPtr<FormState> formState)
 {
+    if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled()) {
+        m_webPagePrivate->m_autofillManager->saveTextFields(formState->form());
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-    if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled())
         credentialManager().saveCredentialIfConfirmed(m_webPagePrivate, CredentialTransformData(formState->form()));
 #endif
+    }
 
     // FIXME: Stub.
     (m_frame->loader()->policyChecker()->*function)(PolicyUse);
@@ -713,12 +718,12 @@ void FrameLoaderClientBlackBerry::dispatchWillSubmitForm(FramePolicyFunction fun
 
 void FrameLoaderClientBlackBerry::dispatchWillSendSubmitEvent(PassRefPtr<FormState> prpFormState)
 {
+    if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled()) {
+        m_webPagePrivate->m_autofillManager->saveTextFields(prpFormState->form());
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-    if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled())
-        credentialManager().saveCredentialIfConfirmed(m_webPagePrivate, CredentialTransformData(prpFormState->form()));
-#else
-    notImplemented();
+    credentialManager().saveCredentialIfConfirmed(m_webPagePrivate, CredentialTransformData(prpFormState->form()));
 #endif
+    }
 }
 
 PassRefPtr<Frame> FrameLoaderClientBlackBerry::createFrame(const KURL& url, const String& name

@@ -2478,7 +2478,8 @@ bool EventHandler::handleGestureScrollCore(const PlatformGestureEvent& gestureEv
 bool EventHandler::bestClickableNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode)
 {
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active;
-    HitTestResult result = hitTestResultAtPoint(touchCenter, /*allowShadowContent*/ false, /*ignoreClipping*/ false, DontHitTestScrollbars, hitType, touchRadius);
+    IntPoint hitTestPoint = m_frame->view()->windowToContents(touchCenter);
+    HitTestResult result = hitTestResultAtPoint(hitTestPoint, /*allowShadowContent*/ false, /*ignoreClipping*/ false, DontHitTestScrollbars, hitType, touchRadius);
 
     IntRect touchRect = result.rectForPoint(touchCenter);
     RefPtr<StaticHashSetNodeList> nodeList = StaticHashSetNodeList::adopt(result.rectBasedTestResult());
@@ -2488,7 +2489,8 @@ bool EventHandler::bestClickableNodeForTouchPoint(const IntPoint& touchCenter, c
 bool EventHandler::bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntRect& targetArea, Node*& targetNode)
 {
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active;
-    HitTestResult result = hitTestResultAtPoint(touchCenter, /*allowShadowContent*/ false, /*ignoreClipping*/ false, DontHitTestScrollbars, hitType, touchRadius);
+    IntPoint hitTestPoint = m_frame->view()->windowToContents(touchCenter);
+    HitTestResult result = hitTestResultAtPoint(hitTestPoint, /*allowShadowContent*/ false, /*ignoreClipping*/ false, DontHitTestScrollbars, hitType, touchRadius);
 
     IntRect touchRect = result.rectForPoint(touchCenter);
     RefPtr<StaticHashSetNodeList> nodeList = StaticHashSetNodeList::adopt(result.rectBasedTestResult());
@@ -2597,6 +2599,18 @@ bool EventHandler::sendContextMenuEventForKey()
     return dispatchMouseEvent(eventNames().contextmenuEvent, targetNode, true, 0, mouseEvent, false);
 }
 
+#if ENABLE(GESTURE_EVENTS)
+bool EventHandler::sendContextMenuEventForGesture(const PlatformGestureEvent& event)
+{
+#if OS(WINDOWS)
+    PlatformEvent::Type eventType = PlatformEvent::MouseReleased;
+#else
+    PlatformEvent::Type eventType = PlatformEvent::MousePressed;
+#endif
+    PlatformMouseEvent mouseEvent(event.position(), event.globalPosition(), RightButton, eventType, 1, false, false, false, false, WTF::currentTime());
+    return sendContextMenuEvent(mouseEvent);
+}
+#endif // ENABLE(GESTURE_EVENTS)
 #endif // ENABLE(CONTEXT_MENUS)
 
 void EventHandler::scheduleHoverStateUpdate()

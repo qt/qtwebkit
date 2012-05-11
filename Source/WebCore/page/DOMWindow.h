@@ -54,6 +54,7 @@ namespace WebCore {
     class IDBFactory;
     class Location;
     class MediaQueryList;
+    class MessageEvent;
     class Navigator;
     class Node;
     class Page;
@@ -61,6 +62,7 @@ namespace WebCore {
     class PostMessageTimer;
     class ScheduledAction;
     class Screen;
+    class ScriptCallStack;
     class SecurityOrigin;
     class SerializedScriptValue;
     class Storage;
@@ -233,6 +235,7 @@ namespace WebCore {
         // FIXME: remove this when we update the ObjC bindings (bug #28774).
         void postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
         void postMessageTimerFired(PassOwnPtr<PostMessageTimer>);
+        void dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, PassRefPtr<Event>, PassRefPtr<ScriptCallStack>);
 
         void scrollBy(int x, int y) const;
         void scrollTo(int x, int y) const;
@@ -390,6 +393,9 @@ namespace WebCore {
         // by the document that is currently active in m_frame.
         bool isCurrentlyDisplayedInFrame() const;
 
+        void willDetachDocumentFromFrame();
+        void willDestroyCachedFrame();
+
     private:
         explicit DOMWindow(Frame*);
 
@@ -411,6 +417,7 @@ namespace WebCore {
         void clearDOMWindowProperties();
         void disconnectDOMWindowProperties();
         void reconnectDOMWindowProperties();
+        void willDestroyDocumentInFrame();
 
         RefPtr<SecurityOrigin> m_securityOrigin;
         KURL m_url;

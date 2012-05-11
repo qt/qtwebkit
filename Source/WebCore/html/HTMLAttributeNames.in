@@ -58,6 +58,7 @@ bgcolor
 bgproperties
 border
 bordercolor
+capture
 cellpadding
 cellspacing
 char
@@ -92,6 +93,7 @@ dir
 direction
 dirname
 disabled
+disposition
 download
 draggable
 webkitdropzone

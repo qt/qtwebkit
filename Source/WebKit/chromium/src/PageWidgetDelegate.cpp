@@ -59,7 +59,8 @@ void PageWidgetDelegate::animate(Page* page, double monotonicFrameBeginTime)
     FrameView* view = mainFrameView(page);
     if (!view)
         return;
-    view->serviceScriptedAnimations(monotonicFrameBeginTime);
+    double timeShift = currentTime() - monotonicallyIncreasingTime();
+    view->serviceScriptedAnimations(convertSecondsToDOMTimeStamp(monotonicFrameBeginTime + timeShift));
 #endif
 }
 
@@ -152,6 +153,7 @@ bool PageWidgetDelegate::handleInputEvent(Page* page, PageWidgetEventHandler& ha
     case WebInputEvent::GestureTap:
     case WebInputEvent::GestureTapDown:
     case WebInputEvent::GestureDoubleTap:
+    case WebInputEvent::GestureLongPress:
         return handler.handleGestureEvent(*static_cast<const WebGestureEvent*>(&event));
 #endif
 

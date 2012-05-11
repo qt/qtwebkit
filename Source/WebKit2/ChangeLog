@@ -1,3 +1,701 @@
+2012-05-10  MORITA Hajime  <morrita@google.com>
+
+        ElementShadow should minimize the usage of "ShadowRoot" name
+        https://bugs.webkit.org/show_bug.cgi?id=85970
+
+        Reviewed by Dimitri Glazkov.
+
+        Removed symbols which no longer exists
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-05-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move resumeAnimations to use Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=86063
+
+        Reviewed by Alexey Proskuryakov.
+
+        * win/WebKit2.def: Add a symbol filter for resumeAnimations.
+
+2012-05-10  Anders Carlsson  <andersca@apple.com>
+
+        PDF files won't scroll in Safari when using Adobe plug-in
+        https://bugs.webkit.org/show_bug.cgi?id=86167
+        <rdar://problem/11389719>
+
+        Reviewed by Sam Weinig.
+
+        Add a way to whitelist plug-ins that we know will process wheel events correctly. Add the new
+        Adobe Reader plug-in to this whitelist. Only send wheel events to plug-ins that are in the whitelist.
+
+        * PluginProcess/PluginControllerProxy.cpp:
+        (WebKit::PluginControllerProxy::wantsWheelEvents):
+        (WebKit):
+        * PluginProcess/PluginControllerProxy.h:
+        (PluginControllerProxy):
+        * PluginProcess/WebProcessConnection.cpp:
+        (WebKit::WebProcessConnection::createPlugin):
+        * PluginProcess/WebProcessConnection.h:
+        (WebProcessConnection):
+        * PluginProcess/WebProcessConnection.messages.in:
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        (WebKit::NetscapePluginModule::determineQuirks):
+        * Shared/Plugins/PluginQuirks.h:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        (WebKit::NetscapePlugin::wantsWheelEvents):
+        (WebKit):
+        * WebProcess/Plugins/Netscape/NetscapePlugin.h:
+        (NetscapePlugin):
+        * WebProcess/Plugins/PDF/BuiltInPDFView.h:
+        (BuiltInPDFView):
+        * WebProcess/Plugins/PDF/BuiltInPDFView.mm:
+        (WebKit::BuiltInPDFView::wantsWheelEvents):
+        (WebKit):
+        * WebProcess/Plugins/Plugin.h:
+        (Plugin):
+        * WebProcess/Plugins/PluginProxy.cpp:
+        (WebKit::PluginProxy::PluginProxy):
+        (WebKit::PluginProxy::initialize):
+        (WebKit::PluginProxy::wantsWheelEvents):
+        (WebKit):
+        * WebProcess/Plugins/PluginProxy.h:
+        (PluginProxy):
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::initializePlugin):
+        (WebKit::PluginView::wantsWheelEvents):
+        (WebKit):
+        (WebKit::PluginView::handleEvent):
+        * WebProcess/Plugins/PluginView.h:
+        (PluginView):
+
+2012-05-10  Anders Carlsson  <andersca@apple.com>
+
+        WebKit2: Add a way to blacklist specific plug-ins/plug-in versions
+        https://bugs.webkit.org/show_bug.cgi?id=86164
+        <rdar://problem/9551196>
+
+        Reviewed by Sam Weinig.
+
+        * Shared/API/c/WKError.h:
+        Add kWKErrorCodeInsecurePlugInVersion error code.
+
+        * Shared/APIClientTraits.cpp:
+        Update now that didFailToInitializePlugin is deprecated.
+
+        * UIProcess/API/C/WKPage.h:
+        Deprecate didFailToInitializePlugin and replace it with the more generic pluginDidFail. 
+        Also, deprecate missingPluginButtonClicked and replace it with unavailablePluginButtonClicked.
+
+        * UIProcess/Plugins/PluginInfoStore.cpp:
+        (WebKit::PluginInfoStore::shouldBlockPlugin):
+        Non-Mac version, always return false.
+
+        * UIProcess/Plugins/mac/PluginInfoStoreMac.mm:
+        (WebKit::PluginInfoStore::shouldBlockPlugin):
+        Call WKShouldBlockPlugin.
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::getPluginPath):
+        Check if the plug-in should be blocked.
+
+        * UIProcess/WebContext.messages.in:
+        GetPluginPath now takes an additional out parameter, a boolean that determines whether the plug-in
+        should be blocked from loading or not.
+
+        * UIProcess/WebLoaderClient.cpp:
+        (WebKit::WebLoaderClient::didFailToInitializePlugin):
+        Call m_client.pluginDidFail.
+
+        (WebKit::WebLoaderClient::didBlockInsecurePluginVersion):
+        Ditto.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::unavailablePluginButtonClicked):
+        Call the loader client.
+
+        (WebKit::WebPageProxy::didBlockInsecurePluginVersion):
+        Ditto.
+
+        * UIProcess/WebPageProxy.messages.in:
+        Rename MissingPluginButtonClicked to UnavailablePluginButtonClicked and add a new DidBlockInsecurePluginVersion message.
+
+        * UIProcess/WebUIClient.cpp:
+        (WebKit::WebUIClient::unavailablePluginButtonClicked):
+        Call missingPluginButtonClicked and unavailablePluginButtonClicked.
+
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::shouldUnavailablePluginMessageBeButton):
+        (WebKit::WebChromeClient::unavailablePluginButtonClicked):
+        Handle RenderEmbeddedObject::InsecurePluginVersion.
+
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::createPlugin):
+        WebPage::createPlugin now takes the plug-in element.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::createPlugin):
+        If the plug-in is blocked, set the appropriate unavailability reason.
+
+        * WebProcess/WebProcess.cpp:
+        (WebKit::canPluginHandleResponse):
+        Update now that GetPluginPath returns a blocked parameter as well.
+
+2012-05-10  Anders Carlsson  <andersca@apple.com>
+
+        Rename the missing plug-in indicator to the unavailable plug-in indicator
+        https://bugs.webkit.org/show_bug.cgi?id=86136
+
+        Reviewed by Sam Weinig.
+
+        Update for WebCore changes.
+
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::pluginProcessCrashed):
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::shouldUnavailablePluginMessageBeButton):
+        (WebKit::WebChromeClient::unavailablePluginButtonClicked):
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient):
+
+2012-05-10  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Test /webkit2/WebKitWebView/resources times out
+        https://bugs.webkit.org/show_bug.cgi?id=86088
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/tests/TestResources.cpp:
+        (testWebViewResources): Use webkit_web_view_reload_bypass_cache()
+        instead of webkit_web_view_reload() to make sure resources are not
+        read from the cache.
+
+2012-05-10  Simon Pena  <spena@igalia.com>
+
+        [GTK] WK2 misses WebKitSettings for media playback requiring user gestures and inline playback
+        https://bugs.webkit.org/show_bug.cgi?id=85999
+
+        Reviewed by Martin Robinson.
+
+        Expose WebKitSettings for media playback requiring user gesture and
+        media playback allows inline to GTK side.
+
+        This adds two properties (mediaPlaybackRequiresUserGesture and
+        mediaPlaybackAllowsInline), with their setters and getters, to
+        WebKitSettings. It also updates the WebKitSettings tests so these
+        two properties are checked, and includes the new methods in the
+        documentation.
+
+        * UIProcess/API/gtk/WebKitSettings.cpp: added the new properties and
+        their accessors
+        (webKitSettingsSetProperty):
+        (webKitSettingsGetProperty):
+        (webkit_settings_class_init):
+        (webkit_settings_set_media_playback_requires_user_gesture):
+        (webkit_settings_get_media_playback_requires_user_gesture):
+        (webkit_settings_set_media_playback_allows_inline):
+        (webkit_settings_get_media_playback_allows_inline):
+        * UIProcess/API/gtk/WebKitSettings.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: included the new
+        methods in the documentation
+        * UIProcess/API/gtk/tests/TestWebKitSettings.cpp: tested the newly
+        added methods
+        (testWebKitSettings):
+
+2012-05-10  Simon Pena  <spena@igalia.com>
+
+        [GTK] Missing field initializers for WKPageLoaderClient
+        https://bugs.webkit.org/show_bug.cgi?id=86005
+
+        Reviewed by Martin Robinson.
+
+        Initialize willGoToBackForwardListItem and
+        interactionOccurredWhileProcessUnresponsive fields of
+        WKPageLoaderClient.
+
+        * UIProcess/API/gtk/WebKitLoaderClient.cpp:
+        (attachLoaderClientToView):
+
+2012-05-10  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Double tap to zoom is considered a user interaction
+        https://bugs.webkit.org/show_bug.cgi?id=86094
+
+        Reviewed by Simon Hausmann.
+
+        This makes it so that the content size change doesn't change scale
+        after a double tap to zoom.
+
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::zoomToAreaGestureEnded):
+
+2012-05-10  Kent Hansen  <kent.hansen@nokia.com>
+
+        [Qt] Rename QDeclarative* to QQml*
+        https://bugs.webkit.org/show_bug.cgi?id=86089
+
+        Reviewed by Simon Hausmann.
+
+        The QtDeclarative module was deprecated in favor of QtQml.
+
+        * Target.pri:
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::_q_onReceivedResponseFromDownload):
+        (QQuickWebViewExperimental::alertDialog):
+        (QQuickWebViewExperimental::setAlertDialog):
+        (QQuickWebViewExperimental::confirmDialog):
+        (QQuickWebViewExperimental::setConfirmDialog):
+        (QQuickWebViewExperimental::promptDialog):
+        (QQuickWebViewExperimental::setPromptDialog):
+        (QQuickWebViewExperimental::authenticationDialog):
+        (QQuickWebViewExperimental::setAuthenticationDialog):
+        (QQuickWebViewExperimental::proxyAuthenticationDialog):
+        (QQuickWebViewExperimental::setProxyAuthenticationDialog):
+        (QQuickWebViewExperimental::certificateVerificationDialog):
+        (QQuickWebViewExperimental::setCertificateVerificationDialog):
+        (QQuickWebViewExperimental::itemSelector):
+        (QQuickWebViewExperimental::setItemSelector):
+        (QQuickWebViewExperimental::filePicker):
+        (QQuickWebViewExperimental::setFilePicker):
+        (QQuickWebViewExperimental::databaseQuotaDialog):
+        (QQuickWebViewExperimental::setDatabaseQuotaDialog):
+        (QQuickWebViewExperimental::schemeDelegates_At):
+        (QQuickWebViewExperimental::schemeDelegates_Append):
+        (QQuickWebViewExperimental::schemeDelegates_Count):
+        (QQuickWebViewExperimental::schemeDelegates_Clear):
+        (QQuickWebViewExperimental::schemeDelegates):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/qwebiconimageprovider.cpp:
+        (QWebIconImageProvider::QWebIconImageProvider):
+        * UIProcess/API/qt/qwebiconimageprovider_p.h:
+        * UIProcess/API/qt/qwebviewportinfo_p.h:
+        * UIProcess/API/qt/tests/tests.pri:
+        * UIProcess/qt/QtDialogRunner.h:
+        (QtDialogRunner):
+        * UIProcess/qt/WebPopupMenuProxyQt.h:
+        (WebPopupMenuProxyQt):
+
+2012-05-10  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt] Fix sites with a viewport meta tag when devicePixelRatio isn't explicitely set on the WebView
+        https://bugs.webkit.org/show_bug.cgi?id=86002
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The preference was recently changed to a double ratio, but was still left under
+        FOR_EACH_WEBKIT_UINT32_PREFERENCE and was initialized to inf instead of 1.0.
+        This would cause the viewport constraints to apply a multi-millionaire device
+        pixel ratio and make the contents invisible.
+
+        This moves it with other double preferences under FOR_EACH_WEBKIT_DOUBLE_PREFERENCE.
+
+        * Shared/WebPreferencesStore.h:
+        (WebKit):
+
+2012-05-10  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Implement fit-to-width behaviour
+        https://bugs.webkit.org/show_bug.cgi?id=86085
+
+        Reviewed by Simon Hausmann.
+
+        We don't restrict the minimum scale to the layout viewport anymore,
+        but instead update the minimum scale when the content size changes.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::didChangeViewportProperties):
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+        * UIProcess/API/qt/qwebviewportinfo.cpp:
+        (QWebViewportInfo::minimumScale):
+        (QWebViewportInfo::maximumScale):
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        (QtViewportInteractionEngine):
+
+2012-05-07  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        WebPageProxy::activeURL() should return the pending API request, even when there's no main frame
+        https://bugs.webkit.org/show_bug.cgi?id=85806
+
+        The m_pendingAPIRequestURL member is used (presumably) to mask over the async
+        nature of WebKit2, so that starting a load of a URL will reflect that URL
+        immedeatly from activeURL, even if the request has not been passed over to
+        the web process yet and reflected there.
+
+        This works well, except in the case of the initial request, where the main
+        frame creation happens on the web process side and is notified back to the
+        UI process. Until we've recived the notification we don't know about the main
+        frame, and this race condition will potentially give us an empty url instead
+        of the pending request.
+
+        To solve this we always return the pending API request if it's set, even
+        when there's no mainframe yet (that we known about).
+
+        Reviewed by Simon Hausmann.
+
+        * UIProcess/WebPageProxy.cpp:
+
+2012-05-09  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move suspendAnimations to use Internals interface.
+        https://bugs.webkit.org/show_bug.cgi?id=85986
+
+        Reviewed by Ryosuke Niwa.
+
+        * win/WebKit2.def: Add a symbol filter for suspendAnimations.
+
+2012-05-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Split WebKit2 Makefile moving source code listings to GNUmakefile.list.am
+        https://bugs.webkit.org/show_bug.cgi?id=85985
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am:
+        * GNUmakefile.list.am: Copied from Source/WebKit2/GNUmakefile.am.
+
+2012-05-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Use independent version numbers for public libraries
+        https://bugs.webkit.org/show_bug.cgi?id=85984
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Use LIBWEBKIT2GTK_VERSION for library version.
+
+2012-05-09  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        [Qt] Tap-to-zoom zooms to wrong area.
+        https://bugs.webkit.org/show_bug.cgi?id=85982
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Fix computation and take more care when to use CSS scale and when to use Item scale.
+
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::zoomToAreaGestureEnded):
+
+2012-05-09  Zalan Bujtas  <zbujtas@gmail.com>
+
+        [Qt][WK2] Define clear split between QtWebPageLoadClient and QQuickWebViewPrivate for loading tasks.
+        https://bugs.webkit.org/show_bug.cgi?id=84527#c3
+
+        Reviewed by Simon Hausmann.
+
+        Moving loading related code and signal emission from QtWebPageLoadClient to QQuickWebViewPrivate.
+        It puts the loading code that implements an API right where the API is defined, including
+        signal emission as well as translation of WebPageProxy internals to public Qt API with correct types.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::QQuickWebViewPrivate):
+        (QQuickWebViewPrivate::provisionalLoadDidStart):
+        (QQuickWebViewPrivate::loadDidCommit):
+        (QQuickWebViewPrivate::didSameDocumentNavigation):
+        (QQuickWebViewPrivate::titleDidChange):
+        (QQuickWebViewPrivate::loadProgressDidChange):
+        (QQuickWebViewPrivate::backForwardListDidChange):
+        (QQuickWebViewPrivate::loadDidFail):
+        (QQuickWebViewPrivate::processDidCrash):
+        (QQuickWebView::loadProgress):
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (WebKit):
+        (QQuickWebViewPrivate):
+        (QQuickWebViewPrivate::didChangeViewportProperties):
+        (QQuickWebViewPrivate::loadProgress):
+        (QQuickWebViewFlickablePrivate):
+        * UIProcess/qt/QtWebError.cpp:
+        (WebKit::QtWebError::isCancellation):
+        (WebKit):
+        * UIProcess/qt/QtWebError.h:
+        * UIProcess/qt/QtWebPageLoadClient.cpp:
+        (WebKit::QtWebPageLoadClient::QtWebPageLoadClient):
+        (WebKit):
+        (WebKit::QtWebPageLoadClient::didStartProvisionalLoad):
+        (WebKit::QtWebPageLoadClient::didCommitLoad):
+        (WebKit::QtWebPageLoadClient::didSameDocumentNavigation):
+        (WebKit::QtWebPageLoadClient::didReceiveTitle):
+        (WebKit::QtWebPageLoadClient::didChangeProgress):
+        (WebKit::QtWebPageLoadClient::didChangeBackForwardList):
+        (WebKit::QtWebPageLoadClient::dispatchLoadFailed):
+        (WebKit::QtWebPageLoadClient::didFailProvisionalLoadWithErrorForFrame):
+        (WebKit::QtWebPageLoadClient::didFailLoadWithErrorForFrame):
+        (WebKit::QtWebPageLoadClient::didStartProgress):
+        (WebKit::QtWebPageLoadClient::didFinishProgress):
+        * UIProcess/qt/QtWebPageLoadClient.h:
+        (WebKit):
+        (QtWebPageLoadClient):
+
+2012-05-09  Zalan Bujtas  <zbujtas@gmail.com>
+
+        [Qt][WK2] Remove delayed loadDidSucceed() signaling and m_deferedUrlToLoad from QQuickWebViewPrivate
+        https://bugs.webkit.org/show_bug.cgi?id=85906
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Deferred loading activies were introduced to work around the delayed Flickable construction
+        at onComponentComplete(). QQuickWebView inherits from QQuickFlickable now,
+        so no need for the workaround anymore.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate):
+        (QQuickWebViewFlickablePrivate::onComponentComplete):
+        (QQuickWebView::setUrl):
+        (QQuickWebView::componentComplete):
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate::onComponentComplete):
+        (QQuickWebViewPrivate):
+        (QQuickWebViewFlickablePrivate):
+
+2012-05-08  Jon Lee  <jonlee@apple.com>
+
+        Unreviewed build fix.
+
+        * WebProcess/WebPage/ca/win/LayerTreeHostCAWin.h:
+        (LayerTreeHostCAWin):
+
+2012-05-08  Anders Carlsson  <andersca@apple.com>
+
+        DrawingAreaProxyImpl doesn't work with window server hosting
+        https://bugs.webkit.org/show_bug.cgi?id=85947
+        <rdar://problem/11213718>
+
+        Reviewed by Andreas Kling.
+
+        * UIProcess/DrawingAreaProxyImpl.cpp:
+        (WebKit::DrawingAreaProxyImpl::updateAcceleratedCompositingMode):
+        Update the layer tree context and call WebPage::updateAcceleratedCompositingMode.
+
+        * WebProcess/WebPage/DrawingAreaImpl.cpp:
+        (WebKit::DrawingAreaImpl::setLayerHostingMode):
+        If setting the layer hosting mode changed the layer tree context, send back an UpdateAcceleratedCompositingMode message
+        with the new context.
+
+        * WebProcess/WebPage/ca/LayerTreeHostCA.cpp:
+        (WebKit::LayerTreeHostCA::initialize):
+        platformInitialize no longer takes a context.
+
+        * WebProcess/WebPage/ca/LayerTreeHostCA.h:
+        (LayerTreeHostCA):
+        Make m_layerTreeContext protected instead.
+
+        * WebProcess/WebPage/ca/mac/LayerTreeHostCAMac.h:
+        * WebProcess/WebPage/ca/mac/LayerTreeHostCAMac.mm:
+        (WebKit::LayerTreeHostCAMac::platformInitialize):
+        Assign to m_layerTreeContext directly.
+
+        (WebKit::LayerTreeHostCAMac::setLayerHostingMode):
+        Set m_layerTreeContext.contextID.
+
+        * WebProcess/WebPage/ca/win/LayerTreeHostCAWin.cpp:
+        (WebKit::LayerTreeHostCAWin::platformInitialize):
+        Assign to m_layerTreeContext directly.
+
+2012-05-08  Jon Lee  <jonlee@apple.com>
+
+        Safari warns that it needs to resend the form in an iFrame when going back
+        https://bugs.webkit.org/show_bug.cgi?id=82658
+        <rdar://problem/11292558>
+
+        Reviewed by Darin Adler.
+
+        * WebProcess/WebCoreSupport/mac/WebSystemInterface.mm:
+        (InitWebCoreSystemInterface): Add wkCFURLRequestAllowAllPostCaching.
+
+2012-05-08  Anders Carlsson  <andersca@apple.com>
+
+        Can't scroll PDF in subframe
+        https://bugs.webkit.org/show_bug.cgi?id=85932
+        <rdar://problem/11405527>
+
+        Reviewed by Sam Weinig.
+
+        * WebProcess/Plugins/PDF/BuiltInPDFView.h:
+        * WebProcess/Plugins/PDF/BuiltInPDFView.mm:
+        (WebKit::BuiltInPDFView::updateScrollbars):
+        Trigger a layout when scrollbars come and go so the non fast scrollable region gets recomputed.
+
+        (WebKit::BuiltInPDFView::scrollableAreaBoundingBox):
+        Implement this by calling out to the PluginView.
+
+2012-05-06  Jon Lee  <jonlee@apple.com>
+
+        [WK2] Push wheel events if there are too many in queue
+        https://bugs.webkit.org/show_bug.cgi?id=85747
+        <rdar://problem/11390790>
+
+        Reviewed by Anders Carlsson.
+
+        It is possible that a whole bunch of messages added to the message queue, or a series
+        of long-running messages, cause unresponsiveness. The reason for this is that we have
+        a scroll event waiting for acknowledgment from the web process before it sends the next
+        event. And in the time between the user has scrolled, causing a large backlog of scroll
+        events to be held in the UI process.
+
+        We should push new scroll events if the queue accumulates too many of them.
+
+        * UIProcess/WebPageProxy.h: The vector m_currentlyProcessedWheelEvents used to hold the
+        series of wheel events that were coalesced and sent as a single wheel event to the web
+        process. When the web process acknowledges this with didReceiveEvent, the UI process
+        cleared that vector, then tried to coalesce the next wheel event to send. Now we might have
+        multiple sets of coalesced wheel events that we are sending to the web process. To keep
+        track of these sets, m_currentlyProcessedWheelEvents now is a queue of Vectors.
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.cpp: Add new constant wheelEventQueueSizeThreshold representing
+        the threshold of scroll events to look for before we start pushing events.
+        (WebKit::canCoalesce): Move static function so that handleWheelEvent() has access. No changes.
+        (WebKit::coalesce): Move static function so that handleWheelEvent() has access. No changes.
+        (WebKit::coalescedWheelEvent): Move static function so that handleWheelEvent() has access. No changes.
+        (WebKit::WebPageProxy::handleWheelEvent): If we are currently waiting for acknowledgment
+        from the web process that a wheel event has been handled, we add it to the queue. We
+        check to see that the queue size is within our threshold before we return early. Otherwise
+        we will start pushing events in the queue. Refactor the rest of the function into
+        processNextQueuedWheelEvent() and sendWheelEvent(). If we are not currently waiting for
+        acknowledgment, nor have events in the queue, then we send the current wheel event.
+        (WebKit::WebPageProxy::processNextQueuedWheelEvent): Try to coalesce events based on the
+        wheel event at the head of the queue, and send that event to the web process.
+        (WebKit::WebPageProxy::sendWheelEvent): Refactored from handleWheelEvent().
+        (WebKit::WebPageProxy::didReceiveEvent): Instead of clearing m_currentlyProcessedWheelEvents,
+        which contained the set of one coalesced wheel event, we pull the head Vector, which
+        contains the same set of events. Refactor to use processNextQueuedWheelEvent().
+
+2012-05-08  Timothy Hatcher  <timothy@apple.com>
+
+        Fix the SOFT_LINK_STAGED_FRAMEWORK_OPTIONAL macro so it passes the full path to dlopen.
+
+        <rdar://problem/11406517>
+
+        Reviewed by Mark Rowe.
+
+        * UIProcess/mac/WebInspectorProxyMac.mm: Pass A to SOFT_LINK_STAGED_FRAMEWORK_OPTIONAL for the version.
+        * WebProcess/WebPage/mac/WebInspectorMac.mm: Ditto.
+
+2012-05-08  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        [WK2] Integrate Page Visibility state change and WK2 Suspend/Resume API
+        https://bugs.webkit.org/show_bug.cgi?id=85650
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        This patch uses state changes of the Page Visibility API to trigger the
+        automatic suspension/resume of animations on the WebPage and its main frame,
+        in the same fashion of what is used by the Suspend/Resume API of WebKit2.
+        By telling the WebPage it will move off/on the screen and the FrameView to
+        hide/show, this patch is suspending/resuming animations (animated painting)
+        but not timers and other active DOM objects.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::setVisibilityState):
+
+2012-05-08  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Add QML/WK2 evaluateJavaScript experimental API
+        https://bugs.webkit.org/show_bug.cgi?id=85496
+
+        Reviewed by Simon Hausmann.
+
+        This is an initial patch adding support for strings,
+        numbers and bools as return values.
+
+        Test: qmltests/WebView/tst_evaluateJavaScript.qml
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (JSCallbackClosure):
+        (toQString):
+        (toQJSValue):
+        (buildQJSValue):
+        (javaScriptCallback):
+        (QQuickWebViewExperimental::evaluateJavaScript):
+        (QQuickWebView::runJavaScriptInMainFrame):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_evaluateJavaScript.qml: Added.
+
+2012-05-07  Alexis Menard  <alexis.menard@openbossa.org>
+
+        [Qt] Unbreak debugging of WebKit2.
+        https://bugs.webkit.org/show_bug.cgi?id=85839
+
+        Reviewed by Simon Hausmann.
+
+        When you attach GDB to a running process, it stops it.
+        http://trac.webkit.org/changeset/115958 introduced a pause()
+        call to wait the debugger to be attached to then continue
+        the execution of the WebProcess. Unfortunately the pause()
+        function does not return unless a signal handler is called.
+        This patch introduce an event handler to exit from the paused
+        state when the debugger send the signal SIGCONT. The old code
+        works with older version of GDB (<7.0) but not with newer
+        versions where the behavior of pause() is correct.
+
+        * qt/MainQt.cpp:
+        (sigcontHandler):
+        (main):
+
+2012-05-07  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Refactor windowClipRectForLayer to remove the explicit RenderLayer dependency
+        https://bugs.webkit.org/show_bug.cgi?id=84090
+
+        Reviewed by David Hyatt.
+
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::clipRectInWindowCoordinates):
+        Updated after windowClipRectForLayer name and signature change.
+
+2012-05-07  Andy Estes  <aestes@apple.com>
+
+        ENABLE_IFRAME_SEAMLESS should be part of FEATURE_DEFINES.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-07  Eric Seidel  <eric@webkit.org>
+
+        Add ENABLE_IFRAME_SEAMLESS so Apple can turn off SEAMLESS if needed
+        https://bugs.webkit.org/show_bug.cgi?id=85822
+
+        Reviewed by Adam Barth.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-07  Alexis Menard  <alexis.menard@openbossa.org>
+
+        Unreviewed Qt build fix in Debug.
+
+        We need some system includes here for getpid() to be recognized.
+
+        * qt/MainQt.cpp:
+
+2012-05-07  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r116299, r116301, and r116303.
+        http://trac.webkit.org/changeset/116299
+        http://trac.webkit.org/changeset/116301
+        http://trac.webkit.org/changeset/116303
+        https://bugs.webkit.org/show_bug.cgi?id=85795
+
+        Build is still broken (Requested by Ossy on #webkit).
+
+        * qt/MainQt.cpp:
+        (main):
+
+2012-05-07  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] Add test specific platform plugin to achieve unified layout test results
+        https://bugs.webkit.org/show_bug.cgi?id=80996
+
+        Reviewed by Simon Hausmann.
+
+        Initialize the test platform plugin before initializing
+        the web process if we are in a WTR run.
+        It is necessary to place this initialization here as we
+        cannot control wich platform plugin will be used after
+        the instantiation of the QApplication.
+
+        * qt/MainQt.cpp:
+        (initializeTestPlatformPluginForWTRIfRequired):
+        (main):
+
 2012-05-06  MORITA Hajime  <morrita@google.com>
 
         https://bugs.webkit.org/show_bug.cgi?id=85265

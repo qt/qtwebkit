@@ -1,3 +1,256 @@
+2012-05-10  Mike Fenton  <mifenton@rim.com>
+
+        Caret node boundary should be adjusted to account for the visible region.
+        https://bugs.webkit.org/show_bug.cgi?id=86116
+
+        Reviewed by Antonio Gomes.
+
+        PR 138988.
+
+        Update the node bounding box to be clipped and adjusted
+        for the visible region of the frame.
+
+        Reviewed Internally by Gen Mak.
+
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::caretPositionChanged):
+
+2012-05-10  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Assertions and assumptions in BackingStoreClient around m_frame and m_frame->view() are invalid
+        https://bugs.webkit.org/show_bug.cgi?id=86096
+
+        Reviewed by Rob Buis.
+
+        A Frame's FrameView has always to be checked since it is
+        a volatile object, and gets created and destroyed all the time.
+
+        We have been facing a particular issue, where during our automated
+        interaction tests, the main frame object was being pinch zoomed in
+        the middle of it creation, and WebKit thread was blocked by a mutex.
+        In practice, it is a case that would not be possible in a real
+        world scenario, but shows that the ASSERTs are bogus regardless.
+
+        * WebKitSupport/BackingStoreClient.cpp:
+        (BlackBerry::WebKit::BackingStoreClient::scrollPosition):
+        (BlackBerry::WebKit::BackingStoreClient::setScrollPosition):
+        (BlackBerry::WebKit::BackingStoreClient::maximumScrollPosition):
+        (BlackBerry::WebKit::BackingStoreClient::viewportSize):
+        (BlackBerry::WebKit::BackingStoreClient::transformedViewportSize):
+        (BlackBerry::WebKit::BackingStoreClient::visibleContentsRect):
+        (BlackBerry::WebKit::BackingStoreClient::contentsSize):
+
+2012-05-09  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] Autofill feature implementation for BlackBerry porting
+        https://bugs.webkit.org/show_bug.cgi?id=85577
+
+        Reviewed by Rob Buis.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::autofillTextField): Added this interface
+        function to auto fill the inputting text field when user selects
+        a autofill candidate value from autofill context dialog.
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::notifyPopupAutofillDialog): Added
+        this interface function to notify WebPageClient to pop up the autofill
+        context dialog with the suggested input items.
+        (BlackBerry::WebKit::WebPage::clearAutofillData):
+        * Api/WebPage.h:
+        * Api/WebPageClient.h:
+        * Api/WebPage_p.h:
+        (WebCore):
+        (WebPagePrivate):
+        * WebCoreSupport/AutofillManager.cpp:
+        (WebCore::AutofillManager::didChangeInTextField):
+        * WebCoreSupport/EditorClientBlackBerry.cpp:
+        (WebCore::EditorClientBlackBerry::textDidChangeInTextField): Implemented
+        this function to listen to the notification of text field change, and
+        notify AutofillManager to handle the autofill.
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchWillSubmitForm):
+        (WebCore::FrameLoaderClientBlackBerry::dispatchWillSendSubmitEvent):
+        Save the name and value pair of every autofillable input text field when
+        user submitting a form.
+
+2012-05-09  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Enable PAGE_POPUP in make file, and implement required methods
+        https://bugs.webkit.org/show_bug.cgi?id=85907
+
+        Reviewed by Rob Buis.
+
+        Internal reviewed by Yong Li.
+
+        Enable PAGE_POPUP so we can use WebCore::PagePopup and WebCore::PagePopupClient interface.
+        Implement virtual methods in WebCore::ChromeClientBlackBerry that required for the 
+        implementation and add methods in WebKit::WebPage that needed for PagePopupClient.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::handleMouseEvent):
+        (BlackBerry::WebKit::WebPage::initPopupWebView):
+        (WebKit):
+        (BlackBerry::WebKit::WebPage::popupOpened):
+        (BlackBerry::WebKit::WebPage::popupClosed):
+        (BlackBerry::WebKit::WebPage::hasOpenedPopup):
+        (BlackBerry::WebKit::WebPage::popup):
+        (BlackBerry::WebKit::WebPagePrivate::setParentPopup):
+        * Api/WebPage.h:
+        (WebCore):
+        * Api/WebPage_p.h:
+        (WebCore):
+        (WebPagePrivate):
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::hasOpenedPopup):
+        (WebCore::ChromeClientBlackBerry::openPagePopup):
+        (WebCore):
+        (WebCore::ChromeClientBlackBerry::closePagePopup):
+        * WebCoreSupport/ChromeClientBlackBerry.h:
+        (WebCore):
+        (ChromeClientBlackBerry):
+
+2012-05-08  Jason Liu  <jason.liu@torchmobile.com.cn>
+
+        [BlackBerry] Auth credentials set in private mode are reused in public mode.
+        https://bugs.webkit.org/show_bug.cgi?id=84697
+
+        Reviewed by Rob Buis.
+
+        Add setPrivateMode function for CredentialStorage.
+
+        We have to change Private Browsing to test, so have to write a manual test case.
+        Test: ManualTests/blackberry/http-auth-private-mode-changed.html
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::didChangeSettings):
+
+2012-05-08  Crystal Zhang  <haizhang@rim.com>
+    
+            [BlackBerry] Implement a popup client for HTML controls
+            https://bugs.webkit.org/show_bug.cgi?id=85670
+    
+            Reviewed by Rob Buis.
+    
+            Implement a popup client for HTML controls, which would be used to load
+            different popups according to popup type.
+    
+            * WebCoreSupport/PagePopupBlackBerry.cpp: Added.
+            (WebCore):
+            (PagePopupChromeClient):
+            (WebCore::PagePopupChromeClient::PagePopupChromeClient):
+            (WebCore::PagePopupChromeClient::closeWindowSoon):
+            (WebCore::PagePopupChromeClient::webPage):
+            (WebCore::PagePopupBlackBerry::PagePopupBlackBerry):
+            (WebCore::PagePopupBlackBerry::~PagePopupBlackBerry):
+            (WebCore::PagePopupBlackBerry::sendCreatePopupWebViewRequest):
+            (WebCore::PagePopupBlackBerry::init):
+            (WebCore::setValueAndClosePopupCallback):
+            (WebCore::popUpExtensionInitialize):
+            (WebCore::popUpExtensionFinalize):
+            (WebCore::PagePopupBlackBerry::installDomFunction):
+            (WebCore::PagePopupBlackBerry::handleMouseEvent):
+            (WebCore::PagePopupBlackBerry::closePopup):
+            (WebCore::PagePopupBlackBerry::closeWebPage):
+            * WebCoreSupport/PagePopupBlackBerry.h: Added.
+            (WebKit):
+            (WebCore):
+            (PagePopupBlackBerry):
+
+2012-05-08  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] Over-scroll image should be tiled
+        https://bugs.webkit.org/show_bug.cgi?id=85860
+
+        Reviewed by Rob Buis.
+
+        Implement tiling for over-scroll image if image dimension don't match
+        the surface dimensions.
+
+        * Api/BackingStore.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::BackingStorePrivate::ensureOverScrollImage):
+        (BlackBerry::WebKit::BackingStorePrivate::paintDefaultBackground):
+        * Api/BackingStore_p.h:
+        (BackingStorePrivate):
+
+2012-05-08  Chris Guan  <chris.guan@torchmobile.com.cn>
+
+        [Blackberry] remove m_isRequestedByPlugin in ResourceRequest
+        https://bugs.webkit.org/show_bug.cgi?id=84559
+
+        Reviewed by Antonio Gomes.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDecidePolicyForNewWindowAction):
+
+2012-05-08  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] AutofillManager implementation upstream
+        https://bugs.webkit.org/show_bug.cgi?id=85576
+
+        Reviewed by Rob Buis.
+
+        RIM PR: 136405
+        Implemented class AutofillManager to handle the form autofill
+        interactions.
+        It listens to text changed notification from text input, searches
+        autofill database for the suggested autofill candidate value,
+        and notifies WebPageClient to pop up a context dialog for user;
+        it also responds to user's choice by autofilling the text input.
+
+        * WebCoreSupport/AutofillManager.cpp: Added.
+        (WebCore):
+        (WebCore::AutofillManager::create):
+        (WebCore::AutofillManager::didChangeInTextField):
+        (WebCore::AutofillManager::autofillTextField):
+        (WebCore::AutofillManager::saveTextFields):
+        (WebCore::AutofillManager::clear):
+        * WebCoreSupport/AutofillManager.h: Added.
+        (WTF):
+        (WebKit):
+        (WebCore):
+        (AutofillManager):
+        (WebCore::AutofillManager::m_element):
+
+2012-05-07  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] Delete previous buffer when new over-scroll image path is set
+        https://bugs.webkit.org/show_bug.cgi?id=85812
+
+        Reviewed by Rob Buis.
+
+        When a new over-scroll image path is set, delete old buffer before creating
+        a new one.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::ensureOverScrollImage):
+
+2012-05-07  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] Over-scroll image path property should be relative to local application directory
+        https://bugs.webkit.org/show_bug.cgi?id=85814
+
+        Reviewed by Rob Buis.
+
+        Over-scroll image path web setting should be relative to the local directory.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::ensureOverScrollImage):
+
+2012-05-07  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Add methods need by client side
+        https://bugs.webkit.org/show_bug.cgi?id=85661
+
+        Reviewed by Antonio Gomes.
+
+        Add methods needed by client side when create and close HTML popup dialogs.
+        PR 154360
+
+        * Api/WebPageClient.h:
+
 2012-05-06  Mary Wu  <mary.wu@torchmobile.com.cn>
 
         [BlackBerry] Support html5 download attribute.

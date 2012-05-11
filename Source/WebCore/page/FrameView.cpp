@@ -482,12 +482,12 @@ PassRefPtr<Scrollbar> FrameView::createScrollbar(ScrollbarOrientation orientatio
     // Try the <body> element first as a scrollbar source.
     Element* body = doc ? doc->body() : 0;
     if (body && body->renderer() && body->renderer()->style()->hasPseudoStyle(SCROLLBAR))
-        return RenderScrollbar::createCustomScrollbar(this, orientation, body->renderer()->enclosingBox());
+        return RenderScrollbar::createCustomScrollbar(this, orientation, body);
     
     // If the <body> didn't have a custom style, then the root element might.
     Element* docElement = doc ? doc->documentElement() : 0;
     if (docElement && docElement->renderer() && docElement->renderer()->style()->hasPseudoStyle(SCROLLBAR))
-        return RenderScrollbar::createCustomScrollbar(this, orientation, docElement->renderBox());
+        return RenderScrollbar::createCustomScrollbar(this, orientation, docElement);
         
     // If we have an owning iframe/frame element, then it can set the custom scrollbar also.
     RenderPart* frameRenderer = m_frame->ownerRenderer();
@@ -2161,7 +2161,7 @@ void FrameView::unscheduleRelayout()
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
+void FrameView::serviceScriptedAnimations(DOMTimeStamp time)
 {
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext()) {
         frame->view()->serviceScrollAnimations();
@@ -2173,7 +2173,7 @@ void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
         documents.append(frame->document());
 
     for (size_t i = 0; i < documents.size(); ++i)
-        documents[i]->serviceScriptedAnimations(monotonicAnimationStartTime);
+        documents[i]->serviceScriptedAnimations(time);
 }
 #endif
 
@@ -2279,7 +2279,7 @@ void FrameView::updateWidget(RenderEmbeddedObject* object)
         return;
 
     // No need to update if it's already crashed or known to be missing.
-    if (object->pluginCrashedOrWasMissing())
+    if (object->showsUnavailablePluginIndicator())
         return;
 
     // FIXME: This could turn into a real virtual dispatch if we defined
@@ -2558,30 +2558,31 @@ IntRect FrameView::windowClipRect(bool clipToContents) const
     if (!m_frame || !m_frame->ownerElement())
         return clipRect;
 
-    // Take our owner element and get the clip rect from the enclosing layer.
-    Element* elt = m_frame->ownerElement();
-    // The renderer can sometimes be null when style="display:none" interacts
-    // with external content and plugins.
-    RenderLayer* layer = elt->renderer() ? elt->renderer()->enclosingLayer() : 0;
-    if (!layer)
-        return clipRect;
-    FrameView* parentView = elt->document()->view();
-    clipRect.intersect(parentView->windowClipRectForLayer(layer, true));
+    // Take our owner element and get its clip rect.
+    HTMLFrameOwnerElement* ownerElement = m_frame->ownerElement();
+    FrameView* parentView = ownerElement->document()->view();
+    clipRect.intersect(parentView->windowClipRectForFrameOwner(ownerElement, true));
     return clipRect;
 }
 
-IntRect FrameView::windowClipRectForLayer(const RenderLayer* layer, bool clipToLayerContents) const
+IntRect FrameView::windowClipRectForFrameOwner(const HTMLFrameOwnerElement* ownerElement, bool clipToLayerContents) const
 {
+    // The renderer can sometimes be null when style="display:none" interacts
+    // with external content and plugins.
+    if (!ownerElement->renderer())
+        return windowClipRect();
+
     // If we have no layer, just return our window clip rect.
-    if (!layer)
+    const RenderLayer* enclosingLayer = ownerElement->renderer()->enclosingLayer();
+    if (!enclosingLayer)
         return windowClipRect();
 
     // Apply the clip from the layer.
     IntRect clipRect;
     if (clipToLayerContents)
-        clipRect = pixelSnappedIntRect(layer->childrenClipRect());
+        clipRect = pixelSnappedIntRect(enclosingLayer->childrenClipRect());
     else
-        clipRect = pixelSnappedIntRect(layer->selfClipRect());
+        clipRect = pixelSnappedIntRect(enclosingLayer->selfClipRect());
     clipRect = contentsToWindow(clipRect); 
     return intersection(clipRect, windowClipRect());
 }
@@ -2910,23 +2911,6 @@ bool FrameView::hasCustomScrollbars() const
     }
 
     return false;
-}
-
-void FrameView::clearOwningRendererForCustomScrollbars(RenderBox* box)
-{
-    const HashSet<RefPtr<Widget> >* viewChildren = children();
-    HashSet<RefPtr<Widget> >::const_iterator end = viewChildren->end();
-    for (HashSet<RefPtr<Widget> >::const_iterator current = viewChildren->begin(); current != end; ++current) {
-        Widget* widget = current->get();
-        if (widget->isScrollbar()) {
-            Scrollbar* scrollbar = static_cast<Scrollbar*>(widget);
-            if (scrollbar->isCustomScrollbar()) {
-                RenderScrollbar* customScrollbar = toRenderScrollbar(scrollbar);
-                if (customScrollbar->owningRenderer() == box)
-                    customScrollbar->clearOwningRenderer();
-            }
-        }
-    }
 }
 
 FrameView* FrameView::parentFrameView() const

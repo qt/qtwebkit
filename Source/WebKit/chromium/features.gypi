@@ -55,6 +55,7 @@
       'ENABLE_GEOLOCATION=1',
       'ENABLE_GESTURE_EVENTS=1',
       'ENABLE_ICONDATABASE=0',
+      'ENABLE_IFRAME_SEAMLESS=1',
       'ENABLE_INDEXED_DATABASE=1',
       'ENABLE_INPUT_SPEECH=1',
       'ENABLE_INPUT_TYPE_DATE=1',
@@ -84,6 +85,7 @@
       'ENABLE_POINTER_LOCK=1',
       'ENABLE_PROGRESS_TAG=1',
       'ENABLE_QUOTA=1',
+      'ENABLE_REGISTER_PROTOCOL_HANDLER=1',
       'ENABLE_REQUEST_ANIMATION_FRAME=1',
       'ENABLE_RUBY=1',
       'ENABLE_SANDBOX=1',
@@ -137,6 +139,7 @@
       ['OS=="android"', {
         'feature_defines': [
           'ENABLE_CALENDAR_PICKER=0',
+          'ENABLE_MEDIA_CAPTURE=1',
           'ENABLE_PAGE_POPUP=0',
           'ENABLE_WEB_AUDIO=0',
           'WTF_USE_NATIVE_FULLSCREEN_VIDEO=1',
@@ -144,6 +147,7 @@
       }, {
         'feature_defines': [
           'ENABLE_CALENDAR_PICKER=1',
+          'ENABLE_MEDIA_CAPTURE=0',
           'ENABLE_PAGE_POPUP=1',
           'ENABLE_WEB_AUDIO=1',
         ],
@@ -174,14 +178,14 @@
           'WTF_USE_WEBAUDIO_FFMPEG=1',
         ],
       }],
-      ['enable_register_protocol_handler==1', {
-        'feature_defines': [
-          'ENABLE_REGISTER_PROTOCOL_HANDLER=1',
-        ],
-      }],
       ['enable_web_intents==1', {
         'feature_defines': [
           'ENABLE_WEB_INTENTS=1',
+        ],
+      }],
+      ['enable_web_intents_tag==1', {
+        'feature_defines': [
+          'ENABLE_WEB_INTENTS_TAG=1',
         ],
       }],
       ['OS=="mac"', {

@@ -634,6 +634,13 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
             currChildNextSibling = 0; // We destroyed the last child, so now we need to update
                                       // the value of currChildNextSibling.
 
+        // It is possible that positioned objects under blockCurr are going to be moved to cloneBlock.
+        // Since we are doing layout anyway, it is easier to blow away the entire list, than
+        // traversing down the subtree looking for positioned children and then remove them
+        // from our positioned objects list.
+        if (currChildNextSibling)
+            blockCurr->removePositionedObjects(0);
+
         // Now we need to take all of the children starting from the first child
         // *after* currChild and append them all to the clone.
         blockCurr->moveChildrenTo(cloneBlock, currChildNextSibling, 0, true);
@@ -1229,7 +1236,7 @@ bool RenderBlock::isSelfCollapsingBlock() const
     // (c) have border/padding,
     // (d) have a min-height
     // (e) have specified that one of our margins can't collapse using a CSS extension
-    if (logicalHeight() > 0
+    if (logicalHeight() > ZERO_LAYOUT_UNIT
         || isTable() || borderAndPaddingLogicalHeight()
         || style()->logicalMinHeight().isPositive()
         || style()->marginBeforeCollapse() == MSEPARATE || style()->marginAfterCollapse() == MSEPARATE)
@@ -1374,7 +1381,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     clearFloats();
 
     LayoutUnit previousHeight = logicalHeight();
-    setLogicalHeight(0);
+    setLogicalHeight(ZERO_LAYOUT_UNIT);
     bool hasSpecifiedPageLogicalHeight = false;
     bool pageLogicalHeightChanged = false;
     ColumnInfo* colInfo = columnInfo();
@@ -1384,11 +1391,11 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
             // avoid doing two layout passes.
             computeLogicalHeight();
             LayoutUnit columnHeight = contentLogicalHeight();
-            if (columnHeight > 0) {
+            if (columnHeight > ZERO_LAYOUT_UNIT) {
                 pageLogicalHeight = columnHeight;
                 hasSpecifiedPageLogicalHeight = true;
             }
-            setLogicalHeight(0);
+            setLogicalHeight(ZERO_LAYOUT_UNIT);
         }
         if (colInfo->columnHeight() != pageLogicalHeight && everHadLayout()) {
             colInfo->setColumnHeight(pageLogicalHeight);
@@ -1447,9 +1454,9 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
             layer()->setHasVerticalScrollbar(true);
     }
 
-    LayoutUnit repaintLogicalTop = 0;
-    LayoutUnit repaintLogicalBottom = 0;
-    LayoutUnit maxFloatLogicalBottom = 0;
+    LayoutUnit repaintLogicalTop = ZERO_LAYOUT_UNIT;
+    LayoutUnit repaintLogicalBottom = ZERO_LAYOUT_UNIT;
+    LayoutUnit maxFloatLogicalBottom = ZERO_LAYOUT_UNIT;
     if (!firstChild() && !isAnonymousBlock())
         setChildrenInline(true);
     if (childrenInline())
@@ -1586,9 +1593,9 @@ void RenderBlock::computeOverflow(LayoutUnit oldClientAfterEdge, bool recomputeF
         LayoutRect clientRect(clientBoxRect());
         LayoutRect rectToApply;
         if (isHorizontalWritingMode())
-            rectToApply = LayoutRect(clientRect.x(), clientRect.y(), 1, max<LayoutUnit>(0, oldClientAfterEdge - clientRect.y()));
+            rectToApply = LayoutRect(clientRect.x(), clientRect.y(), 1, max(ZERO_LAYOUT_UNIT, oldClientAfterEdge - clientRect.y()));
         else
-            rectToApply = LayoutRect(clientRect.x(), clientRect.y(), max<LayoutUnit>(0, oldClientAfterEdge - clientRect.x()), 1);
+            rectToApply = LayoutRect(clientRect.x(), clientRect.y(), max(ZERO_LAYOUT_UNIT, oldClientAfterEdge - clientRect.x()), 1);
         addLayoutOverflow(rectToApply);
     }
         
@@ -1949,7 +1956,7 @@ LayoutUnit RenderBlock::clearFloatsIfNeeded(RenderBox* child, MarginInfo& margin
         
         // Adjust our height such that we are ready to be collapsed with subsequent siblings (or the bottom
         // of the parent block).
-        setLogicalHeight(child->y() - max<LayoutUnit>(0, marginInfo.margin()));
+        setLogicalHeight(child->y() - max(ZERO_LAYOUT_UNIT, marginInfo.margin()));
     } else
         // Increase our height by the amount we had to clear.
         setLogicalHeight(height() + heightIncrease);
@@ -2713,7 +2720,7 @@ void RenderBlock::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOf
         if (checkAfterAlways
             && (absoluteChildY + child->height()) > paintInfo.rect.y()
             && (absoluteChildY + child->height()) < paintInfo.rect.maxY()) {
-            view()->setBestTruncatedAt(absoluteChildY + child->height() + max<LayoutUnit>(0, child->collapsedMarginAfter()), this, true);
+            view()->setBestTruncatedAt(absoluteChildY + child->height() + max(ZERO_LAYOUT_UNIT, child->collapsedMarginAfter()), this, true);
             return;
         }
     }
@@ -3261,14 +3268,14 @@ LayoutRect RenderBlock::blockSelectionGap(RenderBlock* rootBlock, const LayoutPo
 {
     LayoutUnit logicalTop = lastLogicalTop;
     LayoutUnit logicalHeight = blockDirectionOffset(rootBlock, offsetFromRootBlock) + logicalBottom - logicalTop;
-    if (logicalHeight <= static_cast<LayoutUnit>(0))
+    if (logicalHeight <= ZERO_LAYOUT_UNIT)
         return LayoutRect();
 
     // Get the selection offsets for the bottom of the gap
     LayoutUnit logicalLeft = max(lastLogicalLeft, logicalLeftSelectionOffset(rootBlock, logicalBottom));
     LayoutUnit logicalRight = min(lastLogicalRight, logicalRightSelectionOffset(rootBlock, logicalBottom));
     LayoutUnit logicalWidth = logicalRight - logicalLeft;
-    if (logicalWidth <= static_cast<LayoutUnit>(0))
+    if (logicalWidth <= ZERO_LAYOUT_UNIT)
         return LayoutRect();
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(logicalLeft, logicalTop, logicalWidth, logicalHeight));
@@ -3284,7 +3291,7 @@ LayoutRect RenderBlock::logicalLeftSelectionGap(RenderBlock* rootBlock, const La
     LayoutUnit rootBlockLogicalLeft = max(logicalLeftSelectionOffset(rootBlock, logicalTop), logicalLeftSelectionOffset(rootBlock, logicalTop + logicalHeight));
     LayoutUnit rootBlockLogicalRight = min(inlineDirectionOffset(rootBlock, offsetFromRootBlock) + logicalLeft, min(logicalRightSelectionOffset(rootBlock, logicalTop), logicalRightSelectionOffset(rootBlock, logicalTop + logicalHeight)));
     LayoutUnit rootBlockLogicalWidth = rootBlockLogicalRight - rootBlockLogicalLeft;
-    if (rootBlockLogicalWidth <= static_cast<LayoutUnit>(0))
+    if (rootBlockLogicalWidth <= ZERO_LAYOUT_UNIT)
         return LayoutRect();
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
@@ -3300,7 +3307,7 @@ LayoutRect RenderBlock::logicalRightSelectionGap(RenderBlock* rootBlock, const L
     LayoutUnit rootBlockLogicalLeft = max(inlineDirectionOffset(rootBlock, offsetFromRootBlock) + logicalRight, max(logicalLeftSelectionOffset(rootBlock, logicalTop), logicalLeftSelectionOffset(rootBlock, logicalTop + logicalHeight)));
     LayoutUnit rootBlockLogicalRight = min(logicalRightSelectionOffset(rootBlock, logicalTop), logicalRightSelectionOffset(rootBlock, logicalTop + logicalHeight));
     LayoutUnit rootBlockLogicalWidth = rootBlockLogicalRight - rootBlockLogicalLeft;
-    if (rootBlockLogicalWidth <= static_cast<LayoutUnit>(0))
+    if (rootBlockLogicalWidth <= ZERO_LAYOUT_UNIT)
         return LayoutRect();
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
@@ -3568,7 +3575,7 @@ LayoutPoint RenderBlock::computeLogicalLocationForFloat(const FloatingObject* fl
                 floatLogicalWidth = min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset);
             }
         }
-        floatLogicalLeft = max<LayoutUnit>(logicalLeftOffset - borderAndPaddingLogicalLeft(), floatLogicalLeft);
+        floatLogicalLeft = max(logicalLeftOffset - borderAndPaddingLogicalLeft(), floatLogicalLeft);
     } else {
         LayoutUnit heightRemainingLeft = 1;
         LayoutUnit heightRemainingRight = 1;
@@ -3962,8 +3969,8 @@ LayoutUnit RenderBlock::nextFloatLogicalBottomBelow(LayoutUnit logicalHeight) co
 LayoutUnit RenderBlock::lowestFloatLogicalBottom(FloatingObject::Type floatType) const
 {
     if (!m_floatingObjects)
-        return 0;
-    LayoutUnit lowestFloatBottom = 0;
+        return ZERO_LAYOUT_UNIT;
+    LayoutUnit lowestFloatBottom = ZERO_LAYOUT_UNIT;
     const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
     FloatingObjectSetIterator end = floatingObjectSet.end();
     for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it) {
@@ -4340,7 +4347,7 @@ LayoutUnit RenderBlock::getClearDelta(RenderBox* child, LayoutUnit logicalTop)
     }
 
     // We also clear floats if we are too big to sit on the same line as a float (and wish to avoid floats by default).
-    LayoutUnit result = clearSet ? max<LayoutUnit>(0, logicalBottom - logicalTop) : ZERO_LAYOUT_UNIT;
+    LayoutUnit result = clearSet ? max(ZERO_LAYOUT_UNIT, logicalBottom - logicalTop) : ZERO_LAYOUT_UNIT;
     if (!result && child->avoidsFloats()) {
         LayoutUnit newLogicalTop = logicalTop;
         while (true) {
@@ -5160,7 +5167,7 @@ void RenderBlock::computePreferredLogicalWidths()
     updateFirstLetter();
 
     RenderStyle* styleToUse = style();
-    if (!isTableCell() && styleToUse->logicalWidth().isFixed() && styleToUse->logicalWidth().value() > 0 && style()->marqueeBehavior() != MALTERNATE)
+    if (!isTableCell() && styleToUse->logicalWidth().isFixed() && styleToUse->logicalWidth().value() >= 0 && style()->marqueeBehavior() != MALTERNATE)
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = computeContentBoxLogicalWidth(styleToUse->logicalWidth().value());
     else {
         m_minPreferredLogicalWidth = 0;
@@ -5683,8 +5690,8 @@ void RenderBlock::computeBlockPreferredLogicalWidths()
     }
 
     // Always make sure these values are non-negative.
-    m_minPreferredLogicalWidth = max<LayoutUnit>(0, m_minPreferredLogicalWidth);
-    m_maxPreferredLogicalWidth = max<LayoutUnit>(0, m_maxPreferredLogicalWidth);
+    m_minPreferredLogicalWidth = max(ZERO_LAYOUT_UNIT, m_minPreferredLogicalWidth);
+    m_maxPreferredLogicalWidth = max(ZERO_LAYOUT_UNIT, m_maxPreferredLogicalWidth);
 
     m_maxPreferredLogicalWidth = max(floatLeftWidth + floatRightWidth, m_maxPreferredLogicalWidth);
 }
@@ -5883,6 +5890,58 @@ static inline bool shouldSkipForFirstLetter(UChar c)
     return isSpaceOrNewline(c) || c == noBreakSpace || isPunctuationForFirstLetter(c);
 }
 
+RenderObject* RenderBlock::findLastObjectWithFirstLetterText(RenderObject* child, RenderObject* &firstLetterBlock)
+{
+    while (child) {
+        RenderObject* nextChild = child->nextSibling();
+        // Style and skip over any objects such as quotes or punctuation
+        child = findLastObjectAfterFirstLetterPunctuation(child, firstLetterBlock);
+        if (child)
+            break;
+        child = nextChild;
+    }
+    return child;
+}
+
+RenderObject* RenderBlock::findLastObjectAfterFirstLetterPunctuation(RenderObject* child, RenderObject* &firstLetterBlock)
+{
+    if (child->isText()) {
+        // CSS 2.1 http://www.w3.org/TR/CSS21/selector.html#first-letter
+        // "The first letter must occur on the first formatted line."
+        if (child->isBR())
+            return child;
+        
+        // If child is a single punctuation mark or a Render Quote then style it as first-letter now and keep looking for further text,
+        bool textQuote = toRenderText(child)->textLength() == 1 && isPunctuationForFirstLetter(toRenderText(child)->characters()[0]);
+        if (child->isQuote() || textQuote)
+            addFirstLetter(child, firstLetterBlock);
+        else if (!toRenderText(child)->isAllCollapsibleWhitespace())
+            return child;
+        return 0;
+    }
+    
+    if (child->isListMarker())
+        return 0;
+    
+    if (child->isFloatingOrPositioned()) {
+        // Floats and positioned objects do not inherit their style from parents so if it is styled
+        // inspect its children for text, otherwise move on to its sibling.
+        if (child->style()->styleType() == FIRST_LETTER)
+            return findLastObjectWithFirstLetterText(child->firstChild(), firstLetterBlock);
+        return 0;
+    }
+    
+    if (child->isReplaced() || child->isRenderButton() || child->isMenuList())
+        return child;
+    
+    if (child->style()->hasPseudoStyle(FIRST_LETTER) && child->canHaveChildren())  {
+        // We found a lower-level node with first-letter, which supersedes the higher-level style.
+        firstLetterBlock = child;
+        return findLastObjectWithFirstLetterText(child->firstChild(), firstLetterBlock);
+    }
+    return findLastObjectWithFirstLetterText(child->firstChild(), firstLetterBlock);
+}
+
 static inline RenderObject* findFirstLetterBlock(RenderBlock* start)
 {
     RenderObject* firstLetterBlock = start;
@@ -5938,6 +5997,9 @@ void RenderBlock::updateFirstLetterStyle(RenderObject* firstLetterBlock, RenderO
             remainingText->setFirstLetter(newFirstLetter);
             toRenderBoxModelObject(newFirstLetter)->setFirstLetterRemainingText(remainingText);
         }
+        // To prevent removal of single anonymous block in RenderBlock::removeChild and causing
+        // |nextSibling| to go stale, we remove the old first letter using removeChildNode first.
+        firstLetterContainer->virtualChildren()->removeChildNode(firstLetterContainer, firstLetter);
         firstLetter->destroy();
         firstLetter = newFirstLetter;
         firstLetterContainer->addChild(firstLetter, nextSibling);
@@ -6029,47 +6091,36 @@ void RenderBlock::updateFirstLetter()
     if (!firstLetterBlock)
         return;
 
-    // Drill into inlines looking for our first text child.
-    RenderObject* currChild = firstLetterBlock->firstChild();
-    while (currChild) {
-        if (currChild->isText())
-            break;
-        if (currChild->isListMarker())
-            currChild = currChild->nextSibling();
-        else if (currChild->isFloatingOrPositioned()) {
-            if (currChild->style()->styleType() == FIRST_LETTER) {
-                currChild = currChild->firstChild();
-                break;
-            }
-            currChild = currChild->nextSibling();
-        } else if (currChild->isReplaced() || currChild->isRenderButton() || currChild->isMenuList())
-            break;
-        else if (currChild->style()->hasPseudoStyle(FIRST_LETTER) && canHaveGeneratedChildren(currChild))  {
-            // We found a lower-level node with first-letter, which supersedes the higher-level style
-            firstLetterBlock = currChild;
-            currChild = currChild->firstChild();
-        } else
-            currChild = currChild->firstChild();
-    }
+    // Check each sibling and drill into its inlines until we find a text node that is not all whitespace
+    // or is a line break.
+    RenderObject* firstLetterObject = firstLetterBlock->firstChild();
+    
+    firstLetterObject = findLastObjectWithFirstLetterText(firstLetterObject, firstLetterBlock);
 
-    if (!currChild)
+    if (!firstLetterObject)
         return;
+    
+    addFirstLetter(firstLetterObject, firstLetterBlock);
+}
+
+void RenderBlock::addFirstLetter(RenderObject* firstLetterObject, RenderObject* &firstLetterBlock)
+{
 
     // If the child already has style, then it has already been created, so we just want
     // to update it.
-    if (currChild->parent()->style()->styleType() == FIRST_LETTER) {
-        updateFirstLetterStyle(firstLetterBlock, currChild);
+    if (firstLetterObject->parent()->style()->styleType() == FIRST_LETTER) {
+        updateFirstLetterStyle(firstLetterBlock, firstLetterObject);
         return;
     }
 
-    if (!currChild->isText() || currChild->isBR())
+    if (!firstLetterObject->isText() || firstLetterObject->isBR())
         return;
 
     // Our layout state is not valid for the repaints we are going to trigger by
     // adding and removing children of firstLetterContainer.
     LayoutStateDisabler layoutStateDisabler(view());
 
-    createFirstLetterRenderer(firstLetterBlock, currChild);
+    createFirstLetterRenderer(firstLetterBlock, firstLetterObject);
 }
 
 // Helper methods for obtaining the last line, computing line counts and heights for line counts
@@ -6480,8 +6531,8 @@ void RenderBlock::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& a
         // FIXME: This is wrong for block-flows that are horizontal.
         // https://bugs.webkit.org/show_bug.cgi?id=46781
         bool prevInlineHasLineBox = toRenderInline(inlineElementContinuation()->node()->renderer())->firstLineBox(); 
-        float topMargin = prevInlineHasLineBox ? collapsedMarginBefore() : static_cast<LayoutUnit>(0);
-        float bottomMargin = nextInlineHasLineBox ? collapsedMarginAfter() : static_cast<LayoutUnit>(0);
+        float topMargin = prevInlineHasLineBox ? collapsedMarginBefore() : ZERO_LAYOUT_UNIT;
+        float bottomMargin = nextInlineHasLineBox ? collapsedMarginAfter() : ZERO_LAYOUT_UNIT;
         LayoutRect rect(additionalOffset.x(), additionalOffset.y() - topMargin, width(), height() + topMargin + bottomMargin);
         if (!rect.isEmpty())
             rects.append(pixelSnappedIntRect(rect));
@@ -6733,10 +6784,10 @@ void RenderBlock::adjustLinePositionForPagination(RootInlineBox* lineBox, Layout
         // If we have a non-uniform page height, then we have to shift further possibly.
         if (!hasUniformPageLogicalHeight && !pushToNextPageWithMinimumLogicalHeight(remainingLogicalHeight, logicalOffset, lineHeight))
             return;
-        LayoutUnit totalLogicalHeight = lineHeight + max<LayoutUnit>(0, logicalOffset);
+        LayoutUnit totalLogicalHeight = lineHeight + max(ZERO_LAYOUT_UNIT, logicalOffset);
         LayoutUnit pageLogicalHeightAtNewOffset = hasUniformPageLogicalHeight ? pageLogicalHeight : pageLogicalHeightForOffset(logicalOffset + remainingLogicalHeight);
         if (lineBox == firstRootBox() && totalLogicalHeight < pageLogicalHeightAtNewOffset && !isPositioned() && !isTableCell())
-            setPaginationStrut(remainingLogicalHeight + max<LayoutUnit>(0, logicalOffset));
+            setPaginationStrut(remainingLogicalHeight + max(ZERO_LAYOUT_UNIT, logicalOffset));
         else {
             delta += remainingLogicalHeight;
             lineBox->setPaginationStrut(remainingLogicalHeight);
@@ -7223,7 +7274,7 @@ TextRun RenderBlock::constructTextRun(RenderObject* context, const Font& font, c
             directionalOverride |= isOverride(style->unicodeBidi());
     }
 
-    TextRun run(characters, length, false, 0, 0, expansion, textDirection, directionalOverride);
+    TextRun run(characters, length, 0, 0, expansion, textDirection, directionalOverride);
     if (textRunNeedsRenderingContext(font))
         run.setRenderingContext(SVGTextRunRenderingContext::create(context));
 

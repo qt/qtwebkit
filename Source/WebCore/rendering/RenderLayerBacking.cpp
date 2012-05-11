@@ -262,7 +262,7 @@ void RenderLayerBacking::updateCompositedBounds()
         RenderLayer* rootLayer = view->layer();
 
         // Start by clipping to the view's bounds.
-        LayoutRect clippingBounds = view->layoutOverflowRect();
+        LayoutRect clippingBounds = view->unscaledDocumentRect();
 
         if (m_owningLayer != rootLayer)
             clippingBounds.intersect(m_owningLayer->backgroundClipRect(rootLayer, 0, true).rect()); // FIXME: Incorrect for CSS regions.
@@ -1168,6 +1168,9 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
         
     // FIXME: GraphicsLayers need a way to split for RenderRegions.
     m_owningLayer->paintLayerContents(rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, paintFlags);
+
+    if (m_owningLayer->containsDirtyOverlayScrollbars())
+        m_owningLayer->paintOverlayScrollbars(context, paintDirtyRect, paintBehavior, paintingRoot);
 
     ASSERT(!m_owningLayer->m_usedTransparency);
 }

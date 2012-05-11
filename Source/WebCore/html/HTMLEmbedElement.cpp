@@ -132,7 +132,7 @@ void HTMLEmbedElement::parametersForPlugin(Vector<String>& paramNames, Vector<St
 // moved down into HTMLPluginImageElement.cpp
 void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
 {
-    ASSERT(!renderEmbeddedObject()->pluginCrashedOrWasMissing());
+    ASSERT(!renderEmbeddedObject()->showsUnavailablePluginIndicator());
     ASSERT(needsWidgetUpdate());
     setNeedsWidgetUpdate(false);
 
@@ -208,9 +208,9 @@ bool HTMLEmbedElement::rendererIsNeeded(const NodeRenderingContext& context)
     return HTMLPlugInImageElement::rendererIsNeeded(context);
 }
 
-bool HTMLEmbedElement::isURLAttribute(Attribute* attr) const
+bool HTMLEmbedElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == srcAttr || HTMLPlugInImageElement::isURLAttribute(attr);
+    return attribute.name() == srcAttr || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
 const QualifiedName& HTMLEmbedElement::imageSourceAttributeName() const

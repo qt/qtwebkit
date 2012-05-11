@@ -788,7 +788,12 @@ private:
     int m_numDraws;
 };
 
+#if OS(WINDOWS)
+// http://webkit.org/b/74623
+TEST_F(CCLayerTreeHostTestSetNeedsCommit2, FLAKY_runMultiThread)
+#else
 TEST_F(CCLayerTreeHostTestSetNeedsCommit2, runMultiThread)
+#endif
 {
     runTestThreaded();
 }
@@ -840,6 +845,62 @@ TEST_F(CCLayerTreeHostTestSetNeedsRedraw, runMultiThread)
     runTestThreaded();
 }
 
+// If the layerTreeHost says it can't draw, then we should not try to draw.
+// FIXME: Make this run in single threaded mode too. http://crbug.com/127481
+class CCLayerTreeHostTestCanDrawBlocksDrawing : public CCLayerTreeHostTestThreadOnly {
+public:
+    CCLayerTreeHostTestCanDrawBlocksDrawing()
+        : m_numCommits(0)
+    {
+    }
+
+    virtual void beginTest()
+    {
+    }
+
+    virtual void drawLayersOnCCThread(CCLayerTreeHostImpl* impl)
+    {
+        // Only the initial draw should bring us here.
+        EXPECT_TRUE(impl->canDraw());
+        EXPECT_EQ(0, impl->sourceFrameNumber());
+    }
+
+    virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl* impl)
+    {
+        if (m_numCommits >= 1) {
+            // After the first commit, we should not be able to draw.
+            EXPECT_FALSE(impl->canDraw());
+        }
+    }
+
+    virtual void didCommitAndDrawFrame()
+    {
+        m_numCommits++;
+        if (m_numCommits == 1) {
+            // Make the viewport empty so the host says it can't draw.
+            m_layerTreeHost->setViewportSize(IntSize(0, 0));
+
+            OwnArrayPtr<char> pixels(adoptArrayPtr(new char[4]));
+            m_layerTreeHost->compositeAndReadback(static_cast<void*>(pixels.get()), IntRect(0, 0, 1, 1));
+        } else if (m_numCommits == 2) {
+            m_layerTreeHost->setNeedsCommit();
+            m_layerTreeHost->finishAllRendering();
+            endTest();
+        }
+    }
+
+    virtual void afterTest()
+    {
+    }
+
+private:
+    int m_numCommits;
+};
+
+TEST_F(CCLayerTreeHostTestCanDrawBlocksDrawing, runMultiThread)
+{
+    runTestThreaded();
+}
 
 // beginLayerWrite should prevent draws from executing until a commit occurs
 class CCLayerTreeHostTestWriteLayersRedraw : public CCLayerTreeHostTestThreadOnly {
@@ -1096,7 +1157,12 @@ private:
     int m_numAnimates;
 };
 
+#if OS(WINDOWS)
+// http://webkit.org/b/74623
+TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded, FLAKY_runMultiThread)
+#else
 TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded, runMultiThread)
+#endif
 {
     runTestThreaded();
 }
@@ -1134,7 +1200,12 @@ public:
 private:
 };
 
+#if OS(WINDOWS)
+// http://webkit.org/b/74623
+TEST_F(CCLayerTreeHostTestAddAnimationWithTimingFunction, FLAKY_runMultiThread)
+#else
 TEST_F(CCLayerTreeHostTestAddAnimationWithTimingFunction, runMultiThread)
+#endif
 {
     runTestThreaded();
 }
@@ -1168,7 +1239,12 @@ public:
     }
 };
 
+#if OS(WINDOWS)
+// http://webkit.org/b/74623
+TEST_F(CCLayerTreeHostTestDoNotSkipLayersWithAnimatedOpacity, FLAKY_runMultiThread)
+#else
 TEST_F(CCLayerTreeHostTestDoNotSkipLayersWithAnimatedOpacity, runMultiThread)
+#endif
 {
     runTestThreaded();
 }
@@ -1340,11 +1416,11 @@ public:
     virtual void beginCommitOnCCThread(CCLayerTreeHostImpl* impl)
     {
         LayerChromium* root = m_layerTreeHost->rootLayer();
-        if (!m_layerTreeHost->frameNumber())
+        if (!impl->sourceFrameNumber())
             EXPECT_EQ(root->scrollPosition(), m_initialScroll);
-        else if (m_layerTreeHost->frameNumber() == 1)
+        else if (impl->sourceFrameNumber() == 1)
             EXPECT_EQ(root->scrollPosition(), m_initialScroll + m_scrollAmount + m_scrollAmount);
-        else if (m_layerTreeHost->frameNumber() == 2)
+        else if (impl->sourceFrameNumber() == 2)
             EXPECT_EQ(root->scrollPosition(), m_initialScroll + m_scrollAmount + m_scrollAmount);
     }
 
@@ -1711,10 +1787,10 @@ public:
     {
         CompositorFakeWebGraphicsContext3DWithTextureTracking* context = static_cast<CompositorFakeWebGraphicsContext3DWithTextureTracking*>(GraphicsContext3DPrivate::extractWebGraphicsContext3D(impl->context()));
 
-        switch (impl->frameNumber()) {
+        switch (impl->sourceFrameNumber()) {
         case 0:
             // Number of textures should be one.
-            EXPECT_EQ(1, context->numTextures());
+            ASSERT_EQ(1, context->numTextures());
             // Number of textures used for commit should be one.
             EXPECT_EQ(1, context->numUsedTextures());
             // Verify that used texture is correct.
@@ -1725,7 +1801,7 @@ public:
         case 1:
             // Number of textures should be two as the first texture
             // is used by impl thread and cannot by used for update.
-            EXPECT_EQ(2, context->numTextures());
+            ASSERT_EQ(2, context->numTextures());
             // Number of textures used for commit should still be one.
             EXPECT_EQ(1, context->numUsedTextures());
             // First texture should not have been used.
@@ -1748,7 +1824,7 @@ public:
         // Number of textures used for draw should always be one.
         EXPECT_EQ(1, context->numUsedTextures());
 
-        if (impl->frameNumber() < 2) {
+        if (impl->sourceFrameNumber() < 1) {
             context->resetUsedTextures();
             postSetNeedsAnimateAndCommitToMainThread();
             postSetNeedsRedrawToMainThread();
@@ -1815,10 +1891,10 @@ public:
     {
         CompositorFakeWebGraphicsContext3DWithTextureTracking* context = static_cast<CompositorFakeWebGraphicsContext3DWithTextureTracking*>(GraphicsContext3DPrivate::extractWebGraphicsContext3D(impl->context()));
 
-        switch (impl->frameNumber()) {
+        switch (impl->sourceFrameNumber()) {
         case 0:
             // Number of textures should be two.
-            EXPECT_EQ(2, context->numTextures());
+            ASSERT_EQ(2, context->numTextures());
             // Number of textures used for commit should be two.
             EXPECT_EQ(2, context->numUsedTextures());
             // Verify that used textures are correct.
@@ -1830,7 +1906,7 @@ public:
         case 1:
             // Number of textures should be four as the first two
             // textures are used by the impl thread.
-            EXPECT_EQ(4, context->numTextures());
+            ASSERT_EQ(4, context->numTextures());
             // Number of textures used for commit should still be two.
             EXPECT_EQ(2, context->numUsedTextures());
             // First two textures should not have been used.
@@ -1846,7 +1922,7 @@ public:
             // Number of textures should be three as we allow one
             // partial update and the first two textures are used by
             // the impl thread.
-            EXPECT_EQ(3, context->numTextures());
+            ASSERT_EQ(3, context->numTextures());
             // Number of textures used for commit should still be two.
             EXPECT_EQ(2, context->numUsedTextures());
             // First texture should have been used.
@@ -1886,12 +1962,12 @@ public:
 
         // Number of textures used for drawing should two except for frame 4
         // where the viewport only contains one layer.
-        if (impl->frameNumber() == 4)
+        if (impl->sourceFrameNumber() == 3)
             EXPECT_EQ(1, context->numUsedTextures());
         else
             EXPECT_EQ(2, context->numUsedTextures());
 
-        if (impl->frameNumber() < 5) {
+        if (impl->sourceFrameNumber() < 4) {
             context->resetUsedTextures();
             postSetNeedsAnimateAndCommitToMainThread();
             postSetNeedsRedrawToMainThread();

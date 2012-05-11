@@ -93,8 +93,10 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     // names to their methods will be done by calling bindToJavaScript() (defined
     // by CppBoundClass, the parent to LayoutTestController).
     bindMethod("addFileToPasteboardOnDrag", &LayoutTestController::addFileToPasteboardOnDrag);
+#if ENABLE(INPUT_SPEECH)
     bindMethod("addMockSpeechInputResult", &LayoutTestController::addMockSpeechInputResult);
     bindMethod("setMockSpeechInputDumpRect", &LayoutTestController::setMockSpeechInputDumpRect);
+#endif
     bindMethod("addOriginAccessWhitelistEntry", &LayoutTestController::addOriginAccessWhitelistEntry);
     bindMethod("addUserScript", &LayoutTestController::addUserScript);
     bindMethod("addUserStyleSheet", &LayoutTestController::addUserStyleSheet);
@@ -132,7 +134,9 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("setIsolatedWorldSecurityOrigin", &LayoutTestController::setIsolatedWorldSecurityOrigin);
     bindMethod("execCommand", &LayoutTestController::execCommand);
     bindMethod("forceRedSelectionColors", &LayoutTestController::forceRedSelectionColors);
+#if ENABLE(NOTIFICATIONS)
     bindMethod("grantDesktopNotificationPermission", &LayoutTestController::grantDesktopNotificationPermission);
+#endif
     bindMethod("findString", &LayoutTestController::findString);
     bindMethod("isCommandEnabled", &LayoutTestController::isCommandEnabled);
     bindMethod("hasCustomPageSizeStyle", &LayoutTestController::hasCustomPageSizeStyle);
@@ -161,7 +165,6 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("removeOriginAccessWhitelistEntry", &LayoutTestController::removeOriginAccessWhitelistEntry);
     bindMethod("repaintSweepHorizontally", &LayoutTestController::repaintSweepHorizontally);
     bindMethod("resetPageVisibility", &LayoutTestController::resetPageVisibility);
-    bindMethod("resumeAnimations", &LayoutTestController::resumeAnimations);
     bindMethod("setAcceptsEditing", &LayoutTestController::setAcceptsEditing);
     bindMethod("setAllowDisplayOfInsecureContent", &LayoutTestController::setAllowDisplayOfInsecureContent);
     bindMethod("setAllowFileAccessFromFileURLs", &LayoutTestController::setAllowFileAccessFromFileURLs);
@@ -210,9 +213,10 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("setXSSAuditorEnabled", &LayoutTestController::setXSSAuditorEnabled);
     bindMethod("setAsynchronousSpellCheckingEnabled", &LayoutTestController::setAsynchronousSpellCheckingEnabled);
     bindMethod("showWebInspector", &LayoutTestController::showWebInspector);
+#if ENABLE(NOTIFICATIONS)
     bindMethod("simulateDesktopNotificationClick", &LayoutTestController::simulateDesktopNotificationClick);
+#endif
     bindMethod("startSpeechInput", &LayoutTestController::startSpeechInput);
-    bindMethod("suspendAnimations", &LayoutTestController::suspendAnimations);
     bindMethod("testRepaint", &LayoutTestController::testRepaint);
     bindMethod("waitForPolicyDelegate", &LayoutTestController::waitForPolicyDelegate);
     bindMethod("waitUntilDone", &LayoutTestController::waitUntilDone);
@@ -1059,32 +1063,6 @@ int LayoutTestController::numberOfActiveAnimations()
     return controller->numberOfActiveAnimations();
 }
 
-void LayoutTestController::suspendAnimations()
-{
-    WebFrame* webFrame = m_shell->webView()->mainFrame();
-    if (!webFrame)
-        return;
-
-    WebAnimationController* controller = webFrame->animationController();
-    if (!controller)
-        return;
-
-    controller->suspendAnimations();
-}
-
-void LayoutTestController::resumeAnimations()
-{
-    WebFrame* webFrame = m_shell->webView()->mainFrame();
-    if (!webFrame)
-        return;
-
-    WebAnimationController* controller = webFrame->animationController();
-    if (!controller)
-        return;
-
-    controller->resumeAnimations();
-}
-
 void LayoutTestController::pauseAnimationAtTimeOnElementWithId(const CppArgumentList& arguments, CppVariant* result)
 {
     result->set(false);
@@ -1156,18 +1134,6 @@ void LayoutTestController::numberOfActiveAnimations(const CppArgumentList&, CppV
     result->set(numberOfActiveAnimations());
 }
 
-void LayoutTestController::suspendAnimations(const CppArgumentList&, CppVariant* result)
-{
-    suspendAnimations();
-    result->setNull();
-}
-
-void LayoutTestController::resumeAnimations(const CppArgumentList&, CppVariant* result)
-{
-    resumeAnimations();
-    result->setNull();
-}
-
 void LayoutTestController::disableImageLoading(const CppArgumentList&, CppVariant* result)
 {
     m_shell->preferences()->loadsImagesAutomatically = false;
@@ -1186,6 +1152,7 @@ void LayoutTestController::callShouldCloseOnWebView(const CppArgumentList&, CppV
     result->set(m_shell->webView()->dispatchBeforeUnloadEvent());
 }
 
+#if ENABLE(NOTIFICATIONS)
 void LayoutTestController::grantDesktopNotificationPermission(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() != 1 || !arguments[0].isString()) {
@@ -1211,6 +1178,7 @@ void LayoutTestController::simulateDesktopNotificationClick(const CppArgumentLis
 #endif
         result->set(false);
 }
+#endif
 
 void LayoutTestController::setDomainRelaxationForbiddenForURLScheme(const CppArgumentList& arguments, CppVariant* result)
 {
@@ -1960,6 +1928,7 @@ void LayoutTestController::abortModal(const CppArgumentList& arguments, CppVaria
     result->setNull();
 }
 
+#if ENABLE(INPUT_SPEECH)
 void LayoutTestController::addMockSpeechInputResult(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
@@ -1979,6 +1948,7 @@ void LayoutTestController::setMockSpeechInputDumpRect(const CppArgumentList& arg
     if (MockWebSpeechInputController* controller = m_shell->webViewHost()->speechInputControllerMock())
         controller->setDumpRect(arguments[0].value.boolValue);
 }
+#endif
 
 void LayoutTestController::startSpeechInput(const CppArgumentList& arguments, CppVariant* result)
 {

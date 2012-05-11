@@ -515,9 +515,7 @@ void FrameLoader::clear(bool clearWindowProperties, bool clearScriptObjects, boo
         m_frame->document()->cancelParsing();
         m_frame->document()->stopActiveDOMObjects();
         if (m_frame->document()->attached()) {
-            m_frame->document()->willRemove();
-            m_frame->document()->detach();
-            
+            m_frame->document()->prepareForDestruction();
             m_frame->document()->removeFocusedNodeOfSubtree(m_frame->document());
         }
     }
@@ -2119,6 +2117,7 @@ void FrameLoader::checkLoadCompleteForThisFrame()
         }
         
         case FrameStateComplete:
+            m_loadType = FrameLoadTypeStandard;
             frameLoadCompleted();
             return;
     }
@@ -2775,8 +2774,10 @@ void FrameLoader::continueLoadAfterNewWindowPolicy(const ResourceRequest& reques
 
     mainFrame->page()->setOpenedByDOM();
     mainFrame->loader()->m_client->dispatchShow();
-    if (!m_suppressOpenerInNewFrame)
+    if (!m_suppressOpenerInNewFrame) {
         mainFrame->loader()->setOpener(frame.get());
+        mainFrame->document()->setReferrerPolicy(frame->document()->referrerPolicy());
+    }
     mainFrame->loader()->loadWithNavigationAction(request, NavigationAction(request), false, FrameLoadTypeStandard, formState);
 }
 

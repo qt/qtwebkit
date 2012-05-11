@@ -83,12 +83,15 @@ Node::InsertionNotificationRequest HTMLTrackElement::insertedInto(Node* insertio
     return InsertionDone;
 }
 
-void HTMLTrackElement::willRemove()
+void HTMLTrackElement::removedFrom(Node* insertionPoint)
 {
-    if (HTMLMediaElement* parent = mediaElement())
+    HTMLMediaElement* parent = mediaElement();
+    if (!parent && WebCore::isMediaElement(insertionPoint))
+        parent = toMediaElement(insertionPoint);
+    if (parent)
         parent->willRemoveTrack(this);
 
-    HTMLElement::willRemove();
+    HTMLElement::removedFrom(insertionPoint);
 }
 
 void HTMLTrackElement::parseAttribute(Attribute* attribute)
@@ -184,9 +187,9 @@ TextTrack* HTMLTrackElement::track()
     return ensureTrack();
 }
 
-bool HTMLTrackElement::isURLAttribute(Attribute* attribute) const
+bool HTMLTrackElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attribute->name() == srcAttr || HTMLElement::isURLAttribute(attribute);
+    return attribute.name() == srcAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 void HTMLTrackElement::scheduleLoad()

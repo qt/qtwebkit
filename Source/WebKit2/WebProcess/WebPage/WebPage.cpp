@@ -91,6 +91,7 @@
 #include <WebCore/FrameView.h>
 #include <WebCore/HTMLFormElement.h>
 #include <WebCore/HTMLInputElement.h>
+#include <WebCore/HTMLPlugInElement.h>
 #include <WebCore/HistoryItem.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/MouseEvent.h>
@@ -223,6 +224,9 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_willGoToBackForwardItemCallbackEnabled(true)
 #if PLATFORM(WIN)
     , m_gestureReachedScrollingLimit(false)
+#endif
+#if ENABLE(PAGE_VISIBILITY_API)
+    , m_visibilityState(WebCore::PageVisibilityStateVisible)
 #endif
 {
     ASSERT(m_pageID);
@@ -382,13 +386,22 @@ void WebPage::initializeInjectedBundleFullScreenClient(WKBundlePageFullScreenCli
 }
 #endif
 
-PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, const Plugin::Parameters& parameters)
+PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* pluginElement, const Plugin::Parameters& parameters)
 {
     String pluginPath;
+    bool blocked;
 
     if (!WebProcess::shared().connection()->sendSync(
             Messages::WebContext::GetPluginPath(parameters.mimeType, parameters.url.string()), 
-            Messages::WebContext::GetPluginPath::Reply(pluginPath), 0)) {
+            Messages::WebContext::GetPluginPath::Reply(pluginPath, blocked), 0)) {
+        return 0;
+    }
+
+    if (blocked) {
+        if (pluginElement->renderer()->isEmbeddedObject())
+            toRenderEmbeddedObject(pluginElement->renderer())->setPluginUnavailabilityReason(RenderEmbeddedObject::InsecurePluginVersion);
+
+        send(Messages::WebPageProxy::DidBlockInsecurePluginVersion(parameters.mimeType));
         return 0;
     }
 
@@ -3157,7 +3170,28 @@ void WebPage::setVisibilityState(int visibilityState, bool isInitialState)
 {
     if (!m_page)
         return;
-    m_page->setVisibilityState(static_cast<WebCore::PageVisibilityState>(visibilityState), isInitialState);
+
+    WebCore::PageVisibilityState state = static_cast<WebCore::PageVisibilityState>(visibilityState);
+
+    if (m_visibilityState == state)
+        return;
+
+    FrameView* view = m_page->mainFrame() ? m_page->mainFrame()->view() : 0;
+
+    if (state == WebCore::PageVisibilityStateVisible) {
+        m_page->didMoveOnscreen();
+        if (view)
+            view->show();
+    }
+
+    m_page->setVisibilityState(state, isInitialState);
+    m_visibilityState = state;
+
+    if (state == WebCore::PageVisibilityStateHidden) {
+        m_page->willMoveOffscreen();
+        if (view)
+            view->hide();
+    }
 }
 #endif
 

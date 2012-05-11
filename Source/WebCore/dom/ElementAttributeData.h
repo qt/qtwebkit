@@ -55,8 +55,6 @@ public:
         return adoptPtr(new ElementAttributeData);
     }
 
-    ~ElementAttributeData();
-
     void clearClass() { m_classNames.clear(); }
     void setClass(const String& className, bool shouldFoldCase);
     const SpaceSplitString& classNames() const { return m_classNames; }
@@ -106,7 +104,6 @@ private:
     friend class HTMLConstructionSite;
 
     ElementAttributeData()
-        : m_attrCount(0)
     {
     }
 
@@ -125,8 +122,6 @@ private:
     SpaceSplitString m_classNames;
     AtomicString m_idForStyleResolution;
     Vector<Attribute> m_attributes;
-
-    unsigned m_attrCount;
 };
 
 inline void ElementAttributeData::removeAttribute(const QualifiedName& name, Element* element)

@@ -77,6 +77,7 @@
 #include "PlatformWheelEvent.h"
 #include "ProcessingInstruction.h"
 #include "ProgressEvent.h"
+#include "RadioNodeList.h"
 #include "RegisteredEventListener.h"
 #include "RenderBlock.h"
 #include "RenderBox.h"
@@ -835,7 +836,11 @@ bool Node::hasNonEmptyBoundingBox() const
 
 inline static ShadowRoot* oldestShadowRootFor(const Node* node)
 {
-    return node->isElementNode() && toElement(node)->hasShadowRoot() ? toElement(node)->shadow()->oldestShadowRoot() : 0;
+    if (!node->isElementNode())
+        return 0;
+    if (ElementShadow* shadow = toElement(node)->shadow())
+        return shadow->oldestShadowRoot();
+    return 0;
 }
 
 inline void Node::setStyleChange(StyleChangeType changeType)
@@ -991,6 +996,9 @@ void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& at
         && attrName != itempropAttr
         && attrName != itemtypeAttr
 #endif
+        && attrName != idAttr
+        && attrName != typeAttr
+        && attrName != checkedAttr
         && attrName != nameAttr
         && attrName != forAttr)
         return;
@@ -1338,14 +1346,8 @@ void Node::attach()
     clearNeedsStyleRecalc();
 }
 
-void Node::willRemove()
-{
-}
-
 void Node::detach()
 {
-    setFlag(InDetachFlag);
-
     if (renderer())
         renderer()->destroyAndCleanupAnonymousWrappers();
     setRenderer(0);
@@ -1360,8 +1362,6 @@ void Node::detach()
     clearFlag(IsHoveredFlag);
     clearFlag(InActiveChainFlag);
     clearFlag(IsAttachedFlag);
-
-    clearFlag(InDetachFlag);
 }
 
 // FIXME: This code is used by editing.  Seems like it could move over there and not pollute Node.
@@ -2329,6 +2329,10 @@ void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
     for (MicroDataItemListCache::iterator it = m_microDataItemListCache.begin(); it != itemListCacheEnd; ++it)
         it->second->invalidateCache();
 #endif
+
+    RadioNodeListCache::iterator radioNodeListCacheEnd = m_radioNodeListCache.end();
+    for (RadioNodeListCache::iterator it = m_radioNodeListCache.begin(); it != radioNodeListCacheEnd; ++it)
+        it->second->invalidateCache();
 }
 
 bool NodeListsNodeData::isEmpty() const
@@ -2351,7 +2355,10 @@ bool NodeListsNodeData::isEmpty() const
 
     if (m_labelsNodeListCache)
         return false;
-    
+
+    if (!m_radioNodeListCache.isEmpty())
+        return false;
+
     return true;
 }
 
@@ -2956,6 +2963,31 @@ void NodeRareData::clearChildNodeListCache()
 {
     if (m_childNodeList)
         m_childNodeList->invalidateCache();
+}
+
+PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
+{
+    ASSERT(hasTagName(formTag));
+
+    NodeListsNodeData* nodeLists = ensureRareData()->ensureNodeLists(this);
+
+    NodeListsNodeData::RadioNodeListCache::AddResult result = nodeLists->m_radioNodeListCache.add(name, 0);
+    if (!result.isNewEntry)
+        return PassRefPtr<RadioNodeList>(result.iterator->second);
+
+    RefPtr<RadioNodeList> list = RadioNodeList::create(name, toElement(this));
+    result.iterator->second = list.get();
+    return list.release();
+}
+
+void Node::removeCachedRadioNodeList(RadioNodeList* list, const AtomicString& name)
+{
+    ASSERT(rareData());
+    ASSERT(rareData()->nodeLists());
+
+    NodeListsNodeData* data = rareData()->nodeLists();
+    ASSERT_UNUSED(list, list == data->m_radioNodeListCache.get(name));
+    data->m_radioNodeListCache.remove(name);
 }
 
 } // namespace WebCore

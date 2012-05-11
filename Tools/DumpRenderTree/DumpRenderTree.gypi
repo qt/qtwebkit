@@ -93,7 +93,7 @@
                     'chromium/WebThemeEngineDRTMac.mm',
                     'chromium/WebThemeEngineDRTMac.h',
                 ],
-            }],            
+            }],
         ],
     }
 }

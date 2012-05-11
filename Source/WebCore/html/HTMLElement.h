@@ -106,7 +106,7 @@ public:
     virtual bool isLabelable() const { return false; }
 
 protected:
-    HTMLElement(const QualifiedName& tagName, Document*);
+    HTMLElement(const QualifiedName& tagName, Document*, ConstructionType);
 
     void addHTMLLengthToStyle(StylePropertySet*, CSSPropertyID, const String& value);
     void addHTMLColorToStyle(StylePropertySet*, CSSPropertyID, const String& color);
@@ -121,7 +121,7 @@ protected:
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
     void calculateAndAdjustDirectionality();
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
 private:
     virtual String nodeName() const;
@@ -161,8 +161,8 @@ inline const HTMLElement* toHTMLElement(const Node* node)
 // This will catch anyone doing an unnecessary cast.
 void toHTMLElement(const HTMLElement*);
 
-inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document)
-    : StyledElement(tagName, document, CreateHTMLElement)
+inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document, ConstructionType type = CreateHTMLElement)
+    : StyledElement(tagName, document, type)
 {
     ASSERT(tagName.localName().impl());
 }

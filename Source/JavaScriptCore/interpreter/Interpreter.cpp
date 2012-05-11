@@ -2448,7 +2448,7 @@ JSValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         JSValue dividend = callFrame->r(vPC[2].u.operand).jsValue();
         JSValue divisor = callFrame->r(vPC[3].u.operand).jsValue();
 
-        if (dividend.isInt32() && divisor.isInt32() && divisor.asInt32() != 0) {
+        if (dividend.isInt32() && divisor.isInt32() && divisor.asInt32() != 0 && divisor.asInt32() != -1) {
             JSValue result = jsNumber(dividend.asInt32() % divisor.asInt32());
             ASSERT(result);
             callFrame->uncheckedR(dst) = result;
@@ -4788,17 +4788,6 @@ skip_id_custom_self:
         vPC += OPCODE_LENGTH(op_create_activation);
         NEXT_INSTRUCTION();
     }
-    DEFINE_OPCODE(op_get_callee) {
-        /* op_get_callee callee(r)
-
-           Move callee into a register.
-        */
-
-        callFrame->uncheckedR(vPC[1].u.operand) = JSValue(callFrame->callee());
-
-        vPC += OPCODE_LENGTH(op_get_callee);
-        NEXT_INSTRUCTION();
-    }
     DEFINE_OPCODE(op_create_this) {
         /* op_create_this this(r) proto(r)
 
@@ -4809,7 +4798,6 @@ skip_id_custom_self:
         */
 
         int thisRegister = vPC[1].u.operand;
-        int protoRegister = vPC[2].u.operand;
 
         JSFunction* constructor = jsCast<JSFunction*>(callFrame->callee());
 #if !ASSERT_DISABLED
@@ -4817,12 +4805,7 @@ skip_id_custom_self:
         ASSERT(constructor->methodTable()->getConstructData(constructor, constructData) == ConstructTypeJS);
 #endif
 
-        Structure* structure;
-        JSValue proto = callFrame->r(protoRegister).jsValue();
-        if (proto.isObject())
-            structure = asObject(proto)->inheritorID(callFrame->globalData());
-        else
-            structure = constructor->scope()->globalObject->emptyObjectStructure();
+        Structure* structure = constructor->cachedInheritorID(callFrame);
         callFrame->uncheckedR(thisRegister) = constructEmptyObject(callFrame, structure);
 
         vPC += OPCODE_LENGTH(op_create_this);

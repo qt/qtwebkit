@@ -30,7 +30,7 @@ RESOURCES += \
 include_webinspector {
     RESOURCES += \
         $$PWD/inspector/front-end/WebKit.qrc \
-        $${WEBCORE_GENERATED_SOURCES_DIR}/InspectorBackendStub.qrc
+        $${WEBCORE_GENERATED_SOURCES_DIR}/InspectorBackendCommands.qrc
 }
 
 SOURCES += \
@@ -832,6 +832,7 @@ SOURCES += \
     html/PasswordInputType.cpp \
     html/PluginDocument.cpp \
     html/RadioInputType.cpp \
+    html/RadioNodeList.cpp \
     html/RangeInputType.cpp \
     html/ResetInputType.cpp \
     html/SearchInputType.cpp \
@@ -1080,6 +1081,7 @@ SOURCES += \
     platform/DateComponents.cpp \
     platform/DragData.cpp \
     platform/DragImage.cpp \
+    platform/EventTracer.cpp \
     platform/FileChooser.cpp \
     platform/FileIconLoader.cpp \
     platform/FileStream.cpp \
@@ -1102,7 +1104,6 @@ SOURCES += \
     platform/graphics/Font.cpp \
     platform/graphics/FontCache.cpp \
     platform/graphics/FractionalLayoutRect.cpp \
-    platform/graphics/FractionalLayoutSize.cpp \
     platform/graphics/GeneratorGeneratedImage.cpp \
     platform/graphics/Gradient.cpp \
     platform/graphics/GraphicsContext.cpp \
@@ -1974,6 +1975,7 @@ HEADERS += \
     html/MicroDataItemValue.h \
     html/PluginDocument.h \
     html/PublicURLManager.h \
+    html/RadioNodeList.h \
     html/StepRange.h \
     html/TextDocument.h \
     html/TimeRanges.h \
@@ -2187,6 +2189,7 @@ HEADERS += \
     platform/DateComponents.h \
     platform/DragData.h \
     platform/DragImage.h \
+    platform/EventTracer.h \
     platform/FileChooser.h \
     platform/FileStream.h \
     platform/FileStreamClient.h \
@@ -2970,11 +2973,13 @@ contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
                 plugins/mac/PluginViewMac.mm
         } else {
             SOURCES += \
-                plugins/qt/PluginContainerQt.cpp \
                 plugins/qt/PluginPackageQt.cpp \
                 plugins/qt/PluginViewQt.cpp
-            HEADERS += \
-                plugins/qt/PluginContainerQt.h
+
+            haveQt(4) {
+                SOURCES += plugins/qt/PluginContainerQt.cpp
+                HEADERS += plugins/qt/PluginContainerQt.h
+            }
         }
     }
 

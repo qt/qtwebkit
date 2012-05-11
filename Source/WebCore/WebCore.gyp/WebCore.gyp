@@ -367,7 +367,7 @@
             '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorFrontend.h',
             '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorTypeBuilder.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorTypeBuilder.h',
-            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendStub.js',
+            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js',
           ],
           'variables': {
             'generator_include_dirs': [
@@ -1178,6 +1178,8 @@
           'direct_dependent_settings': {
             'include_dirs+++': ['../dom'],
           },
+          # In generated bindings code: 'switch contains default but no case'.
+          'msvs_disabled_warnings': [ 4065 ],
         }],
         ['OS=="linux" and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
           'cflags': [
@@ -1361,7 +1363,7 @@
                 'postbuild_name': 'Check Objective-C Rename',
                 'variables': {
                   'class_whitelist_regex':
-                      'ChromiumWebCoreObjC|TCMVisibleView|RTCMFlippedView',
+                      'ChromiumWebCoreObjC|TCMVisibleView|RTCMFlippedView|WebCoreTextFieldCell',
                   'category_whitelist_regex':
                       'TCMInterposing|ScrollAnimatorChromiumMacExt',
                 },
@@ -1652,7 +1654,6 @@
             ['include', 'platform/graphics/cg/IntPointCG\\.cpp$'],
             ['include', 'platform/graphics/cg/IntRectCG\\.cpp$'],
             ['include', 'platform/graphics/cg/IntSizeCG\\.cpp$'],
-            ['exclude', 'platform/graphics/chromium/ImageChromiumMac\\.mm$'],
             ['exclude', 'platform/graphics/mac/FontMac\\.mm$'],
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],

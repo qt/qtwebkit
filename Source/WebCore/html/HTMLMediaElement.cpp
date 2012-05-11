@@ -3189,14 +3189,14 @@ void HTMLMediaElement::sourceWasAdded(HTMLSourceElement* source)
     scheduleNextSourceChild();
 }
 
-void HTMLMediaElement::sourceWillBeRemoved(HTMLSourceElement* source)
+void HTMLMediaElement::sourceWasRemoved(HTMLSourceElement* source)
 {
-    LOG(Media, "HTMLMediaElement::sourceWillBeRemoved(%p)", source);
+    LOG(Media, "HTMLMediaElement::sourceWasRemoved(%p)", source);
 
 #if !LOG_DISABLED
     if (source->hasTagName(sourceTag)) {
         KURL url = source->getNonEmptyURLAttribute(srcAttr);
-        LOG(Media, "HTMLMediaElement::sourceWillBeRemoved - 'src' is %s", urlForLogging(url).utf8().data());
+        LOG(Media, "HTMLMediaElement::sourceWasRemoved - 'src' is %s", urlForLogging(url).utf8().data());
     }
 #endif
 
@@ -3204,9 +3204,8 @@ void HTMLMediaElement::sourceWillBeRemoved(HTMLSourceElement* source)
         return;
 
     if (source == m_nextChildNodeToConsider) {
-        m_nextChildNodeToConsider = m_nextChildNodeToConsider->nextSibling();
-        if (!m_nextChildNodeToConsider)
-            m_nextChildNodeToConsider = 0;
+        if (m_currentSourceNode)
+            m_nextChildNodeToConsider = m_currentSourceNode->nextSibling();
         LOG(Media, "HTMLMediaElement::sourceRemoved - m_nextChildNodeToConsider set to %p", m_nextChildNodeToConsider.get());
     } else if (source == m_currentSourceNode) {
         // Clear the current source node pointer, but don't change the movie as the spec says:
@@ -4021,9 +4020,9 @@ void HTMLMediaElement::mediaCanStart()
     loadInternal();
 }
 
-bool HTMLMediaElement::isURLAttribute(Attribute* attribute) const
+bool HTMLMediaElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attribute->name() == srcAttr || HTMLElement::isURLAttribute(attribute);
+    return attribute.name() == srcAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 void HTMLMediaElement::setShouldDelayLoadEvent(bool shouldDelay)
@@ -4074,10 +4073,11 @@ MediaControls* HTMLMediaElement::mediaControls()
 
 bool HTMLMediaElement::hasMediaControls()
 {
-    if (!hasShadowRoot())
+    ElementShadow* elementShadow = shadow();
+    if (!elementShadow)
         return false;
 
-    Node* node = shadow()->oldestShadowRoot()->firstChild();
+    Node* node = elementShadow->oldestShadowRoot()->firstChild();
     return node && node->isMediaControls();
 }
 

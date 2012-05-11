@@ -75,7 +75,6 @@ public:
     ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* youngerShadowRoot(Node* shadow, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* olderShadowRoot(Node* shadow, ExceptionCode&);
-    void removeShadowRoot(Element* host, ExceptionCode&);
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     PassRefPtr<Element> createContentElement(Document*, ExceptionCode&);
@@ -162,6 +161,9 @@ public:
     void setBatteryStatus(Document*, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode&);
 
     void setNetworkInformation(Document*, const String& eventType, long bandwidth, bool metered, ExceptionCode&);
+
+    void suspendAnimations(Document*, ExceptionCode&) const;
+    void resumeAnimations(Document*, ExceptionCode&) const;
 
 #if ENABLE(INSPECTOR)
     unsigned numberOfLiveNodes() const;

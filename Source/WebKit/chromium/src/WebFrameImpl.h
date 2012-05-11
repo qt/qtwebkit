@@ -72,7 +72,6 @@ public:
     virtual void setName(const WebString&);
     virtual long long identifier() const;
     virtual WebVector<WebIconURL> iconURLs(int iconTypes) const;
-    virtual WebReferrerPolicy referrerPolicy() const;
     virtual WebSize scrollOffset() const;
     virtual void setScrollOffset(const WebSize&);
     virtual WebSize minimumScrollOffset() const;
@@ -208,11 +207,16 @@ public:
     virtual void handleIntentResult(int, const WebString&);
     virtual void handleIntentFailure(int, const WebString&);
 
+    virtual void sendOrientationChangeEvent(int orientation);
+
     virtual void addEventListener(const WebString& eventType,
                                   WebDOMEventListener*, bool useCapture);
     virtual void removeEventListener(const WebString& eventType,
                                      WebDOMEventListener*, bool useCapture);
     virtual bool dispatchEvent(const WebDOMEvent&);
+    virtual void dispatchMessageEventWithOriginCheck(
+        const WebSecurityOrigin& intendedTargetOrigin,
+        const WebDOMEvent&);
 
     virtual WebString contentAsText(size_t maxChars) const;
     virtual WebString contentAsMarkup() const;

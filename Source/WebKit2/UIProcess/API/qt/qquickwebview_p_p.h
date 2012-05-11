@@ -41,6 +41,7 @@ class DrawingAreaProxy;
 class QtDialogRunner;
 class QtViewportInteractionEngine;
 class QtWebContext;
+class QtWebError;
 class QtWebPageLoadClient;
 class QtWebPagePolicyClient;
 class WebPageProxy;
@@ -50,7 +51,7 @@ class QWebNavigationHistory;
 class QWebViewportInfo;
 
 QT_BEGIN_NAMESPACE
-class QDeclarativeComponent;
+class QQmlComponent;
 QT_END_NAMESPACE
 
 class QQuickWebViewPrivate {
@@ -67,19 +68,26 @@ public:
 
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
+    virtual void onComponentComplete() { }
+
     virtual void enableMouseEvents() { }
     virtual void disableMouseEvents() { }
 
     virtual QPointF pageItemPos();
     virtual void updateContentsSize(const QSizeF&) { }
 
+    virtual void provisionalLoadDidStart(const QUrl& url);
+    virtual void loadDidCommit();
+    virtual void didSameDocumentNavigation();
+    virtual void titleDidChange();
+    virtual void loadProgressDidChange(int loadProgress);
+    virtual void backForwardListDidChange();
     virtual void loadDidSucceed();
-    virtual void onComponentComplete();
-    virtual void loadDidCommit() { }
-    virtual void didFinishFirstNonEmptyLayout() { }
-    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes& attr) { }
-    void didChangeBackForwardList();
+    virtual void loadDidFail(const WebKit::QtWebError& error);
 
+    virtual void didChangeViewportProperties(const WebCore::ViewportAttributes& attr) { }
+
+    int loadProgress() const { return m_loadProgress; }
     void setNeedsDisplay();
 
     virtual WebKit::QtViewportInteractionEngine* viewportInteractionEngine() { return 0; }
@@ -175,15 +183,15 @@ protected:
 
     FlickableAxisLocker axisLocker;
 
-    QDeclarativeComponent* alertDialog;
-    QDeclarativeComponent* confirmDialog;
-    QDeclarativeComponent* promptDialog;
-    QDeclarativeComponent* authenticationDialog;
-    QDeclarativeComponent* certificateVerificationDialog;
-    QDeclarativeComponent* itemSelector;
-    QDeclarativeComponent* proxyAuthenticationDialog;
-    QDeclarativeComponent* filePicker;
-    QDeclarativeComponent* databaseQuotaDialog;
+    QQmlComponent* alertDialog;
+    QQmlComponent* confirmDialog;
+    QQmlComponent* promptDialog;
+    QQmlComponent* authenticationDialog;
+    QQmlComponent* certificateVerificationDialog;
+    QQmlComponent* itemSelector;
+    QQmlComponent* proxyAuthenticationDialog;
+    QQmlComponent* filePicker;
+    QQmlComponent* databaseQuotaDialog;
 
     WebCore::ViewportAttributes attributes;
 
@@ -192,7 +200,7 @@ protected:
     bool m_renderToOffscreenBuffer;
     bool m_dialogActive;
     QUrl m_iconURL;
-    QUrl m_deferedUrlToLoad;
+    int m_loadProgress;
 };
 
 class QQuickWebViewLegacyPrivate : public QQuickWebViewPrivate {
@@ -216,13 +224,11 @@ public:
     virtual ~QQuickWebViewFlickablePrivate();
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
+    virtual void onComponentComplete();
+
     virtual QPointF pageItemPos();
     virtual void updateContentsSize(const QSizeF&);
 
-    virtual void loadDidSucceed();
-    virtual void onComponentComplete();
-    virtual void loadDidCommit();
-    virtual void didFinishFirstNonEmptyLayout();
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
     virtual WebKit::QtViewportInteractionEngine* viewportInteractionEngine() { return interactionEngine.data(); }
     virtual void updateViewportSize();
@@ -237,7 +243,6 @@ public:
 private:
     QScopedPointer<WebKit::QtViewportInteractionEngine> interactionEngine;
     bool pageIsSuspended;
-    bool loadSuccessDispatchIsPending;
 };
 
 #endif // qquickwebview_p_p_h

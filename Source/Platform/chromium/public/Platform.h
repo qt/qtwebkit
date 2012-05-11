@@ -40,6 +40,8 @@
 namespace WebKit {
 
 class WebAudioBus;
+class WebClipboard;
+class WebFileSystem;
 class WebMediaStreamCenter;
 class WebMediaStreamCenterClient;
 class WebMimeRegistry;
@@ -59,6 +61,9 @@ public:
     WEBKIT_EXPORT static Platform* current();
 
     // Must return non-null.
+    virtual WebClipboard* clipboard() { return 0; }
+
+    // Must return non-null.
     virtual WebMimeRegistry* mimeRegistry() { return 0; }
 
 
@@ -68,6 +73,11 @@ public:
     virtual size_t audioHardwareBufferSize() { return 0; }
     virtual WebAudioDevice* createAudioDevice(size_t bufferSize, unsigned numberOfChannels, double sampleRate, WebAudioDevice::RenderCallback*) { return 0; }
 
+
+    // FileSystem ----------------------------------------------------------
+
+    // Must return non-null.
+    virtual WebFileSystem* fileSystem() { return 0; }
 
     // Gamepad -------------------------------------------------------------
 

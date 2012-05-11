@@ -401,6 +401,7 @@ public:
 private:
     static RenderStyle* s_styleNotYetAvailable;
 
+    void addStylesheetsFromSeamlessParents();
     void addAuthorRulesAndCollectUserRulesFromSheets(const Vector<RefPtr<CSSStyleSheet> >*, RuleSet& userStyle);
 
     void cacheBorderAndBackground();
@@ -505,7 +506,7 @@ private:
 #endif
 
 #if ENABLE(STYLE_SCOPED)
-    static const ContainerNode* determineScope(const StyleSheetInternal*);
+    static const ContainerNode* determineScope(const CSSStyleSheet*);
 
     typedef HashMap<const ContainerNode*, OwnPtr<RuleSet> > ScopedRuleSetMap;
 

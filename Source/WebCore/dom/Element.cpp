@@ -704,9 +704,17 @@ void Element::attributeChanged(Attribute* attr)
 {
     document()->incDOMTreeVersion();
 
-    if (isIdAttributeName(attr->name()))
-        idAttributeChanged(attr);
-    else if (attr->name() == HTMLNames::nameAttr)
+    if (isIdAttributeName(attr->name())) {
+        if (attributeData()) {
+            if (attr->isNull())
+                attributeData()->setIdForStyleResolution(nullAtom);
+            else if (document()->inQuirksMode())
+                attributeData()->setIdForStyleResolution(attr->value().lower());
+            else
+                attributeData()->setIdForStyleResolution(attr->value());
+        }
+        setNeedsStyleRecalc();
+    } else if (attr->name() == HTMLNames::nameAttr)
         setHasName(!attr->isNull());
 
     if (!needsStyleRecalc() && document()->attached()) {
@@ -745,19 +753,6 @@ void Element::attributeChanged(Attribute* attr)
         document()->axObjectCache()->postNotification(renderer(), AXObjectCache::AXInvalidStatusChanged, true);
 }
 
-void Element::idAttributeChanged(Attribute* attr)
-{
-    if (attributeData()) {
-        if (attr->isNull())
-            attributeData()->setIdForStyleResolution(nullAtom);
-        else if (document()->inQuirksMode())
-            attributeData()->setIdForStyleResolution(attr->value().lower());
-        else
-            attributeData()->setIdForStyleResolution(attr->value());
-    }
-    setNeedsStyleRecalc();
-}
-    
 // Returns true is the given attribute is an event handler.
 // We consider an event handler any attribute that begins with "on".
 // It is a simple solution that has the advantage of not requiring any
@@ -871,11 +866,6 @@ void Element::createAttributeData() const
     m_attributeData = ElementAttributeData::create();
 }
 
-bool Element::isURLAttribute(Attribute*) const
-{
-    return false;
-}
-
 const QualifiedName& Element::imageSourceAttributeName() const
 {
     return srcAttr;
@@ -900,17 +890,6 @@ bool Element::wasChangedSinceLastFormControlChangeEvent() const
 
 void Element::setChangedSinceLastFormControlChangeEvent(bool)
 {
-}
-
-void Element::willRemove()
-{
-#if ENABLE(FULLSCREEN_API)
-    if (containsFullScreenElement())
-        setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
-#endif
-    if (ElementShadow* shadow = this->shadow())
-        shadow->willRemove();
-    ContainerNode::willRemove();
 }
 
 Node::InsertionNotificationRequest Element::insertedInto(Node* insertionPoint)
@@ -945,6 +924,11 @@ Node::InsertionNotificationRequest Element::insertedInto(Node* insertionPoint)
 
 void Element::removedFrom(Node* insertionPoint)
 {
+#if ENABLE(FULLSCREEN_API)
+    if (containsFullScreenElement())
+        setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
+#endif
+
     setSavedLayerScrollOffset(IntSize());
 
     if (insertionPoint->inDocument()) {
@@ -1156,8 +1140,7 @@ void Element::recalcStyle(StyleChange change)
     StyleResolverParentPusher parentPusher(this);
 
     // FIXME: This does not care about sibling combinators. Will be necessary in XBL2 world.
-    if (hasShadowRoot()) {
-        ElementShadow* shadow = this->shadow();
+    if (ElementShadow* shadow = this->shadow()) {
         if (change >= Inherit || shadow->childNeedsStyleRecalc() || shadow->needsStyleRecalc()) {
             parentPusher.push();
             shadow->recalcStyle(change);
@@ -1195,13 +1178,6 @@ void Element::recalcStyle(StyleChange change)
         didRecalcStyle(change);
 }
 
-bool Element::hasShadowRoot() const
-{
-    if (ElementShadow* shadow = this->shadow())
-        return shadow->hasShadowRoot();
-    return false;
-}
-
 ElementShadow* Element::shadow() const
 {
     if (!hasRareData())
@@ -1221,8 +1197,8 @@ ElementShadow* Element::ensureShadow()
 
 ShadowRoot* Element::ensureShadowRoot()
 {
-    if (hasShadowRoot())
-        return shadow()->oldestShadowRoot();
+    if (ElementShadow* shadow = this->shadow())
+        return shadow->oldestShadowRoot();
 
     return ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot).get();
 }
@@ -1357,10 +1333,8 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
     else
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
 
-    if (hasRareData()) {
-        if (hasShadowRoot())
-            shadow()->hostChildrenChanged();
-    }
+    if (ElementShadow * shadow = this->shadow())
+        shadow->hostChildrenChanged();
 }
 
 void Element::beginParsingChildren()
@@ -1846,7 +1820,7 @@ KURL Element::getURLAttribute(const QualifiedName& name) const
 #if !ASSERT_DISABLED
     if (m_attributeData) {
         if (Attribute* attribute = getAttributeItem(name))
-            ASSERT(isURLAttribute(attribute));
+            ASSERT(isURLAttribute(*attribute));
     }
 #endif
     return document()->completeURL(stripLeadingAndTrailingHTMLSpaces(getAttribute(name)));
@@ -1857,7 +1831,7 @@ KURL Element::getNonEmptyURLAttribute(const QualifiedName& name) const
 #if !ASSERT_DISABLED
     if (m_attributeData) {
         if (Attribute* attribute = getAttributeItem(name))
-            ASSERT(isURLAttribute(attribute));
+            ASSERT(isURLAttribute(*attribute));
     }
 #endif
     String value = stripLeadingAndTrailingHTMLSpaces(getAttribute(name));

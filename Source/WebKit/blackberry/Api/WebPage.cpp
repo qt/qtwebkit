@@ -20,6 +20,7 @@
 #include "WebPage.h"
 
 #include "ApplicationCacheStorage.h"
+#include "AutofillManager.h"
 #include "BackForwardController.h"
 #include "BackForwardListImpl.h"
 #include "BackingStoreClient.h"
@@ -35,6 +36,7 @@
 #include "ContextMenuClientBlackBerry.h"
 #include "CookieManager.h"
 #include "CredentialManager.h"
+#include "CredentialStorage.h"
 #include "CredentialTransformData.h"
 #include "DOMSupport.h"
 #include "Database.h"
@@ -82,6 +84,7 @@
 #include "Page.h"
 #include "PageCache.h"
 #include "PageGroup.h"
+#include "PagePopupBlackBerry.h"
 #include "PlatformTouchEvent.h"
 #include "PlatformWheelEvent.h"
 #include "PluginDatabase.h"
@@ -304,6 +307,11 @@ protected:
     typedef DeferredTask<isActive> DeferredTaskType;
 };
 
+void WebPage::autofillTextField(const string& item)
+{
+    d->m_autofillManager->autofillTextField(item.c_str());
+}
+
 WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const IntRect& rect)
     : m_webPage(webPage)
     , m_client(client)
@@ -372,6 +380,9 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
     , m_hasInRegionScrollableAreas(false)
     , m_updateDelegatedOverlaysDispatched(false)
     , m_deferredTasksTimer(this, &WebPagePrivate::deferredTasksTimerFired)
+    , m_selectPopup(0)
+    , m_parentPopup(0)
+    , m_autofillManager(AutofillManager::create(this))
 {
     static bool isInitialized = false;
     if (!isInitialized) {
@@ -2121,6 +2132,14 @@ PageClientBlackBerry::SaveCredentialType WebPagePrivate::notifyShouldSaveCredent
     return static_cast<PageClientBlackBerry::SaveCredentialType>(m_client->notifyShouldSaveCredential(isNew));
 }
 
+void WebPagePrivate::notifyPopupAutofillDialog(const Vector<String>& candidates, const WebCore::IntRect& screenRect)
+{
+    vector<string> textItems;
+    for (size_t i = 0; i < candidates.size(); i++)
+        textItems.push_back(candidates[i].utf8().data());
+    m_client->notifyPopupAutofillDialog(textItems, screenRect);
+}
+
 bool WebPagePrivate::useFixedLayout() const
 {
     return true;
@@ -3806,6 +3825,9 @@ bool WebPagePrivate::handleMouseEvent(PlatformMouseEvent& mouseEvent)
     if (mouseEvent.type() == WebCore::PlatformEvent::MouseScroll)
         return true;
 
+    if (m_parentPopup)
+        m_parentPopup->handleMouseEvent(mouseEvent);
+
     Node* node = 0;
     if (mouseEvent.inputMethod() == TouchScreen) {
         const FatFingersResult lastFatFingersResult = m_touchEventHandler->lastFatFingersResult();
@@ -5171,6 +5193,11 @@ void WebPage::clearCredentials()
 #endif
 }
 
+void WebPage::clearAutofillData()
+{
+    AutofillManager::clear();
+}
+
 void WebPage::clearNeverRememberSites()
 {
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
@@ -5276,6 +5303,11 @@ bool WebPage::nodeHasHover(const WebDOMNode& node)
     return false;
 }
 #endif
+
+void WebPage::initPopupWebView(BlackBerry::WebKit::WebPage* webPage)
+{
+    d->m_selectPopup->init(webPage);
+}
 
 String WebPagePrivate::findPatternStringForUrl(const KURL& url) const
 {
@@ -5994,6 +6026,8 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
 
     cookieManager().setPrivateMode(webSettings->isPrivateBrowsingEnabled());
 
+    CredentialStorage::setPrivateMode(webSettings->isPrivateBrowsingEnabled());
+
     if (m_mainFrame && m_mainFrame->view()) {
         Color backgroundColor(webSettings->backgroundColor());
         m_mainFrame->view()->updateBackgroundRecursively(backgroundColor, backgroundColor.hasAlpha());
@@ -6075,6 +6109,33 @@ const String& WebPagePrivate::defaultUserAgent()
     }
 
     return *defaultUserAgent;
+}
+
+void WebPage::popupOpened(PagePopupBlackBerry* webPopup)
+{
+    ASSERT(!d->m_selectPopup);
+    d->m_selectPopup = webPopup;
+}
+
+void WebPage::popupClosed()
+{
+    ASSERT(d->m_selectPopup);
+    d->m_selectPopup = 0;
+}
+
+bool WebPage::hasOpenedPopup() const
+{
+    return d->m_selectPopup;
+}
+
+PagePopupBlackBerry* WebPage::popup()
+{
+    return d->m_selectPopup;
+}
+
+void WebPagePrivate::setParentPopup(PagePopupBlackBerry* webPopup)
+{
+    m_parentPopup = webPopup;
 }
 
 }

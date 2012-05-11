@@ -299,7 +299,6 @@
                 'public/platform/WebBlobData.h',
                 'public/platform/WebBlobRegistry.h',
                 'public/platform/WebCanvas.h',
-                'public/platform/WebClipboard.h',
                 'public/platform/WebColor.h',
                 'public/platform/WebCommon.h',
                 'public/platform/WebContentLayer.h',
@@ -307,9 +306,7 @@
                 'public/platform/WebCookie.h',
                 'public/platform/WebCookieJar.h',
                 'public/platform/WebData.h',
-                'public/platform/WebDragData.h',
                 'public/platform/WebExternalTextureLayer.h',
-                'public/platform/WebFileSystem.h',
                 'public/platform/WebFloatPoint.h',
                 'public/platform/WebFloatQuad.h',
                 'public/platform/WebFloatRect.h',
@@ -319,7 +316,6 @@
                 'public/platform/WebHTTPBody.h',
                 'public/platform/WebHTTPHeaderVisitor.h',
                 'public/platform/WebHTTPLoadInfo.h',
-                'public/platform/WebImage.h',
                 'public/platform/WebKitPlatformSupport.h',
                 'public/platform/WebLayer.h',
                 'public/platform/WebLayerTreeView.h',
@@ -477,8 +473,6 @@
                 'src/SpeechRecognitionClientProxy.h',
                 'src/StorageAreaProxy.cpp',
                 'src/StorageAreaProxy.h',
-                'src/StorageEventDispatcherImpl.cpp',
-                'src/StorageEventDispatcherImpl.h',
                 'src/StorageInfoChromium.cpp',
                 'src/StorageNamespaceProxy.cpp',
                 'src/StorageNamespaceProxy.h',
@@ -656,7 +650,6 @@
                 'src/WebSpeechRecognitionHandle.cpp',
                 'src/WebSpeechRecognitionResult.cpp',
                 'src/WebStorageEventDispatcherImpl.cpp',
-                'src/WebStorageEventDispatcherImpl.h',
                 'src/WebStorageQuotaCallbacksImpl.cpp',
                 'src/WebStorageQuotaCallbacksImpl.h',
                 'src/WebSurroundingText.cpp',
@@ -736,8 +729,10 @@
                                 # These tests depend on webkit_support and
                                 # functions defined only in !WEBKIT_IMPLEMENTATION.
                                 'tests/AssociatedURLLoaderTest.cpp',
+                                'tests/EventListenerTest.cpp',
                                 'tests/FrameTestHelpers.cpp',
                                 'tests/LevelDBTest.cpp',
+                                'tests/ListenerLeakTest.cpp',
                                 'tests/PopupMenuTest.cpp',
                                 'tests/RenderTableCellTest.cpp',
                                 'tests/RenderTableRowTest.cpp',
@@ -883,7 +878,7 @@
                     'files': [
                         '<@(devtools_files)',
                         '<@(webinspector_files)',
-                        '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendStub.js',
+                        '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js',
                     ],
                     'conditions': [
                         ['debug_devtools==0', {
@@ -1014,7 +1009,7 @@
                     '<@(_inspector_html)',
                     '<@(devtools_files)',
                     '<@(webinspector_files)',
-                    '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendStub.js',
+                    '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js',
                     '<@(_workers_files)',
                     '<@(webinspector_image_files)',
                     '<@(devtools_image_files)',
@@ -1077,7 +1072,7 @@
                             '<@(_input_page)',
                             '<@(webinspector_files)',
                             '<@(devtools_files)',
-                            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendStub.js'
+                            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js'
                         ],
                         'search_path': [
                             '../../WebCore/inspector/front-end',

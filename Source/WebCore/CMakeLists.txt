@@ -331,6 +331,7 @@ SET(WebCore_IDL_FILES
     html/ImageData.idl
     html/MediaController.idl
     html/MediaError.idl
+    html/RadioNodeList.idl
     html/TextMetrics.idl
     html/TimeRanges.idl
     html/ValidityState.idl
@@ -855,6 +856,7 @@ SET(WebCore_SOURCES
     html/PasswordInputType.cpp
     html/PluginDocument.cpp
     html/RadioInputType.cpp
+    html/RadioNodeList.cpp
     html/RangeInputType.cpp
     html/ResetInputType.cpp
     html/SearchInputType.cpp
@@ -1102,6 +1104,7 @@ SET(WebCore_SOURCES
     platform/DateComponents.cpp
     platform/DragData.cpp
     platform/DragImage.cpp
+    platform/EventTracer.cpp
     platform/FileChooser.cpp
     platform/FileIconLoader.cpp
     platform/FileSystem.cpp
@@ -1155,7 +1158,6 @@ SET(WebCore_SOURCES
     platform/graphics/FontFastPath.cpp
     platform/graphics/FontFeatureSettings.cpp
     platform/graphics/FractionalLayoutRect.cpp
-    platform/graphics/FractionalLayoutSize.cpp  
     platform/graphics/GeneratorGeneratedImage.cpp
     platform/graphics/GlyphPageTreeNode.cpp
     platform/graphics/Gradient.cpp

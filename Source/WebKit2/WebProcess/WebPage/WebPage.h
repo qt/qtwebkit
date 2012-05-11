@@ -52,6 +52,9 @@
 #include <WebCore/Editor.h>
 #include <WebCore/FrameLoaderTypes.h>
 #include <WebCore/IntRect.h>
+#if ENABLE(PAGE_VISIBILITY_API)
+#include <WebCore/PageVisibilityState.h>
+#endif
 #include <WebCore/PlatformScreen.h>
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/WebCoreKeyboardUIMode.h>
@@ -100,6 +103,7 @@ namespace WebCore {
     class GraphicsContext;
     class Frame;
     class FrameView;
+    class HTMLPlugInElement;
     class KeyboardEvent;
     class Page;
     class PrintContext;
@@ -253,7 +257,7 @@ public:
     WebCore::Frame* mainFrame() const; // May return 0.
     WebCore::FrameView* mainFrameView() const; // May return 0.
 
-    PassRefPtr<Plugin> createPlugin(WebFrame*, const Plugin::Parameters&);
+    PassRefPtr<Plugin> createPlugin(WebFrame*, WebCore::HTMLPlugInElement*, const Plugin::Parameters&);
 
     EditorState editorState() const;
 
@@ -827,6 +831,9 @@ private:
 #endif
 #if PLATFORM(QT)
     HashMap<String, QtNetworkReply*> m_applicationSchemeReplies;
+#endif
+#if ENABLE(PAGE_VISIBILITY_API)
+    WebCore::PageVisibilityState m_visibilityState;
 #endif
 };
 

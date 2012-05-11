@@ -1,3 +1,158 @@
+2012-05-10  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Remove WEBKIT_USING_SKIA ifdefs that are always true
+        https://bugs.webkit.org/show_bug.cgi?id=86121
+
+        Reviewed by Adam Barth.
+
+        Chromium always uses Skia now, so this just removes the barriers
+        around code that was previously #if'd.
+
+        * chromium/public/WebCanvas.h:
+        (WebKit):
+        * chromium/public/WebGraphicsContext3D.h:
+        (WebGraphicsContext3D):
+        (WebKit::WebGraphicsContext3D::onCreateGrGLInterface):
+        * chromium/public/WebImage.h:
+        (WebImage):
+
+2012-05-10  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Remove dead code behind unused WEBKIT_USING_CG
+        https://bugs.webkit.org/show_bug.cgi?id=86018
+
+        Reviewed by Adam Barth.
+
+        We never use CoreGraphics as the backend for GraphicsContext in
+        Chromium, so this is all dead code.
+
+        * chromium/public/WebCanvas.h:
+        (WebKit):
+        * chromium/public/WebImage.h:
+        (WebImage):
+
+2012-05-09  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move clipboard to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=85758
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::clipboard):
+        * chromium/public/WebClipboard.h: Added.
+        (WebKit):
+        (WebClipboard):
+        (WebKit::WebClipboard::sequenceNumber):
+        (WebKit::WebClipboard::isFormatAvailable):
+        (WebKit::WebClipboard::readAvailableTypes):
+        (WebKit::WebClipboard::readPlainText):
+        (WebKit::WebClipboard::readHTML):
+        (WebKit::WebClipboard::readImage):
+        (WebKit::WebClipboard::readCustomData):
+        (WebKit::WebClipboard::writePlainText):
+        (WebKit::WebClipboard::writeHTML):
+        (WebKit::WebClipboard::writeURL):
+        (WebKit::WebClipboard::writeImage):
+        (WebKit::WebClipboard::writeDataObject):
+        (WebKit::WebClipboard::~WebClipboard):
+        * chromium/public/WebDragData.h: Added.
+        (WebKit):
+        (WebDragData):
+        (WebKit::WebDragData::~WebDragData):
+        (WebKit::WebDragData::WebDragData):
+        (WebKit::WebDragData::operator=):
+        (WebKit::WebDragData::isNull):
+        * chromium/public/WebImage.h: Added.
+        (WebKit):
+        (WebImage):
+        (WebKit::WebImage::~WebImage):
+        (WebKit::WebImage::WebImage):
+        (WebKit::WebImage::operator=):
+        (WebKit::WebImage::getSkBitmap):
+        (WebKit::WebImage::init):
+        (WebKit::WebImage::getCGImageRef):
+
+2012-05-09  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Adding the possibility of port specific information in MediaStreamDescriptor
+        https://bugs.webkit.org/show_bug.cgi?id=85794
+
+        Reviewed by Adam Barth.
+
+        To facilitate for ports I have added an ExtraData field that can be used for whatever purpose is needed.
+
+        * chromium/public/WebMediaStreamDescriptor.h:
+        (ExtraData):
+        (WebKit::WebMediaStreamDescriptor::ExtraData::~ExtraData):
+        (WebMediaStreamDescriptor):
+
+2012-05-07  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move fileSystem to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=85760
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::fileSystem):
+        * chromium/public/WebFileSystem.h: Added.
+        (WebKit):
+        (WebFileSystem):
+        (WebKit::WebFileSystem::move):
+        (WebKit::WebFileSystem::copy):
+        (WebKit::WebFileSystem::remove):
+        (WebKit::WebFileSystem::removeRecursively):
+        (WebKit::WebFileSystem::readMetadata):
+        (WebKit::WebFileSystem::createFile):
+        (WebKit::WebFileSystem::createDirectory):
+        (WebKit::WebFileSystem::fileExists):
+        (WebKit::WebFileSystem::directoryExists):
+        (WebKit::WebFileSystem::readDirectory):
+        (WebKit::WebFileSystem::createFileWriter):
+        (WebKit::WebFileSystem::createSnapshotFileAndReadMetadata):
+        (WebKit::WebFileSystem::~WebFileSystem):
+
+2012-05-07  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Rename MediaStreamCenter::didConstructMediaStream
+        https://bugs.webkit.org/show_bug.cgi?id=85796
+
+        Reviewed by Adam Barth.
+
+        Renamed WebMediaStreamCenter::didConstructMediaStream to didCreateMediaStream,
+        and change so that it is only called for MediaStreams created from JS.
+        Also send out the WebMediaStreamDescriptor non-const instead.
+
+        * chromium/public/WebMediaStreamCenter.h:
+        (WebKit::WebMediaStreamCenter::didCreateMediaStream):
+        (WebMediaStreamCenter):
+        (WebKit::WebMediaStreamCenter::didConstructMediaStream):
+
+2012-05-07  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Allow UserMediaRequest::succeed to take an MediaStreamDescriptor
+        https://bugs.webkit.org/show_bug.cgi?id=85798
+
+        Reviewed by Adam Barth.
+
+        Adding another UserMediaRequest::succeed function that takes an MediaStreamDescriptor
+        instead of the two MediaStreamSource arrays.
+
+        * chromium/public/WebMediaStreamCenter.h:
+        (WebMediaStreamCenter):
+        (WebKit::WebMediaStreamCenter::constructSDP):
+
 2012-05-04  Tommy Widenflycht  <tommyw@google.com>
 
         MediaStream API: Make PeerConnection00's API fully compliant with the draft

@@ -1,3 +1,224 @@
+2012-05-10  MORITA Hajime  <morrita@google.com>
+
+        ElementShadow should minimize the usage of "ShadowRoot" name
+        https://bugs.webkit.org/show_bug.cgi?id=85970
+
+        Reviewed by Dimitri Glazkov.
+
+        Removed symbols which no longer exists
+
+        * Source/autotools/symbols.filter:
+
+2012-05-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move resumeAnimations to use Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=86063
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Source/autotools/symbols.filter: Add a symbol filter for resumeAnimations. 
+
+2012-05-10  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GTK] ENABLE_IFRAME_SEAMLESS support
+        https://bugs.webkit.org/show_bug.cgi?id=85843
+
+        Reviewed by Eric Seidel.
+
+        Add a configuration option for enabling the iframe seamless
+        attribute support, enabling it by default.
+
+        * configure.ac:
+
+2012-05-09  Stephen Chenney  <schenney@chromium.org>
+
+        SVG Filters allow invalid elements as children
+        https://bugs.webkit.org/show_bug.cgi?id=83979
+
+        Reviewed by Nikolas Zimmermann.
+
+        This test will crash upon load in Chromium, unless the associated fix is in.
+
+        * ManualTests/bugzilla-83979.svg: Added.
+
+2012-05-09  Kent Tamura  <tkent@chromium.org>
+
+        Calendar Picker: Fix a crash by changing input type.
+        https://bugs.webkit.org/show_bug.cgi?id=86007
+
+        Reviewed by Hajime Morita.
+
+        * ManualTests/forms/calendar-picker-crash-by-type-change.html: Added.
+
+2012-05-09  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move suspendAnimations to use Internals interface.
+        https://bugs.webkit.org/show_bug.cgi?id=85986
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/autotools/symbols.filter: Add a symbol filter for suspendAnimations. 
+
+2012-05-09  Hugo Parente Lima  <hugo.lima@openbossa.org>
+
+        Use suitable viewport values on XHTML-MP pages.
+        https://bugs.webkit.org/show_bug.cgi?id=85425
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add LEGACY_VIEWPORT_ADAPTION use feature to cmake build system,
+        this feature will enable the use of a suitable viewport size
+        on legacy XHTML-MP pages.
+
+        * Source/cmake/WebKitFeatures.cmake:
+
+2012-05-09  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Enable PAGE_POPUP in make file, and implement required methods
+        https://bugs.webkit.org/show_bug.cgi?id=85907
+
+        Reviewed by Rob Buis.
+
+        Enable PAGE_POPUP option in make files.
+
+        Internal reviewed by Yong Li.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-05-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Split WebKit2 Makefile moving source code listings to GNUmakefile.list.am
+        https://bugs.webkit.org/show_bug.cgi?id=85985
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am:
+
+2012-05-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Use independent version numbers for public libraries
+        https://bugs.webkit.org/show_bug.cgi?id=85984
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * configure.ac: Define LIBJAVASCRIPTCOREGTK_VERSION and
+        LIBWEBKIT2GTK_VERSION using the same version as
+        LIBWEBKITGTK_VERSION for backwards compatibility.
+
+2012-05-08  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] FindGStreamer: Fix the build with static WebCore.
+        https://bugs.webkit.org/show_bug.cgi?id=85930
+
+        Reviewed by Daniel Bates.
+
+        Building WebCore statically was failing because files in
+        WebCore/platform/gstreamer when ENABLE_VIDEO was set required
+        gstreamer-base, which was not being linked to after r116453.
+
+        Fix that by looking for gstreamer-base, requiring and linking
+        against it if GStreamer is used.
+
+        * Source/cmake/FindGStreamer.cmake:
+
+2012-05-08  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Rewrite FindGStreamer.cmake.
+        https://bugs.webkit.org/show_bug.cgi?id=85857
+
+        Reviewed by Daniel Bates.
+
+        We are currently kind of duplicating the same
+        FindGStreamer-Foo.cmake file whenever a new GStreamer plugin needs
+        to be found. Besides this approach not scaling very well, it
+        relies on pkg-config for version checking, uses the LibFindMacros
+        package that we should deprecate and all the find files could be
+        merged into one, with users using the COMPONENTS feature of the
+        FIND_PACKAGE() call to find the desired plugins.
+
+        FindGStreamer.cmake has then been rewritten to take all that into
+        account:
+        - The LibFindMacros.cmake package is not used anymore.
+        - Version check is performed in the CMake file itself by parsing
+        the gstversion.h header.
+        - All GStreamer plugins are searched and the COMPONENTS keyword
+        used in the FIND_PACKAGE() call is used to check which plugins are
+        required.
+        - The plugins-base and base GStreamer plugins are not searched, as
+        they were not used anywhere in the build system.
+
+        * Source/cmake/FindGStreamer-App.cmake: Removed.
+        * Source/cmake/FindGStreamer-Audio.cmake: Removed.
+        * Source/cmake/FindGStreamer-Base.cmake: Removed.
+        * Source/cmake/FindGStreamer-FFT.cmake: Removed.
+        * Source/cmake/FindGStreamer-Interfaces.cmake: Removed.
+        * Source/cmake/FindGStreamer-Pbutils.cmake: Removed.
+        * Source/cmake/FindGStreamer-Plugins-Base.cmake: Removed.
+        * Source/cmake/FindGStreamer-Video.cmake: Removed.
+        * Source/cmake/FindGStreamer.cmake: Rewrite as described above.
+        * Source/cmake/OptionsEfl.cmake: Use COMPONENTS to specify which
+        GStreamer plugins to look for.
+
+2012-05-08  Ryosuke Niwa  <rniwa@webkit.org>
+
+        perf-o-matic fix attempt for dashboard images.
+
+        Rubber-stamped by Antti Koivisto.
+
+        Also stop generating images for 30, 90, and 365 days since they have been timing out.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (schedule_runs_update):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (Runs.chart_params):
+
+2012-05-08  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [CMake] Add ENABLE_IFRAME_SEAMLESS flag
+        https://bugs.webkit.org/show_bug.cgi?id=85838
+
+        Reviewed by Eric Seidel.
+
+        Add ENABLE_IFRAME_SEAMLESS flag to CMake and enable it by default.
+        This flag was introduced by r116356.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-05-08  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] X11 plugins need to be reworked for Qt5+WK1
+        https://bugs.webkit.org/show_bug.cgi?id=80691
+
+        Reviewed by Simon Hausmann.
+
+        Implement basic windowless plugin support with Qt5.
+
+        * Source/api.pri: Need private API's to be able
+        to use QApplicationPrivate::windowForWidget.
+
+2012-05-07  Dave Tu  <dtu@chromium.org>
+
+        Adjust flakiness dashboard gpu_tests image diff URLs.
+        https://bugs.webkit.org/show_bug.cgi?id=85423
+
+        Reviewed by Ojan Vafai.
+
+        * Tools/TestResultServer/static-dashboards/flakiness_dashboard.js:
+
+2012-05-07  Liam Quinn  <lquinn@rim.com>
+
+        [BlackBerry] WWW-Authenticate header on 200 response pops up authentication dialog
+        https://bugs.webkit.org/show_bug.cgi?id=85643
+
+        Reviewed by George Staikos.
+
+        RIM PR: 151992
+        Added manual test for WWW-Authenticate header on a 200 response.
+
+        * ManualTests/blackberry/http-auth-on-200.php: Added.
+
 2012-05-07  Simon Hausmann  <simon.hausmann@nokia.com>
 
         [Qt] Unreviewed trivial build fix: Don't include bytearraytestdata.h in the QtWebKit

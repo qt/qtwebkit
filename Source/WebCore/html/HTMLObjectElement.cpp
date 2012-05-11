@@ -276,7 +276,7 @@ bool HTMLObjectElement::hasValidClassId()
 // moved down into HTMLPluginImageElement.cpp
 void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
 {
-    ASSERT(!renderEmbeddedObject()->pluginCrashedOrWasMissing());
+    ASSERT(!renderEmbeddedObject()->showsUnavailablePluginIndicator());
     ASSERT(needsWidgetUpdate());
     setNeedsWidgetUpdate(false);
     // FIXME: This should ASSERT isFinishedParsingChildren() instead.
@@ -351,9 +351,9 @@ void HTMLObjectElement::childrenChanged(bool changedByParser, Node* beforeChange
     HTMLPlugInImageElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-bool HTMLObjectElement::isURLAttribute(Attribute *attr) const
+bool HTMLObjectElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attr->name() == dataAttr || (attr->name() == usemapAttr && attr->value().string()[0] != '#') || HTMLPlugInImageElement::isURLAttribute(attr);
+    return attribute.name() == dataAttr || (attribute.name() == usemapAttr && attribute.value().string()[0] != '#') || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
 const QualifiedName& HTMLObjectElement::imageSourceAttributeName() const

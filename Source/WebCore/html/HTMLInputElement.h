@@ -3,6 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2000 Dirk Mueller (mueller@kde.org)
  * Copyright (C) 2004, 2005, 2006, 2007, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Samsung Electronics. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -104,6 +105,12 @@ public:
     bool isSubmitButton() const;
     bool isTelephoneField() const;
     bool isURLField() const;
+    bool isDateField() const;
+    bool isDateTimeField() const;
+    bool isDateTimeLocalField() const;
+    bool isMonthField() const;
+    bool isTimeField() const;
+    bool isWeekField() const;
 
 #if ENABLE(INPUT_SPEECH)
     bool isSpeechEnabled() const;
@@ -234,7 +241,17 @@ public:
 
     String defaultToolTip() const;
 
+#if ENABLE(MEDIA_CAPTURE)
+    String capture() const;
+    void setCapture(const String& value);
+#endif
+
     static const int maximumLength;
+
+    unsigned height() const;
+    unsigned width() const;
+    void setHeight(unsigned);
+    void setWidth(unsigned);
 
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
@@ -243,7 +260,6 @@ protected:
 
 private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
-    enum AnyStepHandling { RejectAny, AnyIsDefaultStep };
 
     virtual void willChangeForm() OVERRIDE;
     virtual void didChangeForm() OVERRIDE;
@@ -292,7 +308,7 @@ private:
     virtual void* preDispatchEventHandler(Event*);
     virtual void postDispatchEventHandler(Event*, void* dataFromPreDispatch);
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     virtual bool hasUnacceptableValue() const;
 
@@ -327,11 +343,6 @@ private:
     
     virtual void subtreeHasChanged();
 
-    bool getAllowedValueStepWithDecimalPlaces(AnyStepHandling, double*, unsigned*) const;
-
-    // Helper for stepUp()/stepDown().  Adds step value * count to the current value.
-    void applyStep(double count, AnyStepHandling, TextFieldEventBehavior, ExceptionCode&);
-    double alignValueForStep(double value, double step, unsigned currentDecimalPlaces, unsigned stepDecimalPlaces);
 
 #if ENABLE(DATALIST)
     HTMLDataListElement* dataList() const;

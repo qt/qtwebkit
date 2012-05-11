@@ -1,3 +1,60 @@
+2012-05-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move resumeAnimations to use Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=86063
+
+        Reviewed by Alexey Proskuryakov.
+
+        Remove resumeAnimations functions, because it is able to work in the 
+        cross-port way through the Internals interface.
+
+        * WebCoreSupport/DumpRenderTreeSupportQt.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportQt.h:
+
+2012-05-10  Marius Storm-Olsen  <marius.storm-olsen@nokia.com>
+
+        [Qt] Fix \sa usage in documentation
+
+        Ensure comma between elements (6 missing).
+
+        Reviewed by Tor Arne Vestbø.
+
+        * Api/qwebpage.cpp:
+
+2012-05-09  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move suspendAnimations to use Internals interface.
+        https://bugs.webkit.org/show_bug.cgi?id=85986
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove suspendAnimations functions, because it is able to work in the 
+        cross-port way through the Internals interface.
+
+        * WebCoreSupport/DumpRenderTreeSupportQt.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportQt.h:
+
+2012-05-08  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] X11 plugins need to be reworked for Qt5+WK1
+        https://bugs.webkit.org/show_bug.cgi?id=80691
+
+        Reviewed by Simon Hausmann.
+
+        * Api/qwebsettings.cpp:
+        (QWebSettings::enablePersistentStorage):
+        Build fix for Qt5.
+        * WebCoreSupport/FrameLoaderClientQt.cpp:
+        (WebCore::FrameLoaderClientQt::createPlugin):
+        Inject the wmode parameter for flash so it will
+        work in windowless, non-transparent mode which
+        is the only one we support currently.
+        * WebCoreSupport/PageClientQt.cpp:
+        (WebCore):
+        (WebCore::QWebPageClient::ownerWindow):
+        Added a getter for the top level window so the PluginView
+        can get it without calling into QtWidgets code.
+
 2012-05-06  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
 
         Convert isPageBoxVisible to use Internals interface.

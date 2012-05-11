@@ -122,6 +122,7 @@
 #include "ResourceHandle.h"
 #include "ResourceRequest.h"
 #include "SchemeRegistry.h"
+#include "ScriptCallStack.h"
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
@@ -178,7 +179,7 @@
 #include "V8DirectoryEntry.h"
 #include "V8DOMFileSystem.h"
 #include "V8FileEntry.h"
-#include "platform/WebFileSystem.h"
+#include <public/WebFileSystem.h>
 #endif
 
 using namespace WebCore;
@@ -595,11 +596,6 @@ WebVector<WebIconURL> WebFrameImpl::iconURLs(int iconTypes) const
     return WebVector<WebIconURL>();
 }
 
-WebReferrerPolicy WebFrameImpl::referrerPolicy() const
-{
-    return static_cast<WebReferrerPolicy>(m_frame->document()->referrerPolicy());
-}
-
 WebSize WebFrameImpl::scrollOffset() const
 {
     FrameView* view = frameView();
@@ -939,7 +935,7 @@ v8::Handle<v8::Value> WebFrameImpl::createFileSystem(WebFileSystem::Type type,
                                                      const WebString& name,
                                                      const WebString& path)
 {
-    return toV8(DOMFileSystem::create(frame()->document(), name, AsyncFileSystemChromium::create(static_cast<FileSystemType>(type), KURL(ParsedURLString, path.utf8().data()))));
+    return toV8(DOMFileSystem::create(frame()->document(), name, static_cast<WebCore::FileSystemType>(type), KURL(ParsedURLString, path.utf8().data()), AsyncFileSystemChromium::create()));
 }
 
 v8::Handle<v8::Value> WebFrameImpl::createFileEntry(WebFileSystem::Type type,
@@ -948,7 +944,7 @@ v8::Handle<v8::Value> WebFrameImpl::createFileEntry(WebFileSystem::Type type,
                                                     const WebString& filePath,
                                                     bool isDirectory)
 {
-    RefPtr<DOMFileSystemBase> fileSystem = DOMFileSystem::create(frame()->document(), fileSystemName, AsyncFileSystemChromium::create(static_cast<FileSystemType>(type), KURL(ParsedURLString, fileSystemPath.utf8().data())));
+    RefPtr<DOMFileSystemBase> fileSystem = DOMFileSystem::create(frame()->document(), fileSystemName, static_cast<WebCore::FileSystemType>(type), KURL(ParsedURLString, fileSystemPath.utf8().data()), AsyncFileSystemChromium::create());
     if (isDirectory)
         return toV8(DirectoryEntry::create(fileSystem, filePath));
     return toV8(FileEntry::create(fileSystem, filePath));
@@ -1497,9 +1493,7 @@ float WebFrameImpl::printPage(int page, WebCanvas* canvas)
 
     GraphicsContextBuilder builder(canvas);
     GraphicsContext& gc = builder.context();
-#if WEBKIT_USING_SKIA
     gc.platformContext()->setPrinting(true);
-#endif
 
     return m_printContext->spoolPage(gc, page);
 }
@@ -1865,6 +1859,14 @@ void WebFrameImpl::handleIntentFailure(int intentIdentifier, const WebString& re
 {
 }
 
+void WebFrameImpl::sendOrientationChangeEvent(int orientation)
+{
+#if ENABLE(ORIENTATION_EVENTS)
+    if (m_frame)
+        m_frame->sendOrientationChangeEvent(orientation);
+#endif
+}
+
 void WebFrameImpl::addEventListener(const WebString& eventType, WebDOMEventListener* listener, bool useCapture)
 {
     DOMWindow* window = m_frame->domWindow();
@@ -1888,6 +1890,13 @@ bool WebFrameImpl::dispatchEvent(const WebDOMEvent& event)
 {
     ASSERT(!event.isNull());
     return m_frame->domWindow()->dispatchEvent(event);
+}
+
+void WebFrameImpl::dispatchMessageEventWithOriginCheck(const WebSecurityOrigin& intendedTargetOrigin, const WebDOMEvent& event)
+{
+    ASSERT(!event.isNull());
+    // Pass an empty call stack, since we don't have the one from the other process.
+    m_frame->domWindow()->dispatchMessageEventWithOriginCheck(intendedTargetOrigin.get(), event, 0);
 }
 
 WebString WebFrameImpl::contentAsText(size_t maxChars) const
@@ -1960,9 +1969,7 @@ void WebFrameImpl::printPagesWithBoundaries(WebCanvas* canvas, const WebSize& pa
 
     GraphicsContextBuilder builder(canvas);
     GraphicsContext& graphicsContext = builder.context();
-#if WEBKIT_USING_SKIA
     graphicsContext.platformContext()->setPrinting(true);
-#endif
 
     m_printContext->spoolAllPagesWithBoundaries(graphicsContext,
         FloatSize(pageSizeInPixels.width, pageSizeInPixels.height));

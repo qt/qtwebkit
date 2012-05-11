@@ -261,7 +261,6 @@ public:
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     void recalcStyle(StyleChange = NoChange);
 
-    bool hasShadowRoot() const;
     ElementShadow* shadow() const;
     ElementShadow* ensureShadow();
 
@@ -281,7 +280,7 @@ public:
 
     virtual void accessKeyAction(bool /*sendToAnyEvent*/) { }
 
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual bool isURLAttribute(const Attribute&) const { return false; }
 
     KURL getURLAttribute(const QualifiedName&) const;
     KURL getNonEmptyURLAttribute(const QualifiedName&) const;
@@ -420,7 +419,6 @@ protected:
     {
     }
 
-    virtual void willRemove();
     virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
     virtual void removedFrom(Node*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
@@ -430,8 +428,6 @@ protected:
 
     virtual bool shouldRegisterAsNamedItem() const { return false; }
     virtual bool shouldRegisterAsExtraNamedItem() const { return false; }
-
-    void idAttributeChanged(Attribute*);
 
     HTMLCollection* ensureCachedHTMLCollection(CollectionType);
 
@@ -715,6 +711,11 @@ inline bool Node::hasID() const
 inline bool Node::hasClass() const
 {
     return isElementNode() && toElement(this)->hasClass();
+}
+
+inline bool isShadowHost(const Node* node)
+{
+    return node && node->isElementNode() && toElement(node)->shadow();
 }
 
 } // namespace

@@ -330,6 +330,7 @@ public:
     bool didDispatchViewportPropertiesChanged() const { return m_didDispatchViewportPropertiesChanged; }
 #endif
 
+    void setReferrerPolicy(ReferrerPolicy referrerPolicy) { m_referrerPolicy = referrerPolicy; }
     ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
 
     DocumentType* doctype() const { return m_docType.get(); }
@@ -577,6 +578,7 @@ public:
 
     virtual void attach();
     virtual void detach();
+    void prepareForDestruction();
 
     // Override ScriptExecutionContext methods to do additional work
     virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
@@ -1124,7 +1126,7 @@ public:
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
     void webkitCancelAnimationFrame(int id);
-    void serviceScriptedAnimations(double monotonicAnimationStartTime);
+    void serviceScriptedAnimations(DOMTimeStamp);
 #endif
 
     virtual EventTarget* errorEventTarget();
@@ -1202,6 +1204,9 @@ private:
     void collectActiveStylesheets(Vector<RefPtr<StyleSheet> >&);
     bool testAddedStylesheetRequiresStyleRecalc(StyleSheetInternal*);
     void analyzeStylesheetChange(StyleResolverUpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleResolverReset, bool& requiresFullStyleRecalc);
+
+    void seamlessParentUpdatedStylesheets();
+    void notifySeamlessChildDocumentsOfStylesheetUpdate() const;
 
     void deleteCustomFonts();
 

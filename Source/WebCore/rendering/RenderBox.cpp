@@ -256,11 +256,6 @@ void RenderBox::willBeDestroyed()
     if (styleToUse) {
         if (RenderView* view = this->view()) {
             if (FrameView* frameView = view->frameView()) {
-                // If this renderer is owning renderer for the FrameView's custom scrollbars,
-                // we need to clear it from the scrollbar. See webkit bug 64737.
-                if (styleToUse->hasPseudoStyle(SCROLLBAR))
-                    frameView->clearOwningRendererForCustomScrollbars(this);
-
                 if (styleToUse->position() == FixedPosition)
                     frameView->removeFixedObject();
             }
@@ -3910,6 +3905,16 @@ LayoutRect RenderBox::layoutOverflowRectForPropagation(RenderStyle* parentStyle)
         rect.setY(height() - rect.maxY());
 
     return rect;
+}
+
+LayoutUnit RenderBox::offsetLeft() const
+{
+    return offsetTopLeft(topLeftLocation()).x();
+}
+
+LayoutUnit RenderBox::offsetTop() const
+{
+    return offsetTopLeft(topLeftLocation()).y();
 }
 
 LayoutPoint RenderBox::flipForWritingModeForChild(const RenderBox* child, const LayoutPoint& point) const

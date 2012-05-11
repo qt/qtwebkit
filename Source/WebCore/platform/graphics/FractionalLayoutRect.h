@@ -56,7 +56,7 @@ public:
     FractionalLayoutSize size() const { return m_size; }
 
     IntPoint pixelSnappedLocation() const { return roundedIntPoint(m_location); }
-    IntSize pixelSnappedSize() const { return pixelSnappedIntSize(m_size, m_location); }
+    IntSize pixelSnappedSize() const { return IntSize(snapSizeToPixel(m_size.width(), m_location.x()), snapSizeToPixel(m_size.height(), m_location.y())); }
 
     void setLocation(const FractionalLayoutPoint& location) { m_location = location; }
     void setSize(const FractionalLayoutSize& size) { m_size = size; }
@@ -72,8 +72,8 @@ public:
     int pixelSnappedY() const { return y().round(); }
     int pixelSnappedWidth() const { return snapSizeToPixel(width(), x()); }
     int pixelSnappedHeight() const { return snapSizeToPixel(height(), y()); }
-    int pixelSnappedMaxX() const { return pixelSnappedX() + pixelSnappedWidth(); }
-    int pixelSnappedMaxY() const { return pixelSnappedY() + pixelSnappedHeight(); }
+    int pixelSnappedMaxX() const { return (m_location.x() + m_size.width()).round(); }
+    int pixelSnappedMaxY() const { return (m_location.y() + m_size.height()).round(); }
 
     void setX(FractionalLayoutUnit x) { m_location.setX(x); }
     void setY(FractionalLayoutUnit y) { m_location.setY(y); }
@@ -184,9 +184,19 @@ inline bool operator!=(const FractionalLayoutRect& a, const FractionalLayoutRect
     return a.location() != b.location() || a.size() != b.size();
 }
 
+inline IntRect pixelSnappedIntRect(const FractionalLayoutRect& rect)
+{
+#if ENABLE(SUBPIXEL_LAYOUT)
+    IntPoint roundedLocation = roundedIntPoint(rect.location());
+    return IntRect(roundedLocation, IntSize((rect.x() + rect.width()).round() - roundedLocation.x(),
+                                            (rect.y() + rect.height()).round() - roundedLocation.y()));
+#else
+    return IntRect(rect);
+#endif
+}
+
 IntRect enclosingIntRect(const FractionalLayoutRect&);
 FractionalLayoutRect enclosingFractionalLayoutRect(const FloatRect&);
-IntRect pixelSnappedIntRect(const FractionalLayoutRect&);
 
 } // namespace WebCore
 

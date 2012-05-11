@@ -143,9 +143,6 @@ public:
     // URLs
     virtual WebVector<WebIconURL> iconURLs(int iconTypes) const = 0;
 
-    // The referrer policy of the document associated with this frame.
-    virtual WebReferrerPolicy referrerPolicy() const = 0;
-
 
     // Geometry -----------------------------------------------------------
 
@@ -565,6 +562,13 @@ public:
     // of matches found during the scoping effort.
     virtual void resetMatchCount() = 0;
 
+    // OrientationChange event ---------------------------------------------
+
+    // Orientation is the interface orientation in degrees.
+    // Some examples are:
+    //  0 is straight up; -90 is when the device is rotated 90 clockwise;
+    //  90 is when rotated counter clockwise.
+    virtual void sendOrientationChangeEvent(int orientation) = 0;
 
     // Events --------------------------------------------------------------
 
@@ -577,6 +581,9 @@ public:
     virtual void removeEventListener(const WebString& eventType,
                                      WebDOMEventListener*, bool useCapture) = 0;
     virtual bool dispatchEvent(const WebDOMEvent&) = 0;
+    virtual void dispatchMessageEventWithOriginCheck(
+        const WebSecurityOrigin& intendedTargetOrigin,
+        const WebDOMEvent&) = 0;
 
 
     // Web Intents ---------------------------------------------------------

@@ -29,6 +29,7 @@
 # Module to share code to get to WebKit directories.
 
 use strict;
+use version;
 use warnings;
 use Config;
 use Digest::MD5 qw(md5_hex);
@@ -336,7 +337,7 @@ sub determineNumberOfCPUs
     } elsif (isWindows() || isCygwin()) {
         # Assumes cygwin
         $numberOfCPUs = `ls /proc/registry/HKEY_LOCAL_MACHINE/HARDWARE/DESCRIPTION/System/CentralProcessor | wc -w`;
-    } elsif (isDarwin()) {
+    } elsif (isDarwin() || isFreeBSD()) {
         chomp($numberOfCPUs = `sysctl -n hw.ncpu`);
     }
 }
@@ -1257,6 +1258,11 @@ sub isLinux()
     return ($^O eq "linux") || 0;
 }
 
+sub isFreeBSD()
+{
+    return ($^O eq "freebsd") || 0;
+}
+
 sub isARM()
 {
     return $Config{archname} =~ /^arm-/;
@@ -1482,9 +1488,15 @@ sub setupAppleWinEnv()
         my $restartNeeded = 0;
         my %variablesToSet = ();
 
-        # Setting the environment variable 'CYGWIN' to 'tty' makes cygwin enable extra support (i.e., termios)
-        # for UNIX-like ttys in the Windows console
-        $variablesToSet{CYGWIN} = "tty" unless $ENV{CYGWIN};
+        # FIXME: We should remove this explicit version check for cygwin once we stop supporting Cygwin 1.7.9 or older versions. 
+        # https://bugs.webkit.org/show_bug.cgi?id=85791
+        my $currentCygwinVersion = version->parse(`uname -r`);
+        my $firstCygwinVersionWithoutTTYSupport = version->parse("1.7.10");
+        if ($currentCygwinVersion < $firstCygwinVersionWithoutTTYSupport) {
+            # Setting the environment variable 'CYGWIN' to 'tty' makes cygwin enable extra support (i.e., termios)
+            # for UNIX-like ttys in the Windows console
+            $variablesToSet{CYGWIN} = "tty" unless $ENV{CYGWIN};
+        }
         
         # Those environment variables must be set to be able to build inside Visual Studio.
         $variablesToSet{WEBKITLIBRARIESDIR} = windowsLibrariesDir() unless $ENV{WEBKITLIBRARIESDIR};

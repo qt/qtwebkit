@@ -427,6 +427,11 @@ DOMWindow::~DOMWindow()
     }
 #endif
 
+    if (m_suspendedForPageCache)
+        willDestroyCachedFrame();
+    else
+        willDestroyDocumentInFrame();
+
     // As the ASSERTs above indicate, this clear should only be necesary if this DOMWindow is suspended for the page cache.
     // But we don't want to risk any of these objects hanging around after we've been destroyed.
     clearDOMWindowProperties();
@@ -467,6 +472,7 @@ Page* DOMWindow::page()
 
 void DOMWindow::frameDestroyed()
 {
+    willDestroyDocumentInFrame();
     FrameDestructionObserver::frameDestroyed();
     clearDOMWindowProperties();
 }
@@ -474,11 +480,36 @@ void DOMWindow::frameDestroyed()
 void DOMWindow::willDetachPage()
 {
     InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
+}
 
+void DOMWindow::willDestroyCachedFrame()
+{
+    // It is necessary to copy m_properties to a separate vector because the DOMWindowProperties may
+    // unregister themselves from the DOMWindow as a result of the call to willDestroyGlobalObjectInCachedFrame.
     Vector<DOMWindowProperty*> properties;
     copyToVector(m_properties, properties);
     for (size_t i = 0; i < properties.size(); ++i)
-        properties[i]->willDetachPage();
+        properties[i]->willDestroyGlobalObjectInCachedFrame();
+}
+
+void DOMWindow::willDestroyDocumentInFrame()
+{
+    // It is necessary to copy m_properties to a separate vector because the DOMWindowProperties may
+    // unregister themselves from the DOMWindow as a result of the call to willDestroyGlobalObjectInFrame.
+    Vector<DOMWindowProperty*> properties;
+    copyToVector(m_properties, properties);
+    for (size_t i = 0; i < properties.size(); ++i)
+        properties[i]->willDestroyGlobalObjectInFrame();
+}
+
+void DOMWindow::willDetachDocumentFromFrame()
+{
+    // It is necessary to copy m_properties to a separate vector because the DOMWindowProperties may
+    // unregister themselves from the DOMWindow as a result of the call to willDetachGlobalObjectFromFrame.
+    Vector<DOMWindowProperty*> properties;
+    copyToVector(m_properties, properties);
+    for (size_t i = 0; i < properties.size(); ++i)
+        properties[i]->willDetachGlobalObjectFromFrame();
 }
 
 void DOMWindow::registerProperty(DOMWindowProperty* property)
@@ -499,6 +530,7 @@ void DOMWindow::clear()
     if (m_suspendedForPageCache)
         return;
     
+    willDestroyDocumentInFrame();
     clearDOMWindowProperties();
 }
 
@@ -516,24 +548,27 @@ void DOMWindow::resumeFromPageCache()
 
 void DOMWindow::disconnectDOMWindowProperties()
 {
+    // It is necessary to copy m_properties to a separate vector because the DOMWindowProperties may
+    // unregister themselves from the DOMWindow as a result of the call to disconnectFrameForPageCache.
     Vector<DOMWindowProperty*> properties;
     copyToVector(m_properties, properties);
     for (size_t i = 0; i < properties.size(); ++i)
-        properties[i]->disconnectFrame();
+        properties[i]->disconnectFrameForPageCache();
 }
 
 void DOMWindow::reconnectDOMWindowProperties()
 {
     ASSERT(m_suspendedForPageCache);
+    // It is necessary to copy m_properties to a separate vector because the DOMWindowProperties may
+    // unregister themselves from the DOMWindow as a result of the call to reconnectFromPageCache.
     Vector<DOMWindowProperty*> properties;
     copyToVector(m_properties, properties);
     for (size_t i = 0; i < properties.size(); ++i)
-        properties[i]->reconnectFrame(m_frame);
+        properties[i]->reconnectFrameFromPageCache(m_frame);
 }
 
 void DOMWindow::clearDOMWindowProperties()
 {
-    disconnectDOMWindowProperties();
     m_properties.clear();
 
     m_screen = 0;
@@ -831,12 +866,17 @@ void DOMWindow::postMessageTimerFired(PassOwnPtr<PostMessageTimer> t)
     if (m_frame->loader()->client()->willCheckAndDispatchMessageEvent(timer->targetOrigin(), event.get()))
         return;
 
-    if (timer->targetOrigin()) {
+    dispatchMessageEventWithOriginCheck(timer->targetOrigin(), event, timer->stackTrace());
+}
+
+void DOMWindow::dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, PassRefPtr<Event> event, PassRefPtr<ScriptCallStack> stackTrace)
+{
+    if (intendedTargetOrigin) {
         // Check target origin now since the target document may have changed since the timer was scheduled.
-        if (!timer->targetOrigin()->isSameSchemeHostPort(document()->securityOrigin())) {
-            String message = "Unable to post message to " + timer->targetOrigin()->toString() +
+        if (!intendedTargetOrigin->isSameSchemeHostPort(document()->securityOrigin())) {
+            String message = "Unable to post message to " + intendedTargetOrigin->toString() +
                              ". Recipient has origin " + document()->securityOrigin()->toString() + ".\n";
-            console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, timer->stackTrace());
+            console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, stackTrace);
             return;
         }
     }

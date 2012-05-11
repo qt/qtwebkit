@@ -439,63 +439,46 @@ static inline bool isSimpleLengthPropertyID(CSSPropertyID propertyId, bool& acce
     }
 }
 
+template <typename CharType>
+static inline bool parseSimpleLength(const CharType* characters, unsigned& length, CSSPrimitiveValue::UnitTypes& unit, double& number)
+{
+    if (length > 2 && (characters[length - 2] | 0x20) == 'p' && (characters[length - 1] | 0x20) == 'x') {
+        length -= 2;
+        unit = CSSPrimitiveValue::CSS_PX;
+    } else if (length > 1 && characters[length - 1] == '%') {
+        length -= 1;
+        unit = CSSPrimitiveValue::CSS_PERCENTAGE;
+    }
+
+    // We rely on charactersToDouble for validation as well. The function
+    // will set "ok" to "false" if the entire passed-in character range does
+    // not represent a double.
+    bool ok;
+    number = charactersToDouble(characters, length, &ok);
+    return ok;
+}
+
 static bool parseSimpleLengthValue(StylePropertySet* declaration, CSSPropertyID propertyId, const String& string, bool important, CSSParserMode cssParserMode)
 {
     ASSERT(!string.isEmpty());
     bool acceptsNegativeNumbers;
-    bool strict = isStrictParserMode(cssParserMode);
-    unsigned length = string.length();
+    if (!isSimpleLengthPropertyID(propertyId, acceptsNegativeNumbers))
+        return false;
 
+    unsigned length = string.length();
     double number;
-    bool ok;
     CSSPrimitiveValue::UnitTypes unit = CSSPrimitiveValue::CSS_NUMBER;
 
     if (string.is8Bit()) {
-        const LChar* characters8 = string.characters8();
-        if (!characters8)
+        if (!parseSimpleLength(string.characters8(), length, unit, number))
             return false;
-
-        if (!isSimpleLengthPropertyID(propertyId, acceptsNegativeNumbers))
-            return false;
-
-        if (length > 2 && (characters8[length - 2] | 0x20) == 'p' && (characters8[length - 1] | 0x20) == 'x') {
-            length -= 2;
-            unit = CSSPrimitiveValue::CSS_PX;
-        } else if (length > 1 && characters8[length - 1] == '%') {
-            length -= 1;
-            unit = CSSPrimitiveValue::CSS_PERCENTAGE;
-        }
-
-        // We rely on charactersToDouble for validation as well. The function
-        // will set "ok" to "false" if the entire passed-in character range does
-        // not represent a double.
-        number = charactersToDouble(characters8, length, &ok);
     } else {
-        const UChar* characters16 = string.characters16();
-        if (!characters16)
+        if (!parseSimpleLength(string.characters16(), length, unit, number))
             return false;
-
-        if (!isSimpleLengthPropertyID(propertyId, acceptsNegativeNumbers))
-            return false;
-
-        if (length > 2 && (characters16[length - 2] | 0x20) == 'p' && (characters16[length - 1] | 0x20) == 'x') {
-            length -= 2;
-            unit = CSSPrimitiveValue::CSS_PX;
-        } else if (length > 1 && characters16[length - 1] == '%') {
-            length -= 1;
-            unit = CSSPrimitiveValue::CSS_PERCENTAGE;
-        }
-
-        // We rely on charactersToDouble for validation as well. The function
-        // will set "ok" to "false" if the entire passed-in character range does
-        // not represent a double.
-        number = charactersToDouble(characters16, length, &ok);
     }
 
-    if (!ok)
-        return false;
     if (unit == CSSPrimitiveValue::CSS_NUMBER) {
-        if (number && strict)
+        if (number && isStrictParserMode(cssParserMode))
             return false;
         unit = CSSPrimitiveValue::CSS_PX;
     }
@@ -1990,6 +1973,9 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         addProperty(propId, val.release(), important);
         return true;
     }
+    case CSSPropertyTabSize:
+        validPrimitive = validUnit(value, FInteger | FNonNeg);
+        break;
     case CSSPropertyWebkitAspectRatio:
         return parseAspectRatio(important);
     case CSSPropertyBorderRadius:
@@ -2307,11 +2293,10 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyBackground: {
         // Position must come before color in this array because a plain old "0" is a legal color
         // in quirks mode but it's usually the X coordinate of a position.
-        // FIXME: Add CSSPropertyBackgroundSize to the shorthand.
         const CSSPropertyID properties[] = { CSSPropertyBackgroundImage, CSSPropertyBackgroundRepeat,
                                    CSSPropertyBackgroundAttachment, CSSPropertyBackgroundPosition, CSSPropertyBackgroundOrigin,
-                                   CSSPropertyBackgroundClip, CSSPropertyBackgroundColor };
-        return parseFillShorthand(propId, properties, 7, important);
+                                   CSSPropertyBackgroundClip, CSSPropertyBackgroundColor, CSSPropertyBackgroundSize };
+        return parseFillShorthand(propId, properties, WTF_ARRAY_LENGTH(properties), important);
     }
     case CSSPropertyWebkitMask: {
         const CSSPropertyID properties[] = { CSSPropertyWebkitMaskImage, CSSPropertyWebkitMaskRepeat,
@@ -2601,6 +2586,7 @@ bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* pr
     RefPtr<CSSValue> repeatYValue;
     bool foundClip = false;
     int i;
+    bool foundBackgroundPositionCSSProperty = false;
 
     while (m_valueList->current()) {
         CSSParserValue* val = m_valueList->current();
@@ -2630,8 +2616,21 @@ bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* pr
                 break;
         }
 
+        bool backgroundSizeCSSPropertyExpected = false;
+        if ((val->unit == CSSParserValue::Operator && val->iValue == '/') && foundBackgroundPositionCSSProperty) {
+            backgroundSizeCSSPropertyExpected = true;
+            m_valueList->next();
+        }
+
+        foundBackgroundPositionCSSProperty = false;
         bool found = false;
         for (i = 0; !found && i < numProperties; ++i) {
+
+            if (backgroundSizeCSSPropertyExpected && properties[i] != CSSPropertyBackgroundSize)
+                continue;
+            if (!backgroundSizeCSSPropertyExpected && properties[i] == CSSPropertyBackgroundSize)
+                continue;
+
             if (!parsedProperty[i]) {
                 RefPtr<CSSValue> val1;
                 RefPtr<CSSValue> val2;
@@ -2656,6 +2655,8 @@ bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* pr
                         addFillValue(clipValue, val1.release());
                         foundClip = true;
                     }
+                    if (properties[i] == CSSPropertyBackgroundPosition)
+                        foundBackgroundPositionCSSProperty =  true;
                 }
             }
         }

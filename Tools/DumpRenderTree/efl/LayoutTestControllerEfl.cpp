@@ -184,7 +184,7 @@ JSStringRef LayoutTestController::pathToLocalResource(JSContextRef context, JSSt
 void LayoutTestController::queueLoad(JSStringRef url, JSStringRef target)
 {
     WebCore::KURL baseURL(WebCore::KURL(), String::fromUTF8(ewk_frame_uri_get(browser->mainFrame())));
-    WebCore::KURL absoluteURL(baseURL, WTF::String(url->characters(), url->length()));
+    WebCore::KURL absoluteURL(baseURL, WTF::String(url->ustring().impl()));
 
     JSRetainPtr<JSStringRef> jsAbsoluteURL(
         Adopt, JSStringCreateWithUTF8CString(absoluteURL.string().utf8().data()));
@@ -270,7 +270,7 @@ void LayoutTestController::setUserStyleSheetLocation(JSStringRef path)
 
 void LayoutTestController::setValueForUser(JSContextRef context, JSValueRef nodeObject, JSStringRef value)
 {
-    DumpRenderTreeSupportEfl::setValueForUser(context, nodeObject, value);
+    DumpRenderTreeSupportEfl::setValueForUser(context, nodeObject, WTF::String(value->ustring().impl()));
 }
 
 void LayoutTestController::setViewModeMediaFeature(JSStringRef mode)
@@ -515,7 +515,7 @@ bool LayoutTestController::findString(JSContextRef context, JSStringRef target, 
             options |= WebCore::StartInSelection;
     }
 
-    return DumpRenderTreeSupportEfl::findString(browser->mainView(), target->ustring().utf8().data(), options);
+    return DumpRenderTreeSupportEfl::findString(browser->mainView(), WTF::String(target->ustring().impl()), options);
 }
 
 bool LayoutTestController::isCommandEnabled(JSStringRef name)
@@ -648,16 +648,6 @@ unsigned LayoutTestController::numberOfActiveAnimations() const
     return DumpRenderTreeSupportEfl::activeAnimationsCount(browser->mainFrame());
 }
 
-void LayoutTestController::suspendAnimations() const
-{
-    DumpRenderTreeSupportEfl::suspendAnimations(browser->mainFrame());
-}
-
-void LayoutTestController::resumeAnimations() const
-{
-    DumpRenderTreeSupportEfl::resumeAnimations(browser->mainFrame());
-}
-
 static inline bool toBool(JSStringRef value)
 {
     return equals(value, "true") || equals(value, "1");
@@ -694,14 +684,14 @@ void LayoutTestController::overridePreference(JSStringRef key, JSStringRef value
         fprintf(stderr, "LayoutTestController::overridePreference tried to override unknown preference '%s'.\n", value->ustring().utf8().data());
 }
 
-void LayoutTestController::addUserScript(JSStringRef, bool, bool)
+void LayoutTestController::addUserScript(JSStringRef source, bool runAtStart, bool allFrames)
 {
-    notImplemented();
+    DumpRenderTreeSupportEfl::addUserScript(browser->mainView(), String(source->ustring().impl()), runAtStart, allFrames);
 }
 
 void LayoutTestController::addUserStyleSheet(JSStringRef source, bool allFrames)
 {
-    DumpRenderTreeSupportEfl::addUserStyleSheet(browser->mainView(), source->ustring().utf8().data(), allFrames);
+    DumpRenderTreeSupportEfl::addUserStyleSheet(browser->mainView(), WTF::String(source->ustring().impl()), allFrames);
 }
 
 void LayoutTestController::setDeveloperExtrasEnabled(bool enabled)
@@ -856,4 +846,6 @@ void LayoutTestController::setPageVisibility(const char* visibility)
         ewk_view_visibility_state_set(browser->mainView(), EWK_PAGE_VISIBILITY_STATE_HIDDEN, false);
     else if (newVisibility == "prerender")
         ewk_view_visibility_state_set(browser->mainView(), EWK_PAGE_VISIBILITY_STATE_PRERENDER, false);
+    else if (newVisibility == "preview")
+        ewk_view_visibility_state_set(browser->mainView(), EWK_PAGE_VISIBILITY_STATE_PREVIEW, false);
 }

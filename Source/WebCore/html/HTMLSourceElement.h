@@ -50,8 +50,8 @@ private:
     HTMLSourceElement(const QualifiedName&, Document*);
     
     virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
-    virtual void willRemove();
-    virtual bool isURLAttribute(Attribute*) const;
+    virtual void removedFrom(Node*) OVERRIDE;
+    virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     void errorEventTimerFired(Timer<HTMLSourceElement>*);
 

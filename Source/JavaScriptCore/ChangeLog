@@ -1,3 +1,377 @@
+2012-05-10  Gavin Barraclough  <barraclough@apple.com>
+
+        Remove op_get_callee
+
+        Rubber stamped by Geoff Garen.
+        
+        This is now redundant.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCapabilities.h:
+        (JSC::DFG::canCompileOpcode):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::privateExecute):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompileMainPass):
+        * jit/JIT.h:
+        * jit/JITOpcodes.cpp:
+        (JSC):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2012-05-10  Gavin Barraclough  <barraclough@apple.com>
+
+        Cache inheritorID on JSFunction
+        https://bugs.webkit.org/show_bug.cgi?id=85853
+
+        Reviewed by Geoff Garen & Filip Pizlo.
+
+        An object's prototype is indicated via its structure.  To create an otherwise
+        empty object with object A as its prototype, we require a structure with its
+        prototype set to point to A.  We wish to use this same structure for all empty
+        objects created with a prototype of A, so we presently store this structure as
+        a property of A, known as the inheritorID.
+
+        When a function F is invoked as a constructor, where F has a property 'prototype'
+        set to point to A, in order to create the 'this' value for the constructor to
+        use the following steps are taken:
+          - the 'prototype' proptery of F is read, via a regular [[Get]] access.
+          - the inheritorID internal property of the prototype is read.
+          - a new, empty object is constructed with its structure set to point to inheritorID.
+
+        There are two drawbacks to the current approach:
+          - it requires that every object has an inheritorID field.
+          - it requires a [[Get]] access on every constructor call to access the 'prototype' property.
+
+        Instead, switch to caching a copy of the inheritorID on the function.  Constructor
+        calls now only need read the internal property from the callee, saving a [[Get]].
+        This also means that JSObject::m_inheritorID is no longer commonly read, and in a
+        future patch we can move to storing this in a more memory efficient fashion.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGNodeType.h:
+        (DFG):
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::privateExecute):
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateJSFunction):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_create_this):
+        (JSC::JIT::emitSlow_op_create_this):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_create_this):
+        (JSC::JIT::emitSlow_op_create_this):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+        * runtime/JSFunction.cpp:
+        (JSC::JSFunction::JSFunction):
+        (JSC::JSFunction::cacheInheritorID):
+        (JSC):
+        (JSC::JSFunction::put):
+        (JSC::JSFunction::defineOwnProperty):
+        * runtime/JSFunction.h:
+        (JSC::JSFunction::cachedInheritorID):
+        (JSFunction):
+        (JSC::JSFunction::offsetOfCachedInheritorID):
+
+2012-05-10  Michael Saboff  <msaboff@apple.com>
+
+        Enh: Hash Const JSString in Backing Stores to Save Memory
+        https://bugs.webkit.org/show_bug.cgi?id=86024
+
+        Reviewed by Filip Pizlo.
+
+        During garbage collection, each marking thread keeps a HashMap of
+        strings.  While visiting via MarkStack::copyAndAppend(), we check to
+        see if the string we are visiting is already in the HashMap.  If not
+        we add it.  If so, we change the reference to the current string we're
+        visiting to the prior string.
+
+        To somewhat reduce the performance impact of this change, if a string
+        is unique at the end of a marking it will not be checked during further
+        GC phases.  In some cases this won't catch all duplicates, but we are
+        trying to catch the growth of duplicate strings.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::markRoots):
+        * heap/MarkStack.cpp:
+        (JSC::MarkStackThreadSharedData::resetChildren): New method called by the 
+        main thread to reset the slave threads.  This is primarily done to
+        clear the m_uniqueStrings HashMap.
+        (JSC):
+        (JSC::MarkStackThreadSharedData::markingThreadMain):
+        (JSC::MarkStackThreadSharedData::markingThreadStartFunc):
+        (JSC::MarkStackThreadSharedData::MarkStackThreadSharedData):
+        (JSC::MarkStackThreadSharedData::reset):
+        (JSC::MarkStack::reset): Added call to clear m_uniqueStrings.
+        (JSC::MarkStack::internalAppend): New method that performs the hash consting.
+        (JSC::SlotVisitor::copyAndAppend): Changed to call the new hash consting
+        internalAppend()
+        * heap/MarkStack.h:
+        (MarkStackThreadSharedData):
+        (MarkStack):
+        (JSC::MarkStack::sharedData):
+        * runtime/JSString.h:
+        (JSString): Added m_isHashConstSingleton flag, accessors for the flag and
+        code to initialize the flag.
+        (JSC::JSString::finishCreation):
+        (JSC::JSString::isHashConstSingleton):
+        (JSC::JSString::clearHashConstSingleton):
+        (JSC::JSString::setHashConstSingleton):
+        (JSC::JSRopeString::finishCreation):
+
+2012-05-09  Filip Pizlo  <fpizlo@apple.com>
+
+        JIT memory allocator is not returning memory to the OS on Darwin
+        https://bugs.webkit.org/show_bug.cgi?id=86047
+        <rdar://problem/11414948>
+
+        Reviewed by Geoff Garen.
+        
+        Work around the problem by using a different madvise() flag, but only for the JIT memory
+        allocator. Also put in ASSERTs that the call is actually working.
+
+        * jit/ExecutableAllocatorFixedVMPool.cpp:
+        (JSC::FixedVMPoolExecutableAllocator::notifyNeedPage):
+        (JSC::FixedVMPoolExecutableAllocator::notifyPageIsFree):
+
+2012-05-09  Filip Pizlo  <fpizlo@apple.com>
+
+        It should be possible to get useful debug logging from the JIT memory allocator
+        https://bugs.webkit.org/show_bug.cgi?id=86042
+
+        Reviewed by Geoff Garen.
+
+        * jit/ExecutableAllocator.h:
+
+2012-05-09  Gavin Barraclough  <barraclough@apple.com>
+
+        GC race condition in OpaqueJSClass::prototype
+        https://bugs.webkit.org/show_bug.cgi?id=86034
+
+        Build fix.
+
+        * API/JSClassRef.cpp:
+        (OpaqueJSClass::prototype):
+            - Eeeep, landed bad version of patch!
+
+2012-05-09  Gavin Barraclough  <barraclough@apple.com>
+
+        GC race condition in OpaqueJSClass::prototype
+        https://bugs.webkit.org/show_bug.cgi?id=86034
+
+        Reviewed by Filip Pizlo.
+
+        The bug here is basically:
+            if (weakref) weakref->method()
+        where a GC may occur between the if & the method call.
+
+        * API/JSClassRef.cpp:
+        (OpaqueJSClass::prototype):
+
+2012-05-09  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        CopiedSpace does not add pinned blocks back to the to-space filter
+        https://bugs.webkit.org/show_bug.cgi?id=86011
+
+        Reviewed by Geoffrey Garen.
+
+        After a collection has finished, we go through the blocks in from-space 
+        and move any of them that are pinned into to-space. At the beginning of 
+        collection, we reset the to-space block filter that is used during 
+        conservative scanning and add back the blocks that are filled during the 
+        collection. However, we neglect to add back those blocks that are moved 
+        from from-space to to-space, which can cause the conservative scan to 
+        think that some pinned items are not actually in CopiedSpace.
+
+        * heap/CopiedSpace.cpp:
+        (JSC::CopiedSpace::doneCopying): Add the pinned blocks back to the 
+        to-space filter. Also added a comment and assert for future readers that 
+        indicates that it's okay that we don't also add the block to the 
+        to-space block set since it was never removed.
+
+
+2012-05-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Use independent version numbers for public libraries
+        https://bugs.webkit.org/show_bug.cgi?id=85984
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Use LIBJAVASCRIPTCOREGTK_VERSION for library
+        version.
+
+2012-05-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Do not install JavaScriptCore platform-specific headers
+        https://bugs.webkit.org/show_bug.cgi?id=85983
+
+        Reviewed by Gustavo Noronha Silva.
+
+        JavaScriptCore.h includes JSStringRefCF.h unconditionally. It was
+        renamed to JavaScript.h in r29234 and it still exists for
+        compatibility with mac and windows users.
+
+        * GNUmakefile.list.am: Remove JavaScriptCore.h, JSStringRefCF.h
+        and JSStringRefBSTR.h from the sources and headers list.
+
+2012-05-08  Gavin Barraclough  <barraclough@apple.com>
+
+        ROLLING OUT r114255
+        
+        GC in the middle of JSObject::allocatePropertyStorage can cause badness
+        https://bugs.webkit.org/show_bug.cgi?id=83839
+
+        Reviewed by nobody.
+
+        This breaks the world, with COLLECT_ON_EVERY_ALLOCATION enabled.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::allocatePropertyStorage):
+        * runtime/JSObject.h:
+        (JSObject):
+        (JSC::JSObject::isUsingInlineStorage):
+        (JSC):
+        (JSC::JSObject::putDirectInternal):
+        (JSC::JSObject::putDirectWithoutTransition):
+        (JSC::JSObject::transitionTo):
+        * runtime/Structure.cpp:
+        (JSC):
+        * runtime/Structure.h:
+        (JSC::Structure::didTransition):
+
+2012-05-08  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Heap should not continually allocate new pages in steady state
+        https://bugs.webkit.org/show_bug.cgi?id=85936
+
+        Reviewed by Geoff Garen.
+
+        Currently, in steady state (i.e. a constant amount of live GC 
+        memory with a constant rate of allocation) assuming we've just 
+        finished a collection with X live blocks in CopiedSpace, we 
+        increase our working set by X blocks in CopiedSpace with each 
+        collection we perform. This is due to the fact that we allocate 
+        until we run out of free blocks to use in the Heap before we 
+        consider whether we should run a collection. 
+
+        In the longer term, this issue will be mostly resolved by 
+        implementing quick release for the CopiedSpace. In the shorter 
+        term, we should change our policy to check whether we should 
+        allocate before trying to use a free block from the Heap. We 
+        can change our policy to something more appropriate once we 
+        have implemented quick release.
+
+        This change should also have the convenient side effect of 
+        reducing the variance in GC-heavy tests (e.g. v8-splay) due 
+        to fact that we are doing less VM allocation during copying 
+        collection. Overall, this patch is performance neutral across 
+        the benchmarks we track.
+
+        * heap/CopiedSpace.cpp: 
+        (JSC::CopiedSpace::getFreshBlock): Shuffle the request from the BlockAllocator
+        around so that we only do it if the block request must succeed 
+        i.e. after we've already checked whether we should do a collection.
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::allocateSlowCase): Ditto.
+        (JSC::MarkedAllocator::allocateBlock): We no longer have a failure mode in this 
+        function because by the time we've called it, we've already checked whether we 
+        should run a collection so there's no point in returning null.
+        * heap/MarkedAllocator.h: Removing old arguments from function declaration.
+        (MarkedAllocator):
+
+2012-05-08  Gavin Barraclough  <barraclough@apple.com>
+
+        SIGFPE on divide in classic interpreter
+        https://bugs.webkit.org/show_bug.cgi?id=85917
+
+        Rubber stamped by Oliver Hunt.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::privateExecute):
+            - check for divisor of -1.
+
+2012-05-07  Oliver Hunt  <oliver@apple.com>
+
+        Rolling out r110287
+
+        RS=Filip Pizlo
+
+        r110287 was meant to be refactoring only, but changed behavior
+        enough to break some websites, including qq.com.
+
+2012-05-07  Andy Estes  <aestes@apple.com>
+
+        ENABLE_IFRAME_SEAMLESS should be part of FEATURE_DEFINES.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-07  Oliver Hunt  <oliver@apple.com>
+
+        Fix release build.
+
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+
+2012-05-07  Oliver Hunt  <oliver@apple.com>
+
+        LLInt doesn't check for Ropes when performing a character switch
+        https://bugs.webkit.org/show_bug.cgi?id=85837
+
+        Reviewed by Filip Pizlo.
+
+        Make LLint check if the scrutinee of a char switch is a rope, and if
+        so fall back to a slow case.
+
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        (LLInt):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2012-05-07  Eric Seidel  <eric@webkit.org>
+
+        Add ENABLE_IFRAME_SEAMLESS so Apple can turn off SEAMLESS if needed
+        https://bugs.webkit.org/show_bug.cgi?id=85822
+
+        Reviewed by Adam Barth.
+
+        * Configurations/FeatureDefines.xcconfig:
+
 2012-05-05  Gavin Barraclough  <barraclough@apple.com>
 
         Remove TrustedImm32::m_isPointer

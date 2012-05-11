@@ -28,6 +28,7 @@
 
 #include "CCAnimationTestCommon.h"
 #include "CCLayerTestCommon.h"
+#include "CCTiledLayerTestCommon.h"
 #include "FakeWebGraphicsContext3D.h"
 #include "GraphicsContext3DPrivate.h"
 #include "LayerRendererChromium.h"
@@ -59,6 +60,8 @@ public:
     {
         CCSettings settings;
         m_hostImpl = CCLayerTreeHostImpl::create(settings, this);
+        m_hostImpl->initializeLayerRenderer(createContext(), adoptPtr(new FakeTextureUploader));
+        m_hostImpl->setViewportSize(IntSize(10, 10));
     }
 
     virtual void didLoseContextOnImplThread() OVERRIDE { }
@@ -254,8 +257,6 @@ TEST_F(CCLayerTreeHostImplTest, nonFastScrollableRegionBasic)
 
 TEST_F(CCLayerTreeHostImplTest, nonFastScrollableRegionWithOffset)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-
     OwnPtr<CCLayerImpl> root = CCLayerImpl::create(0);
     root->setScrollable(true);
     root->setScrollPosition(IntPoint(0, 0));
@@ -440,49 +441,51 @@ private:
 
 TEST_F(CCLayerTreeHostImplTest, didDrawNotCalledOnHiddenLayer)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-
-    // Ensure visibleLayerRect for root layer is empty
-    m_hostImpl->setViewportSize(IntSize(0, 0));
-
+    // The root layer is always drawn, so run this test on a child layer that
+    // will be masked out by the root layer's bounds.
     m_hostImpl->setRootLayer(DidDrawCheckLayer::create(0));
     DidDrawCheckLayer* root = static_cast<DidDrawCheckLayer*>(m_hostImpl->rootLayer());
+    root->setMasksToBounds(true);
+
+    root->addChild(DidDrawCheckLayer::create(1));
+    DidDrawCheckLayer* layer = static_cast<DidDrawCheckLayer*>(root->children()[0].get());
+    // Ensure visibleLayerRect for layer is empty
+    layer->setPosition(FloatPoint(100, 100));
+    layer->setBounds(IntSize(10, 10));
+    layer->setContentBounds(IntSize(10, 10));
 
     CCLayerTreeHostImpl::FrameData frame;
 
-    EXPECT_FALSE(root->willDrawCalled());
-    EXPECT_FALSE(root->didDrawCalled());
+    EXPECT_FALSE(layer->willDrawCalled());
+    EXPECT_FALSE(layer->didDrawCalled());
 
     EXPECT_TRUE(m_hostImpl->prepareToDraw(frame));
     m_hostImpl->drawLayers(frame);
     m_hostImpl->didDrawAllLayers(frame);
 
-    EXPECT_FALSE(root->willDrawCalled());
-    EXPECT_FALSE(root->didDrawCalled());
+    EXPECT_FALSE(layer->willDrawCalled());
+    EXPECT_FALSE(layer->didDrawCalled());
 
-    EXPECT_TRUE(root->visibleLayerRect().isEmpty());
+    EXPECT_TRUE(layer->visibleLayerRect().isEmpty());
 
-    // Ensure visibleLayerRect for root layer is not empty
-    m_hostImpl->setViewportSize(IntSize(10, 10));
+    // Ensure visibleLayerRect for layer layer is not empty
+    layer->setPosition(FloatPoint(0, 0));
 
-    EXPECT_FALSE(root->willDrawCalled());
-    EXPECT_FALSE(root->didDrawCalled());
+    EXPECT_FALSE(layer->willDrawCalled());
+    EXPECT_FALSE(layer->didDrawCalled());
 
     EXPECT_TRUE(m_hostImpl->prepareToDraw(frame));
     m_hostImpl->drawLayers(frame);
     m_hostImpl->didDrawAllLayers(frame);
 
-    EXPECT_TRUE(root->willDrawCalled());
-    EXPECT_TRUE(root->didDrawCalled());
+    EXPECT_TRUE(layer->willDrawCalled());
+    EXPECT_TRUE(layer->didDrawCalled());
 
-    EXPECT_FALSE(root->visibleLayerRect().isEmpty());
+    EXPECT_FALSE(layer->visibleLayerRect().isEmpty());
 }
 
 TEST_F(CCLayerTreeHostImplTest, didDrawCalledOnAllLayers)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-    m_hostImpl->setViewportSize(IntSize(10, 10));
-
     m_hostImpl->setRootLayer(DidDrawCheckLayer::create(0));
     DidDrawCheckLayer* root = static_cast<DidDrawCheckLayer*>(m_hostImpl->rootLayer());
 
@@ -533,9 +536,6 @@ private:
 
 TEST_F(CCLayerTreeHostImplTest, prepareToDrawFailsWhenAnimationUsesCheckerboard)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-    m_hostImpl->setViewportSize(IntSize(10, 10));
-
     // When the texture is not missing, we draw as usual.
     m_hostImpl->setRootLayer(DidDrawCheckLayer::create(0));
     DidDrawCheckLayer* root = static_cast<DidDrawCheckLayer*>(m_hostImpl->rootLayer());
@@ -660,8 +660,6 @@ private:
 // https://bugs.webkit.org/show_bug.cgi?id=75783
 TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-    m_hostImpl->setViewportSize(IntSize(10, 10));
 
     {
         OwnPtr<CCLayerImpl> root = CCLayerImpl::create(0);
@@ -878,7 +876,7 @@ TEST_F(CCLayerTreeHostImplTest, blendingOffWhenDrawingOpaqueLayers)
 
 TEST_F(CCLayerTreeHostImplTest, viewportCovered)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
+    m_hostImpl->initializeLayerRenderer(createContext(), adoptPtr(new FakeTextureUploader));
     m_hostImpl->setBackgroundColor(Color::gray);
 
     IntSize viewportSize(1000, 1000);
@@ -989,8 +987,7 @@ TEST_F(CCLayerTreeHostImplTest, reshapeNotCalledUntilDraw)
 {
     ReshapeTrackerContext* reshapeTracker = new ReshapeTrackerContext();
     RefPtr<GraphicsContext3D> context = GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(reshapeTracker), GraphicsContext3D::RenderDirectlyToHostWindow);
-    m_hostImpl->initializeLayerRenderer(context);
-    m_hostImpl->setViewportSize(IntSize(10, 10));
+    m_hostImpl->initializeLayerRenderer(context, adoptPtr(new FakeTextureUploader));
 
     CCLayerImpl* root = new FakeDrawableCCLayerImpl(1);
     root->setAnchorPoint(FloatPoint(0, 0));
@@ -1039,7 +1036,7 @@ TEST_F(CCLayerTreeHostImplTest, partialSwapReceivesDamageRect)
     CCSettings settings;
     settings.partialSwapEnabled = true;
     OwnPtr<CCLayerTreeHostImpl> layerTreeHostImpl = CCLayerTreeHostImpl::create(settings, this);
-    layerTreeHostImpl->initializeLayerRenderer(context);
+    layerTreeHostImpl->initializeLayerRenderer(context, adoptPtr(new FakeTextureUploader()));
     layerTreeHostImpl->setViewportSize(IntSize(500, 500));
 
     CCLayerImpl* root = new FakeDrawableCCLayerImpl(1);
@@ -1125,9 +1122,6 @@ private:
 
 TEST_F(CCLayerTreeHostImplTest, contextLostAndRestoredNotificationSentToAllLayers)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-    m_hostImpl->setViewportSize(IntSize(10, 10));
-
     m_hostImpl->setRootLayer(ContextLostNotificationCheckLayer::create(0));
     ContextLostNotificationCheckLayer* root = static_cast<ContextLostNotificationCheckLayer*>(m_hostImpl->rootLayer());
 
@@ -1141,7 +1135,7 @@ TEST_F(CCLayerTreeHostImplTest, contextLostAndRestoredNotificationSentToAllLayer
     EXPECT_FALSE(layer1->didLoseContextCalled());
     EXPECT_FALSE(layer2->didLoseContextCalled());
 
-    m_hostImpl->initializeLayerRenderer(createContext());
+    m_hostImpl->initializeLayerRenderer(createContext(), adoptPtr(new FakeTextureUploader));
 
     EXPECT_TRUE(root->didLoseContextCalled());
     EXPECT_TRUE(layer1->didLoseContextCalled());
@@ -1156,7 +1150,7 @@ public:
 TEST_F(CCLayerTreeHostImplTest, finishAllRenderingAfterContextLost)
 {
     // The context initialization will fail, but we should still be able to call finishAllRendering() without any ill effects.
-    m_hostImpl->initializeLayerRenderer(GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(new FakeWebGraphicsContext3DMakeCurrentFails), GraphicsContext3D::RenderDirectlyToHostWindow));
+    m_hostImpl->initializeLayerRenderer(GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(new FakeWebGraphicsContext3DMakeCurrentFails), GraphicsContext3D::RenderDirectlyToHostWindow), adoptPtr(new FakeTextureUploader));
     m_hostImpl->finishAllRendering();
 }
 
@@ -1172,9 +1166,6 @@ private:
 
 TEST_F(CCLayerTreeHostImplTest, scrollbarLayerLostContext)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-    m_hostImpl->setViewportSize(IntSize(10, 10));
-
     m_hostImpl->setRootLayer(ScrollbarLayerFakePaint::create(0));
     ScrollbarLayerFakePaint* scrollbar = static_cast<ScrollbarLayerFakePaint*>(m_hostImpl->rootLayer());
     scrollbar->setBounds(IntSize(1, 1));
@@ -1189,7 +1180,7 @@ TEST_F(CCLayerTreeHostImplTest, scrollbarLayerLostContext)
         // Scrollbar layer should always generate quads, even after lost context
         EXPECT_GT(renderPass->quadList().size(), 0u);
         m_hostImpl->didDrawAllLayers(frame);
-        m_hostImpl->initializeLayerRenderer(createContext());
+        m_hostImpl->initializeLayerRenderer(createContext(), adoptPtr(new FakeTextureUploader));
     }
 }
 
@@ -1322,9 +1313,6 @@ private:
 
 TEST_F(CCLayerTreeHostImplTest, dontUseOldResourcesAfterLostContext)
 {
-    m_hostImpl->initializeLayerRenderer(createContext());
-    m_hostImpl->setViewportSize(IntSize(10, 10));
-
     OwnPtr<CCLayerImpl> rootLayer(CCLayerImpl::create(0));
     rootLayer->setBounds(IntSize(10, 10));
     rootLayer->setAnchorPoint(FloatPoint(0, 0));
@@ -1367,7 +1355,7 @@ TEST_F(CCLayerTreeHostImplTest, dontUseOldResourcesAfterLostContext)
 
     // Lose the context, replacing it with a StrictWebGraphicsContext3D, that
     // will warn if any resource from the previous context gets used.
-    m_hostImpl->initializeLayerRenderer(StrictWebGraphicsContext3D::createGraphicsContext());
+    m_hostImpl->initializeLayerRenderer(StrictWebGraphicsContext3D::createGraphicsContext(), adoptPtr(new FakeTextureUploader));
     EXPECT_TRUE(m_hostImpl->prepareToDraw(frame));
     m_hostImpl->drawLayers(frame);
     m_hostImpl->didDrawAllLayers(frame);

@@ -466,6 +466,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSProcessingInstruction.h \
 	DerivedSources/WebCore/JSProgressEvent.cpp \
 	DerivedSources/WebCore/JSProgressEvent.h \
+	DerivedSources/WebCore/JSRadioNodeList.cpp \
+	DerivedSources/WebCore/JSRadioNodeList.h \
 	DerivedSources/WebCore/JSRange.cpp \
 	DerivedSources/WebCore/JSRangeException.cpp \
 	DerivedSources/WebCore/JSRangeException.h \
@@ -879,6 +881,7 @@ dom_binding_idls += \
 	$(WebCore)/html/MediaError.idl \
 	$(WebCore)/html/MediaKeyError.idl \
 	$(WebCore)/html/MediaKeyEvent.idl \
+	$(WebCore)/html/RadioNodeList.idl \
 	$(WebCore)/html/TextMetrics.idl \
 	$(WebCore)/html/TimeRanges.idl \
 	$(WebCore)/html/ValidityState.idl \
@@ -1027,6 +1030,7 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/filesystem/FileSystemCallback.h \
 	Source/WebCore/Modules/filesystem/FileSystemCallbacks.cpp \
 	Source/WebCore/Modules/filesystem/FileSystemCallbacks.h \
+	Source/WebCore/Modules/filesystem/FileSystemType.h \
 	Source/WebCore/Modules/filesystem/FileWriter.cpp \
 	Source/WebCore/Modules/filesystem/FileWriter.h \
 	Source/WebCore/Modules/filesystem/FileWriterBase.cpp \
@@ -2531,6 +2535,8 @@ webcore_sources += \
 	Source/WebCore/html/RadioInputType.h \
 	Source/WebCore/html/RangeInputType.cpp \
 	Source/WebCore/html/RangeInputType.h \
+	Source/WebCore/html/RadioNodeList.cpp \
+	Source/WebCore/html/RadioNodeList.h \
 	Source/WebCore/html/ResetInputType.cpp \
 	Source/WebCore/html/ResetInputType.h \
 	Source/WebCore/html/SearchInputType.cpp \
@@ -3090,6 +3096,8 @@ webcore_sources += \
 	Source/WebCore/platform/DragImage.cpp \
 	Source/WebCore/platform/DragImage.h \
 	Source/WebCore/platform/EventLoop.h \
+	Source/WebCore/platform/EventTracer.cpp \
+	Source/WebCore/platform/EventTracer.h \
 	Source/WebCore/platform/FileChooser.cpp \
 	Source/WebCore/platform/FileChooser.h \
 	Source/WebCore/platform/FileIconLoader.cpp \
@@ -3246,7 +3254,6 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/FractionalLayoutPoint.h \
 	Source/WebCore/platform/graphics/FractionalLayoutRect.cpp \
 	Source/WebCore/platform/graphics/FractionalLayoutRect.h \
-	Source/WebCore/platform/graphics/FractionalLayoutSize.cpp \
 	Source/WebCore/platform/graphics/FractionalLayoutSize.h \
 	Source/WebCore/platform/graphics/GeneratorGeneratedImage.cpp \
 	Source/WebCore/platform/graphics/GeneratorGeneratedImage.h \

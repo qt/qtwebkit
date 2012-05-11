@@ -68,6 +68,7 @@
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebIntentRequest.h"
+#include "WebIntentServiceInfo.h"
 #include "WebKit.h"
 #include "WebNode.h"
 #include "WebPermissionClient.h"
@@ -634,8 +635,14 @@ void FrameLoaderClientImpl::dispatchDidNavigateWithinPage()
     // didStopLoading only when loader is completed so that we don't fire
     // them for fragment redirection that happens in window.onload handler.
     // See https://bugs.webkit.org/show_bug.cgi?id=31838
-    bool loaderCompleted =
-        !webView->page()->mainFrame()->loader()->activeDocumentLoader()->isLoadingInAPISense();
+    //
+    // FIXME: Although FrameLoader::loadInSameDocument which invokes this
+    // method does not have a provisional document loader, we're seeing crashes
+    // where the FrameLoader is in provisional state, and thus
+    // activeDocumentLoader returns 0. Lacking any understanding of how this
+    // can happen, we do this check here to avoid crashing.
+    FrameLoader* loader = webView->page()->mainFrame()->loader();
+    bool loaderCompleted = !(loader->activeDocumentLoader() && loader->activeDocumentLoader()->isLoadingInAPISense());
 
     // Generate didStartLoading if loader is completed.
     if (webView->client() && loaderCompleted)
@@ -1376,6 +1383,10 @@ void FrameLoaderClientImpl::setTitle(const StringWithDirection& title, const KUR
 
 String FrameLoaderClientImpl::userAgent(const KURL& url)
 {
+    WebString override;
+    if (m_webFrame->client()->userAgent(WebURL(url), &override))
+        return override;
+
     return WebKit::Platform::current()->userAgent(url);
 }
 
@@ -1591,9 +1602,27 @@ bool FrameLoaderClientImpl::willCheckAndDispatchMessageEvent(
     if (!m_webFrame->client())
         return false;
 
+    WebFrame* source = 0;
+    if (event && event->source() && event->source()->document())
+        source = WebFrameImpl::fromFrame(event->source()->document()->frame());
     return m_webFrame->client()->willCheckAndDispatchMessageEvent(
-        m_webFrame, WebSecurityOrigin(target), WebDOMMessageEvent(event));
+        source, WebSecurityOrigin(target), WebDOMMessageEvent(event));
 }
+
+#if ENABLE(WEB_INTENTS_TAG)
+void FrameLoaderClientImpl::registerIntentService(
+        const String& action,
+        const String& type,
+        const KURL& href,
+        const String& title,
+        const String& disposition) {
+    if (!m_webFrame->client())
+        return;
+
+    WebIntentServiceInfo service(action, type, href, title, disposition);
+    m_webFrame->client()->registerIntentService(m_webFrame, service);
+}
+#endif
 
 #if ENABLE(WEB_INTENTS)
 void FrameLoaderClientImpl::dispatchIntent(PassRefPtr<WebCore::IntentRequest> intentRequest)

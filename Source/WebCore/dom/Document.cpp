@@ -712,8 +712,8 @@ void Document::buildAccessKeyMap(TreeScope* scope)
         if (!accessKey.isEmpty())
             m_elementsByAccessKey.set(accessKey.impl(), element);
 
-        if (element->hasShadowRoot()) {
-            for (ShadowRoot* root = element->shadow()->youngestShadowRoot(); root; root = root->olderShadowRoot())
+        if (ElementShadow* shadow = element->shadow()) {
+            for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot())
                 buildAccessKeyMap(root);
         }
     }
@@ -771,8 +771,14 @@ void Document::setDocType(PassRefPtr<DocumentType> docType)
     // This should never be called more than once.
     ASSERT(!m_docType || !docType);
     m_docType = docType;
-    if (m_docType)
+    if (m_docType) {
         this->adoptIfNeeded(m_docType.get());
+#if USE(LEGACY_VIEWPORT_ADAPTION)
+        ASSERT(m_viewportArguments.type == ViewportArguments::Implicit);
+        if (m_docType->publicId().startsWith("-//wapforum//dtd xhtml mobile 1.", /* caseSensitive */ false))
+            processViewport("width=device-width, height=device-height, initial-scale=1");
+#endif
+    }
     // Doctype affects the interpretation of the stylesheets.
     clearStyleResolver();
 }
@@ -1645,6 +1651,9 @@ void Document::scheduleForcedStyleRecalc()
 
 void Document::scheduleStyleRecalc()
 {
+    // FIXME: In the seamless case, we should likely schedule a style recalc
+    // on our parent and instead return early here.
+
     if (m_styleRecalcTimer.isActive() || inPageCache())
         return;
 
@@ -1698,7 +1707,10 @@ void Document::recalcStyle(StyleChange change)
     
     if (m_inStyleRecalc)
         return; // Guard against re-entrancy. -dwh
-    
+
+    // FIXME: In the seamless case, we may wish to exit early in the child after recalcing our parent chain.
+    // I have not yet found a test which requires such.
+
     if (m_hasDirtyStyleResolver)
         updateActiveStylesheets(RecalcStyleImmediately);
 
@@ -1724,7 +1736,8 @@ void Document::recalcStyle(StyleChange change)
     if (m_pendingStyleRecalcShouldForce)
         change = Force;
 
-    if (change == Force) {
+    // Recalculating the root style (on the document) is not needed in the common case.
+    if ((change == Force) || (shouldDisplaySeamlesslyWithParent() && (change >= Inherit))) {
         // style selector may set this again during recalc
         m_hasNodesWithPlaceholderStyle = false;
         
@@ -2062,6 +2075,14 @@ void Document::detach()
     // callers of Document::detach().
     m_frame = 0;
     m_renderArena.clear();
+}
+
+void Document::prepareForDestruction()
+{
+    disconnectDescendantFrames();
+    if (DOMWindow* window = this->domWindow())
+        window->willDetachDocumentFromFrame();
+    detach();
 }
 
 void Document::removeAllEventListeners()
@@ -2864,6 +2885,11 @@ void Document::addUserSheet(PassRefPtr<StyleSheetInternal> userSheet)
     styleResolverChanged(RecalcStyleImmediately);
 }
 
+void Document::seamlessParentUpdatedStylesheets()
+{
+    styleResolverChanged(RecalcStyleImmediately);
+}
+
 CSSStyleSheet* Document::elementSheet()
 {
     if (!m_elemSheet)
@@ -3490,6 +3516,22 @@ static bool styleSheetsUseRemUnits(const Vector<RefPtr<StyleSheet> >& sheets)
     return false;
 }
 
+void Document::notifySeamlessChildDocumentsOfStylesheetUpdate() const
+{
+    // If we're not in a frame yet any potential child documents won't have a StyleResolver to update.
+    if (!frame())
+        return;
+
+    // Seamless child frames are expected to notify their seamless children recursively, so we only do direct children.
+    for (Frame* child = frame()->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
+        Document* childDocument = child->document();
+        if (childDocument->shouldDisplaySeamlesslyWithParent()) {
+            ASSERT(childDocument->seamlessParentIFrame()->document() == this);
+            childDocument->seamlessParentUpdatedStylesheets();
+        }
+    }
+}
+
 bool Document::updateActiveStylesheets(StyleResolverUpdateFlag updateFlag)
 {
     if (m_inStyleRecalc) {
@@ -3521,7 +3563,9 @@ bool Document::updateActiveStylesheets(StyleResolverUpdateFlag updateFlag)
     m_usesRemUnits = styleSheetsUseRemUnits(m_styleSheets->vector());
     m_didCalculateStyleResolver = true;
     m_hasDirtyStyleResolver = false;
-    
+
+    notifySeamlessChildDocumentsOfStylesheetUpdate();
+
     return requiresFullStyleRecalc;
 }
 
@@ -3609,7 +3653,7 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
     m_focusedNode = 0;
 
     // Remove focus from the existing focus node (if any)
-    if (oldFocusedNode && !oldFocusedNode->inDetach()) {
+    if (oldFocusedNode) {
         if (oldFocusedNode->active())
             oldFocusedNode->setActive(false);
 
@@ -5805,11 +5849,11 @@ void Document::webkitCancelAnimationFrame(int id)
     m_scriptedAnimationController->cancelCallback(id);
 }
 
-void Document::serviceScriptedAnimations(double monotonicAnimationStartTime)
+void Document::serviceScriptedAnimations(DOMTimeStamp time)
 {
     if (!m_scriptedAnimationController)
         return;
-    m_scriptedAnimationController->serviceScriptedAnimations(monotonicAnimationStartTime);
+    m_scriptedAnimationController->serviceScriptedAnimations(time);
 }
 #endif
 
@@ -5898,10 +5942,14 @@ HTMLIFrameElement* Document::seamlessParentIFrame() const
 
 bool Document::shouldDisplaySeamlesslyWithParent() const
 {
+#if ENABLE(IFRAME_SEAMLESS)
     HTMLFrameOwnerElement* ownerElement = this->ownerElement();
     if (!ownerElement)
         return false;
     return m_mayDisplaySeamlessWithParent && ownerElement->hasTagName(iframeTag) && ownerElement->fastHasAttribute(seamlessAttr);
+#else
+    return false;
+#endif
 }
 
 DocumentLoader* Document::loader() const

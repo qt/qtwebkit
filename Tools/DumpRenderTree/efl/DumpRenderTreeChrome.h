@@ -47,6 +47,8 @@ public:
     void removeWindow(Evas_Object*);
 
     Vector<Evas_Object*> extraViews() const;
+    void clearExtraViews();
+
     Evas_Object* mainFrame() const;
     Evas_Object* mainView() const;
 
@@ -88,6 +90,8 @@ private:
     static void onInsecureContentDisplayed(void*, Evas_Object*, void*);
 
     static void onFrameCreated(void*, Evas_Object*, void*);
+
+    static void onFrameIconChanged(void*, Evas_Object*, void*);
 
     static void onFrameProvisionalLoad(void*, Evas_Object*, void*);
 

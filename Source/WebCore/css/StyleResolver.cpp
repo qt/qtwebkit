@@ -61,7 +61,7 @@
 #include "FrameSelection.h"
 #include "FrameView.h"
 #include "HTMLDocument.h"
-#include "HTMLElement.h"
+#include "HTMLIFrameElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLOptionElement.h"
@@ -418,7 +418,23 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
     }
 #endif
 
+    addStylesheetsFromSeamlessParents();
     appendAuthorStylesheets(0, document->styleSheets()->vector());
+}
+
+void StyleResolver::addStylesheetsFromSeamlessParents()
+{
+    // Build a list of stylesheet lists from our ancestors, and walk that
+    // list in reverse order so that the root-most sheets are appended first.
+    Document* childDocument = document();
+    Vector<StyleSheetList*> ancestorSheets;
+    while (HTMLIFrameElement* parentIFrame = childDocument->seamlessParentIFrame()) {
+        Document* parentDocument = parentIFrame->document();
+        ancestorSheets.append(parentDocument->styleSheets());
+        childDocument = parentDocument;
+    }
+    for (int i = ancestorSheets.size() - 1; i >= 0; i--)
+        appendAuthorStylesheets(0, ancestorSheets.at(i)->vector());
 }
 
 void StyleResolver::addAuthorRulesAndCollectUserRulesFromSheets(const Vector<RefPtr<CSSStyleSheet> >* userSheets, RuleSet& userStyle)
@@ -467,14 +483,14 @@ void StyleResolver::collectFeatures()
 }
 
 #if ENABLE(STYLE_SCOPED)
-const ContainerNode* StyleResolver::determineScope(const StyleSheetInternal* sheet)
+const ContainerNode* StyleResolver::determineScope(const CSSStyleSheet* sheet)
 {
     ASSERT(sheet);
 
     if (!RuntimeEnabledFeatures::styleScopedEnabled())
         return 0;
 
-    Node* ownerNode = sheet->singleOwnerNode();
+    Node* ownerNode = sheet->ownerNode();
     if (!ownerNode || !ownerNode->isHTMLElement() || !ownerNode->hasTagName(HTMLNames::styleTag))
         return 0;
 
@@ -513,7 +529,7 @@ void StyleResolver::appendAuthorStylesheets(unsigned firstNew, const Vector<RefP
             continue;
         StyleSheetInternal* sheet = cssSheet->internal();
 #if ENABLE(STYLE_SCOPED)
-        const ContainerNode* scope = determineScope(sheet);
+        const ContainerNode* scope = determineScope(cssSheet);
         if (scope) {
             ScopedRuleSetMap::AddResult addResult = m_scopedAuthorStyles.add(scope, nullptr);
             if (addResult.isNewEntry)
@@ -1022,7 +1038,7 @@ void StyleResolver::collectMatchingRulesForList(const Vector<RuleData>* rules, i
             // d) the rule contains shadow-ID pseudo elements
             TreeScope* treeScope = m_element->treeScope();
             if (!MatchingUARulesScope::isMatchingUARules()
-                && !treeScope->applyAuthorSheets()
+                && !treeScope->applyAuthorStyles()
 #if ENABLE(STYLE_SCOPED)
                 && (!options.scope || options.scope->treeScope() != treeScope)
 #endif
@@ -1511,13 +1527,28 @@ PassRefPtr<RenderStyle> StyleResolver::styleForDocument(Document* document, CSSF
 {
     Frame* frame = document->frame();
 
+    // HTML5 states that seamless iframes should replace default CSS values
+    // with values inherited from the containing iframe element. However,
+    // some values (such as the case of designMode = "on") still need to
+    // be set by this "document style".
     RefPtr<RenderStyle> documentStyle = RenderStyle::create();
+    bool seamlessWithParent = document->shouldDisplaySeamlesslyWithParent();
+    if (seamlessWithParent) {
+        RenderStyle* iframeStyle = document->seamlessParentIFrame()->renderStyle();
+        if (iframeStyle)
+            documentStyle->inheritFrom(iframeStyle);
+    }
+
+    // FIXME: It's not clear which values below we want to override in the seamless case!
     documentStyle->setDisplay(BLOCK);
-    documentStyle->setRTLOrdering(document->visuallyOrdered() ? VisualOrder : LogicalOrder);
-    documentStyle->setZoom(frame && !document->printing() ? frame->pageZoomFactor() : 1);
-    documentStyle->setPageScaleTransform(frame ? frame->frameScaleFactor() : 1);
+    if (!seamlessWithParent) {
+        documentStyle->setRTLOrdering(document->visuallyOrdered() ? VisualOrder : LogicalOrder);
+        documentStyle->setZoom(frame && !document->printing() ? frame->pageZoomFactor() : 1);
+        documentStyle->setPageScaleTransform(frame ? frame->frameScaleFactor() : 1);
+        documentStyle->setLocale(document->contentLanguage());
+    }
+    // FIXME: This overrides any -webkit-user-modify inherited from the parent iframe.
     documentStyle->setUserModify(document->inDesignMode() ? READ_WRITE : READ_ONLY);
-    documentStyle->setLocale(document->contentLanguage());
 
     Element* docElement = document->documentElement();
     RenderObject* docElementRenderer = docElement ? docElement->renderer() : 0;
@@ -1545,6 +1576,10 @@ PassRefPtr<RenderStyle> StyleResolver::styleForDocument(Document* document, CSSF
             }
         }
     }
+
+    // Seamless iframes want to inherit their font from their parent iframe, so early return before setting the font.
+    if (seamlessWithParent)
+        return documentStyle.release();
 
     FontDescription fontDescription;
     fontDescription.setUsePrinterFont(document->printing());

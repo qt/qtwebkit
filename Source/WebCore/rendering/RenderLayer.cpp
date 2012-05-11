@@ -147,7 +147,6 @@ void ClipRects::destroy(RenderArena* renderArena)
 RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     : m_inResizeMode(false)
     , m_scrollDimensionsDirty(true)
-    , m_zOrderListsDirty(true)
     , m_normalFlowListDirty(true)
     , m_usedTransparency(false)
     , m_paintingInsideReflection(false)
@@ -193,6 +192,9 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_resizer(0)
 {
     m_isNormalFlowOnly = shouldBeNormalFlowOnly();
+    // Non-stacking contexts should have empty z-order lists. As this is already the case,
+    // there is no need to dirty / recompute these lists.
+    m_zOrderListsDirty = isStackingContext();
 
     ScrollableArea::setConstrainsScrollingToContentEdge(false);
 
@@ -2194,7 +2196,7 @@ PassRefPtr<Scrollbar> RenderLayer::createScrollbar(ScrollbarOrientation orientat
     RenderObject* actualRenderer = renderer()->node() ? renderer()->node()->shadowAncestorNode()->renderer() : renderer();
     bool hasCustomScrollbarStyle = actualRenderer->isBox() && actualRenderer->style()->hasPseudoStyle(SCROLLBAR);
     if (hasCustomScrollbarStyle)
-        widget = RenderScrollbar::createCustomScrollbar(this, orientation, toRenderBox(actualRenderer));
+        widget = RenderScrollbar::createCustomScrollbar(this, orientation, actualRenderer->node());
     else {
         widget = Scrollbar::createNativeScrollbar(this, orientation, RegularScrollbar);
         if (orientation == HorizontalScrollbar)
@@ -2210,14 +2212,10 @@ void RenderLayer::destroyScrollbar(ScrollbarOrientation orientation)
 {
     RefPtr<Scrollbar>& scrollbar = orientation == HorizontalScrollbar ? m_hBar : m_vBar;
     if (scrollbar) {
-        if (scrollbar->isCustomScrollbar())
-            toRenderScrollbar(scrollbar.get())->clearOwningRenderer();
-        else {
-            if (orientation == HorizontalScrollbar)
-                willRemoveHorizontalScrollbar(scrollbar.get());
-            else
-                willRemoveVerticalScrollbar(scrollbar.get());
-        }
+        if (orientation == HorizontalScrollbar)
+            willRemoveHorizontalScrollbar(scrollbar.get());
+        else
+            willRemoveVerticalScrollbar(scrollbar.get());
 
         scrollbar->removeFromParent();
         scrollbar->disconnectFromScrollableArea();
@@ -2561,9 +2559,14 @@ void RenderLayer::paintOverflowControls(GraphicsContext* context, const IntPoint
     // and we'll paint the scrollbars then. In the meantime, cache tx and ty so that the 
     // second pass doesn't need to re-enter the RenderTree to get it right.
     if (hasOverlayScrollbars() && !paintingOverlayControls) {
+        m_cachedOverlayScrollbarOffset = paintOffset;
+#if USE(ACCELERATED_COMPOSITING)
+        // It's not necessary to do the second pass if the scrollbars paint into layers.
+        if ((m_hBar && layerForHorizontalScrollbar()) || (m_vBar && layerForVerticalScrollbar()))
+            return;
+#endif
         RenderView* renderView = renderer()->view();
         renderView->layer()->setContainsDirtyOverlayScrollbars(true);
-        m_cachedOverlayScrollbarOffset = paintOffset;
         renderView->frameView()->setContainsScrollableAreaWithOverlayScrollbars(true);
         return;
     }
@@ -2651,17 +2654,15 @@ void RenderLayer::drawPlatformResizerImage(GraphicsContext* context, IntRect res
         cornerResizerSize = resizeCornerImage->size();
     }
 
-    IntRect imageRect(resizerCornerRect.maxXMaxYCorner() - cornerResizerSize, cornerResizerSize);
     if (renderer()->style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft()) {
         context->save();
-        context->translate(imageRect.x(), imageRect.y());
-        imageRect.setX(0);
-        imageRect.setY(0);
+        context->translate(resizerCornerRect.x() + cornerResizerSize.width(), resizerCornerRect.y() + resizerCornerRect.height() - cornerResizerSize.height());
         context->scale(FloatSize(-1.0, 1.0));
-        context->drawImage(resizeCornerImage.get(), renderer()->style()->colorSpace(), imageRect);
+        context->drawImage(resizeCornerImage.get(), renderer()->style()->colorSpace(), IntRect(IntPoint(), cornerResizerSize));
         context->restore();
         return;
     }
+    IntRect imageRect(resizerCornerRect.maxXMaxYCorner() - cornerResizerSize, cornerResizerSize);
     context->drawImage(resizeCornerImage.get(), renderer()->style()->colorSpace(), imageRect);
 }
 
@@ -2886,7 +2887,7 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* context,
         // but we need to ensure that we don't cache clip rects computed with the wrong root in this case.
         if (context->updatingControlTints() || (paintBehavior & PaintBehaviorFlattenCompositingLayers))
             paintFlags |= PaintLayerTemporaryClipRects;
-        else if (!backing()->paintsIntoWindow() && !backing()->paintsIntoCompositedAncestor() && !shouldDoSoftwarePaint(this, paintFlags & PaintLayerPaintingReflection)) {
+        else if (!backing()->paintsIntoWindow() && !backing()->paintsIntoCompositedAncestor() && !shouldDoSoftwarePaint(this, paintFlags & PaintLayerPaintingReflection) && !rootLayer->containsDirtyOverlayScrollbars()) {
             // If this RenderLayer should paint into its backing, that will be done via RenderLayerBacking::paintIntoLayer().
             return;
         }
@@ -4159,6 +4160,9 @@ IntRect RenderLayer::calculateLayerBounds(const RenderLayer* layer, const Render
     if (flags & UseLocalClipRectIfPossible) {
         LayoutRect localClipRect = layer->localClipRect();
         if (localClipRect != PaintInfo::infiniteRect()) {
+            if ((flags & IncludeSelfTransform) && layer->paintsWithTransform(PaintBehaviorNormal))
+                localClipRect = layer->transform()->mapRect(localClipRect);
+
             LayoutPoint ancestorRelOffset;
             layer->convertToLayerCoords(ancestorLayer, ancestorRelOffset);
             localClipRect.moveBy(ancestorRelOffset);
@@ -4462,8 +4466,7 @@ static inline bool compareZIndex(RenderLayer* first, RenderLayer* second)
 void RenderLayer::dirtyZOrderLists()
 {
     ASSERT(m_layerListMutationAllowed);
-    // We cannot assume that we are called on a stacking context as it
-    // is called when we just got demoted from being a stacking context.
+    ASSERT(isStackingContext());
 
     if (m_posZOrderList)
         m_posZOrderList->clear();
@@ -4679,6 +4682,31 @@ bool RenderLayer::isSelfPaintingLayer() const
         || renderer()->isRenderIFrame();
 }
 
+void RenderLayer::updateStackingContextsAfterStyleChange(const RenderStyle* oldStyle)
+{
+    if (!oldStyle)
+        return;
+
+    bool wasStackingContext = isStackingContext(oldStyle);
+    bool isStackingContext = this->isStackingContext();
+    if (isStackingContext != wasStackingContext) {
+        dirtyStackingContextZOrderLists();
+        if (isStackingContext)
+            dirtyZOrderLists();
+        else
+            clearZOrderLists();
+        return;
+    }
+
+    // FIXME: RenderLayer already handles visibility changes through our visiblity dirty bits. This logic could
+    // likely be folded along with the rest.
+    if (oldStyle->zIndex() != renderer()->style()->zIndex() || oldStyle->visibility() != renderer()->style()->visibility()) {
+        dirtyStackingContextZOrderLists();
+        if (isStackingContext)
+            dirtyZOrderLists();
+    }
+}
+
 static bool overflowCanHaveAScrollbar(EOverflow overflow)
 {
     return overflow == OAUTO || overflow == OSCROLL || overflow == OOVERLAY;
@@ -4733,7 +4761,8 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
         delete m_marquee;
         m_marquee = 0;
     }
-    
+
+    updateStackingContextsAfterStyleChange(oldStyle);
     updateScrollbarsAfterStyleChange(oldStyle);
 
     if (!hasReflection() && m_reflection)

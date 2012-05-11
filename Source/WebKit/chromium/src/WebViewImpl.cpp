@@ -143,14 +143,14 @@
 #include "WheelEvent.h"
 #include "cc/CCProxy.h"
 #include "painting/GraphicsContextBuilder.h"
-#include "platform/WebDragData.h"
-#include "platform/WebImage.h"
 #include "platform/WebKitPlatformSupport.h"
 #include "platform/WebString.h"
 #include "platform/WebVector.h"
 #include <public/Platform.h>
+#include <public/WebDragData.h>
 #include <public/WebFloatPoint.h>
 #include <public/WebGraphicsContext3D.h>
+#include <public/WebImage.h>
 #include <public/WebLayer.h>
 #include <public/WebLayerTreeView.h>
 #include <public/WebPoint.h>
@@ -658,12 +658,22 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
         }
         return gestureHandled;
     }
+    case WebInputEvent::GestureLongPress: {
+        if (!mainFrameImpl() || !mainFrameImpl()->frameView())
+            return false;
+
+        m_page->contextMenuController()->clearContextMenu();
+        m_contextMenuAllowed = true;
+        PlatformGestureEventBuilder platformEvent(mainFrameImpl()->frameView(), event);
+        bool handled = mainFrameImpl()->frame()->eventHandler()->sendContextMenuEventForGesture(platformEvent);
+        m_contextMenuAllowed = false;
+        return handled;
+    }
     case WebInputEvent::GestureScrollBegin:
     case WebInputEvent::GestureScrollEnd:
     case WebInputEvent::GestureScrollUpdate:
     case WebInputEvent::GestureTapDown:
     case WebInputEvent::GestureDoubleTap:
-    case WebInputEvent::GestureLongPress:
     case WebInputEvent::GesturePinchBegin:
     case WebInputEvent::GesturePinchEnd:
     case WebInputEvent::GesturePinchUpdate: {
@@ -1251,6 +1261,11 @@ WebViewImpl* WebViewImpl::fromPage(Page* page)
     return static_cast<WebViewImpl*>(chromeClient->webView());
 }
 
+PageGroup* WebViewImpl::defaultPageGroup()
+{
+    return PageGroup::pageGroup(pageGroupName);
+}
+
 // WebWidget ------------------------------------------------------------------
 
 void WebViewImpl::close()
@@ -1432,6 +1447,13 @@ void WebViewImpl::updateAnimations(double monotonicFrameBeginTime)
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     TRACE_EVENT("WebViewImpl::updateAnimations", this, 0);
 
+    WebFrameImpl* webframe = mainFrameImpl();
+    if (!webframe)
+        return;
+    FrameView* view = webframe->frameView();
+    if (!view)
+        return;
+
     // Create synthetic wheel events as necessary for fling.
     if (m_gestureAnimation) {
         if (m_gestureAnimation->animate(monotonicFrameBeginTime))
@@ -1439,9 +1461,6 @@ void WebViewImpl::updateAnimations(double monotonicFrameBeginTime)
         else
             m_gestureAnimation.clear();
     }
-
-    if (!m_page)
-        return;
 
     PageWidgetDelegate::animate(m_page.get(), monotonicFrameBeginTime);
 #endif
@@ -1872,8 +1891,21 @@ WebTextInputType WebViewImpl::textInputType()
                 return WebTextInputTypeTelephone;
             if (input->isURLField())
                 return WebTextInputTypeURL;
+            if (input->isDateField())
+                return WebTextInputTypeDate;
+            if (input->isDateTimeField())
+                return WebTextInputTypeDateTime;
+            if (input->isDateTimeLocalField())
+                return WebTextInputTypeDateTimeLocal;
+            if (input->isMonthField())
+                return WebTextInputTypeMonth;
+            if (input->isTimeField())
+                return WebTextInputTypeTime;
+            if (input->isWeekField())
+                return WebTextInputTypeWeek;
             if (input->isTextField())
                 return WebTextInputTypeText;
+
             return WebTextInputTypeNone;
         }
 

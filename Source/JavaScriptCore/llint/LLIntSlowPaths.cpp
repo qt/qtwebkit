@@ -458,13 +458,7 @@ LLINT_SLOW_PATH_DECL(slow_path_create_this)
     ASSERT(constructor->methodTable()->getConstructData(constructor, constructData) == ConstructTypeJS);
 #endif
     
-    Structure* structure;
-    JSValue proto = LLINT_OP(2).jsValue();
-    if (proto.isObject())
-        structure = asObject(proto)->inheritorID(globalData);
-    else
-        structure = constructor->scope()->globalObject->emptyObjectStructure();
-    
+    Structure* structure = constructor->cachedInheritorID(exec);
     LLINT_RETURN(constructEmptyObject(exec, structure));
 }
 
@@ -1164,6 +1158,20 @@ LLINT_SLOW_PATH_DECL(slow_path_switch_imm)
         pc += codeBlock->immediateSwitchJumpTable(pc[1].u.operand).offsetForValue(intValue, defaultOffset);
     } else
         pc += defaultOffset;
+    LLINT_END();
+}
+
+LLINT_SLOW_PATH_DECL(slow_path_switch_char)
+{
+    LLINT_BEGIN();
+    JSValue scrutinee = LLINT_OP_C(3).jsValue();
+    ASSERT(scrutinee.isString());
+    JSString* string = asString(scrutinee);
+    ASSERT(string->length() == 1);
+    int defaultOffset = pc[2].u.operand;
+    StringImpl* impl = string->value(exec).impl();
+    CodeBlock* codeBlock = exec->codeBlock();
+    pc += codeBlock->characterSwitchJumpTable(pc[1].u.operand).offsetForValue((*impl)[0], defaultOffset);
     LLINT_END();
 }
 
