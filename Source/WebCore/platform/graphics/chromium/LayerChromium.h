@@ -240,6 +240,7 @@ public:
 
     CCLayerAnimationController* layerAnimationController() { return m_layerAnimationController.get(); }
     void setLayerAnimationController(PassOwnPtr<CCLayerAnimationController>);
+    PassOwnPtr<CCLayerAnimationController> releaseLayerAnimationController();
 
     void setLayerAnimationDelegate(CCLayerAnimationDelegate* layerAnimationDelegate) { m_layerAnimationDelegate = layerAnimationDelegate; }
 
@@ -348,8 +349,6 @@ private:
     bool m_screenSpaceTransformIsAnimating;
     IntRect m_drawableContentRect;
     float m_contentsScale;
-
-    bool m_pageScaleDirty;
 
     CCLayerAnimationDelegate* m_layerAnimationDelegate;
 };

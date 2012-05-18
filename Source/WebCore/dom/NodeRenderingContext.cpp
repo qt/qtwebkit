@@ -27,10 +27,10 @@
 #include "NodeRenderingContext.h"
 
 #include "ContainerNode.h"
+#include "ContentDistributor.h"
 #include "ElementShadow.h"
 #include "FlowThreadController.h"
 #include "HTMLContentElement.h"
-#include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "HTMLShadowElement.h"
 #include "Node.h"
@@ -78,7 +78,7 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
 
         if (m_visualParentShadow) {
             if ((m_insertionPoint = m_visualParentShadow->insertionPointFor(m_node))) {
-                if (toShadowRoot(m_insertionPoint->shadowTreeRootNode())->isUsedForRendering()) {
+                if (m_insertionPoint->shadowRoot()->isUsedForRendering()) {
                     m_phase = AttachingDistributed;
                     m_parentNodeForRenderingAndStyle = NodeRenderingContext(m_insertionPoint).parentNodeForRenderingAndStyle();
                     return;
@@ -91,13 +91,13 @@ NodeRenderingContext::NodeRenderingContext(Node* node)
         }
 
         if (isShadowBoundary(parent)) {
-            if (!toShadowRoot(parent->shadowTreeRootNode())->isUsedForRendering()) {
+            if (!parent->shadowRoot()->isUsedForRendering()) {
                 m_phase = AttachingNotDistributed;
                 m_parentNodeForRenderingAndStyle = parent;
                 return;
             }
 
-            if (toInsertionPoint(parent)->hasSelection())
+            if (toInsertionPoint(parent)->hasDistribution())
                 m_phase = AttachingNotFallbacked;
             else
                 m_phase = AttachingFallbacked;
@@ -142,12 +142,12 @@ PassRefPtr<RenderStyle> NodeRenderingContext::releaseStyle()
 
 static inline RenderObject* nextRendererOfInsertionPoint(InsertionPoint* parent, Node* current)
 {
-    HTMLContentSelection* currentSelection = parent->selections()->find(current);
-    if (!currentSelection)
+    size_t start = parent->indexOf(current);
+    if (notFound == start)
         return 0;
 
-    for (HTMLContentSelection* selection = currentSelection->next(); selection; selection = selection->next()) {
-        if (RenderObject* renderer = selection->node()->renderer())
+    for (size_t i = start + 1; i < parent->size(); ++i) {
+        if (RenderObject* renderer = parent->at(i)->renderer())
             return renderer;
     }
 
@@ -158,10 +158,10 @@ static inline RenderObject* previousRendererOfInsertionPoint(InsertionPoint* par
 {
     RenderObject* lastRenderer = 0;
 
-    for (HTMLContentSelection* selection = parent->selections()->first(); selection; selection = selection->next()) {
-        if (selection->node() == current)
+    for (size_t i = 0; i < parent->size(); ++i) {
+        if (parent->at(i) == current)
             break;
-        if (RenderObject* renderer = selection->node()->renderer())
+        if (RenderObject* renderer = parent->at(i)->renderer())
             lastRenderer = renderer;
     }
 
@@ -170,13 +170,10 @@ static inline RenderObject* previousRendererOfInsertionPoint(InsertionPoint* par
 
 static inline RenderObject* firstRendererOfInsertionPoint(InsertionPoint* parent)
 {
-    if (parent->hasSelection()) {
-        for (HTMLContentSelection* selection = parent->selections()->first(); selection; selection = selection->next()) {
-            if (RenderObject* renderer = selection->node()->renderer())
-                return renderer;
-        }
-
-        return 0;
+    size_t size = parent->size();
+    for (size_t i = 0; i < size; ++i) {
+        if (RenderObject* renderer = parent->at(i)->renderer())
+            return renderer;
     }
 
     return firstRendererOf(parent->firstChild());
@@ -184,13 +181,10 @@ static inline RenderObject* firstRendererOfInsertionPoint(InsertionPoint* parent
 
 static inline RenderObject* lastRendererOfInsertionPoint(InsertionPoint* parent)
 {
-    if (parent->hasSelection()) {
-        for (HTMLContentSelection* selection = parent->selections()->last(); selection; selection = selection->previous()) {
-            if (RenderObject* renderer = selection->node()->renderer())
-                return renderer;
-        }
-
-        return 0;
+    size_t size = parent->size();
+    for (size_t i = 0; i < size; ++i) {
+        if (RenderObject* renderer = parent->at(size - 1 - i)->renderer())
+            return renderer;
     }
 
     return lastRendererOf(parent->lastChild());

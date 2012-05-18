@@ -505,9 +505,6 @@ private:
 
     void createFirstLetterRenderer(RenderObject* firstLetterBlock, RenderObject* currentChild);
     void updateFirstLetterStyle(RenderObject* firstLetterBlock, RenderObject* firstLetterContainer);
-    RenderObject* findLastObjectWithFirstLetterText(RenderObject* child, RenderObject* &firstLetterBlock);
-    RenderObject* findLastObjectAfterFirstLetterPunctuation(RenderObject* child, RenderObject* &firstLetterBlock);
-    void addFirstLetter(RenderObject* firstLetterObject, RenderObject* &firstLetterBlock);
 
     struct FloatWithRect {
         FloatWithRect(RenderBox* f)
@@ -574,13 +571,6 @@ private:
         inline LayoutUnit width() const { return m_frameRect.width(); }
         inline LayoutUnit height() const { return m_frameRect.height(); }
 
-        inline int pixelSnappedX() const { ASSERT(isPlaced()); return m_frameRect.pixelSnappedX(); }
-        inline int pixelSnappedMaxX() const { ASSERT(isPlaced()); return m_frameRect.pixelSnappedMaxX(); }
-        inline int pixelSnappedY() const { ASSERT(isPlaced()); return m_frameRect.pixelSnappedY(); }
-        inline int pixelSnappedMaxY() const { ASSERT(isPlaced()); return m_frameRect.pixelSnappedMaxY(); }
-        inline int pixelSnappedWidth() const { return m_frameRect.pixelSnappedWidth(); }
-        inline int pixelSnappedHeight() const { return m_frameRect.pixelSnappedHeight(); }
-
         void setX(LayoutUnit x) { ASSERT(!isInPlacedTree()); m_frameRect.setX(x); }
         void setY(LayoutUnit y) { ASSERT(!isInPlacedTree()); m_frameRect.setY(y); }
         void setWidth(LayoutUnit width) { ASSERT(!isInPlacedTree()); m_frameRect.setWidth(width); }
@@ -622,11 +612,10 @@ private:
     LayoutUnit logicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->maxX() : child->maxY(); }
     LayoutUnit logicalWidthForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->width() : child->height(); }
 
-    int pixelSnappedLogicalTopForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedY() : child->pixelSnappedX(); }
-    int pixelSnappedLogicalBottomForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedMaxY() : child->pixelSnappedMaxX(); }
-    int pixelSnappedLogicalLeftForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedX() : child->pixelSnappedY(); }
-    int pixelSnappedLogicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedMaxX() : child->pixelSnappedMaxY(); }
-    int pixelSnappedLogicalWidthForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->pixelSnappedWidth() : child->pixelSnappedHeight(); }
+    int pixelSnappedLogicalTopForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedY() : child->frameRect().pixelSnappedX(); }
+    int pixelSnappedLogicalBottomForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedMaxY() : child->frameRect().pixelSnappedMaxX(); }
+    int pixelSnappedLogicalLeftForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedX() : child->frameRect().pixelSnappedY(); }
+    int pixelSnappedLogicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedMaxX() : child->frameRect().pixelSnappedMaxY(); }
 
     void setLogicalTopForFloat(FloatingObject* child, LayoutUnit logicalTop)
     {
@@ -911,7 +900,11 @@ private:
     bool handleSpecialChild(RenderBox* child, const MarginInfo&);
     bool handleFloatingChild(RenderBox* child, const MarginInfo&);
     bool handlePositionedChild(RenderBox* child, const MarginInfo&);
-    bool handleRunInChild(RenderBox* child);
+
+    RenderBoxModelObject* createReplacementRunIn(RenderBoxModelObject* runIn);
+    void moveRunInUnderSiblingBlockIfNeeded(RenderObject* runIn);
+    void moveRunInToOriginalPosition(RenderObject* runIn);
+
     LayoutUnit collapseMargins(RenderBox* child, MarginInfo&);
     LayoutUnit clearFloatsIfNeeded(RenderBox* child, MarginInfo&, LayoutUnit oldTopPosMargin, LayoutUnit oldTopNegMargin, LayoutUnit yPos);
     LayoutUnit estimateLogicalTopPosition(RenderBox* child, const MarginInfo&, LayoutUnit& estimateWithoutPagination);

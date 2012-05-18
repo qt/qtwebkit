@@ -34,9 +34,11 @@
 #include "config.h"
 #include "ChromeClientEfl.h"
 
+#include "ApplicationCacheStorage.h"
 #include "FileChooser.h"
 #include "FileIconLoader.h"
 #include "FloatRect.h"
+#include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClientEfl.h"
 #include "HitTestResult.h"
@@ -50,7 +52,10 @@
 #include "SecurityOrigin.h"
 #include "ViewportArguments.h"
 #include "WindowFeatures.h"
+#include "ewk_frame_private.h"
 #include "ewk_private.h"
+#include "ewk_security_origin_private.h"
+#include "ewk_view_private.h"
 #include <Ecore_Evas.h>
 #include <Evas.h>
 #include <wtf/text/CString.h>
@@ -66,6 +71,10 @@
 
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooserEfl.h"
+#endif
+
+#if ENABLE(FULLSCREEN_API)
+#include "Settings.h"
 #endif
 
 using namespace WebCore;
@@ -149,7 +158,7 @@ Page* ChromeClientEfl::createWindow(Frame*, const FrameLoadRequest& frameLoadReq
     if (!newView)
         return 0;
 
-    return ewk_view_core_page_get(newView);
+    return EWKPrivate::corePage(newView);
 }
 
 void ChromeClientEfl::show()
@@ -388,9 +397,16 @@ void ChromeClientEfl::reachedMaxAppCacheSize(int64_t spaceNeeded)
     notImplemented();
 }
 
-void ChromeClientEfl::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t)
+void ChromeClientEfl::reachedApplicationCacheOriginQuota(SecurityOrigin* origin, int64_t totalSpaceNeeded)
 {
-    notImplemented();
+    Ewk_Security_Origin* ewkOrigin = ewk_security_origin_new(origin);
+    int64_t defaultOriginQuota = WebCore::cacheStorage().defaultOriginQuota();
+
+    int64_t newQuota = ewk_view_exceeded_application_cache_quota(m_view, ewkOrigin, defaultOriginQuota, totalSpaceNeeded);
+    if (newQuota)
+        ewk_security_origin_application_cache_quota_set(ewkOrigin, newQuota);
+
+    ewk_security_origin_free(ewkOrigin);
 }
 
 #if ENABLE(TOUCH_EVENTS)
@@ -597,10 +613,11 @@ ChromeClient::CompositingTriggerFlags ChromeClientEfl::allowedCompositingTrigger
 #if ENABLE(FULLSCREEN_API)
 bool ChromeClientEfl::supportsFullScreenForElement(const WebCore::Element* element, bool withKeyboard)
 {
-    if (withKeyboard)
-        return false;
+    UNUSED_PARAM(withKeyboard);
 
-    return true;
+    if (!element->document()->page())
+        return false;
+    return element->document()->page()->settings()->fullScreenEnabled();
 }
 
 void ChromeClientEfl::enterFullScreenForElement(WebCore::Element* element)

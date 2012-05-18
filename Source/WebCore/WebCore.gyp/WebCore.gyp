@@ -120,7 +120,6 @@
       '../platform/image-decoders/jpeg',
       '../platform/image-decoders/png',
       '../platform/image-decoders/skia',
-      '../platform/image-decoders/xbm',
       '../platform/image-decoders/webp',
       '../platform/image-encoders/skia',
       '../platform/leveldb',
@@ -329,6 +328,9 @@
           'link_settings': {
             'libraries': [
               '<(adjusted_library_path)',
+
+              # libWebKitSystemInterfaceLeopard.a references _kCIFormatRGBA8.
+              '$(SDKROOT)/System/Library/Frameworks/QuartzCore.framework',
             ],
           },  # link_settings
         },  # target webkit_system_interface
@@ -1019,6 +1021,7 @@
             'generator_include_dirs': [
               '--include', '../Modules/filesystem',
               '--include', '../Modules/indexeddb',
+              '--include', '../Modules/intents',
               '--include', '../Modules/mediastream',
               '--include', '../Modules/webaudio',
               '--include', '../Modules/webdatabase',
@@ -1249,9 +1252,6 @@
           '<(SHARED_INTERMEDIATE_DIR)/webkit',
           '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings',
         ],
-        'mac_framework_dirs': [
-          '$(SDKROOT)/System/Library/Frameworks/ApplicationServices.framework/Frameworks',
-        ],
         'msvs_disabled_warnings': [
           4138, 4244, 4291, 4305, 4344, 4355, 4521, 4099,
         ],
@@ -1301,17 +1301,6 @@
           'export_dependent_settings': [
             '<(chromium_src_dir)/build/linux/system.gyp:gtk',
           ],
-        }],
-        ['OS=="linux"', {
-          'direct_dependent_settings': {
-            'defines': [
-              # Mozilla on Linux effectively uses uname -sm, but when running
-              # 32-bit x86 code on an x86_64 processor, it uses
-              # "Linux i686 (x86_64)".  Matching that would require making a
-              # run-time determination.
-              'WEBCORE_NAVIGATOR_PLATFORM="Linux i686"',
-            ],
-          },
         }],
         ['OS=="mac"', {
           'dependencies': [
@@ -1994,16 +1983,6 @@
       'direct_dependent_settings': {
         'include_dirs': [
           '<@(webcore_include_dirs)',
-        ],
-        'mac_framework_dirs': [
-          '$(SDKROOT)/System/Library/Frameworks/ApplicationServices.framework/Frameworks',
-          '$(SDKROOT)/System/Library/Frameworks/Accelerate.framework',
-          '$(SDKROOT)/System/Library/Frameworks/CoreServices.framework',
-          '$(SDKROOT)/System/Library/Frameworks/Foundation.framework',
-          '$(SDKROOT)/System/Library/Frameworks/CoreFoundation.framework',
-          '$(SDKROOT)/System/Library/Frameworks/AudioToolbox.framework',
-          '$(SDKROOT)/System/Library/Frameworks/AudioUnit.framework',
-          '$(SDKROOT)/System/Library/Frameworks/CoreAudio.framework',
         ],
       },
       'conditions': [

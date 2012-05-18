@@ -36,8 +36,8 @@
 #include "JSObject.h"
 #include "ScopeChain.h"
 #include "Structure.h"
-#include "UString.h"
 #include "WriteBarrier.h"
+#include <wtf/DataLog.h>
 #include <wtf/MainThread.h>
 
 namespace JSC {
@@ -219,24 +219,19 @@ void MarkStackArray::stealSomeCellsFrom(MarkStackArray& other)
 }
 
 #if ENABLE(PARALLEL_GC)
-void MarkStackThreadSharedData::resetChildren()
-{
-    for (unsigned i = 0; i < m_slaveMarkStacks.size(); ++i)
-       m_slaveMarkStacks[i]->reset();
-}
-
-void MarkStackThreadSharedData::markingThreadMain(SlotVisitor* slotVisitor)
+void MarkStackThreadSharedData::markingThreadMain()
 {
     WTF::registerGCThread();
-    ParallelModeEnabler enabler(*slotVisitor);
-    slotVisitor->drainFromShared(SlotVisitor::SlaveDrain);
-    delete slotVisitor;
+    {
+        SlotVisitor slotVisitor(*this);
+        ParallelModeEnabler enabler(slotVisitor);
+        slotVisitor.drainFromShared(SlotVisitor::SlaveDrain);
+    }
 }
 
-void MarkStackThreadSharedData::markingThreadStartFunc(void* myVisitor)
+void MarkStackThreadSharedData::markingThreadStartFunc(void* shared)
 {
-    SlotVisitor* slotVisitor = static_cast<SlotVisitor*>(myVisitor);
-    slotVisitor->sharedData().markingThreadMain(slotVisitor);
+    static_cast<MarkStackThreadSharedData*>(shared)->markingThreadMain();
 }
 #endif
 
@@ -249,9 +244,7 @@ MarkStackThreadSharedData::MarkStackThreadSharedData(JSGlobalData* globalData)
 {
 #if ENABLE(PARALLEL_GC)
     for (unsigned i = 1; i < Options::numberOfGCMarkers; ++i) {
-        SlotVisitor* slotVisitor = new SlotVisitor(*this);
-        m_slaveMarkStacks.append(slotVisitor);
-        m_markingThreads.append(createThread(markingThreadStartFunc, slotVisitor, "JavaScriptCore::Marking"));
+        m_markingThreads.append(createThread(markingThreadStartFunc, this, "JavaScriptCore::Marking"));
         ASSERT(m_markingThreads.last());
     }
 #endif
@@ -283,6 +276,7 @@ void MarkStackThreadSharedData::reset()
 #else
     ASSERT(m_opaqueRoots.isEmpty());
 #endif
+    
     m_weakReferenceHarvesters.removeAll();
 }
 
@@ -295,7 +289,6 @@ void MarkStack::reset()
 #else
     m_opaqueRoots.clear();
 #endif
-    m_uniqueStrings.clear();
 }
 
 void MarkStack::append(ConservativeRoots& conservativeRoots)
@@ -496,34 +489,6 @@ void* SlotVisitor::allocateNewSpace(void* ptr, size_t bytes)
     return CopiedSpace::allocateFromBlock(m_copyBlock, bytes);
 }
 
-inline void MarkStack::internalAppend(JSValue* slot)
-{
-    ASSERT(slot);
-    JSValue value = *slot;
-    ASSERT(value);
-    if (!value.isCell())
-        return;
-
-    if (value.isString()) {
-        JSString* string = jsCast<JSString*>(value.asCell());
-        if (!string->isHashConstSingleton() && string->length() > 1 && !string->isRope()) {
-            UniqueStringMap::AddResult addResult = m_uniqueStrings.add(string->string().impl(), value);
-            if (addResult.isNewEntry)
-                string->setHashConstSingleton();
-            else {
-                JSValue existingJSValue = addResult.iterator->second;
-                if (value != existingJSValue)
-                    jsCast<JSString*>(existingJSValue.asCell())->clearHashConstSingleton();
-                *slot = existingJSValue;
-                return;
-            }
-        }
-    }
-
-    internalAppend(value.asCell());
-}
-
-
 void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsigned length)
 {
     void* oldPtr = *ptr;
@@ -537,7 +502,7 @@ void SlotVisitor::copyAndAppend(void** ptr, size_t bytes, JSValue* values, unsig
             newValues[i] = value;
             if (!value)
                 continue;
-            internalAppend(&newValues[i]);
+            internalAppend(value);
         }
 
         memcpy(newPtr, oldPtr, jsValuesOffset);
@@ -571,16 +536,29 @@ void SlotVisitor::finalizeUnconditionalFinalizers()
 #if ENABLE(GC_VALIDATION)
 void MarkStack::validate(JSCell* cell)
 {
-    if (!cell)
+    if (!cell) {
+        dataLog("cell is NULL\n");
         CRASH();
+    }
 
-    if (!cell->structure())
+    if (!cell->structure()) {
+        dataLog("cell at %p has a null structure\n" , cell);
         CRASH();
+    }
 
     // Both the cell's structure, and the cell's structure's structure should be the Structure Structure.
     // I hate this sentence.
-    if (cell->structure()->structure()->JSCell::classInfo() != cell->structure()->JSCell::classInfo())
+    if (cell->structure()->structure()->JSCell::classInfo() != cell->structure()->JSCell::classInfo()) {
+        const char* parentClassName = 0;
+        const char* ourClassName = 0;
+        if (cell->structure()->structure() && cell->structure()->structure()->JSCell::classInfo())
+            parentClassName = cell->structure()->structure()->JSCell::classInfo()->className;
+        if (cell->structure()->JSCell::classInfo())
+            ourClassName = cell->structure()->JSCell::classInfo()->className;
+        dataLog("parent structure (%p <%s>) of cell at %p doesn't match cell's structure (%p <%s>)\n",
+                cell->structure()->structure(), parentClassName, cell, cell->structure(), ourClassName);
         CRASH();
+    }
 }
 #else
 void MarkStack::validate(JSCell*)

@@ -83,7 +83,7 @@ WebInspector.ResourceView.nonSourceViewForResource = function(resource)
 WebInspector.ResourceSourceFrame = function(resource)
 {
     this._resource = resource;
-    WebInspector.SourceFrame.call(this, resource.url);
+    WebInspector.SourceFrame.call(this, resource);
     this._resource.addEventListener(WebInspector.Resource.Events.RevisionAdded, this._contentChanged, this);
 }
 
@@ -91,23 +91,6 @@ WebInspector.ResourceSourceFrame.prototype = {
     get resource()
     {
         return this._resource;
-    },
-
-    /**
-     * @param {function(?string,boolean,string)} callback
-     */
-    requestContent: function(callback)
-    {
-        /**
-         * @param {?string} content
-         * @param {boolean} contentEncoded
-         * @param {string} mimeType
-         */
-        function callbackWrapper(content, contentEncoded, mimeType)
-        {
-            callback(content, contentEncoded, mimeType);
-        }
-        this.resource.requestContent(callbackWrapper.bind(this));
     },
 
     _contentChanged: function(event)
@@ -132,25 +115,31 @@ WebInspector.EditableResourceSourceFrame.Events = {
 }
 
 WebInspector.EditableResourceSourceFrame.prototype = {
+    /**
+     * @return {boolean}
+     */
     canEditSource: function()
     {
         //FIXME: make live edit stop using resource content binding.
         return this._resource.isEditable() && this._resource.type === WebInspector.resourceTypes.Stylesheet;
     },
 
-    editContent: function(newText, callback)
+    /**
+     * @param {string} text
+     */
+    commitEditing: function(text)
     {
         this._clearIncrementalUpdateTimer();
         var majorChange = true;
         this._settingContent = true;
         function callbackWrapper(text)
         {
-            callback(text);
             delete this._settingContent;
+            this.dispatchEventToListeners(WebInspector.EditableResourceSourceFrame.Events.TextEdited, this);
         }
-        this.resource.setContent(newText, majorChange, callbackWrapper.bind(this));
+        this.resource.setContent(text, majorChange, callbackWrapper.bind(this));
     },
-
+    
     afterTextChanged: function(oldRange, newRange)
     {
         function commitIncrementalEdit()
@@ -174,12 +163,6 @@ WebInspector.EditableResourceSourceFrame.prototype = {
     {
         if (!this._settingContent)
             WebInspector.ResourceSourceFrame.prototype._contentChanged.call(this, event);
-    },
-
-    didEditContent: function(error, content)
-    {
-        WebInspector.SourceFrame.prototype.didEditContent.call(this, error, content);
-        this.dispatchEventToListeners(WebInspector.EditableResourceSourceFrame.Events.TextEdited, this);
     },
 
     isDirty: function()

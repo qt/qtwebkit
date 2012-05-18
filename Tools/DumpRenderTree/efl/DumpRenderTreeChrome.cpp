@@ -29,8 +29,10 @@
 
 #include "DumpRenderTree.h"
 #include "DumpRenderTreeView.h"
+#include "EditingCallbacks.h"
 #include "EventSender.h"
 #include "GCController.h"
+#include "KURL.h"
 #include "LayoutTestController.h"
 #include "NotImplemented.h"
 #include "TextInputController.h"
@@ -107,6 +109,8 @@ Evas_Object* DumpRenderTreeChrome::createView() const
     evas_object_smart_callback_add(view, "mixedcontent,displayed", onInsecureContentDisplayed, 0);
     evas_object_smart_callback_add(view, "frame,created", onFrameCreated, 0);
 
+    connectEditingCallbacks(view);
+
     Evas_Object* mainFrame = ewk_view_frame_main_get(view);
     evas_object_smart_callback_add(mainFrame, "icon,changed", onFrameIconChanged, 0);
     evas_object_smart_callback_add(mainFrame, "load,provisional", onFrameProvisionalLoad, 0);
@@ -158,6 +162,8 @@ bool DumpRenderTreeChrome::initialize()
         ewk_settings_local_storage_path_set(path);
         eina_str_join(path, sizeof(path), '/', drtTemp, "Databases");
         ewk_settings_web_database_path_set(path);
+        eina_str_join(path, sizeof(path), '/', drtTemp, "Applications");
+        ewk_settings_application_cache_path_set(path);
     }
 
     return true;
@@ -206,10 +212,11 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     ewk_settings_icon_database_clear();
     ewk_settings_icon_database_path_set(0);
 
-    ewk_settings_web_database_clear();
+    ewk_web_database_remove_all();
     ewk_settings_web_database_default_quota_set(5 * 1024 * 1024);
 
     ewk_settings_memory_cache_clear();
+    ewk_settings_application_cache_clear();
 
     ewk_view_setting_private_browsing_set(mainView(), EINA_FALSE);
     ewk_view_setting_spatial_navigation_set(mainView(), EINA_FALSE);
@@ -264,6 +271,7 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     DumpRenderTreeSupportEfl::setEditingBehavior(mainView(), defaultEditingBehavior());
     DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(mainView(), false);
     DumpRenderTreeSupportEfl::setLoadsSiteIconsIgnoringImageLoadingSetting(mainView(), false);
+    DumpRenderTreeSupportEfl::setSerializeHTTPLoads(false);
 }
 
 static CString pathSuitableForTestResult(const char* uriString)

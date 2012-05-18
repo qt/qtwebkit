@@ -27,6 +27,7 @@
     <file>CookieItemsView.js</file>
     <file>CookieParser.js</file>
     <file>CookiesTable.js</file>
+    <file>CPUProfileView.js</file>
     <file>CSSCompletions.js</file>
     <file>CSSKeywordCompletions.js</file>
     <file>CSSSelectorProfileView.js</file>
@@ -36,7 +37,8 @@
     <file>DatabaseTableView.js</file>
     <file>DataGrid.js</file>
     <file>DebuggerModel.js</file>
-    <file>DebuggerPresentationModel.js</file>
+    <file>DebuggerResourceBinding.js</file>
+    <file>DebuggerScriptMapping.js</file>
     <file>Dialog.js</file>
     <file>DOMAgent.js</file>
     <file>DOMBreakpointsSidebarPane.js</file>
@@ -101,10 +103,10 @@
     <file>PanelEnablerView.js</file>
     <file>Placard.js</file>
     <file>Popover.js</file>
+    <file>PresentationConsoleMessageHelper.js</file>
     <file>ProfileDataGridTree.js</file>
     <file>ProfileLauncherView.js</file>
     <file>ProfilesPanel.js</file>
-    <file>ProfileView.js</file>
     <file>PropertiesSection.js</file>
     <file>PropertiesSidebarPane.js</file>
     <file>RawSourceCode.js</file>
@@ -129,7 +131,7 @@
     <file>Script.js</file>
     <file>ScriptFormatter.js</file>
     <file>ScriptFormatterWorker.js</file>
-    <file>ScriptMapping.js</file>
+    <file>ScriptSnippetModel.js</file>
     <file>ScriptsPanel.js</file>
     <file>ScriptsNavigator.js</file>
     <file>ScriptsSearchScope.js</file>
@@ -142,12 +144,13 @@
     <file>SidebarOverlay.js</file>
     <file>SidebarPane.js</file>
     <file>SidebarTreeElement.js</file>
-    <file>SnippetsModel.js</file>
+    <file>SnippetStorage.js</file>
     <file>SoftContextMenu.js</file>
     <file>SourceCSSTokenizer.js</file>
     <file>SourceFrame.js</file>
     <file>SourceHTMLTokenizer.js</file>
     <file>SourceJavaScriptTokenizer.js</file>
+    <file>SourceMapping.js</file>
     <file>SourceTokenizer.js</file>
     <file>Spectrum.js</file>
     <file>SplitView.js</file>
@@ -250,7 +253,6 @@
     <file>Images/indexedDBIndex.png</file>
     <file>Images/localStorage.png</file>
     <file>Images/navigatorShowHideButton.png</file>
-    <file>Images/navigatorPinButton.png</file>
     <file>Images/paneAddButtons.png</file>
     <file>Images/paneBottomGrow.png</file>
     <file>Images/paneBottomGrowActive.png</file>

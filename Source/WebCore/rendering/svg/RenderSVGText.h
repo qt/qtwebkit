@@ -36,6 +36,7 @@ class RenderSVGInlineText;
 class RenderSVGText : public RenderSVGBlock {
 public:
     RenderSVGText(SVGTextElement*);
+    virtual ~RenderSVGText();
 
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
 
@@ -50,15 +51,11 @@ public:
     bool needsReordering() const { return m_needsReordering; }
     Vector<SVGTextLayoutAttributes*>& layoutAttributes() { return m_layoutAttributes; }
 
-    void subtreeChildAdded(RenderObject*);
-    void subtreeChildWillBeDestroyed(RenderSVGInlineText*, Vector<SVGTextLayoutAttributes*>& affectedAttributes);
-    void subtreeChildWasDestroyed(RenderSVGInlineText*, Vector<SVGTextLayoutAttributes*>& affectedAttributes);
-    void subtreeStyleChanged(RenderSVGInlineText*);
-    void subtreeTextChanged(RenderSVGInlineText*);
-
-    // Call this method when either the children of a DOM text element have changed, or the length of
-    // the text in any child element has changed.
-    void invalidateTextPositioningElements();
+    void subtreeChildWasAdded(RenderObject*);
+    void subtreeChildWillBeRemoved(RenderSVGInlineText*, Vector<SVGTextLayoutAttributes*, 2>& affectedAttributes);
+    void subtreeChildWasRemoved(const Vector<SVGTextLayoutAttributes*, 2>& affectedAttributes);
+    void subtreeStyleDidChange(RenderSVGInlineText*);
+    void subtreeTextDidChange(RenderSVGInlineText*);
 
 private:
     virtual const char* renderName() const { return "RenderSVGText"; }
@@ -80,6 +77,8 @@ private:
 
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, ApplyContainerFlipOrNot = ApplyContainerFlip, bool* wasFixed = 0) const;
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
+    virtual void removeChild(RenderObject*) OVERRIDE;
+    virtual void willBeDestroyed() OVERRIDE;
 
     virtual FloatRect objectBoundingBox() const { return frameRect(); }
     virtual FloatRect strokeBoundingBox() const;
@@ -91,8 +90,7 @@ private:
     virtual RenderBlock* firstLineBlock() const;
     virtual void updateFirstLetter();
 
-    void rebuildAllLayoutAttributes();
-    void rebuildLayoutAttributes();
+    bool shouldHandleSubtreeMutations() const;
 
     bool m_needsReordering : 1;
     bool m_needsPositioningValuesUpdate : 1;

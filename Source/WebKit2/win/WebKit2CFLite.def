@@ -192,12 +192,10 @@ EXPORTS
         ?page@Document@WebCore@@QBEPAVPage@2@XZ
         ?paintControlTints@FrameView@WebCore@@AAEXXZ
         ?placeholderShouldBeVisible@HTMLTextFormControlElement@WebCore@@QBE_NXZ
-        ?rangeFromLocationAndLength@TextIterator@WebCore@@SA?AV?$PassRefPtr@VRange@WebCore@@@WTF@@PAVElement@2@HH_N@Z
+        ?rangeFromLocationAndLength@TextIterator@WebCore@@SA?AV?$PassRefPtr@VRange@WebCore@@@WTF@@PAVContainerNode@2@HH_N@Z
         ?remove@String@WTF@@QAEXIH@Z
         ?reverseFind@StringImpl@WTF@@QAEI_WI@Z
         ?s_frontendCounter@InspectorInstrumentation@WebCore@@0HA
-        ?s_info@JSNode@WebCore@@2UClassInfo@JSC@@B
-        ?s_info@JSDOMGlobalObject@WebCore@@2UClassInfo@JSC@@B
         ?scriptExecutionContext@JSDOMGlobalObject@WebCore@@QBEPAVScriptExecutionContext@2@XZ
         ?scriptNameToCode@WebCore@@YA?AW4UScriptCode@@ABVString@WTF@@@Z
         ?scrollElementToRect@FrameView@WebCore@@QAEXPAVElement@2@ABVIntRect@2@@Z
@@ -217,6 +215,7 @@ EXPORTS
         ?setSerifFontFamily@Settings@WebCore@@QAEXABVAtomicString@WTF@@W4UScriptCode@@@Z
         ?setStandardFontFamily@Settings@WebCore@@QAEXABVAtomicString@WTF@@W4UScriptCode@@@Z
         ?setSuggestedValue@HTMLInputElement@WebCore@@QAEXABVString@WTF@@@Z
+        ?setEditingValue@HTMLInputElement@WebCore@@QAEXABVString@WTF@@@Z
         ?settings@Document@WebCore@@QBEPAVSettings@2@XZ
         ?settings@Frame@WebCore@@QBEPAVSettings@2@XZ
         ?setFixedElementsLayoutRelativeToFrame@Settings@WebCore@@QAEX_N@Z
@@ -241,7 +240,6 @@ EXPORTS
         ?willDetachPage@FrameDestructionObserver@WebCore@@UAEXXZ
         ?nodesFromRect@Document@WebCore@@QBE?AV?$PassRefPtr@VNodeList@WebCore@@@WTF@@HHIIII_N0@Z
         ?selectionStartHasMarkerFor@Editor@WebCore@@QBE_NW4MarkerType@DocumentMarker@2@HH@Z
-        ?webkitWillEnterFullScreenForElement@Document@WebCore@@QAEXPAVElement@2@@Z
-        ?webkitDidEnterFullScreenForElement@Document@WebCore@@QAEXPAVElement@2@@Z
-        ?webkitWillExitFullScreenForElement@Document@WebCore@@QAEXPAVElement@2@@Z
-        ?webkitDidExitFullScreenForElement@Document@WebCore@@QAEXPAVElement@2@@Z
+        ?isPageBoxVisible@Document@WebCore@@QAE_NH@Z
+        ?suspendAnimations@AnimationController@WebCore@@QAEXXZ
+        ?resumeAnimations@AnimationController@WebCore@@QAEXXZ

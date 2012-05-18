@@ -74,6 +74,7 @@
 #include "RenderedPosition.h"
 #include "ReplaceSelectionCommand.h"
 #include "Settings.h"
+#include "ShadowRoot.h"
 #include "SimplifyMarkupCommand.h"
 #include "Sound.h"
 #include "SpellChecker.h"
@@ -840,7 +841,7 @@ void Editor::reappliedEditing(PassRefPtr<EditCommandComposition> cmd)
 }
 
 Editor::Editor(Frame* frame)
-    : m_frame(frame)
+    : FrameDestructionObserver(frame)
     , m_deleteButtonController(adoptPtr(new DeleteButtonController(frame)))
     , m_ignoreCompositionSelectionChange(false)
     , m_shouldStartNewKillRingSequence(false)
@@ -944,9 +945,11 @@ bool Editor::insertLineBreak()
     if (!shouldInsertText("\n", m_frame->selection()->toNormalizedRange().get(), EditorInsertActionTyped))
         return true;
 
+    VisiblePosition caret = m_frame->selection()->selection().visibleStart();
+    bool alignToEdge = isEndOfDocument(caret);
     bool autocorrectionIsApplied = m_alternativeTextController->applyAutocorrectionBeforeTypingIfAppropriate();
     TypingCommand::insertLineBreak(m_frame->document(), autocorrectionIsApplied ? TypingCommand::RetainAutocorrectionIndicator : 0);
-    revealSelectionAfterEditingOperation();
+    revealSelectionAfterEditingOperation(alignToEdge ? ScrollAlignment::alignToEdgeIfNeeded : ScrollAlignment::alignCenterIfNeeded);
 
     return true;
 }
@@ -962,9 +965,11 @@ bool Editor::insertParagraphSeparator()
     if (!shouldInsertText("\n", m_frame->selection()->toNormalizedRange().get(), EditorInsertActionTyped))
         return true;
 
+    VisiblePosition caret = m_frame->selection()->selection().visibleStart();
+    bool alignToEdge = isEndOfDocument(caret);
     bool autocorrectionIsApplied = m_alternativeTextController->applyAutocorrectionBeforeTypingIfAppropriate();
     TypingCommand::insertParagraphSeparator(m_frame->document(), autocorrectionIsApplied ? TypingCommand::RetainAutocorrectionIndicator : 0);
-    revealSelectionAfterEditingOperation();
+    revealSelectionAfterEditingOperation(alignToEdge ? ScrollAlignment::alignToEdgeIfNeeded : ScrollAlignment::alignCenterIfNeeded);
 
     return true;
 }
@@ -2282,12 +2287,12 @@ PassRefPtr<Range> Editor::rangeForPoint(const IntPoint& windowPoint)
     return avoidIntersectionWithNode(selection.toNormalizedRange().get(), m_deleteButtonController->containerElement());
 }
 
-void Editor::revealSelectionAfterEditingOperation()
+void Editor::revealSelectionAfterEditingOperation(const ScrollAlignment& alignment)
 {
     if (m_ignoreCompositionSelectionChange)
         return;
 
-    m_frame->selection()->revealSelection(ScrollAlignment::alignCenterIfNeeded);
+    m_frame->selection()->revealSelection(alignment);
 }
 
 void Editor::setIgnoreCompositionSelectionChange(bool ignore)
@@ -2518,12 +2523,12 @@ PassRefPtr<Range> Editor::nextVisibleRange(Range* currentRange, const String& ta
         else
             searchRange->setEndBefore(resultRange->startContainer(), ec);
 
-        Node* shadowTreeRoot = searchRange->shadowTreeRootNode();
-        if (searchRange->collapsed(ec) && shadowTreeRoot) {
+        ShadowRoot* shadowRoot = searchRange->shadowRoot();
+        if (searchRange->collapsed(ec) && shadowRoot) {
             if (forward)
-                searchRange->setEnd(shadowTreeRoot, shadowTreeRoot->childNodeCount(), ec);
+                searchRange->setEnd(shadowRoot, shadowRoot->childNodeCount(), ec);
             else
-                searchRange->setStartBefore(shadowTreeRoot, ec);
+                searchRange->setStartBefore(shadowRoot, ec);
         }
         
         if (searchRange->startContainer()->isDocumentNode() && searchRange->endContainer()->isDocumentNode())
@@ -2881,7 +2886,7 @@ unsigned Editor::countMatchesForText(const String& target, Range* range, FindOpt
         // text nodes. 
         searchRange->setStart(resultRange->endContainer(exception), resultRange->endOffset(exception), exception);
 
-        Node* shadowTreeRoot = searchRange->shadowTreeRootNode();
+        Node* shadowTreeRoot = searchRange->shadowRoot();
         if (searchRange->collapsed(exception) && shadowTreeRoot)
             searchRange->setEnd(shadowTreeRoot, shadowTreeRoot->childNodeCount(), exception);
     } while (true);
@@ -2951,21 +2956,14 @@ void Editor::respondToChangedSelection(const VisibleSelection& oldSelection, Fra
             }
         }
 
-#if !PLATFORM(MAC) || (PLATFORM(MAC) && (defined(BUILDING_ON_LEOPARD) || defined(BUILDING_ON_SNOW_LEOPARD)))
-#if PLATFORM(CHROMIUM)
-        if (!m_frame->settings() || !m_frame->settings()->asynchronousSpellCheckingEnabled()) {
+        if (!textChecker() || textChecker()->shouldEraseMarkersAfterChangeSelection(TextCheckingTypeSpelling)) {
             if (RefPtr<Range> wordRange = newAdjacentWords.toNormalizedRange())
                 m_frame->document()->markers()->removeMarkers(wordRange.get(), DocumentMarker::Spelling);
         }
-#else
-        // This only erases markers that are in the first unit (word or sentence) of the selection.
-        // Perhaps peculiar, but it matches AppKit on these Mac OS X versions.
-        if (RefPtr<Range> wordRange = newAdjacentWords.toNormalizedRange())
-            m_frame->document()->markers()->removeMarkers(wordRange.get(), DocumentMarker::Spelling);
-#endif
-#endif
-        if (RefPtr<Range> sentenceRange = newSelectedSentence.toNormalizedRange())
-            m_frame->document()->markers()->removeMarkers(sentenceRange.get(), DocumentMarker::Grammar);
+        if (!textChecker() || textChecker()->shouldEraseMarkersAfterChangeSelection(TextCheckingTypeGrammar)) {
+            if (RefPtr<Range> sentenceRange = newSelectedSentence.toNormalizedRange())
+                m_frame->document()->markers()->removeMarkers(sentenceRange.get(), DocumentMarker::Grammar);
+        }
     }
 
     // When continuous spell checking is off, existing markers disappear after the selection changes.
@@ -3057,6 +3055,12 @@ void Editor::deviceScaleFactorChanged()
 bool Editor::unifiedTextCheckerEnabled() const
 {
     return WebCore::unifiedTextCheckerEnabled(m_frame);
+}
+
+void Editor::willDetachPage()
+{
+    if (EditorClient* editorClient = client())
+        editorClient->frameWillDetachPage(frame());
 }
 
 } // namespace WebCore

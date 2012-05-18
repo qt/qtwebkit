@@ -86,8 +86,6 @@ BitmapImage::BitmapImage(CGImageRef cgImage, ImageObserver* observer)
     , m_sizeAvailable(true)
     , m_haveFrameCount(true)
 {
-    initPlatformData();
-    
     CGFloat width = CGImageGetWidth(cgImage);
     CGFloat height = CGImageGetHeight(cgImage);
     m_decodedSize = width * height * 4;
@@ -194,7 +192,7 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& destRect, const F
 {
     startAnimation();
 
-    RetainPtr<CGImageRef> image = frameAtIndex(m_currentFrame);
+    CGImageRef image = frameAtIndex(m_currentFrame);
     if (!image) // If it's too early we won't have an image yet.
         return;
     
@@ -209,7 +207,7 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& destRect, const F
     if (shouldRespectImageOrientation == RespectImageOrientation)
         orientation = frameOrientationAtIndex(m_currentFrame);
 
-    ctxt->drawNativeImage(image.get(), selfSize, styleColorSpace, destRect, srcRect, compositeOp, orientation);
+    ctxt->drawNativeImage(image, selfSize, styleColorSpace, destRect, srcRect, compositeOp, orientation);
 
     if (imageObserver())
         imageObserver()->didDraw(this);

@@ -576,7 +576,7 @@ IntRect RenderLayerCompositor::calculateCompositedBounds(const RenderLayer* laye
 {
     if (!canBeComposited(layer))
         return IntRect();
-    return pixelSnappedIntRect(RenderLayer::calculateLayerBounds(layer, ancestorLayer));
+    return RenderLayer::calculateLayerBounds(layer, ancestorLayer);
 }
 
 void RenderLayerCompositor::layerWasAdded(RenderLayer* /*parent*/, RenderLayer* /*child*/)
@@ -1748,7 +1748,7 @@ bool RenderLayerCompositor::isRunningAcceleratedTransformAnimation(RenderObject*
 // object.
 bool RenderLayerCompositor::needsContentsCompositingLayer(const RenderLayer* layer) const
 {
-    return (layer->m_negZOrderList && layer->m_negZOrderList->size() > 0);
+    return layer->hasNegativeZOrderList();
 }
 
 bool RenderLayerCompositor::requiresScrollLayer(RootLayerAttachment attachment) const
@@ -1982,6 +1982,9 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
     #ifndef NDEBUG
             m_layerForHorizontalScrollbar->setName("horizontal scrollbar");
     #endif
+    #if PLATFORM(MAC) && USE(CA)
+            m_layerForHorizontalScrollbar->setAcceleratesDrawing(acceleratedDrawingEnabled());
+    #endif
             m_overflowControlsHostLayer->addChild(m_layerForHorizontalScrollbar.get());
 
             if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
@@ -2001,6 +2004,9 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
     #ifndef NDEBUG
             m_layerForVerticalScrollbar->setName("vertical scrollbar");
     #endif
+    #if PLATFORM(MAC) && USE(CA)
+            m_layerForVerticalScrollbar->setAcceleratesDrawing(acceleratedDrawingEnabled());
+    #endif
             m_overflowControlsHostLayer->addChild(m_layerForVerticalScrollbar.get());
 
             if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
@@ -2019,6 +2025,9 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
             m_layerForScrollCorner = GraphicsLayer::create(this);
     #ifndef NDEBUG
             m_layerForScrollCorner->setName("scroll corner");
+    #endif
+    #if PLATFORM(MAC) && USE(CA)
+            m_layerForScrollCorner->setAcceleratesDrawing(acceleratedDrawingEnabled());
     #endif
             m_overflowControlsHostLayer->addChild(m_layerForScrollCorner.get());
         }

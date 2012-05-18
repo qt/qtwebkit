@@ -401,7 +401,7 @@ PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* plu
         if (pluginElement->renderer()->isEmbeddedObject())
             toRenderEmbeddedObject(pluginElement->renderer())->setPluginUnavailabilityReason(RenderEmbeddedObject::InsecurePluginVersion);
 
-        send(Messages::WebPageProxy::DidBlockInsecurePluginVersion(parameters.mimeType));
+        send(Messages::WebPageProxy::DidBlockInsecurePluginVersion(parameters.mimeType, parameters.url.string()));
         return 0;
     }
 
@@ -418,9 +418,11 @@ PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* plu
 
 #if ENABLE(PLUGIN_PROCESS)
     return PluginProxy::create(pluginPath);
-#else
+#elif ENABLE(NETSCAPE_PLUGIN_API)
     NetscapePlugin::setSetExceptionFunction(NPRuntimeObjectMap::setGlobalException);
     return NetscapePlugin::create(NetscapePluginModule::getOrCreate(pluginPath));
+#else
+    return 0;
 #endif
 }
 
@@ -2198,8 +2200,10 @@ void WebPage::performDragControllerAction(uint64_t action, WebCore::IntPoint cli
         ASSERT(!m_pendingDropSandboxExtension);
 
         m_pendingDropSandboxExtension = SandboxExtension::create(sandboxExtensionHandle);
-        for (size_t i = 0; i < sandboxExtensionsHandleArray.size(); i++)
-            m_pendingDropExtensionsForFileUpload.append(SandboxExtension::create(sandboxExtensionsHandleArray[i]));
+        for (size_t i = 0; i < sandboxExtensionsHandleArray.size(); i++) {
+            if (RefPtr<SandboxExtension> extension = SandboxExtension::create(sandboxExtensionsHandleArray[i]))
+                m_pendingDropExtensionsForFileUpload.append(extension);
+        }
 
         m_page->dragController()->performDrag(&dragData);
 
@@ -2898,6 +2902,7 @@ void WebPage::drawRectToPDF(uint64_t frameID, const PrintInfo& printInfo, const 
 
     RetainPtr<CFMutableDataRef> pdfPageData(AdoptCF, CFDataCreateMutable(0, 0));
 
+#if USE(CG)
     if (coreFrame) {
 #if PLATFORM(MAC)
         ASSERT(coreFrame->document()->printing() || pdfDocumentForPrintingFrame(coreFrame));
@@ -2929,6 +2934,7 @@ void WebPage::drawRectToPDF(uint64_t frameID, const PrintInfo& printInfo, const 
         CGPDFContextEndPage(context.get());
         CGPDFContextClose(context.get());
     }
+#endif
 
     send(Messages::WebPageProxy::DataCallback(CoreIPC::DataReference(CFDataGetBytePtr(pdfPageData.get()), CFDataGetLength(pdfPageData.get())), callbackID));
 }
@@ -2940,6 +2946,7 @@ void WebPage::drawPagesToPDF(uint64_t frameID, const PrintInfo& printInfo, uint3
 
     RetainPtr<CFMutableDataRef> pdfPageData(AdoptCF, CFDataCreateMutable(0, 0));
 
+#if USE(CG)
     if (coreFrame) {
 
 #if PLATFORM(MAC)
@@ -2979,6 +2986,7 @@ void WebPage::drawPagesToPDF(uint64_t frameID, const PrintInfo& printInfo, uint3
         }
         CGPDFContextClose(context.get());
     }
+#endif
 
     send(Messages::WebPageProxy::DataCallback(CoreIPC::DataReference(CFDataGetBytePtr(pdfPageData.get()), CFDataGetLength(pdfPageData.get())), callbackID));
 }

@@ -1021,7 +1021,9 @@ static WebWheelEvent coalesce(const WebWheelEvent& a, const WebWheelEvent& b)
     FloatSize mergedWheelTicks = a.wheelTicks() + b.wheelTicks();
 
 #if PLATFORM(MAC)
-    return WebWheelEvent(WebEvent::Wheel, b.position(), b.globalPosition(), mergedDelta, mergedWheelTicks, b.granularity(), b.phase(), b.momentumPhase(), b.hasPreciseScrollingDeltas(), b.modifiers(), b.timestamp(), b.directionInvertedFromDevice());
+    FloatSize mergedUnacceleratedScrollingDelta = a.unacceleratedScrollingDelta() + b.unacceleratedScrollingDelta();
+
+    return WebWheelEvent(WebEvent::Wheel, b.position(), b.globalPosition(), mergedDelta, mergedWheelTicks, b.granularity(), b.directionInvertedFromDevice(), b.phase(), b.momentumPhase(), b.hasPreciseScrollingDeltas(), b.scrollCount(), mergedUnacceleratedScrollingDelta, b.modifiers(), b.timestamp());
 #else
     return WebWheelEvent(WebEvent::Wheel, b.position(), b.globalPosition(), mergedDelta, mergedWheelTicks, b.granularity(), b.modifiers(), b.timestamp());
 #endif
@@ -3621,9 +3623,20 @@ void WebPageProxy::didFailToInitializePlugin(const String& mimeType)
     m_loaderClient.didFailToInitializePlugin(this, mimeType);
 }
 
-void WebPageProxy::didBlockInsecurePluginVersion(const String& mimeType)
+void WebPageProxy::didBlockInsecurePluginVersion(const String& mimeType, const String& urlString)
 {
-    m_loaderClient.didBlockInsecurePluginVersion(this, mimeType);
+    String pluginIdentifier;
+    String pluginVersion;
+    String newMimeType = mimeType;
+
+#if PLATFORM(MAC)
+    PluginModuleInfo plugin = m_process->context()->pluginInfoStore().findPlugin(newMimeType, KURL(KURL(), urlString));
+
+    pluginIdentifier = plugin.bundleIdentifier;
+    pluginVersion = plugin.versionString;
+#endif
+
+    m_loaderClient.didBlockInsecurePluginVersion(this, newMimeType, pluginIdentifier, pluginVersion);
 }
 
 bool WebPageProxy::willHandleHorizontalScrollEvents() const

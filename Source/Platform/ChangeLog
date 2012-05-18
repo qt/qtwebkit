@@ -1,3 +1,319 @@
+2012-05-17  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move Web Workers methods to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=86799
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::didStartWorkerRunLoop):
+        (WebKit::Platform::didStopWorkerRunLoop):
+        * chromium/public/WebWorkerRunLoop.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebWorkerRunLoop):
+        (Task):
+        (WebKit::WebWorkerRunLoop::Task::~Task):
+        (WebKit::operator==):
+        (WebKit::operator<):
+
+2012-05-17  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Scale all compositor output by the defaultDeviceScaleFactor
+        https://bugs.webkit.org/show_bug.cgi?id=86051
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+
+2012-05-17  Ami Fischman  <fischman@chromium.org>
+
+        [Chromium] Store HTTP version in WebURLResponse
+        https://bugs.webkit.org/show_bug.cgi?id=86522
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebURLResponse.h:
+        (WebURLResponse):
+
+2012-05-17  Vangelis Kokkevis  <vangelis@chromium.org>
+
+        [chromium] Expose layer tiling size options to WebSettings
+        https://bugs.webkit.org/show_bug.cgi?id=86425
+
+        Adding entries for tile size and max untiled layer size.
+        
+        Reviewed by Adrienne Walker.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit):
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+
+2012-05-17  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move fileUtilities to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=86777
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::fileUtilities):
+        * chromium/public/WebFileUtilities.h: Added.
+        (WebKit):
+        (WebFileUtilities):
+        (WebKit::WebFileUtilities::revealFolderInOS):
+        (WebKit::WebFileUtilities::fileExists):
+        (WebKit::WebFileUtilities::deleteFile):
+        (WebKit::WebFileUtilities::deleteEmptyDirectory):
+        (WebKit::WebFileUtilities::getFileSize):
+        (WebKit::WebFileUtilities::getFileModificationTime):
+        (WebKit::WebFileUtilities::directoryName):
+        (WebKit::WebFileUtilities::pathByAppendingComponent):
+        (WebKit::WebFileUtilities::makeAllDirectories):
+        (WebKit::WebFileUtilities::getAbsolutePath):
+        (WebKit::WebFileUtilities::isDirectory):
+        (WebKit::WebFileUtilities::filePathToURL):
+        (WebKit::WebFileUtilities::openFile):
+        (WebKit::WebFileUtilities::closeFile):
+        (WebKit::WebFileUtilities::seekFile):
+        (WebKit::WebFileUtilities::truncateFile):
+        (WebKit::WebFileUtilities::readFromFile):
+        (WebKit::WebFileUtilities::writeToFile):
+        (WebKit::WebFileUtilities::~WebFileUtilities):
+
+2012-05-11  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Convert GraphicsLayerChromium to use WebLayer types
+        https://bugs.webkit.org/show_bug.cgi?id=86269
+
+        Reviewed by Adrienne Walker.
+
+        Adds some new WebLayer / WebContentLayer APIs that WebCore::GraphicsLayerChromium needs.
+
+        * chromium/public/WebContentLayer.h:
+        (WebCore):
+        (WebKit):
+        (WebContentLayer):
+        * chromium/public/WebLayer.h:
+        (WebKit):
+        (WebKit::WebLayer::isNull):
+        (WebLayer):
+        * chromium/public/WebTransformationMatrix.h:
+        (WebKit::WebTransformationMatrix::~WebTransformationMatrix):
+            Fix a memory leak - WebPrivateOwnPtr<>s have to be explicitly cleared.
+        (WebTransformationMatrix):
+
+2012-05-16  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Clear the m_private pointer when destroying WebFilterOperations to avoid assert in WebPrivateOwnPtr
+        https://bugs.webkit.org/show_bug.cgi?id=86654
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebFilterOperations.h:
+        (WebKit::WebFilterOperations::~WebFilterOperations):
+        (WebFilterOperations):
+
+2012-05-16  Kenichi Ishibashi  <bashi@chromium.org>
+
+        [Chromium] WebTransformationMatrixTest.verifyDefaultConstructorCreatesIdentityMatrix is failing
+        https://bugs.webkit.org/show_bug.cgi?id=86589
+
+        Reviewed by Kent Tamura.
+
+        * chromium/public/WebTransformationMatrix.h: Added destructor.
+        (WebTransformationMatrix):
+
+2012-05-15  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r117204.
+        http://trac.webkit.org/changeset/117204
+        https://bugs.webkit.org/show_bug.cgi?id=86559
+
+        causing win compilation failures (Requested by pilgrim_google_
+        on #webkit).
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        * chromium/public/WebMessagePortChannel.h: Removed.
+        * chromium/public/WebMessagePortChannelClient.h: Removed.
+
+2012-05-15  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move createMessagePortChannel to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=85764
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createMessagePortChannel):
+        * chromium/public/WebMessagePortChannel.h: Added.
+        (WebKit):
+        (WebMessagePortChannel):
+        (WebKit::WebMessagePortChannel::~WebMessagePortChannel):
+        * chromium/public/WebMessagePortChannelClient.h: Added.
+        (WebKit):
+        (WebMessagePortChannelClient):
+        (WebKit::WebMessagePortChannelClient::~WebMessagePortChannelClient):
+
+2012-05-15  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move blobRegistry to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=85765
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::blobRegistry):
+        * chromium/public/WebBlobData.h: Added.
+        (WebKit):
+        (WebBlobData):
+        (WebKit::WebBlobData::~WebBlobData):
+        (WebKit::WebBlobData::WebBlobData):
+        (WebKit::WebBlobData::isNull):
+        * chromium/public/WebBlobRegistry.h: Added.
+        (WebKit):
+        (WebBlobRegistry):
+        (WebKit::WebBlobRegistry::~WebBlobRegistry):
+
+2012-05-15  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove WEBKIT_USING_(SKIA|CG) #defines
+        https://bugs.webkit.org/show_bug.cgi?id=86536
+
+        Reviewed by Adam Barth.
+
+        The Chromium port always using Skia, so WEBKIT_USING_CG has been dead code for many moons.
+
+        * chromium/public/WebCommon.h:
+
+2012-05-15  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move createOffscreenGraphicsContext3D() from WebKitPlatformSupport to Platform
+        https://bugs.webkit.org/show_bug.cgi?id=86524
+
+        Reviewed by Adam Barth.
+
+        Moves createOffscreenGraphicsContext3D(), previously on WebKitPlatformSupport, to WebKit::Platform.
+
+        * chromium/public/Platform.h:
+        (Platform):
+        (WebKit::Platform::createOffscreenGraphicsContext3D):
+
+2012-05-14  Gavin Peters  <gavinp@chromium.org>
+
+        Add Prerenderer, PrerenderHandle and a chromium interface for Prerendering.
+        https://bugs.webkit.org/show_bug.cgi?id=85005
+
+        Reviewed by Adam Barth.
+
+        * Platform.gypi:
+        * chromium/public/WebPrerender.h:
+        (WebKit::WebPrerender::referrer):
+        (WebCore):
+        (WebPrerender):
+        * chromium/public/WebPrerenderingSupport.h:
+        (WebKit):
+        (WebPrerenderingSupport):
+        * chromium/public/WebURLRequest.h:
+        * chromium/src/WebPrerenderingSupport.cpp: Added.
+        (WebKit):
+        (WebKit::WebPrerenderingSupport::initialize):
+        (WebKit::WebPrerenderingSupport::shutdown):
+        (WebKit::WebPrerenderingSupport::current):
+
+2012-05-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r116812.
+        http://trac.webkit.org/changeset/116812
+        https://bugs.webkit.org/show_bug.cgi?id=86313
+
+        Appears to be causing a top crash (Requested by abarth on
+        #webkit).
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        * chromium/public/WebStorageArea.h: Removed.
+        * chromium/public/WebStorageNamespace.h: Removed.
+
+2012-05-11  Shawn Singh  <shawnsingh@chromium.org>
+
+        [chromium] Plumb --show-paint-rects to accelerated compositor
+        https://bugs.webkit.org/show_bug.cgi?id=86255
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+
+2012-05-11  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move createLocalStorageNamespace to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=85766
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createLocalStorageNamespace):
+        * chromium/public/WebStorageArea.h: Added.
+        (WebKit):
+        (WebStorageArea):
+        (WebKit::WebStorageArea::~WebStorageArea):
+        (WebKit::WebStorageArea::setItem):
+        (WebKit::WebStorageArea::removeItem):
+        (WebKit::WebStorageArea::clear):
+        * chromium/public/WebStorageNamespace.h: Added.
+        (WebKit):
+        (WebStorageNamespace):
+        (WebKit::WebStorageNamespace::~WebStorageNamespace):
+        (WebKit::WebStorageNamespace::isSameNamespace):
+
+2012-05-11  Shawn Singh  <shawnsingh@chromium.org>
+
+        [chromium] Create WebTransformationMatrix interface for chromium platform
+        https://bugs.webkit.org/show_bug.cgi?id=86049
+
+        Reviewed by James Robinson.
+
+        * Platform.gyp/Platform.gyp:
+        * Platform.gypi:
+        * chromium/public/WebTransformationMatrix.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebTransformationMatrix):
+
 2012-05-10  Mark Pilgrim  <pilgrim@chromium.org>
 
         [Chromium] Remove WEBKIT_USING_SKIA ifdefs that are always true

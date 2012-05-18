@@ -452,11 +452,16 @@ void RenderLayer::updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerP
         *offsetFromRoot = oldOffsetFromRoot;
 }
 
-LayoutRect RenderLayer::repaintRectIncludingDescendants() const
+LayoutRect RenderLayer::repaintRectIncludingNonCompositingDescendants() const
 {
     LayoutRect repaintRect = m_repaintRect;
-    for (RenderLayer* child = firstChild(); child; child = child->nextSibling())
-        repaintRect.unite(child->repaintRectIncludingDescendants());
+    for (RenderLayer* child = firstChild(); child; child = child->nextSibling()) {
+        // Don't include repaint rects for composited child layers; they will paint themselves and have a different origin.
+        if (child->isComposited())
+            continue;
+
+        repaintRect.unite(child->repaintRectIncludingNonCompositingDescendants());
+    }
     return repaintRect;
 }
 
@@ -736,17 +741,19 @@ bool RenderLayer::update3DTransformedDescendantStatus()
     if (m_3DTransformedDescendantStatusDirty) {
         m_has3DTransformedDescendant = false;
 
+        updateZOrderLists();
+
         // Transformed or preserve-3d descendants can only be in the z-order lists, not
         // in the normal flow list, so we only need to check those.
-        if (m_posZOrderList) {
-            for (unsigned i = 0; i < m_posZOrderList->size(); ++i)
-                m_has3DTransformedDescendant |= m_posZOrderList->at(i)->update3DTransformedDescendantStatus();
+        if (Vector<RenderLayer*>* positiveZOrderList = posZOrderList()) {
+            for (unsigned i = 0; i < positiveZOrderList->size(); ++i)
+                m_has3DTransformedDescendant |= positiveZOrderList->at(i)->update3DTransformedDescendantStatus();
         }
 
         // Now check our negative z-index children.
-        if (m_negZOrderList) {
-            for (unsigned i = 0; i < m_negZOrderList->size(); ++i)
-                m_has3DTransformedDescendant |= m_negZOrderList->at(i)->update3DTransformedDescendantStatus();
+        if (Vector<RenderLayer*>* negativeZOrderList = negZOrderList()) {
+            for (unsigned i = 0; i < negativeZOrderList->size(); ++i)
+                m_has3DTransformedDescendant |= negativeZOrderList->at(i)->update3DTransformedDescendantStatus();
         }
         
         m_3DTransformedDescendantStatusDirty = false;
@@ -2211,16 +2218,19 @@ PassRefPtr<Scrollbar> RenderLayer::createScrollbar(ScrollbarOrientation orientat
 void RenderLayer::destroyScrollbar(ScrollbarOrientation orientation)
 {
     RefPtr<Scrollbar>& scrollbar = orientation == HorizontalScrollbar ? m_hBar : m_vBar;
-    if (scrollbar) {
+    if (!scrollbar)
+        return;
+
+    if (!scrollbar->isCustomScrollbar()) {
         if (orientation == HorizontalScrollbar)
             willRemoveHorizontalScrollbar(scrollbar.get());
         else
             willRemoveVerticalScrollbar(scrollbar.get());
-
-        scrollbar->removeFromParent();
-        scrollbar->disconnectFromScrollableArea();
-        scrollbar = 0;
     }
+
+    scrollbar->removeFromParent();
+    scrollbar->disconnectFromScrollableArea();
+    scrollbar = 0;
 }
 
 bool RenderLayer::scrollsOverflow() const
@@ -2432,13 +2442,12 @@ void RenderLayer::computeScrollDimensions()
 
     m_scrollDimensionsDirty = false;
 
-    m_scrollOverflow.setWidth(overflowLeft() - box->borderLeft());
-    m_scrollOverflow.setHeight(overflowTop() - box->borderTop());
-
     m_scrollSize.setWidth(overflowRight() - overflowLeft());
     m_scrollSize.setHeight(overflowBottom() - overflowTop());
 
-    setScrollOrigin(IntPoint(-m_scrollOverflow.width(), -m_scrollOverflow.height()));
+    int scrollableLeftOverflow = overflowLeft() - box->borderLeft();
+    int scrollableTopOverflow = overflowTop() - box->borderTop();
+    setScrollOrigin(IntPoint(-scrollableLeftOverflow, -scrollableTopOverflow));
 }
 
 bool RenderLayer::hasHorizontalOverflow() const
@@ -2887,7 +2896,7 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* context,
         // but we need to ensure that we don't cache clip rects computed with the wrong root in this case.
         if (context->updatingControlTints() || (paintBehavior & PaintBehaviorFlattenCompositingLayers))
             paintFlags |= PaintLayerTemporaryClipRects;
-        else if (!backing()->paintsIntoWindow() && !backing()->paintsIntoCompositedAncestor() && !shouldDoSoftwarePaint(this, paintFlags & PaintLayerPaintingReflection) && !rootLayer->containsDirtyOverlayScrollbars()) {
+        else if (!backing()->paintsIntoWindow() && !backing()->paintsIntoCompositedAncestor() && !shouldDoSoftwarePaint(this, paintFlags & PaintLayerPaintingReflection) && !(rootLayer->containsDirtyOverlayScrollbars() && (paintFlags & PaintLayerPaintingOverlayScrollbars))) {
             // If this RenderLayer should paint into its backing, that will be done via RenderLayerBacking::paintIntoLayer().
             return;
         }
@@ -3080,7 +3089,7 @@ void RenderLayer::paintLayerContents(RenderLayer* rootLayer, GraphicsContext* co
         }
 
         // Now walk the sorted list of children with negative z-indices.
-        paintList(m_negZOrderList, rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
+        paintList(negZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
     }
     
     if (localPaintFlags & PaintLayerPaintingCompositingForegroundPhase) {
@@ -3127,7 +3136,7 @@ void RenderLayer::paintLayerContents(RenderLayer* rootLayer, GraphicsContext* co
         paintList(m_normalFlowList, rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
     
         // Now walk the sorted list of children with positive z-indices.
-        paintList(m_posZOrderList, rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
+        paintList(posZOrderList(), rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, localPaintFlags);
     }
     
     if ((localPaintFlags & PaintLayerPaintingCompositingMaskPhase) && shouldPaintContent && renderer()->hasMask() && !selectionOnly) {
@@ -3546,7 +3555,7 @@ RenderLayer* RenderLayer::hitTestLayer(RenderLayer* rootLayer, RenderLayer* cont
     RenderLayer* candidateLayer = 0;
 
     // Begin by walking our list of positive layers from highest z-index down to the lowest z-index.
-    RenderLayer* hitLayer = hitTestList(m_posZOrderList, rootLayer, request, result, hitTestRect, hitTestPoint,
+    RenderLayer* hitLayer = hitTestList(posZOrderList(), rootLayer, request, result, hitTestRect, hitTestPoint,
                                         localTransformState.get(), zOffsetForDescendantsPtr, zOffset, unflattenedTransformState.get(), depthSortDescendants);
     if (hitLayer) {
         if (!depthSortDescendants)
@@ -3566,7 +3575,7 @@ RenderLayer* RenderLayer::hitTestLayer(RenderLayer* rootLayer, RenderLayer* cont
     // Next we want to see if the mouse pos is inside the child RenderObjects of the layer.
     if (fgRect.intersects(hitTestArea) && isSelfPaintingLayer()) {
         // Hit test with a temporary HitTestResult, because we only want to commit to 'result' if we know we're frontmost.
-        HitTestResult tempResult(result.point(), result.topPadding(), result.rightPadding(), result.bottomPadding(), result.leftPadding(), result.shadowContentFilterPolicy());
+        HitTestResult tempResult(result.hitTestPoint(), result.shadowContentFilterPolicy());
         if (hitTestContents(request, tempResult, layerBounds, hitTestPoint, HitTestDescendants) &&
             isHitCandidate(this, false, zOffsetForContentsPtr, unflattenedTransformState.get())) {
             if (result.isRectBasedTest())
@@ -3582,7 +3591,7 @@ RenderLayer* RenderLayer::hitTestLayer(RenderLayer* rootLayer, RenderLayer* cont
     }
 
     // Now check our negative z-index children.
-    hitLayer = hitTestList(m_negZOrderList, rootLayer, request, result, hitTestRect, hitTestPoint,
+    hitLayer = hitTestList(negZOrderList(), rootLayer, request, result, hitTestRect, hitTestPoint,
                                         localTransformState.get(), zOffsetForDescendantsPtr, zOffset, unflattenedTransformState.get(), depthSortDescendants);
     if (hitLayer) {
         if (!depthSortDescendants)
@@ -3595,7 +3604,7 @@ RenderLayer* RenderLayer::hitTestLayer(RenderLayer* rootLayer, RenderLayer* cont
         return candidateLayer;
 
     if (bgRect.intersects(hitTestArea) && isSelfPaintingLayer()) {
-        HitTestResult tempResult(result.point(), result.topPadding(), result.rightPadding(), result.bottomPadding(), result.leftPadding(), result.shadowContentFilterPolicy());
+        HitTestResult tempResult(result.hitTestPoint(), result.shadowContentFilterPolicy());
         if (hitTestContents(request, tempResult, layerBounds, hitTestPoint, HitTestSelf) &&
             isHitCandidate(this, false, zOffsetForContentsPtr, unflattenedTransformState.get())) {
             if (result.isRectBasedTest())
@@ -3651,7 +3660,7 @@ RenderLayer* RenderLayer::hitTestList(Vector<RenderLayer*>* list, RenderLayer* r
     for (int i = list->size() - 1; i >= 0; --i) {
         RenderLayer* childLayer = list->at(i);
         RenderLayer* hitLayer = 0;
-        HitTestResult tempResult(result.point(), result.topPadding(), result.rightPadding(), result.bottomPadding(), result.leftPadding(), result.shadowContentFilterPolicy());
+        HitTestResult tempResult(result.hitTestPoint(), result.shadowContentFilterPolicy());
         if (childLayer->isPaginated())
             hitLayer = hitTestPaginatedChildLayer(childLayer, rootLayer, request, tempResult, hitTestRect, hitTestPoint, transformState, zOffsetForDescendants);
         else
@@ -4140,8 +4149,13 @@ IntRect RenderLayer::calculateLayerBounds(const RenderLayer* layer, const Render
 {
     if (!layer->isSelfPaintingLayer())
         return IntRect();
-    
+
     LayoutRect boundingBoxRect = layer->localBoundingBox();
+    if (layer->renderer()->isBox())
+        layer->renderBox()->flipForWritingMode(boundingBoxRect);
+    else
+        layer->renderer()->containingBlock()->flipForWritingMode(boundingBoxRect);
+
     if (layer->renderer()->isRoot()) {
         // If the root layer becomes composited (e.g. because some descendant with negative z-index is composited),
         // then it has to be big enough to cover the viewport in order to display the background. This is akin

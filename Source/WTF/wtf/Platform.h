@@ -293,6 +293,11 @@
 #define WTF_CPU_ARM_NEON 1
 #endif
 
+#if CPU(ARM_NEON) && (!COMPILER(GCC) || GCC_VERSION_AT_LEAST(4, 7, 0))
+// All NEON intrinsics usage can be disabled by this macro.
+#define HAVE_ARM_NEON_INTRINSICS 1
+#endif
+
 #endif /* ARM */
 
 #if CPU(ARM) || CPU(MIPS) || CPU(SH4) || CPU(SPARC)
@@ -552,6 +557,8 @@
 #if !defined(BUILDING_ON_LEOPARD) && !defined(BUILDING_ON_SNOW_LEOPARD) && !defined(BUILDING_ON_LION)
 #define HAVE_LAYER_HOSTING_IN_WINDOW_SERVER 1
 #endif
+#define WTF_USE_APPKIT 1
+#define WTF_USE_SECURITY_FRAMEWORK 1
 #endif /* PLATFORM(MAC) && !PLATFORM(IOS) */
 
 #if PLATFORM(CHROMIUM) && OS(DARWIN)
@@ -603,6 +610,8 @@
     #define ENABLE_YARR_JIT 1
 #endif
 
+#define WTF_USE_APPKIT 0
+#define WTF_USE_SECURITY_FRAMEWORK 0
 #endif
 
 #if PLATFORM(WIN) && !OS(WINCE)

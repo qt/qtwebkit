@@ -24221,250 +24221,250 @@
 		<Filter
 			Name="Modules"
 			>
-                        <Filter
-                                Name="filesystem"
-                                >
-			        <File
-				        RelativePath="..\Modules\filesystem\AsyncFileWriter.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\AsyncFileWriterClient.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFilePath.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFilePath.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFileSystem.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFileSystem.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFileSystemBase.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFileSystemBase.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFileSystemSync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMFileSystemSync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMWindowFileSystem.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DOMWindowFileSystem.h"
-				        >
-			        </File>
-        		        <File
-        			        RelativePath="..\Modules\filesystem\DirectoryEntry.cpp"
-	        		        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryEntry.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryEntrySync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryEntrySync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryReader.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryReader.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryReaderBase.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryReaderSync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\DirectoryReaderSync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntriesCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryBase.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\Entry.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\Entry.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryArray.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryArray.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryArraySync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryArraySync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryBase.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntryCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntrySync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\EntrySync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\ErrorCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileEntry.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileEntry.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileEntrySync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileEntrySync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileError.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileSystemCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileSystemCallbacks.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileSystemCallbacks.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileSystemType.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriter.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriter.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriterBase.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriterBase.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriterBaseCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriterCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriterSync.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\FileWriterSync.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\LocalFileSystem.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\LocalFileSystem.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\Metadata.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\MetadataCallback.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\SyncCallbackHelper.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\WebKitFlags.h"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\WorkerContextFileSystem.cpp"
-				        >
-			        </File>
-			        <File
-				        RelativePath="..\Modules\filesystem\WorkerContextFileSystem.h"
-				        >
-			        </File>
-                        </Filter>
+			<Filter
+				Name="filesystem"
+				>
+				<File
+					RelativePath="..\Modules\filesystem\AsyncFileWriter.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\AsyncFileWriterClient.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryEntry.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryEntry.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryEntrySync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryEntrySync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryReader.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryReader.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryReaderBase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryReaderSync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DirectoryReaderSync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFilePath.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFilePath.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFileSystem.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFileSystem.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFileSystemBase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFileSystemBase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFileSystemSync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMFileSystemSync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMWindowFileSystem.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\DOMWindowFileSystem.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntriesCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\Entry.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\Entry.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryArray.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryArray.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryArraySync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryArraySync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryBase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryBase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntryCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntrySync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\EntrySync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\ErrorCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileEntry.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileEntry.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileEntrySync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileEntrySync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileError.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileSystemCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileSystemCallbacks.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileSystemCallbacks.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileSystemType.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriter.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriter.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriterBase.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriterBase.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriterBaseCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriterCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriterSync.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\FileWriterSync.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\LocalFileSystem.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\LocalFileSystem.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\Metadata.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\MetadataCallback.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\SyncCallbackHelper.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\WebKitFlags.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\WorkerContextFileSystem.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\filesystem\WorkerContextFileSystem.h"
+					>
+				</File>
+			</Filter>
 			<Filter
 				Name="geolocation"
 				>
@@ -26246,14 +26246,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\page\animation\CSSPropertyAnimation.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\page\animation\CSSPropertyAnimation.h"
-				>
-			</File>
-			<File
 				RelativePath="..\page\BarInfo.cpp"
 				>
 			</File>
@@ -26327,6 +26319,14 @@
 			</File>
 			<File
 				RelativePath="..\page\Crypto.h"
+				>
+			</File>
+			<File
+				RelativePath="..\page\animation\CSSPropertyAnimation.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\animation\CSSPropertyAnimation.h"
 				>
 			</File>
 			<File
@@ -27059,6 +27059,22 @@
 			</File>
 			<File
 				RelativePath="..\loader\PolicyChecker.h"
+				>
+			</File>
+			<File
+				RelativePath="..\loader\Prerenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\loader\Prerenderer.h"
+				>
+			</File>
+			<File
+				RelativePath="..\loader\PrerendererClient.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\loader\PrerendererClient.h"
 				>
 			</File>
 			<File
@@ -27946,6 +27962,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\platform\PrerenderHandle.h"
+				>
+			</File>
+			<File
 				RelativePath="..\platform\PurgeableBuffer.h"
 				>
 			</File>
@@ -28139,6 +28159,14 @@
 			</File>
 			<File
 				RelativePath="..\platform\UUID.h"
+				>
+			</File>
+			<File
+				RelativePath="..\platform\VisitedLinks.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\platform\VisitedLinks.h"
 				>
 			</File>
 			<File
@@ -30148,6 +30176,42 @@
 					Name="cairo"
 					>
 					<File
+						RelativePath="..\platform\graphics\cairo\BitmapImageCairo.cpp"
+						>
+						<FileConfiguration
+							Name="Debug|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Debug_All|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Production|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+					</File>
+					<File
 						RelativePath="..\platform\graphics\cairo\CairoPath.h"
 						>
 						<FileConfiguration
@@ -30257,6 +30321,42 @@
 					</File>
 					<File
 						RelativePath="..\platform\graphics\cairo\DrawErrorUnderline.h"
+						>
+						<FileConfiguration
+							Name="Debug|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Debug_All|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Production|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+					</File>
+					<File
+						RelativePath="..\platform\graphics\cairo\FloatRectCairo.cpp"
 						>
 						<FileConfiguration
 							Name="Debug|Win32"
@@ -30473,6 +30573,78 @@
 					</File>
 					<File
 						RelativePath="..\platform\graphics\cairo\ImageCairo.cpp"
+						>
+						<FileConfiguration
+							Name="Debug|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Debug_All|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Production|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+					</File>
+					<File
+						RelativePath="..\platform\graphics\cairo\IntRectCairo.cpp"
+						>
+						<FileConfiguration
+							Name="Debug|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Release|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Debug_All|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+						<FileConfiguration
+							Name="Production|Win32"
+							ExcludedFromBuild="true"
+							>
+							<Tool
+								Name="VCCLCompilerTool"
+							/>
+						</FileConfiguration>
+					</File>
+					<File
+						RelativePath="..\platform\graphics\cairo\NativeImageCairo.cpp"
 						>
 						<FileConfiguration
 							Name="Debug|Win32"
@@ -31053,10 +31225,6 @@
 					</File>
 					<File
 						RelativePath="..\platform\graphics\filters\FEComposite.h"
-						>
-					</File>
-					<File
-						RelativePath="..\platform\graphics\filters\arm\FECompositeArithmeticNEON.cpp"
 						>
 					</File>
 					<File
@@ -35998,58 +36166,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\css\CSSStyleDeclaration.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
 				RelativePath="..\css\CSSStyleDeclaration.h"
 				>
 			</File>
@@ -40101,7 +40217,7 @@
 				RelativePath="..\rendering\RenderMeter.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\rendering\RenderMultiColumnBlock.cpp"
 				>
 				<FileConfiguration
@@ -40157,7 +40273,7 @@
 				RelativePath="..\rendering\RenderMultiColumnBlock.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\rendering\RenderMultiColumnFlowThread.cpp"
 				>
 				<FileConfiguration
@@ -40213,7 +40329,7 @@
 				RelativePath="..\rendering\RenderMultiColumnFlowThread.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\rendering\RenderMultiColumnSet.cpp"
 				>
 				<FileConfiguration
@@ -40269,7 +40385,7 @@
 				RelativePath="..\rendering\RenderMultiColumnSet.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\rendering\RenderNamedFlowThread.cpp"
 				>
 			</File>
@@ -40565,7 +40681,7 @@
 				RelativePath="..\rendering\RenderRegion.h"
 				>
 			</File>
-            <File
+			<File
 				RelativePath="..\rendering\RenderRegionSet.cpp"
 				>
 			</File>
@@ -43580,6 +43696,62 @@
 				>
 			</File>
 			<File
+				RelativePath="..\rendering\svg\SVGRenderingContext.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\rendering\svg\SVGRenderingContext.h"
+				>
+			</File>
+			<File
 				RelativePath="..\rendering\svg\SVGRenderSupport.cpp"
 				>
 				<FileConfiguration
@@ -43689,62 +43861,6 @@
 			</File>
 			<File
 				RelativePath="..\rendering\svg\SVGRenderTreeAsText.h"
-				>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\SVGRenderingContext.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\SVGRenderingContext.h"
 				>
 			</File>
 			<File
@@ -45599,6 +45715,62 @@
 				Name="svg"
 				>
 				<File
+					RelativePath="..\rendering\svg\RenderSVGEllipse.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_All|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\rendering\svg\RenderSVGEllipse.h"
+					>
+				</File>
+				<File
 					RelativePath="..\rendering\svg\RenderSVGInline.cpp"
 					>
 					<FileConfiguration
@@ -45764,62 +45936,6 @@
 				</File>
 				<File
 					RelativePath="..\rendering\svg\RenderSVGPath.h"
-					>
-				</File>
-				<File
-					RelativePath="..\rendering\svg\RenderSVGEllipse.cpp"
-					>
-					<FileConfiguration
-						Name="Debug|Win32"
-						ExcludedFromBuild="true"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						ExcludedFromBuild="true"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug_Cairo_CFLite|Win32"
-						ExcludedFromBuild="true"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release_Cairo_CFLite|Win32"
-						ExcludedFromBuild="true"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Debug_All|Win32"
-						ExcludedFromBuild="true"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-						/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Production|Win32"
-						ExcludedFromBuild="true"
-						>
-						<Tool
-							Name="VCCLCompilerTool"
-						/>
-					</FileConfiguration>
-				</File>
-				<File
-					RelativePath="..\rendering\svg\RenderSVGEllipse.h"
 					>
 				</File>
 				<File
@@ -53370,62 +53486,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\dom\TreeScopeAdjuster.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\dom\TreeScopeAdjuster.h"
-				>
-			</File>
-			<File
 				RelativePath="..\dom\TreeScopeAdopter.cpp"
 				>
 				<FileConfiguration
@@ -54342,62 +54402,6 @@
 				>
 			</File>
 		</Filter>
-		<File
-				RelativePath="..\editing\AlternativeTextController.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_LTCG|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\editing\AlternativeTextController.h"
-				>
-			</File>
 		<Filter
 			Name="editing"
 			>
@@ -56677,7 +56681,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-                    Name="VCCLCompilerTool"
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -56685,7 +56689,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-                    Name="VCCLCompilerTool"
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -56693,7 +56697,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-                    Name="VCCLCompilerTool"
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -56701,7 +56705,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-                    Name="VCCLCompilerTool"
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -56709,7 +56713,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-                    Name="VCCLCompilerTool"
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -56717,7 +56721,7 @@
 					ExcludedFromBuild="true"
 					>
 					<Tool
-                    Name="VCCLCompilerTool"
+						Name="VCCLCompilerTool"
 					/>
 				</FileConfiguration>
 			</File>
@@ -57232,7 +57236,7 @@
 			<File
 				RelativePath="..\editing\TextInsertionBaseCommand.h"
 				>
-	        </File>
+			</File>
 			<File
 				RelativePath="..\editing\TextIterator.cpp"
 				>
@@ -62661,6 +62665,14 @@
 				Name="shadow"
 				>
 				<File
+					RelativePath="..\html\shadow\ContentDistributor.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\html\shadow\ContentDistributor.h"
+					>
+				</File>
+				<File
 					RelativePath="..\html\shadow\ContentSelectorQuery.cpp"
 					>
 				</File>
@@ -62730,14 +62742,6 @@
 				</File>
 				<File
 					RelativePath="..\html\shadow\HTMLContentElement.h"
-					>
-				</File>
-				<File
-					RelativePath="..\html\shadow\HTMLContentSelector.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\html\shadow\HTMLContentSelector.h"
 					>
 				</File>
 				<File
@@ -62978,6 +62982,10 @@
 				</File>
 				<File
 					RelativePath="..\bindings\js\CallbackFunction.h"
+					>
+				</File>
+				<File
+					RelativePath="..\bindings\js\Dictionary.h"
 					>
 				</File>
 				<File
@@ -69705,10 +69713,6 @@
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath="..\bindings\js\Dictionary.h"
-					>
-				</File>
-				<File
 					RelativePath="..\bindings\js\PageScriptDebugServer.cpp"
 					>
 					<FileConfiguration
@@ -74177,6 +74181,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\CPUProfileView.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\CSSCompletions.js"
 					>
 				</File>
@@ -74217,7 +74225,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\DebuggerPresentationModel.js"
+					RelativePath="..\inspector\front-end\DebuggerResourceBinding.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\DebuggerScriptMapping.js"
 					>
 				</File>
 				<File
@@ -74301,11 +74313,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\filteredItemSelectionDialog.css"
+					RelativePath="..\inspector\front-end\FileManager.js"
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\FileManager.js"
+					RelativePath="..\inspector\front-end\filteredItemSelectionDialog.css"
 					>
 				</File>
 				<File
@@ -74433,11 +74445,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\UglifyJS\JavaScriptFormatter.js"
+					RelativePath="..\inspector\front-end\JavaScriptFormatter.js"
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\JavaScriptFormatter.js"
+					RelativePath="..\inspector\front-end\UglifyJS\JavaScriptFormatter.js"
 					>
 				</File>
 				<File
@@ -74465,6 +74477,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\navigatorView.css"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\NavigatorView.js"
 					>
 				</File>
@@ -74474,10 +74490,6 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\NetworkLog.js"
-					>
-				</File>
-				<File
-					RelativePath="..\inspector\front-end\navigatorView.css"
 					>
 				</File>
 				<File
@@ -74541,6 +74553,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\PresentationConsoleMessageHelper.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\ProfileDataGridTree.js"
 					>
 				</File>
@@ -74550,10 +74566,6 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\ProfilesPanel.js"
-					>
-				</File>
-				<File
-					RelativePath="..\inspector\front-end\ProfileView.js"
 					>
 				</File>
 				<File
@@ -74609,15 +74621,15 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\ResourceScriptMapping.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\resourcesPanel.css"
 					>
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\ResourcesPanel.js"
-					>
-				</File>
-				<File
-					RelativePath="..\inspector\front-end\ResourceScriptMapping.js"
 					>
 				</File>
 				<File
@@ -74661,11 +74673,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\ScriptMapping.js"
+					RelativePath="..\inspector\front-end\ScriptsNavigator.js"
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\ScriptsNavigator.js"
+					RelativePath="..\inspector\front-end\ScriptSnippetModel.js"
 					>
 				</File>
 				<File
@@ -74717,7 +74729,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\SnippetsModel.js"
+					RelativePath="..\inspector\front-end\SnippetStorage.js"
 					>
 				</File>
 				<File
@@ -74738,6 +74750,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\SourceJavaScriptTokenizer.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\SourceMapping.js"
 					>
 				</File>
 				<File
@@ -74813,11 +74829,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\TimelineGrid.js"
+					RelativePath="..\inspector\front-end\TimelineFrameController.js"
 					>
 				</File>
 				<File
-					RelativePath="..\inspector\front-end\TimelineFrameController.js"
+					RelativePath="..\inspector\front-end\TimelineGrid.js"
 					>
 				</File>
 				<File
@@ -75026,6 +75042,62 @@
 				>
 			</File>
 		</Filter>
+		<File
+			RelativePath="..\editing\AlternativeTextController.cpp"
+			>
+			<FileConfiguration
+				Name="Debug|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_Cairo_CFLite|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Debug_All|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+				/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release_LTCG|Win32"
+				ExcludedFromBuild="true"
+				>
+				<Tool
+					Name="VCCLCompilerTool"
+				/>
+			</FileConfiguration>
+		</File>
+		<File
+			RelativePath="..\editing\AlternativeTextController.h"
+			>
+		</File>
 		<File
 			RelativePath="..\config.h"
 			>

@@ -27,9 +27,9 @@
 #include "config.h"
 #include "HTMLContentElement.h"
 
+#include "ContentDistributor.h"
 #include "ContentSelectorQuery.h"
 #include "ElementShadow.h"
-#include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "QualifiedName.h"
 #include "RuntimeEnabledFeatures.h"
@@ -86,13 +86,13 @@ void HTMLContentElement::setSelect(const AtomicString& selectValue)
     setAttribute(selectAttr, selectValue);
 }
 
-void HTMLContentElement::parseAttribute(Attribute* attr)
+void HTMLContentElement::parseAttribute(const Attribute& attribute)
 {
-    if (attr->name() == selectAttr) {
-        if (ShadowRoot* root = toShadowRoot(shadowTreeRootNode()))
-            root->owner()->setNeedsReattachHostChildrenAndShadow();
+    if (attribute.name() == selectAttr) {
+        if (ShadowRoot* root = shadowRoot())
+            root->owner()->setNeedsRedistributing();
     } else
-        InsertionPoint::parseAttribute(attr);
+        InsertionPoint::parseAttribute(attribute);
 }
 
 }

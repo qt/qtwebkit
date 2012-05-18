@@ -50,13 +50,17 @@
 #include "SharedBuffer.h"
 #include "SubstituteData.h"
 #include "WindowsKeyboardCodes.h"
-#include "ewk_logging.h"
+#include "ewk_frame_private.h"
 #include "ewk_private.h"
+#include "ewk_security_origin_private.h"
+#include "ewk_view_private.h"
 #include <Eina.h>
 #include <Evas.h>
 #include <eina_safety_checks.h>
 #include <wtf/Assertions.h>
+#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 
 static const char EWK_FRAME_TYPE_STR[] = "EWK_Frame";
@@ -229,8 +233,9 @@ static void _ewk_frame_smart_del(Evas_Object* ewkFrame)
         if (smartData->frame) {
             WebCore::FrameLoaderClientEfl* flc = _ewk_frame_loader_efl_get(smartData->frame);
             flc->setWebFrame(0);
-            smartData->frame->loader()->detachFromParent();
-            smartData->frame->loader()->cancelAndClear();
+            EWK_FRAME_SD_GET(ewk_view_frame_main_get(smartData->view), mainSmartData);
+            if (mainSmartData->frame == smartData->frame) // applying only for main frame is enough (will traverse through frame tree)
+                smartData->frame->loader()->detachFromParent();
             smartData->frame = 0;
         }
 
@@ -1513,6 +1518,18 @@ void ewk_frame_load_progress_changed(Evas_Object* ewkFrame)
     ewk_view_load_progress_changed(smartData->view);
 }
 
+/**
+ * @internal
+ * Reports new intent.
+ *
+ * Emits signal: "intent,new" with pointer to a Ewk_Intent_Request.
+ */
+void ewk_frame_intent_new(Evas_Object* ewkFrame, Ewk_Intent_Request* request)
+{
+#if ENABLE(WEB_INTENTS)
+    evas_object_smart_callback_call(ewkFrame, "intent,new", request);
+#endif
+}
 
 /**
  * @internal

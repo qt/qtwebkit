@@ -102,8 +102,8 @@ void Attr::setPrefix(const AtomicString& prefix, ExceptionCode& ec)
 
     const AtomicString& newPrefix = prefix.isEmpty() ? nullAtom : prefix;
 
-    if (Attribute* attribute = elementAttribute())
-        attribute->setPrefix(newPrefix);
+    if (m_element)
+        elementAttribute().setPrefix(newPrefix);
     m_name.setPrefix(newPrefix);
 }
 
@@ -113,13 +113,13 @@ void Attr::setValue(const AtomicString& value)
     m_ignoreChildrenChanged++;
     removeChildren();
     if (m_element)
-        elementAttribute()->setValue(value);
+        elementAttribute().setValue(value);
     else
         m_standaloneValue = value;
     createTextChild();
     m_ignoreChildrenChanged--;
 
-    invalidateNodeListsCacheAfterAttributeChanged(m_name);
+    invalidateNodeListsCacheAfterAttributeChanged(m_name, m_element);
 }
 
 void Attr::setValue(const AtomicString& value, ExceptionCode&)
@@ -162,7 +162,7 @@ void Attr::childrenChanged(bool, Node*, Node*, int)
     if (m_ignoreChildrenChanged > 0)
         return;
 
-    invalidateNodeListsCacheAfterAttributeChanged(qualifiedName());
+    invalidateNodeListsCacheAfterAttributeChanged(qualifiedName(), m_element);
 
     // FIXME: We should include entity references in the value
 
@@ -177,7 +177,7 @@ void Attr::childrenChanged(bool, Node*, Node*, int)
         m_element->willModifyAttribute(qualifiedName(), value(), newValue);
 
     if (m_element)
-        elementAttribute()->setValue(newValue);
+        elementAttribute().setValue(newValue);
     else
         m_standaloneValue = newValue;
 
@@ -193,7 +193,7 @@ bool Attr::isId() const
 CSSStyleDeclaration* Attr::style()
 {
     // This function only exists to support the Obj-C bindings.
-    if (!m_element->isStyledElement())
+    if (!m_element || !m_element->isStyledElement())
         return 0;
     m_style = StylePropertySet::create();
     static_cast<StyledElement*>(m_element)->collectStyleForAttribute(elementAttribute(), m_style.get());
@@ -207,11 +207,11 @@ const AtomicString& Attr::value() const
     return m_standaloneValue;
 }
 
-Attribute* Attr::elementAttribute()
+Attribute& Attr::elementAttribute()
 {
-    if (!m_element || !m_element->attributeData())
-        return 0;
-    return m_element->getAttributeItem(qualifiedName());
+    ASSERT(m_element);
+    ASSERT(m_element->attributeData());
+    return *m_element->getAttributeItem(qualifiedName());
 }
 
 void Attr::detachFromElementWithValue(const AtomicString& value)

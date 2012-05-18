@@ -416,6 +416,7 @@ public:
 
 class EmptyTextCheckerClient : public TextCheckerClient {
 public:
+    virtual bool shouldEraseMarkersAfterChangeSelection(TextCheckingType) const { return true; }
     virtual void ignoreWordInSpellDocument(const String&) { }
     virtual void learnWord(const String&) { }
     virtual void checkSpellingOfString(const UChar*, int, int*, int*) { }
@@ -436,6 +437,7 @@ public:
     EmptyEditorClient() { }
     virtual ~EmptyEditorClient() { }
     virtual void pageDestroyed() { }
+    virtual void frameWillDetachPage(Frame*) { }
 
     virtual bool shouldDeleteRange(Range*) { return false; }
     virtual bool shouldShowDeleteInterface(HTMLElement*) { return false; }

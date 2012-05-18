@@ -39,6 +39,7 @@
 #include "PlatformKeyboardEvent.h"
 #include "PlatformString.h"
 #include "RenderObject.h"
+#include "Settings.h"
 #include "SpellChecker.h"
 #include "UndoStep.h"
 
@@ -85,6 +86,21 @@ EditorClientImpl::~EditorClientImpl()
 void EditorClientImpl::pageDestroyed()
 {
     // Our lifetime is bound to the WebViewImpl.
+}
+
+void EditorClientImpl::frameWillDetachPage(WebCore::Frame* frame)
+{
+    HashSet<WebTextCheckingCompletionImpl*> validRequests;
+
+    for (HashSet<WebTextCheckingCompletionImpl*>::iterator i = m_pendingTextChecks.begin();
+         i != m_pendingTextChecks.end(); ++i) {
+        if (frame->editor()->spellChecker() == (*i)->spellChecker())
+            (*i)->invalidate();
+        else
+            validRequests.add(*i);
+    }
+
+    m_pendingTextChecks.swap(validRequests);
 }
 
 bool EditorClientImpl::shouldShowDeleteInterface(HTMLElement* elem)
@@ -694,6 +710,12 @@ void EditorClientImpl::textDidChangeInTextArea(Element*)
 {
 }
 
+bool EditorClientImpl::shouldEraseMarkersAfterChangeSelection(TextCheckingType type) const
+{
+    const Frame* frame = m_webView->focusedWebCoreFrame();
+    return !frame || !frame->settings() || !frame->settings()->asynchronousSpellCheckingEnabled();
+}
+
 void EditorClientImpl::ignoreWordInSpellDocument(const String&)
 {
     notImplemented();
@@ -731,8 +753,17 @@ void EditorClientImpl::checkSpellingOfString(const UChar* text, int length,
 
 void EditorClientImpl::requestCheckingOfString(SpellChecker* sender, const WebCore::TextCheckingRequest& request)
 {
-    if (m_webView->spellCheckClient())
-        m_webView->spellCheckClient()->requestCheckingOfText(request.text(), new WebTextCheckingCompletionImpl(request.sequence(), sender));
+    if (!m_webView->spellCheckClient())
+        return;
+
+    WebTextCheckingCompletionImpl* completion = new WebTextCheckingCompletionImpl(request.sequence(), sender, this);
+    m_pendingTextChecks.add(completion);
+    m_webView->spellCheckClient()->requestCheckingOfText(request.text(), completion);
+}
+
+void EditorClientImpl::didCheckString(WebTextCheckingCompletionImpl* completion)
+{
+    m_pendingTextChecks.remove(completion);
 }
 
 String EditorClientImpl::getAutoCorrectSuggestionForMisspelledWord(const String& misspelledWord)

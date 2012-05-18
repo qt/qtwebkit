@@ -307,7 +307,6 @@ void InspectorDOMAgent::setDocument(Document* doc)
 
 void InspectorDOMAgent::releaseDanglingNodes()
 {
-    deleteAllValues(m_danglingNodeToIdMaps);
     m_danglingNodeToIdMaps.clear();
 }
 
@@ -532,8 +531,9 @@ int InspectorDOMAgent::pushNodePathToFrontend(Node* nodeToPush)
         Node* parent = innerParentNode(node);
         if (!parent) {
             // Node being pushed is detached -> push subtree root.
-            danglingMap = new NodeToIdMap();
-            m_danglingNodeToIdMaps.append(danglingMap);
+            OwnPtr<NodeToIdMap> newMap = adoptPtr(new NodeToIdMap);
+            danglingMap = newMap.get();
+            m_danglingNodeToIdMaps.append(newMap.release());
             RefPtr<TypeBuilder::Array<TypeBuilder::DOM::Node> > children = TypeBuilder::Array<TypeBuilder::DOM::Node>::create();
             children->addItem(buildObjectForNode(node, 0, danglingMap));
             m_frontend->setChildNodes(0, children);
@@ -653,7 +653,7 @@ void InspectorDOMAgent::setNodeName(ErrorString* errorString, int nodeId, const 
         return;
 
     // Copy over the original node's attributes.
-    newElem->setAttributesFromElement(*toElement(oldNode));
+    newElem->cloneAttributesFromElement(*toElement(oldNode));
 
     // Copy over the original node's children.
     Node* child;
@@ -883,6 +883,19 @@ void InspectorDOMAgent::performSearch(ErrorString*, const String& whitespaceTrim
                     node = static_cast<Attr*>(node)->ownerElement();
                 resultCollector.add(node);
             }
+        }
+
+        // Selector evaluation
+        for (Vector<Document*>::iterator it = docs.begin(); it != docs.end(); ++it) {
+            Document* document = *it;
+            ExceptionCode ec = 0;
+            RefPtr<NodeList> nodeList = document->querySelectorAll(whitespaceTrimmedQuery, ec);
+            if (ec || !nodeList)
+                continue;
+
+            unsigned size = nodeList->length();
+            for (unsigned i = 0; i < size; ++i)
+                resultCollector.add(nodeList->item(i));
         }
     }
 

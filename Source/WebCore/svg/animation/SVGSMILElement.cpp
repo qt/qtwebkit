@@ -420,28 +420,28 @@ bool SVGSMILElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGSMILElement::parseAttribute(Attribute* attr)
+void SVGSMILElement::parseAttribute(const Attribute& attribute)
 {
-    if (attr->name() == SVGNames::beginAttr) {
+    if (attribute.name() == SVGNames::beginAttr) {
         if (!m_conditions.isEmpty()) {
             disconnectConditions();
             m_conditions.clear();
             parseBeginOrEnd(fastGetAttribute(SVGNames::endAttr), End);
         }
-        parseBeginOrEnd(attr->value().string(), Begin);
+        parseBeginOrEnd(attribute.value().string(), Begin);
         if (inDocument())
             connectConditions();
-    } else if (attr->name() == SVGNames::endAttr) {
+    } else if (attribute.name() == SVGNames::endAttr) {
         if (!m_conditions.isEmpty()) {
             disconnectConditions();
             m_conditions.clear();
             parseBeginOrEnd(fastGetAttribute(SVGNames::beginAttr), Begin);
         }
-        parseBeginOrEnd(attr->value().string(), End);
+        parseBeginOrEnd(attribute.value().string(), End);
         if (inDocument())
             connectConditions();
     } else
-        SVGElement::parseAttribute(attr);
+        SVGElement::parseAttribute(attribute);
 }
 
 void SVGSMILElement::svgAttributeChanged(const QualifiedName& attrName)
@@ -466,9 +466,13 @@ void SVGSMILElement::svgAttributeChanged(const QualifiedName& attrName)
             beginListChanged(elapsed());
         else if (attrName == SVGNames::endAttr)
             endListChanged(elapsed());
-        else if (attrName == SVGNames::attributeNameAttr)
+        else if (attrName == SVGNames::attributeNameAttr) {
             m_attributeName = constructQualifiedName(this, fastGetAttribute(SVGNames::attributeNameAttr));
-        else if (attrName.matches(XLinkNames::hrefAttr)) {
+            if (m_targetElement) {
+                resetTargetElement();
+                return;
+            }
+        } else if (attrName.matches(XLinkNames::hrefAttr)) {
             if (SVGElement* targetElement = this->targetElement())
                 document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(targetElement);
         }

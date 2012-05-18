@@ -467,7 +467,6 @@ SOURCES += \
     css/CSSSelector.cpp \
     css/CSSSelectorList.cpp \
     css/CSSSegmentedFontFace.cpp \
-    css/CSSStyleDeclaration.cpp \
     css/CSSStyleRule.cpp \
     css/CSSStyleSheet.cpp \
     css/CSSTimingFunctionValue.cpp \
@@ -621,7 +620,6 @@ SOURCES += \
     dom/TouchList.cpp \
     dom/Traversal.cpp \
     dom/TreeScope.cpp \
-    dom/TreeScopeAdjuster.cpp \
     dom/TreeScopeAdopter.cpp \
     dom/TreeWalker.cpp \
     dom/UIEvent.cpp \
@@ -872,10 +870,10 @@ SOURCES += \
     html/parser/TextDocumentParser.cpp \
     html/parser/TextViewSourceParser.cpp \
     html/parser/XSSAuditor.cpp \
+    html/shadow/ContentDistributor.cpp \
     html/shadow/ContentSelectorQuery.cpp \
     html/shadow/DetailsMarkerControl.cpp \
     html/shadow/HTMLContentElement.cpp \
-    html/shadow/HTMLContentSelector.cpp \
     html/shadow/HTMLShadowElement.cpp \
     html/shadow/InsertionPoint.cpp \
     html/shadow/MediaControls.cpp \
@@ -984,6 +982,8 @@ SOURCES += \
     loader/PolicyCallback.cpp \
     loader/PolicyChecker.cpp \
     loader/ProgressTracker.cpp \
+    loader/Prerenderer.cpp \
+    loader/PrerendererClient.cpp \
     loader/NavigationScheduler.cpp \
     loader/ResourceLoader.cpp \
     loader/ResourceLoadNotifier.cpp \
@@ -1216,6 +1216,7 @@ SOURCES += \
     platform/text/UnicodeRange.cpp \
     platform/text/transcoder/FontTranscoder.cpp \
     platform/UUID.cpp \
+    platform/VisitedLinks.cpp \
     platform/Widget.cpp \
     platform/PlatformStrategies.cpp \
     plugins/IFrameShimSupport.cpp \
@@ -1773,7 +1774,6 @@ HEADERS += \
     dom/Traversal.h \
     dom/TreeDepthLimit.h \
     dom/TreeScope.h \
-    dom/TreeScopeAdjuster.h \
     dom/TreeScopeAdopter.h \
     dom/TreeWalker.h \
     dom/UIEvent.h \
@@ -1997,9 +1997,9 @@ HEADERS += \
     html/parser/HTMLTreeBuilder.h \
     html/parser/HTMLViewSourceParser.h \
     html/parser/XSSAuditor.h \
+    html/shadow/ContentDistributor.h \
     html/shadow/ContentSelectorQuery.h \
     html/shadow/HTMLContentElement.h \
-    html/shadow/HTMLContentSelector.h \
     html/shadow/HTMLShadowElement.h \
     html/shadow/MediaControlElements.h \
     html/shadow/DetailsMarkerControl.h \
@@ -2106,6 +2106,8 @@ HEADERS += \
     loader/NavigationAction.h \
     loader/NetscapePlugInStreamLoader.h \
     loader/PlaceholderDocument.h \
+    loader/Prerenderer.h \
+    loader/PrerendererClient.h \
     loader/ProgressTracker.h \
     loader/ResourceLoader.h \
     loader/SubresourceLoader.h \
@@ -2391,6 +2393,7 @@ HEADERS += \
     platform/Timer.h \
     platform/Widget.h \
     platform/PlatformStrategies.h \
+    platform/PrerenderHandle.h \
     platform/LocalizedStrings.h \
     plugins/DOMMimeTypeArray.h \
     plugins/DOMMimeType.h \
@@ -2856,6 +2859,9 @@ SOURCES += \
     platform/graphics/qt/FontPlatformDataQt.cpp \
     platform/graphics/qt/FloatPointQt.cpp \
     platform/graphics/qt/FloatRectQt.cpp \
+    platform/graphics/qt/FractionalLayoutPointQt.cpp \
+    platform/graphics/qt/FractionalLayoutRectQt.cpp \
+    platform/graphics/qt/FractionalLayoutSizeQt.cpp \
     platform/graphics/qt/GradientQt.cpp \
     platform/graphics/qt/GraphicsContextQt.cpp \
     platform/graphics/qt/IconQt.cpp \
@@ -3397,7 +3403,6 @@ contains(DEFINES, ENABLE_FILTERS=1) {
         platform/graphics/filters/SpotLightSource.cpp \
         platform/graphics/filters/SourceAlpha.cpp \
         platform/graphics/filters/SourceGraphic.cpp \
-        platform/graphics/filters/arm/FECompositeArithmeticNEON.cpp \
         platform/graphics/filters/arm/FELightingNEON.cpp \
         platform/graphics/filters/arm/FEGaussianBlurNEON.cpp \
 }

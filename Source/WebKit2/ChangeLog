@@ -1,3 +1,1068 @@
+2012-05-18  MORITA Hajime  <morrita@google.com>
+
+        Yet another unreviewed build fix on r117572, this time for wk2...
+
+        * WebProcess/WebCoreSupport/WebEditorClient.h:
+
+2012-05-17  Philippe Normand  <pnormand@igalia.com>
+
+        Unreviewed, WebKit2 GTK/Qt build fix attempt after r117516.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didBlockInsecurePluginVersion):
+
+2012-05-17  Anders Carlsson  <andersca@apple.com>
+
+        Plug-ins blacklist mechanism can tell clients about plug-in with null identifier
+        https://bugs.webkit.org/show_bug.cgi?id=86788
+        <rdar://problem/11479503>
+
+        Reviewed by John Sullivan.
+
+        Pass along the URL string of the blocked plug-in so we can find the plug-in even if there was no
+        MIME type specified in the <embed> or <object> tag.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didBlockInsecurePluginVersion):
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.messages.in:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::createPlugin):
+
+2012-05-17  Oliver Hunt  <oliver@apple.com>
+
+        Endeavour to make the windows test bot actually able to run tests.
+        https://bugs.webkit.org/show_bug.cgi?id=86772
+
+        Reviewed by Sam Weinig.
+
+        Remove the ClassInfo exports from the .def files as we're now using
+        WEBKIT_EXPORT declarations to get expected behaviour on windows.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-05-17  Timothy Hatcher  <timothy@apple.com>
+
+        Make the docked Web Inspector use autoresizing masks so the view doesn't jitter when
+        resizing the window.
+
+        https://webkit.org/b/86765
+
+        Reviewed by John Sullivan.
+
+        * UIProcess/mac/WebInspectorProxyMac.mm:
+        (-[WKWebInspectorProxyObjCAdapter close]): Added. Zero out _inspectorProxy.
+        (-[WKWebInspectorProxyObjCAdapter inspectedViewFrameDidChange:]): Perform the work on a delay to
+        prevent interfering with Cocoa's resizing.
+        (WebKit::WebInspectorProxy::createInspectorWindow): Added setAutoresizingMask: call.
+        (WebKit::WebInspectorProxy::platformCreateInspectorPage): Removed setAutoresizingMask: call.
+        createInspectorWindow and platformAttach do this now.
+        (WebKit::WebInspectorProxy::platformDidClose): Call close on WKWebInspectorProxyObjCAdapter.
+        (WebKit::WebInspectorProxy::platformAttach): Added setAutoresizingMask: call.
+
+2012-05-16  Andreas Kling  <kling@webkit.org>
+
+        Make PluginInfoStore properly thread-safe.
+        <http://webkit.org/b/86648>
+        <rdar://problem/11451178>
+
+        Reviewed by Darin Adler.
+
+        Deep copy the internal storage of PluginInfoStore after constructing it, as we can
+        be doing this from a secondary thread.
+
+        * Shared/Plugins/PluginModuleInfo.h:
+        (WebKit::PluginModuleInfo::isolatedCopy):
+        * UIProcess/Plugins/PluginInfoStore.cpp:
+        (WebKit::deepIsolatedCopyPluginInfoVector):
+        (WebKit::PluginInfoStore::loadPluginsIfNecessary):
+        (WebKit::PluginInfoStore::plugins):
+
+2012-05-17  Hironori Bono  <hbono@chromium.org>
+
+        [Refactoring] Move platform-specific code in Editor::respondToChangedSelection to the WebKit layer
+        https://bugs.webkit.org/show_bug.cgi?id=86591
+
+        Reviewed by Ryosuke Niwa.
+
+        This change adds a TextCheckerClient::shouldEraseMarkersAfterChangeSelection
+        function to remove platform-specific code from Editor::respondToChangedSelection
+        function.
+
+        No new tests, no change in behavior.
+
+        * WebProcess/WebCoreSupport/WebEditorClient.cpp:
+        (WebKit::WebEditorClient::shouldEraseMarkersAfterChangeSelection):
+        (WebKit):
+        * WebProcess/WebCoreSupport/WebEditorClient.h:
+
+2012-05-17  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r117428): WebKit API/SPI was removed
+        https://bugs.webkit.org/show_bug.cgi?id=86748
+
+        Reverted r117428.
+
+        * win/WebKit2.def:
+
+2012-05-17  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Convert setDomainRelaxationForbiddenForURLScheme to use InternalSettings interface
+        https://bugs.webkit.org/show_bug.cgi?id=86704
+
+        Reviewed by Eric Seidel.
+
+        * win/WebKit2.def: Add setDomainRelaxationForbiddenForURLScheme symbol filter.
+
+2012-05-16  Brent Fulgham  <bfulgham@webkit.org>
+
+        [WinCairo] Unreviewed build change after exported symbol
+        updates (r114790) and expansion of CG routines in WebPage
+        PDF output (r114476).
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::drawRectToPDF): Exclude CG use on WinCairo.
+        (WebKit::WebPage::drawPagesToPDF): Exclude CG use on WinCairo.
+        * win/WebKit2CFLite.def: Don't claim to export symbols we don't
+        provide (e.g., full screen API calls).
+
+2012-05-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add API to get plugins to WebKit2 GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=86356
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.list.am: Add new files to compilation.
+        * UIProcess/API/gtk/WebKitMimeInfo.cpp: Added.
+        (_WebKitMimeInfo): Boxed type to represent MIME type information.
+        (webkitMimeInfoCreate): Ceate a new WebKitMimeInfo.
+        (webkit_mime_info_ref):
+        (webkit_mime_info_unref):
+        (webkit_mime_info_get_mime_type): Return the mime type.
+        (webkit_mime_info_get_description): Return the mime type
+        description.
+        (webkit_mime_info_get_extensions): Return the list of extensions
+        associated to the mime type.
+        * UIProcess/API/gtk/WebKitMimeInfo.h: Added.
+        * UIProcess/API/gtk/WebKitMimeInfoPrivate.h: Added.
+        * UIProcess/API/gtk/WebKitPlugin.cpp: Added.
+        (webkitPluginFinalize):
+        (webkit_plugin_init):
+        (webkit_plugin_class_init):
+        (webkitPluginCreate): Create a new WebKitPlugin for the given
+        PluginModuleInfo.
+        (webkit_plugin_get_name): Return the plugin name.
+        (webkit_plugin_get_description): Return the plugin description.
+        (webkit_plugin_get_path): Return the path where the plugin is
+        installed.
+        (webkit_plugin_get_mime_info_list): Return the list of mime types
+        handled by the plugin.
+        * UIProcess/API/gtk/WebKitPlugin.h: Added.
+        * UIProcess/API/gtk/WebKitPluginPrivate.h: Added.
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkit_web_context_set_additional_plugins_directory): Set an
+        additional directory to be scanned for plugins.
+        (GetPluginsAsyncData): Helper struct used to asynchronously get
+        the list of plugins.
+        (getPluginsAsyncDataCreate): Create a GetPluginsAsyncData struct.
+        (getPluginsAsyncDataDestroy): Destroy a GetPluginsAsyncData
+        struct.
+        (webkitWebContextGetPluginThread): Thread body to get the list of
+        plugins installed.
+        (webkit_web_context_get_plugins): Asynchronously get the list of
+        plugins installed.
+        (webkit_web_context_get_plugins_finish): Finish async operation
+        started by webkit_web_context_get_plugins() returning a list of
+        WebKitPlugin.
+        * UIProcess/API/gtk/WebKitWebContext.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-docs.sgml: Add new section for
+        WebKitPlugin.
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbols.
+        * UIProcess/API/gtk/docs/webkit2gtk.types: Add new types.
+        * UIProcess/API/gtk/tests/GNUmakefile.am:
+        * UIProcess/API/gtk/tests/TestWebKitWebContext.cpp:
+        (testWebContextGetPlugins):
+        (beforeAll):
+        * UIProcess/API/gtk/webkit2.h:
+
+2012-05-16  Brady Eidson  <beidson@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=86638
+        Bump the version number on the WKBundlePageLoaderClient
+
+        Reviewed by Dan Bernstein.
+
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h: s/1/2/
+        * Shared/APIClientTraits.cpp: Update client traits for the BundlePageLoaderClient
+        * Shared/APIClientTraits.h: Update client traits for the BundlePageLoaderClient
+
+        * ChangeLog: Change a confusing ChangeLog entry to reflect the actual client that was changed.
+
+2012-05-16  Dinu Jacob  <dinu.jacob@nokia.com>
+
+        Add didFinishProgress BundlePageLoaderClient callback
+        https://bugs.webkit.org/show_bug.cgi?id=86541
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added didFinishProgress BundleUIClient callback needed by
+        WebKitTestRunner. This callback is invoked in postProgressFinishedNotification.
+
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.cpp:
+        (WebKit::InjectedBundlePageLoaderClient::didFinishProgress):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.h:
+        (InjectedBundlePageLoaderClient):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::postProgressFinishedNotification):
+        * WebProcess/qt/QtBuiltinBundlePage.cpp:
+        (WebKit::QtBuiltinBundlePage::QtBuiltinBundlePage):
+
+2012-05-16  Keishi Hattori  <keishi@webkit.org>
+
+        [chromium] Add WebKit API to access inner text value of input element
+        https://bugs.webkit.org/show_bug.cgi?id=85353
+
+        Reviewed by Kent Tamura.
+
+        * win/WebKit2.def: Added HTMLInputElement::setEditingValue
+        * win/WebKit2CFLite.def: Added HTMLInputElement::setEditingValue
+
+2012-05-16  Zalan Bujtas  <zbujtas@gmail.com>
+
+        [Qt][WK2] Move WebFrameNetworkingContext to WebKit namespace.
+        https://bugs.webkit.org/show_bug.cgi?id=86590
+
+        Reviewed by Simon Hausmann.
+
+        * WebProcess/WebCoreSupport/qt/WebFrameNetworkingContext.cpp:
+        (WebKit::WebFrameNetworkingContext::WebFrameNetworkingContext):
+        (WebKit::WebFrameNetworkingContext::create):
+        * WebProcess/WebCoreSupport/qt/WebFrameNetworkingContext.h:
+        (WebKit):
+        (WebFrameNetworkingContext):
+        (WebKit::WebFrameNetworkingContext::originatingObject):
+        (WebKit::WebFrameNetworkingContext::~WebFrameNetworkingContext):
+        (WebKit::WebFrameNetworkingContext::networkAccessManager):
+        (WebKit::WebFrameNetworkingContext::mimeSniffingEnabled):
+        (WebKit::WebFrameNetworkingContext::thirdPartyCookiePolicyPermission):
+
+2012-05-16  Andras Becsi  <andras.becsi@nokia.com>
+
+        [WTR] Visited link tracking is not disabled properly
+        https://bugs.webkit.org/show_bug.cgi?id=76699
+
+        Reviewed by Jocelyn Turcotte.
+
+        If PLATFORM_STRATEGIES is enabled visited link tracking is done through
+        VisitedLinkProvider and not through PageGroup.
+        InjectedBundle sets the shouldTrackVisitedLinks flag on the PageGroup,
+        thus the shared VisitedLinkTable does get populated with visited links
+        regardless of the flag.
+
+        The WebProcess should only track visited links if tracking is specifically
+        enabled for a test through WTR's LayoutTestController.
+
+        This patch fixes several flacky and failing layout tests on Qt-WK2.
+
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setShouldTrackVisitedLinks): Let the WebProcess
+        know about visited link tracking.
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::WebProcess):
+        (WebKit::WebProcess::setShouldTrackVisitedLinks):
+        (WebKit::WebProcess::addVisitedLink):
+        * WebProcess/WebProcess.h:
+        (WebProcess):
+
+2012-05-15  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Fix Qt5/Mac build after r117212 by adding missing NETSCAPE_PLUGIN_API guards
+        https://bugs.webkit.org/show_bug.cgi?id=86577
+
+        Reviewed by Andy Estes.
+
+        * Shared/Plugins/Netscape/NetscapePluginModuleNone.cpp:
+        * UIProcess/Plugins/unix/PluginInfoStoreUnix.cpp:
+        (WebKit::PluginInfoStore::getPluginInfo):
+        * WebProcess/Plugins/Netscape/NetscapePluginNone.cpp:
+
+2012-05-15  Andy Estes  <aestes@apple.com>
+
+        WebKit2 would fail to build on Windows if Netscape plug-ins were disabled.
+
+        * UIProcess/Plugins/win/PluginInfoStoreWin.cpp:
+        (WebKit::PluginInfoStore::getPluginInfo): Return false if ENABLE_NETSCAPE_PLUGIN_API is false.
+
+2012-05-15  Andy Estes  <aestes@apple.com>
+
+        Guard Netscape plug-in code with ENABLE(NETSCAPE_PLUGIN_API)
+        https://bugs.webkit.org/show_bug.cgi?id=86496
+
+        Reviewed by Sam Weinig.
+
+        Ensure that WebKit2 can compile with ENABLE_NETSCAPE_PLUGIN_API disabled.
+
+        * Shared/Plugins/Netscape/NetscapePluginModule.cpp:
+        * Shared/Plugins/Netscape/NetscapePluginModule.h:
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        * Shared/Plugins/Netscape/win/NetscapePluginModuleWin.cpp:
+        * Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp:
+        * UIProcess/Plugins/mac/PluginInfoStoreMac.mm:
+        (WebKit::PluginInfoStore::getPluginInfo):
+        * WebProcess/Plugins/Netscape/JSNPMethod.cpp:
+        * WebProcess/Plugins/Netscape/JSNPMethod.h:
+        * WebProcess/Plugins/Netscape/JSNPObject.cpp:
+        * WebProcess/Plugins/Netscape/JSNPObject.h:
+        * WebProcess/Plugins/Netscape/NPJSObject.cpp:
+        * WebProcess/Plugins/Netscape/NPJSObject.h:
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.cpp:
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.h:
+        * WebProcess/Plugins/Netscape/NPRuntimeUtilities.cpp:
+        * WebProcess/Plugins/Netscape/NPRuntimeUtilities.h:
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.cpp:
+        (WebKit::NPN_GetValue):
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.h:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.h:
+        * WebProcess/Plugins/Netscape/NetscapePluginStream.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePluginStream.h:
+        * WebProcess/Plugins/Netscape/mac/NetscapePluginMac.mm:
+        * WebProcess/Plugins/Netscape/mac/NetscapeSandboxFunctions.h:
+        * WebProcess/Plugins/Netscape/mac/NetscapeSandboxFunctions.mm:
+        * WebProcess/Plugins/Netscape/mac/PluginProxyMac.mm:
+        * WebProcess/Plugins/Netscape/qt/PluginProxyQt.cpp:
+        * WebProcess/Plugins/Netscape/win/NetscapePluginWin.cpp:
+        * WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp:
+        * WebProcess/Plugins/PluginController.h:
+        (PluginController):
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::Stream::didFinishLoading):
+        (WebKit::PluginView::PluginView):
+        (WebKit::PluginView::~PluginView):
+        (WebKit::PluginView::scriptObject):
+        (WebKit):
+        * WebProcess/Plugins/PluginView.h:
+        (PluginView):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::createPlugin):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::getSitesWithPluginData):
+        (WebKit::WebProcess::clearPluginSiteData):
+
+2012-05-15  Michael Brüning  <michael.bruning@nokia.com>
+
+        [Qt][WK2] http/tests/security/xss-DENIED-xsl-document-securityOrigin.xml crashes
+        https://bugs.webkit.org/show_bug.cgi?id=80209
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        This patch adds a method isOpen to WebIconDatabase to
+        be able to check whether the database has already been opened.
+        This helps preventing problems when reusing a WebContext
+        to create another view, as e.g. WebKitTestRunner does it in the
+        Qt port.
+
+        * UIProcess/WebIconDatabase.cpp:
+        (WebKit::WebIconDatabase::setDatabasePath):
+        (WebKit::WebIconDatabase::isOpen): Added.
+        (WebKit):
+        * UIProcess/WebIconDatabase.h:
+        (WebIconDatabase):
+        * UIProcess/qt/QtWebIconDatabaseClient.cpp:
+        (WebKit::QtWebIconDatabaseClient::QtWebIconDatabaseClient):
+
+2012-05-15  Anders Carlsson  <andersca@apple.com>
+
+        Use unaccelerated scrolling deltas when rubber-banding
+        https://bugs.webkit.org/show_bug.cgi?id=86503
+        <rdar://problem/11378742>
+
+        Reviewed by Sam Weinig.
+
+        * Shared/WebEvent.h:
+        (WebWheelEvent):
+        (WebKit::WebWheelEvent::scrollCount):
+        (WebKit::WebWheelEvent::unacceleratedScrollingDelta):
+        Add scroll count and unaccelerated scrolling delta.
+
+        * Shared/WebEventConversion.cpp:
+        (WebKit::WebKit2PlatformWheelEvent::WebKit2PlatformWheelEvent):
+        Initialize scroll count and unaccelerated scrolling deltas.
+
+        * Shared/WebWheelEvent.cpp:
+        (WebKit::WebWheelEvent::WebWheelEvent):
+        Initialize scroll count and unaccelerated scrolling deltas.
+
+        (WebKit::WebWheelEvent::encode):
+        (WebKit::WebWheelEvent::decode):
+        Encode and decode scroll count and unaccelerated scrolling deltas.
+
+        * Shared/mac/WebEventFactory.mm:
+        (WebKit::WebEventFactory::createWebWheelEvent):
+        Initialize the scroll count and unaccelerated scrolling deltas from the underlying NSEvent.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::coalesce):
+        Coalesce unaccelerated scrolling deltas as well.
+
+        * WebProcess/WebCoreSupport/mac/WebSystemInterface.mm:
+        (InitWebCoreSystemInterface):
+        Init new WKSI functions.
+
+2012-05-15  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r117095.
+        http://trac.webkit.org/changeset/117095
+        https://bugs.webkit.org/show_bug.cgi?id=86511
+
+        broke Qt Mac build (Requested by estes on #webkit).
+
+        * Shared/Plugins/Netscape/NetscapePluginModule.cpp:
+        * Shared/Plugins/Netscape/NetscapePluginModule.h:
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        * Shared/Plugins/Netscape/win/NetscapePluginModuleWin.cpp:
+        * Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp:
+        * UIProcess/Plugins/mac/PluginInfoStoreMac.mm:
+        (WebKit::PluginInfoStore::getPluginInfo):
+        * WebProcess/Plugins/Netscape/JSNPMethod.cpp:
+        * WebProcess/Plugins/Netscape/JSNPMethod.h:
+        * WebProcess/Plugins/Netscape/JSNPObject.cpp:
+        * WebProcess/Plugins/Netscape/JSNPObject.h:
+        * WebProcess/Plugins/Netscape/NPJSObject.cpp:
+        * WebProcess/Plugins/Netscape/NPJSObject.h:
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.cpp:
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.h:
+        * WebProcess/Plugins/Netscape/NPRuntimeUtilities.cpp:
+        * WebProcess/Plugins/Netscape/NPRuntimeUtilities.h:
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.cpp:
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.h:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.h:
+        * WebProcess/Plugins/Netscape/NetscapePluginNone.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePluginStream.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePluginStream.h:
+        * WebProcess/Plugins/Netscape/mac/NetscapePluginMac.mm:
+        * WebProcess/Plugins/Netscape/mac/NetscapeSandboxFunctions.h:
+        * WebProcess/Plugins/Netscape/mac/PluginProxyMac.mm:
+        * WebProcess/Plugins/Netscape/qt/PluginProxyQt.cpp:
+        * WebProcess/Plugins/Netscape/win/NetscapePluginWin.cpp:
+        * WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp:
+
+2012-05-15  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Crash when dropping a reference to a non-existing file
+        https://bugs.webkit.org/show_bug.cgi?id=86505
+        <rdar://problem/11402084>
+
+        Reviewed by Darin Adler.
+
+        * WebProcess/WebPage/WebPage.cpp: (WebKit::WebPage::performDragControllerAction): Check that
+        extension handle actually has a non-null extension. Extensions for non-existent files can not
+        exist, so they are passed as null ones.
+
+2012-05-15  Andy Estes  <aestes@apple.com>
+
+        Add WTF_USE_SECURITY_FRAMEWORK and use it in place of the less specific PLATFORM(MAC)
+        https://bugs.webkit.org/show_bug.cgi?id=86508
+
+        Reviewed by Sam Weinig.
+
+        * Shared/cf/ArgumentCodersCF.cpp:
+        (CoreIPC::typeFromCFTypeRef):
+        (CoreIPC::encode):
+        (CoreIPC::decode):
+        (CoreIPC):
+        * Shared/cf/ArgumentCodersCF.h:
+        (CoreIPC):
+        * Shared/mac/KeychainAttribute.cpp:
+        * Shared/mac/KeychainAttribute.h:
+        * Shared/mac/SecKeychainItemRequestData.cpp:
+        * Shared/mac/SecKeychainItemRequestData.h:
+        * Shared/mac/SecKeychainItemResponseData.cpp:
+        * Shared/mac/SecKeychainItemResponseData.h:
+        * UIProcess/WebProcessProxy.h:
+        (WebKit):
+        (WebProcessProxy):
+        * WebProcess/mac/WebProcessMac.mm:
+
+2012-05-15  Andreas Kling  <kling@webkit.org>
+
+        Deep copy PluginModuleInfo before passing across thread boundary.
+        <http://webkit.org/b/86491>
+        <rdar://problem/11451178>
+
+        Reviewed by Anders Carlsson.
+
+        Since the vector of PluginModuleInfo objects returned by PluginInfoStore::plugins()
+        can end up being passed to another thread, we should clone it to make sure it's
+        safe to do so.
+
+        No new tests, speculative use-after-free fix.
+
+        * Shared/Plugins/PluginModuleInfo.h:
+        (PluginModuleInfo):
+        (WebKit::PluginModuleInfo::isolatedCopy):
+        * UIProcess/Plugins/PluginInfoStore.cpp:
+        (WebKit::PluginInfoStore::plugins):
+
+2012-05-15  Andy Estes  <aestes@apple.com>
+
+        Guard Netscape plug-in code with ENABLE(NETSCAPE_PLUGIN_API)
+        https://bugs.webkit.org/show_bug.cgi?id=86496
+
+        Reviewed by Dan Bernstein.
+
+        * Shared/Plugins/Netscape/NetscapePluginModule.cpp:
+        * Shared/Plugins/Netscape/NetscapePluginModule.h:
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        * Shared/Plugins/Netscape/win/NetscapePluginModuleWin.cpp:
+        * Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp:
+        * UIProcess/Plugins/mac/PluginInfoStoreMac.mm:
+        (WebKit::PluginInfoStore::individualPluginPaths):
+        (WebKit::PluginInfoStore::getPluginInfo):
+        * WebProcess/Plugins/Netscape/JSNPMethod.cpp:
+        * WebProcess/Plugins/Netscape/JSNPMethod.h:
+        * WebProcess/Plugins/Netscape/JSNPObject.cpp:
+        * WebProcess/Plugins/Netscape/JSNPObject.h:
+        * WebProcess/Plugins/Netscape/NPJSObject.cpp:
+        * WebProcess/Plugins/Netscape/NPJSObject.h:
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.cpp:
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.h:
+        * WebProcess/Plugins/Netscape/NPRuntimeUtilities.cpp:
+        * WebProcess/Plugins/Netscape/NPRuntimeUtilities.h:
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.cpp:
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.h:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.h:
+        * WebProcess/Plugins/Netscape/NetscapePluginNone.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePluginStream.cpp:
+        * WebProcess/Plugins/Netscape/NetscapePluginStream.h:
+        * WebProcess/Plugins/Netscape/mac/NetscapePluginMac.mm:
+        * WebProcess/Plugins/Netscape/mac/NetscapeSandboxFunctions.h:
+        * WebProcess/Plugins/Netscape/mac/PluginProxyMac.mm:
+        * WebProcess/Plugins/Netscape/qt/PluginProxyQt.cpp:
+        * WebProcess/Plugins/Netscape/win/NetscapePluginWin.cpp:
+        * WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp:
+
+2012-05-14  Andy Estes  <aestes@apple.com>
+
+        Guard some AppKit-specific code in WebKit2 with USE(APPKIT)
+        https://bugs.webkit.org/show_bug.cgi?id=86444
+
+        Reviewed by Sam Weinig.
+
+        * Shared/NativeWebKeyboardEvent.h:
+        (NativeWebKeyboardEvent):
+        (WebKit::NativeWebKeyboardEvent::nativeEvent):
+        * Shared/NativeWebMouseEvent.h:
+        (NativeWebMouseEvent):
+        (WebKit::NativeWebMouseEvent::nativeEvent):
+        * Shared/NativeWebWheelEvent.h:
+        (NativeWebWheelEvent):
+        (WebKit::NativeWebWheelEvent::nativeEvent):
+        * Shared/mac/ArgumentCodersMac.h:
+        (CoreIPC):
+        * Shared/mac/ArgumentCodersMac.mm:
+        (CoreIPC::typeFromObject):
+        (CoreIPC::encode):
+        (CoreIPC::decode):
+        * Shared/mac/WebEventFactory.mm:
+        * WebProcess/WebCoreSupport/mac/WebPopupMenuMac.mm:
+        (WebKit::WebPopupMenu::setUpPlatformData):
+        * WebProcess/mac/WebProcessMainMac.mm:
+        (WebKit::WebProcessMain):
+
+2012-05-15  Dinu Jacob  <dinu.jacob@nokia.com>
+
+        [Qt][WK2] fast/loader/create-frame-in-DOMContentLoaded.html crashes
+        https://bugs.webkit.org/show_bug.cgi?id=83578
+
+        Retrieve and save page ID only for a valid page in WebFrameNetworkingContext.
+        The page will be null if the frame was detached from the page.
+
+        Reviewed by Simon Hausmann.
+
+        * WebProcess/WebCoreSupport/qt/WebFrameNetworkingContext.cpp:
+        (WebCore::WebFrameNetworkingContext::WebFrameNetworkingContext):
+
+2012-05-15  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        [Qt][WK2] Fix scrolling in touch mode
+        https://bugs.webkit.org/show_bug.cgi?id=75006
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Only handle mouse-wheel events in WebCore to avoid double scrolling, and
+        scale pixels scrolled by wheel events according to viewport transformation.
+
+        * Shared/qt/WebEventFactoryQt.cpp:
+        (WebKit::WebEventFactory::createWebWheelEvent):
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        (QtViewportInteractionEngine):
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (QtWebPageEventHandler::handleWheelEvent):
+
+2012-05-15  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Add infra for testing double-tap to zoom functionality etc
+        https://bugs.webkit.org/show_bug.cgi?id=86474
+
+        Reviewed by Simon Hausmann.
+
+        Rename the WebViewportInfo class to QWebKitTest in preparation
+        of becoming a separate module. Adapt the use API.
+
+        Modify the API to work better for testing and make sure the
+        signals are emitted the right places. Also add a method for
+        simulating a double tap.
+
+        Work around issue with animations not running when the item
+        doesn't have focus.
+
+        Create an example test for double-tap to zoom, showing how we can
+        now create UI tests using QML.
+
+        * Target.pri:
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPage::setContentsSize):
+        (QQuickWebPage::setContentsScale):
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::didChangeViewportProperties):
+        (QQuickWebViewFlickablePrivate::_q_contentViewportChanged):
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+        (QQuickWebViewExperimental::QQuickWebViewExperimental):
+        (QQuickWebViewExperimental::test):
+        (QQuickWebView::mouseDoubleClickEvent):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/qwebkittest.cpp: Renamed from Source/WebKit2/UIProcess/API/qt/qwebviewportinfo.cpp.
+        (QWebKitTest::QWebKitTest):
+        (QWebKitTest::~QWebKitTest):
+        (QWebKitTest::touchDoubleTap):
+        (QWebKitTest::contentsSize):
+        (QWebKitTest::contentsScale):
+        (QWebKitTest::devicePixelRatio):
+        (QWebKitTest::initialScale):
+        (QWebKitTest::minimumScale):
+        (QWebKitTest::maximumScale):
+        (QWebKitTest::isScalable):
+        (QWebKitTest::layoutSize):
+        * UIProcess/API/qt/qwebkittest_p.h: Renamed from Source/WebKit2/UIProcess/API/qt/qwebviewportinfo_p.h.
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_doubleTapToZoom.qml: Added.
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::animateItemRectVisible):
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        (QtViewportInteractionEngine):
+
+2012-05-15  Michael Brüning  <michael.bruning@nokia.com>
+
+        [Qt][WK2] http/tests/navigation/https-in-page-cache.html fails with timeout
+        https://bugs.webkit.org/show_bug.cgi?id=83576
+
+        Reviewed by Simon Hausmann.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::QQuickWebViewPrivate):
+        (QQuickWebViewPrivate::handleCertificateVerificationRequest):
+        (QQuickWebView::allowAnyHTTPSCertificateForLocalHost): Added.
+        (QQuickWebView::setAllowAnyHTTPSCertificateForLocalHost): Added.
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):  Added bool m_allowAnyHTTPSCertificateForLocalHost.
+
+2012-05-14  Shinya Kawanaka  <shinyak@chromium.org>
+
+        document.execCommand('Indent') in the direct child of ShadowRoot causes a crash.
+        https://bugs.webkit.org/show_bug.cgi?id=86341
+
+        Reviewed by Ryosuke Niwa.
+
+        Exports necessary symbols.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-05-14  Luke Macpherson  <macpherson@chromium.org>
+
+        Introduce ENABLE_CSS_VARIABLES compile flag.
+        https://bugs.webkit.org/show_bug.cgi?id=86338
+
+        Reviewed by Dimitri Glazkov.
+
+        Add a configuration option for CSS Variables support, disabling it by default.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-14  Michael Saboff  <msaboff@apple.com>
+
+        Enh: Add the Ability to Disable / Enable JavaScript GC Timer
+        https://bugs.webkit.org/show_bug.cgi?id=86382
+
+        Reviewed by Darin Adler.
+
+        Plumbing to set / clear JS GC activity timer enable flag.
+
+        * UIProcess/API/C/WKContext.cpp:
+        (WKContextSetJavaScriptGarbageCollectorTimerEnabled):
+        * UIProcess/API/C/WKContext.h:
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::setJavaScriptGarbageCollectorTimerEnabled):
+        * UIProcess/WebContext.h:
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::setJavaScriptGarbageCollectorTimerEnabled):
+        * WebProcess/WebProcess.h:
+        * WebProcess/WebProcess.messages.in:
+
+2012-05-14  Anders Carlsson  <andersca@apple.com>
+
+        The "plug-in was blocked" callback needs to include enough info to uniquely identify the plug-in + version
+        https://bugs.webkit.org/show_bug.cgi?id=86395
+        <rdar://problem/11447652>
+
+        Reviewed by John Sullivan.
+
+        Add the plug-in identifier and version string to the didFail client callback.
+
+        * UIProcess/API/C/WKPage.h:
+        * UIProcess/WebLoaderClient.cpp:
+        (WebKit::WebLoaderClient::didFailToInitializePlugin):
+        Pass a null plug-in identifier and version here since we don't have the plug-in information here.
+
+        (WebKit::WebLoaderClient::didBlockInsecurePluginVersion):
+        * UIProcess/WebLoaderClient.h:
+        (WebLoaderClient):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::didBlockInsecurePluginVersion):
+
+2012-05-14  Andreas Kling  <kling@webkit.org>
+
+        REGRESSION(r116796): Assertion failure in API tests
+        <http://webkit.org/b/86378>
+        <rdar://problem/10777218>
+
+        Reviewed by Anders Carlsson.
+
+        Invalidate the plugin work queue in ~WebContext to avoid hitting
+        the !m_isValid assertion in ~WorkQueue later on.
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::~WebContext):
+
+2012-05-14  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r116969.
+        http://trac.webkit.org/changeset/116969
+        https://bugs.webkit.org/show_bug.cgi?id=86386
+
+        i accidentally the icondatabase (Requested by kling on
+        #webkit).
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::~WebContext):
+
+2012-05-14  Andreas Kling  <kling@webkit.org>
+
+        REGRESSION(r116796): Assertion failure in API tests
+        <http://webkit.org/b/86378>
+        <rdar://problem/10777218>
+
+        Reviewed by Anders Carlsson.
+
+        Invalidate the plugin work queue in ~WebContext to avoid hitting
+        the !m_isValid assertion in ~WorkQueue later on.
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::~WebContext):
+
+2012-05-14  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [Qt][WK2] Unreviewed trivial buildfix after r116958.
+
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior.pro:
+
+2012-05-14  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Simplify OTHER_FILES for QML tests project files
+
+        Reviewed by Jocelyn Turcotte.
+
+        * UIProcess/API/qt/tests/qmltests/DesktopBehavior.pro:
+        * UIProcess/API/qt/tests/qmltests/WebView.pro:
+
+2012-05-14  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.am: Explicitly link WebProcess to
+        libjavascriptcoregtk to make sure it uses the non installed
+        library.
+        * GNUmakefile.list.am: Add missing header file.
+
+2012-05-14  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] [WK2] Memory leaks in WebKitWebSettings
+        https://bugs.webkit.org/show_bug.cgi?id=86365
+
+        Reviewed by Martin Robinson.
+
+        Fix memory leaks in WebKitWebSettings by adopting allocations
+        using adoptWK.
+
+        * UIProcess/API/gtk/WebKitSettings.cpp:
+        (webkit_settings_init):
+        (webkit_settings_set_serif_font_family):
+
+2012-05-14  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        [Qt] Doesn't build with ENABLE_INSPECTOR=0
+        https://bugs.webkit.org/show_bug.cgi?id=85056
+
+        Reviewed by Tor Arne Vestbø.
+
+        * Target.pri:
+        * UIProcess/qt/QtWebContext.cpp:
+        (WebKit::initInspectorServer):
+
+2012-05-11  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make sure dialogs have their parent and attached properties set before Component.onCompleted
+        https://bugs.webkit.org/show_bug.cgi?id=86222
+
+        The WebView QML api for dialogs is based on delegates for each dialog, which
+        are implemented as components. Since there's no explicit API to show the dialog,
+        the natural place to allow the dialog to choose how to display itself is in
+        Component.onCompleted.
+
+        The issue was that we were using QQmlComponent::create() when instantiating the
+        component, at which point the component did not have a parent or it's attached
+        WebView property set. That meant that we had to do some ugly workaround in our
+        test, using a 1ms timer, to get a callback once the parent was there.
+
+        We now use the QQmlComponent::beginCreate() -> QQmlComponent::completeCreate()
+        pair, which allows us to set the relevant properties before triggering the
+        Component.onCompleted callback. We were already doing this for the context
+        menus (except for setting the parent, which we did afterwards).
+
+        Reviewed by Simon Hausmann.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_javaScriptDialogs.qml:
+        * UIProcess/qt/QtDialogRunner.cpp:
+        * UIProcess/qt/QtDialogRunner.h:
+        * UIProcess/qt/WebPopupMenuProxyQt.cpp:
+
+2012-05-11  Gavin Barraclough  <barraclough@apple.com>
+
+        Introduce PropertyName class
+        https://bugs.webkit.org/show_bug.cgi?id=86241
+
+        Reviewed by Geoff Garen.
+
+        Replace 'const Identifier&' arguments to functions accessing object properties with a new 'PropertyName' type.
+        This change paves the way to allow for properties keyed by values that are not Identifiers.
+
+        This change is largely a mechanical find & replace.
+        It also changes JSFunction's constructor to take a UString& instead of an Identifier&
+        (since in some cases we can no longer guarantee that we'lll have an Identifier), and
+        unifies Identifier's methods to obtain array indices onto PropertyName.
+
+        The new PropertyName class retains the ability to support .impl() and .ustring(), but
+        in a future patch we may need to rework this, since not all PropertyNames should be
+        equal based on their string representation.
+
+        * WebProcess/Plugins/Netscape/JSNPMethod.cpp:
+        (WebKit::JSNPMethod::finishCreation):
+        * WebProcess/Plugins/Netscape/JSNPMethod.h:
+        (WebKit::JSNPMethod::create):
+        (JSNPMethod):
+        * WebProcess/Plugins/Netscape/JSNPObject.cpp:
+        (WebKit::npIdentifierFromIdentifier):
+        (WebKit::JSNPObject::getOwnPropertySlot):
+        (WebKit::JSNPObject::getOwnPropertyDescriptor):
+        (WebKit::JSNPObject::put):
+        (WebKit::JSNPObject::deleteProperty):
+        (WebKit::JSNPObject::propertyGetter):
+        (WebKit::JSNPObject::methodGetter):
+        * WebProcess/Plugins/Netscape/JSNPObject.h:
+        (JSNPObject):
+
+2012-05-11  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] [WK2] Memory leak in PluginProcessProxy::scanPlugin
+        https://bugs.webkit.org/show_bug.cgi?id=86240
+
+        Reviewed by Martin Robinson.
+
+        Free the output received from the g_spawn_sync().
+
+        * UIProcess/Plugins/gtk/PluginProcessProxyGtk.cpp:
+        (WebKit::PluginProcessProxy::scanPlugin):
+
+2012-05-11  Andreas Kling  <kling@webkit.org>
+
+        WK2/Plugins: Move enumeration of plugins to a secondary UIProcess thread.
+        <http://webkit.org/b/86143>
+        <rdar://problem/10777218>
+
+        Reviewed by Anders Carlsson.
+
+        To avoid spins beneath PluginInfoStore::getPluginInfo(), do this work on a secondary
+        thread in the UIProcess.
+
+        * Shared/APIObject.h:
+
+            Made APIObject a ThreadSafeRefCounted. In the context of this patch, this is to
+            be able to dispatch bound Functions on WebContext.
+
+        * WebProcess/mac/KeychainItemShimMethods.mm:
+        (WebKit::responseMap):
+        * WebProcess/mac/SecItemShimMethods.mm:
+        (WebKit::responseMap):
+        * WebKit2.xcodeproj/project.pbxproj:
+        * Shared/BlockingResponseMap.h:
+        (BlockingResponseMap):
+        (BlockingResponseMap::waitForResponse):
+        (BlockingResponseMap::didReceiveResponse):
+
+             Renamed from Source/WebKit2/WebProcess/mac/KeychainShimResponseMap.h.
+             Generalize this somewhat since it's useful in more than just the keychain scenario.
+             This can/should be generalized further, but that's a topic for another patch.
+
+        * UIProcess/Plugins/PluginInfoStore.h:
+        * UIProcess/Plugins/PluginInfoStore.cpp:
+        (WebKit::PluginInfoStore::plugins):
+        (WebKit::PluginInfoStore::findPluginForMIMEType):
+        (WebKit::PluginInfoStore::findPluginForExtension):
+        (WebKit::PluginInfoStore::findPlugin):
+        (WebKit::PluginInfoStore::infoForPluginWithPath):
+
+            Slap a mutex on the PluginInfoStore since it can now be called from both the
+            main thread (via WKFrameCanShowMIMEType) and the GetPlugin work queue.
+
+        * UIProcess/WebContext.messages.in:
+        * UIProcess/WebContext.h:
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::WebContext):
+        (WebKit::WebContext::~WebContext):
+        (WebKit::WebContext::processDidFinishLaunching):
+        (WebKit::WebContext::sendDidGetPlugins):
+        (WebKit::WebContext::handleGetPlugins):
+        (WebKit::WebContext::getPlugins):
+        (WebKit::WebContext::didReceiveMessageOnConnectionWorkQueue):
+
+            Make GetPlugins a DispatchOnConnectionQueue message and execute it on a new
+            plug-in work queue. This effectively makes the GetPlugin call asynchronous.
+            On Mac, the built-in PDF reader is still registered on the main thread as that
+            ends up calling into localizedString().
+
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::didGetPlugins):
+        * WebProcess/WebProcess.h:
+        * WebProcess/WebProcess.messages.in:
+
+            Add a DidGetPlugins message to WebProcess. This is passed directly to the handler
+            in WebPlatformStrategies.cpp.
+
+        * WebProcess/WebCoreSupport/WebPlatformStrategies.h:
+        * WebProcess/WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebKit::responseMap):
+        (WebKit::handleDidGetPlugins):
+        (WebKit::generateRequestID):
+        (WebKit::WebPlatformStrategies::populatePluginCache):
+
+            Use a BlockingResponseMap to block the WebProcess main thread until the UIProcess
+            responds with DidGetPlugins.
+
+2012-05-11  Gustavo Noronha Silva  <gns@gnome.org>
+
+        REGRESSION(r116205): [GTK]: build no longer supports thin archives
+        https://bugs.webkit.org/show_bug.cgi?id=86207
+
+        * GNUmakefile.am: link libWebCoreModules to the webkit2gtk shared
+        library; tell the linker to ignore internal unresolved symbols for
+        PluginProcess and avoid linking libWebCoreModules.
+
+2012-05-11  Hajime Morrita  <morrita@chromium.org>
+
+        Unreviewed build fix attempt.
+
+        * WebProcess/WebCoreSupport/win/WebPopupMenuWin.cpp:
+        (WebKit::WebPopupMenu::setUpPlatformData):
+
+2012-05-11  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Allow sending URI request data in chunks
+        https://bugs.webkit.org/show_bug.cgi?id=85880
+
+        Reviewed by Martin Robinson.
+
+        The API to handle custom URI schemes will receive an input stream
+        to read from. Current code requires to buffer the whole stream
+        before sending it to the WebProcess. This patch allows to send the
+        data in chunks while it's read from the stream.
+
+        * GNUmakefile.list.am: Add new files to compilation
+        * UIProcess/API/C/soup/WKSoupRequestManager.cpp:
+        (WKSoupRequestManagerRegisterURIScheme): Use toWTFString() to
+        convert from WKString to WTFString.
+        (WKSoupRequestManagerDidHandleURIRequest): Use didHandleURIRequest
+        as it has been renamed.
+        (WKSoupRequestManagerDidReceiveURIRequestData): New method to send
+        more data for the uri request to the web process.
+        * UIProcess/API/C/soup/WKSoupRequestManager.h:
+        * UIProcess/soup/WebSoupRequestManagerProxy.cpp:
+        (WebKit::WebSoupRequestManagerProxy::didHandleURIRequest):
+        HandleURIRequest has been renamed to DidHandleURIRequest.
+        (WebKit::WebSoupRequestManagerProxy::didReceiveURIRequestData):
+        Send DidReceiveURIRequestData message to the web process.
+        (WebKit::WebSoupRequestManagerProxy::didReceiveURIRequest): Use
+        didHandleURIRequest as it has been renamed.
+        * UIProcess/soup/WebSoupRequestManagerProxy.h:
+        (WebSoupRequestManagerProxy):
+        * WebProcess/soup/WebKitSoupRequestInputStream.cpp: Added.
+        (AsyncReadData::AsyncReadData): Helper struct to store information
+        about pending async read operations.
+        (_WebKitSoupRequestInputStreamPrivate):
+        (webkitSoupRequestInputStreamReadAsyncResultComplete): Read the
+        data from the memory input stream and complete the async read
+        operation.
+        (webkitSoupRequestInputStreamReadAsync): Read the data from the
+        memory input stream and complete the async read operation if
+        there's data to read, or save the async result to be completed
+        when more data is added to the stream.
+        (webkitSoupRequestInputStreamReadFinish): Finish an async read
+        started with webkitSoupRequestInputStreamReadAsync.
+        (webkitSoupRequestInputStreamFinalize):
+        (webkit_soup_request_input_stream_init):
+        (webkit_soup_request_input_stream_class_init):
+        (webkitSoupRequestInputStreamNew): Create a new input stream with
+        a fixed size or 0 if content length is not known.
+        (webkitSoupRequestInputStreamAddData): Add more data to the
+        stream and complete any pending async read.
+        (webkitSoupRequestInputStreamFinished): Whether all data expected
+        by the stream has been received.
+        * WebProcess/soup/WebKitSoupRequestInputStream.h: Added.
+        * WebProcess/soup/WebSoupRequestManager.cpp:
+        (WebKit::WebSoupRequestManager::didHandleURIRequest): Create a
+        WebKitSoupRequestInputStream if we haven't received all the
+        request data in the HandleURIRequest message. Otherwise just
+        create a memory input stream with all the data.
+        (WebKit::WebSoupRequestManager::didReceiveURIRequestData): Add the data
+        received to the WebKitSoupRequestInputStream associated to the
+        given request identifier.
+        * WebProcess/soup/WebSoupRequestManager.h:
+        * WebProcess/soup/WebSoupRequestManager.messages.in: Add
+        contentLength parameter to DidHandleURIRequest message and add
+        DidReceiveURIRequestData message.
+
 2012-05-10  MORITA Hajime  <morrita@google.com>
 
         ElementShadow should minimize the usage of "ShadowRoot" name

@@ -1,3 +1,55 @@
+2012-05-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Add simple implementation of Web Intents
+        https://bugs.webkit.org/show_bug.cgi?id=86354
+
+        Reviewed by Eric Seidel.
+
+        Add new ewk_intent.* and ewk_intent_request.* files to CMake.
+
+        * CMakeLists.txt:
+        * PlatformEfl.cmake:
+
+2012-05-17  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Add API for Web Database handling
+        https://bugs.webkit.org/show_bug.cgi?id=85178
+
+        Reviewed by Antonio Gomes.
+
+        Added the new Web Database API to the buildsystem.
+
+        * PlatformEfl.cmake:
+
+2012-05-17  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Fix link error caused by not directly linking with edbus
+        https://bugs.webkit.org/show_bug.cgi?id=86747
+
+        Unreviewed build fix.
+
+        * PlatformEfl.cmake:
+
+2012-05-16  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Support for Battery Status API on the WebKit-Efl
+        https://bugs.webkit.org/show_bug.cgi?id=83254
+
+        Reviewed by Chang Shu.
+
+        Add e_ukit library and include directory to get battery status of device.
+
+        * PlatformEfl.cmake:
+
+2012-05-15  Tomasz Morawski  <t.morawski@samsung.com>
+
+        [EFL] Split ewk_private.h file to multiple private files.
+        https://bugs.webkit.org/show_bug.cgi?id=84572
+
+        Reviewed by Antonio Gomes.
+
+        * PlatformEfl.cmake: Removed ewk_logging.h file from EWebKit_HEADERS.
+
 2012-05-10  Sam D  <dsam2912@gmail.com>
 
         Web Inspector: rename InspectorBackendStub.js to InspectorBackendCommands.js

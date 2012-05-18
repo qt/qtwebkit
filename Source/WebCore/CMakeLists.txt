@@ -3,6 +3,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/filesystem"
     "${WEBCORE_DIR}/Modules/geolocation"
     "${WEBCORE_DIR}/Modules/indexeddb"
+    "${WEBCORE_DIR}/Modules/intents"
     "${WEBCORE_DIR}/Modules/webaudio"
     "${WEBCORE_DIR}/Modules/webdatabase"
     "${WEBCORE_DIR}/Modules/websockets"
@@ -492,7 +493,6 @@ SET(WebCore_SOURCES
     css/CSSSegmentedFontFace.cpp
     css/CSSSelector.cpp
     css/CSSSelectorList.cpp
-    css/CSSStyleDeclaration.cpp
     css/CSSStyleRule.cpp
     css/CSSStyleSheet.cpp
     css/CSSTimingFunctionValue.cpp
@@ -645,7 +645,6 @@ SET(WebCore_SOURCES
     dom/TransformSourceLibxslt.cpp
     dom/Traversal.cpp
     dom/TreeScope.cpp
-    dom/TreeScopeAdjuster.cpp
     dom/TreeScopeAdopter.cpp
     dom/TreeWalker.cpp
     dom/UIEvent.cpp
@@ -900,10 +899,10 @@ SET(WebCore_SOURCES
     html/parser/TextViewSourceParser.cpp
     html/parser/XSSAuditor.cpp
 
+    html/shadow/ContentDistributor.cpp
     html/shadow/ContentSelectorQuery.cpp
     html/shadow/DetailsMarkerControl.cpp
     html/shadow/HTMLContentElement.cpp
-    html/shadow/HTMLContentSelector.cpp
     html/shadow/HTMLShadowElement.cpp
     html/shadow/InsertionPoint.cpp
     html/shadow/MediaControls.cpp
@@ -1136,6 +1135,7 @@ SET(WebCore_SOURCES
     platform/ThreadTimers.cpp
     platform/Timer.cpp
     platform/UUID.cpp
+    platform/VisitedLinks.cpp
     platform/Widget.cpp
 
     platform/animation/Animation.cpp
@@ -1212,7 +1212,6 @@ SET(WebCore_SOURCES
     platform/graphics/filters/SourceAlpha.cpp
     platform/graphics/filters/SourceGraphic.cpp
 
-    platform/graphics/filters/arm/FECompositeArithmeticNEON.cpp
     platform/graphics/filters/arm/FECompositeArithmeticNEON.h
     platform/graphics/filters/arm/FEGaussianBlurNEON.cpp
     platform/graphics/filters/arm/FEGaussianBlurNEON.h
@@ -2451,6 +2450,7 @@ IF (ENABLE_WEB_AUDIO)
         Modules/webaudio/AudioParamTimeline.cpp
         Modules/webaudio/AudioProcessingEvent.cpp
         Modules/webaudio/AudioScheduledSourceNode.cpp
+        Modules/webaudio/AudioSummingJunction.cpp
         Modules/webaudio/BiquadDSPKernel.cpp
         Modules/webaudio/BiquadFilterNode.cpp
         Modules/webaudio/BiquadProcessor.cpp
@@ -2504,6 +2504,20 @@ IF (ENABLE_WEB_AUDIO)
         platform/audio/SincResampler.cpp
         platform/audio/VectorMath.cpp
         platform/audio/ZeroPole.cpp
+    )
+ENDIF ()
+
+IF (ENABLE_WEB_INTENTS)
+    LIST(APPEND WebCore_IDL_FILES
+        Modules/intents/DOMWindowIntents.idl
+        Modules/intents/Intent.idl
+        Modules/intents/IntentResultCallback.idl
+        Modules/intents/NavigatorIntents.idl
+    )
+    LIST(APPEND WebCore_SOURCES
+       Modules/intents/Intent.cpp
+       Modules/intents/IntentRequest.cpp
+       Modules/intents/NavigatorIntents.cpp
     )
 ENDIF ()
 

@@ -42,6 +42,7 @@ public:
 
 private:
     virtual void pageDestroyed() OVERRIDE;
+    virtual void frameWillDetachPage(WebCore::Frame*) OVERRIDE { }
 
     virtual bool shouldDeleteRange(WebCore::Range*) OVERRIDE;
     virtual bool shouldShowDeleteInterface(WebCore::HTMLElement*) OVERRIDE;
@@ -126,6 +127,7 @@ private:
 
     TextCheckerClient* textChecker()  OVERRIDE { return this; }
 
+    virtual bool shouldEraseMarkersAfterChangeSelection(WebCore::TextCheckingType) const OVERRIDE;
     virtual void ignoreWordInSpellDocument(const String&) OVERRIDE;
     virtual void learnWord(const String&) OVERRIDE;
     virtual void checkSpellingOfString(const UChar*, int length, int* misspellingLocation, int* misspellingLength) OVERRIDE;

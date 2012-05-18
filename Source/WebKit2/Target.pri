@@ -195,7 +195,7 @@ HEADERS += \
     UIProcess/API/qt/qquicknetworkreply_p.h \
     UIProcess/API/qt/qquicknetworkrequest_p.h \
     UIProcess/API/qt/qquickurlschemedelegate_p.h \
-    UIProcess/API/qt/qwebviewportinfo_p.h \
+    UIProcess/API/qt/qwebkittest_p.h \
     UIProcess/Authentication/AuthenticationChallengeProxy.h \
     UIProcess/Authentication/AuthenticationDecisionListener.h \
     UIProcess/Authentication/WebCredential.h \
@@ -208,11 +208,6 @@ HEADERS += \
     UIProcess/GenericCallback.h \
     UIProcess/GeolocationPermissionRequestManagerProxy.h \
     UIProcess/GeolocationPermissionRequestProxy.h \
-    UIProcess/InspectorServer/WebInspectorServer.h \
-    UIProcess/InspectorServer/WebSocketServer.h \
-    UIProcess/InspectorServer/WebSocketServerClient.h \
-    UIProcess/InspectorServer/WebSocketServerConnection.h \
-    UIProcess/InspectorServer/qt/WebSocketServerQt.h \
     UIProcess/Launcher/ProcessLauncher.h \
     UIProcess/Launcher/ThreadLauncher.h \
     UIProcess/LayerTreeHostProxy.h \
@@ -540,7 +535,7 @@ SOURCES += \
     UIProcess/API/qt/qquicknetworkrequest.cpp \
     UIProcess/API/qt/qquickurlschemedelegate.cpp \
     UIProcess/API/qt/qwebpreferences.cpp \
-    UIProcess/API/qt/qwebviewportinfo.cpp \
+    UIProcess/API/qt/qwebkittest.cpp \
     UIProcess/Authentication/AuthenticationChallengeProxy.cpp \
     UIProcess/Authentication/AuthenticationDecisionListener.cpp \
     UIProcess/Authentication/WebCredential.cpp \
@@ -554,11 +549,6 @@ SOURCES += \
     UIProcess/FindIndicator.cpp \
     UIProcess/GeolocationPermissionRequestManagerProxy.cpp \
     UIProcess/GeolocationPermissionRequestProxy.cpp \
-    UIProcess/InspectorServer/WebInspectorServer.cpp \
-    UIProcess/InspectorServer/WebSocketServer.cpp \
-    UIProcess/InspectorServer/WebSocketServerConnection.cpp \
-    UIProcess/InspectorServer/qt/WebInspectorServerQt.cpp \
-    UIProcess/InspectorServer/qt/WebSocketServerQt.cpp \
     UIProcess/Launcher/ProcessLauncher.cpp \
     UIProcess/Launcher/ThreadLauncher.cpp \
     UIProcess/Launcher/qt/ProcessLauncherQt.cpp \
@@ -780,6 +770,22 @@ mac: {
         Platform/CoreIPC/unix/ConnectionUnix.cpp \
         Platform/qt/WorkQueueQt.cpp \
         Platform/unix/SharedMemoryUnix.cpp
+}
+
+contains(DEFINES, ENABLE_INSPECTOR_SERVER=1) {
+    HEADERS += \
+        UIProcess/InspectorServer/WebInspectorServer.h \
+        UIProcess/InspectorServer/WebSocketServer.h \
+        UIProcess/InspectorServer/WebSocketServerClient.h \
+        UIProcess/InspectorServer/WebSocketServerConnection.h \
+        UIProcess/InspectorServer/qt/WebSocketServerQt.h
+
+    SOURCES += \
+        UIProcess/InspectorServer/WebInspectorServer.cpp \
+        UIProcess/InspectorServer/WebSocketServer.cpp \
+        UIProcess/InspectorServer/WebSocketServerConnection.cpp \
+        UIProcess/InspectorServer/qt/WebInspectorServerQt.cpp \
+        UIProcess/InspectorServer/qt/WebSocketServerQt.cpp
 }
 
 contains(DEFINES, ENABLE_TOUCH_EVENTS=1) {

@@ -31,7 +31,7 @@
 #ifndef InsertionPoint_h
 #define InsertionPoint_h
 
-#include "HTMLContentSelector.h"
+#include "ContentDistributor.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
 #include <wtf/Forward.h>
@@ -42,8 +42,7 @@ class InsertionPoint : public HTMLElement {
 public:
     virtual ~InsertionPoint();
 
-    const HTMLContentSelectionList* selections() const { return &m_selections; }
-    bool hasSelection() const { return m_selections.first(); }
+    bool hasDistribution() const { return !m_distribution.isEmpty(); }
     bool isShadowBoundary() const;
     bool isActive() const;
 
@@ -57,6 +56,14 @@ public:
     virtual bool isInsertionPoint() const OVERRIDE { return true; }
     ShadowRoot* assignedFrom() const;
 
+    size_t indexOf(Node* node) const { return m_distribution.find(node); }
+    size_t size() const { return m_distribution.size(); }
+    Node* at(size_t index)  const { return m_distribution.at(index).get(); }
+    Node* first() const { return m_distribution.isEmpty() ? 0 : m_distribution.first().get(); }
+    Node* last() const { return m_distribution.isEmpty() ? 0 : m_distribution.last().get(); }
+    Node* nextTo(const Node*) const;
+    Node* previousTo(const Node*) const;
+
 protected:
     InsertionPoint(const QualifiedName&, Document*);
     virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
@@ -69,7 +76,7 @@ private:
     void assignShadowRoot(ShadowRoot*);
     void clearAssignment(ShadowRoot*);
 
-    HTMLContentSelectionList m_selections;
+    ContentDistribution m_distribution;
 };
 
 inline bool isInsertionPoint(const Node* node)

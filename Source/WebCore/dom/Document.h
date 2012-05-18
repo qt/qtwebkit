@@ -167,6 +167,10 @@ class ScriptedAnimationController;
 class MicroDataItemList;
 #endif
 
+#if ENABLE(LINK_PRERENDER)
+class Prerenderer;
+#endif
+
 typedef int ExceptionCode;
 
 class FormElementKey {
@@ -969,9 +973,6 @@ public:
     void updateFocusAppearanceSoon(bool restorePreviousSelection);
     void cancelFocusAppearanceUpdate();
         
-    // FF method for accessing the selection added for compatibility.
-    DOMSelection* getSelection() const;
-    
     // Extension for manipulating canvas drawing contexts for use in CSS
     CanvasRenderingContext* getCSSCanvasContext(const String& type, const String& name, int width, int height);
     HTMLCanvasElement* getCSSCanvasElement(const String& name);
@@ -1049,7 +1050,7 @@ public:
     void setSecurityOrigin(PassRefPtr<SecurityOrigin>);
 
     void updateURLForPushOrReplaceState(const KURL&);
-    void statePopped(SerializedScriptValue*);
+    void statePopped(PassRefPtr<SerializedScriptValue>);
 
     bool processingLoadEvent() const { return m_processingLoadEvent; }
     bool loadEventFinished() const { return m_loadEventFinished; }
@@ -1155,6 +1156,10 @@ public:
     void resumeScheduledTasks();
 
     IntSize viewportSize() const;
+
+#if ENABLE(LINK_PRERENDER)
+    Prerenderer* prerenderer() { return m_prerenderer.get(); }
+#endif
 
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
@@ -1500,6 +1505,11 @@ private:
 
     Timer<Document> m_pendingTasksTimer;
     Vector<OwnPtr<Task> > m_pendingTasks;
+
+#if ENABLE(LINK_PRERENDER)
+    OwnPtr<Prerenderer> m_prerenderer;
+#endif
+
     bool m_scheduledTasksAreSuspended;
     
     bool m_visualUpdatesAllowed;

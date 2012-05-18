@@ -51,6 +51,7 @@ my (
     $cssFiltersSupport,
     $cssGridLayoutSupport,
     $cssShadersSupport,
+    $cssVariablesSupport,
     $dataTransferItemsSupport,
     $datalistSupport,
     $detailsSupport,
@@ -150,6 +151,9 @@ my @features = (
     { option => "css-shaders", desc => "Toggle CSS Shaders support",
       define => "ENABLE_CSS_SHADERS", default => 0, value => \$cssShadersSupport },
 
+    { option => "css-variables", desc => "Toggle CSS Variable support",
+      define => "ENABLE_CSS_VARIABLES", default => 0, value => \$cssVariablesSupport },
+
     { option => "datalist", desc => "Toggle Datalist support",
       define => "ENABLE_DATALIST", default => 0, value => \$datalistSupport },
 
@@ -178,7 +182,7 @@ my @features = (
       define => "ENABLE_FTPDIR", default => !isWinCE(), value => \$ftpDirSupport },
 
     { option => "fullscreen-api", desc => "Toggle Fullscreen API support",
-      define => "ENABLE_FULLSCREEN_API", default => (isAppleMacWebKit() || isGtk() || isBlackBerry() || isQt()), value => \$fullscreenAPISupport },
+      define => "ENABLE_FULLSCREEN_API", default => (isAppleMacWebKit() || isEfl() || isGtk() || isBlackBerry() || isQt()), value => \$fullscreenAPISupport },
 
     { option => "gamepad", desc => "Toggle Gamepad support",
       define => "ENABLE_GAMEPAD", default => 0, value => \$gamepadSupport },

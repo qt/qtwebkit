@@ -30,8 +30,7 @@
 #include "Settings.h"
 #include "StorageTracker.h"
 #include "StorageTrackerClientEfl.h"
-#include "ewk_auth_soup.h"
-#include "ewk_logging.h"
+#include "ewk_auth_soup_private.h"
 #include "ewk_network.h"
 #include "ewk_private.h"
 #include "ewk_settings.h"
@@ -166,10 +165,8 @@ Eina_Bool _ewk_init_body(void)
     }
 
     WTF::String webkitDirectory = home + "/.webkit";
-    if (WebCore::makeAllDirectories(webkitDirectory)) {
+    if (WebCore::makeAllDirectories(webkitDirectory))
         ewk_settings_web_database_path_set(webkitDirectory.utf8().data());
-        ewk_settings_application_cache_path_set(webkitDirectory.utf8().data());
-    }
 
     ewk_network_tls_certificate_check_set(false);
 

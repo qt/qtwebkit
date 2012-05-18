@@ -73,7 +73,7 @@ v8::Handle<v8::Value> V8Clipboard::clearDataCallback(const v8::Arguments& args)
     }
 
     if (args.Length() != 1)
-        return throwError("clearData: Invalid number of arguments", V8Proxy::SyntaxError);
+        return V8Proxy::throwError(V8Proxy::SyntaxError, "clearData: Invalid number of arguments");
 
     String type = toWebCoreString(args[0]);
     clipboard->clearData(type);
@@ -89,7 +89,7 @@ v8::Handle<v8::Value> V8Clipboard::setDragImageCallback(const v8::Arguments& arg
         return v8::Undefined();
 
     if (args.Length() != 3)
-        return throwError("setDragImage: Invalid number of arguments", V8Proxy::SyntaxError);
+        return V8Proxy::throwError(V8Proxy::SyntaxError, "setDragImage: Invalid number of arguments");
 
     int x = toInt32(args[1]);
     int y = toInt32(args[2]);
@@ -99,7 +99,7 @@ v8::Handle<v8::Value> V8Clipboard::setDragImageCallback(const v8::Arguments& arg
         node = V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0]));
 
     if (!node || !node->isElementNode())
-        return throwError("setDragImageFromElement: Invalid first argument");
+        return V8Proxy::throwTypeError("setDragImageFromElement: Invalid first argument");
 
     if (static_cast<Element*>(node)->hasLocalName(HTMLNames::imgTag) && !node->inDocument())
         clipboard->setDragImage(static_cast<HTMLImageElement*>(node)->cachedImage(), IntPoint(x, y));

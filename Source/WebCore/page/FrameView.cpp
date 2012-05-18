@@ -395,16 +395,6 @@ void FrameView::setFrameRect(const IntRect& newRect)
     if (newRect == oldRect)
         return;
 
-#if ENABLE(VIEWPORT)
-    if (useFixedLayout()) {
-        Document* document = m_frame->document();
-        ViewportArguments viewport = document->viewportArguments();
-        Page* page = frame() ? frame()->page() : 0;
-        if (page)
-            page->chrome()->client()->dispatchViewportPropertiesDidChange(viewport);
-    }
-#endif
-
     ScrollView::setFrameRect(newRect);
 
     updateScrollableAreaSet();
@@ -1464,8 +1454,6 @@ IntPoint FrameView::currentMousePosition() const
 
 bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect)
 {
-    const size_t fixedObjectThreshold = 5;
-
     RenderBlock::PositionedObjectsListHashSet* positionedObjects = 0;
     if (RenderView* root = rootRenderer(this))
         positionedObjects = root->positionedObjects();
@@ -1478,8 +1466,7 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
     const bool isCompositedContentLayer = contentsInCompositedLayer();
 
     // Get the rects of the fixed objects visible in the rectToScroll
-    Vector<IntRect, fixedObjectThreshold> subRectToUpdate;
-    bool updateInvalidatedSubRect = true;
+    Region regionToUpdate;
     RenderBlock::PositionedObjectsListHashSet::const_iterator end = positionedObjects->end();
     for (RenderBlock::PositionedObjectsListHashSet::const_iterator it = positionedObjects->begin(); it != end; ++it) {
         RenderBox* renderBox = *it;
@@ -1489,49 +1476,44 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
         if (renderBox->isComposited())
             continue;
 #endif
-        IntRect updateRect = pixelSnappedIntRect(renderBox->layer()->repaintRectIncludingDescendants());
+        IntRect updateRect = pixelSnappedIntRect(renderBox->layer()->repaintRectIncludingNonCompositingDescendants());
         updateRect = contentsToRootView(updateRect);
         if (!isCompositedContentLayer && clipsRepaints())
             updateRect.intersect(rectToScroll);
-        if (!updateRect.isEmpty()) {
-            if (subRectToUpdate.size() >= fixedObjectThreshold) {
-                updateInvalidatedSubRect = false;
-                break;
-            }
-            subRectToUpdate.append(updateRect);
-        }
+        if (!updateRect.isEmpty())
+            regionToUpdate.unite(updateRect);
     }
 
-    // Scroll the view
-    if (updateInvalidatedSubRect) {
-        // 1) scroll
-        hostWindow()->scroll(scrollDelta, rectToScroll, clipRect);
+    // The area to be painted by fixed objects exceeds 50% of the area of the view, we cannot use the fast path.
+    if (regionToUpdate.totalArea() > (clipRect.width() * clipRect.height() * 0.5))
+        return false;
 
-        // 2) update the area of fixed objects that has been invalidated
-        size_t fixObjectsCount = subRectToUpdate.size();
-        for (size_t i = 0; i < fixObjectsCount; ++i) {
-            IntRect updateRect = subRectToUpdate[i];
-            IntRect scrolledRect = updateRect;
-            scrolledRect.move(scrollDelta);
-            updateRect.unite(scrolledRect);
+    // 1) scroll
+    hostWindow()->scroll(scrollDelta, rectToScroll, clipRect);
+
+    // 2) update the area of fixed objects that has been invalidated
+    Vector<IntRect> subRectsToUpdate = regionToUpdate.rects();
+    size_t fixObjectsCount = subRectsToUpdate.size();
+    for (size_t i = 0; i < fixObjectsCount; ++i) {
+        IntRect updateRect = subRectsToUpdate[i];
+        IntRect scrolledRect = updateRect;
+        scrolledRect.move(scrollDelta);
+        updateRect.unite(scrolledRect);
 #if USE(ACCELERATED_COMPOSITING)
-            if (isCompositedContentLayer) {
-                updateRect = rootViewToContents(updateRect);
-                RenderView* root = rootRenderer(this);
-                ASSERT(root);
-                root->layer()->setBackingNeedsRepaintInRect(updateRect);
-                continue;
-            }
-#endif
-            if (clipsRepaints())
-                updateRect.intersect(rectToScroll);
-            hostWindow()->invalidateContentsAndRootView(updateRect, false);
+        if (isCompositedContentLayer) {
+            updateRect = rootViewToContents(updateRect);
+            RenderView* root = rootRenderer(this);
+            ASSERT(root);
+            root->layer()->setBackingNeedsRepaintInRect(updateRect);
+            continue;
         }
-        return true;
+#endif
+        if (clipsRepaints())
+            updateRect.intersect(rectToScroll);
+        hostWindow()->invalidateContentsAndRootView(updateRect, false);
     }
 
-    // the number of fixed objects exceed the threshold, we cannot use the fast path
-    return false;
+    return true;
 }
 
 void FrameView::scrollContentsSlowPath(const IntRect& updateRect)
@@ -1704,6 +1686,10 @@ void FrameView::setScrollPosition(const IntPoint& scrollPoint)
 {
     TemporaryChange<bool> changeInProgrammaticScroll(m_inProgrammaticScroll, true);
     m_maintainScrollPositionAnchor = 0;
+
+    if (requestScrollPositionUpdate(scrollPoint))
+        return;
+
     ScrollView::setScrollPosition(scrollPoint);
 }
 
@@ -1718,11 +1704,13 @@ void FrameView::delegatesScrollingDidChange()
 
 void FrameView::setFixedVisibleContentRect(const IntRect& visibleContentRect)
 {
+    bool visibleContentSizeDidChange = false;
     if (visibleContentRect.size() != this->fixedVisibleContentRect().size()) {
         // When the viewport size changes or the content is scaled, we need to
         // reposition the fixed positioned elements.
         if (RenderView* root = rootRenderer(this))
             root->setFixedPositionedObjectsNeedLayout();
+        visibleContentSizeDidChange = true;
     }
 
     IntSize offset = scrollOffset();
@@ -1730,7 +1718,12 @@ void FrameView::setFixedVisibleContentRect(const IntRect& visibleContentRect)
     if (offset != scrollOffset()) {
         if (m_frame->page()->settings()->acceleratedCompositingForFixedPositionEnabled())
             updateFixedElementsAfterScrolling();
+        scrollAnimator()->setCurrentPosition(scrollPosition());
         scrollPositionChanged();
+    }
+    if (visibleContentSizeDidChange) {
+        // Update the scroll-bars to calculate new page-step size.
+        updateScrollbars(scrollOffset());
     }
     frame()->loader()->client()->didChangeScrollOffset();
 }
@@ -2561,7 +2554,8 @@ IntRect FrameView::windowClipRect(bool clipToContents) const
     // Take our owner element and get its clip rect.
     HTMLFrameOwnerElement* ownerElement = m_frame->ownerElement();
     FrameView* parentView = ownerElement->document()->view();
-    clipRect.intersect(parentView->windowClipRectForFrameOwner(ownerElement, true));
+    if (parentView)
+        clipRect.intersect(parentView->windowClipRectForFrameOwner(ownerElement, true));
     return clipRect;
 }
 

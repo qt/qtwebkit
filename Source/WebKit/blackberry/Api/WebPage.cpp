@@ -123,7 +123,6 @@
 #include "runtime_root.h"
 
 #if ENABLE(VIDEO)
-#include "HTMLMediaElement.h"
 #include "MediaPlayer.h"
 #include "MediaPlayerPrivateBlackBerry.h"
 #endif
@@ -892,8 +891,12 @@ void WebPagePrivate::setLoadState(LoadState state)
                 m_virtualViewportWidth = m_webSettings->viewportWidth();
                 m_virtualViewportHeight = m_defaultLayoutSize.height();
             }
-            // Check if we have already process the meta viewport tag, this only happens on history navigation
-            if (!m_didRestoreFromPageCache) {
+            // Check if we have already process the meta viewport tag, this only happens on history navigation.
+            // Refreshing should keep these previous values as well.
+            FrameLoadType frameLoadType = FrameLoadTypeStandard;
+            if (m_mainFrame && m_mainFrame->loader())
+                frameLoadType = m_mainFrame->loader()->loadType();
+            if (!m_didRestoreFromPageCache && !(frameLoadType == FrameLoadTypeReload || frameLoadType == FrameLoadTypeReloadFromOrigin)) {
                 m_viewportArguments = ViewportArguments();
 
                 // At the moment we commit a new load, set the viewport arguments
@@ -5490,6 +5493,12 @@ void WebPage::dispatchInspectorMessage(const std::string& message)
     d->m_page->inspectorController()->dispatchMessageFromFrontend(stringMessage);
 }
 
+void WebPage::inspectCurrentContextElement()
+{
+    if (isWebInspectorEnabled() && d->m_currentContextNode.get())
+        d->m_page->inspectorController()->inspect(d->m_currentContextNode.get());
+}
+
 bool WebPagePrivate::compositorDrawsRootLayer() const
 {
 #if USE(ACCELERATED_COMPOSITING)
@@ -6011,6 +6020,11 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
 
 #if ENABLE(WEB_SOCKETS)
     WebSocket::setIsAvailable(webSettings->areWebSocketsEnabled());
+#endif
+
+#if ENABLE(FULLSCREEN_API)
+    // This allows Javascript to call webkitRequestFullScreen() on an element.
+    coreSettings->setFullScreenEnabled(true);
 #endif
 
 #if ENABLE(VIEWPORT_REFLOW)

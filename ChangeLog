@@ -1,3 +1,183 @@
+2012-05-18  Zalan Bujtas  <zbujtas@gmail.com>
+
+        [Qt] Gesture tap highlighter needs to take overflow clip into account.
+        https://bugs.webkit.org/show_bug.cgi?id=84989
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * ManualTests/qt/tap-highlighting-overflow-hidden.html: Added.
+
+2012-05-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Add simple implementation of Web Intents
+        https://bugs.webkit.org/show_bug.cgi?id=86354
+
+        Reviewed by Eric Seidel.
+
+        Enable WEB_INTENTS flag by default on EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2012-05-17  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r117428): WebKit API/SPI was removed
+        https://bugs.webkit.org/show_bug.cgi?id=86748
+
+        Reverted r117428.
+
+        * Source/autotools/symbols.filter:
+
+2012-05-17  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Fix link error caused by not directly linking with edbus
+        https://bugs.webkit.org/show_bug.cgi?id=86747
+
+        Unreviewed build fix.
+
+        * Source/cmake/FindEFL.cmake:
+
+2012-05-17  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Convert setDomainRelaxationForbiddenForURLScheme to use InternalSettings interface
+        https://bugs.webkit.org/show_bug.cgi?id=86704
+
+        Reviewed by Eric Seidel.
+
+        * Source/autotools/symbols.filter: Add setDomainRelaxationForbiddenForURLScheme symbol filter.
+
+2012-05-16  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Support for Battery Status API on the WebKit-Efl
+        https://bugs.webkit.org/show_bug.cgi?id=83254
+
+        Reviewed by Chang Shu.
+
+        Add dependency check for e_ukit package which is in the e_dbus library.
+
+        * Source/cmake/FindEFL.cmake:
+
+2012-05-16  Varun Jain  <varunjain@google.com>
+
+        [chromium] No modifier flags (shift/ctrl/alt) in drag&drop events on chromium linux
+        https://bugs.webkit.org/show_bug.cgi?id=86236
+
+        Reviewed by Tony Chang.
+
+        * ManualTests/chromium/modifiers-during-drag-and-drop.html: Added.
+
+2012-05-16  Keishi Hattori  <keishi@webkit.org>
+
+        [chromium] Add WebKit API to access inner text value of input element
+        https://bugs.webkit.org/show_bug.cgi?id=85353
+
+        Reviewed by Kent Tamura.
+
+        * Source/autotools/symbols.filter: Added HTMLInputElement::setEditingValue
+
+2012-05-15  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Enable Fullscreen API
+        https://bugs.webkit.org/show_bug.cgi?id=85870
+
+        Reviewed by Antonio Gomes.
+
+        Enable FULLSCREEN_API on the Efl port.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2012-05-14  Shinya Kawanaka  <shinyak@chromium.org>
+
+        document.execCommand('Indent') in the direct child of ShadowRoot causes a crash.
+        https://bugs.webkit.org/show_bug.cgi?id=86341
+
+        Reviewed by Ryosuke Niwa.
+
+        Exports necessary symbols.
+
+        * Source/autotools/symbols.filter:
+
+2012-05-14  Luke Macpherson  <macpherson@chromium.org>
+
+        Introduce ENABLE_CSS_VARIABLES compile flag.
+        https://bugs.webkit.org/show_bug.cgi?id=86338
+
+        Reviewed by Dimitri Glazkov.
+
+        Add a configuration option for CSS Variables support, disabling it by default.
+
+        * Source/cmake/WebKitFeatures.cmake:
+
+2012-05-14  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed build fix. Fix wxMSW build, and make sure we properly
+        define WebKitVersion.h as a build target for all platforms to avoid
+        unnecessary rebuilds.
+        
+        * wscript:
+
+2012-05-11  Jeffrey Pfau  <jpfau@apple.com>
+
+        REGRESSION (r114170): Scroll areas in nested frames improperly placed when tiled drawing is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=86239
+
+        Reviewed by Anders Carlsson.
+
+        * ManualTests/resources/frame-textarea.html: Added.
+        * ManualTests/scrollable-positioned-frame.html: Added.
+        * ManualTests/scrollable-positioned-nested-frame.html: Added.
+
+2012-05-11  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed build fix, exclude some files we don't use from the build.
+
+        * wscript:
+
+2012-05-11  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Fix a reference counting issue in UserMediaRequest
+        https://bugs.webkit.org/show_bug.cgi?id=86210
+
+        Reviewed by Abhishek Arya.
+
+        * ManualTests/user-media-request-crash.html: Added.
+
+2012-05-11  Christophe Dumez  <christophe.dumez@intel.com>
+
+        Web Intents code only supports V8
+        https://bugs.webkit.org/show_bug.cgi?id=85954
+
+        Reviewed by Adam Barth.
+
+        Add ENABLE_WEB_INTENTS flag to CMake.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-05-11  Xiaobo Wang  <xbwang@torchmobile.com.cn>
+
+        [BlackBerry] Update DumpRenderTree.cpp to also run ref-tests if there're any
+        https://bugs.webkit.org/show_bug.cgi?id=86055
+
+        Reviewed by Rob Buis.
+
+        Ref-tests are tests with suffix "-expected", "-expected-mismatch" and a valid
+        extension(".html", ".htm", etc.).
+        Currently torch-launcher only run tests parsed by NRWT, with ref-tests
+        excluded. As a result, if a test have ref-tests (which were not run), our
+        DumpRenderTree Perl script will think there's a crash and exit with code 1.
+        So NRWT will report the result as CRASH.
+        We need to update DumpRenderTree.cpp to try to find ref-tests and run them.
+
+        * DumpRenderTree/blackberry/DumpRenderTree.cpp:
+        (BlackBerry::WebKit::DumpRenderTree::DumpRenderTree):
+        (BlackBerry::WebKit::DumpRenderTree::getRefTests):
+        (WebKit):
+        (BlackBerry::WebKit::DumpRenderTree::runCurrentTest):
+        (BlackBerry::WebKit::DumpRenderTree::runRemainingTests):
+        (BlackBerry::WebKit::DumpRenderTree::runTests):
+        * DumpRenderTree/blackberry/DumpRenderTreeBlackBerry.h:
+        (DumpRenderTree):
+
 2012-05-10  MORITA Hajime  <morrita@google.com>
 
         ElementShadow should minimize the usage of "ShadowRoot" name

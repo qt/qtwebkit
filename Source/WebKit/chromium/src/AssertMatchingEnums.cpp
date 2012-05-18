@@ -62,7 +62,9 @@
 #include "PeerConnection00.h"
 #include "PlatformCursor.h"
 #include "ReferrerPolicy.h"
+#include "ResourceResponse.h"
 #include "Settings.h"
+#include "SpeechRecognitionError.h"
 #include "StorageInfo.h"
 #include "TextAffinity.h"
 #include "TextChecking.h"
@@ -92,6 +94,7 @@
 #include "WebPageVisibilityState.h"
 #include "WebScrollbar.h"
 #include "WebSettings.h"
+#include "WebSpeechRecognizerClient.h"
 #include "WebStorageQuotaError.h"
 #include "WebStorageQuotaType.h"
 #include "WebTextAffinity.h"
@@ -107,6 +110,7 @@
 #include <public/WebFileSystem.h>
 #include <public/WebFilterOperation.h>
 #include <public/WebReferrerPolicy.h>
+#include <public/WebURLResponse.h>
 #include <wtf/Assertions.h>
 #include <wtf/text/StringImpl.h>
 
@@ -563,6 +567,18 @@ COMPILE_ASSERT_MATCHING_ENUM(WebPeerConnection00HandlerClient::ICEStateFailed, P
 COMPILE_ASSERT_MATCHING_ENUM(WebPeerConnection00HandlerClient::ICEStateClosed, PeerConnection00::ICE_CLOSED);
 #endif
 
+#if ENABLE(SCRIPTED_SPEECH)
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::OtherError, SpeechRecognitionError::OTHER);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::NoSpeechError, SpeechRecognitionError::NO_SPEECH);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::AbortedError, SpeechRecognitionError::ABORTED);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::AudioCaptureError, SpeechRecognitionError::AUDIO_CAPTURE);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::NetworkError, SpeechRecognitionError::NETWORK);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::NotAllowedError, SpeechRecognitionError::NOT_ALLOWED);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::ServiceNotAllowedError, SpeechRecognitionError::SERVICE_NOT_ALLOWED);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::BadGrammarError, SpeechRecognitionError::BAD_GRAMMAR);
+COMPILE_ASSERT_MATCHING_ENUM(WebSpeechRecognizerClient::LanguageNotSupportedError, SpeechRecognitionError::LANGUAGE_NOT_SUPPORTED);
+#endif
+
 COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyAlways, ReferrerPolicyAlways);
 COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyDefault, ReferrerPolicyDefault);
 COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyNever, ReferrerPolicyNever);
@@ -570,3 +586,8 @@ COMPILE_ASSERT_MATCHING_ENUM(WebReferrerPolicyOrigin, ReferrerPolicyOrigin);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypeReportOnly, ContentSecurityPolicy::ReportOnly);
 COMPILE_ASSERT_MATCHING_ENUM(WebContentSecurityPolicyTypeEnforcePolicy, ContentSecurityPolicy::EnforcePolicy);
+
+COMPILE_ASSERT_MATCHING_ENUM(WebURLResponse::Unknown, ResourceResponse::Unknown);
+COMPILE_ASSERT_MATCHING_ENUM(WebURLResponse::HTTP_0_9, ResourceResponse::HTTP_0_9);
+COMPILE_ASSERT_MATCHING_ENUM(WebURLResponse::HTTP_1_0, ResourceResponse::HTTP_1_0);
+COMPILE_ASSERT_MATCHING_ENUM(WebURLResponse::HTTP_1_1, ResourceResponse::HTTP_1_1);

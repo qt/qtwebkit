@@ -95,13 +95,12 @@ public:
     virtual void setActivatedSubmit(bool) { }
 
     virtual bool willValidate() const;
-    String validationMessage();
     void updateVisibleValidationMessage();
     void hideVisibleValidationMessage();
     bool checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls = 0);
     // This must be called when a validation constraint or control value is changed.
     void setNeedsValidityCheck();
-    void setCustomValidity(const String&);
+    virtual void setCustomValidity(const String&) OVERRIDE;
 
     bool readOnly() const { return m_readOnly; }
 
@@ -116,7 +115,7 @@ public:
 protected:
     HTMLFormControlElement(const QualifiedName& tagName, Document*, HTMLFormElement*);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual void requiredAttributeChanged();
     virtual void disabledAttributeChanged();
     virtual void attach();
@@ -128,7 +127,7 @@ protected:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
 
-    virtual void didRecalcStyle(StyleChange);
+    virtual void didRecalcStyle(StyleChange) OVERRIDE;
 
     virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);
     virtual void detach();

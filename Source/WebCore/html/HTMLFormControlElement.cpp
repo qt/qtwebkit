@@ -63,7 +63,7 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
     , m_hasAutofocused(false)
 {
     setForm(form ? form : findFormAncestor());
-    setHasCustomWillOrDidRecalcStyle();
+    setHasCustomCallbacks();
 }
 
 HTMLFormControlElement::~HTMLFormControlElement()
@@ -116,30 +116,30 @@ void HTMLFormControlElement::updateFieldSetAndLegendAncestor() const
     m_fieldSetAncestorValid = true;
 }
 
-void HTMLFormControlElement::parseAttribute(Attribute* attr)
+void HTMLFormControlElement::parseAttribute(const Attribute& attribute)
 {
-    if (attr->name() == formAttr)
+    if (attribute.name() == formAttr)
         formAttributeChanged();
-    else if (attr->name() == disabledAttr) {
+    else if (attribute.name() == disabledAttr) {
         bool oldDisabled = m_disabled;
-        m_disabled = !attr->isNull();
+        m_disabled = !attribute.isNull();
         if (oldDisabled != m_disabled)
             disabledAttributeChanged();
-    } else if (attr->name() == readonlyAttr) {
+    } else if (attribute.name() == readonlyAttr) {
         bool oldReadOnly = m_readOnly;
-        m_readOnly = !attr->isNull();
+        m_readOnly = !attribute.isNull();
         if (oldReadOnly != m_readOnly) {
             setNeedsStyleRecalc();
             if (renderer() && renderer()->style()->hasAppearance())
                 renderer()->theme()->stateChanged(renderer(), ReadOnlyState);
         }
-    } else if (attr->name() == requiredAttr) {
+    } else if (attribute.name() == requiredAttr) {
         bool oldRequired = m_required;
-        m_required = !attr->isNull();
+        m_required = !attribute.isNull();
         if (oldRequired != m_required)
             requiredAttributeChanged();
     } else
-        HTMLElement::parseAttribute(attr);
+        HTMLElement::parseAttribute(attribute);
     setNeedsWillValidateCheck();
 }
 
@@ -397,11 +397,6 @@ void HTMLFormControlElement::setNeedsWillValidateCheck()
         hideVisibleValidationMessage();
 }
 
-String HTMLFormControlElement::validationMessage()
-{
-    return validity()->validationMessage();
-}
-
 void HTMLFormControlElement::updateVisibleValidationMessage()
 {
     Page* page = document()->page();
@@ -484,7 +479,8 @@ void HTMLFormControlElement::setNeedsValidityCheck()
 
 void HTMLFormControlElement::setCustomValidity(const String& error)
 {
-    validity()->setCustomErrorMessage(error);
+    FormAssociatedElement::setCustomValidity(error);
+    setNeedsValidityCheck();
 }
 
 void HTMLFormControlElement::dispatchBlurEvent(PassRefPtr<Node> newFocusedNode)

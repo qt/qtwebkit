@@ -74,7 +74,7 @@ class PerfTest(object):
         re.compile(r'^Running \d+ times$'),
         re.compile(r'^Ignoring warm-up '),
         re.compile(r'^Info:'),
-        re.compile(r'^\d+(.\d+)?$'),
+        re.compile(r'^\d+(.\d+)?(\s*(runs\/s|ms))?$'),
         # Following are for handle existing test like Dromaeo
         re.compile(re.escape("""main frame - has 1 onunload handler(s)""")),
         re.compile(re.escape("""frame "<!--framePath //<!--frame0-->-->" - has 1 onunload handler(s)""")),
@@ -95,9 +95,16 @@ class PerfTest(object):
         test_failed = False
         results = {}
         score_regex = re.compile(r'^(?P<key>' + r'|'.join(self._statistics_keys) + r')\s+(?P<value>[0-9\.]+)\s*(?P<unit>.*)')
+        description_regex = re.compile(r'^Description: (?P<description>.*)$', re.IGNORECASE)
+        description_string = ""
         unit = "ms"
 
         for line in re.split('\n', output.text):
+            description = description_regex.match(line)
+            if description:
+                description_string = description.group('description')
+                continue
+
             score = score_regex.match(line)
             if score:
                 results[score.group('key')] = float(score.group('value'))
@@ -115,12 +122,14 @@ class PerfTest(object):
         results['unit'] = unit
 
         test_name = re.sub(r'\.\w+$', '', self._test_name)
-        self.output_statistics(test_name, results)
+        self.output_statistics(test_name, results, description_string)
 
         return {test_name: results}
 
-    def output_statistics(self, test_name, results):
+    def output_statistics(self, test_name, results, description_string):
         unit = results['unit']
+        if description_string:
+            _log.info('DESCRIPTION: %s' % description_string)
         _log.info('RESULT %s= %s %s' % (test_name.replace('/', ': '), results['avg'], unit))
         _log.info(', '.join(['%s= %s %s' % (key, results[key], unit) for key in self._statistics_keys[1:]]))
 
@@ -181,7 +190,7 @@ class PageLoadingPerfTest(PerfTest):
             'median': test_times[middle] if len(test_times) % 2 else (test_times[middle - 1] + test_times[middle]) / 2,
             'stdev': math.sqrt(squareSum),
             'unit': 'ms'}
-        self.output_statistics(self.test_name(), results)
+        self.output_statistics(self.test_name(), results, '')
         return {self.test_name(): results}
 
 

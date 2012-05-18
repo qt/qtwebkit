@@ -30,6 +30,7 @@
 #include "WebCommon.h"
 #include "WebNonCopyable.h"
 #include "WebPrivateOwnPtr.h"
+#include "WebSize.h"
 
 namespace WebCore {
 class CCLayerTreeHost;
@@ -43,7 +44,6 @@ class WebLayerTreeViewClient;
 class WebLayerTreeViewImpl;
 struct WebPoint;
 struct WebRect;
-struct WebSize;
 
 class WebLayerTreeView : public WebNonCopyable {
 public:
@@ -52,20 +52,28 @@ public:
             : acceleratePainting(false)
             , showFPSCounter(false)
             , showPlatformLayerTree(false)
+            , showPaintRects(false)
             , refreshRate(0)
             , perTilePainting(false)
             , partialSwapEnabled(false)
             , threadedAnimationEnabled(false)
+            , defaultTileSize(WebSize(256, 256))
+            , maxUntiledLayerSize(WebSize(512, 512))
+            , deviceScaleFactor(1)
         {
         }
 
         bool acceleratePainting;
         bool showFPSCounter;
         bool showPlatformLayerTree;
+        bool showPaintRects;
         double refreshRate;
         bool perTilePainting;
         bool partialSwapEnabled;
         bool threadedAnimationEnabled;
+        WebSize defaultTileSize;
+        WebSize maxUntiledLayerSize;
+        float deviceScaleFactor;
 #if WEBKIT_IMPLEMENTATION
         operator WebCore::CCSettings() const;
 #endif

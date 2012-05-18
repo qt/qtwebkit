@@ -35,7 +35,7 @@ class QQuickWebView;
 class QWheelEvent;
 QT_END_NAMESPACE
 
-class QWebViewportInfo;
+class QWebKitTest;
 
 namespace WebKit {
 
@@ -65,7 +65,6 @@ public:
     void setItemRectVisible(const QRectF&);
     bool animateItemRectVisible(const QRectF&);
 
-    void wheelEvent(QWheelEvent*);
     void pagePositionRequest(const QPoint& pos);
     void touchBegin();
     void touchEnd();
@@ -116,7 +115,7 @@ private Q_SLOTS:
 
 private:
     friend class ViewportUpdateDeferrer;
-    friend class ::QWebViewportInfo;
+    friend class ::QWebKitTest;
 
     QQuickWebView* const m_viewport;
     QQuickWebPage* const m_content;

@@ -60,23 +60,23 @@ v8::Handle<v8::Value> constructWebGLArrayWithArrayBufferArgument(const v8::Argum
 {
     ArrayBuffer* buf = V8ArrayBuffer::toNative(args[0]->ToObject());
     if (!buf)
-        return throwError("Could not convert argument 0 to a ArrayBuffer");
+        return V8Proxy::throwTypeError("Could not convert argument 0 to a ArrayBuffer");
     bool ok;
     uint32_t offset = 0;
     int argLen = args.Length();
     if (argLen > 1) {
         offset = toUInt32(args[1], ok);
         if (!ok)
-            return throwError("Could not convert argument 1 to a number");
+            return V8Proxy::throwTypeError("Could not convert argument 1 to a number");
     }
     uint32_t length = 0;
     if (argLen > 2) {
         length = toUInt32(args[2], ok);
         if (!ok)
-            return throwError("Could not convert argument 2 to a number");
+            return V8Proxy::throwTypeError("Could not convert argument 2 to a number");
     } else {
         if ((buf->byteLength() - offset) % sizeof(ElementType))
-            return throwError("ArrayBuffer length minus the byteOffset is not a multiple of the element size.", V8Proxy::RangeError);
+            return V8Proxy::throwError(V8Proxy::RangeError, "ArrayBuffer length minus the byteOffset is not a multiple of the element size.");
         length = (buf->byteLength() - offset) / sizeof(ElementType);
     }
     RefPtr<ArrayClass> array = ArrayClass::create(buf, offset, length);
@@ -99,7 +99,7 @@ template<class ArrayClass, class ElementType>
 v8::Handle<v8::Value> constructWebGLArray(const v8::Arguments& args, WrapperTypeInfo* type, v8::ExternalArrayType arrayType)
 {
     if (!args.IsConstructCall())
-        return throwError("DOM object constructor cannot be called as a function.", V8Proxy::TypeError);
+        return V8Proxy::throwTypeError("DOM object constructor cannot be called as a function.");
 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
         return args.Holder();
@@ -153,7 +153,7 @@ v8::Handle<v8::Value> constructWebGLArray(const v8::Arguments& args, WrapperType
     if (args[0]->IsObject()) {
         srcArray = args[0]->ToObject();
         if (srcArray.IsEmpty())
-            return throwError("Could not convert argument 0 to an array");
+            return V8Proxy::throwTypeError("Could not convert argument 0 to an array");
         len = toUInt32(srcArray->Get(v8::String::New("length")));
         doInstantiation = true;
     } else {
@@ -169,7 +169,7 @@ v8::Handle<v8::Value> constructWebGLArray(const v8::Arguments& args, WrapperType
     if (doInstantiation)
         array = ArrayClass::create(len);
     if (!array.get())
-        return throwError("ArrayBufferView size is not a small enough positive integer.", V8Proxy::RangeError);
+        return V8Proxy::throwError(V8Proxy::RangeError, "ArrayBufferView size is not a small enough positive integer.");
 
 
     // Transform the holder into a wrapper object for the array.

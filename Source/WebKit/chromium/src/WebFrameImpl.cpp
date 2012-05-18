@@ -78,6 +78,9 @@
 #include "Console.h"
 #include "DOMUtilitiesPrivate.h"
 #include "DOMWindow.h"
+#include "DOMWindowIntents.h"
+#include "DeliveredIntent.h"
+#include "DeliveredIntentClientImpl.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "DocumentMarker.h"
@@ -130,6 +133,7 @@
 #include "ScrollbarTheme.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
+#include "ShadowRoot.h"
 #include "SkiaUtils.h"
 #include "SpellChecker.h"
 #include "SubstituteData.h"
@@ -141,6 +145,7 @@
 #include "WebDOMEvent.h"
 #include "WebDOMEventListener.h"
 #include "WebDataSourceImpl.h"
+#include "WebDeliveredIntentClient.h"
 #include "WebDevToolsAgentPrivate.h"
 #include "WebDocument.h"
 #include "WebFindOptions.h"
@@ -149,10 +154,12 @@
 #include "WebHistoryItem.h"
 #include "WebIconURL.h"
 #include "WebInputElement.h"
+#include "WebIntent.h"
 #include "WebNode.h"
 #include "WebPerformance.h"
 #include "WebPlugin.h"
 #include "WebPluginContainerImpl.h"
+#include "WebPrintParams.h"
 #include "WebRange.h"
 #include "WebScriptSource.h"
 #include "WebSecurityOrigin.h"
@@ -162,6 +169,7 @@
 #include "painting/GraphicsContextBuilder.h"
 #include "platform/WebPoint.h"
 #include "platform/WebRect.h"
+#include "platform/WebSerializedScriptValue.h"
 #include "platform/WebSize.h"
 #include "platform/WebURLError.h"
 #include "platform/WebVector.h"
@@ -169,6 +177,7 @@
 #include <algorithm>
 #include <public/Platform.h>
 #include <wtf/CurrentTime.h>
+#include <wtf/HashMap.h>
 
 #if USE(V8)
 #include "AsyncFileSystem.h"
@@ -443,8 +452,8 @@ private:
 // want to delegate all printing related calls to the plugin.
 class ChromePluginPrintContext : public ChromePrintContext {
 public:
-    ChromePluginPrintContext(Frame* frame, WebPluginContainerImpl* plugin, int printerDPI)
-        : ChromePrintContext(frame), m_plugin(plugin), m_pageCount(0), m_printerDPI(printerDPI)
+    ChromePluginPrintContext(Frame* frame, WebPluginContainerImpl* plugin, const WebPrintParams& printParams)
+        : ChromePrintContext(frame), m_plugin(plugin), m_pageCount(0), m_printParams(printParams)
     {
     }
 
@@ -467,7 +476,8 @@ public:
 
     virtual void computePageRects(const FloatRect& printRect, float headerHeight, float footerHeight, float userScaleFactor, float& outPageHeight)
     {
-        m_pageCount = m_plugin->printBegin(IntRect(printRect), m_printerDPI);
+        m_printParams.printContentArea = IntRect(printRect);
+        m_pageCount = m_plugin->printBegin(m_printParams);
     }
 
     virtual int pageCount() const
@@ -493,14 +503,15 @@ private:
     // Set when printing.
     WebPluginContainerImpl* m_plugin;
     int m_pageCount;
-    int m_printerDPI;
+    WebPrintParams m_printParams;
+    WebPrintScalingOption m_printScalingOption;
+
 };
 
 static WebDataSource* DataSourceForDocLoader(DocumentLoader* loader)
 {
     return loader ? WebDataSourceImpl::fromDocumentLoader(loader) : 0;
 }
-
 
 // WebFrame -------------------------------------------------------------------
 
@@ -1438,9 +1449,23 @@ VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& poin
     return node->renderer()->positionForPoint(result.localPoint());
 }
 
-int WebFrameImpl::printBegin(const WebSize& pageSize,
+// TODO(kmadhusu@chromium.org): Remove this function after fixing
+// crbug.com/85132. For more information, please refer to the comments in
+// WebFrame.h
+int WebFrameImpl::printBegin(const WebSize& printContentSize,
                              const WebNode& constrainToNode,
                              int printerDPI,
+                             bool* useBrowserOverlays) {
+    WebRect printableArea(0, 0, printContentSize.width, printContentSize.height);
+    WebSize paperSize(printContentSize);
+    WebRect printContentArea(0, 0, printContentSize.width, printContentSize.height);
+    WebPrintParams printParams(printContentArea, printableArea, paperSize,
+                               printerDPI, WebPrintScalingOptionSourceSize);
+    return printBegin(printParams, constrainToNode, useBrowserOverlays);
+}
+
+int WebFrameImpl::printBegin(const WebPrintParams& printParams,
+                             const WebNode& constrainToNode,
                              bool* useBrowserOverlays)
 {
     ASSERT(!frame()->document()->isFrameSet());
@@ -1455,12 +1480,12 @@ int WebFrameImpl::printBegin(const WebSize& pageSize,
     }
 
     if (pluginContainer && pluginContainer->supportsPaginatedPrint())
-        m_printContext = adoptPtr(new ChromePluginPrintContext(frame(), pluginContainer, printerDPI));
+        m_printContext = adoptPtr(new ChromePluginPrintContext(frame(), pluginContainer, printParams));
     else
         m_printContext = adoptPtr(new ChromePrintContext(frame()));
 
-    FloatRect rect(0, 0, static_cast<float>(pageSize.width),
-                         static_cast<float>(pageSize.height));
+    FloatRect rect(0, 0, static_cast<float>(printParams.printContentArea.width),
+                         static_cast<float>(printParams.printContentArea.height));
     m_printContext->begin(rect.width(), rect.height());
     float pageHeight;
     // We ignore the overlays calculation for now since they are generated in the
@@ -1765,7 +1790,7 @@ void WebFrameImpl::scopeStringMatches(int identifier,
         // text nodes.
         searchRange->setStart(resultRange->endContainer(ec), resultRange->endOffset(ec), ec);
 
-        Node* shadowTreeRoot = searchRange->shadowTreeRootNode();
+        Node* shadowTreeRoot = searchRange->shadowRoot();
         if (searchRange->collapsed(ec) && shadowTreeRoot)
             searchRange->setEnd(shadowTreeRoot, shadowTreeRoot->childNodeCount(), ec);
 
@@ -1851,14 +1876,6 @@ void WebFrameImpl::resetMatchCount()
     m_framesScopingCount = 0;
 }
 
-void WebFrameImpl::handleIntentResult(int intentIdentifier, const WebString& reply)
-{
-}
-
-void WebFrameImpl::handleIntentFailure(int intentIdentifier, const WebString& reply)
-{
-}
-
 void WebFrameImpl::sendOrientationChangeEvent(int orientation)
 {
 #if ENABLE(ORIENTATION_EVENTS)
@@ -1897,6 +1914,20 @@ void WebFrameImpl::dispatchMessageEventWithOriginCheck(const WebSecurityOrigin& 
     ASSERT(!event.isNull());
     // Pass an empty call stack, since we don't have the one from the other process.
     m_frame->domWindow()->dispatchMessageEventWithOriginCheck(intendedTargetOrigin.get(), event, 0);
+}
+
+void WebFrameImpl::deliverIntent(const WebIntent& intent, WebDeliveredIntentClient* intentClient)
+{
+#if ENABLE(WEB_INTENTS)
+    OwnPtr<WebCore::DeliveredIntentClient> client(adoptPtr(new DeliveredIntentClientImpl(intentClient)));
+
+    OwnPtr<MessagePortArray> ports;
+    WebSerializedScriptValue intentData = WebSerializedScriptValue::fromString(intent.data());
+    const WebCore::Intent* webcoreIntent = intent;
+    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_frame, client.release(), intent.action(), intent.type(), intentData, ports.release(), webcoreIntent->extras());
+
+    DOMWindowIntents::from(m_frame->domWindow())->deliver(deliveredIntent.release());
+#endif
 }
 
 WebString WebFrameImpl::contentAsText(size_t maxChars) const

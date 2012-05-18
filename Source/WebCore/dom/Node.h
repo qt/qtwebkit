@@ -82,6 +82,7 @@ class RenderBox;
 class RenderBoxModelObject;
 class RenderObject;
 class RenderStyle;
+class ShadowRoot;
 class TagNodeList;
 class TreeScope;
 
@@ -213,15 +214,15 @@ public:
     bool isStyledElement() const { return getFlag(IsStyledElementFlag); }
     virtual bool isAttributeNode() const { return false; }
     virtual bool isCharacterDataNode() const { return false; }
+    virtual bool isFrameOwnerElement() const { return false; }
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootFlag); }
     bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
     bool hasAttrList() const { return getFlag(HasAttrListFlag); }
-    bool isFrameOwnerElement() const { return getFlag(IsFrameOwnerElementFlag); }
+    bool hasCustomCallbacks() const { return getFlag(HasCustomCallbacksFlag); }
 
     Node* shadowAncestorNode() const;
-    // Returns 0, a ShadowRoot, or a legacy shadow root.
-    Node* shadowTreeRootNode() const;
+    ShadowRoot* shadowRoot() const;
     // Returns 0, a child of ShadowRoot, or a legacy shadow root.
     Node* nonBoundaryShadowTreeRootNode();
     bool isInShadowTree() const;
@@ -271,7 +272,8 @@ public:
 
     // enclosingBlockFlowElement() is deprecated. Use enclosingBlock instead.
     Element* enclosingBlockFlowElement() const;
-    
+
+    bool isRootEditableElement() const;
     Element* rootEditableElement() const;
     Element* rootEditableElement(EditableType) const;
 
@@ -431,10 +433,12 @@ public:
     // This uses the same order that tags appear in the source file. If the stayWithin
     // argument is non-null, the traversal will stop once the specified node is reached.
     // This can be used to restrict traversal to a particular sub-tree.
-    Node* traverseNextNode(const Node* stayWithin = 0) const;
+    Node* traverseNextNode() const;
+    Node* traverseNextNode(const Node* stayWithin) const;
 
     // Like traverseNextNode, but skips children and starts with the next sibling.
-    Node* traverseNextSibling(const Node* stayWithin = 0) const;
+    Node* traverseNextSibling() const;
+    Node* traverseNextSibling(const Node* stayWithin) const;
 
     // Does a reverse pre-order traversal to find the node that comes before the current one in document order
     Node* traversePreviousNode(const Node* stayWithin = 0) const;
@@ -493,6 +497,10 @@ public:
     // the node's rendering object from the rendering tree and delete it.
     virtual void detach();
 
+#ifndef NDEBUG
+    bool inDetach() const;
+#endif
+
     void reattach();
     void reattachIfAttached();
     void createRendererIfNeeded();
@@ -543,13 +551,14 @@ public:
 
     void showNode(const char* prefix = "") const;
     void showTreeForThis() const;
+    void showNodePathForThis() const;
     void showTreeAndMark(const Node* markedNode1, const char* markedLabel1, const Node* markedNode2 = 0, const char* markedLabel2 = 0) const;
     void showTreeForThisAcrossFrame() const;
 #endif
 
     void registerDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
     void unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
-    void invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName&);
+    void invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName&, Element* attributeOwnerElement);
     void invalidateNodeListsCacheAfterChildrenChanged();
     void removeCachedClassNodeList(ClassNodeList*, const String&);
 
@@ -679,24 +688,22 @@ private:
         StyleChangeMask = 1 << nodeStyleChangeShift | 1 << (nodeStyleChangeShift + 1),
 
         SelfOrAncestorHasDirAutoFlag = 1 << 22,
-        HasCustomWillOrDidRecalcStyleFlag = 1 << 23,
-        HasCustomStyleForRendererFlag = 1 << 24,
 
-        HasNameFlag = 1 << 25,
+        HasNameFlag = 1 << 23,
 
-        AttributeStyleDirtyFlag = 1 << 26,
+        AttributeStyleDirtyFlag = 1 << 24,
 
 #if ENABLE(SVG)
         DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag | AreSVGAttributesValidFlag,
 #else
         DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag,
 #endif
-        InNamedFlowFlag = 1 << 28,
-        HasAttrListFlag = 1 << 29,
-        IsFrameOwnerElementFlag = 1 << 30
+        InNamedFlowFlag = 1 << 26,
+        HasAttrListFlag = 1 << 27,
+        HasCustomCallbacksFlag = 1 << 28
     };
 
-    // 2 bits remaining
+    // 4 bits remaining
 
     bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
     void setFlag(bool f, NodeFlags mask) const { m_nodeFlags = (m_nodeFlags & ~mask) | (-(int32_t)f & mask); } 
@@ -712,7 +719,7 @@ protected:
         CreateShadowRoot = CreateContainer | IsShadowRootFlag,
         CreateStyledElement = CreateElement | IsStyledElementFlag, 
         CreateHTMLElement = CreateStyledElement | IsHTMLFlag, 
-        CreateFrameOwnerElement = CreateHTMLElement | IsFrameOwnerElementFlag,
+        CreateFrameOwnerElement = CreateHTMLElement | HasCustomCallbacksFlag,
         CreateSVGElement = CreateStyledElement | IsSVGFlag,
         CreateDocument = CreateContainer | InDocumentFlag
     };
@@ -730,12 +737,7 @@ protected:
     NodeRareData* ensureRareData();
     void clearRareData();
 
-    bool hasCustomWillOrDidRecalcStyle() const { return getFlag(HasCustomWillOrDidRecalcStyleFlag); }
-    void setHasCustomWillOrDidRecalcStyle() { setFlag(true, HasCustomWillOrDidRecalcStyleFlag); }
-    
-    bool hasCustomStyleForRenderer() const { return getFlag(HasCustomStyleForRendererFlag); }
-    void setHasCustomStyleForRenderer() { setFlag(true, HasCustomStyleForRendererFlag); }
-    void clearHasCustomStyleForRenderer() { clearFlag(HasCustomStyleForRendererFlag); }
+    void setHasCustomCallbacks() { setFlag(true, HasCustomCallbacksFlag); }
 
 private:
     // These API should be only used for a tree scope migration.
@@ -767,6 +769,9 @@ private:
 
     Element* ancestorElement() const;
 
+    Node* traverseNextAncestorSibling() const;
+    Node* traverseNextAncestorSibling(const Node* stayWithin) const;
+
     // Use Node::parentNode as the consistent way of querying a parent node.
     // This method is made private to ensure a compiler error on call sites that
     // don't follow this rule.
@@ -786,14 +791,16 @@ private:
     Node* m_next;
     RenderObject* m_renderer;
 
-protected:
-    bool isParsingChildrenFinished() const { return getFlag(IsParsingChildrenFinishedFlag); }
-    void setIsParsingChildrenFinished() { setFlag(IsParsingChildrenFinishedFlag); }
-    void clearIsParsingChildrenFinished() { clearFlag(IsParsingChildrenFinishedFlag); }
+public:
     bool isStyleAttributeValid() const { return getFlag(IsStyleAttributeValidFlag); }
     void setIsStyleAttributeValid(bool f) { setFlag(f, IsStyleAttributeValidFlag); }
     void setIsStyleAttributeValid() const { setFlag(IsStyleAttributeValidFlag); }
     void clearIsStyleAttributeValid() { clearFlag(IsStyleAttributeValidFlag); }
+
+protected:
+    bool isParsingChildrenFinished() const { return getFlag(IsParsingChildrenFinishedFlag); }
+    void setIsParsingChildrenFinished() { setFlag(IsParsingChildrenFinishedFlag); }
+    void clearIsParsingChildrenFinished() { clearFlag(IsParsingChildrenFinishedFlag); }
 
 #if ENABLE(SVG)
     bool areSVGAttributesValid() const { return getFlag(AreSVGAttributesValidFlag); }
@@ -855,6 +862,7 @@ inline void Node::reattachIfAttached()
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showTree(const WebCore::Node*);
+void showNodePath(const WebCore::Node*);
 #endif
 
 #endif

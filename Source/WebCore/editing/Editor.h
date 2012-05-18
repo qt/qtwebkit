@@ -35,6 +35,7 @@
 #include "EditingStyle.h"
 #include "EditorInsertAction.h"
 #include "FindOptions.h"
+#include "FrameDestructionObserver.h"
 #include "FrameSelection.h"
 #include "TextChecking.h"
 #include "VisibleSelection.h"
@@ -83,7 +84,7 @@ struct CompositionUnderline {
 enum EditorCommandSource { CommandFromMenuOrKeyBinding, CommandFromDOM, CommandFromDOMWithUserInterface };
 enum EditorParagraphSeparator { EditorParagraphSeparatorIsDiv, EditorParagraphSeparatorIsP };
 
-class Editor {
+class Editor : public FrameDestructionObserver {
 public:
     Editor(Frame*);
     ~Editor();
@@ -398,7 +399,8 @@ public:
     void setDefaultParagraphSeparator(EditorParagraphSeparator separator) { m_defaultParagraphSeparator = separator; }
 
 private:
-    Frame* m_frame;
+    virtual void willDetachPage() OVERRIDE;
+
     OwnPtr<DeleteButtonController> m_deleteButtonController;
     RefPtr<CompositeEditCommand> m_lastEditCommand;
     RefPtr<Node> m_removedAnchor;
@@ -421,7 +423,7 @@ private:
     PassRefPtr<Clipboard> newGeneralClipboard(ClipboardAccessPolicy, Frame*);
     void pasteAsPlainTextWithPasteboard(Pasteboard*);
     void pasteWithPasteboard(Pasteboard*, bool allowPlainText);
-    void revealSelectionAfterEditingOperation();
+    void revealSelectionAfterEditingOperation(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded);
     void markMisspellingsOrBadGrammar(const VisibleSelection&, bool checkSpelling, RefPtr<Range>& firstMisspellingRange);
     TextCheckingTypeMask resolveTextCheckingTypeMask(TextCheckingTypeMask);
 

@@ -54,9 +54,9 @@ public:
 
     // Implementations of constraint validation API.
     // Note that the object elements are always barred from constraint validation.
-    String validationMessage() { return String(); }
+    virtual String validationMessage() const OVERRIDE { return String(); }
     bool checkValidity() { return true; }
-    void setCustomValidity(const String&) { }
+    virtual void setCustomValidity(const String&) OVERRIDE { }
 
     using TreeShared<ContainerNode>::ref;
     using TreeShared<ContainerNode>::deref;
@@ -66,9 +66,9 @@ public:
 private:
     HTMLObjectElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
 
-    virtual void parseAttribute(Attribute*) OVERRIDE;
+    virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(Attribute*, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
 
     virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
     virtual void removedFrom(Node*) OVERRIDE;

@@ -239,11 +239,12 @@ namespace WebCore {
         static v8::Handle<v8::Value> throwError(ErrorType, const char* message, v8::Isolate* = 0);
 
         // Helpers for throwing syntax and type errors with predefined messages.
-        static v8::Handle<v8::Value> throwTypeError();
+        static v8::Handle<v8::Value> throwTypeError(const char* = 0);
         static v8::Handle<v8::Value> throwNotEnoughArgumentsError();
 
         v8::Local<v8::Context> context();
         v8::Local<v8::Context> mainWorldContext();
+        v8::Local<v8::Context> isolatedWorldContext(int worldId);
         bool matchesCurrentContext();
 
         // FIXME: This should eventually take DOMWrapperWorld argument!
@@ -251,6 +252,7 @@ namespace WebCore {
 
         bool setContextDebugId(int id);
         static int contextDebugId(v8::Handle<v8::Context>);
+        void collectIsolatedContexts(Vector<std::pair<ScriptState*, SecurityOrigin*> >&);
 
         // Registers a v8 extension to be available on webpages. Will only
         // affect v8 contexts initialized after this call. Takes ownership of
@@ -316,18 +318,6 @@ namespace WebCore {
     inline static v8::Local<v8::Object> notHandledByInterceptor()
     {
         return v8::Local<v8::Object>();
-    }
-
-    inline static v8::Local<v8::Boolean> deletionNotHandledByInterceptor()
-    {
-        return v8::Local<v8::Boolean>();
-    }
-
-    inline v8::Handle<v8::Primitive> throwError(const char* message, v8::Isolate* isolate = 0)
-    {
-        if (!v8::V8::IsExecutionTerminating())
-            V8Proxy::throwError(V8Proxy::TypeError, message, isolate);
-        return v8::Undefined();
     }
 
     inline v8::Handle<v8::Primitive> throwError(const char* message, V8Proxy::ErrorType type, v8::Isolate* isolate = 0)

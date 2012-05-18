@@ -35,13 +35,16 @@
 #include "WebCommon.h"
 #include "WebData.h"
 #include "WebGamepads.h"
+#include "WebGraphicsContext3D.h"
 #include "WebString.h"
 
 namespace WebKit {
 
 class WebAudioBus;
+class WebBlobRegistry;
 class WebClipboard;
 class WebFileSystem;
+class WebFileUtilities;
 class WebMediaStreamCenter;
 class WebMediaStreamCenterClient;
 class WebMimeRegistry;
@@ -53,6 +56,7 @@ class WebURL;
 class WebURLLoader;
 class WebSocketStreamHandle;
 class WebThread;
+class WebWorkerRunLoop;
 
 class Platform {
 public:
@@ -64,6 +68,9 @@ public:
     virtual WebClipboard* clipboard() { return 0; }
 
     // Must return non-null.
+    virtual WebFileUtilities* fileUtilities() { return 0; }
+
+    // Must return non-null.
     virtual WebMimeRegistry* mimeRegistry() { return 0; }
 
 
@@ -72,6 +79,12 @@ public:
     virtual double audioHardwareSampleRate() { return 0; }
     virtual size_t audioHardwareBufferSize() { return 0; }
     virtual WebAudioDevice* createAudioDevice(size_t bufferSize, unsigned numberOfChannels, double sampleRate, WebAudioDevice::RenderCallback*) { return 0; }
+
+
+    // Blob ----------------------------------------------------------------
+
+    // Must return non-null.
+    virtual WebBlobRegistry* blobRegistry() { return 0; }
 
 
     // FileSystem ----------------------------------------------------------
@@ -294,6 +307,13 @@ public:
     virtual void histogramEnumeration(const char* name, int sample, int boundaryValue) { }
 
 
+    // GPU ----------------------------------------------------------------
+    //
+    // May return null if GPU is not supported.
+    // Returns newly allocated and initialized offscreen WebGraphicsContext3D instance.
+    virtual WebGraphicsContext3D* createOffscreenGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
+
+
     // WebRTC ----------------------------------------------------------
 
     // DEPRECATED
@@ -308,6 +328,12 @@ public:
 
     // May return null if WebRTC functionality is not avaliable or out of resources.
     virtual WebMediaStreamCenter* createMediaStreamCenter(WebMediaStreamCenterClient*) { return 0; }
+
+
+    // WebWorker ----------------------------------------------------------
+
+    virtual void didStartWorkerRunLoop(const WebWorkerRunLoop&) { }
+    virtual void didStopWorkerRunLoop(const WebWorkerRunLoop&) { }
 
 protected:
     ~Platform() { }

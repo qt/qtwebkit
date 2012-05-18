@@ -136,16 +136,16 @@ CSSStyleDeclaration* StyledElement::style()
     return ensureAttributeData()->ensureMutableInlineStyle(this)->ensureInlineCSSStyleDeclaration(this); 
 }
 
-void StyledElement::attributeChanged(Attribute* attr)
+void StyledElement::attributeChanged(const Attribute& attribute)
 {
-    parseAttribute(attr);
+    parseAttribute(attribute);
 
-    if (isPresentationAttribute(attr->name())) {
+    if (isPresentationAttribute(attribute.name())) {
         setAttributeStyleDirty();
         setNeedsStyleRecalc(InlineStyleChange);
     }
 
-    Element::attributeChanged(attr);
+    Element::attributeChanged(attribute);
 }
 
 void StyledElement::classAttributeChanged(const AtomicString& newClassString)
@@ -168,19 +168,25 @@ void StyledElement::classAttributeChanged(const AtomicString& newClassString)
     setNeedsStyleRecalc();
 }
 
-void StyledElement::parseAttribute(Attribute* attr)
+void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, ShouldReparseStyleAttribute shouldReparse)
 {
-    if (attr->name() == classAttr)
-        classAttributeChanged(attr->value());
-    else if (attr->name() == styleAttr) {
-        if (attr->isNull())
+    if (shouldReparse) {
+        if (newStyleString.isNull())
             destroyInlineStyle();
         else if (document()->contentSecurityPolicy()->allowInlineStyle())
-            ensureAttributeData()->updateInlineStyleAvoidingMutation(this, attr->value());
+            ensureAttributeData()->updateInlineStyleAvoidingMutation(this, newStyleString);
         setIsStyleAttributeValid();
-        setNeedsStyleRecalc();
-        InspectorInstrumentation::didInvalidateStyleAttr(document(), this);
     }
+    setNeedsStyleRecalc();
+    InspectorInstrumentation::didInvalidateStyleAttr(document(), this);
+}
+
+void StyledElement::parseAttribute(const Attribute& attribute)
+{
+    if (attribute.name() == classAttr)
+        classAttributeChanged(attribute.value());
+    else if (attribute.name() == styleAttr)
+        styleAttributeChanged(attribute.value());
 }
 
 void StyledElement::inlineStyleChanged()
@@ -296,7 +302,7 @@ void StyledElement::updateAttributeStyle()
         unsigned size = attributeCount();
         for (unsigned i = 0; i < size; ++i) {
             Attribute* attribute = attributeItem(i);
-            collectStyleForAttribute(attribute, style.get());
+            collectStyleForAttribute(*attribute, style.get());
         }
     }
     clearAttributeStyleDirty();

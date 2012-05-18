@@ -21,23 +21,15 @@
 
 #include "DOMSupport.h"
 #include "Document.h"
-#include "Editor.h"
-#include "EditorClient.h"
 #include "FatFingers.h"
 #include "FloatQuad.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
-#include "HTMLAnchorElement.h"
-#include "HTMLAreaElement.h"
 #include "HitTestResult.h"
 #include "InputHandler.h"
 #include "IntRect.h"
-#include "Page.h"
-#include "RenderPart.h"
-#include "TextGranularity.h"
 #include "TouchEventHandler.h"
-#include "WebPage.h"
 #include "WebPageClient.h"
 #include "WebPage_p.h"
 
@@ -45,6 +37,7 @@
 #include "visible_units.h"
 
 #include <BlackBerryPlatformKeyboardEvent.h>
+#include <BlackBerryPlatformLog.h>
 
 #include <sys/keycodes.h>
 
@@ -597,14 +590,13 @@ static bool expandSelectionToGranularity(Frame* frame, VisibleSelection selectio
         selection = DOMSupport::visibleSelectionForClosestActualWordStart(selection);
 
     selection.expandUsingGranularity(granularity);
-    RefPtr<Range> newRange = selection.toNormalizedRange();
-    RefPtr<Range> oldRange = frame->selection()->selection().toNormalizedRange();
-    EAffinity affinity = frame->selection()->affinity();
+    selection.setAffinity(frame->selection()->affinity());
 
-    if (isInputMode && !frame->editor()->client()->shouldChangeSelectedRange(oldRange.get(), newRange.get(), affinity, false))
+    if (isInputMode && !frame->selection()->shouldChangeSelection(selection))
         return false;
 
-    return frame->selection()->setSelectedRange(newRange.get(), affinity, true);
+    frame->selection()->setSelection(selection);
+    return true;
 }
 
 void SelectionHandler::selectObject(const WebCore::IntPoint& location, TextGranularity granularity)
@@ -942,9 +934,12 @@ void SelectionHandler::caretPositionChanged()
     DEBUG_SELECTION(LogLevelInfo, "SelectionHandler::caretPositionChanged");
 
     WebCore::IntRect caretLocation;
+    // If the input field is empty, we always turn off the caret.
     // If the input field is not active, we must be turning off the caret.
-    if (!m_webPage->m_inputHandler->isInputMode() && m_caretActive) {
-        m_caretActive = false;
+    bool emptyInputField = m_webPage->m_inputHandler->elementText().isEmpty();
+    if (emptyInputField || (!m_webPage->m_inputHandler->isInputMode() && m_caretActive)) {
+        if (!emptyInputField)
+            m_caretActive = false;
         // Send an empty caret change to turn off the caret.
         m_webPage->m_client->notifyCaretChanged(caretLocation, m_webPage->m_touchEventHandler->lastFatFingersResult().isTextInput() /* userTouchTriggered */);
         return;

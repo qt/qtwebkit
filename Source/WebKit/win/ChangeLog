@@ -1,3 +1,66 @@
+2012-05-18  MORITA Hajime <morrita@google.com>
+
+        Another unreviewed attempt to fix build breakage on r117572.
+
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient::frameWillDetachPage):
+
+2012-05-18  MORITA Hajime  <morrita@google.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=85515
+        Stale frame in WebCore::SpellChecker::didCheckSucceeded
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient::frameWillDetachPage):
+
+2012-05-17  Hironori Bono  <hbono@chromium.org>
+
+        [Refactoring] Move platform-specific code in Editor::respondToChangedSelection to the WebKit layer
+        https://bugs.webkit.org/show_bug.cgi?id=86591
+
+        Reviewed by Ryosuke Niwa.
+
+        This change adds a TextCheckerClient::shouldEraseMarkersAfterChangeSelection
+        function to remove platform-specific code from Editor::respondToChangedSelection
+        function.
+
+        No new tests, no change in behavior.
+
+        * WebCoreSupport/WebEditorClient.cpp:
+        (WebEditorClient::shouldEraseMarkersAfterChangeSelection):
+        * WebCoreSupport/WebEditorClient.h:
+        (WebEditorClient):
+
+2012-05-17  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r117428): WebKit API/SPI was removed
+        https://bugs.webkit.org/show_bug.cgi?id=86748
+
+        Reverted r117428.
+
+        * Interfaces/IWebViewPrivate.idl:
+        * WebView.cpp:
+        (WebView::setDomainRelaxationForbiddenForURLScheme):
+        * WebView.h:
+        (WebView):
+
+2012-05-17  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Convert setDomainRelaxationForbiddenForURLScheme to use InternalSettings interface
+        https://bugs.webkit.org/show_bug.cgi?id=86704
+
+        Reviewed by Eric Seidel.
+
+        Remove setDomainRelaxationForbiddenForURLScheme functions, because it is able to work in the
+        cross-port way through the InternalSettings interface.
+
+        * Interfaces/IWebViewPrivate.idl:
+        * WebView.cpp:
+        * WebView.h:
+        (WebView):
+
 2012-05-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
 
         Move resumeAnimations to use Internals interface

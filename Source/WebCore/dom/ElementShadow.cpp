@@ -32,7 +32,6 @@
 #include "Element.h"
 #include "HTMLShadowElement.h"
 #include "InspectorInstrumentation.h"
-#include "RuntimeEnabledFeatures.h"
 #include "ShadowRoot.h"
 #include "StyleResolver.h"
 #include "Text.h"
@@ -40,7 +39,7 @@
 namespace WebCore {
 
 ElementShadow::ElementShadow()
-    : m_needsRecalculateContent(false)
+    : m_needsRedistributing(false)
 {
 }
 
@@ -119,16 +118,16 @@ void ElementShadow::setParentTreeScope(TreeScope* scope)
 
 void ElementShadow::attach()
 {
-    // Children of m_selector is populated lazily in
-    // ensureSelector(), and here we just ensure that it is in clean state.
-    ASSERT(!selector().hasPopulated());
+    // The pool nodes are populated lazily in
+    // ensureDistributor(), and here we just ensure that it is in clean state.
+    ASSERT(!distributor().poolIsReady());
 
-    selector().willSelect();
+    distributor().willDistribute();
     for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
         if (!root->attached())
             root->attach();
     }
-    selector().didSelect();
+    distributor().didDistribute();
 }
 
 void ElementShadow::attachHost(Element* host)
@@ -164,15 +163,7 @@ InsertionPoint* ElementShadow::insertionPointFor(const Node* node) const
         return 0;
     }
 
-    HTMLContentSelection* found = selector().findFor(node);
-    if (!found)
-        return 0;
-    return found->insertionPoint();
-}
-
-HTMLContentSelection* ElementShadow::selectionFor(const Node* node) const
-{
-    return m_selector.findFor(node);
+    return distributor().findInsertionPointFor(node);
 }
 
 void ElementShadow::reattach()
@@ -207,7 +198,7 @@ void ElementShadow::recalcStyle(Node::StyleChange change)
     if (!youngest)
         return;
 
-    if (needsReattachHostChildrenAndShadow())
+    if (needsRedistributing())
         reattachHostChildrenAndShadow();
     else {
         StyleResolver* styleResolver = youngest->document()->styleResolver();
@@ -222,16 +213,16 @@ void ElementShadow::recalcStyle(Node::StyleChange change)
         styleResolver->popParentShadowRoot(youngest);
     }
 
-    clearNeedsReattachHostChildrenAndShadow();
+    clearNeedsRedistributing();
     for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
         root->clearNeedsStyleRecalc();
         root->clearChildNeedsStyleRecalc();
     }
 }
 
-bool ElementShadow::needsReattachHostChildrenAndShadow()
+bool ElementShadow::needsRedistributing()
 {
-    return m_needsRecalculateContent || (youngestShadowRoot() && youngestShadowRoot()->hasInsertionPoint());
+    return m_needsRedistributing || (youngestShadowRoot() && youngestShadowRoot()->hasInsertionPoint());
 }
 
 void ElementShadow::hostChildrenChanged()
@@ -242,12 +233,12 @@ void ElementShadow::hostChildrenChanged()
         return;
 
     // This results in forced detaching/attaching of the shadow render tree. See ShadowRoot::recalcStyle().
-    setNeedsReattachHostChildrenAndShadow();
+    setNeedsRedistributing();
 }
 
-void ElementShadow::setNeedsReattachHostChildrenAndShadow()
+void ElementShadow::setNeedsRedistributing()
 {
-    m_needsRecalculateContent = true;
+    m_needsRedistributing = true;
 
     host()->setNeedsStyleRecalc();
 }

@@ -86,6 +86,8 @@ public:
     virtual void setNeedsRedraw() = 0;
     virtual void setVisible(bool) = 0;
 
+    virtual void didAddAnimation() = 0;
+
     virtual bool commitRequested() const = 0;
 
     virtual void start() = 0; // Must be called before using the proxy.
@@ -106,6 +108,8 @@ public:
 #ifndef NDEBUG
     static bool isMainThread();
     static bool isImplThread();
+    static bool isMainThreadBlocked();
+    static void setMainThreadBlocked(bool);
 #endif
 
     // Temporary hack while render_widget still does scheduling for CCLayerTreeHostMainThreadI
@@ -121,6 +125,25 @@ public:
 protected:
     CCProxy();
     friend class DebugScopedSetImplThread;
+    friend class DebugScopedSetMainThreadBlocked;
+};
+
+class DebugScopedSetMainThreadBlocked {
+public:
+    DebugScopedSetMainThreadBlocked()
+    {
+#if !ASSERT_DISABLED
+        ASSERT(!CCProxy::isMainThreadBlocked());
+        CCProxy::setMainThreadBlocked(true);
+#endif
+    }
+    ~DebugScopedSetMainThreadBlocked()
+    {
+#if !ASSERT_DISABLED
+        ASSERT(CCProxy::isMainThreadBlocked());
+        CCProxy::setMainThreadBlocked(false);
+#endif
+    }
 };
 
 }

@@ -45,10 +45,11 @@
 #include "PositionIterator.h"
 #include "RenderObject.h"
 #include "Range.h"
-#include "VisibleSelection.h"
+#include "ShadowRoot.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
+#include "VisibleSelection.h"
 #include "visible_units.h"
 #include <wtf/Assertions.h>
 #include <wtf/StdLibExtras.h>
@@ -298,7 +299,7 @@ VisiblePosition lastEditablePositionBeforePositionInRoot(const Position& positio
 // Whether or not content before and after this node will collapse onto the same line as it.
 bool isBlock(const Node* node)
 {
-    return node && node->renderer() && !node->renderer()->isInline();
+    return node && node->renderer() && !node->renderer()->isInline() && !node->renderer()->isRubyText();
 }
 
 bool isInline(const Node* node)
@@ -1084,20 +1085,19 @@ VisibleSelection selectionForParagraphIteration(const VisibleSelection& original
 // opertion is unreliable. TextIterator's TextIteratorEmitsCharactersBetweenAllVisiblePositions mode needs to be fixed, 
 // or these functions need to be changed to iterate using actual VisiblePositions.
 // FIXME: Deploy these functions everywhere that TextIterators are used to convert between VisiblePositions and indices.
-int indexForVisiblePosition(const VisiblePosition& visiblePosition, RefPtr<Element>& scope)
+ 
+int indexForVisiblePosition(const VisiblePosition& visiblePosition, RefPtr<ContainerNode>& scope)
 {
     if (visiblePosition.isNull())
         return 0;
 
     Position p(visiblePosition.deepEquivalent());
     Document* document = p.anchorNode()->document();
-    Node* shadowRoot = p.anchorNode()->shadowTreeRootNode();
+    ShadowRoot* shadowRoot = p.anchorNode()->shadowRoot();
 
-    if (shadowRoot) {
-        // Use the shadow root for form elements, since TextIterators will not enter shadow content.
-        ASSERT(shadowRoot->isElementNode());
-        scope = static_cast<Element*>(shadowRoot);
-    } else
+    if (shadowRoot)
+        scope = shadowRoot;
+    else
         scope = document->documentElement();
 
     RefPtr<Range> range = Range::create(document, firstPositionInNode(scope.get()), p.parentAnchoredEquivalent());
@@ -1105,7 +1105,7 @@ int indexForVisiblePosition(const VisiblePosition& visiblePosition, RefPtr<Eleme
     return TextIterator::rangeLength(range.get(), true);
 }
 
-VisiblePosition visiblePositionForIndex(int index, Element *scope)
+VisiblePosition visiblePositionForIndex(int index, ContainerNode* scope)
 {
     RefPtr<Range> range = TextIterator::rangeFromLocationAndLength(scope, index, 0, true);
     // Check for an invalid index. Certain editing operations invalidate indices because 

@@ -34,9 +34,8 @@
 #include "MemoryCache.h"
 #include "PageCache.h"
 #include "Settings.h"
-#include "ewk_logging.h"
 #include "ewk_private.h"
-#include "ewk_util.h"
+#include "ewk_util_private.h"
 #include <Eina.h>
 #include <eina_safety_checks.h>
 #include <errno.h>
@@ -104,13 +103,6 @@ uint64_t ewk_settings_web_database_default_quota_get()
 void ewk_settings_web_database_default_quota_set(uint64_t maximumSize)
 {
     s_webDatabaseQuota = maximumSize;
-}
-
-void ewk_settings_web_database_clear()
-{
-#if ENABLE(SQL_DATABASE)
-    WebCore::DatabaseTracker::tracker().deleteAllDatabases();
-#endif
 }
 
 void ewk_settings_local_storage_path_set(const char* path)

@@ -46,6 +46,7 @@
 #include "ContentSecurityPolicy.h"
 #include "CookieJar.h"
 #include "DOMImplementation.h"
+#include "DOMSelection.h"
 #include "DOMWindow.h"
 #include "DateComponents.h"
 #include "DeviceMotionController.h"
@@ -204,6 +205,10 @@
 #if ENABLE(MICRODATA)
 #include "MicroDataItemList.h"
 #include "NodeRareData.h"
+#endif
+
+#if ENABLE(LINK_PRERENDER)
+#include "Prerenderer.h"
 #endif
 
 using namespace std;
@@ -509,7 +514,9 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     m_markers = adoptPtr(new DocumentMarkerController);
 
     m_cachedResourceLoader = adoptPtr(new CachedResourceLoader(this));
-
+#if ENABLE(LINK_PRERENDER)
+    m_prerenderer = Prerenderer::create(this);
+#endif
     m_visuallyOrdered = false;
     m_bParsing = false;
     m_wellFormed = false;
@@ -907,8 +914,7 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
         if (ec)
             return 0;
 
-        newElement->setAttributesFromElement(*oldElement);
-        newElement->copyNonAttributeProperties(oldElement);
+        newElement->cloneDataFromElement(*oldElement);
 
         if (deep) {
             for (Node* oldChild = oldElement->firstChild(); oldChild; oldChild = oldChild->nextSibling()) {
@@ -3654,6 +3660,8 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
 
     // Remove focus from the existing focus node (if any)
     if (oldFocusedNode) {
+        ASSERT(!oldFocusedNode->inDetach());
+
         if (oldFocusedNode->active())
             oldFocusedNode->setActive(false);
 
@@ -3688,7 +3696,7 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
         if (oldFocusedNode == this && oldFocusedNode->hasOneRef())
             return true;
             
-        if (oldFocusedNode == oldFocusedNode->rootEditableElement())
+        if (oldFocusedNode->isRootEditableElement())
             frame()->editor()->didEndEditing();
 
         if (view()) {
@@ -3701,7 +3709,7 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
     }
 
     if (newFocusedNode) {
-        if (newFocusedNode == newFocusedNode->rootEditableElement() && !acceptsEditingFocus(newFocusedNode.get())) {
+        if (newFocusedNode->isRootEditableElement() && !acceptsEditingFocus(newFocusedNode.get())) {
             // delegate blocks focus change
             focusChangeBlocked = true;
             goto SetFocusedNodeDone;
@@ -3737,7 +3745,7 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode)
         }
         m_focusedNode->setFocus(true);
 
-        if (m_focusedNode == m_focusedNode->rootEditableElement())
+        if (m_focusedNode->isRootEditableElement())
             frame()->editor()->didBeginEditing();
 
         // eww, I suck. set the qt focus correctly
@@ -5052,7 +5060,7 @@ void Document::updateURLForPushOrReplaceState(const KURL& url)
         documentLoader->replaceRequestURLForSameDocumentNavigation(url);
 }
 
-void Document::statePopped(SerializedScriptValue* stateObject)
+void Document::statePopped(PassRefPtr<SerializedScriptValue> stateObject)
 {
     if (!frame())
         return;
@@ -5090,12 +5098,6 @@ void Document::updateFocusAppearanceTimerFired(Timer<Document>*)
     Element* element = static_cast<Element*>(node);
     if (element->isFocusable())
         element->updateFocusAppearance(m_updateFocusAppearanceRestoresSelection);
-}
-
-// FF method for accessing the selection added for compatibility.
-DOMSelection* Document::getSelection() const
-{
-    return frame() ? frame()->domWindow()->getSelection() : 0;
 }
 
 void Document::attachRange(Range* range)

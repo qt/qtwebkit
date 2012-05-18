@@ -58,6 +58,7 @@
 #include "WebRange.h"
 #include "platform/WebRect.h"
 #include "WebScreenInfo.h"
+#include "platform/WebSerializedScriptValue.h"
 #include "platform/WebSize.h"
 #include "WebStorageNamespace.h"
 #include "WebTextCheckingCompletion.h"
@@ -547,7 +548,7 @@ void WebViewHost::setStatusText(const WebString& text)
     printf("UI DELEGATE STATUS CALLBACK: setStatusText:%s\n", text.utf8().data());
 }
 
-void WebViewHost::startDragging(const WebDragData& data, WebDragOperationsMask mask, const WebImage&, const WebPoint&)
+void WebViewHost::startDragging(WebFrame*, const WebDragData& data, WebDragOperationsMask mask, const WebImage&, const WebPoint&)
 {
     WebDragData mutableDragData = data;
     if (layoutTestController()->shouldAddFileToPasteboard()) {
@@ -1354,6 +1355,16 @@ void WebViewHost::dispatchIntent(WebFrame* source, const WebIntentRequest& reque
     }
 }
 
+void WebViewHost::deliveredIntentResult(WebFrame* frame, int id, const WebSerializedScriptValue& data)
+{
+    printf("Web intent success for id %d\n", id);
+}
+
+void WebViewHost::deliveredIntentFailure(WebFrame* frame, int id, const WebSerializedScriptValue& data)
+{
+    printf("Web intent failure for id %d\n", id);
+}
+
 // Public functions -----------------------------------------------------------
 
 WebViewHost::WebViewHost(TestShell* shell)
@@ -1735,12 +1746,7 @@ void WebViewHost::paintRect(const WebRect& rect)
     ASSERT(!m_isPainting);
     ASSERT(canvas());
     m_isPainting = true;
-#if USE(CG)
-    webWidget()->paint(skia::BeginPlatformPaint(canvas()), rect);
-    skia::EndPlatformPaint(canvas());
-#else
     webWidget()->paint(canvas(), rect);
-#endif
     m_isPainting = false;
 }
 
@@ -1799,21 +1805,7 @@ void WebViewHost::paintPagesWithBoundaries()
         return;
     }
 
-#if WEBKIT_USING_SKIA
-    WebCanvas* webCanvas = canvas();
-#elif WEBKIT_USING_CG
-    const SkBitmap& canvasBitmap = canvas()->getDevice()->accessBitmap(false);
-    WebCanvas* webCanvas = CGBitmapContextCreate(canvasBitmap.getPixels(),
-                                                 pageSizeInPixels.width, totalHeight,
-                                                 8, pageSizeInPixels.width * 4,
-                                                 CGColorSpaceCreateDeviceRGB(),
-                                                 kCGImageAlphaPremultipliedFirst |
-                                                 kCGBitmapByteOrder32Host);
-    CGContextTranslateCTM(webCanvas, 0.0, totalHeight);
-    CGContextScaleCTM(webCanvas, 1.0, -1.0f);
-#endif
-
-    webFrame->printPagesWithBoundaries(webCanvas, pageSizeInPixels);
+    webFrame->printPagesWithBoundaries(canvas(), pageSizeInPixels);
     webFrame->printEnd();
 
     m_isPainting = false;

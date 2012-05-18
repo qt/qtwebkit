@@ -489,11 +489,6 @@ WebInspector.JavaScriptOutlineDialog.show = function(view, contentProvider)
     WebInspector.Dialog.show(view.element, filteredItemSelectionDialog);
 }
 
-WebInspector.JavaScriptOutlineDialog.createShortcut = function()
-{
-    return WebInspector.KeyboardShortcut.makeDescriptor("o", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift);
-}
-
 WebInspector.JavaScriptOutlineDialog.prototype = {
     /**
      * @param {number} itemIndex
@@ -654,23 +649,23 @@ WebInspector.OpenResourceDialog.prototype.__proto__ = WebInspector.SelectionDial
  * @constructor
  * @extends {WebInspector.OpenResourceDialog}
  * @param {WebInspector.ScriptsPanel} panel
- * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ * @param {WebInspector.UISourceCodeProvider} uiSourceCodeProvider
  */
-WebInspector.OpenScriptDialog = function(panel, presentationModel)
+WebInspector.OpenScriptDialog = function(panel, uiSourceCodeProvider)
 {
-    WebInspector.OpenResourceDialog.call(this, presentationModel.uiSourceCodes());
+    WebInspector.OpenResourceDialog.call(this, uiSourceCodeProvider.uiSourceCodes());
     this._panel = panel;
 }
 
 /**
  * @param {WebInspector.ScriptsPanel} panel
- * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ * @param {WebInspector.UISourceCodeProvider} uiSourceCodeProvider
  */
-WebInspector.OpenScriptDialog.install = function(panel, presentationModel, relativeToElement)
+WebInspector.OpenScriptDialog.install = function(panel, uiSourceCodeProvider, relativeToElement)
 {
     function showOpenResourceDialog()
     {
-        WebInspector.OpenScriptDialog._show(panel, presentationModel, relativeToElement);
+        WebInspector.OpenScriptDialog._show(panel, uiSourceCodeProvider, relativeToElement);
     }
 
     var openResourceShortcut = WebInspector.OpenResourceDialog.createShortcut();
@@ -679,15 +674,15 @@ WebInspector.OpenScriptDialog.install = function(panel, presentationModel, relat
 
 /**
  * @param {WebInspector.ScriptsPanel} panel
- * @param {WebInspector.DebuggerPresentationModel} presentationModel
+ * @param {WebInspector.UISourceCodeProvider} uiSourceCodeProvider
  * @param {Element} relativeToElement
  */
-WebInspector.OpenScriptDialog._show = function(panel, presentationModel, relativeToElement)
+WebInspector.OpenScriptDialog._show = function(panel, uiSourceCodeProvider, relativeToElement)
 {
     if (WebInspector.Dialog.currentInstance())
         return;
 
-    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.OpenScriptDialog(panel, presentationModel));
+    var filteredItemSelectionDialog = new WebInspector.FilteredItemSelectionDialog(new WebInspector.OpenScriptDialog(panel, uiSourceCodeProvider));
     WebInspector.Dialog.show(relativeToElement, filteredItemSelectionDialog);
 }
 

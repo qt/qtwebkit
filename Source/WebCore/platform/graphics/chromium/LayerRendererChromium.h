@@ -66,7 +66,7 @@ class ScopedEnsureFramebufferAllocation;
 
 class LayerRendererChromiumClient {
 public:
-    virtual const IntSize& viewportSize() const = 0;
+    virtual const IntSize& deviceViewportSize() const = 0;
     virtual const CCSettings& settings() const = 0;
     virtual void didLoseContext() = 0;
     virtual void onSwapBuffersComplete() = 0;
@@ -74,11 +74,13 @@ public:
     virtual void setContentsMemoryAllocationLimitBytes(size_t) = 0;
 };
 
+enum TextureUploaderOption { ThrottledUploader, UnthrottledUploader };
+
 // Class that handles drawing of composited render layers using GL.
 class LayerRendererChromium {
     WTF_MAKE_NONCOPYABLE(LayerRendererChromium);
 public:
-    static PassOwnPtr<LayerRendererChromium> create(LayerRendererChromiumClient*, PassRefPtr<GraphicsContext3D>, PassOwnPtr<TextureUploader>);
+    static PassOwnPtr<LayerRendererChromium> create(LayerRendererChromiumClient*, PassRefPtr<GraphicsContext3D>, TextureUploaderOption);
 
     ~LayerRendererChromium();
 
@@ -87,10 +89,6 @@ public:
 
     GraphicsContext3D* context();
     bool contextSupportsMapSub() const { return m_capabilities.usingMapSub; }
-
-    const IntSize& viewportSize() { return m_client->viewportSize(); }
-    int viewportWidth() { return viewportSize().width(); }
-    int viewportHeight() { return viewportSize().height(); }
 
     void viewportChanged();
 
@@ -144,10 +142,14 @@ protected:
     void ensureFramebuffer();
     bool isFramebufferDiscarded() const { return m_isFramebufferDiscarded; }
 
-    LayerRendererChromium(LayerRendererChromiumClient*, PassRefPtr<GraphicsContext3D>, PassOwnPtr<TextureUploader>);
+    LayerRendererChromium(LayerRendererChromiumClient*, PassRefPtr<GraphicsContext3D>, TextureUploaderOption);
     bool initialize();
 
 private:
+    const IntSize& viewportSize() { return m_client->deviceViewportSize(); }
+    int viewportWidth() { return viewportSize().width(); }
+    int viewportHeight() { return viewportSize().height(); }
+
     void drawQuad(const CCDrawQuad*, const FloatRect& surfaceDamageRect);
     void drawCheckerboardQuad(const CCCheckerboardDrawQuad*);
     void drawDebugBorderQuad(const CCDebugBorderDrawQuad*);
@@ -298,6 +300,7 @@ private:
 
     bool m_isViewportChanged;
     bool m_isFramebufferDiscarded;
+    TextureUploaderOption m_textureUploaderSetting;
 };
 
 

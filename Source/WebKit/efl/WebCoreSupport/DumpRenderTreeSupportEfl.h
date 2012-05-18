@@ -88,6 +88,8 @@ public:
     static HistoryItemChildrenVector childHistoryItems(const Ewk_History_Item*);
     static String historyItemTarget(const Ewk_History_Item*);
     static bool isTargetItem(const Ewk_History_Item*);
+    static void evaluateScriptInIsolatedWorld(const Evas_Object* ewkFrame, int worldID, JSObjectRef globalObject, const String& script);
+    static JSGlobalContextRef globalContextRefForFrame(const Evas_Object* ewkFrame);
 
     static void setMockScrollbarsEnabled(bool);
 
@@ -99,6 +101,7 @@ public:
     static void setInteractiveFormValidationEnabled(Evas_Object* ewkView, bool enabled);
     static JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     static void setAuthorAndUserStylesEnabled(Evas_Object* ewkView, bool);
+    static void setSerializeHTTPLoads(bool);
 
     // TextInputController
     static void setComposition(Evas_Object*, const char*, int, int);

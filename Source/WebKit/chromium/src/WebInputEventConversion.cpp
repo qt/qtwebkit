@@ -128,6 +128,9 @@ PlatformWheelEventBuilder::PlatformWheelEventBuilder(Widget* widget, const WebMo
     m_phase = static_cast<WebCore::PlatformWheelEventPhase>(e.phase);
     m_momentumPhase = static_cast<WebCore::PlatformWheelEventPhase>(e.momentumPhase);
     m_timestamp = e.timeStampSeconds;
+    m_scrollCount = 0;
+    m_unacceleratedScrollingDeltaX = e.deltaX;
+    m_unacceleratedScrollingDeltaY = e.deltaY;
 #endif
 }
 
@@ -148,6 +151,7 @@ PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const W
         break;
     case WebInputEvent::GestureTap:
         m_type = PlatformEvent::GestureTap;
+        m_area = IntSize(e.deltaX * 2, e.deltaY * 2);
         break;
     case WebInputEvent::GestureTapDown:
         m_type = PlatformEvent::GestureTapDown;
@@ -174,8 +178,6 @@ PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const W
     m_globalPosition = IntPoint(e.globalX, e.globalY);
     m_deltaX = e.deltaX;
     m_deltaY = e.deltaY;
-    m_gammaX = e.gammaX;
-    m_gammaY = e.gammaY;
     m_timestamp = e.timeStampSeconds;
 
     m_modifiers = 0;

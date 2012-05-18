@@ -49,7 +49,11 @@ WebSettingsImpl::WebSettingsImpl(Settings* settings)
     : m_settings(settings)
     , m_showFPSCounter(false)
     , m_showPlatformLayerTree(false)
+    , m_showPaintRects(false)
     , m_viewportEnabled(false)
+    , m_applyDefaultDeviceScaleFactorInCompositor(false)
+    , m_defaultTileSize(WebSize(256, 256))
+    , m_maxUntiledLayerSize(WebSize(512, 512))
 {
     ASSERT(settings);
 }
@@ -112,6 +116,11 @@ void WebSettingsImpl::setMinimumLogicalFontSize(int size)
 void WebSettingsImpl::setDefaultDeviceScaleFactor(int defaultDeviceScaleFactor)
 {
     m_settings->setDefaultDeviceScaleFactor(defaultDeviceScaleFactor);
+}
+
+void WebSettingsImpl::setApplyDefaultDeviceScaleFactorInCompositor(bool applyDefaultDeviceScaleFactorInCompositor)
+{
+    m_applyDefaultDeviceScaleFactorInCompositor = applyDefaultDeviceScaleFactorInCompositor;
 }
 
 void WebSettingsImpl::setDefaultTextEncodingName(const WebString& encoding)
@@ -331,6 +340,11 @@ void WebSettingsImpl::setShowFPSCounter(bool show)
 void WebSettingsImpl::setShowPlatformLayerTree(bool show)
 {
     m_showPlatformLayerTree = show;
+}
+
+void WebSettingsImpl::setShowPaintRects(bool show)
+{
+    m_showPaintRects = show;
 }
 
 void WebSettingsImpl::setEditingBehavior(EditingBehavior behavior)
@@ -565,6 +579,16 @@ void WebSettingsImpl::setThreadedAnimationEnabled(bool enabled)
 void WebSettingsImpl::setViewportEnabled(bool enabled)
 {
     m_viewportEnabled = enabled;
+}
+
+void WebSettingsImpl::setDefaultTileSize(WebSize size)
+{
+    m_defaultTileSize = size;
+}
+
+void WebSettingsImpl::setMaxUntiledLayerSize(WebSize size)
+{
+    m_maxUntiledLayerSize = size;
 }
 
 } // namespace WebKit

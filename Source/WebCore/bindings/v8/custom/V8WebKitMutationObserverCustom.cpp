@@ -55,7 +55,7 @@ v8::Handle<v8::Value> V8WebKitMutationObserver::constructorCallback(const v8::Ar
     INC_STATS("DOM.WebKitMutationObserver.Constructor");
 
     if (!args.IsConstructCall())
-        return throwError("DOM object constructor cannot be called as a function.", V8Proxy::TypeError);
+        return V8Proxy::throwTypeError("DOM object constructor cannot be called as a function.");
 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
         return args.Holder();
@@ -69,7 +69,7 @@ v8::Handle<v8::Value> V8WebKitMutationObserver::constructorCallback(const v8::Ar
 
     ScriptExecutionContext* context = getScriptExecutionContext();
     if (!context)
-        return throwError("WebKitMutationObserver constructor's associated frame unavailable", V8Proxy::ReferenceError);
+        return V8Proxy::throwError(V8Proxy::ReferenceError, "WebKitMutationObserver constructor's associated frame unavailable");
 
     RefPtr<MutationCallback> callback = V8MutationCallback::create(arg, context);
     RefPtr<WebKitMutationObserver> observer = WebKitMutationObserver::create(callback.release());

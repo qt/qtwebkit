@@ -370,7 +370,7 @@ int RenderTableSection::calcRowLogicalHeight()
 
             // find out the baseline
             EVerticalAlign va = cell->style()->verticalAlign();
-            if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB) {
+            if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH) {
                 LayoutUnit baselinePosition = cell->cellBaselinePosition();
                 if (baselinePosition > cell->borderBefore() + cell->paddingBefore()) {
                     m_grid[r].baseline = max(m_grid[r].baseline, baselinePosition - cell->intrinsicPaddingBefore());
@@ -609,7 +609,7 @@ void RenderTableSection::layoutRows()
 
                 // If the baseline moved, we may have to update the data for our row. Find out the new baseline.
                 EVerticalAlign va = cell->style()->verticalAlign();
-                if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB) {
+                if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH) {
                     LayoutUnit baseline = cell->cellBaselinePosition();
                     if (baseline > cell->borderBefore() + cell->paddingBefore())
                         m_grid[r].baseline = max(m_grid[r].baseline, baseline);
@@ -618,7 +618,7 @@ void RenderTableSection::layoutRows()
 
             int oldIntrinsicPaddingBefore = cell->intrinsicPaddingBefore();
             int oldIntrinsicPaddingAfter = cell->intrinsicPaddingAfter();
-            int logicalHeightWithoutIntrinsicPadding = cell->logicalHeight() - oldIntrinsicPaddingBefore - oldIntrinsicPaddingAfter;
+            int logicalHeightWithoutIntrinsicPadding = cell->pixelSnappedLogicalHeight() - oldIntrinsicPaddingBefore - oldIntrinsicPaddingAfter;
 
             int intrinsicPaddingBefore = 0;
             switch (cell->style()->verticalAlign()) {
@@ -626,6 +626,7 @@ void RenderTableSection::layoutRows()
                 case SUPER:
                 case TEXT_TOP:
                 case TEXT_BOTTOM:
+                case LENGTH:
                 case BASELINE: {
                     LayoutUnit b = cell->cellBaselinePosition();
                     if (b > cell->borderBefore() + cell->paddingBefore())
@@ -661,7 +662,7 @@ void RenderTableSection::layoutRows()
             if (intrinsicPaddingBefore != oldIntrinsicPaddingBefore || intrinsicPaddingAfter != oldIntrinsicPaddingAfter)
                 cell->setNeedsLayout(true, MarkOnlyThis);
 
-            if (!cell->needsLayout() && view()->layoutState()->pageLogicalHeight() && view()->layoutState()->pageLogicalOffset(cell->logicalTop()) != cell->pageLogicalOffset())
+            if (!cell->needsLayout() && view()->layoutState()->pageLogicalHeight() && view()->layoutState()->pageLogicalOffset(cell, cell->logicalTop()) != cell->pageLogicalOffset())
                 cell->setChildNeedsLayout(true, MarkOnlyThis);
 
             cell->layoutIfNeeded();
@@ -949,7 +950,8 @@ LayoutUnit RenderTableSection::firstLineBoxBaseline() const
     for (size_t i = 0; i < firstRow.size(); ++i) {
         const CellStruct& cs = firstRow.at(i);
         const RenderTableCell* cell = cs.primaryCell();
-        if (cell)
+        // Only cells with content have a baseline
+        if (cell && cell->contentLogicalHeight())
             firstLineBaseline = max(firstLineBaseline, cell->logicalTop() + cell->paddingBefore() + cell->borderBefore() + cell->contentLogicalHeight());
     }
 

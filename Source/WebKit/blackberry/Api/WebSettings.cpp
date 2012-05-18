@@ -54,6 +54,7 @@ DEFINE_STATIC_LOCAL(String, BlackBerryUserAgentString, ("BlackBerryUserAgentStri
 DEFINE_STATIC_LOCAL(String, BlackBerryUserScalableEnabled, ("BlackBerryUserScalableEnabled"));
 DEFINE_STATIC_LOCAL(String, BlackBerryViewportWidth, ("BlackBerryViewportWidth"));
 DEFINE_STATIC_LOCAL(String, BlackBerryZoomToFitOnLoadEnabled, ("BlackBerryZoomToFitOnLoadEnabled"));
+DEFINE_STATIC_LOCAL(String, BlackBerryFullScreenVideoCapable, ("BlackBerryFullScreenVideoCapable"));
 DEFINE_STATIC_LOCAL(String, SpatialNavigationEnabled, ("SpatialNavigationEnabled"));
 DEFINE_STATIC_LOCAL(String, WebKitDatabasePath, ("WebKitDatabasePath"));
 DEFINE_STATIC_LOCAL(String, WebKitDatabasesEnabled, ("WebKitDatabasesEnabled"));
@@ -162,21 +163,18 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setBoolean(BlackBerryUseWebKitCache, true);
     settings->m_private->setBoolean(BlackBerryUserScalableEnabled, true);
     settings->m_private->setBoolean(BlackBerryZoomToFitOnLoadEnabled, true);
+    settings->m_private->setBoolean(BlackBerryFullScreenVideoCapable, false);
 
     settings->m_private->setInteger(WebKitDefaultFontSize, 16);
     settings->m_private->setInteger(WebKitDefaultFixedFontSize, 13);
     settings->m_private->setString(WebKitDefaultTextEncodingName, "iso-8859-1");
     settings->m_private->setBoolean(WebKitDownloadableBinaryFontsEnabled, true);
     settings->m_private->setInteger(WebKitFirstScheduledLayoutDelay, 250); // Match Document::cLayoutScheduleThreshold.
-    settings->m_private->setString(WebKitFixedFontFamily, "Courier New");
     settings->m_private->setBoolean(WebKitJavaScriptEnabled, true);
     settings->m_private->setBoolean(WebKitLoadsImagesAutomatically, true);
     settings->m_private->setUnsignedLongLong(WebKitLocalStorageQuota, 5 * 1024 * 1024);
     settings->m_private->setInteger(WebKitMaximumPagesInCache, 0);
     settings->m_private->setInteger(WebKitMinimumFontSize, 8);
-    settings->m_private->setString(WebKitSansSeriffFontFamily, "Arial");
-    settings->m_private->setString(WebKitSeriffFontFamily, "Times New Roman");
-    settings->m_private->setString(WebKitStandardFontFamily, "Times New Roman");
     settings->m_private->setBoolean(WebKitWebSocketsEnabled, true);
 
     return settings;
@@ -751,6 +749,16 @@ bool WebSettings::isSpatialNavigationEnabled() const
 void WebSettings::setSpatialNavigationEnabled(bool enable)
 {
     m_private->setBoolean(SpatialNavigationEnabled, enable);
+}
+
+bool WebSettings::fullScreenVideoCapable() const
+{
+    return m_private->getBoolean(BlackBerryFullScreenVideoCapable);
+}
+
+void WebSettings::setFullScreenVideoCapable(bool enable)
+{
+    m_private->setBoolean(BlackBerryFullScreenVideoCapable, enable);
 }
 
 } // namespace WebKit

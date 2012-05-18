@@ -34,38 +34,21 @@
 
 #include "GraphicsContext3D.h"
 
-#include "CachedImage.h"
-#include "CanvasRenderingContext.h"
-#include "Chrome.h"
-#include "ChromeClientImpl.h"
 #include "DrawingBuffer.h"
 #include "Extensions3DChromium.h"
+#include "GrContext.h"
+#include "GrGLInterface.h"
 #include "GraphicsContext3DPrivate.h"
-#include "HTMLCanvasElement.h"
-#include "HTMLImageElement.h"
 #include "ImageBuffer.h"
 #include "ImageData.h"
-#include "WebKit.h"
-#include "WebViewClient.h"
-#include "WebViewImpl.h"
-#include "platform/WebGraphicsContext3D.h"
-#include "platform/WebKitPlatformSupport.h"
+#include <public/Platform.h>
+#include <public/WebGraphicsContext3D.h>
 
 #include <stdio.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringHash.h>
 
-#if USE(CG)
-#include "GraphicsContext.h"
-#include "WebGLRenderingContext.h"
-#include <CoreGraphics/CGContext.h>
-#include <CoreGraphics/CGImage.h>
-#endif
-
-#if USE(SKIA)
-#include "GrContext.h"
-#include "GrGLInterface.h"
-#endif
 
 namespace {
 
@@ -100,24 +83,16 @@ GraphicsContext3DPrivate::GraphicsContext3DPrivate(PassOwnPtr<WebKit::WebGraphic
     , m_layerComposited(false)
     , m_preserveDrawingBuffer(preserveDrawingBuffer)
     , m_resourceSafety(ResourceSafetyUnknown)
-#if USE(SKIA)
     , m_grContext(0)
-#elif USE(CG)
-    , m_renderOutputSize(0)
-#else
-#error Must port to your platform
-#endif
 {
 }
 
 GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 {
-#if USE(SKIA)
     if (m_grContext) {
         m_grContext->contextDestroyed();
         GrSafeUnref(m_grContext);
     }
-#endif
 }
 
 PassRefPtr<GraphicsContext3D> GraphicsContext3DPrivate::createGraphicsContextFromWebContext(PassOwnPtr<WebKit::WebGraphicsContext3D> webContext, GraphicsContext3D::RenderStyle renderStyle, bool preserveDrawingBuffer)
@@ -166,7 +141,6 @@ Platform3DObject GraphicsContext3DPrivate::platformTexture() const
     return m_impl->getPlatformTextureId();
 }
 
-#if USE(SKIA)
 class GrMemoryAllocationChangedCallback : public Extensions3DChromium::GpuMemoryAllocationChangedCallbackCHROMIUM {
 public:
     GrMemoryAllocationChangedCallback(GraphicsContext3DPrivate* context)
@@ -205,7 +179,6 @@ GrContext* GraphicsContext3DPrivate::grContext()
     }
     return m_grContext;
 }
-#endif
 
 void GraphicsContext3DPrivate::prepareTexture()
 {
@@ -231,7 +204,7 @@ void GraphicsContext3DPrivate::paintFramebufferToCanvas(int framebuffer, int wid
 {
     unsigned char* pixels = 0;
     size_t bufferSize = 4 * width * height;
-#if USE(SKIA)
+
     const SkBitmap* canvasBitmap = imageBuffer->context()->platformContext()->bitmap();
     const SkBitmap* readbackBitmap = 0;
     ASSERT(canvasBitmap->config() == SkBitmap::kARGB_8888_Config);
@@ -257,16 +230,6 @@ void GraphicsContext3DPrivate::paintFramebufferToCanvas(int framebuffer, int wid
     // Read back the frame buffer.
     SkAutoLockPixels bitmapLock(*readbackBitmap);
     pixels = static_cast<unsigned char*>(readbackBitmap->getPixels());
-#elif USE(CG)
-    if (!m_renderOutput || m_renderOutputSize != bufferSize) {
-        m_renderOutput = adoptArrayPtr(new unsigned char[bufferSize]);
-        m_renderOutputSize = bufferSize;
-    }
-
-    pixels = m_renderOutput.get();
-#else
-#error Must port to your platform
-#endif
 
     m_impl->readBackFramebuffer(pixels, 4 * width * height, framebuffer, width, height);
 
@@ -278,7 +241,6 @@ void GraphicsContext3DPrivate::paintFramebufferToCanvas(int framebuffer, int wid
         }
     }
 
-#if USE(SKIA)
     readbackBitmap->notifyPixelsChanged();
     if (m_resizingBitmap.readyToDraw()) {
         // We need to draw the resizing bitmap into the canvas's backing store.
@@ -287,23 +249,17 @@ void GraphicsContext3DPrivate::paintFramebufferToCanvas(int framebuffer, int wid
         dst.set(SkIntToScalar(0), SkIntToScalar(0), SkIntToScalar(canvasBitmap->width()), SkIntToScalar(canvasBitmap->height()));
         canvas.drawBitmapRect(m_resizingBitmap, 0, dst);
     }
-#elif USE(CG)
-    GraphicsContext3D::paintToCanvas(pixels, width, height, imageBuffer->width(), imageBuffer->height(), imageBuffer->context()->platformContext());
-#else
-#error Must port to your platform
-#endif
 }
 
-void GraphicsContext3DPrivate::paintRenderingResultsToCanvas(CanvasRenderingContext* context, DrawingBuffer* drawingBuffer)
+void GraphicsContext3DPrivate::paintRenderingResultsToCanvas(ImageBuffer* imageBuffer, DrawingBuffer* drawingBuffer)
 {
-    ImageBuffer* imageBuffer = context->canvas()->buffer();
     Platform3DObject framebufferId;
     int width, height;
     getDrawingParameters(drawingBuffer, m_impl.get(), &framebufferId, &width, &height);
     paintFramebufferToCanvas(framebufferId, width, height, !m_impl->getContextAttributes().premultipliedAlpha, imageBuffer);
 }
 
-bool GraphicsContext3DPrivate::paintCompositedResultsToCanvas(CanvasRenderingContext* context)
+bool GraphicsContext3DPrivate::paintCompositedResultsToCanvas(ImageBuffer*)
 {
     return false;
 }
@@ -1043,7 +999,7 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
     webAttributes.shareResources = attrs.shareResources;
     webAttributes.preferDiscreteGPU = attrs.preferDiscreteGPU;
 
-    OwnPtr<WebKit::WebGraphicsContext3D> webContext = adoptPtr(WebKit::webKitPlatformSupport()->createOffscreenGraphicsContext3D(webAttributes));
+    OwnPtr<WebKit::WebGraphicsContext3D> webContext = adoptPtr(WebKit::Platform::current()->createOffscreenGraphicsContext3D(webAttributes));
     if (!webContext)
         return 0;
 
@@ -1060,12 +1016,10 @@ Platform3DObject GraphicsContext3D::platformTexture() const
     return m_private->platformTexture();
 }
 
-#if USE(SKIA)
 GrContext* GraphicsContext3D::grContext()
 {
     return m_private->grContext();
 }
-#endif
 
 void GraphicsContext3D::prepareTexture()
 {
@@ -1244,9 +1198,9 @@ bool GraphicsContext3D::layerComposited() const
     return m_private->layerComposited();
 }
 
-void GraphicsContext3D::paintRenderingResultsToCanvas(CanvasRenderingContext* context, DrawingBuffer* drawingBuffer)
+void GraphicsContext3D::paintRenderingResultsToCanvas(ImageBuffer* imageBuffer, DrawingBuffer* drawingBuffer)
 {
-    return m_private->paintRenderingResultsToCanvas(context, drawingBuffer);
+    return m_private->paintRenderingResultsToCanvas(imageBuffer, drawingBuffer);
 }
 
 PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData(DrawingBuffer* drawingBuffer)
@@ -1254,7 +1208,7 @@ PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData(Drawin
     return m_private->paintRenderingResultsToImageData(drawingBuffer);
 }
 
-DELEGATE_TO_INTERNAL_1R(paintCompositedResultsToCanvas, CanvasRenderingContext*, bool)
+DELEGATE_TO_INTERNAL_1R(paintCompositedResultsToCanvas, ImageBuffer*, bool)
 
 DELEGATE_TO_INTERNAL_R(createBuffer, Platform3DObject)
 DELEGATE_TO_INTERNAL_R(createFramebuffer, Platform3DObject)

@@ -37,6 +37,7 @@ class EditorClientBlackBerry : public EditorClient, public TextCheckerClient {
 public:
     EditorClientBlackBerry(BlackBerry::WebKit::WebPagePrivate*);
     virtual void pageDestroyed();
+    virtual void frameWillDetachPage(Frame*) { }
     virtual bool shouldDeleteRange(Range*);
     virtual bool shouldShowDeleteInterface(HTMLElement*);
     virtual bool smartInsertDeleteEnabled();
@@ -78,6 +79,7 @@ public:
     virtual bool doTextFieldCommandFromEvent(Element*, KeyboardEvent*);
     virtual void textWillBeDeletedInTextField(Element*);
     virtual void textDidChangeInTextArea(Element*);
+    virtual bool shouldEraseMarkersAfterChangeSelection(TextCheckingType) const;
     virtual void ignoreWordInSpellDocument(const String&);
     virtual void learnWord(const String&);
     virtual void checkSpellingOfString(const UChar*, int, int*, int*);

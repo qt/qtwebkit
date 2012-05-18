@@ -543,10 +543,11 @@ void LayoutTestController::clearAllApplicationCaches()
     ewk_settings_application_cache_clear();
 }
 
-void LayoutTestController::setApplicationCacheOriginQuota(unsigned long long)
+void LayoutTestController::setApplicationCacheOriginQuota(unsigned long long quota)
 {
-    // FIXME: Implement to support application cache quotas.
-    notImplemented();
+    Ewk_Security_Origin* origin = ewk_frame_security_origin_get(browser->mainFrame());
+    ewk_security_origin_application_cache_quota_set(origin, quota);
+    ewk_security_origin_free(origin);
 }
 
 void LayoutTestController::clearApplicationCacheForOrigin(OpaqueJSString*)
@@ -577,7 +578,7 @@ long long LayoutTestController::applicationCacheDiskUsageForOrigin(JSStringRef)
 
 void LayoutTestController::clearAllDatabases()
 {
-    ewk_settings_web_database_clear();
+    ewk_web_database_remove_all();
 }
 
 void LayoutTestController::setDatabaseQuota(unsigned long long quota)
@@ -724,9 +725,9 @@ void LayoutTestController::evaluateScriptInIsolatedWorldAndReturnValue(unsigned,
     notImplemented();
 }
 
-void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned, JSObjectRef, JSStringRef)
+void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script)
 {
-    notImplemented();
+    DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld(browser->mainFrame(), worldID, globalObject, String(script->ustring().impl()));
 }
 
 void LayoutTestController::removeAllVisitedLinks()
@@ -787,10 +788,9 @@ void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int devic
             WebCore::IntSize(availableWidth, availableHeight));
 }
 
-void LayoutTestController::setSerializeHTTPLoads(bool)
+void LayoutTestController::setSerializeHTTPLoads(bool serialize)
 {
-    // FIXME: Implement if needed for https://bugs.webkit.org/show_bug.cgi?id=50758.
-    notImplemented();
+    DumpRenderTreeSupportEfl::setSerializeHTTPLoads(serialize);
 }
 
 void LayoutTestController::setMinimumTimerInterval(double minimumTimerInterval)

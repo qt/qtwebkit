@@ -100,6 +100,16 @@
         "b " SYMBOL_STRING_RELOCATION(function) "WithReturnAddress" "\n" \
     );
 
+// EncodedJSValue in JSVALUE32_64 is a 64-bit integer. When being compiled in ARM EABI, it must be aligned even-numbered register (r0, r2 or [sp]).
+// As a result, return address will be at a 4-byte further location in the following cases.
+#if COMPILER_SUPPORTS(EABI) && CPU(ARM)
+#define INSTRUCTION_STORE_RETURN_ADDRESS_EJI "str lr, [sp, #4]"
+#define INSTRUCTION_STORE_RETURN_ADDRESS_EJCI "str lr, [sp, #8]"
+#else
+#define INSTRUCTION_STORE_RETURN_ADDRESS_EJI "str lr, [sp, #0]"
+#define INSTRUCTION_STORE_RETURN_ADDRESS_EJCI "str lr, [sp, #4]"
+#endif
+
 #define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJI(function) \
     asm ( \
     ".text" "\n" \
@@ -109,7 +119,7 @@
     ".thumb" "\n" \
     ".thumb_func " THUMB_FUNC_PARAM(function) "\n" \
     SYMBOL_STRING(function) ":" "\n" \
-        "str lr, [sp, #0]" "\n" \
+        INSTRUCTION_STORE_RETURN_ADDRESS_EJI "\n" \
         "b " SYMBOL_STRING_RELOCATION(function) "WithReturnAddress" "\n" \
     );
 
@@ -122,7 +132,7 @@
     ".thumb" "\n" \
     ".thumb_func " THUMB_FUNC_PARAM(function) "\n" \
     SYMBOL_STRING(function) ":" "\n" \
-        "str lr, [sp, #4]" "\n" \
+        INSTRUCTION_STORE_RETURN_ADDRESS_EJCI "\n" \
         "b " SYMBOL_STRING_RELOCATION(function) "WithReturnAddress" "\n" \
     );
 
@@ -444,9 +454,16 @@ void DFG_OPERATION operationPutByValBeyondArrayBoundsStrict(ExecState* exec, JSA
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
     
-    // We should only get here if index is outside the existing vector.
-    ASSERT(!array->canSetIndex(index));
-    JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue), true);
+    if (index >= 0) {
+        // We should only get here if index is outside the existing vector.
+        ASSERT(!array->canSetIndex(index));
+        JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue), true);
+        return;
+    }
+    
+    PutPropertySlot slot(true);
+    array->methodTable()->put(
+        array, exec, Identifier::from(exec, index), JSValue::decode(encodedValue), slot);
 }
 
 void DFG_OPERATION operationPutByValBeyondArrayBoundsNonStrict(ExecState* exec, JSArray* array, int32_t index, EncodedJSValue encodedValue)
@@ -454,9 +471,16 @@ void DFG_OPERATION operationPutByValBeyondArrayBoundsNonStrict(ExecState* exec, 
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
     
-    // We should only get here if index is outside the existing vector.
-    ASSERT(!array->canSetIndex(index));
-    JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue), false);
+    if (index >= 0) {
+        // We should only get here if index is outside the existing vector.
+        ASSERT(!array->canSetIndex(index));
+        JSArray::putByIndex(array, exec, index, JSValue::decode(encodedValue), false);
+        return;
+    }
+    
+    PutPropertySlot slot(false);
+    array->methodTable()->put(
+        array, exec, Identifier::from(exec, index), JSValue::decode(encodedValue), slot);
 }
 
 EncodedJSValue DFG_OPERATION operationArrayPush(ExecState* exec, EncodedJSValue encodedValue, JSArray* array)

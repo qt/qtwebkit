@@ -129,7 +129,7 @@ private:
     SVGShadowText(Document* document, const String& data)
         : Text(document, data)
     {
-         setHasCustomWillOrDidRecalcStyle();
+        setHasCustomCallbacks();
     }
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual void willRecalcTextStyle(StyleChange);
@@ -200,14 +200,14 @@ bool SVGTRefElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGTRefElement::parseAttribute(Attribute* attr)
+void SVGTRefElement::parseAttribute(const Attribute& attribute)
 {
-    if (!isSupportedAttribute(attr->name())) {
-        SVGTextPositioningElement::parseAttribute(attr);
+    if (!isSupportedAttribute(attribute.name())) {
+        SVGTextPositioningElement::parseAttribute(attribute);
         return;
     }
 
-    if (SVGURIReference::parseAttribute(attr)) {
+    if (SVGURIReference::parseAttribute(attribute)) {
         return;
     }
 

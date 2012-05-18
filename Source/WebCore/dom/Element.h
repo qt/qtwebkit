@@ -241,7 +241,7 @@ public:
     NamedNodeMap* attributes() const;
 
     // This method is called whenever an attribute is added, changed or removed.
-    virtual void attributeChanged(Attribute*);
+    virtual void attributeChanged(const Attribute&);
 
     // Only called by the parser immediately after element construction.
     void parserSetAttributes(const Vector<Attribute>&, FragmentScriptingPermission);
@@ -251,10 +251,15 @@ public:
     ElementAttributeData* updatedAttributeData() const;
     ElementAttributeData* ensureUpdatedAttributeData() const;
 
-    void setAttributesFromElement(const Element&);
+    // Clones attributes only.
+    void cloneAttributesFromElement(const Element&);
+
+    // Clones all attribute-derived data, including subclass specifics (through copyNonAttributeProperties.)
+    void cloneDataFromElement(const Element&);
+
     bool hasEquivalentAttributes(const Element* other) const;
 
-    virtual void copyNonAttributeProperties(const Element* source);
+    virtual void copyNonAttributePropertiesFromElement(const Element&) { }
 
     virtual void attach();
     virtual void detach();
@@ -302,8 +307,8 @@ public:
 
     void willModifyAttribute(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue);
     void willRemoveAttribute(const QualifiedName&, const AtomicString& value);
-    void didAddAttribute(Attribute*);
-    void didModifyAttribute(Attribute*);
+    void didAddAttribute(const Attribute&);
+    void didModifyAttribute(const Attribute&);
     void didRemoveAttribute(const QualifiedName&);
 
     LayoutSize minimumSizeForResizing() const;
@@ -422,8 +427,9 @@ protected:
     virtual InsertionNotificationRequest insertedInto(Node*) OVERRIDE;
     virtual void removedFrom(Node*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
-    virtual bool willRecalcStyle(StyleChange) { return true; }
-    virtual void didRecalcStyle(StyleChange) { }
+
+    virtual bool willRecalcStyle(StyleChange);
+    virtual void didRecalcStyle(StyleChange);
     virtual PassRefPtr<RenderStyle> customStyleForRenderer();
 
     virtual bool shouldRegisterAsNamedItem() const { return false; }
@@ -559,12 +565,6 @@ inline ElementAttributeData* Element::ensureUpdatedAttributeData() const
 {
     updateInvalidAttributes();
     return ensureAttributeData();
-}
-
-inline void Element::setAttributesFromElement(const Element& other)
-{
-    if (ElementAttributeData* attributeData = other.updatedAttributeData())
-        ensureUpdatedAttributeData()->setAttributes(*attributeData, this);
 }
 
 inline void Element::updateName(const AtomicString& oldName, const AtomicString& newName)

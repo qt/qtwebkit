@@ -1651,7 +1651,6 @@ webcore_sources += \
 	Source/WebCore/css/CSSSelector.h \
 	Source/WebCore/css/CSSSelectorList.cpp \
 	Source/WebCore/css/CSSSelectorList.h \
-	Source/WebCore/css/CSSStyleDeclaration.cpp \
 	Source/WebCore/css/CSSStyleDeclaration.h \
 	Source/WebCore/css/CSSStyleRule.cpp \
 	Source/WebCore/css/CSSStyleRule.h \
@@ -1990,8 +1989,6 @@ webcore_sources += \
 	Source/WebCore/dom/TreeDepthLimit.h \
 	Source/WebCore/dom/TreeScope.cpp \
 	Source/WebCore/dom/TreeScope.h \
-	Source/WebCore/dom/TreeScopeAdjuster.cpp \
-	Source/WebCore/dom/TreeScopeAdjuster.h \
 	Source/WebCore/dom/TreeScopeAdopter.cpp \
 	Source/WebCore/dom/TreeScopeAdopter.h \
 	Source/WebCore/dom/TreeWalker.cpp \
@@ -2502,14 +2499,14 @@ webcore_sources += \
 	Source/WebCore/html/parser/XSSAuditor.h \
 	Source/WebCore/html/shadow/CalendarPickerElement.cpp \
 	Source/WebCore/html/shadow/CalendarPickerElement.h \
+	Source/WebCore/html/shadow/ContentDistributor.cpp \
+	Source/WebCore/html/shadow/ContentDistributor.h \
 	Source/WebCore/html/shadow/ContentSelectorQuery.cpp \
 	Source/WebCore/html/shadow/ContentSelectorQuery.h \
 	Source/WebCore/html/shadow/DetailsMarkerControl.cpp \
 	Source/WebCore/html/shadow/DetailsMarkerControl.h \
 	Source/WebCore/html/shadow/HTMLContentElement.cpp \
 	Source/WebCore/html/shadow/HTMLContentElement.h \
-	Source/WebCore/html/shadow/HTMLContentSelector.cpp \
-	Source/WebCore/html/shadow/HTMLContentSelector.h \
 	Source/WebCore/html/shadow/InsertionPoint.cpp \
 	Source/WebCore/html/shadow/InsertionPoint.h \
 	Source/WebCore/html/shadow/MediaControls.cpp \
@@ -2850,6 +2847,10 @@ webcore_sources += \
 	Source/WebCore/loader/PolicyCallback.h \
 	Source/WebCore/loader/PolicyChecker.cpp \
 	Source/WebCore/loader/PolicyChecker.h \
+	Source/WebCore/loader/Prerenderer.cpp \
+	Source/WebCore/loader/Prerenderer.h \
+	Source/WebCore/loader/PrerendererClient.cpp \
+	Source/WebCore/loader/PrerendererClient.h \
 	Source/WebCore/loader/ProgressTracker.cpp \
 	Source/WebCore/loader/ProgressTracker.h \
 	Source/WebCore/loader/NavigationScheduler.cpp \
@@ -3211,7 +3212,6 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/filters/SourceGraphic.h \
 	Source/WebCore/platform/graphics/filters/SpotLightSource.cpp \
 	Source/WebCore/platform/graphics/filters/SpotLightSource.h \
-	Source/WebCore/platform/graphics/filters/arm/FECompositeArithmeticNEON.cpp \
 	Source/WebCore/platform/graphics/filters/arm/FECompositeArithmeticNEON.h \
 	Source/WebCore/platform/graphics/filters/arm/FEGaussianBlurNEON.cpp \
 	Source/WebCore/platform/graphics/filters/arm/FEGaussianBlurNEON.h \
@@ -3547,6 +3547,7 @@ webcore_sources += \
 	Source/WebCore/platform/PopupMenuClient.h \
 	Source/WebCore/platform/PopupMenu.h \
 	Source/WebCore/platform/PopupMenuStyle.h \
+	Source/WebCore/platform/PrerenderHandle.h \
 	Source/WebCore/platform/PurgeableBuffer.h \
 	Source/WebCore/platform/PurgePriority.h \
 	Source/WebCore/platform/ReferrerPolicy.h \
@@ -3670,6 +3671,8 @@ webcore_sources += \
 	Source/WebCore/platform/UUID.cpp \
 	Source/WebCore/platform/UUID.h \
 	Source/WebCore/platform/VisitedLinkStrategy.h \
+	Source/WebCore/platform/VisitedLinks.cpp \
+	Source/WebCore/platform/VisitedLinks.h \
 	Source/WebCore/platform/Widget.cpp \
 	Source/WebCore/platform/Widget.h \
 	Source/WebCore/platform/WindowsKeyboardCodes.h \
@@ -4923,6 +4926,10 @@ if ENABLE_INDEXED_DATABASE
 webcore_built_sources += \
 	DerivedSources/WebCore/JSIDBAny.cpp \
 	DerivedSources/WebCore/JSIDBAny.h \
+	DerivedSources/WebCore/JSIDBCursor.cpp \
+	DerivedSources/WebCore/JSIDBCursor.h \
+	DerivedSources/WebCore/JSIDBCursorWithValue.cpp \
+	DerivedSources/WebCore/JSIDBCursorWithValue.h \
 	DerivedSources/WebCore/JSIDBDatabaseException.cpp \
 	DerivedSources/WebCore/JSIDBDatabaseException.h \
 	DerivedSources/WebCore/JSIDBDatabase.cpp \
@@ -4931,6 +4938,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSIDBFactory.h \
 	DerivedSources/WebCore/JSIDBIndex.cpp \
 	DerivedSources/WebCore/JSIDBIndex.h \
+	DerivedSources/WebCore/JSIDBKey.cpp \
+	DerivedSources/WebCore/JSIDBKey.h \
 	DerivedSources/WebCore/JSIDBKeyRange.cpp \
 	DerivedSources/WebCore/JSIDBKeyRange.h \
 	DerivedSources/WebCore/JSIDBObjectStore.cpp \
@@ -4938,20 +4947,30 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSIDBRequest.cpp \
 	DerivedSources/WebCore/JSIDBRequest.h \
 	DerivedSources/WebCore/JSIDBTransaction.cpp \
-	DerivedSources/WebCore/JSIDBTransaction.h
+	DerivedSources/WebCore/JSIDBTransaction.h \
+	DerivedSources/WebCore/JSIDBVersionChangeEvent.cpp \
+	DerivedSources/WebCore/JSIDBVersionChangeEvent.h \
+	DerivedSources/WebCore/JSIDBVersionChangeRequest.cpp \
+	DerivedSources/WebCore/JSIDBVersionChangeRequest.h
 
 dom_binding_idls += \
 	$(WebCore)/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
 	$(WebCore)/Modules/indexeddb/IDBAny.idl \
-	$(WebCore)/Modules/indexeddb/IDBDatabase.idl \
+	$(WebCore)/Modules/indexeddb/IDBCursor.idl \
+	$(WebCore)/Modules/indexeddb/IDBCursorWithValue.idl \
 	$(WebCore)/Modules/indexeddb/IDBDatabaseException.idl \
+	$(WebCore)/Modules/indexeddb/IDBDatabase.idl \
 	$(WebCore)/Modules/indexeddb/IDBFactory.idl \
 	$(WebCore)/Modules/indexeddb/IDBIndex.idl \
+	$(WebCore)/Modules/indexeddb/IDBKey.idl \
 	$(WebCore)/Modules/indexeddb/IDBKeyRange.idl \
 	$(WebCore)/Modules/indexeddb/IDBObjectStore.idl \
 	$(WebCore)/Modules/indexeddb/IDBRequest.idl \
 	$(WebCore)/Modules/indexeddb/IDBTransaction.idl \
+	$(WebCore)/Modules/indexeddb/IDBVersionChangeEvent.idl \
+	$(WebCore)/Modules/indexeddb/IDBVersionChangeRequest.idl \
 	$(WebCore)/Modules/indexeddb/WorkerContextIndexedDatabase.idl
+
 endif # END ENABLE_INDEXED_DATABASE
 
 # ----
@@ -5526,6 +5545,8 @@ webcore_sources += \
 	Source/WebCore/Modules/webaudio/AudioProcessingEvent.h \
 	Source/WebCore/Modules/webaudio/AudioScheduledSourceNode.cpp \
 	Source/WebCore/Modules/webaudio/AudioScheduledSourceNode.h \
+	Source/WebCore/Modules/webaudio/AudioSummingJunction.cpp \
+	Source/WebCore/Modules/webaudio/AudioSummingJunction.h \
 	Source/WebCore/Modules/webaudio/AudioSourceNode.h \
 	Source/WebCore/Modules/webaudio/BiquadDSPKernel.cpp \
 	Source/WebCore/Modules/webaudio/BiquadDSPKernel.h \

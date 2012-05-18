@@ -27,6 +27,7 @@
 #include "config.h"
 #include "ShadowRoot.h"
 
+#include "ContentDistributor.h"
 #include "DOMSelection.h"
 #include "DOMWindow.h"
 #include "Document.h"
@@ -34,7 +35,6 @@
 #include "Element.h"
 #include "ElementShadow.h"
 #include "HTMLContentElement.h"
-#include "HTMLContentSelector.h"
 #include "HTMLNames.h"
 #include "InsertionPoint.h"
 #include "NodeRareData.h"
@@ -147,13 +147,6 @@ void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
     RefPtr<DocumentFragment> fragment = createFragmentFromSource(markup, host(), ec);
     if (fragment)
         replaceChildrenWithFragment(this, fragment.release(), ec);
-}
-
-DOMSelection* ShadowRoot::selection()
-{
-    if (document() && document()->domWindow())
-        return document()->domWindow()->getSelection();
-    return 0;
 }
 
 bool ShadowRoot::childTypeAllowed(NodeType type) const

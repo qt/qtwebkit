@@ -35,6 +35,7 @@
 #include "KURL.h"
 #include "MessagePort.h"
 #include "MessagePortChannel.h"
+#include "ScriptState.h"
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -43,7 +44,6 @@
 
 namespace WebCore {
 
-class ScriptState;
 class SerializedScriptValue;
 
 typedef int ExceptionCode;
@@ -52,6 +52,8 @@ class Intent : public RefCounted<Intent> {
 public:
     static PassRefPtr<Intent> create(const String& action, const String& type, PassRefPtr<SerializedScriptValue> data, const MessagePortArray& ports, ExceptionCode&);
     static PassRefPtr<Intent> create(ScriptState*, const Dictionary&, ExceptionCode&);
+
+    virtual ~Intent() { }
 
     const String& action() const { return m_action; }
     const String& type() const { return m_type; }
@@ -67,7 +69,6 @@ protected:
            const WTF::HashMap<String, String>& extras, const KURL& service);
 
 private:
-
     String m_action;
     String m_type;
     RefPtr<SerializedScriptValue> m_data;

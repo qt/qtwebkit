@@ -54,6 +54,8 @@
 #include "StyleResolver.h"
 #include "TiledBacking.h"
 
+#include <wtf/CurrentTime.h>
+
 #if ENABLE(CSS_FILTERS)
 #include "FilterEffectRenderer.h"
 #endif
@@ -322,6 +324,8 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
 {
     RenderLayerCompositor* compositor = this->compositor();
     RenderObject* renderer = this->renderer();
+
+    m_owningLayer->updateZOrderLists();
 
     bool layerConfigChanged = false;
     if (updateForegroundLayer(compositor->needsContentsCompositingLayer(m_owningLayer)))
@@ -1205,6 +1209,9 @@ void RenderLayerBacking::paintContents(const GraphicsLayer* graphicsLayer, Graph
 
         // We have to use the same root as for hit testing, because both methods can compute and cache clipRects.
         paintIntoLayer(m_owningLayer, &context, dirtyRect, PaintBehaviorNormal, paintingPhase, renderer());
+
+        if (m_usingTiledCacheLayer)
+            m_owningLayer->renderer()->frame()->view()->setLastPaintTime(currentTime());
 
         InspectorInstrumentation::didPaint(cookie);
     } else if (graphicsLayer == layerForHorizontalScrollbar()) {

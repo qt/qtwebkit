@@ -39,19 +39,17 @@
 #endif
 #include "WebPageGroup.h"
 #include "WebPreferences.h"
-
 #include "qquicknetworkreply_p.h"
 #include "qquicknetworkrequest_p.h"
 #include "qquickwebpage_p_p.h"
 #include "qquickwebview_p_p.h"
 #include "qwebdownloaditem_p_p.h"
+#include "qwebkittest_p.h"
 #include "qwebloadrequest_p.h"
 #include "qwebnavigationhistory_p.h"
 #include "qwebnavigationhistory_p_p.h"
 #include "qwebpreferences_p.h"
 #include "qwebpreferences_p_p.h"
-#include "qwebviewportinfo_p.h"
-
 #include <JavaScriptCore/InitializeThreading.h>
 #include <JavaScriptCore/JSBase.h>
 #include <JavaScriptCore/JSRetainPtr.h>
@@ -266,6 +264,7 @@ QQuickWebViewPrivate::QQuickWebViewPrivate(QQuickWebView* viewport)
     , m_navigatorQtObjectEnabled(false)
     , m_renderToOffscreenBuffer(false)
     , m_dialogActive(false)
+    , m_allowAnyHTTPSCertificateForLocalHost(false)
     , m_loadProgress(0)
 {
     viewport->setClip(true);
@@ -495,47 +494,36 @@ void QQuickWebViewPrivate::_q_onReceivedResponseFromDownload(QWebDownloadItem* d
 
 void QQuickWebViewPrivate::runJavaScriptAlert(const QString& alertText)
 {
-    if (!alertDialog)
-        return;
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForAlert(alertDialog, q, alertText))
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForAlert(alertText))
         return;
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 }
 
 bool QQuickWebViewPrivate::runJavaScriptConfirm(const QString& message)
 {
-    if (!confirmDialog)
-        return true;
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForConfirm(confirmDialog, q, message))
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForConfirm(message))
         return true;
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     return dialogRunner.wasAccepted();
 }
 
 QString QQuickWebViewPrivate::runJavaScriptPrompt(const QString& message, const QString& defaultValue, bool& ok)
 {
-    if (!promptDialog) {
-        ok = true;
-        return defaultValue;
-    }
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForPrompt(promptDialog, q, message, defaultValue)) {
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForPrompt(message, defaultValue)) {
         ok = true;
         return defaultValue;
     }
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     ok = dialogRunner.wasAccepted();
     return dialogRunner.result();
@@ -543,15 +531,12 @@ QString QQuickWebViewPrivate::runJavaScriptPrompt(const QString& message, const 
 
 void QQuickWebViewPrivate::handleAuthenticationRequiredRequest(const QString& hostname, const QString& realm, const QString& prefilledUsername, QString& username, QString& password)
 {
-    if (!authenticationDialog)
-        return;
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForAuthentication(authenticationDialog, q, hostname, realm, prefilledUsername))
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForAuthentication(hostname, realm, prefilledUsername))
         return;
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     username = dialogRunner.username();
     password = dialogRunner.password();
@@ -559,15 +544,12 @@ void QQuickWebViewPrivate::handleAuthenticationRequiredRequest(const QString& ho
 
 void QQuickWebViewPrivate::handleProxyAuthenticationRequiredRequest(const QString& hostname, uint16_t port, const QString& prefilledUsername, QString& username, QString& password)
 {
-    if (!proxyAuthenticationDialog)
-        return;
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForProxyAuthentication(proxyAuthenticationDialog, q, hostname, port, prefilledUsername))
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForProxyAuthentication(hostname, port, prefilledUsername))
         return;
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     username = dialogRunner.username();
     password = dialogRunner.password();
@@ -575,43 +557,30 @@ void QQuickWebViewPrivate::handleProxyAuthenticationRequiredRequest(const QStrin
 
 bool QQuickWebViewPrivate::handleCertificateVerificationRequest(const QString& hostname)
 {
-    if (!certificateVerificationDialog)
-        return false;
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForCertificateVerification(certificateVerificationDialog, q, hostname))
+
+    if (m_allowAnyHTTPSCertificateForLocalHost
+        && (hostname == QStringLiteral("127.0.0.1") || hostname == QStringLiteral("localhost")))
+        return true;
+
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForCertificateVerification(hostname))
         return false;
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     return dialogRunner.wasAccepted();
-}
-
-void QQuickWebViewPrivate::execDialogRunner(QtDialogRunner& dialogRunner)
-{
-    setViewInAttachedProperties(dialogRunner.dialog());
-
-    disableMouseEvents();
-    m_dialogActive = true;
-
-    dialogRunner.exec();
-    m_dialogActive = false;
-    enableMouseEvents();
 }
 
 void QQuickWebViewPrivate::chooseFiles(WKOpenPanelResultListenerRef listenerRef, const QStringList& selectedFileNames, QtWebPageUIClient::FileChooserType type)
 {
     Q_Q(QQuickWebView);
 
-    if (!filePicker)
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForFilePicker(selectedFileNames, (type == QtWebPageUIClient::MultipleFilesSelection)))
         return;
 
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForFilePicker(filePicker, q, selectedFileNames, (type == QtWebPageUIClient::MultipleFilesSelection)))
-        return;
-
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     if (dialogRunner.wasAccepted()) {
         QStringList selectedPaths = dialogRunner.filePaths();
@@ -628,20 +597,41 @@ void QQuickWebViewPrivate::chooseFiles(WKOpenPanelResultListenerRef listenerRef,
 
 quint64 QQuickWebViewPrivate::exceededDatabaseQuota(const QString& databaseName, const QString& displayName, WKSecurityOriginRef securityOrigin, quint64 currentQuota, quint64 currentOriginUsage, quint64 currentDatabaseUsage, quint64 expectedUsage)
 {
-    if (!databaseQuotaDialog)
-        return 0;
-
     Q_Q(QQuickWebView);
-    QtDialogRunner dialogRunner;
-    if (!dialogRunner.initForDatabaseQuotaDialog(databaseQuotaDialog, q, databaseName, displayName, securityOrigin, currentQuota, currentOriginUsage, currentDatabaseUsage, expectedUsage))
+    QtDialogRunner dialogRunner(q);
+    if (!dialogRunner.initForDatabaseQuotaDialog(databaseName, displayName, securityOrigin, currentQuota, currentOriginUsage, currentDatabaseUsage, expectedUsage))
         return 0;
 
-    execDialogRunner(dialogRunner);
+    dialogRunner.run();
 
     return dialogRunner.wasAccepted() ? dialogRunner.databaseQuota() : 0;
 }
 
-void QQuickWebViewPrivate::setViewInAttachedProperties(QObject* object)
+/* The 'WebView' attached property allows items spawned by the webView to
+   refer back to the originating webView through 'WebView.view', similar
+   to how ListView.view and GridView.view is exposed to items. */
+QQuickWebViewAttached::QQuickWebViewAttached(QObject* object)
+    : QObject(object)
+    , m_view(0)
+{
+}
+
+void QQuickWebViewAttached::setView(QQuickWebView* view)
+{
+    if (m_view == view)
+        return;
+    m_view = view;
+    emit viewChanged();
+}
+
+QQuickWebViewAttached* QQuickWebView::qmlAttachedProperties(QObject* object)
+{
+    return new QQuickWebViewAttached(object);
+}
+
+
+
+void QQuickWebViewPrivate::addAttachedPropertyTo(QObject* object)
 {
     Q_Q(QQuickWebView);
     QQuickWebViewAttached* attached = static_cast<QQuickWebViewAttached*>(qmlAttachedPropertiesObject<QQuickWebView>(object));
@@ -874,7 +864,7 @@ void QQuickWebViewFlickablePrivate::didChangeViewportProperties(const WebCore::V
         interactionEngine->setCSSScale(attr.initialScale);
 
     this->attributes = attr;
-    q->experimental()->viewportInfo()->didUpdateViewportConstraints();
+    emit q->experimental()->test()->viewportChanged();
 
     // If the web app successively changes the viewport on purpose
     // it wants to be in control and we should disable animations.
@@ -903,8 +893,6 @@ void QQuickWebViewFlickablePrivate::updateViewportSize()
 void QQuickWebViewFlickablePrivate::_q_contentViewportChanged(const QPointF& trajectoryVector)
 {
     Q_Q(QQuickWebView);
-    // This is only for our QML ViewportInfo debugging API.
-    q->experimental()->viewportInfo()->didUpdateCurrentScale();
 
     DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
     if (!drawingArea)
@@ -912,6 +900,8 @@ void QQuickWebViewFlickablePrivate::_q_contentViewportChanged(const QPointF& tra
 
     const QRect visibleRect(visibleContentsRect());
     float scale = pageView->contentsScale();
+
+    emit q->experimental()->test()->contentsScaleChanged();
 
     QRectF accurateVisibleRect(q->boundingRect());
     accurateVisibleRect.translate(contentPos());
@@ -948,14 +938,13 @@ void QQuickWebViewFlickablePrivate::didChangeContentsSize(const QSize& newSize)
     Q_Q(QQuickWebView);
     QSize viewportSize = q->boundingRect().size().toSize();
 
-    pageView->setContentsSize(newSize);
-    q->experimental()->viewportInfo()->didUpdateContentsSize();
+    pageView->setContentsSize(newSize); // emits contentsSizeChanged()
 
     float minimumScale = WebCore::computeMinimumScaleFactorForContentContained(attributes, viewportSize, newSize);
 
     if (!qFuzzyCompare(minimumScale, attributes.minimumScale)) {
         interactionEngine->setCSSScaleBounds(minimumScale, attributes.maximumScale);
-        q->experimental()->viewportInfo()->didUpdateViewportConstraints();
+        emit q->experimental()->test()->viewportChanged();
 
         if (!interactionEngine->hadUserInteraction() && !pageIsSuspended)
             interactionEngine->setCSSScale(minimumScale);
@@ -978,27 +967,12 @@ void QQuickWebViewFlickablePrivate::didChangeContentsSize(const QSize& newSize)
     \sa WebNavigationRequest
 */
 
-QQuickWebViewAttached::QQuickWebViewAttached(QObject* object)
-    : QObject(object)
-    , m_view(0)
-{
-
-}
-
-void QQuickWebViewAttached::setView(QQuickWebView* view)
-{
-    if (m_view == view)
-        return;
-    m_view = view;
-    emit viewChanged();
-}
-
 QQuickWebViewExperimental::QQuickWebViewExperimental(QQuickWebView *webView)
     : QObject(webView)
     , q_ptr(webView)
     , d_ptr(webView->d_ptr.data())
     , schemeParent(new QObject(this))
-    , m_viewportInfo(new QWebViewportInfo(webView->d_ptr.data(), this))
+    , m_test(new QWebKitTest(webView->d_ptr.data(), this))
 {
 }
 
@@ -1409,9 +1383,9 @@ void QQuickWebViewExperimental::goBackTo(int index)
     d_ptr->navigationHistory->d->goBackTo(index);
 }
 
-QWebViewportInfo* QQuickWebViewExperimental::viewportInfo()
+QWebKitTest* QQuickWebViewExperimental::test()
 {
-    return m_viewportInfo;
+    return m_test;
 }
 
 QQuickWebPage* QQuickWebViewExperimental::page()
@@ -1633,11 +1607,6 @@ QQuickWebViewExperimental* QQuickWebView::experimental() const
     return m_experimental;
 }
 
-QQuickWebViewAttached* QQuickWebView::qmlAttachedProperties(QObject* object)
-{
-    return new QQuickWebViewAttached(object);
-}
-
 /*!
     \internal
 */
@@ -1738,6 +1707,7 @@ void QQuickWebView::mouseReleaseEvent(QMouseEvent* event)
 void QQuickWebView::mouseDoubleClickEvent(QMouseEvent* event)
 {
     Q_D(QQuickWebView);
+
     // If a MouseButtonDblClick was received then we got a MouseButtonPress before
     // handleMousePressEvent will take care of double clicks.
     d->pageView->eventHandler()->handleMousePressEvent(event);
@@ -1892,5 +1862,18 @@ void QQuickWebView::runJavaScriptInMainFrame(const QString &script, QObject *rec
 
     d->webPageProxy.get()->runJavaScriptInMainFrame(script, ScriptValueCallback::create(closure, javaScriptCallback));
 }
+
+bool QQuickWebView::allowAnyHTTPSCertificateForLocalHost() const
+{
+    Q_D(const QQuickWebView);
+    return d->m_allowAnyHTTPSCertificateForLocalHost;
+}
+
+void QQuickWebView::setAllowAnyHTTPSCertificateForLocalHost(bool allow)
+{
+    Q_D(QQuickWebView);
+    d->m_allowAnyHTTPSCertificateForLocalHost = allow;
+}
+
 
 #include "moc_qquickwebview_p.cpp"

@@ -83,7 +83,11 @@ struct CCSettings {
             , perTilePainting(false)
             , partialSwapEnabled(false)
             , threadedAnimationEnabled(false)
-            , maxPartialTextureUpdates(std::numeric_limits<size_t>::max()) { }
+            , maxPartialTextureUpdates(std::numeric_limits<size_t>::max())
+            , defaultTileSize(IntSize(256, 256))
+            , maxUntiledLayerSize(IntSize(512, 512))
+            , deviceScaleFactor(1)
+    { }
 
     bool acceleratePainting;
     bool showFPSCounter;
@@ -96,6 +100,9 @@ struct CCSettings {
     bool partialSwapEnabled;
     bool threadedAnimationEnabled;
     size_t maxPartialTextureUpdates;
+    IntSize defaultTileSize;
+    IntSize maxUntiledLayerSize;
+    float deviceScaleFactor;
 };
 
 // Provides information on an Impl's rendering capabilities back to the CCLayerTreeHost
@@ -198,6 +205,7 @@ public:
     bool commitRequested() const;
 
     void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime);
+    void didAddAnimation();
 
     LayerChromium* rootLayer() { return m_rootLayer.get(); }
     const LayerChromium* rootLayer() const { return m_rootLayer.get(); }
@@ -208,6 +216,8 @@ public:
     void setViewportSize(const IntSize&);
 
     const IntSize& viewportSize() const { return m_viewportSize; }
+    // Gives the viewport size in device/content space.
+    const IntSize& deviceViewportSize() const { return m_deviceViewportSize; }
 
     void setPageScaleFactorAndLimits(float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor);
 
@@ -276,6 +286,7 @@ private:
     CCSettings m_settings;
 
     IntSize m_viewportSize;
+    IntSize m_deviceViewportSize;
     bool m_visible;
     typedef HashMap<GraphicsContext3D*, RefPtr<RateLimiter> > RateLimiterMap;
     RateLimiterMap m_rateLimiters;

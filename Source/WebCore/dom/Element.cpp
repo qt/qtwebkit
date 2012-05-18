@@ -60,7 +60,6 @@
 #include "RenderRegion.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
-#include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "StyleResolver.h"
@@ -179,19 +178,13 @@ PassRefPtr<Element> Element::cloneElementWithoutChildren()
     // This is a sanity check as HTML overloads some of the DOM methods.
     ASSERT(isHTMLElement() == clone->isHTMLElement());
 
-    clone->setAttributesFromElement(*this);
-    clone->copyNonAttributeProperties(this);
-
+    clone->cloneDataFromElement(*this);
     return clone.release();
 }
 
 PassRefPtr<Element> Element::cloneElementWithoutAttributesAndChildren()
 {
     return document()->createElement(tagQName(), false);
-}
-
-void Element::copyNonAttributeProperties(const Element*)
-{
 }
 
 PassRefPtr<Attr> Element::detachAttribute(size_t index)
@@ -697,38 +690,38 @@ inline void Element::setAttributeInternal(size_t index, const QualifiedName& nam
         old->setValue(value);
 
     if (inUpdateStyleAttribute == NotInUpdateStyleAttribute)
-        didModifyAttribute(old);
+        didModifyAttribute(*old);
 }
 
-void Element::attributeChanged(Attribute* attr)
+void Element::attributeChanged(const Attribute& attribute)
 {
     document()->incDOMTreeVersion();
 
-    if (isIdAttributeName(attr->name())) {
+    if (isIdAttributeName(attribute.name())) {
         if (attributeData()) {
-            if (attr->isNull())
+            if (attribute.isNull())
                 attributeData()->setIdForStyleResolution(nullAtom);
             else if (document()->inQuirksMode())
-                attributeData()->setIdForStyleResolution(attr->value().lower());
+                attributeData()->setIdForStyleResolution(attribute.value().lower());
             else
-                attributeData()->setIdForStyleResolution(attr->value());
+                attributeData()->setIdForStyleResolution(attribute.value());
         }
         setNeedsStyleRecalc();
-    } else if (attr->name() == HTMLNames::nameAttr)
-        setHasName(!attr->isNull());
+    } else if (attribute.name() == HTMLNames::nameAttr)
+        setHasName(!attribute.isNull());
 
     if (!needsStyleRecalc() && document()->attached()) {
         StyleResolver* styleResolver = document()->styleResolverIfExists();
-        if (!styleResolver || styleResolver->hasSelectorForAttribute(attr->name().localName()))
+        if (!styleResolver || styleResolver->hasSelectorForAttribute(attribute.name().localName()))
             setNeedsStyleRecalc();
     }
 
-    invalidateNodeListsCacheAfterAttributeChanged(attr->name());
+    invalidateNodeListsCacheAfterAttributeChanged(attribute.name(), this);
 
     if (!AXObjectCache::accessibilityEnabled())
         return;
 
-    const QualifiedName& attrName = attr->name();
+    const QualifiedName& attrName = attribute.name();
     if (attrName == aria_activedescendantAttr) {
         // any change to aria-activedescendant attribute triggers accessibility focus change, but document focus remains intact
         document()->axObjectCache()->handleActiveDescendantChanged(renderer());
@@ -803,7 +796,7 @@ void Element::parserSetAttributes(const Vector<Attribute>& attributeVector, Frag
     // attributeChanged mutates m_attributeData.
     Vector<Attribute> clonedAttributes = m_attributeData->clonedAttributeVector();
     for (unsigned i = 0; i < clonedAttributes.size(); ++i)
-        attributeChanged(&clonedAttributes[i]);
+        attributeChanged(clonedAttributes[i]);
 }
 
 bool Element::hasAttributes() const
@@ -1041,22 +1034,19 @@ bool Element::pseudoStyleCacheIsInvalid(const RenderStyle* currentStyle, RenderS
     return false;
 }
 
-PassRefPtr<RenderStyle> Element::customStyleForRenderer()
-{
-    ASSERT_NOT_REACHED(); 
-    return 0; 
-}
-
 PassRefPtr<RenderStyle> Element::styleForRenderer()
 {
-    if (hasCustomStyleForRenderer())
-        return customStyleForRenderer();
-    return document()->styleResolver()->styleForElement(static_cast<Element*>(this));
+    if (hasCustomCallbacks()) {
+        if (RefPtr<RenderStyle> style = customStyleForRenderer())
+            return style.release();
+    }
+
+    return document()->styleResolver()->styleForElement(this);
 }
 
 void Element::recalcStyle(StyleChange change)
 {
-    if (hasCustomWillOrDidRecalcStyle()) {
+    if (hasCustomCallbacks()) {
         if (!willRecalcStyle(change))
             return;
     }
@@ -1084,7 +1074,7 @@ void Element::recalcStyle(StyleChange change)
             clearNeedsStyleRecalc();
             clearChildNeedsStyleRecalc();
 
-            if (hasCustomWillOrDidRecalcStyle())
+            if (hasCustomCallbacks())
                 didRecalcStyle(change);
             return;
         }
@@ -1174,7 +1164,7 @@ void Element::recalcStyle(StyleChange change)
     clearNeedsStyleRecalc();
     clearChildNeedsStyleRecalc();
     
-    if (hasCustomWillOrDidRecalcStyle())
+    if (hasCustomCallbacks())
         didRecalcStyle(change);
 }
 
@@ -1588,7 +1578,7 @@ void Element::focus(bool restorePreviousSelection)
 
 void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
 {
-    if (this == rootEditableElement()) { 
+    if (isRootEditableElement()) {
         Frame* frame = document()->frame();
         if (!frame)
             return;
@@ -2026,25 +2016,23 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
 #endif
 }
 
-void Element::didAddAttribute(Attribute* attr)
+void Element::didAddAttribute(const Attribute& attribute)
 {
-    attributeChanged(attr);
-    InspectorInstrumentation::didModifyDOMAttr(document(), this, attr->name().localName(), attr->value());
+    attributeChanged(attribute);
+    InspectorInstrumentation::didModifyDOMAttr(document(), this, attribute.localName(), attribute.value());
     dispatchSubtreeModifiedEvent();
 }
 
-void Element::didModifyAttribute(Attribute* attr)
+void Element::didModifyAttribute(const Attribute& attribute)
 {
-    attributeChanged(attr);
-    InspectorInstrumentation::didModifyDOMAttr(document(), this, attr->name().localName(), attr->value());
+    attributeChanged(attribute);
+    InspectorInstrumentation::didModifyDOMAttr(document(), this, attribute.localName(), attribute.value());
     // Do not dispatch a DOMSubtreeModified event here; see bug 81141.
 }
 
 void Element::didRemoveAttribute(const QualifiedName& name)
 {
-    Attribute dummyAttribute(name, nullAtom);
-    attributeChanged(&dummyAttribute);
-
+    attributeChanged(Attribute(name, nullAtom));
     InspectorInstrumentation::didRemoveDOMAttr(document(), this, name.localName());
     dispatchSubtreeModifiedEvent();
 }
@@ -2102,6 +2090,41 @@ PassRefPtr<Attr> Element::ensureAttr(const QualifiedName& name)
 {
     ASSERT(attributeData());
     return attributeData()->ensureAttr(this, name);
+}
+
+bool Element::willRecalcStyle(StyleChange)
+{
+    ASSERT(hasCustomCallbacks());
+    return true;
+}
+
+void Element::didRecalcStyle(StyleChange)
+{
+    ASSERT(hasCustomCallbacks());
+}
+
+
+PassRefPtr<RenderStyle> Element::customStyleForRenderer()
+{
+    ASSERT(hasCustomCallbacks());
+    return 0;
+}
+
+
+void Element::cloneAttributesFromElement(const Element& other)
+{
+    if (ElementAttributeData* attributeData = other.updatedAttributeData())
+        ensureUpdatedAttributeData()->cloneDataFrom(*attributeData, other, *this);
+    else if (m_attributeData) {
+        m_attributeData->clearAttributes(this);
+        m_attributeData.clear();
+    }
+}
+
+void Element::cloneDataFromElement(const Element& other)
+{
+    cloneAttributesFromElement(other);
+    copyNonAttributePropertiesFromElement(other);
 }
 
 } // namespace WebCore

@@ -56,6 +56,7 @@
 #include "RenderRegion.h"
 #include "RenderRuby.h"
 #include "RenderRubyText.h"
+#include "RenderScrollbarPart.h"
 #include "RenderTableCaption.h"
 #include "RenderTableCell.h"
 #include "RenderTableCol.h"
@@ -189,8 +190,8 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case BOX:
     case INLINE_BOX:
         return new (arena) RenderDeprecatedFlexibleBox(node);
-    case FLEXBOX:
-    case INLINE_FLEXBOX:
+    case FLEX:
+    case INLINE_FLEX:
         return new (arena) RenderFlexibleBox(node);
     }
 
@@ -698,6 +699,8 @@ void RenderObject::setLayerNeedsFullRepaintForPositionedMovementLayout()
 RenderBlock* RenderObject::containingBlock() const
 {
     RenderObject* o = parent();
+    if (!o && isRenderScrollbarPart())
+        o = toRenderScrollbarPart(this)->rendererOwningScrollbar();
     if (!isText() && m_style->position() == FixedPosition) {
         while (o && !o->isRenderView() && !(o->hasTransform() && o->isRenderBlock()))
             o = o->parent();

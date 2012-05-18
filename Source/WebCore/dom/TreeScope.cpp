@@ -27,6 +27,8 @@
 #include "TreeScope.h"
 
 #include "ContainerNode.h"
+#include "DOMSelection.h"
+#include "DOMWindow.h"
 #include "Document.h"
 #include "Element.h"
 #include "FocusController.h"
@@ -36,6 +38,7 @@
 #include "HTMLMapElement.h"
 #include "HTMLNames.h"
 #include "Page.h"
+#include "RuntimeEnabledFeatures.h"
 #include "TreeScopeAdopter.h"
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/CString.h>
@@ -54,6 +57,10 @@ TreeScope::TreeScope(ContainerNode* rootNode)
 
 TreeScope::~TreeScope()
 {
+    if (m_selection) {
+        m_selection->clearTreeScope();
+        m_selection = 0;
+    }
 }
 
 void TreeScope::destroyTreeScopeData()
@@ -89,6 +96,19 @@ void TreeScope::removeElementById(const AtomicString& elementId, Element* elemen
     m_elementsById.remove(elementId.impl(), element);
 }
 
+Node* TreeScope::ancestorInThisScope(Node* node) const
+{
+    while (node) {
+        if (node->treeScope() == this)
+            return node;
+        if (!node->isInShadowTree())
+            return 0;
+        node = node->shadowAncestorNode();
+    }
+
+    return 0;
+}
+
 void TreeScope::addImageMap(HTMLMapElement* imageMap)
 {
     AtomicStringImpl* name = imageMap->getName().impl();
@@ -114,6 +134,31 @@ HTMLMapElement* TreeScope::getImageMap(const String& url) const
     if (rootNode()->document()->isHTMLDocument())
         return static_cast<HTMLMapElement*>(m_imageMapsByName.getElementByLowercasedMapName(AtomicString(name.lower()).impl(), this));
     return static_cast<HTMLMapElement*>(m_imageMapsByName.getElementByMapName(AtomicString(name).impl(), this));
+}
+
+DOMSelection* TreeScope::getSelection() const
+{
+    if (!rootNode()->document()->frame())
+        return 0;
+
+    if (m_selection)
+        return m_selection.get();
+
+    // FIXME: The correct selection in Shadow DOM requires that Position can have a ShadowRoot
+    // as a container. It is now enabled only if runtime Shadow DOM feature is enabled.
+    // See https://bugs.webkit.org/show_bug.cgi?id=82697
+#if ENABLE(SHADOW_DOM)
+    if (RuntimeEnabledFeatures::shadowDOMEnabled()) {
+        m_selection = DOMSelection::create(this);
+        return m_selection.get();
+    }
+#endif
+
+    if (this != rootNode()->document())
+        return rootNode()->document()->getSelection();
+
+    m_selection = DOMSelection::create(rootNode()->document());
+    return m_selection.get();
 }
 
 Element* TreeScope::findAnchor(const String& name)

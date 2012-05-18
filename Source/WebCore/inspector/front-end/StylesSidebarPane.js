@@ -217,7 +217,7 @@ WebInspector.StylesSidebarPane.prototype = {
     update: function(node, forceUpdate)
     {
         if (this._spectrum.visible)
-            this._spectrum.hide();
+            this._spectrum.hide(false);
 
         var refresh = false;
 
@@ -879,7 +879,7 @@ WebInspector.StylesSidebarPane.prototype = {
     willHide: function()
     {
         if (this._spectrum.visible)
-            this._spectrum.hide();
+            this._spectrum.hide(false);
     }
 }
 
@@ -959,7 +959,7 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule, editable, 
                 var refElement = mediaDataElement.createChild("div", "subtitle");
                 var lineNumber = media.sourceLine < 0 ? undefined : media.sourceLine;
                 var anchor = WebInspector.linkifyResourceAsNode(media.sourceURL, lineNumber, "subtitle", media.sourceURL + (isNaN(lineNumber) ? "" : (":" + (lineNumber + 1))));
-                anchor.preferredPanel = "styles";
+                anchor.preferredPanel = "scripts";
                 anchor.style.float = "right";
                 refElement.appendChild(anchor);
             }
@@ -1213,7 +1213,7 @@ WebInspector.StylePropertiesSection.prototype = {
         function linkifyUncopyable(url, line)
         {
             var link = WebInspector.linkifyResourceAsNode(url, line, "", url + ":" + (line + 1));
-            link.preferredPanel = "styles";
+            link.preferredPanel = "scripts";
             link.classList.add("webkit-html-resource-link");
             link.setAttribute("data-uncopyable", link.textContent);
             link.textContent = "";
@@ -1774,14 +1774,17 @@ WebInspector.StylePropertyTreeElement.prototype = {
                     self.applyStyleText(nameElement.textContent + ": " + valueElement.textContent, false, false, false);
                 }
 
-                function spectrumHidden()
+                function spectrumHidden(event)
                 {
                     scrollerElement.removeEventListener("scroll", repositionSpectrum, false);
-                    self.applyStyleText(nameElement.textContent + ": " + valueElement.textContent, true, true, false);
+                    var commitEdit = event.data;
+                    var propertyText = !commitEdit && self.originalPropertyText ? self.originalPropertyText : (nameElement.textContent + ": " + valueElement.textContent);
+                    self.applyStyleText(propertyText, true, true, false);
                     spectrum.removeEventListener(WebInspector.Spectrum.Events.ColorChanged, spectrumChanged);
                     spectrum.removeEventListener(WebInspector.Spectrum.Events.Hidden, spectrumHidden);
 
                     delete self._parentPane._isEditingStyle;
+                    delete self.originalPropertyText;
                 }
 
                 function repositionSpectrum()
@@ -1800,6 +1803,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
                         if (visible) {
                             spectrum.displayText = color.toString(format);
+                            self.originalPropertyText = self.property.propertyText;
                             self._parentPane._isEditingStyle = true;
                             spectrum.addEventListener(WebInspector.Spectrum.Events.ColorChanged, spectrumChanged);
                             spectrum.addEventListener(WebInspector.Spectrum.Events.Hidden, spectrumHidden);
@@ -1888,7 +1892,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
                         colorValueElement.textContent = currentValue;
                 }
 
-                var container = document.createDocumentFragment();
+                var container = document.createElement("nobr");
                 container.appendChild(swatchElement);
                 container.appendChild(colorValueElement);
                 return container;

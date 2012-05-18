@@ -58,6 +58,12 @@ using namespace WebKit;
 using namespace WebKitTests;
 using namespace WTF;
 
+#define EXPECT_EQ_RECT(a, b) \
+    EXPECT_EQ(a.x(), b.x()); \
+    EXPECT_EQ(a.y(), b.y()); \
+    EXPECT_EQ(a.width(), b.width()); \
+    EXPECT_EQ(a.height(), b.height());
+
 namespace {
 
 // Used by test stubs to notify the test when something interesting happens.
@@ -113,6 +119,10 @@ public:
         m_testHooks->drawLayersOnCCThread(this);
     }
 
+    // Make these public.
+    typedef Vector<CCLayerImpl*> CCLayerList;
+    using CCLayerTreeHostImpl::calculateRenderSurfaceLayerList;
+
 protected:
     virtual void animateLayers(double monotonicTime, double wallClockTime)
     {
@@ -156,9 +166,9 @@ public:
     virtual PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHostImpl(CCLayerTreeHostImplClient* client)
     {
         // For these tests, we will enable threaded animations.
-        CCSettings settings;
-        settings.threadedAnimationEnabled = true;
-        return MockLayerTreeHostImpl::create(m_testHooks, settings, client);
+        CCSettings copySettings = settings();
+        copySettings.threadedAnimationEnabled = true;
+        return MockLayerTreeHostImpl::create(m_testHooks, copySettings, client);
     }
 
 private:
@@ -1140,9 +1150,11 @@ public:
 
     virtual void animateLayers(CCLayerTreeHostImpl* layerTreeHostImpl, double monotonicTime)
     {
-        if (!m_numAnimates) {
-            // We have a long animation running. It should continue to tick even if we are not visible.
-            postSetVisibleToMainThread(false);
+        if (m_numAnimates < 2) {
+            if (!m_numAnimates) {
+                // We have a long animation running. It should continue to tick even if we are not visible.
+                postSetVisibleToMainThread(false);
+            }
             m_numAnimates++;
             return;
         }
@@ -1157,15 +1169,7 @@ private:
     int m_numAnimates;
 };
 
-#if OS(WINDOWS)
-// http://webkit.org/b/74623
-TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded, FLAKY_runMultiThread)
-#else
-TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded, runMultiThread)
-#endif
-{
-    runTestThreaded();
-}
+SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestTickAnimationWhileBackgrounded)
 
 // Ensures that animations continue to be ticked when we are backgrounded.
 class CCLayerTreeHostTestAddAnimationWithTimingFunction : public CCLayerTreeHostTestThreadOnly {
@@ -1200,15 +1204,7 @@ public:
 private:
 };
 
-#if OS(WINDOWS)
-// http://webkit.org/b/74623
-TEST_F(CCLayerTreeHostTestAddAnimationWithTimingFunction, FLAKY_runMultiThread)
-#else
-TEST_F(CCLayerTreeHostTestAddAnimationWithTimingFunction, runMultiThread)
-#endif
-{
-    runTestThreaded();
-}
+SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestAddAnimationWithTimingFunction)
 
 // Ensures that when opacity is being animated, this value does not cause the subtree to be skipped.
 class CCLayerTreeHostTestDoNotSkipLayersWithAnimatedOpacity : public CCLayerTreeHostTestThreadOnly {
@@ -1290,10 +1286,7 @@ private:
     CCLayerTreeHostImpl* m_layerTreeHostImpl;
 };
 
-TEST_F(CCLayerTreeHostTestSynchronizeAnimationStartTimes, runMultiThread)
-{
-    runTestThreaded();
-}
+SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestSynchronizeAnimationStartTimes)
 
 // Ensures that main thread animations have their start times synchronized with impl thread animations.
 class CCLayerTreeHostTestAnimationFinishedEvents : public CCLayerTreeHostTestThreadOnly {
@@ -1319,10 +1312,7 @@ public:
 private:
 };
 
-TEST_F(CCLayerTreeHostTestAnimationFinishedEvents, runMultiThread)
-{
-    runTestThreaded();
-}
+SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestAnimationFinishedEvents)
 
 class CCLayerTreeHostTestScrollSimple : public CCLayerTreeHostTestThreadOnly {
 public:
@@ -1764,6 +1754,114 @@ public:
     void notifySyncRequired() { }
 };
 
+class CCLayerTreeHostTestDeviceScaleFactorScalesViewportAndLayers : public CCLayerTreeHostTest {
+public:
+
+    CCLayerTreeHostTestDeviceScaleFactorScalesViewportAndLayers()
+        : m_rootLayer(ContentLayerChromium::create(&m_delegate))
+        , m_childLayer(ContentLayerChromium::create(&m_delegate))
+    {
+        m_settings.deviceScaleFactor = 1.5;
+    }
+
+    virtual void beginTest()
+    {
+        // The device viewport should be scaled by the device scale factor.
+        m_layerTreeHost->setViewportSize(IntSize(40, 40));
+        EXPECT_EQ(IntSize(40, 40), m_layerTreeHost->viewportSize());
+        EXPECT_EQ(IntSize(60, 60), m_layerTreeHost->deviceViewportSize());
+
+        m_rootLayer->addChild(m_childLayer);
+
+        m_rootLayer->setIsDrawable(true);
+        m_rootLayer->setBounds(IntSize(30, 30));
+        m_rootLayer->setAnchorPoint(FloatPoint(0, 0));
+
+        m_childLayer->setIsDrawable(true);
+        m_childLayer->setPosition(IntPoint(2, 2));
+        m_childLayer->setBounds(IntSize(10, 10));
+        m_childLayer->setAnchorPoint(FloatPoint(0, 0));
+
+        m_layerTreeHost->setRootLayer(m_rootLayer);
+    }
+
+    virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl* impl)
+    {
+        // Get access to protected methods.
+        MockLayerTreeHostImpl* mockImpl = static_cast<MockLayerTreeHostImpl*>(impl);
+
+        // Should only do one commit.
+        EXPECT_EQ(0, impl->sourceFrameNumber());
+        // Device scale factor should come over to impl.
+        EXPECT_NEAR(impl->settings().deviceScaleFactor, 1.5, 0.00001);
+
+        // Both layers are on impl.
+        ASSERT_EQ(1u, impl->rootLayer()->children().size());
+
+        // Device viewport is scaled.
+        EXPECT_EQ(IntSize(40, 40), impl->viewportSize());
+        EXPECT_EQ(IntSize(60, 60), impl->deviceViewportSize());
+
+        CCLayerImpl* root = impl->rootLayer();
+        CCLayerImpl* child = impl->rootLayer()->children()[0].get();
+
+        // Positions remain in layout pixels.
+        EXPECT_EQ(IntPoint(0, 0), root->position());
+        EXPECT_EQ(IntPoint(2, 2), child->position());
+
+        // Compute all the layer transforms for the frame.
+        MockLayerTreeHostImpl::CCLayerList renderSurfaceLayerList;
+        mockImpl->calculateRenderSurfaceLayerList(renderSurfaceLayerList);
+
+        // Both layers should be drawing into the root render surface.
+        ASSERT_EQ(1u, renderSurfaceLayerList.size());
+        ASSERT_EQ(root->renderSurface(), renderSurfaceLayerList[0]->renderSurface());
+        ASSERT_EQ(2u, root->renderSurface()->layerList().size());
+
+        // The root render surface is the size of the viewport.
+        EXPECT_EQ_RECT(IntRect(0, 0, 60, 60), root->renderSurface()->contentRect());
+
+        TransformationMatrix scaleTransform;
+        scaleTransform.scale(impl->settings().deviceScaleFactor);
+
+        // The root layer is scaled by 2x.
+        TransformationMatrix rootScreenSpaceTransform = scaleTransform;
+        TransformationMatrix rootDrawTransform = scaleTransform;
+        rootDrawTransform.translate(root->bounds().width() * 0.5, root->bounds().height() * 0.5);
+
+        EXPECT_EQ(rootDrawTransform, root->drawTransform());
+        EXPECT_EQ(rootScreenSpaceTransform, root->screenSpaceTransform());
+
+        // The child is at position 2,2, so translate by 2,2 before applying the scale by 2x.
+        TransformationMatrix childScreenSpaceTransform = scaleTransform;
+        childScreenSpaceTransform.translate(2, 2);
+        TransformationMatrix childDrawTransform = scaleTransform;
+        childDrawTransform.translate(2, 2);
+        childDrawTransform.translate(child->bounds().width() * 0.5, child->bounds().height() * 0.5);
+
+        EXPECT_EQ(childDrawTransform, child->drawTransform());
+        EXPECT_EQ(childScreenSpaceTransform, child->screenSpaceTransform());
+
+        endTest();
+    }
+
+    virtual void afterTest()
+    {
+        m_rootLayer.clear();
+        m_childLayer.clear();
+    }
+
+private:
+    MockContentLayerDelegate m_delegate;
+    RefPtr<ContentLayerChromium> m_rootLayer;
+    RefPtr<ContentLayerChromium> m_childLayer;
+};
+
+TEST_F(CCLayerTreeHostTestDeviceScaleFactorScalesViewportAndLayers, runMultiThread)
+{
+    runTest(true);
+}
+
 // Verify atomicity of commits and reuse of textures.
 class CCLayerTreeHostTestAtomicCommit : public CCLayerTreeHostTest {
 public:
@@ -2016,12 +2114,6 @@ TEST_F(CCLayerTreeHostTestAtomicCommitWithPartialUpdate, runMultiThread)
 {
     runTest(true);
 }
-
-#define EXPECT_EQ_RECT(a, b) \
-    EXPECT_EQ(a.x(), b.x()); \
-    EXPECT_EQ(a.y(), b.y()); \
-    EXPECT_EQ(a.width(), b.width()); \
-    EXPECT_EQ(a.height(), b.height());
 
 class TestLayerChromium : public LayerChromium {
 public:

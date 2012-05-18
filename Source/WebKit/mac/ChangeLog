@@ -1,3 +1,168 @@
+2012-05-18  MORITA Hajime <morrita@google.com>
+
+        Another unreviewed attempt to fix build breakage on r117572.
+
+        * WebCoreSupport/WebEditorClient.h:
+
+2012-05-18  MORITA Hajime  <morrita@google.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=85515
+        Stale frame in WebCore::SpellChecker::didCheckSucceeded
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/WebEditorClient.h:
+
+2012-05-17  Andy Estes  <aestes@apple.com>
+
+        Don't let -[CALayer renderInContext:] try to render WebView's root layer
+        https://bugs.webkit.org/show_bug.cgi?id=86773
+        <rdar://problem/10950075>
+
+        Reviewed by Dan Bernstein.
+
+        -[CALayer renderInContext:] doesn't correctly render our layer tree, so
+        don't let it try. Calling drawRect: with a bitmap context will already
+        do the right thing for WebViews.
+
+        * WebView/WebHTMLView.mm: Create a subclass of CALayer called WebLayerHostingLayer.
+        (-[WebLayerHostingLayer renderInContext:]): override renderInContext: to be a NOOP.
+        (-[WebHTMLView attachRootLayer:]): Create a WebLayerHostingLayer rather than a CALayer.
+
+2012-05-17  Hironori Bono  <hbono@chromium.org>
+
+        [Refactoring] Move platform-specific code in Editor::respondToChangedSelection to the WebKit layer
+        https://bugs.webkit.org/show_bug.cgi?id=86591
+
+        Reviewed by Ryosuke Niwa.
+
+        This change adds a TextCheckerClient::shouldEraseMarkersAfterChangeSelection
+        function to remove platform-specific code from Editor::respondToChangedSelection
+        function.
+
+        No new tests, no change in behavior.
+
+        * WebCoreSupport/WebEditorClient.h:
+        * WebCoreSupport/WebEditorClient.mm:
+        (WebEditorClient::shouldEraseMarkersAfterChangeSelection):
+
+2012-05-17  Dan Bernstein  <mitz@apple.com>
+
+        REGRESSION (r117428): WebKit API/SPI was removed
+        https://bugs.webkit.org/show_bug.cgi?id=86748
+
+        Reverted r117428.
+
+        * WebKit.order:
+        * WebView/WebView.mm:
+        (+[WebView _setDomainRelaxationForbidden:forURLScheme:]):
+        * WebView/WebViewPrivate.h:
+
+2012-05-17  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Convert setDomainRelaxationForbiddenForURLScheme to use InternalSettings interface
+        https://bugs.webkit.org/show_bug.cgi?id=86704
+
+        Reviewed by Eric Seidel.
+
+        Remove setDomainRelaxationForbiddenForURLScheme functions, because it is able to work in the
+        cross-port way through the InternalSettings interface.
+
+        * WebKit.order:
+        * WebView/WebView.mm:
+        * WebView/WebViewPrivate.h:
+
+2012-05-15  Anders Carlsson  <andersca@apple.com>
+
+        Use unaccelerated scrolling deltas when rubber-banding
+        https://bugs.webkit.org/show_bug.cgi?id=86503
+        <rdar://problem/11378742>
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/WebSystemInterface.mm:
+        (InitWebCoreSystemInterface):
+        Init new WKSI functions.
+
+2012-05-14  Luke Macpherson  <macpherson@chromium.org>
+
+        Introduce ENABLE_CSS_VARIABLES compile flag.
+        https://bugs.webkit.org/show_bug.cgi?id=86338
+
+        Reviewed by Dimitri Glazkov.
+
+        Add a configuration option for CSS Variables support, disabling it by default.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-14  Michael Saboff  <msaboff@apple.com>
+
+        Enh: Add the Ability to Disable / Enable JavaScript GC Timer
+        https://bugs.webkit.org/show_bug.cgi?id=86382
+
+        Reviewed by Darin Adler.
+
+        Plumbing to set / clear JS GC activity timer enable flag.
+
+        * Misc/WebCoreStatistics.h:
+        * Misc/WebCoreStatistics.mm:
+        (+[WebCoreStatistics setJavaScriptGarbageCollectorTimerEnabled:]):
+
+2012-05-11  Gavin Barraclough  <barraclough@apple.com>
+
+        Introduce PropertyName class
+        https://bugs.webkit.org/show_bug.cgi?id=86241
+
+        Reviewed by Geoff Garen.
+
+        Replace 'const Identifier&' arguments to functions accessing object properties with a new 'PropertyName' type.
+        This change paves the way to allow for properties keyed by values that are not Identifiers.
+
+        This change is largely a mechanical find & replace.
+        It also changes JSFunction's constructor to take a UString& instead of an Identifier&
+        (since in some cases we can no longer guarantee that we'lll have an Identifier), and
+        unifies Identifier's methods to obtain array indices onto PropertyName.
+
+        The new PropertyName class retains the ability to support .impl() and .ustring(), but
+        in a future patch we may need to rework this, since not all PropertyNames should be
+        equal based on their string representation.
+
+        * Plugins/Hosted/ProxyInstance.h:
+        (ProxyInstance):
+        * Plugins/Hosted/ProxyInstance.mm:
+        (ProxyClass):
+        (WebKit::ProxyClass::methodsNamed):
+        (WebKit::ProxyClass::fieldNamed):
+        (WebKit::ProxyRuntimeMethod::create):
+        (WebKit::ProxyRuntimeMethod::finishCreation):
+        (WebKit::ProxyInstance::getMethod):
+        (WebKit::ProxyInstance::methodsNamed):
+        (WebKit::ProxyInstance::fieldNamed):
+
+2012-05-11  Brady Eidson  <beidson@apple.com>
+
+        <rdar://problem/11361907> and https://bugs.webkit.org/show_bug.cgi?id=86265
+        REGRESSION(r104885): Images missing from printed YummySoup! recipes
+
+        We thought clients were passing paths as URLs.
+        It turns out it was more likely they were passing file: URLs with the file: scheme removed.
+        And that jives perfectly with the behavior change caused by r104885.
+        
+        Reviewed by Alexey Proskuryakov.
+
+        Rename _webkit_URLFromURLOrPath to _webkit_URLFromURLOrSchemelessFileURL, and change it
+        to create the new URL simply by appending "file:":
+        * Misc/WebNSURLExtras.h:
+        * Misc/WebNSURLExtras.mm:
+        (-[NSURL _webkit_URLFromURLOrSchemelessFileURL]):
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame loadRequest:]): Create the fixed url simply by appending "file:" to the
+          existing URL string.
+        (-[WebFrame loadData:MIMEType:textEncodingName:baseURL:]):
+        (-[WebFrame loadHTMLString:baseURL:]):
+        (-[WebFrame loadAlternateHTMLString:baseURL:forUnreachableURL:]):
+
 2012-05-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
 
         Move resumeAnimations to use Internals interface

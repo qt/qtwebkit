@@ -355,6 +355,7 @@ public:
 
     virtual bool isRenderFlowThread() const { return false; }
     virtual bool isRenderNamedFlowThread() const { return false; }
+    virtual bool isRenderScrollbarPart() const { return false; }
     bool canHaveRegionStyle() const { return isRenderBlock() && !isAnonymous() && !isRenderFlowThread(); }
 
     bool isRoot() const { return document()->documentElement() == m_node; }
@@ -840,7 +841,7 @@ public:
     virtual bool isFlexingChildren() const { return false; }
     virtual bool isStretchingChildren() const { return false; }
 
-    // Virtual function helper for the new FlexibleBox Layout (display: -webkit-flexbox).
+    // Virtual function helper for the new FlexibleBox Layout (display: -webkit-flex).
     virtual bool isFlexibleBox() const { return false; }
 
     bool isFlexibleBoxIncludingDeprecated() const

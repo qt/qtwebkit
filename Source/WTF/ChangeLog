@@ -1,3 +1,122 @@
+2012-05-16  Geoffrey Garen  <ggaren@apple.com>
+
+        This is not a joke: 3.7X speedup from removing a call to sleep
+        https://bugs.webkit.org/show_bug.cgi?id=86702
+
+        Reviewed by Eric Seidel.
+
+        The speedup was on a GC benchmark, with a custom VM caching layer
+        not in TOT yet.
+
+        Instruments showed most GC threads spending the majority of their
+        time sleeping instead of doing useful work. Removing the call to
+        sleep sped up the benchmark.
+
+        * wtf/TCSpinLock.h:
+        (TCMalloc_SlowLock): Since a spin lock is only ever held for a short
+        amount of time, don't sleep for a long amount of time waiting for it
+        to unlock -- yielding to the scheduler is sufficient.
+
+        If we find a case where someone is sitting on a spin lock for over 2ms,
+        we should fix the spin lock holder, not the spin lock.
+
+2012-05-16  Simon Fraser  <simon.fraser@apple.com>
+
+        Make things build with DUMP_HASHTABLE_STATS=1
+        https://bugs.webkit.org/show_bug.cgi?id=86571
+
+        Reviewed by Geoffrey Garen.
+        
+        DUMP_HASHTABLE_STATS bitrotted after the WTF separation. This patch
+        makes it build.
+        
+        Added WTF_EXPORTDATA to the global data, and WTF_EXPORT_PRIVATE to
+        the static HashTableStats methods. Added a dumpStats() method
+        that is not yet called anywhere; we can no longer rely on destroying
+        a global object to dump the stats because global destructors are
+        disallowed.
+
+        * wtf/HashTable.cpp:
+        (WTF):
+        (WTF::HashTableStats::recordCollisionAtCount):
+        (WTF::HashTableStats::dumpStats):
+        * wtf/HashTable.h:
+        (HashTableStats):
+
+2012-05-15  Filip Pizlo  <fpizlo@apple.com>
+
+        shrinkToFit() is often not called for Vectors in CodeBlock
+        https://bugs.webkit.org/show_bug.cgi?id=86436
+
+        Reviewed by Oliver Hunt.
+        
+        Gave SegmentedVector a shrinkToFit() method. This only shrinks the segment
+        lookup table, which is likely to not be hugely profitable, but it is better
+        than nothing.
+
+        * wtf/SegmentedVector.h:
+        (SegmentedVector):
+        (WTF::SegmentedVector::shrinkToFit):
+
+2012-05-15  Andy Estes  <aestes@apple.com>
+
+        Add WTF_USE_SECURITY_FRAMEWORK and use it in place of the less specific PLATFORM(MAC)
+        https://bugs.webkit.org/show_bug.cgi?id=86508
+
+        Reviewed by Sam Weinig.
+
+        * wtf/Platform.h:
+
+2012-05-15  Zoltan Herczeg  <zherczeg@webkit.org>
+
+        NEONizing forceValidPreMultipliedPixels
+        https://bugs.webkit.org/show_bug.cgi?id=86468
+
+        Reviewed by Nikolas Zimmermann.
+
+        Allow to disable all intrinsics with a single macro.
+
+        * wtf/Platform.h:
+
+2012-05-14  Andy Estes  <aestes@apple.com>
+
+        Add WTF_USE_APPKIT to differentiate platforms that use AppKit.framework from other Darwin platforms
+        https://bugs.webkit.org/show_bug.cgi?id=86432
+
+        Reviewed by Maciej Stachowiak.
+
+        * wtf/Platform.h:
+
+2012-05-14  Mark Rowe  <mrowe@apple.com>
+
+        <http://webkit.org/b/86320> WTF.xcodeproj builds with -O3 in debug builds
+
+        Reviewed by Simon Fraser.
+
+        * WTF.xcodeproj/project.pbxproj: Ensure that the debug configuration uses the
+        same settings as the debug variant would.
+
+2012-05-14  Wei James  <james.wei@intel.com>
+
+        [Chromium] ImageDiff should be build for host on Android
+        https://bugs.webkit.org/show_bug.cgi?id=82039
+
+        Reviewed by Adam Barth.
+
+        * WTF.gyp/WTF.gyp:
+
+2012-05-14  Yong Li  <yoli@rim.com>
+
+        DFG JIT is not ARM EABI compatible
+        https://bugs.webkit.org/show_bug.cgi?id=84449
+
+        Reviewed by Filip Pizlo.
+
+        Add COMPILER_SUPPORTS(EABI) when __ARM_EABI__
+        or __EABI__ is defined.
+
+        * wtf/Compiler.h:
+
 2012-05-10  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
 
         [EFL] Add OwnPtr specialization for Eina_Hash.

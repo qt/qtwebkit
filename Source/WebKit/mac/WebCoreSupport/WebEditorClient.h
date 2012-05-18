@@ -41,6 +41,7 @@ public:
     WebEditorClient(WebView *);
     virtual ~WebEditorClient();
     virtual void pageDestroyed() OVERRIDE;
+    virtual void frameWillDetachPage(WebCore::Frame*) OVERRIDE { }
 
     virtual bool isGrammarCheckingEnabled() OVERRIDE;
     virtual void toggleGrammarChecking() OVERRIDE;
@@ -121,6 +122,7 @@ public:
     virtual void textWillBeDeletedInTextField(WebCore::Element*) OVERRIDE;
     virtual void textDidChangeInTextArea(WebCore::Element*) OVERRIDE;
     
+    virtual bool shouldEraseMarkersAfterChangeSelection(WebCore::TextCheckingType) const OVERRIDE;
     virtual void ignoreWordInSpellDocument(const WTF::String&) OVERRIDE;
     virtual void learnWord(const WTF::String&) OVERRIDE;
     virtual void checkSpellingOfString(const UChar*, int length, int* misspellingLocation, int* misspellingLength) OVERRIDE;

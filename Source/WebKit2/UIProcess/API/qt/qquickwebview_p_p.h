@@ -48,7 +48,7 @@ class WebPageProxy;
 }
 
 class QWebNavigationHistory;
-class QWebViewportInfo;
+class QWebKitTest;
 
 QT_BEGIN_NAMESPACE
 class QQmlComponent;
@@ -56,10 +56,11 @@ QT_END_NAMESPACE
 
 class QQuickWebViewPrivate {
     Q_DECLARE_PUBLIC(QQuickWebView)
+    friend class WebKit::QtDialogRunner;
     friend class QQuickWebViewExperimental;
     friend class QQuickWebPage;
     friend class QWebPreferencesPrivate;
-    friend class QWebViewportInfo;
+    friend class QWebKitTest;
 
 public:
     static QQuickWebViewPrivate* get(QQuickWebView* q) { return q->d_ptr.data(); }
@@ -116,11 +117,9 @@ public:
     bool handleCertificateVerificationRequest(const QString& hostname);
     void handleProxyAuthenticationRequiredRequest(const QString& hostname, uint16_t port, const QString& prefilledUsername, QString& username, QString& password);
 
-    void execDialogRunner(WebKit::QtDialogRunner&);
-
     void setRenderToOffscreenBuffer(bool enable) { m_renderToOffscreenBuffer = enable; }
     void setTransparentBackground(bool);
-    void setViewInAttachedProperties(QObject*);
+    void addAttachedPropertyTo(QObject*);
     void setIcon(const QUrl&);
 
     bool navigatorQtObjectEnabled() const;
@@ -199,6 +198,7 @@ protected:
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
     bool m_dialogActive;
+    bool m_allowAnyHTTPSCertificateForLocalHost;
     QUrl m_iconURL;
     int m_loadProgress;
 };

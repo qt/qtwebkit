@@ -50,9 +50,7 @@ namespace WebKit {
 
 class WebApplicationCacheHost; // FIXME: Does this belong in platform?
 class WebApplicationCacheHostClient; // FIXME: Does this belong in platform?
-class WebBlobRegistry;
 class WebCookieJar;
-class WebFileUtilities;
 class WebIDBFactory; // FIXME: Does this belong in platform?
 class WebIDBKey; // FIXME: Does this belong in platform?
 class WebMessagePortChannel; // FIXME: Does this belong in platform?
@@ -61,14 +59,10 @@ class WebSandboxSupport;
 class WebSharedWorkerRepository; // FIXME: Does this belong in platform?
 class WebStorageNamespace; // FIXME: Does this belong in platform?
 class WebThemeEngine;
-class WebWorkerRunLoop;
 
 // FIXME: Eventually all these API will need to move to WebKit::Platform.
 class WebKitPlatformSupport : public Platform {
 public:
-    // Must return non-null.
-    virtual WebFileUtilities* fileUtilities() { return 0; }
-
     // May return null if sandbox support is not necessary
     virtual WebSandboxSupport* sandboxSupport() { return 0; }
 
@@ -78,15 +72,15 @@ public:
     // May return null.
     virtual WebCookieJar* cookieJar() { return 0; }
 
-    // Blob ----------------------------------------------------------------
-
-    // Must return non-null.
-    virtual WebBlobRegistry* blobRegistry() { return 0; }
-
     // DOM Storage --------------------------------------------------
 
     // Return a LocalStorage namespace that corresponds to the following path.
     virtual WebStorageNamespace* createLocalStorageNamespace(const WebString& path, unsigned quota) { return 0; }
+
+    // DEPRECATED
+    virtual void dispatchStorageEvent(const WebString& key, const WebString& oldValue,
+                                      const WebString& newValue, const WebString& origin,
+                                      const WebURL& url, bool isLocalStorage) { }
 
 
     // HTML5 Database ------------------------------------------------------
@@ -154,10 +148,6 @@ public:
     virtual WebSharedWorkerRepository* sharedWorkerRepository() { return 0; }
 
     // GPU ----------------------------------------------------------------
-    //
-    // May return null if GPU is not supported.
-    // Returns newly allocated and initialized offscreen WebGraphicsContext3D instance.
-    virtual WebGraphicsContext3D* createOffscreenGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
 
     // Returns true if the platform is capable of producing an offscreen context suitable for accelerating 2d canvas.
     // This will return false if the platform cannot promise that contexts will be preserved across operations like
@@ -166,11 +156,6 @@ public:
     // This value must be checked again after a context loss event as the platform's capabilities may have changed.
     virtual bool canAccelerate2dCanvas() { return false; }
 
-
-    // WebWorker ----------------------------------------------------------
-
-    virtual void didStartWorkerRunLoop(const WebWorkerRunLoop&) { }
-    virtual void didStopWorkerRunLoop(const WebWorkerRunLoop&) { }
 
 protected:
     ~WebKitPlatformSupport() { }

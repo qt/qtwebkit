@@ -72,25 +72,11 @@ RenderSVGInlineText::RenderSVGInlineText(Node* n, PassRefPtr<StringImpl> string)
 {
 }
 
-void RenderSVGInlineText::willBeDestroyed()
-{
-    RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this);
-    if (!textRenderer) {
-        RenderText::willBeDestroyed();
-        return;
-    }
-
-    Vector<SVGTextLayoutAttributes*> affectedAttributes;
-    textRenderer->subtreeChildWillBeDestroyed(this, affectedAttributes);
-    RenderText::willBeDestroyed();
-    textRenderer->subtreeChildWasDestroyed(this, affectedAttributes);
-}
-
 void RenderSVGInlineText::setTextInternal(PassRefPtr<StringImpl> text)
 {
     RenderText::setTextInternal(text);
     if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
-        textRenderer->subtreeTextChanged(this);
+        textRenderer->subtreeTextDidChange(this);
 }
 
 void RenderSVGInlineText::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
@@ -115,7 +101,7 @@ void RenderSVGInlineText::styleDidChange(StyleDifference diff, const RenderStyle
 
     // The text metrics may be influenced by style changes.
     if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
-        textRenderer->subtreeStyleChanged(this);
+        textRenderer->subtreeStyleDidChange(this);
 }
 
 InlineTextBox* RenderSVGInlineText::createTextBox()

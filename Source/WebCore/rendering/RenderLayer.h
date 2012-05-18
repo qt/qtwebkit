@@ -369,7 +369,6 @@ public:
 
     void updateTransform();
 
-    void relativePositionOffset(LayoutUnit& relX, LayoutUnit& relY) const { relX += m_relativeOffset.width(); relY += m_relativeOffset.height(); }
     const LayoutSize& relativePositionOffset() const { return m_relativeOffset; }
 
     void clearClipRectsIncludingDescendants();
@@ -393,6 +392,8 @@ public:
         ASSERT(isStackingContext() || !m_posZOrderList);
         return m_posZOrderList;
     }
+
+    bool hasNegativeZOrderList() const { return negZOrderList() && negZOrderList()->size(); }
 
     Vector<RenderLayer*>* negZOrderList() const
     {
@@ -511,7 +512,7 @@ public:
 
     // Return a cached repaint rect, computed relative to the layer renderer's containerForRepaint.
     LayoutRect repaintRect() const { return m_repaintRect; }
-    LayoutRect repaintRectIncludingDescendants() const;
+    LayoutRect repaintRectIncludingNonCompositingDescendants() const;
 
     enum UpdateLayerPositionsAfterScrollFlag {
         NoFlag = 0,
@@ -635,7 +636,7 @@ private:
     void updateScrollbarsAfterLayout();
 
     friend IntSize RenderBox::scrolledContentOffset() const;
-    IntSize scrolledContentOffset() const { return scrollOffset() + m_scrollOverflow; }
+    IntSize scrolledContentOffset() const { return m_scrollOffset; }
 
     // The normal operator new is disallowed on all render objects.
     void* operator new(size_t) throw();
@@ -883,11 +884,9 @@ protected:
     // The layer's width/height
     IntSize m_layerSize;
 
-    // Our scroll offsets if the view is scrolled.
+    // This is the (scroll) offset from scrollOrigin().
     IntSize m_scrollOffset;
 
-    IntSize m_scrollOverflow;
-    
     // The width/height of our scrolled area.
     LayoutSize m_scrollSize;
 

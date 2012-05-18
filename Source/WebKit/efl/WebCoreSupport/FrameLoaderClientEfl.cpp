@@ -43,6 +43,7 @@
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "HTMLFormElement.h"
+#include "IntentRequest.h"
 #include "MIMETypeRegistry.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -53,8 +54,11 @@
 #include "ResourceResponse.h"
 #include "Settings.h"
 #include "WebKitVersion.h"
-#include "ewk_logging.h"
+#include "ewk_frame_private.h"
+#include "ewk_intent_request.h"
 #include "ewk_private.h"
+#include "ewk_settings_private.h"
+#include "ewk_view_private.h"
 #include <Ecore_Evas.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
@@ -967,6 +971,15 @@ void FrameLoaderClientEfl::didRestoreFromPageCache()
 void FrameLoaderClientEfl::dispatchDidBecomeFrameset(bool)
 {
 }
+
+#if ENABLE(WEB_INTENTS)
+void FrameLoaderClientEfl::dispatchIntent(PassRefPtr<WebCore::IntentRequest> intentRequest)
+{
+    Ewk_Intent_Request* ewkRequest = ewk_intent_request_new(intentRequest);
+    ewk_frame_intent_new(m_frame, ewkRequest);
+    ewk_intent_request_unref(ewkRequest);
+}
+#endif
 
 PassRefPtr<FrameNetworkingContext> FrameLoaderClientEfl::createNetworkingContext()
 {

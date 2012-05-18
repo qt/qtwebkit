@@ -33,6 +33,7 @@
 namespace WebCore {
 
 class ContainerNode;
+class DOMSelection;
 class Element;
 class HTMLMapElement;
 class Node;
@@ -54,6 +55,8 @@ public:
     void addElementById(const AtomicString& elementId, Element*);
     void removeElementById(const AtomicString& elementId, Element*);
 
+    Node* ancestorInThisScope(Node*) const;
+
     void addImageMap(HTMLMapElement*);
     void removeImageMap(HTMLMapElement*);
     HTMLMapElement* getImageMap(const String& url) const;
@@ -61,6 +64,8 @@ public:
     void addNodeListCache() { ++m_numNodeListCaches; }
     void removeNodeListCache() { ASSERT(m_numNodeListCaches > 0); --m_numNodeListCaches; }
     bool hasNodeListCaches() const { return m_numNodeListCaches; }
+
+    DOMSelection* getSelection() const;
 
     // Find first anchor with the given name.
     // First searches for an element with the given ID, but if that fails, then looks
@@ -90,6 +95,8 @@ private:
     DocumentOrderedMap m_imageMapsByName;
 
     unsigned m_numNodeListCaches;
+
+    mutable RefPtr<DOMSelection> m_selection;
 };
 
 inline bool TreeScope::hasElementWithId(AtomicStringImpl* id) const
