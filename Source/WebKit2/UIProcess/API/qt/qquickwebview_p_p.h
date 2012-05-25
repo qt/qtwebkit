@@ -74,10 +74,8 @@ public:
     virtual void enableMouseEvents() { }
     virtual void disableMouseEvents() { }
 
-    virtual QPointF pageItemPos();
-    virtual void updateContentsSize(const QSizeF&) { }
-
-    virtual void provisionalLoadDidStart(const QUrl& url);
+    virtual void provisionalLoadDidStart(const WTF::String& url);
+    virtual void didReceiveServerRedirectForProvisionalLoad(const WTF::String& url);
     virtual void loadDidCommit();
     virtual void didSameDocumentNavigation();
     virtual void titleDidChange();
@@ -97,7 +95,7 @@ public:
 
     virtual void _q_suspend() { }
     virtual void _q_resume() { }
-    virtual void _q_contentViewportChanged(const QPointF& trajectory) { };
+    virtual void _q_onInformVisibleContentChange(const QPointF& trajectory) { };
 
     virtual qreal zoomFactor() const { return 1; }
     virtual void setZoomFactor(qreal) { }
@@ -201,6 +199,7 @@ protected:
     bool m_allowAnyHTTPSCertificateForLocalHost;
     QUrl m_iconURL;
     int m_loadProgress;
+    WTF::String m_currentUrl;
 };
 
 class QQuickWebViewLegacyPrivate : public QQuickWebViewPrivate {
@@ -226,16 +225,13 @@ public:
 
     virtual void onComponentComplete();
 
-    virtual QPointF pageItemPos();
-    virtual void updateContentsSize(const QSizeF&);
-
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
     virtual WebKit::QtViewportInteractionEngine* viewportInteractionEngine() { return interactionEngine.data(); }
     virtual void updateViewportSize();
 
     virtual void _q_suspend();
     virtual void _q_resume();
-    virtual void _q_contentViewportChanged(const QPointF& trajectory);
+    virtual void _q_onInformVisibleContentChange(const QPointF& trajectory);
 
     virtual void pageDidRequestScroll(const QPoint& pos);
     virtual void didChangeContentsSize(const QSize& newSize);

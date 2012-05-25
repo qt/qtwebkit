@@ -51,6 +51,8 @@
 #include "StyleBoxData.h"
 #include "StyleDeprecatedFlexibleBoxData.h"
 #include "StyleFlexibleBoxData.h"
+#include "StyleGridData.h"
+#include "StyleGridItemData.h"
 #include "StyleInheritedData.h"
 #include "StyleMarqueeData.h"
 #include "StyleMultiColData.h"
@@ -74,11 +76,6 @@
 #if ENABLE(CSS_FILTERS)
 #include "FilterOperations.h"
 #include "StyleFilterData.h"
-#endif
-
-#if ENABLE(CSS_GRID_LAYOUT)
-#include "StyleGridData.h"
-#include "StyleGridItemData.h"
 #endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -501,10 +498,10 @@ public:
     Length bottom() const { return surround->offset.bottom(); }
 
     // Accessors for positioned object edges that take into account writing mode.
-    Length logicalLeft() const { return isHorizontalWritingMode() ? left() : top(); }
-    Length logicalRight() const { return isHorizontalWritingMode() ? right() : bottom(); }
-    Length logicalTop() const { return isHorizontalWritingMode() ? (isFlippedBlocksWritingMode() ? bottom() : top()) : (isFlippedBlocksWritingMode() ? right() : left()); }
-    Length logicalBottom() const { return isHorizontalWritingMode() ? (isFlippedBlocksWritingMode() ? top() : bottom()) : (isFlippedBlocksWritingMode() ? left() : right()); }
+    Length logicalLeft() const { return surround->offset.logicalLeft(this); }
+    Length logicalRight() const { return surround->offset.logicalRight(this); }
+    Length logicalTop() const { return surround->offset.before(this); }
+    Length logicalBottom() const { return surround->offset.after(this); }
 
     // Whether or not a positioned element requires normal flow x/y to be computed
     // to determine its position.
@@ -741,24 +738,24 @@ public:
     Length marginBottom() const { return surround->margin.bottom(); }
     Length marginLeft() const { return surround->margin.left(); }
     Length marginRight() const { return surround->margin.right(); }
-    Length marginBefore() const;
-    Length marginAfter() const;
-    Length marginStart() const;
-    Length marginEnd() const;
-    Length marginStartUsing(const RenderStyle* otherStyle) const;
-    Length marginEndUsing(const RenderStyle* otherStyle) const;
-    Length marginBeforeUsing(const RenderStyle* otherStyle) const;
-    Length marginAfterUsing(const RenderStyle* otherStyle) const;
+    Length marginBefore() const { return surround->margin.before(this); }
+    Length marginAfter() const { return surround->margin.after(this); }
+    Length marginStart() const { return surround->margin.start(this); }
+    Length marginEnd() const { return surround->margin.end(this); }
+    Length marginStartUsing(const RenderStyle* otherStyle) const { return surround->margin.start(otherStyle); }
+    Length marginEndUsing(const RenderStyle* otherStyle) const { return surround->margin.end(otherStyle); }
+    Length marginBeforeUsing(const RenderStyle* otherStyle) const { return surround->margin.before(otherStyle); }
+    Length marginAfterUsing(const RenderStyle* otherStyle) const { return surround->margin.after(otherStyle); }
 
     LengthBox paddingBox() const { return surround->padding; }
     Length paddingTop() const { return surround->padding.top(); }
     Length paddingBottom() const { return surround->padding.bottom(); }
     Length paddingLeft() const { return surround->padding.left(); }
     Length paddingRight() const { return surround->padding.right(); }
-    Length paddingBefore() const;
-    Length paddingAfter() const;
-    Length paddingStart() const;
-    Length paddingEnd() const;
+    Length paddingBefore() const { return surround->padding.before(this); }
+    Length paddingAfter() const { return surround->padding.after(this); }
+    Length paddingStart() const { return surround->padding.start(this); }
+    Length paddingEnd() const { return surround->padding.end(this); }
 
     ECursor cursor() const { return static_cast<ECursor>(inherited_flags._cursor_style); }
 
@@ -820,13 +817,11 @@ public:
     EFlexWrap flexWrap() const { return static_cast<EFlexWrap>(rareNonInheritedData->m_flexibleBox->m_flexWrap); }
     EFlexLinePack flexLinePack() const { return static_cast<EFlexLinePack>(rareNonInheritedData->m_flexibleBox->m_flexLinePack); }
 
-#if ENABLE(CSS_GRID_LAYOUT)
     const Vector<Length>& gridColumns() const { return rareNonInheritedData->m_grid->m_gridColumns; }
     const Vector<Length>& gridRows() const { return rareNonInheritedData->m_grid->m_gridRows; }
 
     const Length& gridItemColumn() const { return rareNonInheritedData->m_gridItem->m_gridColumn; }
     const Length& gridItemRow() const { return rareNonInheritedData->m_gridItem->m_gridRow; }
-#endif
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
     void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
@@ -1259,13 +1254,10 @@ public:
     void setFlexDirection(EFlexDirection direction) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexDirection, direction); }
     void setFlexWrap(EFlexWrap w) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexWrap, w); }
     void setFlexLinePack(EFlexLinePack p) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexLinePack, p); }
-#if ENABLE(CSS_GRID_LAYOUT)
     void setGridColumns(const Vector<Length>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridColumns, lengths); }
     void setGridRows(const Vector<Length>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridRows, lengths); }
-
     void setGridItemColumn(const Length& columnPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumn, columnPosition); }
     void setGridItemRow(const Length& rowPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRow, rowPosition); }
-#endif
 
     void setMarqueeIncrement(const Length& f) { SET_VAR(rareNonInheritedData.access()->m_marquee, increment, f); }
     void setMarqueeSpeed(int f) { SET_VAR(rareNonInheritedData.access()->m_marquee, speed, f); }
@@ -1651,7 +1643,6 @@ public:
     static StyleImage* initialMaskBoxImageSource() { return 0; }
     static PrintColorAdjust initialPrintColorAdjust() { return PrintColorAdjustEconomy; }
 
-#if ENABLE(CSS_GRID_LAYOUT)
     // The initial value is 'none' for grid tracks.
     static Vector<Length> initialGridTrackValue()
     {
@@ -1667,7 +1658,6 @@ public:
     // 'auto' is the default.
     static Length initialGridItemColumn() { return Length(); }
     static Length initialGridItemRow() { return Length(); }
-#endif
 
     static unsigned initialTabSize() { return 8; }
 

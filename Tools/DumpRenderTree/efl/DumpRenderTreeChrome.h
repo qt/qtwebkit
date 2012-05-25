@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 ProFUSION Embedded Systems
  * Copyright (C) 2011 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +32,7 @@
 
 #include <Eina.h>
 #include <Evas.h>
+#include <ewk_intent_request.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -52,6 +54,8 @@ public:
     Evas_Object* mainFrame() const;
     Evas_Object* mainView() const;
 
+    Ewk_Intent_Request* currentIntentRequest() const;
+
     void resetDefaultsToConsistentValues();
 
 private:
@@ -66,6 +70,8 @@ private:
     OwnPtr<GCController> m_gcController;
     Vector<Evas_Object*> m_extraViews;
     static HashMap<unsigned long, CString> m_dumpAssignedUrls;
+    static Evas_Object* m_provisionalLoadFailedFrame;
+    static Ewk_Intent_Request* m_currentIntentRequest;
 
     // Smart callbacks
     static void onWindowObjectCleared(void*, Evas_Object*, void*);
@@ -77,7 +83,7 @@ private:
 
     static void onStatusbarTextSet(void*, Evas_Object*, void*);
 
-    static void onTitleChanged(void*, Evas_Object*, void*);
+    static void onFrameTitleChanged(void*, Evas_Object*, void*);
 
     static void onDocumentLoadFinished(void*, Evas_Object*, void*);
 
@@ -94,6 +100,7 @@ private:
     static void onFrameIconChanged(void*, Evas_Object*, void*);
 
     static void onFrameProvisionalLoad(void*, Evas_Object*, void*);
+    static void onFrameProvisionalLoadFailed(void*, Evas_Object*, void*);
 
     static void onFrameLoadCommitted(void*, Evas_Object*, void*);
 
@@ -113,6 +120,8 @@ private:
     static void onResourceLoadFailed(void*, Evas_Object*, void*);
 
     static void onNewResourceRequest(void*, Evas_Object*, void*);
+
+    static void onFrameIntentNew(void*, Evas_Object*, void*);
 };
 
 #endif // DumpRenderTreeChrome_h

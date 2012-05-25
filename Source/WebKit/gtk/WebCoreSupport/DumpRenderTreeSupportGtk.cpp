@@ -27,12 +27,13 @@
 #include "AccessibilityObject.h"
 #include "AnimationController.h"
 #include "CSSComputedStyleDeclaration.h"
+#include "Chrome.h"
+#include "ChromeClientGtk.h"
 #include "DOMWrapperWorld.h"
 #include "Document.h"
 #include "EditorClientGtk.h"
 #include "Element.h"
 #include "FocusController.h"
-#include "FrameLoaderClientGtk.h"
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "GCController.h"
@@ -56,6 +57,7 @@
 #include "RenderListItem.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
+#include "ResourceLoadScheduler.h"
 #include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
@@ -132,10 +134,9 @@ GSList* DumpRenderTreeSupportGtk::getFrameChildren(WebKitWebFrame* frame)
 
     GSList* children = 0;
     for (Frame* child = coreFrame->tree()->firstChild(); child; child = child->tree()->nextSibling()) {
-        FrameLoader* loader = child->loader();
-        WebKit::FrameLoaderClient* client = static_cast<WebKit::FrameLoaderClient*>(loader->client());
-        if (client)
-          children = g_slist_append(children, client->webFrame());
+        WebKitWebFrame* kitFrame = kit(child);
+        if (kitFrame)
+          children = g_slist_append(children, kitFrame);
     }
 
     return children;
@@ -587,6 +588,13 @@ void DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(WebKitWebView* webVie
     client->setSmartInsertDeleteEnabled(enabled);
 }
 
+void DumpRenderTreeSupportGtk::forceWebViewPaint(WebKitWebView* webView)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+
+    static_cast<WebKit::ChromeClient*>(core(webView)->chrome()->client())->forcePaint();
+}
+
 void DumpRenderTreeSupportGtk::whiteListAccessFromOrigin(const gchar* sourceOrigin, const gchar* destinationProtocol, const gchar* destinationHost, bool allowDestinationSubdomains)
 {
     SecurityPolicy::addOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
@@ -884,4 +892,9 @@ void DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary()
 void DumpRenderTreeSupportGtk::setDomainRelaxationForbiddenForURLScheme(bool forbidden, const char* urlScheme)
 {
     SchemeRegistry::setDomainRelaxationForbiddenForURLScheme(forbidden, String::fromUTF8(urlScheme));
+}
+
+void DumpRenderTreeSupportGtk::setSerializeHTTPLoads(bool enabled)
+{
+    resourceLoadScheduler()->setSerialLoadingEnabled(enabled);
 }

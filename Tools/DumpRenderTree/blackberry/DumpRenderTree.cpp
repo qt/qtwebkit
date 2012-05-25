@@ -19,6 +19,7 @@
 #include "config.h"
 #include "DumpRenderTree.h"
 
+#include "APICast.h"
 #include "AccessibilityController.h"
 #include "BackForwardController.h"
 #include "BackForwardListImpl.h"
@@ -38,6 +39,7 @@
 #include "FrameView.h"
 #include "HistoryItem.h"
 #include "IntSize.h"
+#include "JSDOMBinding.h"
 #include "LayoutTestController.h"
 #include "NotImplemented.h"
 #include "OwnArrayPtr.h"
@@ -307,7 +309,10 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting()
 
     if (WebCore::Page* page = DumpRenderTreeSupport::corePage(m_page)) {
         page->setTabKeyCyclesThroughElements(true);
+
+        // FIXME: Remove this once BlackBerry uses resetInternalsObject: https://bugs.webkit.org/show_bug.cgi?id=86899.
         page->settings()->setEditingBehaviorType(WebCore::EditingUnixBehavior);
+
         page->settings()->setDOMPasteAllowed(true);
         page->settings()->setValidationMessageTimerMagnification(-1);
         page->settings()->setInteractiveFormValidationEnabled(true);
@@ -320,6 +325,9 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting()
         if (mainFrame = page->mainFrame()) {
             mainFrame->tree()->clearName();
             mainFrame->loader()->setOpener(0);
+            // [WebKit bug #86899] Reset JS state settings.
+            JSGlobalContextRef jsContext = toGlobalRef(mainFrame->script()->globalObject(WebCore::mainThreadNormalWorld())->globalExec());
+            WebCoreTestSupport::resetInternalsObject(jsContext);
         }
     }
 

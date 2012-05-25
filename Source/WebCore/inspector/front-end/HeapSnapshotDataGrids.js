@@ -44,7 +44,16 @@ WebInspector.HeapSnapshotSortableDataGrid = function(columns)
      * @type {WebInspector.HeapSnapshotGridNode}
      */
     this._highlightedNode = null;
+    /**
+     * @type {boolean}
+     */
+    this._populatedAndSorted = false;
+    this.addEventListener("sorting complete", this._sortingComplete, this);
     this.addEventListener("sorting changed", this.sortingChanged, this);
+}
+
+WebInspector.HeapSnapshotSortableDataGrid.Events = {
+    ContentShown: "ContentShown"
 }
 
 WebInspector.HeapSnapshotSortableDataGrid.prototype = {
@@ -61,6 +70,54 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
         var children = this.topLevelNodes();
         for (var i = 0, l = children.length; i < l; ++i)
             children[i].dispose();
+    },
+
+    /**
+     * @override
+     */
+    wasShown: function()
+    {
+        if (this._populatedAndSorted)
+            this.dispatchEventToListeners(WebInspector.HeapSnapshotSortableDataGrid.Events.ContentShown, this);
+    },
+
+    _sortingComplete: function()
+    {
+        this.removeEventListener("sorting complete", this._sortingComplete, this);
+        this._populatedAndSorted = true;
+        this.dispatchEventToListeners(WebInspector.HeapSnapshotSortableDataGrid.Events.ContentShown, this);
+    },
+
+    /**
+     * @override
+     */
+    willHide: function()
+    {
+        this._clearCurrentHighlight();
+    },
+
+    /**
+     * @param {WebInspector.ContextMenu} contextMenu
+     */
+    populateContextMenu: function(contextMenu, event)
+    {
+        var td = event.target.enclosingNodeOrSelfWithNodeName("td");
+        if (!td)
+            return;
+        var node = td.heapSnapshotNode;
+        if (node instanceof WebInspector.HeapSnapshotInstanceNode || node instanceof WebInspector.HeapSnapshotObjectNode) {
+            function revealInDominatorsView()
+            {
+                WebInspector.panels.profiles.showObject(node.snapshotNodeId, "Dominators");
+            }
+            contextMenu.appendItem(WebInspector.UIString("Reveal in Dominators View"), revealInDominatorsView.bind(this));
+        } else if (node instanceof WebInspector.HeapSnapshotDominatorObjectNode) {
+            function revealInSummaryView()
+            {
+                WebInspector.panels.profiles.showObject(node.snapshotNodeId, "Summary");
+            }
+            contextMenu.appendItem(WebInspector.UIString("Reveal in Summary View"), revealInSummaryView.bind(this));
+        }
     },
 
     resetSortingCache: function()
@@ -86,9 +143,18 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
      */
     highlightNode: function(node)
     {
+        var prevNode = this._highlightedNode;
         this._clearCurrentHighlight();
         this._highlightedNode = node;
         this._highlightedNode.element.addStyleClass("highlighted-row");
+        // If highlighted node hasn't changed reinsert it to make the highlight animation restart.
+        if (node === prevNode) {
+            var element = node.element;
+            var parent = element.parentElement;
+            var nextSibling = element.nextSibling;
+            parent.removeChild(element);
+            parent.insertBefore(element, nextSibling);
+        }
     },
 
     nodeWasDetached: function(node)
@@ -158,8 +224,8 @@ WebInspector.HeapSnapshotSortableDataGrid.prototype = {
             if (child.expanded)
                 child.sort();
         }
-        this.recursiveSortingLeave();
         this.updateVisibleNodes();
+        this.recursiveSortingLeave();
     },
 
     appendChildAfterSorting: function(child)
@@ -278,8 +344,21 @@ WebInspector.HeapSnapshotViewportDataGrid.prototype = {
      */
     highlightNode: function(node)
     {
-        node.element.scrollIntoViewIfNeeded(true);
-        this._nodeToHighlightAfterScroll = node;
+        if (this._isScrolledIntoView(node.element))
+            WebInspector.HeapSnapshotSortableDataGrid.prototype.highlightNode.call(this, node);
+        else {
+            node.element.scrollIntoViewIfNeeded(true);
+            this._nodeToHighlightAfterScroll = node;
+        }
+    },
+
+    _isScrolledIntoView: function(element)
+    {
+        var viewportTop = this.scrollContainer.scrollTop;
+        var viewportBottom = viewportTop + this.scrollContainer.clientHeight;
+        var elemTop = element.offsetTop
+        var elemBottom = elemTop + element.offsetHeight;
+        return elemBottom <= viewportBottom && elemTop >= viewportTop;
     },
 
     _addPaddingRows: function(top, bottom)
@@ -493,7 +572,7 @@ WebInspector.HeapSnapshotConstructorsDataGrid.prototype = {
         this.resetSortingCache();
 
         var key = this._profileIndex === -1 ? "allObjects" : this._minNodeId + ".." + this._maxNodeId;
-        var filter = this._profileIndex === -1 ? null : "function(node) { var id = node.id; return id > " + this._minNodeId + " && id <= " + this._maxNodeId + "; }";
+        var filter = this._profileIndex === -1 ? null : "function(node) { var id = node.id(); return id > " + this._minNodeId + " && id <= " + this._maxNodeId + "; }";
 
         this.snapshot.aggregates(false, key, filter, aggregatesReceived.bind(this, key));
     },

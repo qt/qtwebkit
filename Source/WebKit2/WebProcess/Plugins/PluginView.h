@@ -72,6 +72,9 @@ public:
     // FIXME: Remove this; nobody should have to know about the plug-in view's renderer except the plug-in view itself.
     WebCore::RenderBoxModelObject* renderer() const;
 
+    void pageScaleFactorDidChange();
+    void webPageDestroyed();
+
 private:
     PluginView(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters& parameters);
     virtual ~PluginView();

@@ -94,14 +94,47 @@ WebInspector.StylesUISourceCodeProvider.prototype.__proto__ = WebInspector.Objec
  */
 WebInspector.StyleSource = function(resource)
 {
-    WebInspector.UISourceCode.call(this, resource.url, resource);
-    this._resource = resource;
+    WebInspector.UISourceCode.call(this, resource.url, resource, resource);
 }
 
 WebInspector.StyleSource.prototype = {
+    /**
+     * @param {function(?string)} callback
+     */
+    workingCopyCommitted: function(callback)
+    {  
+        this._resource.setContent(this.workingCopy(), true, callback);
+    },
+
+    workingCopyChanged: function()
+    {  
+        function commitIncrementalEdit()
+        {
+            this._resource.setContent(this.workingCopy(), false, function() {});
+        }
+        const updateTimeout = 200;
+        this._incrementalUpdateTimer = setTimeout(commitIncrementalEdit.bind(this), updateTimeout);
+    }
 }
 
 WebInspector.StyleSource.prototype.__proto__ = WebInspector.UISourceCode.prototype;
+
+/**
+ * @constructor
+ * @extends {WebInspector.UISourceCode}
+ * @param {CSSAgent.StyleSheetId} styleSheetId
+ * @param {string} url
+ * @param {string} content
+ */
+WebInspector.InspectorStyleSource = function(styleSheetId, url, content)
+{
+    WebInspector.UISourceCode.call(this, "<inspector style>", null, new WebInspector.StaticContentProvider(WebInspector.resourceTypes.Stylesheet, content));
+}
+
+WebInspector.InspectorStyleSource.prototype = {
+}
+
+WebInspector.InspectorStyleSource.prototype.__proto__ = WebInspector.UISourceCode.prototype;
 
 /**
  * @constructor
@@ -110,10 +143,9 @@ WebInspector.StyleSource.prototype.__proto__ = WebInspector.UISourceCode.prototy
  */
 WebInspector.StyleSourceFrame = function(styleSource)
 {
-    this._resource = styleSource._resource;
     this._styleSource = styleSource;
     WebInspector.SourceFrame.call(this, this._styleSource);
-    this._resource.addEventListener(WebInspector.Resource.Events.RevisionAdded, this._contentChanged, this);
+    this._styleSource.addEventListener(WebInspector.UISourceCode.Events.ContentChanged, this._onContentChanged, this);
 }
 
 WebInspector.StyleSourceFrame.prototype = {
@@ -130,19 +162,25 @@ WebInspector.StyleSourceFrame.prototype = {
      */
     commitEditing: function(text)
     {
-        this._resource.setContent(text, true, function() {});
+        if (!this._styleSource.isDirty())
+            return;
+
+        this._isCommittingEditing = true;
+        this._styleSource.commitWorkingCopy(this._didEditContent.bind(this));
     },
 
     afterTextChanged: function(oldRange, newRange)
     {
-        function commitIncrementalEdit()
-        {
-            var text = this._textModel.text;
-            this._styleSource.setWorkingCopy(text);
-            this._resource.setContent(text, false, function() {});
+        this._styleSource.setWorkingCopy(this.textModel.text);
+    },
+
+    _didEditContent: function(error)
+    {
+        if (error) {
+            WebInspector.log(error, WebInspector.ConsoleMessage.MessageLevel.Error, true);
+            return;
         }
-        const updateTimeout = 200;
-        this._incrementalUpdateTimer = setTimeout(commitIncrementalEdit.bind(this), updateTimeout);
+        delete this._isCommittingEditing;
     },
 
     _clearIncrementalUpdateTimer: function()
@@ -152,10 +190,21 @@ WebInspector.StyleSourceFrame.prototype = {
         delete this._incrementalUpdateTimer;
     },
 
-    _contentChanged: function(event)
+    /**
+     * @param {WebInspector.Event} event
+     */
+    _onContentChanged: function(event)
     {
-        this._styleSource.contentChanged(this._resource.content || "");
-        this.setContent(this._resource.content, false, "text/stylesheet");
+        if (!this._isCommittingEditing)
+            this.setContent(this._styleSource.content() || "", false, "text/css");
+    },
+
+    populateTextAreaContextMenu: function(contextMenu, lineNumber)
+    {
+        WebInspector.SourceFrame.prototype.populateTextAreaContextMenu.call(this, contextMenu, lineNumber);
+        var scriptsPanel = WebInspector.panels.scripts;
+        contextMenu.appendApplicableItems(this._styleSource);
+        contextMenu.appendSeparator();
     }
 }
 

@@ -89,6 +89,7 @@
     <file>Linkifier.js</file>
     <file>MemoryStatistics.js</file>
     <file>MetricsSidebarPane.js</file>
+    <file>NativeMemorySnapshotView.js</file>
     <file>NavigatorOverlayController.js</file>
     <file>NavigatorView.js</file>
     <file>NetworkItemView.js</file>
@@ -127,6 +128,7 @@
     <file>ResourceView.js</file>
     <file>ResourceWebSocketFrameView.js</file>
     <file>ResourcesPanel.js</file>
+    <file>RevisionHistoryView.js</file>
     <file>ScopeChainSidebarPane.js</file>
     <file>Script.js</file>
     <file>ScriptFormatter.js</file>
@@ -203,6 +205,7 @@
     <file>profilesPanel.css</file>
     <file>resourceView.css</file>
     <file>resourcesPanel.css</file>
+    <file>revisionHistory.css</file>
     <file>scriptsPanel.css</file>
     <file>splitView.css</file>
     <file>tabbedPane.css</file>

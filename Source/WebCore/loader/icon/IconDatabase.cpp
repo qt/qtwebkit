@@ -223,8 +223,7 @@ Image* IconDatabase::synchronousIconForPageURL(const String& pageURLOriginal, co
 
     MutexLocker locker(m_urlAndIconLock);
 
-    if (m_retainOrReleaseIconRequested)
-        performPendingRetainAndReleaseOperations();
+    performPendingRetainAndReleaseOperations();
     
     String pageURLCopy; // Creates a null string for easy testing
     
@@ -398,9 +397,13 @@ void IconDatabase::retainIconForPageURL(const String& pageURL)
 
     if (!isEnabled() || !documentCanHaveIcon(pageURL))
         return;
-       
-    MutexLocker locker(m_urlsToRetainOrReleaseLock);
-    m_urlsToRetain.add(pageURL);
+
+    {
+        MutexLocker locker(m_urlsToRetainOrReleaseLock);
+        m_urlsToRetain.add(pageURL);
+        m_retainOrReleaseIconRequested = true;
+    }
+
     scheduleOrDeferSyncTimer();
 }
 
@@ -448,9 +451,11 @@ void IconDatabase::releaseIconForPageURL(const String& pageURL)
     if (!isEnabled() || !documentCanHaveIcon(pageURL))
         return;
 
-    MutexLocker locker(m_urlsToRetainOrReleaseLock);
-    m_urlsToRelease.add(pageURL);
-    m_retainOrReleaseIconRequested = true;
+    {
+        MutexLocker locker(m_urlsToRetainOrReleaseLock);
+        m_urlsToRelease.add(pageURL);
+        m_retainOrReleaseIconRequested = true;
+    }
     scheduleOrDeferSyncTimer();
 }
 
@@ -744,10 +749,7 @@ size_t IconDatabase::pageURLMappingCount()
 size_t IconDatabase::retainedPageURLCount()
 {
     MutexLocker locker(m_urlAndIconLock);
-
-    if (m_retainOrReleaseIconRequested)
-        performPendingRetainAndReleaseOperations();
-
+    performPendingRetainAndReleaseOperations();
     return m_retainedPageURLs.size();
 }
 
@@ -782,6 +784,7 @@ IconDatabase::IconDatabase()
     , m_iconURLImportComplete(false)
     , m_syncThreadHasWorkToDo(false)
     , m_disabledSuddenTerminationForSyncThread(false)
+    , m_retainOrReleaseIconRequested(false)
     , m_initialPruningComplete(false)
     , m_client(defaultClient())
     , m_imported(false)
@@ -1333,8 +1336,7 @@ void IconDatabase::performURLImport()
     {
         MutexLocker locker(m_urlAndIconLock);
 
-        if (m_retainOrReleaseIconRequested)
-            performPendingRetainAndReleaseOperations();
+        performPendingRetainAndReleaseOperations();
 
         for (unsigned i = 0; i < urls.size(); ++i) {
             if (!m_retainedPageURLs.contains(urls[i])) {
@@ -1417,7 +1419,7 @@ void IconDatabase::syncThreadMainLoop()
         if (m_threadTerminationRequested)
             break;
 
-        if (m_retainOrReleaseIconRequested) {
+        {
             MutexLocker locker(m_urlAndIconLock);
             performPendingRetainAndReleaseOperations();
         }
@@ -1507,21 +1509,29 @@ void IconDatabase::syncThreadMainLoop()
 
 void IconDatabase::performPendingRetainAndReleaseOperations()
 {
-    ASSERT(m_retainOrReleaseIconRequested);
-
     // NOTE: The caller is assumed to hold m_urlAndIconLock.
     ASSERT(!m_urlAndIconLock.tryLock());
 
-    MutexLocker vectorLocker(m_urlsToRetainOrReleaseLock);
+    HashCountedSet<String> toRetain;
+    HashCountedSet<String> toRelease;
 
-    for (HashCountedSet<String>::const_iterator it = m_urlsToRetain.begin(), end = m_urlsToRetain.end(); it != end; ++it)
+    {
+        MutexLocker pendingWorkLocker(m_urlsToRetainOrReleaseLock);
+        if (!m_retainOrReleaseIconRequested)
+            return;
+
+        // Make a copy of the URLs to retain and/or release so we can release m_urlsToRetainOrReleaseLock ASAP.
+        // Holding m_urlAndIconLock protects this function from being re-entered.
+
+        toRetain.swap(m_urlsToRetain);
+        toRelease.swap(m_urlsToRelease);
+        m_retainOrReleaseIconRequested = false;
+    }
+
+    for (HashCountedSet<String>::const_iterator it = toRetain.begin(), end = toRetain.end(); it != end; ++it)
         performRetainIconForPageURL(it->first, it->second);
-    for (HashCountedSet<String>::const_iterator it = m_urlsToRelease.begin(), end = m_urlsToRelease.end(); it != end; ++it)
+    for (HashCountedSet<String>::const_iterator it = toRelease.begin(), end = toRelease.end(); it != end; ++it)
         performReleaseIconForPageURL(it->first, it->second);
-
-    m_urlsToRetain.clear();
-    m_urlsToRelease.clear();
-    m_retainOrReleaseIconRequested = false;
 }
 
 bool IconDatabase::readFromDatabase()

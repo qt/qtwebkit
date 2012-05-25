@@ -49,7 +49,7 @@ const JSC::HashTable* getHashTableForGlobalData(JSGlobalData& globalData, const 
 JSValue jsStringSlowCase(ExecState* exec, JSStringCache& stringCache, StringImpl* stringImpl)
 {
     JSString* wrapper = jsString(exec, UString(stringImpl));
-    stringCache.add(stringImpl, PassWeak<JSString>(wrapper, currentWorld(exec)->stringWrapperOwner(), stringImpl));
+    weakAdd(stringCache, stringImpl, PassWeak<JSString>(wrapper, currentWorld(exec)->stringWrapperOwner(), stringImpl));
     return wrapper;
 }
 
@@ -109,7 +109,7 @@ JSValue jsStringOrFalse(ExecState* exec, const KURL& url)
 
 AtomicStringImpl* findAtomicString(PropertyName propertyName)
 {
-    StringImpl* impl = propertyName.impl();
+    StringImpl* impl = propertyName.publicName();
     if (!impl)
         return 0;
     ASSERT(impl->existingHash());
@@ -245,7 +245,7 @@ void printErrorMessageForFrame(Frame* frame, const String& message)
 
 JSValue objectToStringFunctionGetter(ExecState* exec, JSValue, PropertyName propertyName)
 {
-    return JSFunction::create(exec, exec->lexicalGlobalObject(), 0, propertyName.impl(), objectProtoFuncToString);
+    return JSFunction::create(exec, exec->lexicalGlobalObject(), 0, propertyName.publicName(), objectProtoFuncToString);
 }
 
 Structure* getCachedDOMStructure(JSDOMGlobalObject* globalObject, const ClassInfo* classInfo)

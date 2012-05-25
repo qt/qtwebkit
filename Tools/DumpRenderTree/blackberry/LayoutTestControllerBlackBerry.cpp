@@ -653,22 +653,6 @@ void LayoutTestController::setPluginsEnabled(bool flag)
     notImplemented();
 }
 
-void LayoutTestController::setEditingBehavior(const char* editingBehavior)
-{
-    if (!mainFrame)
-        return;
-    WebCore::EditingBehaviorType type = WebCore::EditingUnixBehavior;
-    if (!strcmp(editingBehavior, "win"))
-        type = WebCore::EditingWindowsBehavior;
-    else if (!strcmp(editingBehavior, "mac"))
-        type = WebCore::EditingMacBehavior;
-    else if (!strcmp(editingBehavior, "unix"))
-        type = WebCore::EditingUnixBehavior;
-    else
-        CRASH();
-    mainFrame->page()->settings()->setEditingBehaviorType(type);
-}
-
 void LayoutTestController::abortModal()
 {
     notImplemented();
@@ -885,6 +869,16 @@ void LayoutTestController::resetPageVisibility()
 }
 
 void LayoutTestController::setPageVisibility(const char*)
+{
+    notImplemented();
+}
+
+void LayoutTestController::setAutomaticLinkDetectionEnabled(bool)
+{
+    notImplemented();
+}
+
+void LayoutTestController::sendWebIntentResponse(JSStringRef)
 {
     notImplemented();
 }

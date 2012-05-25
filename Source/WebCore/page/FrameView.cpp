@@ -1522,7 +1522,14 @@ void FrameView::scrollContentsSlowPath(const IntRect& updateRect)
     if (contentsInCompositedLayer()) {
         RenderView* root = rootRenderer(this);
         ASSERT(root);
-        root->layer()->setBackingNeedsRepaintInRect(visibleContentRect());
+
+        IntRect updateRect = visibleContentRect();
+
+        // Make sure to "apply" the scale factor here since we're converting from frame view
+        // coordinates to layer backing coordinates.
+        updateRect.scale(1 / m_frame->frameScaleFactor());
+
+        root->layer()->setBackingNeedsRepaintInRect(updateRect);
     }
     if (RenderPart* frameRenderer = m_frame->ownerRenderer()) {
         if (isEnclosedInCompositingLayer()) {
@@ -2041,7 +2048,7 @@ void FrameView::scheduleRelayout()
 
     // When frame flattening is enabled, the contents of the frame could affect the layout of the parent frames.
     // Also invalidate parent frame starting from the owner element of this frame.
-    if (isInChildFrameWithFrameFlattening() && m_frame->ownerRenderer())
+    if (m_frame->ownerRenderer() && isInChildFrameWithFrameFlattening())
         m_frame->ownerRenderer()->setNeedsLayout(true, MarkContainingBlockChain);
 
     int delay = m_frame->document()->minimumLayoutDelay();
@@ -2918,18 +2925,21 @@ FrameView* FrameView::parentFrameView() const
 
 bool FrameView::isInChildFrameWithFrameFlattening()
 {
-    if (!parent() || !m_frame->ownerElement() || !m_frame->settings() || !m_frame->settings()->frameFlatteningEnabled())
+    if (!parent() || !m_frame->ownerElement())
         return false;
 
     // Frame flattening applies when the owner element is either in a frameset or
     // an iframe with flattening parameters.
     if (m_frame->ownerElement()->hasTagName(iframeTag)) {
         RenderIFrame* iframeRenderer = toRenderIFrame(m_frame->ownerElement()->renderPart());
-
-        if (iframeRenderer->flattenFrame())
+        if (iframeRenderer->flattenFrame() || iframeRenderer->isSeamless())
             return true;
+    }
 
-    } else if (m_frame->ownerElement()->hasTagName(frameTag))
+    if (!m_frame->settings() || !m_frame->settings()->frameFlatteningEnabled())
+        return false;
+
+    if (m_frame->ownerElement()->hasTagName(frameTag))
         return true;
 
     return false;
@@ -3279,8 +3289,8 @@ void FrameView::adjustPageHeightDeprecated(float *newBottom, float oldTop, float
     if (RenderView* root = rootRenderer(this)) {
         // Use a context with painting disabled.
         GraphicsContext context((PlatformGraphicsContext*)0);
-        root->setTruncatedAt((int)floorf(oldBottom));
-        IntRect dirtyRect(0, (int)floorf(oldTop), root->maxXLayoutOverflow(), (int)ceilf(oldBottom - oldTop));
+        root->setTruncatedAt(static_cast<int>(floorf(oldBottom)));
+        IntRect dirtyRect(0, static_cast<int>(floorf(oldTop)), root->layoutOverflowRect().maxX(), static_cast<int>(ceilf(oldBottom - oldTop)));
         root->setPrintRect(dirtyRect);
         root->layer()->paint(&context, dirtyRect);
         *newBottom = root->bestTruncatedAt();

@@ -51,6 +51,7 @@ using namespace HTMLNames;
 using namespace std;
 
 static const double numberDefaultStep = 1.0;
+static const double numberDefaultStepBase = 0.0;
 static const double numberStepScaleFactor = 1.0;
 
 static unsigned lengthBeforeDecimalPoint(double value)
@@ -98,7 +99,7 @@ void NumberInputType::setValueAsNumber(double newValue, TextFieldEventBehavior e
 
 bool NumberInputType::typeMismatchFor(const String& value) const
 {
-    return !value.isEmpty() && !parseToDoubleForNumberType(value, 0);
+    return !value.isEmpty() && !isfinite(parseToDoubleForNumberType(value));
 }
 
 bool NumberInputType::typeMismatch() const
@@ -107,33 +108,18 @@ bool NumberInputType::typeMismatch() const
     return false;
 }
 
-bool NumberInputType::rangeUnderflow(const String& value) const
+StepRange NumberInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
-    const double nan = numeric_limits<double>::quiet_NaN();
-    double doubleValue = parseToDouble(value, nan);
-    return isfinite(doubleValue) && doubleValue < minimum();
-}
+    DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (numberDefaultStep, numberDefaultStepBase, numberStepScaleFactor));
 
-bool NumberInputType::rangeOverflow(const String& value) const
-{
-    const double nan = numeric_limits<double>::quiet_NaN();
-    double doubleValue = parseToDouble(value, nan);
-    return isfinite(doubleValue) && doubleValue > maximum();
-}
+    unsigned stepBaseDecimalPlaces;
+    double stepBaseValue = parseToDoubleWithDecimalPlaces(element()->fastGetAttribute(minAttr), numberDefaultStepBase, &stepBaseDecimalPlaces);
+    StepRange::DoubleWithDecimalPlaces stepBase(stepBaseValue, min(stepBaseDecimalPlaces, 16u));
+    double minimum = parseToDouble(element()->fastGetAttribute(minAttr), -numeric_limits<float>::max());
+    double maximum = parseToDouble(element()->fastGetAttribute(maxAttr), numeric_limits<float>::max());
 
-bool NumberInputType::supportsRangeLimitation() const
-{
-    return true;
-}
-
-double NumberInputType::minimum() const
-{
-    return parseToDouble(element()->fastGetAttribute(minAttr), -numeric_limits<float>::max());
-}
-
-double NumberInputType::maximum() const
-{
-    return parseToDouble(element()->fastGetAttribute(maxAttr), numeric_limits<float>::max());
+    StepRange::DoubleWithDecimalPlacesOrMissing step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 
 bool NumberInputType::sizeShouldIncludeDecoration(int defaultSize, int& preferredSize) const
@@ -141,15 +127,15 @@ bool NumberInputType::sizeShouldIncludeDecoration(int defaultSize, int& preferre
     preferredSize = defaultSize;
 
     unsigned minValueDecimalPlaces;
-    double minValueDouble;
     String minValue = element()->fastGetAttribute(minAttr);
-    if (!parseToDoubleForNumberTypeWithDecimalPlaces(minValue, &minValueDouble, &minValueDecimalPlaces))
+    double minValueDouble = parseToDoubleForNumberTypeWithDecimalPlaces(minValue, &minValueDecimalPlaces);
+    if (!isfinite(minValueDouble))
         return false;
 
     unsigned maxValueDecimalPlaces;
-    double maxValueDouble;
     String maxValue = element()->fastGetAttribute(maxAttr);
-    if (!parseToDoubleForNumberTypeWithDecimalPlaces(maxValue, &maxValueDouble, &maxValueDecimalPlaces))
+    double maxValueDouble = parseToDoubleForNumberTypeWithDecimalPlaces(maxValue, &maxValueDecimalPlaces);
+    if (!isfinite(maxValueDouble))
         return false;
 
     if (maxValueDouble < minValueDouble) {
@@ -157,12 +143,12 @@ bool NumberInputType::sizeShouldIncludeDecoration(int defaultSize, int& preferre
         maxValueDecimalPlaces = minValueDecimalPlaces;
     }
 
-    unsigned stepValueDecimalPlaces;
-    double stepValueDouble;
     String stepValue = element()->fastGetAttribute(stepAttr);
     if (equalIgnoringCase(stepValue, "any"))
         return false;
-    if (!parseToDoubleForNumberTypeWithDecimalPlaces(stepValue, &stepValueDouble, &stepValueDecimalPlaces)) {
+    unsigned stepValueDecimalPlaces;
+    double stepValueDouble = parseToDoubleForNumberTypeWithDecimalPlaces(stepValue, &stepValueDecimalPlaces);
+    if (!isfinite(stepValueDouble)) {
         stepValueDouble = 1;
         stepValueDecimalPlaces = 0;
     }
@@ -188,49 +174,6 @@ bool NumberInputType::isSteppable() const
     return true;
 }
 
-bool NumberInputType::stepMismatch(const String& value, double step) const
-{
-    double doubleValue;
-    if (!parseToDoubleForNumberType(value, &doubleValue))
-        return false;
-    doubleValue = fabs(doubleValue - stepBase());
-    if (isinf(doubleValue))
-        return false;
-    // double's fractional part size is DBL_MAN_DIG-bit. If the current value
-    // is greater than step*2^DBL_MANT_DIG, the following computation for
-    // remainder makes no sense.
-    if (doubleValue / pow(2.0, DBL_MANT_DIG) > step)
-        return false;
-    // The computation follows HTML5 4.10.7.2.10 `The step attribute' :
-    // ... that number subtracted from the step base is not an integral multiple
-    // of the allowed value step, the element is suffering from a step mismatch.
-    double remainder = fabs(doubleValue - step * round(doubleValue / step));
-    // Accepts erros in lower fractional part which IEEE 754 single-precision
-    // can't represent.
-    double computedAcceptableError = acceptableError(step);
-    return computedAcceptableError < remainder && remainder < (step - computedAcceptableError);
-}
-
-double NumberInputType::stepBase() const
-{
-    return parseToDouble(element()->fastGetAttribute(minAttr), defaultStepBase());
-}
-
-double NumberInputType::stepBaseWithDecimalPlaces(unsigned* decimalPlaces) const
-{
-    return parseToDoubleWithDecimalPlaces(element()->fastGetAttribute(minAttr), defaultStepBase(), decimalPlaces);
-}
-
-double NumberInputType::defaultStep() const
-{
-    return numberDefaultStep;
-}
-
-double NumberInputType::stepScaleFactor() const
-{
-    return numberStepScaleFactor;
-}
-
 void NumberInputType::handleKeydownEvent(KeyboardEvent* event)
 {
     handleKeydownEventForSpinButton(event);
@@ -245,20 +188,12 @@ void NumberInputType::handleWheelEvent(WheelEvent* event)
 
 double NumberInputType::parseToDouble(const String& src, double defaultValue) const
 {
-    double numberValue;
-    if (!parseToDoubleForNumberType(src, &numberValue))
-        return defaultValue;
-    ASSERT(isfinite(numberValue));
-    return numberValue;
+    return parseToDoubleForNumberType(src, defaultValue);
 }
 
 double NumberInputType::parseToDoubleWithDecimalPlaces(const String& src, double defaultValue, unsigned *decimalPlaces) const
 {
-    double numberValue;
-    if (!parseToDoubleForNumberTypeWithDecimalPlaces(src, &numberValue, decimalPlaces))
-        return defaultValue;
-    ASSERT(isfinite(numberValue));
-    return numberValue;
+    return parseToDoubleForNumberTypeWithDecimalPlaces(src, decimalPlaces, defaultValue);
 }
 
 String NumberInputType::serialize(double value) const
@@ -266,11 +201,6 @@ String NumberInputType::serialize(double value) const
     if (!isfinite(value))
         return String();
     return serializeForNumberType(value);
-}
-
-double NumberInputType::acceptableError(double step) const
-{
-    return step / pow(2.0, FLT_MANT_DIG);
 }
 
 void NumberInputType::handleBlurEvent()
@@ -298,9 +228,10 @@ String NumberInputType::visibleValue() const
         return currentValue;
     // FIXME: The following three lines should be removed when we
     // remove the second argument of convertToLocalizedNumber().
-    double doubleValue = numeric_limits<double>::quiet_NaN();
+    // Note: parseToDoubleForNumberTypeWithDecimalPlaces set zero to decimalPlaces
+    // if currentValue isn't valid floating pointer number.
     unsigned decimalPlace;
-    parseToDoubleForNumberTypeWithDecimalPlaces(currentValue, &doubleValue, &decimalPlace);
+    parseToDoubleForNumberTypeWithDecimalPlaces(currentValue, &decimalPlace);
     return convertToLocalizedNumber(currentValue, decimalPlace);
 }
 
@@ -324,7 +255,7 @@ String NumberInputType::sanitizeValue(const String& proposedValue) const
 {
     if (proposedValue.isEmpty())
         return proposedValue;
-    return parseToDoubleForNumberType(proposedValue, 0) ? proposedValue : emptyAtom.string();
+    return isfinite(parseToDoubleForNumberType(proposedValue)) ? proposedValue : emptyString();
 }
 
 bool NumberInputType::hasUnacceptableValue()

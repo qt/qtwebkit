@@ -51,7 +51,7 @@ IDBObjectStoreBackendImpl::~IDBObjectStoreBackendImpl()
 {
 }
 
-IDBObjectStoreBackendImpl::IDBObjectStoreBackendImpl(IDBBackingStore* backingStore, int64_t databaseId, int64_t id, const String& name, const String& keyPath, bool autoIncrement)
+IDBObjectStoreBackendImpl::IDBObjectStoreBackendImpl(IDBBackingStore* backingStore, int64_t databaseId, int64_t id, const String& name, const IDBKeyPath& keyPath, bool autoIncrement)
     : m_backingStore(backingStore)
     , m_databaseId(databaseId)
     , m_id(id)
@@ -63,7 +63,7 @@ IDBObjectStoreBackendImpl::IDBObjectStoreBackendImpl(IDBBackingStore* backingSto
     loadIndexes();
 }
 
-IDBObjectStoreBackendImpl::IDBObjectStoreBackendImpl(IDBBackingStore* backingStore, int64_t databaseId, const String& name, const String& keyPath, bool autoIncrement)
+IDBObjectStoreBackendImpl::IDBObjectStoreBackendImpl(IDBBackingStore* backingStore, int64_t databaseId, const String& name, const IDBKeyPath& keyPath, bool autoIncrement)
     : m_backingStore(backingStore)
     , m_databaseId(databaseId)
     , m_id(InvalidId)
@@ -137,9 +137,11 @@ void IDBObjectStoreBackendImpl::getInternal(ScriptExecutionContext*, PassRefPtr<
     callbacks->onSuccess(SerializedScriptValue::createFromWire(wireData));
 }
 
-static PassRefPtr<IDBKey> fetchKeyFromKeyPath(SerializedScriptValue* value, const String& keyPath)
+static PassRefPtr<IDBKey> fetchKeyFromKeyPath(SerializedScriptValue* value, const IDBKeyPath& keyPath)
 {
     IDB_TRACE("IDBObjectStoreBackendImpl::fetchKeyFromKeyPath");
+    ASSERT(!keyPath.isNull());
+
     Vector<RefPtr<SerializedScriptValue> > values;
     values.append(value);
     Vector<RefPtr<IDBKey> > keys;
@@ -150,7 +152,7 @@ static PassRefPtr<IDBKey> fetchKeyFromKeyPath(SerializedScriptValue* value, cons
     return keys[0].release();
 }
 
-static PassRefPtr<SerializedScriptValue> injectKeyIntoKeyPath(PassRefPtr<IDBKey> key, PassRefPtr<SerializedScriptValue> value, const String& keyPath)
+static PassRefPtr<SerializedScriptValue> injectKeyIntoKeyPath(PassRefPtr<IDBKey> key, PassRefPtr<SerializedScriptValue> value, const IDBKeyPath& keyPath)
 {
     IDB_TRACE("IDBObjectStoreBackendImpl::injectKeyIntoKeyPath");
     return IDBKeyPathBackendImpl::injectIDBKeyIntoSerializedValue(key, value, keyPath);
@@ -204,14 +206,6 @@ void IDBObjectStoreBackendImpl::put(PassRefPtr<SerializedScriptValue> prpValue, 
         if (key && !key->isValid()) {
             ec = IDBDatabaseException::DATA_ERR;
             return;
-        }
-        for (IndexMap::iterator it = m_indexes.begin(); it != m_indexes.end(); ++it) {
-            const RefPtr<IDBIndexBackendImpl>& index = it->second;
-            RefPtr<IDBKey> indexKey = fetchKeyFromKeyPath(value.get(), index->keyPath());
-            if (indexKey && !indexKey->isValid()) {
-                ec = IDBDatabaseException::DATA_ERR;
-                return;
-            }
         }
     } else {
         ASSERT(key);
@@ -293,8 +287,10 @@ void IDBObjectStoreBackendImpl::putInternal(ScriptExecutionContext*, PassRefPtr<
         const RefPtr<IDBIndexBackendImpl>& index = it->second;
 
         RefPtr<IDBKey> indexKey = fetchKeyFromKeyPath(value.get(), index->keyPath());
-        if (!indexKey) {
-            indexKeys.append(indexKey.release());
+        if (!indexKey || !indexKey->isValid()) {
+            // Null/invalid keys not added to index; null entry keeps iterator/vector indexes consistent.
+            indexKey.clear();
+            indexKeys.append(indexKey);
             continue;
         }
         ASSERT(indexKey->isValid());
@@ -503,7 +499,7 @@ bool IDBObjectStoreBackendImpl::populateIndex(IDBBackingStore& backingStore, int
     return true;
 }
 
-PassRefPtr<IDBIndexBackendInterface> IDBObjectStoreBackendImpl::createIndex(const String& name, const String& keyPath, bool unique, bool multiEntry, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
+PassRefPtr<IDBIndexBackendInterface> IDBObjectStoreBackendImpl::createIndex(const String& name, const IDBKeyPath& keyPath, bool unique, bool multiEntry, IDBTransactionBackendInterface* transaction, ExceptionCode& ec)
 {
     if (name.isNull()) {
         ec = IDBDatabaseException::NON_TRANSIENT_ERR;
@@ -654,7 +650,7 @@ void IDBObjectStoreBackendImpl::loadIndexes()
 {
     Vector<int64_t> ids;
     Vector<String> names;
-    Vector<String> keyPaths;
+    Vector<IDBKeyPath> keyPaths;
     Vector<bool> uniqueFlags;
     Vector<bool> multiEntryFlags;
     backingStore()->getIndexes(databaseId(), m_id, ids, names, keyPaths, uniqueFlags, multiEntryFlags);

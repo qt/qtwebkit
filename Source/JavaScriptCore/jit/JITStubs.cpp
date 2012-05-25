@@ -54,6 +54,7 @@
 #include "JSPropertyNameIterator.h"
 #include "JSStaticScopeObject.h"
 #include "JSString.h"
+#include "NameInstance.h"
 #include "ObjectPrototype.h"
 #include "Operations.h"
 #include "Parser.h"
@@ -2447,7 +2448,13 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val)
         CHECK_FOR_EXCEPTION();
         return JSValue::encode(result);
     }
-    
+
+    if (isName(subscript)) {
+        JSValue result = baseValue.get(callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName());
+        CHECK_FOR_EXCEPTION();
+        return JSValue::encode(result);
+    }
+
     Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
     JSValue result = baseValue.get(callFrame, property);
     CHECK_FOR_EXCEPTION_AT_END();
@@ -2474,7 +2481,9 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val_string)
             if (!isJSString(baseValue))
                 ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_get_by_val));
         }
-    } else {
+    } else if (isName(subscript))
+        result = baseValue.get(callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName());
+    else {
         Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
         result = baseValue.get(callFrame, property);
     }
@@ -2520,6 +2529,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val)
                 JSArray::putByIndex(jsArray, callFrame, i, value, callFrame->codeBlock()->isStrictMode());
         } else
             baseValue.putByIndex(callFrame, i, value, callFrame->codeBlock()->isStrictMode());
+    } else if (isName(subscript)) {
+        PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
+        baseValue.put(callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName(), value, slot);
     } else {
         Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
         if (!stackFrame.globalData->exception) { // Don't put to an object if toString threw an exception.
@@ -2759,9 +2771,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_not)
 
     JSValue src = stackFrame.args[0].jsValue();
 
-    CallFrame* callFrame = stackFrame.callFrame;
-
-    JSValue result = jsBoolean(!src.toBoolean(callFrame));
+    JSValue result = jsBoolean(!src.toBoolean());
     CHECK_FOR_EXCEPTION_AT_END();
     return JSValue::encode(result);
 }
@@ -2772,9 +2782,7 @@ DEFINE_STUB_FUNCTION(int, op_jtrue)
 
     JSValue src1 = stackFrame.args[0].jsValue();
 
-    CallFrame* callFrame = stackFrame.callFrame;
-
-    bool result = src1.toBoolean(callFrame);
+    bool result = src1.toBoolean();
     CHECK_FOR_EXCEPTION_AT_END();
     return result;
 }
@@ -3245,6 +3253,9 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_in)
     if (propName.getUInt32(i))
         return JSValue::encode(jsBoolean(baseObj->hasProperty(callFrame, i)));
 
+    if (isName(propName))
+        return JSValue::encode(jsBoolean(baseObj->hasProperty(callFrame, jsCast<NameInstance*>(propName.asCell())->privateName())));
+
     Identifier property(callFrame, propName.toString(callFrame)->value(callFrame));
     CHECK_FOR_EXCEPTION();
     return JSValue::encode(jsBoolean(baseObj->hasProperty(callFrame, property)));
@@ -3357,6 +3368,8 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_del_by_val)
     uint32_t i;
     if (subscript.getUInt32(i))
         result = baseObj->methodTable()->deletePropertyByIndex(baseObj, callFrame, i);
+    else if (isName(subscript))
+        result = baseObj->methodTable()->deleteProperty(baseObj, callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName());
     else {
         CHECK_FOR_EXCEPTION();
         Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
@@ -3445,27 +3458,31 @@ MacroAssemblerCodeRef JITThunks::ctiStub(JSGlobalData* globalData, ThunkGenerato
 
 NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, NativeFunction constructor)
 {
-    HostFunctionStubMap::AddResult result = m_hostFunctionStubMap->add(function, PassWeak<NativeExecutable>());
-    if (!result.iterator->second)
-        result.iterator->second = PassWeak<NativeExecutable>(NativeExecutable::create(*globalData, JIT::compileCTINativeCall(globalData, function), function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), constructor, NoIntrinsic));
-    return result.iterator->second.get();
+    if (NativeExecutable* nativeExecutable = m_hostFunctionStubMap->get(function))
+        return nativeExecutable;
+
+    NativeExecutable* nativeExecutable = NativeExecutable::create(*globalData, JIT::compileCTINativeCall(globalData, function), function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), constructor, NoIntrinsic);
+    weakAdd(*m_hostFunctionStubMap, function, PassWeak<NativeExecutable>(nativeExecutable));
+    return nativeExecutable;
 }
 
 NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, ThunkGenerator generator, Intrinsic intrinsic)
 {
-    HostFunctionStubMap::AddResult entry = m_hostFunctionStubMap->add(function, PassWeak<NativeExecutable>());
-    if (!entry.iterator->second) {
-        MacroAssemblerCodeRef code;
-        if (generator) {
-            if (globalData->canUseJIT())
-                code = generator(globalData);
-            else
-                code = MacroAssemblerCodeRef();
-        } else
-            code = JIT::compileCTINativeCall(globalData, function);
-        entry.iterator->second = PassWeak<NativeExecutable>(NativeExecutable::create(*globalData, code, function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), callHostFunctionAsConstructor, intrinsic));
-    }
-    return entry.iterator->second.get();
+    if (NativeExecutable* nativeExecutable = m_hostFunctionStubMap->get(function))
+        return nativeExecutable;
+
+    MacroAssemblerCodeRef code;
+    if (generator) {
+        if (globalData->canUseJIT())
+            code = generator(globalData);
+        else
+            code = MacroAssemblerCodeRef();
+    } else
+        code = JIT::compileCTINativeCall(globalData, function);
+
+    NativeExecutable* nativeExecutable = NativeExecutable::create(*globalData, code, function, MacroAssemblerCodeRef::createSelfManagedCodeRef(ctiNativeConstruct()), callHostFunctionAsConstructor, intrinsic);
+    weakAdd(*m_hostFunctionStubMap, function, PassWeak<NativeExecutable>(nativeExecutable));
+    return nativeExecutable;
 }
 
 void JITThunks::clearHostFunctionStubs()

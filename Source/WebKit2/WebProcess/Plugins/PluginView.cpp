@@ -268,16 +268,13 @@ PluginView::PluginView(PassRefPtr<HTMLPlugInElement> pluginElement, PassRefPtr<P
 #endif
     , m_manualStreamState(StreamStateInitial)
 {
-#if PLATFORM(MAC)
     m_webPage->addPluginView(this);
-#endif
 }
 
 PluginView::~PluginView()
 {
-#if PLATFORM(MAC)
-    m_webPage->removePluginView(this);
-#endif
+    if (m_webPage)
+        m_webPage->removePluginView(this);
 
     ASSERT(!m_isBeingDestroyed);
 
@@ -293,7 +290,8 @@ PluginView::~PluginView()
         m_plugin->destroyPlugin();
         m_isBeingDestroyed = false;
 #if PLATFORM(MAC)
-        pluginFocusOrWindowFocusChanged(false);
+        if (m_webPage)
+            pluginFocusOrWindowFocusChanged(false);
 #endif
     }
 
@@ -393,6 +391,16 @@ void PluginView::manualLoadDidFail(const ResourceError& error)
 RenderBoxModelObject* PluginView::renderer() const
 {
     return toRenderBoxModelObject(m_pluginElement->renderer());
+}
+
+void PluginView::pageScaleFactorDidChange()
+{
+    viewGeometryDidChange();
+}
+
+void PluginView::webPageDestroyed()
+{
+    m_webPage = 0;
 }
 
 #if PLATFORM(MAC)    
@@ -748,15 +756,15 @@ void PluginView::viewGeometryDidChange()
         return;
 
     ASSERT(frame());
-    float frameScaleFactor = frame()->frameScaleFactor();
+    float pageScaleFactor = frame()->page() ? frame()->page()->pageScaleFactor() : 1;
 
-    IntPoint scaledFrameRectLocation(frameRect().location().x() * frameScaleFactor, frameRect().location().y() * frameScaleFactor);
+    IntPoint scaledFrameRectLocation(frameRect().location().x() * pageScaleFactor, frameRect().location().y() * pageScaleFactor);
     IntPoint scaledLocationInRootViewCoordinates(parent()->contentsToRootView(scaledFrameRectLocation));
 
     // FIXME: We still don't get the right coordinates for transformed plugins.
     AffineTransform transform;
     transform.translate(scaledLocationInRootViewCoordinates.x(), scaledLocationInRootViewCoordinates.y());
-    transform.scale(frameScaleFactor);
+    transform.scale(pageScaleFactor);
 
     // FIXME: The clip rect isn't correct.
     IntRect clipRect = boundsRect();

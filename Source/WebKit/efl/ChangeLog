@@ -1,3 +1,293 @@
+2012-05-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] API for PageGroup visited links hash populating
+        https://bugs.webkit.org/show_bug.cgi?id=86370
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added "populate,visited,links" ewk_view signal that tells to the client managing
+        persistent history storage to fill the visited links cache.
+        Added API for the PageGroup visited links hash populating.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::populateVisitedLinks): Implementation added (sends notification).
+        (WebCore):
+        * WebCoreSupport/ChromeClientEfl.h:
+        (ChromeClientEfl):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_visited_link_add): PageGroup visited links hash populating.
+        * ewk/ewk_view.h:
+
+2012-05-24  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] LayoutTestController's setCacheModel() implementation
+        https://bugs.webkit.org/show_bug.cgi?id=86840
+
+        Reviewed by Csaba Osztrogonác.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setDeadDecodedDataDeletionInterval): Aux wrapper function for DRT.
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-24  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's LayoutTestController needs to implement sendWebIntentResponse
+        https://bugs.webkit.org/show_bug.cgi?id=86867
+
+        Reviewed by Adam Barth.
+
+        ewk_intent_request_failure_post() should call
+        WebCore::IntentRequest::postFailure(), not
+        WebCore::IntentRequest::postResult().
+
+        * ewk/ewk_intent_request.cpp:
+        (ewk_intent_request_failure_post):
+
+2012-05-24  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] The EFL port has no support for title directionality
+        https://bugs.webkit.org/show_bug.cgi?id=86462
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Define a new Ewk_Text_With_Direction type to store the direction of
+        the text along with the text itself. This is needed to support text
+        directionality in EFL port.
+
+        Use the new Ewk_Text_With_Direction type for the frame title. Updated
+        "title,changed" signal, title getter/setter and Ewk_Hit_Test struct.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidReceiveTitle):
+        * ewk/ewk_frame.cpp:
+        (Ewk_Frame_Smart_Data):
+        (_ewk_frame_smart_del):
+        (ewk_frame_title_get):
+        (ewk_frame_hit_test_free):
+        (ewk_frame_hit_test_new):
+        (ewk_frame_title_set):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_frame_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_title_get):
+        (ewk_view_title_set):
+        * ewk/ewk_view.h:
+        * ewk/ewk_view_private.h:
+
+2012-05-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's DRT does not print didFailProvisionalLoadWithError messages
+        https://bugs.webkit.org/show_bug.cgi?id=85956
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add new "load,provisional,failed" signal on the frame and the view to
+        complement the "load,provisional" one.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailProvisionalLoad):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_load_provisional_failed):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_frame_private.h:
+        * ewk/ewk_view.cpp:
+        (ewk_view_load_provisional_failed):
+        * ewk/ewk_view.h:
+        * ewk/ewk_view_private.h:
+
+2012-05-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's DRT needs to call Settings::setValidationMessageTimerMagnification(-1)
+        https://bugs.webkit.org/show_bug.cgi?id=86366
+
+        Reviewed by Antonio Gomes.
+
+        Add helper function to DumpRenderTreeSupportEfl to set the validation
+        message timer magnification.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setValidationMessageTimerMagnification):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-22  Dongwoo Im  <dw.im@samsung.com>
+
+        [EFL] Implements the registerProtocolHandler method and option.
+        https://bugs.webkit.org/show_bug.cgi?id=73638
+
+        Reviewed by Andreas Kling.
+
+        The registerProtocolHandler() method allows Web sites to register themselves
+        as possible handlers for particular schemes.
+
+        http://dev.w3.org/html5/spec/Overview.html#dom-navigator-registerprotocolhandler
+
+        * WebCoreSupport/ChromeClientEfl.cpp: Adds a new function.
+        (WebCore):
+        (WebCore::customHandlersDataCreate): Creates and fills the data object.
+        (WebCore::customHandlersDataDelete): Deletes the data object.
+        (WebCore::ChromeClientEfl::registerProtocolHandler): Registers a protocol and the handler of it.
+        * WebCoreSupport/ChromeClientEfl.h: Adds a prototype.
+        (ChromeClientEfl):
+        * ewk/ewk_custom_handlers.cpp: Added.
+        (ewk_custom_handlers_register_protocol_handler):
+        * ewk/ewk_view.h: Adds Data structure.
+        * ewk/ewk_view_private.h: Adds private function.
+
+2012-05-22  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL][DRT] Implement touch event
+        https://bugs.webkit.org/show_bug.cgi?id=86720
+
+        Reviewed by Hajime Morita.
+
+        Currently EFL DRT doesn't support touch event.
+        Therefore, this patch enabled it and implemented some eventSender function callbacks.
+
+        * ewebkit.pc.in:
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_feed_touch_event):
+        * ewk/ewk_frame.h:
+
+2012-05-22  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's DRT needs to print information about received Web Intents
+        https://bugs.webkit.org/show_bug.cgi?id=86864
+
+        Reviewed by Adam Barth.
+
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_suggestions_get): Add function to retrieve suggested
+        service URLs for an intent.
+        (ewk_intent_extra_names_get): Add function to retrieve names of
+        extra metadata for an intent.
+        (ewk_intent_new): Correctly initialize Ewk_Intent members to avoid
+        crashes.
+        (ewk_intent_free): Unref shared strings.
+        * ewk/ewk_intent.h:
+
+2012-05-22  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] Add support to enable/disable DOM paste 
+        https://bugs.webkit.org/show_bug.cgi?id=85040
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add support to enable/disable DOM paste setting so that document.execCommand()
+        allows paste command when this setting is enabled. Also, update documentation
+        for scripts_can_access_clipboard setting in ewk_view.
+
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+        (ewk_view_setting_scripts_can_access_clipboard_set):
+        * ewk/ewk_view.h:
+
+2012-05-21  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] Clients should be able to set page cache capacity.
+        https://bugs.webkit.org/show_bug.cgi?id=86960
+
+        Reviewed by Csaba Osztrogonác.
+
+        Exported memory page cache capacity getter and setter functions.
+        Those will be used both by clients and DRT Layout Test Controller.
+
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_page_cache_capacity_get):
+        (ewk_settings_page_cache_capacity_set):
+        * ewk/ewk_settings.h:
+
+2012-05-21  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Move setEditingBehavior() from layoutTestController to window.internals
+        https://bugs.webkit.org/show_bug.cgi?id=42689
+
+        Reviewed by Hajime Morita and Kenneth Rohde Christiansen.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-21  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Minor style fixes in web intents code are needed
+        https://bugs.webkit.org/show_bug.cgi?id=86986
+
+        Reviewed by Adam Barth.
+
+        * ewk/EWebKit.h: Add new intent headers.
+        * ewk/ewk_frame.h: Add missing underscores to EwkIntentRequest type.
+
+2012-05-20  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] ewk_view navigation_policy_decision() input parameters should be extended
+        https://bugs.webkit.org/show_bug.cgi?id=85048
+
+        Reviewed by Antonio Gomes.
+
+        Introduced new enum Ewk_Navigation_Type cloning WebCore::NavigationType.
+        Extended ewk_view navigation_policy_decision() input parameters with new
+        navigationType parameter. This paramater gives more data for making a
+        navigation policy decision and also provides dumping necessary for many Layout
+        testcases.
+
+        * WebCoreSupport/AssertMatchingEnums.cpp:
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDecidePolicyForNavigationAction):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_view_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_navigation_policy_decision):
+        * ewk/ewk_view.h:
+
+2012-05-18  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [EFL][DRT] Make it possible to enable CSS Grid Layout.
+        https://bugs.webkit.org/show_bug.cgi?id=86921
+
+        Reviewed by Tony Chang.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setCSSGridLayoutEnabled):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-05-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Web Intents code is not compiling
+        https://bugs.webkit.org/show_bug.cgi?id=85364
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp: Add missing header include.
+        * ewk/ewk_intent_private.h: Ditto.
+        * ewk/ewk_intent_request.cpp:
+        (ewk_intent_request_new): Do not PassRefPtr after it becomes 0.
+
+2012-05-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Default values for ewk_view video tracks settings should be documented
+        https://bugs.webkit.org/show_bug.cgi?id=85169
+
+        Reviewed by Antonio Gomes.
+
+        Document default values for video tracks settings in ewk_view.
+
+        * ewk/ewk_view.h:
+
+2012-05-18  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] Text input events are emitted for nodes that do not allow editing.
+        https://bugs.webkit.org/show_bug.cgi?id=86836
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Text input events are not anymore emitted for nodes that do not allow editing.
+        This can be checked with fast/events/key-events-in-input-button.html test output.
+
+        * WebCoreSupport/EditorClientEfl.cpp:
+        (WebCore::EditorClientEfl::handleEditingKeyboardEvent): Returns false if the node cannot edit.
+
 2012-05-18  MORITA Hajime  <morrita@google.com>
 
         https://bugs.webkit.org/show_bug.cgi?id=85515

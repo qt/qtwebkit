@@ -150,11 +150,9 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
         return new (arena) RenderRubyText(node);
 
     switch (style->display()) {
-#if ENABLE(CSS_GRID_LAYOUT)
     // For now, we don't show grid elements.
     case GRID:
     case INLINE_GRID:
-#endif
     case NONE:
         return 0;
     case INLINE:
@@ -273,8 +271,10 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
 
     bool needsTable = false;
 
-    if (newChild->isTableCol() && newChild->style()->display() == TABLE_COLUMN_GROUP)
+    if (newChild->style()->display() == TABLE_COLUMN_GROUP)
         needsTable = !isTable();
+    else if (newChild->style()->display() == TABLE_COLUMN)
+        needsTable = !isTable() && style()->display() != TABLE_COLUMN_GROUP;
     else if (newChild->isTableCaption())
         needsTable = !isTable();
     else if (newChild->isTableSection())

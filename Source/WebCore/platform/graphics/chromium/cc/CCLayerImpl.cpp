@@ -60,6 +60,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_usesLayerClipping(false)
     , m_isNonCompositedContent(false)
     , m_drawsContent(false)
+    , m_forceRenderSurface(false)
     , m_pageScaleDelta(1)
     , m_targetRenderSurface(0)
     , m_drawDepth(0)
@@ -385,7 +386,7 @@ void CCLayerImpl::setBackgroundColor(const Color& backgroundColor)
     m_layerPropertyChanged = true;
 }
 
-void CCLayerImpl::setFilters(const FilterOperations& filters)
+void CCLayerImpl::setFilters(const WebKit::WebFilterOperations& filters)
 {
     if (m_filters == filters)
         return;
@@ -394,7 +395,7 @@ void CCLayerImpl::setFilters(const FilterOperations& filters)
     noteLayerPropertyChangedForSubtree();
 }
 
-void CCLayerImpl::setBackgroundFilters(const FilterOperations& backgroundFilters)
+void CCLayerImpl::setBackgroundFilters(const WebKit::WebFilterOperations& backgroundFilters)
 {
     if (m_backgroundFilters == backgroundFilters)
         return;

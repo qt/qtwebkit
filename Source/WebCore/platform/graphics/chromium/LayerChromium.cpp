@@ -80,6 +80,7 @@ LayerChromium::LayerChromium()
     , m_preserves3D(false)
     , m_alwaysReserveTextures(false)
     , m_drawCheckerboardForMissingTiles(false)
+    , m_forceRenderSurface(false)
     , m_replicaLayer(0)
     , m_drawOpacity(0)
     , m_drawOpacityIsAnimating(false)
@@ -307,7 +308,7 @@ void LayerChromium::setReplicaLayer(LayerChromium* layer)
     setNeedsCommit();
 }
 
-void LayerChromium::setFilters(const FilterOperations& filters)
+void LayerChromium::setFilters(const WebKit::WebFilterOperations& filters)
 {
     if (m_filters == filters)
         return;
@@ -317,12 +318,14 @@ void LayerChromium::setFilters(const FilterOperations& filters)
         CCLayerTreeHost::setNeedsFilterContext(true);
 }
 
-void LayerChromium::setBackgroundFilters(const FilterOperations& backgroundFilters)
+void LayerChromium::setBackgroundFilters(const WebKit::WebFilterOperations& backgroundFilters)
 {
     if (m_backgroundFilters == backgroundFilters)
         return;
     m_backgroundFilters = backgroundFilters;
     setNeedsCommit();
+    if (!backgroundFilters.isEmpty())
+        CCLayerTreeHost::setNeedsFilterContext(true);
 }
 
 void LayerChromium::setOpacity(float opacity)
@@ -424,6 +427,14 @@ void LayerChromium::setDrawCheckerboardForMissingTiles(bool checkerboard)
     setNeedsCommit();
 }
 
+void LayerChromium::setForceRenderSurface(bool force)
+{
+    if (m_forceRenderSurface == force)
+        return;
+    m_forceRenderSurface = force;
+    setNeedsCommit();
+}
+
 void LayerChromium::setDoubleSided(bool doubleSided)
 {
     if (m_doubleSided == doubleSided)
@@ -471,19 +482,8 @@ void LayerChromium::pushPropertiesTo(CCLayerImpl* layer)
     layer->setDebugName(m_debugName.isolatedCopy()); // We have to use isolatedCopy() here to safely pass ownership to another thread.
     layer->setDoubleSided(m_doubleSided);
     layer->setDrawCheckerboardForMissingTiles(m_drawCheckerboardForMissingTiles);
+    layer->setForceRenderSurface(m_forceRenderSurface);
     layer->setDrawsContent(drawsContent());
-    if (CCProxy::hasImplThread()) {
-        // Since FilterOperations contains a vector of RefPtrs, we must deep copy the filters.
-        FilterOperations filtersCopy;
-        for (unsigned i = 0; i < m_filters.size(); ++i) {
-            RefPtr<FilterOperation> clone = m_filters.at(i)->clone();
-            if (clone)
-                filtersCopy.operations().append(clone);
-        }
-        layer->setFilters(filtersCopy);
-    } else
-        layer->setFilters(filters());
-
     layer->setFilters(filters());
     layer->setBackgroundFilters(backgroundFilters());
     layer->setIsNonCompositedContent(m_isNonCompositedContent);

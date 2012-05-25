@@ -41,10 +41,10 @@ public:
     virtual LayoutUnit marginRight() const;
     virtual LayoutUnit marginTop() const;
     virtual LayoutUnit marginBottom() const;
-    virtual LayoutUnit marginBefore() const;
-    virtual LayoutUnit marginAfter() const;
-    virtual LayoutUnit marginStart() const;
-    virtual LayoutUnit marginEnd() const;
+    virtual LayoutUnit marginBefore(const RenderStyle* otherStyle = 0) const;
+    virtual LayoutUnit marginAfter(const RenderStyle* otherStyle = 0) const;
+    virtual LayoutUnit marginStart(const RenderStyle* otherStyle = 0) const;
+    virtual LayoutUnit marginEnd(const RenderStyle* otherStyle = 0) const;
 
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const;
@@ -57,6 +57,7 @@ public:
     InlineFlowBox* createAndAppendInlineFlowBox();
 
     void dirtyLineBoxes(bool fullLayout);
+    void deleteLineBoxTree();
 
     RenderLineBoxList* lineBoxes() { return &m_lineBoxes; }
     const RenderLineBoxList* lineBoxes() const { return &m_lineBoxes; }

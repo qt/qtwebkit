@@ -40,7 +40,7 @@ public:
     {
     }
     
-    void run()
+    bool run()
     {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
         m_count = 0;
@@ -77,6 +77,8 @@ public:
             doRoundOfDoubleVoting();
             propagateBackward();
         } while (m_changed);
+        
+        return true;
     }
     
 private:
@@ -329,8 +331,29 @@ private:
             changed |= m_graph[node.child2()].mergeFlags(flags);
             break;
         }
+
+        case ArithMul: {
+            PredictedType left = m_graph[node.child1()].prediction();
+            PredictedType right = m_graph[node.child2()].prediction();
             
-        case ArithMul:
+            if (left && right) {
+                if (m_graph.mulShouldSpeculateInteger(node))
+                    changed |= mergePrediction(PredictInt32);
+                else
+                    changed |= mergePrediction(PredictDouble);
+            }
+
+            // As soon as a multiply happens, we can easily end up in the part
+            // of the double domain where the point at which you do truncation
+            // can change the outcome. So, ArithMul always checks for overflow
+            // no matter what, and always forces its inputs to check as well.
+            
+            flags |= NodeUsedAsNumber | NodeNeedsNegZero;
+            changed |= m_graph[node.child1()].mergeFlags(flags);
+            changed |= m_graph[node.child2()].mergeFlags(flags);
+            break;
+        }
+            
         case ArithDiv: {
             PredictedType left = m_graph[node.child1()].prediction();
             PredictedType right = m_graph[node.child2()].prediction();
@@ -411,6 +434,17 @@ private:
 
             changed |= m_graph[node.child1()].mergeFlags(NodeUsedAsValue);
             changed |= m_graph[node.child2()].mergeFlags(NodeUsedAsNumber | NodeUsedAsInt);
+            break;
+        }
+            
+        case GetMyArgumentByValSafe: {
+            changed |= mergePrediction(node.getHeapPrediction());
+            changed |= m_graph[node.child1()].mergeFlags(NodeUsedAsNumber | NodeUsedAsInt);
+            break;
+        }
+            
+        case GetMyArgumentsLengthSafe: {
+            changed |= setPrediction(PredictInt32);
             break;
         }
             
@@ -553,6 +587,13 @@ private:
             break;
         }
             
+        case CreateArguments: {
+            // At this stage we don't try to predict whether the arguments are ours or
+            // someone else's. We could, but we don't, yet.
+            changed |= setPrediction(PredictArguments);
+            break;
+        }
+            
         case NewFunction:
         case NewFunctionNoCheck:
         case NewFunctionExpression: {
@@ -562,6 +603,7 @@ private:
             
         case PutByValAlias:
         case GetArrayLength:
+        case GetArgumentsLength:
         case GetInt8ArrayLength:
         case GetInt16ArrayLength:
         case GetInt32ArrayLength:
@@ -573,7 +615,10 @@ private:
         case GetFloat64ArrayLength:
         case GetStringLength:
         case Int32ToDouble:
-        case DoubleAsInt32: {
+        case DoubleAsInt32:
+        case GetLocalUnlinked:
+        case GetMyArgumentsLength:
+        case GetMyArgumentByVal: {
             // This node should never be visible at this stage of compilation. It is
             // inserted by fixup(), which follows this phase.
             ASSERT_NOT_REACHED();
@@ -619,7 +664,9 @@ private:
         case CheckFunction:
         case PutStructure:
         case TearOffActivation:
+        case TearOffArguments:
         case CheckNumber:
+        case CheckArgumentsNotCreated:
             changed |= mergeDefaultFlags(node);
             break;
             
@@ -751,7 +798,23 @@ private:
                 break;
             }
                 
-            case ArithMul:
+            case ArithMul: {
+                PredictedType left = m_graph[node.child1()].prediction();
+                PredictedType right = m_graph[node.child2()].prediction();
+                
+                VariableAccessData::Ballot ballot;
+                
+                if (isNumberPrediction(left) && isNumberPrediction(right)
+                    && !m_graph.mulShouldSpeculateInteger(node))
+                    ballot = VariableAccessData::VoteDouble;
+                else
+                    ballot = VariableAccessData::VoteValue;
+                
+                vote(node.child1(), ballot);
+                vote(node.child2(), ballot);
+                break;
+            }
+
             case ArithMin:
             case ArithMax:
             case ArithMod:
@@ -807,7 +870,7 @@ private:
             if (!variableAccessData->isRoot())
                 continue;
             if (operandIsArgument(variableAccessData->local())
-                || m_graph.isCaptured(variableAccessData->local()))
+                || variableAccessData->isCaptured())
                 continue;
             m_changed |= variableAccessData->tallyVotesForShouldUseDoubleFormat();
         }
@@ -818,7 +881,7 @@ private:
             if (!variableAccessData->isRoot())
                 continue;
             if (operandIsArgument(variableAccessData->local())
-                || m_graph.isCaptured(variableAccessData->local()))
+                || variableAccessData->isCaptured())
                 continue;
             m_changed |= variableAccessData->makePredictionForDoubleFormat();
         }
@@ -832,9 +895,9 @@ private:
 #endif
 };
     
-void performPredictionPropagation(Graph& graph)
+bool performPredictionPropagation(Graph& graph)
 {
-    runPhase<PredictionPropagationPhase>(graph);
+    return runPhase<PredictionPropagationPhase>(graph);
 }
 
 } } // namespace JSC::DFG

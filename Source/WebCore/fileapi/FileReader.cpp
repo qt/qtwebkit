@@ -74,11 +74,6 @@ const AtomicString& FileReader::interfaceName() const
     return eventNames().interfaceForFileReader;
 }
 
-bool FileReader::hasPendingActivity() const
-{
-    return m_state == LOADING || ActiveDOMObject::hasPendingActivity();
-}
-
 bool FileReader::canSuspend() const
 {
     // FIXME: It is not currently possible to suspend a FileReader, so pages with FileReader can not go into page cache.
@@ -95,7 +90,7 @@ void FileReader::readAsArrayBuffer(Blob* blob, ExceptionCode& ec)
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as array buffer: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? static_cast<File*>(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as array buffer: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
 
     readInternal(blob, FileReaderLoader::ReadAsArrayBuffer, ec);
 }
@@ -105,7 +100,7 @@ void FileReader::readAsBinaryString(Blob* blob, ExceptionCode& ec)
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as binary: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? static_cast<File*>(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as binary: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
 
     readInternal(blob, FileReaderLoader::ReadAsBinaryString, ec);
 }
@@ -115,7 +110,7 @@ void FileReader::readAsText(Blob* blob, const String& encoding, ExceptionCode& e
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as text: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? static_cast<File*>(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as text: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
 
     m_encoding = encoding;
     readInternal(blob, FileReaderLoader::ReadAsText, ec);
@@ -131,7 +126,7 @@ void FileReader::readAsDataURL(Blob* blob, ExceptionCode& ec)
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as data URL: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? static_cast<File*>(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as data URL: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
 
     readInternal(blob, FileReaderLoader::ReadAsDataURL, ec);
 }
@@ -143,6 +138,8 @@ void FileReader::readInternal(Blob* blob, FileReaderLoader::ReadType type, Excep
         ec = OperationNotAllowedException::NOT_ALLOWED_ERR;
         return;
     }
+
+    setPendingActivity(this);
 
     m_blob = blob;
     m_readType = type;
@@ -175,6 +172,8 @@ void FileReader::abort()
 
 void FileReader::doAbort()
 {
+    ASSERT(m_state != DONE);
+
     terminate();
     m_aborting = false;
 
@@ -183,6 +182,9 @@ void FileReader::doAbort()
     fireEvent(eventNames().errorEvent);
     fireEvent(eventNames().abortEvent);
     fireEvent(eventNames().loadendEvent);
+
+    // All possible events have fired and we're done, no more pending activity.
+    unsetPendingActivity(this);
 }
 
 void FileReader::terminate()
@@ -213,10 +215,14 @@ void FileReader::didReceiveData()
 
 void FileReader::didFinishLoading()
 {
+    ASSERT(m_state != DONE);
     m_state = DONE;
 
     fireEvent(eventNames().loadEvent);
     fireEvent(eventNames().loadendEvent);
+    
+    // All possible events have fired and we're done, no more pending activity.
+    unsetPendingActivity(this);
 }
 
 void FileReader::didFail(int errorCode)
@@ -225,11 +231,15 @@ void FileReader::didFail(int errorCode)
     if (m_aborting)
         return;
 
+    ASSERT(m_state != DONE);
     m_state = DONE;
 
     m_error = FileError::create(static_cast<FileError::ErrorCode>(errorCode));
     fireEvent(eventNames().errorEvent);
     fireEvent(eventNames().loadendEvent);
+    
+    // All possible events have fired and we're done, no more pending activity.
+    unsetPendingActivity(this);
 }
 
 void FileReader::fireEvent(const AtomicString& type)

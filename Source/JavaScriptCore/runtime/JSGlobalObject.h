@@ -68,6 +68,9 @@ namespace JSC {
 
         typedef bool (*ShouldInterruptScriptFunctionPtr)(const JSGlobalObject*);
         ShouldInterruptScriptFunctionPtr shouldInterruptScript;
+
+        typedef bool (*JavaScriptExperimentsEnabledFunctionPtr)(const JSGlobalObject*);
+        JavaScriptExperimentsEnabledFunctionPtr javaScriptExperimentsEnabled;
     };
 
     class JSGlobalObject : public JSVariableObject {
@@ -130,6 +133,7 @@ namespace JSC {
         WriteBarrier<Structure> m_namedFunctionStructure;
         size_t m_functionNameOffset;
         WriteBarrier<Structure> m_numberObjectStructure;
+        WriteBarrier<Structure> m_privateNameStructure;
         WriteBarrier<Structure> m_regExpMatchesArrayStructure;
         WriteBarrier<Structure> m_regExpStructure;
         WriteBarrier<Structure> m_stringObjectStructure;
@@ -144,6 +148,7 @@ namespace JSC {
         SymbolTable m_symbolTable;
 
         bool m_evalEnabled;
+        bool m_experimentsEnabled;
 
         static JS_EXPORTDATA const GlobalObjectMethodTable s_globalObjectMethodTable;
         const GlobalObjectMethodTable* m_globalObjectMethodTable;
@@ -183,6 +188,7 @@ namespace JSC {
         {
             Base::finishCreation(globalData);
             structure()->setGlobalObject(globalData, this);
+            m_experimentsEnabled = m_globalObjectMethodTable->javaScriptExperimentsEnabled(this);
             init(this);
         }
 
@@ -190,6 +196,7 @@ namespace JSC {
         {
             Base::finishCreation(globalData);
             structure()->setGlobalObject(globalData, this);
+            m_experimentsEnabled = m_globalObjectMethodTable->javaScriptExperimentsEnabled(this);
             init(thisValue);
         }
 
@@ -263,6 +270,7 @@ namespace JSC {
         Structure* namedFunctionStructure() const { return m_namedFunctionStructure.get(); }
         size_t functionNameOffset() const { return m_functionNameOffset; }
         Structure* numberObjectStructure() const { return m_numberObjectStructure.get(); }
+        Structure* privateNameStructure() const { return m_privateNameStructure.get(); }
         Structure* internalFunctionStructure() const { return m_internalFunctionStructure.get(); }
         Structure* regExpMatchesArrayStructure() const { return m_regExpMatchesArrayStructure.get(); }
         Structure* regExpStructure() const { return m_regExpStructure.get(); }
@@ -290,6 +298,7 @@ namespace JSC {
         JS_EXPORT_PRIVATE ExecState* globalExec();
 
         static bool shouldInterruptScript(const JSGlobalObject*) { return true; }
+        static bool javaScriptExperimentsEnabled(const JSGlobalObject*) { return false; }
 
         bool isDynamicScope(bool& requiresDynamicChecks) const;
 
@@ -376,7 +385,7 @@ namespace JSC {
 
     inline bool JSGlobalObject::symbolTableHasProperty(PropertyName propertyName)
     {
-        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.impl());
+        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.publicName());
         return !entry.isNull();
     }
 

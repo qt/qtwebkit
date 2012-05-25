@@ -163,21 +163,13 @@ public:
     // but it is on the right in vertical-rl.
     LayoutRect layoutOverflowRect() const { return m_overflow ? m_overflow->layoutOverflowRect() : clientBoxRect(); }
     IntRect pixelSnappedLayoutOverflowRect() const { return pixelSnappedIntRect(layoutOverflowRect()); }
-    LayoutUnit minYLayoutOverflow() const { return m_overflow? m_overflow->minYLayoutOverflow() : static_cast<LayoutUnit>(borderTop()); }
-    LayoutUnit maxYLayoutOverflow() const { return m_overflow ? m_overflow->maxYLayoutOverflow() : static_cast<LayoutUnit>(borderTop()) + clientHeight(); }
-    LayoutUnit minXLayoutOverflow() const { return m_overflow ? m_overflow->minXLayoutOverflow() : static_cast<LayoutUnit>(borderLeft()); }
-    LayoutUnit maxXLayoutOverflow() const { return m_overflow ? m_overflow->maxXLayoutOverflow() : static_cast<LayoutUnit>(borderLeft()) + clientWidth(); }
-    LayoutSize maxLayoutOverflow() const { return LayoutSize(maxXLayoutOverflow(), maxYLayoutOverflow()); }
-    LayoutUnit logicalLeftLayoutOverflow() const { return style()->isHorizontalWritingMode() ? minXLayoutOverflow() : minYLayoutOverflow(); }
-    LayoutUnit logicalRightLayoutOverflow() const { return style()->isHorizontalWritingMode() ? maxXLayoutOverflow() : maxYLayoutOverflow(); }
+    LayoutSize maxLayoutOverflow() const { return LayoutSize(layoutOverflowRect().maxX(), layoutOverflowRect().maxY()); }
+    LayoutUnit logicalLeftLayoutOverflow() const { return style()->isHorizontalWritingMode() ? layoutOverflowRect().x() : layoutOverflowRect().y(); }
+    LayoutUnit logicalRightLayoutOverflow() const { return style()->isHorizontalWritingMode() ? layoutOverflowRect().maxX() : layoutOverflowRect().maxY(); }
     
     virtual LayoutRect visualOverflowRect() const { return m_overflow ? m_overflow->visualOverflowRect() : borderBoxRect(); }
-    LayoutUnit minYVisualOverflow() const { return m_overflow? m_overflow->minYVisualOverflow() : ZERO_LAYOUT_UNIT; }
-    LayoutUnit maxYVisualOverflow() const { return m_overflow ? m_overflow->maxYVisualOverflow() : height(); }
-    LayoutUnit minXVisualOverflow() const { return m_overflow ? m_overflow->minXVisualOverflow() : ZERO_LAYOUT_UNIT; }
-    LayoutUnit maxXVisualOverflow() const { return m_overflow ? m_overflow->maxXVisualOverflow() : width(); }
-    LayoutUnit logicalLeftVisualOverflow() const { return style()->isHorizontalWritingMode() ? minXVisualOverflow() : minYVisualOverflow(); }
-    LayoutUnit logicalRightVisualOverflow() const { return style()->isHorizontalWritingMode() ? maxXVisualOverflow() : maxYVisualOverflow(); }
+    LayoutUnit logicalLeftVisualOverflow() const { return style()->isHorizontalWritingMode() ? visualOverflowRect().x() : visualOverflowRect().y(); }
+    LayoutUnit logicalRightVisualOverflow() const { return style()->isHorizontalWritingMode() ? visualOverflowRect().maxX() : visualOverflowRect().maxY(); }
     
     void addLayoutOverflow(const LayoutRect&);
     void addVisualOverflow(const LayoutRect&);
@@ -229,22 +221,26 @@ public:
     virtual void setScrollLeft(int);
     virtual void setScrollTop(int);
 
-    virtual LayoutUnit marginTop() const { return m_marginTop; }
-    virtual LayoutUnit marginBottom() const { return m_marginBottom; }
-    virtual LayoutUnit marginLeft() const { return m_marginLeft; }
-    virtual LayoutUnit marginRight() const { return m_marginRight; }
-    void setMarginTop(LayoutUnit margin) { m_marginTop = margin; }
-    void setMarginBottom(LayoutUnit margin) { m_marginBottom = margin; }
-    void setMarginLeft(LayoutUnit margin) { m_marginLeft = margin; }
-    void setMarginRight(LayoutUnit margin) { m_marginRight = margin; }
-    virtual LayoutUnit marginBefore() const;
-    virtual LayoutUnit marginAfter() const;
-    virtual LayoutUnit marginStart() const;
-    virtual LayoutUnit marginEnd() const;
-    void setMarginStart(LayoutUnit);
-    void setMarginEnd(LayoutUnit);
-    void setMarginBefore(LayoutUnit);
-    void setMarginAfter(LayoutUnit);
+    virtual LayoutUnit marginTop() const OVERRIDE { return m_marginBox.top(); }
+    virtual LayoutUnit marginBottom() const OVERRIDE { return m_marginBox.bottom(); }
+    virtual LayoutUnit marginLeft() const OVERRIDE { return m_marginBox.left(); }
+    virtual LayoutUnit marginRight() const OVERRIDE { return m_marginBox.right(); }
+    void setMarginTop(LayoutUnit margin) { m_marginBox.setTop(margin); }
+    void setMarginBottom(LayoutUnit margin) { m_marginBox.setBottom(margin); }
+    void setMarginLeft(LayoutUnit margin) { m_marginBox.setLeft(margin); }
+    void setMarginRight(LayoutUnit margin) { m_marginBox.setRight(margin); }
+
+    virtual LayoutUnit marginLogicalLeft() const { return m_marginBox.logicalLeft(style()); }
+    virtual LayoutUnit marginLogicalRight() const { return m_marginBox.logicalRight(style()); }
+    
+    virtual LayoutUnit marginBefore(const RenderStyle* overrideStyle = 0) const OVERRIDE { return m_marginBox.before(overrideStyle ? overrideStyle : style()); }
+    virtual LayoutUnit marginAfter(const RenderStyle* overrideStyle = 0) const OVERRIDE { return m_marginBox.after(overrideStyle ? overrideStyle : style()); }
+    virtual LayoutUnit marginStart(const RenderStyle* overrideStyle = 0) const OVERRIDE { return m_marginBox.start(overrideStyle ? overrideStyle : style()); }
+    virtual LayoutUnit marginEnd(const RenderStyle* overrideStyle = 0) const OVERRIDE { return m_marginBox.end(overrideStyle ? overrideStyle : style()); }
+    void setMarginBefore(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBox.setBefore(overrideStyle ? overrideStyle : style(), value); }
+    void setMarginAfter(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBox.setAfter(overrideStyle ? overrideStyle : style(), value); }
+    void setMarginStart(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBox.setStart(overrideStyle ? overrideStyle : style(), value); }
+    void setMarginEnd(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBox.setEnd(overrideStyle ? overrideStyle : style(), value); }
 
     // The following five functions are used to implement collapsing margins.
     // All objects know their maximal positive and negative margins.  The
@@ -330,7 +326,7 @@ public:
 
     bool stretchesToViewport() const
     {
-        return document()->inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrPositioned() && (isRoot() || isBody());
+        return document()->inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrPositioned() && (isRoot() || isBody()) && !document()->shouldDisplaySeamlesslyWithParent();
     }
 
     virtual IntSize intrinsicSize() const { return IntSize(); }
@@ -565,10 +561,7 @@ private:
     LayoutRect m_frameRect;
 
 protected:
-    LayoutUnit m_marginLeft;
-    LayoutUnit m_marginRight;
-    LayoutUnit m_marginTop;
-    LayoutUnit m_marginBottom;
+    LayoutBoxExtent m_marginBox;
 
     // The preferred logical width of the element if it were to break its lines at every possible opportunity.
     LayoutUnit m_minPreferredLogicalWidth;

@@ -20,6 +20,8 @@
             'chromium/GamepadController.h',
             'chromium/LayoutTestController.cpp',
             'chromium/LayoutTestController.h',
+            'chromium/MockGrammarCheck.cpp',
+            'chromium/MockGrammarCheck.h',
             'chromium/MockSpellCheck.cpp',
             'chromium/MockSpellCheck.h',
             'chromium/MockWebSpeechInputController.cpp',
@@ -34,10 +36,12 @@
             'chromium/TestNavigationController.h',
             'chromium/TestShell.cpp',
             'chromium/TestShell.h',
-            'chromium/TestShellLinux.cpp',
-            'chromium/TestShellGtk.cpp',
+            'chromium/TestShellAndroid.cpp',
             'chromium/TestShellMac.mm',
+            'chromium/TestShellPosix.cpp',
+            'chromium/TestShellStub.cpp',
             'chromium/TestShellWin.cpp',
+            'chromium/TestShellX11.cpp',
             'chromium/TestWebPlugin.cpp',
             'chromium/TestWebPlugin.h',
             'chromium/TextInputController.cpp',
@@ -46,6 +50,12 @@
             'chromium/WebPermissions.h',
             'chromium/WebPreferences.cpp',
             'chromium/WebPreferences.h',
+            'chromium/WebThemeControlDRTWin.cpp',
+            'chromium/WebThemeControlDRTWin.h',
+            'chromium/WebThemeEngineDRTMac.mm',
+            'chromium/WebThemeEngineDRTMac.h',
+            'chromium/WebThemeEngineDRTWin.cpp',
+            'chromium/WebThemeEngineDRTWin.h',
             'chromium/WebUserMediaClientMock.cpp',
             'chromium/WebUserMediaClientMock.h',
             'chromium/WebViewHost.cpp',
@@ -73,27 +83,6 @@
             'TestNetscapePlugIn/Tests/PluginScriptableNPObjectInvokeDefault.cpp',
             'TestNetscapePlugIn/Tests/PrivateBrowsing.cpp',
             'TestNetscapePlugIn/main.cpp',
-        ],
-        'conditions': [
-            ['(OS=="linux" and toolkit_uses_gtk!=1) or OS=="android"', {
-                'drt_files': [
-                    'chromium/TestShellStub.cpp',
-                ],
-            }],
-            ['OS=="win"', {
-                'drt_files': [
-                    'chromium/WebThemeControlDRTWin.cpp',
-                    'chromium/WebThemeControlDRTWin.h',
-                    'chromium/WebThemeEngineDRTWin.cpp',
-                    'chromium/WebThemeEngineDRTWin.h',
-                ],
-            }],
-            ['OS=="mac"', {
-                'drt_files': [
-                    'chromium/WebThemeEngineDRTMac.mm',
-                    'chromium/WebThemeEngineDRTMac.h',
-                ],
-            }],
         ],
     }
 }

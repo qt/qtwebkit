@@ -52,6 +52,7 @@
 #include "IDBDatabaseException.h"
 #include "IDBFactoryBackendInterface.h"
 #include "IDBKey.h"
+#include "IDBKeyPath.h"
 #include "IceOptions.h"
 #include "IconURL.h"
 #include "MediaPlayer.h"
@@ -86,6 +87,7 @@
 #include "WebIDBDatabaseException.h"
 #include "WebIDBFactory.h"
 #include "WebIDBKey.h"
+#include "WebIDBKeyPath.h"
 #include "WebIconURL.h"
 #include "WebInputElement.h"
 #include "WebMediaPlayer.h"
@@ -116,7 +118,7 @@
 
 #if OS(DARWIN)
 #include "PlatformSupport.h"
-#include "platform/mac/WebThemeEngine.h"
+#include <public/mac/WebThemeEngine.h>
 #endif
 
 #define COMPILE_ASSERT_MATCHING_ENUM(webkit_name, webcore_name) \
@@ -323,15 +325,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebEditingActionTyped, EditorInsertActionTyped);
 COMPILE_ASSERT_MATCHING_ENUM(WebEditingActionPasted, EditorInsertActionPasted);
 COMPILE_ASSERT_MATCHING_ENUM(WebEditingActionDropped, EditorInsertActionDropped);
 
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicColorMatrixFilterOperation::BasicColorMatrixFilterTypeGrayscale, FilterOperation::GRAYSCALE);
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicColorMatrixFilterOperation::BasicColorMatrixFilterTypeSepia, FilterOperation::SEPIA);
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicColorMatrixFilterOperation::BasicColorMatrixFilterTypeSaturate, FilterOperation::SATURATE);
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicColorMatrixFilterOperation::BasicColorMatrixFilterTypeHueRotate, FilterOperation::HUE_ROTATE);
-
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicComponentTransferFilterOperation::BasicComponentTransferFilterTypeInvert, FilterOperation::INVERT);
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicComponentTransferFilterOperation::BasicComponentTransferFilterTypeBrightness, FilterOperation::BRIGHTNESS);
-COMPILE_ASSERT_MATCHING_ENUM(WebBasicComponentTransferFilterOperation::BasicComponentTransferFilterTypeContrast, FilterOperation::CONTRAST);
-
 COMPILE_ASSERT_MATCHING_ENUM(WebFontDescription::GenericFamilyNone, FontDescription::NoFamily);
 COMPILE_ASSERT_MATCHING_ENUM(WebFontDescription::GenericFamilyStandard, FontDescription::StandardFamily);
 COMPILE_ASSERT_MATCHING_ENUM(WebFontDescription::GenericFamilySerif, FontDescription::SerifFamily);
@@ -467,11 +460,17 @@ COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInSubsequentDocuments, Inje
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionDataError, IDBDatabaseException::DATA_ERR);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionQuotaError, IDBDatabaseException::QUOTA_ERR);
 
+#if ENABLE(INDEXED_DATABASE)
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::InvalidType, IDBKey::InvalidType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::ArrayType, IDBKey::ArrayType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::StringType, IDBKey::StringType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::DateType, IDBKey::DateType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::NumberType, IDBKey::NumberType);
+
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBKeyPath::NullType, IDBKeyPath::NullType);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBKeyPath::StringType, IDBKeyPath::StringType);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBKeyPath::ArrayType, IDBKeyPath::ArrayType);
+#endif
 
 #if ENABLE(FILE_SYSTEM)
 COMPILE_ASSERT_MATCHING_ENUM(WebFileSystem::TypeTemporary, FileSystemTypeTemporary);

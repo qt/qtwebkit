@@ -171,7 +171,7 @@ void SVGElement::setXmlbase(const String& value, ExceptionCode&)
     setAttribute(XMLNames::baseAttr, value);
 }
 
-void SVGElement::removedFrom(Node* rootParent)
+void SVGElement::removedFrom(ContainerNode* rootParent)
 {
     if (rootParent->inDocument()) {
         document()->accessSVGExtensions()->removeAllAnimationElementsFromTarget(this);
@@ -362,28 +362,23 @@ static inline void collectInstancesForSVGElement(SVGElement* element, HashSet<SV
     instances = styledElement->instancesForElement();
 }
 
-bool SVGElement::addEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener, bool useCapture)
+bool SVGElement::addEventListener(const AtomicString& eventType, PassRefPtr<EventListener> prpListener, bool useCapture)
 {
-    HashSet<SVGElementInstance*> instances;
-    collectInstancesForSVGElement(this, instances);
-    if (instances.isEmpty())
-        return Node::addEventListener(eventType, listener, useCapture);
-
-    RefPtr<EventListener> listenerForRegularTree = listener;
-    RefPtr<EventListener> listenerForShadowTree = listenerForRegularTree;
-
+    RefPtr<EventListener> listener = prpListener;
+    
     // Add event listener to regular DOM element
-    if (!Node::addEventListener(eventType, listenerForRegularTree.release(), useCapture))
+    if (!Node::addEventListener(eventType, listener, useCapture))
         return false;
 
     // Add event listener to all shadow tree DOM element instances
+    HashSet<SVGElementInstance*> instances;
+    collectInstancesForSVGElement(this, instances);    
     const HashSet<SVGElementInstance*>::const_iterator end = instances.end();
     for (HashSet<SVGElementInstance*>::const_iterator it = instances.begin(); it != end; ++it) {
         ASSERT((*it)->shadowTreeElement());
         ASSERT((*it)->correspondingElement() == this);
 
-        RefPtr<EventListener> listenerForCurrentShadowTreeElement = listenerForShadowTree;
-        bool result = (*it)->shadowTreeElement()->Node::addEventListener(eventType, listenerForCurrentShadowTreeElement.release(), useCapture);
+        bool result = (*it)->shadowTreeElement()->Node::addEventListener(eventType, listener, useCapture);
         ASSERT_UNUSED(result, result);
     }
 
@@ -495,8 +490,22 @@ void SVGElement::finishParsingChildren()
 
 bool SVGElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
-    if (childContext.node()->isSVGElement())
+    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, invalidTextContent, ());
+
+    if (invalidTextContent.isEmpty()) {
+        invalidTextContent.add(SVGNames::textPathTag);
+#if ENABLE(SVG_FONTS)
+        invalidTextContent.add(SVGNames::altGlyphTag);
+#endif
+        invalidTextContent.add(SVGNames::trefTag);
+        invalidTextContent.add(SVGNames::tspanTag);
+    }
+    if (childContext.node()->isSVGElement()) {
+        if (invalidTextContent.contains(static_cast<SVGElement*>(childContext.node())->tagQName()))
+            return false;
+
         return static_cast<SVGElement*>(childContext.node())->isValid();
+    }
     return false;
 }
 

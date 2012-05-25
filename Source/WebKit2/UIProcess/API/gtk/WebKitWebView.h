@@ -40,6 +40,7 @@
 #include <webkit2/WebKitSettings.h>
 #include <webkit2/WebKitURIRequest.h>
 #include <webkit2/WebKitWebContext.h>
+#include <webkit2/WebKitWebInspector.h>
 #include <webkit2/WebKitWebResource.h>
 #include <webkit2/WebKitWebViewBase.h>
 #include <webkit2/WebKitWindowProperties.h>
@@ -263,6 +264,7 @@ webkit_web_view_get_zoom_level                     (WebKitWebView             *w
 WEBKIT_API void
 webkit_web_view_can_execute_editing_command        (WebKitWebView             *web_view,
                                                     const gchar               *command,
+                                                    GCancellable              *cancellable,
                                                     GAsyncReadyCallback        callback,
                                                     gpointer                   user_data);
 
@@ -284,6 +286,7 @@ webkit_web_view_get_javascript_global_context      (WebKitWebView             *w
 WEBKIT_API void
 webkit_web_view_run_javascript                     (WebKitWebView             *web_view,
                                                     const gchar               *script,
+                                                    GCancellable              *cancellable,
                                                     GAsyncReadyCallback        callback,
                                                     gpointer                   user_data);
 WEBKIT_API WebKitJavascriptResult *
@@ -296,6 +299,10 @@ webkit_web_view_get_main_resource                  (WebKitWebView             *w
 
 WEBKIT_API GList *
 webkit_web_view_get_subresources                   (WebKitWebView             *web_view);
+
+WEBKIT_API WebKitWebInspector *
+webkit_web_view_get_inspector                      (WebKitWebView             *web_view);
+
 G_END_DECLS
 
 #endif

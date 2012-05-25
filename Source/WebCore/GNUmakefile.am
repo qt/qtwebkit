@@ -241,6 +241,10 @@ FEATURE_DEFINES += ENABLE_INDEXED_DATABASE=1
 webcore_cppflags += -DENABLE_INDEXED_DATABASE=1
 endif # END ENABLE_INDEXED_DATABASE
 
+if USE_LEVELDB
+webcore_cppflags += -DWTF_USE_LEVELDB
+endif # END USE_LEVELDB
+
 # ----
 # Support for <input type="file" directory>
 # ----
@@ -454,6 +458,24 @@ endif
 endif # END ENABLE_FILTERS
 
 # ----
+# Regions
+# ----
+if ENABLE_CSS_REGIONS
+FEATURE_DEFINES += ENABLE_CSS_REGIONS=1
+webcore_cppflags += -DENABLE_CSS_REGIONS=1
+
+endif # END ENABLE_CSS_REGIONS
+
+# ----
+# Exclusions
+# ----
+if ENABLE_CSS_EXCLUSIONS
+FEATURE_DEFINES += ENABLE_CSS_EXCLUSIONS=1
+webcore_cppflags += -DENABLE_CSS_EXCLUSIONS=1
+
+endif # END ENABLE_CSS_EXCLUSIONS
+
+# ----
 # Geolocation
 # ----
 if ENABLE_GEOLOCATION
@@ -644,6 +666,14 @@ webcore_cppflags += -DENABLE_DEVICE_ORIENTATION=1
 endif  # END ENABLE_DEVICE_ORIENTATION
 
 # ---
+# Font Boosting support
+# ---
+if ENABLE_FONT_BOOSTING
+FEATURE_DEFINES += ENABLE_FONT_BOOSTING=1
+webcore_cppflags += -DENABLE_FONT_BOOSTING=1
+endif  # END ENABLE_FONT_BOOSTING
+
+# ---
 # Web Timing support
 # ---
 if ENABLE_WEB_TIMING
@@ -658,6 +688,14 @@ if ENABLE_IFRAME_SEAMLESS
 FEATURE_DEFINES += ENABLE_IFRAME_SEAMLESS=1
 webcore_cppflags += -DENABLE_IFRAME_SEAMLESS=1
 endif  # END ENABLE_IFRAME_SEAMLESS
+
+# ---
+# CSS3 Flexbox support
+# ---
+if ENABLE_CSS3_FLEXBOX
+FEATURE_DEFINES += ENABLE_CSS3_FLEXBOX=1
+webcore_cppflags += -DENABLE_CSS3_FLEXBOX=1
+endif  # END ENABLE_CSS3_FLEXBOX
 
 DerivedSources/WebCore/CSSPropertyNames.cpp: DerivedSources/WebCore/CSSPropertyNames.h
 DerivedSources/WebCore/CSSPropertyNames.h: $(WEBCORE_CSS_PROPERTY_NAMES) $(WebCore)/css/makeprop.pl

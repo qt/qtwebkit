@@ -48,7 +48,9 @@ namespace JSC { namespace DFG {
     macro(CreateThis, NodeResultJS) /* Note this is not MustGenerate since we're returning it anyway. */ \
     macro(GetCallee, NodeResultJS) \
     \
-    /* Nodes for local variable access. */\
+    /* Nodes for local variable access. These nodes are linked together using Phi nodes. */\
+    /* Any two nodes that are part of the same Phi graph will share the same */\
+    /* VariableAccessData, and thus will share predictions. */\
     macro(GetLocal, NodeResultJS) \
     macro(SetLocal, 0) \
     macro(Phantom, NodeMustGenerate) \
@@ -56,7 +58,12 @@ namespace JSC { namespace DFG {
     macro(Phi, 0) \
     macro(Flush, NodeMustGenerate) \
     \
-    /* Marker for arguments being set. */\
+    /* Get the value of a local variable, without linking into the VariableAccessData */\
+    /* network. This is only valid for variable accesses whose predictions originated */\
+    /* as something other than a local access, and thus had their own profiling. */\
+    macro(GetLocalUnlinked, NodeResultJS) \
+    \
+    /* Marker for an argument being set at the prologue of a function. */\
     macro(SetArgument, 0) \
     \
     /* Hint that inlining begins here. No code is generated for this node. It's only */\
@@ -117,6 +124,7 @@ namespace JSC { namespace DFG {
     macro(GetByOffset, NodeResultJS) \
     macro(PutByOffset, NodeMustGenerate | NodeClobbersWorld) \
     macro(GetArrayLength, NodeResultInt32) \
+    macro(GetArgumentsLength, NodeResultInt32) \
     macro(GetStringLength, NodeResultInt32) \
     macro(GetInt8ArrayLength, NodeResultInt32) \
     macro(GetInt16ArrayLength, NodeResultInt32) \
@@ -180,7 +188,7 @@ namespace JSC { namespace DFG {
     macro(IsString, NodeResultBoolean) \
     macro(IsObject, NodeResultBoolean) \
     macro(IsFunction, NodeResultBoolean) \
-    macro(LogicalNot, NodeResultBoolean | NodeMightClobber) \
+    macro(LogicalNot, NodeResultBoolean) \
     macro(ToPrimitive, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(StrCat, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     \
@@ -189,6 +197,16 @@ namespace JSC { namespace DFG {
     /* being threaded with each other. */\
     macro(CreateActivation, NodeResultJS) \
     macro(TearOffActivation, NodeMustGenerate) \
+    \
+    /* Nodes used for arguments. Similar to activation support, only it makes even less */\
+    /* sense. */\
+    macro(CreateArguments, NodeResultJS) \
+    macro(TearOffArguments, NodeMustGenerate) \
+    macro(GetMyArgumentsLength, NodeResultJS | NodeMustGenerate) \
+    macro(GetMyArgumentByVal, NodeResultJS | NodeMustGenerate) \
+    macro(GetMyArgumentsLengthSafe, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
+    macro(GetMyArgumentByValSafe, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
+    macro(CheckArgumentsNotCreated, NodeMustGenerate) \
     \
     /* Nodes for creating functions. */\
     macro(NewFunctionNoCheck, NodeResultJS) \

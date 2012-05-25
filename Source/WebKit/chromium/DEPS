@@ -32,7 +32,7 @@
 
 vars = {
   'chromium_svn': 'http://src.chromium.org/svn/trunk/src',
-  'chromium_rev': '136942'
+  'chromium_rev': '138307'
 }
 
 deps = {
@@ -169,6 +169,8 @@ deps_os = {
   'android': {
     'third_party/freetype':
       'https://git.chromium.org/chromium/src/third_party/freetype.git',
+    'tools/android':
+      Var('chromium_svn')+'/tools/android@'+Var('chromium_rev'),
   },
 }
 

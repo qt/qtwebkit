@@ -42,9 +42,9 @@ inline HTMLScriptElement::HTMLScriptElement(const QualifiedName& tagName, Docume
     ASSERT(hasTagName(scriptTag));
 }
 
-PassRefPtr<HTMLScriptElement> HTMLScriptElement::create(const QualifiedName& tagName, Document* document, bool wasInsertedByParser)
+PassRefPtr<HTMLScriptElement> HTMLScriptElement::create(const QualifiedName& tagName, Document* document, bool wasInsertedByParser, bool alreadyStarted)
 {
-    return adoptRef(new HTMLScriptElement(tagName, document, wasInsertedByParser, false));
+    return adoptRef(new HTMLScriptElement(tagName, document, wasInsertedByParser, alreadyStarted));
 }
 
 bool HTMLScriptElement::isURLAttribute(const Attribute& attribute) const
@@ -72,7 +72,7 @@ void HTMLScriptElement::parseAttribute(const Attribute& attribute)
         HTMLElement::parseAttribute(attribute);
 }
 
-Node::InsertionNotificationRequest HTMLScriptElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLScriptElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
     ScriptElement::insertedInto(insertionPoint);

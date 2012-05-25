@@ -7,6 +7,7 @@
  * Copyright (C) 2008 Kenneth Rohde Christiansen
  * Copyright (C) 2009-2010 ProFUSION embedded systems
  * Copyright (C) 2009-2010 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation
  *
  * All rights reserved.
  *
@@ -55,7 +56,7 @@
 #include "Settings.h"
 #include "WebKitVersion.h"
 #include "ewk_frame_private.h"
-#include "ewk_intent_request.h"
+#include "ewk_intent_private.h"
 #include "ewk_private.h"
 #include "ewk_settings_private.h"
 #include "ewk_view_private.h"
@@ -334,7 +335,7 @@ void FrameLoaderClientEfl::dispatchDecidePolicyForNavigationAction(FramePolicyFu
     CString firstParty = resourceRequest.firstPartyForCookies().string().utf8();
     CString httpMethod = resourceRequest.httpMethod().utf8();
     Ewk_Frame_Resource_Request request = { url.data(), firstParty.data(), httpMethod.data(), 0, m_frame, false };
-    bool ret = ewk_view_navigation_policy_decision(m_view, &request);
+    bool ret = ewk_view_navigation_policy_decision(m_view, &request, static_cast<Ewk_Navigation_Type>(action.type()));
 
     PolicyAction policy;
     if (!ret)
@@ -615,13 +616,15 @@ void FrameLoaderClientEfl::dispatchDidStartProvisionalLoad()
 
 void FrameLoaderClientEfl::dispatchDidReceiveTitle(const StringWithDirection& title)
 {
-    // FIXME: use direction of title.
+    Ewk_Text_With_Direction ewkTitle;
     CString cs = title.string().utf8();
-    ewk_frame_title_set(m_frame, cs.data());
+    ewkTitle.string = cs.data();
+    ewkTitle.direction = (title.direction() == LTR) ? EWK_TEXT_DIRECTION_LEFT_TO_RIGHT : EWK_TEXT_DIRECTION_RIGHT_TO_LEFT;
+    ewk_frame_title_set(m_frame, &ewkTitle);
 
     if (ewk_view_frame_main_get(m_view) != m_frame)
         return;
-    ewk_view_title_set(m_view, cs.data());
+    ewk_view_title_set(m_view, &ewkTitle);
 }
 
 void FrameLoaderClientEfl::dispatchDidChangeIcons(WebCore::IconType iconType)
@@ -791,6 +794,27 @@ void FrameLoaderClientEfl::dispatchDidLoadResourceByXMLHttpRequest(unsigned long
 
 void FrameLoaderClientEfl::dispatchDidFailProvisionalLoad(const ResourceError& err)
 {
+    Ewk_Frame_Load_Error error;
+    CString errorDomain = err.domain().utf8();
+    CString errorDescription = err.localizedDescription().utf8();
+    CString failingUrl = err.failingURL().utf8();
+
+    DBG("ewkFrame=%p, error=%s (%d, cancellation=%hhu) \"%s\", url=%s",
+        m_frame, errorDomain.data(), err.errorCode(), err.isCancellation(),
+        errorDescription.data(), failingUrl.data());
+
+    error.code = err.errorCode();
+    error.is_cancellation = err.isCancellation();
+    error.domain = errorDomain.data();
+    error.description = errorDescription.data();
+    error.failing_url = failingUrl.data();
+    error.resource_identifier = 0;
+    error.frame = m_frame;
+
+    ewk_frame_load_provisional_failed(m_frame, &error);
+    if (ewk_view_frame_main_get(m_view) == m_frame)
+        ewk_view_load_provisional_failed(m_view, &error);
+
     dispatchDidFailLoad(err);
 }
 

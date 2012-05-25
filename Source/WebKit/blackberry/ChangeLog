@@ -1,3 +1,186 @@
+2012-05-24  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] InputHandler can hold a ref on an object when document is cleared.
+        https://bugs.webkit.org/show_bug.cgi?id=87412
+
+        Reviewed by Rob Buis.
+
+        PR 145234.
+
+        When the document data is cleared, notify the InputHandler
+        of the associated frame being unloaded.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::clearDocumentData):
+
+2012-05-24  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Implement select popup and remove old hook to air popup
+        https://bugs.webkit.org/show_bug.cgi?id=87419
+
+        Reviewed by Rob Buis.
+
+        Introduce new html select popup client, remove the old hook to air popup.
+
+        * Api/WebPageClient.h:
+        * WebCoreSupport/SelectPopupClient.cpp: Added.
+        (WebCore):
+        (WebCore::SelectPopupClient::SelectPopupClient):
+        (WebCore::SelectPopupClient::~SelectPopupClient):
+        (WebCore::SelectPopupClient::update):
+        (WebCore::SelectPopupClient::generateHTML):
+        (WebCore::SelectPopupClient::closePopup):
+        (WebCore::SelectPopupClient::contentSize):
+        (WebCore::SelectPopupClient::htmlSource):
+        (WebCore::SelectPopupClient::setValueAndClosePopup):
+        (WebCore::SelectPopupClient::didClosePopup):
+        (WebCore::SelectPopupClient::writeDocument):
+        * WebCoreSupport/SelectPopupClient.h: Added.
+        (WebKit):
+        (WebCore):
+        (SelectPopupClient):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::openSelectPopup):
+        * WebKitSupport/InputHandler.h:
+        (WebCore):
+        (InputHandler):
+        * WebKitSupport/WebPopupType.h: Added.
+        (BlackBerry):
+        (WebKit):
+
+2012-05-24  Antonio Gomes  <agomes@rim.com>
+
+        Possible missing layout in Iris browser after hiding VKB
+        https://bugs.webkit.org/show_bug.cgi?id=87408
+        PR #153056 / MKS_3674963
+
+        Reviewed by Adam Treat.
+
+        Also informally reviewed by Mike Fenton.
+
+        If we are not rotating and we've started a viewport resize with
+        the Render tree in dirty state (i.e. it needs layout), lets
+        reset the needsLayout flag for now but set our own 'needsLayout'.
+
+        Reason: calls like ScrollView::setFixedLayoutSize can trigger a layout
+        if the render tree needs it. We want to avoid it till the viewport resize
+        is actually done (i.e. ScrollView::setViewportSize gets called
+        further down the method) so we do not get render artifacts.
+
+        Since our WebPage::setViewportSize calls rely on async Virtual
+        Keyboard responses, we were getting it called with the render
+        tree sometimes in a dirty state, sometimes not. It was flaky!
+        Patch ensures a clear render tree state, and sets it as dirty
+        afterwards as needed, so layout happens at the proper time.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setViewportSize):
+
+2012-05-24  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Padding adjustment for determining the relative distance for a point was backwards.
+        https://bugs.webkit.org/show_bug.cgi?id=87404
+
+        Reviewed by Rob Buis.
+
+        Fix padding calculation for handle adjustment.
+
+        Reviewed Internally by Mike Lattanzio.
+
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::directionOfPointRelativeToRect):
+
+2012-05-24  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Remove unused API function touchEventCancelAndClearFocusedNode.
+        https://bugs.webkit.org/show_bug.cgi?id=87379
+
+        Reviewed by Antonio Gomes.
+
+        Remove unused API, touchEventCancelAndClearFocusedNode.
+
+        Reviewed Internally by Gen Mak.
+
+        * Api/WebPage.cpp:
+        * Api/WebPage.h:
+        * WebKitSupport/TouchEventHandler.cpp:
+        * WebKitSupport/TouchEventHandler.h:
+        (TouchEventHandler):
+
+2012-05-23  Genevieve Mak  <gmak@rim.com>
+
+        Remove minimum and maximum scroll position as they are no
+        longer required due to changes in ScrollViewBase.
+        https://bugs.webkit.org/show_bug.cgi?id=87298
+
+        Reviewed by Antonio Gomes.
+
+        * WebKitSupport/InRegionScrollableArea.cpp:
+        (BlackBerry::WebKit::InRegionScrollableArea::InRegionScrollableArea):
+        * WebKitSupport/InRegionScrollableArea.h:
+        (InRegionScrollableArea):
+
+2012-05-22  Chris Guan  <chris.guan@torchmobile.com.cn>
+
+        [Blackberry]Pages contain video or audio tags should be in pageCache
+        https://bugs.webkit.org/show_bug.cgi?id=87116
+
+        Reviewed by George Staikos.
+        
+        There is not any reason to disable pageCache for video/audio 
+        tags probably. By my testing, Back and Forward are working for 
+        those pages contain video and audio tags.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::canCachePage):
+
+2012-05-22  Konrad Piascik  <kpaiscik@rim.com>
+
+        [BlackBerry] Remove unused/unimplemented methods from InspectorClientBlackberry
+        https://bugs.webkit.org/show_bug.cgi?id=87125
+
+        Reviewed by Rob Buis.
+
+        Removed unimplemented methods that are no longer part of InspectorClient and added
+        a new stub for InspectorStateClient::updateInspectorStateCookie
+
+        * WebCoreSupport/InspectorClientBlackBerry.cpp:
+        (WebCore::InspectorClientBlackBerry::updateInspectorStateCookie):
+        (WebCore):
+        * WebCoreSupport/InspectorClientBlackBerry.h:
+        (InspectorClientBlackBerry):
+
+2012-05-18  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Validation of Last Fat Finger result is needed for selection.
+        https://bugs.webkit.org/show_bug.cgi?id=86888
+
+        Reviewed by Antonio Gomes.
+
+        PR 128393.
+
+        Cached FatFingersResults must be validatible against
+        the desired request to ensure the result is both for
+        the same point and of the same type.
+
+        * WebKitSupport/FatFingers.h:
+        (WebKit):
+        (FatFingersResult):
+        (BlackBerry::WebKit::FatFingersResult::FatFingersResult):
+        (BlackBerry::WebKit::FatFingersResult::reset):
+        (BlackBerry::WebKit::FatFingersResult::resultMatches):
+        (BlackBerry::WebKit::FatFingersResult::originPosition):
+        (BlackBerry::WebKit::FatFingersResult::adjustedPosition):
+        (BlackBerry::WebKit::FatFingersResult::positionWasAdjusted):
+        (BlackBerry::WebKit::FatFingersResult::isTextInput):
+        (BlackBerry::WebKit::FatFingersResult::isValid):
+        (BlackBerry::WebKit::FatFingersResult::node):
+        (BlackBerry::WebKit::FatFingersResult::nodeAsElementIfApplicable):
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::selectAtPoint):
+
 2012-05-18  MORITA Hajime  <morrita@google.com>
 
         https://bugs.webkit.org/show_bug.cgi?id=85515

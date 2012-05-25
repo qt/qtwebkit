@@ -35,11 +35,14 @@
 
 #include "Chrome.h"
 #include "ChromeClientImpl.h"
+#include "FileMetadata.h"
 #include "Page.h"
+#include "WebFileInfo.h"
 #include "WebFileUtilities.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebIDBKey.h"
+#include "WebIDBKeyPath.h"
 #include "WebKit.h"
 #include "WebPluginContainerImpl.h"
 #include "WebPluginListBuilderImpl.h"
@@ -49,8 +52,6 @@
 #include "WebViewImpl.h"
 #include "WebWorkerClientImpl.h"
 #include "platform/WebAudioBus.h"
-#include "platform/WebCookie.h"
-#include "platform/WebCookieJar.h"
 #include "platform/WebData.h"
 #include "platform/WebDragData.h"
 #include "platform/WebImage.h"
@@ -62,17 +63,17 @@
 
 #if OS(WINDOWS)
 #include "platform/WebRect.h"
-#include "platform/win/WebThemeEngine.h"
+#include <public/win/WebThemeEngine.h>
 #endif
 
 #if OS(DARWIN)
-#include "platform/mac/WebThemeEngine.h"
+#include <public/mac/WebThemeEngine.h>
 #elif OS(UNIX) && !OS(ANDROID)
-#include "platform/linux/WebThemeEngine.h"
 #include "WebFontInfo.h"
 #include "WebFontRenderStyle.h"
+#include <public/linux/WebThemeEngine.h>
 #elif OS(ANDROID)
-#include "platform/android/WebThemeEngine.h"
+#include <public/android/WebThemeEngine.h>
 #endif
 
 #include "NativeImageSkia.h"
@@ -94,6 +95,8 @@
 #include "Worker.h"
 #include "WorkerContextProxy.h"
 #include <public/WebClipboard.h>
+#include <public/WebCookie.h>
+#include <public/WebCookieJar.h>
 #include <public/WebMimeRegistry.h>
 #include <public/WebWorkerRunLoop.h>
 #include <wtf/Assertions.h>
@@ -134,7 +137,7 @@ static WebCookieJar* getCookieJar(const Document* document)
         return 0;
     WebCookieJar* cookieJar = frameImpl->client()->cookieJar(frameImpl);
     if (!cookieJar)
-        cookieJar = webKitPlatformSupport()->cookieJar();
+        cookieJar = WebKit::Platform::current()->cookieJar();
     return cookieJar;
 }
 
@@ -319,17 +322,23 @@ bool PlatformSupport::getFileSize(const String& path, long long& result)
     return WebKit::Platform::current()->fileUtilities()->getFileSize(path, result);
 }
 
-void PlatformSupport::revealFolderInOS(const String& path)
-{
-    WebKit::Platform::current()->fileUtilities()->revealFolderInOS(path);
-}
-
 bool PlatformSupport::getFileModificationTime(const String& path, time_t& result)
 {
     double modificationTime;
     if (!WebKit::Platform::current()->fileUtilities()->getFileModificationTime(path, modificationTime))
         return false;
     result = static_cast<time_t>(modificationTime);
+    return true;
+}
+
+bool PlatformSupport::getFileMetadata(const String& path, FileMetadata& result)
+{
+    WebFileInfo webFileInfo;
+    if (!webKitPlatformSupport()->fileUtilities()->getFileInfo(path, webFileInfo))
+        return false;
+    result.modificationTime = webFileInfo.modificationTime;
+    result.length = webFileInfo.length;
+    result.type = static_cast<FileMetadata::Type>(webFileInfo.type);
     return true;
 }
 
@@ -500,7 +509,7 @@ PassRefPtr<IDBFactoryBackendInterface> PlatformSupport::idbFactory()
     return IDBFactoryBackendProxy::create();
 }
 
-void PlatformSupport::createIDBKeysFromSerializedValuesAndKeyPath(const Vector<RefPtr<SerializedScriptValue> >& values, const String& keyPath, Vector<RefPtr<IDBKey> >& keys)
+void PlatformSupport::createIDBKeysFromSerializedValuesAndKeyPath(const Vector<RefPtr<SerializedScriptValue> >& values, const IDBKeyPath& keyPath, Vector<RefPtr<IDBKey> >& keys)
 {
     WebVector<WebSerializedScriptValue> webValues = values;
     WebVector<WebIDBKey> webKeys;
@@ -512,7 +521,7 @@ void PlatformSupport::createIDBKeysFromSerializedValuesAndKeyPath(const Vector<R
         keys.append(PassRefPtr<IDBKey>(webKeys[i]));
 }
 
-PassRefPtr<SerializedScriptValue> PlatformSupport::injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey> key, PassRefPtr<SerializedScriptValue> value, const String& keyPath)
+PassRefPtr<SerializedScriptValue> PlatformSupport::injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey> key, PassRefPtr<SerializedScriptValue> value, const IDBKeyPath& keyPath)
 {
     return webKitPlatformSupport()->injectIDBKeyIntoSerializedValue(key, value, keyPath);
 }
@@ -575,7 +584,7 @@ void PlatformSupport::paintButton(
     GraphicsContext* gc, int part, int state, int classicState,
     const IntRect& rect)
 {
-    webKitPlatformSupport()->themeEngine()->paintButton(
+    WebKit::Platform::current()->themeEngine()->paintButton(
         gc->platformContext()->canvas(), part, state, classicState, rect);
 }
 
@@ -583,7 +592,7 @@ void PlatformSupport::paintMenuList(
     GraphicsContext* gc, int part, int state, int classicState,
     const IntRect& rect)
 {
-    webKitPlatformSupport()->themeEngine()->paintMenuList(
+    WebKit::Platform::current()->themeEngine()->paintMenuList(
         gc->platformContext()->canvas(), part, state, classicState, rect);
 }
 
@@ -591,7 +600,7 @@ void PlatformSupport::paintScrollbarArrow(
     GraphicsContext* gc, int state, int classicState,
     const IntRect& rect)
 {
-    webKitPlatformSupport()->themeEngine()->paintScrollbarArrow(
+    WebKit::Platform::current()->themeEngine()->paintScrollbarArrow(
         gc->platformContext()->canvas(), state, classicState, rect);
 }
 
@@ -599,7 +608,7 @@ void PlatformSupport::paintScrollbarThumb(
     GraphicsContext* gc, int part, int state, int classicState,
     const IntRect& rect)
 {
-    webKitPlatformSupport()->themeEngine()->paintScrollbarThumb(
+    WebKit::Platform::current()->themeEngine()->paintScrollbarThumb(
         gc->platformContext()->canvas(), part, state, classicState, rect);
 }
 
@@ -607,7 +616,7 @@ void PlatformSupport::paintScrollbarTrack(
     GraphicsContext* gc, int part, int state, int classicState,
     const IntRect& rect, const IntRect& alignRect)
 {
-    webKitPlatformSupport()->themeEngine()->paintScrollbarTrack(
+    WebKit::Platform::current()->themeEngine()->paintScrollbarTrack(
         gc->platformContext()->canvas(), part, state, classicState, rect,
         alignRect);
 }
@@ -616,7 +625,7 @@ void PlatformSupport::paintSpinButton(
     GraphicsContext* gc, int part, int state, int classicState,
     const IntRect& rect)
 {
-    webKitPlatformSupport()->themeEngine()->paintSpinButton(
+    WebKit::Platform::current()->themeEngine()->paintSpinButton(
         gc->platformContext()->canvas(), part, state, classicState, rect);
 }
 
@@ -628,7 +637,7 @@ void PlatformSupport::paintTextField(
     // Fallback to white when |color| is invalid.
     RGBA32 backgroundColor = color.isValid() ? color.rgb() : Color::white;
 
-    webKitPlatformSupport()->themeEngine()->paintTextField(
+    WebKit::Platform::current()->themeEngine()->paintTextField(
         gc->platformContext()->canvas(), part, state, classicState, rect,
         backgroundColor, fillContentArea, drawEdges);
 }
@@ -637,14 +646,14 @@ void PlatformSupport::paintTrackbar(
     GraphicsContext* gc, int part, int state, int classicState,
     const IntRect& rect)
 {
-    webKitPlatformSupport()->themeEngine()->paintTrackbar(
+    WebKit::Platform::current()->themeEngine()->paintTrackbar(
         gc->platformContext()->canvas(), part, state, classicState, rect);
 }
 
 void PlatformSupport::paintProgressBar(
     GraphicsContext* gc, const IntRect& barRect, const IntRect& valueRect, bool determinate, double animatedSeconds)
 {
-    webKitPlatformSupport()->themeEngine()->paintProgressBar(
+    WebKit::Platform::current()->themeEngine()->paintProgressBar(
         gc->platformContext()->canvas(), barRect, valueRect, determinate, animatedSeconds);
 }
 
@@ -663,7 +672,7 @@ void PlatformSupport::paintScrollbarThumb(
     webThemeScrollbarInfo.totalSize = scrollbarInfo.totalSize;
 
     WebKit::WebCanvas* webCanvas = gc->platformContext()->canvas();
-    webKitPlatformSupport()->themeEngine()->paintScrollbarThumb(
+    WebKit::Platform::current()->themeEngine()->paintScrollbarThumb(
         webCanvas,
         static_cast<WebThemeEngine::State>(state),
         static_cast<WebThemeEngine::Size>(size),
@@ -767,7 +776,7 @@ static void GetWebThemeExtraParams(PlatformSupport::ThemePart part, PlatformSupp
 
 IntSize PlatformSupport::getThemePartSize(ThemePart part)
 {
-     return webKitPlatformSupport()->themeEngine()->getSize(WebThemePart(part));
+     return WebKit::Platform::current()->themeEngine()->getSize(WebThemePart(part));
 }
 
 void PlatformSupport::paintThemePart(
@@ -775,7 +784,7 @@ void PlatformSupport::paintThemePart(
 {
     WebThemeEngine::ExtraParams webThemeExtraParams;
     GetWebThemeExtraParams(part, state, extraParams, &webThemeExtraParams);
-    webKitPlatformSupport()->themeEngine()->paint(
+    WebKit::Platform::current()->themeEngine()->paint(
         gc->platformContext()->canvas(), WebThemePart(part), WebThemeState(state), rect, &webThemeExtraParams);
 }
 
@@ -839,6 +848,11 @@ void PlatformSupport::notifyJSOutOfMemory(Frame* frame)
     if (!webFrame->client())
         return;
     webFrame->client()->didExhaustMemoryAvailableForScript(webFrame);
+}
+
+bool PlatformSupport::getProcessMemorySize(size_t* privateBytes, size_t* sharedBytes)
+{
+    return webKitPlatformSupport()->getProcessMemorySize(privateBytes, sharedBytes);
 }
 
 int PlatformSupport::screenHorizontalDPI(Widget* widget)
@@ -919,10 +933,5 @@ WorkerContextProxy* WorkerContextProxy::create(Worker* worker)
     return WebWorkerClientImpl::createWorkerContextProxy(worker);
 }
 #endif
-
-bool PlatformSupport::canAccelerate2dCanvas()
-{
-    return webKitPlatformSupport()->canAccelerate2dCanvas();
-}
 
 } // namespace WebCore

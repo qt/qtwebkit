@@ -257,7 +257,6 @@ public:
 
     void setDomainRelaxationForbiddenForURLScheme(const CppArgumentList&, CppVariant*);
     void setDeferMainResourceDataLoad(const CppArgumentList&, CppVariant*);
-    void setEditingBehavior(const CppArgumentList&, CppVariant*);
 
     // Deals with Web Audio WAV file data.
     void setAudioData(const CppArgumentList&, CppVariant*);
@@ -429,6 +428,9 @@ public:
     void setFixedLayoutSize(const CppArgumentList&, CppVariant*);
 
     void selectionAsMarkup(const CppArgumentList&, CppVariant*);
+
+    // Switch the link detection.
+    void setAutomaticLinkDetectionEnabled(bool);
 
 #if ENABLE(POINTER_LOCK)
     void didLosePointerLock(const CppArgumentList&, CppVariant*);

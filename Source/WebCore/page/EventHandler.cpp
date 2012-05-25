@@ -31,6 +31,7 @@
 #include "CachedImage.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
+#include "ComposedShadowTreeWalker.h"
 #include "Cursor.h"
 #include "CursorList.h"
 #include "Document.h"
@@ -1599,7 +1600,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
         // If a mouse event handler changes the input element type to one that has a widget associated,
         // we'd like to EventHandler::handleMousePressEvent to pass the event to the widget and thus the
         // event target node can't still be the shadow node.
-        if (targetNode(mev)->isShadowRoot() && targetNode(mev)->shadowHost()->hasTagName(inputTag)) {
+        if (targetNode(mev)->isShadowRoot() && toShadowRoot(targetNode(mev))->host()->hasTagName(inputTag)) {
             HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active);
             mev = m_frame->document()->prepareMouseEvent(request, documentPoint, mouseEvent);
         }
@@ -1977,8 +1978,6 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, Clipboard*
     RefPtr<Node> newTarget = targetNode(mev);
     if (newTarget && newTarget->isTextNode())
         newTarget = newTarget->parentNode();
-    if (newTarget)
-        newTarget = newTarget->shadowAncestorNode();
 
     if (m_dragTarget != newTarget) {
         // FIXME: this ordering was explicitly chosen to match WinIE. However,
@@ -2092,15 +2091,14 @@ static inline SVGElementInstance* instanceAssociatedWithShadowTreeElement(Node* 
     if (!referenceNode || !referenceNode->isSVGElement())
         return 0;
 
-    Node* shadowTreeElement = referenceNode->shadowRoot();
-    if (!shadowTreeElement)
+    ShadowRoot* shadowRoot = referenceNode->shadowRoot();
+    if (!shadowRoot)
         return 0;
 
-    Element* shadowTreeParentElement = shadowTreeElement->shadowHost();
-    if (!shadowTreeParentElement)
+    Element* shadowTreeParentElement = shadowRoot->host();
+    if (!shadowTreeParentElement || !shadowTreeParentElement->hasTagName(useTag))
         return 0;
 
-    ASSERT(shadowTreeParentElement->hasTagName(useTag));
     return static_cast<SVGUseElement*>(shadowTreeParentElement)->instanceForShadowTreeElement(referenceNode);
 }
 #endif
@@ -2114,8 +2112,11 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
         result = m_capturingMouseEventsNode.get();
     else {
         // If the target node is a text node, dispatch on the parent node - rdar://4196646
-        if (result && result->isTextNode())
-            result = result->parentNode();
+        if (result && result->isTextNode()) {
+            ComposedShadowTreeWalker walker(result);
+            walker.parentIncludingInsertionPointAndShadowRoot();
+            result = walker.get();
+        }
     }
     m_nodeUnderMouse = result;
 #if ENABLE(SVG)
@@ -2250,7 +2251,7 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
                 // focused if the user does a mouseup over it, however, because the mouseup
                 // will set a selection inside it, which will call setFocuseNodeIfNeeded.
                 ExceptionCode ec = 0;
-                Node* n = node->isShadowRoot() ? node->shadowHost() : node;
+                Node* n = node->isShadowRoot() ? toShadowRoot(node)->host() : node;
                 if (m_frame->selection()->isRange()
                     && m_frame->selection()->toNormalizedRange()->compareNode(n, ec) == Range::NODE_INSIDE
                     && n->isDescendantOf(m_frame->document()->focusedNode()))
@@ -2346,7 +2347,6 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& e)
                 return true;
         }
 
-        node = node->shadowAncestorNode();
         if (node && !node->dispatchWheelEvent(event))
             return true;
     }

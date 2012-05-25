@@ -27,7 +27,6 @@
 #define CCLayerImpl_h
 
 #include "Color.h"
-#include "FilterOperations.h"
 #include "FloatRect.h"
 #include "IntRect.h"
 #include "Region.h"
@@ -36,6 +35,7 @@
 #include "cc/CCLayerAnimationController.h"
 #include "cc/CCRenderSurface.h"
 #include "cc/CCSharedQuadState.h"
+#include <public/WebFilterOperations.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -94,6 +94,9 @@ public:
     void setDrawsContent(bool);
     bool drawsContent() const { return m_drawsContent; }
 
+    bool forceRenderSurface() const { return m_forceRenderSurface; }
+    void setForceRenderSurface(bool force) { m_forceRenderSurface = force; }
+
     // Returns true if any of the layer's descendants has content to draw.
     bool descendantDrawsContent();
 
@@ -106,11 +109,11 @@ public:
     void setBackgroundColor(const Color&);
     Color backgroundColor() const { return m_backgroundColor; }
 
-    void setFilters(const FilterOperations&);
-    const FilterOperations& filters() const { return m_filters; }
+    void setFilters(const WebKit::WebFilterOperations&);
+    const WebKit::WebFilterOperations& filters() const { return m_filters; }
 
-    void setBackgroundFilters(const FilterOperations&);
-    const FilterOperations& backgroundFilters() const { return m_backgroundFilters; }
+    void setBackgroundFilters(const WebKit::WebFilterOperations&);
+    const WebKit::WebFilterOperations& backgroundFilters() const { return m_backgroundFilters; }
 
     void setMasksToBounds(bool);
     bool masksToBounds() const { return m_masksToBounds; }
@@ -307,6 +310,7 @@ private:
     bool m_isNonCompositedContent;
 
     bool m_drawsContent;
+    bool m_forceRenderSurface;
 
     FloatSize m_scrollDelta;
     IntSize m_sentScrollDelta;
@@ -332,8 +336,8 @@ private:
     // Debug layer name.
     String m_debugName;
 
-    FilterOperations m_filters;
-    FilterOperations m_backgroundFilters;
+    WebKit::WebFilterOperations m_filters;
+    WebKit::WebFilterOperations m_backgroundFilters;
 
     TransformationMatrix m_drawTransform;
     TransformationMatrix m_screenSpaceTransform;

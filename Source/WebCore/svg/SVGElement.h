@@ -123,9 +123,9 @@ protected:
 
     virtual void finishParsingChildren();
     virtual void attributeChanged(const Attribute&) OVERRIDE;
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
+    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
     
-    virtual void removedFrom(Node*) OVERRIDE;
+    virtual void removedFrom(ContainerNode*) OVERRIDE;
 
     SVGElementRareData* rareSVGData() const;
     SVGElementRareData* ensureRareSVGData();

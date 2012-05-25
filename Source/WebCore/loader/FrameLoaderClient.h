@@ -310,7 +310,13 @@ namespace WebCore {
         virtual bool allowImage(bool enabledPerSettings, const KURL&) { return enabledPerSettings; }
         virtual bool allowDisplayingInsecureContent(bool enabledPerSettings, SecurityOrigin*, const KURL&) { return enabledPerSettings; }
         virtual bool allowRunningInsecureContent(bool enabledPerSettings, SecurityOrigin*, const KURL&) { return enabledPerSettings; }
-        
+
+        virtual bool shadowDOMAllowed(bool enabledAsRuntimeFeatures) { return enabledAsRuntimeFeatures; }
+        virtual bool allowStyleScoped(bool enabledAsRuntimeFeatures) { return enabledAsRuntimeFeatures; }
+#if ENABLE(PAGE_POPUP)
+        virtual bool allowPagePopup() { return false; }
+#endif
+
         // This callback notifies the client that the frame was about to run
         // JavaScript but did not because allowScript returned false. We
         // have a separate callback here because there are a number of places
@@ -319,6 +325,9 @@ namespace WebCore {
         virtual void didNotAllowScript() { }
         // This callback is similar, but for plugins.
         virtual void didNotAllowPlugins() { }
+
+        // Clients that generally disallow universal access can make exceptions for particular URLs.
+        virtual bool shouldForceUniversalAccessFromLocalURL(const KURL&) { return false; }
 
         virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() = 0;
 

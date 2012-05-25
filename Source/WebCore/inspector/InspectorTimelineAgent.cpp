@@ -56,13 +56,14 @@ static const char timelineMaxCallStackDepth[] = "timelineMaxCallStackDepth";
 static const char includeMemoryDetails[] = "includeMemoryDetails";
 }
 
-// Must be kept in sync with TimelineAgent.js
+// Must be kept in sync with WebInspector.TimelineModel.RecordType in TimelineModel.js
 namespace TimelineRecordType {
 static const char EventDispatch[] = "EventDispatch";
+static const char BeginFrame[] = "BeginFrame";
 static const char Layout[] = "Layout";
 static const char RecalculateStyles[] = "RecalculateStyles";
 static const char Paint[] = "Paint";
-static const char BeginFrame[] = "BeginFrame";
+static const char CompositeLayers[] = "CompositeLayers";
 
 static const char ParseHTML[] = "ParseHTML";
 
@@ -237,6 +238,16 @@ void InspectorTimelineAgent::willPaint(const LayoutRect& rect)
 void InspectorTimelineAgent::didPaint()
 {
     didCompleteCurrentRecord(TimelineRecordType::Paint);
+}
+
+void InspectorTimelineAgent::willComposite()
+{
+    pushCurrentRecord(InspectorObject::create(), TimelineRecordType::CompositeLayers, false);
+}
+
+void InspectorTimelineAgent::didComposite()
+{
+    didCompleteCurrentRecord(TimelineRecordType::CompositeLayers);
 }
 
 void InspectorTimelineAgent::willWriteHTML(unsigned int length, unsigned int startLine)

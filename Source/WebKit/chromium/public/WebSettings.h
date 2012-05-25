@@ -65,6 +65,7 @@ public:
     virtual void setMinimumLogicalFontSize(int) = 0;
     virtual void setDefaultDeviceScaleFactor(int) = 0;
     virtual void setApplyDefaultDeviceScaleFactorInCompositor(bool) = 0;
+    virtual void setFontBoostingEnabled(bool) = 0;
     virtual void setDefaultTextEncodingName(const WebString&) = 0;
     virtual void setJavaScriptEnabled(bool) = 0;
     virtual void setWebSecurityEnabled(bool) = 0;
@@ -100,6 +101,7 @@ public:
     virtual void setWebAudioEnabled(bool) = 0;
     virtual void setExperimentalWebGLEnabled(bool) = 0;
     virtual void setExperimentalCSSRegionsEnabled(bool) = 0;
+    virtual void setExperimentalCSSGridLayoutEnabled(bool) = 0;
     virtual void setExperimentalCSSCustomFilterEnabled(bool) = 0;
     virtual void setOpenGLMultisamplingEnabled(bool) = 0;
     virtual void setPrivilegedWebGLExtensionsEnabled(bool) = 0;
@@ -146,9 +148,11 @@ public:
     virtual void setPartialSwapEnabled(bool) = 0;
     virtual void setThreadedAnimationEnabled(bool) = 0;
     virtual void setViewportEnabled(bool) = 0;
+    virtual void setMediaPlaybackRequiresUserGesture(bool) = 0;
     virtual bool viewportEnabled() const = 0;
     virtual void setDefaultTileSize(WebSize) = 0;
     virtual void setMaxUntiledLayerSize(WebSize) = 0;
+    virtual void setFixedPositionCreatesStackingContext(bool) = 0;
 
 
 protected:

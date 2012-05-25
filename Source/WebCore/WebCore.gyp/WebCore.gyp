@@ -174,7 +174,6 @@
       '../svg/SVGTests.idl',
       '../svg/SVGTransformable.idl',
       '../svg/SVGViewSpec.idl',
-      '../svg/SVGZoomAndPan.idl',
 
       # FIXME: I don't know why these are excluded, either.
       # Someone (me?) should figure it out and add appropriate comments.
@@ -1204,6 +1203,7 @@
         '../../ThirdParty/glu/glu.gyp:libtess',
         '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:yarr',
         '../../WTF/WTF.gyp/WTF.gyp:wtf',
+        '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',
         '<(chromium_src_dir)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
@@ -1222,6 +1222,7 @@
       'export_dependent_settings': [
         '../../JavaScriptCore/JavaScriptCore.gyp/JavaScriptCore.gyp:yarr',
         '../../WTF/WTF.gyp/WTF.gyp:wtf',
+        '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',
         '<(chromium_src_dir)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
@@ -1300,6 +1301,11 @@
           ],
           'export_dependent_settings': [
             '<(chromium_src_dir)/build/linux/system.gyp:gtk',
+          ],
+        }],
+        ['OS=="android"', {
+          'sources/': [
+            ['exclude', 'accessibility/'],
           ],
         }],
         ['OS=="mac"', {
@@ -1466,7 +1472,6 @@
       'type': 'static_library',
       'dependencies': [
         'webcore_prerequisites',
-        '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
       ],
       'defines': [ 
         'WEBKIT_IMPLEMENTATION=1', 
@@ -2030,6 +2035,7 @@
         '<@(webcore_include_dirs)',
         '../testing',
         '../testing/v8',
+        '../../Platform/chromium',
       ],
       'sources': [
         '<@(webcore_test_support_files)',

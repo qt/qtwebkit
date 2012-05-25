@@ -78,6 +78,7 @@ class GraphicsContext;
 class Image;
 class IDBFactoryBackendInterface;
 class IDBKey;
+class IDBKeyPath;
 class IntRect;
 class KURL;
 class SerializedScriptValue;
@@ -122,12 +123,12 @@ public:
     static bool cookiesEnabled(const Document*);
 
     // File ---------------------------------------------------------------
-    static void revealFolderInOS(const String&);
     static bool fileExists(const String&);
     static bool deleteFile(const String&);
     static bool deleteEmptyDirectory(const String&);
     static bool getFileSize(const String&, long long& result);
     static bool getFileModificationTime(const String&, time_t& result);
+    static bool getFileMetadata(const String&, FileMetadata& result);
     static String directoryName(const String& path);
     static String pathByAppendingComponent(const String& path, const String& component);
     static bool makeAllDirectories(const String& path);
@@ -179,9 +180,9 @@ public:
     // IndexedDB ----------------------------------------------------------
     static PassRefPtr<IDBFactoryBackendInterface> idbFactory();
     // Extracts keyPath from values and returns the corresponding keys.
-    static void createIDBKeysFromSerializedValuesAndKeyPath(const Vector<RefPtr<SerializedScriptValue> >& values, const String& keyPath, Vector<RefPtr<IDBKey> >& keys);
+    static void createIDBKeysFromSerializedValuesAndKeyPath(const Vector<RefPtr<SerializedScriptValue> >& values, const IDBKeyPath&, Vector<RefPtr<IDBKey> >& keys);
     // Injects key via keyPath into value. Returns true on success.
-    static PassRefPtr<SerializedScriptValue> injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>, const String& keyPath);
+    static PassRefPtr<SerializedScriptValue> injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>, const IDBKeyPath&);
 
     // JavaScript ---------------------------------------------------------
     static void notifyJSOutOfMemory(Frame*);
@@ -213,6 +214,10 @@ public:
     static void setSharedTimerFiredFunction(void (*func)());
     static void setSharedTimerFireInterval(double);
 
+    // Returns private and shared usage, in bytes. Private bytes is the amount of
+    // memory currently allocated to this process that cannot be shared. Returns
+    // false on platform specific error conditions.
+    static bool getProcessMemorySize(size_t* privateBytes, size_t* sharedBytes);
     // Theming ------------------------------------------------------------
 #if OS(WINDOWS)
     static void paintButton(
@@ -371,8 +376,6 @@ public:
 
     static void didStartWorkerRunLoop(WorkerRunLoop*);
     static void didStopWorkerRunLoop(WorkerRunLoop*);
-
-    static bool canAccelerate2dCanvas();
 };
 
 } // namespace WebCore

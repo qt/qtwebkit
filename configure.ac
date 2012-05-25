@@ -117,7 +117,6 @@ fi
 
 AC_PROG_CC
 AC_PROG_CXX
-AM_PROG_CC_STDC
 AM_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_SYS_LARGEFILE
@@ -666,7 +665,7 @@ AC_MSG_RESULT([$enable_dom_storage])
 AC_MSG_CHECKING([whether to enable the indexed database API])
 AC_ARG_ENABLE(indexed_database,
               AC_HELP_STRING([--enable-indexed-database],
-                             [enable the indexed database API [default=no]]),
+                             [enable the indexed database API (incomplete) [default=no]]),
               [],[enable_indexed_database="no"])
 AC_MSG_RESULT([$enable_indexed_database])
 
@@ -977,6 +976,14 @@ AC_ARG_ENABLE(coverage,
               [],[enable_coverage="no"])
 AC_MSG_RESULT([$enable_coverage])
 
+# check whether to enable CSS flaxbox support
+AC_MSG_CHECKING([whether to enable CSS3 flexbox support])
+AC_ARG_ENABLE(css3_flexbox,
+              AC_HELP_STRING([--enable-css3-flexbox],
+                             [enable CSS3 flexbox support [default=no]]),
+              [],[enable_css3_flexbox="no"])
+AC_MSG_RESULT([$enable_css3_flexbox])
+
 # check whether to enable FastMalloc
 AC_MSG_CHECKING([whether to enable optimized memory allocator])
 AC_ARG_ENABLE(fast_malloc,
@@ -1084,6 +1091,30 @@ AC_ARG_ENABLE(device_orientation,
                              [enable support for DeviceOrientation (experimental and incomplete) [default=no]]),
               [],[enable_device_orientation="no"])
 AC_MSG_RESULT([$enable_device_orientation])
+
+# check whether to enable Font Boosting support
+AC_MSG_CHECKING([whether to enable Font Boosting])
+AC_ARG_ENABLE(font_boosting,
+              AC_HELP_STRING([--enable-font-boosting],
+                             [enable support for Font Boosting (incomplete) [default=no]]),
+              [],[enable_font_boosting="no"])
+AC_MSG_RESULT([$enable_font_boosting])
+
+# check whether to enable CSS Exclusions support
+AC_MSG_CHECKING([whether to enable CSS Exclusions])
+AC_ARG_ENABLE(css_exclusions,
+              AC_HELP_STRING([--enable-css-exclusions],
+                             [enable support for CSS Exclusions [default=yes]]),
+              [],[enable_css_exclusions="yes"])
+AC_MSG_RESULT([$enable_css_exclusions])
+
+# check whether to enable CSS Regions support
+AC_MSG_CHECKING([whether to enable CSS Regions])
+AC_ARG_ENABLE(css_regions,
+              AC_HELP_STRING([--enable-css-regions],
+                             [enable support for CSS Regions [default=yes]]),
+              [],[enable_css_regions="yes"])
+AC_MSG_RESULT([$enable_css_regions])
 
 G_IR_SCANNER=
 G_IR_COMPILER=
@@ -1340,6 +1371,10 @@ AM_CONDITIONAL([USE_CLUTTER], [test "$with_accelerated_compositing" = "clutter"]
 AM_CONDITIONAL([USE_GLX], [test "$with_accelerated_compositing" = "opengl" || test "$enable_webgl" = "yes"])
 AM_CONDITIONAL([USE_OPENGL], [test "$with_accelerated_compositing" = "opengl" || test "$enable_webgl" = "yes"])
 
+# IndexedDB implies LevelDB, but other features may one day require LevelDB.
+AM_CONDITIONAL([ENABLE_INDEXED_DATABASE],[test "$enable_indexed_database" = "yes"])
+AM_CONDITIONAL([USE_LEVELDB],[test "$enable_indexed_database" = "yes"])
+
 # WebKit feature conditionals
 AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug_features" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBGL],[test "$enable_webgl" = "yes"])
@@ -1364,7 +1399,6 @@ AM_CONDITIONAL([ENABLE_STYLE_SCOPED],[test "$enable_style_scoped" = "yes"])
 AM_CONDITIONAL([ENABLE_QUOTA],[test "$enable_quota" = "yes"])
 AM_CONDITIONAL([ENABLE_ICONDATABASE],[test "$enable_icon_database" = "yes"])
 AM_CONDITIONAL([ENABLE_IMAGE_RESIZER],[test "$enable_image_resizer" = "yes"])
-AM_CONDITIONAL([ENABLE_INDEXED_DATABASE],[test "$enable_indexed_database" = "yes"])
 AM_CONDITIONAL([ENABLE_INPUT_TYPE_COLOR],[test "$enable_input_type_color" = "yes"])
 AM_CONDITIONAL([ENABLE_INPUT_SPEECH],[test "$enable_input_speech" = "yes"])
 AM_CONDITIONAL([ENABLE_SCRIPTED_SPEECH],[test "$enable_scripted_speech" = "yes"])
@@ -1385,6 +1419,7 @@ AM_CONDITIONAL([ENABLE_ORIENTATION_EVENTS],[test "$enable_orientation_events" = 
 AM_CONDITIONAL([ENABLE_SVG],[test "$enable_svg" = "yes"])
 AM_CONDITIONAL([ENABLE_SVG_FONTS],[test "$enable_svg_fonts" = "yes"])
 AM_CONDITIONAL([ENABLE_COVERAGE],[test "$enable_coverage" = "yes"])
+AM_CONDITIONAL([ENABLE_CSS3_FLEXBOX],[test "$enable_css3_flexbox" = "yes"])
 AM_CONDITIONAL([ENABLE_FAST_MALLOC],[test "$enable_fast_malloc" = "yes"])
 AM_CONDITIONAL([ENABLE_WORKERS],[test "$enable_workers" = "yes"])
 AM_CONDITIONAL([ENABLE_SHADOW_DOM],[test "$enable_shadow_dom" = "yes"])
@@ -1405,6 +1440,9 @@ AM_CONDITIONAL([ENABLE_REGISTER_PROTOCOL_HANDLER],[test "$enable_register_protoc
 AM_CONDITIONAL([ENABLE_DEVICE_ORIENTATION],[test "$enable_device_orientation" = "yes"])
 AM_CONDITIONAL([ENABLE_MUTATION_OBSERVERS],[test "$enable_mutation_observers" = "yes"])
 AM_CONDITIONAL([ENABLE_IFRAME_SEAMLESS],[test "$enable_iframe_seamless" = "yes"])
+AM_CONDITIONAL([ENABLE_FONT_BOOSTING],[test "$enable_font_boosting" = "yes"])
+AM_CONDITIONAL([ENABLE_CSS_EXCLUSIONS],[test "$enable_css_exclusions" = "yes"])
+AM_CONDITIONAL([ENABLE_CSS_REGIONS],[test "$enable_css_regions" = "yes"])
 
 # Gtk conditionals
 AM_CONDITIONAL([ENABLE_INTROSPECTION],[test "$enable_introspection" = "yes"])
@@ -1454,11 +1492,15 @@ Build configuration:
 Features:
  WebGL                                                    : $enable_webgl
  Blob support                                             : $enable_blob
+ CSS3 Flexbox support                                     : $enable_css3_flexbox
  Legacy WebKitBlobBuilder support                         : $enable_legacy_webkit_blob_builder
+ CSS Exclusions support                                   : $enable_css_exclusions
+ CSS Regions support                                      : $enable_css_regions
  DOM mutation observer support                            : $enable_mutation_observers
  DeviceOrientation support                                : $enable_device_orientation
  Directory upload                                         : $enable_directory_upload
  Fast Mobile Scrolling                                    : $enable_fast_mobile_scrolling
+ Font Boosting support                                    : $enable_font_boosting
  JIT compilation                                          : $enable_jit
  Filters support                                          : $enable_filters
  Geolocation support                                      : $enable_geolocation

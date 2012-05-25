@@ -26,6 +26,7 @@
 #include "config.h"
 #include "DFGOperations.h"
 
+#include "Arguments.h"
 #include "CodeBlock.h"
 #include "DFGOSRExit.h"
 #include "DFGRepatch.h"
@@ -36,6 +37,7 @@
 #include "JSActivation.h"
 #include "JSGlobalData.h"
 #include "JSStaticScopeObject.h"
+#include "NameInstance.h"
 #include "Operations.h"
 
 #if ENABLE(DFG_JIT)
@@ -139,19 +141,19 @@
 #endif
 
 #define P_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function) \
-void* DFG_OPERATION function##WithReturnAddress(ExecState*, ReturnAddressPtr); \
+void* DFG_OPERATION function##WithReturnAddress(ExecState*, ReturnAddressPtr) REFERENCED_FROM_ASM; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function)
 
 #define J_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function) \
-EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, JSCell*, Identifier*, ReturnAddressPtr); \
+EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, JSCell*, Identifier*, ReturnAddressPtr) REFERENCED_FROM_ASM; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function)
 
 #define J_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJI(function) \
-EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, Identifier*, ReturnAddressPtr); \
+EncodedJSValue DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, Identifier*, ReturnAddressPtr) REFERENCED_FROM_ASM; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJI(function)
 
 #define V_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function) \
-void DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, JSCell*, Identifier*, ReturnAddressPtr); \
+void DFG_OPERATION function##WithReturnAddress(ExecState*, EncodedJSValue, JSCell*, Identifier*, ReturnAddressPtr) REFERENCED_FROM_ASM; \
 FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function)
 
 namespace JSC { namespace DFG {
@@ -200,6 +202,11 @@ ALWAYS_INLINE static void DFG_OPERATION operationPutByValInternal(ExecState* exe
         }
     }
 
+    if (isName(property)) {
+        PutPropertySlot slot(strict);
+        baseValue.put(exec, jsCast<NameInstance*>(property.asCell())->privateName(), value, slot);
+        return;
+    }
 
     // Don't put to an object if toString throws an exception.
     Identifier ident(exec, property.toString(exec)->value(exec));
@@ -307,6 +314,9 @@ EncodedJSValue DFG_OPERATION operationGetByVal(ExecState* exec, EncodedJSValue e
         }
     }
 
+    if (isName(property))
+        return JSValue::encode(baseValue.get(exec, jsCast<NameInstance*>(property.asCell())->privateName()));
+
     Identifier ident(exec, property.toString(exec)->value(exec));
     return JSValue::encode(baseValue.get(exec, ident));
 }
@@ -329,6 +339,9 @@ EncodedJSValue DFG_OPERATION operationGetByValCell(ExecState* exec, JSCell* base
         if (JSValue result = base->fastGetOwnProperty(exec, asString(property)->value(exec)))
             return JSValue::encode(result);
     }
+
+    if (isName(property))
+        return JSValue::encode(JSValue(base).get(exec, jsCast<NameInstance*>(property.asCell())->privateName()));
 
     Identifier ident(exec, property.toString(exec)->value(exec));
     return JSValue::encode(JSValue(base).get(exec, ident));
@@ -979,20 +992,20 @@ EncodedJSValue DFG_OPERATION operationToPrimitive(ExecState* exec, EncodedJSValu
     return JSValue::encode(JSValue::decode(value).toPrimitive(exec));
 }
 
-EncodedJSValue DFG_OPERATION operationStrCat(ExecState* exec, void* start, size_t size)
+EncodedJSValue DFG_OPERATION operationStrCat(ExecState* exec, void* buffer, size_t size)
 {
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
-    
-    return JSValue::encode(jsString(exec, static_cast<Register*>(start), size));
+
+    return JSValue::encode(jsString(exec, static_cast<Register*>(buffer), size));
 }
 
-EncodedJSValue DFG_OPERATION operationNewArray(ExecState* exec, void* start, size_t size)
+EncodedJSValue DFG_OPERATION operationNewArray(ExecState* exec, void* buffer, size_t size)
 {
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
-    
-    return JSValue::encode(constructArray(exec, static_cast<JSValue*>(start), size));
+
+    return JSValue::encode(constructArray(exec, static_cast<JSValue*>(buffer), size));
 }
 
 EncodedJSValue DFG_OPERATION operationNewArrayBuffer(ExecState* exec, size_t start, size_t size)
@@ -1025,13 +1038,73 @@ JSCell* DFG_OPERATION operationCreateActivation(ExecState* exec)
     return activation;
 }
 
-void DFG_OPERATION operationTearOffActivation(ExecState* exec, JSCell* activation)
+JSCell* DFG_OPERATION operationCreateArguments(ExecState* exec)
 {
-    ASSERT(activation);
-    ASSERT(activation->inherits(&JSActivation::s_info));
+    // NB: This needs to be exceedingly careful with top call frame tracking, since it
+    // may be called from OSR exit, while the state of the call stack is bizarre.
+    Arguments* result = Arguments::create(exec->globalData(), exec);
+    ASSERT(!exec->globalData().exception);
+    return result;
+}
+
+JSCell* DFG_OPERATION operationCreateInlinedArguments(
+    ExecState* exec, InlineCallFrame* inlineCallFrame)
+{
+    // NB: This needs to be exceedingly careful with top call frame tracking, since it
+    // may be called from OSR exit, while the state of the call stack is bizarre.
+    Arguments* result = Arguments::create(exec->globalData(), exec, inlineCallFrame);
+    ASSERT(!exec->globalData().exception);
+    return result;
+}
+
+void DFG_OPERATION operationTearOffActivation(ExecState* exec, JSCell* activationCell, int32_t unmodifiedArgumentsRegister)
+{
     JSGlobalData& globalData = exec->globalData();
     NativeCallFrameTracer tracer(&globalData, exec);
-    jsCast<JSActivation*>(activation)->tearOff(exec->globalData());
+    if (!activationCell) {
+        if (JSValue v = exec->uncheckedR(unmodifiedArgumentsRegister).jsValue()) {
+            if (!exec->codeBlock()->isStrictMode())
+                asArguments(v)->tearOff(exec);
+        }
+        return;
+    }
+    JSActivation* activation = jsCast<JSActivation*>(activationCell);
+    activation->tearOff(exec->globalData());
+    if (JSValue v = exec->uncheckedR(unmodifiedArgumentsRegister).jsValue())
+        asArguments(v)->didTearOffActivation(exec->globalData(), activation);
+}
+
+
+void DFG_OPERATION operationTearOffArguments(ExecState* exec, JSCell* argumentsCell)
+{
+    ASSERT(exec->codeBlock()->usesArguments());
+    ASSERT(!exec->codeBlock()->needsFullScopeChain());
+    asArguments(argumentsCell)->tearOff(exec);
+}
+
+void DFG_OPERATION operationTearOffInlinedArguments(
+    ExecState* exec, JSCell* argumentsCell, InlineCallFrame* inlineCallFrame)
+{
+    // This should only be called when the inline code block uses arguments but does not
+    // need a full scope chain. We could assert it, except that the assertion would be
+    // rather expensive and may cause side effects that would greatly diverge debug-mode
+    // behavior from release-mode behavior, since getting the code block of an inline
+    // call frame implies call frame reification.
+    asArguments(argumentsCell)->tearOff(exec, inlineCallFrame);
+}
+
+EncodedJSValue DFG_OPERATION operationGetArgumentsLength(ExecState* exec, int32_t argumentsRegister)
+{
+    Identifier ident(&exec->globalData(), "length");
+    JSValue baseValue = exec->uncheckedR(argumentsRegister).jsValue();
+    PropertySlot slot(baseValue);
+    return JSValue::encode(baseValue.get(exec, ident, slot));
+}
+
+EncodedJSValue DFG_OPERATION operationGetArgumentByVal(ExecState* exec, int32_t argumentsRegister, int32_t index)
+{
+    return JSValue::encode(
+        exec->uncheckedR(argumentsRegister).jsValue().get(exec, index));
 }
 
 JSCell* DFG_OPERATION operationNewFunction(ExecState* exec, JSCell* functionExecutable)
@@ -1129,7 +1202,7 @@ size_t DFG_OPERATION dfgConvertJSValueToBoolean(ExecState* exec, EncodedJSValue 
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
     
-    return JSValue::decode(encodedOp).toBoolean(exec);
+    return JSValue::decode(encodedOp).toBoolean();
 }
 
 #if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)

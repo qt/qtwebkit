@@ -98,6 +98,8 @@ InternalSettings::InternalSettings(Frame* frame)
 #if ENABLE(SHADOW_DOM)
     , m_originalShadowDOMEnabled(RuntimeEnabledFeatures::shadowDOMEnabled())
 #endif
+    , m_originalEditingBehavior(settings()->editingBehaviorType())
+    , m_originalFixedPositionCreatesStackingContext(settings()->fixedPositionCreatesStackingContext())
 {
 }
 
@@ -109,6 +111,8 @@ void InternalSettings::restoreTo(Settings* settings)
 #if ENABLE(SHADOW_DOM)
     RuntimeEnabledFeatures::setShadowDOMEnabled(m_originalShadowDOMEnabled);
 #endif
+    settings->setEditingBehaviorType(m_originalEditingBehavior);
+    settings->setFixedPositionCreatesStackingContext(m_originalFixedPositionCreatesStackingContext);
 }
 
 Settings* InternalSettings::settings() const
@@ -327,6 +331,25 @@ void InternalSettings::setMediaPlaybackRequiresUserGesture(bool enabled, Excepti
 {
     InternalSettingsGuardForSettings();
     settings()->setMediaPlaybackRequiresUserGesture(enabled);
+}
+
+void InternalSettings::setEditingBehavior(const String& editingBehavior, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    if (equalIgnoringCase(editingBehavior, "win"))
+        settings()->setEditingBehaviorType(EditingWindowsBehavior);
+    else if (equalIgnoringCase(editingBehavior, "mac"))
+        settings()->setEditingBehaviorType(EditingMacBehavior);
+    else if (equalIgnoringCase(editingBehavior, "unix"))
+        settings()->setEditingBehaviorType(EditingUnixBehavior);
+    else
+        ec = SYNTAX_ERR;
+}
+
+void InternalSettings::setFixedPositionCreatesStackingContext(bool creates, ExceptionCode& ec)
+{
+    InternalSettingsGuardForFrameView();
+    settings()->setFixedPositionCreatesStackingContext(creates);
 }
 
 }

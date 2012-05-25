@@ -1,3 +1,221 @@
+2012-05-24  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        cti_vm_throw gets kicked out by gcc 4.6 -flto
+        https://bugs.webkit.org/show_bug.cgi?id=56088
+
+        Reviewed by Darin Adler.
+
+        Define REFERENCED_FROM_ASM to __attribute__((used)) on GCC.
+
+        * wtf/Compiler.h:
+
+2012-05-23  Darin Adler  <darin@apple.com>
+
+        Optimize iteration of empty hash tables
+        https://bugs.webkit.org/show_bug.cgi?id=87215
+
+        Reviewed by Geoffrey Garen.
+
+        Iteration of empty hash tables was showing up on simple page loading
+        profiles due to the use of hash tables in the
+        NodeListsNodeData::invalidateCaches and
+        NodeListsNodeData::invalidateCachesThatDependOnAttributes functions.
+        It's worth optimizing the case of an empty table.
+
+        * wtf/HashTable.h:
+        (WTF::HashTable::begin): Return the known-good end iterator when the
+        table is empty. This makes iterating an empty table faster because we
+        avoid skipping empty and deleted buckets.
+
+2012-05-22  Geoffrey Garen  <ggaren@apple.com>
+
+        Build fix.
+
+        * wtf/RAMSize.cpp:
+        (WTF::computeRAMSize): sysctl expects a uint64_t, so use that and then
+        cast back to size_t. Since it's coneivable that a 32bit process would
+        run on a system with more than 4GB RAM, I added a paranoid check for
+        that condition.
+
+2012-05-22  Jessie Berlin  <jberlin@apple.com>
+
+        Build fix.
+
+        * wtf/RAMSize.cpp:
+        (WTF::computeRAMSize):
+        If you say you are going to return a size_t, actually return a size_t.
+
+2012-05-21  Geoffrey Garen  <ggaren@apple.com>
+
+        GC allocation trigger should be tuned to system RAM
+        https://bugs.webkit.org/show_bug.cgi?id=87039
+
+        Reviewed by Darin Adler.
+
+        Added a helper function for measuring system RAM.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/AmountOfRAM.cpp: Added.
+        (WTF):
+        (WTF::computeAmountOfRAM):
+        (WTF::amountOfRAM):
+        * wtf/AmountOfRAM.h: Added.
+        (WTF):
+        * wtf/CMakeLists.txt:
+        * wtf/StdLibExtras.h:
+        (WTF):
+
+2012-05-22  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        GCC 4.7 and C++11 support.
+        https://bugs.webkit.org/show_bug.cgi?id=86465
+
+        Reviewed by Darin Adler.
+
+        Detect C++11 mode in GCC 4.7 and set appropiate compiler feature flags.
+        Turn C++11 override control into a compiler feature flag.
+        Fix non-clang support of compiler feature CXX_DELETED_FUNCTIONS.
+
+        * wtf/Compiler.h:
+        * wtf/Noncopyable.h:
+
+2012-05-22  Filip Pizlo  <fpizlo@apple.com>
+
+        REGRESSION(r117861): It made almost all tests crash on Qt
+        https://bugs.webkit.org/show_bug.cgi?id=87082
+
+        Reviewed by Csaba Osztrogonác.
+        
+        Using OwnArrayPtr is a bad idea if you allocate array with fastCalloc.
+
+        * wtf/FastBitVector.h:
+        (WTF::FastBitVector::FastBitVector):
+        (WTF::FastBitVector::~FastBitVector):
+        (FastBitVector):
+        (WTF::FastBitVector::operator=):
+        (WTF::FastBitVector::resize):
+        (WTF::FastBitVector::setAll):
+        (WTF::FastBitVector::clearAll):
+        (WTF::FastBitVector::set):
+
+2012-05-21  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should be able to compute dominators
+        https://bugs.webkit.org/show_bug.cgi?id=85269
+
+        Reviewed by Oliver Hunt.
+        
+        Merged r115754 from dfgopt.
+        
+        Added a bitvector class suitable for cheap static analysis. This class
+        differs from BitVector in that instead of optimizing for space, it
+        optimizes for execution time. Its API is also somewhat less friendly,
+        which is intentional; it's meant to be used in places where you know
+        up front how bit your bitvectors are going to be.
+
+        * GNUmakefile.list.am:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/FastBitVector.h: Added.
+        (WTF):
+        (FastBitVector):
+        (WTF::FastBitVector::FastBitVector):
+        (WTF::FastBitVector::operator=):
+        (WTF::FastBitVector::numBits):
+        (WTF::FastBitVector::resize):
+        (WTF::FastBitVector::setAll):
+        (WTF::FastBitVector::clearAll):
+        (WTF::FastBitVector::set):
+        (WTF::FastBitVector::setAndCheck):
+        (WTF::FastBitVector::equals):
+        (WTF::FastBitVector::merge):
+        (WTF::FastBitVector::filter):
+        (WTF::FastBitVector::exclude):
+        (WTF::FastBitVector::clear):
+        (WTF::FastBitVector::get):
+        (WTF::FastBitVector::arrayLength):
+
+2012-05-15  Gavin Barraclough  <barraclough@apple.com>
+
+        Add support for private names
+        https://bugs.webkit.org/show_bug.cgi?id=86509
+
+        Reviewed by Oliver Hunt.
+
+        The spec isn't final, but we can start adding support to allow property maps
+        to contain keys that aren't identifiers.
+
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::StringImpl):
+        (StringImpl):
+        (WTF::StringImpl::createEmptyUnique):
+        (WTF::StringImpl::isEmptyUnique):
+            - Allow empty string impls to be allocated, which can be used as unique keys.
+
+2012-05-21  Emil A Eklund <eae@chromium.org> and Levi Weintraub  <leviw@chromium.org>
+
+        Enable SUBPIXEL_LAYOUT feature flag on Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=85555
+
+        Reviewed by Eric Seidel.
+
+        Enabling sub-pixel layout on Chromium port.
+
+        * wtf/Platform.h:
+
+2012-05-21  Andreas Kling  <kling@webkit.org>
+
+        CSS: Move duplicate property elimination to parser.
+        <http://webkit.org/b/86948>
+
+        Reviewed by Antti Koivisto.
+
+        Add WTF::BitArray, a simple, malloc free, fixed-size bit array class.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/BitArray.h: Added.
+        (WTF):
+        (BitArray):
+        (WTF::BitArray::BitArray):
+        (WTF::BitArray::set):
+        (WTF::BitArray::get):
+        * wtf/CMakeLists.txt:
+
+2012-05-21  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        Colliding isinf/isnan between C99 and C++11 with GCC >=4.6
+        https://bugs.webkit.org/show_bug.cgi?id=59249
+
+        Reviewed by Darin Adler.
+
+        Workaround the isinf and isnan conflict in GCC C++11.
+
+        * wtf/Compiler.h:
+        * wtf/MathExtras.h:
+        (std::wtf_isinf):
+        (std::wtf_isnan):
+
+2012-05-21  Andreas Kling  <kling@webkit.org>
+
+        REGRESSION(r117501): IconDatabase asserts on startup in synchronousIconForPageURL().
+        <http://webkit.org/b/86935>
+        <rdar://problem/11480012>
+
+        Reviewed by Anders Carlsson.
+
+        Added a swap() to HashCountedSet.
+
+        * wtf/HashCountedSet.h:
+        (HashCountedSet::swap):
+
 2012-05-16  Geoffrey Garen  <ggaren@apple.com>
 
         This is not a joke: 3.7X speedup from removing a call to sleep

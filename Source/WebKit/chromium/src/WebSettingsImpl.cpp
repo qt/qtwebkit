@@ -123,6 +123,11 @@ void WebSettingsImpl::setApplyDefaultDeviceScaleFactorInCompositor(bool applyDef
     m_applyDefaultDeviceScaleFactorInCompositor = applyDefaultDeviceScaleFactorInCompositor;
 }
 
+void WebSettingsImpl::setFontBoostingEnabled(bool enabled)
+{
+    m_settings->setFontBoostingEnabled(enabled);
+}
+
 void WebSettingsImpl::setDefaultTextEncodingName(const WebString& encoding)
 {
     m_settings->setDefaultTextEncodingName((String)encoding);
@@ -305,6 +310,11 @@ void WebSettingsImpl::setExperimentalWebGLEnabled(bool enabled)
 void WebSettingsImpl::setExperimentalCSSRegionsEnabled(bool enabled)
 {
     m_settings->setCSSRegionsEnabled(enabled);
+}
+
+void WebSettingsImpl::setExperimentalCSSGridLayoutEnabled(bool enabled)
+{
+    m_settings->setCSSGridLayoutEnabled(enabled);
 }
 
 void WebSettingsImpl::setExperimentalCSSCustomFilterEnabled(bool enabled)
@@ -574,6 +584,16 @@ void WebSettingsImpl::setPartialSwapEnabled(bool enabled)
 void WebSettingsImpl::setThreadedAnimationEnabled(bool enabled)
 {
     m_settings->setThreadedAnimationEnabled(enabled);
+}
+
+void WebSettingsImpl::setMediaPlaybackRequiresUserGesture(bool required)
+{
+    m_settings->setMediaPlaybackRequiresUserGesture(required);
+}
+
+void WebSettingsImpl::setFixedPositionCreatesStackingContext(bool creates)
+{
+    m_settings->setFixedPositionCreatesStackingContext(creates);
 }
 
 void WebSettingsImpl::setViewportEnabled(bool enabled)

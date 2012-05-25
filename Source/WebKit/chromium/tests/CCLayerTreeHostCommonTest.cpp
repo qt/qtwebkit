@@ -581,6 +581,37 @@ TEST(CCLayerTreeHostCommonTest, verifyRenderSurfaceListForTransparentChild)
     EXPECT_EQ(parent->drawableContentRect(), IntRect());
 }
 
+TEST(CCLayerTreeHostCommonTest, verifyForceRenderSurface)
+{
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> renderSurface1 = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> child = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    renderSurface1->setForceRenderSurface(true);
+
+    const TransformationMatrix identityMatrix;
+    setLayerPropertiesForTesting(renderSurface1.get(), identityMatrix, identityMatrix, FloatPoint::zero(), FloatPoint::zero(), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(child.get(), identityMatrix, identityMatrix, FloatPoint::zero(), FloatPoint::zero(), IntSize(10, 10), false);
+
+    parent->createRenderSurface();
+    parent->setClipRect(IntRect(0, 0, 10, 10));
+    parent->addChild(renderSurface1);
+    renderSurface1->addChild(child);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    EXPECT_TRUE(renderSurface1->renderSurface());
+    EXPECT_EQ(renderSurfaceLayerList.size(), 1U);
+
+    renderSurfaceLayerList.clear();
+    renderSurface1->setForceRenderSurface(false);
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+    EXPECT_FALSE(renderSurface1->renderSurface());
+    EXPECT_EQ(renderSurfaceLayerList.size(), 0U);
+}
+
 TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfaces)
 {
     // The entire subtree of layers that are outside the clipRect should be culled away,
@@ -698,6 +729,78 @@ TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsRenderSurfacesCrashRepro)
     ASSERT_EQ(2U, renderSurfaceLayerList.size());
     EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
     EXPECT_EQ(child->id(), renderSurfaceLayerList[1]->id());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyClipRectCullsSurfaceWithoutVisibleContent)
+{
+    // When a renderSurface has a clipRect, it is used to clip the contentRect
+    // of the surface. When the renderSurface is animating its transforms, then
+    // the contentRect's position in the clipRect is not defined on the main
+    // thread, and its contentRect should not be clipped.
+
+    // The test tree is set up as follows:
+    //  - parent is a container layer that masksToBounds=true to cause clipping.
+    //  - child is a renderSurface, which has a clipRect set to the bounds of the parent.
+    //  - grandChild is a renderSurface, and the only visible content in child. It is positioned outside of the clipRect from parent.
+
+    // In this configuration, grandChild should be outside the clipped
+    // contentRect of the child, making grandChild not appear in the
+    // renderSurfaceLayerList. However, when we place an animation on the child,
+    // this clipping should be avoided and we should keep the grandChild
+    // in the renderSurfaceLayerList.
+
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromium> grandChild = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> leafNode = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    parent->addChild(child);
+    child->addChild(grandChild);
+    grandChild->addChild(leafNode);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(child.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(20, 20), false);
+    setLayerPropertiesForTesting(grandChild.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(200, 200), IntSize(10, 10), false);
+    setLayerPropertiesForTesting(leafNode.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 10), false);
+
+    parent->setMasksToBounds(true);
+    child->setOpacity(0.4f);
+    grandChild->setOpacity(0.4f);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    parent->createRenderSurface();
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    // Without an animation, we should cull child and grandChild from the renderSurfaceLayerList.
+    ASSERT_EQ(1U, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+
+    // Now put an animating transform on child.
+    addAnimatedTransformToController(*child->layerAnimationController(), 10, 30, 0);
+
+    parent->clearRenderSurface();
+    child->clearRenderSurface();
+    grandChild->clearRenderSurface();
+    renderSurfaceLayerList.clear();
+    dummyLayerList.clear();
+
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    parent->createRenderSurface();
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    // With an animating transform, we should keep child and grandChild in the renderSurfaceLayerList.
+    ASSERT_EQ(3U, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+    EXPECT_EQ(child->id(), renderSurfaceLayerList[1]->id());
+    EXPECT_EQ(grandChild->id(), renderSurfaceLayerList[2]->id());
 }
 
 TEST(CCLayerTreeHostCommonTest, verifyClipRectIsPropagatedCorrectlyToLayers)
@@ -874,8 +977,9 @@ TEST(CCLayerTreeHostCommonTest, verifyAnimationsForRenderSurfaceHierarchy)
     TransformationMatrix sublayerTransform;
     sublayerTransform.scale3d(10.0, 1.0, 1.0);
 
-    // In combination with descendantDrawsContent, an animated transform forces the layer to have a new renderSurface.
+    // In combination with descendantDrawsContent and masksToBounds, an animated transform forces the layer to have a new renderSurface.
     addAnimatedTransformToController(*renderSurface2->layerAnimationController(), 10, 30, 0);
+    renderSurface2->setMasksToBounds(true);
 
     // Also put transform animations on grandChildOfRoot, and grandChildOfRS2
     addAnimatedTransformToController(*grandChildOfRoot->layerAnimationController(), 10, 30, 0);
@@ -1238,9 +1342,208 @@ TEST(CCLayerTreeHostCommonTest, verifyVisibleRectForPerspectiveUnprojection)
     EXPECT_INT_RECT_EQ(expected, actual);
 }
 
-TEST(CCLayerTreeHostCommonTest, verifyBackFaceCulling)
+TEST(CCLayerTreeHostCommonTest, verifyBackFaceCullingWithoutPreserves3d)
 {
-    // Verify that layers are appropriately culled when their back face is showing and they are not double sided.
+    // Verify the behavior of back-face culling when there are no preserve-3d layers. Note
+    // that 3d transforms still apply in this case, but they are "flattened" to each
+    // parent layer according to current W3C spec.
+
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingChildOfFrontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingChildOfFrontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingChildOfBackFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingChildOfBackFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+
+    parent->createRenderSurface();
+    parent->addChild(frontFacingChild);
+    parent->addChild(backFacingChild);
+    parent->addChild(frontFacingSurface);
+    parent->addChild(backFacingSurface);
+    frontFacingSurface->addChild(frontFacingChildOfFrontFacingSurface);
+    frontFacingSurface->addChild(backFacingChildOfFrontFacingSurface);
+    backFacingSurface->addChild(frontFacingChildOfBackFacingSurface);
+    backFacingSurface->addChild(backFacingChildOfBackFacingSurface);
+
+    // Nothing is double-sided
+    frontFacingChild->setDoubleSided(false);
+    backFacingChild->setDoubleSided(false);
+    frontFacingSurface->setDoubleSided(false);
+    backFacingSurface->setDoubleSided(false);
+    frontFacingChildOfFrontFacingSurface->setDoubleSided(false);
+    backFacingChildOfFrontFacingSurface->setDoubleSided(false);
+    frontFacingChildOfBackFacingSurface->setDoubleSided(false);
+    backFacingChildOfBackFacingSurface->setDoubleSided(false);
+
+    TransformationMatrix backfaceMatrix;
+    backfaceMatrix.translate(50, 50);
+    backfaceMatrix.rotate3d(0, 1, 0, 180);
+    backfaceMatrix.translate(-50, -50);
+
+    // Having a descendant and opacity will force these to have render surfaces.
+    frontFacingSurface->setOpacity(0.5f);
+    backFacingSurface->setOpacity(0.5f);
+
+    // Nothing preserves 3d. According to current W3C CSS Transforms spec, these layers
+    // should blindly use their own local transforms to determine back-face culling.
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(frontFacingChild.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingChild.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(frontFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(frontFacingChildOfFrontFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingChildOfFrontFacingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(frontFacingChildOfBackFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingChildOfBackFacingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+    parent->renderSurface()->setContentRect(IntRect(IntPoint(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    // Verify which renderSurfaces were created.
+    EXPECT_FALSE(frontFacingChild->renderSurface());
+    EXPECT_FALSE(backFacingChild->renderSurface());
+    EXPECT_TRUE(frontFacingSurface->renderSurface());
+    EXPECT_TRUE(backFacingSurface->renderSurface());
+    EXPECT_FALSE(frontFacingChildOfFrontFacingSurface->renderSurface());
+    EXPECT_FALSE(backFacingChildOfFrontFacingSurface->renderSurface());
+    EXPECT_FALSE(frontFacingChildOfBackFacingSurface->renderSurface());
+    EXPECT_FALSE(backFacingChildOfBackFacingSurface->renderSurface());
+
+    // Verify the renderSurfaceLayerList.
+    ASSERT_EQ(3u, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[1]->id());
+    // Even though the back facing surface LAYER gets culled, the other descendants should still be added, so the SURFACE should not be culled.
+    EXPECT_EQ(backFacingSurface->id(), renderSurfaceLayerList[2]->id());
+
+    // Verify root surface's layerList.
+    ASSERT_EQ(3u, renderSurfaceLayerList[0]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingChild->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[1]->id());
+    EXPECT_EQ(backFacingSurface->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[2]->id());
+
+    // Verify frontFacingSurface's layerList.
+    ASSERT_EQ(2u, renderSurfaceLayerList[1]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(frontFacingChildOfFrontFacingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[1]->id());
+
+    // Verify backFacingSurface's layerList; its own layer should be culled from the surface list.
+    ASSERT_EQ(1u, renderSurfaceLayerList[2]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingChildOfBackFacingSurface->id(), renderSurfaceLayerList[2]->renderSurface()->layerList()[0]->id());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyBackFaceCullingWithPreserves3d)
+{
+    // Verify the behavior of back-face culling when preserves-3d transform style is used.
+
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingChildOfFrontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingChildOfFrontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingChildOfBackFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingChildOfBackFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> dummyReplicaLayer1 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> dummyReplicaLayer2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+
+    parent->createRenderSurface();
+    parent->addChild(frontFacingChild);
+    parent->addChild(backFacingChild);
+    parent->addChild(frontFacingSurface);
+    parent->addChild(backFacingSurface);
+    frontFacingSurface->addChild(frontFacingChildOfFrontFacingSurface);
+    frontFacingSurface->addChild(backFacingChildOfFrontFacingSurface);
+    backFacingSurface->addChild(frontFacingChildOfBackFacingSurface);
+    backFacingSurface->addChild(backFacingChildOfBackFacingSurface);
+
+    // Nothing is double-sided
+    frontFacingChild->setDoubleSided(false);
+    backFacingChild->setDoubleSided(false);
+    frontFacingSurface->setDoubleSided(false);
+    backFacingSurface->setDoubleSided(false);
+    frontFacingChildOfFrontFacingSurface->setDoubleSided(false);
+    backFacingChildOfFrontFacingSurface->setDoubleSided(false);
+    frontFacingChildOfBackFacingSurface->setDoubleSided(false);
+    backFacingChildOfBackFacingSurface->setDoubleSided(false);
+
+    TransformationMatrix backfaceMatrix;
+    backfaceMatrix.translate(50, 50);
+    backfaceMatrix.rotate3d(0, 1, 0, 180);
+    backfaceMatrix.translate(-50, -50);
+
+    // Opacity will not force creation of renderSurfaces in this case because of the
+    // preserve-3d transform style. Instead, an example of when a surface would be
+    // created with preserve-3d is when there is a replica layer.
+    frontFacingSurface->setReplicaLayer(dummyReplicaLayer1.get());
+    backFacingSurface->setReplicaLayer(dummyReplicaLayer2.get());
+
+    // Each surface creates its own new 3d rendering context (as defined by W3C spec).
+    // According to current W3C CSS Transforms spec, layers in a 3d rendering context
+    // should use the transform with respect to that context. This 3d rendering context
+    // occurs when (a) parent's transform style is flat and (b) the layer's transform
+    // style is preserve-3d.
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false); // parent transform style is flat.
+    setLayerPropertiesForTesting(frontFacingChild.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingChild.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(frontFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true); // surface transform style is preserve-3d.
+    setLayerPropertiesForTesting(backFacingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true); // surface transform style is preserve-3d.
+    setLayerPropertiesForTesting(frontFacingChildOfFrontFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingChildOfFrontFacingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(frontFacingChildOfBackFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(backFacingChildOfBackFacingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+    parent->renderSurface()->setContentRect(IntRect(IntPoint(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    // Verify which renderSurfaces were created.
+    EXPECT_FALSE(frontFacingChild->renderSurface());
+    EXPECT_FALSE(backFacingChild->renderSurface());
+    EXPECT_TRUE(frontFacingSurface->renderSurface());
+    EXPECT_FALSE(backFacingSurface->renderSurface());
+    EXPECT_FALSE(frontFacingChildOfFrontFacingSurface->renderSurface());
+    EXPECT_FALSE(backFacingChildOfFrontFacingSurface->renderSurface());
+    EXPECT_FALSE(frontFacingChildOfBackFacingSurface->renderSurface());
+    EXPECT_FALSE(backFacingChildOfBackFacingSurface->renderSurface());
+
+    // Verify the renderSurfaceLayerList. The back-facing surface should be culled.
+    ASSERT_EQ(2u, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[1]->id());
+
+    // Verify root surface's layerList.
+    ASSERT_EQ(2u, renderSurfaceLayerList[0]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingChild->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[1]->id());
+
+    // Verify frontFacingSurface's layerList.
+    ASSERT_EQ(2u, renderSurfaceLayerList[1]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(frontFacingChildOfFrontFacingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[1]->id());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyBackFaceCullingWithAnimatingTransforms)
+{
+    // Verify that layers are appropriately culled when their back face is showing and
+    // they are not double sided, while animations are going on.
     //
     // Layers that are animating do not get culled on the main thread, as their transforms should be
     // treated as "unknown" so we can not be sure that their back face is really showing.
@@ -1273,15 +1576,16 @@ TEST(CCLayerTreeHostCommonTest, verifyBackFaceCulling)
     backfaceMatrix.rotate3d(0, 1, 0, 180);
     backfaceMatrix.translate(-50, -50);
 
-    // Having a descendent, and animating transforms, will make the animatingSurface own a render surface.
+    // Having a descendant that draws, masksToBounds, and animating transforms, will make the animatingSurface own a render surface.
     addAnimatedTransformToController(*animatingSurface->layerAnimationController(), 10, 30, 0);
+    animatingSurface->setMasksToBounds(true);
     // This is just an animating layer, not a surface.
     addAnimatedTransformToController(*animatingChild->layerAnimationController(), 10, 30, 0);
 
-    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true);
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
     setLayerPropertiesForTesting(child.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
     setLayerPropertiesForTesting(animatingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
-    setLayerPropertiesForTesting(childOfAnimatingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(childOfAnimatingSurface.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
     setLayerPropertiesForTesting(animatingChild.get(), backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
     setLayerPropertiesForTesting(child2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
 
@@ -1318,11 +1622,74 @@ TEST(CCLayerTreeHostCommonTest, verifyBackFaceCulling)
 
     EXPECT_FALSE(child2->visibleLayerRect().isEmpty());
 
-    // But if the back face is visible, then the visibleLayerRect should be empty.
-    EXPECT_TRUE(animatingChild->visibleLayerRect().isEmpty());
-    EXPECT_TRUE(animatingSurface->visibleLayerRect().isEmpty());
-    // And any layers in the subtree should not be considered visible either.
-    EXPECT_TRUE(childOfAnimatingSurface->visibleLayerRect().isEmpty());
+    // The animating layers should have a visibleLayerRect that represents the area of the front face that is within the viewport.
+    EXPECT_EQ(animatingChild->visibleLayerRect(), IntRect(IntPoint(), animatingChild->contentBounds()));
+    EXPECT_EQ(animatingSurface->visibleLayerRect(), IntRect(IntPoint(), animatingSurface->contentBounds()));
+    // And layers in the subtree of the animating layer should have valid visibleLayerRects also.
+    EXPECT_EQ(childOfAnimatingSurface->visibleLayerRect(), IntRect(IntPoint(), childOfAnimatingSurface->contentBounds()));
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyBackFaceCullingWithPreserves3dForFlatteningSurface)
+{
+    // Verify the behavior of back-face culling for a renderSurface that is created
+    // when it flattens its subtree, and its parent has preserves-3d.
+
+    const TransformationMatrix identityMatrix;
+    RefPtr<LayerChromium> parent = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> frontFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> backFacingSurface = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> child1 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+    RefPtr<LayerChromiumWithForcedDrawsContent> child2 = adoptRef(new LayerChromiumWithForcedDrawsContent());
+
+    parent->createRenderSurface();
+    parent->addChild(frontFacingSurface);
+    parent->addChild(backFacingSurface);
+    frontFacingSurface->addChild(child1);
+    backFacingSurface->addChild(child2);
+
+    // RenderSurfaces are not double-sided
+    frontFacingSurface->setDoubleSided(false);
+    backFacingSurface->setDoubleSided(false);
+
+    TransformationMatrix backfaceMatrix;
+    backfaceMatrix.translate(50, 50);
+    backfaceMatrix.rotate3d(0, 1, 0, 180);
+    backfaceMatrix.translate(-50, -50);
+
+    setLayerPropertiesForTesting(parent.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), true); // parent transform style is preserve3d.
+    setLayerPropertiesForTesting(frontFacingSurface.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false); // surface transform style is flat.
+    setLayerPropertiesForTesting(backFacingSurface.get(),  backfaceMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false); // surface transform style is flat.
+    setLayerPropertiesForTesting(child1.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(child2.get(), identityMatrix, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(100, 100), false);
+
+    Vector<RefPtr<LayerChromium> > renderSurfaceLayerList;
+    Vector<RefPtr<LayerChromium> > dummyLayerList;
+    int dummyMaxTextureSize = 512;
+    parent->renderSurface()->setContentRect(IntRect(IntPoint(), parent->bounds()));
+    parent->setClipRect(IntRect(IntPoint::zero(), parent->bounds()));
+    renderSurfaceLayerList.append(parent.get());
+
+    CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(parent.get(), parent.get(), identityMatrix, identityMatrix, renderSurfaceLayerList, dummyLayerList, dummyMaxTextureSize);
+
+    // Verify which renderSurfaces were created.
+    EXPECT_TRUE(frontFacingSurface->renderSurface());
+    EXPECT_FALSE(backFacingSurface->renderSurface()); // because it should be culled
+    EXPECT_FALSE(child1->renderSurface());
+    EXPECT_FALSE(child2->renderSurface());
+
+    // Verify the renderSurfaceLayerList. The back-facing surface should be culled.
+    ASSERT_EQ(2u, renderSurfaceLayerList.size());
+    EXPECT_EQ(parent->id(), renderSurfaceLayerList[0]->id());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[1]->id());
+
+    // Verify root surface's layerList.
+    ASSERT_EQ(1u, renderSurfaceLayerList[0]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[0]->renderSurface()->layerList()[0]->id());
+
+    // Verify frontFacingSurface's layerList.
+    ASSERT_EQ(2u, renderSurfaceLayerList[1]->renderSurface()->layerList().size());
+    EXPECT_EQ(frontFacingSurface->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[0]->id());
+    EXPECT_EQ(child1->id(), renderSurfaceLayerList[1]->renderSurface()->layerList()[1]->id());
 }
 
 // FIXME:

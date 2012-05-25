@@ -141,10 +141,6 @@ public:
 
     static void platformInitialize(); // Only needed by WTR.
 
-    // Internal API used by WebPage.
-    void updateContentsSize(const QSizeF&);
-    QPointF pageItemPos();
-
     // Private C++-only API.
     qreal zoomFactor() const;
     void setZoomFactor(qreal);
@@ -154,7 +150,7 @@ public:
     void setAllowAnyHTTPSCertificateForLocalHost(bool allow);
 
 public Q_SLOTS:
-    void loadHtml(const QString& html, const QUrl& baseUrl = QUrl());
+    void loadHtml(const QString& html, const QUrl& baseUrl = QUrl(), const QUrl& unreachableUrl = QUrl());
 
     void goBack();
     void goForward();
@@ -207,9 +203,11 @@ private:
     QQuickWebView(WKContextRef, WKPageGroupRef, QQuickItem* parent = 0);
     WKPageRef pageRef() const;
 
+    void emitUrlChangeIfNeeded();
+
     Q_PRIVATE_SLOT(d_func(), void _q_suspend());
     Q_PRIVATE_SLOT(d_func(), void _q_resume());
-    Q_PRIVATE_SLOT(d_func(), void _q_contentViewportChanged(const QPointF&));
+    Q_PRIVATE_SLOT(d_func(), void _q_onInformVisibleContentChange(const QPointF&));
 
     Q_PRIVATE_SLOT(d_func(), void _q_onVisibleChanged());
     Q_PRIVATE_SLOT(d_func(), void _q_onUrlChanged());

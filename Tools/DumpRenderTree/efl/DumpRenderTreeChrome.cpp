@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 ProFUSION Embedded Systems
  * Copyright (C) 2011 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,6 +52,8 @@
 using namespace WebCore;
 
 HashMap<unsigned long, CString> DumpRenderTreeChrome::m_dumpAssignedUrls;
+Evas_Object* DumpRenderTreeChrome::m_provisionalLoadFailedFrame = 0;
+Ewk_Intent_Request* DumpRenderTreeChrome::m_currentIntentRequest = 0;
 
 PassOwnPtr<DumpRenderTreeChrome> DumpRenderTreeChrome::create(Evas* evas)
 {
@@ -97,7 +100,6 @@ Evas_Object* DumpRenderTreeChrome::createView() const
     evas_object_smart_callback_add(view, "load,resource,failed", onResourceLoadFailed, 0);
     evas_object_smart_callback_add(view, "load,resource,finished", onResourceLoadFinished, 0);
     evas_object_smart_callback_add(view, "load,started", onLoadStarted, 0);
-    evas_object_smart_callback_add(view, "title,changed", onTitleChanged, 0);
     evas_object_smart_callback_add(view, "window,object,cleared", onWindowObjectCleared, m_gcController.get());
     evas_object_smart_callback_add(view, "statusbar,text,set", onStatusbarTextSet, 0);
     evas_object_smart_callback_add(view, "load,document,finished", onDocumentLoadFinished, 0);
@@ -113,13 +115,16 @@ Evas_Object* DumpRenderTreeChrome::createView() const
 
     Evas_Object* mainFrame = ewk_view_frame_main_get(view);
     evas_object_smart_callback_add(mainFrame, "icon,changed", onFrameIconChanged, 0);
+    evas_object_smart_callback_add(mainFrame, "intent,new", onFrameIntentNew, 0);
     evas_object_smart_callback_add(mainFrame, "load,provisional", onFrameProvisionalLoad, 0);
+    evas_object_smart_callback_add(mainFrame, "load,provisional,failed", onFrameProvisionalLoadFailed, 0);
     evas_object_smart_callback_add(mainFrame, "load,committed", onFrameLoadCommitted, 0);
     evas_object_smart_callback_add(mainFrame, "load,finished", onFrameLoadFinished, 0);
     evas_object_smart_callback_add(mainFrame, "load,error", onFrameLoadError, 0);
     evas_object_smart_callback_add(mainFrame, "redirect,cancelled", onFrameRedirectCancelled, 0);
     evas_object_smart_callback_add(mainFrame, "redirect,load,provisional", onFrameRedirectForProvisionalLoad, 0);
     evas_object_smart_callback_add(mainFrame, "redirect,requested", onFrameRedirectRequested, 0);
+    evas_object_smart_callback_add(mainFrame, "title,changed", onFrameTitleChanged, 0);
     evas_object_smart_callback_add(mainFrame, "xss,detected", onDidDetectXSS, 0);
 
     return view;
@@ -192,19 +197,9 @@ Evas_Object* DumpRenderTreeChrome::mainView() const
     return m_mainView;
 }
 
-static inline const char* defaultEditingBehavior()
+Ewk_Intent_Request* DumpRenderTreeChrome::currentIntentRequest() const
 {
-    return
-#if OS(DARWIN)
-    "mac";
-#elif OS(WINDOWS)
-    "win";
-#elif OS(UNIX)
-    "unix";
-#else
-    // Fallback
-    "mac";
-#endif
+    return m_currentIntentRequest;
 }
 
 void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
@@ -241,11 +236,11 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     ewk_view_setting_auto_load_images_set(mainView(), EINA_TRUE);
     ewk_view_setting_user_stylesheet_set(mainView(), 0);
     ewk_view_setting_enable_xss_auditor_set(browser->mainView(), EINA_TRUE);
-    ewk_view_setting_enable_developer_extras_set(browser->mainView(), EINA_FALSE);
     ewk_view_setting_minimum_timer_interval_set(browser->mainView(), 0.010); // 10 milliseconds (DOMTimer::s_minDefaultTimerInterval)
     ewk_view_setting_enable_webgl_set(mainView(), EINA_TRUE);
     ewk_view_setting_enable_hyperlink_auditing_set(mainView(), EINA_FALSE);
     ewk_view_setting_include_links_in_focus_chain_set(mainView(), EINA_TRUE);
+    ewk_view_setting_scripts_can_access_clipboard_set(mainView(), EINA_TRUE);
 
     ewk_view_zoom_set(mainView(), 1.0, 0, 0);
     ewk_view_scale_set(mainView(), 1.0, 0, 0);
@@ -264,14 +259,21 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     DumpRenderTreeSupportEfl::clearUserScripts(mainView());
     DumpRenderTreeSupportEfl::clearUserStyleSheets(mainView());
     DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled(mainView(), true);
+    DumpRenderTreeSupportEfl::setValidationMessageTimerMagnification(mainView(), -1);
     DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(mainView(), true);
+    DumpRenderTreeSupportEfl::setCSSGridLayoutEnabled(mainView(), false);
     DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled(mainView(), false);
     DumpRenderTreeSupportEfl::setSelectTrailingWhitespaceEnabled(mainView(), false);
     DumpRenderTreeSupportEfl::setDefersLoading(mainView(), false);
-    DumpRenderTreeSupportEfl::setEditingBehavior(mainView(), defaultEditingBehavior());
     DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(mainView(), false);
     DumpRenderTreeSupportEfl::setLoadsSiteIconsIgnoringImageLoadingSetting(mainView(), false);
     DumpRenderTreeSupportEfl::setSerializeHTTPLoads(false);
+    DumpRenderTreeSupportEfl::setDeadDecodedDataDeletionInterval(0);
+
+    if (m_currentIntentRequest) {
+        ewk_intent_request_unref(m_currentIntentRequest);
+        m_currentIntentRequest = 0;
+    }
 }
 
 static CString pathSuitableForTestResult(const char* uriString)
@@ -438,13 +440,17 @@ void DumpRenderTreeChrome::onFrameIconChanged(void*, Evas_Object* frame, void*)
     }
 }
 
-void DumpRenderTreeChrome::onTitleChanged(void*, Evas_Object*, void* eventInfo)
+void DumpRenderTreeChrome::onFrameTitleChanged(void*, Evas_Object* frame, void* eventInfo)
 {
-    if (!gLayoutTestController->dumpTitleChanges())
-        return;
+    const Ewk_Text_With_Direction* titleText = static_cast<const Ewk_Text_With_Direction*>(eventInfo);
 
-    const char* titleText = static_cast<const char*>(eventInfo);
-    printf("TITLE CHANGED: %s\n", titleText);
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didReceiveTitle: %s\n", frameName.utf8().data(), (titleText && titleText->string) ? titleText->string : "");
+    }
+
+    if (!done && gLayoutTestController->dumpTitleChanges())
+        printf("TITLE CHANGED: %s\n", (titleText && titleText->string) ? titleText->string : "");
 }
 
 void DumpRenderTreeChrome::onDocumentLoadFinished(void*, Evas_Object*, void* eventInfo)
@@ -527,13 +533,16 @@ void DumpRenderTreeChrome::onFrameCreated(void*, Evas_Object*, void* eventInfo)
     Evas_Object* frame = static_cast<Evas_Object*>(eventInfo);
 
     evas_object_smart_callback_add(frame, "icon,changed", onFrameIconChanged, 0);
+    evas_object_smart_callback_add(frame, "intent,new", onFrameIntentNew, 0);
     evas_object_smart_callback_add(frame, "load,provisional", onFrameProvisionalLoad, 0);
+    evas_object_smart_callback_add(frame, "load,provisional,failed", onFrameProvisionalLoadFailed, 0);
     evas_object_smart_callback_add(frame, "load,committed", onFrameLoadCommitted, 0);
     evas_object_smart_callback_add(frame, "load,finished", onFrameLoadFinished, 0);
     evas_object_smart_callback_add(frame, "load,error", onFrameLoadError, 0);
     evas_object_smart_callback_add(frame, "redirect,cancelled", onFrameRedirectCancelled, 0);
     evas_object_smart_callback_add(frame, "redirect,load,provisional", onFrameRedirectForProvisionalLoad, 0);
     evas_object_smart_callback_add(frame, "redirect,requested", onFrameRedirectRequested, 0);
+    evas_object_smart_callback_add(frame, "title,changed", onFrameTitleChanged, 0);
     evas_object_smart_callback_add(frame, "xss,detected", onDidDetectXSS, 0);
 }
 
@@ -542,6 +551,16 @@ void DumpRenderTreeChrome::onFrameProvisionalLoad(void*, Evas_Object* frame, voi
     if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
         const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
         printf("%s - didStartProvisionalLoadForFrame\n", frameName.utf8().data());
+    }
+}
+
+void DumpRenderTreeChrome::onFrameProvisionalLoadFailed(void*, Evas_Object* frame, void*)
+{
+    m_provisionalLoadFailedFrame = frame;
+
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+        const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
+        printf("%s - didFailProvisionalLoadWithError\n", frameName.utf8().data());
     }
 }
 
@@ -574,10 +593,16 @@ void DumpRenderTreeChrome::onFrameLoadFinished(void*, Evas_Object* frame, void* 
 
 void DumpRenderTreeChrome::onFrameLoadError(void*, Evas_Object* frame, void*)
 {
-    if (!done && gLayoutTestController->dumpFrameLoadCallbacks()) {
+    // In case of provisional load error, we receive both "load,error" and "load,provisional,failed"
+    // signals. m_provisionalLoadFailedFrame is used to avoid printing twice the load error: in
+    // onFrameProvisionalLoadFailed() and onFrameLoadError().
+    if (!done && gLayoutTestController->dumpFrameLoadCallbacks() && frame != m_provisionalLoadFailedFrame) {
         const String frameName(DumpRenderTreeSupportEfl::suitableDRTFrameName(frame));
         printf("%s - didFailLoadWithError\n", frameName.utf8().data());
     }
+
+    if (m_provisionalLoadFailedFrame && frame == m_provisionalLoadFailedFrame)
+        m_provisionalLoadFailedFrame = 0;
 
     if (frame == topLoadingFrame)
         topLoadingFrameLoadFinished();
@@ -658,4 +683,45 @@ void DumpRenderTreeChrome::onNewResourceRequest(void*, Evas_Object*, void* event
 
     if (!done && gLayoutTestController->dumpResourceLoadCallbacks())
         m_dumpAssignedUrls.add(request->identifier, pathSuitableForTestResult(request->url));
+}
+
+void DumpRenderTreeChrome::onFrameIntentNew(void*, Evas_Object*, void* eventInfo)
+{
+    Ewk_Intent_Request* request = static_cast<Ewk_Intent_Request*>(eventInfo);
+    Ewk_Intent* intent = ewk_intent_request_intent_get(request);
+    if (!intent)
+        return;
+
+    ewk_intent_request_ref(request);
+    if (m_currentIntentRequest)
+        ewk_intent_request_unref(m_currentIntentRequest);
+    m_currentIntentRequest = request;
+
+    printf("Received Web Intent: action=%s type=%s\n",
+           ewk_intent_action_get(intent),
+           ewk_intent_type_get(intent));
+
+    // TODO: Display number of ports once Ewk_Intent exposes this information.
+
+    const char* service = ewk_intent_service_get(intent);
+    if (service && strcmp(service, ""))
+        printf("Explicit intent service: %s\n", service);
+
+    void* data = 0;
+    Eina_List* extraNames = ewk_intent_extra_names_get(intent);
+    EINA_LIST_FREE(extraNames, data) {
+        char* name = static_cast<char*>(data);
+        char* value = ewk_intent_extra_get(intent, name);
+        if (value) {
+            printf("Extras[%s] = %s\n", name, value);
+            free(value);
+        }
+        free(name);
+    }
+
+    Eina_List* suggestions = ewk_intent_suggestions_get(intent);
+    EINA_LIST_FREE(suggestions, data) {
+        printf("Have suggestion %s\n", static_cast<char*>(data));
+        free(data);
+    }
 }

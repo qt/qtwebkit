@@ -35,6 +35,7 @@
 #include "WebKitCSSRegionRule.h"
 #include "NotImplemented.h"
 #include "StyleRule.h"
+#include "StyleSheetContents.h"
 
 namespace WebCore {
 
@@ -71,8 +72,10 @@ String CSSRule::cssText() const
         return static_cast<const WebKitCSSKeyframesRule*>(this)->cssText();
     case WEBKIT_KEYFRAME_RULE:
         return static_cast<const WebKitCSSKeyframeRule*>(this)->cssText();
+#if ENABLE(CSS_REGIONS)
     case WEBKIT_REGION_RULE:
         return static_cast<const WebKitCSSRegionRule*>(this)->cssText();
+#endif
     }
     ASSERT_NOT_REACHED();
     return String();
@@ -108,9 +111,11 @@ void CSSRule::destroy()
     case WEBKIT_KEYFRAME_RULE:
         delete static_cast<WebKitCSSKeyframeRule*>(this);
         return;
+#if ENABLE(CSS_REGIONS)
     case WEBKIT_REGION_RULE:
         delete static_cast<WebKitCSSRegionRule*>(this);
         return;
+#endif
     }
     ASSERT_NOT_REACHED();
 }
@@ -146,9 +151,11 @@ void CSSRule::reattach(StyleRuleBase* rule)
         // No need to reattach, the underlying data is shareable on mutation.
         ASSERT_NOT_REACHED();
         return;
+#if ENABLE(CSS_REGIONS)
     case WEBKIT_REGION_RULE:
         static_cast<WebKitCSSRegionRule*>(this)->reattach(static_cast<StyleRuleRegion*>(rule));
         return;
+#endif
     }
     ASSERT_NOT_REACHED();
 }
@@ -156,7 +163,7 @@ void CSSRule::reattach(StyleRuleBase* rule)
 const CSSParserContext& CSSRule::parserContext() const
 {
     CSSStyleSheet* styleSheet = parentStyleSheet();
-    return styleSheet ? styleSheet->internal()->parserContext() : strictCSSParserContext();
+    return styleSheet ? styleSheet->contents()->parserContext() : strictCSSParserContext();
 }
 
 } // namespace WebCore

@@ -75,7 +75,7 @@ struct OpInfo {
 // Node represents a single operation in the data flow graph.
 struct Node {
     enum VarArgTag { VarArg };
-
+    
     // Construct a node with up to 3 children, no immediate value.
     Node(NodeType op, CodeOrigin codeOrigin, NodeIndex child1 = NoNode, NodeIndex child2 = NoNode, NodeIndex child3 = NoNode)
         : codeOrigin(codeOrigin)
@@ -144,6 +144,7 @@ struct Node {
     
     bool mergeFlags(NodeFlags flags)
     {
+        ASSERT(!(flags & NodeDoesNotExit));
         NodeFlags newFlags = m_flags | flags;
         if (newFlags == m_flags)
             return false;
@@ -153,6 +154,7 @@ struct Node {
     
     bool filterFlags(NodeFlags flags)
     {
+        ASSERT(flags & NodeDoesNotExit);
         NodeFlags newFlags = m_flags & flags;
         if (newFlags == m_flags)
             return false;
@@ -175,7 +177,20 @@ struct Node {
     {
         return m_flags & NodeMustGenerate;
     }
-
+    
+    void setCanExit(bool exits)
+    {
+        if (exits)
+            m_flags &= ~NodeDoesNotExit;
+        else
+            m_flags |= NodeDoesNotExit;
+    }
+    
+    bool canExit()
+    {
+        return !(m_flags & NodeDoesNotExit);
+    }
+    
     bool isConstant()
     {
         return op() == JSConstant;
@@ -195,6 +210,26 @@ struct Node {
     {
         ASSERT(isConstant());
         return m_opInfo;
+    }
+    
+    void convertToConstant(unsigned constantNumber)
+    {
+        m_op = JSConstant;
+        if (m_flags & NodeMustGenerate)
+            m_refCount--;
+        m_flags &= ~(NodeMustGenerate | NodeMightClobber | NodeClobbersWorld);
+        m_opInfo = constantNumber;
+        children.reset();
+    }
+    
+    void convertToGetLocalUnlinked(VirtualRegister local)
+    {
+        m_op = GetLocalUnlinked;
+        if (m_flags & NodeMustGenerate)
+            m_refCount--;
+        m_flags &= ~(NodeMustGenerate | NodeMightClobber | NodeClobbersWorld);
+        m_opInfo = local;
+        children.reset();
     }
     
     JSCell* weakConstant()
@@ -262,6 +297,18 @@ struct Node {
     VirtualRegister local()
     {
         return variableAccessData()->local();
+    }
+    
+    VirtualRegister unmodifiedArgumentsRegister()
+    {
+        ASSERT(op() == TearOffActivation);
+        return static_cast<VirtualRegister>(m_opInfo);
+    }
+    
+    VirtualRegister unlinkedLocal()
+    {
+        ASSERT(op() == GetLocalUnlinked);
+        return static_cast<VirtualRegister>(m_opInfo);
     }
     
     bool hasIdentifier()
@@ -458,12 +505,45 @@ struct Node {
         return m_opInfo2;
     }
     
+    unsigned numSuccessors()
+    {
+        switch (op()) {
+        case Jump:
+            return 1;
+        case Branch:
+            return 2;
+        default:
+            return 0;
+        }
+    }
+    
+    BlockIndex successor(unsigned index)
+    {
+        switch (index) {
+        case 0:
+            return takenBlockIndex();
+        case 1:
+            return notTakenBlockIndex();
+        default:
+            ASSERT_NOT_REACHED();
+            return NoBlock;
+        }
+    }
+    
+    BlockIndex successorForCondition(bool condition)
+    {
+        ASSERT(isBranch());
+        return condition ? takenBlockIndex() : notTakenBlockIndex();
+    }
+    
     bool hasHeapPrediction()
     {
         switch (op()) {
         case GetById:
         case GetByIdFlush:
         case GetByVal:
+        case GetMyArgumentByVal:
+        case GetMyArgumentByValSafe:
         case Call:
         case Construct:
         case GetByOffset:
@@ -698,6 +778,11 @@ struct Node {
     bool shouldSpeculateArray()
     {
         return isArrayPrediction(prediction());
+    }
+    
+    bool shouldSpeculateArguments()
+    {
+        return isArgumentsPrediction(prediction());
     }
     
     bool shouldSpeculateInt8Array()

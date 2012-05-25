@@ -60,7 +60,7 @@ String IDBObjectStore::name() const
     return m_backend->name();
 }
 
-String IDBObjectStore::keyPath() const
+PassRefPtr<IDBAny> IDBObjectStore::keyPath() const
 {
     IDB_TRACE("IDBObjectStore::keyPath");
     return m_backend->keyPath();
@@ -211,9 +211,23 @@ PassRefPtr<IDBRequest> IDBObjectStore::clear(ScriptExecutionContext* context, Ex
 
 PassRefPtr<IDBIndex> IDBObjectStore::createIndex(const String& name, const String& keyPath, const Dictionary& options, ExceptionCode& ec)
 {
+    return createIndex(name, IDBKeyPath(keyPath), options, ec);
+}
+
+PassRefPtr<IDBIndex> IDBObjectStore::createIndex(const String& name, PassRefPtr<DOMStringList> keyPath, const Dictionary& options, ExceptionCode& ec)
+{
+    // FIXME: Binding code for DOMString[] should not match null. http://webkit.org/b/84217
+    if (!keyPath)
+        return createIndex(name, IDBKeyPath("null"), options, ec);
+    return createIndex(name, IDBKeyPath(*keyPath), options, ec);
+}
+
+
+PassRefPtr<IDBIndex> IDBObjectStore::createIndex(const String& name, const IDBKeyPath& keyPath, const Dictionary& options, ExceptionCode& ec)
+{
     IDB_TRACE("IDBObjectStore::createIndex");
-    if (!IDBIsValidKeyPath(keyPath)) {
-        ec = IDBDatabaseException::NON_TRANSIENT_ERR;
+    if (!keyPath.isValid()) {
+        ec = SYNTAX_ERR;
         return 0;
     }
 
@@ -223,7 +237,10 @@ PassRefPtr<IDBIndex> IDBObjectStore::createIndex(const String& name, const Strin
     bool multiEntry = false;
     options.get("multiEntry", multiEntry);
 
-    // FIXME: When Array-type keyPaths are supported, throw exception if keyPath is Array and multiEntry is true.
+    if (keyPath.type() == IDBKeyPath::ArrayType && multiEntry) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
 
     RefPtr<IDBIndexBackendInterface> indexBackend = m_backend->createIndex(name, keyPath, unique, multiEntry, m_transaction->backend(), ec);
     ASSERT(!indexBackend != !ec); // If we didn't get an index, we should have gotten an exception code. And vice versa.

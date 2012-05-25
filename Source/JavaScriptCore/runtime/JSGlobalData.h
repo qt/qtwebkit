@@ -123,7 +123,34 @@ namespace JSC {
         size_t m_storageOffset;
         size_t m_lengthOffset;
     };
-    
+
+#if ENABLE(DFG_JIT)
+    class ConservativeRoots;
+
+    struct ScratchBuffer {
+        ScratchBuffer()
+            : m_activeLength(0)
+        {
+        }
+
+        static ScratchBuffer* create(size_t size)
+        {
+            ScratchBuffer* result = new (fastMalloc(ScratchBuffer::allocationSize(size))) ScratchBuffer;
+
+            return result;
+        }
+
+        static size_t allocationSize(size_t bufferSize) { return sizeof(size_t) + bufferSize; }
+        void setActiveLength(size_t activeLength) { m_activeLength = activeLength; }
+        size_t activeLength() const { return m_activeLength; };
+        size_t* activeLengthPtr() { return &m_activeLength; };
+        void* dataBuffer() { return m_buffer; }
+
+        size_t m_activeLength;
+        void* m_buffer[0];
+    };
+#endif
+
     class JSGlobalData : public RefCounted<JSGlobalData> {
     public:
         // WebCore has a one-to-one mapping of threads to JSGlobalDatas;
@@ -145,9 +172,9 @@ namespace JSC {
         static bool sharedInstanceExists();
         JS_EXPORT_PRIVATE static JSGlobalData& sharedInstance();
 
-        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapSize = SmallHeap);
-        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapSize = SmallHeap);
-        static PassRefPtr<JSGlobalData> createContextGroup(ThreadStackType, HeapSize = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> create(ThreadStackType, HeapType = SmallHeap);
+        JS_EXPORT_PRIVATE static PassRefPtr<JSGlobalData> createLeaked(ThreadStackType, HeapType = SmallHeap);
+        static PassRefPtr<JSGlobalData> createContextGroup(ThreadStackType, HeapType = SmallHeap);
         JS_EXPORT_PRIVATE ~JSGlobalData();
 
         void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
@@ -171,6 +198,7 @@ namespace JSC {
         const HashTable* numberPrototypeTable;
         const HashTable* objectConstructorTable;
         const HashTable* objectPrototypeTable;
+        const HashTable* privateNamePrototypeTable;
         const HashTable* regExpTable;
         const HashTable* regExpConstructorTable;
         const HashTable* regExpPrototypeTable;
@@ -278,10 +306,10 @@ namespace JSC {
 #if ENABLE(DFG_JIT)
         uint32_t osrExitIndex;
         void* osrExitJumpDestination;
-        Vector<void*> scratchBuffers;
+        Vector<ScratchBuffer*> scratchBuffers;
         size_t sizeOfLastScratchBuffer;
         
-        void* scratchBufferForSize(size_t size)
+        ScratchBuffer* scratchBufferForSize(size_t size)
         {
             if (!size)
                 return 0;
@@ -292,12 +320,16 @@ namespace JSC {
                 // total memory usage is somewhere around
                 // max(scratch buffer size) * 4.
                 sizeOfLastScratchBuffer = size * 2;
-                
-                scratchBuffers.append(fastMalloc(sizeOfLastScratchBuffer));
+
+                scratchBuffers.append(ScratchBuffer::create(sizeOfLastScratchBuffer));
             }
-            
-            return scratchBuffers.last();
+
+            ScratchBuffer* result = scratchBuffers.last();
+            result->setActiveLength(0);
+            return result;
         }
+
+        void gatherConservativeRoots(ConservativeRoots&);
 #endif
 
         HashMap<OpaqueJSClass*, OwnPtr<OpaqueJSClassContextData> > opaqueJSClassData;
@@ -373,7 +405,7 @@ namespace JSC {
     private:
         friend class LLIntOffsetsExtractor;
         
-        JSGlobalData(GlobalDataType, ThreadStackType, HeapSize);
+        JSGlobalData(GlobalDataType, ThreadStackType, HeapType);
         static JSGlobalData*& sharedInstanceInternal();
         void createNativeThunk();
 #if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))

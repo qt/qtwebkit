@@ -33,6 +33,7 @@
 #include "HTTPParsers.h"
 #include "MemoryCache.h"
 #include "SharedBuffer.h"
+#include "StyleSheetContents.h"
 #include "TextResourceDecoder.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/Vector.h>
@@ -164,7 +165,7 @@ void CachedCSSStyleSheet::destroyDecodedData()
     setDecodedSize(0);
 }
 
-PassRefPtr<StyleSheetInternal> CachedCSSStyleSheet::restoreParsedStyleSheet(const CSSParserContext& context)
+PassRefPtr<StyleSheetContents> CachedCSSStyleSheet::restoreParsedStyleSheet(const CSSParserContext& context)
 {
     if (!m_parsedStyleSheetCache)
         return 0;
@@ -180,7 +181,7 @@ PassRefPtr<StyleSheetInternal> CachedCSSStyleSheet::restoreParsedStyleSheet(cons
     return m_parsedStyleSheetCache;
 }
 
-void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetInternal> sheet)
+void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetContents> sheet)
 {
     ASSERT(sheet && sheet->isCacheable());
 

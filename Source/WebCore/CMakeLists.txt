@@ -200,6 +200,7 @@ SET(WebCore_IDL_FILES
     dom/Document.idl
     dom/DocumentType.idl
     dom/DOMCoreException.idl
+    dom/DOMError.idl
     dom/DOMImplementation.idl
     dom/DOMStringList.idl
     dom/DOMStringMap.idl
@@ -383,6 +384,7 @@ SET(WebCore_IDL_FILES
     page/Location.idl
     page/MemoryInfo.idl
     page/Navigator.idl
+    page/NavigatorRegisterProtocolHandler.idl
     page/Performance.idl
     page/PerformanceEntry.idl
     page/PerformanceEntryList.idl
@@ -455,6 +457,7 @@ SET(WebCore_SOURCES
     bindings/ScriptControllerBase.cpp
 
     bindings/generic/ActiveDOMCallback.cpp
+    bindings/generic/ContextEnabledFeatures.cpp
     bindings/generic/RuntimeEnabledFeatures.cpp
 
     css/CSSAspectRatioValue.cpp
@@ -522,7 +525,9 @@ SET(WebCore_SOURCES
     css/StylePropertyShorthand.cpp
     css/StyleResolver.cpp
     css/StyleRule.cpp
+    css/StyleRuleImport.cpp
     css/StyleSheet.cpp
+    css/StyleSheetContents.cpp
     css/StyleSheetList.cpp
     css/WebKitCSSFilterValue.cpp
     css/WebKitCSSKeyframeRule.cpp
@@ -569,6 +574,7 @@ SET(WebCore_SOURCES
     dom/DocumentOrderedMap.cpp
     dom/DocumentType.cpp
     dom/DOMCoreException.cpp
+    dom/DOMError.cpp
     dom/DOMImplementation.cpp
     dom/DOMStringList.cpp
     dom/DOMStringMap.cpp
@@ -1113,6 +1119,7 @@ SET(WebCore_SOURCES
     platform/KillRingNone.cpp
     platform/Language.cpp
     platform/Length.cpp
+    platform/LengthBox.cpp
     platform/LinkHash.cpp
     platform/Logging.cpp
     platform/MemoryUsageSupport.cpp
@@ -1157,6 +1164,7 @@ SET(WebCore_SOURCES
     platform/graphics/FontFamily.cpp
     platform/graphics/FontFastPath.cpp
     platform/graphics/FontFeatureSettings.cpp
+    platform/graphics/FractionalLayoutBoxExtent.cpp
     platform/graphics/FractionalLayoutRect.cpp
     platform/graphics/GeneratorGeneratedImage.cpp
     platform/graphics/GlyphPageTreeNode.cpp
@@ -1797,7 +1805,6 @@ IF (ENABLE_SVG)
         rendering/svg/RenderSVGViewportContainer.cpp
         rendering/svg/SVGInlineFlowBox.cpp
         rendering/svg/SVGInlineTextBox.cpp
-        rendering/svg/SVGMarkerLayoutInfo.cpp
         rendering/svg/SVGPathData.cpp
         rendering/svg/SVGRenderSupport.cpp
         rendering/svg/SVGRenderTreeAsText.cpp
@@ -2128,6 +2135,7 @@ IF (ENABLE_SVG)
         svg/SVGUseElement.idl
         svg/SVGViewElement.idl
         svg/SVGVKernElement.idl
+        svg/SVGZoomAndPan.idl
         svg/SVGZoomEvent.idl
     )
 
@@ -2509,12 +2517,15 @@ ENDIF ()
 
 IF (ENABLE_WEB_INTENTS)
     LIST(APPEND WebCore_IDL_FILES
+        Modules/intents/DeliveredIntent.idl
         Modules/intents/DOMWindowIntents.idl
         Modules/intents/Intent.idl
         Modules/intents/IntentResultCallback.idl
         Modules/intents/NavigatorIntents.idl
     )
     LIST(APPEND WebCore_SOURCES
+       Modules/intents/DeliveredIntent.cpp
+       Modules/intents/DOMWindowIntents.cpp
        Modules/intents/Intent.cpp
        Modules/intents/IntentRequest.cpp
        Modules/intents/NavigatorIntents.cpp

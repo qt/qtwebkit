@@ -42,6 +42,7 @@ void ewk_frame_core_gone(Evas_Object* ewkFrame);
 void ewk_frame_load_committed(Evas_Object* ewkFrame);
 void ewk_frame_load_started(Evas_Object* ewkFrame);
 void ewk_frame_load_provisional(Evas_Object* ewkFrame);
+void ewk_frame_load_provisional_failed(Evas_Object* ewkFrame, const Ewk_Frame_Load_Error* error);
 void ewk_frame_load_firstlayout_finished(Evas_Object* ewkFrame);
 void ewk_frame_load_firstlayout_nonempty_finished(Evas_Object* ewkFrame);
 void ewk_frame_load_document_finished(Evas_Object* ewkFrame);
@@ -62,7 +63,7 @@ void ewk_frame_view_state_save(Evas_Object* ewkFrame, WebCore::HistoryItem* item
 void ewk_frame_did_perform_first_navigation(Evas_Object* ewkFrame);
 
 void ewk_frame_contents_size_changed(Evas_Object* ewkFrame, Evas_Coord width, Evas_Coord height);
-void ewk_frame_title_set(Evas_Object* ewkFrame, const char* title);
+void ewk_frame_title_set(Evas_Object* ewkFrame, const Ewk_Text_With_Direction* title);
 
 void ewk_frame_view_create_for_view(Evas_Object* ewkFrame, Evas_Object* view);
 bool ewk_frame_uri_changed(Evas_Object* ewkFrame);

@@ -55,11 +55,14 @@ class TextureManager;
 class CCLayerTreeHostClient {
 public:
     virtual void willBeginFrame() = 0;
+    // Marks finishing compositing-related tasks on the main thread. In threaded mode, this corresponds to didCommit().
+    virtual void didBeginFrame() = 0;
     virtual void updateAnimations(double frameBeginTime) = 0;
     virtual void layout() = 0;
     virtual void applyScrollAndScale(const IntSize& scrollDelta, float pageScale) = 0;
     virtual PassRefPtr<GraphicsContext3D> createContext() = 0;
     virtual void didRecreateContext(bool success) = 0;
+    virtual void willCommit() = 0;
     virtual void didCommit() = 0;
     virtual void didCommitAndDrawFrame() = 0;
     virtual void didCompleteSwapBuffers() = 0;
@@ -151,6 +154,7 @@ public:
 
     // CCLayerTreeHost interface to CCProxy.
     void willBeginFrame() { m_client->willBeginFrame(); }
+    void didBeginFrame() { m_client->didBeginFrame(); }
     void updateAnimations(double monotonicFrameBeginTime);
     void layout();
     void beginCommitOnImplThread(CCLayerTreeHostImpl*);
@@ -158,7 +162,6 @@ public:
     void commitComplete();
     PassRefPtr<GraphicsContext3D> createContext();
     virtual PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHostImpl(CCLayerTreeHostImplClient*);
-    void didBecomeInvisibleOnImplThread(CCLayerTreeHostImpl*);
     void didLoseContext();
     enum RecreateResult {
         RecreateSucceeded,
@@ -166,6 +169,7 @@ public:
         RecreateFailedAndGaveUp,
     };
     RecreateResult recreateContext();
+    void willCommit() { m_client->willCommit(); }
     void didCommitAndDrawFrame() { m_client->didCommitAndDrawFrame(); }
     void didCompleteSwapBuffers() { m_client->didCompleteSwapBuffers(); }
     void deleteContentsTexturesOnImplThread(TextureAllocator*);
@@ -179,6 +183,7 @@ public:
 
     // Only used when compositing on the main thread.
     void composite();
+    void scheduleComposite();
 
     // NOTE: The returned value can only be used to make GL calls or make the
     // context current on the thread the compositor is running on!
@@ -201,6 +206,7 @@ public:
     void setNeedsAnimate();
     // virtual for testing
     virtual void setNeedsCommit();
+    void setNeedsForcedCommit();
     void setNeedsRedraw();
     bool commitRequested() const;
 
@@ -273,6 +279,7 @@ private:
     CCLayerTreeHostClient* m_client;
 
     int m_frameNumber;
+    bool m_frameIsForDisplay;
 
     OwnPtr<CCProxy> m_proxy;
     bool m_layerRendererInitialized;
@@ -287,7 +294,12 @@ private:
 
     IntSize m_viewportSize;
     IntSize m_deviceViewportSize;
+
     bool m_visible;
+
+    size_t m_memoryAllocationBytes;
+    bool m_memoryAllocationIsForDisplay;
+
     typedef HashMap<GraphicsContext3D*, RefPtr<RateLimiter> > RateLimiterMap;
     RateLimiterMap m_rateLimiters;
 

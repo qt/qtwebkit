@@ -106,6 +106,8 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_cookies.cpp
     efl/ewk/ewk_frame.cpp
     efl/ewk/ewk_history.cpp
+    efl/ewk/ewk_intent.cpp
+    efl/ewk/ewk_intent_request.cpp
     efl/ewk/ewk_js.cpp
     efl/ewk/ewk_main.cpp
     efl/ewk/ewk_network.cpp
@@ -119,8 +121,6 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_view.cpp
     efl/ewk/ewk_view_single.cpp
     efl/ewk/ewk_view_tiled.cpp
-    efl/ewk/ewk_intent.cpp
-    efl/ewk/ewk_intent_request.cpp
     efl/ewk/ewk_window_features.cpp
     efl/ewk/ewk_web_database.cpp
 )
@@ -154,6 +154,12 @@ ENDIF ()
 IF (ENABLE_BATTERY_STATUS)
     LIST(APPEND WebKit_INCLUDE_DIRECTORIES ${WEBCORE_DIR}/Modules/battery)
     LIST(APPEND WebKit_SOURCES efl/WebCoreSupport/BatteryClientEfl.cpp)
+ENDIF ()
+
+IF (ENABLE_REGISTER_PROTOCOL_HANDLER)
+    LIST(APPEND WebKit_SOURCES
+        efl/ewk/ewk_custom_handler.cpp
+    )
 ENDIF ()
 
 SET(WebKit_THEME_DEFINITION "")
@@ -257,11 +263,12 @@ UNSET(LIBS_PRIVATE)
 SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/EWebKit.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_auth.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_auth_soup.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_contextmenu.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_cookies.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_frame.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_history.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent_request.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_js.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_main.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_network.h
@@ -269,8 +276,6 @@ SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_security_policy.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_settings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_view.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent_request.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_window_features.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_web_database.h
 )

@@ -424,6 +424,14 @@ void HTMLMediaElement::parseAttribute(const Attribute& attribute)
         setAttributeEventListener(eventNames().webkitbeginfullscreenEvent, createAttributeEventListener(this, attribute));
     else if (attribute.name() == onwebkitendfullscreenAttr)
         setAttributeEventListener(eventNames().webkitendfullscreenEvent, createAttributeEventListener(this, attribute));
+#if ENABLE(MEDIA_SOURCE)
+    else if (attribute.name() == onwebkitsourcecloseAttr)
+        setAttributeEventListener(eventNames().webkitsourcecloseEvent, createAttributeEventListener(this, attribute));
+    else if (attribute.name() == onwebkitsourceendedAttr)
+        setAttributeEventListener(eventNames().webkitsourceendedEvent, createAttributeEventListener(this, attribute));
+    else if (attribute.name() == onwebkitsourceopenAttr)
+        setAttributeEventListener(eventNames().webkitsourceopenEvent, createAttributeEventListener(this, attribute));
+#endif
     else
         HTMLElement::parseAttribute(attribute);
 }
@@ -487,7 +495,7 @@ bool HTMLMediaElement::childShouldCreateRenderer(const NodeRenderingContext& chi
     return childContext.isOnUpperEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext);
 }
 
-Node::InsertionNotificationRequest HTMLMediaElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLMediaElement::insertedInto(ContainerNode* insertionPoint)
 {
     LOG(Media, "HTMLMediaElement::insertedInto");
     HTMLElement::insertedInto(insertionPoint);
@@ -497,7 +505,7 @@ Node::InsertionNotificationRequest HTMLMediaElement::insertedInto(Node* insertio
     return InsertionDone;
 }
 
-void HTMLMediaElement::removedFrom(Node* insertionPoint)
+void HTMLMediaElement::removedFrom(ContainerNode* insertionPoint)
 {
     if (insertionPoint->inDocument()) {
         LOG(Media, "HTMLMediaElement::removedFromDocument");
@@ -1277,9 +1285,10 @@ void HTMLMediaElement::textTrackModeChanged(TextTrack* track)
     configureTextTrackDisplay();
 }
 
-void HTMLMediaElement::textTrackKindChanged(TextTrack*)
+void HTMLMediaElement::textTrackKindChanged(TextTrack* track)
 {
-    // FIXME(62885): Implement.
+    if (track->kind() != TextTrack::captionsKeyword() && track->kind() != TextTrack::subtitlesKeyword() && track->mode() == TextTrack::SHOWING)
+        track->setMode(TextTrack::HIDDEN, ASSERT_NO_EXCEPTION);
 }
 
 void HTMLMediaElement::textTrackAddCues(TextTrack*, const TextTrackCueList* cues) 
@@ -2291,7 +2300,7 @@ void HTMLMediaElement::pauseInternal()
         scheduleLoad(MediaResource);
 
     m_autoplaying = false;
-    
+
     if (!m_paused) {
         m_paused = true;
         scheduleTimeupdateEvent(false);
@@ -2302,6 +2311,7 @@ void HTMLMediaElement::pauseInternal()
 }
 
 #if ENABLE(MEDIA_SOURCE)
+
 void HTMLMediaElement::webkitSourceAddId(const String& id, const String& type, ExceptionCode& ec)
 {
     if (id.isNull() || id.isEmpty()) {
@@ -2324,7 +2334,15 @@ void HTMLMediaElement::webkitSourceAddId(const String& id, const String& type, E
         return;
     }
 
-    switch (m_player->sourceAddId(id, type)) {
+    ContentType contentType(type);
+    Vector<String> codecs = contentType.codecs();
+
+    if (!codecs.size()) {
+        ec = NOT_SUPPORTED_ERR;
+        return;
+    }
+
+    switch (m_player->sourceAddId(id, contentType.type(), codecs)) {
     case MediaPlayer::Ok:
         m_sourceIDs.add(id);
         return;
@@ -2355,17 +2373,55 @@ void HTMLMediaElement::webkitSourceRemoveId(const String& id, ExceptionCode& ec)
     m_sourceIDs.remove(id);
 }
 
-void HTMLMediaElement::webkitSourceAppend(PassRefPtr<Uint8Array> data, ExceptionCode& ec)
+PassRefPtr<TimeRanges> HTMLMediaElement::webkitSourceBuffered(const String& id, ExceptionCode& ec)
 {
+    if (!isValidSourceId(id, ec))
+        return 0;
+
+    if (!m_player || m_currentSrc != m_mediaSourceURL || m_sourceState == SOURCE_CLOSED) {
+        ec = INVALID_STATE_ERR;
+        return 0;
+    }
+
+    return m_player->sourceBuffered(id);
+}
+
+void HTMLMediaElement::webkitSourceAppend(const String& id, PassRefPtr<Uint8Array> data, ExceptionCode& ec)
+{
+    if (!isValidSourceId(id, ec))
+        return;
+
     if (!m_player || m_currentSrc != m_mediaSourceURL || m_sourceState != SOURCE_OPEN) {
         ec = INVALID_STATE_ERR;
         return;
     }
 
-    if (!data.get() || !m_player->sourceAppend(data->data(), data->length())) {
+    if (!data.get()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (!data->length())
+        return;
+
+    if (!m_player->sourceAppend(id, data->data(), data->length())) {
         ec = SYNTAX_ERR;
         return;
     }
+}
+
+void HTMLMediaElement::webkitSourceAbort(const String& id, ExceptionCode& ec)
+{
+    if (!isValidSourceId(id, ec))
+        return;
+
+    if (!m_player || m_currentSrc != m_mediaSourceURL || m_sourceState != SOURCE_OPEN) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    if (!m_player->sourceAbort(id))
+        ASSERT_NOT_REACHED();
 }
 
 void HTMLMediaElement::webkitSourceEndOfStream(unsigned short status, ExceptionCode& ec)

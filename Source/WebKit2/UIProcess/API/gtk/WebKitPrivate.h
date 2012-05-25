@@ -30,6 +30,8 @@
 #include <WebKit2/WKDownload.h>
 #include <WebKit2/WKFindOptions.h>
 #include <WebKit2/WKFullScreenClientGtk.h>
+#include <WebKit2/WKInspector.h>
+#include <WebKit2/WKInspectorClientGtk.h>
 #include <WebKit2/WKRetainPtr.h>
 #include <WebKit2/WKSerializedScriptValue.h>
 #include <WebKit2/WKString.h>
@@ -43,6 +45,19 @@
 
 #define COMPILE_ASSERT_MATCHING_ENUM(webkitName, webcoreName) \
         COMPILE_ASSERT(int(webkitName) == int(webcoreName), mismatchingEnums)
+
+#define WEBKIT_DEFINE_ASYNC_DATA_STRUCT(structName) \
+static structName* create##structName() \
+{ \
+    structName* data = g_slice_new0(structName); \
+    new (data) structName(); \
+    return data; \
+} \
+static void destroy##structName(structName* data) \
+{ \
+    data->~structName(); \
+    g_slice_free(structName, data); \
+}
 
 unsigned wkEventModifiersToGdkModifiers(WKEventModifiers);
 

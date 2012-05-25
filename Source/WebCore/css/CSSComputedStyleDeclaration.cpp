@@ -41,11 +41,6 @@
 #include "ContentData.h"
 #include "CounterContent.h"
 #include "CursorList.h"
-#if ENABLE(CSS_SHADERS)
-#include "CustomFilterNumberParameter.h"
-#include "CustomFilterOperation.h"
-#include "CustomFilterParameter.h"
-#endif
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "FontFeatureSettings.h"
@@ -59,12 +54,19 @@
 #include "ShadowValue.h"
 #include "StylePropertySet.h"
 #include "StylePropertyShorthand.h"
+#include "WebKitCSSTransformValue.h"
+#include "WebKitFontFamilyNames.h"
+
+#if ENABLE(CSS_SHADERS)
+#include "CustomFilterNumberParameter.h"
+#include "CustomFilterOperation.h"
+#include "CustomFilterParameter.h"
+#endif
+
 #if ENABLE(CSS_FILTERS)
 #include "StyleCustomFilterProgram.h"
 #include "WebKitCSSFilterValue.h"
 #endif
-#include "WebKitCSSTransformValue.h"
-#include "WebKitFontFamilyNames.h"
 
 #if ENABLE(DASHBOARD_SUPPORT)
 #include "DashboardRegion.h"
@@ -236,13 +238,10 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitFontVariantLigatures,
-#if ENABLE(CSS_GRID_LAYOUT)
     CSSPropertyWebkitGridColumns,
     CSSPropertyWebkitGridRows,
-
     CSSPropertyWebkitGridColumn,
     CSSPropertyWebkitGridRow,
-#endif
     CSSPropertyWebkitHighlight,
     CSSPropertyWebkitHyphenateCharacter,
     CSSPropertyWebkitHyphenateLimitAfter,
@@ -284,8 +283,10 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitPerspectiveOrigin,
     CSSPropertyWebkitPrintColorAdjust,
     CSSPropertyWebkitRtlOrdering,
+#if ENABLE(CSS_EXCLUSIONS)
     CSSPropertyWebkitShapeInside,
     CSSPropertyWebkitShapeOutside,
+#endif
 #if ENABLE(TOUCH_EVENTS)
     CSSPropertyWebkitTapHighlightColor,
 #endif
@@ -310,18 +311,21 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitUserModify,
     CSSPropertyWebkitUserSelect,
     CSSPropertyWebkitWritingMode,
+#if ENABLE(CSS_REGIONS)
     CSSPropertyWebkitFlowInto,
     CSSPropertyWebkitFlowFrom,
     CSSPropertyWebkitRegionOverflow,
     CSSPropertyWebkitRegionBreakAfter,
     CSSPropertyWebkitRegionBreakBefore,
     CSSPropertyWebkitRegionBreakInside,
+#endif
+#if ENABLE(CSS_EXCLUSIONS)
     CSSPropertyWebkitWrapFlow,
     CSSPropertyWebkitWrapMargin,
     CSSPropertyWebkitWrapPadding,
-    CSSPropertyWebkitWrapThrough
+    CSSPropertyWebkitWrapThrough,
+#endif
 #if ENABLE(SVG)
-    ,
     CSSPropertyClipPath,
     CSSPropertyClipRule,
     CSSPropertyMask,
@@ -894,7 +898,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(RenderStyle* st
 }
 #endif
 
-#if ENABLE(CSS_GRID_LAYOUT)
 static PassRefPtr<CSSValue> valueForGridTrackBreadth(const Length& trackLength, const RenderStyle* style)
 {
     if (trackLength.isPercent())
@@ -927,7 +930,6 @@ static PassRefPtr<CSSValue> valueForGridPosition(const Length& position)
     ASSERT(position.isFixed());
     return cssValuePool().createValue(position.value(), CSSPrimitiveValue::CSS_NUMBER);
 }
-#endif
 
 static PassRefPtr<CSSValue> getDelayValue(const AnimationList* animList)
 {
@@ -1327,6 +1329,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
 
     RefPtr<RenderStyle> style;
     if (renderer && renderer->isComposited() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID)) {
+        AnimationUpdateBlock animationUpdateBlock(renderer->animation());
         style = renderer->animation()->getAnimatedStyleForRenderer(renderer);
         if (m_pseudoElementSpecifier) {
             // FIXME: This cached pseudo style will only exist if the animation has been run at least once.
@@ -1594,12 +1597,14 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return zoomAdjustedPixelValue(style->columnWidth(), style.get());
         case CSSPropertyTabSize:
             return cssValuePool().createValue(style->tabSize(), CSSPrimitiveValue::CSS_NUMBER);
+#if ENABLE(CSS_REGIONS)
         case CSSPropertyWebkitRegionBreakAfter:
             return cssValuePool().createValue(style->regionBreakAfter());
         case CSSPropertyWebkitRegionBreakBefore:
             return cssValuePool().createValue(style->regionBreakBefore());
         case CSSPropertyWebkitRegionBreakInside:
             return cssValuePool().createValue(style->regionBreakInside());
+#endif
         case CSSPropertyCursor: {
             RefPtr<CSSValueList> list;
             CursorList* cursors = style->cursors();
@@ -1702,7 +1707,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             }
             return list.release();
         }
-#if ENABLE(CSS_GRID_LAYOUT)
         case CSSPropertyWebkitGridColumns: {
             return valueForGridTrackList(style->gridColumns(), style.get());
         }
@@ -1714,7 +1718,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return valueForGridPosition(style->gridItemColumn());
         case CSSPropertyWebkitGridRow:
             return valueForGridPosition(style->gridItemRow());
-#endif
+
         case CSSPropertyHeight:
             if (renderer) {
                 // According to http://www.w3.org/TR/CSS2/visudet.html#the-height-property,
@@ -2316,6 +2320,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return counterToCSSValue(style.get(), propertyID);
         case CSSPropertyCounterReset:
             return counterToCSSValue(style.get(), propertyID);
+#if ENABLE(CSS_REGIONS)
         case CSSPropertyWebkitFlowInto:
             if (style->flowThread().isNull())
                 return cssValuePool().createIdentifierValue(CSSValueNone);
@@ -2326,6 +2331,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->regionThread(), CSSPrimitiveValue::CSS_STRING);
         case CSSPropertyWebkitRegionOverflow:
             return cssValuePool().createValue(style->regionOverflow());
+#endif
+#if ENABLE(CSS_EXCLUSIONS)
         case CSSPropertyWebkitWrapFlow:
             return cssValuePool().createValue(style->wrapFlow());
         case CSSPropertyWebkitWrapMargin:
@@ -2342,6 +2349,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->wrapShapeOutside());
         case CSSPropertyWebkitWrapThrough:
             return cssValuePool().createValue(style->wrapThrough());
+#endif
 #if ENABLE(CSS_FILTERS)
         case CSSPropertyWebkitFilter:
             return valueForFilter(style.get());
@@ -2472,7 +2480,9 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitTransformOriginY:
         case CSSPropertyWebkitTransformOriginZ:
         case CSSPropertyWebkitTransition:
+#if ENABLE(CSS_EXCLUSIONS)
         case CSSPropertyWebkitWrap:
+#endif
             break;
 
 #if ENABLE(SVG)
@@ -2620,14 +2630,14 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getCSSPropertyValuesForSid
 
 PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(const CSSPropertyID* set, unsigned length) const
 {
-    Vector<CSSProperty> list;
+    StylePropertyVector list;
     list.reserveInitialCapacity(length);
     for (unsigned i = 0; i < length; ++i) {
         RefPtr<CSSValue> value = getPropertyCSSValue(set[i]);
         if (value)
             list.append(CSSProperty(set[i], value.release(), false));
     }
-    return StylePropertySet::create(list);
+    return StylePropertySet::adopt(list);
 }
 
 CSSRule* CSSComputedStyleDeclaration::parentRule() const

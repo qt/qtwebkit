@@ -91,11 +91,8 @@ void HTMLProgressElement::attach()
 
 double HTMLProgressElement::value() const
 {
-    double value;
-    bool ok = parseToDoubleForNumberType(fastGetAttribute(valueAttr), &value);
-    if (!ok || value < 0)
-        return 0;
-    return (value > max()) ? max() : value;
+    double value = parseToDoubleForNumberType(fastGetAttribute(valueAttr));
+    return !isfinite(value) || value < 0 ? 0 : std::min(value, max());
 }
 
 void HTMLProgressElement::setValue(double value, ExceptionCode& ec)
@@ -109,11 +106,8 @@ void HTMLProgressElement::setValue(double value, ExceptionCode& ec)
 
 double HTMLProgressElement::max() const
 {
-    double max;
-    bool ok = parseToDoubleForNumberType(getAttribute(maxAttr), &max);
-    if (!ok || max <= 0)
-        return 1;
-    return max;
+    double max = parseToDoubleForNumberType(getAttribute(maxAttr));
+    return !isfinite(max) || max <= 0 ? 1 : max;
 }
 
 void HTMLProgressElement::setMax(double max, ExceptionCode& ec)
@@ -140,7 +134,7 @@ bool HTMLProgressElement::isDeterminate() const
 void HTMLProgressElement::didElementStateChange()
 {
     m_value->setWidthPercentage(position() * 100);
-    if (renderer()) {
+    if (renderer() && renderer()->isProgress()) {
         RenderProgress* render = toRenderProgress(renderer());
         bool wasDeterminate = render->isDeterminate();
         renderer()->updateFromElement();

@@ -40,7 +40,7 @@
  *  - "editorclient,contents,changed", void: reports that editor client's
  *    contents were changed
  *  - "icon,changed", void: frame favicon changed.
- *  - "intent,new", EwkIntentRequest*: reports new intent.
+ *  - "intent,new", Ewk_Intent_Request*: reports new intent.
  *  - "load,committed", void: reports load committed.
  *  - "load,document,finished", void: frame finished loading the document.
  *  - "load,error", const Ewk_Frame_Load_Error*: reports load failed
@@ -58,6 +58,7 @@
  *  - "load,progress", double*: load progress is changed (overall value
  *    from 0.0 to 1.0, connect to individual frames for fine grained).
  *  - "load,provisional", void: frame started provisional load.
+ *  - "load,provisional,failed", Ewk_Frame_Load_Error*: frame provisional load failed.
  *  - "load,started", void: frame started loading the document.
  *  - "mixedcontent,displayed", void: frame has loaded and displayed mixed content.
  *  - "mixedcontent,run", void: frame has loaded and run mixed content.
@@ -72,7 +73,7 @@
  *  - "resource,response,received", Ewk_Frame_Resource_Response*: reports that a response
  *    to a resource request was received.
  *  - "state,save", void: frame's state will be saved as a history item.
- *  - "title,changed", const char*: title of the main frame was changed.
+ *  - "title,changed", Ewk_Text_With_Direction*: title of the main frame was changed.
  *  - "uri,changed", const char*: uri of the main frame was changed.
  *  - "xss,detected", Ewk_Frame_Xss_Notification*: reflected XSS is encountered in the page and suppressed.
  */
@@ -151,6 +152,21 @@ struct _Ewk_Frame_Resource_Messages {
     Ewk_Frame_Resource_Response *redirect_response; /**< redirect response, can not be changed */
 };
 
+/// Enum containing text directionality values.
+typedef enum {
+    EWK_TEXT_DIRECTION_DEFAULT, /**< Natural writing direction ("inherit") */
+    EWK_TEXT_DIRECTION_LEFT_TO_RIGHT,
+    EWK_TEXT_DIRECTION_RIGHT_TO_LEFT
+} Ewk_Text_Direction;
+
+/// Creates a type name for Ewk_Text_With_Direction.
+typedef struct _Ewk_Text_With_Direction Ewk_Text_With_Direction;
+
+struct _Ewk_Text_With_Direction {
+    const char *string;
+    Ewk_Text_Direction direction;
+};
+
 /// Creates a type name for Ewk_Frame_Xss_Notification.
 typedef struct _Ewk_Frame_Xss_Notification Ewk_Frame_Xss_Notification;
 
@@ -176,6 +192,16 @@ typedef enum {
     EWK_HIT_TEST_RESULT_CONTEXT_EDITABLE = 1 << 6
 } Ewk_Hit_Test_Result_Context;
 
+/// Enum containing navigation types
+typedef enum  {
+    EWK_NAVIGATION_TYPE_LINK_CLICKED,
+    EWK_NAVIGATION_TYPE_FORM_SUBMITTED,
+    EWK_NAVIGATION_TYPE_BACK_FORWARD,
+    EWK_NAVIGATION_TYPE_RELOAD,
+    EWK_NAVIGATION_TYPE_FORM_RESUBMITTED,
+    EWK_NAVIGATION_TYPE_OTHER
+} Ewk_Navigation_Type;
+
 /// Creates a type name for _Ewk_Hit_Test.
 typedef struct _Ewk_Hit_Test Ewk_Hit_Test;
 /// Structure used to report hit test result.
@@ -185,7 +211,7 @@ struct _Ewk_Hit_Test {
     struct {
         int x, y, w, h;
     } bounding_box; /**< DEPRECATED, see ewk_frame_hit_test_new() */
-    const char *title; /**< title of the element */
+    Ewk_Text_With_Direction title; /**< title of the element */
     const char *alternate_text; /**< the alternate text for image, area, input and applet */
     Evas_Object *frame; /**< the pointer to frame where hit test was requested */
     struct {
@@ -340,7 +366,7 @@ EAPI const char  *ewk_frame_uri_get(const Evas_Object *o);
  *
  * @return frame title on success or @c 0 on failure
  */
-EAPI const char  *ewk_frame_title_get(const Evas_Object *o);
+EAPI const Ewk_Text_With_Direction  *ewk_frame_title_get(const Evas_Object *o);
 
 /**
  * Gets the name of this frame.
@@ -851,11 +877,11 @@ EAPI Eina_Bool    ewk_frame_feed_mouse_move(Evas_Object *o, const Evas_Event_Mou
  * @param o frame object to feed touch event
  * @param action the action of touch event
  * @param points a list of points (Ewk_Touch_Point) to process
- * @param metaState DEPRECTAED, not supported for now
+ * @param metaState modifiers state of touch event. Users are expected to pass ORed values of the ECORE_EVENT_MODIFIER macros in Ecore_Input.h, such as ECORE_EVENT_MODIFIER_ALT or ECORE_EVENT_MODIFIER_SHIFT
  *
  * @return @c EINA_TRUE if touch event was handled, @c EINA_FALSE otherwise
  */
-EAPI Eina_Bool    ewk_frame_feed_touch_event(Evas_Object *o, Ewk_Touch_Event_Type action, Eina_List *points, int metaState);
+EAPI Eina_Bool    ewk_frame_feed_touch_event(Evas_Object *o, Ewk_Touch_Event_Type action, Eina_List *points, unsigned modifiers);
 
 /**
  * Feeds the keyboard key down event to the frame.

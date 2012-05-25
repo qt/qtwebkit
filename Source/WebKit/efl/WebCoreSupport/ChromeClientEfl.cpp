@@ -409,6 +409,11 @@ void ChromeClientEfl::reachedApplicationCacheOriginQuota(SecurityOrigin* origin,
     ewk_security_origin_free(ewkOrigin);
 }
 
+void ChromeClientEfl::populateVisitedLinks()
+{
+    evas_object_smart_callback_call(m_view, "populate,visited,links", 0);
+}
+
 #if ENABLE(TOUCH_EVENTS)
 void ChromeClientEfl::needTouchEvents(bool needed)
 {
@@ -632,4 +637,34 @@ void ChromeClientEfl::exitFullScreenForElement(WebCore::Element* element)
     element->document()->webkitDidExitFullScreenForElement(element);
 }
 #endif
+
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
+static Ewk_Custom_Handler_Data* customHandlerDataCreate(Evas_Object* ewkView, const char* scheme, const char* baseURL, const char* url, const char* title)
+{
+    Ewk_Custom_Handler_Data* data = new Ewk_Custom_Handler_Data;
+    data->ewkView = ewkView;
+    data->scheme = eina_stringshare_add(scheme);
+    data->base_url = eina_stringshare_add(baseURL);
+    data->url = eina_stringshare_add(url);
+    data->title = eina_stringshare_add(title);
+    return data;
+}
+
+static void customHandlerDataDelete(Ewk_Custom_Handler_Data* data)
+{
+    eina_stringshare_del(data->scheme);
+    eina_stringshare_del(data->base_url);
+    eina_stringshare_del(data->url);
+    eina_stringshare_del(data->title);
+    delete data;
+}
+
+void ChromeClientEfl::registerProtocolHandler(const String& scheme, const String& baseURL, const String& url, const String& title)
+{
+    Ewk_Custom_Handler_Data* data = customHandlerDataCreate(m_view, scheme.utf8().data(), baseURL.utf8().data(), url.utf8().data(), title.utf8().data());
+    ewk_custom_handler_register_protocol_handler(data);
+    customHandlerDataDelete(data);
+}
+#endif
+
 }

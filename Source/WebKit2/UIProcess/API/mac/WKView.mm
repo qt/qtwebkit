@@ -1598,6 +1598,7 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
     return resultRect;
 }
 
+#if ENABLE(DRAG_SUPPORT)
 - (void)draggedImage:(NSImage *)anImage endedAt:(NSPoint)aPoint operation:(NSDragOperation)operation
 {
     NSPoint windowImageLoc = [[self window] convertScreenToBase:aPoint];
@@ -1699,7 +1700,7 @@ static void createSandboxExtensionsForFileUpload(NSPasteboard *pasteboard, Sandb
     NSArray *types = [pasteboard types];
     if (![types containsObject:NSFilenamesPboardType])
         return;
-    
+
     NSArray *files = [pasteboard propertyListForType:NSFilenamesPboardType];
     handles.allocate([files count]);
     for (unsigned i = 0; i < [files count]; i++) {
@@ -1724,7 +1725,7 @@ static void createSandboxExtensionsForFileUpload(NSPasteboard *pasteboard, Sandb
 
     SandboxExtension::HandleArray sandboxExtensionForUpload;
     createSandboxExtensionsForFileUpload([draggingInfo draggingPasteboard], sandboxExtensionForUpload);
-    
+
     _data->_page->performDrag(&dragData, [[draggingInfo draggingPasteboard] name], sandboxExtensionHandle, sandboxExtensionForUpload);
 
     return YES;
@@ -1739,6 +1740,7 @@ static void createSandboxExtensionsForFileUpload(NSPasteboard *pasteboard, Sandb
         return self;
     return nil;
 }
+#endif // ENABLE(DRAG_SUPPORT)
 
 - (BOOL)_windowResizeMouseLocationIsInVisibleScrollerThumb:(NSPoint)loc
 {
@@ -2511,8 +2513,20 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 
 - (void)_updateAcceleratedCompositingMode:(const WebKit::LayerTreeContext&)layerTreeContext
 {
-    [self _exitAcceleratedCompositingMode];
-    [self _enterAcceleratedCompositingMode:layerTreeContext];
+    if (_data->_layerHostingView) {
+        // Wrap the call to setSublayers: in a CATransaction with actions disabled to
+        // keep CA from cross-fading between the two sublayer arrays.
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+
+        CALayer *renderLayer = WKMakeRenderLayer(layerTreeContext.contextID);
+        [[_data->_layerHostingView.get() layer] setSublayers:[NSArray arrayWithObject:renderLayer]];
+
+        [CATransaction commit];
+    } else {
+        [self _exitAcceleratedCompositingMode];
+        [self _enterAcceleratedCompositingMode:layerTreeContext];
+    }
 }
 
 - (void)_setAccessibilityWebProcessToken:(NSData *)data

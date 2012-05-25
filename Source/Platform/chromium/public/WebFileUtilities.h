@@ -41,6 +41,8 @@ typedef void *HANDLE;
 
 namespace WebKit {
 
+struct WebFileInfo;
+
 class WebFileUtilities {
 public:
 #ifdef WIN32
@@ -48,12 +50,13 @@ public:
 #else
     typedef int FileHandle;
 #endif
-    virtual void revealFolderInOS(const WebString& path) { }
     virtual bool fileExists(const WebString& path) { return false; }
     virtual bool deleteFile(const WebString& path) { return false; }
     virtual bool deleteEmptyDirectory(const WebString& path) { return false; }
+    // FIXME: Deprecate getFileSize and getFileModificationTime once getFileInfo is implemented.
     virtual bool getFileSize(const WebString& path, long long& result) { return false; }
     virtual bool getFileModificationTime(const WebString& path, double& result) { return false; }
+    virtual bool getFileInfo(const WebString& path, WebFileInfo& result) { return false; }
     virtual WebString directoryName(const WebString& path)  { return WebString(); }
     virtual WebString pathByAppendingComponent(const WebString& path, const WebString& component)  { return WebString(); }
     virtual bool makeAllDirectories(const WebString& path) { return false; }

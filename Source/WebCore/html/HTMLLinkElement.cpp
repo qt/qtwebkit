@@ -45,6 +45,7 @@
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "StyleResolver.h"
+#include "StyleSheetContents.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
@@ -243,7 +244,7 @@ void HTMLLinkElement::clearSheet()
     m_sheet = 0;
 }
 
-Node::InsertionNotificationRequest HTMLLinkElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLLinkElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
     if (!insertionPoint->inDocument())
@@ -259,7 +260,7 @@ Node::InsertionNotificationRequest HTMLLinkElement::insertedInto(Node* insertion
     return InsertionDone;
 }
 
-void HTMLLinkElement::removedFrom(Node* insertionPoint)
+void HTMLLinkElement::removedFrom(ContainerNode* insertionPoint)
 {
     HTMLElement::removedFrom(insertionPoint);
     if (!insertionPoint->inDocument())
@@ -301,7 +302,7 @@ void HTMLLinkElement::setCSSStyleSheet(const String& href, const KURL& baseURL, 
     CSSParserContext parserContext(document(), baseURL, charset);
 
 #if ENABLE(PARSED_STYLE_SHEET_CACHING)
-    if (RefPtr<StyleSheetInternal> restoredSheet = const_cast<CachedCSSStyleSheet*>(cachedStyleSheet)->restoreParsedStyleSheet(parserContext)) {
+    if (RefPtr<StyleSheetContents> restoredSheet = const_cast<CachedCSSStyleSheet*>(cachedStyleSheet)->restoreParsedStyleSheet(parserContext)) {
         ASSERT(restoredSheet->isCacheable());
         ASSERT(!restoredSheet->isLoading());
 
@@ -316,7 +317,7 @@ void HTMLLinkElement::setCSSStyleSheet(const String& href, const KURL& baseURL, 
     }
 #endif
 
-    RefPtr<StyleSheetInternal> styleSheet = StyleSheetInternal::create(href, baseURL, parserContext);
+    RefPtr<StyleSheetContents> styleSheet = StyleSheetContents::create(href, baseURL, parserContext);
 
     m_sheet = CSSStyleSheet::create(styleSheet, this);
     m_sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(m_media));
@@ -340,7 +341,7 @@ bool HTMLLinkElement::styleSheetIsLoading() const
         return true;
     if (!m_sheet)
         return false;
-    return m_sheet->internal()->isLoading();
+    return m_sheet->contents()->isLoading();
 }
 
 void HTMLLinkElement::linkLoaded()
@@ -433,7 +434,7 @@ void HTMLLinkElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
     
     // Walk the URLs linked by the linked-to stylesheet.
     if (CSSStyleSheet* styleSheet = const_cast<HTMLLinkElement*>(this)->sheet())
-        styleSheet->internal()->addSubresourceStyleURLs(urls);
+        styleSheet->contents()->addSubresourceStyleURLs(urls);
 }
 
 void HTMLLinkElement::addPendingSheet(PendingSheetType type)

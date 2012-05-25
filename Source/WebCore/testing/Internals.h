@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -95,6 +95,8 @@ public:
 #if ENABLE(INPUT_TYPE_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);
 #endif
+
+    PassRefPtr<ClientRect> absoluteCaretBounds(Document*, ExceptionCode&);
 
     PassRefPtr<ClientRect> boundingBox(Element*, ExceptionCode&);
 

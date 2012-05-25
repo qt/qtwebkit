@@ -1526,6 +1526,7 @@ void JIT::emit_op_get_argument_by_val(Instruction* currentInstruction)
     neg32(regT1);
     signExtend32ToPtr(regT1, regT1);
     loadPtr(BaseIndex(callFrameRegister, regT1, TimesEight, CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT0);
+    emitValueProfilingSite();
     emitPutVirtualRegister(dst, regT0);
 }
 
@@ -1548,7 +1549,7 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     JITStubCall stubCall(this, cti_op_get_by_val);
     stubCall.addArgument(arguments, regT2);
     stubCall.addArgument(property, regT2);
-    stubCall.call(dst);
+    stubCall.callWithValueProfiling(dst);
 }
 
 #endif // USE(JSVALUE64)

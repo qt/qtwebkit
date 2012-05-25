@@ -31,6 +31,7 @@
 #include "Page.h"
 #include "RenderArena.h"
 #include "RenderBlock.h"
+#include "RenderFlowThread.h"
 #include "RenderLayer.h"
 #include "RenderTheme.h"
 #include "RenderView.h"
@@ -212,7 +213,8 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
         || style()->verticalAlign() != BASELINE
         || style()->textEmphasisMark() != TextEmphasisMarkNone
         || (checkFonts && (!parentStyle->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(style()->font().fontMetrics())
-        || parentStyle->lineHeight() != style()->lineHeight()));
+        || parentStyle->lineHeight() != style()->lineHeight()))
+        || (inRenderFlowThread() && enclosingRenderFlowThread()->hasRegionsWithStyling());
 
     if (!alwaysCreateLineBoxes && checkFonts && document()->usesFirstLineRules()) {
         // Have to check the first line style as well.
@@ -609,7 +611,7 @@ void RenderInline::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accu
     if (continuation()) {
         if (continuation()->isBox()) {
             RenderBox* box = toRenderBox(continuation());
-            continuation()->absoluteRects(rects, toLayoutPoint(accumulatedOffset - containingBlock()->location() + box->size()));
+            continuation()->absoluteRects(rects, toLayoutPoint(accumulatedOffset - containingBlock()->location() + box->locationOffset()));
         } else
             continuation()->absoluteRects(rects, toLayoutPoint(accumulatedOffset - containingBlock()->location()));
     }
@@ -694,24 +696,24 @@ LayoutUnit RenderInline::marginBottom() const
     return computeMargin(this, style()->marginBottom());
 }
 
-LayoutUnit RenderInline::marginStart() const
+LayoutUnit RenderInline::marginStart(const RenderStyle* otherStyle) const
 {
-    return computeMargin(this, style()->marginStart());
+    return computeMargin(this, style()->marginStartUsing(otherStyle ? otherStyle : style()));
 }
 
-LayoutUnit RenderInline::marginEnd() const
+LayoutUnit RenderInline::marginEnd(const RenderStyle* otherStyle) const
 {
-    return computeMargin(this, style()->marginEnd());
+    return computeMargin(this, style()->marginEndUsing(otherStyle ? otherStyle : style()));
 }
 
-LayoutUnit RenderInline::marginBefore() const
+LayoutUnit RenderInline::marginBefore(const RenderStyle* otherStyle) const
 {
-    return computeMargin(this, style()->marginBefore());
+    return computeMargin(this, style()->marginBeforeUsing(otherStyle ? otherStyle : style()));
 }
 
-LayoutUnit RenderInline::marginAfter() const
+LayoutUnit RenderInline::marginAfter(const RenderStyle* otherStyle) const
 {
-    return computeMargin(this, style()->marginAfter());
+    return computeMargin(this, style()->marginAfterUsing(otherStyle ? otherStyle : style()));
 }
 
 const char* RenderInline::renderName() const
@@ -1200,6 +1202,11 @@ void RenderInline::dirtyLineBoxes(bool fullLayout)
         }
     } else
         m_lineBoxes.dirtyLineBoxes();
+}
+
+void RenderInline::deleteLineBoxTree()
+{
+    m_lineBoxes.deleteLineBoxTree(renderArena());
 }
 
 InlineFlowBox* RenderInline::createInlineFlowBox() 

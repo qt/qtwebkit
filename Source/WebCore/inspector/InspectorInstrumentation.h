@@ -38,6 +38,7 @@
 #include "Frame.h"
 #include "Page.h"
 #include "ScriptExecutionContext.h"
+#include "StorageArea.h"
 
 #if USE(JSC)
 namespace JSC {
@@ -49,7 +50,6 @@ namespace WebCore {
 
 class CSSRule;
 class CharacterData;
-class DOMFileSystem;
 class DOMWindow;
 class DOMWrapperWorld;
 class Database;
@@ -143,6 +143,8 @@ public:
     static void didLoadXHR(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willPaint(Frame*, GraphicsContext*, const LayoutRect&);
     static void didPaint(const InspectorInstrumentationCookie&);
+    static void willComposite(Page*);
+    static void didComposite(Page*);
     static InspectorInstrumentationCookie willRecalculateStyle(Document*);
     static void didRecalculateStyle(const InspectorInstrumentationCookie&);
     static void didScheduleStyleRecalculation(Document*);
@@ -212,11 +214,8 @@ public:
     static void didOpenDatabase(ScriptExecutionContext*, PassRefPtr<Database>, const String& domain, const String& name, const String& version);
 #endif
 
-#if ENABLE(FILE_SYSTEM)
-    static void didOpenFileSystem(PassRefPtr<DOMFileSystem>);
-#endif
-
     static void didUseDOMStorage(Page*, StorageArea*, bool isLocalStorage, Frame*);
+    static void didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType, SecurityOrigin*, Page*);
 
 #if ENABLE(WORKERS)
     static bool shouldPauseDedicatedWorkerOnStart(ScriptExecutionContext*);
@@ -303,6 +302,8 @@ private:
     static void didLoadXHRImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willPaintImpl(InstrumentingAgents*, GraphicsContext*, const LayoutRect&);
     static void didPaintImpl(const InspectorInstrumentationCookie&);
+    static void willCompositeImpl(InstrumentingAgents*);
+    static void didCompositeImpl(InstrumentingAgents*);
     static InspectorInstrumentationCookie willRecalculateStyleImpl(InstrumentingAgents*);
     static void didRecalculateStyleImpl(const InspectorInstrumentationCookie&);
     static void didScheduleStyleRecalculationImpl(InstrumentingAgents*, Document*);
@@ -369,11 +370,8 @@ private:
     static void didOpenDatabaseImpl(InstrumentingAgents*, PassRefPtr<Database>, const String& domain, const String& name, const String& version);
 #endif
 
-#if ENABLE(FILE_SYSTEM)
-    static void didOpenFileSystemImpl(InstrumentingAgents*, PassRefPtr<DOMFileSystem>);
-#endif
-
     static void didUseDOMStorageImpl(InstrumentingAgents*, StorageArea*, bool isLocalStorage, Frame*);
+    static void didDispatchDOMStorageEventImpl(InstrumentingAgents*, const String& key, const String& oldValue, const String& newValue, StorageType, SecurityOrigin*, Page*);
 
 #if ENABLE(WORKERS)
     static bool shouldPauseDedicatedWorkerOnStartImpl(InstrumentingAgents*);
@@ -824,6 +822,24 @@ inline void InspectorInstrumentation::didPaint(const InspectorInstrumentationCoo
 #endif
 }
 
+inline void InspectorInstrumentation::willComposite(Page* page)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
+        willCompositeImpl(instrumentingAgents);
+#endif
+}
+
+inline void InspectorInstrumentation::didComposite(Page* page)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
+        didCompositeImpl(instrumentingAgents);
+#endif
+}
+
 inline InspectorInstrumentationCookie InspectorInstrumentation::willRecalculateStyle(Document* document)
 {
 #if ENABLE(INSPECTOR)
@@ -1173,6 +1189,15 @@ inline void InspectorInstrumentation::didUseDOMStorage(Page* page, StorageArea* 
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         didUseDOMStorageImpl(instrumentingAgents, storageArea, isLocalStorage, frame);
 #endif
+}
+
+inline void InspectorInstrumentation::didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page* page)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
+        didDispatchDOMStorageEventImpl(instrumentingAgents, key, oldValue, newValue, storageType, securityOrigin, page);
+#endif // ENABLE(INSPECTOR)
 }
 
 #if ENABLE(WORKERS)

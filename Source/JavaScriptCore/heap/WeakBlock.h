@@ -30,7 +30,6 @@
 #include "WeakHandleOwner.h"
 #include "WeakImpl.h"
 #include <wtf/DoublyLinkedList.h>
-#include <wtf/PageAllocation.h>
 #include <wtf/StdLibExtras.h>
 
 namespace JSC {
@@ -42,7 +41,7 @@ class WeakHandleOwner;
 class WeakBlock : public DoublyLinkedListNode<WeakBlock> {
 public:
     friend class WTF::DoublyLinkedListNode<WeakBlock>;
-    static const size_t blockSize = 4 * KB;
+    static const size_t blockSize = 3 * KB; // 5% of MarkedBlock size
 
     struct FreeCell {
         FreeCell* next;
@@ -61,26 +60,26 @@ public:
 
     static WeakImpl* asWeakImpl(FreeCell*);
 
+    bool isEmpty();
+
     void sweep();
-    const SweepResult& sweepResult();
     SweepResult takeSweepResult();
 
-    void visitLiveWeakImpls(HeapRootVisitor&);
-    void visitDeadWeakImpls(HeapRootVisitor&);
+    void visit(HeapRootVisitor&);
+    void reap();
 
-    void finalizeAll();
+    void lastChanceToFinalize();
 
 private:
     static FreeCell* asFreeCell(WeakImpl*);
 
-    WeakBlock(PageAllocation&);
+    WeakBlock();
     WeakImpl* firstWeakImpl();
     void finalize(WeakImpl*);
     WeakImpl* weakImpls();
     size_t weakImplCount();
     void addToFreeList(FreeCell**, WeakImpl*);
 
-    PageAllocation m_allocation;
     WeakBlock* m_prev;
     WeakBlock* m_next;
     SweepResult m_sweepResult;
@@ -109,11 +108,6 @@ inline WeakBlock::SweepResult WeakBlock::takeSweepResult()
     std::swap(tmp, m_sweepResult);
     ASSERT(m_sweepResult.isNull());
     return tmp;
-}
-
-inline const WeakBlock::SweepResult& WeakBlock::sweepResult()
-{
-    return m_sweepResult;
 }
 
 inline WeakBlock::FreeCell* WeakBlock::asFreeCell(WeakImpl* weakImpl)
@@ -149,6 +143,11 @@ inline void WeakBlock::addToFreeList(FreeCell** freeList, WeakImpl* weakImpl)
     ASSERT((char*)freeCell > (char*)this && (char*)freeCell < (char*)this + blockSize);
     freeCell->next = *freeList;
     *freeList = freeCell;
+}
+
+inline bool WeakBlock::isEmpty()
+{
+    return !m_sweepResult.isNull() && m_sweepResult.blockIsFree;
 }
 
 } // namespace JSC

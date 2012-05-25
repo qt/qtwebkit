@@ -142,9 +142,9 @@ RenderObject* SVGShadowText::createRenderer(RenderArena* arena, RenderStyle*)
 
 void SVGShadowText::willRecalcTextStyle(StyleChange change)
 {
-    if (change != NoChange && parentNode()->shadowHost()) {
+    if (change != NoChange && parentNode()->isShadowRoot()) {
         if (renderer())
-            renderer()->setStyle(parentNode()->shadowHost()->renderer()->style());
+            renderer()->setStyle(toShadowRoot(parentNode())->host()->renderer()->style());
     }
 }
 
@@ -292,7 +292,7 @@ void SVGTRefElement::buildPendingResource()
     }
 }
 
-Node::InsertionNotificationRequest SVGTRefElement::insertedInto(Node* rootParent)
+Node::InsertionNotificationRequest SVGTRefElement::insertedInto(ContainerNode* rootParent)
 {
     SVGStyledElement::insertedInto(rootParent);
     if (rootParent->inDocument())
@@ -300,7 +300,7 @@ Node::InsertionNotificationRequest SVGTRefElement::insertedInto(Node* rootParent
     return InsertionDone;
 }
 
-void SVGTRefElement::removedFrom(Node* rootParent)
+void SVGTRefElement::removedFrom(ContainerNode* rootParent)
 {
     SVGStyledElement::removedFrom(rootParent);
     if (rootParent->inDocument())

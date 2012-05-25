@@ -31,10 +31,8 @@
 #ifndef WebKitPlatformSupport_h
 #define WebKitPlatformSupport_h
 
-#include "../WebIDBKeyPath.h" // FIXME: Remove with: http://webkit.org/b/84207
 #include "WebCommon.h"
 #include "WebGraphicsContext3D.h"
-#include "WebLocalizedString.h"
 #include "WebSerializedScriptValue.h"
 #include "WebString.h"
 #include "WebURL.h"
@@ -50,15 +48,14 @@ namespace WebKit {
 
 class WebApplicationCacheHost; // FIXME: Does this belong in platform?
 class WebApplicationCacheHostClient; // FIXME: Does this belong in platform?
-class WebCookieJar;
 class WebIDBFactory; // FIXME: Does this belong in platform?
 class WebIDBKey; // FIXME: Does this belong in platform?
+class WebIDBKeyPath; // FIXME: Does this belong in platform?
 class WebMessagePortChannel; // FIXME: Does this belong in platform?
 class WebPluginListBuilder; // FIXME: Does this belong in platform?
 class WebSandboxSupport;
 class WebSharedWorkerRepository; // FIXME: Does this belong in platform?
 class WebStorageNamespace; // FIXME: Does this belong in platform?
-class WebThemeEngine;
 
 // FIXME: Eventually all these API will need to move to WebKit::Platform.
 class WebKitPlatformSupport : public Platform {
@@ -66,21 +63,10 @@ public:
     // May return null if sandbox support is not necessary
     virtual WebSandboxSupport* sandboxSupport() { return 0; }
 
-    // May return null on some platforms.
-    virtual WebThemeEngine* themeEngine() { return 0; }
-
-    // May return null.
-    virtual WebCookieJar* cookieJar() { return 0; }
-
     // DOM Storage --------------------------------------------------
 
     // Return a LocalStorage namespace that corresponds to the following path.
     virtual WebStorageNamespace* createLocalStorageNamespace(const WebString& path, unsigned quota) { return 0; }
-
-    // DEPRECATED
-    virtual void dispatchStorageEvent(const WebString& key, const WebString& oldValue,
-                                      const WebString& newValue, const WebString& origin,
-                                      const WebURL& url, bool isLocalStorage) { }
 
 
     // HTML5 Database ------------------------------------------------------
@@ -111,13 +97,7 @@ public:
     // Indexed Database ----------------------------------------------------
 
     virtual WebIDBFactory* idbFactory() { return 0; }
-    // FIXME: Remove WebString keyPath overload once callers are updated.
-    // http://webkit.org/b/84207
-    virtual void createIDBKeysFromSerializedValuesAndKeyPath(const WebVector<WebSerializedScriptValue>& values,  const WebString& keyPath, WebVector<WebIDBKey>& keys) { createIDBKeysFromSerializedValuesAndKeyPath(values, WebIDBKeyPath(keyPath), keys); }
     virtual void createIDBKeysFromSerializedValuesAndKeyPath(const WebVector<WebSerializedScriptValue>& values,  const WebIDBKeyPath& keyPath, WebVector<WebIDBKey>& keys) { }
-    // FIXME: Remove WebString keyPath overload once callers are updated.
-    // http://webkit.org/b/84207
-    virtual WebSerializedScriptValue injectIDBKeyIntoSerializedValue(const WebIDBKey& key, const WebSerializedScriptValue& value, const WebString& keyPath) { return injectIDBKeyIntoSerializedValue(key, value, WebIDBKeyPath(keyPath)); }
     virtual WebSerializedScriptValue injectIDBKeyIntoSerializedValue(const WebIDBKey& key, const WebSerializedScriptValue& value, const WebIDBKeyPath& keyPath) { return WebSerializedScriptValue(); }
 
 
@@ -135,27 +115,14 @@ public:
     virtual void getPluginList(bool refresh, WebPluginListBuilder*) { }
 
 
-    // Resources -----------------------------------------------------------
-
-    // Returns a localized string resource (with substitution parameters).
-    virtual WebString queryLocalizedString(WebLocalizedString::Name) { return WebString(); }
-    virtual WebString queryLocalizedString(WebLocalizedString::Name, const WebString& parameter) { return WebString(); }
-    virtual WebString queryLocalizedString(WebLocalizedString::Name, const WebString& parameter1, const WebString& parameter2) { return WebString(); }
-
-
     // Shared Workers ------------------------------------------------------
 
     virtual WebSharedWorkerRepository* sharedWorkerRepository() { return 0; }
 
-    // GPU ----------------------------------------------------------------
-
-    // Returns true if the platform is capable of producing an offscreen context suitable for accelerating 2d canvas.
-    // This will return false if the platform cannot promise that contexts will be preserved across operations like
-    // locking the screen or if the platform cannot provide a context with suitable performance characteristics.
-    //
-    // This value must be checked again after a context loss event as the platform's capabilities may have changed.
-    virtual bool canAccelerate2dCanvas() { return false; }
-
+    // Returns private and shared usage, in bytes. Private bytes is the amount of
+    // memory currently allocated to this process that cannot be shared. Returns
+    // false on platform specific error conditions.
+    virtual bool getProcessMemorySize(size_t* privateBytes, size_t* sharedBytes) { return false; }
 
 protected:
     ~WebKitPlatformSupport() { }

@@ -620,6 +620,11 @@ void LayoutTestController::setJavaScriptCanAccessClipboard(bool enabled)
     [[[mainFrame webView] preferences] setJavaScriptCanAccessClipboard:enabled];
 }
 
+void LayoutTestController::setAutomaticLinkDetectionEnabled(bool enabled)
+{
+    [[mainFrame webView] setAutomaticLinkDetectionEnabled:enabled];
+}
+
 void LayoutTestController::setTabKeyCyclesThroughElements(bool cycles)
 {
     [[mainFrame webView] setTabKeyCyclesThroughElements:cycles];
@@ -1132,18 +1137,6 @@ void LayoutTestController::authenticateSession(JSStringRef url, JSStringRef user
 #endif
 }
 
-void LayoutTestController::setEditingBehavior(const char* editingBehavior)
-{
-    NSString *editingBehaviorNS = [[NSString alloc] initWithUTF8String:editingBehavior];
-    if ([editingBehaviorNS isEqualToString:@"mac"])
-        [[WebPreferences standardPreferences] setEditingBehavior:WebKitEditingMacBehavior];
-    else if ([editingBehaviorNS isEqualToString:@"win"])
-        [[WebPreferences standardPreferences] setEditingBehavior:WebKitEditingWinBehavior];
-    else if ([editingBehaviorNS isEqualToString:@"unix"])
-        [[WebPreferences standardPreferences] setEditingBehavior:WebKitEditingUnixBehavior];
-    [editingBehaviorNS release];
-}
-
 void LayoutTestController::abortModal()
 {
     [NSApp abortModal];
@@ -1217,6 +1210,11 @@ void LayoutTestController::resetPageVisibility()
 }
 
 void LayoutTestController::setPageVisibility(const char*)
+{
+    // FIXME: Implement.
+}
+
+void LayoutTestController::sendWebIntentResponse(JSStringRef)
 {
     // FIXME: Implement.
 }

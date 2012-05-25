@@ -31,6 +31,7 @@
 #include "config.h"
 #include "FileSystem.h"
 
+#include "FileMetadata.h"
 #include "NotImplemented.h"
 #include "PlatformString.h"
 #include "PlatformSupport.h"
@@ -57,9 +58,17 @@ bool getFileModificationTime(const String& path, time_t& result)
     return PlatformSupport::getFileModificationTime(path, result);
 }
 
-void revealFolderInOS(const String& path)
+bool getFileMetadata(const String& path, FileMetadata& metadata)
 {
-    PlatformSupport::revealFolderInOS(path);
+    // FIXME: Call PlatformSupport::getFileMetadata once it is implemented.
+    // return PlatformSupport::getFileMetadata(path, metadata);
+    if (!PlatformSupport::getFileSize(path, metadata.length))
+        return false;
+    time_t modificationTime;
+    if (!PlatformSupport::getFileModificationTime(path, modificationTime))
+        return false;
+    metadata.modificationTime = modificationTime;
+    return true;
 }
 
 String directoryName(const String& path)

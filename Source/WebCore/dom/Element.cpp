@@ -134,8 +134,11 @@ Element::~Element()
 
     if (shadow())
         rareData()->m_shadow.clear();
-    if (m_attributeData)
-        m_attributeData->clearAttributes(this);
+
+    if (hasAttrList()) {
+        ASSERT(m_attributeData);
+        m_attributeData->detachAttrObjectsFromElement(this);
+    }
 }
 
 inline ElementRareData* Element::rareData() const
@@ -189,10 +192,10 @@ PassRefPtr<Element> Element::cloneElementWithoutAttributesAndChildren()
 
 PassRefPtr<Attr> Element::detachAttribute(size_t index)
 {
-    if (!attributeData())
-        return 0;
+    ASSERT(attributeData());
 
     Attribute* attribute = attributeData()->attributeItem(index);
+    ASSERT(attribute);
 
     RefPtr<Attr> attr = attrIfExists(attribute->name());
     if (attr)
@@ -200,6 +203,7 @@ PassRefPtr<Attr> Element::detachAttribute(size_t index)
     else
         attr = Attr::create(document(), attribute->name(), attribute->value());
 
+    attributeData()->removeAttribute(index, this);
     return attr.release();
 }
 
@@ -698,15 +702,15 @@ void Element::attributeChanged(const Attribute& attribute)
     document()->incDOMTreeVersion();
 
     if (isIdAttributeName(attribute.name())) {
-        if (attributeData()) {
+        if (attribute.value() != attributeData()->idForStyleResolution()) {
             if (attribute.isNull())
                 attributeData()->setIdForStyleResolution(nullAtom);
             else if (document()->inQuirksMode())
                 attributeData()->setIdForStyleResolution(attribute.value().lower());
             else
                 attributeData()->setIdForStyleResolution(attribute.value());
+            setNeedsStyleRecalc();
         }
-        setNeedsStyleRecalc();
     } else if (attribute.name() == HTMLNames::nameAttr)
         setHasName(!attribute.isNull());
 
@@ -777,7 +781,7 @@ void Element::parserSetAttributes(const Vector<Attribute>& attributeVector, Frag
 
     // If the element is created as result of a paste or drag-n-drop operation
     // we want to remove all the script and event handlers.
-    if (scriptingPermission == FragmentScriptingNotAllowed) {
+    if (scriptingPermission == DisallowScriptingContent) {
         unsigned i = 0;
         while (i < m_attributeData->length()) {
             const QualifiedName& attributeName = m_attributeData->m_attributes[i].name();
@@ -885,7 +889,7 @@ void Element::setChangedSinceLastFormControlChangeEvent(bool)
 {
 }
 
-Node::InsertionNotificationRequest Element::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertionPoint)
 {
     // need to do superclass processing first so inDocument() is true
     // by the time we reach updateId
@@ -899,23 +903,18 @@ Node::InsertionNotificationRequest Element::insertedInto(Node* insertionPoint)
     if (!insertionPoint->inDocument())
         return InsertionDone;
 
-    if (m_attributeData) {
-        if (hasID()) {
-            Attribute* idItem = getAttributeItem(document()->idAttributeName());
-            if (idItem && !idItem->isNull())
-                updateId(nullAtom, idItem->value());
-        }
-        if (hasName()) {
-            Attribute* nameItem = getAttributeItem(HTMLNames::nameAttr);
-            if (nameItem && !nameItem->isNull())
-                updateName(nullAtom, nameItem->value());
-        }
-    }
+    const AtomicString& idValue = getIdAttribute();
+    if (!idValue.isNull())
+        updateId(nullAtom, idValue);
+
+    const AtomicString& nameValue = getNameAttribute();
+    if (!nameValue.isNull())
+        updateName(nullAtom, nameValue);
 
     return InsertionDone;
 }
 
-void Element::removedFrom(Node* insertionPoint)
+void Element::removedFrom(ContainerNode* insertionPoint)
 {
 #if ENABLE(FULLSCREEN_API)
     if (containsFullScreenElement())
@@ -925,18 +924,13 @@ void Element::removedFrom(Node* insertionPoint)
     setSavedLayerScrollOffset(IntSize());
 
     if (insertionPoint->inDocument()) {
-        if (m_attributeData) {
-            if (hasID()) {
-                Attribute* idItem = getAttributeItem(document()->idAttributeName());
-                if (idItem && !idItem->isNull())
-                    updateId(idItem->value(), nullAtom);
-            }
-            if (hasName()) {
-                Attribute* nameItem = getAttributeItem(HTMLNames::nameAttr);
-                if (nameItem && !nameItem->isNull())
-                    updateName(nameItem->value(), nullAtom);
-            }
-        }
+        const AtomicString& idValue = getIdAttribute();
+        if (!idValue.isNull())
+            updateId(idValue, nullAtom);
+
+        const AtomicString& nameValue = getNameAttribute();
+        if (!nameValue.isNull())
+            updateName(nameValue, nullAtom);
     }
 
     ContainerNode::removedFrom(insertionPoint);
@@ -1433,8 +1427,7 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
     ASSERT(document() == attr->document());
 
     ElementAttributeData* attributeData = updatedAttributeData();
-    if (!attributeData)
-        return 0;
+    ASSERT(attributeData);
 
     size_t index = attributeData->getAttributeItemIndex(attr->qualifiedName());
     if (index == notFound) {
@@ -1442,9 +1435,7 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
         return 0;
     }
 
-    RefPtr<Attr> oldAttr = detachAttribute(index);
-    attributeData->removeAttribute(index, this);
-    return oldAttr.release();
+    return detachAttribute(index);
 }
 
 void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& value, ExceptionCode& ec, FragmentScriptingPermission scriptingPermission)
@@ -1460,7 +1451,7 @@ void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicStrin
         return;
     }
 
-    if (scriptingPermission == FragmentScriptingNotAllowed && (isEventHandlerAttribute(qName) || isAttributeToRemove(qName, value)))
+    if (scriptingPermission == DisallowScriptingContent && (isEventHandlerAttribute(qName) || isAttributeToRemove(qName, value)))
         return;
 
     setAttribute(qName, value);
@@ -1715,9 +1706,11 @@ void Element::cancelFocusAppearanceUpdate()
 
 void Element::normalizeAttributes()
 {
-    ElementAttributeData* attributeData = updatedAttributeData();
-    if (!attributeData || attributeData->isEmpty())
+    if (!hasAttrList())
         return;
+
+    ElementAttributeData* attributeData = updatedAttributeData();
+    ASSERT(attributeData);
 
     const Vector<Attribute>& attributes = attributeData->attributeVector();
     for (size_t i = 0; i < attributes.size(); ++i) {
@@ -2081,8 +2074,9 @@ void Element::setSavedLayerScrollOffset(const IntSize& size)
 
 PassRefPtr<Attr> Element::attrIfExists(const QualifiedName& name)
 {
-    if (!attributeData())
+    if (!hasAttrList())
         return 0;
+    ASSERT(attributeData());
     return attributeData()->attrIfExists(this, name);
 }
 

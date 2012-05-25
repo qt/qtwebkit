@@ -171,9 +171,15 @@ void RenderSVGText::subtreeChildWasAdded(RenderObject* child)
     if (!shouldHandleSubtreeMutations() || documentBeingDestroyed())
         return;
 
+    // Always protect the cache before clearing text positioning elements when the cache will subsequently be rebuilt.
+    FontCachePurgePreventer fontCachePurgePreventer;
+
     // The positioning elements cache doesn't include the new 'child' yet. Clear the
     // cache, as the next buildLayoutAttributesForTextRenderer() call rebuilds it.
     m_layoutAttributesBuilder.clearTextPositioningElements();
+
+    if (!child->isSVGInlineText() && !child->isSVGInline())
+        return;
 
     // Detect changes in layout attributes and only measure those text parts that have changed!
     Vector<SVGTextLayoutAttributes*> newLayoutAttributes;
@@ -234,9 +240,9 @@ void RenderSVGText::willBeDestroyed()
     RenderSVGBlock::willBeDestroyed();
 }
 
-void RenderSVGText::subtreeChildWillBeRemoved(RenderSVGInlineText* text, Vector<SVGTextLayoutAttributes*, 2>& affectedAttributes)
+void RenderSVGText::subtreeChildWillBeRemoved(RenderObject* child, Vector<SVGTextLayoutAttributes*, 2>& affectedAttributes)
 {
-    ASSERT(text);
+    ASSERT(child);
     if (!shouldHandleSubtreeMutations())
         return;
 
@@ -245,10 +251,11 @@ void RenderSVGText::subtreeChildWillBeRemoved(RenderSVGInlineText* text, Vector<
     // The positioning elements cache depends on the size of each text renderer in the
     // subtree. If this changes, clear the cache. It's going to be rebuilt below.
     m_layoutAttributesBuilder.clearTextPositioningElements();
-    if (m_layoutAttributes.isEmpty())
+    if (m_layoutAttributes.isEmpty() || !child->isSVGInlineText())
         return;
 
     // This logic requires that the 'text' child is still inserted in the tree.
+    RenderSVGInlineText* text = toRenderSVGInlineText(child);
     bool stopAfterNext = false;
     SVGTextLayoutAttributes* previous = 0;
     SVGTextLayoutAttributes* next = 0;
@@ -305,6 +312,9 @@ void RenderSVGText::subtreeTextDidChange(RenderSVGInlineText* text)
         ASSERT(!m_layoutAttributesBuilder.numberOfTextPositioningElements());
         return;
     }
+
+    // Always protect the cache before clearing text positioning elements when the cache will subsequently be rebuilt.
+    FontCachePurgePreventer fontCachePurgePreventer;
 
     // The positioning elements cache depends on the size of each text renderer in the
     // subtree. If this changes, clear the cache. It's going to be rebuilt below.
@@ -519,14 +529,9 @@ void RenderSVGText::addChild(RenderObject* child, RenderObject* beforeChild)
 
 void RenderSVGText::removeChild(RenderObject* child)
 {
-    if (!child->isSVGInlineText()) {
-        RenderSVGBlock::removeChild(child);
-        return;
-    }
-
-    RenderSVGInlineText* text = toRenderSVGInlineText(child);
     Vector<SVGTextLayoutAttributes*, 2> affectedAttributes;
-    subtreeChildWillBeRemoved(text, affectedAttributes);
+    FontCachePurgePreventer fontCachePurgePreventer;
+    subtreeChildWillBeRemoved(child, affectedAttributes);
     RenderSVGBlock::removeChild(child);
     subtreeChildWasRemoved(affectedAttributes);
 }

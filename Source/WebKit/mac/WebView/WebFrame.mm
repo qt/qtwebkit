@@ -198,20 +198,6 @@ EditableLinkBehavior core(WebKitEditableLinkBehavior editableLinkBehavior)
     return EditableLinkDefaultBehavior;
 }
 
-WebCore::EditingBehaviorType core(WebKitEditingBehavior behavior)
-{
-    switch (behavior) {
-        case WebKitEditingMacBehavior:
-            return WebCore::EditingMacBehavior;
-        case WebKitEditingWinBehavior:
-            return WebCore::EditingWindowsBehavior;
-        case WebKitEditingUnixBehavior:
-            return WebCore::EditingUnixBehavior;
-    }
-    ASSERT_NOT_REACHED();
-    return WebCore::EditingMacBehavior;
-}
-
 TextDirectionSubmenuInclusionBehavior core(WebTextDirectionSubmenuInclusionBehavior behavior)
 {
     switch (behavior) {
@@ -736,7 +722,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (!_private->coreFrame || !_private->coreFrame->document())
         return nil;
 
-    return kit(createFragmentFromMarkup(_private->coreFrame->document(), markupString, baseURLString, FragmentScriptingNotAllowed).get());
+    return kit(createFragmentFromMarkup(_private->coreFrame->document(), markupString, baseURLString, DisallowScriptingContent).get());
 }
 
 - (DOMDocumentFragment *)_documentFragmentWithNodesAsParagraphs:(NSArray *)nodes
@@ -797,6 +783,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     _private->coreFrame->editor()->computeAndSetTypingStyle(core(style)->copy().get(), undoAction);
 }
 
+#if ENABLE(DRAG_SUPPORT)
 - (void)_dragSourceEndedAt:(NSPoint)windowLoc operation:(NSDragOperation)operation
 {
     if (!_private->coreFrame)
@@ -809,6 +796,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
         LeftButton, PlatformEvent::MouseMoved, 0, false, false, false, false, currentTime());
     _private->coreFrame->eventHandler()->dragSourceEndedAt(event, (DragOperation)operation);
 }
+#endif
 
 - (BOOL)_canProvideDocumentSource
 {

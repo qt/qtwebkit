@@ -372,7 +372,6 @@ WebInspector.ResourcesPanel.prototype = {
         }
         if (view.searchCanceled)
             view.searchCanceled();
-        this._fetchAndApplyDiffMarkup(view, resource);
         this._innerShowView(view);
     },
 
@@ -385,49 +384,6 @@ WebInspector.ResourcesPanel.prototype = {
             return treeElement.sourceView();
         }
         return WebInspector.ResourceView.nonSourceViewForResource(resource);
-    },
-
-    _showRevisionView: function(revision)
-    {
-        var view = this._sourceViewForRevision(revision);
-        this._fetchAndApplyDiffMarkup(view, revision.resource, revision);
-        this._innerShowView(view);
-    },
-
-    _sourceViewForRevision: function(revision)
-    {
-        var treeElement = this._findTreeElementForRevision(revision);
-        return treeElement.sourceView();
-    },
-
-    /**
-     * @param {WebInspector.ResourceRevision=} revision
-     */
-    _fetchAndApplyDiffMarkup: function(view, resource, revision)
-    {
-        var baseRevision = resource.history[0];
-        if (!baseRevision)
-            return;
-        if (!(view instanceof WebInspector.SourceFrame))
-            return;
-
-        baseRevision.requestContent(step1.bind(this));
-
-        function step1(baseContent)
-        {
-            (revision ? revision : resource).requestContent(step2.bind(this, baseContent));
-        }
-
-        function step2(baseContent, revisionContent)
-        {
-            this._applyDiffMarkup(view, baseContent, revisionContent);
-        }
-    },
-
-    _applyDiffMarkup: function(view, baseContent, newContent)
-    {
-        var diffData = TextDiff.compute(baseContent, newContent);
-        view.markDiff(diffData);
     },
 
     /**
@@ -565,7 +521,7 @@ WebInspector.ResourcesPanel.prototype = {
         database.getTableNames(tableNamesCallback);
     },
 
-    updateDOMStorage: function(storageId)
+    domStorageUpdated: function(storageId)
     {
         var domStorage = this._domStorageForId(storageId);
         if (!domStorage)
@@ -831,21 +787,6 @@ WebInspector.ResourcesPanel.prototype = {
         }
 
         return this.sidebarTree.findTreeElement(resource, isAncestor, getParent);
-    },
-
-    _findTreeElementForRevision: function(revision)
-    {
-        function isAncestor(ancestor, object)
-        {
-            return false;
-        }
-
-        function getParent(object)
-        {
-            return null;
-        }
-
-        return this.sidebarTree.findTreeElement(revision, isAncestor, getParent);
     },
 
     showView: function(view)
@@ -1116,6 +1057,8 @@ WebInspector.FrameTreeElement.prototype = {
 
     appendResource: function(resource)
     {
+        if (resource.isHidden())
+            return;
         var categoryName = resource.type.name();
         var categoryElement = resource.type === WebInspector.resourceTypes.Document ? this : this._categoryElements[categoryName];
         if (!categoryElement) {
@@ -1125,8 +1068,6 @@ WebInspector.FrameTreeElement.prototype = {
         }
         var resourceTreeElement = new WebInspector.FrameResourceTreeElement(this._storagePanel, resource);
         this._insertInPresentationOrder(categoryElement, resourceTreeElement);
-        resourceTreeElement._populateRevisions();
-
         this._treeElementForResource[resource.url] = resourceTreeElement;
     },
 
@@ -1193,7 +1134,6 @@ WebInspector.FrameResourceTreeElement = function(storagePanel, resource)
     this._resource = resource;
     this._resource.addEventListener(WebInspector.Resource.Events.MessageAdded, this._consoleMessageAdded, this);
     this._resource.addEventListener(WebInspector.Resource.Events.MessagesCleared, this._consoleMessagesCleared, this);
-    this._resource.addEventListener(WebInspector.Resource.Events.RevisionAdded, this._revisionAdded, this);
     this.tooltip = resource.url;
 }
 
@@ -1250,45 +1190,10 @@ WebInspector.FrameResourceTreeElement.prototype = {
     _handleContextMenuEvent: function(event)
     {
         var contextMenu = new WebInspector.ContextMenu();
-        contextMenu.appendItem(WebInspector.openLinkExternallyLabel(), WebInspector.openResource.bind(WebInspector, this._resource.url, false));
-        contextMenu.appendItem(WebInspector.copyLinkAddressLabel(), InspectorFrontendHost.copyText.bind(InspectorFrontendHost, this._resource.url));
-        this._appendOpenInNetworkPanelAction(contextMenu, event);
-        WebInspector.populateResourceContextMenu(contextMenu, this._resource.url, null);
-        this._appendSaveAsAction(contextMenu, event);
+        contextMenu.appendApplicableItems(this._resource);
+        if (this._resource.request)
+            contextMenu.appendApplicableItems(this._resource.request);
         contextMenu.show(event);
-    },
-
-    _appendOpenInNetworkPanelAction: function(contextMenu, event)
-    {
-        if (!this._resource.request)
-            return;
-
-        contextMenu.appendItem(WebInspector.openInNetworkPanelLabel(), WebInspector.openRequestInNetworkPanel.bind(WebInspector, this._resource.request));
-    },
-
-    _appendSaveAsAction: function(contextMenu, event)
-    {
-        if (!InspectorFrontendHost.canSave())
-            return;
-
-        if (this._resource.type !== WebInspector.resourceTypes.Document &&
-            this._resource.type !== WebInspector.resourceTypes.Stylesheet &&
-            this._resource.type !== WebInspector.resourceTypes.Script)
-            return;
-
-        function doSave(forceSaveAs, content)
-        {
-            WebInspector.fileManager.save(this._resource.url, content, forceSaveAs);
-        }
-
-        function save(forceSaveAs)
-        {
-            this._resource.requestContent(doSave.bind(this, forceSaveAs));
-        }
-
-        contextMenu.appendSeparator();
-        contextMenu.appendItem(WebInspector.UIString("Save"), save.bind(this, false));
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Save as..." : "Save As..."), save.bind(this, true));
     },
 
     _setBubbleText: function(x)
@@ -1374,42 +1279,16 @@ WebInspector.FrameResourceTreeElement.prototype = {
         this._updateErrorsAndWarningsBubbles();
     },
 
-    _populateRevisions: function()
-    {
-        for (var i = 0; i < this._resource.history.length; ++i)
-            this._appendRevision(this._resource.history[i]);
-    },
-
-    _revisionAdded: function(event)
-    {
-        this._appendRevision(event.data);
-    },
-
-    _appendRevision: function(revision)
-    {
-        this.subtitleText = "";
-        this.insertChild(new WebInspector.ResourceRevisionTreeElement(this._storagePanel, revision), 0);
-        if (this._sourceView === this._storagePanel.visibleView)
-            this._storagePanel._showResourceView(this._resource);
-    },
-
     sourceView: function()
     {
         if (!this._sourceView) {
-            this._sourceView = new WebInspector.EditableResourceSourceFrame(this._resource);
+            this._sourceView = new WebInspector.ResourceSourceFrame(this._resource);
             if (this._resource.messages) {
                 for (var i = 0; i < this._resource.messages.length; i++)
                     this._sourceView.addMessage(this._resource.messages[i]);
             }
-            this._sourceView.addEventListener(WebInspector.EditableResourceSourceFrame.Events.TextEdited, this._sourceViewTextEdited, this);
         }
         return this._sourceView;
-    },
-
-    _sourceViewTextEdited: function(event)
-    {
-        var sourceFrame = event.data;
-        this.subtitleText = sourceFrame.isDirty() ? "*" : "";
     }
 }
 
@@ -1998,82 +1877,6 @@ WebInspector.ApplicationCacheFrameTreeElement.prototype = {
     }
 }
 WebInspector.ApplicationCacheFrameTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
-
-/**
- * @constructor
- * @extends {WebInspector.BaseStorageTreeElement}
- */
-WebInspector.ResourceRevisionTreeElement = function(storagePanel, revision)
-{
-    var title = revision.timestamp ? revision.timestamp.toLocaleTimeString() : WebInspector.UIString("(original)");
-    WebInspector.BaseStorageTreeElement.call(this, storagePanel, revision, title, ["resource-sidebar-tree-item", "resources-type-" + revision.resource.type.name()]);
-    if (revision.timestamp)
-        this.tooltip = revision.timestamp.toLocaleString();
-    this._revision = revision;
-}
-
-WebInspector.ResourceRevisionTreeElement.prototype = {
-    get itemURL()
-    {
-        return this._revision.resource.url;
-    },
-
-    onattach: function()
-    {
-        WebInspector.BaseStorageTreeElement.prototype.onattach.call(this);
-        this.listItemElement.draggable = true;
-        this.listItemElement.addEventListener("dragstart", this._ondragstart.bind(this), false);
-        this.listItemElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), true);
-    },
-
-    onselect: function()
-    {
-        WebInspector.BaseStorageTreeElement.prototype.onselect.call(this);
-        this._storagePanel._showRevisionView(this._revision);
-    },
-
-    _ondragstart: function(event)
-    {
-        if (this._revision.content) {
-            event.dataTransfer.setData("text/plain", this._revision.content);
-            event.dataTransfer.effectAllowed = "copy";
-            return true;
-        }
-    },
-
-    _handleContextMenuEvent: function(event)
-    {
-        var contextMenu = new WebInspector.ContextMenu();
-        contextMenu.appendItem(WebInspector.UIString("Revert to this revision"), this._revision.revertToThis.bind(this._revision));
-
-        if (InspectorFrontendHost.canSave()) {
-            function doSave(forceSaveAs, content)
-            {
-                WebInspector.fileManager.save(this._revision.resource.url, content, forceSaveAs);
-            }
-
-            function save(forceSaveAs)
-            {
-                this._revision.requestContent(doSave.bind(this, forceSaveAs));
-            }
-
-            contextMenu.appendSeparator();
-            contextMenu.appendItem(WebInspector.UIString("Save"), save.bind(this, false));
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Save as..." : "Save As..."), save.bind(this, true));
-        }
-
-        contextMenu.show(event);
-    },
-
-    sourceView: function()
-    {
-        if (!this._sourceView)
-            this._sourceView = new WebInspector.ResourceRevisionSourceFrame(this._revision);
-        return this._sourceView;
-    }
-}
-
-WebInspector.ResourceRevisionTreeElement.prototype.__proto__ = WebInspector.BaseStorageTreeElement.prototype;
 
 /**
  * @constructor

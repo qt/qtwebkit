@@ -68,6 +68,11 @@ WebInspector.RawSourceCode.prototype = {
     addScript: function(script)
     {
         this._scripts.push(script);
+        if (this._temporaryUISourceCode) {
+            var oldUISourceCode = this._temporaryUISourceCode;
+            this._temporaryUISourceCode = this._createUISourceCode();
+            this.dispatchEventToListeners(WebInspector.RawSourceCode.Events.UISourceCodeChanged, { uiSourceCode: this._temporaryUISourceCode, oldUISourceCode: oldUISourceCode });
+        }
     },
 
     /**
@@ -100,7 +105,7 @@ WebInspector.RawSourceCode.prototype = {
         else
             contentProvider = new WebInspector.ConcatenatedScriptsContentProvider(this._scripts);
 
-        var uiSourceCode = new WebInspector.JavaScriptSource(this.url, contentProvider, this._sourceMapping, isStandaloneScript);
+        var uiSourceCode = new WebInspector.JavaScriptSource(this.url, this._resource, contentProvider, this._sourceMapping, isStandaloneScript);
         uiSourceCode.isContentScript = this.isContentScript;
         return uiSourceCode;
     },
@@ -131,6 +136,7 @@ WebInspector.RawSourceCode.prototype = {
         this._resource = WebInspector.resourceForURL(this._pendingRequest.url);
         delete this._pendingRequest;
         var oldUISourceCode = this._uiSourceCode || this._temporaryUISourceCode;
+        delete this._temporaryUISourceCode;
         this._uiSourceCode = this._createUISourceCode();
         this.dispatchEventToListeners(WebInspector.RawSourceCode.Events.UISourceCodeChanged, { uiSourceCode: this._uiSourceCode, oldUISourceCode: oldUISourceCode });
     }

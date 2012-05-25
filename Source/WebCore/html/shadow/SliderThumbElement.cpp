@@ -53,8 +53,9 @@ namespace WebCore {
 
 inline static double sliderPosition(HTMLInputElement* element)
 {
-    StepRange range(element);
-    return range.proportionFromValue(range.valueFromElement(element));
+    const StepRange stepRange(element->createStepRange(RejectAny));
+    const double oldValue = parseToDoubleForNumberType(element->value(), stepRange.defaultValue());
+    return stepRange.proportionFromValue(stepRange.clampValue(oldValue));
 }
 
 inline static bool hasVerticalAppearance(HTMLInputElement* input)
@@ -235,11 +236,11 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
     if (position == currentPosition)
         return;
 
-    StepRange range(input);
     double fraction = static_cast<double>(position) / trackSize;
     if (isVertical || !renderBox()->style()->isLeftToRightDirection())
         fraction = 1 - fraction;
-    double value = range.clampValue(range.valueFromProportion(fraction));
+    StepRange stepRange(input->createStepRange(RejectAny));
+    double value = stepRange.clampValue(stepRange.valueFromProportion(fraction));
 
     // FIXME: This is no longer being set from renderer. Consider updating the method name.
     input->setValueFromRenderer(serializeForNumberType(value));

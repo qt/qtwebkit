@@ -85,7 +85,7 @@ public:
         }
 
         // Make sure that tiles all around the viewport will be requested.
-        emit engine->contentViewportChanged(QPointF());
+        emit engine->informVisibleContentChange(QPointF());
     }
 
 private:
@@ -98,22 +98,22 @@ static inline bool fuzzyCompare(qreal a, qreal b, qreal epsilon)
     return qAbs(a - b) < epsilon;
 }
 
-inline qreal QtViewportInteractionEngine::cssScaleFromItem(qreal itemScale)
+inline qreal QtViewportInteractionEngine::cssScaleFromItem(qreal itemScale) const
 {
     return itemScale / m_devicePixelRatio;
 }
 
-inline qreal QtViewportInteractionEngine::itemScaleFromCSS(qreal cssScale)
+inline qreal QtViewportInteractionEngine::itemScaleFromCSS(qreal cssScale) const
 {
     return cssScale * m_devicePixelRatio;
 }
 
-inline qreal QtViewportInteractionEngine::itemCoordFromCSS(qreal value)
+inline qreal QtViewportInteractionEngine::itemCoordFromCSS(qreal value) const
 {
     return value * m_devicePixelRatio;
 }
 
-inline QRectF QtViewportInteractionEngine::itemRectFromCSS(const QRectF& cssRect)
+inline QRectF QtViewportInteractionEngine::itemRectFromCSS(const QRectF& cssRect) const
 {
     QRectF itemRect;
 
@@ -152,12 +152,12 @@ QtViewportInteractionEngine::~QtViewportInteractionEngine()
 {
 }
 
-qreal QtViewportInteractionEngine::innerBoundedCSSScale(qreal cssScale)
+qreal QtViewportInteractionEngine::innerBoundedCSSScale(qreal cssScale) const
 {
     return qBound(m_minimumScale, cssScale, m_maximumScale);
 }
 
-qreal QtViewportInteractionEngine::outerBoundedCSSScale(qreal cssScale)
+qreal QtViewportInteractionEngine::outerBoundedCSSScale(qreal cssScale) const
 {
     if (m_allowsUserScaling) {
         // Bounded by [0.1, 10.0] like the viewport meta code in WebCore.
@@ -173,8 +173,6 @@ void QtViewportInteractionEngine::setItemRectVisible(const QRectF& itemRect)
     if (itemRect.isEmpty())
         return;
 
-    ViewportUpdateDeferrer guard(this);
-
     qreal itemScale = m_viewport->width() / itemRect.width();
 
     m_content->setContentsScale(itemScale);
@@ -186,27 +184,41 @@ void QtViewportInteractionEngine::setItemRectVisible(const QRectF& itemRect)
     m_viewport->setContentPos(newPosition);
 }
 
-bool QtViewportInteractionEngine::animateItemRectVisible(const QRectF& itemRect)
+// Ease out overshoot of 1.25 combined with ease in correction of 0.25. Both quadratic to have physical motion.
+static qreal physicalOvershoot(qreal t)
 {
+    return (-t * (t - 2)) * 1.25 - (t * t) * 0.25;
+}
+
+void QtViewportInteractionEngine::animateItemRectVisible(const QRectF& itemRect)
+{
+    ASSERT(m_scaleAnimation->state() == QAbstractAnimation::Stopped);
+
+    ASSERT(!scrollAnimationActive());
+    if (scrollAnimationActive())
+        return;
+
     QRectF currentItemRectVisible = m_viewport->mapRectToWebContent(m_viewport->boundingRect());
     if (itemRect == currentItemRectVisible)
-        return false;
+        return;
 
     // FIXME: Investigate why that animation doesn't run when we are unfocused.
     if (!m_viewport->isVisible() || !m_viewport->hasFocus()) {
         // Apply the end result immediately when we are non-visible.
         setItemRectVisible(itemRect);
-        return true;
+        return;
     }
 
+    QEasingCurve easingCurve;
+    easingCurve.setCustomType(physicalOvershoot);
+
     m_scaleAnimation->setDuration(kScaleAnimationDurationMillis);
-    m_scaleAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    m_scaleAnimation->setEasingCurve(easingCurve);
 
     m_scaleAnimation->setStartValue(currentItemRectVisible);
     m_scaleAnimation->setEndValue(itemRect);
 
     m_scaleAnimation->start();
-    return true;
 }
 
 void QtViewportInteractionEngine::flickableMoveStarted()
@@ -234,7 +246,7 @@ void QtViewportInteractionEngine::flickableMovingPositionUpdate()
 {
     QPointF newPosition = m_viewport->contentPos();
 
-    emit contentViewportChanged(m_lastScrollPosition - newPosition);
+    emit informVisibleContentChange(m_lastScrollPosition - newPosition);
 
     m_lastScrollPosition = newPosition;
 }
@@ -244,11 +256,11 @@ void QtViewportInteractionEngine::scaleAnimationStateChanged(QAbstractAnimation:
     switch (newState) {
     case QAbstractAnimation::Running:
         m_viewport->cancelFlick();
-        if (!m_scaleUpdateDeferrer)
-            m_scaleUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this, ViewportUpdateDeferrer::DeferUpdateAndSuspendContent));
+        ASSERT(!m_animationUpdateDeferrer);
+        m_animationUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this, ViewportUpdateDeferrer::DeferUpdateAndSuspendContent));
         break;
     case QAbstractAnimation::Stopped:
-        m_scaleUpdateDeferrer.clear();
+        m_animationUpdateDeferrer.clear();
         break;
     default:
         break;
@@ -275,10 +287,15 @@ void QtViewportInteractionEngine::pagePositionRequest(const QPoint& pagePosition
     QRectF endVisibleContentRect(endPosition / endItemScale, m_viewport->boundingRect().size() / endItemScale);
 
     setItemRectVisible(endVisibleContentRect);
+
+    // Make sure that tiles all around the viewport will be requested.
+    emit informVisibleContentChange(QPointF());
 }
 
 void QtViewportInteractionEngine::touchBegin()
 {
+    m_hadUserInteraction = true;
+
     // Prevents resuming the page between the user's flicks of the page while the animation is running.
     if (scrollAnimationActive())
         m_touchUpdateDeferrer = adoptPtr(new ViewportUpdateDeferrer(this, ViewportUpdateDeferrer::DeferUpdateAndSuspendContent));
@@ -302,6 +319,9 @@ QRectF QtViewportInteractionEngine::computePosRangeForItemAtScale(qreal itemScal
 
 void QtViewportInteractionEngine::focusEditableArea(const QRectF& caretArea, const QRectF& targetArea)
 {
+    // This can only happen as a result of a user interaction.
+    ASSERT(m_hadUserInteraction);
+
     QRectF endArea = itemRectFromCSS(targetArea);
 
     qreal endItemScale = itemScaleFromCSS(innerBoundedCSSScale(2.0));
@@ -336,13 +356,14 @@ void QtViewportInteractionEngine::focusEditableArea(const QRectF& caretArea, con
 
 void QtViewportInteractionEngine::zoomToAreaGestureEnded(const QPointF& touchPoint, const QRectF& targetArea)
 {
+    // This can only happen as a result of a user interaction.
+    ASSERT(m_hadUserInteraction);
+
     if (!targetArea.isValid())
         return;
 
-    if (scrollAnimationActive() || scaleAnimationActive())
+    if (m_suspendCount)
         return;
-
-    m_hadUserInteraction = true;
 
     const int margin = 10; // We want at least a little bit of margin.
     QRectF endArea = itemRectFromCSS(targetArea.adjusted(-margin, -margin, margin, margin));
@@ -417,11 +438,8 @@ void QtViewportInteractionEngine::zoomToAreaGestureEnded(const QPointF& touchPoi
     animateItemRectVisible(endVisibleContentRect);
 }
 
-bool QtViewportInteractionEngine::ensureContentWithinViewportBoundary(bool immediate)
+QRectF QtViewportInteractionEngine::nearestValidBounds() const
 {
-    if (scrollAnimationActive() || scaleAnimationActive())
-        return false;
-
     qreal endItemScale = itemScaleFromCSS(innerBoundedCSSScale(currentCSSScale()));
 
     const QRectF viewportRect = m_viewport->boundingRect();
@@ -434,11 +452,7 @@ bool QtViewportInteractionEngine::ensureContentWithinViewportBoundary(bool immed
 
     QRectF endVisibleContentRect(endPosition / endItemScale, viewportRect.size() / endItemScale);
 
-    if (immediate) {
-        setItemRectVisible(endVisibleContentRect);
-        return true;
-    }
-    return !animateItemRectVisible(endVisibleContentRect);
+    return endVisibleContentRect;
 }
 
 void QtViewportInteractionEngine::reset()
@@ -475,7 +489,7 @@ void QtViewportInteractionEngine::setCSSScale(qreal scale)
     m_content->setContentsScale(itemScaleFromCSS(newScale));
 }
 
-qreal QtViewportInteractionEngine::currentCSSScale()
+qreal QtViewportInteractionEngine::currentCSSScale() const
 {
     return cssScaleFromItem(m_content->contentsScale());
 }
@@ -492,7 +506,9 @@ bool QtViewportInteractionEngine::panGestureActive() const
 
 void QtViewportInteractionEngine::panGestureStarted(const QPointF& position, qint64 eventTimestampMillis)
 {
-    m_hadUserInteraction = true;
+    // This can only happen as a result of a user interaction.
+    ASSERT(m_hadUserInteraction);
+
     m_viewport->handleFlickableMousePress(position, eventTimestampMillis);
     m_lastPinchCenterInViewportCoordinates = position;
 }
@@ -528,7 +544,8 @@ bool QtViewportInteractionEngine::scaleAnimationActive() const
 
 void QtViewportInteractionEngine::cancelScrollAnimation()
 {
-    ViewportUpdateDeferrer guard(this);
+    if (!scrollAnimationActive())
+        return;
 
     // If the pan gesture recognizer receives a touch begin event
     // during an ongoing kinetic scroll animation of a previous
@@ -536,7 +553,7 @@ void QtViewportInteractionEngine::cancelScrollAnimation()
     // immediately positioned back to valid boundaries.
 
     m_viewport->cancelFlick();
-    ensureContentWithinViewportBoundary(/*immediate*/ true);
+    setItemRectVisible(nearestValidBounds());
 }
 
 void QtViewportInteractionEngine::interruptScaleAnimation()
@@ -552,10 +569,12 @@ bool QtViewportInteractionEngine::pinchGestureActive() const
 
 void QtViewportInteractionEngine::pinchGestureStarted(const QPointF& pinchCenterInViewportCoordinates)
 {
+    // This can only happen as a result of a user interaction.
+    ASSERT(m_hadUserInteraction);
+
     if (!m_allowsUserScaling)
         return;
 
-    m_hadUserInteraction = true;
     m_scaleStack.clear();
     m_zoomOutScale = 0.0;
 
@@ -565,7 +584,7 @@ void QtViewportInteractionEngine::pinchGestureStarted(const QPointF& pinchCenter
     m_pinchStartScale = m_content->contentsScale();
 
     // Reset the tiling look-ahead vector so that tiles all around the viewport will be requested on pinch-end.
-    emit contentViewportChanged(QPointF());
+    emit informVisibleContentChange(QPointF());
 }
 
 void QtViewportInteractionEngine::pinchGestureRequestUpdate(const QPointF& pinchCenterInViewportCoordinates, qreal totalScaleFactor)
@@ -598,9 +617,9 @@ void QtViewportInteractionEngine::pinchGestureEnded()
         return;
 
     m_pinchStartScale = -1;
-    // Clear the update deferrer now if we're in our final position and there won't be any animation to clear it later.
-    if (ensureContentWithinViewportBoundary())
-        m_scaleUpdateDeferrer.clear();
+
+    animateItemRectVisible(nearestValidBounds());
+    m_scaleUpdateDeferrer.clear(); // Clear after starting potential animation, which takes over deferring.
 }
 
 void QtViewportInteractionEngine::pinchGestureCancelled()
@@ -609,14 +628,18 @@ void QtViewportInteractionEngine::pinchGestureCancelled()
     m_scaleUpdateDeferrer.clear();
 }
 
+/*
+ * This is called for all changes of item scale, width or height.
+ * This is called when interacting, ie. during for instance pinch-zooming.
+ *
+ * FIXME: This is currently called twice if you concurrently change width and height.
+ */
 void QtViewportInteractionEngine::itemSizeChanged()
 {
-    // FIXME: This needs to be done smarter. What happens if it resizes when we were interacting?
     if (m_suspendCount)
         return;
 
-    ViewportUpdateDeferrer guard(this);
-    ensureContentWithinViewportBoundary(true);
+    setItemRectVisible(nearestValidBounds());
 }
 
 void QtViewportInteractionEngine::scaleContent(const QPointF& centerInCSSCoordinates, qreal cssScale)

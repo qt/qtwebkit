@@ -276,12 +276,12 @@ void WebLayer::setBackgroundColor(WebColor color)
 
 void WebLayer::setFilters(const WebFilterOperations& filters)
 {
-    m_private->setFilters(filters.toFilterOperations());
+    m_private->setFilters(filters);
 }
 
 void WebLayer::setBackgroundFilters(const WebFilterOperations& filters)
 {
-    m_private->setBackgroundFilters(filters.toFilterOperations());
+    m_private->setBackgroundFilters(filters);
 }
 
 void WebLayer::setDebugBorderColor(const WebColor& color)
@@ -292,6 +292,11 @@ void WebLayer::setDebugBorderColor(const WebColor& color)
 void WebLayer::setDebugBorderWidth(float width)
 {
     m_private->setDebugBorderWidth(width);
+}
+
+void WebLayer::setForceRenderSurface(bool forceRenderSurface)
+{
+    m_private->setForceRenderSurface(forceRenderSurface);
 }
 
 WebLayer::WebLayer(const PassRefPtr<LayerChromium>& node)

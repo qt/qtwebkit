@@ -43,6 +43,7 @@
 #include <IntRect.h>
 #include <JSCSSStyleDeclaration.h>
 #include <JSElement.h>
+#include <MemoryCache.h>
 #include <PageGroup.h>
 #include <PrintContext.h>
 #include <RenderTreeAsText.h>
@@ -420,6 +421,13 @@ bool DumpRenderTreeSupportEfl::findString(const Evas_Object* ewkView, const Stri
     return page->findString(text, options);
 }
 
+void DumpRenderTreeSupportEfl::setCSSGridLayoutEnabled(const Evas_Object* ewkView, bool enabled)
+{
+    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
+    if (corePage)
+        corePage->settings()->setCSSGridLayoutEnabled(enabled);
+}
+
 void DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(const Evas_Object* ewkView, bool enabled)
 {
 #if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
@@ -495,6 +503,11 @@ unsigned DumpRenderTreeSupportEfl::workerThreadCount()
 #else
     return 0;
 #endif
+}
+
+void DumpRenderTreeSupportEfl::setDeadDecodedDataDeletionInterval(double interval)
+{
+    WebCore::memoryCache()->setDeadDecodedDataDeletionInterval(interval);
 }
 
 HistoryItemChildrenVector DumpRenderTreeSupportEfl::childHistoryItems(const Ewk_History_Item* ewkHistoryItem)
@@ -617,28 +630,6 @@ void DumpRenderTreeSupportEfl::deliverAllMutationsIfNecessary()
 #endif
 }
 
-void DumpRenderTreeSupportEfl::setEditingBehavior(Evas_Object* ewkView, const char* editingBehavior)
-{
-    WebCore::EditingBehaviorType coreEditingBehavior;
-
-    if (!strcmp(editingBehavior, "win"))
-        coreEditingBehavior = WebCore::EditingWindowsBehavior;
-    else if (!strcmp(editingBehavior, "mac"))
-        coreEditingBehavior = WebCore::EditingMacBehavior;
-    else if (!strcmp(editingBehavior, "unix"))
-        coreEditingBehavior = WebCore::EditingUnixBehavior;
-    else {
-        ASSERT_NOT_REACHED();
-        return;
-    }
-
-    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
-    if (!corePage)
-        return;
-
-    corePage->settings()->setEditingBehaviorType(coreEditingBehavior);
-}
-
 String DumpRenderTreeSupportEfl::markerTextForListItem(JSContextRef context, JSValueRef nodeObject)
 {
     JSC::ExecState* exec = toJS(context);
@@ -654,6 +645,13 @@ void DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled(Evas_Object* 
     WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
     if (corePage)
         corePage->settings()->setInteractiveFormValidationEnabled(enabled);
+}
+
+void DumpRenderTreeSupportEfl::setValidationMessageTimerMagnification(Evas_Object* ewkView, int value)
+{
+    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
+    if (corePage)
+        corePage->settings()->setValidationMessageTimerMagnification(value);
 }
 
 JSValueRef DumpRenderTreeSupportEfl::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)

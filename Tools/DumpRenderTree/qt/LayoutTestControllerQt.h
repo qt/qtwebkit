@@ -240,6 +240,8 @@ public slots:
     void setPageVisibility(const char*);
     void resetPageVisibility();
 
+    void setAutomaticLinkDetectionEnabled(bool);
+
     // Empty stub method to keep parity with object model exposed by global LayoutTestController.
     void abortModal() {}
 
@@ -256,8 +258,6 @@ public slots:
 
     // Simulate a request an embedding application could make, populating per-session credential storage.
     void authenticateSession(const QString& url, const QString& username, const QString& password);
-
-    void setEditingBehavior(const QString& editingBehavior);
 
     void evaluateScriptInIsolatedWorldAndReturnValue(int worldID, const QString& script);
     void evaluateScriptInIsolatedWorld(int worldID, const QString& script);

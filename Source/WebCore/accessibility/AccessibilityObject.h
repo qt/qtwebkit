@@ -313,7 +313,8 @@ protected:
 public:
     virtual ~AccessibilityObject();
     virtual void detach();
-        
+    virtual bool isDetached() const { return true; }
+
     typedef Vector<RefPtr<AccessibilityObject> > AccessibilityChildrenVector;
     
     virtual bool isAccessibilityRenderObject() const { return false; }
@@ -707,7 +708,6 @@ protected:
     virtual ScrollableArea* getScrollableAreaIfScrollable() const { return 0; }
     virtual void scrollTo(const IntPoint&) const { }
 
-    virtual bool isDetached() const { return true; }
     static bool isAccessibilityObjectSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool objectMatchesSearchCriteriaWithResultLimit(AccessibilityObject*, AccessibilitySearchCriteria*, AccessibilityChildrenVector&);
@@ -730,6 +730,13 @@ protected:
     RefPtr<AccessibilityObjectWrapper> m_wrapper;
 #endif
 };
+
+#if !HAVE(ACCESSIBILITY)
+inline const AccessibilityObject::AccessibilityChildrenVector& AccessibilityObject::children() { return m_children; }
+inline const String& AccessibilityObject::actionVerb() const { return emptyString(); }
+inline int AccessibilityObject::lineForPosition(const VisiblePosition&) const { return -1; }
+inline void AccessibilityObject::updateBackingStore() { }
+#endif
 
 } // namespace WebCore
 

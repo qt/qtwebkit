@@ -92,6 +92,7 @@ public:
     static void scalePageBy(WebKitWebView*, float, float, float);
     static void setDefersLoading(WebKitWebView*, bool);
     static void setSmartInsertDeleteEnabled(WebKitWebView*, bool);
+    static void forceWebViewPaint(WebKitWebView*);
 
     // Accessibility
     static void incrementAccessibilityValue(AtkObject*);
@@ -127,6 +128,7 @@ public:
 
     static void deliverAllMutationsIfNecessary();
     static void setDomainRelaxationForbiddenForURLScheme(bool forbidden, const char* urlScheme);
+    static void setSerializeHTTPLoads(bool enabled);
 
 private:
     static bool s_drtRun;

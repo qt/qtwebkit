@@ -45,10 +45,8 @@ class StyleDeprecatedFlexibleBoxData;
 class StyleFilterData;
 #endif
 class StyleFlexibleBoxData;
-#if ENABLE(CSS_GRID_LAYOUT)
 class StyleGridData;
 class StyleGridItemData;
-#endif
 class StyleMarqueeData;
 class StyleMultiColData;
 class StyleReflection;
@@ -118,10 +116,8 @@ public:
     DataRef<StyleFilterData> m_filter; // Filter operations (url, sepia, blur, etc.)
 #endif
 
-#if ENABLE(CSS_GRID_LAYOUT)
     DataRef<StyleGridData> m_grid;
     DataRef<StyleGridItemData> m_gridItem;
-#endif
 
     OwnPtr<ContentData> m_content;
     OwnPtr<CounterDirectiveMap> m_counterDirectives;
@@ -174,10 +170,10 @@ public:
     unsigned m_wrapFlow: 3; // WrapFlow
     unsigned m_wrapThrough: 1; // WrapThrough
 
-    bool m_hasAspectRatio : 1; // Whether or not an aspect ratio has been specified.
 #if USE(ACCELERATED_COMPOSITING)
-    bool m_runningAcceleratedAnimation : 1;
+    unsigned m_runningAcceleratedAnimation : 1;
 #endif
+    unsigned m_hasAspectRatio : 1; // Whether or not an aspect ratio has been specified.
 
 private:
     StyleRareNonInheritedData();

@@ -54,6 +54,7 @@
 #include "ewk_private.h"
 #include "ewk_security_origin_private.h"
 #include "ewk_view_private.h"
+#include <Ecore_Input.h>
 #include <Eina.h>
 #include <Evas.h>
 #include <eina_safety_checks.h>
@@ -73,7 +74,7 @@ struct Ewk_Frame_Smart_Data {
     Evas_Object* region;
 #endif
     WebCore::Frame* frame;
-    const char* title;
+    Ewk_Text_With_Direction title;
     const char* uri;
     const char* name;
     bool editable : 1;
@@ -239,7 +240,7 @@ static void _ewk_frame_smart_del(Evas_Object* ewkFrame)
             smartData->frame = 0;
         }
 
-        eina_stringshare_del(smartData->title);
+        eina_stringshare_del(smartData->title.string);
         eina_stringshare_del(smartData->uri);
         eina_stringshare_del(smartData->name);
     }
@@ -342,10 +343,10 @@ const char* ewk_frame_uri_get(const Evas_Object* ewkFrame)
     return smartData->uri;
 }
 
-const char* ewk_frame_title_get(const Evas_Object* ewkFrame)
+const Ewk_Text_With_Direction* ewk_frame_title_get(const Evas_Object* ewkFrame)
 {
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData, 0);
-    return smartData->title;
+    return &smartData->title;
 }
 
 const char* ewk_frame_name_get(const Evas_Object* ewkFrame)
@@ -667,7 +668,7 @@ Eina_Bool ewk_frame_text_zoom_set(Evas_Object* ewkFrame, float textZoomFactor)
 void ewk_frame_hit_test_free(Ewk_Hit_Test* hitTest)
 {
     EINA_SAFETY_ON_NULL_RETURN(hitTest);
-    eina_stringshare_del(hitTest->title);
+    eina_stringshare_del(hitTest->title.string);
     eina_stringshare_del(hitTest->alternate_text);
     eina_stringshare_del(hitTest->link.text);
     eina_stringshare_del(hitTest->link.url);
@@ -712,7 +713,8 @@ Ewk_Hit_Test* ewk_frame_hit_test_new(const Evas_Object* ewkFrame, int x, int y)
 #endif
 
     WebCore::TextDirection direction;
-    hitTest->title = eina_stringshare_add(result.title(direction).utf8().data());
+    hitTest->title.string = eina_stringshare_add(result.title(direction).utf8().data());
+    hitTest->title.direction = (direction == WebCore::LTR) ? EWK_TEXT_DIRECTION_LEFT_TO_RIGHT : EWK_TEXT_DIRECTION_RIGHT_TO_LEFT;
     hitTest->alternate_text = eina_stringshare_add(result.altDisplayString().utf8().data());
     if (result.innerNonSharedNode() && result.innerNonSharedNode()->document()
         && result.innerNonSharedNode()->document()->frame())
@@ -948,7 +950,7 @@ Eina_Bool ewk_frame_feed_mouse_move(Evas_Object* ewkFrame, const Evas_Event_Mous
     return smartData->frame->eventHandler()->mouseMoved(event);
 }
 
-Eina_Bool ewk_frame_feed_touch_event(Evas_Object* ewkFrame, Ewk_Touch_Event_Type action, Eina_List* points, int metaState)
+Eina_Bool ewk_frame_feed_touch_event(Evas_Object* ewkFrame, Ewk_Touch_Event_Type action, Eina_List* points, unsigned modifiers)
 {
 #if ENABLE(TOUCH_EVENTS)
     EINA_SAFETY_ON_NULL_RETURN_VAL(points, false);
@@ -979,7 +981,17 @@ Eina_Bool ewk_frame_feed_touch_event(Evas_Object* ewkFrame, Ewk_Touch_Event_Type
         return false;
     }
 
-    WebCore::PlatformTouchEvent touchEvent(points, WebCore::IntPoint(x, y), type, metaState);
+    unsigned touchModifiers = 0;
+    if (modifiers & ECORE_EVENT_MODIFIER_ALT)
+        touchModifiers |= WebCore::PlatformEvent::AltKey;
+    if (modifiers & ECORE_EVENT_MODIFIER_CTRL)
+        touchModifiers |= WebCore::PlatformEvent::CtrlKey;
+    if (modifiers & ECORE_EVENT_MODIFIER_SHIFT)
+        touchModifiers |= WebCore::PlatformEvent::ShiftKey;
+    if (modifiers & ECORE_EVENT_MODIFIER_WIN)
+        touchModifiers |= WebCore::PlatformEvent::MetaKey;
+
+    WebCore::PlatformTouchEvent touchEvent(points, WebCore::IntPoint(x, y), type, static_cast<WebCore::PlatformEvent::Modifiers>(touchModifiers));
     return smartData->frame->eventHandler()->handleTouchEvent(touchEvent);
 #else
     return false;
@@ -1373,6 +1385,20 @@ void ewk_frame_load_provisional(Evas_Object* ewkFrame)
 
 /**
  * @internal
+ * Reports the frame provisional load failed.
+ *
+ * @param ewkFrame Frame.
+ * @param error Load error.
+ *
+ * Emits signal: "load,provisional,failed" with pointer to Ewk_Frame_Load_Error.
+ */
+void ewk_frame_load_provisional_failed(Evas_Object* ewkFrame, const Ewk_Frame_Load_Error* error)
+{
+    evas_object_smart_callback_call(ewkFrame, "load,provisional,failed", const_cast<Ewk_Frame_Load_Error*>(error));
+}
+
+/**
+ * @internal
  * Reports the frame finished first layout.
  *
  * @param ewkFrame Frame.
@@ -1547,13 +1573,14 @@ void ewk_frame_contents_size_changed(Evas_Object* ewkFrame, Evas_Coord width, Ev
  *
  * Reports title changed.
  */
-void ewk_frame_title_set(Evas_Object* ewkFrame, const char* title)
+void ewk_frame_title_set(Evas_Object* ewkFrame, const Ewk_Text_With_Direction* title)
 {
-    DBG("ewkFrame=%p, title=%s", ewkFrame, title ? title : "(null)");
+    DBG("ewkFrame=%p, title=%s", ewkFrame, title->string ? title->string : "(null)");
     EWK_FRAME_SD_GET_OR_RETURN(ewkFrame, smartData);
-    if (!eina_stringshare_replace(&smartData->title, title))
+    if (!eina_stringshare_replace(&smartData->title.string, title->string))
         return;
-    evas_object_smart_callback_call(ewkFrame, "title,changed", (void*)smartData->title);
+    smartData->title.direction = title->direction;
+    evas_object_smart_callback_call(ewkFrame, "title,changed", (void*)title);
 }
 
 /**

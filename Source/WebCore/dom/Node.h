@@ -223,21 +223,21 @@ public:
 
     Node* shadowAncestorNode() const;
     ShadowRoot* shadowRoot() const;
+    ShadowRoot* youngestShadowRoot() const;
+
     // Returns 0, a child of ShadowRoot, or a legacy shadow root.
     Node* nonBoundaryShadowTreeRootNode();
     bool isInShadowTree() const;
     // Node's parent, shadow tree host.
     ContainerNode* parentOrHostNode() const;
     Element* parentOrHostElement() const;
+    void setParentOrHostNode(ContainerNode*);
     Node* highestAncestor() const;
 
     // Use when it's guaranteed to that shadowHost is 0.
     ContainerNode* parentNodeGuaranteedHostFree() const;
     // Returns the parent node, but 0 if the parent node is a ShadowRoot.
     ContainerNode* nonShadowBoundaryParentNode() const;
-
-    Element* shadowHost() const;
-    void setShadowHost(Element*);
 
     bool selfOrAncestorHasDirAutoAttribute() const { return getFlag(SelfOrAncestorHasDirAutoFlag); }
     void setSelfOrAncestorHasDirAutoAttribute(bool flag) { setFlag(flag, SelfOrAncestorHasDirAutoFlag); }
@@ -523,28 +523,28 @@ public:
     // This is similar to the DOMNodeInsertedIntoDocument DOM event, but does not require the overhead of event
     // dispatching.
     //
-    // Webkit notifies this callback regardless if the subtree of the node is a document tree or a floating subtree.
+    // WebKit notifies this callback regardless if the subtree of the node is a document tree or a floating subtree.
     // Implementation can determine the type of subtree by seeing insertionPoint->inDocument().
     // For a performance reason, notifications are delivered only to ContainerNode subclasses if the insertionPoint is out of document.
     //
-    // There are another callback named didNotifyDescendantInseretions(), which is called after all the descendant is notified.
-    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallDidNotifyDescendantInseretions
+    // There are another callback named didNotifyDescendantInsertions(), which is called after all the descendant is notified.
+    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallDidNotifyDescendantInsertions
     // from insrtedInto().
     //
     enum InsertionNotificationRequest {
         InsertionDone,
-        InsertionShouldCallDidNotifyDescendantInseretions
+        InsertionShouldCallDidNotifyDescendantInsertions
     };
 
-    virtual InsertionNotificationRequest insertedInto(Node* insertionPoint);
-    virtual void didNotifyDescendantInseretions(Node*) { }
+    virtual InsertionNotificationRequest insertedInto(ContainerNode* insertionPoint);
+    virtual void didNotifyDescendantInsertions(ContainerNode*) { }
 
     // Notifies the node that it is no longer part of the tree.
     //
     // This is a dual of insertedInto(), and is similar to the DOMNodeRemovedFromDocument DOM event, but does not require the overhead of event
     // dispatching, and is called _after_ the node is removed from the tree.
     //
-    virtual void removedFrom(Node* insertionPoint);
+    virtual void removedFrom(ContainerNode* insertionPoint);
 
 #ifndef NDEBUG
     virtual void formatForDebugger(char* buffer, unsigned length) const;
@@ -606,7 +606,7 @@ public:
     void dispatchRegionLayoutUpdateEvent();
 
     void dispatchSubtreeModifiedEvent();
-    void dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent);
+    bool dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent);
     void dispatchFocusInEvent(const AtomicString& eventType, PassRefPtr<Node> oldFocusedNode);
     void dispatchFocusOutEvent(const AtomicString& eventType, PassRefPtr<Node> newFocusedNode);
 
@@ -776,6 +776,7 @@ private:
     // This method is made private to ensure a compiler error on call sites that
     // don't follow this rule.
     using TreeShared<ContainerNode>::parent;
+    using TreeShared<ContainerNode>::setParent;
 
     void trackForDebugging();
 
@@ -831,6 +832,11 @@ inline void addSubresourceURL(ListHashSet<KURL>& urls, const KURL& url)
 inline ContainerNode* Node::parentNode() const
 {
     return getFlag(IsShadowRootFlag) ? 0 : parent();
+}
+
+inline void Node::setParentOrHostNode(ContainerNode* parent)
+{
+    setParent(parent);
 }
 
 inline ContainerNode* Node::parentOrHostNode() const

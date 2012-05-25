@@ -66,14 +66,59 @@ IntRect CCLayerTreeHostCommon::calculateVisibleRect(const IntRect& targetSurface
 }
 
 template<typename LayerType>
+static inline bool layerIsInExisting3DRenderingContext(LayerType* layer)
+{
+    // According to current W3C spec on CSS transforms, a layer is part of an established
+    // 3d rendering context if its parent has transform-style of preserves-3d.
+    return layer->parent() && layer->parent()->preserves3D();
+}
+
+template<typename LayerType>
+static bool layerIsRootOfNewRenderingContext(LayerType* layer)
+{
+    // According to current W3C spec on CSS transforms (Section 6.1), a layer is the
+    // beginning of 3d rendering context if its parent does not have transform-style:
+    // preserve-3d, but this layer itself does.
+    if (layer->parent())
+        return !layer->parent()->preserves3D() && layer->preserves3D();
+
+    return layer->preserves3D();
+}
+
+template<typename LayerType>
+static bool isLayerBackFaceVisible(LayerType* layer)
+{
+    // The current W3C spec on CSS transforms says that backface visibility should be
+    // determined differently depending on whether the layer is in a "3d rendering
+    // context" or not. For Chromium code, we can determine whether we are in a 3d
+    // rendering context by checking if the parent preserves 3d.
+
+    if (layerIsInExisting3DRenderingContext(layer))
+        return layer->drawTransform().isBackFaceVisible();
+
+    // In this case, either the layer establishes a new 3d rendering context, or is not in
+    // a 3d rendering context at all.
+    return layer->transform().isBackFaceVisible();
+}
+
+template<typename LayerType>
+static bool isSurfaceBackFaceVisible(LayerType* layer, const TransformationMatrix& drawTransform)
+{
+    if (layerIsInExisting3DRenderingContext(layer))
+        return drawTransform.isBackFaceVisible();
+
+    if (layerIsRootOfNewRenderingContext(layer))
+        return layer->transform().isBackFaceVisible();
+
+    // If the renderSurface is not part of a new or existing rendering context, then the
+    // layers that contribute to this surface will decide back-face visibility for themselves.
+    return false;
+}
+
+template<typename LayerType>
 static IntRect calculateVisibleLayerRect(LayerType* layer)
 {
     ASSERT(layer->targetRenderSurface());
-
-    // Animated layers can exist in the render surface tree that are not visible currently
-    // and have their back face showing. In this case, their visible rect should be empty.
-    if (!layer->doubleSided() && layer->screenSpaceTransform().isBackFaceVisible())
-        return IntRect();
 
     IntRect targetSurfaceRect = layer->targetRenderSurface()->contentRect();
 
@@ -160,7 +205,7 @@ static bool layerShouldBeSkipped(LayerType* layer)
         return true;
 
     // The layer should not be drawn if (1) it is not double-sided and (2) the back of the layer is known to be facing the screen.
-    if (!layer->doubleSided() && transformToScreenIsKnown(layer) && layer->screenSpaceTransform().isBackFaceVisible())
+    if (!layer->doubleSided() && transformToScreenIsKnown(layer) && isLayerBackFaceVisible(layer))
         return true;
 
     return false;
@@ -197,6 +242,10 @@ static bool subtreeShouldRenderToSeparateSurface(LayerType* layer, bool axisAlig
     // A layer and its descendants should render onto a new RenderSurface if any of these rules hold:
     //
 
+    // If we force it.
+    if (layer->forceRenderSurface())
+        return true;
+
     // If the layer uses a mask.
     if (layer->maskLayer())
         return true;
@@ -211,20 +260,19 @@ static bool subtreeShouldRenderToSeparateSurface(LayerType* layer, bool axisAlig
 
     // If the layer flattens its subtree (i.e. the layer doesn't preserve-3d), but it is
     // treated as a 3D object by its parent (i.e. parent does preserve-3d).
-    if (layer->parent() && layer->parent()->preserves3D() && !layer->preserves3D() && descendantDrawsContent)
-        return true;
-
-    // On the main thread side, animating transforms are unknown, and may cause a RenderSurface on the impl side.
-    // Since they are cheap, we create a rendersurface for all animating transforms to cover these cases, and so
-    // that we can consider descendants as not animating relative to their target to aid culling.
-    if (!transformToParentIsKnown(layer) && descendantDrawsContent)
+    if (layerIsInExisting3DRenderingContext(layer) && !layer->preserves3D() && descendantDrawsContent)
         return true;
 
     // If the layer clips its descendants but it is not axis-aligned with respect to its parent.
-    if (layer->masksToBounds() && !axisAlignedWithRespectToParent && descendantDrawsContent)
+    // On the main thread, when the transform is being animated, it is treated as unknown and we
+    // always error on the side of making a render surface, to let us consider descendents as
+    // not animating relative to their target to aid culling.
+    if (layer->masksToBounds() && (!axisAlignedWithRespectToParent || !transformToParentIsKnown(layer)) && descendantDrawsContent)
         return true;
 
     // If the layer has opacity != 1 and does not have a preserves-3d transform style.
+    // On the main thread, when opacity is being animated, it is treated as neither 1
+    // nor 0.
     if (!layerOpacityIsOpaque(layer) && !layer->preserves3D() && descendantDrawsContent)
         return true;
 
@@ -382,6 +430,10 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
     layer->setUsesLayerClipping(false);
 
     if (subtreeShouldRenderToSeparateSurface(layer, isScaleOrTranslation(combinedTransform))) {
+        // Check back-face visibility before continuing with this surface and its subtree
+        if (!layer->doubleSided() && transformToParentIsKnown(layer) && isSurfaceBackFaceVisible(layer, combinedTransform))
+            return false;
+
         if (!layer->renderSurface())
             layer->createRenderSurface();
 
@@ -553,8 +605,10 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
         FloatSize centerOffsetDueToClipping;
 
         // Don't clip if the layer is reflected as the reflection shouldn't be
-        // clipped.
-        if (!layer->replicaLayer()) {
+        // clipped. If the layer is animating, then the surface's transform to
+        // its target is not known on the main thread, and we should not use it
+        // to clip.
+        if (!layer->replicaLayer() && transformToParentIsKnown(layer)) {
             if (!renderSurface->clipRect().isEmpty() && !clippedContentRect.isEmpty()) {
                 IntRect surfaceClipRect = CCLayerTreeHostCommon::calculateVisibleRect(renderSurface->clipRect(), clippedContentRect, renderSurface->originTransform());
                 clippedContentRect.intersect(surfaceClipRect);

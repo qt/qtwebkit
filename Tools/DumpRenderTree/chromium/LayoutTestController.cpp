@@ -54,6 +54,7 @@
 #include "WebKit.h"
 #include "WebNotificationPresenter.h"
 #include "WebPermissions.h"
+#include "WebPrintParams.h"
 #include "WebScriptSource.h"
 #include "WebSecurityPolicy.h"
 #include "platform/WebSerializedScriptValue.h"
@@ -191,7 +192,6 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("setDatabaseQuota", &LayoutTestController::setDatabaseQuota);
     bindMethod("setDeferMainResourceDataLoad", &LayoutTestController::setDeferMainResourceDataLoad);
     bindMethod("setDomainRelaxationForbiddenForURLScheme", &LayoutTestController::setDomainRelaxationForbiddenForURLScheme);
-    bindMethod("setEditingBehavior", &LayoutTestController::setEditingBehavior);
     bindMethod("setAudioData", &LayoutTestController::setAudioData);
     bindMethod("setGeolocationPermission", &LayoutTestController::setGeolocationPermission);
     bindMethod("setIconDatabaseEnabled", &LayoutTestController::setIconDatabaseEnabled);
@@ -1557,6 +1557,8 @@ void LayoutTestController::overridePreference(const CppArgumentList& arguments, 
         prefs->experimentalWebGLEnabled = cppVariantToBool(value);
     else if (key == "WebKitCSSRegionsEnabled")
         prefs->experimentalCSSRegionsEnabled = cppVariantToBool(value);
+    else if (key == "WebKitCSSGridLayoutEnabled")
+        prefs->experimentalCSSGridLayoutEnabled = cppVariantToBool(value);
     else if (key == "WebKitHyperlinkAuditingEnabled")
         prefs->hyperlinkAuditingEnabled = cppVariantToBool(value);
     else if (key == "WebKitEnableCaretBrowsing")
@@ -1806,8 +1808,8 @@ void LayoutTestController::numberOfPages(const CppArgumentList& arguments, CppVa
     WebFrame* frame = m_shell->webView()->mainFrame();
     if (!frame)
         return;
-    WebSize size(pageWidthInPixels, pageHeightInPixels);
-    int numberOfPages = frame->printBegin(size);
+    WebPrintParams printParams(WebSize(pageWidthInPixels, pageHeightInPixels));
+    int numberOfPages = frame->printBegin(printParams);
     frame->printEnd();
     result->set(numberOfPages);
 }
@@ -1873,22 +1875,6 @@ void LayoutTestController::addUserStyleSheet(const CppArgumentList& arguments, C
         // Chromium defaults to InjectInSubsequentDocuments, but for compatibility
         // with the other ports' DRTs, we use UserStyleInjectInExistingDocuments.
         WebView::UserStyleInjectInExistingDocuments);
-}
-
-void LayoutTestController::setEditingBehavior(const CppArgumentList& arguments, CppVariant* results)
-{
-    string key = arguments[0].toString();
-    if (key == "mac") {
-        m_shell->preferences()->editingBehavior = WebSettings::EditingBehaviorMac;
-        m_shell->applyPreferences();
-    } else if (key == "win") {
-        m_shell->preferences()->editingBehavior = WebSettings::EditingBehaviorWin;
-        m_shell->applyPreferences();
-    } else if (key == "unix") {
-        m_shell->preferences()->editingBehavior = WebSettings::EditingBehaviorUnix;
-        m_shell->applyPreferences();
-    } else
-        logErrorToConsole("Passed invalid editing behavior. Should be 'mac', 'win', or 'unix'.");
 }
 
 void LayoutTestController::setMockDeviceOrientation(const CppArgumentList& arguments, CppVariant* result)
@@ -2214,6 +2200,11 @@ void LayoutTestController::setPageVisibility(const CppArgumentList& arguments, C
         else if (newVisibility == "preview")
             m_shell->webView()->setVisibilityState(WebPageVisibilityStatePreview, false);
     }
+}
+
+void LayoutTestController::setAutomaticLinkDetectionEnabled(bool)
+{
+    // Not Implemented
 }
 
 void LayoutTestController::setTextDirection(const CppArgumentList& arguments, CppVariant* result)

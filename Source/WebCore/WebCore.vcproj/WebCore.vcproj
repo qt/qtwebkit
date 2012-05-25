@@ -3322,6 +3322,62 @@
 				>
 			</File>
 			<File
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSDOMError.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSDOMError.h"
+				>
+			</File>
+			<File
 				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSDOMFileSystem.cpp"
 				>
 				<FileConfiguration
@@ -21834,6 +21890,63 @@
 				>
 			</File>
 			<File
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSSVGZoomAndPan.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSSVGZoomAndPan.h"
+				>
+			</File>
+
+			<File
 				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSSVGZoomEvent.cpp"
 				>
 				<FileConfiguration
@@ -27846,6 +27959,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\platform\LengthBox.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\platform\LengthBox.h"
 				>
 			</File>
@@ -28850,6 +28967,14 @@
 				</File>
 				<File
 					RelativePath="..\platform\graphics\FontTraitsMask.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutBoxExtent.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\FractionalLayoutBoxExtent.cpp"
 					>
 				</File>
 				<File
@@ -37181,12 +37306,28 @@
 				RelativePath="..\css\StyleRule.h"
 				>
 			</File>
+            <File
+				RelativePath="..\css\StyleRuleImport.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\css\StyleRuleImport.h"
+				>
+			</File>
 			<File
 				RelativePath="..\css\StyleSheet.cpp"
 				>
 			</File>
 			<File
 				RelativePath="..\css\StyleSheet.h"
+				>
+			</File>
+			<File
+				RelativePath="..\css\StyleSheetContents.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\css\StyleSheetContents.h"
 				>
 			</File>
 			<File
@@ -43584,62 +43725,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\rendering\svg\SVGMarkerLayoutInfo.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\rendering\svg\SVGMarkerLayoutInfo.h"
-				>
-			</File>
-			<File
 				RelativePath="..\rendering\svg\SVGPathData.cpp"
 				>
 				<FileConfiguration
@@ -49535,6 +49620,62 @@
 			</File>
 			<File
 				RelativePath="..\dom\DOMCoreException.h"
+				>
+			</File>
+			<File
+				RelativePath="..\dom\DOMError.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\DOMError.h"
 				>
 			</File>
 			<File
@@ -62909,6 +63050,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\bindings\generic\ContextEnabledFeatures.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\bindings\generic\ContextEnabledFeatures.h"
+					>
+				</File>
+				<File
 					RelativePath="..\bindings\generic\GenericBinding.h"
 					>
 				</File>
@@ -73346,10 +73495,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\inspector\InspectorFileSystemInstrumentation.h"
-				>
-			</File>
-			<File
 				RelativePath="..\inspector\InspectorFrontendChannel.h"
 				>
 			</File>
@@ -74481,6 +74626,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\NativeMemorySnapshotView.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\NavigatorView.js"
 					>
 				</File>
@@ -74654,6 +74803,14 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\ResourceWebSocketFrameView.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\revisionHistory.css"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\RevisionHistoryView.js"
 					>
 				</File>
 				<File

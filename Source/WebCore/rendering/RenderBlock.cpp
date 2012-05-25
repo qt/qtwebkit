@@ -58,6 +58,7 @@
 #include "RenderView.h"
 #include "Settings.h"
 #include "SVGTextRunRenderingContext.h"
+#include "ShadowRoot.h"
 #include "TransformState.h"
 #include <wtf/StdLibExtras.h>
 
@@ -852,6 +853,10 @@ void RenderBlock::addChildIgnoringAnonymousColumnBlocks(RenderObject* newChild, 
         }
     }
 
+    // Nothing goes before the intruded run-in.
+    if (beforeChild && beforeChild->isRunIn() && runInIsPlacedIntoSiblingBlock(beforeChild))
+        beforeChild = beforeChild->nextSibling();
+
     // Check for a spanning element in columns.
     RenderBlock* columnsBlockAncestor = columnsBlockForSpanningElement(newChild);
     if (columnsBlockAncestor) {
@@ -933,13 +938,8 @@ void RenderBlock::addChildIgnoringAnonymousColumnBlocks(RenderObject* newChild, 
 
     RenderBox::addChild(newChild, beforeChild);
  
-    // Handle positioning of run-ins.
-    if (newChild->isRunIn())
-        moveRunInUnderSiblingBlockIfNeeded(newChild);
-    else if (RenderObject* prevSibling = newChild->previousSibling()) {
-        if (prevSibling->isRunIn())
-            moveRunInUnderSiblingBlockIfNeeded(prevSibling);
-    }
+    // Handle placement of run-ins.
+    placeRunInIfNeeded(newChild, DoNotPlaceGeneratedRunIn);
 
     if (madeBoxesNonInline && parent() && isAnonymousBlock() && parent()->isRenderBlock())
         toRenderBlock(parent())->removeLeftoverAnonymousBlock(this);
@@ -1046,14 +1046,14 @@ void RenderBlock::makeChildrenNonInline(RenderObject *insertionPoint)
     if (!child)
         return;
 
+    deleteLineBoxTree();
+
     // Since we are going to have block children, we have to move
     // back the run-in to its original place.
     if (child->isRunIn()) {
         moveRunInToOriginalPosition(child);
         child = firstChild();
     }
-
-    deleteLineBoxTree();
 
     while (child) {
         RenderObject *inlineRunStart, *inlineRunEnd;
@@ -1768,11 +1768,26 @@ static void destroyRunIn(RenderBoxModelObject* runIn)
     ASSERT(runIn->isRunIn());
     ASSERT(!runIn->firstChild());
 
-    // If it is a block run-in, delete its line box tree as well. This is needed as our
-    // children got moved and our line box tree is no longer valid.
+    // Delete our line box tree. This is needed as our children got moved
+    // and our line box tree is no longer valid.
     if (runIn->isRenderBlock())
         toRenderBlock(runIn)->deleteLineBoxTree();
+    else if (runIn->isRenderInline())
+        toRenderInline(runIn)->deleteLineBoxTree();
+    else
+        ASSERT_NOT_REACHED();
+
     runIn->destroy();
+}
+
+void RenderBlock::placeRunInIfNeeded(RenderObject* newChild, PlaceGeneratedRunInFlag flag)
+{
+    if (newChild->isRunIn() && (flag == PlaceGeneratedRunIn || !newChild->isBeforeOrAfterContent()))
+        moveRunInUnderSiblingBlockIfNeeded(newChild);
+    else if (RenderObject* prevSibling = newChild->previousSibling()) {
+        if (prevSibling->isRunIn() && (flag == PlaceGeneratedRunIn || !newChild->isBeforeOrAfterContent()))
+            moveRunInUnderSiblingBlockIfNeeded(prevSibling);
+    }
 }
 
 RenderBoxModelObject* RenderBlock::createReplacementRunIn(RenderBoxModelObject* runIn)
@@ -1820,8 +1835,8 @@ void RenderBlock::moveRunInUnderSiblingBlockIfNeeded(RenderObject* runIn)
     if (!runIn->isRenderBlock())
         return;
 
-    // We shouldn't run in into the sibling block if we are part of a
-    // continuation chain. In that case, treat it as a normal block.
+    // FIXME: We don't support run-ins with or as part of a continuation
+    // as it makes the back-and-forth placing complex.
     if (runIn->isElementContinuation() || runIn->virtualContinuation())
         return;
 
@@ -1829,6 +1844,9 @@ void RenderBlock::moveRunInUnderSiblingBlockIfNeeded(RenderObject* runIn)
     // be a RenderListBox or RenderMenuList, and hence cannot be a RenderInline run-in.
     Node* runInNode = runIn->node();
     if (runInNode && runInNode->hasTagName(selectTag))
+        return;
+
+    if (runInNode && runInNode->hasTagName(progressTag))
         return;
 
     RenderObject* curr = runIn->nextSibling();
@@ -1851,19 +1869,39 @@ void RenderBlock::moveRunInUnderSiblingBlockIfNeeded(RenderObject* runIn)
     // since it handles correct placement of the children, especially where we cannot insert
     // anything before the first child. e.g. details tag. See https://bugs.webkit.org/show_bug.cgi?id=58228.
     curr->addChild(newRunIn, curr->firstChild());
+
+    // Make sure that |this| get a layout since its run-in child moved.
+    curr->setNeedsLayoutAndPrefWidthsRecalc();
+}
+
+bool RenderBlock::runInIsPlacedIntoSiblingBlock(RenderObject* runIn)
+{
+    ASSERT(runIn->isRunIn());
+
+    // If we don't have a parent, we can't be moved into our sibling block.
+    if (!parent())
+        return false;
+
+    // An intruded run-in needs to be an inline.
+    if (!runIn->isRenderInline())
+        return false;
+
+    return true;
 }
 
 void RenderBlock::moveRunInToOriginalPosition(RenderObject* runIn)
 {
     ASSERT(runIn->isRunIn());
 
-    // If we don't have a parent, there is nothing to move. This might
-    // happen if |this| got detached from parent after |runIn| run into |this|.
-    if (!parent())
+    if (!runInIsPlacedIntoSiblingBlock(runIn))
         return;
 
-    // An intruded run-in needs to be an inline.
-    if (!runIn->isRenderInline())
+    // FIXME: Run-in that are now placed in sibling block can break up into continuation
+    // chains when new children are added to it. We cannot easily send them back to their
+    // original place since that requires writing integration logic with RenderInline::addChild
+    // and all other places that might cause continuations to be created (without blowing away
+    // |this|). Disabling this feature for now to prevent crashes.
+    if (runIn->isElementContinuation() || runIn->virtualContinuation())
         return;
 
     RenderBoxModelObject* oldRunIn = toRenderBoxModelObject(runIn);
@@ -1872,6 +1910,9 @@ void RenderBlock::moveRunInToOriginalPosition(RenderObject* runIn)
 
     // Add the run-in block as our previous sibling.
     parent()->addChild(newRunIn, this);
+
+    // Make sure that the parent holding the new run-in gets layout.
+    parent()->setNeedsLayoutAndPrefWidthsRecalc();
 }
 
 LayoutUnit RenderBlock::collapseMargins(RenderBox* child, MarginInfo& marginInfo)
@@ -1974,6 +2015,16 @@ LayoutUnit RenderBlock::collapseMargins(RenderBox* child, MarginInfo& marginInfo
         logicalTop = min(logicalTop, nextPageLogicalTop(beforeCollapseLogicalTop));
         setLogicalHeight(logicalHeight() + (logicalTop - oldLogicalTop));
     }
+
+    // If we have collapsed into a previous sibling and so reduced the height of the parent, ensure any floats that now
+    // overhang from the previous sibling are added to our parent
+    RenderObject* prev = child->previousSibling();
+    if (prev && prev->isRenderBlock()) {
+        RenderBlock* block = toRenderBlock(prev);
+        if (block->m_floatingObjects && block->lowestFloatLogicalBottom() > logicalTop) 
+            addOverhangingFloats(block, false);
+    }
+
     return logicalTop;
 }
 
@@ -3346,6 +3397,13 @@ LayoutRect RenderBlock::blockSelectionGap(RenderBlock* rootBlock, const LayoutPo
     return gapRect;
 }
 
+static inline void alignSelectionRectToDevicePixels(LayoutRect& rect)
+{
+    LayoutUnit maxX = floorToInt(rect.maxX());
+    rect.setX(floorToInt(rect.x()));
+    rect.setWidth((maxX - rect.x()).round());
+}
+
 LayoutRect RenderBlock::logicalLeftSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
                                                 RenderObject* selObj, LayoutUnit logicalLeft, LayoutUnit logicalTop, LayoutUnit logicalHeight, const PaintInfo* paintInfo)
 {
@@ -3432,15 +3490,15 @@ RenderBlock* RenderBlock::blockBeforeWithinSelectionRoot(LayoutSize& offset) con
     if (isSelectionRoot())
         return 0;
 
-    const RenderBox* object = this;
+    const RenderObject* object = this;
     RenderObject* sibling;
     do {
         sibling = object->previousSibling();
         while (sibling && (!sibling->isRenderBlock() || toRenderBlock(sibling)->isSelectionRoot()))
             sibling = sibling->previousSibling();
 
-        offset -= LayoutSize(object->logicalLeft(), object->logicalTop());
-        object = object->parentBox();
+        offset -= LayoutSize(toRenderBlock(object)->logicalLeft(), toRenderBlock(object)->logicalTop());
+        object = object->parent();
     } while (!sibling && object && object->isRenderBlock() && !toRenderBlock(object)->isSelectionRoot());
 
     if (!sibling)
@@ -4292,7 +4350,7 @@ void RenderBlock::addIntrudingFloats(RenderBlock* prev, LayoutUnit logicalLeftOf
     if (!prev->m_floatingObjects)
         return;
 
-    logicalLeftOffset += (isHorizontalWritingMode() ? marginLeft() : marginTop());
+    logicalLeftOffset += marginLogicalLeft();
 
     const FloatingObjectSet& prevSet = prev->m_floatingObjects->set();
     FloatingObjectSetIterator prevEnd = prevSet.end();
@@ -5475,7 +5533,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                     child->setPreferredLogicalWidthsDirty(false);
                 } else {
                     // Inline replaced elts add in their margins to their min/max values.
-                    float margins = 0;
+                    LayoutUnit margins = 0;
                     Length startMargin = childStyle->marginStart();
                     Length endMargin = childStyle->marginEnd();
                     if (startMargin.isFixed())
@@ -5766,7 +5824,7 @@ bool RenderBlock::hasLineIfEmpty() const
     if (node()->isRootEditableElement())
         return true;
     
-    if (node()->isShadowRoot() && (node()->shadowHost()->hasTagName(inputTag)))
+    if (node()->isShadowRoot() && toShadowRoot(node())->host()->hasTagName(inputTag))
         return true;
     
     return false;
@@ -6999,118 +7057,6 @@ LayoutUnit RenderBlock::collapsedMarginAfterForChild(const  RenderBox* child) co
     // The child is perpendicular to us, which means its margins don't collapse but are on the
     // "logical left/right" side of the child box.  We can just return the raw margin in this case.  
     return marginAfterForChild(child);
-}
-
-LayoutUnit RenderBlock::marginBeforeForChild(const RenderBoxModelObject* child) const
-{
-    switch (style()->writingMode()) {
-    case TopToBottomWritingMode:
-        return child->marginTop();
-    case BottomToTopWritingMode:
-        return child->marginBottom();
-    case LeftToRightWritingMode:
-        return child->marginLeft();
-    case RightToLeftWritingMode:
-        return child->marginRight();
-    }
-    ASSERT_NOT_REACHED();
-    return child->marginTop();
-}
-
-LayoutUnit RenderBlock::marginAfterForChild(const RenderBoxModelObject* child) const
-{
-    switch (style()->writingMode()) {
-    case TopToBottomWritingMode:
-        return child->marginBottom();
-    case BottomToTopWritingMode:
-        return child->marginTop();
-    case LeftToRightWritingMode:
-        return child->marginRight();
-    case RightToLeftWritingMode:
-        return child->marginLeft();
-    }
-    ASSERT_NOT_REACHED();
-    return child->marginBottom();
-}
-
-LayoutUnit RenderBlock::marginStartForChild(const RenderBoxModelObject* child) const
-{
-    if (isHorizontalWritingMode())
-        return style()->isLeftToRightDirection() ? child->marginLeft() : child->marginRight();
-    return style()->isLeftToRightDirection() ? child->marginTop() : child->marginBottom();
-}
-
-LayoutUnit RenderBlock::marginEndForChild(const RenderBoxModelObject* child) const
-{
-    if (isHorizontalWritingMode())
-        return style()->isLeftToRightDirection() ? child->marginRight() : child->marginLeft();
-    return style()->isLeftToRightDirection() ? child->marginBottom() : child->marginTop();
-}
-
-void RenderBlock::setMarginStartForChild(RenderBox* child, LayoutUnit margin)
-{
-    if (isHorizontalWritingMode()) {
-        if (style()->isLeftToRightDirection())
-            child->setMarginLeft(margin);
-        else
-            child->setMarginRight(margin);
-    } else {
-        if (style()->isLeftToRightDirection())
-            child->setMarginTop(margin);
-        else
-            child->setMarginBottom(margin);
-    }
-}
-
-void RenderBlock::setMarginEndForChild(RenderBox* child, LayoutUnit margin)
-{
-    if (isHorizontalWritingMode()) {
-        if (style()->isLeftToRightDirection())
-            child->setMarginRight(margin);
-        else
-            child->setMarginLeft(margin);
-    } else {
-        if (style()->isLeftToRightDirection())
-            child->setMarginBottom(margin);
-        else
-            child->setMarginTop(margin);
-    }
-}
-
-void RenderBlock::setMarginBeforeForChild(RenderBox* child, LayoutUnit margin)
-{
-    switch (style()->writingMode()) {
-    case TopToBottomWritingMode:
-        child->setMarginTop(margin);
-        break;
-    case BottomToTopWritingMode:
-        child->setMarginBottom(margin);
-        break;
-    case LeftToRightWritingMode:
-        child->setMarginLeft(margin);
-        break;
-    case RightToLeftWritingMode:
-        child->setMarginRight(margin);
-        break;
-    }
-}
-
-void RenderBlock::setMarginAfterForChild(RenderBox* child, LayoutUnit margin)
-{
-    switch (style()->writingMode()) {
-    case TopToBottomWritingMode:
-        child->setMarginBottom(margin);
-        break;
-    case BottomToTopWritingMode:
-        child->setMarginTop(margin);
-        break;
-    case LeftToRightWritingMode:
-        child->setMarginRight(margin);
-        break;
-    case RightToLeftWritingMode:
-        child->setMarginLeft(margin);
-        break;
-    }
 }
 
 RenderBlock::MarginValues RenderBlock::marginValuesForChild(RenderBox* child)

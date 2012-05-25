@@ -1140,16 +1140,16 @@ WebInspector.StylePropertiesSection.prototype = {
         // Create property tree elements.
         for (var i = 0; i < this.uniqueProperties.length; ++i) {
             var property = this.uniqueProperties[i];
-            var disabled = property.disabled;
-            var shorthand = !disabled ? property.shorthand : null;
-
-            if (shorthand && shorthand in handledProperties)
-                continue;
+            var shorthand = !property.disabled && !property.inactive ? property.shorthand : null;
 
             if (shorthand) {
-                property = style.getLiveProperty(shorthand);
-                if (!property)
+                if (shorthand in handledProperties)
+                    continue;
+                // We should only create synthetic shorthands if they are not present in the style source (i.e. we are dealing with a source-less style).
+                if (!style.getLiveProperty(shorthand))
                     property = new WebInspector.CSSProperty(style, style.allProperties.length, shorthand, style.getShorthandValue(shorthand), style.getShorthandPriority(shorthand), "style", true, true, "", undefined);
+                else
+                    shorthand = null;
             }
 
             // BUG71275: Never show purely style-based properties in editable rules.
@@ -1157,6 +1157,8 @@ WebInspector.StylePropertiesSection.prototype = {
                 continue;
 
             var isShorthand = !!(property.isLive && (shorthand || shorthandNames[property.name]));
+            if (isShorthand && (property.name in handledProperties))
+                continue;
             var inherited = this.isPropertyInherited(property.name);
             var overloaded = this.isPropertyOverloaded(property.name, isShorthand);
 
@@ -1186,7 +1188,7 @@ WebInspector.StylePropertiesSection.prototype = {
 
     _handleSelectorContainerClick: function(event)
     {
-        if (this._checkWillCancelEditing())
+        if (this._checkWillCancelEditing() || !this.editable)
             return;
         if (event.target === this._selectorContainer)
             this.addNewBlankProperty(0).startEditing();
@@ -1222,17 +1224,30 @@ WebInspector.StylePropertiesSection.prototype = {
 
         if (this.styleRule.sourceURL)
             return linkifyUncopyable(this.styleRule.sourceURL, this.rule.sourceLine);
+
         if (!this.rule)
             return document.createTextNode("");
 
         var origin = "";
         if (this.rule.isUserAgent)
-            origin = WebInspector.UIString("user agent stylesheet");
-        else if (this.rule.isUser)
-            origin = WebInspector.UIString("user stylesheet");
-        else if (this.rule.isViaInspector)
-            origin = WebInspector.UIString("via inspector");
-        return document.createTextNode(origin);
+            return document.createTextNode(WebInspector.UIString("user agent stylesheet"));
+        if (this.rule.isUser)
+            return document.createTextNode(WebInspector.UIString("user stylesheet"));
+        if (this.rule.isViaInspector) {
+            var element = document.createElement("span");
+            /**
+             * @param {?WebInspector.Resource} resource
+             */
+            function callback(resource)
+            {
+                if (resource)
+                    element.appendChild(linkifyUncopyable(resource.url, this.rule.sourceLine));
+                else
+                    element.textContent = WebInspector.UIString("via inspector");
+            }
+            WebInspector.cssModel.getViaInspectorResourceForRule(this.rule, callback.bind(this));
+            return element;
+        }
     },
 
     _handleEmptySpaceMouseDown: function(event)
@@ -1301,6 +1316,8 @@ WebInspector.StylePropertiesSection.prototype = {
         if (moveDirection === "forward") {
             this.expand();
             var firstChild = this.propertiesTreeOutline.children[0];
+            while (firstChild && firstChild.inherited)
+                firstChild = firstChild.nextSibling;
             if (!firstChild)
                 this.addNewBlankProperty().startEditing();
             else
@@ -1505,7 +1522,8 @@ WebInspector.BlankStylePropertiesSection.prototype = {
                 this.element.addStyleClass("no-affect");
             }
 
-            this._selectorRefElement.textContent = WebInspector.UIString("via inspector");
+            this._selectorRefElement.removeChildren();
+            this._selectorRefElement.appendChild(this._createRuleOriginNode());
             this.expand();
             if (this.element.parentElement) // Might have been detached already.
                 this._moveEditorFromSelector(moveDirection);

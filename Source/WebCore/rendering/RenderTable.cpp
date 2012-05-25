@@ -423,7 +423,7 @@ void RenderTable::layout()
     while (section) {
         if (!sectionMoved && section->logicalTop() != logicalHeight()) {
             sectionMoved = true;
-            movedSectionLogicalTop = min(logicalHeight(), section->logicalTop()) + (style()->isHorizontalWritingMode() ? section->minYVisualOverflow() : section->minXVisualOverflow());
+            movedSectionLogicalTop = min(logicalHeight(), section->logicalTop()) + (style()->isHorizontalWritingMode() ? section->visualOverflowRect().y() : section->visualOverflowRect().x());
         }
         section->setLogicalLocation(LayoutPoint(sectionLogicalLeft, logicalHeight()));
 
@@ -462,9 +462,9 @@ void RenderTable::layout()
     // Repaint with our new bounds if they are different from our old bounds.
     if (!didFullRepaint && sectionMoved) {
         if (style()->isHorizontalWritingMode())
-            repaintRectangle(LayoutRect(minXVisualOverflow(), movedSectionLogicalTop, maxXVisualOverflow() - minXVisualOverflow(), maxYVisualOverflow() - movedSectionLogicalTop));
+            repaintRectangle(LayoutRect(visualOverflowRect().x(), movedSectionLogicalTop, visualOverflowRect().width(), visualOverflowRect().maxY() - movedSectionLogicalTop));
         else
-            repaintRectangle(LayoutRect(movedSectionLogicalTop, minYVisualOverflow(), maxXVisualOverflow() - movedSectionLogicalTop, maxYVisualOverflow() - minYVisualOverflow()));
+            repaintRectangle(LayoutRect(movedSectionLogicalTop, visualOverflowRect().y(), visualOverflowRect().maxX() - movedSectionLogicalTop, visualOverflowRect().height()));
     }
 
     setNeedsLayout(false);
@@ -726,22 +726,17 @@ void RenderTable::appendColumn(unsigned span)
     setNeedsLayoutAndPrefWidthsRecalc();
 }
 
-RenderTableCol* RenderTable::nextColElement(RenderTableCol* current) const
+RenderTableCol* RenderTable::firstColumn() const
 {
-    RenderObject* next = current->firstChild();
-    if (!next)
-        next = current->nextSibling();
-    if (!next && current->parent()->isTableCol())
-        next = current->parent()->nextSibling();
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->isTableCol())
+            return toRenderTableCol(child);
 
-    while (next) {
-        if (next->isTableCol())
-            return toRenderTableCol(next);
-        if (!m_captions.contains(next))
+        // We allow only table-captions before columns or column-groups.
+        if (!child->isTableCaption())
             return 0;
-        next = next->nextSibling();
     }
-    
+
     return 0;
 }
 
@@ -749,36 +744,24 @@ RenderTableCol* RenderTable::colElement(unsigned col, bool* startEdge, bool* end
 {
     if (!m_hasColElements)
         return 0;
-    RenderObject* child = firstChild();
-    unsigned cCol = 0;
 
-    while (child) {
-        if (child->isTableCol())
-            break;
-        if (!m_captions.contains(child))
-            return 0;
-        child = child->nextSibling();
-    }
-    if (!child)
-        return 0;
+    unsigned columnCount = 0;
+    for (RenderTableCol* columnRenderer = firstColumn(); columnRenderer; columnRenderer = columnRenderer->nextColumn()) {
+        if (columnRenderer->isTableColumnGroupWithColumnChildren())
+            continue;
 
-    RenderTableCol* colElem = toRenderTableCol(child);
-    while (colElem) {
-        unsigned span = colElem->span();
-        if (!colElem->firstChild()) {
-            unsigned startCol = cCol;
-            ASSERT(span >= 1);
-            unsigned endCol = cCol + span - 1;
-            cCol += span;
-            if (cCol > col) {
-                if (startEdge)
-                    *startEdge = startCol == col;
-                if (endEdge)
-                    *endEdge = endCol == col;
-                return colElem;
-            }
+        unsigned span = columnRenderer->span();
+        unsigned startCol = columnCount;
+        ASSERT(span >= 1);
+        unsigned endCol = columnCount + span - 1;
+        columnCount += span;
+        if (columnCount > col) {
+            if (startEdge)
+                *startEdge = startCol == col;
+            if (endEdge)
+                *endEdge = endCol == col;
+            return columnRenderer;
         }
-        colElem = nextColElement(colElem);
     }
 
     return 0;

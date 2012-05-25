@@ -51,7 +51,7 @@ v8::Handle<v8::Value> V8DOMStringMap::namedPropertyGetter(v8::Local<v8::String> 
     INC_STATS("DOM.DOMStringMap.NamedPropertyGetter");
     String value = V8DOMStringMap::toNative(info.Holder())->item(toWebCoreString(name));
     if (value.isNull())
-        return notHandledByInterceptor();
+        return v8::Handle<v8::Value>();
     return v8StringOrUndefined(value);
 }
 
@@ -80,7 +80,7 @@ v8::Handle<v8::Value> V8DOMStringMap::namedPropertySetter(v8::Local<v8::String> 
     ExceptionCode ec = 0;
     V8DOMStringMap::toNative(info.Holder())->setItem(toWebCoreString(name), toWebCoreString(value), ec);
     if (ec)
-        return throwError(ec);
+        return throwError(ec, info.GetIsolate());
     return value;
 }
 

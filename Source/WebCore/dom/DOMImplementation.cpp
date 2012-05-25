@@ -48,6 +48,7 @@
 #include "RegularExpression.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "StyleSheetContents.h"
 #include "TextDocument.h"
 #include "ThreadGlobalData.h"
 #include "XMLNames.h"
@@ -325,15 +326,15 @@ PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, 
 {
     // FIXME: Title should be set.
     // FIXME: Media could have wrong syntax, in which case we should generate an exception.
-    RefPtr<CSSStyleSheet> sheet = CSSStyleSheet::create(StyleSheetInternal::create());
+    RefPtr<CSSStyleSheet> sheet = CSSStyleSheet::create(StyleSheetContents::create());
     sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(media));
     return sheet;
 }
 
 static const char* const validXMLMIMETypeChars = "[0-9a-zA-Z_\\-+~!$\\^{}|.%'`#&*]"; // per RFCs: 3023, 2045
 
-XMLMIMETypeRegExp::XMLMIMETypeRegExp() :
-    m_regex(adoptPtr(new RegularExpression(WTF::makeString("^", validXMLMIMETypeChars, "+/", validXMLMIMETypeChars, "+\\+xml$"), TextCaseSensitive)))
+XMLMIMETypeRegExp::XMLMIMETypeRegExp()
+    : m_regex(adoptPtr(new RegularExpression(WTF::makeString("^", validXMLMIMETypeChars, "+/", validXMLMIMETypeChars, "+\\+xml$"), TextCaseSensitive)))
 {
 }
 

@@ -47,6 +47,7 @@
 #include "JSLock.h"
 #include "LayoutTypes.h"
 #include "PageClientEfl.h"
+#include "PageGroup.h"
 #include "PlatformMouseEvent.h"
 #include "PopupMenuClient.h"
 #include "ProgressTracker.h"
@@ -821,7 +822,7 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
     priv->settings.shouldDisplaySubtitles = priv->pageSettings->shouldDisplaySubtitles();
     priv->settings.shouldDisplayTextDescriptions = priv->pageSettings->shouldDisplayTextDescriptions();
 #endif
-    priv->settings.scriptsCanAccessClipboard = priv->pageSettings->javaScriptCanAccessClipboard();
+    priv->settings.scriptsCanAccessClipboard = priv->pageSettings->javaScriptCanAccessClipboard() && priv->pageSettings->isDOMPasteAllowed();
     priv->settings.resizableTextareas = priv->pageSettings->textAreasAreResizable();
     priv->settings.privateBrowsing = priv->pageSettings->privateBrowsingEnabled();
     priv->settings.caretBrowsing = priv->pageSettings->caretBrowsingEnabled();
@@ -1404,7 +1405,7 @@ const char* ewk_view_uri_get(const Evas_Object* ewkView)
     return ewk_frame_uri_get(smartData->main_frame);
 }
 
-const char* ewk_view_title_get(const Evas_Object* ewkView)
+const Ewk_Text_With_Direction* ewk_view_title_get(const Evas_Object* ewkView)
 {
     EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, 0);
     return ewk_frame_title_get(smartData->main_frame);
@@ -1703,6 +1704,19 @@ Ewk_History* ewk_view_history_get(const Evas_Object* ewkView)
         return 0;
     }
     return priv->history;
+}
+
+Eina_Bool ewk_view_visited_link_add(Evas_Object* ewkView, const char* visitedUrl)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, false);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
+
+    EINA_SAFETY_ON_NULL_RETURN_VAL(priv->page, false);
+    EINA_SAFETY_ON_NULL_RETURN_VAL(priv->page->groupPtr(), false);
+
+    WebCore::KURL kurl(WebCore::KURL(), WTF::String::fromUTF8(visitedUrl));
+    priv->page->groupPtr()->addVisitedLink(kurl);
+    return true;
 }
 
 float ewk_view_zoom_get(const Evas_Object* ewkView)
@@ -2195,6 +2209,7 @@ Eina_Bool ewk_view_setting_scripts_can_access_clipboard_set(Evas_Object* ewkView
     allow = !!allow;
     if (priv->settings.scriptsCanAccessClipboard != allow) {
         priv->pageSettings->setJavaScriptCanAccessClipboard(allow);
+        priv->pageSettings->setDOMPasteAllowed(allow);
         priv->settings.scriptsCanAccessClipboard = allow;
     }
     return true;
@@ -2952,9 +2967,9 @@ void ewk_view_input_method_state_set(Evas_Object* ewkView, bool active)
  *
  * Emits signal: "title,changed" with pointer to new title string.
  */
-void ewk_view_title_set(Evas_Object* ewkView, const char* title)
+void ewk_view_title_set(Evas_Object* ewkView, const Ewk_Text_With_Direction* title)
 {
-    DBG("ewkView=%p, title=%s", ewkView, title ? title : "(null)");
+    DBG("ewkView=%p, title=%s", ewkView, (title && title->string) ? title->string : "(null)");
     evas_object_smart_callback_call(ewkView, "title,changed", (void*)title);
 }
 
@@ -3027,6 +3042,21 @@ void ewk_view_load_provisional(Evas_Object* ewkView)
 {
     DBG("ewkView=%p", ewkView);
     evas_object_smart_callback_call(ewkView, "load,provisional", 0);
+}
+
+/**
+ * @internal
+ * Reports the main frame provisional load failed.
+ *
+ * @param ewkView View.
+ * @param error Load error.
+ *
+ * Emits signal: "load,provisional" on View with pointer to Ewk_Frame_Load_Error.
+ */
+void ewk_view_load_provisional_failed(Evas_Object* ewkView, const Ewk_Frame_Load_Error* error)
+{
+    DBG("ewkView=%p, error=%p", ewkView, error);
+    evas_object_smart_callback_call(ewkView, "load,provisional,failed", const_cast<Ewk_Frame_Load_Error*>(error));
 }
 
 /**
@@ -3994,8 +4024,9 @@ void ewk_view_transition_to_commited_for_newpage(Evas_Object* ewkView)
  *
  * @param ewkView View to load
  * @param request Request which contain url to navigate
+ * @param navigationType navigation type
  */
-bool ewk_view_navigation_policy_decision(Evas_Object* ewkView, Ewk_Frame_Resource_Request* request)
+bool ewk_view_navigation_policy_decision(Evas_Object* ewkView, Ewk_Frame_Resource_Request* request, Ewk_Navigation_Type navigationType)
 {
     EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, true);
     EINA_SAFETY_ON_NULL_RETURN_VAL(smartData->api, true);
@@ -4003,7 +4034,7 @@ bool ewk_view_navigation_policy_decision(Evas_Object* ewkView, Ewk_Frame_Resourc
     if (!smartData->api->navigation_policy_decision)
         return true;
 
-    return smartData->api->navigation_policy_decision(smartData, request);
+    return smartData->api->navigation_policy_decision(smartData, request, navigationType);
 }
 
 Eina_Bool ewk_view_js_object_add(Evas_Object* ewkView, Ewk_JS_Object* object, const char* objectName)

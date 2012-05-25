@@ -37,6 +37,7 @@
 #include "CodeType.h"
 #include "CompactJITCodeMap.h"
 #include "DFGCodeBlocks.h"
+#include "DFGCommon.h"
 #include "DFGExitProfile.h"
 #include "DFGOSREntry.h"
 #include "DFGOSRExit.h"
@@ -132,9 +133,9 @@ namespace JSC {
 
         static void dumpStatistics();
 
-        void dump(ExecState*) const;
-        void printStructures(const Instruction*) const;
-        void printStructure(const char* name, const Instruction*, int operand) const;
+        void dump(ExecState*);
+        void printStructures(const Instruction*);
+        void printStructure(const char* name, const Instruction*, int operand);
 
         bool isStrictMode() const { return m_isStrictMode; }
 
@@ -259,7 +260,17 @@ namespace JSC {
         DFG::OSREntryData* dfgOSREntryData(unsigned i) { return &m_dfgData->osrEntry[i]; }
         DFG::OSREntryData* dfgOSREntryDataForBytecodeIndex(unsigned bytecodeIndex)
         {
-            return binarySearch<DFG::OSREntryData, unsigned, DFG::getOSREntryDataBytecodeIndex>(m_dfgData->osrEntry.begin(), m_dfgData->osrEntry.size(), bytecodeIndex);
+            if (!m_dfgData)
+                return 0;
+            if (m_dfgData->osrEntry.isEmpty())
+                return 0;
+            DFG::OSREntryData* result = binarySearch<
+                DFG::OSREntryData, unsigned, DFG::getOSREntryDataBytecodeIndex>(
+                    m_dfgData->osrEntry.begin(), m_dfgData->osrEntry.size(),
+                    bytecodeIndex, WTF::KeyMustNotBePresentInArray);
+            if (result->m_bytecodeIndex != bytecodeIndex)
+                return 0;
+            return result;
         }
         
         void appendOSRExit(const DFG::OSRExit& osrExit)
@@ -355,37 +366,31 @@ namespace JSC {
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
         virtual void jettison() = 0;
         enum JITCompilationResult { AlreadyCompiled, CouldNotCompile, CompiledSuccessfully };
-        JITCompilationResult jitCompile(JSGlobalData& globalData)
+        JITCompilationResult jitCompile(ExecState* exec)
         {
             if (getJITType() != JITCode::InterpreterThunk) {
                 ASSERT(getJITType() == JITCode::BaselineJIT);
                 return AlreadyCompiled;
             }
 #if ENABLE(JIT)
-            if (jitCompileImpl(globalData))
+            if (jitCompileImpl(exec))
                 return CompiledSuccessfully;
             return CouldNotCompile;
 #else
-            UNUSED_PARAM(globalData);
+            UNUSED_PARAM(exec);
             return CouldNotCompile;
 #endif
         }
         virtual CodeBlock* replacement() = 0;
 
-        enum CompileWithDFGState {
-            CompileWithDFGFalse,
-            CompileWithDFGTrue,
-            CompileWithDFGUnset
-        };
-
-        virtual bool canCompileWithDFGInternal() = 0;
-        bool canCompileWithDFG()
+        virtual DFG::CapabilityLevel canCompileWithDFGInternal() = 0;
+        DFG::CapabilityLevel canCompileWithDFG()
         {
-            bool result = canCompileWithDFGInternal();
-            m_canCompileWithDFGState = result ? CompileWithDFGTrue : CompileWithDFGFalse;
+            DFG::CapabilityLevel result = canCompileWithDFGInternal();
+            m_canCompileWithDFGState = result;
             return result;
         }
-        CompileWithDFGState canCompileWithDFGState() { return m_canCompileWithDFGState; }
+        DFG::CapabilityLevel canCompileWithDFGState() { return m_canCompileWithDFGState; }
 
         bool hasOptimizedReplacement()
         {
@@ -429,6 +434,12 @@ namespace JSC {
             ASSERT(usesArguments());
             return m_argumentsRegister;
         }
+        int uncheckedArgumentsRegister()
+        {
+            if (!usesArguments())
+                return InvalidVirtualRegister;
+            return argumentsRegister();
+        }
         void setActivationRegister(int activationRegister)
         {
             m_activationRegister = activationRegister;
@@ -439,6 +450,31 @@ namespace JSC {
             return m_activationRegister;
         }
         bool usesArguments() const { return m_argumentsRegister != -1; }
+        
+        bool needsActivation() const
+        {
+            return needsFullScopeChain() && codeType() != GlobalCode;
+        }
+        
+        bool argumentIsCaptured(int) const
+        {
+            return needsActivation() || usesArguments();
+        }
+        
+        bool localIsCaptured(InlineCallFrame* inlineCallFrame, int operand) const
+        {
+            if (!inlineCallFrame)
+                return operand < m_numCapturedVars;
+            
+            return inlineCallFrame->capturedVars.get(operand);
+        }
+        
+        bool isCaptured(InlineCallFrame* inlineCallFrame, int operand) const
+        {
+            if (operandIsArgument(operand))
+                return argumentIsCaptured(operandToArgument(operand));
+            return localIsCaptured(inlineCallFrame, operand);
+        }
 
         CodeType codeType() const { return m_codeType; }
 
@@ -1065,7 +1101,7 @@ namespace JSC {
 
     protected:
 #if ENABLE(JIT)
-        virtual bool jitCompileImpl(JSGlobalData&) = 0;
+        virtual bool jitCompileImpl(ExecState*) = 0;
 #endif
         virtual void visitWeakReferences(SlotVisitor&);
         virtual void finalizeUnconditionally();
@@ -1079,16 +1115,18 @@ namespace JSC {
         void tallyFrequentExitSites() { }
 #endif
         
-        void dump(ExecState*, const Vector<Instruction>::const_iterator& begin, Vector<Instruction>::const_iterator&) const;
+        void dump(ExecState*, const Vector<Instruction>::const_iterator& begin, Vector<Instruction>::const_iterator&);
 
         CString registerName(ExecState*, int r) const;
-        void printUnaryOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
-        void printBinaryOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
-        void printConditionalJump(ExecState*, const Vector<Instruction>::const_iterator&, Vector<Instruction>::const_iterator&, int location, const char* op) const;
-        void printGetByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
-        void printCallOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
-        void printPutByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op) const;
-        void visitStructures(SlotVisitor&, Instruction* vPC) const;
+        void printUnaryOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op);
+        void printBinaryOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op);
+        void printConditionalJump(ExecState*, const Vector<Instruction>::const_iterator&, Vector<Instruction>::const_iterator&, int location, const char* op);
+        void printGetByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&);
+        void printGetByIdCacheStatus(ExecState*, int location);
+        enum CacheDumpMode { DumpCaches, DontDumpCaches };
+        void printCallOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op, CacheDumpMode);
+        void printPutByIdOp(ExecState*, int location, Vector<Instruction>::const_iterator&, const char* op);
+        void visitStructures(SlotVisitor&, Instruction* vPC);
         
 #if ENABLE(DFG_JIT)
         bool shouldImmediatelyAssumeLivenessDuringScan()
@@ -1272,7 +1310,7 @@ namespace JSC {
 #endif
         OwnPtr<RareData> m_rareData;
 #if ENABLE(JIT)
-        CompileWithDFGState m_canCompileWithDFGState;
+        DFG::CapabilityLevel m_canCompileWithDFGState;
 #endif
     };
 
@@ -1312,9 +1350,9 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
-        virtual bool jitCompileImpl(JSGlobalData&);
+        virtual bool jitCompileImpl(ExecState*);
         virtual CodeBlock* replacement();
-        virtual bool canCompileWithDFGInternal();
+        virtual DFG::CapabilityLevel canCompileWithDFGInternal();
 #endif
     };
 
@@ -1347,9 +1385,9 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
-        virtual bool jitCompileImpl(JSGlobalData&);
+        virtual bool jitCompileImpl(ExecState*);
         virtual CodeBlock* replacement();
-        virtual bool canCompileWithDFGInternal();
+        virtual DFG::CapabilityLevel canCompileWithDFGInternal();
 #endif
 
     private:
@@ -1385,9 +1423,9 @@ namespace JSC {
     protected:
         virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
         virtual void jettison();
-        virtual bool jitCompileImpl(JSGlobalData&);
+        virtual bool jitCompileImpl(ExecState*);
         virtual CodeBlock* replacement();
-        virtual bool canCompileWithDFGInternal();
+        virtual DFG::CapabilityLevel canCompileWithDFGInternal();
 #endif
     };
 

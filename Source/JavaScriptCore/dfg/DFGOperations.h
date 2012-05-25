@@ -60,6 +60,7 @@ extern "C" {
     I: Identifier*
     G: GlobalResolveInfo*
 */
+typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_E)(ExecState*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EA)(ExecState*, JSArray*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_ECC)(ExecState*, JSCell*, JSCell*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_ECI)(ExecState*, JSCell*, Identifier*);
@@ -75,9 +76,12 @@ typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EP)(ExecState*, void*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EPP)(ExecState*, void*, void*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EPS)(ExecState*, void*, size_t);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_ESS)(ExecState*, size_t, size_t);
+typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EZ)(ExecState*, int32_t);
+typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EZZ)(ExecState*, int32_t, int32_t);
 typedef JSCell* DFG_OPERATION (*C_DFGOperation_E)(ExecState*);
 typedef JSCell* DFG_OPERATION (*C_DFGOperation_EC)(ExecState*, JSCell*);
 typedef JSCell* DFG_OPERATION (*C_DFGOperation_ECC)(ExecState*, JSCell*, JSCell*);
+typedef JSCell* DFG_OPERATION (*C_DFGOperation_EIcf)(ExecState*, InlineCallFrame*);
 typedef double DFG_OPERATION (*D_DFGOperation_DD)(double, double);
 typedef double DFG_OPERATION (*D_DFGOperation_ZZ)(int32_t, int32_t);
 typedef double DFG_OPERATION (*D_DFGOperation_EJ)(ExecState*, EncodedJSValue);
@@ -87,12 +91,14 @@ typedef size_t DFG_OPERATION (*S_DFGOperation_EJ)(ExecState*, EncodedJSValue);
 typedef size_t DFG_OPERATION (*S_DFGOperation_EJJ)(ExecState*, EncodedJSValue, EncodedJSValue);
 typedef size_t DFG_OPERATION (*S_DFGOperation_J)(EncodedJSValue);
 typedef void DFG_OPERATION (*V_DFGOperation_EAZJ)(ExecState*, JSArray*, int32_t, EncodedJSValue);
+typedef void DFG_OPERATION (*V_DFGOperation_EC)(ExecState*, JSCell*);
+typedef void DFG_OPERATION (*V_DFGOperation_ECIcf)(ExecState*, JSCell*, InlineCallFrame*);
 typedef void DFG_OPERATION (*V_DFGOperation_ECJJ)(ExecState*, JSCell*, EncodedJSValue, EncodedJSValue);
+typedef void DFG_OPERATION (*V_DFGOperation_ECZ)(ExecState*, JSCell*, int32_t);
 typedef void DFG_OPERATION (*V_DFGOperation_EJCI)(ExecState*, EncodedJSValue, JSCell*, Identifier*);
 typedef void DFG_OPERATION (*V_DFGOperation_EJJJ)(ExecState*, EncodedJSValue, EncodedJSValue, EncodedJSValue);
 typedef void DFG_OPERATION (*V_DFGOperation_EJPP)(ExecState*, EncodedJSValue, EncodedJSValue, void*);
 typedef void DFG_OPERATION (*V_DFGOperation_EPZJ)(ExecState*, void*, int32_t, EncodedJSValue);
-typedef void DFG_OPERATION (V_DFGOperation_EC)(ExecState*, JSCell*);
 typedef void* DFG_OPERATION (*P_DFGOperation_E)(ExecState*);
 
 // These routines are provide callbacks out to C++ implementations of operations too complex to JIT.
@@ -114,8 +120,8 @@ EncodedJSValue DFG_OPERATION operationResolveBase(ExecState*, Identifier*);
 EncodedJSValue DFG_OPERATION operationResolveBaseStrictPut(ExecState*, Identifier*);
 EncodedJSValue DFG_OPERATION operationResolveGlobal(ExecState*, GlobalResolveInfo*, Identifier*);
 EncodedJSValue DFG_OPERATION operationToPrimitive(ExecState*, EncodedJSValue);
-EncodedJSValue DFG_OPERATION operationStrCat(ExecState*, void* start, size_t);
-EncodedJSValue DFG_OPERATION operationNewArray(ExecState*, void* start, size_t);
+EncodedJSValue DFG_OPERATION operationStrCat(ExecState*, void*, size_t);
+EncodedJSValue DFG_OPERATION operationNewArray(ExecState*, void*, size_t);
 EncodedJSValue DFG_OPERATION operationNewArrayBuffer(ExecState*, size_t, size_t);
 EncodedJSValue DFG_OPERATION operationNewRegexp(ExecState*, void*);
 void DFG_OPERATION operationPutByValStrict(ExecState*, EncodedJSValue encodedBase, EncodedJSValue encodedProperty, EncodedJSValue encodedValue);
@@ -153,7 +159,13 @@ void* DFG_OPERATION operationLinkCall(ExecState*);
 void* DFG_OPERATION operationVirtualConstruct(ExecState*);
 void* DFG_OPERATION operationLinkConstruct(ExecState*);
 JSCell* DFG_OPERATION operationCreateActivation(ExecState*);
-void DFG_OPERATION operationTearOffActivation(ExecState*, JSCell*);
+JSCell* DFG_OPERATION operationCreateArguments(ExecState*);
+JSCell* DFG_OPERATION operationCreateInlinedArguments(ExecState*, InlineCallFrame*);
+void DFG_OPERATION operationTearOffActivation(ExecState*, JSCell*, int32_t unmodifiedArgumentsRegister);
+void DFG_OPERATION operationTearOffArguments(ExecState*, JSCell*);
+void DFG_OPERATION operationTearOffInlinedArguments(ExecState*, JSCell*, InlineCallFrame*);
+EncodedJSValue DFG_OPERATION operationGetArgumentsLength(ExecState*, int32_t);
+EncodedJSValue DFG_OPERATION operationGetArgumentByVal(ExecState*, int32_t, int32_t);
 JSCell* DFG_OPERATION operationNewFunction(ExecState*, JSCell*);
 JSCell* DFG_OPERATION operationNewFunctionExpression(ExecState*, JSCell*);
 double DFG_OPERATION operationFModOnInts(int32_t, int32_t);

@@ -47,16 +47,20 @@ public:
         , m_argumentAwarePrediction(PredictNone)
         , m_flags(0)
         , m_doubleFormatState(EmptyDoubleFormatState)
+        , m_isCaptured(false)
+        , m_isArgumentsAlias(false)
     {
         clearVotes();
     }
     
-    VariableAccessData(VirtualRegister local)
+    VariableAccessData(VirtualRegister local, bool isCaptured)
         : m_local(local)
         , m_prediction(PredictNone)
         , m_argumentAwarePrediction(PredictNone)
         , m_flags(0)
         , m_doubleFormatState(EmptyDoubleFormatState)
+        , m_isCaptured(isCaptured)
+        , m_isArgumentsAlias(false)
     {
         clearVotes();
     }
@@ -70,6 +74,34 @@ public:
     int operand()
     {
         return static_cast<int>(local());
+    }
+    
+    bool mergeIsCaptured(bool isCaptured)
+    {
+        bool newIsCaptured = m_isCaptured | isCaptured;
+        if (newIsCaptured == m_isCaptured)
+            return false;
+        m_isCaptured = newIsCaptured;
+        return true;
+    }
+    
+    bool isCaptured()
+    {
+        return m_isCaptured;
+    }
+    
+    bool mergeIsArgumentsAlias(bool isArgumentsAlias)
+    {
+        bool newIsArgumentsAlias = m_isArgumentsAlias | isArgumentsAlias;
+        if (newIsArgumentsAlias == m_isArgumentsAlias)
+            return false;
+        m_isArgumentsAlias = newIsArgumentsAlias;
+        return true;
+    }
+    
+    bool isArgumentsAlias()
+    {
+        return m_isArgumentsAlias;
     }
     
     bool predict(PredictedType prediction)
@@ -220,6 +252,9 @@ private:
     
     float m_votes[2];
     DoubleFormatState m_doubleFormatState;
+    
+    bool m_isCaptured;
+    bool m_isArgumentsAlias;
 };
 
 } } // namespace JSC::DFG

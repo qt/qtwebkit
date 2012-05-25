@@ -94,7 +94,7 @@ void JSDOMWindow::visitChildren(JSCell* cell, SlotVisitor& visitor)
 template<NativeFunction nativeFunction, int length>
 JSValue nonCachingStaticFunctionGetter(ExecState* exec, JSValue, PropertyName propertyName)
 {
-    return JSFunction::create(exec, exec->lexicalGlobalObject(), length, propertyName.impl(), nativeFunction);
+    return JSFunction::create(exec, exec->lexicalGlobalObject(), length, propertyName.publicName(), nativeFunction);
 }
 
 static JSValue childFrameGetter(ExecState* exec, JSValue slotBase, PropertyName propertyName)
@@ -542,7 +542,7 @@ JSValue JSDOMWindow::showModalDialog(ExecState* exec)
     return handler.returnValue();
 }
 
-static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransfer)
+static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec)
 {
     MessagePortArray messagePorts;
     ArrayBufferArray arrayBuffers;
@@ -566,8 +566,8 @@ static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransf
         return jsUndefined();
 
     RefPtr<SerializedScriptValue> message = SerializedScriptValue::create(exec, exec->argument(0),
-                                                                         doTransfer ? &messagePorts : 0,
-                                                                         doTransfer ? &arrayBuffers : 0);
+                                                                         &messagePorts,
+                                                                         &arrayBuffers);
 
     if (exec->hadException())
         return jsUndefined();
@@ -585,12 +585,12 @@ static JSValue handlePostMessage(DOMWindow* impl, ExecState* exec, bool doTransf
 
 JSValue JSDOMWindow::postMessage(ExecState* exec)
 {
-    return handlePostMessage(impl(), exec, false);
+    return handlePostMessage(impl(), exec);
 }
 
 JSValue JSDOMWindow::webkitPostMessage(ExecState* exec)
 {
-    return handlePostMessage(impl(), exec, true);
+    return handlePostMessage(impl(), exec);
 }
 
 JSValue JSDOMWindow::setTimeout(ExecState* exec)
@@ -640,7 +640,7 @@ JSValue JSDOMWindow::addEventListener(ExecState* exec)
     if (!listener.isObject())
         return jsUndefined();
 
-    impl()->addEventListener(ustringToAtomicString(exec->argument(0).toString(exec)->value(exec)), JSEventListener::create(asObject(listener), this, false, currentWorld(exec)), exec->argument(2).toBoolean(exec));
+    impl()->addEventListener(ustringToAtomicString(exec->argument(0).toString(exec)->value(exec)), JSEventListener::create(asObject(listener), this, false, currentWorld(exec)), exec->argument(2).toBoolean());
     return jsUndefined();
 }
 
@@ -654,7 +654,7 @@ JSValue JSDOMWindow::removeEventListener(ExecState* exec)
     if (!listener.isObject())
         return jsUndefined();
 
-    impl()->removeEventListener(ustringToAtomicString(exec->argument(0).toString(exec)->value(exec)), JSEventListener::create(asObject(listener), this, false, currentWorld(exec)).get(), exec->argument(2).toBoolean(exec));
+    impl()->removeEventListener(ustringToAtomicString(exec->argument(0).toString(exec)->value(exec)), JSEventListener::create(asObject(listener), this, false, currentWorld(exec)).get(), exec->argument(2).toBoolean());
     return jsUndefined();
 }
 

@@ -497,17 +497,6 @@ void Node::clearRareData()
     clearFlag(HasRareDataFlag);
 }
 
-Element* Node::shadowHost() const
-{
-    return toElement(isShadowRoot() ? parent() : 0);
-}
-
-void Node::setShadowHost(Element* host)
-{
-    ASSERT(!parentNode() && isShadowRoot());
-    setParent(host);
-}
-
 Node* Node::toNode()
 {
     return this;
@@ -1552,7 +1541,7 @@ Element* Node::parentOrHostElement() const
         return 0;
 
     if (parent->isShadowRoot())
-        return parent->shadowHost();
+        return toShadowRoot(parent)->host();
 
     if (!parent->isElementNode())
         return 0;
@@ -2460,7 +2449,7 @@ ScriptExecutionContext* Node::scriptExecutionContext() const
     return document();
 }
 
-Node::InsertionNotificationRequest Node::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest Node::insertedInto(ContainerNode* insertionPoint)
 {
     ASSERT(insertionPoint->inDocument() || isContainerNode());
     if (insertionPoint->inDocument())
@@ -2468,7 +2457,7 @@ Node::InsertionNotificationRequest Node::insertedInto(Node* insertionPoint)
     return InsertionDone;
 }
 
-void Node::removedFrom(Node* insertionPoint)
+void Node::removedFrom(ContainerNode* insertionPoint)
 {
     ASSERT(insertionPoint->inDocument() || isContainerNode());
     if (insertionPoint->inDocument())
@@ -2760,12 +2749,13 @@ void Node::dispatchFocusOutEvent(const AtomicString& eventType, PassRefPtr<Node>
     dispatchScopedEventDispatchMediator(FocusOutEventDispatchMediator::create(UIEvent::create(eventType, true, false, document()->defaultView(), 0), newFocusedNode));
 }
 
-void Node::dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent)
+bool Node::dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent)
 {
     ASSERT(!eventDispatchForbidden());
     RefPtr<UIEvent> event = UIEvent::create(eventNames().DOMActivateEvent, true, true, document()->defaultView(), detail);
     event->setUnderlyingEvent(underlyingEvent);
-    dispatchScopedEvent(event.release());
+    dispatchScopedEvent(event);
+    return event->defaultHandled();
 }
 
 bool Node::dispatchKeyEvent(const PlatformKeyboardEvent& event)
@@ -2842,7 +2832,8 @@ void Node::defaultEventHandler(Event* event)
                 frame->eventHandler()->defaultKeyboardEventHandler(static_cast<KeyboardEvent*>(event));
     } else if (eventType == eventNames().clickEvent) {
         int detail = event->isUIEvent() ? static_cast<UIEvent*>(event)->detail() : 0;
-        dispatchDOMActivateEvent(detail, event);
+        if (dispatchDOMActivateEvent(detail, event))
+            event->setDefaultHandled();
 #if ENABLE(CONTEXT_MENUS)
     } else if (eventType == eventNames().contextmenuEvent) {
         if (Frame* frame = document()->frame())

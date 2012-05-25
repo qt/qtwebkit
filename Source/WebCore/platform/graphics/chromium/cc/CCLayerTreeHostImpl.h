@@ -144,6 +144,9 @@ public:
     int sourceFrameNumber() const { return m_sourceFrameNumber; }
     void setSourceFrameNumber(int frameNumber) { m_sourceFrameNumber = frameNumber; }
 
+    bool sourceFrameCanBeDrawn() const { return m_sourceFrameCanBeDrawn; }
+    void setSourceFrameCanBeDrawn(bool sourceFrameCanBeDrawn) { m_sourceFrameCanBeDrawn = sourceFrameCanBeDrawn; }
+
     const IntSize& viewportSize() const { return m_viewportSize; }
     void setViewportSize(const IntSize&);
 
@@ -177,6 +180,9 @@ protected:
     // Virtual for testing.
     virtual void animateLayers(double monotonicTime, double wallClockTime);
 
+    // Virtual for testing. Measured in seconds.
+    virtual double lowFrequencyAnimationInterval() const;
+
     CCLayerTreeHostImplClient* m_client;
     int m_sourceFrameNumber;
     int m_frameNumber;
@@ -197,6 +203,7 @@ private:
     // if this helper function is called.
     bool calculateRenderPasses(CCRenderPassList&, CCLayerList& renderSurfaceLayerList);
     void animateLayersRecursive(CCLayerImpl*, double monotonicTime, double wallClockTime, CCAnimationEventsVector*, bool& didAnimate, bool& needsAnimateLayers);
+    void setBackgroundTickingEnabled(bool);
     IntSize contentSize() const;
     void sendDidLoseContextRecursive(CCLayerImpl*);
     void clearRenderSurfacesOnCCLayerImplRecursive(CCLayerImpl*);
@@ -210,6 +217,7 @@ private:
     IntSize m_viewportSize;
     IntSize m_deviceViewportSize;
     bool m_visible;
+    bool m_sourceFrameCanBeDrawn;
 
     OwnPtr<CCHeadsUpDisplay> m_headsUpDisplay;
 

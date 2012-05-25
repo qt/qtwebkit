@@ -81,7 +81,7 @@ void Attr::createTextChild()
 
         // This does everything appendChild() would do in this situation (assuming m_ignoreChildrenChanged was set),
         // but much more efficiently.
-        textNode->setParent(this);
+        textNode->setParentOrHostNode(this);
         setFirstChild(textNode.get());
         setLastChild(textNode.get());
     }
@@ -203,7 +203,7 @@ CSSStyleDeclaration* Attr::style()
 const AtomicString& Attr::value() const
 {
     if (m_element)
-        return m_element->getAttributeItem(qualifiedName())->value();
+        return m_element->getAttribute(qualifiedName());
     return m_standaloneValue;
 }
 

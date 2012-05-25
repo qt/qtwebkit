@@ -28,6 +28,7 @@
 #define ElementShadow_h
 
 #include "ContentDistributor.h"
+#include "Element.h"
 #include "ExceptionCode.h"
 #include "ShadowRoot.h"
 #include <wtf/DoublyLinkedList.h>
@@ -53,8 +54,6 @@ public:
 
     void addShadowRoot(Element* shadowHost, PassRefPtr<ShadowRoot>, ExceptionCode&);
 
-    void setParentTreeScope(TreeScope*);
-
     void attach();
     void detach();
     void reattach();
@@ -65,7 +64,6 @@ public:
     bool needsStyleRecalc();
     void recalcStyle(Node::StyleChange);
     void setNeedsRedistributing();
-    void clearNeedsRedistributing();
     bool needsRedistributing();
     void hostChildrenChanged();
 
@@ -80,7 +78,6 @@ private:
 
     DoublyLinkedList<ShadowRoot> m_shadowRoots;
     ContentDistributor m_distributor;
-    bool m_needsRedistributing : 1;
     WTF_MAKE_NONCOPYABLE(ElementShadow);
 };
 
@@ -104,15 +101,19 @@ inline const ContentDistributor& ElementShadow::distributor() const
     return m_distributor;
 }
 
-inline void ElementShadow::clearNeedsRedistributing()
-{
-    m_needsRedistributing = false;
-}
-
 inline Element* ElementShadow::host() const
 {
     ASSERT(!m_shadowRoots.isEmpty());
     return youngestShadowRoot()->host();
+}
+
+inline ShadowRoot* Node::youngestShadowRoot() const
+{
+    if (!this->isElementNode())
+        return 0;
+    if (ElementShadow* shadow = toElement(this)->shadow())
+        return shadow->youngestShadowRoot();
+    return 0;
 }
 
 class ShadowRootVector : public Vector<RefPtr<ShadowRoot> > {

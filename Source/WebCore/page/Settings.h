@@ -106,6 +106,9 @@ namespace WebCore {
         void setDefaultDeviceScaleFactor(int);
         int defaultDeviceScaleFactor() const { return m_defaultDeviceScaleFactor; }
 
+        void setFontBoostingEnabled(bool);
+        bool fontBoostingEnabled() const { return m_fontBoostingEnabled; }
+
         // Unlike areImagesEnabled, this only suppresses the network load of
         // the image URL.  A cached image will still be rendered if requested.
         void setLoadsImagesAutomatically(bool);
@@ -260,6 +263,9 @@ namespace WebCore {
         
         void setDeveloperExtrasEnabled(bool);
         bool developerExtrasEnabled() const { return m_developerExtrasEnabled; }
+        
+        void setJavaScriptExperimentsEnabled(bool);
+        bool javaScriptExperimentsEnabled() const { return m_javaScriptExperimentsEnabled; }
 
         void setFrameFlatteningEnabled(bool);
         bool frameFlatteningEnabled() const { return m_frameFlatteningEnabled; }
@@ -320,11 +326,19 @@ namespace WebCore {
         void setCSSCustomFilterEnabled(bool enabled) { m_isCSSCustomFilterEnabled = enabled; }
         bool isCSSCustomFilterEnabled() const { return m_isCSSCustomFilterEnabled; }
 
+#if ENABLE(CSS_REGIONS)
         void setCSSRegionsEnabled(bool enabled) { m_cssRegionsEnabled = enabled; }
         bool cssRegionsEnabled() const { return m_cssRegionsEnabled; }
+#else
+        void setCSSRegionsEnabled(bool) { }
+        bool cssRegionsEnabled() const { return false; }
+#endif
 
         void setRegionBasedColumnsEnabled(bool enabled) { m_regionBasedColumnsEnabled = enabled; }
         bool regionBasedColumnsEnabled() const { return m_regionBasedColumnsEnabled; }
+
+        void setCSSGridLayoutEnabled(bool enabled) { m_cssGridLayoutEnabled = enabled; }
+        bool cssGridLayoutEnabled() const { return m_cssGridLayoutEnabled; }
 
         void setAcceleratedCompositingEnabled(bool);
         bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
@@ -561,6 +575,12 @@ namespace WebCore {
         void setRequestAnimationFrameEnabled(bool enabled) { m_requestAnimationFrameEnabled = enabled; }
         bool requestAnimationFrameEnabled() const { return m_requestAnimationFrameEnabled; }
 
+        void setNeedsDidFinishLoadOrderQuirk(bool needsQuirk) { m_needsDidFinishLoadOrderQuirk = needsQuirk; }
+        bool needsDidFinishLoadOrderQuirk() const { return m_needsDidFinishLoadOrderQuirk; }
+
+        void setFixedPositionCreatesStackingContext(bool creates) { m_fixedPositionCreatesStackingContext = creates; }
+        bool fixedPositionCreatesStackingContext() const { return m_fixedPositionCreatesStackingContext; }
+
 #if USE(JSC)
         static void setShouldRespectPriorityInCSSAttributeSetters(bool);
         static bool shouldRespectPriorityInCSSAttributeSetters();
@@ -602,6 +622,7 @@ namespace WebCore {
         unsigned m_sessionStorageQuota;
         unsigned m_editingBehaviorType;
         unsigned m_maximumHTMLParserDOMTreeDepth;
+        bool m_fontBoostingEnabled : 1;
         bool m_isSpatialNavigationEnabled : 1;
         bool m_isJavaEnabled : 1;
         bool m_isJavaEnabledForLocalFiles : 1;
@@ -636,6 +657,7 @@ namespace WebCore {
         bool m_showsToolTipOverTruncatedText : 1;
         bool m_forceFTPDirectoryListings : 1;
         bool m_developerExtrasEnabled : 1;
+        bool m_javaScriptExperimentsEnabled : 1;
         bool m_authorAndUserStylesEnabled : 1;
         bool m_needsSiteSpecificQuirks : 1;
         unsigned m_fontRenderingMode : 1;
@@ -651,8 +673,11 @@ namespace WebCore {
         bool m_acceleratedDrawingEnabled : 1;
         bool m_acceleratedFiltersEnabled : 1;
         bool m_isCSSCustomFilterEnabled : 1;
+#if ENABLE(CSS_REGIONS)
         bool m_cssRegionsEnabled : 1;
+#endif
         bool m_regionBasedColumnsEnabled : 1;
+        bool m_cssGridLayoutEnabled : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
         bool m_xssAuditorEnabled : 1;
         bool m_acceleratedCompositingEnabled : 1;
@@ -725,6 +750,9 @@ namespace WebCore {
         bool m_shouldRespectImageOrientation : 1;
         bool m_wantsBalancedSetDefersLoadingBehavior : 1;
         bool m_requestAnimationFrameEnabled : 1;
+        bool m_needsDidFinishLoadOrderQuirk : 1;
+
+        bool m_fixedPositionCreatesStackingContext : 1;
 
         Timer<Settings> m_loadsImagesAutomaticallyTimer;
         void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);

@@ -27,6 +27,7 @@
 /**
  * @constructor
  * @implements {WebInspector.TabbedEditorContainerDelegate}
+ * @implements {WebInspector.ContextMenu.Provider}
  * @extends {WebInspector.Panel}
  * @param {WebInspector.CompositeUISourceCodeProvider=} uiSourceCodeProviderForTest
  */
@@ -41,8 +42,7 @@ WebInspector.ScriptsPanel = function(uiSourceCodeProviderForTest)
 
     var scriptMapping = new WebInspector.DebuggerScriptMapping();
     var providers = scriptMapping.uiSourceCodeProviders();
-    if (WebInspector.experimentsSettings.sourceCodePanel.isEnabled())
-        providers = providers.concat(new WebInspector.StylesUISourceCodeProvider());
+    providers = providers.concat(new WebInspector.StylesUISourceCodeProvider());
     this._uiSourceCodeProvider = uiSourceCodeProviderForTest || new WebInspector.CompositeUISourceCodeProvider(providers);
 
     new WebInspector.PresentationConsoleMessageHelper(this._uiSourceCodeProvider);
@@ -54,7 +54,7 @@ WebInspector.ScriptsPanel = function(uiSourceCodeProviderForTest)
     }
     WebInspector.GoToLineDialog.install(this, viewGetter.bind(this));
 
-    var helpSection = WebInspector.shortcutsScreen.section(WebInspector.UIString(WebInspector.experimentsSettings.sourceCodePanel.isEnabled() ? "Source Code Panel" : "Scripts Panel"));
+    var helpSection = WebInspector.shortcutsScreen.section(WebInspector.UIString("Sources Panel"));
     this.debugToolbar = this._createDebugToolbar(helpSection);
 
     const initialDebugSidebarWidth = 225;
@@ -85,7 +85,6 @@ WebInspector.ScriptsPanel = function(uiSourceCodeProviderForTest)
 
     this._editorContainer = new WebInspector.TabbedEditorContainer(this, "previouslyViewedFiles");
     this._editorContainer.show(this.editorView.mainElement);
-    WebInspector.OpenScriptDialog.install(this, this._uiSourceCodeProvider, this.editorView.mainElement);
 
     this._navigatorController = new WebInspector.NavigatorOverlayController(this, this.editorView, this._navigator.view, this._editorContainer.view);
 
@@ -131,9 +130,6 @@ WebInspector.ScriptsPanel = function(uiSourceCodeProviderForTest)
     var evaluateInConsoleShortcut = WebInspector.KeyboardShortcut.makeDescriptor("e", WebInspector.KeyboardShortcut.Modifiers.Shift | WebInspector.KeyboardShortcut.Modifiers.Ctrl);
     helpSection.addKey(evaluateInConsoleShortcut.name, WebInspector.UIString("Evaluate selection in console"));
     this.registerShortcut(evaluateInConsoleShortcut.key, this._evaluateSelectionInConsole.bind(this));
-
-    var openResourceShortcut = WebInspector.OpenResourceDialog.createShortcut();
-    helpSection.addKey(openResourceShortcut.name, WebInspector.UIString("Open file"));
 
     var outlineShortcut = WebInspector.KeyboardShortcut.makeDescriptor("o", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta | WebInspector.KeyboardShortcut.Modifiers.Shift);
     helpSection.addKey(outlineShortcut.name, WebInspector.UIString("Go to member"));
@@ -186,6 +182,7 @@ WebInspector.ScriptsPanel = function(uiSourceCodeProviderForTest)
         WebInspector.debuggerModel.enableDebugger();
 
     WebInspector.advancedSearchController.registerSearchScope(new WebInspector.ScriptsSearchScope(this._uiSourceCodeProvider));
+    WebInspector.ContextMenu.registerProvider(this);
 }
 
 // Keep these in sync with WebCore::ScriptDebugServer
@@ -198,9 +195,7 @@ WebInspector.ScriptsPanel.PauseOnExceptionsState = {
 WebInspector.ScriptsPanel.prototype = {
     get toolbarItemLabel()
     {
-        if (WebInspector.experimentsSettings.sourceCodePanel.isEnabled())
-            return WebInspector.UIString("Source Code");
-        return WebInspector.UIString("Scripts");
+        return WebInspector.UIString("Sources");
     },
 
     get statusBarItems()
@@ -226,6 +221,12 @@ WebInspector.ScriptsPanel.prototype = {
         this.sidebarPanes.watchExpressions.show();
 
         this._navigatorController.wasShown();
+    },
+
+    willHide: function()
+    {
+        WebInspector.Panel.prototype.willHide.call(this);
+        WebInspector.closeViewInDrawer();
     },
 
     /**
@@ -462,11 +463,13 @@ WebInspector.ScriptsPanel.prototype = {
     _createSourceFrame: function(uiSourceCode)
     {
         var sourceFrame;
-        if (uiSourceCode instanceof WebInspector.JavaScriptSource)
-            sourceFrame = new WebInspector.JavaScriptSourceFrame(this, uiSourceCode);
-        else if (uiSourceCode instanceof WebInspector.StyleSource)
-            sourceFrame = new WebInspector.StyleSourceFrame(uiSourceCode);
-        else {
+        if (uiSourceCode instanceof WebInspector.JavaScriptSource) {
+            var javaScriptSource = /** @type {WebInspector.JavaScriptSource} */ uiSourceCode;
+            sourceFrame = new WebInspector.JavaScriptSourceFrame(this, javaScriptSource);
+        } else if (uiSourceCode instanceof WebInspector.StyleSource) {
+            var styleSource = /** @type {WebInspector.StyleSource} */ uiSourceCode;
+            sourceFrame = new WebInspector.StyleSourceFrame(styleSource);
+        } else {
             console.assert(false, "Unknown UISourceCode type");
             sourceFrame = new WebInspector.SourceFrame(uiSourceCode);
         }
@@ -573,6 +576,7 @@ WebInspector.ScriptsPanel.prototype = {
     _editorSelected: function(event)
     {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.data;
+        WebInspector.RevisionHistoryView.uiSourceCodeSelected(uiSourceCode);
         this._showFile(uiSourceCode);
         this._navigatorController.hideNavigatorOverlay();
     },
@@ -771,9 +775,11 @@ WebInspector.ScriptsPanel.prototype = {
         if (active) {
             this._toggleBreakpointsButton.title = WebInspector.UIString("Deactivate all breakpoints.");
             WebInspector.inspectorView.element.removeStyleClass("breakpoints-deactivated");
+            this.sidebarPanes.jsBreakpoints.listElement.removeStyleClass("breakpoints-list-deactivated");
         } else {
             this._toggleBreakpointsButton.title = WebInspector.UIString("Activate all breakpoints.");
             WebInspector.inspectorView.element.addStyleClass("breakpoints-deactivated");
+            this.sidebarPanes.jsBreakpoints.listElement.addStyleClass("breakpoints-list-deactivated");
         }
     },
 
@@ -1040,6 +1046,35 @@ WebInspector.ScriptsPanel.prototype = {
     registerUISourceCodeProvider: function(uiSourceCodeProvider)
     {
         this._uiSourceCodeProvider._registerUISourceCodeProvider(uiSourceCodeProvider);
+    },
+
+    /**
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     */
+    _showLocalHistory: function(uiSourceCode)
+    {
+        WebInspector.RevisionHistoryView.showHistory(uiSourceCode);
+    },
+
+    /** 
+     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {Object} target
+     */
+    appendApplicableItems: function(contextMenu, target)
+    {
+        if (!(target instanceof WebInspector.UISourceCode))
+            return;
+
+        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ target;
+        contextMenu.appendItem(WebInspector.UIString("Revision history..."), this._showLocalHistory.bind(this, uiSourceCode));
+        if (uiSourceCode.resource() && uiSourceCode.resource().request)
+            contextMenu.appendApplicableItems(uiSourceCode.resource().request);
+    },
+
+    showGoToSourceDialog: function()
+    {
+        WebInspector.inspectorView.setCurrentPanel(this);
+        WebInspector.OpenResourceDialog.show(this, this._uiSourceCodeProvider, this.editorView.mainElement);
     }
 }
 

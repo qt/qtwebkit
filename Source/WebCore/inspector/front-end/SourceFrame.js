@@ -53,7 +53,7 @@ WebInspector.SourceFrame = function(contentProvider)
     this._rowMessages = {};
     this._messageBubbles = {};
 
-    this._textViewer.readOnly = !this.canEditSource();
+    this._textViewer.setReadOnly(!this.canEditSource());
 }
 
 WebInspector.SourceFrame.createSearchRegex = function(query)
@@ -118,19 +118,6 @@ WebInspector.SourceFrame.prototype = {
             this._contentRequested = true;
             this._contentProvider.requestContent(this.setContent.bind(this));
         }
-    },
-
-    /**
-     * @param {TextDiff} diffData
-     */
-    markDiff: function(diffData)
-    {
-        if (this._diffLines && this.loaded)
-            this._removeDiffDecorations();
-
-        this._diffLines = diffData;
-        if (this.loaded)
-            this._updateDiffDecorations();
     },
 
     addMessage: function(msg)
@@ -251,7 +238,6 @@ WebInspector.SourceFrame.prototype = {
         this._textViewer.beginUpdates();
 
         this._addExistingMessagesToSource();
-        this._updateDiffDecorations();
 
         this._textViewer.doResize();
 
@@ -358,33 +344,6 @@ WebInspector.SourceFrame.prototype = {
             } while (match && line);
         }
         return ranges;
-    },
-
-    _updateDiffDecorations: function()
-    {
-        if (!this._diffLines)
-            return;
-
-        function addDecorations(textViewer, lines, className)
-        {
-            for (var i = 0; i < lines.length; ++i)
-                textViewer.addDecoration(lines[i], className);
-        }
-        addDecorations(this._textViewer, this._diffLines.added, "webkit-added-line");
-        addDecorations(this._textViewer, this._diffLines.removed, "webkit-removed-line");
-        addDecorations(this._textViewer, this._diffLines.changed, "webkit-changed-line");
-    },
-
-    _removeDiffDecorations: function()
-    {
-        function removeDecorations(textViewer, lines, className)
-        {
-            for (var i = 0; i < lines.length; ++i)
-                textViewer.removeDecoration(lines[i], className);
-        }
-        removeDecorations(this._textViewer, this._diffLines.added, "webkit-added-line");
-        removeDecorations(this._textViewer, this._diffLines.removed, "webkit-removed-line");
-        removeDecorations(this._textViewer, this._diffLines.changed, "webkit-changed-line");
     },
 
     _addExistingMessagesToSource: function()
@@ -501,9 +460,6 @@ WebInspector.SourceFrame.prototype = {
 
     populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
-        if (!window.getSelection().isCollapsed)
-            return;
-        WebInspector.populateResourceContextMenu(contextMenu, this._url, lineNumber);
     },
 
     inheritScrollPositions: function(sourceFrame)

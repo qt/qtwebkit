@@ -36,6 +36,7 @@
 #include "InspectorInstrumentation.h"
 #include "MouseEvent.h"
 #include "ScopedEventQueue.h"
+#include "ShadowRoot.h"
 #include "WindowEventContext.h"
 #include <wtf/RefPtr.h>
 #include <wtf/UnusedParam.h>
@@ -125,17 +126,13 @@ inline static EventTarget* eventTargetRespectingSVGTargetRules(Node* referenceNo
 
     // Spec: The event handling for the non-exposed tree works as if the referenced element had been textually included
     // as a deeply cloned child of the 'use' element, except that events are dispatched to the SVGElementInstance objects
-    Element* shadowHostElement = referenceNode->treeScope()->rootNode()->shadowHost();
-    // At this time, SVG nodes are not allowed in non-<use> shadow trees, so any shadow root we do
-    // have should be a use. The assert and following test is here to catch future shadow DOM changes
-    // that do enable SVG in a shadow tree.
-    ASSERT(!shadowHostElement || shadowHostElement->hasTagName(SVGNames::useTag));
-    if (shadowHostElement && shadowHostElement->hasTagName(SVGNames::useTag)) {
-        SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowHostElement);
-
-        if (SVGElementInstance* instance = useElement->instanceForShadowTreeElement(referenceNode))
-            return instance;
-    }
+    Element* shadowHostElement = toShadowRoot(referenceNode->treeScope()->rootNode())->host();
+    // At this time, SVG nodes are not supported in non-<use> shadow trees.
+    if (!shadowHostElement || !shadowHostElement->hasTagName(SVGNames::useTag))
+        return referenceNode;
+    SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowHostElement);
+    if (SVGElementInstance* instance = useElement->instanceForShadowTreeElement(referenceNode))
+        return instance;
 #endif
 
     return referenceNode;
@@ -176,7 +173,6 @@ void EventDispatcher::dispatchSimulatedClick(Node* node, PassRefPtr<Event> under
     gNodesDispatchingSimulatedClicks->remove(node);
 }
 
-
 void EventDispatcher::adjustRelatedTarget(Event* event, PassRefPtr<EventTarget> prpRelatedTarget)
 {
     if (!prpRelatedTarget)
@@ -216,7 +212,7 @@ void EventDispatcher::ensureEventAncestors(Event* event)
     targetStack.append(originalTarget);
     while (true) {
         if (ancestorWalker.get()->isShadowRoot()) {
-            if (determineDispatchBehavior(event, ancestorWalker.get()) == StayInsideShadowDOM)
+            if (determineDispatchBehavior(event, toShadowRoot(ancestorWalker.get())) == StayInsideShadowDOM)
                 return;
             ancestorWalker.parentIncludingInsertionPointAndShadowRoot();
             if (!ancestorWalker.get())
@@ -347,7 +343,7 @@ const EventContext* EventDispatcher::topEventContext()
     return m_ancestors.isEmpty() ? 0 : &m_ancestors.last();
 }
 
-EventDispatchBehavior EventDispatcher::determineDispatchBehavior(Event* event, Node* shadowRoot)
+EventDispatchBehavior EventDispatcher::determineDispatchBehavior(Event* event, ShadowRoot* shadowRoot)
 {
 #if ENABLE(FULLSCREEN_API) && ENABLE(VIDEO)
     // Video-only full screen is a mode where we use the shadow DOM as an implementation
@@ -355,7 +351,7 @@ EventDispatchBehavior EventDispatcher::determineDispatchBehavior(Event* event, N
     if (Element* element = m_node->document()->webkitCurrentFullScreenElement()) {
         // FIXME: We assume that if the full screen element is a media element that it's
         // the video-only full screen. Both here and elsewhere. But that is probably wrong.
-        if (element->isMediaElement() && shadowRoot && shadowRoot->shadowHost() == element)
+        if (element->isMediaElement() && shadowRoot && shadowRoot->host() == element)
             return StayInsideShadowDOM;
     }
 #else

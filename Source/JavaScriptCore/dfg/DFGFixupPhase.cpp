@@ -41,15 +41,19 @@ public:
     {
     }
     
-    void run()
+    bool run()
     {
         for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex)
             fixupBlock(m_graph.m_blocks[blockIndex].get());
+        return true;
     }
 
 private:
     void fixupBlock(BasicBlock* block)
     {
+        if (!block)
+            return;
+        ASSERT(block->isReachable);
         for (m_indexInBlock = 0; m_indexInBlock < block->size(); ++m_indexInBlock) {
             m_compileIndex = block->at(m_indexInBlock);
             fixupNode(m_graph[m_compileIndex]);
@@ -75,6 +79,7 @@ private:
             if (codeBlock()->identifier(node.identifierNumber()) != globalData().propertyNames->length)
                 break;
             bool isArray = isArrayPrediction(m_graph[node.child1()].prediction());
+            bool isArguments = isArgumentsPrediction(m_graph[node.child1()].prediction());
             bool isString = isStringPrediction(m_graph[node.child1()].prediction());
             bool isInt8Array = m_graph[node.child1()].shouldSpeculateInt8Array();
             bool isInt16Array = m_graph[node.child1()].shouldSpeculateInt16Array();
@@ -85,7 +90,7 @@ private:
             bool isUint32Array = m_graph[node.child1()].shouldSpeculateUint32Array();
             bool isFloat32Array = m_graph[node.child1()].shouldSpeculateFloat32Array();
             bool isFloat64Array = m_graph[node.child1()].shouldSpeculateFloat64Array();
-            if (!isArray && !isString && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint8ClampedArray && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
+            if (!isArray && !isArguments && !isString && !isInt8Array && !isInt16Array && !isInt32Array && !isUint8Array && !isUint8ClampedArray && !isUint16Array && !isUint32Array && !isFloat32Array && !isFloat64Array)
                 break;
             
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
@@ -93,6 +98,8 @@ private:
 #endif
             if (isArray)
                 node.setOp(GetArrayLength);
+            else if (isArguments)
+                node.setOp(GetArgumentsLength);
             else if (isString)
                 node.setOp(GetStringLength);
             else if (isInt8Array)
@@ -123,7 +130,9 @@ private:
         }
         case GetIndexedPropertyStorage: {
             PredictedType basePrediction = m_graph[node.child2()].prediction();
-            if (!(basePrediction & PredictInt32) && basePrediction) {
+            if ((!(basePrediction & PredictInt32) && basePrediction)
+                || m_graph[node.child1()].shouldSpeculateArguments()
+                || !isActionableArrayPrediction(m_graph[node.child1()].prediction())) {
                 node.setOpAndDefaultFlags(Nop);
                 m_graph.clearAndDerefChild1(node);
                 m_graph.clearAndDerefChild2(node);
@@ -209,7 +218,7 @@ private:
         }
             
         case SetLocal: {
-            if (m_graph.isCaptured(node.local()))
+            if (node.variableAccessData()->isCaptured())
                 break;
             if (!node.variableAccessData()->shouldUseDoubleFormat())
                 break;
@@ -246,7 +255,6 @@ private:
             
         case ArithMin:
         case ArithMax:
-        case ArithMul:
         case ArithMod: {
             if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()])
                 && node.canSpeculateInteger())
@@ -256,6 +264,14 @@ private:
             break;
         }
             
+        case ArithMul: {
+            if (m_graph.mulShouldSpeculateInteger(node))
+                break;
+            fixDoubleEdge(0);
+            fixDoubleEdge(1);
+            break;
+        }
+
         case ArithDiv: {
             if (Node::shouldSpeculateInteger(m_graph[node.child1()], m_graph[node.child2()])
                 && node.canSpeculateInteger()) {
@@ -383,9 +399,9 @@ private:
     InsertionSet<NodeIndex> m_insertionSet;
 };
     
-void performFixup(Graph& graph)
+bool performFixup(Graph& graph)
 {
-    runPhase<FixupPhase>(graph);
+    return runPhase<FixupPhase>(graph);
 }
 
 } } // namespace JSC::DFG

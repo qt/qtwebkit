@@ -34,12 +34,14 @@
  * @extends {WebInspector.Object}
  * @implements {WebInspector.ContentProvider}
  * @param {string} url
+ * @param {WebInspector.Resource} resource
  * @param {WebInspector.ContentProvider} contentProvider
  * @param {WebInspector.SourceMapping=} sourceMapping
  */
-WebInspector.UISourceCode = function(url, contentProvider, sourceMapping)
+WebInspector.UISourceCode = function(url, resource, contentProvider, sourceMapping)
 {
     this._url = url;
+    this._resource = resource;
     this._parsedURL = new WebInspector.ParsedURL(url);
     this._contentProvider = contentProvider;
     this._sourceMapping = sourceMapping;
@@ -53,6 +55,9 @@ WebInspector.UISourceCode = function(url, contentProvider, sourceMapping)
      * @type {Array.<WebInspector.PresentationConsoleMessage>}
      */
     this._consoleMessages = [];
+    
+    if (this.resource())
+        this.resource().addEventListener(WebInspector.Resource.Events.RevisionAdded, this._revisionAdded, this);
 }
 
 WebInspector.UISourceCode.Events = {
@@ -81,6 +86,14 @@ WebInspector.UISourceCode.prototype = {
         this._url = url;
         this._parsedURL = new WebInspector.ParsedURL(this._url);
         this.dispatchEventToListeners(WebInspector.UISourceCode.Events.TitleChanged, null);
+    },
+
+    /**
+     * @return {WebInspector.Resource}
+     */
+    resource: function()
+    {
+        return this._resource;
     },
 
     /**
@@ -121,16 +134,26 @@ WebInspector.UISourceCode.prototype = {
             this._contentProvider.requestContent(this.fireContentAvailable.bind(this));
     },
 
+    _revisionAdded: function(event)
+    {
+        var revision = /** @type {WebInspector.ResourceRevision} */ event.data;
+        this.contentChanged(revision.content || "", this._resource.canonicalMimeType());
+    },
+
     /**
      * @param {string} newContent
+     * @param {string} mimeType
      */
-    contentChanged: function(newContent)
+    contentChanged: function(newContent, mimeType)
     {
-        console.assert(this._contentLoaded);
-        var oldContent = this._content;
+        if (this._committingWorkingCopy)
+            return;
+
         this._content = newContent;
+        this._mimeType = mimeType;
+        this._contentLoaded = true;
         delete this._workingCopy;
-        this.dispatchEventToListeners(WebInspector.UISourceCode.Events.ContentChanged, {oldContent: oldContent, content: newContent});
+        this.dispatchEventToListeners(WebInspector.UISourceCode.Events.ContentChanged, {content: newContent});
     },
 
     /**
@@ -147,7 +170,9 @@ WebInspector.UISourceCode.prototype = {
     workingCopy: function()
     {
         console.assert(this._contentLoaded);
-        return this._workingCopy;
+        if (this.isDirty())
+            return this._workingCopy;
+        return this._content;
     },
 
     /**
@@ -161,7 +186,42 @@ WebInspector.UISourceCode.prototype = {
             delete this._workingCopy;
         else
             this._workingCopy = newWorkingCopy;
+        this.workingCopyChanged();
         this.dispatchEventToListeners(WebInspector.UISourceCode.Events.WorkingCopyChanged, {oldWorkingCopy: oldWorkingCopy, workingCopy: newWorkingCopy});
+    },
+
+    workingCopyChanged: function()
+    {  
+        // Overridden.
+    },
+
+    /**
+     * @param {function(?string)} callback
+     */
+    commitWorkingCopy: function(callback)
+    {
+        /**
+         * @param {?string} error
+         */
+        function innerCallback(error)
+        {
+            delete this._committingWorkingCopy;
+            if (!error)
+                this.contentChanged(newContent, this._mimeType);
+            callback(error);
+        }
+
+        var newContent = this._workingCopy;
+        this._committingWorkingCopy = true;
+        this.workingCopyCommitted(innerCallback.bind(this));
+    },
+
+    /**
+     * @param {function(?string)} callback
+     */
+    workingCopyCommitted: function(callback)
+    {  
+        // Overridden.
     },
 
     /**
@@ -296,6 +356,16 @@ WebInspector.UISourceCode.prototype = {
     {
         this._consoleMessages = [];
         this.dispatchEventToListeners(WebInspector.UISourceCode.Events.ConsoleMessagesCleared);
+    },
+
+    /**
+     * @param {boolean} formatted
+     * @param {function()=} callback
+     */
+    setFormatted: function(formatted, callback)
+    {
+        if (callback)
+            callback();
     }
 }
 

@@ -92,6 +92,36 @@ public:
         MergeToSuccessors
     };
     
+    enum BranchDirection {
+        // This is not a branch and so there is no branch direction, or
+        // the branch direction has yet to be set.
+        InvalidBranchDirection,
+        
+        // The branch takes the true case.
+        TakeTrue,
+        
+        // The branch takes the false case.
+        TakeFalse,
+        
+        // For all we know, the branch could go either direction, so we
+        // have to assume the worst.
+        TakeBoth
+    };
+    
+    static const char* branchDirectionToString(BranchDirection branchDirection)
+    {
+        switch (branchDirection) {
+        case InvalidBranchDirection:
+            return "Invalid";
+        case TakeTrue:
+            return "TakeTrue";
+        case TakeFalse:
+            return "TakeFalse";
+        case TakeBoth:
+            return "TakeBoth";
+        }
+    }
+
     AbstractState(Graph&);
     
     ~AbstractState();
@@ -139,7 +169,11 @@ public:
     //    A true return means that you must revisit (at least) the successor
     //    blocks. This also sets cfaShouldRevisit to true for basic blocks
     //    that must be visited next.
-    bool endBasicBlock(MergeMode);
+    //
+    // If you'd like to know what direction the branch at the end of the
+    // basic block is thought to have taken, you can pass a non-0 pointer
+    // for BranchDirection.
+    bool endBasicBlock(MergeMode, BranchDirection* = 0);
     
     // Reset the AbstractState. This throws away any results, and at this point
     // you can safely call beginBasicBlock() on any basic block.
@@ -169,11 +203,9 @@ public:
     // successors. Returns true if any of the successors' states changed. Note
     // that this is automatically called in endBasicBlock() if MergeMode is
     // MergeToSuccessors.
-    bool mergeToSuccessors(Graph&, BasicBlock*);
+    bool mergeToSuccessors(Graph&, BasicBlock*, BranchDirection);
 
-#ifndef NDEBUG
     void dump(FILE* out);
-#endif
     
 private:
     void clobberStructures(unsigned);
@@ -182,6 +214,50 @@ private:
     
     static bool mergeVariableBetweenBlocks(AbstractValue& destination, AbstractValue& source, NodeIndex destinationNodeIndex, NodeIndex sourceNodeIndex);
     
+    void speculateInt32Unary(Node& node, bool forceCanExit = false)
+    {
+        AbstractValue& childValue = forNode(node.child1());
+        node.setCanExit(forceCanExit || !isInt32Prediction(childValue.m_type));
+        childValue.filter(PredictInt32);
+    }
+    
+    void speculateNumberUnary(Node& node)
+    {
+        AbstractValue& childValue = forNode(node.child1());
+        node.setCanExit(!isNumberPrediction(childValue.m_type));
+        childValue.filter(PredictNumber);
+    }
+    
+    void speculateBooleanUnary(Node& node)
+    {
+        AbstractValue& childValue = forNode(node.child1());
+        node.setCanExit(!isBooleanPrediction(childValue.m_type));
+        childValue.filter(PredictBoolean);
+    }
+    
+    void speculateInt32Binary(Node& node, bool forceCanExit = false)
+    {
+        AbstractValue& childValue1 = forNode(node.child1());
+        AbstractValue& childValue2 = forNode(node.child2());
+        node.setCanExit(
+            forceCanExit
+            || !isInt32Prediction(childValue1.m_type)
+            || !isInt32Prediction(childValue2.m_type));
+        childValue1.filter(PredictInt32);
+        childValue2.filter(PredictInt32);
+    }
+    
+    void speculateNumberBinary(Node& node)
+    {
+        AbstractValue& childValue1 = forNode(node.child1());
+        AbstractValue& childValue2 = forNode(node.child2());
+        node.setCanExit(
+            !isNumberPrediction(childValue1.m_type)
+            || !isNumberPrediction(childValue2.m_type));
+        childValue1.filter(PredictNumber);
+        childValue2.filter(PredictNumber);
+    }
+    
     CodeBlock* m_codeBlock;
     Graph& m_graph;
     
@@ -189,8 +265,11 @@ private:
     Operands<AbstractValue> m_variables;
     BasicBlock* m_block;
     bool m_haveStructures;
+    bool m_foundConstants;
     
     bool m_isValid;
+    
+    BranchDirection m_branchDirection; // This is only set for blocks that end in Branch and that execute to completion (i.e. m_isValid == true).
 };
 
 } } // namespace JSC::DFG

@@ -278,6 +278,11 @@ bool HTMLInputElement::getAllowedValueStep(double* step) const
     return m_inputType->getAllowedValueStep(step);
 }
 
+StepRange HTMLInputElement::createStepRange(AnyStepHandling anyStepHandling) const
+{
+    return m_inputType->createStepRange(anyStepHandling);
+}
+
 void HTMLInputElement::stepUp(int n, ExceptionCode& ec)
 {
     m_inputType->stepUp(n, ec);
@@ -1268,12 +1273,12 @@ bool HTMLInputElement::hasUnacceptableValue() const
 
 bool HTMLInputElement::isInRange() const
 {
-    return m_inputType->supportsRangeLimitation() && !m_inputType->rangeUnderflow(value()) && !m_inputType->rangeOverflow(value());
+    return m_inputType->isInRange(value());
 }
 
 bool HTMLInputElement::isOutOfRange() const
 {
-    return m_inputType->supportsRangeLimitation() && (m_inputType->rangeUnderflow(value()) || m_inputType->rangeOverflow(value()));
+    return m_inputType->isOutOfRange(value());
 }
 
 bool HTMLInputElement::needsSuspensionCallback()
@@ -1331,7 +1336,7 @@ void HTMLInputElement::didChangeForm()
     addToRadioButtonGroup();
 }
 
-Node::InsertionNotificationRequest HTMLInputElement::insertedInto(Node* insertionPoint)
+Node::InsertionNotificationRequest HTMLInputElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLTextFormControlElement::insertedInto(insertionPoint);
     if (!insertionPoint->inDocument())
@@ -1341,7 +1346,7 @@ Node::InsertionNotificationRequest HTMLInputElement::insertedInto(Node* insertio
     return InsertionDone;
 }
 
-void HTMLInputElement::removedFrom(Node* insertionPoint)
+void HTMLInputElement::removedFrom(ContainerNode* insertionPoint)
 {
     if (insertionPoint->inDocument())
         removeFromRadioButtonGroup();

@@ -135,10 +135,8 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
 #if ENABLE(CSS_FILTERS)
     rareNonInheritedData.access()->m_filter.init();
 #endif
-#if ENABLE(CSS_GRID_LAYOUT)
     rareNonInheritedData.access()->m_grid.init();
     rareNonInheritedData.access()->m_gridItem.init();
-#endif
     rareInheritedData.init();
     inherited.init();
 
@@ -420,11 +418,9 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
 #endif
         }
 
-#if ENABLE(CSS_GRID_LAYOUT)
         if (rareNonInheritedData->m_grid.get() != other->rareNonInheritedData->m_grid.get()
             && rareNonInheritedData->m_gridItem.get() != other->rareNonInheritedData->m_gridItem.get())
             return StyleDifferenceLayout;
-#endif
 
 #if !USE(ACCELERATED_COMPOSITING)
         if (rareNonInheritedData.get() != other->rareNonInheritedData.get()) {
@@ -1416,98 +1412,6 @@ unsigned short RenderStyle::borderEndWidth() const
         return isLeftToRightDirection() ? borderRightWidth() : borderLeftWidth();
     return isLeftToRightDirection() ? borderBottomWidth() : borderTopWidth();
 }
-    
-Length RenderStyle::marginBefore() const
-{
-    switch (writingMode()) {
-    case TopToBottomWritingMode:
-        return marginTop();
-    case BottomToTopWritingMode:
-        return marginBottom();
-    case LeftToRightWritingMode:
-        return marginLeft();
-    case RightToLeftWritingMode:
-        return marginRight();
-    }
-    ASSERT_NOT_REACHED();
-    return marginTop();
-}
-
-Length RenderStyle::marginAfter() const
-{
-    switch (writingMode()) {
-    case TopToBottomWritingMode:
-        return marginBottom();
-    case BottomToTopWritingMode:
-        return marginTop();
-    case LeftToRightWritingMode:
-        return marginRight();
-    case RightToLeftWritingMode:
-        return marginLeft();
-    }
-    ASSERT_NOT_REACHED();
-    return marginBottom();
-}
-
-Length RenderStyle::marginBeforeUsing(const RenderStyle* otherStyle) const
-{
-    switch (otherStyle->writingMode()) {
-    case TopToBottomWritingMode:
-        return marginTop();
-    case BottomToTopWritingMode:
-        return marginBottom();
-    case LeftToRightWritingMode:
-        return marginLeft();
-    case RightToLeftWritingMode:
-        return marginRight();
-    }
-    ASSERT_NOT_REACHED();
-    return marginTop();
-}
-
-Length RenderStyle::marginAfterUsing(const RenderStyle* otherStyle) const
-{
-    switch (otherStyle->writingMode()) {
-    case TopToBottomWritingMode:
-        return marginBottom();
-    case BottomToTopWritingMode:
-        return marginTop();
-    case LeftToRightWritingMode:
-        return marginRight();
-    case RightToLeftWritingMode:
-        return marginLeft();
-    }
-    ASSERT_NOT_REACHED();
-    return marginBottom();
-}
-
-Length RenderStyle::marginStart() const
-{
-    if (isHorizontalWritingMode())
-        return isLeftToRightDirection() ? marginLeft() : marginRight();
-    return isLeftToRightDirection() ? marginTop() : marginBottom();
-}
-
-Length RenderStyle::marginEnd() const
-{
-    if (isHorizontalWritingMode())
-        return isLeftToRightDirection() ? marginRight() : marginLeft();
-    return isLeftToRightDirection() ? marginBottom() : marginTop();
-}
-    
-Length RenderStyle::marginStartUsing(const RenderStyle* otherStyle) const
-{
-    if (otherStyle->isHorizontalWritingMode())
-        return otherStyle->isLeftToRightDirection() ? marginLeft() : marginRight();
-    return otherStyle->isLeftToRightDirection() ? marginTop() : marginBottom();
-}
-
-Length RenderStyle::marginEndUsing(const RenderStyle* otherStyle) const
-{
-    if (otherStyle->isHorizontalWritingMode())
-        return otherStyle->isLeftToRightDirection() ? marginRight() : marginLeft();
-    return otherStyle->isLeftToRightDirection() ? marginBottom() : marginTop();
-}
 
 void RenderStyle::setMarginStart(Length margin)
 {
@@ -1537,52 +1441,6 @@ void RenderStyle::setMarginEnd(Length margin)
         else
             setMarginTop(margin);
     }
-}
-
-Length RenderStyle::paddingBefore() const
-{
-    switch (writingMode()) {
-    case TopToBottomWritingMode:
-        return paddingTop();
-    case BottomToTopWritingMode:
-        return paddingBottom();
-    case LeftToRightWritingMode:
-        return paddingLeft();
-    case RightToLeftWritingMode:
-        return paddingRight();
-    }
-    ASSERT_NOT_REACHED();
-    return paddingTop();
-}
-
-Length RenderStyle::paddingAfter() const
-{
-    switch (writingMode()) {
-    case TopToBottomWritingMode:
-        return paddingBottom();
-    case BottomToTopWritingMode:
-        return paddingTop();
-    case LeftToRightWritingMode:
-        return paddingRight();
-    case RightToLeftWritingMode:
-        return paddingLeft();
-    }
-    ASSERT_NOT_REACHED();
-    return paddingBottom();
-}
-
-Length RenderStyle::paddingStart() const
-{
-    if (isHorizontalWritingMode())
-        return isLeftToRightDirection() ? paddingLeft() : paddingRight();
-    return isLeftToRightDirection() ? paddingTop() : paddingBottom();
-}
-
-Length RenderStyle::paddingEnd() const
-{
-    if (isHorizontalWritingMode())
-        return isLeftToRightDirection() ? paddingRight() : paddingLeft();
-    return isLeftToRightDirection() ? paddingBottom() : paddingTop();
 }
 
 TextEmphasisMark RenderStyle::textEmphasisMark() const

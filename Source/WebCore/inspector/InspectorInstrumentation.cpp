@@ -36,7 +36,6 @@
 
 #include "CSSRule.h"
 #include "CSSStyleRule.h"
-#include "DOMFileSystem.h"
 #include "DOMWindow.h"
 #include "Database.h"
 #include "DocumentLoader.h"
@@ -53,7 +52,6 @@
 #include "InspectorDOMAgent.h"
 #include "InspectorDOMStorageAgent.h"
 #include "InspectorDebuggerAgent.h"
-#include "InspectorFileSystemAgent.h"
 #include "InspectorPageAgent.h"
 #include "InspectorProfilerAgent.h"
 #include "InspectorResourceAgent.h"
@@ -464,6 +462,18 @@ void InspectorInstrumentation::didPaintImpl(const InspectorInstrumentationCookie
         timelineAgent->didPaint();
     if (InspectorPageAgent* pageAgent = cookie.first ? cookie.first->inspectorPageAgent() : 0)
         pageAgent->didPaint();
+}
+
+void InspectorInstrumentation::willCompositeImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->willComposite();
+}
+
+void InspectorInstrumentation::didCompositeImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->didComposite();
 }
 
 InspectorInstrumentationCookie InspectorInstrumentation::willRecalculateStyleImpl(InstrumentingAgents* instrumentingAgents)
@@ -909,14 +919,6 @@ void InspectorInstrumentation::didOpenDatabaseImpl(InstrumentingAgents* instrume
 }
 #endif
 
-#if ENABLE(FILE_SYSTEM)
-void InspectorInstrumentation::didOpenFileSystemImpl(InstrumentingAgents* instrumentingAgents, PassRefPtr<DOMFileSystem> fileSystem)
-{
-    if (InspectorFileSystemAgent* fileSystemAgent = instrumentingAgents->inspectorFileSystemAgent())
-        fileSystemAgent->didOpenFileSystem(fileSystem);
-}
-#endif // ENABLE(FILE_SYSTEM)
-
 void InspectorInstrumentation::didUseDOMStorageImpl(InstrumentingAgents* instrumentingAgents, StorageArea* storageArea, bool isLocalStorage, Frame* frame)
 {
     InspectorAgent* inspectorAgent = instrumentingAgents->inspectorAgent();
@@ -924,6 +926,12 @@ void InspectorInstrumentation::didUseDOMStorageImpl(InstrumentingAgents* instrum
         return;
     if (InspectorDOMStorageAgent* domStorageAgent = instrumentingAgents->inspectorDOMStorageAgent())
         domStorageAgent->didUseDOMStorage(storageArea, isLocalStorage, frame);
+}
+
+void InspectorInstrumentation::didDispatchDOMStorageEventImpl(InstrumentingAgents* instrumentingAgents, const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page* page)
+{
+    if (InspectorDOMStorageAgent* domStorageAgent = instrumentingAgents->inspectorDOMStorageAgent())
+        domStorageAgent->didDispatchDOMStorageEvent(key, oldValue, newValue, storageType, securityOrigin, page);
 }
 
 #if ENABLE(WORKERS)

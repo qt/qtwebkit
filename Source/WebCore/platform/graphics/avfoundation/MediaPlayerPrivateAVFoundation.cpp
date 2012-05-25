@@ -378,7 +378,10 @@ unsigned MediaPlayerPrivateAVFoundation::bytesLoaded() const
 
 bool MediaPlayerPrivateAVFoundation::isReadyForVideoSetup() const
 {
-    return m_isAllowedToRender && m_readyState >= MediaPlayer::HaveMetadata && m_player->visible();
+    // AVFoundation will not return true for firstVideoFrameAvailable until
+    // an AVPlayerLayer has been added to the AVPlayerItem, so allow video setup
+    // here if a video track to trigger allocation of a AVPlayerLayer.
+    return (m_isAllowedToRender || m_cachedHasVideo) && m_readyState >= MediaPlayer::HaveMetadata && m_player->visible();
 }
 
 void MediaPlayerPrivateAVFoundation::prepareForRendering()
@@ -530,12 +533,6 @@ void MediaPlayerPrivateAVFoundation::metadataLoaded()
 {
     m_loadingMetadata = false;
     tracksChanged();
-
-    // AVFoundation will not return true for firstVideoFrameAvailable until
-    // an AVPlayerLayer has been added to the AVPlayerItem, so call prepareForRendering()
-    // here to trigger allocation of a AVPlayerLayer.
-    if (m_cachedHasVideo)
-        prepareForRendering();
 }
 
 void MediaPlayerPrivateAVFoundation::rateChanged()

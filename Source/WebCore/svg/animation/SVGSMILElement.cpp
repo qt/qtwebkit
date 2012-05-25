@@ -193,7 +193,7 @@ void SVGSMILElement::reset()
     resolveFirstInterval();
 }
 
-Node::InsertionNotificationRequest SVGSMILElement::insertedInto(Node* rootParent)
+Node::InsertionNotificationRequest SVGSMILElement::insertedInto(ContainerNode* rootParent)
 {
     SVGElement::insertedInto(rootParent);
     if (!rootParent->inDocument())
@@ -222,7 +222,7 @@ Node::InsertionNotificationRequest SVGSMILElement::insertedInto(Node* rootParent
     return InsertionDone;
 }
 
-void SVGSMILElement::removedFrom(Node* rootParent)
+void SVGSMILElement::removedFrom(ContainerNode* rootParent)
 {
     if (rootParent->inDocument()) {
         if (m_timeContainer) {
@@ -1055,8 +1055,8 @@ bool SVGSMILElement::progress(SMILTime elapsed, SVGSMILElement* resultElement, b
     m_activeState = determineActiveState(elapsed);
     bool animationIsContributing = isContributing(elapsed);
 
-    // Only reset the animated type to the base value once for the lowest priority animation that animates a particular element/attribute pair.
-    if (this == resultElement)
+    // Only reset the animated type to the base value once for the lowest priority animation that animates and contributes to a particular element/attribute pair.
+    if (this == resultElement && animationIsContributing)
         resetAnimatedType();
 
     if (animationIsContributing) {

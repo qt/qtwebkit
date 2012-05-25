@@ -61,7 +61,7 @@ class StylePropertyShorthand;
 class StyleRuleBase;
 class StyleRuleKeyframes;
 class StyleKeyframe;
-class StyleSheetInternal;
+class StyleSheetContents;
 class StyledElement;
 
 class CSSParser {
@@ -70,15 +70,15 @@ public:
 
     ~CSSParser();
 
-    void parseSheet(StyleSheetInternal*, const String&, int startLineNumber = 0, StyleRuleRangeMap* = 0);
-    PassRefPtr<StyleRuleBase> parseRule(StyleSheetInternal*, const String&);
-    PassRefPtr<StyleKeyframe> parseKeyframeRule(StyleSheetInternal*, const String&);
-    static bool parseValue(StylePropertySet*, CSSPropertyID, const String&, bool important, CSSParserMode, StyleSheetInternal*);
+    void parseSheet(StyleSheetContents*, const String&, int startLineNumber = 0, StyleRuleRangeMap* = 0);
+    PassRefPtr<StyleRuleBase> parseRule(StyleSheetContents*, const String&);
+    PassRefPtr<StyleKeyframe> parseKeyframeRule(StyleSheetContents*, const String&);
+    static bool parseValue(StylePropertySet*, CSSPropertyID, const String&, bool important, CSSParserMode, StyleSheetContents*);
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
     static PassRefPtr<CSSValueList> parseFontFaceValue(const AtomicString&);
     PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(int ident, CSSParserValue*);
-    bool parseDeclaration(StylePropertySet*, const String&, RefPtr<CSSStyleSourceData>*, StyleSheetInternal* contextStyleSheet);
+    bool parseDeclaration(StylePropertySet*, const String&, RefPtr<CSSStyleSourceData>*, StyleSheetContents* contextStyleSheet);
     PassOwnPtr<MediaQuery> parseMediaQuery(const String&);
 
     void addProperty(CSSPropertyID, PassRefPtr<CSSValue>, bool important, bool implicit = false);
@@ -129,9 +129,8 @@ public:
     bool parseTransitionShorthand(bool important);
     bool parseAnimationShorthand(bool important);
 
-#if ENABLE(CSS_GRID_LAYOUT)
+    bool cssGridLayoutEnabled() const;
     bool parseGridTrackList(CSSPropertyID, bool important);
-#endif
 
     bool parseDashboardRegions(CSSPropertyID, bool important);
 
@@ -283,11 +282,13 @@ public:
 
     void clearProperties();
 
+    PassRefPtr<StylePropertySet> createStylePropertySet();
+
     CSSParserContext m_context;
 
     bool m_important;
     CSSPropertyID m_id;
-    StyleSheetInternal* m_styleSheet;
+    StyleSheetContents* m_styleSheet;
     RefPtr<StyleRuleBase> m_rule;
     RefPtr<StyleKeyframe> m_keyframe;
     OwnPtr<MediaQuery> m_mediaQuery;
@@ -348,7 +349,7 @@ private:
     inline void detectDashToken(int);
     inline void detectAtToken(int, bool);
 
-    void setStyleSheet(StyleSheetInternal*);
+    void setStyleSheet(StyleSheetContents*);
 
     inline bool inStrictMode() const { return m_context.mode == CSSStrictMode || m_context.mode == SVGAttributeMode; }
     inline bool inQuirksMode() const { return m_context.mode == CSSQuirksMode; }
@@ -368,7 +369,7 @@ private:
     bool isGeneratedImageValue(CSSParserValue*) const;
     bool parseGeneratedImage(CSSParserValueList*, RefPtr<CSSValue>&);
 
-    bool parseValue(StylePropertySet*, CSSPropertyID, const String&, bool important, StyleSheetInternal* contextStyleSheet);
+    bool parseValue(StylePropertySet*, CSSPropertyID, const String&, bool important, StyleSheetContents* contextStyleSheet);
 
     enum SizeParameterType {
         None,

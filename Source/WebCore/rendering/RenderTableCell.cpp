@@ -132,7 +132,7 @@ Length RenderTableCell::styleOrColLogicalWidth() const
 
             colWidthSum = Length(colWidthSum.value() + colWidth.value(), Fixed);
 
-            tableCol = table()->nextColElement(tableCol);
+            tableCol = tableCol->nextColumn();
             // If no next <col> tag found for the span we just return what we have for now.
             if (!tableCol)
                 break;
@@ -290,8 +290,8 @@ LayoutRect RenderTableCell::clippedOverflowRectForRepaint(RenderBoxModelObject* 
             right = max(right, below->borderHalfRight(true));
         }
     }
-    LayoutPoint location(max<LayoutUnit>(left, -minXVisualOverflow()), max<LayoutUnit>(top, -minYVisualOverflow()));
-    LayoutRect r(-location.x(), -location.y(), location.x() + max(width() + right, maxXVisualOverflow()), location.y() + max(height() + bottom, maxYVisualOverflow()));
+    LayoutPoint location(max<LayoutUnit>(left, -visualOverflowRect().x()), max<LayoutUnit>(top, -visualOverflowRect().y()));
+    LayoutRect r(-location.x(), -location.y(), location.x() + max(width() + right, visualOverflowRect().maxX()), location.y() + max(height() + bottom, visualOverflowRect().maxY()));
 
     if (RenderView* v = view()) {
         // FIXME: layoutDelta needs to be applied in parts before/after transforms and

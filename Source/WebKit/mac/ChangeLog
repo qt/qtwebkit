@@ -1,3 +1,174 @@
+2012-05-24  Tim Horton  <timothy_horton@apple.com>
+
+        Add feature defines for web-facing parts of CSS Regions and Exclusions
+        https://bugs.webkit.org/show_bug.cgi?id=87442
+        <rdar://problem/10887709>
+
+        Reviewed by Dan Bernstein.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-24  John Mellor  <johnme@chromium.org>
+
+        Font Boosting: Add compile flag and runtime setting
+        https://bugs.webkit.org/show_bug.cgi?id=87394
+
+        Reviewed by Adam Barth.
+
+        Add ENABLE_FONT_BOOSTING.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-23  Ojan Vafai  <ojan@chromium.org>
+
+        add back the ability to disable flexbox
+        https://bugs.webkit.org/show_bug.cgi?id=87147
+
+        Reviewed by Tony Chang.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-22  Tim Horton  <timothy_horton@apple.com>
+
+        Add a quirk for applications that depend on the relative ordering of progressCompleted/didFinishLoad
+        https://bugs.webkit.org/show_bug.cgi?id=87178
+        <rdar://problem/11468434>
+
+        Reviewed by Maciej Stachowiak.
+
+        Add plumbing for the quirk to flip the relative ordering of progressCompleted/didFinishLoad back
+        to the behavior before http://trac.webkit.org/changeset/94105. Make it apply to any Mail.app linked
+        against WebKit before that revision.
+
+        * Misc/WebKitVersionChecks.h:
+        * WebView/WebView.mm:
+        (-[WebView _needsDidFinishLoadOrderQuirk]):
+        (-[WebView _preferencesChanged:]):
+
+2012-05-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Disable private names by default in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=87088
+
+        Reviewed by Geoff Garen.
+
+        r117859 introduced a preliminary implementation of ES6-like private name objects to JSC.
+        These are probably not yet ready to be web-facing, so disabling by default in WebCore.
+        Opting-in for JSC & DumpRenderTree so that we can still run the fast/js/names.html test.
+
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]):
+        (-[WebPreferences setJavaScriptExperimentsEnabled:]):
+        (-[WebPreferences javaScriptExperimentsEnabled]):
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+            - Added JavaScriptExperimentsEnabled to WebPreferences.
+
+2012-05-15  Gavin Barraclough  <barraclough@apple.com>
+
+        Add support for private names
+        https://bugs.webkit.org/show_bug.cgi?id=86509
+
+        Reviewed by Oliver Hunt.
+
+        The spec isn't final, but we can start adding support to allow property maps
+        to contain keys that aren't identifiers.
+
+        * Plugins/Hosted/ProxyInstance.mm:
+        (WebKit::ProxyClass::methodsNamed):
+        (WebKit::ProxyClass::fieldNamed):
+        (WebKit::ProxyInstance::getMethod):
+        (WebKit::ProxyInstance::methodsNamed):
+        (WebKit::ProxyInstance::fieldNamed):
+            - Removed PropertyName::impl(), call publicName() to get the string associated with a name.
+
+2012-05-21  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Move setEditingBehavior() from layoutTestController to window.internals
+        https://bugs.webkit.org/show_bug.cgi?id=42689
+
+        Reviewed by Hajime Morita and Kenneth Rohde Christiansen.
+
+        Remove Mac private API to get/set the editing behavior, since it was only there
+        for the DRT.
+
+        * WebKit.order:
+        * WebView/WebFrame.mm:
+        * WebView/WebFrameInternal.h:
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]):
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+
+2012-05-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Using createContextualFragment to insert a <script> does not cause the script to execute
+        https://bugs.webkit.org/show_bug.cgi?id=12234
+
+        Reviewed by Adam Barth.
+
+        Renamed FragmentScriptingNotAllowed to DisallowScriptingContent.
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame _documentFragmentWithMarkupString:baseURLString:]):
+
+2012-05-19  Andy Estes  <aestes@apple.com>
+
+        Fix build errors found when disabling ENABLE_DRAG_SUPPORT
+        https://bugs.webkit.org/show_bug.cgi?id=86947
+
+        Reviewed by Jon Honeycutt.
+
+        * WebCoreSupport/WebDragClient.h:
+        * WebCoreSupport/WebDragClient.mm:
+        * WebView/WebFrame.mm:
+        * WebView/WebFrameInternal.h:
+        * WebView/WebFrameView.mm:
+        (-[WebFrameView _setDocumentView:]):
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView acceptsFirstMouse:]):
+        (-[WebHTMLView shouldDelayWindowOrderingForEvent:]):
+        (matchesExtensionOrEquivalent):
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+        (-[WebView moveDragCaretToPoint:]):
+        (-[WebView removeDragCaret]):
+
+2012-04-27  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should have control flow graph simplification
+        https://bugs.webkit.org/show_bug.cgi?id=84553
+
+        Reviewed by Oliver Hunt.
+        
+        Merged r115512 from dfgopt.
+
+        JSValue::toBoolean(ExecState*) -> JSValue::toBoolean()
+        
+        * Plugins/Hosted/NetscapePluginInstanceProxy.mm:
+        (WebKit::NetscapePluginInstanceProxy::addValueToArray):
+
+2012-05-18  Tony Chang  <tony@chromium.org>
+
+        remove the CSS_GRID_LAYOUT compiler define, but default grid layout to off
+        https://bugs.webkit.org/show_bug.cgi?id=86767
+
+        Reviewed by Ojan Vafai.
+
+        * Configurations/FeatureDefines.xcconfig:
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]):
+        (-[WebPreferences cssGridLayoutEnabled]):
+        (-[WebPreferences setCSSGridLayoutEnabled:]):
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]):
+
 2012-05-18  MORITA Hajime <morrita@google.com>
 
         Another unreviewed attempt to fix build breakage on r117572.

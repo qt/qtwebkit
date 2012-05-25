@@ -72,6 +72,7 @@ SOURCES += \
     accessibility/AccessibilityTableRow.cpp \
     accessibility/AXObjectCache.cpp \
     bindings/generic/ActiveDOMCallback.cpp \
+    bindings/generic/ContextEnabledFeatures.cpp \
     bindings/generic/RuntimeEnabledFeatures.cpp
 
 v8 {
@@ -496,7 +497,9 @@ SOURCES += \
     css/StylePropertyShorthand.cpp \
     css/StyleResolver.cpp \
     css/StyleRule.cpp \
+    css/StyleRuleImport.cpp \
     css/StyleSheet.cpp \
+    css/StyleSheetContents.cpp \
     css/StyleSheetList.cpp \
     css/WebKitCSSFilterValue.cpp \
     css/WebKitCSSKeyframeRule.cpp \
@@ -542,6 +545,7 @@ SOURCES += \
     dom/DocumentParser.cpp \
     dom/DocumentType.cpp \
     dom/DOMCoreException.cpp \
+    dom/DOMError.cpp \
     dom/DOMImplementation.cpp \
     dom/DOMStringList.cpp \
     dom/DOMStringMap.cpp \
@@ -1103,6 +1107,7 @@ SOURCES += \
     platform/graphics/FontData.cpp \
     platform/graphics/Font.cpp \
     platform/graphics/FontCache.cpp \
+    platform/graphics/FractionalLayoutBoxExtent.cpp \
     platform/graphics/FractionalLayoutRect.cpp \
     platform/graphics/GeneratorGeneratedImage.cpp \
     platform/graphics/Gradient.cpp \
@@ -1143,6 +1148,7 @@ SOURCES += \
     platform/KURL.cpp \
     platform/Language.cpp \
     platform/Length.cpp \
+    platform/LengthBox.cpp \
     platform/text/LineEnding.cpp \
     platform/leveldb/LevelDBDatabase.cpp \
     platform/leveldb/LevelDBTransaction.cpp \
@@ -1409,6 +1415,7 @@ HEADERS += \
     accessibility/AXObjectCache.h \
     bindings/ScriptControllerBase.h \
     bindings/generic/ActiveDOMCallback.h \
+    bindings/generic/ContextEnabledFeatures.h \
     bindings/generic/RuntimeEnabledFeatures.h
 
 v8 {
@@ -1658,7 +1665,9 @@ HEADERS += \
     css/StylePropertyShorthand.h \
     css/StyleResolver.h \
     css/StyleRule.h \
+    css/StyleRuleImport.h \
     css/StyleSheet.h \
+    css/StyleSheetContents.h \
     css/StyleSheetList.h \
     css/WebKitCSSFilterValue.h \
     css/WebKitCSSKeyframeRule.h \
@@ -1701,6 +1710,7 @@ HEADERS += \
     dom/DocumentMarkerController.h \
     dom/DocumentOrderedMap.h \
     dom/DocumentType.h \
+    dom/DOMError.h \
     dom/DOMImplementation.h \
     dom/DOMStringList.h \
     dom/DOMStringMap.h \
@@ -2572,7 +2582,6 @@ HEADERS += \
     rendering/svg/SVGInlineFlowBox.h \
     rendering/svg/SVGInlineTextBox.h \
     rendering/svg/SVGMarkerData.h \
-    rendering/svg/SVGMarkerLayoutInfo.h \
     rendering/svg/SVGPathData.h \
     rendering/svg/SVGRenderSupport.h \
     rendering/svg/SVGRenderTreeAsText.h \
@@ -2859,6 +2868,7 @@ SOURCES += \
     platform/graphics/qt/FontPlatformDataQt.cpp \
     platform/graphics/qt/FloatPointQt.cpp \
     platform/graphics/qt/FloatRectQt.cpp \
+    platform/graphics/qt/FloatSizeQt.cpp \
     platform/graphics/qt/FractionalLayoutPointQt.cpp \
     platform/graphics/qt/FractionalLayoutRectQt.cpp \
     platform/graphics/qt/FractionalLayoutSizeQt.cpp \
@@ -3447,6 +3457,10 @@ contains(DEFINES, HAVE_QRAWFONT=1) {
         platform/graphics/qt/FontQt4.cpp
 }
 
+contains(DEFINES, ENABLE_FONT_BOOSTING=1) {
+    SOURCES += # FIXME!
+}
+
 contains(DEFINES, ENABLE_DEVICE_ORIENTATION=1) {
     HEADERS += \
         platform/qt/DeviceMotionClientQt.h \
@@ -3535,7 +3549,6 @@ contains(DEFINES, ENABLE_SVG=1) {
               rendering/svg/RenderSVGViewportContainer.cpp \
               rendering/svg/SVGInlineFlowBox.cpp \
               rendering/svg/SVGInlineTextBox.cpp \
-              rendering/svg/SVGMarkerLayoutInfo.cpp \
               rendering/svg/SVGPathData.cpp \
               rendering/svg/SVGRenderSupport.cpp \
               rendering/svg/SVGRenderTreeAsText.cpp \

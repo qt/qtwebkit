@@ -28,6 +28,7 @@
 #include "MediaList.h"
 #include "MediaQueryEvaluator.h"
 #include "ScriptableDocumentParser.h"
+#include "StyleSheetContents.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -173,14 +174,14 @@ void StyleElement::createSheet(Element* e, int startLineNumber, const String& te
             m_sheet->setMediaQueries(mediaQueries.release());
             m_sheet->setTitle(e->title());
     
-            m_sheet->internal()->parseStringAtLine(text, startLineNumber);
+            m_sheet->contents()->parseStringAtLine(text, startLineNumber);
 
             m_loading = false;
         }
     }
 
     if (m_sheet)
-        m_sheet->internal()->checkLoaded();
+        m_sheet->contents()->checkLoaded();
 }
 
 bool StyleElement::isLoading() const

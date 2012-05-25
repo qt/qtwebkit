@@ -128,7 +128,7 @@ class SegmentedString;
 class Settings;
 class StyleResolver;
 class StyleSheet;
-class StyleSheetInternal;
+class StyleSheetContents;
 class StyleSheetList;
 class Text;
 class TextResourceDecoder;
@@ -361,14 +361,18 @@ public:
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
     bool cssRegionsEnabled() const;
+#if ENABLE(CSS_REGIONS)
     enum FlowNameCheck {
         CheckFlowNameForInvalidValues,
         DoNotCheckFlowNameForInvalidValues
     };
     PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
     PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&, FlowNameCheck);
+#endif
 
     bool regionBasedColumnsEnabled() const;
+
+    bool cssGridLayoutEnabled() const;
 
     /**
      * Retrieve all nodes that intersect a rect in the window's document, until it is fully enclosed by
@@ -653,7 +657,7 @@ public:
     void updatePageGroupUserSheets();
 
     const Vector<RefPtr<CSSStyleSheet> >* documentUserSheets() const { return m_userSheets.get(); }
-    void addUserSheet(PassRefPtr<StyleSheetInternal> userSheet);
+    void addUserSheet(PassRefPtr<StyleSheetContents> userSheet);
 
     CSSStyleSheet* elementSheet();
     
@@ -1207,7 +1211,7 @@ private:
     
     bool updateActiveStylesheets(StyleResolverUpdateFlag);
     void collectActiveStylesheets(Vector<RefPtr<StyleSheet> >&);
-    bool testAddedStylesheetRequiresStyleRecalc(StyleSheetInternal*);
+    bool testAddedStylesheetRequiresStyleRecalc(StyleSheetContents*);
     void analyzeStylesheetChange(StyleResolverUpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleResolverReset, bool& requiresFullStyleRecalc);
 
     void seamlessParentUpdatedStylesheets();

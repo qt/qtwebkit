@@ -101,6 +101,10 @@ private:
     LayoutUnit preferredMainAxisContentExtentForChild(RenderBox* child) const;
 
     void layoutFlexItems(FlexOrderIterator&, WTF::Vector<LineContext>&);
+    LayoutUnit autoMarginOffsetInMainAxis(const OrderedFlexItemList&, LayoutUnit& availableFreeSpace);
+    void updateAutoMarginsInMainAxis(RenderBox* child, LayoutUnit autoMarginOffset);
+    bool hasAutoMarginsInCrossAxis(RenderBox* child);
+    bool updateAutoMarginsInCrossAxis(RenderBox* child, LayoutUnit availableAlignmentSpace);
     void repositionLogicalHeightDependentFlexItems(FlexOrderIterator&, WTF::Vector<LineContext>&, LayoutUnit& oldClientAfterEdge);
 
     LayoutUnit availableAlignmentSpaceForChild(LayoutUnit lineCrossAxisExtent, RenderBox*);

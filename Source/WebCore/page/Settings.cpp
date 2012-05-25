@@ -140,6 +140,7 @@ Settings::Settings(Page* page)
     , m_sessionStorageQuota(StorageMap::noQuota)
     , m_editingBehaviorType(editingBehaviorTypeForPlatform())
     , m_maximumHTMLParserDOMTreeDepth(defaultMaximumHTMLParserDOMTreeDepth)
+    , m_fontBoostingEnabled(true)
     , m_isSpatialNavigationEnabled(false)
     , m_isJavaEnabled(false)
     , m_isJavaEnabledForLocalFiles(true)
@@ -174,6 +175,7 @@ Settings::Settings(Page* page)
     , m_showsToolTipOverTruncatedText(false)
     , m_forceFTPDirectoryListings(false)
     , m_developerExtrasEnabled(false)
+    , m_javaScriptExperimentsEnabled(false)
     , m_authorAndUserStylesEnabled(true)
     , m_needsSiteSpecificQuirks(false)
     , m_fontRenderingMode(0)
@@ -189,8 +191,11 @@ Settings::Settings(Page* page)
     , m_acceleratedDrawingEnabled(false)
     , m_acceleratedFiltersEnabled(false)
     , m_isCSSCustomFilterEnabled(false)
+#if ENABLE(CSS_REGIONS)
     , m_cssRegionsEnabled(false)
+#endif
     , m_regionBasedColumnsEnabled(false)
+    , m_cssGridLayoutEnabled(false)
     // FIXME: This should really be disabled by default as it makes platforms that don't support the feature download files
     // they can't use by. Leaving enabled for now to not change existing behavior.
     , m_downloadableBinaryFontsEnabled(true)
@@ -265,6 +270,8 @@ Settings::Settings(Page* page)
     , m_shouldRespectImageOrientation(false)
     , m_wantsBalancedSetDefersLoadingBehavior(false)
     , m_requestAnimationFrameEnabled(true)
+    , m_needsDidFinishLoadOrderQuirk(false)
+    , m_fixedPositionCreatesStackingContext(false)
     , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
     , m_incrementalRenderingSuppressionTimeoutInSeconds(defaultIncrementalRenderingSuppressionTimeoutInSeconds)
 {
@@ -396,6 +403,15 @@ void Settings::setDefaultFixedFontSize(int defaultFontSize)
 void Settings::setDefaultDeviceScaleFactor(int defaultDeviceScaleFactor)
 {
     m_defaultDeviceScaleFactor = defaultDeviceScaleFactor;
+}
+
+void Settings::setFontBoostingEnabled(bool fontBoostingEnabled)
+{
+    if (m_fontBoostingEnabled == fontBoostingEnabled)
+        return;
+
+    m_fontBoostingEnabled = fontBoostingEnabled;
+    m_page->setNeedsRecalcStyleInAllFrames();
 }
 
 void Settings::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
@@ -662,6 +678,11 @@ void Settings::setForceFTPDirectoryListings(bool force)
 void Settings::setDeveloperExtrasEnabled(bool developerExtrasEnabled)
 {
     m_developerExtrasEnabled = developerExtrasEnabled;
+}
+
+void Settings::setJavaScriptExperimentsEnabled(bool javaScriptExperimentsEnabled)
+{
+    m_javaScriptExperimentsEnabled = javaScriptExperimentsEnabled;
 }
 
 void Settings::setAuthorAndUserStylesEnabled(bool authorAndUserStylesEnabled)

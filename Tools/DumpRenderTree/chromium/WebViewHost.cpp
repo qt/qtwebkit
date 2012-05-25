@@ -32,6 +32,7 @@
 #include "WebViewHost.h"
 
 #include "LayoutTestController.h"
+#include "MockGrammarCheck.h"
 #include "MockWebSpeechInputController.h"
 #include "TestNavigationController.h"
 #include "TestShell.h"
@@ -55,6 +56,7 @@
 #include "WebPluginParams.h"
 #include "WebPopupMenu.h"
 #include "WebPopupType.h"
+#include "WebPrintParams.h"
 #include "WebRange.h"
 #include "platform/WebRect.h"
 #include "WebScreenInfo.h"
@@ -470,7 +472,6 @@ void WebViewHost::requestCheckingOfText(const WebString& text, WebTextCheckingCo
 void WebViewHost::finishLastTextCheck()
 {
     Vector<WebTextCheckingResult> results;
-    // FIXME: Do the grammar check.
     int offset = 0;
     String text(m_lastRequestedTextCheckString.data(), m_lastRequestedTextCheckString.length());
     while (text.length()) {
@@ -486,7 +487,7 @@ void WebViewHost::finishLastTextCheck()
         text = text.substring(misspelledPosition + misspelledLength);
         offset += misspelledPosition + misspelledLength;
     }
-
+    MockGrammarCheck::checkGrammarOfString(m_lastRequestedTextCheckString, &results);
     m_lastRequestedTextCheckingCompletion->didFinishCheckingText(results);
     m_lastRequestedTextCheckingCompletion = 0;
 }
@@ -676,10 +677,12 @@ void WebViewHost::postAccessibilityNotification(const WebAccessibilityObject& ob
     }
 }
 
+#if ENABLE(NOTIFICATIONS)
 WebNotificationPresenter* WebViewHost::notificationPresenter()
 {
     return m_shell->notificationPresenter();
 }
+#endif
 
 WebKit::WebGeolocationClient* WebViewHost::geolocationClient()
 {
@@ -693,12 +696,14 @@ WebKit::WebGeolocationClientMock* WebViewHost::geolocationClientMock()
     return m_geolocationClientMock.get();
 }
 
+#if ENABLE(INPUT_SPEECH)
 WebSpeechInputController* WebViewHost::speechInputController(WebKit::WebSpeechInputListener* listener)
 {
     if (!m_speechInputControllerMock)
         m_speechInputControllerMock = MockWebSpeechInputController::create(listener);
     return m_speechInputControllerMock.get();
 }
+#endif
 
 WebDeviceOrientationClientMock* WebViewHost::deviceOrientationClientMock()
 {
@@ -1346,13 +1351,19 @@ void WebViewHost::dispatchIntent(WebFrame* source, const WebIntentRequest& reque
             (*ports)[i]->destroy();
         delete ports;
     }
+
     if (!request.intent().service().isEmpty())
         printf("Explicit intent service: %s\n", request.intent().service().spec().data());
+
     WebVector<WebString> extras = request.intent().extrasNames();
     for (size_t i = 0; i < extras.size(); ++i) {
         printf("Extras[%s] = %s\n", extras[i].utf8().data(),
                request.intent().extrasValue(extras[i]).utf8().data());
     }
+
+    WebVector<WebURL> suggestions = request.intent().suggestions();
+    for (size_t i = 0; i < suggestions.size(); ++i)
+        printf("Have suggestion %s\n", suggestions[i].spec().data());
 }
 
 void WebViewHost::deliveredIntentResult(WebFrame* frame, int id, const WebSerializedScriptValue& data)
@@ -1451,8 +1462,10 @@ void WebViewHost::reset()
     if (m_geolocationClientMock.get())
         m_geolocationClientMock->resetMock();
 
+#if ENABLE(INPUT_SPEECH)
     if (m_speechInputControllerMock.get())
         m_speechInputControllerMock->clearResults();
+#endif
 
     m_currentCursor = WebCursorInfo();
     m_windowRect = WebRect();
@@ -1841,7 +1854,7 @@ void WebViewHost::displayRepaintMask()
 void WebViewHost::printPage(WebKit::WebFrame* frame)
 {
     WebSize pageSizeInPixels = webWidget()->size();
-
-    frame->printBegin(pageSizeInPixels);
+    WebPrintParams printParams(pageSizeInPixels);
+    frame->printBegin(printParams);
     frame->printEnd();
 }

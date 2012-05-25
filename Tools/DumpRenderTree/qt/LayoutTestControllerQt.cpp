@@ -828,11 +828,6 @@ void LayoutTestController::setIconDatabaseEnabled(bool enable)
         QWebSettings::setIconDatabasePath(QString());
 }
 
-void LayoutTestController::setEditingBehavior(const QString& editingBehavior)
-{
-    DumpRenderTreeSupportQt::setEditingBehavior(m_drt->webPage(), editingBehavior);
-}
-
 void LayoutTestController::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bool canProvideBeta, double beta, bool canProvideGamma, double gamma)
 {
     QList<WebCore::WebPage*> pages = m_drt->getAllPages();
@@ -970,6 +965,11 @@ void LayoutTestController::resetPageVisibility()
 }
 
 void LayoutTestController::setPageVisibility(const char*)
+{
+    // FIXME: Implement this.
+}
+
+void LayoutTestController::setAutomaticLinkDetectionEnabled(bool)
 {
     // FIXME: Implement this.
 }

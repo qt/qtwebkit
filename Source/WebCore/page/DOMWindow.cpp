@@ -78,6 +78,7 @@
 #include "PageTransitionEvent.h"
 #include "Performance.h"
 #include "PlatformScreen.h"
+#include "RuntimeEnabledFeatures.h"
 #include "ScheduledAction.h"
 #include "Screen.h"
 #include "ScriptCallStack.h"
@@ -1545,6 +1546,17 @@ void DOMWindow::webkitCancelAnimationFrame(int id)
 }
 #endif
 
+static void didAddStorageEventListener(DOMWindow* window)
+{
+    // Creating these WebCore::Storage objects informs the system that we'd like to receive
+    // notifications about storage events that might be triggered in other processes. Rather
+    // than subscribe to these notifications explicitly, we subscribe to them implicitly to
+    // simplify the work done by the system. 
+    ExceptionCode unused;
+    window->localStorage(unused);
+    window->sessionStorage(unused);
+}
+
 bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener, bool useCapture)
 {
     if (!EventTarget::addEventListener(eventType, listener, useCapture))
@@ -1556,6 +1568,8 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
             document->didAddWheelEventHandler();
         else if (eventNames().isTouchEventType(eventType))
             document->didAddTouchEventHandler();
+        else if (eventType == eventNames().storageEvent)
+            didAddStorageEventListener(this);
     }
 
     if (eventType == eventNames().unloadEvent)

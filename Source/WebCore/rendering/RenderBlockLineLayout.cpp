@@ -315,8 +315,7 @@ static inline BidiRun* createRun(int start, int end, RenderObject* obj, InlineBi
 
 void RenderBlock::appendRunsForObject(BidiRunList<BidiRun>& runs, int start, int end, RenderObject* obj, InlineBidiResolver& resolver)
 {
-    if (start > end || obj->isFloating() ||
-        (obj->isPositioned() && !obj->style()->isOriginalDisplayInlineType() && !obj->container()->isRenderInline()))
+    if (start > end || shouldSkipCreatingRunsForObject(obj))
         return;
 
     LineMidpointState& lineMidpointState = resolver.midpointState();
@@ -1001,7 +1000,11 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
         // rniwa says previousLineBrokeCleanly is just a WinIE hack and could always be false here?
         isolatedResolver.createBidiRunsForLine(endOfLine, NoVisualOverride, previousLineBrokeCleanly);
         // Note that we do not delete the runs from the resolver.
-        bidiRuns.replaceRunWithRuns(isolatedRun, isolatedResolver.runs());
+        // We're not guaranteed to get any BidiRuns in the previous step. If we don't, we allow the placeholder
+        // itself to be turned into an InlineBox. We can't remove it here without potentially losing track of
+        // the logically last run.
+        if (isolatedResolver.runs().runCount())
+            bidiRuns.replaceRunWithRuns(isolatedRun, isolatedResolver.runs());
 
         // If we encountered any nested isolate runs, just move them
         // to the top resolver's list for later processing.
@@ -1499,7 +1502,6 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
                 else if (layoutState.isFullLayout() || o->needsLayout()) {
                     // Replaced elements
                     toRenderBox(o)->dirtyLineBoxes(layoutState.isFullLayout());
-                    o->layoutIfNeeded();
                 }
             } else if (o->isText() || (o->isRenderInline() && !walker.atEndOfInline())) {
                 if (!o->isText())
@@ -2269,6 +2271,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             width.addUncommittedWidth(borderPaddingMarginStart(flowBox) + borderPaddingMarginEnd(flowBox));
         } else if (current.m_obj->isReplaced()) {
             RenderBox* replacedBox = toRenderBox(current.m_obj);
+            replacedBox->layoutIfNeeded();
 
             // Break on replaced elements if either has normal white-space.
             if ((autoWrap || RenderStyle::autoWrap(lastWS)) && (!current.m_obj->isImage() || allowImagesToBreak)) {

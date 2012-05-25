@@ -69,6 +69,7 @@ class HistoryItem;
 class HitTestResult;
 class KeyboardEvent;
 class Page;
+class PageGroup;
 class PagePopup;
 class PagePopupClient;
 class PlatformGestureCurveTarget;
@@ -145,6 +146,7 @@ public:
     virtual bool confirmComposition();
     virtual bool confirmComposition(const WebString& text);
     virtual bool compositionRange(size_t* location, size_t* length);
+    virtual WebTextInputInfo textInputInfo();
     virtual WebTextInputType textInputType();
     virtual bool selectionBounds(WebRect& start, WebRect& end) const;
     virtual bool selectionTextDirection(WebTextDirection& start, WebTextDirection& end) const;
@@ -289,10 +291,12 @@ public:
 
     // WebLayerTreeViewClient
     virtual void willBeginFrame();
+    virtual void didBeginFrame();
     virtual void updateAnimations(double monotonicFrameBeginTime);
     virtual void applyScrollAndScale(const WebSize&, float);
     virtual WebGraphicsContext3D* createContext3D();
     virtual void didRebindGraphicsContext(bool);
+    virtual void willCommit();
     virtual void didCommit();
     virtual void didCommitAndDrawFrame();
     virtual void didCompleteSwapBuffers();
@@ -318,6 +322,12 @@ public:
     WebCore::Node* focusedWebCoreNode();
 
     static WebViewImpl* fromPage(WebCore::Page*);
+
+    // A pageGroup identifies a namespace of pages. Page groups are used on PLATFORM(MAC)
+    // for some programs that use HTML views to display things that don't seem like
+    // web pages to the user (so shouldn't have visited link coloring). We only use
+    // one page group.
+    static WebCore::PageGroup* defaultPageGroup();
 
     WebViewClient* client()
     {
@@ -487,7 +497,6 @@ public:
 
 #if USE(ACCELERATED_COMPOSITING)
     bool allowsAcceleratedCompositing();
-    bool pageHasRTLStyle() const;
     void setRootGraphicsLayer(WebCore::GraphicsLayer*);
     void scheduleCompositingLayerSync();
     void scrollRootLayerRect(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& clipRect);

@@ -144,6 +144,7 @@
 #include "ShadowRoot.h"
 #include "StaticHashSetNodeList.h"
 #include "StyleResolver.h"
+#include "StyleSheetContents.h"
 #include "StyleSheetList.h"
 #include "TextResourceDecoder.h"
 #include "Timer.h"
@@ -719,10 +720,8 @@ void Document::buildAccessKeyMap(TreeScope* scope)
         if (!accessKey.isEmpty())
             m_elementsByAccessKey.set(accessKey.impl(), element);
 
-        if (ElementShadow* shadow = element->shadow()) {
-            for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot())
-                buildAccessKeyMap(root);
-        }
+        for (ShadowRoot* root = node->youngestShadowRoot(); root; root = root->olderShadowRoot())
+            buildAccessKeyMap(root);
     }
 }
 
@@ -1086,6 +1085,13 @@ bool Document::cssRegionsEnabled() const
     return settings() && settings()->cssRegionsEnabled(); 
 }
 
+bool Document::cssGridLayoutEnabled() const
+{
+    return settings() && settings()->cssGridLayoutEnabled();
+}
+
+#if ENABLE(CSS_REGIONS)
+
 static bool validFlowName(const String& flowName)
 {
     if (equalIgnoringCase(flowName, "auto")
@@ -1121,6 +1127,8 @@ PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName
         return view->flowThreadController()->ensureRenderFlowThreadWithName(flowName)->ensureNamedFlow();
     return 0;
 }
+
+#endif
 
 PassRefPtr<Element> Document::createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode& ec)
 {
@@ -1411,7 +1419,7 @@ Element* Document::elementFromPoint(int x, int y) const
     while (node && !node->isElementNode())
         node = node->parentNode();
     if (node)
-        node = node->shadowAncestorNode();
+        node = ancestorInThisScope(node);
     return static_cast<Element*>(node);
 }
 
@@ -1424,7 +1432,7 @@ PassRefPtr<Range> Document::caretRangeFromPoint(int x, int y)
     if (!node)
         return 0;
 
-    Node* shadowAncestorNode = node->shadowAncestorNode();
+    Node* shadowAncestorNode = ancestorInThisScope(node);
     if (shadowAncestorNode != node) {
         unsigned offset = shadowAncestorNode->nodeIndex();
         ContainerNode* container = shadowAncestorNode->parentNode();
@@ -1657,8 +1665,12 @@ void Document::scheduleForcedStyleRecalc()
 
 void Document::scheduleStyleRecalc()
 {
-    // FIXME: In the seamless case, we should likely schedule a style recalc
-    // on our parent and instead return early here.
+    if (shouldDisplaySeamlesslyWithParent()) {
+        // When we're seamless, our parent document manages our style recalcs.
+        ownerElement()->setNeedsStyleRecalc();
+        ownerElement()->document()->scheduleStyleRecalc();
+        return;
+    }
 
     if (m_styleRecalcTimer.isActive() || inPageCache())
         return;
@@ -1714,15 +1726,19 @@ void Document::recalcStyle(StyleChange change)
     if (m_inStyleRecalc)
         return; // Guard against re-entrancy. -dwh
 
-    // FIXME: In the seamless case, we may wish to exit early in the child after recalcing our parent chain.
-    // I have not yet found a test which requires such.
+    // FIXME: We should update style on our ancestor chain before proceeding (especially for seamless),
+    // however doing so currently causes several tests to crash, as Frame::setDocument calls Document::attach
+    // before setting the DOMWindow on the Frame, or the SecurityOrigin on the document. The attach, in turn
+    // resolves style (here) and then when we resolve style on the parent chain, we may end up
+    // re-attaching our containing iframe, which when asked HTMLFrameElementBase::isURLAllowed
+    // hits a null-dereference due to security code always assuming the document has a SecurityOrigin.
 
     if (m_hasDirtyStyleResolver)
         updateActiveStylesheets(RecalcStyleImmediately);
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRecalculateStyle(this);
 
-    if (m_elemSheet && m_elemSheet->internal()->usesRemUnits())
+    if (m_elemSheet && m_elemSheet->contents()->usesRemUnits())
         m_usesRemUnits = true;
 
     m_inStyleRecalc = true;
@@ -1805,14 +1821,8 @@ void Document::updateStyleIfNeeded()
     if ((!m_pendingStyleRecalcShouldForce && !childNeedsStyleRecalc()) || inPageCache())
         return;
 
-    if (m_frame)
-        m_frame->animation()->beginAnimationUpdate();
-        
+    AnimationUpdateBlock animationUpdateBlock(m_frame ? m_frame->animation() : 0);
     recalcStyle(NoChange);
-
-    // Tell the animation controller that updateStyleIfNeeded is finished and it can do any post-processing
-    if (m_frame)
-        m_frame->animation()->endAnimationUpdate();
 }
 
 void Document::updateStyleForAllDocuments()
@@ -2294,11 +2304,6 @@ void Document::implicitOpen()
     m_parser = createParser();
     setParsing(true);
     setReadyState(Loading);
-
-    // If we reload, the animation controller sticks around and has
-    // a stale animation time. We need to update it here.
-    if (m_frame && m_frame->animation())
-        m_frame->animation()->beginAnimationUpdate();
 }
 
 HTMLElement* Document::body() const
@@ -2654,11 +2659,11 @@ void Document::updateBaseURL()
 
     if (m_elemSheet) {
         // Element sheet is silly. It never contains anything.
-        ASSERT(!m_elemSheet->internal()->ruleCount());
-        bool usesRemUnits = m_elemSheet->internal()->usesRemUnits();
+        ASSERT(!m_elemSheet->contents()->ruleCount());
+        bool usesRemUnits = m_elemSheet->contents()->usesRemUnits();
         m_elemSheet = CSSStyleSheet::createInline(this, m_baseURL);
         // FIXME: So we are not really the parser. The right fix is to eliminate the element sheet completely.
-        m_elemSheet->internal()->parserSetUsesRemUnits(usesRemUnits);
+        m_elemSheet->contents()->parserSetUsesRemUnits(usesRemUnits);
     }
 
     if (!equalIgnoringFragmentIdentifier(oldBaseURL, m_baseURL)) {
@@ -2810,8 +2815,8 @@ CSSStyleSheet* Document::pageUserSheet()
     
     // Parse the sheet and cache it.
     m_pageUserSheet = CSSStyleSheet::createInline(this, settings()->userStyleSheetLocation());
-    m_pageUserSheet->internal()->setIsUserStyleSheet(true);
-    m_pageUserSheet->internal()->parseString(userSheetText);
+    m_pageUserSheet->contents()->setIsUserStyleSheet(true);
+    m_pageUserSheet->contents()->parseString(userSheetText);
     return m_pageUserSheet.get();
 }
 
@@ -2859,8 +2864,8 @@ const Vector<RefPtr<CSSStyleSheet> >* Document::pageGroupUserSheets() const
             if (!m_pageGroupUserSheets)
                 m_pageGroupUserSheets = adoptPtr(new Vector<RefPtr<CSSStyleSheet> >);
             m_pageGroupUserSheets->append(groupSheet);
-            groupSheet->internal()->setIsUserStyleSheet(sheet->level() == UserStyleUserLevel);
-            groupSheet->internal()->parseString(sheet->source());
+            groupSheet->contents()->setIsUserStyleSheet(sheet->level() == UserStyleUserLevel);
+            groupSheet->contents()->parseString(sheet->source());
         }
     }
 
@@ -2883,7 +2888,7 @@ void Document::updatePageGroupUserSheets()
         styleResolverChanged(RecalcStyleImmediately);
 }
 
-void Document::addUserSheet(PassRefPtr<StyleSheetInternal> userSheet)
+void Document::addUserSheet(PassRefPtr<StyleSheetContents> userSheet)
 {
     if (!m_userSheets)
         m_userSheets = adoptPtr(new Vector<RefPtr<CSSStyleSheet> >);
@@ -3286,11 +3291,10 @@ void Document::styleResolverChanged(StyleResolverUpdateFlag updateFlag)
 
     // This recalcStyle initiates a new recalc cycle. We need to bracket it to
     // make sure animations get the correct update time
-    if (m_frame)
-        m_frame->animation()->beginAnimationUpdate();
-    recalcStyle(Force);
-    if (m_frame)
-        m_frame->animation()->endAnimationUpdate();
+    {
+        AnimationUpdateBlock animationUpdateBlock(m_frame ? m_frame->animation() : 0);
+        recalcStyle(Force);
+    }
 
 #ifdef INSTRUMENT_LAYOUT_SCHEDULING
     if (!ownerElement())
@@ -3437,7 +3441,7 @@ void Document::collectActiveStylesheets(Vector<RefPtr<StyleSheet> >& sheets)
     }
 }
 
-bool Document::testAddedStylesheetRequiresStyleRecalc(StyleSheetInternal* stylesheet)
+bool Document::testAddedStylesheetRequiresStyleRecalc(StyleSheetContents* stylesheet)
 {
     // See if all rules on the sheet are scoped to some specific ids or classes.
     // Then test if we actually have any of those in the tree at the moment.
@@ -3505,7 +3509,7 @@ void Document::analyzeStylesheetChange(StyleResolverUpdateFlag updateFlag, const
             return;
         if (newStylesheets[i]->disabled())
             continue;
-        if (testAddedStylesheetRequiresStyleRecalc(static_cast<CSSStyleSheet*>(newStylesheets[i].get())->internal()))
+        if (testAddedStylesheetRequiresStyleRecalc(static_cast<CSSStyleSheet*>(newStylesheets[i].get())->contents()))
             return;
     }
     requiresFullStyleRecalc = false;
@@ -3516,7 +3520,7 @@ static bool styleSheetsUseRemUnits(const Vector<RefPtr<StyleSheet> >& sheets)
     for (unsigned i = 0; i < sheets.size(); ++i) {
         if (!sheets[i]->isCSSStyleSheet())
             continue;
-        if (static_cast<CSSStyleSheet*>(sheets[i].get())->internal()->usesRemUnits())
+        if (static_cast<CSSStyleSheet*>(sheets[i].get())->contents()->usesRemUnits())
             return true;
     }
     return false;
@@ -4972,20 +4976,19 @@ void Document::initSecurityContext()
 
     if (Settings* settings = this->settings()) {
         if (!settings->isWebSecurityEnabled()) {
-            // Web security is turned off. We should let this document access every
-            // other document. This is used primary by testing harnesses for web
-            // sites.
+            // Web security is turned off. We should let this document access every other document. This is used primary by testing
+            // harnesses for web sites.
             securityOrigin()->grantUniversalAccess();
-        } else if (settings->allowUniversalAccessFromFileURLs() && securityOrigin()->isLocal()) {
-            // Some clients want file:// URLs to have universal access, but that
-            // setting is dangerous for other clients.
-            securityOrigin()->grantUniversalAccess();
-        } else if (!settings->allowFileAccessFromFileURLs() && securityOrigin()->isLocal()) {
-            // Some clients want file:// URLs to have even tighter restrictions by
-            // default, and not be able to access other local files.
-            // FIXME 81578: The naming of this is confusing. Files with restricted access to other local files
-            // still can have other privileges that can be remembered, thereby not making them unique origins.
-            securityOrigin()->enforceFilePathSeparation();
+        } else if (securityOrigin()->isLocal()) {
+            if (settings->allowUniversalAccessFromFileURLs() || m_frame->loader()->client()->shouldForceUniversalAccessFromLocalURL(m_url)) {
+                // Some clients want local URLs to have universal access, but that setting is dangerous for other clients.
+                securityOrigin()->grantUniversalAccess();
+            } else if (!settings->allowFileAccessFromFileURLs()) {
+                // Some clients want local URLs to have even tighter restrictions by default, and not be able to access other local files.
+                // FIXME 81578: The naming of this is confusing. Files with restricted access to other local files
+                // still can have other privileges that can be remembered, thereby not making them unique origins.
+                securityOrigin()->enforceFilePathSeparation();
+            }
         }
     }
 

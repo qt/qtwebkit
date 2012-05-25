@@ -946,7 +946,7 @@ bool Editor::insertLineBreak()
         return true;
 
     VisiblePosition caret = m_frame->selection()->selection().visibleStart();
-    bool alignToEdge = isEndOfDocument(caret);
+    bool alignToEdge = isEndOfEditableOrNonEditableContent(caret);
     bool autocorrectionIsApplied = m_alternativeTextController->applyAutocorrectionBeforeTypingIfAppropriate();
     TypingCommand::insertLineBreak(m_frame->document(), autocorrectionIsApplied ? TypingCommand::RetainAutocorrectionIndicator : 0);
     revealSelectionAfterEditingOperation(alignToEdge ? ScrollAlignment::alignToEdgeIfNeeded : ScrollAlignment::alignCenterIfNeeded);
@@ -966,7 +966,7 @@ bool Editor::insertParagraphSeparator()
         return true;
 
     VisiblePosition caret = m_frame->selection()->selection().visibleStart();
-    bool alignToEdge = isEndOfDocument(caret);
+    bool alignToEdge = isEndOfEditableOrNonEditableContent(caret);
     bool autocorrectionIsApplied = m_alternativeTextController->applyAutocorrectionBeforeTypingIfAppropriate();
     TypingCommand::insertParagraphSeparator(m_frame->document(), autocorrectionIsApplied ? TypingCommand::RetainAutocorrectionIndicator : 0);
     revealSelectionAfterEditingOperation(alignToEdge ? ScrollAlignment::alignToEdgeIfNeeded : ScrollAlignment::alignCenterIfNeeded);
@@ -1996,6 +1996,7 @@ void Editor::markAndReplaceFor(PassRefPtr<SpellCheckRequest> request, const Vect
 
     bool shouldMarkSpelling = textCheckingOptions & TextCheckingTypeSpelling;
     bool shouldMarkGrammar = textCheckingOptions & TextCheckingTypeGrammar;
+    bool shouldMarkLink = textCheckingOptions & TextCheckingTypeLink;
     bool shouldPerformReplacement = textCheckingOptions & TextCheckingTypeReplacement;
     bool shouldShowCorrectionPanel = textCheckingOptions & TextCheckingTypeShowCorrectionPanel;
     bool shouldCheckForCorrection = shouldShowCorrectionPanel || (textCheckingOptions & TextCheckingTypeCorrection);
@@ -2080,7 +2081,7 @@ void Editor::markAndReplaceFor(PassRefPtr<SpellCheckRequest> request, const Vect
             if (result->type == TextCheckingTypeLink && selectionOffset > resultLocation + resultLength + 1)
                 continue;
 
-            if (!(shouldPerformReplacement || shouldShowCorrectionPanel) || !doReplacement)
+            if (!(shouldPerformReplacement || shouldShowCorrectionPanel || shouldMarkLink) || !doReplacement)
                 continue;
 
             String replacedString = plainText(rangeToReplace.get());

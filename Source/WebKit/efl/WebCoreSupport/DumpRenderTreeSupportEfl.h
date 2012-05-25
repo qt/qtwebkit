@@ -76,6 +76,7 @@ public:
     static void executeCoreCommandByName(const Evas_Object* ewkView, const char* name, const char* value);
     static bool findString(const Evas_Object* ewkView, const String& text, WebCore::FindOptions);
     static bool isCommandEnabled(const Evas_Object* ewkView, const char* name);
+    static void setCSSGridLayoutEnabled(const Evas_Object* ewkView, bool enabled);
     static void setJavaScriptProfilingEnabled(const Evas_Object* ewkView, bool enabled);
     static void setSmartInsertDeleteEnabled(Evas_Object* ewkView, bool enabled);
     static void setSelectTrailingWhitespaceEnabled(Evas_Object* ewkView, bool enabled);
@@ -84,6 +85,8 @@ public:
     static void garbageCollectorCollectOnAlternateThread(bool waitUntilDone);
     static size_t javaScriptObjectsCount();
     static unsigned workerThreadCount();
+
+    static void setDeadDecodedDataDeletionInterval(double);
 
     static HistoryItemChildrenVector childHistoryItems(const Ewk_History_Item*);
     static String historyItemTarget(const Ewk_History_Item*);
@@ -96,9 +99,9 @@ public:
     static void dumpConfigurationForViewport(Evas_Object* ewkView, int deviceDPI, const WebCore::IntSize& deviceSize, const WebCore::IntSize& availableSize);
 
     static void deliverAllMutationsIfNecessary();
-    static void setEditingBehavior(Evas_Object* ewkView, const char* editingBehavior);
     static String markerTextForListItem(JSContextRef, JSValueRef nodeObject);
     static void setInteractiveFormValidationEnabled(Evas_Object* ewkView, bool enabled);
+    static void setValidationMessageTimerMagnification(Evas_Object* ewkView, int value);
     static JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     static void setAuthorAndUserStylesEnabled(Evas_Object* ewkView, bool);
     static void setSerializeHTTPLoads(bool);

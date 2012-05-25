@@ -60,6 +60,7 @@
  *  - "load,progress", double*: load progress is changed (overall value
  *    from 0.0 to 1.0, connect to individual frames for fine grained).
  *  - "load,provisional", void: view started provisional load.
+ *  - "load,provisional,failed", Ewk_Frame_Load_Error*: view provisional load failed.
  *  - "load,resource,finished", unsigned long*: reports resource load finished and it gives
  *    a pointer to its identifier.
  *  - "load,resource,failed", Ewk_Frame_Load_Error*: reports resource load failure and it
@@ -70,7 +71,9 @@
  *  - "menubar,visible,set", Eina_Bool: sets menubar visibility.
  *  - "mixedcontent,displayed", void: any of the containing frames has loaded and displayed mixed content.
  *  - "mixedcontent,run", void: any of the containing frames has loaded and run mixed content.
+ *  - "protocolhandler,registration,requested", Ewk_Custom_Handler_Data: add a handler url for the given protocol.
  *  - "onload,event", Evas_Object*: a frame onload event has been received.
+ *  - "populate,visited,links": tells the client to fill the visited links set.
  *  - "ready", void: page is fully loaded.
  *  - "resource,request,new", Ewk_Frame_Resource_Request*: reports that
  *    there's a new resource request.
@@ -84,7 +87,7 @@
  *  - "statusbar,visible,get", Eina_Bool *: expects a @c EINA_TRUE if statusbar is
  *    visible; @c EINA_FALSE, otherwise.
  *  - "statusbar,visible,set", Eina_Bool: sets statusbar visibility.
- *  - "title,changed", const char*: title of the main frame was changed.
+ *  - "title,changed", Ewk_Text_With_Direction*: title of the main frame was changed.
  *  - "toolbars,visible,get", Eina_Bool *: expects a @c EINA_TRUE if toolbar
  *    is visible; @c EINA_FALSE, otherwise.
  *  - "toolbars,visible,set", Eina_Bool: sets toolbar visibility.
@@ -179,7 +182,7 @@ struct _Ewk_View_Smart_Class {
 
     Eina_Bool (*run_open_panel)(Ewk_View_Smart_Data *sd, Evas_Object *frame, Eina_Bool allows_multiple_files, Eina_List *accept_types, Eina_List **selected_filenames);
 
-    Eina_Bool (*navigation_policy_decision)(Ewk_View_Smart_Data *sd, Ewk_Frame_Resource_Request *request);
+    Eina_Bool (*navigation_policy_decision)(Ewk_View_Smart_Data *sd, Ewk_Frame_Resource_Request *request, Ewk_Navigation_Type navigation_type);
     Eina_Bool (*focus_can_cycle)(Ewk_View_Smart_Data *sd, Ewk_Focus_Direction direction);
 };
 
@@ -307,6 +310,17 @@ struct _Ewk_Color {
     unsigned char g; /**< Green channel. */
     unsigned char b; /**< Blue channel. */
     unsigned char a; /**< Alpha channel. */
+};
+
+/// Creates a type name for @a _Ewk_Custom_Handler_Data.
+typedef struct _Ewk_Custom_Handler_Data Ewk_Custom_Handler_Data;
+/// Contains the target scheme and the url which take care of the target.
+struct _Ewk_Custom_Handler_Data {
+    Evas_Object *ewkView; /**< Reference to the view object. */
+    const char *scheme; /**< Reference to the scheme that will be handled. (eg. "application/x-soup") */
+    const char *base_url; /**< Reference to the resolved url if the url is relative url. (eg. "https://www.example.com/") */
+    const char *url; /**< Reference to the url which will handle the given protocol. (eg. "soup?url=%s") */
+    const char *title; /**< Reference to the descriptive title of the handler. (eg. "SoupWeb") */
 };
 
 /**
@@ -738,7 +752,7 @@ EAPI const char  *ewk_view_uri_get(const Evas_Object *o);
  *
  * @return current title on success or @c 0 on failure
  */
-EAPI const char  *ewk_view_title_get(const Evas_Object *o);
+EAPI const Ewk_Text_With_Direction  *ewk_view_title_get(const Evas_Object *o);
 
 /**
  * Queries if the main frame is editable.
@@ -1086,6 +1100,19 @@ EAPI Eina_Bool    ewk_view_history_enable_set(Evas_Object *o, Eina_Bool enable);
  * @see ewk_view_history_enable_set()
  */
 EAPI Ewk_History *ewk_view_history_get(const Evas_Object *o);
+
+/**
+ * Adds @a visited_url to the view's visited links cache.
+ *
+ * This function is to be invoked by the client managing persistent history storage
+ * when "populate,visited,links" signal is received.
+ *
+ * @param o view object to add visited links data.
+ * @param visited_url visited url.
+ *
+ * @return @c EINA_TRUE on success, @c EINA_FALSE on failure.
+ */
+EAPI Eina_Bool  ewk_view_visited_link_add(Evas_Object *o, const char *visited_url);
 
 /**
  * Gets the current page zoom level of the main frame.
@@ -1618,6 +1645,9 @@ EAPI Eina_Bool    ewk_view_setting_scripts_can_access_clipboard_get(const Evas_O
 
 /**
  * Sets whether scripts are allowed to access clipboard.
+ *
+ * The default value is @c EINA_FALSE. If set to @c EINA_TRUE, document.execCommand()
+ * allows cut, copy and paste commands. 
  *
  * @param o View whose settings to change.
  * @param allow @c EINA_TRUE to allow scripts access clipboard,
@@ -2603,6 +2633,8 @@ EAPI void ewk_view_setting_enable_xss_auditor_set(Evas_Object *o, Eina_Bool enab
 /**
  * Returns whether video captions display feature is enabled.
  *
+ * Video captions display is disabled by default.
+ *
  * @param o view object to query whether video captions display feature is enabled.
  *
  * @return @c EINA_TRUE if the video captions display feature is enabled,
@@ -2624,6 +2656,8 @@ EAPI void ewk_view_setting_should_display_captions_set(Evas_Object *o, Eina_Bool
 /**
  * Returns whether video subtitles display feature is enabled.
  *
+ * Video subtitles display is disabled by default.
+ *
  * @param o view object to query whether video subtitles display feature is enabled.
  *
  * @return @c EINA_TRUE if the video subtitles display feature is enabled,
@@ -2644,6 +2678,8 @@ EAPI void ewk_view_setting_should_display_subtitles_set(Evas_Object *o, Eina_Boo
 
 /**
  * Returns whether video text descriptions display feature is enabled.
+ *
+ * Video text descriptions display is disabled by default.
  *
  * @param o view object to query whether video text descriptions display feature is enabled.
  *

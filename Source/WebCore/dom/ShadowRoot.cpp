@@ -144,8 +144,7 @@ String ShadowRoot::innerHTML() const
 
 void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
 {
-    RefPtr<DocumentFragment> fragment = createFragmentFromSource(markup, host(), ec);
-    if (fragment)
+    if (RefPtr<DocumentFragment> fragment = createFragmentForInnerOuterHTML(markup, host(), ec))
         replaceChildrenWithFragment(this, fragment.release(), ec);
 }
 
@@ -188,7 +187,11 @@ bool ShadowRoot::applyAuthorStyles() const
 
 void ShadowRoot::setApplyAuthorStyles(bool value)
 {
-    m_applyAuthorStyles = value;
+    if (m_applyAuthorStyles != value) {
+        m_applyAuthorStyles = value;
+        if (attached() && owner())
+            owner()->setNeedsRedistributing();
+    }
 }
 
 void ShadowRoot::attach()

@@ -23,6 +23,7 @@
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
 
+#include "ContextEnabledFeatures.h"
 #include "ExceptionCode.h"
 #include "RuntimeEnabledFeatures.h"
 #include "TestSupplemental.h"
@@ -124,7 +125,7 @@ static v8::Handle<v8::Value> supplementalMethod2Callback(const v8::Arguments& ar
 {
     INC_STATS("DOM.TestInterface.supplementalMethod2");
     if (args.Length() < 2)
-        return V8Proxy::throwNotEnoughArgumentsError();
+        return V8Proxy::throwNotEnoughArgumentsError(args.GetIsolate());
     TestInterface* imp = V8TestInterface::toNative(args.Holder());
     ExceptionCode ec = 0;
     {
@@ -139,8 +140,7 @@ static v8::Handle<v8::Value> supplementalMethod2Callback(const v8::Arguments& ar
     return toV8(result.release(), args.GetIsolate());
     }
     fail:
-    V8Proxy::setDOMException(ec, args.GetIsolate());
-    return v8::Handle<v8::Value>();
+    return V8Proxy::setDOMException(ec, args.GetIsolate());
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -213,7 +213,7 @@ v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& 
     if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
         return args.Holder();
     if (args.Length() < 1)
-        return V8Proxy::throwNotEnoughArgumentsError();
+        return V8Proxy::throwNotEnoughArgumentsError(args.GetIsolate());
 
     ExceptionCode ec = 0;
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, str1, MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined));
@@ -221,7 +221,7 @@ v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& 
 
     ScriptExecutionContext* context = getScriptExecutionContext();
     if (!context)
-        return V8Proxy::throwError(V8Proxy::ReferenceError, "TestInterface constructor's associated context is not available");
+        return V8Proxy::throwError(V8Proxy::ReferenceError, "TestInterface constructor's associated context is not available", args.GetIsolate());
 
     RefPtr<TestInterface> impl = TestInterface::create(context, str1, str2, ec);
     v8::Handle<v8::Object> wrapper = args.Holder();
@@ -232,7 +232,7 @@ v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& 
     V8DOMWrapper::setJSWrapperForActiveDOMObject(impl.release(), v8::Persistent<v8::Object>::New(wrapper), args.GetIsolate());
     return args.Holder();
   fail:
-    return throwError(ec);
+    return throwError(ec, args.GetIsolate());
 }
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceTemplate(v8::Persistent<v8::FunctionTemplate> desc)

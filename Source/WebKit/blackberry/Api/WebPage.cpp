@@ -2385,6 +2385,9 @@ void WebPagePrivate::clearDocumentData(const Document* documentGoingAway)
     if (m_inRegionScrollStartingNode && m_inRegionScrollStartingNode->document() == documentGoingAway)
         m_inRegionScrollStartingNode = 0;
 
+    if (documentGoingAway->frame())
+        m_inputHandler->frameUnloaded(documentGoingAway->frame());
+
     Node* nodeUnderFatFinger = m_touchEventHandler->lastFatFingersResult().node();
     if (nodeUnderFatFinger && nodeUnderFatFinger->document() == documentGoingAway)
         m_touchEventHandler->resetLastFatFingersResult();
@@ -3514,9 +3517,26 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
     if (!m_visible || !m_backingStore->d->isActive())
         setShouldResetTilesWhenShown(true);
 
+    bool needsLayout = false;
+
     bool hasPendingOrientation = m_pendingOrientation != -1;
     if (hasPendingOrientation)
         screenRotated();
+    else {
+        // If we are not rotating and we've started a viewport resize with
+        // the Render tree in dirty state (i.e. it needs layout), lets
+        // reset the needsLayout flag for now but set our own 'needsLayout'.
+        //
+        // Reason: calls like ScrollView::setFixedLayoutSize can trigger a layout
+        // if the render tree needs it. We want to avoid it till the viewport resize
+        // is actually done (i.e. ScrollView::setViewportSize gets called
+        // further down the method).
+        if (m_mainFrame->view()->needsLayout()) {
+            m_mainFrame->view()->unscheduleRelayout();
+            m_mainFrame->contentRenderer()->setNeedsLayout(false);
+            needsLayout = true;
+        }
+    }
 
     // The window buffers might have been recreated, cleared, moved, etc., so:
     m_backingStore->d->windowFrontBufferState()->clearBlittedRegion();
@@ -3541,7 +3561,6 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
     setDefaultLayoutSize(transformedActualVisibleSize);
 
     // Recompute our virtual viewport.
-    bool needsLayout = false;
     static ViewportArguments defaultViewportArguments;
     if (!(m_viewportArguments == defaultViewportArguments)) {
         // We may need to infer the width and height for the viewport with respect to the rotation.
@@ -4096,13 +4115,6 @@ void WebPage::touchEventCancel()
     if (d->m_page->defersLoading())
         return;
     d->m_touchEventHandler->touchEventCancel();
-}
-
-void WebPage::touchEventCancelAndClearFocusedNode()
-{
-    if (d->m_page->defersLoading())
-        return;
-    d->m_touchEventHandler->touchEventCancelAndClearFocusedNode();
 }
 
 Frame* WebPagePrivate::focusedOrMainFrame() const

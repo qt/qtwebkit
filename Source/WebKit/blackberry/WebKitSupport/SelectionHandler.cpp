@@ -177,7 +177,7 @@ static unsigned short directionOfPointRelativeToRect(const WebCore::IntPoint& po
 
     // Do height movement check first but add padding. We may be off on both x & y axis and only
     // want to move in one direction at a time.
-    if (point.y() + (useTopPadding ? verticalPadding : 0) < rect.y())
+    if (point.y() - (useTopPadding ? verticalPadding : 0) < rect.y())
         return KEYCODE_UP;
     if (point.y() > rect.maxY() + (useBottomPadding ? verticalPadding : 0))
         return KEYCODE_DOWN;
@@ -554,7 +554,7 @@ void SelectionHandler::selectAtPoint(const WebCore::IntPoint& location)
     WebCore::IntPoint targetPosition;
     // FIXME: Factory this get right fat finger code into a helper.
     const FatFingersResult lastFatFingersResult = m_webPage->m_touchEventHandler->lastFatFingersResult();
-    if (lastFatFingersResult.positionWasAdjusted() && lastFatFingersResult.nodeAsElementIfApplicable()) {
+    if (lastFatFingersResult.resultMatches(location, FatFingers::Text) && lastFatFingersResult.positionWasAdjusted() && lastFatFingersResult.nodeAsElementIfApplicable()) {
         targetNode = lastFatFingersResult.node(FatFingersResult::ShadowContentNotAllowed);
         targetPosition = lastFatFingersResult.adjustedPosition();
     } else {
