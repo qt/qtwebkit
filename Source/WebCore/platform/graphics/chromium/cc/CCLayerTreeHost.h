@@ -77,6 +77,7 @@ protected:
 struct CCSettings {
     CCSettings()
             : acceleratePainting(false)
+            , debugShowTileInfo(false)
             , showFPSCounter(false)
             , showPlatformLayerTree(false)
             , showPaintRects(false)
@@ -93,6 +94,7 @@ struct CCSettings {
     { }
 
     bool acceleratePainting;
+    bool debugShowTileInfo;
     bool showFPSCounter;
     bool showPlatformLayerTree;
     bool showPaintRects;
@@ -211,7 +213,7 @@ public:
     bool commitRequested() const;
 
     void setAnimationEvents(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime);
-    void didAddAnimation();
+    virtual void didAddAnimation();
 
     LayerChromium* rootLayer() { return m_rootLayer.get(); }
     const LayerChromium* rootLayer() const { return m_rootLayer.get(); }

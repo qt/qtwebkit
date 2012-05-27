@@ -1,3 +1,223 @@
+2012-05-26  Geoffrey Garen  <ggaren@apple.com>
+
+        WebKit should be lazy-finalization-safe (esp. the DOM) v2
+        https://bugs.webkit.org/show_bug.cgi?id=87581
+
+        Reviewed by Oliver Hunt.
+
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::callDestructor):
+        * heap/WeakBlock.h:
+        * heap/WeakSetInlines.h:
+        (JSC::WeakBlock::finalize): Since we don't guarantee destruction order,
+        it's not valid to access GC pointers like the Structure pointer during
+        finalization. We NULL out the structure pointer in debug builds to try
+        to make this programming mistake more obvious.
+
+        * API/JSCallbackConstructor.cpp:
+        (JSC::JSCallbackConstructor::destroy):
+        * API/JSCallbackObject.cpp:
+        (JSC::::destroy):
+        (JSC::JSCallbackObjectData::finalize):
+        * runtime/Arguments.cpp:
+        (JSC::Arguments::destroy):
+        * runtime/DateInstance.cpp:
+        (JSC::DateInstance::destroy):
+        * runtime/Error.cpp:
+        (JSC::StrictModeTypeErrorFunction::destroy):
+        * runtime/Executable.cpp:
+        (JSC::ExecutableBase::destroy):
+        (JSC::NativeExecutable::destroy):
+        (JSC::ScriptExecutable::destroy):
+        (JSC::EvalExecutable::destroy):
+        (JSC::ProgramExecutable::destroy):
+        (JSC::FunctionExecutable::destroy):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::destroy):
+        * runtime/JSPropertyNameIterator.cpp:
+        (JSC::JSPropertyNameIterator::destroy):
+        * runtime/JSStaticScopeObject.cpp:
+        (JSC::JSStaticScopeObject::destroy):
+        * runtime/JSString.cpp:
+        (JSC::JSString::destroy):
+        * runtime/JSVariableObject.cpp:
+        (JSC::JSVariableObject::destroy):
+        * runtime/NameInstance.cpp:
+        (JSC::NameInstance::destroy):
+        * runtime/RegExp.cpp:
+        (JSC::RegExp::destroy):
+        * runtime/RegExpConstructor.cpp:
+        (JSC::RegExpConstructor::destroy):
+        * runtime/Structure.cpp:
+        (JSC::Structure::destroy):
+        * runtime/StructureChain.cpp:
+        (JSC::StructureChain::destroy): Use static_cast instead of jsCast because
+        jsCast does Structure-based validation, and our Structure is not guaranteed
+        to be alive when we get finalized.
+
+2012-05-22  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG CSE should eliminate redundant WeakJSConstants
+        https://bugs.webkit.org/show_bug.cgi?id=87179
+
+        Reviewed by Gavin Barraclough.
+        
+        Merged r118141 from dfgopt.
+
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::weakConstantCSE):
+        (CSEPhase):
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::weakConstant):
+
+2012-05-22  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG CSE should do redundant store elimination
+        https://bugs.webkit.org/show_bug.cgi?id=87161
+
+        Reviewed by Oliver Hunt.
+        
+        Merge r118138 from dfgopt.
+        
+        This patch adds redundant store elimination. For example, consider this
+        code:
+        
+        o.x = 42;
+        o.x = 84;
+        
+        If o.x is speculated to be a well-behaved field, the first assignment is
+        unnecessary, since the second just overwrites it. We would like to
+        eliminate the first assignment in these cases. The need for this
+        optimization arises mostly from stores that our runtime requires. For
+        example:
+        
+        o = {f:1, g:2, h:3};
+        
+        This will have four assignments to the structure for the newly created
+        object - one assignment for the empty structure, one for {f}, one for
+        {f, g}, and one for {f, g, h}. We would like to only have the last of
+        those assigments in this case.
+        
+        Intriguingly, doing so for captured variables breaks the way arguments
+        simplification used to work. Consider that prior to either arguments
+        simplification or store elimination we will have IR that looks like:
+        
+        a: SetLocal(r0, Empty)
+        b: SetLocal(r1, Empty)
+        c: GetLocal(r0)
+        d: CreateArguments(@c)
+        e: SetLocal(r0, @d)
+        f: SetLocal(r1, @d)
+        
+        Then redundant store elimination will eliminate the stores that
+        initialize the arguments registers to Empty, but then arguments
+        simplification eliminates the stores that initialize the arguments to
+        the newly created arguments - and at this point we no longer have any
+        stores to the arguments register, leading to hilarious crashes. This
+        patch therefore changes arguments simplification to replace
+        CreateArguments with JSConstant(Empty) rather than eliminating the
+        SetLocals. But this revealed bugs where arguments simplification was
+        being overzealous, so I fixed those bugs.
+        
+        This is a minor speed-up on V8/early and a handful of other tests.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::uncheckedActivationRegister):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGArgumentsSimplificationPhase.cpp:
+        (JSC::DFG::ArgumentsSimplificationPhase::run):
+        (JSC::DFG::ArgumentsSimplificationPhase::observeBadArgumentsUse):
+        (JSC::DFG::ArgumentsSimplificationPhase::observeBadArgumentsUses):
+        (JSC::DFG::ArgumentsSimplificationPhase::observeProperArgumentsUse):
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::globalVarStoreElimination):
+        (CSEPhase):
+        (JSC::DFG::CSEPhase::putStructureStoreElimination):
+        (JSC::DFG::CSEPhase::putByOffsetStoreElimination):
+        (JSC::DFG::CSEPhase::setLocalStoreElimination):
+        (JSC::DFG::CSEPhase::setReplacement):
+        (JSC::DFG::CSEPhase::eliminate):
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGGraph.h:
+        (JSC::DFG::Graph::uncheckedActivationRegisterFor):
+        (Graph):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::isPhantomArguments):
+        (Node):
+        (JSC::DFG::Node::hasConstant):
+        (JSC::DFG::Node::valueOfJSConstant):
+        (JSC::DFG::Node::hasStructureTransitionData):
+        * dfg/DFGNodeType.h:
+        (DFG):
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::computeValueRecoveryFor):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-05-21  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG ConvertThis should just be a CheckStructure if the structure is known
+        https://bugs.webkit.org/show_bug.cgi?id=87057
+
+        Reviewed by Gavin Barraclough.
+        
+        Merged r118021 from dfgopt.
+        
+        This gives ValueProfile the ability to track singleton values - i.e. profiling
+        sites that always see the same value.
+        
+        That is then used to profile the structure in op_convert_this.
+        
+        This is then used to optimize op_convert_this into a CheckStructure if the
+        structure is always the same.
+        
+        That then results in better CSE in inlined code that uses 'this', since
+        previously we couldn't CSE accesses on 'this' from different inline call frames.
+        
+        Also fixed a bug where we were unnecessarily flushing 'this'.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+        * bytecode/LazyOperandValueProfile.cpp:
+        (JSC::CompressedLazyOperandValueProfileHolder::computeUpdatedPredictions):
+        * bytecode/LazyOperandValueProfile.h:
+        (CompressedLazyOperandValueProfileHolder):
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * bytecode/ValueProfile.h:
+        (JSC::ValueProfileBase::ValueProfileBase):
+        (JSC::ValueProfileBase::dump):
+        (JSC::ValueProfileBase::computeUpdatedPrediction):
+        (ValueProfileBase):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::setArgument):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_convert_this):
+        (JSC::JIT::emitSlow_op_convert_this):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_convert_this):
+        (JSC::JIT::emitSlow_op_convert_this):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+        * runtime/JSValue.h:
+        (JSValue):
+        * runtime/Structure.h:
+        (JSC::JSValue::structureOrUndefined):
+        (JSC):
+
 2012-05-24  Tim Horton  <timothy_horton@apple.com>
 
         Add feature defines for web-facing parts of CSS Regions and Exclusions

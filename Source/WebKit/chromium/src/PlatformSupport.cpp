@@ -317,20 +317,6 @@ bool PlatformSupport::deleteEmptyDirectory(const String& path)
     return WebKit::Platform::current()->fileUtilities()->deleteEmptyDirectory(path);
 }
 
-bool PlatformSupport::getFileSize(const String& path, long long& result)
-{
-    return WebKit::Platform::current()->fileUtilities()->getFileSize(path, result);
-}
-
-bool PlatformSupport::getFileModificationTime(const String& path, time_t& result)
-{
-    double modificationTime;
-    if (!WebKit::Platform::current()->fileUtilities()->getFileModificationTime(path, modificationTime))
-        return false;
-    result = static_cast<time_t>(modificationTime);
-    return true;
-}
-
 bool PlatformSupport::getFileMetadata(const String& path, FileMetadata& result)
 {
     WebFileInfo webFileInfo;
@@ -414,7 +400,7 @@ PassOwnPtr<AsyncFileSystem> PlatformSupport::createAsyncFileSystem()
 #if OS(WINDOWS)
 bool PlatformSupport::ensureFontLoaded(HFONT font)
 {
-    WebSandboxSupport* ss = webKitPlatformSupport()->sandboxSupport();
+    WebSandboxSupport* ss = WebKit::Platform::current()->sandboxSupport();
 
     // if there is no sandbox, then we can assume the font
     // was able to be loaded successfully already
@@ -425,7 +411,7 @@ bool PlatformSupport::ensureFontLoaded(HFONT font)
 #if OS(DARWIN)
 bool PlatformSupport::loadFont(NSFont* srcFont, CGFontRef* out, uint32_t* fontID)
 {
-    WebSandboxSupport* ss = webKitPlatformSupport()->sandboxSupport();
+    WebSandboxSupport* ss = WebKit::Platform::current()->sandboxSupport();
     if (ss)
         return ss->loadFont(srcFont, out, fontID);
 
@@ -448,8 +434,8 @@ void PlatformSupport::getFontFamilyForCharacters(const UChar* characters, size_t
     family->isItalic = false;
 #else
     WebFontFamily webFamily;
-    if (webKitPlatformSupport()->sandboxSupport())
-        webKitPlatformSupport()->sandboxSupport()->getFontFamilyForCharacters(characters, numCharacters, preferredLocale, &webFamily);
+    if (WebKit::Platform::current()->sandboxSupport())
+        WebKit::Platform::current()->sandboxSupport()->getFontFamilyForCharacters(characters, numCharacters, preferredLocale, &webFamily);
     else
         WebFontInfo::familyForChars(characters, numCharacters, preferredLocale, &webFamily);
     family->name = String::fromUTF8(webFamily.name.data(), webFamily.name.length());
@@ -463,8 +449,8 @@ void PlatformSupport::getRenderStyleForStrike(const char* font, int sizeAndStyle
 #if !OS(ANDROID)
     WebFontRenderStyle style;
 
-    if (webKitPlatformSupport()->sandboxSupport())
-        webKitPlatformSupport()->sandboxSupport()->getRenderStyleForStrike(font, sizeAndStyle, &style);
+    if (WebKit::Platform::current()->sandboxSupport())
+        WebKit::Platform::current()->sandboxSupport()->getRenderStyleForStrike(font, sizeAndStyle, &style);
     else
         WebFontInfo::renderStyleForStrike(font, sizeAndStyle, &style);
 

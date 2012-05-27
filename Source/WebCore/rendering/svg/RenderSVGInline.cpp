@@ -84,6 +84,11 @@ void RenderSVGInline::mapLocalToContainer(RenderBoxModelObject* repaintContainer
     SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
 }
 
+const RenderObject* RenderSVGInline::pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
+{
+    return SVGRenderSupport::pushMappingToContainer(this, ancestorToStopAt, geometryMap);
+}
+
 void RenderSVGInline::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
     const RenderObject* object = RenderSVGText::locateRenderSVGTextAncestor(this);
@@ -114,21 +119,19 @@ void RenderSVGInline::styleDidChange(StyleDifference diff, const RenderStyle* ol
     SVGResourcesCache::clientStyleChanged(this, diff, style());
 }
 
-void RenderSVGInline::updateFromElement()
-{
-    RenderInline::updateFromElement();
-    SVGResourcesCache::clientUpdatedFromElement(this, style());
-}
-
 void RenderSVGInline::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderInline::addChild(child, beforeChild);
+    SVGResourcesCache::clientWasAddedToTree(child, child->style());
+
     if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
         textRenderer->subtreeChildWasAdded(child);
 }
 
 void RenderSVGInline::removeChild(RenderObject* child)
 {
+    SVGResourcesCache::clientWillBeRemovedFromTree(child);
+
     RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this);
     if (!textRenderer) {
         RenderInline::removeChild(child);

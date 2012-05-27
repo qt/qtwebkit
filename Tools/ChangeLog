@@ -1,3 +1,155 @@
+2012-05-27  David Barton  <dbarton@mathscribe.com>
+
+        [watchlist] Improve MathML rule
+        https://bugs.webkit.org/show_bug.cgi?id=87592
+
+        Reviewed by Adam Barth.
+
+        The old rule "filename": r".*mathml" works fine because "filename" is a prefix match,
+        but if this changed the rule would be slow. We protect against this, clarify the rule,
+        and make it more similar to existing rules.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-05-27  David Barton  <dbarton@mathscribe.com>
+
+        [watchlist] Add myself & a rule for MathML
+        https://bugs.webkit.org/show_bug.cgi?id=87586
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-05-26  David Kilzer  <ddkilzer@apple.com>
+
+        Use xcrun to find path to nm for Mac port
+        <http://webkit.org/b/87588>
+
+        Reviewed by Dan Bernstein.
+
+        * Scripts/webkitpy/layout_tests/port/mac.py:
+        (MacPort.nm_command): Add. Tries to find a path for the nm
+        command using xcrun.  Falls back to returning 'nm'.
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        (WebKitPort.nm_command): Add. Returns 'nm'.
+        (WebKitPort._webcore_symbols_string): Call self.nm_command().
+
+2012-05-25  Lynn Neir  <lynn.neir@skype.net>
+
+        Added windows implementation in DRT for TextInputController, https://bugs.webkit.org/show_bug.cgi?id=32021
+
+        Reviewed by Eric Seidel.
+
+        * DumpRenderTree/win/DumpRenderTree.vcproj:
+        * DumpRenderTree/win/FrameLoadDelegate.cpp:
+        (FrameLoadDelegate::FrameLoadDelegate):
+        (FrameLoadDelegate::didClearWindowObjectForFrameInStandardWorld):
+        * DumpRenderTree/win/FrameLoadDelegate.h:
+        (FrameLoadDelegate):
+        * DumpRenderTree/win/TextInputController.cpp: Added.
+        (setMarkedTextCallback):
+        (hasMarkedTextCallback):
+        (unmarkTextCallback):
+        (markedRangeCallback):
+        (insertTextCallback):
+        (firstRectForCharacterRangeCallback):
+        (selectedRangeCallback):
+        (TextInputController::makeWindowObject):
+        (TextInputController::getJSClass):
+        (TextInputController::staticValues):
+        (TextInputController::staticFunctions):
+        * DumpRenderTree/win/TextInputController.h: Added.
+        (TextInputController):
+        * DumpRenderTree/win/TextInputControllerWin.cpp: Added.
+        (TextInputController::setMarkedText):
+        (TextInputController::hasMarkedText):
+        (TextInputController::unmarkText):
+        (TextInputController::markedRange):
+        (TextInputController::insertText):
+        (TextInputController::firstRectForCharacterRange):
+        (TextInputController::selectedRange):
+
+2012-05-25  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: change scm.add(), scm.delete() to accept multiple paths
+        https://bugs.webkit.org/show_bug.cgi?id=87528
+
+        Reviewed by Ojan Vafai.
+
+        launching git or svn for individual files can be slow; this
+        change will hand multiple paths at once to git and svn so they
+        can be added in a batch.
+
+        * Scripts/webkitpy/common/checkout/scm/git.py:
+        (Git.add_list):
+        (Git.delete_list):
+        * Scripts/webkitpy/common/checkout/scm/scm.py:
+        (SCM.add):
+        (SCM):
+        (SCM.add_list):
+        (SCM.delete):
+        (SCM.delete_list):
+        * Scripts/webkitpy/common/checkout/scm/scm_mock.py:
+        (MockSCM.add):
+        (MockSCM):
+        (MockSCM.add_list):
+        (MockSCM.delete):
+        (MockSCM.delete_list):
+        * Scripts/webkitpy/common/checkout/scm/scm_unittest.py:
+        (_shared_test_exists):
+        (_shared_test_added_files):
+        (_test_delete_list):
+        * Scripts/webkitpy/common/checkout/scm/svn.py:
+        (SVN.add_list):
+        (SVN.delete_list):
+
+2012-05-25  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [NRWT] Add unit testing for perf tests on locked shards
+        https://bugs.webkit.org/show_bug.cgi?id=87489
+
+        Reviewed by Dirk Pranke.
+
+        Adding utests that makes sure that perf tests are running in locked
+        shards and by passing --no-http won't break NRWT (r118421).
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_unittest.py:
+        (ShardingTests):
+        (ShardingTests.test_shard_by_dir):
+        (ShardingTests.test_shard_every_file):
+        (ShardingTests.test_shard_in_two):
+        (ShardingTests.test_multiple_locked_shards):
+        (LockCheckingManager):
+        (LockCheckingManager.__init__):
+        (LockCheckingManager.handle_finished_list):
+        (ManagerTest.test_http_locking):
+        (ManagerTest):
+        (ManagerTest.test_perf_locking):
+        * Scripts/webkitpy/layout_tests/port/test.py:
+
+2012-05-25  Jessie Berlin  <jberlin@apple.com>
+
+        [Win] fast/events/keydown-leftright-keys.html failing since introduction in r118001
+        https://bugs.webkit.org/show_bug.cgi?id=87511
+
+        Reviewed by Alexey Proskuryakov.
+
+        Update the Windows implementation of keyDown to match the Mac one changed in r118001.
+
+        * DumpRenderTree/win/EventSender.cpp:
+        (keyDownCallback):
+
+2012-05-25  Ken Buchanan  <kenrb@chromium.org>
+
+        Adding Ken Buchanan to committers.py
+        https://bugs.webkit.org/show_bug.cgi?id=87443
+
+        Unreviewed.
+
+        Adding self to committers.py as a Committer.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
 2012-05-25  Csaba Osztrogonác  <ossy@webkit.org>
 
         [Qt] Buildfix for newer Qt5

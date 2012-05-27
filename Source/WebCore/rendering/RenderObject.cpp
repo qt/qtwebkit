@@ -46,6 +46,7 @@
 #include "RenderCounter.h"
 #include "RenderDeprecatedFlexibleBox.h"
 #include "RenderFlexibleBox.h"
+#include "RenderGeometryMap.h"
 #include "RenderImage.h"
 #include "RenderImageResourceStyleImage.h"
 #include "RenderInline.h"
@@ -188,9 +189,11 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case BOX:
     case INLINE_BOX:
         return new (arena) RenderDeprecatedFlexibleBox(node);
+#if ENABLE(CSS3_FLEXBOX)
     case FLEX:
     case INLINE_FLEX:
         return new (arena) RenderFlexibleBox(node);
+#endif
     }
 
     return 0;
@@ -219,7 +222,6 @@ RenderObject::RenderObject(Node* node)
 
 RenderObject::~RenderObject()
 {
-    ASSERT(!node() || documentBeingDestroyed() || !frame()->view() || frame()->view()->layoutRoot() != this);
 #ifndef NDEBUG
     ASSERT(!m_hasAXObject);
     renderObjectCounter.decrement();
@@ -593,14 +595,26 @@ RenderBlock* RenderObject::firstLineBlock() const
 
 static inline bool objectIsRelayoutBoundary(const RenderObject* object)
 {
-    // FIXME: In future it may be possible to broaden this condition in order to improve performance.
-    // Table cells are excluded because even when their CSS height is fixed, their height()
-    // may depend on their contents.
-    return object->isTextControl()
+    // FIXME: In future it may be possible to broaden these conditions in order to improve performance.
+    if (object->isTextControl())
+        return true;
+
 #if ENABLE(SVG)
-        || object->isSVGRoot()
+    if (object->isSVGRoot())
+        return true;
 #endif
-        || (object->hasOverflowClip() && !object->style()->width().isIntrinsicOrAuto() && !object->style()->height().isIntrinsicOrAuto() && !object->style()->height().isPercent() && !object->isTableCell());
+
+    if (!object->hasOverflowClip())
+        return false;
+
+    if (object->style()->width().isIntrinsicOrAuto() || object->style()->height().isIntrinsicOrAuto() || object->style()->height().isPercent())
+        return false;
+
+    // Table parts can't be relayout roots since the table is responsible for layouting all the parts.
+    if (object->isTablePart())
+        return false;
+
+    return true;
 }
 
 void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderObject* newRoot)
@@ -2031,6 +2045,7 @@ void RenderObject::mapLocalToContainer(RenderBoxModelObject* repaintContainer, b
     if (!o)
         return;
 
+    // FIXME: this should call offsetFromContainer to share code, but I'm not sure it's ever called.
     LayoutPoint centerPoint = roundedLayoutPoint(transformState.mappedPoint());
     if (o->isBox() && o->style()->isFlippedBlocksWritingMode())
         transformState.move(toRenderBox(o)->flipForWritingModeIncludingColumns(roundedLayoutPoint(transformState.mappedPoint())) - centerPoint);
@@ -2044,6 +2059,24 @@ void RenderObject::mapLocalToContainer(RenderBoxModelObject* repaintContainer, b
         transformState.move(-toRenderBox(o)->scrolledContentOffset());
 
     o->mapLocalToContainer(repaintContainer, fixed, useTransforms, transformState, DoNotApplyContainerFlip, wasFixed);
+}
+
+const RenderObject* RenderObject::pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
+{
+    ASSERT_UNUSED(ancestorToStopAt, ancestorToStopAt != this);
+
+    RenderObject* container = parent();
+    if (!container)
+        return 0;
+
+    // FIXME: this should call offsetFromContainer to share code, but I'm not sure it's ever called.
+    LayoutSize offset;
+    if (container->hasOverflowClip())
+        offset = -toRenderBox(container)->scrolledContentOffset();
+
+    geometryMap.push(this, offset, hasColumns());
+    
+    return container;
 }
 
 void RenderObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState& transformState) const
@@ -2114,7 +2147,7 @@ FloatPoint RenderObject::localToContainerPoint(const FloatPoint& localPoint, Ren
     return transformState.lastPlanarPoint();
 }
 
-LayoutSize RenderObject::offsetFromContainer(RenderObject* o, const LayoutPoint& point) const
+LayoutSize RenderObject::offsetFromContainer(RenderObject* o, const LayoutPoint& point, bool* offsetDependsOnPoint) const
 {
     ASSERT(o == container());
 
@@ -2124,6 +2157,9 @@ LayoutSize RenderObject::offsetFromContainer(RenderObject* o, const LayoutPoint&
 
     if (o->hasOverflowClip())
         offset -= toRenderBox(o)->scrolledContentOffset();
+
+    if (offsetDependsOnPoint)
+        *offsetDependsOnPoint = hasColumns();
 
     return offset;
 }
@@ -2200,7 +2236,7 @@ bool RenderObject::hasOutlineAnnotation() const
     return node() && node()->isLink() && document()->printing();
 }
 
-RenderObject* RenderObject::container(RenderBoxModelObject* repaintContainer, bool* repaintContainerSkipped) const
+RenderObject* RenderObject::container(const RenderBoxModelObject* repaintContainer, bool* repaintContainerSkipped) const
 {
     if (repaintContainerSkipped)
         *repaintContainerSkipped = false;
@@ -2260,7 +2296,7 @@ bool RenderObject::isSelectionBorder() const
 
 inline void RenderObject::clearLayoutRootIfNeeded() const
 {
-    if (node() && !documentBeingDestroyed() && frame()) {
+    if (!documentBeingDestroyed() && frame()) {
         if (FrameView* view = frame()->view()) {
             if (view->layoutRoot() == this) {
                 ASSERT_NOT_REACHED();

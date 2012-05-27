@@ -1,3 +1,125 @@
+2012-05-26  Geoffrey Garen  <ggaren@apple.com>
+
+        WebKit should be lazy-finalization-safe (esp. the DOM) v2
+        https://bugs.webkit.org/show_bug.cgi?id=87581
+
+        Reviewed by Oliver Hunt.
+
+        * WebProcess/Plugins/Netscape/JSNPObject.cpp:
+        (WebKit::JSNPObject::destroy):
+        (WebKit::JSNPObject::leakNPObject):
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.cpp:
+        (WebKit::NPRuntimeObjectMap::finalize): Use static_cast instead of jsCast because
+        jsCast does Structure-based validation, and our Structure is not guaranteed
+        to be alive when we get finalized.
+
+2012-05-25  Maciej Stachowiak  <mjs@apple.com>
+
+        REGRESSION (r116720): Subframe PDF scrolls extremely slowly
+        https://bugs.webkit.org/show_bug.cgi?id=87557
+        <rdar://problem/11499408>
+
+        Reviewed by Anders Carlsson.
+        
+        It's not possible to make an automated test for this.
+
+        * WebProcess/Plugins/PDF/BuiltInPDFView.mm:
+        (WebKit::BuiltInPDFView::wantsWheelEvents): Return true instead of false and delete
+        misleading comment. While the built-in PDF view would get added to the set of scrollable
+        areas anyway, there are some code paths that check wantsWheelEvents explicitly, so it seems
+        necessary to reutrn true.
+
+2012-05-25  Brady Eidson  <beidson@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87418
+        WebBackForwardList should separate "has no current index" from the integer value of the current index
+
+        This patch also renames "m_current" to "m_currentIndex" for clarity and symmetry with
+        other variable names that reference "index",
+
+        It also removes the m_closed and m_enabled flags which were never actually used.
+
+        Reviewed by Darin Adler.
+
+        * UIProcess/WebBackForwardList.cpp:
+        (WebKit::WebBackForwardList::WebBackForwardList):
+        (WebKit::WebBackForwardList::addItem):
+        (WebKit::WebBackForwardList::goToItem):
+        (WebKit::WebBackForwardList::currentItem):
+        (WebKit::WebBackForwardList::backItem):
+        (WebKit::WebBackForwardList::forwardItem):
+        (WebKit::WebBackForwardList::itemAtIndex):
+        (WebKit::WebBackForwardList::backListCount):
+        (WebKit::WebBackForwardList::forwardListCount):
+        (WebKit::WebBackForwardList::backListAsImmutableArrayWithLimit):
+        (WebKit::WebBackForwardList::forwardListAsImmutableArrayWithLimit):
+        (WebKit::WebBackForwardList::clear):
+
+        * UIProcess/WebBackForwardList.h:
+        (WebKit::WebBackForwardList::currentIndex):
+        (WebBackForwardList):
+
+        * UIProcess/cf/WebBackForwardListCF.cpp:
+        (WebKit::WebBackForwardList::createCFDictionaryRepresentation):
+        (WebKit::WebBackForwardList::restoreFromCFDictionaryRepresentation):
+
+2012-05-25  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87529
+        Background tabs hosted in window server flash before painting 
+        when they first become active
+
+        Reviewed by Anders Carlsson.
+
+        Initialize to LayerHostingModeInWindowServer if that is 
+        available to avoid having to re-make the context and re-set 
+        everything later on.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::WebPageProxy):
+
+2012-05-25  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK][WK2] Implement API for generic permission requests
+        https://bugs.webkit.org/show_bug.cgi?id=84018
+
+        Reviewed by Martin Robinson.
+
+        Added new 'permission-request' signal to WebKitWebView, to be
+        fired when WebKit needs confirmation from the user on whether to
+        allow or deny certain operations, such as sharing the user's
+        location with web site through the Geolocation API.
+
+        New WebKitPermissionRequest interface, providing allow() and
+        deny() operations, to be called over the objects implementing it
+        when emitted along with the new 'permission-request' signal.
+
+        * UIProcess/API/gtk/WebKitPermissionRequest.cpp: Added.
+        (webkit_permission_request_default_init):
+        (webkit_permission_request_allow):
+        (webkit_permission_request_deny):
+        * UIProcess/API/gtk/WebKitPermissionRequest.h: Added.
+        (_WebKitPermissionRequestIface):
+        * GNUmakefile.am: Added new files.
+
+        Added the new signal to WebKitWebView, providing a default handler
+        that will just deny the request when the signal is not handled.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewDecidePermissionRequest): Default handler.
+        (webkit_web_view_class_init): Declare the new signal and connect
+        to the default handler.
+        (webkitWebViewMakePermissionRequest): Helper function to create a
+        make a new permission request and emit the new signal signal.
+        * UIProcess/API/gtk/WebKitWebView.h:
+        (_WebKitWebViewClass):
+        * UIProcess/API/gtk/WebKitWebViewPrivate.h: Declare the creational
+        function webkitWebViewMakePermissionRequest for internal use only.
+
+        Updated documentation files.
+
+        * UIProcess/API/gtk/docs/webkit2gtk-docs.sgml:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt:
+
 2012-05-25  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
 
         [WK2] Fix client interface size for WKPageContextMenuClient.

@@ -638,7 +638,13 @@ void WebPage::loadFile(const char* path, const char* overrideContentType)
 
 void WebPage::download(const Platform::NetworkRequest& request)
 {
-    d->load(request.getUrlRef().c_str(), 0, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, 0, 0, false, false, true, "", request.getSuggestedSaveName().c_str());
+    vector<const char*> headers;
+    Platform::NetworkRequest::HeaderList& list = request.getHeaderListRef();
+    for (unsigned i = 0; i < list.size(); i++) {
+        headers.push_back(list[i].first.c_str());
+        headers.push_back(list[i].second.c_str());
+    }
+    d->load(request.getUrlRef().c_str(), 0, "GET", Platform::NetworkRequest::UseProtocolCachePolicy, 0, 0, headers.empty() ? 0 : &headers[0], headers.size(), false, false, true, "", request.getSuggestedSaveName().c_str());
 }
 
 void WebPagePrivate::loadString(const char* string, const char* baseURL, const char* contentType, const char* failingURL)
@@ -892,11 +898,17 @@ void WebPagePrivate::setLoadState(LoadState state)
                 m_virtualViewportHeight = m_defaultLayoutSize.height();
             }
             // Check if we have already process the meta viewport tag, this only happens on history navigation.
+            // For back/forward history navigation, we should only keep these previous values if the document
+            // has the meta viewport tag when the state is Committed in setLoadState.
             // Refreshing should keep these previous values as well.
+            static ViewportArguments defaultViewportArguments;
+            bool documentHasViewportArguments = false;
             FrameLoadType frameLoadType = FrameLoadTypeStandard;
+            if (m_mainFrame && m_mainFrame->document() && !(m_mainFrame->document()->viewportArguments() == defaultViewportArguments))
+                documentHasViewportArguments = true;
             if (m_mainFrame && m_mainFrame->loader())
                 frameLoadType = m_mainFrame->loader()->loadType();
-            if (!m_didRestoreFromPageCache && !(frameLoadType == FrameLoadTypeReload || frameLoadType == FrameLoadTypeReloadFromOrigin)) {
+            if (!((m_didRestoreFromPageCache && documentHasViewportArguments) || (frameLoadType == FrameLoadTypeReload || frameLoadType == FrameLoadTypeReloadFromOrigin))) {
                 m_viewportArguments = ViewportArguments();
 
                 // At the moment we commit a new load, set the viewport arguments
@@ -5618,6 +5630,8 @@ void WebPagePrivate::setCompositor(PassRefPtr<WebPageCompositorPrivate> composit
     }
 
     m_compositor = compositor;
+    if (m_compositor)
+        m_compositor->setPage(this);
 
     // The previous compositor, if any, has now released it's OpenGL resources,
     // so we can safely free the owned context, if any.
@@ -5850,6 +5864,9 @@ void WebPagePrivate::destroyCompositor()
     if (!m_ownedContext)
         return;
 
+    // m_compositor is a RefPtr, so it may live on beyond this point.
+    // Disconnect the compositor from us
+    m_compositor->setPage(0);
     m_compositor.clear();
     m_ownedContext.clear();
 }

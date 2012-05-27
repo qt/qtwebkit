@@ -115,6 +115,11 @@ void RenderSVGText::mapLocalToContainer(RenderBoxModelObject* repaintContainer, 
     SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
 }
 
+const RenderObject* RenderSVGText::pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
+{
+    return SVGRenderSupport::pushMappingToContainer(this, ancestorToStopAt, geometryMap);
+}
+
 static inline void collectLayoutAttributes(RenderObject* text, Vector<SVGTextLayoutAttributes*>& attributes)
 {
     for (RenderObject* descendant = text; descendant; descendant = descendant->nextInPreOrder(text)) {
@@ -524,11 +529,15 @@ FloatRect RenderSVGText::repaintRectInLocalCoordinates() const
 void RenderSVGText::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderSVGBlock::addChild(child, beforeChild);
+
+    SVGResourcesCache::clientWasAddedToTree(child, child->style());
     subtreeChildWasAdded(child);
 }
 
 void RenderSVGText::removeChild(RenderObject* child)
 {
+    SVGResourcesCache::clientWillBeRemovedFromTree(child);
+
     Vector<SVGTextLayoutAttributes*, 2> affectedAttributes;
     FontCachePurgePreventer fontCachePurgePreventer;
     subtreeChildWillBeRemoved(child, affectedAttributes);

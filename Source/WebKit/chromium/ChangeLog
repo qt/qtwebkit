@@ -1,3 +1,165 @@
+2012-05-25  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Roll chromium DEPS from r139156 to r139184.
+
+        * DEPS:
+
+2012-05-25  Garrett Casto  <gcasto@chromium.org>
+
+        Allow WebTextFieldDecoratorClient to see applied decorations.
+        https://bugs.webkit.org/show_bug.cgi?id=86557
+
+        Reviewed by Kent Tamura.
+
+        * WebKit.gyp: Added new files.
+        * public/WebInputElement.h:
+        (WebKit::WebInputElement::decorationElementFor): Returns the
+        WebElement attached to the WebInputElement by the given
+        WebTextFieldDecoratorClient, if one exists.
+        * src/TextFieldDecoratorImpl.cpp:
+        (WebKit):
+        * src/TextFieldDecoratorImpl.h:
+        (TextFieldDecoratorImpl::decoratorClient): Get the
+        WebTextFieldDecoratorClient owned by this object.
+
+2012-05-25  Mihai Parparita  <mihaip@chromium.org>
+
+        Allow synchronous XHRs to be disabled in documents
+        https://bugs.webkit.org/show_bug.cgi?id=87540
+
+        Reviewed by Eric Seidel.
+
+        Synchronous XMLHttpRequests are a problematic API, since they result
+        in blocked UI threads. Some clients may wish to always disable them;
+        give them a setting to do so (see also r103629 for other cases where
+        synchronous XHRs are disabled).
+
+        * public/WebSettings.h:
+        * src/WebSettingsImpl.cpp:
+        (WebKit::WebSettingsImpl::setSyncXHRInDocumentsEnabled):
+        (WebKit):
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+
+2012-05-25  Kinuko Yasuda  <kinuko@chromium.org>
+
+        [chromium] Deprecate FileUtilities::getFileSize and getFileModifiedTime in favor of getFileMetadata
+        https://bugs.webkit.org/show_bug.cgi?id=87492
+
+        Reviewed by Adam Barth.
+
+        * src/PlatformSupport.cpp:
+        (WebCore::PlatformSupport::getFileMetadata):
+
+2012-05-25  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Roll Chromium DEPS from r139024 to r139156 in an attempt to fix Chromium Win builds.
+
+        * DEPS:
+
+2012-05-25  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chomium] Move sandboxSupport to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=87518
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * WebKit.gyp:
+        * public/platform/WebKitPlatformSupport.h:
+        (WebKit):
+        (WebKitPlatformSupport):
+        * public/platform/android/WebSandboxSupport.h:
+        * public/platform/linux/WebFontFamily.h:
+        * public/platform/linux/WebSandboxSupport.h:
+        * public/platform/mac/WebSandboxSupport.h:
+        * public/platform/win/WebSandboxSupport.h:
+        * src/PlatformSupport.cpp:
+        (WebCore::PlatformSupport::ensureFontLoaded):
+        (WebCore::PlatformSupport::loadFont):
+        (WebCore::PlatformSupport::getFontFamilyForCharacters):
+        (WebCore::PlatformSupport::getRenderStyleForStrike):
+
+2012-05-25  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] WebLayerTreeViewImpl should not hide methods in CCLayerTreeHost with signatures that match the Client interface
+        https://bugs.webkit.org/show_bug.cgi?id=87301
+
+        Reviewed by James Robinson.
+
+        Most methods in the CCLayerTreeHostClient interface have a matching
+        method signature on CCLayerTreeHost that simply calls the client, if
+        one exists at all. However, CCLayerTreeHost::updateAnimations() does
+        important work in addition to calling the client.
+
+        Currently WebLayerTreeViewImpl itself implements the interface for
+        CCLayerTreeHostClient as well as CCLayerTreeHost, and simply forwards
+        any call to a method in the client interface to its own client. This
+        blocks WebViewImpl from calling CCLayerTreeHost::updateAnimations, since
+        the method is also in the client interface.
+
+        We change WebLayerTreeViewImpl to own a CCLayerTreeHost and a
+        WebLayerTreeHostClientAdapter. This fixes the shadowing by making
+        the two interfaces separate, and resolves lifetime issues by
+        ensuring that the CCLayerTreeHost is destroyed before its client.
+
+        * src/WebLayerTreeView.cpp:
+        (WebKit::WebLayerTreeView::setSurfaceReady):
+        (WebKit::WebLayerTreeView::setRootLayer):
+        (WebKit::WebLayerTreeView::compositorIdentifier):
+        (WebKit::WebLayerTreeView::setViewportSize):
+        (WebKit::WebLayerTreeView::viewportSize):
+        (WebKit::WebLayerTreeView::setBackgroundColor):
+        (WebKit::WebLayerTreeView::setVisible):
+        (WebKit::WebLayerTreeView::setPageScaleFactorAndLimits):
+        (WebKit::WebLayerTreeView::startPageScaleAnimation):
+        (WebKit::WebLayerTreeView::setNeedsAnimate):
+        (WebKit::WebLayerTreeView::setNeedsRedraw):
+        (WebKit::WebLayerTreeView::commitRequested):
+        (WebKit::WebLayerTreeView::composite):
+        (WebKit::WebLayerTreeView::updateAnimations):
+        (WebKit::WebLayerTreeView::compositeAndReadback):
+        (WebKit::WebLayerTreeView::finishAllRendering):
+        (WebKit::WebLayerTreeView::context):
+        (WebKit::WebLayerTreeView::loseCompositorContext):
+        * src/WebLayerTreeViewImpl.cpp:
+        (WebKit):
+        (WebLayerTreeViewClientAdapter):
+        (WebKit::WebLayerTreeViewClientAdapter::WebLayerTreeViewClientAdapter):
+        (WebKit::WebLayerTreeViewClientAdapter::~WebLayerTreeViewClientAdapter):
+        (WebKit::WebLayerTreeViewImpl::create):
+        (WebKit::WebLayerTreeViewImpl::WebLayerTreeViewImpl):
+        (WebKit::WebLayerTreeViewImpl::~WebLayerTreeViewImpl):
+        * src/WebLayerTreeViewImpl.h:
+        (WebCore):
+        (WebKit):
+        (WebKit::WebLayerTreeViewImpl::layerTreeHost):
+        (WebLayerTreeViewImpl):
+
+2012-05-25  Kinuko Yasuda  <kinuko@chromium.org>
+
+        Unreviewed; rolling chromium deps.
+
+        * DEPS:
+
+2012-05-25  W. James MacLean  <wjmaclean@chromium.org>
+
+        [chromium] LayerChromium should recognise existing layer active animations when the layer is added.
+        https://bugs.webkit.org/show_bug.cgi?id=87166
+
+        Reviewed by Adrienne Walker.
+
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::MockLayerTreeHost::didAddAnimationWasCalled):
+        (MockLayerTreeHost):
+        (WTF::MockLayerTreeHost::MockLayerTreeHost):
+        (WTF):
+        (CCLayerTreeHostTestLayerAddedWithAnimation):
+        (WTF::CCLayerTreeHostTestLayerAddedWithAnimation::CCLayerTreeHostTestLayerAddedWithAnimation):
+        (WTF::CCLayerTreeHostTestLayerAddedWithAnimation::beginTest):
+        (WTF::CCLayerTreeHostTestLayerAddedWithAnimation::afterTest):
+
 2012-05-17  Andrey Kosyakov  <caseq@chromium.org>
 
         [chromium] add instrumentation for compositing
