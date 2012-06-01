@@ -93,10 +93,6 @@ public:
     virtual void updateViewportSize() { }
     void updateTouchViewportSize();
 
-    virtual void _q_suspend() { }
-    virtual void _q_resume() { }
-    virtual void _q_onInformVisibleContentChange(const QPointF& trajectory) { };
-
     virtual qreal zoomFactor() const { return 1; }
     virtual void setZoomFactor(qreal) { }
 
@@ -127,8 +123,6 @@ public:
 
     QPointF contentPos() const;
     void setContentPos(const QPointF&);
-
-    QRect visibleContentsRect() const;
 
     void setDialogActive(bool active) { m_dialogActive = active; }
 
@@ -231,17 +225,11 @@ public:
     virtual WebKit::QtViewportInteractionEngine* viewportInteractionEngine() { return interactionEngine.data(); }
     virtual void updateViewportSize();
 
-    virtual void _q_suspend();
-    virtual void _q_resume();
-    virtual void _q_onInformVisibleContentChange(const QPointF& trajectory);
-
     virtual void pageDidRequestScroll(const QPoint& pos);
     virtual void didChangeContentsSize(const QSize& newSize);
 
 private:
     QScopedPointer<WebKit::QtViewportInteractionEngine> interactionEngine;
-    bool pageIsSuspended;
-    float lastCommittedScale;
 };
 
 #endif // qquickwebview_p_p_h

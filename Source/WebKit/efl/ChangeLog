@@ -1,3 +1,138 @@
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL port does not enable WEB_INTENTS_TAG flag
+        https://bugs.webkit.org/show_bug.cgi?id=86866
+
+        Reviewed by Adam Barth.
+
+        Implement registerIntentService() in EFL's FrameLoaderClient.
+        Emit a "intent,service,register" signal on the frame when a new Web
+        Intent service registers.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore):
+        (WebCore::FrameLoaderClientEfl::registerIntentService):
+        * WebCoreSupport/FrameLoaderClientEfl.h:
+        (FrameLoaderClientEfl):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_intent_service_register):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_frame_private.h:
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] ewk_intent_data_get() is not needed and can be removed
+        https://bugs.webkit.org/show_bug.cgi?id=88072
+
+        Reviewed by Adam Barth.
+
+        Remove ewk_intent_data_get() method from Ewk_Intent. Intent data is
+        serialized and does not need to be publicly exposed. The browser only
+        needs action and type to match with services.
+
+        * ewk/ewk_intent.cpp:
+        (_Ewk_Intent):
+        (ewk_intent_action_get):
+        (ewk_intent_type_get):
+        (ewk_intent_service_get):
+        (ewk_intent_free):
+        * ewk/ewk_intent.h:
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's LayoutTestController needs to implement deliverWebIntent
+        https://bugs.webkit.org/show_bug.cgi?id=86865
+
+        Reviewed by Adam Barth.
+
+        Add method on Ewk_Frame to deliver an intent.
+        Add helper function to DumpRenderTreeSupportEfl to deliver a Web
+        Intent.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::deliverWebIntent):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_intent_deliver):
+        * ewk/ewk_frame.h:
+
+2012-06-01  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r119228.
+        http://trac.webkit.org/changeset/119228
+        https://bugs.webkit.org/show_bug.cgi?id=88098
+
+        Caused the EFL debug bot to crash. (Requested by rakuco on
+        #webkit).
+
+        * ewk/ewk_main.cpp:
+        (ewk_init):
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] [DRT] editing/execCommand/paste-and-match-style-event.html crashes
+        https://bugs.webkit.org/show_bug.cgi?id=86961
+
+        Reviewed by Csaba Osztrogonác.
+
+        Call ecore_x_init() in ewk_init() to initialize the ecore_x library.
+        This avoids crashing upong calling WebCore::systemBeep() which uses
+        ecore_x_bell() internally.
+
+        * ewk/ewk_main.cpp:
+        (ewk_init):
+
+2012-06-01  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] New signals in ewk_view to enable global history delegate functionality
+        https://bugs.webkit.org/show_bug.cgi?id=86343
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Global history delegate is an interface for WebKit clients to manage their own global history store.
+        The new ewk_view signals do the following:
+        1) report that a navigation happened within the view and give the navigation details.
+        2) report that view performed a client redirect and give source and destination uris.
+        3) report that view performed a server redirect and give source and destination uris.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::updateGlobalHistoryRedirectLinks): implementation added.
+        (WebCore::FrameLoaderClientEfl::updateGlobalHistory): implementation added.
+        * ewk/ewk_view.h: Added new signals and data types.
+
+2012-06-01  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] Implement PlatformStrategies
+        https://bugs.webkit.org/show_bug.cgi?id=86946
+
+        Reviewed by Carlos Garcia Campos.                 
+
+        Enable PLATFORM_STRATEGIES for EFL platform.
+
+        * WebCoreSupport/PlatformStrategiesEfl.cpp: Added, code was moved
+        from platform/PluginDataEfl.
+        (PlatformStrategiesEfl::initialize): Initialize platform strategies.
+        (PlatformStrategiesEfl::PlatformStrategiesEfl):
+        (PlatformStrategiesEfl::createCookiesStrategy): Return this.
+        (PlatformStrategiesEfl::createPluginStrategy): Ditto.
+        (PlatformStrategiesEfl::createVisitedLinkStrategy): Ditto.
+        (PlatformStrategiesEfl::createPasteboardStrategy): Return 0, since
+        PasteboardStrategy is only used by mac code for now.
+        (PlatformStrategiesEfl::notifyCookiesChanged): 
+        (PlatformStrategiesEfl::refreshPlugins): Refresh the plugin
+        database. Code executes only when NETSCAPE_PLUGIN_API is ON.
+        (PlatformStrategiesEfl::getPluginInfo): Initialize plugins and
+        populate the given vector with plugins information. Code executes
+        only when NETSCAPE_PLUGIN_API is ON.
+        (PlatformStrategiesEfl::isLinkVisited): Return whether the given
+        hash is a visited link of the page group.
+        (PlatformStrategiesEfl::addVisitedLink): Add the given hash to the
+        page group visited links.
+        * WebCoreSupport/PlatformStrategiesEfl.h: Added.
+        (PlatformStrategiesEfl):
+        * ewk/ewk_main.cpp: Initialize PlatformStrategiesEfl.
+        (_ewk_init_body):
+
 2012-05-31  Alexander Shalamov  <alexander.shalamov@intel.com>
 
         [EFL] <input type="number"> is not a spinbutton

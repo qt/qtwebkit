@@ -834,7 +834,7 @@ public:
      * @param content The header value (value of the meta tag's "content" attribute)
      */
     void processHttpEquiv(const String& equiv, const String& content);
-    void processViewport(const String& features);
+    void processViewport(const String& features, ViewportArguments::Type origin);
     void updateViewportArguments();
     void processReferrerPolicy(const String& policy);
 
@@ -1048,11 +1048,6 @@ public:
     void initSecurityContext();
     void initContentSecurityPolicy();
 
-    // Explicitly override the security origin for this document.
-    // Note: It is dangerous to change the security origin of a document
-    //       that already contains content.
-    void setSecurityOrigin(PassRefPtr<SecurityOrigin>);
-
     void updateURLForPushOrReplaceState(const KURL&);
     void statePopped(PassRefPtr<SerializedScriptValue>);
 
@@ -1166,6 +1161,8 @@ public:
 
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
+
+    virtual void didUpdateSecurityOrigin() OVERRIDE;
 
     void clearXMLVersion() { m_xmlVersion = String(); }
 

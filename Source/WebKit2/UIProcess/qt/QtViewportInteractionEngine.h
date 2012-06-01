@@ -40,33 +40,15 @@ class QWebKitTest;
 
 namespace WebKit {
 
+class WebPageProxy;
 class ViewportUpdateDeferrer;
 
 class QtViewportInteractionEngine : public QObject {
     Q_OBJECT
 
 public:
-    QtViewportInteractionEngine(QQuickWebView*, QQuickWebPage*);
+    QtViewportInteractionEngine(WebPageProxy*, QQuickWebView*, QQuickWebPage*);
     ~QtViewportInteractionEngine();
-
-    void reset();
-
-    bool hadUserInteraction() const { return m_hadUserInteraction; }
-
-    void setCSSScaleBounds(qreal minimum, qreal maximum);
-    void setCSSScale(qreal);
-
-    qreal currentCSSScale() const;
-
-    void setAllowsUserScaling(bool allow) { m_allowsUserScaling = allow; }
-    void setDevicePixelRatio(qreal ratio) { m_devicePixelRatio = ratio; }
-
-    void setPageItemRectVisible(const QRectF&);
-    void animatePageItemRectVisible(const QRectF&);
-
-    QRectF nearestValidBounds() const;
-
-    void pageContentPositionRequest(const QPoint& pos);
 
     void touchBegin();
     void touchEnd();
@@ -92,18 +74,15 @@ public:
     void zoomToAreaGestureEnded(const QPointF& touchPoint, const QRectF& targetArea);
     void focusEditableArea(const QRectF& caretArea, const QRectF& targetArea);
 
+    void pageContentPositionRequested(const QPoint& position);
+
+    void viewportItemSizeChanged();
     void viewportAttributesChanged(const WebCore::ViewportAttributes&);
+    void informVisibleContentChange(const QPointF& trajectory = QPointF());
     void pageContentsSizeChanged(const QSize& newSize, const QSize& viewportSize);
 
-Q_SIGNALS:
-    void contentSuspendRequested();
-    void contentResumeRequested();
-
-    void informVisibleContentChange(const QPointF& trajectory = QPointF());
-
 private Q_SLOTS:
-    // Respond to changes of content that are not driven by us, like the page resizing itself.
-    void pageItemSizeChanged();
+    // Respond to changes of position that are not driven by us.
     void pageItemPositionChanged();
 
     void scaleAnimationStateChanged(QAbstractAnimation::State, QAbstractAnimation::State);
@@ -116,6 +95,7 @@ private:
     friend class ViewportUpdateDeferrer;
     friend class ::QWebKitTest;
 
+    WebPageProxy* const m_webPageProxy;
     QQuickWebView* const m_viewportItem;
     QQuickWebPage* const m_pageItem;
 
@@ -127,8 +107,20 @@ private:
     qreal innerBoundedCSSScale(qreal) const;
     qreal outerBoundedCSSScale(qreal) const;
 
+    void setCSSScale(qreal);
+    qreal currentCSSScale() const;
+
+    void setPageItemRectVisible(const QRectF&);
+    void animatePageItemRectVisible(const QRectF&);
+
+    QRect visibleContentsRect() const;
+    QRectF nearestValidBounds() const;
+
     QRectF computePosRangeForPageItemAtScale(qreal itemScale) const;
     void scaleContent(const QPointF& centerInCSSCoordinates, qreal cssScale);
+
+    void suspendPageContent();
+    void resumePageContent();
 
     WebCore::ViewportAttributes m_rawAttributes;
 
@@ -172,6 +164,8 @@ private:
     QPointF m_lastPinchCenterInViewportCoordinates;
     QPointF m_lastScrollPosition;
     qreal m_pinchStartScale;
+    qreal m_lastCommittedScale;
+    QRectF m_lastVisibleContentsRect;
     qreal m_zoomOutScale;
     QList<ScaleStackItem> m_scaleStack;
 };

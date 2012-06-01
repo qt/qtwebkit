@@ -1,3 +1,124 @@
+2012-06-01  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Use -Werror only in developer builds
+
+        Rubber-stamped by Tor Arne Vestbø.
+
+        In production builds -Werror with custom toolchains and wierd system
+        headers, -Werror is of no use and just creates confusion. So use it
+        only if Qt is configured with -developer-build.
+
+        * qmake/mkspecs/features/default_pre.prf: Move qt_developer_build determination here...
+        * qmake/mkspecs/features/unix/default_post.prf: ... so that we can use it here to do -Werror
+        only if qt_developer_build is set.
+
+2012-06-01  Jochen Eisinger  <jochen@chromium.org>
+
+        [watchlist] Add myself to loader and v8 bindings changes
+        https://bugs.webkit.org/show_bug.cgi?id=88112
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-06-01  Jacky Jiang  <zhajiang@rim.com>
+
+        Adding Jacky Jiang to committers.py
+        https://bugs.webkit.org/show_bug.cgi?id=88122
+
+        Reviewed by Rob Buis.
+
+        Adding myself to committers.py as a Committer.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-06-01  Jessie Berlin  <jberlin@apple.com>
+
+        Fix Windows build.
+
+        * TestWebKitAPI/Tests/WebKit2/MouseMoveAfterCrash.cpp:
+
+2012-06-01  Jessie Berlin  <jberlin@apple.com>
+
+        Windows WK2 MouseMoveAfterCrash API test failing
+        https://bugs.webkit.org/show_bug.cgi?id=69982
+
+        Disable the test on Windows to get the bots greener.
+
+        * TestWebKitAPI/Tests/WebKit2/MouseMoveAfterCrash.cpp:
+        (TestWebKitAPI::TEST):
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL port does not enable WEB_INTENTS_TAG flag
+        https://bugs.webkit.org/show_bug.cgi?id=86866
+
+        Reviewed by Adam Barth.
+
+        Catch new "intent,service,register" signal on the frame and print out
+        information about the Web Intent service in EFL's DumpRenderTree.
+
+        * DumpRenderTree/efl/DumpRenderTreeChrome.cpp:
+        (DumpRenderTreeChrome::createView):
+        (DumpRenderTreeChrome::onFrameCreated):
+        (DumpRenderTreeChrome::onFrameIntentServiceRegistration):
+        * DumpRenderTree/efl/DumpRenderTreeChrome.h:
+        (DumpRenderTreeChrome):
+
+2012-06-01  Martin Robinson  <mrobinson@igalia.com>
+
+        The ChangeLog parser cannot handle reviewers with initials in their name
+        https://bugs.webkit.org/show_bug.cgi?id=87864
+
+        Reviewed by Ryosuke Niwa.
+
+        Add support in the ChangeLog parser for reviewer names that have
+        initials in them.
+
+        * Scripts/webkitpy/common/checkout/changelog.py:
+        (ChangeLogEntry): Add a new group of regular expressions that need a backreference
+        in the replacement string. This allows for matching the word characters before a
+        period, without totally throwing them away.
+        (ChangeLogEntry._parse_reviewer_text): Use the new regular expression.
+        * Scripts/webkitpy/common/checkout/changelog_unittest.py:
+        (test_fuzzy_reviewer_match_initial): Add a test for a reviewer name that has an initial.
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's LayoutTestController needs to implement deliverWebIntent
+        https://bugs.webkit.org/show_bug.cgi?id=86865
+
+        Reviewed by Adam Barth.
+
+        Add deliverWebIntent method to LayoutTestController and provide
+        implementation for EFL port.
+
+        * DumpRenderTree/LayoutTestController.cpp:
+        (deliverWebIntentCallback):
+        (LayoutTestController::staticFunctions):
+        * DumpRenderTree/LayoutTestController.h:
+        (LayoutTestController):
+        * DumpRenderTree/blackberry/LayoutTestControllerBlackBerry.cpp:
+        (LayoutTestController::deliverWebIntent):
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        (LayoutTestController::deliverWebIntent):
+        * DumpRenderTree/gtk/LayoutTestControllerGtk.cpp:
+        (LayoutTestController::deliverWebIntent):
+        * DumpRenderTree/mac/LayoutTestControllerMac.mm:
+        (LayoutTestController::deliverWebIntent):
+        * DumpRenderTree/win/LayoutTestControllerWin.cpp:
+        (LayoutTestController::deliverWebIntent):
+        * DumpRenderTree/wx/LayoutTestControllerWx.cpp:
+        (LayoutTestController::deliverWebIntent):
+
+2012-06-01  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make Qt Creator aware of files in webkitpy/perl for easy editing
+
+        Reviewed by Simon Hausmann.
+
+        * Tools.pro:
+
 2012-06-01  Ryosuke Niwa  <rniwa@webkit.org>
 
         Add public page loading performance tests using web-page-replay

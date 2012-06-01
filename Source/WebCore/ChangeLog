@@ -1,3 +1,610 @@
+2012-06-01  Joe Thomas  <joethomas@motorola.com>
+
+        getComputedStyle for background shorthand property does not return background-origin and background-clip.
+        https://bugs.webkit.org/show_bug.cgi?id=86155
+
+        Reviewed by Tony Chang.
+
+        Added background-origin and background-clip CSS Property values to the background shorthand CSSValueList.
+
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore::CSSComputedStyleDeclaration::getBackgroundShorthandValue):
+
+2012-06-01  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Call clipboard methods directly
+        https://bugs.webkit.org/show_bug.cgi?id=88038
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * WebCore.gypi:
+        * platform/Pasteboard.h:
+        (Pasteboard):
+        * platform/chromium/ChromiumDataObject.cpp:
+        (WebCore::ChromiumDataObject::createFromPasteboard):
+        * platform/chromium/ChromiumDataObjectItem.cpp:
+        (WebCore::ChromiumDataObjectItem::getAsFile):
+        (WebCore::ChromiumDataObjectItem::internalGetAsString):
+        * platform/chromium/ClipboardUtilitiesChromium.cpp:
+        (WebCore::currentPasteboardBuffer):
+        * platform/chromium/ClipboardUtilitiesChromium.h:
+        (WebCore):
+        * platform/chromium/PasteboardChromium.cpp:
+        (WebCore::Pasteboard::writeSelection):
+        (WebCore::Pasteboard::writePlainText):
+        (WebCore::Pasteboard::writeURL):
+        (WebCore::Pasteboard::writeImage):
+        (WebCore::Pasteboard::writeClipboard):
+        (WebCore::Pasteboard::canSmartReplace):
+        (WebCore::Pasteboard::plainText):
+        (WebCore::Pasteboard::documentFragment):
+        * platform/chromium/PasteboardPrivate.h: Removed.
+        * platform/chromium/PlatformSupport.h:
+        (WebCore):
+        (PlatformSupport):
+
+2012-06-01  Hugo Parente Lima  <hugo.lima@openbossa.org>
+
+        Improve handling of legacy viewport meta tags
+        https://bugs.webkit.org/show_bug.cgi?id=55874
+
+        Reviewed by Adam Barth.
+
+        We now support MobileOptimized and HandheldFriendly as well.
+
+        We set width equal to device-width for HandheldFriendly and
+        for MobileOptimized, the content value of MobileOptimized is
+        ignored and the initial-scale set to 1 to fit Android behavior.
+
+        The prioritizing is done the same way as on Windows Phone 7:
+
+        XHTML Mobile Profile found
+        HandheldFriendly
+        MobileOptimized (overrides HandheldFriendly)
+        Viewport (overrides all above)
+
+        Original patch by Kenneth Rohde Christiansen.
+
+        Tests: fast/viewport/viewport-legacy-handheldfriendly.html
+               fast/viewport/viewport-legacy-mobileoptimized-2.html
+               fast/viewport/viewport-legacy-mobileoptimized-3.html
+               fast/viewport/viewport-legacy-mobileoptimized.html
+               fast/viewport/viewport-legacy-ordering-1.html
+               fast/viewport/viewport-legacy-ordering-2.html
+               fast/viewport/viewport-legacy-ordering-3.html
+               fast/viewport/viewport-legacy-ordering-4.html
+               fast/viewport/viewport-legacy-ordering-5.html
+               fast/viewport/viewport-legacy-ordering-6.html
+               fast/viewport/viewport-legacy-ordering-7.html
+               fast/viewport/viewport-legacy-ordering-8.html
+               fast/viewport/viewport-legacy-ordering-9.html
+
+        * dom/Document.cpp:
+        (WebCore::Document::setDocType):
+        (WebCore::Document::processViewport): Add an origin parameter to
+        tell what is changing the viewport.
+        * dom/Document.h:
+        (Document):
+        * dom/ViewportArguments.h:
+        * html/HTMLMetaElement.cpp:
+        (WebCore::HTMLMetaElement::process):
+
+2012-06-01  Tony Chang  <tony@chromium.org>
+
+        rename -webkit-flex-order to -webkit-order
+        https://bugs.webkit.org/show_bug.cgi?id=88104
+
+        Reviewed by Ojan Vafai.
+
+        This recently changed in the spec:
+        http://dev.w3.org/csswg/css3-flexbox/#order-property
+
+        No new tests, just updated existing results.
+
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore):
+        (WebCore::CSSComputedStyleDeclaration::getPropertyCSSValue):
+        * css/CSSParser.cpp:
+        (WebCore::CSSParser::parseValue):
+        * css/CSSProperty.cpp:
+        (WebCore::CSSProperty::isInheritedProperty):
+        * css/CSSPropertyNames.in:
+        * css/StyleBuilder.cpp:
+        (WebCore::StyleBuilder::StyleBuilder):
+        * css/StyleResolver.cpp:
+        (WebCore::StyleResolver::collectMatchingRulesForList):
+        * rendering/RenderFlexibleBox.cpp:
+        (WebCore::RenderFlexibleBox::OrderIterator::OrderIterator):
+        (WebCore::RenderFlexibleBox::OrderIterator::next):
+        (WebCore::RenderFlexibleBox::layoutBlock):
+        (WebCore::RenderFlexibleBox::repositionLogicalHeightDependentFlexItems):
+        (WebCore::RenderFlexibleBox::layoutFlexItems):
+        (WebCore::RenderFlexibleBox::computeMainAxisPreferredSizes):
+        (WebCore::RenderFlexibleBox::computeNextFlexLine):
+        (WebCore::RenderFlexibleBox::packFlexLines):
+        (WebCore::RenderFlexibleBox::alignChildren):
+        (WebCore::RenderFlexibleBox::flipForRightToLeftColumn):
+        (WebCore::RenderFlexibleBox::flipForWrapReverse):
+        * rendering/RenderFlexibleBox.h:
+        * rendering/style/RenderStyle.h:
+        * rendering/style/StyleFlexibleBoxData.cpp:
+        (WebCore::StyleFlexibleBoxData::StyleFlexibleBoxData):
+        (WebCore::StyleFlexibleBoxData::operator==):
+        * rendering/style/StyleFlexibleBoxData.h:
+        (StyleFlexibleBoxData):
+        * rendering/style/StyleRareNonInheritedData.cpp:
+        (WebCore::StyleRareNonInheritedData::StyleRareNonInheritedData):
+        (WebCore::StyleRareNonInheritedData::operator==):
+        * rendering/style/StyleRareNonInheritedData.h:
+        (StyleRareNonInheritedData):
+
+2012-06-01  Zeno Albisser  <zeno@webkit.org>
+
+        Unreviewed build fix after r119247.
+
+        Do not include TextureMapperGL.h when not building
+        with GRAPHICS_SURFACE.
+
+        * platform/graphics/texmap/TextureMapperBackingStore.cpp:
+
+2012-06-01  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Add a new and reusable Geoclue-based geolocation provider in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=87800
+
+        Reviewed by Carlos Garcia Campos.
+
+        Added new and reusable Geoclue-based geolocation provider to WebCore.
+
+        * GNUmakefile.am:
+        * GNUmakefile.list.am:
+        * platform/geoclue/GeolocationProviderGeoclue.cpp: Added.
+        (getPositionCallback):
+        (positionChangedCallback):
+        (GeolocationProviderGeoclue::GeolocationProviderGeoclue):
+        (GeolocationProviderGeoclue::~GeolocationProviderGeoclue):
+        (GeolocationProviderGeoclue::startUpdating):
+        (GeolocationProviderGeoclue::stopUpdating):
+        (GeolocationProviderGeoclue::setEnableHighAccuracy):
+        (GeolocationProviderGeoclue::setGeoclueClient):
+        (GeolocationProviderGeoclue::setGeocluePosition):
+        (GeolocationProviderGeoclue::updateClientRequirements):
+        (GeolocationProviderGeoclue::positionChanged):
+        (GeolocationProviderGeoclue::errorOccured):
+        * platform/geoclue/GeolocationProviderGeoclue.h: Added.
+        (WebCore):
+        (GeolocationProviderGeoclue):
+        * platform/geoclue/GeolocationProviderGeoclueClient.h: Added.
+        (WebCore):
+        (GeolocationProviderGeoclueClient):
+
+2012-06-01  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [Qt] Remove deprecated Q_GLOBAL_STATIC_WITH_INITIALIZER
+        https://bugs.webkit.org/show_bug.cgi?id=88100
+
+        Reviewed by Tor Arne Vestbø.
+
+        It will be deprecated on Qt5.
+
+        * platform/text/qt/TextBreakIteratorInternalICUQt.cpp:
+        (WebCore):
+
+2012-06-01  Zeno Albisser  <zeno@webkit.org>
+
+        Make TextureMapper work with GraphicsSurface.
+        https://bugs.webkit.org/show_bug.cgi?id=87738
+
+        Add TextureMapperSurfaceBackingStore, a new backing store
+        that allows to import textures from a GraphicsSurface.
+        On Mac the GraphicsSurface is backed by an IOSurface
+        which must be used with a GL_TEXTURE_RECTANGLE_ARB texture.
+        Therefore it is also necessary to add new shader programs
+        for directly painting these textures on screen.
+
+        Reviewed by Noam Rosenthal.
+
+        * platform/graphics/texmap/TextureMapperBackingStore.cpp:
+        Add a new TextureMapperBackingStore implementation that can directly
+        reuse textures as they are being passed from the GraphicsSurface.
+        (WebCore::TextureMapperSurfaceBackingStore::setGraphicsSurface):
+        (WebCore::TextureMapperSurfaceBackingStore::texture):
+        (WebCore::TextureMapperSurfaceBackingStore::paintToTextureMapper):
+        * platform/graphics/texmap/TextureMapperBackingStore.h:
+        (GraphicsSurfaceData):
+        (WebCore::GraphicsSurfaceData::setSurface):
+        (WebCore::GraphicsSurfaceData::GraphicsSurfaceData):
+        (TextureMapperSurfaceBackingStore):
+        (WebCore::TextureMapperSurfaceBackingStore::create):
+        (WebCore::TextureMapperSurfaceBackingStore::~TextureMapperSurfaceBackingStore):
+        (WebCore::TextureMapperSurfaceBackingStore::TextureMapperSurfaceBackingStore):
+
+        * platform/graphics/texmap/TextureMapperGL.cpp:
+        Add a drawing function for textures of type GL_TEXTURE_RECTANGLE_ARB.
+        (WebCore::TextureMapperGL::drawTextureRectangleARB):
+        * platform/graphics/texmap/TextureMapperShaderManager.cpp:
+        (WebCore::TextureMapperShaderManager::getShaderProgram):
+        (WebCore::TextureMapperShaderProgramSimple::create):
+        (WebCore::TextureMapperShaderProgramSimple::initialize):
+        (WebCore::TextureMapperShaderProgramSolidColor::create):
+        (WebCore::TextureMapperShaderProgramSolidColor::initialize):
+        (WebCore::TextureMapperShaderProgramRectSimple::create):
+        (WebCore::TextureMapperShaderProgramRectSimple::fragmentShaderSource):
+        (WebCore::TextureMapperShaderProgramOpacityAndMask::create):
+        (WebCore::TextureMapperShaderProgramOpacityAndMask::initialize):
+        (WebCore::TextureMapperShaderProgramRectOpacityAndMask::create):
+        (WebCore::TextureMapperShaderProgramRectOpacityAndMask::fragmentShaderSource):
+
+        * platform/graphics/texmap/TextureMapperShaderManager.h:
+        Add new shader programs that can be used with GL_TEXTURE_RECTANGLE_ARB textures.
+        This is mainly necessary, because this type of texture uses non-normalized coordinates.
+        Further move the calls to initializeProgram() from the constructor into a separate
+        initialize() function, as initializeProgram() calls vertexShaderSource() (and friends)
+        and we should not call virtual functions in the constructor.
+        (WebCore::TextureMapperShaderProgram::initialize):
+        (TextureMapperShaderProgramSimple):
+        (WebCore::TextureMapperShaderProgramSimple::TextureMapperShaderProgramSimple):
+        (TextureMapperShaderProgramRectSimple):
+        (WebCore::TextureMapperShaderProgramRectSimple::TextureMapperShaderProgramRectSimple):
+        (TextureMapperShaderProgramOpacityAndMask):
+        (WebCore::TextureMapperShaderProgramOpacityAndMask::TextureMapperShaderProgramOpacityAndMask):
+        (TextureMapperShaderProgramRectOpacityAndMask):
+        (WebCore::TextureMapperShaderProgramRectOpacityAndMask::TextureMapperShaderProgramRectOpacityAndMask):
+        (TextureMapperShaderProgramSolidColor):
+        (WebCore::TextureMapperShaderProgramSolidColor::TextureMapperShaderProgramSolidColor):
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL port does not enable WEB_INTENTS_TAG flag
+        https://bugs.webkit.org/show_bug.cgi?id=86866
+
+        Reviewed by Adam Barth.
+
+        Fix compilation error when WEB_INTENTS_TAG flag is enabled.
+        HTMLElement::insertedInto() takes a ContainerNode* in argument, not a
+        Node*.
+
+        Test: webintents/intent-tag.html
+
+        * CMakeLists.txt:
+        * html/HTMLIntentElement.cpp:
+        (WebCore::HTMLIntentElement::insertedInto):
+        * html/HTMLIntentElement.h:
+        (HTMLIntentElement):
+
+2012-06-01  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        [cairo] Pixel artifacts can be seen on reflections
+        https://bugs.webkit.org/show_bug.cgi?id=85483
+
+        Antialiased clipping in the simple rectangular clip method
+        leads to edge artifacts when transformations are applied to the layer.
+        Explicitly disabling antialiased clipping for this function solves this issue.
+        Comparing Cairo GraphicsContext to Qt and Skia GC, it seems that these
+        backends do not expect the platform context to clip antialiased in this
+        case either.
+
+        Reviewed by Martin Robinson.
+
+        No new tests, covered by fast/css/transformed-mask.html.
+
+        * platform/graphics/cairo/GraphicsContextCairo.cpp:
+        (WebCore::GraphicsContext::clip):
+
+2012-06-01  Florin Malita  <fmalita@chromium.org>
+
+        http://shinydemos.com/clock/ doesn't seem to work
+        https://bugs.webkit.org/show_bug.cgi?id=79682
+
+        Reviewed by Nikolas Zimmermann.
+
+        Test: svg/repaint/text-mask-update.svg
+
+        Currently, parent resources are not invalidated when SVGInlineText nodes
+        are added or removed. Adjusting SVGResourcesCache::clientWasAddedToTree()
+        and SVGResourcesCache::clientWillBeRemovedFromTree() to cover this case.
+
+        * rendering/svg/SVGResourcesCache.cpp:
+        (WebCore::SVGResourcesCache::clientWasAddedToTree):
+        (WebCore::SVGResourcesCache::clientWillBeRemovedFromTree):
+
+2012-06-01  John Mellor  <johnme@chromium.org>
+
+        Don't set scroll position twice in HistoryController::restoreScrollPositionAndViewState
+        https://bugs.webkit.org/show_bug.cgi?id=88068
+
+        Reviewed by Adam Barth.
+
+        In the case where pageScaleFactor changes, we were calling
+        setScrollPosition with an incorrect scroll position (i.e. a scroll
+        position scaled by the pageScaleFactor we hadn't yet applied), then
+        fixing it by setting the pageScaleFactor and scroll position together,
+        overwriting the old scroll position. It's cleaner to just set the
+        pageScaleFactor and scroll position together.
+
+        No new tests as this isn't expected to change the ultimate behavior, just clean up how it happens.
+
+        * loader/HistoryController.cpp:
+        (WebCore::HistoryController::restoreScrollPositionAndViewState):
+
+2012-06-01  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [Qt] Remove deprecated to/fromAscii()
+        https://bugs.webkit.org/show_bug.cgi?id=88086
+
+        Reviewed by Simon Hausmann.
+
+        Replacing to/fromAscii with to/fromLatin1 since it
+        is deprecated on Qt5.
+
+        * bridge/qt/qt_class.cpp:
+        (JSC::Bindings::QtClass::fallbackObject):
+        * platform/network/qt/ResourceRequestQt.cpp:
+        (WebCore::ResourceRequest::toNetworkRequest):
+
+2012-06-01  Dan Bernstein  <mitz@apple.com>
+
+        Layout not updated after setting -webkit-line-clamp to none
+        https://bugs.webkit.org/show_bug.cgi?id=88049
+
+        Reviewed by Abhishek Arya.
+
+        Test: fast/flexbox/line-clamp-removed-dynamically.html
+
+        * rendering/RenderDeprecatedFlexibleBox.cpp:
+        (WebCore::RenderDeprecatedFlexibleBox::styleWillChange): Added. Calls clearLineClamp if
+        line-clamp will change to none.
+        (WebCore::RenderDeprecatedFlexibleBox::clearLineClamp): Added. Marks possibly-clamped
+        children for layout and clears truncation from blocks.
+        * rendering/RenderDeprecatedFlexibleBox.h:
+
+2012-06-01  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r119213.
+        http://trac.webkit.org/changeset/119213
+        https://bugs.webkit.org/show_bug.cgi?id=88084
+
+        This patch broke two tests on all platform except Chromium.
+        The authors are unavailable. (Requested by zherczeg on
+        #webkit).
+
+        * css/StyleResolver.cpp:
+        (WebCore::StyleResolver::collectMatchingRulesForList):
+
+2012-06-01  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r119219.
+        http://trac.webkit.org/changeset/119219
+        https://bugs.webkit.org/show_bug.cgi?id=88088
+
+        This patch broke two tests on GTK/Qt. The authors are
+        unavailable. (Requested by kkristof on #webkit).
+
+        * loader/FrameLoader.cpp:
+        (WebCore::FrameLoader::closeAndRemoveChild):
+        (WebCore::FrameLoader::detachFromParent):
+        * page/Frame.cpp:
+        (WebCore::Frame::willDetachPage):
+        * page/Frame.h:
+        (Frame):
+        (WebCore::Frame::detachFromPage):
+        (WebCore):
+        * page/Page.cpp:
+        (WebCore::Page::~Page):
+
+2012-06-01  Alexei Filippov  <alexeif@chromium.org>
+
+        Web Inspector: Add Closure compiler annotations to WorkerConsole
+        https://bugs.webkit.org/show_bug.cgi?id=88073
+
+        Reviewed by Yury Semikhatsky.
+
+        * inspector/front-end/HeapSnapshotWorker.js:
+        (WebInspector.WorkerConsole.prototype.log):
+        (WebInspector.WorkerConsole.prototype.error):
+        (WebInspector.WorkerConsole.prototype.info):
+
+2012-06-01  MORITA Hajime  <morrita@google.com>
+
+        Frame::willDetachPage() shouldn't be called more than once.
+        https://bugs.webkit.org/show_bug.cgi?id=88056
+
+        Reviewed by Ryosuke Niwa.
+
+        This change moved willDetachPage() to private and calls it from
+        detachFromParent().  Also, it checks m_page and call
+        willDetachPage() only once, if m_page is available.
+
+        No new tests. Covered by existing suites.
+
+        * loader/FrameLoader.cpp:
+        (WebCore::FrameLoader::closeAndRemoveChild):
+        (WebCore::FrameLoader::detachFromParent):
+        * page/Frame.cpp:
+        (WebCore::Frame::detachFromPage):
+        (WebCore):
+        (WebCore::Frame::willDetachPage):
+        * page/Frame.h:
+        (Frame):
+        * page/Page.cpp:
+        (WebCore::Page::~Page):
+
+2012-06-01  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] Support drawing a pattern with a translation.
+        https://bugs.webkit.org/show_bug.cgi?id=87025
+
+        Drawing an SVG pattern that has its x or y attribute set
+        works by setting a transform on the Pattern.
+        We would ignore this by only taking into account the texture and
+        target rect.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        test: svg/W3C-SVG-1.1-SE/pservers-pattern-04-f.svg
+
+        * platform/graphics/qt/GraphicsContextQt.cpp:
+        (WebCore::drawRepeatPattern): refactored to take into account the translation set on the brush.
+        (WebCore::GraphicsContext::fillRect):
+
+2012-06-01  Yoshifumi Inoue  <yosin@chromium.org>
+
+        REGRESSION(r109729) [Form] Rendering of select/optgroup/option combination is too slow.
+        https://bugs.webkit.org/show_bug.cgi?id=88059
+
+        Reviewed by Kent Tamura.
+
+        This patch changes to share RenderStyle object among the "option" 
+        elements to improve rendering performance and reducing memory usage
+        of RenderStyle.
+
+        No new tests. This patch doesn't change behavior but rendering performance.
+
+        * css/StyleResolver.cpp:
+        (WebCore::StyleResolver::canShareStyleWithElement): Check attribute value
+        mismatching for "option" element.
+
+2012-06-01  Alexander Pavlov  <apavlov@chromium.org>
+
+        Web Inspector: [REGRESSION] Bad layout of "Override device metrics" controls in the Settings dialog
+        https://bugs.webkit.org/show_bug.cgi?id=88074
+
+        Reviewed by Yury Semikhatsky.
+
+        The "Override device metrics" controls are placed in a table, which gets too narrow. Give it a
+        "white-space: nowrap" to avoid wrapping individual cells.
+
+        * inspector/front-end/SettingsScreen.js:
+        (WebInspector.SettingsScreen.prototype._createDeviceMetricsElement):
+        * inspector/front-end/elementsPanel.css:
+        * inspector/front-end/inspector.css:
+        (.nowrap):
+
+2012-06-01  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] Implement PlatformStrategies
+        https://bugs.webkit.org/show_bug.cgi?id=86946
+
+        Reviewed by Carlos Garcia Campos.
+
+        * PlatformEfl.cmake: Add PlatformStrategies.cpp file to the build system.
+        Also, remove PluginDataEfl.cpp because the same functionality is now
+        implemented in PlatformStrategiesEfl.cpp.
+
+2012-06-01  Adam Barth  <abarth@webkit.org>
+
+        ASSERT(m_fontSelector->document()) is bogus and should be removed
+        https://bugs.webkit.org/show_bug.cgi?id=88053
+
+        Reviewed by Abhishek Arya.
+
+        This ASSERT was introduced in http://trac.webkit.org/changeset/97402
+        together with a branch that handled the case of the ASSERT firing.
+        This ASSERT fires when running tests on Android (which runs with
+        ASSERTs enabled). The ASSERT appears to be bogus, so this patch removes
+        it.
+
+        * css/CSSSegmentedFontFace.cpp:
+        (WebCore::CSSSegmentedFontFace::getFontData):
+
+2012-06-01  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [Platform][Decimal] UInt128::operator/= calls makeUInt128 with wrong argument order
+        https://bugs.webkit.org/show_bug.cgi?id=88044
+
+        Reviewed by Kent Tamura.
+
+        This patch fixed wrong argument of makeUInt128 in UInt128::operator/= to get right
+        result for decimal multiplication.
+
+        Test: WebKit/chromium/tests/DecimalTest.cpp: Add new a new test case.
+
+        * platform/Decimal.cpp:
+        (WebCore::DecimalPrivate::UInt128::operator/=):
+
+2012-06-01  Adam Barth  <abarth@webkit.org>
+
+        sandbox directive in X-WebKit-CSP header unable to create a unique origin
+        https://bugs.webkit.org/show_bug.cgi?id=88014
+
+        Reviewed by Ryosuke Niwa.
+
+        We process the HTTP headers for a response after we create a document
+        object for the response. Previously, the SecurityOrigin of a document
+        was determined when the document was created, which meant that the
+        sandbox directive in CSP couldn't create a unique origin.
+
+        In this patch, we transition to a unique origin when we start enforcing
+        the SandboxOrigin bit. This patch is more complicated than you might
+        expect because we redundantly store the SecurityOrigin object in
+        DOMWindow. Removing that redundant state is
+        https://bugs.webkit.org/show_bug.cgi?id=75793.
+
+        The CSP sandbox directive is defined in
+        http://dvcs.w3.org/hg/content-security-policy/raw-file/tip/csp-1.0-specification.html
+        by reference to
+        http://www.whatwg.org/specs/web-apps/current-work/#forced-sandboxing-flag-set.
+        The relation between sandbox and unique origin arises from
+        http://www.whatwg.org/specs/web-apps/current-work/#origin-0.
+
+        Test: http/tests/security/contentSecurityPolicy/sandbox-allow-scripts-in-http-header-control.html
+              http/tests/security/contentSecurityPolicy/sandbox-allow-scripts-in-http-header.html
+              http/tests/security/contentSecurityPolicy/sandbox-in-http-header-control.html
+              http/tests/security/contentSecurityPolicy/sandbox-in-http-header.html
+
+        * dom/Document.cpp:
+        (WebCore::Document::didUpdateSecurityOrigin):
+        (WebCore::Document::initContentSecurityPolicy):
+        * dom/Document.h:
+        (Document):
+        * dom/SecurityContext.cpp:
+        (WebCore::SecurityContext::enforceSandboxFlags):
+        (WebCore):
+        (WebCore::SecurityContext::didUpdateSecurityOrigin):
+        * dom/SecurityContext.h:
+        (SecurityContext):
+
+2012-05-31  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: expose MemoryCache statistics in the inspector protocol
+        https://bugs.webkit.org/show_bug.cgi?id=87984
+
+        Reviewed by Pavel Feldman.
+
+        Added MemoryCache statistics to Memory.getProcessMemoryDistribution command
+        result. Corresponding sector is added to the memory pie-chart.
+
+        * inspector/InspectorMemoryAgent.cpp:
+        (MemoryBlockName):
+        (WebCore):
+        (WebCore::addMemoryBlockFor):
+        (WebCore::memoryCacheInfo):
+        (WebCore::InspectorMemoryAgent::getProcessMemoryDistribution):
+        * inspector/front-end/NativeMemorySnapshotView.js:
+        (WebInspector.MemoryBlockViewProperties._initialize):
+
+2012-05-31  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: add RenderArena sizes to the memory pie-chart
+        https://bugs.webkit.org/show_bug.cgi?id=87971
+
+        Reviewed by Pavel Feldman.
+
+        Added allocated and used sizes of page render arenas to the memory
+        report returned by the InspectorMemoryAgent. Total allocated size of
+        the inspected page's render arenas will be displayed on the memory
+        pie-chart.
+
+        * inspector/InspectorMemoryAgent.cpp:
+        (MemoryBlockName):
+        (WebCore):
+        (WebCore::renderTreeInfo):
+        (WebCore::InspectorMemoryAgent::getProcessMemoryDistribution):
+        * inspector/front-end/NativeMemorySnapshotView.js:
+        (WebInspector.MemoryBlockViewProperties._initialize):
+
 2012-05-30  Yury Semikhatsky  <yurys@chromium.org>
 
         Web Inspector: change type of injected script id from long to int

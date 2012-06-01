@@ -1,3 +1,37 @@
+2012-06-01  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Use -Werror only in developer builds
+
+        Rubber-stamped by Tor Arne Vestbø.
+
+        In production builds -Werror with custom toolchains and wierd system
+        headers, -Werror is of no use and just creates confusion. So use it
+        only if Qt is configured with -developer-build.
+
+        * Source/api.pri: qt_developer_build determination moved to default_pre.prf
+
+2012-06-01  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        [Qt] Move QObject bridge related tests from tst_qwebframe to tst_qobjectbridge
+        https://bugs.webkit.org/show_bug.cgi?id=88117
+
+        Reviewed by Noam Rosenthal.
+
+        * Source/tests.pri: Add new entry for tst_qobjectbridge.
+
+2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL port does not enable WEB_INTENTS_TAG flag
+        https://bugs.webkit.org/show_bug.cgi?id=86866
+
+        Reviewed by Adam Barth.
+
+        Enable WEB_INTENTS_TAG flag by default on EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
 2012-05-31  Christophe Dumez  <christophe.dumez@intel.com>
 
         [EFL] Enable CSS_IMAGE_SET flag
