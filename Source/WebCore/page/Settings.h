@@ -575,6 +575,9 @@ namespace WebCore {
         void setRequestAnimationFrameEnabled(bool enabled) { m_requestAnimationFrameEnabled = enabled; }
         bool requestAnimationFrameEnabled() const { return m_requestAnimationFrameEnabled; }
 
+        void setDeviceSupportsTouch(bool enabled) { m_deviceSupportsTouch = enabled; }
+        bool deviceSupportsTouch() const { return m_deviceSupportsTouch; }
+
         void setNeedsDidFinishLoadOrderQuirk(bool needsQuirk) { m_needsDidFinishLoadOrderQuirk = needsQuirk; }
         bool needsDidFinishLoadOrderQuirk() const { return m_needsDidFinishLoadOrderQuirk; }
 
@@ -583,6 +586,12 @@ namespace WebCore {
 
         void setSyncXHRInDocumentsEnabled(bool enabled) { m_syncXHRInDocumentsEnabled = enabled; }
         bool syncXHRInDocumentsEnabled() const { return m_syncXHRInDocumentsEnabled; }
+
+        // When enabled, window.blur() does not change focus, and
+        // window.focus() only changes focus when invoked from the context that
+        // created the window.
+        void setWindowFocusRestricted(bool restricted) { m_windowFocusRestricted = restricted; }
+        bool windowFocusRestricted() const { return m_windowFocusRestricted; }
 
 #if USE(JSC)
         static void setShouldRespectPriorityInCSSAttributeSetters(bool);
@@ -753,10 +762,13 @@ namespace WebCore {
         bool m_shouldRespectImageOrientation : 1;
         bool m_wantsBalancedSetDefersLoadingBehavior : 1;
         bool m_requestAnimationFrameEnabled : 1;
+        bool m_deviceSupportsTouch : 1;
         bool m_needsDidFinishLoadOrderQuirk : 1;
 
         bool m_fixedPositionCreatesStackingContext : 1;
         bool m_syncXHRInDocumentsEnabled : 1;
+
+        bool m_windowFocusRestricted : 1;
 
         Timer<Settings> m_loadsImagesAutomaticallyTimer;
         void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);

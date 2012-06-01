@@ -30,7 +30,6 @@
 #include "IntRect.h"
 #include "LayerChromium.h"
 #include "RateLimiter.h"
-#include "TransformationMatrix.h"
 #include "cc/CCAnimationEvents.h"
 #include "cc/CCLayerTreeHostCommon.h"
 #include "cc/CCProxy.h"
@@ -77,7 +76,6 @@ protected:
 struct CCSettings {
     CCSettings()
             : acceleratePainting(false)
-            , debugShowTileInfo(false)
             , showFPSCounter(false)
             , showPlatformLayerTree(false)
             , showPaintRects(false)
@@ -94,7 +92,6 @@ struct CCSettings {
     { }
 
     bool acceleratePainting;
-    bool debugShowTileInfo;
     bool showFPSCounter;
     bool showPlatformLayerTree;
     bool showPaintRects;

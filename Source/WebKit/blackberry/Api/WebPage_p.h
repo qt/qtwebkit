@@ -20,9 +20,11 @@
 #define WebPage_p_h
 
 #include "ChromeClient.h"
+#include "InspectorOverlay.h"
 #if USE(ACCELERATED_COMPOSITING)
 #include "GLES2Context.h"
 #include "LayerRenderer.h"
+#include <EGL/egl.h>
 #endif
 #include "KURL.h"
 #include "PageClientBlackBerry.h"
@@ -32,6 +34,7 @@
 #include "ViewportArguments.h"
 #include "WebPage.h"
 #include "WebSettings.h"
+#include "WebTapHighlight.h"
 
 #include <BlackBerryPlatformMessage.h>
 
@@ -39,9 +42,12 @@ namespace WebCore {
 class AutofillManager;
 class DOMWrapperWorld;
 class Document;
+class Element;
 class Frame;
 class GeolocationControllerClientBlackBerry;
+class GraphicsLayerBlackBerry;
 class JavaScriptDebuggerBlackBerry;
+class LayerWebKitThread;
 class Node;
 class Page;
 class PluginView;
@@ -181,12 +187,16 @@ public:
     virtual int showAlertDialog(WebPageClient::AlertType atype);
     virtual bool isActive() const;
     virtual bool isVisible() const { return m_visible; }
-    virtual WebCore::Credential authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&);
+    virtual bool authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, WebCore::Credential&);
     virtual SaveCredentialType notifyShouldSaveCredential(bool);
 
     // Called from within WebKit via ChromeClientBlackBerry.
     void enterFullscreenForNode(WebCore::Node*);
     void exitFullscreenForNode(WebCore::Node*);
+#if ENABLE(FULLSCREEN_API)
+    void enterFullScreenForElement(WebCore::Element*);
+    void exitFullScreenForElement(WebCore::Element*);
+#endif
     void contentsSizeChanged(const WebCore::IntSize&);
     void overflowExceedsContentsSize() { m_overflowExceedsContentsSize = true; }
     void layoutFinished();
@@ -368,6 +378,7 @@ public:
     void rootLayerCommitTimerFired(WebCore::Timer<WebPagePrivate>*);
     bool commitRootLayerIfNeeded();
     WebCore::LayerRenderingResults lastCompositingResults() const;
+    WebCore::GraphicsLayer* overlayLayer();
 
     // WebKit thread, plumbed through from ChromeClientBlackBerry.
     void setRootLayerWebKitThread(WebCore::Frame*, WebCore::LayerWebKitThread*);
@@ -383,7 +394,7 @@ public:
     void commitRootLayer(const WebCore::IntRect&, const WebCore::IntSize&, bool);
     bool isAcceleratedCompositingActive() const { return m_compositor; }
     WebPageCompositorPrivate* compositor() const { return m_compositor.get(); }
-    void setCompositor(PassRefPtr<WebPageCompositorPrivate>);
+    void setCompositor(PassRefPtr<WebPageCompositorPrivate>, EGLContext compositingContext);
     bool createCompositor();
     void destroyCompositor();
     void syncDestroyCompositorOnCompositingThread();
@@ -422,12 +433,16 @@ public:
 
     void deferredTasksTimerFired(WebCore::Timer<WebPagePrivate>*);
 
+    void setInspectorOverlayClient(WebCore::InspectorOverlay::InspectorOverlayClient*);
+
     WebPage* m_webPage;
     WebPageClient* m_client;
     WebCore::Page* m_page;
     WebCore::Frame* m_mainFrame;
     RefPtr<WebCore::Node> m_currentContextNode;
     WebSettings* m_webSettings;
+    OwnPtr<WebTapHighlight> m_tapHighlight;
+    OwnPtr<WebSelectionOverlay> m_selectionOverlay;
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     OwnPtr<WebCore::JavaScriptDebuggerBlackBerry> m_scriptDebugger;
@@ -516,6 +531,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     bool m_isAcceleratedCompositingActive;
     OwnPtr<FrameLayers> m_frameLayers; // WebKit thread only.
+    OwnPtr<WebCore::GraphicsLayer> m_overlayLayer;
 
     // Compositing thread only, used only when the WebKit layer created the context.
     // If the API client created the context, this will be null.
@@ -542,6 +558,7 @@ public:
     RefPtr<WebCore::DOMWrapperWorld> m_isolatedWorld;
     bool m_hasInRegionScrollableAreas;
     bool m_updateDelegatedOverlaysDispatched;
+    OwnPtr<WebCore::InspectorOverlay> m_inspectorOverlay;
 
     // There is no need to initialize the following members in WebPagePrivate's constructor,
     // because they are only used by WebPageTasks and the tasks will initialize them when

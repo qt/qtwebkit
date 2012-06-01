@@ -88,6 +88,7 @@ public:
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
     void setFrameFlatteningEnabled(bool);
+    void setPluginsEnabled(bool);
     void setGeolocationPermission(bool);
     void setJavaScriptCanAccessClipboard(bool);
     void setPrivateBrowsingEnabled(bool);
@@ -174,7 +175,6 @@ public:
     void showWebInspector();
     void closeWebInspector();
     void evaluateInWebInspector(long callId, JSStringRef script);
-    void setJavaScriptProfilingEnabled(bool);
 
     void setPOSIXLocale(JSStringRef);
 

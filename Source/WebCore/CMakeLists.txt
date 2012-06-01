@@ -477,6 +477,7 @@ SET(WebCore_SOURCES
     css/CSSFunctionValue.cpp
     css/CSSGradientValue.cpp
     css/CSSImageGeneratorValue.cpp
+    css/CSSImageSetValue.cpp
     css/CSSImageValue.cpp
     css/CSSImportRule.cpp
     css/CSSInheritedValue.cpp
@@ -1059,6 +1060,7 @@ SET(WebCore_SOURCES
     page/FrameTree.cpp
     page/FrameView.cpp
     page/GroupSettings.cpp
+    page/GestureTapHighlighter.cpp
     page/History.cpp
     page/Location.cpp
     page/MemoryInfo.cpp
@@ -1088,6 +1090,7 @@ SET(WebCore_SOURCES
     page/WebKitAnimation.cpp
     page/WebKitAnimationList.cpp
     page/WindowFeatures.cpp
+    page/WindowFocusAllowedIndicator.cpp
 
     page/animation/AnimationBase.cpp
     page/animation/AnimationController.cpp
@@ -1107,6 +1110,7 @@ SET(WebCore_SOURCES
     platform/ContentType.cpp
     platform/CrossThreadCopier.cpp
     platform/DateComponents.cpp
+    platform/Decimal.cpp
     platform/DragData.cpp
     platform/DragImage.cpp
     platform/EventTracer.cpp
@@ -1410,6 +1414,7 @@ SET(WebCore_SOURCES
     rendering/style/StyleBackgroundData.cpp
     rendering/style/StyleBoxData.cpp
     rendering/style/StyleCachedImage.cpp
+    rendering/style/StyleCachedImageSet.cpp
     rendering/style/StyleDeprecatedFlexibleBoxData.cpp
     rendering/style/StyleFilterData.cpp
     rendering/style/StyleFlexibleBoxData.cpp
@@ -1976,8 +1981,8 @@ IF (ENABLE_SVG)
         svg/SVGURIReference.cpp
         svg/SVGUseElement.cpp
         svg/SVGViewElement.cpp
-        svg/SVGVKernElement.cpp
         svg/SVGViewSpec.cpp
+        svg/SVGVKernElement.cpp
         svg/SVGZoomAndPan.cpp
         svg/SVGZoomEvent.cpp
         svg/animation/SMILTime.cpp
@@ -2135,6 +2140,7 @@ IF (ENABLE_SVG)
         svg/SVGUnitTypes.idl
         svg/SVGUseElement.idl
         svg/SVGViewElement.idl
+        svg/SVGViewSpec.idl
         svg/SVGVKernElement.idl
         svg/SVGZoomAndPan.idl
         svg/SVGZoomEvent.idl

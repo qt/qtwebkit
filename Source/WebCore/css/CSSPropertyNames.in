@@ -253,15 +253,16 @@ z-index
 -webkit-column-span
 -webkit-column-width
 -webkit-columns
+-webkit-box-decoration-break
 #if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
 -webkit-filter
 #endif
 #if defined(ENABLE_CSS3_FLEXBOX) && ENABLE_CSS3_FLEXBOX
+-webkit-align-items
+-webkit-align-self
 -webkit-flex
--webkit-flex-align
 -webkit-flex-direction
 -webkit-flex-flow
--webkit-flex-item-align
 -webkit-flex-line-pack
 -webkit-flex-order
 -webkit-flex-pack

@@ -76,10 +76,11 @@ public:
     virtual NSURL* canonicalizeURL(NSURL*) OVERRIDE;
     virtual NSURL* canonicalizeURLString(NSString*) OVERRIDE;
     
-#ifndef BUILDING_ON_LEOPARD
     virtual void uppercaseWord() OVERRIDE;
     virtual void lowercaseWord() OVERRIDE;
     virtual void capitalizeWord() OVERRIDE;
+
+#if USE(AUTOMATIC_TEXT_REPLACEMENT)
     virtual void showSubstitutionsPanel(bool show) OVERRIDE;
     virtual bool substitutionsPanelIsShowing() OVERRIDE;
     virtual void toggleSmartInsertDelete() OVERRIDE;
@@ -136,7 +137,10 @@ public:
     virtual void getGuessesForWord(const WTF::String& word, const WTF::String& context, WTF::Vector<WTF::String>& guesses) OVERRIDE;
     virtual void willSetInputMethodState() OVERRIDE;
     virtual void setInputMethodState(bool enabled) OVERRIDE;
-    virtual void requestCheckingOfString(WebCore::SpellChecker*, const WebCore::TextCheckingRequest&) OVERRIDE;
+    virtual void requestCheckingOfString(PassRefPtr<WebCore::TextCheckingRequest>) OVERRIDE;
+
+    void didCheckSucceed(int sequence, NSArray* results);
+
 private:
     void registerUndoOrRedoStep(PassRefPtr<WebCore::UndoStep>, bool isRedo);
     WebEditorClient();
@@ -144,4 +148,5 @@ private:
     WebView *m_webView;
     RetainPtr<WebEditorUndoTarget> m_undoTarget;
     bool m_haveUndoRedoOperations;
+    RefPtr<WebCore::TextCheckingRequest> m_textCheckingRequest;
 };

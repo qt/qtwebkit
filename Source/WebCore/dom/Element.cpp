@@ -132,8 +132,10 @@ Element::~Element()
     }
 #endif
 
-    if (shadow())
+    if (ElementShadow* elementShadow = shadow()) {
+        elementShadow->removeAllShadowRoots();
         rareData()->m_shadow.clear();
+    }
 
     if (hasAttrList()) {
         ASSERT(m_attributeData);
@@ -914,6 +916,14 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
     return InsertionDone;
 }
 
+static inline TreeScope* treeScopeOfParent(Node* node, ContainerNode* insertionPoint)
+{
+    if (Node* parent = node->parentNode())
+        parent->treeScope();
+    return insertionPoint->treeScope();
+}
+
+
 void Element::removedFrom(ContainerNode* insertionPoint)
 {
 #if ENABLE(FULLSCREEN_API)
@@ -925,8 +935,8 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 
     if (insertionPoint->inDocument()) {
         const AtomicString& idValue = getIdAttribute();
-        if (!idValue.isNull())
-            updateId(idValue, nullAtom);
+        if (!idValue.isNull() && inDocument())
+            updateId(treeScopeOfParent(this, insertionPoint), idValue, nullAtom);
 
         const AtomicString& nameValue = getNameAttribute();
         if (!nameValue.isNull())
@@ -947,7 +957,9 @@ void Element::attach()
     // When a shadow root exists, it does the work of attaching the children.
     if (ElementShadow* shadow = this->shadow()) {
         parentPusher.push();
-        shadow->attachHost(this);
+        shadow->attach();
+        attachChildrenIfNeeded();
+        attachAsNode();
     } else {
         if (firstChild())
             parentPusher.push();
@@ -983,9 +995,11 @@ void Element::detach()
     if (hasRareData())
         rareData()->resetComputedStyle();
 
-    if (ElementShadow* shadow = this->shadow())
-        shadow->detachHost(this);
-    else
+    if (ElementShadow* shadow = this->shadow()) {
+        detachChildrenIfNeeded();
+        shadow->detach();
+        detachAsNode();
+    } else
         ContainerNode::detach();
 
     RenderWidget::resumeWidgetHierarchyUpdates();
@@ -1318,7 +1332,7 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
 
     if (ElementShadow * shadow = this->shadow())
-        shadow->hostChildrenChanged();
+        shadow->invalidateDistribution();
 }
 
 void Element::beginParsingChildren()

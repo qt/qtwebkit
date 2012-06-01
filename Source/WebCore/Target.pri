@@ -1061,6 +1061,7 @@ SOURCES += \
     page/SuspendableTimer.cpp \
     page/UserContentURLPattern.cpp \
     page/WindowFeatures.cpp \
+    page/WindowFocusAllowedIndicator.cpp \
     plugins/PluginData.cpp \
     plugins/DOMPluginArray.cpp \
     plugins/DOMPlugin.cpp \
@@ -1083,6 +1084,7 @@ SOURCES += \
     platform/ContentType.cpp \
     platform/CrossThreadCopier.cpp \
     platform/DateComponents.cpp \
+    platform/Decimal.cpp \
     platform/DragData.cpp \
     platform/DragImage.cpp \
     platform/EventTracer.cpp \
@@ -1091,7 +1093,6 @@ SOURCES += \
     platform/FileStream.cpp \
     platform/FileSystem.cpp \
     platform/HistogramSupport.cpp \
-    platform/image-decoders/qt/ImageFrameQt.cpp \
     platform/graphics/FontDescription.cpp \
     platform/graphics/FontFallbackList.cpp \
     platform/graphics/FontFamily.cpp \
@@ -1144,6 +1145,11 @@ SOURCES += \
     platform/graphics/transforms/TransformOperations.cpp \
     platform/graphics/transforms/TransformState.cpp \
     platform/graphics/transforms/TranslateTransformOperation.cpp \
+    platform/image-decoders/ImageDecoder.cpp \
+    platform/image-decoders/bmp/BMPImageDecoder.cpp \
+    platform/image-decoders/bmp/BMPImageReader.cpp \
+    platform/image-decoders/gif/GIFImageDecoder.cpp \
+    platform/image-decoders/gif/GIFImageReader.cpp\
     platform/KillRingNone.cpp \
     platform/KURL.cpp \
     platform/Language.cpp \
@@ -2188,6 +2194,7 @@ HEADERS += \
     page/WebKitAnimation.h \
     page/WebKitAnimationList.h \
     page/WindowFeatures.h \
+    page/WindowFocusAllowedIndicator.h \
     page/WorkerNavigator.h \
     platform/animation/Animation.h \
     platform/animation/AnimationList.h \
@@ -2200,6 +2207,7 @@ HEADERS += \
     platform/ContextMenu.h \
     platform/CrossThreadCopier.h \
     platform/DateComponents.h \
+    platform/Decimal.h \
     platform/DragData.h \
     platform/DragImage.h \
     platform/EventTracer.h \
@@ -2300,6 +2308,13 @@ HEADERS += \
     platform/graphics/transforms/TransformOperations.h \
     platform/graphics/transforms/TransformState.h \
     platform/graphics/transforms/TranslateTransformOperation.h \
+    platform/image-decoders/bmp/BMPImageDecoder.h \
+    platform/image-decoders/bmp/BMPImageReader.h \
+    platform/image-decoders/ico/ICOImageDecoder.h \
+    platform/image-decoders/gif/GIFImageDecoder.h \
+    platform/image-decoders/gif/GIFImageReader.h \
+    platform/image-decoders/jpeg/JPEGImageDecoder.h \
+    platform/image-decoders/png/PNGImageDecoder.h \
     platform/KillRing.h \
     platform/KURL.h \
     platform/Length.h \
@@ -2634,7 +2649,6 @@ HEADERS += \
     svg/properties/SVGAnimatedProperty.h \
     svg/properties/SVGAnimatedPropertyDescription.h \
     svg/properties/SVGAnimatedPropertyMacros.h \
-    svg/properties/SVGAnimatedPropertySynchronizer.h \
     svg/properties/SVGAnimatedPropertyTearOff.h \
     svg/properties/SVGAnimatedStaticPropertyTearOff.h \
     svg/properties/SVGAnimatedTransformListPropertyTearOff.h \
@@ -2878,6 +2892,7 @@ SOURCES += \
     platform/graphics/qt/GraphicsContextQt.cpp \
     platform/graphics/qt/IconQt.cpp \
     platform/graphics/qt/ImageBufferQt.cpp \
+    platform/graphics/qt/ImageDecoderQt.cpp \
     platform/graphics/qt/ImageQt.cpp \
     platform/graphics/qt/IntPointQt.cpp \
     platform/graphics/qt/IntRectQt.cpp \
@@ -4053,33 +4068,19 @@ contains(DEFINES, ENABLE_MHTML=1) {
         page/PageSerializer.cpp
 }
 
-contains(DEFINES, WTF_USE_QT_IMAGE_DECODER=1) {
-    HEADERS += platform/graphics/qt/ImageDecoderQt.h
-    SOURCES += platform/graphics/qt/ImageDecoderQt.cpp
-} else {
-    HEADERS += \
-        platform/image-decoders/bmp/BMPImageDecoder.h \
-        platform/image-decoders/bmp/BMPImageReader.h \
-        platform/image-decoders/gif/GIFImageDecoder.h \
-        platform/image-decoders/gif/GIFImageReader.h\
-        platform/image-decoders/ico/ICOImageDecoder.h \
-        platform/image-decoders/jpeg/JPEGImageDecoder.h \
-        platform/image-decoders/png/PNGImageDecoder.h
+contains(DEFINES, HAVE_LIBPNG=1) {
+    SOURCES += platform/image-decoders/ico/ICOImageDecoder.cpp \
+               platform/image-decoders/png/PNGImageDecoder.cpp
+}
 
-    SOURCES += \
-        platform/image-decoders/ImageDecoder.cpp \
-        platform/image-decoders/bmp/BMPImageDecoder.cpp \
-        platform/image-decoders/bmp/BMPImageReader.cpp \
-        platform/image-decoders/gif/GIFImageDecoder.cpp \
-        platform/image-decoders/gif/GIFImageReader.cpp\
-        platform/image-decoders/ico/ICOImageDecoder.cpp \
-        platform/image-decoders/jpeg/JPEGImageDecoder.cpp \
-        platform/image-decoders/png/PNGImageDecoder.cpp
+contains(DEFINES, HAVE_LIBJPEG=1) {
+    SOURCES += platform/image-decoders/jpeg/JPEGImageDecoder.cpp
+}
 
-    contains(DEFINES, WTF_USE_WEBP=1) {
-        HEADERS += platform/image-decoders/webp/WEBPImageDecoder.h
-        SOURCES += platform/image-decoders/webp/WEBPImageDecoder.cpp
-    }
+contains(DEFINES, WTF_USE_WEBP=1) {
+    INCLUDEPATH += platform/image-decoders/webp
+    HEADERS += platform/image-decoders/webp/WEBPImageDecoder.h
+    SOURCES += platform/image-decoders/webp/WEBPImageDecoder.cpp
 }
 
 !system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {

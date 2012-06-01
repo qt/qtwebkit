@@ -250,15 +250,16 @@ void FileReader::fireEvent(const AtomicString& type)
 
 PassRefPtr<ArrayBuffer> FileReader::arrayBufferResult() const
 {
-    return m_loader ? m_loader->arrayBufferResult() : 0;
+    if (!m_loader || m_error)
+        return 0;
+    return m_loader->arrayBufferResult();
 }
 
 String FileReader::stringResult()
 {
-    String ret =  m_loader ? m_loader->stringResult() : "";
-    if (ret.isEmpty())
+    if (!m_loader || m_error)
         return String();
-    return ret;
+    return m_loader->stringResult();
 }
 
 } // namespace WebCore

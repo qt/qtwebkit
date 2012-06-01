@@ -74,7 +74,7 @@
 
 namespace WebCore {
 
-WrapperTypeInfo V8TestObj::info = { V8TestObj::GetTemplate, V8TestObj::derefObject, 0, 0 };
+WrapperTypeInfo V8TestObj::info = { V8TestObj::GetTemplate, V8TestObj::derefObject, 0, 0, WrapperTypeObjectPrototype };
 
 namespace TestObjV8Internal {
 
@@ -464,7 +464,7 @@ static v8::Handle<v8::Value> createAttrGetter(v8::Local<v8::String> name, const 
 {
     INC_STATS("DOM.TestObj.create._get");
     TestObj* imp = V8TestObj::toNative(info.Holder());
-    return v8Boolean(imp->isCreate());
+    return v8Boolean(imp->isCreate(), info.GetIsolate());
 }
 
 static void createAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
@@ -528,7 +528,7 @@ static v8::Handle<v8::Value> reflectedBooleanAttrAttrGetter(v8::Local<v8::String
 {
     INC_STATS("DOM.TestObj.reflectedBooleanAttr._get");
     TestObj* imp = V8TestObj::toNative(info.Holder());
-    return v8Boolean(imp->hasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr));
+    return v8Boolean(imp->hasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr), info.GetIsolate());
 }
 
 static void reflectedBooleanAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
@@ -592,7 +592,7 @@ static v8::Handle<v8::Value> reflectedCustomBooleanAttrAttrGetter(v8::Local<v8::
 {
     INC_STATS("DOM.TestObj.reflectedCustomBooleanAttr._get");
     TestObj* imp = V8TestObj::toNative(info.Holder());
-    return v8Boolean(imp->hasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr));
+    return v8Boolean(imp->hasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr), info.GetIsolate());
 }
 
 static void reflectedCustomBooleanAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
@@ -1134,7 +1134,7 @@ static v8::Handle<v8::Value> contentDocumentAttrGetter(v8::Local<v8::String> nam
     INC_STATS("DOM.TestObj.contentDocument._get");
     TestObj* imp = V8TestObj::toNative(info.Holder());
     if (!V8BindingSecurity::shouldAllowAccessToNode(V8BindingState::Only(), imp->contentDocument()))
-        return v8::Handle<v8::Value>(v8::Null());
+        return v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
 
     return toV8(imp->contentDocument(), info.GetIsolate());
 }
@@ -1904,7 +1904,7 @@ static v8::Handle<v8::Value> getSVGDocumentCallback(const v8::Arguments& args)
     ExceptionCode ec = 0;
     {
     if (!V8BindingSecurity::shouldAllowAccessToNode(V8BindingState::Only(), imp->getSVGDocument(ec)))
-        return v8::Handle<v8::Value>(v8::Null());
+        return v8::Handle<v8::Value>(v8::Null(args.GetIsolate()));
     RefPtr<SVGDocument> result = imp->getSVGDocument(ec);
     if (UNLIKELY(ec))
         goto fail;
@@ -2405,6 +2405,8 @@ bool V8TestObj::HasInstance(v8::Handle<v8::Value> value)
 void V8TestObj::installPerContextProperties(v8::Handle<v8::Object> instance, TestObj* impl)
 {
     v8::Local<v8::Object> proto = v8::Local<v8::Object>::Cast(instance->GetPrototype());
+    // When building QtWebkit with V8 this variable is unused when none of the features are enabled.
+    UNUSED_PARAM(proto);
     if (ContextEnabledFeatures::enabledAtContextAttr1Enabled(impl)) {
         static const BatchedAttribute attrData =\
         // Attribute 'enabledAtContextAttr1' (Type: 'attribute' ExtAttr: 'V8EnabledPerContext')

@@ -954,14 +954,9 @@ simple_selector:
             static_cast<CSSParser*>(parser)->updateSpecifiersWithElementName(nullAtom, starAtom, $$);
     }
     | namespace_selector element_name {
-        AtomicString namespacePrefix = $1;
         CSSParser* p = static_cast<CSSParser*>(parser);
         $$ = p->createFloatingSelector();
-        if (p->m_styleSheet)
-            $$->setTag(QualifiedName(namespacePrefix, $2,
-                                      p->m_styleSheet->determineNamespace(namespacePrefix)));
-        else // FIXME: Shouldn't this case be an error?
-            $$->setTag(QualifiedName(nullAtom, $2, p->m_defaultNamespace));
+        $$->setTag(p->determineNameInNamespace($1, $2));
     }
     | namespace_selector element_name specifier_list {
         $$ = $3;
@@ -1087,19 +1082,15 @@ attrib:
         $$->setValue($6);
     }
     | '[' maybe_space namespace_selector attr_name ']' {
-        AtomicString namespacePrefix = $3;
         CSSParser* p = static_cast<CSSParser*>(parser);
         $$ = p->createFloatingSelector();
-        $$->setAttribute(QualifiedName(namespacePrefix, $4,
-                                   p->m_styleSheet->determineNamespace(namespacePrefix)));
+        $$->setAttribute(p->determineNameInNamespace($3, $4));
         $$->setMatch(CSSSelector::Set);
     }
     | '[' maybe_space namespace_selector attr_name match maybe_space ident_or_string maybe_space ']' {
-        AtomicString namespacePrefix = $3;
         CSSParser* p = static_cast<CSSParser*>(parser);
         $$ = p->createFloatingSelector();
-        $$->setAttribute(QualifiedName(namespacePrefix, $4,
-                                   p->m_styleSheet->determineNamespace(namespacePrefix)));
+        $$->setAttribute(p->determineNameInNamespace($3, $4));
         $$->setMatch((CSSSelector::Match)$5);
         $$->setValue($7);
     }

@@ -100,7 +100,6 @@ public:
     void setDomainRelaxationForbiddenForURLScheme(bool forbidden, JSStringRef scheme);
     void setDefersLoading(bool);
     void setIconDatabaseEnabled(bool iconDatabaseEnabled);
-    void setJavaScriptProfilingEnabled(bool profilingEnabled);
     void setJavaScriptCanAccessClipboard(bool flag);
     void setAutomaticLinkDetectionEnabled(bool flag);
     void setMainFrameIsFirstResponder(bool flag);
@@ -282,6 +281,9 @@ public:
     bool deferMainResourceDataLoad() const { return m_deferMainResourceDataLoad; }
     void setDeferMainResourceDataLoad(bool flag) { m_deferMainResourceDataLoad = flag; }
 
+    bool useDeferredFrameLoading() const { return m_useDeferredFrameLoading; }
+    void setUseDeferredFrameLoading(bool flag) { m_useDeferredFrameLoading = flag; }
+
     const std::string& testPathOrURL() const { return m_testPathOrURL; }
     const std::string& expectedPixelHash() const { return m_expectedPixelHash; }
 
@@ -309,7 +311,6 @@ public:
     void evaluateInWebInspector(long callId, JSStringRef script);
     void evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
     void evaluateScriptInIsolatedWorldAndReturnValue(unsigned worldID, JSObjectRef globalObject, JSStringRef script);
-    void allowRoundingHacks();
 
     bool shouldStayOnPageAfterHandlingBeforeUnload() const { return m_shouldStayOnPageAfterHandlingBeforeUnload; }
     void setShouldStayOnPageAfterHandlingBeforeUnload(bool shouldStayOnPageAfterHandlingBeforeUnload) { m_shouldStayOnPageAfterHandlingBeforeUnload = shouldStayOnPageAfterHandlingBeforeUnload; }
@@ -412,6 +413,7 @@ private:
     bool m_handlesAuthenticationChallenges;
     bool m_isPrinting;
     bool m_deferMainResourceDataLoad;
+    bool m_useDeferredFrameLoading;
     bool m_shouldPaintBrokenImage;
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
     bool m_areDesktopNotificationPermissionRequestsIgnored;

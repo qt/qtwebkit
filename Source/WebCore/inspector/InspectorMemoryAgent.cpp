@@ -43,11 +43,9 @@
 #include "InspectorState.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
+#include "MemoryUsageSupport.h"
 #include "Node.h"
 #include "Page.h"
-#if PLATFORM(CHROMIUM)
-#include "PlatformSupport.h"
-#endif
 #include "ScriptGCEvent.h"
 #include "ScriptProfiler.h"
 #include "StyledElement.h"
@@ -62,9 +60,9 @@ using WebCore::TypeBuilder::Memory::StringStatistics;
 namespace WebCore {
 
 namespace MemoryBlockName {
-static const char totalJsHeap[] = "TotalJSHeap";
+static const char jsHeapAllocated[] = "JSHeapAllocated";
+static const char jsHeapUsed[] = "JSHeapUsed";
 static const char processPrivateMemory[] = "ProcessPrivateMemory";
-static const char usedJsHeap[] = "UsedJSHeap";
 }
 
 namespace {
@@ -324,27 +322,25 @@ static PassRefPtr<WebCore::TypeBuilder::Memory::MemoryBlock> jsHeapInfo()
     size_t jsHeapSizeLimit;
     ScriptGCEvent::getHeapSize(usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit);
 
-    RefPtr<WebCore::TypeBuilder::Memory::MemoryBlock> totalJsHeap = WebCore::TypeBuilder::Memory::MemoryBlock::create().setName(MemoryBlockName::totalJsHeap);
-    totalJsHeap->setSize(totalJSHeapSize);
+    RefPtr<WebCore::TypeBuilder::Memory::MemoryBlock> jsHeapAllocated = WebCore::TypeBuilder::Memory::MemoryBlock::create().setName(MemoryBlockName::jsHeapAllocated);
+    jsHeapAllocated->setSize(static_cast<int>(totalJSHeapSize));
 
     RefPtr<TypeBuilder::Array<WebCore::TypeBuilder::Memory::MemoryBlock> > children = TypeBuilder::Array<WebCore::TypeBuilder::Memory::MemoryBlock>::create();
-    RefPtr<WebCore::TypeBuilder::Memory::MemoryBlock> usedJsHeap = WebCore::TypeBuilder::Memory::MemoryBlock::create().setName(MemoryBlockName::usedJsHeap);
-    usedJsHeap->setSize(usedJSHeapSize);
-    children->addItem(usedJsHeap);
+    RefPtr<WebCore::TypeBuilder::Memory::MemoryBlock> jsHeapUsed = WebCore::TypeBuilder::Memory::MemoryBlock::create().setName(MemoryBlockName::jsHeapUsed);
+    jsHeapUsed->setSize(static_cast<int>(usedJSHeapSize));
+    children->addItem(jsHeapUsed);
 
-    totalJsHeap->setChildren(children);
-    return totalJsHeap.release();
+    jsHeapAllocated->setChildren(children);
+    return jsHeapAllocated.release();
 }
 
 void InspectorMemoryAgent::getProcessMemoryDistribution(ErrorString*, RefPtr<WebCore::TypeBuilder::Memory::MemoryBlock>& processMemory)
 {
     size_t privateBytes = 0;
-#if PLATFORM(CHROMIUM)
     size_t sharedBytes = 0;
-    PlatformSupport::getProcessMemorySize(&privateBytes, &sharedBytes);
-#endif
+    MemoryUsageSupport::processMemorySizesInBytes(&privateBytes, &sharedBytes);
     processMemory = WebCore::TypeBuilder::Memory::MemoryBlock::create().setName(MemoryBlockName::processPrivateMemory);
-    processMemory->setSize(privateBytes);
+    processMemory->setSize(static_cast<int>(privateBytes));
 
     RefPtr<TypeBuilder::Array<WebCore::TypeBuilder::Memory::MemoryBlock> > children = TypeBuilder::Array<WebCore::TypeBuilder::Memory::MemoryBlock>::create();
     children->addItem(jsHeapInfo());

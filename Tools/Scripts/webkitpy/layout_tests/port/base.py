@@ -36,13 +36,13 @@ import errno
 import os
 import re
 
+from webkitpy.common import find_files
+from webkitpy.common import read_checksum_from_png
 from webkitpy.common.memoized import memoized
 from webkitpy.common.system import path
-from webkitpy.common import find_files
 from webkitpy.common.system import logutils
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.systemhost import SystemHost
-from webkitpy.layout_tests import read_checksum_from_png
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port import config as port_config
 from webkitpy.layout_tests.port import driver
@@ -907,7 +907,6 @@ class Port(object):
         # where turnk isn't checked out as a whole.
         return [('webkit', self.layout_tests_dir())]
 
-
     _WDIFF_DEL = '##WDIFF_DEL##'
     _WDIFF_ADD = '##WDIFF_ADD##'
     _WDIFF_END = '##WDIFF_END##'
@@ -1084,6 +1083,9 @@ class Port(object):
         return 'crash log for %s (pid %s):\n%s\n%s\n' % (name_str, pid_str,
             '\n'.join(('STDOUT: ' + l) for l in stdout_lines),
             '\n'.join(('STDERR: ' + l) for l in stderr_lines))
+
+    def look_for_new_crash_logs(self, crashed_processes, start_time):
+        pass
 
     def sample_process(self, name, pid):
         pass

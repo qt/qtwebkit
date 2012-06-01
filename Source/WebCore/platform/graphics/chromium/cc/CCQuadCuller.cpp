@@ -30,12 +30,12 @@
 #include "cc/CCQuadCuller.h"
 
 #include "Region.h"
-#include "TransformationMatrix.h"
 #include "cc/CCDebugBorderDrawQuad.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCOverdrawMetrics.h"
 #include "cc/CCRenderPass.h"
 #include "cc/CCRenderSurfaceDrawQuad.h"
+#include <public/WebTransformationMatrix.h>
 
 using namespace std;
 
@@ -86,12 +86,6 @@ bool CCQuadCuller::append(PassOwnPtr<CCDrawQuad> passDrawQuad)
 bool CCQuadCuller::appendSurface(PassOwnPtr<CCDrawQuad> passDrawQuad)
 {
     IntRect culledRect = m_occlusionTracker->unoccludedContributingSurfaceContentRect(m_layer->renderSurface(), false, passDrawQuad->quadRect());
-    return appendQuadInternal(passDrawQuad, culledRect, m_quadList, *m_occlusionTracker, m_showCullingWithDebugBorderQuads);
-}
-
-bool CCQuadCuller::appendReplica(PassOwnPtr<CCDrawQuad> passDrawQuad)
-{
-    IntRect culledRect = m_occlusionTracker->unoccludedContributingSurfaceContentRect(m_layer->renderSurface(), true, passDrawQuad->quadRect());
     return appendQuadInternal(passDrawQuad, culledRect, m_quadList, *m_occlusionTracker, m_showCullingWithDebugBorderQuads);
 }
 

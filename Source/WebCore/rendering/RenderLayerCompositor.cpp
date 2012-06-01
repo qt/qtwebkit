@@ -124,10 +124,13 @@ public:
         m_overlapStack[m_overlapStack.size() - 2].unite(m_overlapStack.last());
         m_overlapStack.removeLast();
     }
+    
+    RenderGeometryMap& geometryMap() { return m_geometryMap; }
 
 private:
     Vector<Region> m_overlapStack;
     HashSet<const RenderLayer*> m_layers;
+    RenderGeometryMap m_geometryMap;
 };
 
 struct CompositingState {
@@ -400,10 +403,9 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
         bool layersChanged = false;
         if (m_compositingConsultsOverlap) {
             OverlapMap overlapTestRequestMap;
-            RenderGeometryMap geometryMap;
-            computeCompositingRequirements(0, updateRoot, &geometryMap, &overlapTestRequestMap, compState, layersChanged);
+            computeCompositingRequirements(0, updateRoot, &overlapTestRequestMap, compState, layersChanged);
         } else
-            computeCompositingRequirements(0, updateRoot, 0, 0, compState, layersChanged);
+            computeCompositingRequirements(0, updateRoot, 0, compState, layersChanged);
         
         needHierarchyUpdate |= layersChanged;
     }
@@ -420,7 +422,7 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
         LOG(Compositing, "\nUpdate %d of %s. Overlap testing is %s\n", m_rootLayerUpdateCount, isMainFrame ? "main frame" : frame->tree()->uniqueName().string().utf8().data(),
             m_compositingConsultsOverlap ? "on" : "off");
     }
-#endif        
+#endif
 
     if (needHierarchyUpdate) {
         // Update the hierarchy of the compositing layers.
@@ -578,6 +580,28 @@ void RenderLayerCompositor::repaintOnCompositingChange(RenderLayer* layer)
     }
 }
 
+// This method assumes that layout is up-to-date, unlike repaintOnCompositingChange().
+void RenderLayerCompositor::repaintInCompositedAncestor(RenderLayer* layer, const LayoutRect& rect)
+{
+    RenderLayer* compositedAncestor = layer->enclosingCompositingLayerForRepaint(false /*exclude self*/);
+    if (compositedAncestor) {
+        ASSERT(compositedAncestor->backing());
+
+        LayoutPoint offset;
+        layer->convertToLayerCoords(compositedAncestor, offset);
+
+        LayoutRect repaintRect = rect;
+        repaintRect.moveBy(offset);
+
+        compositedAncestor->setBackingNeedsRepaintInRect(repaintRect);
+    }
+
+    // The contents of this layer may be moving from a GraphicsLayer to the window,
+    // so we need to make sure the window system synchronizes those changes on the screen.
+    if (compositedAncestor == m_renderView->layer())
+        m_renderView->frameView()->setNeedsOneShotDrawingSynchronization();
+}
+
 // The bounds of the GraphicsLayer created for a compositing layer is the union of the bounds of all the descendant
 // RenderLayers that are rendered by the composited RenderLayer.
 IntRect RenderLayerCompositor::calculateCompositedBounds(const RenderLayer* layer, const RenderLayer* ancestorLayer)
@@ -597,24 +621,9 @@ void RenderLayerCompositor::layerWillBeRemoved(RenderLayer* parent, RenderLayer*
     if (!child->isComposited() || parent->renderer()->documentBeingDestroyed())
         return;
 
+    repaintInCompositedAncestor(child, child->backing()->compositedBounds());
+
     setCompositingParent(child, 0);
-    
-    RenderLayer* compLayer = parent->enclosingCompositingLayerForRepaint();
-    if (compLayer) {
-        ASSERT(compLayer->backing());
-        LayoutRect compBounds = child->backing()->compositedBounds();
-
-        LayoutPoint offset;
-        child->convertToLayerCoords(compLayer, offset);
-        compBounds.moveBy(offset);
-
-        compLayer->setBackingNeedsRepaintInRect(compBounds);
-
-        // The contents of this layer may be moving from a GraphicsLayer to the window,
-        // so we need to make sure the window system synchronizes those changes on the screen.
-        m_renderView->frameView()->setNeedsOneShotDrawingSynchronization();
-    }
-
     setCompositingLayersNeedRebuild();
 }
 
@@ -630,13 +639,13 @@ RenderLayer* RenderLayerCompositor::enclosingNonStackingClippingLayer(const Rend
     return 0;
 }
 
-void RenderLayerCompositor::addToOverlapMap(RenderGeometryMap& geometryMap, OverlapMap& overlapMap, RenderLayer* layer, IntRect& layerBounds, bool& boundsComputed)
+void RenderLayerCompositor::addToOverlapMap(OverlapMap& overlapMap, RenderLayer* layer, IntRect& layerBounds, bool& boundsComputed)
 {
     if (layer->isRootLayer())
         return;
 
     if (!boundsComputed) {
-        layerBounds = enclosingIntRect(geometryMap.absoluteRect(layer->localBoundingBox()));
+        layerBounds = enclosingIntRect(overlapMap.geometryMap().absoluteRect(layer->localBoundingBox()));
         // Empty rects never intersect, but we need them to for the purposes of overlap testing.
         if (layerBounds.isEmpty())
             layerBounds.setSize(IntSize(1, 1));
@@ -649,18 +658,18 @@ void RenderLayerCompositor::addToOverlapMap(RenderGeometryMap& geometryMap, Over
     overlapMap.add(layer, clipRect);
 }
 
-void RenderLayerCompositor::addToOverlapMapRecursive(RenderGeometryMap& geometryMap, OverlapMap& overlapMap, RenderLayer* layer, RenderLayer* ancestorLayer)
+void RenderLayerCompositor::addToOverlapMapRecursive(OverlapMap& overlapMap, RenderLayer* layer, RenderLayer* ancestorLayer)
 {
     if (!canBeComposited(layer) || overlapMap.contains(layer))
         return;
 
     // A null ancestorLayer is an indication that 'layer' has already been pushed.
     if (ancestorLayer)
-        geometryMap.pushMappingsToAncestor(layer->renderer(), ancestorLayer->renderer());
+        overlapMap.geometryMap().pushMappingsToAncestor(layer->renderer(), ancestorLayer->renderer());
     
     IntRect bounds;
     bool haveComputedBounds = false;
-    addToOverlapMap(geometryMap, overlapMap, layer, bounds, haveComputedBounds);
+    addToOverlapMap(overlapMap, layer, bounds, haveComputedBounds);
 
 #if !ASSERT_DISABLED
     LayerListMutationDetector mutationChecker(layer);
@@ -671,7 +680,7 @@ void RenderLayerCompositor::addToOverlapMapRecursive(RenderGeometryMap& geometry
             size_t listSize = negZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = negZOrderList->at(i);
-                addToOverlapMapRecursive(geometryMap, overlapMap, curLayer, layer);
+                addToOverlapMapRecursive(overlapMap, curLayer, layer);
             }
         }
     }
@@ -680,7 +689,7 @@ void RenderLayerCompositor::addToOverlapMapRecursive(RenderGeometryMap& geometry
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
             RenderLayer* curLayer = normalFlowList->at(i);
-            addToOverlapMapRecursive(geometryMap, overlapMap, curLayer, layer);
+            addToOverlapMapRecursive(overlapMap, curLayer, layer);
         }
     }
 
@@ -689,13 +698,13 @@ void RenderLayerCompositor::addToOverlapMapRecursive(RenderGeometryMap& geometry
             size_t listSize = posZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = posZOrderList->at(i);
-                addToOverlapMapRecursive(geometryMap, overlapMap, curLayer, layer);
+                addToOverlapMapRecursive(overlapMap, curLayer, layer);
             }
         }
     }
     
     if (ancestorLayer)
-        geometryMap.popMappingsToAncestor(ancestorLayer->renderer());
+        overlapMap.geometryMap().popMappingsToAncestor(ancestorLayer->renderer());
 }
 
 //  Recurse through the layers in z-index and overflow order (which is equivalent to painting order)
@@ -707,13 +716,12 @@ void RenderLayerCompositor::addToOverlapMapRecursive(RenderGeometryMap& geometry
 //      must be compositing so that its contents render over that child.
 //      This implies that its positive z-index children must also be compositing.
 //
-void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer* layer, RenderGeometryMap* geometryMap, OverlapMap* overlapMap, CompositingState& compositingState, bool& layersChanged)
+void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer* layer, OverlapMap* overlapMap, CompositingState& compositingState, bool& layersChanged)
 {
     layer->updateLayerListsIfNeeded();
     
-    // Should geometryMap be part of the overlap map?
-    if (geometryMap)
-        geometryMap->pushMappingsToAncestor(layer->renderer(), ancestorLayer ? ancestorLayer->renderer() : 0);
+    if (overlapMap)
+        overlapMap->geometryMap().pushMappingsToAncestor(layer->renderer(), ancestorLayer ? ancestorLayer->renderer() : 0);
     
     // Clear the flag
     layer->setHasCompositingDescendant(false);
@@ -724,7 +732,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
     IntRect absBounds;
     if (overlapMap && !overlapMap->isEmpty() && compositingState.m_testingOverlap) {
         // If we're testing for overlap, we only need to composite if we overlap something that is already composited.
-        absBounds = enclosingIntRect(geometryMap->absoluteRect(layer->localBoundingBox()));
+        absBounds = enclosingIntRect(overlapMap->geometryMap().absoluteRect(layer->localBoundingBox()));
 
         // Empty rects never intersect, but we need them to for the purposes of overlap testing.
         if (absBounds.isEmpty())
@@ -751,7 +759,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
         if (overlapMap)
             overlapMap->pushCompositingContainer();
 
-        if (hasNonAffineTransform(layer->renderer()) || isRunningAcceleratedTransformAnimation(layer->renderer())) {
+        if (layer->has3DTransform() || isRunningAcceleratedTransformAnimation(layer->renderer())) {
             // If we have a 3D transform, or are animating transform, then turn overlap testing off.
             childState.m_testingOverlap = false;
         }
@@ -774,7 +782,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
             size_t listSize = negZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = negZOrderList->at(i);
-                computeCompositingRequirements(layer, curLayer, geometryMap, overlapMap, childState, layersChanged);
+                computeCompositingRequirements(layer, curLayer, overlapMap, childState, layersChanged);
 
                 // If we have to make a layer for this child, make one now so we can have a contents layer
                 // (since we need to ensure that the -ve z-order child renders underneath our contents).
@@ -794,7 +802,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
         size_t listSize = normalFlowList->size();
         for (size_t i = 0; i < listSize; ++i) {
             RenderLayer* curLayer = normalFlowList->at(i);
-            computeCompositingRequirements(layer, curLayer, geometryMap, overlapMap, childState, layersChanged);
+            computeCompositingRequirements(layer, curLayer, overlapMap, childState, layersChanged);
         }
     }
 
@@ -803,7 +811,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
             size_t listSize = posZOrderList->size();
             for (size_t i = 0; i < listSize; ++i) {
                 RenderLayer* curLayer = posZOrderList->at(i);
-                computeCompositingRequirements(layer, curLayer, geometryMap, overlapMap, childState, layersChanged);
+                computeCompositingRequirements(layer, curLayer, overlapMap, childState, layersChanged);
             }
         }
     }
@@ -820,7 +828,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
     // the overlap map. Layers that do not composite will draw into their
     // compositing ancestor's backing, and so are still considered for overlap.
     if (overlapMap && childState.m_compositingAncestor && !childState.m_compositingAncestor->isRootLayer())
-        addToOverlapMap(*geometryMap, *overlapMap, layer, absBounds, haveComputedBounds);
+        addToOverlapMap(*overlapMap, layer, absBounds, haveComputedBounds);
 
     // If we have a software transform, and we have layers under us, we need to also
     // be composited. Also, if we have opacity < 1, then we need to be a layer so that
@@ -830,7 +838,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
         childState.m_compositingAncestor = layer;
         if (overlapMap) {
             overlapMap->pushCompositingContainer();
-            addToOverlapMapRecursive(*geometryMap, *overlapMap, layer);
+            addToOverlapMapRecursive(*overlapMap, layer);
         }
         willBeComposited = true;
     }
@@ -859,7 +867,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
             childState.m_compositingAncestor = layer;
             if (overlapMap) {
                 overlapMap->pushCompositingContainer();
-                addToOverlapMapRecursive(*geometryMap, *overlapMap, layer);
+                addToOverlapMapRecursive(*overlapMap, layer);
             }
             willBeComposited = true;
          }
@@ -891,8 +899,8 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
     if (layer->reflectionLayer() && updateLayerCompositingState(layer->reflectionLayer(), CompositingChangeRepaintNow))
         layersChanged = true;
 
-    if (geometryMap)
-        geometryMap->popMappingsToAncestor(ancestorLayer ? ancestorLayer->renderer() : 0);
+    if (overlapMap)
+        overlapMap->geometryMap().popMappingsToAncestor(ancestorLayer ? ancestorLayer->renderer() : 0);
 }
 
 void RenderLayerCompositor::setCompositingParent(RenderLayer* childLayer, RenderLayer* parentLayer)
@@ -1741,17 +1749,6 @@ bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* rendere
         return false;
 
     return true;
-}
-
-bool RenderLayerCompositor::hasNonAffineTransform(RenderObject* renderer) const
-{
-    if (!renderer->hasTransform())
-        return false;
-    
-    if (TransformationMatrix* transform = toRenderBoxModelObject(renderer)->layer()->transform())
-        return !transform->isAffine();
-    
-    return false;
 }
 
 bool RenderLayerCompositor::isRunningAcceleratedTransformAnimation(RenderObject* renderer) const

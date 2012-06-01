@@ -239,7 +239,16 @@ bool FrameLoaderClientImpl::allowRunningInsecureContent(bool enabledPerSettings,
     return enabledPerSettings;
 }
 
-bool FrameLoaderClientImpl::shadowDOMAllowed(bool enabledAsRuntimeFeature)
+bool FrameLoaderClientImpl::allowShadowDOM(bool enabledAsRuntimeFeature)
+{
+    WebViewImpl* webview = m_webFrame->viewImpl();
+    if (webview && webview->permissionClient())
+        return webview->permissionClient()->allowWebComponents(m_webFrame, enabledAsRuntimeFeature);
+
+    return enabledAsRuntimeFeature;
+}
+
+bool FrameLoaderClientImpl::allowStyleScoped(bool enabledAsRuntimeFeature)
 {
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->permissionClient())

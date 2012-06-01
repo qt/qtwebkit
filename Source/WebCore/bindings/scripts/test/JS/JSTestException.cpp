@@ -104,7 +104,7 @@ void JSTestException::finishCreation(JSGlobalData& globalData)
 
 JSObject* JSTestException::createPrototype(ExecState* exec, JSGlobalObject* globalObject)
 {
-    return JSTestExceptionPrototype::create(exec->globalData(), globalObject, JSTestExceptionPrototype::createStructure(globalObject->globalData(), globalObject, globalObject->objectPrototype()));
+    return JSTestExceptionPrototype::create(exec->globalData(), globalObject, JSTestExceptionPrototype::createStructure(globalObject->globalData(), globalObject, globalObject->errorPrototype()));
 }
 
 void JSTestException::destroy(JSC::JSCell* cell)
@@ -171,7 +171,7 @@ bool JSTestExceptionOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> 
 
 void JSTestExceptionOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    JSTestException* jsTestException = static_cast<JSTestException*>(handle.get().asCell());
+    JSTestException* jsTestException = jsCast<JSTestException*>(handle.get().asCell());
     DOMWrapperWorld* world = static_cast<DOMWrapperWorld*>(context);
     uncacheWrapper(world, jsTestException->impl(), jsTestException);
     jsTestException->releaseImpl();

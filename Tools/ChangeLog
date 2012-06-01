@@ -1,3 +1,937 @@
+2012-06-01  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add public page loading performance tests using web-page-replay
+        https://bugs.webkit.org/show_bug.cgi?id=84008
+
+        Reviewed by Dirk Pranke.
+
+        Add the primitive implementation of replay performance tests. We use web-page-replay (http://code.google.com/p/web-page-replay/)
+        to cache data locally. Each replay test is represented by a text file with .replay extension containing a single URL.
+        To hash out bugs and isolate them from the rest of performance tests, replay tests are hidden behind --replay flag.
+
+        Run "run-perf-tests --replay PerformanceTests/Replay" after changing the system network preference to forward HTTP and HTTPS requests
+        to localhost:8080 and localhost:8443 respectively (i.e. configure the system as if there are HTTP proxies at ports 8080 and 8443)
+        excluding: *.webkit.org, *.googlecode.com, *.sourceforge.net, pypi.python.org, and www.adambarth.com for thirdparty Python dependencies.
+        run-perf-tests starts web-page-replay, which provides HTTP proxies at ports 8080 and 8443 to replay pages.
+
+        * Scripts/webkitpy/layout_tests/port/driver.py:
+        (Driver.is_external_http_test): Added.
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        (WebKitDriver._command_from_driver_input): Allow test names that starts with http:// or https://.
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (PerfTest.__init__): Takes port.
+        (PerfTest.prepare): Added. Overridden by ReplayPerfTest.
+        (PerfTest):
+        (PerfTest.run): Calls run_single.
+        (PerfTest.run_single): Extracted from PageLoadingPerfTest.run.
+        (ChromiumStylePerfTest.__init__):
+        (PageLoadingPerfTest.__init__):
+        (PageLoadingPerfTest.run):
+        (ReplayServer): Added. Responsible for starting and stopping replay.py in the web-page-replay.
+        (ReplayServer.__init__):
+        (ReplayServer.wait_until_ready): Wait until port 8080 is ready. I have tried looking at the piped output from web-page-replay
+        but it caused a dead lock on some web pages.
+        (ReplayServer.stop):
+        (ReplayServer.__del__):
+        (ReplayPerfTest):
+        (ReplayPerfTest.__init__):
+        (ReplayPerfTest._start_replay_server):
+        (ReplayPerfTest.prepare): Creates test.wpr and test-expected.png to cache the page when a replay test is ran for the first time.
+        The subsequent runs of the same test will just use test.wpr.
+        (ReplayPerfTest.run_single):
+        (PerfTestFactory):
+        (PerfTestFactory.create_perf_test):
+        * Scripts/webkitpy/performance_tests/perftest_unittest.py:
+        (MainTest.test_parse_output):
+        (MainTest.test_parse_output_with_failing_line):
+        (TestPageLoadingPerfTest.test_run):
+        (TestPageLoadingPerfTest.test_run_with_bad_output):
+        (TestReplayPerfTest):
+        (TestReplayPerfTest.ReplayTestPort):
+        (TestReplayPerfTest.ReplayTestPort.__init__):
+        (TestReplayPerfTest.ReplayTestPort.__init__.ReplayTestDriver):
+        (TestReplayPerfTest.ReplayTestPort.__init__.ReplayTestDriver.run_test):
+        (TestReplayPerfTest.ReplayTestPort._driver_class):
+        (TestReplayPerfTest.MockReplayServer):
+        (TestReplayPerfTest.MockReplayServer.__init__):
+        (TestReplayPerfTest.MockReplayServer.stop):
+        (TestReplayPerfTest._add_file):
+        (TestReplayPerfTest._setup_test):
+        (TestReplayPerfTest.test_run_single):
+        (TestReplayPerfTest.test_run_single.run_test):
+        (TestReplayPerfTest.test_run_single_fails_without_webpagereplay):
+        (TestReplayPerfTest.test_prepare_fails_when_wait_until_ready_fails):
+        (TestReplayPerfTest.test_run_single_fails_when_output_has_error):
+        (TestReplayPerfTest.test_run_single_fails_when_output_has_error.run_test):
+        (TestReplayPerfTest.test_prepare):
+        (TestReplayPerfTest.test_prepare.run_test):
+        (TestReplayPerfTest.test_prepare_calls_run_single):
+        (TestReplayPerfTest.test_prepare_calls_run_single.run_single):
+        (TestPerfTestFactory.test_regular_test):
+        (TestPerfTestFactory.test_inspector_test):
+        (TestPerfTestFactory.test_page_loading_test):
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner):
+        (PerfTestsRunner._parse_args): Added --replay flag to enable replay tests.
+        (PerfTestsRunner._collect_tests): Collect .replay files when replay tests are enabled.
+        (PerfTestsRunner._collect_tests._is_test_file):
+        (PerfTestsRunner.run): Exit early if one of calls to prepare() fails.
+        * Scripts/webkitpy/performance_tests/perftestsrunner_unittest.py:
+        (create_runner):
+        (run_test):
+        (_tests_for_runner):
+        (test_run_test_set):
+        (test_run_test_set_kills_drt_per_run):
+        (test_run_test_pause_before_testing):
+        (test_run_test_set_for_parser_tests):
+        (test_run_test_set_with_json_output):
+        (test_run_test_set_with_json_source):
+        (test_run_test_set_with_multiple_repositories):
+        (test_run_with_upload_json):
+        (test_upload_json):
+        (test_upload_json.MockFileUploader.upload_single_text_file):
+        (_add_file):
+        (test_collect_tests):
+        (test_collect_tests_with_multile_files):
+        (test_collect_tests_with_multile_files.add_file):
+        (test_collect_tests_with_skipped_list):
+        (test_collect_tests_with_page_load_svg):
+        (test_collect_tests_should_ignore_replay_tests_by_default):
+        (test_collect_tests_with_replay_tests):
+        (test_parse_args):
+        * Scripts/webkitpy/thirdparty/__init__.py: Added the dependency for web-page-replay version 1.1.1.
+        (AutoinstallImportHook.find_module):
+        (AutoinstallImportHook._install_webpagereplay):
+
+2012-05-31  Yaron Friedman  <yfriedman@chromium.org>
+
+        Support building the Android port of chromium with Ninja
+        https://bugs.webkit.org/show_bug.cgi?id=87545
+
+        Reviewed by Adam Barth.
+
+        Ensures that shared libraries are looked up in a generator-agnostic
+        way and that output is placed in the correct directory.
+
+        Depends on http://codereview.chromium.org/10386188/
+
+        * DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:
+
+2012-05-31  Ryosuke Niwa  <rniwa@webkit.org>
+
+        [Chromium] Chromium DRT should be able to load external resources
+        https://bugs.webkit.org/show_bug.cgi?id=87893
+
+        Reviewed by Dirk Pranke.
+
+        Allow external resources to be loaded when the main frame's URL is also an external resource.
+        This change is analogous to r118231 for Mac port.
+
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (blockRequest):
+        (isLocalhost):
+        (hostIsUsedBySomeTestsToGenerateError):
+        (WebViewHost::willSendRequest):
+
+2012-05-31  Anders Carlsson  <andersca@apple.com>
+
+        Build fixes.
+
+        Disable the C++11 extensions warning.
+
+        * DumpRenderTree/mac/Configurations/Base.xcconfig:
+        * TestWebKitAPI/Configurations/Base.xcconfig:
+        * WebKitTestRunner/Configurations/Base.xcconfig:
+
+2012-05-31  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] window.internals settings are not reset between tests
+        https://bugs.webkit.org/show_bug.cgi?id=87783
+
+        Reviewed by Mihai Parparita.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::done): Call resetAfterTest().
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::prepare): Renamed from "reset" for clarity.
+        (WTR::InjectedBundlePage::resetAfterTest): Added a function that resets internals.
+        This needs to be done after a tets, because the code assumes that there is an object
+        with this name in global scope.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.h:
+
+2012-05-31  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] EFL's DRT navigation_policy_decision implementation
+        https://bugs.webkit.org/show_bug.cgi?id=85006
+
+        Reviewed by Tor Arne Vestbø.
+
+        Added navigation_policy_decision implementation for DumpRenderTreeView.
+        Added LayoutTestController::setCustomPolicyDelegate implementation.
+        Modified LayoutTestController::waitForPolicyDelegate.
+
+        * DumpRenderTree/efl/DumpRenderTree.cpp:
+        * DumpRenderTree/efl/DumpRenderTreeChrome.cpp:
+        (DumpRenderTreeChrome::resetDefaultsToConsistentValues):
+        * DumpRenderTree/efl/DumpRenderTreeEfl.h:
+        * DumpRenderTree/efl/DumpRenderTreeView.cpp:
+        (navigationTypeToString): aux function
+        (onNavigationPolicyDecision): navigation_policy_decision implementation
+        (drtViewAdd):
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        (LayoutTestController::setCustomPolicyDelegate):
+        (LayoutTestController::waitForPolicyDelegate):
+
+2012-05-31  Jussi Kukkonen  <jussi.kukkonen@intel.com>
+
+        [EFL][DRT] LayoutTestController does not implement clearApplicationCacheForOrigin
+        https://bugs.webkit.org/show_bug.cgi?id=86195
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Implement clearApplicationCacheForOrigin in EFL
+        LayoutTestController.
+
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        (LayoutTestController::clearApplicationCacheForOrigin):
+
+2012-05-31  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Simplify QT_VERSION_CHECKS for Qt5 by introducing HAVE(QT5)
+        https://bugs.webkit.org/show_bug.cgi?id=87955
+
+        Reviewed by Simon Hausmann.
+
+        * DumpRenderTree/qt/DumpRenderTreeQt.cpp:
+        * DumpRenderTree/qt/EventSenderQt.cpp:
+        * DumpRenderTree/qt/QtInitializeTestFonts.cpp:
+        * DumpRenderTree/qt/main.cpp:
+        * QtTestBrowser/cookiejar.cpp:
+        * QtTestBrowser/launcherwindow.cpp:
+        * WebKitTestRunner/InjectedBundle/qt/LayoutTestControllerQt.cpp:
+        * qmake/mkspecs/features/default_post.prf:
+
+2012-05-31  Zoltan Horvath  <zoltan@webkit.org>
+
+        [Qt] Don't enforce the version of libpng for the config test when passing the option to the linker
+
+        Rubber-stamped by Kenneth Rohde Christiansen.
+
+        * qmake/config.tests/libpng/libpng.pro:
+
+2012-05-30  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Automatically install 64-bit linker for Android
+        https://bugs.webkit.org/show_bug.cgi?id=79780
+
+        Reviewed by Adam Barth.
+
+        Change the update-webkit-chromium script to check whether the 64-bit
+        linker needs to be installed as part of the update process. The actual
+        code for doing these checks and "installing" it has been added to the
+        webkitdirs.pm script.
+
+        The linker itself is part of the third_party/aosp repository, which
+        will be pulled in through the DEPS change.
+
+        * Scripts/update-webkit-chromium:
+        * Scripts/webkitdirs.pm:
+        (chromiumInstall64BitAndroidLinkerIfNeeded):
+        (chromiumReplaceAndroidLinkerIfNeeded):
+
+2012-05-30  Stephanie Lewis  <slewis@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87803
+        Layout tests often fail trying to stat nonexistent logs 
+
+        Reviewed by Dirk Pranke.
+
+        CrashReporter removes logs using a heuristic to conserve space.  Wrap a 
+        try/catch block around accessing the logs as a precaution.
+
+        * Scripts/webkitpy/common/system/crashlogs.py:
+        (CrashLogs._find_newest_log_darwin):
+
+2012-05-30  Gavin Peters  <gavinp@chromium.org>
+
+        Add a LayoutTest for prerender remove after stop.
+        https://bugs.webkit.org/show_bug.cgi?id=87860
+
+        These very boring mocks in DumpRenderTree mean that the basic Prerendering API
+        can be tested by LayoutTests now.
+
+        Reviewed by Adam Barth.
+
+        * DumpRenderTree/DumpRenderTree.gypi:
+        * DumpRenderTree/chromium/MockWebPrerenderingSupport.cpp: Added.
+        (MockWebPrerenderingSupport::MockWebPrerenderingSupport):
+        (MockWebPrerenderingSupport::~MockWebPrerenderingSupport):
+        (MockWebPrerenderingSupport::add):
+        (MockWebPrerenderingSupport::cancel):
+        (MockWebPrerenderingSupport::abandon):
+        * DumpRenderTree/chromium/MockWebPrerenderingSupport.h: Added.
+        (MockWebPrerenderingSupport):
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::initialize):
+        * DumpRenderTree/chromium/TestShell.h:
+        (TestShell):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::willAddPrerender):
+        (WebViewHost::setWebWidget):
+        * DumpRenderTree/chromium/WebViewHost.h:
+        (WebViewHost):
+
+2012-05-30  Stephanie Lewis  <slewis@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87717
+        Unresponsive WebProcesses can be mistaken for WebProcess crashes.
+
+        Reviewed by Dirk Pranke.
+
+        Change the error message from #CRASHED to #UNRESPONSIVE PROCESS
+        If there isn't a crash log found for the process add a message saying
+        the process was unresponsive.
+
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        (WebKitDriver.__init__):
+        (WebKitDriver._check_for_driver_crash):
+        (WebKitDriver.run_test):
+        * Scripts/webkitpy/layout_tests/port/webkit_unittest.py:
+        (WebKitDriverTest.test_check_for_driver_crash.assert_crash):
+        (WebKitDriverTest):
+        (WebKitDriverTest.test_check_for_driver_crash):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR):
+        (WTR::TestController::runTest):
+
+2012-05-30  Stephanie Lewis  <slewis@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87714
+        Mac crash logs can take a really long time to be written out.
+
+        Reviewed by Dirk Pranke.
+
+        Make a second pass looking for crash logs after the tests have completed running.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (use_trac_links_in_results_html):
+        (Manager.run):
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.repository_paths):
+        (Port.look_for_new_crash_logs):
+        * Scripts/webkitpy/layout_tests/port/mac.py:
+        (MacPort.look_for_new_crash_logs):
+        * Scripts/webkitpy/layout_tests/port/mac_unittest.py:
+        (test_get_crash_log):
+        (test_look_for_new_crash_logs):
+        (test_look_for_new_crash_logs.fake_time_cb):
+
+2012-05-30  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Fix 2.9 issues with c_str() type by using the wx fprintf wrapper.
+
+        * DumpRenderTree/wx/DumpRenderTreeWx.cpp:
+        (LayoutWebViewEventHandler::OnAlertEvent):
+        (LayoutWebViewEventHandler::OnConfirmEvent):
+        (LayoutWebViewEventHandler):
+        (LayoutWebViewEventHandler::OnPromptEvent):
+        (LayoutWebViewEventHandler::OnConsoleMessageEvent):
+        (LayoutWebViewEventHandler::OnReceivedTitleEvent):
+
+2012-05-30  Ojan Vafai  <ojan@chromium.org>
+
+        Only give lint errors for -expected.png png files that lack a checksum
+        https://bugs.webkit.org/show_bug.cgi?id=87875
+
+        Reviewed by Tony Chang.
+
+        We have other pngs in the tree, e.g. for the inspector, that legitimately
+        lack a checksum.
+
+        * Scripts/webkitpy/style/checkers/png.py:
+        (PNGChecker.check):
+        * Scripts/webkitpy/style/checkers/png_unittest.py:
+        (PNGCheckerTest.test_check):
+
+2012-05-30  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: seems to leak temp dirs
+        https://bugs.webkit.org/show_bug.cgi?id=87795
+
+        Reviewed by Ojan Vafai.
+
+        There appears to be a bug where the chromium bots are creating
+        temporary directories and not cleaning them up that started
+        after the switch to WebKitDriver. It's possible that __del__
+        wasn't getting called in a timely manner (or at all), and it's
+        generally bad style to rely on __del__ being called, so this
+        code changes things so that we create a temp dir in
+        driver.start() and remove it in driver.stop(). We could be
+        paranoid and leave the __del__ code in, but there doesn't seem
+        to be much advantage to it. If there are bugs that result in
+        drivers being started but not stopped, we have other problems.
+
+        * Scripts/webkitpy/common/system/filesystem_mock.py:
+        (MockFileSystem.__init__):
+        (MockFileSystem._mktemp):
+        (MockFileSystem.mkdtemp):
+        * Scripts/webkitpy/layout_tests/port/webkit.py:
+        (WebKitDriver.__init__):
+        (WebKitDriver._start):
+        (WebKitDriver.stop):
+        * Scripts/webkitpy/layout_tests/port/webkit_unittest.py:
+        (WebKitDriverTest.test_check_for_driver_crash):
+        (WebKitDriverTest):
+        (WebKitDriverTest.test_creating_a_port_does_not_write_to_the_filesystem):
+        (WebKitDriverTest.test_stop_cleans_up_properly):
+
+2012-05-30  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's DRT should print the number of MessagePorts for new each new intent
+        https://bugs.webkit.org/show_bug.cgi?id=86841
+
+        Reviewed by Adam Barth.
+
+        Print the number of MessagePorts for each new intent in EFL's DRT.
+        This output is expected by several Web Intents test cases.
+
+        * DumpRenderTree/efl/DumpRenderTreeChrome.cpp:
+        (DumpRenderTreeChrome::onFrameIntentNew):
+
+2012-05-30  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed build fix after removal of setJavaScriptProfilingEnabled.
+
+        * DumpRenderTree/wx/LayoutTestControllerWx.cpp:
+
+2012-05-30  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Ewk_Intent_Request's postResult/postFailure should take serialized script values in argument
+        https://bugs.webkit.org/show_bug.cgi?id=87829
+
+        Reviewed by Adam Barth.
+
+        EFL's LayoutTestController now makes uses of the new helper method in
+        DumpRenderTreeSupportEfl in order to send the intent response. This is
+        now needed because the Ewk_Intent_Request postResult / postFailure
+        methods were made private.
+
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        (LayoutTestController::sendWebIntentResponse):
+
+2012-05-30  Xueqing Huang  <huangxueqing@baidu.com>
+
+        eventSender.beginDragWithFiles should be implemented in Windows, which blocked drag and drop related tests.
+        https://bugs.webkit.org/show_bug.cgi?id=86296
+
+        Reviewed by Tony Chang.
+
+        * DumpRenderTree/win/DRTDataObject.cpp: Added.
+        (cfHDropFormat):
+        (cfFileNameWFormat):
+        (cfUrlWFormat):
+        (WCEnumFormatEtc):
+        (WCEnumFormatEtc::WCEnumFormatEtc):
+        (WCEnumFormatEtc::QueryInterface):
+        (WCEnumFormatEtc::AddRef):
+        (WCEnumFormatEtc::Release):
+        (WCEnumFormatEtc::Next):
+        (WCEnumFormatEtc::Skip):
+        (WCEnumFormatEtc::Reset):
+        (WCEnumFormatEtc::Clone):
+        (DRTDataObject::createInstance):
+        (DRTDataObject::DRTDataObject):
+        (DRTDataObject::~DRTDataObject):
+        (DRTDataObject::QueryInterface):
+        (DRTDataObject::AddRef):
+        (DRTDataObject::Release):
+        (DRTDataObject::GetData):
+        (DRTDataObject::GetDataHere):
+        (DRTDataObject::QueryGetData):
+        (DRTDataObject::GetCanonicalFormatEtc):
+        (DRTDataObject::SetData):
+        (DRTDataObject::CopyMedium):
+        (DRTDataObject::EnumFormatEtc):
+        (DRTDataObject::DAdvise):
+        (DRTDataObject::DUnadvise):
+        (DRTDataObject::EnumDAdvise):
+        (DRTDataObject::clearData):
+        * DumpRenderTree/win/DRTDataObject.h: Added.
+        (DRTDataObject):
+        * DumpRenderTree/win/DRTDropSource.cpp: Added.
+        (DRTDropSource::DRTDropSource):
+        (DRTDropSource::~DRTDropSource):
+        (DRTDropSource::QueryInterface):
+        (DRTDropSource::AddRef):
+        (DRTDropSource::Release):
+        (DRTDropSource::createInstance):
+        (DRTDropSource::QueryContinueDrag):
+        (DRTDropSource::GiveFeedback):
+        * DumpRenderTree/win/DRTDropSource.h: Added.
+        (DRTDropSource):
+        * DumpRenderTree/win/DumpRenderTree.vcproj:
+        * DumpRenderTree/win/EventSender.cpp:
+        (beginDragWithFilesCallback):
+
+2012-05-30  Marcelo Lira  <marcelo.lira@openbossa.org>
+
+        WebKit2: Implement layoutTestController.setPluginsEnabled() in WebKitTestRunner.
+        https://bugs.webkit.org/show_bug.cgi?id=58593
+
+        Adds the ability to change the pluginsEnabled flag in WebCore::Settings
+        to WebKitTestRunner's LayoutTestController. The flag is modified via the
+        public C API of the WebProcess.
+
+        Reviewed by Darin Adler.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/LayoutTestController.idl:
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.cpp:
+        (WTR::LayoutTestController::setPluginsEnabled): Just calls the
+        WKBundleSetPluginsEnabled function in the public C API of WebProcess.
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.h:
+
+2012-05-30  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] http/tests/navigation/new-window-redirect-history.html does not pass
+        https://bugs.webkit.org/show_bug.cgi?id=87848
+
+        Reviewed by Csaba Osztrogonác.
+
+        The reason was that DumpRenderTreeChrome::extraViews() returned copy of the vector
+        and dumpBackForwardListForWebViews() used iterators belonging actually to different vectors
+        (browser->extraViews().begin() and browser->extraViews().end()) as if they had belonged to the same vector.
+
+        * DumpRenderTree/efl/DumpRenderTreeChrome.cpp:
+        (DumpRenderTreeChrome::extraViews):
+        * DumpRenderTree/efl/DumpRenderTreeChrome.h:
+        (DumpRenderTreeChrome):
+
+2012-05-30  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] EFL's DRT needs "postProgressFinishedNotification" message
+        https://bugs.webkit.org/show_bug.cgi?id=87833
+
+        Reviewed by Tor Arne Vestbø.
+
+        Print "postProgressFinishedNotification" message if frame load finished 
+        to unskip http/tests/loading/progress-finished-callback.html.
+
+        * DumpRenderTree/efl/DumpRenderTreeChrome.cpp:
+        (DumpRenderTreeChrome::onFrameLoadFinished):
+
+2012-05-30  Mariusz Grzegorczyk  <mariusz.g@samsung.com>, Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][WK2] Fix WebKit2-EFL build
+        https://bugs.webkit.org/show_bug.cgi?id=83693
+
+        Reviewed by Carlos Garcia Campos.
+
+        * CMakeLists.txt:  Guard Webkit1 related codes with ENABLE_WEBKIT.
+
+2012-05-29  János Badics  <jbadics@inf.u-szeged.hu>
+
+        [Qt] Modified ORWT and NRWT to check for test expectations in platform/qt-5.0-wk1 too
+        (They only used to check for Skipped in platform/qt-5.0-wk1)
+        https://bugs.webkit.org/show_bug.cgi?id=87376
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Scripts/old-run-webkit-tests:
+        (buildPlatformResultHierarchy):
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort.baseline_search_path):
+
+2012-05-29  Ojan Vafai  <ojan@chromium.org>
+
+        Add a linter error for pngs that lack an embedded checksum
+        https://bugs.webkit.org/show_bug.cgi?id=87793
+
+        Reviewed by Dirk Pranke.
+
+        * Scripts/read-checksum-from-png:
+        * Scripts/webkitpy/common/read_checksum_from_png.py: Renamed from Tools/Scripts/webkitpy/layout_tests/read_checksum_from_png.py.
+        (read_checksum):
+        * Scripts/webkitpy/common/read_checksum_from_png_unittest.py: Renamed from Tools/Scripts/webkitpy/layout_tests/read_checksum_from_png_unittest.py.
+        (ReadChecksumFromPngTest):
+        (ReadChecksumFromPngTest.test_read_checksum):
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        * Scripts/webkitpy/style/checkers/png.py:
+        (PNGChecker.check):
+        * Scripts/webkitpy/style/checkers/png_unittest.py:
+        (PNGCheckerTest.test_check):
+
+2012-05-29  Stephanie Lewis  <slewis@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87720
+        WebProcess is often killed due to being unresponsive on the bots
+
+        Reviewed by Alexey Proskuryakov.
+
+        Blind attempt to improve flakiness on the bots by reducing the number
+        of crashes due to an unresponsive process.  This helped on my personal machine
+        under stress conditions.  I don't have enough cores to hit the problem
+        under normal conditions.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR):
+
+2012-05-29  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: rename 'rm' to 'delete' in rebaseline scm output
+        https://bugs.webkit.org/show_bug.cgi?id=87779
+
+        Reviewed by Eric Seidel.
+
+        Update output to match the names in scm.py as per
+        https://bugs.webkit.org/show_bug.cgi?id=87451#c26 .
+
+        * Scripts/webkitpy/tool/commands/rebaseline.py:
+        (RebaselineTest.execute):
+        * Scripts/webkitpy/tool/commands/rebaseline_unittest.py:
+        (test_rebaseline_test_and_print_scm_changes):
+        * Scripts/webkitpy/tool/servers/gardeningserver_unittest.py:
+        (GardeningServerTest.test_rebaselineall):
+
+2012-05-29  Stephanie Lewis  <slewis@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=87711
+
+        Reviewed by Jessie Berlin.
+
+        Remove Snowleopard testers so the hardware can be repurposed.  The lion bots
+        are better maintained.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+
+2012-05-29  Dirk Pranke  <dpranke@chromium.org>
+
+        webkit-patch optimize-baselines should add/delete files in batches from the vcs
+        https://bugs.webkit.org/show_bug.cgi?id=87538
+
+        Reviewed by Ojan Vafai.
+
+        Invoking git and svn on one file at a time is kinda slow. We
+        should batch the add and rm operations together.
+
+        * Scripts/webkitpy/common/checkout/baselineoptimizer.py:
+        (BaselineOptimizer._move_baselines):
+
+2012-05-29  Dirk Pranke  <dpranke@chromium.org>
+
+        garden-o-matic should rebaseline baselines in parallel
+        https://bugs.webkit.org/show_bug.cgi?id=87451
+
+        Reviewed by Ojan Vafai.
+                                                                               
+        This modifies garden-o-matic so that we will fetch all                  
+        of the baselines in parallel from the bots, and then                    
+        optimize the baselines serially (since that should be fairly            
+        quick and we get into trouble if we optimize in parallel due            
+        to concurrent access to the source control system).                     
+
+        This change adds a flag to webkit-patch rebaseline-test (--print-scm-changes)
+        so that the files that need to be modified in the SCM are returned to 
+        garden-o-matic rather than actually added or removed. This is done so that
+        we can run multiple rebaseline-tests in parallel (we can't modify the SCM
+        concurrently). In order to safely return the files (as a JSON dict) I
+        needed to shift all of the logging in rebaseline-test to use the logging
+        module (and hence log to stderr).
+
+        I also had to stub out a line in chromium.py that would get confused if
+        the skia overrides file didn't exist in a mock checkout.
+
+        * Scripts/webkitpy/common/system/executive.py:
+        (Executive.popen):
+        (Executive):
+        (Executive.run_in_parallel):
+        (_run_command_thunk):
+        * Scripts/webkitpy/common/system/executive_mock.py:
+        (MockExecutive.run_in_parallel):
+        * Scripts/webkitpy/common/system/executive_unittest.py:
+        (ExecutiveTest.test_run_in_parallel):
+        * Scripts/webkitpy/layout_tests/port/chromium.py:
+        (ChromiumPort._expectations_file_contents):
+        * Scripts/webkitpy/tool/commands/rebaseline.py:
+        (AbstractRebaseliningCommand.__init__):
+        (RebaselineTest.__init__):
+        (RebaselineTest._copy_existing_baseline):
+        (RebaselineTest._save_baseline):
+        (RebaselineTest):
+        (RebaselineTest._add_to_scm):
+        (RebaselineTest._rebaseline_test):
+        (RebaselineTest.execute):
+        (RebaselineExpectations._rebaseline_port):
+        (RebaselineExpectations.execute):
+        (Rebaseline._builder_to_pull_from):
+        (Rebaseline.execute):
+        * Scripts/webkitpy/tool/commands/rebaseline_unittest.py:
+        (test_rebaseline_updates_expectations_file):
+        (test_rebaseline_test):
+        (test_rebaseline_test_and_print_scm_changes):
+        (test_rebaseline_and_copy_test):
+        (test_rebaseline_and_copy_test_no_existing_result):
+        (test_rebaseline_and_copy_test_with_lion_result):
+        (test_rebaseline_and_copy_no_overwrite_test):
+        (test_rebaseline_expectations):
+        * Scripts/webkitpy/tool/servers/gardeningserver.py:
+        (GardeningHTTPRequestHandler._rebaseline_commands):
+        (GardeningHTTPRequestHandler):
+        (GardeningHTTPRequestHandler._files_to_add):
+        (GardeningHTTPRequestHandler._optimize_baselines):
+        (GardeningHTTPRequestHandler.rebaselineall):
+        * Scripts/webkitpy/tool/servers/gardeningserver_unittest.py:
+        (GardeningServerTest._post_to_path):
+        (GardeningServerTest.test_rebaselineall):
+        (GardeningServerTest.test_rebaselineall.run_command):
+
+2012-05-29  Benjamin Poulain  <bpoulain@apple.com>
+
+        Fix the type of dispatch_time() offset
+
+        Rubber-stamped by Joseph Pecoraro.
+
+        In r118631, I erroneously used the type NSTimeInterval for the delta of dispatch_time().
+
+        * DumpRenderTree/mac/FrameLoadDelegate.mm:
+        (-[FrameLoadDelegate webView:didStartProvisionalLoadForFrame:]):
+
+2012-05-29  Arvid Nilsson  <anilsson@rim.com>
+
+        2012-05-29  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] OpenGL content is not rendered on simulator
+        https://bugs.webkit.org/show_bug.cgi?id=87721
+
+        Reviewed by George Staikos.
+
+        Fixed by enabling GLES2 support in simulator builds.
+
+        To experiment with building without OpenGL support, you can set the
+        DISABLE_GLES2 environment variable to a non-empty string and rebuild.
+
+        PR #150695
+
+        * Scripts/webkitdirs.pm:
+        (blackberryCMakeArguments):
+
+2012-05-29  David Barr  <davidbarr@chromium.org>
+
+        Introduce ENABLE_CSS_IMAGE_RESOLUTION compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=87685
+
+        Reviewed by Eric Seidel.
+
+        Add a configuration option for CSS image-resolution support, disabling it by default.
+
+        * Scripts/webkitperl/FeatureList.pm:
+        * qmake/mkspecs/features/features.pri:
+
+2012-05-29  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Don't add cxx-flags to QMAKE_CFLAGS
+
+        Prevents warnings such as: "command line option ‘-Wno-c++0x-compat’ is
+            valid for C++/ObjC++ but not for C [enabled by default]"
+
+        Reviewed by Simon Hausmann.
+
+        * qmake/mkspecs/features/unix/default_post.prf:
+
+2012-05-29  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Sync up favicon-implementation with WebView url changes in r118158
+
+        https://bugs.webkit.org/show_bug.cgi?id=87133
+
+        We now base64-encode the page url in the image-provider url, so that any
+        normalization done by QUrl will not mess up the page-url. The logic of
+        creating and parsing the provider-url has been moved into the image
+        provider, to keep it in one place.
+
+        We were also releasing icons (even ones we hadn't retained), which we can't
+        do since we don't know when the icon url is no longer in use.
+
+        Reviewed-by Simon Hausmann.
+
+        * MiniBrowser/qt/icons/favicon.png:
+        * MiniBrowser/qt/qml/BrowserWindow.qml:
+
+2012-05-29  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] Refactoring. Get rid of unnecessary singleCharacterString() function
+        https://bugs.webkit.org/show_bug.cgi?id=87654
+
+        Reviewed by Csaba Osztrogonác.
+
+        Event sender provides strings for all the key events.
+        Also KeyEventInfo constructor parameters order was changed to simplify the case when
+        a key event has empty string.
+
+        * DumpRenderTree/efl/EventSender.cpp:
+        (KeyEventInfo::KeyEventInfo):
+        (keyPadNameFromJSValue):
+        (keyNameFromJSValue):
+
+2012-05-23  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Cancel potential url-edit when going back/forward
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * MiniBrowser/qt/qml/BrowserWindow.qml:
+
+2012-05-29  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Compilation warning in DumpRenderTreeView.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=87636
+
+        Reviewed by Filip Pizlo.
+
+        Fix compilation error in DumpRenderTreeView.cpp due to wrong format
+        specifier in printf. Also fix the return type for
+        onExceededApplicationCacheQuota callback.
+
+        * DumpRenderTree/efl/DumpRenderTreeView.cpp:
+        (onExceededApplicationCacheQuota):
+
+2012-05-29  Hironori Bono  <hbono@chromium.org>
+
+        Adding Hironori Bono to committers.py.
+        https://bugs.webkit.org/show_bug.cgi?id=87697
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-05-28  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] http authenticate dialog popup only once no matter authentication pass or fail
+        https://bugs.webkit.org/show_bug.cgi?id=80135
+
+        Reviewed by Rob Buis.
+
+        Implemented interface function didReceiveAuthenticationChallenge in class
+        DumpRenderTree.
+
+        Resubmit the patch reverted by r115104 after the digest infinite loop
+        issue for BlackBerry porting get identified and fixed.
+
+        Internally reviewed by Joe Mason <jmason@rim.com>
+
+        * DumpRenderTree/blackberry/DumpRenderTree.cpp:
+        (drtCredentialDescription):
+        (BlackBerry::WebKit::DumpRenderTree::didReceiveAuthenticationChallenge):
+        (WebKit):
+        * DumpRenderTree/blackberry/DumpRenderTreeBlackBerry.h:
+        (WebCore):
+        (DumpRenderTree):
+
+2012-05-25  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        WebKitTestRunner needs to support layoutTestController.setJavaScriptProfilingEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=42328
+
+        Reviewed by Eric Seidel.
+
+        Removed unneeded setJavaScriptProfilingEnabled function from DRT after its
+        move to windows.internals.settings.
+
+        * DumpRenderTree/LayoutTestController.cpp:
+        (LayoutTestController::staticFunctions):
+        * DumpRenderTree/LayoutTestController.h:
+        (LayoutTestController):
+        * DumpRenderTree/blackberry/LayoutTestControllerBlackBerry.cpp:
+        * DumpRenderTree/chromium/DRTDevToolsAgent.cpp:
+        * DumpRenderTree/chromium/DRTDevToolsAgent.h:
+        (DRTDevToolsAgent):
+        * DumpRenderTree/chromium/LayoutTestController.cpp:
+        (LayoutTestController::LayoutTestController):
+        * DumpRenderTree/chromium/LayoutTestController.h:
+        (LayoutTestController):
+        * DumpRenderTree/efl/DumpRenderTreeChrome.cpp:
+        (DumpRenderTreeChrome::resetDefaultsToConsistentValues):
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        * DumpRenderTree/gtk/LayoutTestControllerGtk.cpp:
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (resetWebViewToConsistentStateBeforeTesting):
+        * DumpRenderTree/mac/LayoutTestControllerMac.mm:
+        * DumpRenderTree/qt/LayoutTestControllerQt.cpp:
+        * DumpRenderTree/qt/LayoutTestControllerQt.h:
+        (LayoutTestController):
+        * DumpRenderTree/win/DumpRenderTree.cpp:
+        (resetWebViewToConsistentStateBeforeTesting):
+        * DumpRenderTree/win/LayoutTestControllerWin.cpp:
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.cpp:
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.h:
+        (LayoutTestController):
+
+2012-05-28  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move allowRoundingHacks to Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=87328
+
+        Reviewed by Hajime Morita.
+
+        Remove allowRoundingHacks functions, because it is able to work in the
+        cross-port way through the Internals interface.
+
+        * DumpRenderTree/LayoutTestController.cpp:
+        (LayoutTestController::staticFunctions):
+        * DumpRenderTree/LayoutTestController.h:
+        (LayoutTestController):
+        * DumpRenderTree/blackberry/LayoutTestControllerBlackBerry.cpp:
+        * DumpRenderTree/efl/LayoutTestControllerEfl.cpp:
+        * DumpRenderTree/gtk/LayoutTestControllerGtk.cpp:
+        * DumpRenderTree/mac/LayoutTestControllerMac.mm:
+        * DumpRenderTree/win/LayoutTestControllerWin.cpp:
+        * DumpRenderTree/wx/LayoutTestControllerWx.cpp:
+
+2012-05-28  Luke Macpherson  <macpherson@chromium.org>
+
+        Fix mac build with older XCode by defining NSEC_PER_MSEC.
+        https://bugs.webkit.org/show_bug.cgi?id=87616
+
+        Reviewed by Hajime Morita.
+
+        The following patch introduced the use of NSEC_PER_MSEC which is not defined for older XCode versions.
+        http://trac.webkit.org/changeset/118631/trunk/Tools/DumpRenderTree/mac/FrameLoadDelegate.mm
+        Patch just adds a #ifndef / #define check.
+
+        * DumpRenderTree/mac/FrameLoadDelegate.mm:
+        (-[FrameLoadDelegate webView:didStartProvisionalLoadForFrame:]):
+
+2012-05-27  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] Enable blob support for the EFL port
+        https://bugs.webkit.org/show_bug.cgi?id=85363
+
+        Reviewed by Hajime Morita.
+
+        Enable Blob support by default for the EFL port.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-05-27  Benjamin Poulain  <bpoulain@apple.com>
+
+        When pages are loaded from AppCache with DeferredLoading, willSendRequest() is never called
+        https://bugs.webkit.org/show_bug.cgi?id=87582
+
+        Reviewed by Darin Adler.
+
+        Extend DumpRenderTree to support loading the main resource deferred with a delay. This makes it
+        possible to test pages in a similar way as they are loaded in Browsers.
+
+        * DumpRenderTree/LayoutTestController.cpp:
+        (LayoutTestController::LayoutTestController):
+        (setUseDeferredFrameLoadingCallback):
+        (LayoutTestController::staticFunctions):
+        * DumpRenderTree/LayoutTestController.h:
+        (LayoutTestController::useDeferredFrameLoading):
+        (LayoutTestController::setUseDeferredFrameLoading):
+        (LayoutTestController):
+        * DumpRenderTree/mac/FrameLoadDelegate.mm:
+        (-[FrameLoadDelegate webView:didStartProvisionalLoadForFrame:]):
+
 2012-05-27  David Barton  <dbarton@mathscribe.com>
 
         [watchlist] Improve MathML rule

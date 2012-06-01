@@ -31,11 +31,15 @@
 
 typedef struct _Evas_Object Evas_Object;
 typedef struct _Ewk_History_Item Ewk_History_Item;
+typedef struct _Ewk_Intent Ewk_Intent;
+typedef struct _Ewk_Intent_Request Ewk_Intent_Request;
 
 typedef Vector<Ewk_History_Item*> HistoryItemChildrenVector;
 
 namespace WebCore {
 class Frame;
+class MessagePortChannel;
+typedef Vector<OwnPtr<MessagePortChannel>, 1> MessagePortChannelArray;
 }
 
 class EAPI DumpRenderTreeSupportEfl {
@@ -77,7 +81,6 @@ public:
     static bool findString(const Evas_Object* ewkView, const String& text, WebCore::FindOptions);
     static bool isCommandEnabled(const Evas_Object* ewkView, const char* name);
     static void setCSSGridLayoutEnabled(const Evas_Object* ewkView, bool enabled);
-    static void setJavaScriptProfilingEnabled(const Evas_Object* ewkView, bool enabled);
     static void setSmartInsertDeleteEnabled(Evas_Object* ewkView, bool enabled);
     static void setSelectTrailingWhitespaceEnabled(Evas_Object* ewkView, bool enabled);
 
@@ -105,6 +108,10 @@ public:
     static JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     static void setAuthorAndUserStylesEnabled(Evas_Object* ewkView, bool);
     static void setSerializeHTTPLoads(bool);
+    
+    // Web Intents
+    static void sendWebIntentResponse(Ewk_Intent_Request*, JSStringRef response);
+    static WebCore::MessagePortChannelArray* intentMessagePorts(const Ewk_Intent*);
 
     // TextInputController
     static void setComposition(Evas_Object*, const char*, int, int);

@@ -199,6 +199,7 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitBorderImage,
     CSSPropertyWebkitBorderVerticalSpacing,
     CSSPropertyWebkitBoxAlign,
+    CSSPropertyWebkitBoxDecorationBreak,
     CSSPropertyWebkitBoxDirection,
     CSSPropertyWebkitBoxFlex,
     CSSPropertyWebkitBoxFlexGroup,
@@ -227,11 +228,11 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitFilter,
 #endif
 #if ENABLE(CSS3_FLEXBOX)
+    CSSPropertyWebkitAlignItems,
+    CSSPropertyWebkitAlignSelf,
     CSSPropertyWebkitFlex,
     CSSPropertyWebkitFlexOrder,
     CSSPropertyWebkitFlexPack,
-    CSSPropertyWebkitFlexAlign,
-    CSSPropertyWebkitFlexItemAlign,
     CSSPropertyWebkitFlexDirection,
     CSSPropertyWebkitFlexFlow,
     CSSPropertyWebkitFlexLinePack,
@@ -1540,6 +1541,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return getPositionOffsetValue(style.get(), CSSPropertyBottom, m_node->document()->renderView());
         case CSSPropertyWebkitBoxAlign:
             return cssValuePool().createValue(style->boxAlign());
+        case CSSPropertyWebkitBoxDecorationBreak:
+            if (style->boxDecorationBreak() == DSLICE)
+                return cssValuePool().createIdentifierValue(CSSValueSlice);
+        return cssValuePool().createIdentifierValue(CSSValueClone);
         case CSSPropertyWebkitBoxDirection:
             return cssValuePool().createValue(style->boxDirection());
         case CSSPropertyWebkitBoxFlex:
@@ -1649,15 +1654,15 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->flexOrder(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyWebkitFlexPack:
             return cssValuePool().createValue(style->flexPack());
-        case CSSPropertyWebkitFlexAlign:
-            return cssValuePool().createValue(style->flexAlign());
-        case CSSPropertyWebkitFlexItemAlign:
-            if (style->flexItemAlign() == AlignAuto) {
+        case CSSPropertyWebkitAlignItems:
+            return cssValuePool().createValue(style->alignItems());
+        case CSSPropertyWebkitAlignSelf:
+            if (style->alignSelf() == AlignAuto) {
                 if (m_node && m_node->parentNode() && m_node->parentNode()->computedStyle())
-                    return cssValuePool().createValue(m_node->parentNode()->computedStyle()->flexAlign());
+                    return cssValuePool().createValue(m_node->parentNode()->computedStyle()->alignItems());
                 return cssValuePool().createValue(AlignStretch);
             }
-            return cssValuePool().createValue(style->flexItemAlign());
+            return cssValuePool().createValue(style->alignSelf());
         case CSSPropertyWebkitFlexDirection:
             return cssValuePool().createValue(style->flexDirection());
         case CSSPropertyWebkitFlexWrap:
@@ -2634,14 +2639,14 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getCSSPropertyValuesForSid
 
 PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(const CSSPropertyID* set, unsigned length) const
 {
-    StylePropertyVector list;
+    Vector<CSSProperty, 256> list;
     list.reserveInitialCapacity(length);
     for (unsigned i = 0; i < length; ++i) {
         RefPtr<CSSValue> value = getPropertyCSSValue(set[i]);
         if (value)
             list.append(CSSProperty(set[i], value.release(), false));
     }
-    return StylePropertySet::adopt(list);
+    return StylePropertySet::create(list.data(), list.size());
 }
 
 CSSRule* CSSComputedStyleDeclaration::parentRule() const

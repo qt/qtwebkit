@@ -1,3 +1,425 @@
+2012-05-31  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        JSGlobalObject does not mark m_privateNameStructure
+        https://bugs.webkit.org/show_bug.cgi?id=88023
+
+        Rubber stamped by Gavin Barraclough.
+
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::visitChildren): We need to mark this so it doesn't get 
+        inadvertently garbage collected.
+
+2012-05-31  Erik Arvidsson  <arv@chromium.org>
+
+        Make DOM Exceptions Errors
+        https://bugs.webkit.org/show_bug.cgi?id=85078
+
+        Reviewed by Oliver Hunt.
+
+        WebIDL mandates that exceptions should have Error.prototype on its prototype chain.
+
+        For JSC we have access to the Error.prototype from the binding code.
+
+        For V8 we set a field in the WrapperTypeInfo and when the constructor function is created we
+        set the prototype as needed.
+
+        Updated test: fast/dom/DOMException/prototype-object.html
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::reset):
+        * runtime/JSGlobalObject.h:
+        (JSC):
+        (JSGlobalObject):
+        (JSC::JSGlobalObject::errorPrototype):
+
+2012-05-31  Andy Wingo  <wingo@igalia.com>
+
+        Fix reference to unset variable in debug mode
+        https://bugs.webkit.org/show_bug.cgi?id=87981
+
+        Reviewed by Geoffrey Garen.
+
+        * runtime/JSONObject.cpp (Stringifier::Holder::Holder):
+        Initialize m_size in debug mode, as we check it later in an assert.
+
+2012-05-30  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Heap should sweep incrementally
+        https://bugs.webkit.org/show_bug.cgi?id=85429
+
+        We shouldn't have to wait for the opportunistic GC timer to fire in order 
+        to call object destructors. Instead, we should incrementally sweep some 
+        subset of the blocks requiring sweeping periodically. We tie this sweeping 
+        to a timer rather than to collections because we want to reclaim this memory 
+        even if we stop allocating. This way, our memory usage scales smoothly with 
+        actual use, regardless of whether we've recently done an opportunistic GC or not.
+
+        Reviewed by Geoffrey Garen.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.gypi:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * heap/Heap.cpp:
+        (JSC::Heap::Heap):
+        (JSC::Heap::collect): We no longer sweep during a full sweep. We only shrink now,
+        which we will switch over to being done during incremental sweeping too as soon as
+        all finalizers can be run lazily (and, by extension, incrementally). 
+        (JSC::Heap::sweeper):
+        (JSC):
+        * heap/Heap.h:
+        (JSC):
+        (Heap):
+        * heap/IncrementalSweeper.cpp: Added.
+        (JSC):
+        (JSC::IncrementalSweeper::timerDidFire): The IncrementalSweeper works very similarly to 
+        GCActivityCallback. It is tied to a run-loop based timer that fires periodically based 
+        on how long the previous sweep increment took to run. The IncrementalSweeper doesn't do 
+        anything if the platform doesn't support CoreFoundation.
+        (JSC::IncrementalSweeper::IncrementalSweeper):
+        (JSC::IncrementalSweeper::~IncrementalSweeper):
+        (JSC::IncrementalSweeper::create):
+        (JSC::IncrementalSweeper::scheduleTimer):
+        (JSC::IncrementalSweeper::cancelTimer):
+        (JSC::IncrementalSweeper::doSweep): Iterates over the snapshot of the MarkedSpace taken 
+        during the last collection, checking to see which blocks need sweeping. If it successfully 
+        gets to the end of the blocks that need sweeping then it cancels the timer.
+        (JSC::IncrementalSweeper::startSweeping): We take a snapshot of the Heap and store it in 
+        a Vector that the incremental sweep will iterate over. We also reset our index into this Vector.
+        * heap/IncrementalSweeper.h: Added.
+        (JSC):
+        (IncrementalSweeper):
+        * heap/MarkedBlock.h:
+        (JSC::MarkedBlock::needsSweeping): If a block is in the Marked state it needs sweeping 
+        to be usable and to run any destructors that need to be run.
+
+2012-05-30  Patrick Gansterer  <paroga@webkit.org>
+
+        [WINCE] Fix JSString after r115516.
+        https://bugs.webkit.org/show_bug.cgi?id=87892
+
+        Reviewed by Geoffrey Garen.
+
+        r115516 splitted JSString into two classes, with addition nested classes.
+        Add a workaround for the WinCE compiler since it can't resolve the friend class
+        declerations corretly and denies the access to protected members of JSString.
+
+        * runtime/JSString.h:
+        (JSC::JSRopeString::RopeBuilder::append):
+        (JSC::JSRopeString::append):
+        (JSRopeString):
+
+2012-05-30  Oliver Hunt  <oliver@apple.com>
+
+        Really provide error information with the inspector disabled
+        https://bugs.webkit.org/show_bug.cgi?id=87910
+
+        Reviewed by Filip Pizlo.
+
+        Don't bother checking for anything other than pre-existing error info.
+        In the absence of complete line number information you'll only get the
+        line a function starts on, but at least it's something.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::throwException):
+
+2012-05-30  Filip Pizlo  <fpizlo@apple.com>
+
+        LLInt broken on x86-32 with JIT turned off
+        https://bugs.webkit.org/show_bug.cgi?id=87906
+
+        Reviewed by Geoffrey Garen.
+        
+        Fixed the code to not clobber registers that contain important things, like the call frame.
+
+        * llint/LowLevelInterpreter32_64.asm:
+
+2012-05-30  Filip Pizlo  <fpizlo@apple.com>
+
+        ScriptDebugServer wants sourceIDs that are non-zero because that's what HashMaps want, so JSC should placate it
+        https://bugs.webkit.org/show_bug.cgi?id=87887
+
+        Reviewed by Darin Adler.
+        
+        Better fix - we now never call SourceProvider::asID() if SourceProvider* is 0.
+
+        * parser/Nodes.h:
+        (JSC::ScopeNode::sourceID):
+        * parser/SourceCode.h:
+        (JSC::SourceCode::providerID):
+        (SourceCode):
+        * parser/SourceProvider.h:
+        (SourceProvider):
+        (JSC::SourceProvider::asID):
+        * runtime/Executable.h:
+        (JSC::ScriptExecutable::sourceID):
+
+2012-05-30  Filip Pizlo  <fpizlo@apple.com>
+
+        ScriptDebugServer wants sourceIDs that are non-zero because that's what HashMaps want, so JSC should placate it
+        https://bugs.webkit.org/show_bug.cgi?id=87887
+
+        Reviewed by Geoffrey Garen.
+
+        * parser/SourceProvider.h:
+        (JSC::SourceProvider::asID):
+
+2012-05-30  Oliver Hunt  <oliver@apple.com>
+
+        DFG does not correctly handle exceptions caught in the LLInt
+        https://bugs.webkit.org/show_bug.cgi?id=87885
+
+        Reviewed by Filip Pizlo.
+
+        Make the DFG use genericThrow, rather than reimplementing a small portion of it.
+        Also make the LLInt slow paths validate that their PC is correct.
+
+        * dfg/DFGOperations.cpp:
+        * llint/LLIntSlowPaths.cpp:
+        (LLInt):
+
+2012-05-29  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG CFA should infer types and values of captured variables
+        https://bugs.webkit.org/show_bug.cgi?id=87813
+
+        Reviewed by Gavin Barraclough.
+        
+        Slight speed-up in V8/earley-boyer (~1%).
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::argumentsAreCaptured):
+        (JSC::CodeBlock::argumentIsCaptured):
+        (CodeBlock):
+        * dfg/DFGAbstractState.cpp:
+        (DFG):
+        (JSC::DFG::AbstractState::beginBasicBlock):
+        (JSC::DFG::AbstractState::initialize):
+        (JSC::DFG::AbstractState::endBasicBlock):
+        (JSC::DFG::AbstractState::execute):
+        (JSC::DFG::AbstractState::clobberWorld):
+        (JSC::DFG::AbstractState::clobberStructures):
+        (JSC::DFG::AbstractState::mergeStateAtTail):
+        (JSC::DFG::AbstractState::merge):
+        (JSC::DFG::AbstractState::mergeToSuccessors):
+        * dfg/DFGAbstractState.h:
+        (JSC::DFG::AbstractState::variables):
+        (AbstractState):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-05-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Unreviewed. Build fix for !ENABLE(JIT) after r117823.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+
+2012-05-30  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r118868.
+        http://trac.webkit.org/changeset/118868
+        https://bugs.webkit.org/show_bug.cgi?id=87828
+
+        introduced ~20 crashes on Mac and Qt bots (Requested by pizlo_
+        on #webkit).
+
+        * heap/Heap.cpp:
+        (JSC::Heap::collect):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweep):
+        * heap/MarkedBlock.h:
+        (JSC::MarkedBlock::sweepWeakSet):
+        (JSC):
+        * heap/MarkedSpace.cpp:
+        (JSC::SweepWeakSet::operator()):
+        (JSC):
+        (JSC::MarkedSpace::sweepWeakSets):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+
+2012-05-29  Geoffrey Garen  <ggaren@apple.com>
+
+        Rolled back in r118646, now that
+        https://bugs.webkit.org/show_bug.cgi?id=87784 is fixed.
+
+        http://trac.webkit.org/changeset/118646
+        https://bugs.webkit.org/show_bug.cgi?id=87599
+
+        * heap/Heap.cpp:
+        (JSC::Heap::collect):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweep):
+        * heap/MarkedBlock.h:
+        (JSC):
+        * heap/MarkedSpace.cpp:
+        (JSC):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+
+2012-05-29  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should keep captured variables alive until the (inline) return.
+        https://bugs.webkit.org/show_bug.cgi?id=87205
+
+        Reviewed by Gavin Barraclough.
+        
+        Changes the way we do flushing for captured variables and arguments. Instead of flushing
+        each SetLocal immediately, we flush at kill points. So a SetLocal will cause a Flush of
+        whatever was live in the variable previously, and a return will cause a Flush of all
+        captured variables and all arguments.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::setDirect):
+        (JSC::DFG::ByteCodeParser::set):
+        (JSC::DFG::ByteCodeParser::setLocal):
+        (JSC::DFG::ByteCodeParser::getArgument):
+        (JSC::DFG::ByteCodeParser::setArgument):
+        (JSC::DFG::ByteCodeParser::findArgumentPositionForArgument):
+        (ByteCodeParser):
+        (JSC::DFG::ByteCodeParser::findArgumentPositionForLocal):
+        (JSC::DFG::ByteCodeParser::findArgumentPosition):
+        (JSC::DFG::ByteCodeParser::flush):
+        (JSC::DFG::ByteCodeParser::flushDirect):
+        (JSC::DFG::ByteCodeParser::flushArgumentsAndCapturedVariables):
+        (JSC::DFG::ByteCodeParser::handleInlining):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        (JSC::DFG::ByteCodeParser::InlineStackEntry::InlineStackEntry):
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::setLocalStoreElimination):
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::forwardSpeculationCheck):
+
+2012-05-29  Geoffrey Garen  <ggaren@apple.com>
+
+        WeakGCMap should be lazy-finalization-safe
+        https://bugs.webkit.org/show_bug.cgi?id=87784
+
+        Reviewed by Darin Adler.
+
+        * runtime/WeakGCMap.h:
+        (JSC::WeakGCMap::get): Since this is a map of raw WeakImpl pointers, and
+        not Weak<T>, we need to verify manually that the WeakImpl is live before
+        we return its payload.
+
+2012-05-29  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        CopiedSpace::doneCopying could start another collection
+        https://bugs.webkit.org/show_bug.cgi?id=86538
+
+        Reviewed by Geoffrey Garen.
+
+        It's possible that if we don't have anything at the head of to-space 
+        after a collection and the BlockAllocator doesn't have any fresh blocks 
+        to give us right now we could start another collection while still in 
+        the middle of the first collection when we call CopiedSpace::addNewBlock(). 
+
+        One way to resolve this would be to have Heap::shouldCollect() check that 
+        m_operationInProgress is NoOperation. This would prevent the path in 
+        getFreshBlock() that starts the collection if we're already in the middle of one.
+
+        I could not come up with a test case to reproduce this crash on ToT.
+
+        * heap/Heap.h:
+        (JSC::Heap::shouldCollect): We shouldn't collect if we're already in the middle
+        of a collection, i.e. the current operation should be NoOperation.
+
+2012-05-29  David Barr  <davidbarr@chromium.org>
+
+        Introduce ENABLE_CSS_IMAGE_RESOLUTION compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=87685
+
+        Reviewed by Eric Seidel.
+
+        Add a configuration option for CSS image-resolution support, disabling it by default.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-28  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r118646.
+        http://trac.webkit.org/changeset/118646
+        https://bugs.webkit.org/show_bug.cgi?id=87691
+
+        broke V8 raytrace benchmark (Requested by pizlo_ on #webkit).
+
+        * heap/Heap.cpp:
+        (JSC::Heap::collect):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweep):
+        * heap/MarkedBlock.h:
+        (JSC::MarkedBlock::sweepWeakSet):
+        (JSC):
+        * heap/MarkedSpace.cpp:
+        (JSC::SweepWeakSet::operator()):
+        (JSC):
+        (JSC::MarkedSpace::sweepWeakSets):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+
+2012-05-28  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should not generate code for code that the CFA proves to be unreachable
+        https://bugs.webkit.org/show_bug.cgi?id=87682
+
+        Reviewed by Sam Weinig.
+        
+        This also fixes a small performance bug where CFA was not marking blocks
+        as having constants (and hence not triggering constant folding) if the only
+        constants were on GetLocals.
+        
+        And fixing that bug revealed another bug: constant folding was assuming that
+        a GetLocal must be the first access to a local in a basic block. This isn't
+        true. The first access may be a Flush. This patch fixes that issue using the
+        safest approach possible, since we don't need to be clever for something that
+        only happens in one of our benchmarks.
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGConstantFoldingPhase.cpp:
+        (JSC::DFG::ConstantFoldingPhase::run):
+        * dfg/DFGJITCompiler.h:
+        (JSC::DFG::JITCompiler::noticeOSREntry):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-05-28  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.list.am: Add missing header file.
+
+2012-05-27  Geoffrey Garen  <ggaren@apple.com>
+
+        Weak pointer finalization should be lazy
+        https://bugs.webkit.org/show_bug.cgi?id=87599
+
+        Reviewed by Darin Adler.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::collect): Don't force immediate finalization -- it will
+        happen lazily.
+
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweep): Sweep a block's weak set when sweeping the
+        block. The weak set may not have been swept yet, and this is our last
+        chance to run weak finalizers before we recycle the memory they reference.
+
+        * heap/MarkedBlock.h:
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedBlock::sweepWeakSets):
+        * heap/MarkedSpace.h:
+        (JSC::MarkedSpace::sweepWeakSets): Nixed sweepWeakSets because it's unused
+        now.
+
 2012-05-26  Geoffrey Garen  <ggaren@apple.com>
 
         WebKit should be lazy-finalization-safe (esp. the DOM) v2

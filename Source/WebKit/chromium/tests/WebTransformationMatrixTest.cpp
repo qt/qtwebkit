@@ -153,6 +153,15 @@ TEST(WebTransformationMatrixTest, verifyConstructorFor2dElements)
     EXPECT_ROW4_EQ(0, 0, 0, 1, A);
 }
 
+TEST(WebTransformationMatrixTest, verifyConstructorForAllElements)
+{
+    WebTransformationMatrix A(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+    EXPECT_ROW1_EQ(1, 5,  9, 13, A);
+    EXPECT_ROW2_EQ(2, 6, 10, 14, A);
+    EXPECT_ROW3_EQ(3, 7, 11, 15, A);
+    EXPECT_ROW4_EQ(4, 8, 12, 16, A);
+}
+
 TEST(WebTransformationMatrixTest, verifyCopyConstructor)
 {
     WebTransformationMatrix A;
@@ -621,6 +630,38 @@ TEST(WebTransformationMatrixTest, verifyRotateAxisAngle3d)
     EXPECT_ROW1_NEAR(0, -6, 0, 0, A, ERROR_THRESHOLD);
     EXPECT_ROW2_NEAR(7, 0,  0, 0, A, ERROR_THRESHOLD);
     EXPECT_ROW3_EQ(0, 0, 8, 0, A);
+    EXPECT_ROW4_EQ(0, 0, 0, 1, A);
+}
+
+TEST(WebTransformationMatrixTest, verifyRotateAxisAngle3dForArbitraryAxis)
+{
+    // Check rotation about an arbitrary non-axis-aligned vector.
+    WebTransformationMatrix A;
+    A.rotate3d(1, 1, 1, 90);
+    EXPECT_ROW1_NEAR(0.3333333333333334258519187,
+                     -0.2440169358562924717404030,
+                     0.9106836025229592124219380,
+                     0, A, ERROR_THRESHOLD);
+    EXPECT_ROW2_NEAR(0.9106836025229592124219380,
+                     0.3333333333333334258519187,
+                     -0.2440169358562924717404030,
+                     0, A, ERROR_THRESHOLD);
+    EXPECT_ROW3_NEAR(-0.2440169358562924717404030,
+                     0.9106836025229592124219380,
+                     0.3333333333333334258519187,
+                     0, A, ERROR_THRESHOLD);
+    EXPECT_ROW4_EQ(0, 0, 0, 1, A);
+}
+
+TEST(WebTransformationMatrixTest, verifyRotateAxisAngle3dForDegenerateAxis)
+{
+    // Check rotation about a degenerate zero vector.
+    // It is expected to default to rotation about the z-axis.
+    WebTransformationMatrix A;
+    A.rotate3d(0, 0, 0, 90);
+    EXPECT_ROW1_NEAR(0, -1, 0, 0, A, ERROR_THRESHOLD);
+    EXPECT_ROW2_NEAR(1, 0, 0, 0, A, ERROR_THRESHOLD);
+    EXPECT_ROW3_EQ(0, 0, 1, 0, A);
     EXPECT_ROW4_EQ(0, 0, 0, 1, A);
 }
 

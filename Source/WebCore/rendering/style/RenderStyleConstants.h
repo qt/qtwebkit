@@ -103,6 +103,10 @@ enum EFloat {
 
 enum EMarginCollapse { MCOLLAPSE, MSEPARATE, MDISCARD };
 
+// Box decoration attributes. Not inherited.
+
+enum EBoxDecorationBreak { DSLICE, DCLONE };
+
 // Box attributes. Not inherited.
 
 enum EBoxSizing { CONTENT_BOX, BORDER_BOX };
@@ -169,10 +173,10 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 
 // CSS3 Flexbox Properties
 
-enum EFlexPack { PackStart, PackEnd, PackCenter, PackJustify, PackDistribute };
-enum EFlexAlign { AlignAuto, AlignStart, AlignEnd, AlignCenter, AlignStretch, AlignBaseline };
+enum EAlignItems { AlignAuto, AlignStart, AlignEnd, AlignCenter, AlignStretch, AlignBaseline };
+enum EFlexPack { PackStart, PackEnd, PackCenter, PackSpaceBetween, PackSpaceAround };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
-enum EFlexLinePack { LinePackStart, LinePackEnd, LinePackCenter, LinePackJustify, LinePackDistribute, LinePackStretch };
+enum EFlexLinePack { LinePackStart, LinePackEnd, LinePackCenter, LinePackSpaceBetween, LinePackSpaceAround, LinePackStretch };
 enum EFlexWrap { FlexWrapNone, FlexWrap, FlexWrapReverse };
 
 enum ETextSecurity {

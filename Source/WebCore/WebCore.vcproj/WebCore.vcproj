@@ -21834,6 +21834,62 @@
 				>
 			</File>
 			<File
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSSVGViewSpec.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSSVGViewSpec.h"
+				>
+			</File>
+			<File
 				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\JSSVGVKernElement.cpp"
 				>
 				<FileConfiguration
@@ -26891,6 +26947,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\page\WindowFocusAllowedIndicator.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\WindowFocusAllowedIndicator.h"
+				>
+			</File>
+			<File
 				RelativePath="..\page\WorkerNavigator.cpp"
 				>
 			</File>
@@ -27832,6 +27896,14 @@
 			</File>
 			<File
 				RelativePath="..\platform\DateComponents.h"
+				>
+			</File>
+			<File
+				RelativePath="..\platform\Decimal.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\platform\Decimal.h"
 				>
 			</File>
 			<File
@@ -72182,10 +72254,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\svg\properties\SVGAnimatedPropertySynchronizer.h"
-					>
-				</File>
-				<File
 					RelativePath="..\svg\properties\SVGAnimatedPropertyTearOff.h"
 					>
 				</File>
@@ -74627,6 +74695,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\NavigatorOverlayController.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\nativeMemoryProfiler.css"
 					>
 				</File>
 				<File

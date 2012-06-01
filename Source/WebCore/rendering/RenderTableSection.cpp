@@ -654,6 +654,7 @@ void RenderTableSection::layoutRows()
             LayoutRect oldCellRect(cell->x(), cell->y() , cell->width(), cell->height());
 
             LayoutPoint cellLocation(0, m_rowPos[rindx]);
+            // FIXME: Switch to cell's styleForCellFlow() for consistency with RenderTableCell, once it supports row group.
             if (!style()->isLeftToRightDirection())
                 cellLocation.setX(table()->columnPositions()[nEffCols] - table()->columnPositions()[table()->colToEffCol(cell->col() + cell->colSpan())] + hspacing);
             else
@@ -1010,18 +1011,16 @@ void RenderTableSection::paintCell(RenderTableCell* cell, PaintInfo& paintInfo, 
     if (paintPhase == PaintPhaseBlockBackground || paintPhase == PaintPhaseChildBlockBackground) {
         // We need to handle painting a stack of backgrounds.  This stack (from bottom to top) consists of
         // the column group, column, row group, row, and then the cell.
-        RenderObject* col = table()->colElement(cell->col());
-        RenderObject* colGroup = 0;
-        if (col && col->parent()->style()->display() == TABLE_COLUMN_GROUP)
-            colGroup = col->parent();
+        RenderTableCol* column = table()->colElement(cell->col());
+        RenderTableCol* columnGroup = column ? column->enclosingColumnGroup() : 0;
 
         // Column groups and columns first.
         // FIXME: Columns and column groups do not currently support opacity, and they are being painted "too late" in
         // the stack, since we have already opened a transparency layer (potentially) for the table row group.
         // Note that we deliberately ignore whether or not the cell has a layer, since these backgrounds paint "behind" the
         // cell.
-        cell->paintBackgroundsBehindCell(paintInfo, cellPoint, colGroup);
-        cell->paintBackgroundsBehindCell(paintInfo, cellPoint, col);
+        cell->paintBackgroundsBehindCell(paintInfo, cellPoint, columnGroup);
+        cell->paintBackgroundsBehindCell(paintInfo, cellPoint, column);
 
         // Paint the row group next.
         cell->paintBackgroundsBehindCell(paintInfo, cellPoint, this);

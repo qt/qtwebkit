@@ -49,7 +49,7 @@
 namespace WTR {
 
 static const double defaultLongTimeout = 30;
-static const double defaultShortTimeout = 5;
+static const double defaultShortTimeout = 15;
 static const double defaultNoTimeout = -1;
 
 static WKURLRef blankURL()
@@ -498,9 +498,9 @@ bool TestController::runTest(const char* test)
     if (!resetStateToConsistentValues()) {
 #if PLATFORM(MAC)
         pid_t pid = WKPageGetProcessIdentifier(m_mainWebView->page());
-        fprintf(stderr, "#CRASHED - WebProcess (pid %ld)\n", static_cast<long>(pid));
+        fprintf(stderr, "#PROCESS UNRESPONSIVE - WebProcess (pid %ld)\n", static_cast<long>(pid));
 #else
-        fputs("#CRASHED - WebProcess\n", stderr);
+        fputs("#PROCESS UNRESPONSIVE - WebProcess\n", stderr);
 #endif
         fflush(stderr);
         return false;

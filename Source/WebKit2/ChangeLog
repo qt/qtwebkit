@@ -1,3 +1,822 @@
+2012-05-31  Hajime Morrita  <morrita@chromium.org>
+
+        REGRESSION(r117572): editing/spelling/spellcheck-async-remove-frame.html crashes on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=86859
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebProcess/WebCoreSupport/WebEditorClient.cpp:
+        (WebKit::WebEditorClient::requestCheckingOfString):
+        * WebProcess/WebCoreSupport/WebEditorClient.h:
+
+2012-05-31  Andy Estes  <aestes@apple.com>
+
+        [WebKit2] Remove nested #if conditions from messages.in files
+        https://bugs.webkit.org/show_bug.cgi?id=88039
+
+        Reviewed by Filip Pizlo.
+
+        The code generator that processes messages.in files can't handle nested
+        #if conditions. Sadly I added said conditions in r117700 but failed to
+        verify the generated result. Un-nest the conditions I added.
+
+        * UIProcess/WebPageProxy.messages.in:
+        * WebProcess/WebPage/WebPage.messages.in:
+
+2012-05-31  Andy Estes  <aestes@apple.com>
+
+        Disentangle code that relies on USE(AUTOMATIC_TEXT_REPLACEMENT) from that which merely relies on PLATFORM(MAC)
+        https://bugs.webkit.org/show_bug.cgi?id=87933
+
+        Reviewed by Dan Bernstein.
+
+        * WebProcess/WebCoreSupport/WebEditorClient.h:
+        * WebProcess/WebCoreSupport/mac/WebEditorClientMac.mm:
+
+2012-05-31  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add webkit_download_get_request to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=87957
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/WebKitDownload.cpp:
+        (webkit_download_get_request): Return the WebKitURIRequest
+        representing the request that originated the download.
+        * UIProcess/API/gtk/WebKitDownload.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbol.
+        * UIProcess/API/gtk/tests/TestDownloads.cpp:
+        (testDownloadLocalFile):
+        (testDownloadRemoteFile):
+
+2012-05-31  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] WebProcess crashes when a download is started from an existing ResourceHandle
+        https://bugs.webkit.org/show_bug.cgi?id=87953
+
+        Reviewed by Martin Robinson.
+
+        The output stream to write the downloaded data is created in the
+        didReceiveResponse callback of the download client. When a
+        download is created for an existing ResourceHandle (this happens
+        for example when policy decision is download), the response has
+        already been received. In this case we should make sure that the
+        download client is notified about the response, so that when data
+        actually arrives the output stream has already been created.
+
+        * WebProcess/Downloads/soup/DownloadSoup.cpp:
+        (WebKit::Download::startWithHandle):
+
+2012-05-31  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Fix webkit_web_view_can_execute_editing_command() API doc
+        https://bugs.webkit.org/show_bug.cgi?id=87930
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+
+2012-05-31  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Simplify QT_VERSION_CHECKS for Qt5 by introducing HAVE(QT5)
+        https://bugs.webkit.org/show_bug.cgi?id=87955
+
+        Reviewed by Simon Hausmann.
+
+        * UIProcess/API/qt/tests/publicapi/tst_publicapi.cpp:
+
+2012-05-31  Zalan Bujtas  <zbujtas@gmail.com>
+
+        [Qt][WK2] Add missing ViewportUpdateDeferrer guarding to setPageItemRectVisible() calls.
+        https://bugs.webkit.org/show_bug.cgi?id=87936
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::viewportAttributesChanged):
+        (WebKit::QtViewportInteractionEngine::pageContentsSizeChanged):
+
+2012-05-31  Keunsoon Lee  <keunsoon.lee@samsung.com>
+
+        [EFL][WK2] Add WKURLRequestEfl and WKURLResponseEfl
+        https://bugs.webkit.org/show_bug.cgi?id=70231
+
+        Reviewed by Chang Shu.
+
+        These codes can be used for WKPageDecidePolicyForResponseCallback on page policy callbacks.
+        The callback conveys WKURLResponseRef and WKURLRequestRef as parameter.
+
+        By the way, EFL browser needs content type from response to decide correct policy.
+        Another information, cookie, is necessary with similar reason.
+        But, there is no way to obtain such information on WebKit2 main stream, except for WKURLRequestCopyURL().
+
+        So, EFL port created those files to extract necessary information from WKURLResponseRef and WKURLRequestRef,
+        and not to desturb WebKit2 main stream. 
+
+        * Shared/API/c/efl/WKURLRequestEfl.cpp: Added.
+        (WKURLRequestEflCopyCookies): extracting cookie information from WKURLRequestRef.
+        * Shared/API/c/efl/WKURLRequestEfl.h: Added.
+        * Shared/API/c/efl/WKURLResponseEfl.cpp: Added.
+        (WKURLResponseEflCopyContentType): extracting content type (i.e. MIME type) from WKURLResponseRef.
+        * Shared/API/c/efl/WKURLResponseEfl.h: Added.
+        * Shared/efl/WebCoreArgumentCodersEfl.cpp: Added.
+        (CoreIPC):
+        (CoreIPC::::encode):
+        (CoreIPC::::decode):
+        * Shared/efl/WebURLRequestEfl.cpp: Added.
+        (WebKit):
+        (WebKit::WebURLRequestEfl::WebURLRequestEfl):
+        (WebKit::WebURLRequestEfl::cookies): obtaining cookie information from ResourceRequest.
+        * Shared/efl/WebURLRequestEfl.h: Added.
+        (WebKit):
+        (WebURLRequestEfl):
+        (WebKit::WebURLRequestEfl::create):
+        * Shared/efl/WebURLResponseEfl.cpp: Added.
+        (WebKit):
+        (WebKit::WebURLResponseEfl::WebURLResponseEfl):
+        (WebKit::WebURLResponseEfl::contentType): obtaining content type (i.e. MIME type) from ResourceResponse.
+        * Shared/efl/WebURLResponseEfl.h: Added.
+        (WebKit):
+        (WebURLResponseEfl):
+        (WebKit::WebURLResponseEfl::create):
+
+2012-05-31  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL][WK2] Rename ewk_private.h to ewk_view_private.h
+        https://bugs.webkit.org/show_bug.cgi?id=87923
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        EFL WK1 decided to divide up ewk_private.h into each file's XXX_private.h file in order to maintain
+        internal functions more easily. EFL WK2 needs to adjust this as well.
+
+        * UIProcess/API/efl/PageClientImpl.cpp:
+        * UIProcess/API/efl/ewk_view_private.h: Renamed from Source/WebKit2/UIProcess/API/efl/ewk_private.h.
+        (WebCore):
+        * UIProcess/cairo/BackingStoreCairo.cpp:
+
+2012-05-31  Andy Estes  <aestes@apple.com>
+
+        Move the specification of framework and library linking out of WebKit2.xcodeproj and into WebKit2.xcconfig
+        https://bugs.webkit.org/show_bug.cgi?id=87932
+
+        Reviewed by Dan Bernstein.
+
+        Doing this makes it easier to vary linking based on SDK or other factors.
+
+        * Configurations/WebKit2.xcconfig: Create FRAMEWORK_AND_LIBRARY_LDFLAGS,
+        which specifies the same list of frameworks and libraries that were
+        previously in WebKit2's 'Link Binary With Libraries' build phase, and
+        append it to $(OTHER_LDFLAGS).
+        * WebKit2.xcodeproj/project.pbxproj: Remove all frameworks and
+        libraries from the 'Link Binary With Libraries' build phase.
+
+2012-05-30  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] [WK2] Memory leak in webkitWebViewBaseStartDrag
+        https://bugs.webkit.org/show_bug.cgi?id=87756
+
+        Reviewed by Carlos Garcia Campos.
+
+        Fixed memory leaks in drag and drop by using adoptRef instead
+        of just getting new references.
+
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkitWebViewBaseStartDrag):
+
+2012-05-30  Luiz Agostini  <luiz.agostini@nokia.com>
+
+        [Qt] handled touchmove events should not cancel tap gesture recognition
+        https://bugs.webkit.org/show_bug.cgi?id=87808
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Tap gesture recognition should not be canceled if a touchmove event is handled
+        by the web process.
+
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (WebKit::QtWebPageEventHandler::doneWithTouchEvent):
+
+2012-05-30  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK][WK2] Errors in documentation about  webkit_web_view_run_javascript()
+        https://bugs.webkit.org/show_bug.cgi?id=87866
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp: Fix errors.
+
+2012-05-30  Andy Estes  <aestes@apple.com>
+
+        WebProcessMainMac.mm doesn't need to import WKView.h.
+
+        Rubber-stamped by Anders Carlsson. 
+
+        * WebProcess/mac/WebProcessMainMac.mm:
+
+2012-05-30  Marcelo Lira  <marcelo.lira@openbossa.org>
+
+        WebKit2: Implement layoutTestController.setPluginsEnabled() in WebKitTestRunner.
+        https://bugs.webkit.org/show_bug.cgi?id=58593
+
+        Adds the ability to change the pluginsEnabled flag in WebCore::Settings
+        to WebKitTestRunner's LayoutTestController. The flag is modified via the
+        public C API of the WebProcess.
+
+        Reviewed by Darin Adler.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetPluginsEnabled):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setPluginsEnabled): Calls the setPluginsEnabled
+        method for the WebCore::Settings of each WebCore::Page in the current
+        page group.
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-05-30  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        HashTable.h has using directives for std::pair and std::make_pair
+        https://bugs.webkit.org/show_bug.cgi?id=29919
+
+        Reviewed by Darin Adler.
+
+        Change code to use std::pair and std::make_pair.
+
+        * UIProcess/Launcher/mac/DynamicLinkerEnvironmentExtractor.mm:
+        (WebKit::DynamicLinkerEnvironmentExtractor::processEnvironmentVariable):
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::postMessageToInjectedBundle):
+
+2012-05-30  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        Unreviewed: Fix wrongly typed Qt slot.
+
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::QtViewportInteractionEngine):
+
+2012-05-30  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Move ViewportAttribute related methods to the interaction engine.
+        https://bugs.webkit.org/show_bug.cgi?id=87855
+
+        Reviewed by Simon Hausmann.
+
+        Move the logic of didChange{ViewportProperties|ContentsSize} to the
+        interaction engine and update our testing object.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewLegacyPrivate::QQuickWebViewLegacyPrivate):
+        (QQuickWebViewFlickablePrivate::didChangeViewportProperties):
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/qwebkittest.cpp:
+        (QWebKitTest::contentsScale):
+        (QWebKitTest::devicePixelRatio):
+        (QWebKitTest::initialScale):
+        (QWebKitTest::minimumScale):
+        (QWebKitTest::maximumScale):
+        (QWebKitTest::isScalable):
+        (QWebKitTest::layoutSize):
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::viewportAttributesChanged):
+        (WebKit):
+        (WebKit::QtViewportInteractionEngine::pageContentsSizeChanged):
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        (QtViewportInteractionEngine):
+
+2012-05-30  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Do renames in ViewportInteractionEngine as agreed upon
+        https://bugs.webkit.org/show_bug.cgi?id=87845
+
+        Reviewed by Simon Hausmann.
+
+        Mostly moving methods around and renaming them to be more
+        consistent and avoid terminology clashes.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::didChangeViewportProperties):
+        (QQuickWebViewFlickablePrivate::pageDidRequestScroll):
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::boundPosition):
+        (WebKit):
+        (WebKit::QtViewportInteractionEngine::QtViewportInteractionEngine):
+        (WebKit::QtViewportInteractionEngine::setPageItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::animatePageItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::flickMoveStarted):
+        (WebKit::QtViewportInteractionEngine::flickMoveEnded):
+        (WebKit::QtViewportInteractionEngine::pageItemPositionChanged):
+        (WebKit::QtViewportInteractionEngine::pageContentPositionRequest):
+        (WebKit::QtViewportInteractionEngine::scaleAnimationValueChanged):
+        (WebKit::QtViewportInteractionEngine::computePosRangeForPageItemAtScale):
+        (WebKit::QtViewportInteractionEngine::focusEditableArea):
+        (WebKit::QtViewportInteractionEngine::zoomToAreaGestureEnded):
+        (WebKit::QtViewportInteractionEngine::nearestValidBounds):
+        (WebKit::QtViewportInteractionEngine::cancelScrollAnimation):
+        (WebKit::QtViewportInteractionEngine::pinchGestureEnded):
+        (WebKit::QtViewportInteractionEngine::pageItemSizeChanged):
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        (WebKit::QtViewportInteractionEngine::setDevicePixelRatio):
+        (QtViewportInteractionEngine):
+
+2012-05-30  Mariusz Grzegorczyk  <mariusz.g@samsung.com>, Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][WK2] Fix WebKit2-EFL build
+        https://bugs.webkit.org/show_bug.cgi?id=83693
+
+        Reviewed by Carlos Garcia Campos.
+
+        * CMakeLists.txt: Move IDL generator codes to generate port specific *.messages.in.
+        * PlatformEfl.cmake: Add soup related files after r115411 and includes to fix build break.
+        * UIProcess/API/efl/PageClientImpl.cpp: Fix build break with ENABLE_TOUCH_EVENTS.
+        (WebKit):
+        (WebKit::PageClientImpl::doneWithTouchEvent):
+        * UIProcess/API/efl/PageClientImpl.h:
+        (PageClientImpl):
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp: Fix build break with ENABLE_INPUT_TYPE_COLOR and ENABLE_REGISTER_PROTOCOL_HANDLER.
+        (WebKit):
+        (WebKit::WebChromeClient::createColorChooser):
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp: Fix build break with ENABLE_WEB_INTENTS
+        (WebKit):
+        (WebKit::WebFrameLoaderClient::dispatchIntent):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.h:
+        (WebCore):
+        (WebFrameLoaderClient):
+        * WebProcess/WebProcess.cpp: Guard PLATFORM_STRATEGIES codes.
+        (WebKit::WebProcess::didGetPlugins):
+        * WebProcess/soup/WebSoupRequestManager.cpp: Try to share with EFL port.
+        (WebKit::WebSoupRequestManager::didHandleURIRequest):
+
+2012-05-30  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Variable renaming as preparation of further refactoring.
+
+        Rubberstamped by Simon Hausmann.
+
+        Change m_viewport to m_viewportItem and m_content to m_pageItem.
+
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::QtViewportInteractionEngine):
+        (WebKit::QtViewportInteractionEngine::setItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::animateItemRectVisible):
+        (WebKit::QtViewportInteractionEngine::flickableMoveStarted):
+        (WebKit::QtViewportInteractionEngine::flickableMoveEnded):
+        (WebKit::QtViewportInteractionEngine::flickableMovingPositionUpdate):
+        (WebKit::QtViewportInteractionEngine::scaleAnimationStateChanged):
+        (WebKit::QtViewportInteractionEngine::pagePositionRequest):
+        (WebKit::QtViewportInteractionEngine::computePosRangeForItemAtScale):
+        (WebKit::QtViewportInteractionEngine::focusEditableArea):
+        (WebKit::QtViewportInteractionEngine::zoomToAreaGestureEnded):
+        (WebKit::QtViewportInteractionEngine::nearestValidBounds):
+        (WebKit::QtViewportInteractionEngine::reset):
+        (WebKit::QtViewportInteractionEngine::setCSSScale):
+        (WebKit::QtViewportInteractionEngine::currentCSSScale):
+        (WebKit::QtViewportInteractionEngine::scrollAnimationActive):
+        (WebKit::QtViewportInteractionEngine::panGestureActive):
+        (WebKit::QtViewportInteractionEngine::panGestureStarted):
+        (WebKit::QtViewportInteractionEngine::panGestureRequestUpdate):
+        (WebKit::QtViewportInteractionEngine::panGestureEnded):
+        (WebKit::QtViewportInteractionEngine::panGestureCancelled):
+        (WebKit::QtViewportInteractionEngine::cancelScrollAnimation):
+        (WebKit::QtViewportInteractionEngine::pinchGestureStarted):
+        (WebKit::QtViewportInteractionEngine::pinchGestureRequestUpdate):
+        (WebKit::QtViewportInteractionEngine::scaleContent):
+        * UIProcess/qt/QtViewportInteractionEngine.h:
+        (QtViewportInteractionEngine):
+
+2012-05-30  Zalan Bujtas  <zbujtas@gmail.com>
+
+        [Qt][WK2] Do not use anonymous variables for ViewportUpdateDeferrer.
+        https://bugs.webkit.org/show_bug.cgi?id=87831
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::pagePositionRequest):
+        (WebKit::QtViewportInteractionEngine::cancelScrollAnimation):
+        (WebKit::QtViewportInteractionEngine::itemSizeChanged):
+
+2012-05-30  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix WebKit2GTK+ API tests in the bots.
+
+        * UIProcess/API/gtk/tests/TestWebKitWebView.cpp:
+        (testWebViewCanShowMIMEType): Remove the check for multimedia and
+        plugins MIME types since they depend on the configuration and they
+        are not available in the bots.
+
+2012-05-29  Jer Noble  <jer.noble@apple.com>
+
+        Noticeable delay taking an HTML5 trailer fullscreen.
+        https://bugs.webkit.org/show_bug.cgi?id=87794
+
+        Reviewed by Darin Adler.
+
+        Work around a not-entirely understood delay when using the results of a CGWindowListCreateImage()
+        call as the contents of a placeholder view.  The backing of the resulting CGImageRef resides on
+        the WindowServer, and drawing that image requires synchronous calls to the WindowServer process.
+        By copying the image data, up front, into our own process, we can avoid those synchronous calls
+        later and avoid the delay-causing drawing behavior.
+
+        * UIProcess/mac/WKFullScreenWindowController.mm:
+        (CGImageDeepCopy): Added a helper function which copies the image data into a new CGImage.
+        (-[WKFullScreenWindowController enterFullScreen:]): Use the above.
+
+2012-05-29  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] [WK2] Reproducible crash in performDragControllerAction
+        https://bugs.webkit.org/show_bug.cgi?id=87744
+
+        Reviewed by Martin Robinson.
+
+        Fix a crash by using deref() instead of delete to dereference and
+        release the platformData of DragData.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::performDragControllerAction):
+
+2012-05-29  Simon Pena  <spena@igalia.com>
+
+        [GTK] Missing field initializers for WKPageLoaderClient and WKPageUIClient
+        https://bugs.webkit.org/show_bug.cgi?id=87745
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add missing initializers for WKPageLoaderClient and
+        WKPageUIClient, for callbacks WKPagePluginDidFailCallback and
+        WKPageUnavailablePluginButtonClickedCallback, introduced in
+        revision r116716.
+
+        * UIProcess/API/gtk/WebKitLoaderClient.cpp:
+        (attachLoaderClientToView): Initialize WKPagePluginDidFailCallback
+        * UIProcess/API/gtk/WebKitUIClient.cpp:
+        (attachUIClientToView): Initialize callback
+        WKPageUnavailablePluginButtonClickedCallback
+
+2012-05-29  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Policy decision headers are not included in the main webkit2.h header
+        https://bugs.webkit.org/show_bug.cgi?id=87753
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/webkit2.h: Include
+        WebKitNavigationPolicyDecision.h and WebKitResponsePolicyDecision.h.
+
+2012-05-29  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add webkit_web_view_can_show_mime_type() to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=85998
+
+        Reviewed by Martin Robinson.
+
+        And use it in the default handler of WebKitWebView::decide-policy
+        signal to decide whether to use or ignore a response policy
+        decision depending on whether the mime type of the response can be
+        displayed in the WebView or not.
+
+        * UIProcess/API/gtk/WebKitURIResponse.cpp:
+        (webkitURIResponseGetProperty): Add getter for mime-type property.
+        (webkit_uri_response_class_init): Add mime-type property.
+        (webkit_uri_response_get_mime_type): Return the mime type of the
+        response.
+        * UIProcess/API/gtk/WebKitURIResponse.h:
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewDecidePolicy): In case of response policy decisions,
+        use the URI response to decide what to do: download if the
+        response is an attachment, use if the mime type is supported by
+        the web view or ignore otherwise.
+        (webkit_web_view_can_show_mime_type): Returns whether the given
+        mime type can be displayed in the WebView or not.
+        * UIProcess/API/gtk/WebKitWebView.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbols.
+        * UIProcess/API/gtk/tests/TestResources.cpp:
+        (testWebResourceResponse):
+        (testWebResourceMimeType):
+        (serverCallback):
+        (beforeAll):
+        * UIProcess/API/gtk/tests/TestWebKitWebView.cpp:
+        (testWebViewCanShowMIMEType):
+        (beforeAll):
+
+2012-05-29  David Barr  <davidbarr@chromium.org>
+
+        Introduce ENABLE_CSS_IMAGE_RESOLUTION compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=87685
+
+        Reviewed by Eric Seidel.
+
+        Add a configuration option for CSS image-resolution support, disabling it by default.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-05-29  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt] Move tests from DesktopBehavior which can be made to work
+        https://bugs.webkit.org/show_bug.cgi?id=87736
+
+        Rubberstamped by Simon Hausmann.
+
+        Move and modify the following tests to WebView/ and make them
+        use touch events.
+
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_itemSelector.qml: Renamed from Source/WebKit2/UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_itemSelector.qml.
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_messaging.qml: Renamed from Source/WebKit2/UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_messaging.qml.
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_multiFileUpload.qml: Renamed from Source/WebKit2/UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_multiFileUpload.qml.
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_singleFileUpload.qml: Renamed from Source/WebKit2/UIProcess/API/qt/tests/qmltests/DesktopBehavior/tst_singleFileUpload.qml.
+
+2012-05-29  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Sync up favicon-implementation with WebView url changes in r118158
+
+        https://bugs.webkit.org/show_bug.cgi?id=87133
+
+        We now base64-encode the page url in the image-provider url, so that any
+        normalization done by QUrl will not mess up the page-url. The logic of
+        creating and parsing the provider-url has been moved into the image
+        provider, to keep it in one place.
+
+        We were also releasing icons (even ones we hadn't retained), which we can't
+        do since we don't know when the icon url is no longer in use.
+
+        Reviewed-by Simon Hausmann.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::initialize):
+        (QQuickWebViewPrivate::loadProgressDidChange):
+        (QQuickWebViewPrivate::_q_onUrlChanged):
+        (QQuickWebViewPrivate::_q_onIconChangedForPageURL):
+        (QQuickWebViewPrivate::updateIcon):
+        (QQuickWebView::icon):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/qwebiconimageprovider.cpp:
+        (QWebIconImageProvider::iconURLForPageURLInContext):
+        (QWebIconImageProvider::requestImage):
+        * UIProcess/API/qt/qwebiconimageprovider_p.h:
+        (WebKit):
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_favIconLoad.qml:
+        * UIProcess/qt/QtWebIconDatabaseClient.cpp:
+        (WebKit::QtWebIconDatabaseClient::didChangeIconForPageURL):
+        (WebKit::QtWebIconDatabaseClient::iconForPageURL):
+        (WebKit):
+        (WebKit::QtWebIconDatabaseClient::iconImageForPageURL):
+        * UIProcess/qt/QtWebIconDatabaseClient.h:
+        (QtWebIconDatabaseClient):
+
+2012-05-29  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [Qt][WK2] Fix failing qmltests::FitToView::test_basic()
+        https://bugs.webkit.org/show_bug.cgi?id=87236
+
+        Reviewed by Simon Hausmann.
+
+        The fix is a combination of things. First of all some events
+        were emitted at the wrong times or when nothing had changed.
+
+        We also initialized the view saying it was suspended which is
+        not correct.
+
+        Another bug was that the touch tap, didn't result in marking
+        the view as having user interaction. This was recently fixed
+        in r118493.
+
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPage::setContentsScale):
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate):
+
+            Make sure pageIsSuspended is initialized to false.
+
+        (QQuickWebViewFlickablePrivate::_q_onInformVisibleContentChange):
+
+            Early bail out if there is no change.
+
+            Inform contentScaleCommitted if the scale changed since last time.
+
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+
+            Make sure to commit the right signals, ie. *Changed and not *Committed.
+
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qwebkittest.cpp:
+        (touchPoint):
+        (QWebKitTest::sendTouchEvent):
+        (QWebKitTest::touchTap):
+        (QWebKitTest::touchDoubleTap):
+
+            Add proper touch emulation for the testing system. Call directly
+            to our WebKit API (avoid Qt event loop) to ensure all events gets
+            delivered.
+
+        * UIProcess/API/qt/qwebkittest_p.h:
+        * UIProcess/qt/QtViewportInteractionEngine.cpp:
+        (WebKit::QtViewportInteractionEngine::setItemRectVisible):
+
+            Assert that a ViewportUpdateDeferrer is always used when calling
+            this method.
+
+        (WebKit::QtViewportInteractionEngine::animateItemRectVisible):
+
+            Remove work around now we have the proper fix in place.
+
+        (WebKit::QtViewportInteractionEngine::pagePositionRequest):
+
+            Do not send the informVisibleContentChange manually, use the
+            ViewportUpdateDeferrer instead.
+
+        (WebKit::QtViewportInteractionEngine::cancelScrollAnimation):
+
+            Add missing ViewportUpdateDeferrer.
+
+        (WebKit::QtViewportInteractionEngine::pinchGestureStarted):
+
+            No reason to emit informVisibleContentChange before pinch
+            start, as it is always done on end (due to the ViewportUpdateDeferrer).
+
+        (WebKit::QtViewportInteractionEngine::itemSizeChanged):
+
+            Add missing ViewportUpdateDeferrer.
+
+2012-05-29  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        [Qt] [WK2] Allow user to inject JS scripts when the page loads
+        https://bugs.webkit.org/show_bug.cgi?id=85827
+
+        Reviewed by Simon Hausmann.
+
+        Create a new experimental property to list URLs of JS scripts that should be
+        loaded when a page is loaded. These scripts will run in the normal JS environment
+        of the page.
+
+        The supported URL schemes are file:/// and qrc:///. The scripts are read from the
+        UI process and transfered to the Web process.
+
+        Together with the experimental messaging API this provides a way for the
+        application to manipulate the DOM (by injecting a script that does the
+        manipulation and communicating with it via postMessage). This covers some of the
+        use cases of QWebElement in our WK1 API.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::didRelaunchProcess):
+        (readUserScript):
+        (QQuickWebViewPrivate::updateUserScripts):
+        (QQuickWebViewExperimental::userScripts):
+        (QQuickWebViewExperimental::setUserScripts):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/tests/qmltests/WebView.pro:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_userScripts.qml: Added.
+        * UIProcess/API/qt/tests/qmltests/common/append-document-title.js: Added.
+        * UIProcess/API/qt/tests/qmltests/common/big-user-script.js: Added.
+        * UIProcess/API/qt/tests/qmltests/common/change-document-title.js: Added.
+        * UIProcess/API/qt/tests/qmltests/resources.qrc: Added.
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/qt/WebPageProxyQt.cpp:
+        (WebKit::WebPageProxy::setUserScripts):
+        (WebKit):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+        * WebProcess/WebPage/WebPage.messages.in:
+        * WebProcess/WebPage/qt/WebPageQt.cpp:
+        (WebKit::WebPage::setUserScripts):
+        (WebKit):
+
+2012-05-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r118752.
+        http://trac.webkit.org/changeset/118752
+        https://bugs.webkit.org/show_bug.cgi?id=87731
+
+        incomplete patch (Requested by cmarcelo on #webkit).
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::didRelaunchProcess):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/tests/qmltests/WebView.pro:
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/qt/WebPageProxyQt.cpp:
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+        * WebProcess/WebPage/WebPage.messages.in:
+        * WebProcess/WebPage/qt/WebPageQt.cpp:
+
+2012-05-21  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        [Qt] [WK2] Allow user to inject JS scripts when the page loads
+        https://bugs.webkit.org/show_bug.cgi?id=85827
+
+        Reviewed by Simon Hausmann.
+
+        Create a new experimental property to list URLs of JS scripts that should be
+        loaded when a page is loaded. These scripts will run in the normal JS environment
+        of the page.
+
+        The supported URL schemes are file:/// and qrc:///. The scripts are read from the
+        UI process and transfered to the Web process.
+
+        Together with the experimental messaging API this provides a way for the
+        application to manipulate the DOM (by injecting a script that does the
+        manipulation and communicating with it via postMessage). This covers some of the
+        use cases of QWebElement in our WK1 API.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::didRelaunchProcess):
+        (readUserScript):
+        (QQuickWebViewPrivate::updateUserScripts):
+        (QQuickWebViewExperimental::userScripts):
+        (QQuickWebViewExperimental::setUserScripts):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/tests/qmltests/WebView.pro:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_userScripts.qml: Added.
+        * UIProcess/API/qt/tests/qmltests/common/append-document-title.js: Added.
+        * UIProcess/API/qt/tests/qmltests/common/big-user-script.js: Added.
+        * UIProcess/API/qt/tests/qmltests/common/change-document-title.js: Added.
+        * UIProcess/API/qt/tests/qmltests/resources.qrc: Added.
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/qt/WebPageProxyQt.cpp:
+        (WebKit::WebPageProxy::setUserScripts):
+        (WebKit):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+        * WebProcess/WebPage/WebPage.messages.in:
+        * WebProcess/WebPage/qt/WebPageQt.cpp:
+        (WebKit::WebPage::setUserScripts):
+        (WebKit):
+
+2012-05-29  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add return value information to WebKitWebView::load-failed signal documentation
+        https://bugs.webkit.org/show_bug.cgi?id=87704
+
+        Reviewed by Martin Robinson.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkit_web_view_class_init):
+
+2012-05-29  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add WebKitWebInspector.h to the list of WebKit2 GTK public headers
+        https://bugs.webkit.org/show_bug.cgi?id=87703
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.list.am: Add WebKitWebInspector.h to webkit2gtk_h_api.
+
+2012-05-25  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        WebKitTestRunner needs to support layoutTestController.setJavaScriptProfilingEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=42328
+
+        Reviewed by Eric Seidel.
+
+        Removed unneeded setJavaScriptProfilingEnabled function from WTR after its
+        move to windows.internals.settings.
+
+        * WebProcess/InjectedBundle/API/c/WKBundleInspector.cpp:
+        * WebProcess/InjectedBundle/API/c/WKBundleInspector.h:
+        * WebProcess/WebPage/WebInspector.cpp:
+        (WebKit::WebInspector::setJavaScriptProfilingEnabled):
+        * win/WebKit2.def:
+
+2012-05-28  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        Remove unused argument coders for animation
+        https://bugs.webkit.org/show_bug.cgi?id=87435
+
+        Reviewed by Sam Weinig.
+
+        Left the used argument coders only, behind a proper USE(UI_SIDE_COMPOSITING) flag.
+
+        * Shared/WebCoreArgumentCoders.cpp:
+        (CoreIPC):
+        * Shared/WebCoreArgumentCoders.h:
+
+2012-05-28  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move allowRoundingHacks to Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=87328
+
+        Reviewed by Hajime Morita.
+
+        * win/WebKit2.def: Add setAllowsRoundingHacks() to symbol filter.
+
 2012-05-26  Geoffrey Garen  <ggaren@apple.com>
 
         WebKit should be lazy-finalization-safe (esp. the DOM) v2

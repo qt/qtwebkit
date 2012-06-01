@@ -41,6 +41,7 @@
 #include "EmailInputType.h"
 #include "ExceptionCode.h"
 #include "FileInputType.h"
+#include "FileList.h"
 #include "FormDataList.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
@@ -577,6 +578,10 @@ FileList* InputType::files()
     return 0;
 }
 
+void InputType::setFiles(PassRefPtr<FileList>)
+{
+}
+
 bool InputType::getTypeSpecificValue(String&)
 {
     return false;
@@ -627,6 +632,11 @@ PassOwnPtr<ClickHandlingState> InputType::willDispatchClick()
 
 void InputType::didDispatchClick(Event*, const ClickHandlingState&)
 {
+}
+
+String InputType::localizeValue(const String& proposedValue) const
+{
+    return proposedValue;
 }
 
 String InputType::visibleValue() const

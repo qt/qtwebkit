@@ -210,7 +210,6 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* docum
     , m_readyStateMaximum(HAVE_NOTHING)
     , m_volume(1.0f)
     , m_lastSeekTime(0)
-    , m_previousProgress(0)
     , m_previousProgressTime(numeric_limits<double>::max())
     , m_lastTimeUpdateEventWallTime(0)
     , m_lastTimeUpdateEventMovieTime(numeric_limits<float>::max())
@@ -1141,11 +1140,18 @@ void HTMLMediaElement::updateActiveTextTrackCues(float movieTime)
         eventTasks.append(std::make_pair(missedCues[i].data()->startTime(),
                                          missedCues[i].data()));
 
-        // 10 - For each text track in missed cues, prepare an event
-        // named exit for the TextTrackCue object with the text track cue end
-        // time.
-        eventTasks.append(std::make_pair(missedCues[i].data()->endTime(),
-                                         missedCues[i].data()));
+        // 10 - For each text track [...] in missed cues, prepare an event
+        // named exit for the TextTrackCue object with the  with the later of
+        // the text track cue end time and the text track cue start time.
+
+        // Note: An explicit task is added only if the cue is NOT a zero or
+        // negative length cue. Otherwise, the need for an exit event is
+        // checked when these tasks are actually queued below. This doesn't
+        // affect sorting events before dispatch either, because the exit
+        // event has the same time as the enter event.
+        if (missedCues[i].data()->startTime() < missedCues[i].data()->endTime())
+            eventTasks.append(std::make_pair(missedCues[i].data()->endTime(),
+                                             missedCues[i].data()));
     }
 
     for (size_t i = 0; i < previousCuesSize; ++i) {
@@ -1179,15 +1185,25 @@ void HTMLMediaElement::updateActiveTextTrackCues(float movieTime)
 
         // Each event in eventTasks may be either an enterEvent or an exitEvent,
         // depending on the time that is associated with the event. This
-        // correctly identifies the type of the event, since the startTime is
-        // always less than the endTime.
-        if (eventTasks[i].first == eventTasks[i].second->startTime())
+        // correctly identifies the type of the event, if the startTime is
+        // less than the endTime in the cue.
+        if (eventTasks[i].second->startTime() >= eventTasks[i].second->endTime()) {
             event = Event::create(eventNames().enterEvent, false, false);
-        else
-            event = Event::create(eventNames().exitEvent, false, false);
+            event->setTarget(eventTasks[i].second);
+            m_asyncEventQueue->enqueueEvent(event.release());
 
-        event->setTarget(eventTasks[i].second);
-        m_asyncEventQueue->enqueueEvent(event.release());
+            event = Event::create(eventNames().exitEvent, false, false);
+            event->setTarget(eventTasks[i].second);
+            m_asyncEventQueue->enqueueEvent(event.release());
+        } else {
+            if (eventTasks[i].first == eventTasks[i].second->startTime())
+                event = Event::create(eventNames().enterEvent, false, false);
+            else
+                event = Event::create(eventNames().exitEvent, false, false);
+
+            event->setTarget(eventTasks[i].second);
+            m_asyncEventQueue->enqueueEvent(event.release());
+        }
     }
 
     // 14 - Sort affected tracks in the same order as the text tracks appear in
@@ -1311,13 +1327,21 @@ void HTMLMediaElement::textTrackRemoveCues(TextTrack*, const TextTrackCueList* c
 
 void HTMLMediaElement::textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue> cue)
 {
-    m_cueTree.add(m_cueTree.createInterval(cue->startTime(), cue->endTime(), cue.get()));
+    // Negative duration cues need be treated in the interval tree as
+    // zero-length cues.
+    double endTime = max(cue->startTime(), cue->endTime());
+
+    m_cueTree.add(m_cueTree.createInterval(cue->startTime(), endTime, cue.get()));
     updateActiveTextTrackCues(currentTime());
 }
 
 void HTMLMediaElement::textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue> cue)
 {
-    m_cueTree.remove(m_cueTree.createInterval(cue->startTime(), cue->endTime(), cue.get()));
+    // Negative duration cues need to be treated in the interval tree as
+    // zero-length cues.
+    double endTime = max(cue->startTime(), cue->endTime());
+
+    m_cueTree.remove(m_cueTree.createInterval(cue->startTime(), endTime, cue.get()));
     updateActiveTextTrackCues(currentTime());
 }
 
@@ -1352,7 +1376,6 @@ void HTMLMediaElement::startProgressEventTimer()
         return;
 
     m_previousProgressTime = WTF::currentTime();
-    m_previousProgress = 0;
     // 350ms is not magic, it is in the spec!
     m_progressEventTimer.startRepeating(0.350);
 }
@@ -1559,7 +1582,7 @@ void HTMLMediaElement::setNetworkState(MediaPlayer::NetworkState state)
 void HTMLMediaElement::changeNetworkStateFromLoadingToIdle()
 {
     m_progressEventTimer.stop();
-    if (hasMediaControls() && m_player->bytesLoaded() != m_previousProgress)
+    if (hasMediaControls() && m_player->didLoadingProgress())
         mediaControls()->bufferingProgressed();
 
     // Schedule one last progress event so we guarantee that at least one is fired
@@ -1812,25 +1835,21 @@ void HTMLMediaElement::progressEventTimerFired(Timer<HTMLMediaElement>*)
     if (m_networkState != NETWORK_LOADING)
         return;
 
-    unsigned progress = m_player->bytesLoaded();
     double time = WTF::currentTime();
     double timedelta = time - m_previousProgressTime;
 
-    if (progress == m_previousProgress) {
-        if (timedelta > 3.0 && !m_sentStalledEvent) {
-            scheduleEvent(eventNames().stalledEvent);
-            m_sentStalledEvent = true;
-            setShouldDelayLoadEvent(false);
-        }
-    } else {
+    if (m_player->didLoadingProgress()) {
         scheduleEvent(eventNames().progressEvent);
-        m_previousProgress = progress;
         m_previousProgressTime = time;
         m_sentStalledEvent = false;
         if (renderer())
             renderer()->updateFromElement();
         if (hasMediaControls())
             mediaControls()->bufferingProgressed();
+    } else if (timedelta > 3.0 && !m_sentStalledEvent) {
+        scheduleEvent(eventNames().stalledEvent);
+        m_sentStalledEvent = true;
+        setShouldDelayLoadEvent(false);
     }
 }
 
@@ -2698,7 +2717,6 @@ void HTMLMediaElement::startPlaybackProgressTimer()
         return;
 
     m_previousProgressTime = WTF::currentTime();
-    m_previousProgress = 0;
     m_playbackProgressTimer.startRepeating(maxTimeupdateEventFrequency);
 }
 

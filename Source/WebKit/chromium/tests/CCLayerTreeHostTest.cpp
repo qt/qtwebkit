@@ -32,6 +32,7 @@
 #include "CCTiledLayerTestCommon.h"
 #include "CompositorFakeWebGraphicsContext3D.h"
 #include "ContentLayerChromium.h"
+#include "FakeWebGraphicsContext3D.h"
 #include "GraphicsContext3DPrivate.h"
 #include "LayerChromium.h"
 #include "TextureManager.h"
@@ -43,6 +44,7 @@
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCScopedThreadProxy.h"
+#include "cc/CCSingleThreadProxy.h"
 #include "cc/CCTextureUpdater.h"
 #include "cc/CCThreadTask.h"
 #include "cc/CCTimingFunction.h"
@@ -71,6 +73,52 @@ using namespace WTF;
 
 namespace {
 
+class CompositorFakeWebGraphicsContext3DWithTextureTracking : public CompositorFakeWebGraphicsContext3D {
+public:
+    static PassOwnPtr<CompositorFakeWebGraphicsContext3DWithTextureTracking> create(Attributes attrs)
+    {
+        return adoptPtr(new CompositorFakeWebGraphicsContext3DWithTextureTracking(attrs));
+    }
+
+    virtual WebGLId createTexture()
+    {
+        WebGLId texture = m_textures.size() + 1;
+        m_textures.append(texture);
+        return texture;
+    }
+
+    virtual void deleteTexture(WebGLId texture)
+    {
+        for (size_t i = 0; i < m_textures.size(); i++) {
+            if (m_textures[i] == texture) {
+                m_textures.remove(i);
+                break;
+            }
+        }
+    }
+
+    virtual void bindTexture(WGC3Denum /* target */, WebGLId texture)
+    {
+        m_usedTextures.add(texture);
+    }
+
+    int numTextures() const { return static_cast<int>(m_textures.size()); }
+    int texture(int i) const { return m_textures[i]; }
+    void resetTextures() { m_textures.clear(); }
+
+    int numUsedTextures() const { return static_cast<int>(m_usedTextures.size()); }
+    bool usedTexture(int texture) const { return m_usedTextures.find(texture) != m_usedTextures.end(); }
+    void resetUsedTextures() { m_usedTextures.clear(); }
+
+private:
+    explicit CompositorFakeWebGraphicsContext3DWithTextureTracking(Attributes attrs) : CompositorFakeWebGraphicsContext3D(attrs)
+    {
+    }
+
+    Vector<WebGLId> m_textures;
+    HashSet<WebGLId, DefaultHash<WebGLId>::Hash, UnsignedWithZeroKeyHashTraits<WebGLId> > m_usedTextures;
+};
+
 // Used by test stubs to notify the test when something interesting happens.
 class TestHooks : public CCLayerAnimationDelegate {
 public:
@@ -83,7 +131,7 @@ public:
     virtual void applyScrollAndScale(const IntSize&, float) { }
     virtual void updateAnimations(double monotonicTime) { }
     virtual void layout() { }
-    virtual void didRecreateContext(bool succeded) { }
+    virtual void didRecreateContext(bool succeeded) { }
     virtual void didCommit() { }
     virtual void didCommitAndDrawFrame() { }
     virtual void scheduleComposite() { }
@@ -91,6 +139,16 @@ public:
     // Implementation of CCLayerAnimationDelegate
     virtual void notifyAnimationStarted(double time) { }
     virtual void notifyAnimationFinished(double time) { }
+
+    virtual PassRefPtr<GraphicsContext3D> createContext()
+    {
+        GraphicsContext3D::Attributes attrs;
+        WebGraphicsContext3D::Attributes webAttrs;
+        webAttrs.alpha = attrs.alpha;
+
+        OwnPtr<WebGraphicsContext3D> webContext = CompositorFakeWebGraphicsContext3DWithTextureTracking::create(webAttrs);
+        return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), GraphicsContext3D::RenderDirectlyToHostWindow);
+    }
 };
 
 // Adapts CCLayerTreeHostImpl for test. Runs real code, then invokes test hooks.
@@ -206,52 +264,6 @@ private:
     bool m_didAddAnimationWasCalled;
 };
 
-class CompositorFakeWebGraphicsContext3DWithTextureTracking : public CompositorFakeWebGraphicsContext3D {
-public:
-    static PassOwnPtr<CompositorFakeWebGraphicsContext3DWithTextureTracking> create(Attributes attrs)
-    {
-        return adoptPtr(new CompositorFakeWebGraphicsContext3DWithTextureTracking(attrs));
-    }
-
-    virtual WebGLId createTexture()
-    {
-        WebGLId texture = m_textures.size() + 1;
-        m_textures.append(texture);
-        return texture;
-    }
-
-    virtual void deleteTexture(WebGLId texture)
-    {
-        for (size_t i = 0; i < m_textures.size(); i++) {
-            if (m_textures[i] == texture) {
-                m_textures.remove(i);
-                break;
-            }
-        }
-    }
-
-    virtual void bindTexture(WGC3Denum /* target */, WebGLId texture)
-    {
-        m_usedTextures.add(texture);
-    }
-
-    int numTextures() const { return static_cast<int>(m_textures.size()); }
-    int texture(int i) const { return m_textures[i]; }
-    void resetTextures() { m_textures.clear(); }
-
-    int numUsedTextures() const { return static_cast<int>(m_usedTextures.size()); }
-    bool usedTexture(int texture) const { return m_usedTextures.find(texture) != m_usedTextures.end(); }
-    void resetUsedTextures() { m_usedTextures.clear(); }
-
-private:
-    explicit CompositorFakeWebGraphicsContext3DWithTextureTracking(Attributes attrs) : CompositorFakeWebGraphicsContext3D(attrs)
-    {
-    }
-
-    Vector<WebGLId> m_textures;
-    HashSet<WebGLId, DefaultHash<WebGLId>::Hash, UnsignedWithZeroKeyHashTraits<WebGLId> > m_usedTextures;
-};
-
 // Implementation of CCLayerTreeHost callback interface.
 class MockLayerTreeHostClient : public CCLayerTreeHostClient {
 public:
@@ -285,12 +297,7 @@ public:
 
     virtual PassRefPtr<GraphicsContext3D> createContext() OVERRIDE
     {
-        GraphicsContext3D::Attributes attrs;
-        WebGraphicsContext3D::Attributes webAttrs;
-        webAttrs.alpha = attrs.alpha;
-
-        OwnPtr<WebGraphicsContext3D> webContext = CompositorFakeWebGraphicsContext3DWithTextureTracking::create(webAttrs);
-        return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), GraphicsContext3D::RenderDirectlyToHostWindow);
+        return m_testHooks->createContext();
     }
 
     virtual void willCommit() OVERRIDE
@@ -343,6 +350,7 @@ public:
     virtual void beginTest() = 0;
 
     void endTest();
+    void endTestAfterDelay(int delayMilliseconds);
 
     void postSetNeedsAnimateToMainThread()
     {
@@ -395,6 +403,11 @@ public:
         m_timeoutTask = 0;
     }
 
+    void clearEndTestTask()
+    {
+        m_endTestTask = 0;
+    }
+
     CCLayerTreeHost* layerTreeHost() { return m_layerTreeHost.get(); }
 
 
@@ -406,6 +419,7 @@ protected:
         , m_finished(false)
         , m_scheduled(false)
         , m_started(false)
+        , m_endTestTask(0)
     { }
 
     void doBeginTest();
@@ -597,6 +611,34 @@ protected:
         CCLayerTreeHostTest* m_test;
     };
 
+    class EndTestTask : public WebThread::Task {
+    public:
+        explicit EndTestTask(CCLayerTreeHostTest* test)
+            : m_test(test)
+        {
+        }
+
+        virtual ~EndTestTask()
+        {
+            if (m_test)
+                m_test->clearEndTestTask();
+        }
+
+        void clearTest()
+        {
+            m_test = 0;
+        }
+
+        virtual void run()
+        {
+            if (m_test)
+                m_test->endTest();
+        }
+
+    private:
+        CCLayerTreeHostTest* m_test;
+    };
+
     virtual void runTest(bool threaded)
     {
         if (threaded) {
@@ -620,6 +662,9 @@ protected:
 
         if (m_timeoutTask)
             m_timeoutTask->clearTest();
+
+        if (m_endTestTask)
+            m_endTestTask->clearTest();
 
         ASSERT_FALSE(m_layerTreeHost.get());
         m_client.clear();
@@ -648,6 +693,7 @@ private:
     RefPtr<CCScopedThreadProxy> m_mainThreadProxy;
     TimeoutTask* m_timeoutTask;
     BeginTask* m_beginTask;
+    EndTestTask* m_endTestTask;
 };
 
 void CCLayerTreeHostTest::doBeginTest()
@@ -683,6 +729,17 @@ void CCLayerTreeHostTest::endTest()
             m_endWhenBeginReturns = true;
         else
             onEndTest(static_cast<void*>(this));
+    }
+}
+
+void CCLayerTreeHostTest::endTestAfterDelay(int delayMilliseconds)
+{
+    // If we are called from the CCThread, re-call endTest on the main thread.
+    if (!isMainThread())
+        m_mainThreadProxy->postTask(createCCThreadTask(this, &CCLayerTreeHostTest::endTestAfterDelay, delayMilliseconds));
+    else {
+        m_endTestTask = new EndTestTask(this);
+        WebKit::Platform::current()->currentThread()->postDelayedTask(m_endTestTask, delayMilliseconds);
     }
 }
 
@@ -1389,6 +1446,56 @@ private:
 
 SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestSynchronizeAnimationStartTimes)
 
+class FakeWebGraphicsContext3DMakeCurrentFails : public FakeWebGraphicsContext3D {
+public:
+    virtual bool makeContextCurrent() { return false; }
+};
+
+// Ensures that we do not animate
+class CCLayerTreeHostTestInitializeLayerRendererFailsAfterAddAnimation : public CCLayerTreeHostTest {
+public:
+    CCLayerTreeHostTestInitializeLayerRendererFailsAfterAddAnimation()
+    {
+    }
+
+    virtual void beginTest()
+    {
+        // This will cause the animation timer to be set which will fire in
+        // CCSingleThreadProxy::animationTimerDelay() seconds.
+        postAddAnimationToMainThread();
+    }
+
+    virtual void animateLayers(CCLayerTreeHostImpl* layerTreeHostImpl, double monotonicTime)
+    {
+        ASSERT_NOT_REACHED();
+    }
+
+    virtual void didRecreateContext(bool succeeded)
+    {
+        EXPECT_FALSE(succeeded);
+
+        // Make sure we wait CCSingleThreadProxy::animationTimerDelay() seconds
+        // (use ceil just to be sure). If the timer was not disabled, we will
+        // attempt to call CCSingleThreadProxy::compositeImmediately and the
+        // test will fail.
+        endTestAfterDelay(ceil(CCSingleThreadProxy::animationTimerDelay() * 1000));
+    }
+
+    virtual PassRefPtr<GraphicsContext3D> createContext() OVERRIDE
+    {
+        return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(new FakeWebGraphicsContext3DMakeCurrentFails), GraphicsContext3D::RenderDirectlyToHostWindow);
+    }
+
+    virtual void afterTest()
+    {
+    }
+};
+
+TEST_F(CCLayerTreeHostTestInitializeLayerRendererFailsAfterAddAnimation, runSingleThread)
+{
+    runTest(false);
+}
+
 // Ensures that main thread animations have their start times synchronized with impl thread animations.
 class CCLayerTreeHostTestAnimationFinishedEvents : public CCLayerTreeHostTestThreadOnly {
 public:
@@ -1985,21 +2092,21 @@ public:
         // The root render surface is the size of the viewport.
         EXPECT_EQ_RECT(IntRect(0, 0, 60, 60), root->renderSurface()->contentRect());
 
-        TransformationMatrix scaleTransform;
+        WebTransformationMatrix scaleTransform;
         scaleTransform.scale(impl->settings().deviceScaleFactor);
 
         // The root layer is scaled by 2x.
-        TransformationMatrix rootScreenSpaceTransform = scaleTransform;
-        TransformationMatrix rootDrawTransform = scaleTransform;
+        WebTransformationMatrix rootScreenSpaceTransform = scaleTransform;
+        WebTransformationMatrix rootDrawTransform = scaleTransform;
         rootDrawTransform.translate(root->bounds().width() * 0.5, root->bounds().height() * 0.5);
 
         EXPECT_EQ(rootDrawTransform, root->drawTransform());
         EXPECT_EQ(rootScreenSpaceTransform, root->screenSpaceTransform());
 
         // The child is at position 2,2, so translate by 2,2 before applying the scale by 2x.
-        TransformationMatrix childScreenSpaceTransform = scaleTransform;
+        WebTransformationMatrix childScreenSpaceTransform = scaleTransform;
         childScreenSpaceTransform.translate(2, 2);
-        TransformationMatrix childDrawTransform = scaleTransform;
+        WebTransformationMatrix childDrawTransform = scaleTransform;
         childDrawTransform.translate(2, 2);
         childDrawTransform.translate(child->bounds().width() * 0.5, child->bounds().height() * 0.5);
 
@@ -2113,7 +2220,7 @@ TEST_F(CCLayerTreeHostTestAtomicCommit, runMultiThread)
     runTest(true);
 }
 
-static void setLayerPropertiesForTesting(LayerChromium* layer, LayerChromium* parent, const TransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
+static void setLayerPropertiesForTesting(LayerChromium* layer, LayerChromium* parent, const WebTransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
 {
     layer->removeAllChildren();
     if (parent)
@@ -2141,7 +2248,7 @@ public:
         m_layerTreeHost->setRootLayer(m_parent);
         m_layerTreeHost->setViewportSize(IntSize(10, 20));
 
-        TransformationMatrix identityMatrix;
+        WebTransformationMatrix identityMatrix;
         setLayerPropertiesForTesting(m_parent.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 20), true);
         setLayerPropertiesForTesting(m_child.get(), m_parent.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(0, 10), IntSize(10, 10), false);
 
@@ -2301,7 +2408,7 @@ private:
     Region m_occludedScreenSpace;
 };
 
-static void setTestLayerPropertiesForTesting(TestLayerChromium* layer, LayerChromium* parent, const TransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
+static void setTestLayerPropertiesForTesting(TestLayerChromium* layer, LayerChromium* parent, const WebTransformationMatrix& transform, const FloatPoint& anchor, const FloatPoint& position, const IntSize& bounds, bool opaque)
 {
     setLayerPropertiesForTesting(layer, parent, transform, anchor, position, bounds, opaque);
     layer->clearOccludedScreenSpace();
@@ -2319,8 +2426,8 @@ public:
         RefPtr<TestLayerChromium> grandChild = TestLayerChromium::create();
         RefPtr<TestLayerChromium> mask = TestLayerChromium::create();
 
-        TransformationMatrix identityMatrix;
-        TransformationMatrix childTransform;
+        WebTransformationMatrix identityMatrix;
+        WebTransformationMatrix childTransform;
         childTransform.translate(250, 250);
         childTransform.rotate(90);
         childTransform.translate(-250, -250);
@@ -2521,8 +2628,8 @@ public:
         RefPtr<TestLayerChromium> grandChild = TestLayerChromium::create();
         RefPtr<TestLayerChromium> mask = TestLayerChromium::create();
 
-        TransformationMatrix identityMatrix;
-        TransformationMatrix childTransform;
+        WebTransformationMatrix identityMatrix;
+        WebTransformationMatrix childTransform;
         childTransform.translate(250, 250);
         childTransform.rotate(90);
         childTransform.translate(-250, -250);
@@ -2607,7 +2714,7 @@ public:
     {
         // We create enough RenderSurfaces that it will trigger Vector reallocation while computing occlusion.
         Region occluded;
-        const TransformationMatrix identityMatrix;
+        const WebTransformationMatrix identityMatrix;
         Vector<RefPtr<TestLayerChromium> > layers;
         Vector<RefPtr<TestLayerChromium> > children;
         int numSurfaces = 20;

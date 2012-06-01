@@ -525,6 +525,7 @@ WebView *createWebViewAndOffscreenWindow()
     [WebView registerURLSchemeAsLocal:@"feedsearch"];
     
     [webView setContinuousSpellCheckingEnabled:YES];
+    [webView setDefersCallbacks:NO];
     [webView setGrammarCheckingEnabled:YES];
     [webView setInteractiveFormValidationEnabled:YES];
     [webView setValidationMessageTimerMagnification:-1];
@@ -1264,7 +1265,6 @@ static void resetWebViewToConsistentStateBeforeTesting()
     }
 
     [[mainFrame webView] setSmartInsertDeleteEnabled:YES];
-    [[[mainFrame webView] inspector] setJavaScriptProfilingEnabled:NO];
 
     [WebView _setUsesTestModeFocusRingColor:YES];
     [WebView _resetOriginAccessWhitelists];

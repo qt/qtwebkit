@@ -64,7 +64,7 @@ module window {
 
         readonly attribute [CheckSecurityForNode] Element frameElement;
 
-        [DoNotCheckSecurity] void focus();
+        [DoNotCheckSecurity, CallWith=ScriptExecutionContext] void focus();
         [DoNotCheckSecurity] void blur();
         [DoNotCheckSecurity, CallWith=ScriptExecutionContext] void close();
 
@@ -388,6 +388,8 @@ module window {
         attribute EntityReferenceConstructor EntityReference;
         attribute ProcessingInstructionConstructor ProcessingInstruction;
         attribute [Conditional=SHADOW_DOM, V8EnabledPerContext=shadowDOM] ShadowRootConstructor WebKitShadowRoot;
+        attribute [Conditional=SHADOW_DOM, V8EnabledPerContext=shadowDOM] HTMLContentElementConstructor HTMLContentElement;
+        attribute [Conditional=SHADOW_DOM, V8EnabledPerContext=shadowDOM] HTMLShadowElementConstructor HTMLShadowElement;
 
         attribute DOMSelectionConstructor Selection;
         attribute DOMWindowConstructor Window;
@@ -708,7 +710,7 @@ module window {
         attribute SVGUnitTypesConstructor SVGUnitTypes;
         attribute SVGUseElementConstructor SVGUseElement;
         attribute SVGViewElementConstructor SVGViewElement;
-//      attribute SVGViewSpecConstructor SVGViewSpec;
+        attribute SVGViewSpecConstructor SVGViewSpec;
         attribute SVGZoomAndPanConstructor SVGZoomAndPan;
 
         attribute SVGAnimateColorElementConstructor SVGAnimateColorElement;

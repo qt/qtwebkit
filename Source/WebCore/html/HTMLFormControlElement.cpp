@@ -26,6 +26,7 @@
 #include "HTMLFormControlElement.h"
 
 #include "Attribute.h"
+#include "ElementShadow.h"
 #include "Event.h"
 #include "EventHandler.h"
 #include "EventNames.h"
@@ -48,13 +49,11 @@ using namespace std;
 
 HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
     : LabelableElement(tagName, document)
-    , m_fieldSetAncestor(0)
-    , m_legendAncestor(0)
-    , m_fieldSetAncestorValid(false)
     , m_disabled(false)
     , m_readOnly(false)
     , m_required(false)
     , m_valueMatchesRenderer(false)
+    , m_ancestorDisabledState(AncestorDisabledStateUnknown)
     , m_dataListAncestorState(Unknown)
     , m_willValidateInitialized(false)
     , m_willValidate(true)
@@ -68,12 +67,6 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
 
 HTMLFormControlElement::~HTMLFormControlElement()
 {
-}
-
-void HTMLFormControlElement::detach()
-{
-    m_validationMessage = nullptr;
-    HTMLElement::detach();
 }
 
 String HTMLFormControlElement::formEnctype() const
@@ -101,19 +94,25 @@ bool HTMLFormControlElement::formNoValidate() const
     return fastHasAttribute(formnovalidateAttr);
 }
 
-void HTMLFormControlElement::updateFieldSetAndLegendAncestor() const
+void HTMLFormControlElement::updateAncestorDisabledState() const
 {
-    m_fieldSetAncestor = 0;
-    m_legendAncestor = 0;
+    HTMLFieldSetElement* fieldSetAncestor = 0;
+    ContainerNode* legendAncestor = 0;
     for (ContainerNode* ancestor = parentNode(); ancestor; ancestor = ancestor->parentNode()) {
-        if (!m_legendAncestor && ancestor->hasTagName(legendTag))
-            m_legendAncestor = static_cast<HTMLLegendElement*>(ancestor);
+        if (!legendAncestor && ancestor->hasTagName(legendTag))
+            legendAncestor = ancestor;
         if (ancestor->hasTagName(fieldsetTag)) {
-            m_fieldSetAncestor = static_cast<HTMLFieldSetElement*>(ancestor);
+            fieldSetAncestor = static_cast<HTMLFieldSetElement*>(ancestor);
             break;
         }
     }
-    m_fieldSetAncestorValid = true;
+    m_ancestorDisabledState = (fieldSetAncestor && fieldSetAncestor->disabled() && !(legendAncestor && legendAncestor == fieldSetAncestor->legend())) ? AncestorDisabledStateDisabled : AncestorDisabledStateEnabled;
+}
+
+void HTMLFormControlElement::ancestorDisabledStateWasChanged()
+{
+    m_ancestorDisabledState = AncestorDisabledStateUnknown;
+    disabledAttributeChanged();
 }
 
 void HTMLFormControlElement::parseAttribute(const Attribute& attribute)
@@ -129,6 +128,7 @@ void HTMLFormControlElement::parseAttribute(const Attribute& attribute)
         bool oldReadOnly = m_readOnly;
         m_readOnly = !attribute.isNull();
         if (oldReadOnly != m_readOnly) {
+            setNeedsWillValidateCheck();
             setNeedsStyleRecalc();
             if (renderer() && renderer()->style()->hasAppearance())
                 renderer()->theme()->stateChanged(renderer(), ReadOnlyState);
@@ -140,11 +140,11 @@ void HTMLFormControlElement::parseAttribute(const Attribute& attribute)
             requiredAttributeChanged();
     } else
         HTMLElement::parseAttribute(attribute);
-    setNeedsWillValidateCheck();
 }
 
 void HTMLFormControlElement::disabledAttributeChanged()
 {
+    setNeedsWillValidateCheck();
     setNeedsStyleRecalc();
     if (renderer() && renderer()->style()->hasAppearance())
         renderer()->theme()->stateChanged(renderer(), EnabledState);
@@ -224,6 +224,7 @@ void HTMLFormControlElement::didMoveToNewDocument(Document* oldDocument)
 
 Node::InsertionNotificationRequest HTMLFormControlElement::insertedInto(ContainerNode* insertionPoint)
 {
+    m_ancestorDisabledState = AncestorDisabledStateUnknown;
     m_dataListAncestorState = Unknown;
     setNeedsWillValidateCheck();
     HTMLElement::insertedInto(insertionPoint);
@@ -233,7 +234,8 @@ Node::InsertionNotificationRequest HTMLFormControlElement::insertedInto(Containe
 
 void HTMLFormControlElement::removedFrom(ContainerNode* insertionPoint)
 {
-    m_fieldSetAncestorValid = false;
+    m_validationMessage = nullptr;
+    m_ancestorDisabledState = AncestorDisabledStateUnknown;
     m_dataListAncestorState = Unknown;
     HTMLElement::removedFrom(insertionPoint);
     FormAssociatedElement::removedFrom(insertionPoint);
@@ -277,13 +279,9 @@ bool HTMLFormControlElement::disabled() const
     if (m_disabled)
         return true;
 
-    if (!m_fieldSetAncestorValid)
-        updateFieldSetAndLegendAncestor();
-
-    // Form controls in the first legend element inside a fieldset are not affected by fieldset.disabled.
-    if (m_fieldSetAncestor && m_fieldSetAncestor->disabled())
-        return !(m_legendAncestor && m_legendAncestor == m_fieldSetAncestor->legend());
-    return false;
+    if (m_ancestorDisabledState == AncestorDisabledStateUnknown)
+        updateAncestorDisabledState();
+    return m_ancestorDisabledState == AncestorDisabledStateDisabled;
 }
 
 void HTMLFormControlElement::setDisabled(bool b)
@@ -320,7 +318,7 @@ void HTMLFormControlElement::didRecalcStyle(StyleChange)
 
 bool HTMLFormControlElement::supportsFocus() const
 {
-    return !m_disabled;
+    return !disabled();
 }
 
 bool HTMLFormControlElement::isFocusable() const
@@ -359,7 +357,7 @@ bool HTMLFormControlElement::recalcWillValidate() const
 {
     if (m_dataListAncestorState == Unknown) {
         for (ContainerNode* ancestor = parentNode(); ancestor; ancestor = ancestor->parentNode()) {
-            if (!m_legendAncestor && ancestor->hasTagName(datalistTag)) {
+            if (ancestor->hasTagName(datalistTag)) {
                 m_dataListAncestorState = InsideDataList;
                 break;
             }
@@ -367,7 +365,7 @@ bool HTMLFormControlElement::recalcWillValidate() const
         if (m_dataListAncestorState == Unknown)
             m_dataListAncestorState = NotInsideDataList;
     }
-    return m_dataListAncestorState == NotInsideDataList && !m_disabled && !m_readOnly;
+    return m_dataListAncestorState == NotInsideDataList && !disabled() && !m_readOnly;
 }
 
 bool HTMLFormControlElement::willValidate() const

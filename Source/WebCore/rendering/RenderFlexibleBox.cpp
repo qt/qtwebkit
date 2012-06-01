@@ -698,7 +698,9 @@ bool RenderFlexibleBox::hasAutoMarginsInCrossAxis(RenderBox* child)
 
 LayoutUnit RenderFlexibleBox::availableAlignmentSpaceForChild(LayoutUnit lineCrossAxisExtent, RenderBox* child)
 {
-    LayoutUnit childCrossExtent = crossAxisMarginExtentForChild(child) + crossAxisExtentForChild(child);
+    LayoutUnit childCrossExtent = 0;
+    if (!child->isPositioned())
+        childCrossExtent = crossAxisMarginExtentForChild(child) + crossAxisExtentForChild(child);
     return lineCrossAxisExtent - childCrossExtent;
 }
 
@@ -755,7 +757,8 @@ void RenderFlexibleBox::computeMainAxisPreferredSizes(bool relayoutChildren, Fle
             continue;
 
         child->clearOverrideSize();
-        if (preferredLengthForChild(child).isAuto()) {
+        // Only need to layout here if we will need to get the logicalHeight of the child in computeNextFlexLine.
+        if (hasOrthogonalFlow(child) && preferredLengthForChild(child).isAuto()) {
             if (!relayoutChildren)
                 child->setChildNeedsLayout(true);
             child->layoutIfNeeded();
@@ -903,7 +906,7 @@ static LayoutUnit initialPackingOffset(LayoutUnit availableFreeSpace, EFlexPack 
         return availableFreeSpace;
     if (flexPack == PackCenter)
         return availableFreeSpace / 2;
-    if (flexPack == PackDistribute) {
+    if (flexPack == PackSpaceAround) {
         if (availableFreeSpace > 0 && numberOfChildren)
             return availableFreeSpace / (2 * numberOfChildren);
         if (availableFreeSpace < 0)
@@ -915,9 +918,9 @@ static LayoutUnit initialPackingOffset(LayoutUnit availableFreeSpace, EFlexPack 
 static LayoutUnit packingSpaceBetweenChildren(LayoutUnit availableFreeSpace, EFlexPack flexPack, unsigned numberOfChildren)
 {
     if (availableFreeSpace > 0 && numberOfChildren > 1) {
-        if (flexPack == PackJustify)
+        if (flexPack == PackSpaceBetween)
             return availableFreeSpace / (numberOfChildren - 1);
-        if (flexPack == PackDistribute)
+        if (flexPack == PackSpaceAround)
             return availableFreeSpace / numberOfChildren;
     }
     return 0;
@@ -932,13 +935,13 @@ void RenderFlexibleBox::setLogicalOverrideSize(RenderBox* child, LayoutUnit chil
         child->setOverrideWidth(childPreferredSize);
 }
 
-void RenderFlexibleBox::prepareChildForPositionedLayout(RenderBox* child, LayoutUnit mainAxisOffset, LayoutUnit crossAxisOffset)
+void RenderFlexibleBox::prepareChildForPositionedLayout(RenderBox* child, LayoutUnit mainAxisOffset, LayoutUnit crossAxisOffset, PositionedLayoutMode layoutMode)
 {
     ASSERT(child->isPositioned());
     child->containingBlock()->insertPositionedObject(child);
     RenderLayer* childLayer = child->layer();
     LayoutUnit inlinePosition = isColumnFlow() ? crossAxisOffset : mainAxisOffset;
-    if (style()->flexDirection() == FlowRowReverse)
+    if (layoutMode == FlipForRowReverse && style()->flexDirection() == FlowRowReverse)
         inlinePosition = mainAxisExtent() - mainAxisOffset;
     childLayer->setStaticInlinePosition(inlinePosition); // FIXME: Not right for regions.
 
@@ -950,11 +953,11 @@ void RenderFlexibleBox::prepareChildForPositionedLayout(RenderBox* child, Layout
     }
 }
 
-static EFlexAlign flexAlignForChild(RenderBox* child)
+static EAlignItems alignmentForChild(RenderBox* child)
 {
-    EFlexAlign align = child->style()->flexItemAlign();
+    EAlignItems align = child->style()->alignSelf();
     if (align == AlignAuto)
-        align = child->parent()->style()->flexAlign();
+        align = child->parent()->style()->alignItems();
 
     if (child->parent()->style()->flexWrap() == FlexWrapReverse) {
         if (align == AlignStart)
@@ -977,25 +980,26 @@ void RenderFlexibleBox::layoutAndPlaceChildren(LayoutUnit& crossAxisOffset, cons
         mainAxisOffset += isHorizontalFlow() ? verticalScrollbarWidth() : horizontalScrollbarHeight();
 
     LayoutUnit totalMainExtent = mainAxisExtent();
-    LayoutUnit maxAscent = 0, maxDescent = 0; // Used when flex-align: baseline.
+    LayoutUnit maxAscent = 0, maxDescent = 0; // Used when align-items: baseline.
     LayoutUnit maxChildCrossAxisExtent = 0;
     bool shouldFlipMainAxis = !isColumnFlow() && !isLeftToRightFlow();
     for (size_t i = 0; i < children.size(); ++i) {
         RenderBox* child = children[i];
         if (child->isPositioned()) {
-            prepareChildForPositionedLayout(child, mainAxisOffset, crossAxisOffset);
+            prepareChildForPositionedLayout(child, mainAxisOffset, crossAxisOffset, FlipForRowReverse);
             mainAxisOffset += packingSpaceBetweenChildren(availableFreeSpace, style()->flexPack(), childSizes.size());
             continue;
         }
         LayoutUnit childPreferredSize = childSizes[i] + mainAxisBorderAndPaddingExtentForChild(child);
         setLogicalOverrideSize(child, childPreferredSize);
+        // FIXME: Can avoid laying out here in some cases. See https://webkit.org/b/87905.
         child->setChildNeedsLayout(true);
         child->layoutIfNeeded();
 
         updateAutoMarginsInMainAxis(child, autoMarginOffset);
 
         LayoutUnit childCrossAxisMarginBoxExtent;
-        if (flexAlignForChild(child) == AlignBaseline && !hasAutoMarginsInCrossAxis(child)) {
+        if (alignmentForChild(child) == AlignBaseline && !hasAutoMarginsInCrossAxis(child)) {
             LayoutUnit ascent = marginBoxAscentForChild(child);
             LayoutUnit descent = (crossAxisMarginExtentForChild(child) + crossAxisExtentForChild(child)) - ascent;
 
@@ -1070,7 +1074,7 @@ static LayoutUnit initialLinePackingOffset(LayoutUnit availableFreeSpace, EFlexL
         return availableFreeSpace;
     if (linePack == LinePackCenter)
         return availableFreeSpace / 2;
-    if (linePack == LinePackDistribute) {
+    if (linePack == LinePackSpaceAround) {
         if (availableFreeSpace > 0 && numberOfLines)
             return availableFreeSpace / (2 * numberOfLines);
         if (availableFreeSpace < 0)
@@ -1082,9 +1086,9 @@ static LayoutUnit initialLinePackingOffset(LayoutUnit availableFreeSpace, EFlexL
 static LayoutUnit linePackingSpaceBetweenChildren(LayoutUnit availableFreeSpace, EFlexLinePack linePack, unsigned numberOfLines)
 {
     if (availableFreeSpace > 0 && numberOfLines > 1) {
-        if (linePack == LinePackJustify)
+        if (linePack == LinePackSpaceBetween)
             return availableFreeSpace / (numberOfLines - 1);
-        if (linePack == LinePackDistribute || linePack == LinePackStretch)
+        if (linePack == LinePackSpaceAround || linePack == LinePackStretch)
             return availableFreeSpace / numberOfLines;
     }
     return 0;
@@ -1115,8 +1119,17 @@ void RenderFlexibleBox::packFlexLines(FlexOrderIterator& iterator, WTF::Vector<L
 
 void RenderFlexibleBox::adjustAlignmentForChild(RenderBox* child, LayoutUnit delta)
 {
-    LayoutRect oldRect = child->frameRect();
+    if (child->isPositioned()) {
+        LayoutUnit staticInlinePosition = child->layer()->staticInlinePosition();
+        LayoutUnit staticBlockPosition = child->layer()->staticBlockPosition();
+        LayoutUnit mainAxis = isColumnFlow() ? staticBlockPosition : staticInlinePosition;
+        LayoutUnit crossAxis = isColumnFlow() ? staticInlinePosition : staticBlockPosition;
+        crossAxis += delta;
+        prepareChildForPositionedLayout(child, mainAxis, crossAxis, NoFlipForRowReverse);
+        return;
+    }
 
+    LayoutRect oldRect = child->frameRect();
     setFlowAwareLocationForChild(child, flowAwareLocationForChild(child) + LayoutSize(0, delta));
 
     // If the child moved, we have to repaint it as well as any floating/positioned
@@ -1142,7 +1155,7 @@ void RenderFlexibleBox::alignChildren(FlexOrderIterator& iterator, const WTF::Ve
             if (updateAutoMarginsInCrossAxis(child, availableAlignmentSpaceForChild(lineCrossAxisExtent, child)))
                 continue;
 
-            switch (flexAlignForChild(child)) {
+            switch (alignmentForChild(child)) {
             case AlignAuto:
                 ASSERT_NOT_REACHED();
                 break;
@@ -1185,7 +1198,7 @@ void RenderFlexibleBox::alignChildren(FlexOrderIterator& iterator, const WTF::Ve
         LayoutUnit minMarginAfterBaseline = minMarginAfterBaselines[lineNumber];
         for (size_t childNumber = 0; childNumber < lineContexts[lineNumber].numberOfChildren; ++childNumber, child = iterator.next()) {
             ASSERT(child);
-            if (flexAlignForChild(child) == AlignBaseline && !hasAutoMarginsInCrossAxis(child) && minMarginAfterBaseline)
+            if (alignmentForChild(child) == AlignBaseline && !hasAutoMarginsInCrossAxis(child) && minMarginAfterBaseline)
                 adjustAlignmentForChild(child, minMarginAfterBaseline);
         }
     }
@@ -1202,6 +1215,7 @@ void RenderFlexibleBox::applyStretchAlignmentToChild(RenderBox* child, LayoutUni
         child->setLogicalHeight(stretchedLogicalHeight);
         child->computeLogicalHeight();
 
+        // FIXME: Can avoid laying out here in some cases. See https://webkit.org/b/87905.
         if (child->logicalHeight() != logicalHeightBefore) {
             child->setOverrideHeight(child->logicalHeight());
             child->setLogicalHeight(0);
@@ -1224,6 +1238,8 @@ void RenderFlexibleBox::flipForRightToLeftColumn(FlexOrderIterator& iterator)
 
     LayoutUnit crossExtent = crossAxisExtent();
     for (RenderBox* child = iterator.first(); child; child = iterator.next()) {
+        if (child->isPositioned())
+            continue;
         LayoutPoint location = flowAwareLocationForChild(child);
         location.setY(crossExtent - crossAxisExtentForChild(child) - location.y());
         setFlowAwareLocationForChild(child, location);
@@ -1237,16 +1253,10 @@ void RenderFlexibleBox::flipForWrapReverse(FlexOrderIterator& iterator, const WT
     for (size_t lineNumber = 0; lineNumber < lineContexts.size(); ++lineNumber) {
         for (size_t childNumber = 0; childNumber < lineContexts[lineNumber].numberOfChildren; ++childNumber, child = iterator.next()) {
             ASSERT(child);
-            LayoutPoint location = flowAwareLocationForChild(child);
             LayoutUnit lineCrossAxisExtent = lineContexts[lineNumber].crossAxisExtent;
             LayoutUnit originalOffset = lineContexts[lineNumber].crossAxisOffset - crossAxisStartEdge;
             LayoutUnit newOffset = contentExtent - originalOffset - lineCrossAxisExtent;
-            location.setY(location.y() + newOffset - originalOffset);
-
-            LayoutRect oldRect = child->frameRect();
-            setFlowAwareLocationForChild(child, location);
-            if (!selfNeedsLayout() && child->checkForRepaintDuringLayout())
-                child->repaintDuringLayoutIfMoved(oldRect);
+            adjustAlignmentForChild(child, newOffset - originalOffset);
         }
     }
 }

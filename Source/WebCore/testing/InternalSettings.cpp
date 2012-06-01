@@ -101,6 +101,11 @@ InternalSettings::InternalSettings(Frame* frame)
     , m_originalEditingBehavior(settings()->editingBehaviorType())
     , m_originalFixedPositionCreatesStackingContext(settings()->fixedPositionCreatesStackingContext())
     , m_originalSyncXHRInDocumentsEnabled(settings()->syncXHRInDocumentsEnabled())
+#if ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
+    , m_originalJavaScriptProfilingEnabled(page() && page()->inspectorController() && page()->inspectorController()->profilerEnabled())
+#endif
+    , m_originalWindowFocusRestricted(settings()->windowFocusRestricted())
+    , m_originalDeviceSupportsTouch(settings()->deviceSupportsTouch())
 {
 }
 
@@ -115,6 +120,12 @@ void InternalSettings::restoreTo(Settings* settings)
     settings->setEditingBehaviorType(m_originalEditingBehavior);
     settings->setFixedPositionCreatesStackingContext(m_originalFixedPositionCreatesStackingContext);
     settings->setSyncXHRInDocumentsEnabled(m_originalSyncXHRInDocumentsEnabled);
+#if ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
+    if (page() && page()->inspectorController())
+        page()->inspectorController()->setProfilerEnabled(m_originalJavaScriptProfilingEnabled);
+#endif
+    settings->setWindowFocusRestricted(m_originalWindowFocusRestricted);
+    settings->setDeviceSupportsTouch(m_originalDeviceSupportsTouch);
 }
 
 Settings* InternalSettings::settings() const
@@ -251,6 +262,12 @@ void InternalSettings::setTouchEventEmulationEnabled(bool enabled, ExceptionCode
 #endif
 }
 
+void InternalSettings::setDeviceSupportsTouch(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setDeviceSupportsTouch(enabled);
+}
+
 typedef void (Settings::*SetFontFamilyFunction)(const AtomicString&, UScriptCode);
 static void setFontFamily(Settings* settings, const String& family, const String& script, SetFontFamilyFunction setter)
 {
@@ -358,6 +375,28 @@ void InternalSettings::setSyncXHRInDocumentsEnabled(bool creates, ExceptionCode&
 {
     InternalSettingsGuardForFrameView();
     settings()->setSyncXHRInDocumentsEnabled(creates);
+}
+
+void InternalSettings::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
+{
+#if ENABLE(INSPECTOR)
+    if (!page() || !page()->inspectorController()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    page()->inspectorController()->setProfilerEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+    UNUSED_PARAM(ec);
+    return;
+#endif
+}
+
+void InternalSettings::setWindowFocusRestricted(bool restricted, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setWindowFocusRestricted(restricted);
 }
 
 }

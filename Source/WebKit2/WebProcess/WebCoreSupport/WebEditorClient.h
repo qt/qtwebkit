@@ -100,10 +100,12 @@ private:
     virtual NSURL* canonicalizeURLString(NSString*) OVERRIDE;
 #endif
 
-#if PLATFORM(MAC) && !defined(BUILDING_ON_LEOPARD)
+#if PLATFORM(MAC)
     virtual void uppercaseWord() OVERRIDE;
     virtual void lowercaseWord() OVERRIDE;
     virtual void capitalizeWord() OVERRIDE;
+#endif
+#if USE(AUTOMATIC_TEXT_REPLACEMENT)
     virtual void showSubstitutionsPanel(bool show) OVERRIDE;
     virtual bool substitutionsPanelIsShowing() OVERRIDE;
     virtual void toggleSmartInsertDelete() OVERRIDE;
@@ -143,7 +145,7 @@ private:
     virtual void getGuessesForWord(const String& word, const String& context, Vector<String>& guesses) OVERRIDE;
     virtual void willSetInputMethodState() OVERRIDE;
     virtual void setInputMethodState(bool enabled) OVERRIDE;
-    virtual void requestCheckingOfString(WebCore::SpellChecker*, const WebCore::TextCheckingRequest&) OVERRIDE;
+    virtual void requestCheckingOfString(WTF::PassRefPtr<WebCore::TextCheckingRequest>) OVERRIDE;
 #if PLATFORM(GTK)
     virtual bool shouldShowUnicodeMenu() OVERRIDE;
 #endif

@@ -242,6 +242,7 @@ public:
     // RenderObject tree manipulation
     //////////////////////////////////////////
     virtual bool canHaveChildren() const { return virtualChildren(); }
+    virtual bool canHaveGeneratedChildren() const;
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const { return true; }
     virtual void addChild(RenderObject* newChild, RenderObject* beforeChild = 0);
     virtual void addChildIgnoringContinuation(RenderObject* newChild, RenderObject* beforeChild = 0) { return addChild(newChild, beforeChild); }
@@ -344,7 +345,7 @@ public:
     virtual bool isSliderThumb() const { return false; }
     virtual bool isTable() const { return false; }
     virtual bool isTableCell() const { return false; }
-    virtual bool isTableCol() const { return false; }
+    virtual bool isRenderTableCol() const { return false; }
     virtual bool isTableCaption() const { return false; }
     virtual bool isTableRow() const { return false; }
     virtual bool isTableSection() const { return false; }
@@ -362,6 +363,7 @@ public:
     virtual bool isRenderFlowThread() const { return false; }
     virtual bool isRenderNamedFlowThread() const { return false; }
     
+    virtual bool isRenderMultiColumnBlock() const { return false; }
     virtual bool isRenderMultiColumnSet() const { return false; }
 
     virtual bool isRenderScrollbarPart() const { return false; }
@@ -374,7 +376,7 @@ public:
 
     bool isHTMLMarquee() const;
 
-    bool isTablePart() const { return isTableCell() || isTableCol() || isTableCaption() || isTableRow() || isTableSection(); }
+    bool isTablePart() const { return isTableCell() || isRenderTableCol() || isTableCaption() || isTableRow() || isTableSection(); }
 
     inline bool isBeforeContent() const;
     inline bool isAfterContent() const;

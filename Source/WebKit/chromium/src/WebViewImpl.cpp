@@ -1678,8 +1678,9 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
     if (m_doingDragAndDrop)
         return true;
 
+    // Report the event to be NOT processed by WebKit, so that the browser can handle it appropriately.
     if (m_ignoreInputEvents)
-        return true;
+        return false;
 
     m_currentInputEvent = &inputEvent;
 
@@ -2955,10 +2956,10 @@ void WebViewImpl::applyAutofillSuggestions(
 
     if (!m_autofillPopup) {
         PopupContainerSettings popupSettings = autofillPopupSettings;
-        popupSettings.defaultDeviceScaleFactor =
-            m_page->settings()->defaultDeviceScaleFactor();
+        popupSettings.defaultDeviceScaleFactor = settingsImpl()->defaultDeviceScaleFactor();
         if (!popupSettings.defaultDeviceScaleFactor)
             popupSettings.defaultDeviceScaleFactor = 1;
+        popupSettings.deviceSupportsTouch = settingsImpl()->deviceSupportsTouch();
         m_autofillPopup = PopupContainer::create(m_autofillPopupClient.get(),
                                                  PopupContainer::Suggestion,
                                                  popupSettings);

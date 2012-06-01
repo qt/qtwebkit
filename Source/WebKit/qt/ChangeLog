@@ -1,3 +1,70 @@
+2012-05-31  Hajime Morrita  <morrita@chromium.org>
+
+        REGRESSION(r117572): editing/spelling/spellcheck-async-remove-frame.html crashes on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=86859
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/TextCheckerClientQt.h:
+        (WebCore::TextCheckerClientQt::requestCheckingOfString):
+
+2012-05-31  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Simplify QT_VERSION_CHECKS for Qt5 by introducing HAVE(QT5)
+        https://bugs.webkit.org/show_bug.cgi?id=87955
+
+        Reviewed by Simon Hausmann.
+
+        * Api/qgraphicswebview.cpp:
+        * Api/qgraphicswebview.h:
+        * Api/qwebframe.cpp:
+        * Api/qwebframe_p.h:
+        * Api/qwebpage.cpp:
+        * Api/qwebpage.h:
+        * Api/qwebsettings.cpp:
+        * Api/qwebview.cpp:
+        * Api/qwebview.h:
+        * WebCoreSupport/FrameLoaderClientQt.cpp:
+        * WebCoreSupport/GeolocationClientQt.cpp:
+        * WebCoreSupport/GeolocationClientQt.h:
+        * WebCoreSupport/PageClientQt.cpp:
+        * WebCoreSupport/WebEventConversion.cpp:
+        * declarative/plugin.cpp:
+        * tests/qwebframe/tst_qwebframe.cpp:
+        * tests/util.h:
+
+2012-05-29  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Sync up favicon-implementation with WebView url changes in r118158
+
+        https://bugs.webkit.org/show_bug.cgi?id=87133
+
+        We now base64-encode the page url in the image-provider url, so that any
+        normalization done by QUrl will not mess up the page-url. The logic of
+        creating and parsing the provider-url has been moved into the image
+        provider, to keep it in one place.
+
+        We were also releasing icons (even ones we hadn't retained), which we can't
+        do since we don't know when the icon url is no longer in use.
+
+        Reviewed-by Simon Hausmann.
+
+        * declarative/plugin.cpp:
+        * declarative/public.pri:
+
+2012-05-25  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        WebKitTestRunner needs to support layoutTestController.setJavaScriptProfilingEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=42328
+
+        Reviewed by Eric Seidel.
+
+        Removed unneeded setJavaScriptProfilingEnabled function from DRT after its
+        move to windows.internals.settings.
+
+        * WebCoreSupport/DumpRenderTreeSupportQt.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportQt.h:
+
 2012-05-27  Simon Hausmann  <simon.hausmann@nokia.com>
 
         [Qt] Trivial unreviewed build fix with newer Qt

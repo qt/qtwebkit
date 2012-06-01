@@ -26,6 +26,7 @@
 #include <QtCore/QRectF>
 #include <QtCore/QVariant>
 #include <QtCore/QVariantAnimation>
+#include <WebCore/ViewportArguments.h>
 #include <wtf/OwnPtr.h>
 
 QT_BEGIN_NAMESPACE
@@ -58,14 +59,15 @@ public:
     qreal currentCSSScale() const;
 
     void setAllowsUserScaling(bool allow) { m_allowsUserScaling = allow; }
-    void setContentToDevicePixelRatio(qreal ratio) {m_devicePixelRatio = ratio; }
+    void setDevicePixelRatio(qreal ratio) { m_devicePixelRatio = ratio; }
 
-    void setItemRectVisible(const QRectF&);
-    void animateItemRectVisible(const QRectF&);
+    void setPageItemRectVisible(const QRectF&);
+    void animatePageItemRectVisible(const QRectF&);
 
     QRectF nearestValidBounds() const;
 
-    void pagePositionRequest(const QPoint& pos);
+    void pageContentPositionRequest(const QPoint& pos);
+
     void touchBegin();
     void touchEnd();
 
@@ -73,11 +75,9 @@ public:
     void cancelScrollAnimation();
 
     bool panGestureActive() const;
-
     void panGestureStarted(const QPointF& position, qint64 eventTimestampMillis);
     void panGestureRequestUpdate(const QPointF& position, qint64 eventTimestampMillis);
     void panGestureEnded(const QPointF& position, qint64 eventTimestampMillis);
-
     void panGestureCancelled();
 
     bool scaleAnimationActive() const;
@@ -92,32 +92,32 @@ public:
     void zoomToAreaGestureEnded(const QPointF& touchPoint, const QRectF& targetArea);
     void focusEditableArea(const QRectF& caretArea, const QRectF& targetArea);
 
+    void viewportAttributesChanged(const WebCore::ViewportAttributes&);
+    void pageContentsSizeChanged(const QSize& newSize, const QSize& viewportSize);
+
 Q_SIGNALS:
     void contentSuspendRequested();
     void contentResumeRequested();
 
     void informVisibleContentChange(const QPointF& trajectory = QPointF());
 
-    void visibleContentRectAndScaleChanged();
-
 private Q_SLOTS:
     // Respond to changes of content that are not driven by us, like the page resizing itself.
-    void itemSizeChanged();
-
-    void flickableMovingPositionUpdate();
+    void pageItemSizeChanged();
+    void pageItemPositionChanged();
 
     void scaleAnimationStateChanged(QAbstractAnimation::State, QAbstractAnimation::State);
-    void scaleAnimationValueChanged(QVariant value) { setItemRectVisible(value.toRectF()); }
+    void scaleAnimationValueChanged(QVariant value);
 
-    void flickableMoveStarted(); // Called when panning starts.
-    void flickableMoveEnded(); //   Called when panning (+ kinetic animation) ends.
+    void flickMoveStarted(); // Called when panning starts.
+    void flickMoveEnded(); //   Called when panning (+ kinetic animation) ends.
 
 private:
     friend class ViewportUpdateDeferrer;
     friend class ::QWebKitTest;
 
-    QQuickWebView* const m_viewport;
-    QQuickWebPage* const m_content;
+    QQuickWebView* const m_viewportItem;
+    QQuickWebPage* const m_pageItem;
 
     qreal cssScaleFromItem(qreal) const;
     qreal itemScaleFromCSS(qreal) const;
@@ -127,6 +127,11 @@ private:
     qreal innerBoundedCSSScale(qreal) const;
     qreal outerBoundedCSSScale(qreal) const;
 
+    QRectF computePosRangeForPageItemAtScale(qreal itemScale) const;
+    void scaleContent(const QPointF& centerInCSSCoordinates, qreal cssScale);
+
+    WebCore::ViewportAttributes m_rawAttributes;
+
     bool m_allowsUserScaling;
     qreal m_minimumScale;
     qreal m_maximumScale;
@@ -134,12 +139,9 @@ private:
 
     QSize m_layoutSize;
 
-    QRectF computePosRangeForItemAtScale(qreal itemScale) const;
-
-    void scaleContent(const QPointF& centerInCSSCoordinates, qreal cssScale);
-
     int m_suspendCount;
     bool m_hasSuspendedContent;
+
     OwnPtr<ViewportUpdateDeferrer> m_scaleUpdateDeferrer;
     OwnPtr<ViewportUpdateDeferrer> m_scrollUpdateDeferrer;
     OwnPtr<ViewportUpdateDeferrer> m_touchUpdateDeferrer;

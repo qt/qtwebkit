@@ -1,3 +1,147 @@
+2012-05-31  Anders Carlsson  <andersca@apple.com>
+
+        Enable support for rvalue references when building with a version of clang that supports them
+        https://bugs.webkit.org/show_bug.cgi?id=88018
+
+        Re-enable support for rvalue references when building with a version of Xcode newer than 4.2.
+
+        * wtf/Compiler.h:
+
+2012-05-31  Filip Pizlo  <fpizlo@apple.com>
+
+        DataLog should be usable outside of JSC
+        https://bugs.webkit.org/show_bug.cgi?id=88015
+
+        Reviewed by Oliver Hunt.
+
+        * wtf/DataLog.h:
+        (WTF):
+
+2012-05-31  Anders Carlsson  <andersca@apple.com>
+
+        Disable support for rvalue references until I figure out why this is breaking the Xcode 4.2 build.
+
+        * wtf/Compiler.h:
+
+2012-05-31  Anders Carlsson  <andersca@apple.com>
+
+        Vector should have a move constructor and move assignment operator
+        https://bugs.webkit.org/show_bug.cgi?id=87997
+
+        Reviewed by Andreas Kling.
+
+        * wtf/Compiler.h:
+        Use __has_extension so we can use move semantics and other C++11 features even when building as C++98.
+
+        * wtf/Vector.h:
+        Add a move constructor and a move assignment operator to Vector.
+
+2012-05-31  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Simplify QT_VERSION_CHECKS for Qt5 by introducing HAVE(QT5)
+        https://bugs.webkit.org/show_bug.cgi?id=87955
+
+        Reviewed by Simon Hausmann.
+
+        * wtf/qt/UtilsQt.h:
+
+2012-05-30  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        HashTable.h has using directives for std::pair and std::make_pair
+        https://bugs.webkit.org/show_bug.cgi?id=29919
+
+        Reviewed by Darin Adler.
+
+        * wtf/HashTraits.h:
+        (WTF): Remove the directives.
+
+2012-05-30  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        HashTable.h has using directives for std::pair and std::make_pair
+        https://bugs.webkit.org/show_bug.cgi?id=29919
+
+        Reviewed by Darin Adler.
+
+        Change code to use std::pair and std::make_pair. Later patch will remove the
+        'using' directives.
+
+        * wtf/HashTable.h:
+        (WTF::hashTableSwap):
+        (HashTable):
+        * wtf/HashTraits.h:
+        (PairHashTraits):
+        (WTF::PairHashTraits::emptyValue):
+
+2012-05-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Build fix for WinCE after r118603.
+
+        * wtf/Atomics.h:
+        (WTF::weakCompareAndSwap):
+
+2012-05-29  Anders Carlsson  <andersca@apple.com>
+
+        String should be move enabled/optimized
+        https://bugs.webkit.org/show_bug.cgi?id=87596
+
+        Reviewed by Andreas Kling.
+
+        Add move constructors and move assignment operators to String and AtomicString when building with
+        compilers that support rvalue references. This gets rid of ref-churn when the source of the 
+        constructor or assignment is a temporary object.
+
+        * wtf/text/AtomicString.h:
+        (AtomicString):
+        (WTF::AtomicString::AtomicString):
+        (WTF::AtomicString::operator=):
+        * wtf/text/WTFString.h:
+        (String):
+        (WTF::String::String):
+        (WTF::String::operator=):
+
+2012-05-29  Alexandre Elias  <aelias@google.com>
+
+        Support WebKit log messages on Android
+        https://bugs.webkit.org/show_bug.cgi?id=87773
+
+        Reviewed by Darin Adler.
+
+        This sends WebKit log messages to the Android "logcat" facility, as
+        Android sends stderr to /dev/null.
+
+        * wtf/Assertions.cpp:
+
+2012-05-29  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Remove duplication of logic for disabling selected warnings related to C++11
+
+        This is already handled in unix/default_post.prf
+
+        Reviewed by Simon Hausmann.
+
+        * WTF.pro:
+
+2012-05-27  Darin Adler  <darin@apple.com>
+
+        Fix an incorrect assertion in Vector::remove
+        https://bugs.webkit.org/show_bug.cgi?id=87612
+
+        Reviewed by Dan Bernstein.
+
+        * wtf/Vector.h: There's no good reason to disallow calling remove
+        with a size of 0, even when the position is at the end of the vector,
+        so changed the two-argument Vector::remove assertion to assert that
+        the position is <= size rather than < size.
+
+2012-05-27  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [WTF] Introduce UINT64_C to MathExtras.h
+        https://bugs.webkit.org/show_bug.cgi?id=87485
+
+        Reviewed by Kent Tamura.
+
+        * wtf/MathExtras.h:
+
 2012-05-25  Filip Pizlo  <fpizlo@apple.com>
 
         weakCompareAndSwap should work on Windows

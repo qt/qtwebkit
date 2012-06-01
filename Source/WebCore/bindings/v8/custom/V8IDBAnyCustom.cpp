@@ -48,13 +48,13 @@ namespace WebCore {
 v8::Handle<v8::Value> toV8(IDBAny* impl, v8::Isolate* isolate)
 {
     if (!impl)
-        return v8::Null();
+        return v8NullWithCheck(isolate);
 
     switch (impl->type()) {
     case IDBAny::UndefinedType:
         return v8::Undefined();
     case IDBAny::NullType:
-        return v8::Null();
+        return v8NullWithCheck(isolate);
     case IDBAny::DOMStringListType:
         return toV8(impl->domStringList(), isolate);
     case IDBAny::IDBCursorType:
@@ -76,7 +76,7 @@ v8::Handle<v8::Value> toV8(IDBAny* impl, v8::Isolate* isolate)
     case IDBAny::SerializedScriptValueType:
         return impl->serializedScriptValue()->deserialize(0, isolate);
     case IDBAny::StringType:
-        return v8String(impl->string());
+        return v8String(impl->string(), isolate);
     }
 
     ASSERT_NOT_REACHED();

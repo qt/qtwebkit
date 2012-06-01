@@ -1,3 +1,118 @@
+2012-05-31  Alexander Shalamov  <alexander.shalamov@intel.com>
+
+        [EFL] <input type="number"> is not a spinbutton
+        https://bugs.webkit.org/show_bug.cgi?id=86846
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Implemented spinner widget.
+
+        * DefaultTheme/default.edc:
+        * DefaultTheme/widget/spinner/sp_bg.png: Added.
+        * DefaultTheme/widget/spinner/sp_down_default.png: Added.
+        * DefaultTheme/widget/spinner/sp_down_hover.png: Added.
+        * DefaultTheme/widget/spinner/sp_down_pressed.png: Added.
+        * DefaultTheme/widget/spinner/sp_up_default.png: Added.
+        * DefaultTheme/widget/spinner/sp_up_hover.png: Added.
+        * DefaultTheme/widget/spinner/sp_up_pressed.png: Added.
+        * DefaultTheme/widget/spinner/spinner.edc: Added.
+
+2012-05-31  Hajime Morrita  <morrita@chromium.org>
+
+        REGRESSION(r117572): editing/spelling/spellcheck-async-remove-frame.html crashes on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=86859
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/EditorClientEfl.h:
+        (WebCore::EditorClientEfl::requestCheckingOfString):
+
+2012-05-31  Jussi Kukkonen  <jussi.kukkonen@intel.com>
+
+        [EFL][DRT] LayoutTestController does not implement clearApplicationCacheForOrigin
+        https://bugs.webkit.org/show_bug.cgi?id=86195
+
+        Reviewed by Gustavo Noronha Silva.
+
+        add new function to clear security origin application cache,
+        and a function to create a security origin from url string.
+        Reindent the header to match new longer return signature.
+
+        * ewk/ewk_security_origin.cpp:
+        (ewk_security_origin_application_cache_clear):
+        (ewk_security_origin_new_from_string):
+        * ewk/ewk_security_origin.h:
+
+2012-05-30  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EFL's DRT should print the number of MessagePorts for new each new intent
+        https://bugs.webkit.org/show_bug.cgi?id=86841
+
+        Reviewed by Adam Barth.
+
+        Add EWKPrivate method to retrieve the internal WebCore object for a Ewk_Intent.
+        Add helper function to DumpRenderTreeSupportEfl that returns the MessagePorts 
+        for a Ewk_Intent object so that the DRT can print information about them.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::intentMessagePorts):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+        (WebCore):
+        * ewk/ewk_intent.cpp:
+        (EWKPrivate):
+        (EWKPrivate::coreIntent):
+        * ewk/ewk_intent_private.h:
+        (EWKPrivate):
+
+2012-05-30  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Ewk_Intent_Request's postResult/postFailure should take serialized script values in argument
+        https://bugs.webkit.org/show_bug.cgi?id=87829
+
+        Reviewed by Adam Barth.
+
+        Ewk_Intent_Request's postResult/postFailure methods now take
+        SerializedScriptValues in argument instead of strings. The client can
+        now post results of any type, not just strings, which is according to
+        spec. Those methods are now moved to private header and a helper
+        function was added to DumpRenderTreeSupportEfl so that the DRT can
+        still send intent results.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::sendWebIntentResponse):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+        * ewk/ewk_intent_private.h:
+        (WebCore):
+        * ewk/ewk_intent_request.cpp:
+        (ewk_intent_request_result_post):
+        (ewk_intent_request_failure_post):
+        * ewk/ewk_intent_request.h:
+
+2012-05-29  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Compilation warning in DumpRenderTreeView.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=87636
+
+        Reviewed by Filip Pizlo.
+
+        Fix return type of exceeded_application_cache_quota callback, it
+        should be int64_t, not uint64_t.
+
+        * ewk/ewk_view.h:
+
+2012-05-25  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        WebKitTestRunner needs to support layoutTestController.setJavaScriptProfilingEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=42328
+
+        Reviewed by Eric Seidel.
+
+        Removed unneeded setJavaScriptProfilingEnabled function from DRT after its
+        move to windows.internals.settings.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
 2012-05-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
 
         [EFL] API for PageGroup visited links hash populating

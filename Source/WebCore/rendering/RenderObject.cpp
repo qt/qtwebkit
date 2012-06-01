@@ -273,11 +273,11 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
 
     bool needsTable = false;
 
-    if (newChild->style()->display() == TABLE_COLUMN_GROUP)
-        needsTable = !isTable();
-    else if (newChild->style()->display() == TABLE_COLUMN)
-        needsTable = !isTable() && style()->display() != TABLE_COLUMN_GROUP;
-    else if (newChild->isTableCaption())
+    if (newChild->isRenderTableCol()) {
+        RenderTableCol* newTableColumn = toRenderTableCol(newChild);
+        bool isColumnInColumnGroup = newTableColumn->isTableColumn() && isRenderTableCol();
+        needsTable = !isTable() && !isColumnInColumnGroup;
+    } else if (newChild->isTableCaption())
         needsTable = !isTable();
     else if (newChild->isTableSection())
         needsTable = !isTable();
@@ -1788,9 +1788,15 @@ void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
     if (m_style->outlineWidth() > 0 && m_style->outlineSize() > maximalOutlineSize(PaintPhaseOutline))
         toRenderView(document()->renderer())->setMaximalOutlineSize(m_style->outlineSize());
 
+    bool doesNotNeedLayout = !m_parent || isText();
+
     styleDidChange(diff, oldStyle.get());
 
-    if (!m_parent || isText())
+    // FIXME: |this| might be destroyed here. This can currently happen for a RenderTextFragment when
+    // its first-letter block gets an update in RenderTextFragment::styleDidChange. For RenderTextFragment(s),
+    // we will safely bail out with the doesNotNeedLayout flag. We might want to broaden this condition
+    // in the future as we move renderer changes out of layout and into style changes.
+    if (doesNotNeedLayout)
         return;
 
     // Now that the layer (if any) has been updated, we need to adjust the diff again,
@@ -2640,7 +2646,7 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
                 linethrough = decorationColor(styleToUse);
             }
         }
-        if (curr->isFloating() || curr->isPositioned() || curr->isRubyText())
+        if (curr->isRubyText())
             return;
         curr = curr->parent();
         if (curr && curr->isAnonymousBlock() && toRenderBlock(curr)->continuation())
@@ -2898,6 +2904,15 @@ bool RenderObject::canUpdateSelectionOnRootLineBoxes()
 
     RenderBlock* containingBlock = this->containingBlock();
     return containingBlock ? !containingBlock->needsLayout() : true;
+}
+
+// We only create "generated" child renderers like one for first-letter if:
+// - the firstLetterBlock can have children in the DOM and
+// - the block doesn't have any special assumption on its text children.
+// This correctly prevents form controls from having such renderers.
+bool RenderObject::canHaveGeneratedChildren() const
+{
+    return canHaveChildren();
 }
 
 #if ENABLE(SVG)

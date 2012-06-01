@@ -1279,12 +1279,13 @@ void RenderBox::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool
 
     bool isFixedPos = style()->position() == FixedPosition;
     bool hasTransform = hasLayer() && layer()->transform();
-    if (hasTransform) {
-        // If this box has a transform, it acts as a fixed position container for fixed descendants,
-        // and may itself also be fixed position. So propagate 'fixed' up only if this box is fixed position.
-        fixed &= isFixedPos;
-    } else
-        fixed |= isFixedPos;
+    // If this box has a transform, it acts as a fixed position container for fixed descendants,
+    // and may itself also be fixed position. So propagate 'fixed' up only if this box is fixed position.
+    if (hasTransform && !isFixedPos)
+        fixed = false;
+    else if (isFixedPos)
+        fixed = true;
+
     if (wasFixed)
         *wasFixed = fixed;
     
@@ -1790,8 +1791,8 @@ bool RenderBox::sizesToIntrinsicLogicalWidth(LogicalWidthType widthType) const
         // For multiline columns, we need to apply the flex-line-pack first, so we can't stretch now.
         if (!parent()->style()->isColumnFlexDirection() || parent()->style()->flexWrap() != FlexWrapNone)
             return true;
-        EFlexAlign itemAlign = style()->flexItemAlign();
-        if (itemAlign != AlignStretch && (itemAlign != AlignAuto || parent()->style()->flexAlign() != AlignStretch))
+        EAlignItems itemAlign = style()->alignSelf();
+        if (itemAlign != AlignStretch && (itemAlign != AlignAuto || parent()->style()->alignItems() != AlignStretch))
             return true;
     }
 
@@ -3834,12 +3835,12 @@ LayoutRect RenderBox::layoutOverflowRectForPropagation(RenderStyle* parentStyle)
 
 LayoutUnit RenderBox::offsetLeft() const
 {
-    return offsetTopLeft(topLeftLocation()).x();
+    return adjustedPositionRelativeToOffsetParent(topLeftLocation()).x();
 }
 
 LayoutUnit RenderBox::offsetTop() const
 {
-    return offsetTopLeft(topLeftLocation()).y();
+    return adjustedPositionRelativeToOffsetParent(topLeftLocation()).y();
 }
 
 LayoutPoint RenderBox::flipForWritingModeForChild(const RenderBox* child, const LayoutPoint& point) const

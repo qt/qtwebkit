@@ -89,6 +89,7 @@ LayoutTestController::LayoutTestController(const std::string& testPathOrURL, con
     , m_handlesAuthenticationChallenges(false)
     , m_isPrinting(false)
     , m_deferMainResourceDataLoad(true)
+    , m_useDeferredFrameLoading(false)
     , m_shouldPaintBrokenImage(true)
     , m_shouldStayOnPageAfterHandlingBeforeUnload(false)
     , m_areDesktopNotificationPermissionRequestsIgnored(false)
@@ -1231,6 +1232,17 @@ static JSValueRef setDefersLoadingCallback(JSContextRef context, JSObjectRef fun
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef setUseDeferredFrameLoadingCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount < 1)
+        return JSValueMakeUndefined(context);
+
+    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
+    controller->setUseDeferredFrameLoading(JSValueToBoolean(context, arguments[0]));
+
+    return JSValueMakeUndefined(context);
+}
+
 static JSValueRef setDomainRelaxationForbiddenForURLSchemeCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     // Has Mac and Windows implementation
@@ -1384,17 +1396,6 @@ static JSValueRef setIconDatabaseEnabledCallback(JSContextRef context, JSObjectR
 
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
     controller->setIconDatabaseEnabled(JSValueToBoolean(context, arguments[0]));
-
-    return JSValueMakeUndefined(context);
-}
-
-static JSValueRef setJavaScriptProfilingEnabledCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    if (argumentCount < 1)
-        return JSValueMakeUndefined(context);
-
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-    controller->setJavaScriptProfilingEnabled(JSValueToBoolean(context, arguments[0]));
 
     return JSValueMakeUndefined(context);
 }
@@ -2063,14 +2064,6 @@ static JSValueRef setSerializeHTTPLoadsCallback(JSContextRef context, JSObjectRe
     return JSValueMakeUndefined(context);
 }
 
-static JSValueRef allowRoundingHacksCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
-
-    controller->allowRoundingHacks();
-    return JSValueMakeUndefined(context);
-}
-
 static JSValueRef setShouldStayOnPageAfterHandlingBeforeUnloadCallback(JSContextRef context, JSObjectRef, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     LayoutTestController* controller = static_cast<LayoutTestController*>(JSObjectGetPrivate(thisObject));
@@ -2372,12 +2365,12 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "setDatabaseQuota", setDatabaseQuotaCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete }, 
         { "setDeferMainResourceDataLoad", setDeferMainResourceDataLoadCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setDefersLoading", setDefersLoadingCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setUseDeferredFrameLoading", setUseDeferredFrameLoadingCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setDomainRelaxationForbiddenForURLScheme", setDomainRelaxationForbiddenForURLSchemeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setFrameFlatteningEnabled", setFrameFlatteningEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setGeolocationPermission", setGeolocationPermissionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setHandlesAuthenticationChallenges", setHandlesAuthenticationChallengesCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setIconDatabaseEnabled", setIconDatabaseEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "setJavaScriptProfilingEnabled", setJavaScriptProfilingEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAutomaticLinkDetectionEnabled", setAutomaticLinkDetectionEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setMainFrameIsFirstResponder", setMainFrameIsFirstResponderCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setMinimumTimerInterval", setMinimumTimerIntervalCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2431,7 +2424,6 @@ JSStaticFunction* LayoutTestController::staticFunctions()
         { "originsWithLocalStorage", originsWithLocalStorageCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setShouldPaintBrokenImage", setShouldPaintBrokenImageCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setTextDirection", setTextDirectionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "allowRoundingHacks", allowRoundingHacksCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setShouldStayOnPageAfterHandlingBeforeUnload", setShouldStayOnPageAfterHandlingBeforeUnloadCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "addChromeInputField", addChromeInputFieldCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "removeChromeInputField", removeChromeInputFieldCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },

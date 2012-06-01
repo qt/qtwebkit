@@ -674,8 +674,8 @@ Node* Editor::findEventTargetFrom(const VisibleSelection& selection) const
         target = m_frame->document()->body();
     if (!target)
         return 0;
-    return target->shadowAncestorNode();
 
+    return target;
 }
 
 Node* Editor::findEventTargetFromSelection() const
@@ -1116,7 +1116,7 @@ int Editor::spellCheckerDocumentTag()
     return client() ? client()->spellCheckerDocumentTag() : 0;
 }
 
-#if USE(AUTOMATIC_TEXT_REPLACEMENT)
+#if PLATFORM(MAC)
 
 void Editor::uppercaseWord()
 {
@@ -1135,6 +1135,10 @@ void Editor::capitalizeWord()
     if (client())
         client()->capitalizeWord();
 }
+    
+#endif
+
+#if USE(AUTOMATIC_TEXT_REPLACEMENT)
 
 void Editor::showSubstitutionsPanel()
 {

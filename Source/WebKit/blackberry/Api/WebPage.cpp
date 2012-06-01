@@ -42,6 +42,7 @@
 #include "Database.h"
 #include "DatabaseSync.h"
 #include "DatabaseTracker.h"
+#include "DefaultTapHighlight.h"
 #include "DeviceMotionClientBlackBerry.h"
 #include "DeviceOrientationClientBlackBerry.h"
 #include "DragClientBlackBerry.h"
@@ -74,6 +75,7 @@
 #include "InspectorBackendDispatcher.h"
 #include "InspectorClientBlackBerry.h"
 #include "InspectorController.h"
+#include "InspectorOverlay.h"
 #include "JavaScriptDebuggerBlackBerry.h"
 #include "LayerWebKitThread.h"
 #include "NetworkManager.h"
@@ -100,6 +102,7 @@
 #include "ScriptValue.h"
 #include "ScrollTypes.h"
 #include "SelectionHandler.h"
+#include "SelectionOverlay.h"
 #include "Settings.h"
 #include "Storage.h"
 #include "StorageNamespace.h"
@@ -116,6 +119,8 @@
 #include "WebDOMDocument.h"
 #endif
 #include "WebKitVersion.h"
+#include "WebOverlay.h"
+#include "WebOverlay_p.h"
 #include "WebPageClient.h"
 #include "WebSocket.h"
 #include "WebViewportArguments.h"
@@ -155,8 +160,8 @@
 #endif
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
-#include "SharedGraphicsContext3D.h"
 #include "GrContext.h"
+#include "SharedGraphicsContext3D.h"
 #endif
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
@@ -504,6 +509,11 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     m_webSettings = WebSettings::createFromStandardSettings();
     m_webSettings->setUserAgentString(defaultUserAgent());
 
+#if USE(ACCELERATED_COMPOSITING)
+    m_tapHighlight = DefaultTapHighlight::create(this);
+    m_selectionOverlay = SelectionOverlay::create(this);
+#endif
+
     // FIXME: We explicitly call setDelegate() instead of passing ourself in createFromStandardSettings()
     // so that we only get one didChangeSettings() callback when we set the page group name. This causes us
     // to make a copy of the WebSettings since some WebSettings method make use of the page group name.
@@ -550,6 +560,14 @@ void WebPagePrivate::init(const WebString& pageGroupName)
 
 #if ENABLE(WEB_TIMING)
     m_page->settings()->setMemoryInfoEnabled(true);
+#endif
+
+#if USE(ACCELERATED_COMPOSITING)
+    // The compositor will be needed for overlay rendering, so create it
+    // unconditionally. It will allocate OpenGL objects lazily, so this incurs
+    // no overhead in the unlikely case where the compositor is not needed.
+    Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
+            createMethodCallMessage(&WebPagePrivate::createCompositor, this));
 #endif
 }
 
@@ -879,8 +897,10 @@ void WebPagePrivate::setLoadState(LoadState state)
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
-            if (isAcceleratedCompositingActive() && !compositorDrawsRootLayer())
-                syncDestroyCompositorOnCompositingThread();
+            if (isAcceleratedCompositingActive()) {
+                Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
+                    Platform::createMethodCallMessage(&WebPagePrivate::destroyLayerResources, this));
+            }
 #endif
             m_previousContentsSize = IntSize();
             m_backingStore->d->resetRenderQueue();
@@ -2120,26 +2140,32 @@ bool WebPagePrivate::isActive() const
     return m_client->isActive();
 }
 
-Credential WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace)
+bool WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace, Credential& inputCredential)
 {
     WebString username;
     WebString password;
+
+#if ENABLE_DRT
+    if (m_dumpRenderTree)
+        return m_dumpRenderTree->didReceiveAuthenticationChallenge(inputCredential);
+#endif
 
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
     if (!m_webSettings->isPrivateBrowsingEnabled())
         credentialManager().autofillAuthenticationChallenge(protectionSpace, username, password);
 #endif
 
-    m_client->authenticationChallenge(protectionSpace.realm().characters(), protectionSpace.realm().length(), username, password);
+    bool isConfirmed = m_client->authenticationChallenge(protectionSpace.realm().characters(), protectionSpace.realm().length(), username, password);
 
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-    Credential inputCredential(username, password, CredentialPersistencePermanent);
-    if (!m_webSettings->isPrivateBrowsingEnabled())
-        credentialManager().saveCredentialIfConfirmed(this, CredentialTransformData(url, protectionSpace, inputCredential));
+    Credential credential(username, password, CredentialPersistencePermanent);
+    if (!m_webSettings->isPrivateBrowsingEnabled() && isConfirmed)
+        credentialManager().saveCredentialIfConfirmed(this, CredentialTransformData(url, protectionSpace, credential));
 #else
-    Credential inputCredential(username, password, CredentialPersistenceNone);
+    Credential credential(username, password, CredentialPersistenceNone);
 #endif
-    return inputCredential;
+    inputCredential = credential;
+    return isConfirmed;
 }
 
 PageClientBlackBerry::SaveCredentialType WebPagePrivate::notifyShouldSaveCredential(bool isNew)
@@ -2234,7 +2260,7 @@ Platform::WebContext WebPagePrivate::webContext(TargetDetectionStrategy strategy
     }
 
     if (node->isTextNode()) {
-        Text* curText = static_cast<Text*>(node.get());
+        Text* curText = toText(node.get());
         if (!curText->wholeText().isEmpty())
             context.setText(curText->wholeText().utf8().data());
     }
@@ -3192,6 +3218,8 @@ void WebPagePrivate::updateDelegatedOverlays(bool dispatched)
         // Must be called on the WebKit thread.
         if (m_selectionHandler->isSelectionActive())
             m_selectionHandler->selectionPositionChanged(true /* visualChangeOnly */);
+        if (m_inspectorOverlay)
+            m_inspectorOverlay->update();
 
     } else if (m_selectionHandler->isSelectionActive()) {
         // Don't bother dispatching to webkit thread if selection and tap highlight are not active.
@@ -3333,8 +3361,10 @@ void WebPage::resetVirtualViewportOnCommitted(bool reset)
 IntSize WebPagePrivate::recomputeVirtualViewportFromViewportArguments()
 {
     static const ViewportArguments defaultViewportArguments;
-    if (m_viewportArguments == defaultViewportArguments)
+    if (m_viewportArguments == defaultViewportArguments) {
+        m_page->setDeviceScaleFactor(1.0);
         return IntSize();
+    }
 
     int desktopWidth = defaultMaxLayoutSize().width();
     int deviceWidth = Platform::Graphics::Screen::primaryScreen()->width();
@@ -3372,8 +3402,7 @@ void WebPagePrivate::didReceiveTouchEventMode(TouchEventMode mode)
 
 void WebPagePrivate::dispatchViewportPropertiesDidChange(const ViewportArguments& arguments)
 {
-    static ViewportArguments defaultViewportArguments;
-    if (arguments == defaultViewportArguments)
+    if (arguments == m_viewportArguments)
         return;
 
     m_viewportArguments = arguments;
@@ -5453,8 +5482,15 @@ void WebPage::notifyFullScreenVideoExited(bool done)
 {
     UNUSED_PARAM(done);
 #if ENABLE(VIDEO)
-    if (HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(d->m_fullscreenVideoNode.get()))
-        mediaElement->exitFullscreen();
+    if (d->m_webSettings->fullScreenVideoCapable()) {
+        if (HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(d->m_fullscreenVideoNode.get()))
+            mediaElement->exitFullscreen();
+    } else {
+#if ENABLE(FULLSCREEN_API)
+        if (Element* element = static_cast<Element*>(d->m_fullscreenVideoNode.get()))
+            element->document()->webkitCancelFullScreen();
+#endif
+    }
 #endif
 }
 
@@ -5582,7 +5618,7 @@ void WebPagePrivate::drawLayersOnCommit()
 
 void WebPagePrivate::scheduleRootLayerCommit()
 {
-    if (!m_frameLayers || !m_frameLayers->hasLayer())
+    if (!(m_frameLayers && m_frameLayers->hasLayer()) && !m_overlayLayer)
         return;
 
     m_needsCommit = true;
@@ -5618,14 +5654,33 @@ LayerRenderingResults WebPagePrivate::lastCompositingResults() const
     return LayerRenderingResults();
 }
 
-void WebPagePrivate::setCompositor(PassRefPtr<WebPageCompositorPrivate> compositor)
+GraphicsLayer* WebPagePrivate::overlayLayer()
+{
+    // The overlay layer has no GraphicsLayerClient, it's just a container
+    // for various overlays.
+    if (!m_overlayLayer)
+        m_overlayLayer = GraphicsLayer::create(0);
+
+    return m_overlayLayer.get();
+}
+
+void WebPagePrivate::setCompositor(PassRefPtr<WebPageCompositorPrivate> compositor, EGLContext compositingContext)
 {
     using namespace BlackBerry::Platform;
 
     // The m_compositor member has to be modified during a sync call for thread
     // safe access to m_compositor and its refcount.
     if (!userInterfaceThreadMessageClient()->isCurrentThread()) {
-        userInterfaceThreadMessageClient()->dispatchSyncMessage(createMethodCallMessage(&WebPagePrivate::setCompositor, this, compositor));
+        // We depend on the current thread being the WebKit thread when it's not the Compositing thread.
+        // That seems extremely likely to be the case, but let's assert just to make sure.
+        ASSERT(webKitThreadMessageClient()->isCurrentThread());
+
+        // This method call always round-trips on the WebKit thread (see WebPageCompositor::WebPageCompositor() and ~WebPageCompositor()),
+        // and the compositing context must be set on the WebKit thread. How convenient!
+        if (compositingContext != EGL_NO_CONTEXT)
+            BlackBerry::Platform::Graphics::setCompositingContext(compositingContext);
+
+        userInterfaceThreadMessageClient()->dispatchSyncMessage(createMethodCallMessage(&WebPagePrivate::setCompositor, this, compositor, compositingContext));
         return;
     }
 
@@ -5647,16 +5702,34 @@ void WebPagePrivate::commitRootLayer(const IntRect& layoutRectForCompositing,
             WTF_PRETTY_FUNCTION, m_compositor.get());
 #endif
 
-    if (!m_frameLayers || !m_compositor)
+    if (!m_compositor)
         return;
 
-    if (m_frameLayers->rootLayer() && m_frameLayers->rootLayer()->layerCompositingThread() != m_compositor->rootLayer())
-        m_compositor->setRootLayer(m_frameLayers->rootLayer()->layerCompositingThread());
+    // Frame layers
+    LayerWebKitThread* rootLayer = 0;
+    if (m_frameLayers)
+        rootLayer = m_frameLayers->rootLayer();
+
+    if (rootLayer && rootLayer->layerCompositingThread() != m_compositor->rootLayer())
+        m_compositor->setRootLayer(rootLayer->layerCompositingThread());
+
+    // Overlay layers
+    LayerWebKitThread* overlayLayer = 0;
+    if (m_overlayLayer)
+        overlayLayer = m_overlayLayer->platformLayer();
+
+    if (overlayLayer && overlayLayer->layerCompositingThread() != m_compositor->overlayLayer())
+        m_compositor->setOverlayLayer(overlayLayer->layerCompositingThread());
 
     m_compositor->setLayoutRectForCompositing(layoutRectForCompositing);
     m_compositor->setContentsSizeForCompositing(contentsSizeForCompositing);
     m_compositor->setDrawsRootLayer(drawsRootLayer);
-    m_compositor->commit(m_frameLayers->rootLayer());
+
+    if (rootLayer)
+        rootLayer->commitOnCompositingThread();
+
+    if (overlayLayer)
+        overlayLayer->commitOnCompositingThread();
 }
 
 bool WebPagePrivate::commitRootLayerIfNeeded()
@@ -5677,7 +5750,7 @@ bool WebPagePrivate::commitRootLayerIfNeeded()
     if (!m_needsCommit)
         return false;
 
-    if (!m_frameLayers || !m_frameLayers->hasLayer())
+    if (!(m_frameLayers && m_frameLayers->hasLayer()) && !m_overlayLayer)
         return false;
 
     FrameView* view = m_mainFrame->view();
@@ -5702,8 +5775,13 @@ bool WebPagePrivate::commitRootLayerIfNeeded()
     if (m_rootLayerCommitTimer->isActive())
         m_rootLayerCommitTimer->stop();
 
-    m_frameLayers->commitOnWebKitThread(currentScale());
+    double scale = currentScale();
+    if (m_frameLayers && m_frameLayers->hasLayer())
+        m_frameLayers->commitOnWebKitThread(scale);
+
     updateDelegatedOverlays();
+    if (m_overlayLayer)
+        m_overlayLayer->platformLayer()->commitOnWebKitThread(scale);
 
     // Stash the visible content rect according to webkit thread
     // This is the rectangle used to layout fixed positioned elements,
@@ -5848,22 +5926,11 @@ bool WebPagePrivate::createCompositor()
     m_compositor = WebPageCompositorPrivate::create(this, 0);
     m_compositor->setContext(m_ownedContext.get());
 
-    if (!m_compositor->hardwareCompositing()) {
-        destroyCompositor();
-        return false;
-    }
-
     return true;
 }
 
 void WebPagePrivate::destroyCompositor()
 {
-    // We shouldn't release the compositor unless we created and own the
-    // context. If the compositor was created from the WebPageCompositor API,
-    // keep it around and reuse it later.
-    if (!m_ownedContext)
-        return;
-
     // m_compositor is a RefPtr, so it may live on beyond this point.
     // Disconnect the compositor from us
     m_compositor->setPage(0);
@@ -5985,6 +6052,60 @@ void WebPagePrivate::exitFullscreenForNode(Node* node)
     mmrPlayer->setFullscreenWebPageClient(0);
 #endif
 }
+
+#if ENABLE(FULLSCREEN_API)
+// TODO: We should remove this helper class when we decide to support all elements.
+static bool containsVideoTags(Element* element)
+{
+    for (Node* node = element->firstChild(); node; node = node->traverseNextNode(element)) {
+        if (node->hasTagName(HTMLNames::videoTag))
+            return true;
+    }
+    return false;
+}
+
+void WebPagePrivate::enterFullScreenForElement(Element* element)
+{
+#if ENABLE(VIDEO)
+    // TODO: We should not check video tag when we decide to support all elements.
+    if (!element || (!element->hasTagName(HTMLNames::videoTag) && !containsVideoTags(element)))
+        return;
+    if (m_webSettings->fullScreenVideoCapable()) {
+        // The Browser chrome has its own fullscreen video widget it wants to
+        // use, and this is a video element. The only reason that
+        // webkitWillEnterFullScreenForElement() and
+        // webkitDidEnterFullScreenForElement() are still called in this case
+        // is so that exitFullScreenForElement() gets called later.
+        enterFullscreenForNode(element);
+    } else {
+        // No fullscreen video widget has been made available by the Browser
+        // chrome, or this is not a video element. The webkitRequestFullScreen
+        // Javascript call is often made on a div element.
+        // This is where we would hide the browser's chrome if we wanted to.
+        client()->fullscreenStart();
+        m_fullscreenVideoNode = element;
+    }
+#endif
+}
+
+void WebPagePrivate::exitFullScreenForElement(Element* element)
+{
+#if ENABLE(VIDEO)
+    // TODO: We should not check video tag when we decide to support all elements.
+    if (!element || !element->hasTagName(HTMLNames::videoTag))
+        return;
+    if (m_webSettings->fullScreenVideoCapable()) {
+        // The Browser chrome has its own fullscreen video widget.
+        exitFullscreenForNode(element);
+    } else {
+        // This is where we would restore the browser's chrome
+        // if hidden above.
+        client()->fullscreenStop();
+        m_fullscreenVideoNode = 0;
+    }
+#endif
+}
+#endif
 
 void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
 {
@@ -6154,6 +6275,66 @@ const String& WebPagePrivate::defaultUserAgent()
     return *defaultUserAgent;
 }
 
+WebTapHighlight* WebPage::tapHighlight() const
+{
+    return d->m_tapHighlight.get();
+}
+
+void WebPage::setTapHighlight(WebTapHighlight* tapHighlight)
+{
+    d->m_tapHighlight = adoptPtr(tapHighlight);
+}
+
+WebSelectionOverlay* WebPage::selectionOverlay() const
+{
+    return d->m_selectionOverlay.get();
+}
+
+void WebPage::addOverlay(WebOverlay* overlay)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (overlay->d->graphicsLayer()) {
+        overlay->d->setPage(d);
+        d->overlayLayer()->addChild(overlay->d->graphicsLayer());
+    }
+#endif
+}
+
+void WebPage::removeOverlay(WebOverlay* overlay)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (overlay->d->graphicsLayer()->parent() != d->overlayLayer())
+        return;
+
+    overlay->removeFromParent();
+    overlay->d->clear();
+    overlay->d->setPage(0);
+#endif
+}
+
+void WebPage::addCompositingThreadOverlay(WebOverlay* overlay)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    ASSERT(Platform::userInterfaceThreadMessageClient()->isCurrentThread());
+    if (!d->compositor())
+        return;
+
+    overlay->d->setPage(d);
+    d->compositor()->addOverlay(overlay->d->layerCompositingThread());
+#endif
+}
+
+void WebPage::removeCompositingThreadOverlay(WebOverlay* overlay)
+{
+#if USE(ACCELERATED_COMPOSITING)
+    ASSERT(Platform::userInterfaceThreadMessageClient()->isCurrentThread());
+    if (d->compositor())
+        d->compositor()->removeOverlay(overlay->d->layerCompositingThread());
+    overlay->d->clear();
+    overlay->d->setPage(0);
+#endif
+}
+
 void WebPage::popupOpened(PagePopupBlackBerry* webPopup)
 {
     ASSERT(!d->m_selectPopup);
@@ -6179,6 +6360,24 @@ PagePopupBlackBerry* WebPage::popup()
 void WebPagePrivate::setParentPopup(PagePopupBlackBerry* webPopup)
 {
     m_parentPopup = webPopup;
+}
+
+void WebPagePrivate::setInspectorOverlayClient(WebCore::InspectorOverlay::InspectorOverlayClient* inspectorOverlayClient)
+{
+    if (inspectorOverlayClient) {
+        if (!m_inspectorOverlay)
+            m_inspectorOverlay = WebCore::InspectorOverlay::create(this, inspectorOverlayClient);
+        else
+            m_inspectorOverlay->setClient(inspectorOverlayClient);
+        m_inspectorOverlay->update();
+        scheduleRootLayerCommit();
+    } else {
+        if (m_inspectorOverlay) {
+            m_inspectorOverlay->clear();
+            m_inspectorOverlay = nullptr;
+            scheduleRootLayerCommit();
+        }
+    }
 }
 
 }

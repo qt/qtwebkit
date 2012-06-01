@@ -17,13 +17,15 @@
     Boston, MA 02110-1301, USA.
 */
 
+#include "config.h"
+
 #include "qglobal.h"
 
 #if defined(HAVE_QQUICK1)
 #include "qdeclarativewebview_p.h"
 #endif
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
+#if (HAVE(QT5))
 #include <QtQml/qqml.h>
 #include <QtQml/qqmlextensionplugin.h>
 #else

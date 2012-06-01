@@ -47,13 +47,16 @@ ADD_DEFINITIONS(-DUSER_PROCESSES)
 LIST(APPEND WebKit_SOURCES
     blackberry/Api/BackingStore.cpp
     blackberry/Api/BlackBerryGlobal.cpp
-    blackberry/Api/WebString.cpp
+    blackberry/Api/WebAnimation.cpp
     blackberry/Api/WebKitMIMETypeConverter.cpp
     blackberry/Api/WebKitTextCodec.cpp
+    blackberry/Api/WebOverlay.cpp
+    blackberry/Api/WebOverlayOverride.cpp
     blackberry/Api/WebPage.cpp
     blackberry/Api/WebPageCompositor.cpp
     blackberry/Api/WebPageGroupLoadDeferrer.cpp
     blackberry/Api/WebSettings.cpp
+    blackberry/Api/WebString.cpp
     blackberry/Api/WebViewportArguments.cpp
     blackberry/WebCoreSupport/AboutData.cpp
     blackberry/WebCoreSupport/AutofillManager.cpp
@@ -72,6 +75,7 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.cpp
     blackberry/WebCoreSupport/IconDatabaseClientBlackBerry.cpp
     blackberry/WebCoreSupport/InspectorClientBlackBerry.cpp
+    blackberry/WebCoreSupport/InspectorOverlay.cpp
     blackberry/WebCoreSupport/JavaScriptDebuggerBlackBerry.cpp
     blackberry/WebCoreSupport/NotificationPresenterImpl.cpp
     blackberry/WebCoreSupport/VibrationClientBlackBerry.cpp
@@ -80,12 +84,14 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebKitSupport/BackingStoreCompositingSurface.cpp
     blackberry/WebKitSupport/BackingStoreTile.cpp
     blackberry/WebKitSupport/BackingStoreClient.cpp
+    blackberry/WebKitSupport/DefaultTapHighlight.cpp
     blackberry/WebKitSupport/DOMSupport.cpp
     blackberry/WebKitSupport/FrameLayers.cpp
     blackberry/WebKitSupport/InPageSearchManager.cpp
     blackberry/WebKitSupport/InputHandler.cpp
     blackberry/WebKitSupport/RenderQueue.cpp
     blackberry/WebKitSupport/SelectionHandler.cpp
+    blackberry/WebKitSupport/SelectionOverlay.cpp
     blackberry/WebKitSupport/SurfacePool.cpp
     blackberry/WebKitSupport/TouchEventHandler.cpp
     blackberry/WebKitSupport/FatFingers.cpp

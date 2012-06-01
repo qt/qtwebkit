@@ -11,24 +11,28 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Library General Public License for more details.
  *
- * You should have received a copy of the GNU Library General Public License
- * along with this library; see the file COPYING.LIB.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
- * Boston, MA 02110-1301, USA.
- *
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA  02110-1301, USA.
  */
 
-#ifndef ewk_private_h
-#define ewk_private_h
+#include "config.h"
+#include "WebURLResponseEfl.h"
 
-#include <Evas.h>
+namespace WebKit {
 
-namespace WebCore {
-class IntRect;
-class IntSize;
+WebURLResponseEfl::WebURLResponseEfl(const WebURLResponse* response)
+    : m_response(response)
+{
 }
 
-void ewk_view_display(Evas_Object* ewkView, const WebCore::IntRect& rect);
-void ewk_view_image_data_set(Evas_Object* ewkView, void* imageData, const WebCore::IntSize& size);
+const String& WebURLResponseEfl::contentType() const
+{
+    if (!m_response)
+        return String();
 
-#endif // ewk_private_h
+    return m_response->resourceResponse().mimeType();
+}
+
+} // namespace WebKit

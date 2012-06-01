@@ -105,6 +105,7 @@ Rectangle {
                         if (parent.enabled) {
                             console.log("MiniBrowser: Going backward in session history.")
                             webView.goBack()
+                            webView.forceActiveFocus()
                         }
                     }
                 }
@@ -139,6 +140,7 @@ Rectangle {
                         if (parent.enabled) {
                             console.log("MiniBrowser: Going forward in session history.")
                             webView.goForward()
+                            webView.forceActiveFocus()
                         }
                     }
                 }
@@ -267,7 +269,7 @@ Rectangle {
                 height: 16
                 anchors {
                     left: parent.left
-                    leftMargin: 4
+                    leftMargin: 6
                     verticalCenter: parent.verticalCenter
                 }
             }

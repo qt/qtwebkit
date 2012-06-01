@@ -24,6 +24,7 @@
 #include "FrameLoaderClientEfl.h"
 #include "ewk_frame_private.h"
 #include "ewk_history_private.h"
+#include "ewk_intent_private.h"
 #include "ewk_private.h"
 #include "ewk_view_private.h"
 
@@ -41,8 +42,10 @@
 #include <HTMLInputElement.h>
 #include <InspectorController.h>
 #include <IntRect.h>
+#include <Intent.h>
 #include <JSCSSStyleDeclaration.h>
 #include <JSElement.h>
+#include <JavaScriptCore/OpaqueJSString.h>
 #include <MemoryCache.h>
 #include <PageGroup.h>
 #include <PrintContext.h>
@@ -428,24 +431,6 @@ void DumpRenderTreeSupportEfl::setCSSGridLayoutEnabled(const Evas_Object* ewkVie
         corePage->settings()->setCSSGridLayoutEnabled(enabled);
 }
 
-void DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(const Evas_Object* ewkView, bool enabled)
-{
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
-    WebCore::Page* corePage = EWKPrivate::corePage(ewkView);
-    if (!corePage)
-        return;
-
-    WebCore::InspectorController* controller = corePage->inspectorController();
-    if (!controller)
-        return;
-
-    if (enabled)
-        controller->enableProfiler();
-    else
-        controller->disableProfiler();
-#endif
-}
-
 bool DumpRenderTreeSupportEfl::isCommandEnabled(const Evas_Object* ewkView, const char* name)
 {
     WebCore::Page* page = EWKPrivate::corePage(ewkView);
@@ -682,6 +667,27 @@ void DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(Evas_Object* ewkVie
 void DumpRenderTreeSupportEfl::setSerializeHTTPLoads(bool enabled)
 {
     WebCore::resourceLoadScheduler()->setSerialLoadingEnabled(enabled);
+}
+
+void DumpRenderTreeSupportEfl::sendWebIntentResponse(Ewk_Intent_Request* request, JSStringRef response)
+{
+#if ENABLE(WEB_INTENTS)
+    JSC::UString responseString = response->ustring();
+    if (responseString.isNull())
+        ewk_intent_request_failure_post(request, WebCore::SerializedScriptValue::create(String::fromUTF8("ERROR")));
+    else
+        ewk_intent_request_result_post(request, WebCore::SerializedScriptValue::create(String(responseString.impl())));
+#endif
+}
+
+WebCore::MessagePortChannelArray* DumpRenderTreeSupportEfl::intentMessagePorts(const Ewk_Intent* intent)
+{
+#if ENABLE(WEB_INTENTS)
+    const WebCore::Intent* coreIntent = EWKPrivate::coreIntent(intent);
+    return coreIntent ? coreIntent->messagePorts() : 0;
+#else
+    return 0;
+#endif
 }
 
 void DumpRenderTreeSupportEfl::setComposition(Evas_Object* ewkView, const char* text, int start, int length)

@@ -167,6 +167,7 @@ public:
     virtual String typeMismatchText() const;
     virtual String valueMissingText() const;
     virtual bool canSetStringValue() const;
+    virtual String localizeValue(const String&) const;
     virtual String visibleValue() const;
     virtual String convertFromVisibleValue(const String&) const;
     virtual bool isAcceptableValue(const String&);
@@ -228,6 +229,7 @@ public:
     virtual void willMoveToNewOwnerDocument();
     virtual bool shouldRespectAlignAttribute();
     virtual FileList* files();
+    virtual void setFiles(PassRefPtr<FileList>);
     virtual void receiveDroppedFiles(const Vector<String>&);
     virtual Icon* icon() const;
     // Should return true if the corresponding renderer for a type can display a suggested value.

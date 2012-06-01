@@ -51,13 +51,13 @@ v8::Handle<v8::Value> V8Clipboard::typesAccessorGetter(v8::Local<v8::String> nam
 
     HashSet<String> types = clipboard->types();
     if (types.isEmpty())
-        return v8::Null();
+        return v8::Null(info.GetIsolate());
 
     v8::Local<v8::Array> result = v8::Array::New(types.size());
     HashSet<String>::const_iterator end = types.end();
     int index = 0;
     for (HashSet<String>::const_iterator it = types.begin(); it != end; ++it, ++index)
-        result->Set(v8::Integer::New(index), v8String(*it));
+        result->Set(v8::Integer::New(index), v8String(*it, info.GetIsolate()));
 
     return result;
 }

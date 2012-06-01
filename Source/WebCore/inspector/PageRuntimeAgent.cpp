@@ -151,7 +151,7 @@ void PageRuntimeAgent::unmuteConsole()
 void PageRuntimeAgent::notifyContextCreated(const String& frameId, ScriptState* scriptState, SecurityOrigin* securityOrigin, bool isPageContext)
 {
     ASSERT(securityOrigin || isPageContext);
-    long executionContextId = injectedScriptManager()->injectedScriptIdFor(scriptState);
+    int executionContextId = injectedScriptManager()->injectedScriptIdFor(scriptState);
     String name = securityOrigin ? securityOrigin->toString() : "";
     m_frontend->isolatedContextCreated(ExecutionContextDescription::create()
         .setId(executionContextId)

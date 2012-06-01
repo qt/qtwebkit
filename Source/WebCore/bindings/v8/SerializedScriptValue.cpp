@@ -1263,13 +1263,13 @@ public:
             *value = v8::Undefined();
             break;
         case NullTag:
-            *value = v8::Null();
+            *value = v8NullWithCheck(m_isolate);
             break;
         case TrueTag:
-            *value = v8::True();
+            *value = v8BooleanWithCheck(true, m_isolate);
             break;
         case FalseTag:
-            *value = v8::False();
+            *value = v8BooleanWithCheck(false, m_isolate);
             break;
         case TrueObjectTag:
             *value = v8::BooleanObject::New(true);
@@ -1828,15 +1828,15 @@ public:
     v8::Handle<v8::Value> deserialize()
     {
         if (!m_reader.readVersion(m_version) || m_version > wireFormatVersion)
-            return v8::Null();
+            return v8NullWithCheck(m_reader.getIsolate());
         m_reader.setVersion(m_version);
         v8::HandleScope scope;
         while (!m_reader.isEof()) {
             if (!doDeserialize())
-                return v8::Null();
+                return v8NullWithCheck(m_reader.getIsolate());
         }
         if (stackDepth() != 1 || m_openCompositeReferenceStack.size())
-            return v8::Null();
+            return v8NullWithCheck(m_reader.getIsolate());
         v8::Handle<v8::Value> result = scope.Close(element(0));
         return result;
     }
@@ -2245,7 +2245,7 @@ SerializedScriptValue::SerializedScriptValue(const String& wireData)
 v8::Handle<v8::Value> SerializedScriptValue::deserialize(MessagePortArray* messagePorts, v8::Isolate* isolate)
 {
     if (!m_data.impl())
-        return v8::Null();
+        return v8NullWithCheck(isolate);
     COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
     Reader reader(reinterpret_cast<const uint8_t*>(m_data.impl()->characters()), 2 * m_data.length(), isolate);
     Deserializer deserializer(reader, messagePorts, m_arrayBufferContentsArray.get());

@@ -1,3 +1,114 @@
+2012-05-31  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Enable CSS_IMAGE_SET flag
+        https://bugs.webkit.org/show_bug.cgi?id=87727
+
+        Reviewed by Adam Roben.
+
+        Add CSS_IMAGE_SET flag to CMake and enable it by default on EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-05-30  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed build fix. Add needed file back to the wx build.
+
+        * wscript:
+
+2012-05-30  Mariusz Grzegorczyk  <mariusz.g@samsung.com>, Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][WK2] Fix WebKit2-EFL build
+        https://bugs.webkit.org/show_bug.cgi?id=83693
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/cmake/OptionsEfl.cmake: Define BUILDING_SOUP__ to build WebKit2/Efl.
+
+2012-05-29  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] Loading media data with http authentication
+        https://bugs.webkit.org/show_bug.cgi?id=84214
+
+        Reviewed by George Staikos.
+
+        Added a manual test case which needs user to provide a HTTP server
+        with HTTP authentication support when loading the specified media
+        resource. The test case will test if the media resource is successfully
+        loaded.
+
+        * ManualTests/blackberry/video-load-with-authentication.html: Added.
+
+2012-05-29  Simon Fraser  <simon.fraser@apple.com>
+
+        Incomplete repaint on twitter.com when replying to a tweet
+        https://bugs.webkit.org/show_bug.cgi?id=87553
+
+        Reviewed by Dean Jackson.
+        
+        Manual test that adds a transform to a layer, forcing that
+        layer to gain backing store.
+
+        * ManualTests/compositing/requires-backing-change.html: Added.
+
+2012-05-29  David Barr  <davidbarr@chromium.org>
+
+        Introduce ENABLE_CSS_IMAGE_RESOLUTION compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=87685
+
+        Reviewed by Eric Seidel.
+
+        Add a configuration option for CSS image-resolution support, disabling it by default.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-05-25  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        WebKitTestRunner needs to support layoutTestController.setJavaScriptProfilingEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=42328
+
+        Reviewed by Eric Seidel.
+
+        * Source/autotools/symbols.filter: Added needed symbols for GTK build.
+
+2012-05-28  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Move allowRoundingHacks to Internals interface
+        https://bugs.webkit.org/show_bug.cgi?id=87328
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter: Add allowRoundingHacks symbol filter.
+
+2012-05-27  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] Enable blob support for the EFL port
+        https://bugs.webkit.org/show_bug.cgi?id=85363
+
+        Reviewed by Hajime Morita.
+
+        Enable Blob support by default for the EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2012-05-27  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Make WEBKIT_SET_EXTRA_COMPILER_FLAGS work with clang.
+        https://bugs.webkit.org/show_bug.cgi?id=87597
+
+        Reviewed by Daniel Bates.
+
+        Building with clang requires at least the -fPIC option being
+        passed correctly, just like it is needed with gcc. clang is also
+        compatible with most of gcc's compiler options, so we only need to
+        check for clang besides g++ in the macro definition.
+
+        * Source/cmake/WebKitHelpers.cmake: Check for "Clang" and use
+        CMAKE_COMPILER_IS_GNUCXX for the previous check, as it is shorter
+        and achieves the same effect.
+
 2012-05-25  Zan Dobersek  <zandobersek@gmail.com>
 
         configure.ac has duplicated AC_MSG_RESULT([$enable_sandbox]) and nothing for seamless iframes

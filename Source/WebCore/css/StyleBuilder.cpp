@@ -1723,8 +1723,11 @@ public:
     {
         if (value->isPrimitiveValue()) {
             CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
-            if (primitiveValue->getIdent() == CSSValueNone)
-                applyInitialValue(styleResolver);
+            if (primitiveValue->getIdent() == CSSValueNone) {
+                styleResolver->style()->setPositiveFlex(0);
+                styleResolver->style()->setNegativeFlex(0);
+                styleResolver->style()->setFlexPreferredSize(Length(Auto));
+            }
             return;
         }
 
@@ -1911,6 +1914,7 @@ StyleBuilder::StyleBuilder()
     setPropertyHandler(CSSPropertyWebkitBorderRadius, CSSPropertyBorderRadius);
     setPropertyHandler(CSSPropertyWebkitBorderVerticalSpacing, ApplyPropertyComputeLength<short, &RenderStyle::verticalBorderSpacing, &RenderStyle::setVerticalBorderSpacing, &RenderStyle::initialVerticalBorderSpacing>::createHandler());
     setPropertyHandler(CSSPropertyWebkitBoxAlign, ApplyPropertyDefault<EBoxAlignment, &RenderStyle::boxAlign, EBoxAlignment, &RenderStyle::setBoxAlign, EBoxAlignment, &RenderStyle::initialBoxAlign>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitBoxDecorationBreak, ApplyPropertyDefault<EBoxDecorationBreak, &RenderStyle::boxDecorationBreak, EBoxDecorationBreak, &RenderStyle::setBoxDecorationBreak, EBoxDecorationBreak, &RenderStyle::initialBoxDecorationBreak>::createHandler());
     setPropertyHandler(CSSPropertyWebkitBoxDirection, ApplyPropertyDefault<EBoxDirection, &RenderStyle::boxDirection, EBoxDirection, &RenderStyle::setBoxDirection, EBoxDirection, &RenderStyle::initialBoxDirection>::createHandler());
     setPropertyHandler(CSSPropertyWebkitBoxFlex, ApplyPropertyDefault<float, &RenderStyle::boxFlex, float, &RenderStyle::setBoxFlex, float, &RenderStyle::initialBoxFlex>::createHandler());
     setPropertyHandler(CSSPropertyWebkitBoxFlexGroup, ApplyPropertyDefault<unsigned int, &RenderStyle::boxFlexGroup, unsigned int, &RenderStyle::setBoxFlexGroup, unsigned int, &RenderStyle::initialBoxFlexGroup>::createHandler());
@@ -1932,11 +1936,11 @@ StyleBuilder::StyleBuilder()
     setPropertyHandler(CSSPropertyWebkitColumnRuleStyle, ApplyPropertyDefault<EBorderStyle, &RenderStyle::columnRuleStyle, EBorderStyle, &RenderStyle::setColumnRuleStyle, EBorderStyle, &RenderStyle::initialBorderStyle>::createHandler());
     setPropertyHandler(CSSPropertyWebkitColumnWidth, ApplyPropertyAuto<float, &RenderStyle::columnWidth, &RenderStyle::setColumnWidth, &RenderStyle::hasAutoColumnWidth, &RenderStyle::setHasAutoColumnWidth, ComputeLength>::createHandler());
 #if ENABLE(CSS3_FLEXBOX)
+    setPropertyHandler(CSSPropertyWebkitAlignItems, ApplyPropertyDefault<EAlignItems, &RenderStyle::alignItems, EAlignItems, &RenderStyle::setAlignItems, EAlignItems, &RenderStyle::initialAlignItems>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitAlignSelf, ApplyPropertyDefault<EAlignItems, &RenderStyle::alignSelf, EAlignItems, &RenderStyle::setAlignSelf, EAlignItems, &RenderStyle::initialAlignSelf>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlex, ApplyPropertyFlex::createHandler());
-    setPropertyHandler(CSSPropertyWebkitFlexAlign, ApplyPropertyDefault<EFlexAlign, &RenderStyle::flexAlign, EFlexAlign, &RenderStyle::setFlexAlign, EFlexAlign, &RenderStyle::initialFlexAlign>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexDirection, ApplyPropertyDefault<EFlexDirection, &RenderStyle::flexDirection, EFlexDirection, &RenderStyle::setFlexDirection, EFlexDirection, &RenderStyle::initialFlexDirection>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexFlow, ApplyPropertyExpanding<SuppressValue, CSSPropertyWebkitFlexDirection, CSSPropertyWebkitFlexWrap>::createHandler());
-    setPropertyHandler(CSSPropertyWebkitFlexItemAlign, ApplyPropertyDefault<EFlexAlign, &RenderStyle::flexItemAlign, EFlexAlign, &RenderStyle::setFlexItemAlign, EFlexAlign, &RenderStyle::initialFlexItemAlign>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexLinePack, ApplyPropertyDefault<EFlexLinePack, &RenderStyle::flexLinePack, EFlexLinePack, &RenderStyle::setFlexLinePack, EFlexLinePack, &RenderStyle::initialFlexLinePack>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexOrder, ApplyPropertyDefault<int, &RenderStyle::flexOrder, int, &RenderStyle::setFlexOrder, int, &RenderStyle::initialFlexOrder>::createHandler());
     setPropertyHandler(CSSPropertyWebkitFlexPack, ApplyPropertyDefault<EFlexPack, &RenderStyle::flexPack, EFlexPack, &RenderStyle::setFlexPack, EFlexPack, &RenderStyle::initialFlexPack>::createHandler());

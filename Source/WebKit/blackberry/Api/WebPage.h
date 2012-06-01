@@ -62,11 +62,14 @@ class BackingStore;
 class BackingStoreClient;
 class BackingStorePrivate;
 class RenderQueue;
+class WebOverlay;
 class WebPageClient;
 class WebPageCompositor;
 class WebPageGroupLoadDeferrer;
 class WebPagePrivate;
+class WebSelectionOverlay;
 class WebSettings;
+class WebTapHighlight;
 class WebViewportArguments;
 
 enum JavaScriptDataType { JSUndefined = 0, JSNull, JSBoolean, JSNumber, JSString, JSObject, JSException, JSDataTypeMax };
@@ -334,6 +337,20 @@ public:
     void setUserViewportArguments(const WebViewportArguments&);
     void resetUserViewportArguments();
 
+    WebTapHighlight* tapHighlight() const;
+    void setTapHighlight(WebTapHighlight*);
+
+    WebSelectionOverlay* selectionOverlay() const;
+
+    // Adds an overlay that can be modified on the WebKit thread, and
+    // whose attributes can be overridden on the compositing thread.
+    void addOverlay(WebOverlay*);
+    void removeOverlay(WebOverlay*);
+
+    // Adds an overlay that can only be modified on the compositing thread.
+    void addCompositingThreadOverlay(WebOverlay*);
+    void removeCompositingThreadOverlay(WebOverlay*);
+
     // Popup client
     void initPopupWebView(BlackBerry::WebKit::WebPage*);
     void popupOpened(WebCore::PagePopupBlackBerry* webPopup);
@@ -342,6 +359,7 @@ public:
     WebCore::PagePopupBlackBerry* popup();
 
     void autofillTextField(const std::string&);
+
 private:
     virtual ~WebPage();
 

@@ -816,11 +816,11 @@ static void ensureDefaultStyleSheetsForElement(Element* element)
     ASSERT(mathMLStyleSheet || defaultStyle->features().siblingRules.isEmpty());
 }
 
-void StyleResolver::addMatchedProperties(MatchResult& matchResult, StylePropertySet* properties, StyleRule* rule, unsigned linkMatchType, bool inRegionRule)
+void StyleResolver::addMatchedProperties(MatchResult& matchResult, const StylePropertySet* properties, StyleRule* rule, unsigned linkMatchType, bool inRegionRule)
 {
     matchResult.matchedProperties.grow(matchResult.matchedProperties.size() + 1);
     MatchedProperties& newProperties = matchResult.matchedProperties.last();
-    newProperties.properties = properties;
+    newProperties.properties = const_cast<StylePropertySet*>(properties);
     newProperties.linkMatchType = linkMatchType;
     newProperties.isInRegionRule = inRegionRule;
     matchResult.matchedRules.append(rule);
@@ -1051,7 +1051,7 @@ void StyleResolver::collectMatchingRulesForList(const Vector<RuleData>* rules, i
                 continue;
             }
             // If the rule has no properties to apply, then ignore it in the non-debug mode.
-            StylePropertySet* properties = rule->properties();
+            const StylePropertySet* properties = rule->properties();
             if (!properties || (properties->isEmpty() && !options.includeEmptyRules)) {
                 InspectorInstrumentation::didMatchRule(cookie, false);
                 continue;
@@ -1390,6 +1390,9 @@ bool StyleResolver::canShareStyleWithElement(StyledElement* element) const
 #endif
 
     if (element->hasTagName(optionTag))
+        return false;
+
+    if (element->hasTagName(optgroupTag) && m_element->disabled() != element->disabled())
         return false;
 
     bool isControl = element->isFormControlElement();
@@ -1957,6 +1960,16 @@ static EDisplay equivalentBlockDisplay(EDisplay display, bool isFloating, bool s
     return BLOCK;
 }
 
+// CSS requires text-decoration to be reset at each DOM element for tables, 
+// inline blocks, inline tables, run-ins, shadow DOM crossings, floating elements,
+// and absolute or relatively positioned elements.
+static bool doesNotInheritTextDecoration(RenderStyle* style, Element* e)
+{
+    return style->display() == TABLE || style->display() == INLINE_TABLE || style->display() == RUN_IN
+        || style->display() == INLINE_BLOCK || style->display() == INLINE_BOX || isAtShadowBoundary(e)
+        || style->isFloating() || style->isPositioned();
+}
+
 void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentStyle, Element *e)
 {
     // Cache our original display.
@@ -2069,10 +2082,7 @@ void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
         style->setOverflowY(style->overflowY() == OVISIBLE ? OAUTO : style->overflowY());
     }
 
-    // Finally update our text decorations in effect, but don't allow text-decoration to percolate through
-    // tables, inline blocks, inline tables, run-ins, or shadow DOM.
-    if (style->display() == TABLE || style->display() == INLINE_TABLE || style->display() == RUN_IN
-        || style->display() == INLINE_BLOCK || style->display() == INLINE_BOX || isAtShadowBoundary(e))
+    if (doesNotInheritTextDecoration(style, e))
         style->setTextDecorationsInEffect(style->textDecoration());
     else
         style->addToTextDecorationsInEffect(style->textDecoration());
@@ -2911,7 +2921,7 @@ void StyleResolver::matchPageRulesForList(Vector<StyleRulePage*>& matchedRules, 
             continue;
 
         // If the rule has no properties to apply, then ignore it.
-        StylePropertySet* properties = rule->properties();
+        const StylePropertySet* properties = rule->properties();
         if (!properties || properties->isEmpty())
             continue;
 
@@ -4089,6 +4099,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue *value)
     case CSSPropertyWebkitBorderRadius:
     case CSSPropertyWebkitBorderVerticalSpacing:
     case CSSPropertyWebkitBoxAlign:
+    case CSSPropertyWebkitBoxDecorationBreak:
     case CSSPropertyWebkitBoxDirection:
     case CSSPropertyWebkitBoxFlex:
     case CSSPropertyWebkitBoxFlexGroup:
@@ -4110,11 +4121,11 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue *value)
     case CSSPropertyWebkitColumnSpan:
     case CSSPropertyWebkitColumnWidth:
 #if ENABLE(CSS3_FLEXBOX)
+    case CSSPropertyWebkitAlignItems:
+    case CSSPropertyWebkitAlignSelf:
     case CSSPropertyWebkitFlex:
-    case CSSPropertyWebkitFlexAlign:
     case CSSPropertyWebkitFlexDirection:
     case CSSPropertyWebkitFlexFlow:
-    case CSSPropertyWebkitFlexItemAlign:
     case CSSPropertyWebkitFlexLinePack:
     case CSSPropertyWebkitFlexOrder:
     case CSSPropertyWebkitFlexPack:

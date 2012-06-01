@@ -51,7 +51,16 @@ RenderRegion::RenderRegion(Node* node, RenderFlowThread* flowThread)
     , m_regionState(RegionUndefined)
     , m_dispatchRegionLayoutUpdateEvent(false)
 {
-    ASSERT(node->document()->cssRegionsEnabled());
+}
+
+LayoutUnit RenderRegion::logicalWidthForFlowThreadContent() const
+{
+    return m_flowThread->isHorizontalWritingMode() ? contentWidth() : contentHeight();
+}
+
+LayoutUnit RenderRegion::logicalHeightForFlowThreadContent() const
+{
+    return m_flowThread->isHorizontalWritingMode() ? contentHeight() : contentWidth();
 }
 
 LayoutRect RenderRegion::regionOverflowRect() const
@@ -148,7 +157,10 @@ void RenderRegion::layout()
 {
     RenderReplaced::layout();
     if (m_flowThread && isValid()) {
-        if (regionRect().width() != contentWidth() || regionRect().height() != contentHeight())
+        LayoutRect oldRegionRect(regionRect());
+        if (!isHorizontalWritingMode())
+            oldRegionRect = oldRegionRect.transposedRect();
+        if (oldRegionRect.width() != logicalWidthForFlowThreadContent() || oldRegionRect.height() != logicalHeightForFlowThreadContent())
             m_flowThread->invalidateRegions();
     }
 

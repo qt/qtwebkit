@@ -63,6 +63,7 @@ public:
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
     void setPerTileDrawingEnabled(bool enabled, ExceptionCode&);
     void setTouchEventEmulationEnabled(bool enabled, ExceptionCode&);
+    void setDeviceSupportsTouch(bool enabled, ExceptionCode&);
     void setShadowDOMEnabled(bool enabled, ExceptionCode&);
     void setStandardFontFamily(const String& family, const String& script, ExceptionCode&);
     void setSerifFontFamily(const String& family, const String& script, ExceptionCode&);
@@ -78,8 +79,11 @@ public:
     void setEditingBehavior(const String&, ExceptionCode&);
     void setFixedPositionCreatesStackingContext(bool, ExceptionCode&);
     void setSyncXHRInDocumentsEnabled(bool, ExceptionCode&);
+    void setWindowFocusRestricted(bool, ExceptionCode&);
 
     void restoreTo(Settings*);
+
+    void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
 
 private:
     InternalSettings(Frame*);
@@ -97,6 +101,11 @@ private:
     EditingBehaviorType m_originalEditingBehavior;
     bool m_originalFixedPositionCreatesStackingContext;
     bool m_originalSyncXHRInDocumentsEnabled;
+#if ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
+    bool m_originalJavaScriptProfilingEnabled;
+#endif
+    bool m_originalWindowFocusRestricted;
+    bool m_originalDeviceSupportsTouch;
 };
 
 } // namespace WebCore

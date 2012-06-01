@@ -846,24 +846,6 @@ void LayoutTestController::setSmartInsertDeleteEnabled(bool flag)
     viewEditing->setSmartInsertDeleteEnabled(flag ? TRUE : FALSE);
 }
 
-void LayoutTestController::setJavaScriptProfilingEnabled(bool flag)
-{
-    COMPtr<IWebView> webView;
-    if (FAILED(frame->webView(&webView)))
-        return;
-
-    COMPtr<IWebViewPrivate> viewPrivate;
-    if (FAILED(webView->QueryInterface(&viewPrivate)))
-        return;
-
-    COMPtr<IWebInspector> inspector;
-    if (FAILED(viewPrivate->inspector(&inspector)))
-        return;
-
-    setDeveloperExtrasEnabled(flag);
-    inspector->setJavaScriptProfilingEnabled(flag);
-}
-
 void LayoutTestController::setSelectTrailingWhitespaceEnabled(bool flag)
 {
     COMPtr<IWebView> webView;
@@ -1473,10 +1455,6 @@ void LayoutTestController::setTextDirection(JSStringRef direction)
         return;
 
     framePrivate->setTextDirection(bstrT(direction).GetBSTR());
-}
-
-void LayoutTestController::allowRoundingHacks()
-{
 }
 
 void LayoutTestController::addChromeInputField()

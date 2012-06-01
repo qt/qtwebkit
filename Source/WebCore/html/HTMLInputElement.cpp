@@ -1220,6 +1220,11 @@ FileList* HTMLInputElement::files()
     return m_inputType->files();
 }
 
+void HTMLInputElement::setFiles(PassRefPtr<FileList> files)
+{
+    m_inputType->setFiles(files);
+}
+
 void HTMLInputElement::receiveDroppedFiles(const Vector<String>& filenames)
 {
     m_inputType->receiveDroppedFiles(filenames);
@@ -1264,6 +1269,13 @@ String HTMLInputElement::sanitizeValue(const String& proposedValue) const
     if (proposedValue.isNull())
         return proposedValue;
     return m_inputType->sanitizeValue(proposedValue);
+}
+
+String HTMLInputElement::localizeValue(const String& proposedValue) const
+{
+    if (proposedValue.isNull())
+        return proposedValue;
+    return m_inputType->localizeValue(proposedValue);
 }
 
 bool HTMLInputElement::hasUnacceptableValue() const

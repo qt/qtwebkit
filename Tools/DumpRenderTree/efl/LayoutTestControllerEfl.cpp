@@ -202,13 +202,15 @@ void LayoutTestController::setAlwaysAcceptCookies(bool alwaysAcceptCookies)
     ewk_cookies_policy_set(alwaysAcceptCookies ? EWK_COOKIE_JAR_ACCEPT_ALWAYS : EWK_COOKIE_JAR_ACCEPT_NEVER);
 }
 
-void LayoutTestController::setCustomPolicyDelegate(bool, bool)
+void LayoutTestController::setCustomPolicyDelegate(bool enabled, bool permissive)
 {
-    notImplemented();
+    policyDelegateEnabled = enabled;
+    policyDelegatePermissive = permissive;
 }
 
 void LayoutTestController::waitForPolicyDelegate()
 {
+    setCustomPolicyDelegate(true, false);
     waitForPolicy = true;
     setWaitToDump(true);
 }
@@ -449,14 +451,6 @@ void LayoutTestController::setIconDatabaseEnabled(bool enabled)
         ewk_settings_icon_database_path_set(databasePath.utf8().data());
 }
 
-void LayoutTestController::setJavaScriptProfilingEnabled(bool enabled)
-{
-    if (enabled)
-        setDeveloperExtrasEnabled(enabled);
-
-    DumpRenderTreeSupportEfl::setJavaScriptProfilingEnabled(browser->mainView(), enabled);
-}
-
 void LayoutTestController::setSelectTrailingWhitespaceEnabled(bool flag)
 {
     DumpRenderTreeSupportEfl::setSelectTrailingWhitespaceEnabled(browser->mainView(), flag);
@@ -586,10 +580,11 @@ void LayoutTestController::setApplicationCacheOriginQuota(unsigned long long quo
     ewk_security_origin_free(origin);
 }
 
-void LayoutTestController::clearApplicationCacheForOrigin(OpaqueJSString*)
+void LayoutTestController::clearApplicationCacheForOrigin(OpaqueJSString* url)
 {
-    // FIXME: Implement to support deleting all application caches for an origin.
-    notImplemented();
+    Ewk_Security_Origin* origin = ewk_security_origin_new_from_string(url->ustring().utf8().data());
+    ewk_security_origin_application_cache_clear(origin);
+    ewk_security_origin_free(origin);
 }
 
 long long LayoutTestController::localStorageDiskUsageForOrigin(JSStringRef)
@@ -838,11 +833,6 @@ void LayoutTestController::setTextDirection(JSStringRef)
     notImplemented();
 }
 
-void LayoutTestController::allowRoundingHacks()
-{
-    notImplemented();
-}
-
 void LayoutTestController::addChromeInputField()
 {
     notImplemented();
@@ -896,9 +886,5 @@ void LayoutTestController::sendWebIntentResponse(JSStringRef response)
     if (!request)
         return;
 
-    JSC::UString responseString = response->ustring();
-    if (responseString.isNull())
-        ewk_intent_request_failure_post(request, "ERROR");
-    else
-        ewk_intent_request_result_post(request, responseString.utf8().data());
+    DumpRenderTreeSupportEfl::sendWebIntentResponse(request, response);
 }

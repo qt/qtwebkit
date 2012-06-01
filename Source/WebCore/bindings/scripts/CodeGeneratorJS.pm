@@ -661,7 +661,11 @@ sub GenerateHeader
     } else {
         $headerIncludes{"JSDOMBinding.h"} = 1;
         $headerIncludes{"<runtime/JSGlobalObject.h>"} = 1;
-        $headerIncludes{"<runtime/ObjectPrototype.h>"} = 1;
+        if ($dataNode->isException) {
+            $headerIncludes{"<runtime/ErrorPrototype.h>"} = 1;
+        } else {
+            $headerIncludes{"<runtime/ObjectPrototype.h>"} = 1;
+        }
     }
 
     if ($dataNode->extendedAttributes->{"CustomCall"}) {
@@ -1612,7 +1616,8 @@ sub GenerateImplementation
         if ($hasParent && $parentClassName ne "JSC::DOMNodeFilter") {
             push(@implContent, "    return ${className}Prototype::create(exec->globalData(), globalObject, ${className}Prototype::createStructure(exec->globalData(), globalObject, ${parentClassName}Prototype::self(exec, globalObject)));\n");
         } else {
-            push(@implContent, "    return ${className}Prototype::create(exec->globalData(), globalObject, ${className}Prototype::createStructure(globalObject->globalData(), globalObject, globalObject->objectPrototype()));\n");
+            my $prototype = $dataNode->isException ? "errorPrototype" : "objectPrototype";
+            push(@implContent, "    return ${className}Prototype::create(exec->globalData(), globalObject, ${className}Prototype::createStructure(globalObject->globalData(), globalObject, globalObject->${prototype}()));\n");
         }
         push(@implContent, "}\n\n");
     }
@@ -1956,7 +1961,7 @@ sub GenerateImplementation
                             my $nativeValue = JSValueToNative($attribute->signature, "value");
                             if ($svgPropertyOrListPropertyType) {
                                 if ($svgPropertyType) {
-                                    push(@implContent, "    if (impl->role() == AnimValRole) {\n");
+                                    push(@implContent, "    if (impl->isReadOnly()) {\n");
                                     push(@implContent, "        setDOMException(exec, NO_MODIFICATION_ALLOWED_ERR);\n");
                                     push(@implContent, "        return;\n");
                                     push(@implContent, "    }\n");
@@ -2129,7 +2134,7 @@ sub GenerateImplementation
                 } else {
                     push(@implContent, "    $implType* impl = static_cast<$implType*>(castedThis->impl());\n");
                     if ($svgPropertyType) {
-                        push(@implContent, "    if (impl->role() == AnimValRole) {\n");
+                        push(@implContent, "    if (impl->isReadOnly()) {\n");
                         push(@implContent, "        setDOMException(exec, NO_MODIFICATION_ALLOWED_ERR);\n");
                         push(@implContent, "        return JSValue::encode(jsUndefined());\n");
                         push(@implContent, "    }\n");
@@ -3099,7 +3104,7 @@ sub NativeToJSValue
         return "toJSNewlyCreated(exec, $globalObject, WTF::getPtr($value))";
     }
 
-    if ($codeGenerator->IsSVGAnimatedType($implClassName)) {
+    if ($codeGenerator->IsSVGAnimatedType($implClassName) or $implClassName eq "SVGViewSpec") {
         # Convert from abstract SVGProperty to real type, so the right toJS() method can be invoked.
         $value = "static_cast<" . GetNativeType($type) . ">($value)";
     } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($type) and not $implClassName =~ /List$/) {

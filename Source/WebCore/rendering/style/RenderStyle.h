@@ -809,8 +809,8 @@ public:
     Length flexPreferredSize() const { return rareNonInheritedData->m_flexibleBox->m_preferredSize; }
     int flexOrder() const { return rareNonInheritedData->m_flexibleBox->m_flexOrder; }
     EFlexPack flexPack() const { return static_cast<EFlexPack>(rareNonInheritedData->m_flexibleBox->m_flexPack); }
-    EFlexAlign flexAlign() const { return static_cast<EFlexAlign>(rareNonInheritedData->m_flexibleBox->m_flexAlign); }
-    EFlexAlign flexItemAlign() const { return static_cast<EFlexAlign>(rareNonInheritedData->m_flexibleBox->m_flexItemAlign); }
+    EAlignItems alignItems() const { return static_cast<EAlignItems>(rareNonInheritedData->m_alignItems); }
+    EAlignItems alignSelf() const { return static_cast<EAlignItems>(rareNonInheritedData->m_alignSelf); }
     EFlexDirection flexDirection() const { return static_cast<EFlexDirection>(rareNonInheritedData->m_flexibleBox->m_flexDirection); }
     bool isColumnFlexDirection() const { return flexDirection() == FlowColumn || flexDirection() == FlowColumnReverse; }
     bool isReverseFlexDirection() const { return flexDirection() == FlowRowReverse || flexDirection() == FlowColumnReverse; }
@@ -830,6 +830,7 @@ public:
     void getBoxShadowInlineDirectionExtent(LayoutUnit& logicalLeft, LayoutUnit& logicalRight) { getShadowInlineDirectionExtent(boxShadow(), logicalLeft, logicalRight); }
     void getBoxShadowBlockDirectionExtent(LayoutUnit& logicalTop, LayoutUnit& logicalBottom) { getShadowBlockDirectionExtent(boxShadow(), logicalTop, logicalBottom); }
 
+    EBoxDecorationBreak boxDecorationBreak() const { return m_box->boxDecorationBreak(); }
     StyleReflection* boxReflect() const { return rareNonInheritedData->m_boxReflect.get(); }
     EBoxSizing boxSizing() const { return m_box->boxSizing(); }
     Length marqueeIncrement() const { return rareNonInheritedData->m_marquee->increment; }
@@ -1234,6 +1235,7 @@ public:
     void setAppearance(ControlPart a) { SET_VAR(rareNonInheritedData, m_appearance, a); }
     // For valid values of box-align see http://www.w3.org/TR/2009/WD-css3-flexbox-20090723/#alignment
     void setBoxAlign(EBoxAlignment a) { SET_VAR(rareNonInheritedData.access()->m_deprecatedFlexibleBox, align, a); }
+    void setBoxDecorationBreak(EBoxDecorationBreak b) { SET_VAR(m_box, m_boxDecorationBreak, b); }
     void setBoxDirection(EBoxDirection d) { inherited_flags._box_direction = d; }
     void setBoxFlex(float f) { SET_VAR(rareNonInheritedData.access()->m_deprecatedFlexibleBox, flex, f); }
     void setBoxFlexGroup(unsigned int fg) { SET_VAR(rareNonInheritedData.access()->m_deprecatedFlexibleBox, flex_group, fg); }
@@ -1249,8 +1251,8 @@ public:
     void setFlexPreferredSize(Length l) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_preferredSize, l); }
     void setFlexOrder(int o) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexOrder, o); }
     void setFlexPack(EFlexPack p) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexPack, p); }
-    void setFlexAlign(EFlexAlign a) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexAlign, a); }
-    void setFlexItemAlign(EFlexAlign a) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexItemAlign, a); }
+    void setAlignItems(EAlignItems a) { SET_VAR(rareNonInheritedData, m_alignItems, a); }
+    void setAlignSelf(EAlignItems a) { SET_VAR(rareNonInheritedData, m_alignSelf, a); }
     void setFlexDirection(EFlexDirection direction) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexDirection, direction); }
     void setFlexWrap(EFlexWrap w) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexWrap, w); }
     void setFlexLinePack(EFlexLinePack p) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexLinePack, p); }
@@ -1568,6 +1570,7 @@ public:
     static int initialOutlineOffset() { return 0; }
     static float initialOpacity() { return 1.0f; }
     static EBoxAlignment initialBoxAlign() { return BSTRETCH; }
+    static EBoxDecorationBreak initialBoxDecorationBreak() { return DSLICE; }
     static EBoxDirection initialBoxDirection() { return BNORMAL; }
     static EBoxLines initialBoxLines() { return SINGLE; }
     static EBoxOrient initialBoxOrient() { return HORIZONTAL; }
@@ -1577,13 +1580,13 @@ public:
     static unsigned int initialBoxOrdinalGroup() { return 1; }
     static EBoxSizing initialBoxSizing() { return CONTENT_BOX; }
     static StyleReflection* initialBoxReflect() { return 0; }
-    static float initialPositiveFlex() { return 0; }
-    static float initialNegativeFlex() { return 0; }
+    static float initialPositiveFlex() { return 1; }
+    static float initialNegativeFlex() { return 1; }
     static Length initialFlexPreferredSize() { return Length(Auto); }
     static int initialFlexOrder() { return 0; }
     static EFlexPack initialFlexPack() { return PackStart; }
-    static EFlexAlign initialFlexAlign() { return AlignStretch; }
-    static EFlexAlign initialFlexItemAlign() { return AlignAuto; }
+    static EAlignItems initialAlignItems() { return AlignStretch; }
+    static EAlignItems initialAlignSelf() { return AlignAuto; }
     static EFlexDirection initialFlexDirection() { return FlowRow; }
     static EFlexWrap initialFlexWrap() { return FlexWrapNone; }
     static EFlexLinePack initialFlexLinePack() { return LinePackStretch; }

@@ -249,6 +249,7 @@ sub GenerateHeader
 
     $headerIncludes{"wtf/text/StringHash.h"} = 1;
     $headerIncludes{"WrapperTypeInfo.h"} = 1;
+    $headerIncludes{"V8Binding.h"} = 1;
     $headerIncludes{"V8DOMWrapper.h"} = 1;
     $headerIncludes{"wtf/HashMap.h"} = 1;
     $headerIncludes{"v8.h"} = 1;
@@ -455,7 +456,7 @@ END
 inline v8::Handle<v8::Value> toV8(${nativeType}* impl, v8::Isolate* isolate = 0${forceNewObjectParameter})
 {
     if (!impl)
-        return v8::Null();
+        return v8NullWithCheck(isolate);
     return ${className}::wrap(impl, isolate${forceNewObjectCall});
 }
 END
@@ -472,7 +473,7 @@ v8::Handle<v8::Value> toV8Slow(Node*, v8::Isolate*, bool);
 inline v8::Handle<v8::Value> toV8(Node* impl, v8::Isolate* isolate = 0, bool forceNewObject = false)
 {
     if (UNLIKELY(!impl))
-        return v8::Null();
+        return v8NullWithCheck(isolate);
     if (UNLIKELY(forceNewObject))
         return toV8Slow(impl, isolate, forceNewObject);
     v8::Handle<v8::Value> wrapper = V8DOMWrapper::getCachedWrapper(impl);
@@ -821,7 +822,8 @@ END
             my $contentAttributeName = $reflect eq "VALUE_IS_MISSING" ? lc $attrName : $reflect;
             my $namespace = $codeGenerator->NamespaceForAttributeName($interfaceName, $contentAttributeName);
             AddToImplIncludes("${namespace}.h");
-            push(@implContentDecls, "    return getElementStringAttr(info, ${namespace}::${contentAttributeName}Attr);\n");
+            push(@implContentDecls, "    Element* imp = V8Element::toNative(info.Holder());\n");
+            push(@implContentDecls, "    return v8ExternalString(imp->getAttribute(${namespace}::${contentAttributeName}Attr), info.GetIsolate());\n");
             push(@implContentDecls, "}\n\n");
             push(@implContentDecls, "#endif // ${conditionalString}\n\n") if $conditionalString;
             return;
@@ -842,7 +844,7 @@ END
 
     # Generate security checks if necessary
     if ($attribute->signature->extendedAttributes->{"CheckSecurityForNode"}) {
-        push(@implContentDecls, "    if (!V8BindingSecurity::shouldAllowAccessToNode(V8BindingState::Only(), imp->" . $attribute->signature->name . "()))\n        return v8::Handle<v8::Value>(v8::Null());\n\n");
+        push(@implContentDecls, "    if (!V8BindingSecurity::shouldAllowAccessToNode(V8BindingState::Only(), imp->" . $attribute->signature->name . "()))\n        return v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));\n\n");
     }
 
     my $useExceptions = 1 if @{$attribute->getterExceptions};
@@ -944,7 +946,7 @@ END
         return;
     }
 
-    if ($codeGenerator->IsSVGAnimatedType($implClassName) and $codeGenerator->IsSVGTypeNeedingTearOff($attrType)) {
+    if (($codeGenerator->IsSVGAnimatedType($implClassName) or $implClassName eq "SVGViewSpec") and $codeGenerator->IsSVGTypeNeedingTearOff($attrType)) {
         AddToImplIncludes("V8$attrType.h");
         my $svgNativeType = $codeGenerator->GetSVGTypeNeedingTearOff($attrType);
         # Convert from abstract SVGProperty to real type, so the right toJS() method can be invoked.
@@ -1004,7 +1006,7 @@ END
             my $getterFunc = $codeGenerator->WK_lcfirst($attribute->signature->name);
             push(@implContentDecls, <<END);
     SerializedScriptValue* serialized = imp->${getterFunc}();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null());
+    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
     info.Holder()->SetHiddenValue(propertyName, value);
     return value;
 END
@@ -1060,7 +1062,7 @@ END
         } else {
             AddToImplIncludes("ExceptionCode.h");
             push(@implContentDecls, "    $svgNativeType* wrapper = V8${implClassName}::toNative(info.Holder());\n");
-            push(@implContentDecls, "    if (wrapper->role() == AnimValRole) {\n");
+            push(@implContentDecls, "    if (wrapper->isReadOnly()) {\n");
             push(@implContentDecls, "        V8Proxy::setDOMException(NO_MODIFICATION_ALLOWED_ERR, info.GetIsolate());\n");
             push(@implContentDecls, "        return;\n");
             push(@implContentDecls, "    }\n");
@@ -1091,7 +1093,9 @@ END
             my $contentAttributeName = $reflect eq "VALUE_IS_MISSING" ? lc $attrName : $reflect;
             my $namespace = $codeGenerator->NamespaceForAttributeName($interfaceName, $contentAttributeName);
             AddToImplIncludes("${namespace}.h");
-            push(@implContentDecls, "    setElementStringAttr(info, ${namespace}::${contentAttributeName}Attr, value);\n");
+            push(@implContentDecls, "    Element* imp = V8Element::toNative(info.Holder());\n");
+            push(@implContentDecls, "    AtomicString v = toAtomicWebCoreStringWithNullCheck(value);\n");
+            push(@implContentDecls, "    imp->setAttribute(${namespace}::${contentAttributeName}Attr, v);\n");
             push(@implContentDecls, "}\n\n");
             push(@implContentDecls, "#endif // ${conditionalString}\n\n") if $conditionalString;
             return;
@@ -1394,7 +1398,7 @@ END
         } else {
             AddToImplIncludes("ExceptionCode.h");
             push(@implContentDecls, "    $nativeClassName wrapper = V8${implClassName}::toNative(args.Holder());\n");
-            push(@implContentDecls, "    if (wrapper->role() == AnimValRole)\n");
+            push(@implContentDecls, "    if (wrapper->isReadOnly())\n");
             push(@implContentDecls, "        return V8Proxy::setDOMException(NO_MODIFICATION_ALLOWED_ERR, args.GetIsolate());\n");
             my $svgWrappedNativeType = $codeGenerator->GetSVGWrappedTypeNeedingTearOff($implClassName);
             push(@implContentDecls, "    $svgWrappedNativeType& impInstance = wrapper->propertyReference();\n");
@@ -1437,7 +1441,7 @@ END
 
     if ($function->signature->extendedAttributes->{"CheckSecurityForNode"}) {
         push(@implContentDecls, "    if (!V8BindingSecurity::shouldAllowAccessToNode(V8BindingState::Only(), imp->" . $function->signature->name . "(ec)))\n");
-        push(@implContentDecls, "        return v8::Handle<v8::Value>(v8::Null());\n");
+        push(@implContentDecls, "        return v8::Handle<v8::Value>(v8::Null(args.GetIsolate()));\n");
 END
     }
 
@@ -1864,12 +1868,12 @@ sub GenerateNamedConstructorCallback
 
     if ($dataNode->extendedAttributes->{"ActiveDOMObject"}) {
         push(@implContent, <<END);
-WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, V8${implClassName}::derefObject, V8${implClassName}::toActiveDOMObject, 0 };
+WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, V8${implClassName}::derefObject, V8${implClassName}::toActiveDOMObject, 0, WrapperTypeObjectPrototype };
 
 END
     } else {
         push(@implContent, <<END);
-WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, 0, 0, 0 };
+WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, 0, 0, 0, WrapperTypeObjectPrototype };
 
 END
     }
@@ -2437,8 +2441,12 @@ sub GenerateImplementation
     }
     push(@implContentDecls, "namespace WebCore {\n\n");
     my $parentClassInfo = $parentClass ? "&${parentClass}::info" : "0";
-    push(@implContentDecls, "WrapperTypeInfo ${className}::info = { ${className}::GetTemplate, ${className}::derefObject, ${toActive}, ${parentClassInfo} };\n\n");   
+
+    my $WrapperTypePrototype = $dataNode->isException ? "WrapperTypeErrorPrototype" : "WrapperTypeObjectPrototype";
+
+    push(@implContentDecls, "WrapperTypeInfo ${className}::info = { ${className}::GetTemplate, ${className}::derefObject, $toActive, $parentClassInfo, $WrapperTypePrototype };\n\n");
     push(@implContentDecls, "namespace ${interfaceName}V8Internal {\n\n");
+
     push(@implContentDecls, "template <typename T> void V8_USE(T) { }\n\n");
 
     my $hasConstructors = 0;
@@ -3098,7 +3106,7 @@ END
             @args = ();
             foreach my $param (@params) {
                 my $paramName = $param->name;
-                push(@implContent, "    v8::Handle<v8::Value> ${paramName}Handle = " . NativeToJSValue($param, $paramName, "0") . ";\n");
+                push(@implContent, "    v8::Handle<v8::Value> ${paramName}Handle = " . NativeToJSValue($param, $paramName) . ";\n");
                 push(@implContent, "    if (${paramName}Handle.IsEmpty()) {\n");
                 push(@implContent, "        if (!isScriptControllerTerminating())\n");
                 push(@implContent, "            CRASH();\n");
@@ -3798,9 +3806,10 @@ sub NativeToJSValue
     my $signature = shift;
     my $value = shift;
     my $getIsolate = shift;
+    my $getIsolateArg = $getIsolate ? ", $getIsolate" : "";
     my $type = GetTypeFromSignature($signature);
 
-    return "v8Boolean($value)" if $type eq "boolean";
+    return ($getIsolate ? "v8Boolean($value, $getIsolate)" : "v8Boolean($value)") if $type eq "boolean";
     return "v8::Handle<v8::Value>()" if $type eq "void";     # equivalent to v8::Undefined()
 
     # HTML5 says that unsigned reflected attributes should be in the range
@@ -3817,7 +3826,7 @@ sub NativeToJSValue
     return "v8::Integer::New($value)" if $nativeType eq "int";
     return "v8::Integer::NewFromUnsigned($value)" if $nativeType eq "unsigned";
 
-    return "v8DateOrNull($value)" if $type eq "Date";
+    return "v8DateOrNull($value$getIsolateArg)" if $type eq "Date";
     # long long and unsigned long long are not representable in ECMAScript.
     return "v8::Number::New(static_cast<double>($value))" if $type eq "long long" or $type eq "unsigned long long" or $type eq "DOMTimeStamp";
     return "v8::Number::New($value)" if $codeGenerator->IsPrimitiveType($type);
@@ -3829,13 +3838,13 @@ sub NativeToJSValue
     if ($codeGenerator->IsStringType($type)) {
         my $conv = $signature->extendedAttributes->{"TreatReturnedNullStringAs"};
         if (defined $conv) {
-            return "v8StringOrNull($value, $getIsolate)" if $conv eq "Null";
-            return "v8StringOrUndefined($value, $getIsolate)" if $conv eq "Undefined";
-            return "v8StringOrFalse($value, $getIsolate)" if $conv eq "False";
+            return "v8StringOrNull($value$getIsolateArg)" if $conv eq "Null";
+            return "v8StringOrUndefined($value$getIsolateArg)" if $conv eq "Undefined";
+            return "v8StringOrFalse($value$getIsolateArg)" if $conv eq "False";
 
             die "Unknown value for TreatReturnedNullStringAs extended attribute";
         }
-        return "v8String($value, $getIsolate)";
+        return "v8String($value$getIsolateArg)";
     }
 
     my $arrayType = $codeGenerator->GetArrayType($type);
@@ -3844,35 +3853,35 @@ sub NativeToJSValue
             AddToImplIncludes("V8$arrayType.h");
             AddToImplIncludes("$arrayType.h");
         }
-        return "v8Array($value, $getIsolate)";
+        return "v8Array($value$getIsolateArg)";
     }
 
     AddIncludesForType($type);
 
     # special case for non-DOM node interfaces
     if (IsDOMNodeType($type)) {
-        return "toV8(${value}" . ($signature->extendedAttributes->{"ReturnNewObject"} ? ", $getIsolate, true)" : ", $getIsolate)");
+        return "toV8(${value}" . ($signature->extendedAttributes->{"ReturnNewObject"} ? "$getIsolateArg, true)" : "$getIsolateArg)");
     }
 
     if ($type eq "EventTarget") {
-        return "V8DOMWrapper::convertEventTargetToV8Object($value, $getIsolate)";
+        return "V8DOMWrapper::convertEventTargetToV8Object($value$getIsolateArg)";
     }
 
     if ($type eq "EventListener") {
         AddToImplIncludes("V8AbstractEventListener.h");
-        return "${value} ? v8::Handle<v8::Value>(static_cast<V8AbstractEventListener*>(${value})->getListenerObject(imp->scriptExecutionContext())) : v8::Handle<v8::Value>(v8::Null())";
+        return "${value} ? v8::Handle<v8::Value>(static_cast<V8AbstractEventListener*>(${value})->getListenerObject(imp->scriptExecutionContext())) : v8::Handle<v8::Value>(" . ($getIsolate ? "v8::Null($getIsolate)" : "v8::Null()") . ")";
     }
 
     if ($type eq "SerializedScriptValue") {
         AddToImplIncludes("$type.h");
-        return "$value ? $value->deserialize() : v8::Handle<v8::Value>(v8::Null())";
+        return "$value ? $value->deserialize() : v8::Handle<v8::Value>(" . ($getIsolate ? "v8::Null($getIsolate)" : "v8::Null()") . ")";
     }
 
     AddToImplIncludes("wtf/RefCounted.h");
     AddToImplIncludes("wtf/RefPtr.h");
     AddToImplIncludes("wtf/GetPtr.h");
 
-    return "toV8($value, $getIsolate)";
+    return "toV8($value$getIsolateArg)";
 }
 
 sub ReturnNativeToJSValue

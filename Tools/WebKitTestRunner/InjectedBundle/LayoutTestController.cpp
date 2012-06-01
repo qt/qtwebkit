@@ -371,6 +371,11 @@ void LayoutTestController::setFrameFlatteningEnabled(bool enabled)
     WKBundleSetFrameFlatteningEnabled(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
 }
 
+void LayoutTestController::setPluginsEnabled(bool enabled)
+{
+    WKBundleSetPluginsEnabled(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
+}
+
 void LayoutTestController::setGeolocationPermission(bool enabled)
 {
     WKBundleSetGeolocationPermission(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
@@ -475,13 +480,6 @@ void LayoutTestController::evaluateInWebInspector(long callID, JSStringRef scrip
 #if ENABLE(INSPECTOR)
     WKRetainPtr<WKStringRef> scriptWK = toWK(script);
     WKBundleInspectorEvaluateScriptForTest(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), callID, scriptWK.get());
-#endif // ENABLE(INSPECTOR)
-}
-
-void LayoutTestController::setJavaScriptProfilingEnabled(bool enabled)
-{
-#if ENABLE(INSPECTOR)
-    WKBundleInspectorSetJavaScriptProfilingEnabled(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), enabled);
 #endif // ENABLE(INSPECTOR)
 }
 

@@ -234,12 +234,6 @@ void LayoutTestController::setIconDatabaseEnabled(bool iconDatabaseEnabled)
     notImplemented();
 }
 
-void LayoutTestController::setJavaScriptProfilingEnabled(bool profilingEnabled)
-{
-    UNUSED_PARAM(profilingEnabled);
-    notImplemented();
-}
-
 void LayoutTestController::setMainFrameIsFirstResponder(bool flag)
 {
     UNUSED_PARAM(flag);
@@ -701,11 +695,6 @@ void LayoutTestController::setMinimumTimerInterval(double)
 }
 
 void LayoutTestController::setTextDirection(JSStringRef)
-{
-    notImplemented();
-}
-
-void LayoutTestController::allowRoundingHacks()
 {
     notImplemented();
 }

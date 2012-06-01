@@ -147,6 +147,8 @@ public:
 
     String sanitizeValue(const String&) const;
 
+    String localizeValue(const String&) const;
+
     void updateInnerTextValue();
 
     // The value which is drawn by a renderer.
@@ -209,6 +211,7 @@ public:
     void setAutofilled(bool = true);
 
     FileList* files();
+    void setFiles(PassRefPtr<FileList>);
     void receiveDroppedFiles(const Vector<String>&);
     Icon* icon() const;
     // These functions are used for rendering the input active during a

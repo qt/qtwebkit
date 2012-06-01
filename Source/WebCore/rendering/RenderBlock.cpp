@@ -108,18 +108,6 @@ typedef WTF::HashSet<RenderBlock*> DelayedUpdateScrollInfoSet;
 static int gDelayUpdateScrollInfo = 0;
 static DelayedUpdateScrollInfoSet* gDelayedUpdateScrollInfoSet = 0;
 
-// We only create "generated" renderers like one for first-letter and
-// before/after pseudo elements if:
-// - the firstLetterBlock can have children in the DOM and
-// - the block doesn't have any special assumption on its text children.
-// This correctly prevents form controls from having such renderers.
-static inline bool canHaveGeneratedChildren(RenderObject* renderer)
-{
-    return (renderer->canHaveChildren()
-            && (!renderer->isDeprecatedFlexibleBox()
-                || static_cast<RenderDeprecatedFlexibleBox*>(renderer)->canHaveGeneratedChildren()));
-}
-
 bool RenderBlock::s_canPropagateFloatIntoSibling = false;
 
 // This class helps dispatching the 'overflow' event on layout change. overflow can be set on RenderBoxes, yet the existing code
@@ -340,7 +328,7 @@ void RenderBlock::styleDidChange(StyleDifference diff, const RenderStyle* oldSty
     m_lineHeight = -1;
 
     // Update pseudos for :before and :after now.
-    if (!isAnonymous() && document()->usesBeforeAfterRules() && canHaveGeneratedChildren(this)) {
+    if (!isAnonymous() && document()->usesBeforeAfterRules() && canHaveGeneratedChildren()) {
         updateBeforeAfterContent(BEFORE);
         updateBeforeAfterContent(AFTER);
     }
@@ -1376,29 +1364,8 @@ bool RenderBlock::recomputeLogicalWidth()
     return oldWidth != logicalWidth() || oldColumnWidth != desiredColumnWidth();
 }
 
-void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight)
+void RenderBlock::checkForPaginationLogicalHeightChange(LayoutUnit& pageLogicalHeight, bool& pageLogicalHeightChanged, bool& hasSpecifiedPageLogicalHeight)
 {
-    ASSERT(needsLayout());
-
-    if (isInline() && !isInlineBlockOrInlineTable()) // Inline <form>s inside various table elements can
-        return;                                      // cause us to come in here.  Just bail.
-
-    if (!relayoutChildren && simplifiedLayout())
-        return;
-
-    LayoutRepainter repainter(*this, everHadLayout() && checkForRepaintDuringLayout());
-
-    if (recomputeLogicalWidth())
-        relayoutChildren = true;
-
-    m_overflow.clear();
-
-    clearFloats();
-
-    LayoutUnit previousHeight = logicalHeight();
-    setLogicalHeight(ZERO_LAYOUT_UNIT);
-    bool hasSpecifiedPageLogicalHeight = false;
-    bool pageLogicalHeightChanged = false;
     ColumnInfo* colInfo = columnInfo();
     if (hasColumns()) {
         if (!pageLogicalHeight) {
@@ -1422,10 +1389,37 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
 
         colInfo->setPaginationUnit(paginationUnit());
     }
+}
+
+void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight)
+{
+    ASSERT(needsLayout());
+
+    if (isInline() && !isInlineBlockOrInlineTable()) // Inline <form>s inside various table elements can
+        return;                                      // cause us to come in here.  Just bail.
+
+    if (!relayoutChildren && simplifiedLayout())
+        return;
+
+    LayoutRepainter repainter(*this, everHadLayout() && checkForRepaintDuringLayout());
+
+    if (recomputeLogicalWidth())
+        relayoutChildren = true;
+
+    m_overflow.clear();
+
+    clearFloats();
+
+    LayoutUnit previousHeight = logicalHeight();
+    setLogicalHeight(ZERO_LAYOUT_UNIT);
+
+    bool pageLogicalHeightChanged = false;
+    bool hasSpecifiedPageLogicalHeight = false;
+    checkForPaginationLogicalHeightChange(pageLogicalHeight, pageLogicalHeightChanged, hasSpecifiedPageLogicalHeight);
 
     RenderView* renderView = view();
     RenderStyle* styleToUse = style();
-    LayoutStateMaintainer statePusher(renderView, this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || styleToUse->isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, colInfo);
+    LayoutStateMaintainer statePusher(renderView, this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || styleToUse->isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, columnInfo());
 
     if (inRenderFlowThread()) {
         // Regions changing widths can force us to relayout our children.
@@ -1484,7 +1478,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     if (lowestFloatLogicalBottom() > (logicalHeight() - toAdd) && expandsToEncloseOverhangingFloats())
         setLogicalHeight(lowestFloatLogicalBottom() + toAdd);
     
-    if (layoutColumns(hasSpecifiedPageLogicalHeight, pageLogicalHeight, statePusher))
+    if (relayoutForPagination(hasSpecifiedPageLogicalHeight, pageLogicalHeight, statePusher))
         return;
  
     // Calculate our new height.
@@ -3971,7 +3965,7 @@ LayoutUnit RenderBlock::logicalLeftOffsetForLine(LayoutUnit logicalTop, LayoutUn
         if (heightRemaining)
             *heightRemaining = 1;
 
-        FloatIntervalSearchAdapter<FloatingObject::FloatLeft> adapter(this, logicalTop, left, heightRemaining);
+        FloatIntervalSearchAdapter<FloatingObject::FloatLeft> adapter(this, roundToInt(logicalTop), left, heightRemaining);
         m_floatingObjects->placedFloatsTree().allOverlapsWithAdapter(adapter);
     }
 
@@ -4019,7 +4013,7 @@ LayoutUnit RenderBlock::logicalRightOffsetForLine(LayoutUnit logicalTop, LayoutU
             *heightRemaining = 1;
 
         LayoutUnit rightFloatOffset = fixedOffset;
-        FloatIntervalSearchAdapter<FloatingObject::FloatRight> adapter(this, logicalTop, rightFloatOffset, heightRemaining);
+        FloatIntervalSearchAdapter<FloatingObject::FloatRight> adapter(this, roundToInt(logicalTop), rightFloatOffset, heightRemaining);
         m_floatingObjects->placedFloatsTree().allOverlapsWithAdapter(adapter);
         right = min(right, rightFloatOffset);
     }
@@ -5023,7 +5017,7 @@ LayoutRect RenderBlock::columnRectAt(ColumnInfo* colInfo, unsigned index) const
     return LayoutRect(colLogicalTop, colLogicalLeft, colLogicalHeight, colLogicalWidth);
 }
 
-bool RenderBlock::layoutColumns(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer& statePusher)
+bool RenderBlock::relayoutForPagination(bool hasSpecifiedPageLogicalHeight, LayoutUnit pageLogicalHeight, LayoutStateMaintainer& statePusher)
 {
     if (!hasColumns())
         return false;
@@ -5399,14 +5393,14 @@ RenderObject* InlineMinMaxIterator::next()
     return current;
 }
 
-static int getBPMWidth(int childValue, Length cssUnit)
+static LayoutUnit getBPMWidth(LayoutUnit childValue, Length cssUnit)
 {
     if (cssUnit.type() != Auto)
-        return (cssUnit.isFixed() ? cssUnit.value() : childValue);
+        return (cssUnit.isFixed() ? static_cast<LayoutUnit>(cssUnit.value()) : childValue);
     return 0;
 }
 
-static int getBorderPaddingMargin(const RenderBoxModelObject* child, bool endOfInline)
+static LayoutUnit getBorderPaddingMargin(const RenderBoxModelObject* child, bool endOfInline)
 {
     RenderStyle* childStyle = child->style();
     if (endOfInline)
@@ -6005,7 +5999,7 @@ static inline RenderObject* findFirstLetterBlock(RenderBlock* start)
     RenderObject* firstLetterBlock = start;
     while (true) {
         bool canHaveFirstLetterRenderer = firstLetterBlock->style()->hasPseudoStyle(FIRST_LETTER)
-            && canHaveGeneratedChildren(firstLetterBlock);
+            && firstLetterBlock->canHaveGeneratedChildren();
         if (canHaveFirstLetterRenderer)
             return firstLetterBlock;
 
@@ -6164,7 +6158,7 @@ void RenderBlock::updateFirstLetter()
             currChild = currChild->nextSibling();
         } else if (currChild->isReplaced() || currChild->isRenderButton() || currChild->isMenuList())
             break;
-        else if (currChild->style()->hasPseudoStyle(FIRST_LETTER) && canHaveGeneratedChildren(currChild))  {
+        else if (currChild->style()->hasPseudoStyle(FIRST_LETTER) && currChild->canHaveGeneratedChildren())  {
             // We found a lower-level node with first-letter, which supersedes the higher-level style
             firstLetterBlock = currChild;
             currChild = currChild->firstChild();

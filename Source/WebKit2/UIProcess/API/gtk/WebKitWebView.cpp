@@ -33,9 +33,11 @@
 #include "WebKitPrintOperationPrivate.h"
 #include "WebKitPrivate.h"
 #include "WebKitResourceLoadClient.h"
+#include "WebKitResponsePolicyDecision.h"
 #include "WebKitScriptDialogPrivate.h"
 #include "WebKitSettingsPrivate.h"
 #include "WebKitUIClient.h"
+#include "WebKitURIResponsePrivate.h"
 #include "WebKitWebContextPrivate.h"
 #include "WebKitWebInspectorPrivate.h"
 #include "WebKitWebResourcePrivate.h"
@@ -190,9 +192,25 @@ static gboolean webkitWebViewScriptDialog(WebKitWebView* webView, WebKitScriptDi
     return TRUE;
 }
 
-static gboolean webkitWebViewDecidePolicy(WebKitWebView*, WebKitPolicyDecision* decision, WebKitPolicyDecisionType)
+static gboolean webkitWebViewDecidePolicy(WebKitWebView* webView, WebKitPolicyDecision* decision, WebKitPolicyDecisionType decisionType)
 {
-    webkit_policy_decision_use(decision);
+    if (decisionType != WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
+        webkit_policy_decision_use(decision);
+        return TRUE;
+    }
+
+    WebKitURIResponse* response = webkit_response_policy_decision_get_response(WEBKIT_RESPONSE_POLICY_DECISION(decision));
+    const ResourceResponse resourceResponse = webkitURIResponseGetResourceResponse(response);
+    if (resourceResponse.isAttachment()) {
+        webkit_policy_decision_download(decision);
+        return TRUE;
+    }
+
+    if (webkit_web_view_can_show_mime_type(webView, webkit_uri_response_get_mime_type(response)))
+        webkit_policy_decision_use(decision);
+    else
+        webkit_policy_decision_ignore(decision);
+
     return TRUE;
 }
 
@@ -509,6 +527,9 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      *
      * By default, if the signal is not handled, a stock error page will be displayed.
      * You need to handle the signal if you want to provide your own error page.
+     *
+     * Returns: %TRUE to stop other handlers from being invoked for the event.
+     *    %FALSE to propagate the event further.
      */
     signals[LOAD_FAILED] =
         g_signal_new("load-failed",
@@ -1754,7 +1775,7 @@ void webkit_web_view_can_execute_editing_command(WebKitWebView* webView, const c
  *
  * Finish an asynchronous operation started with webkit_web_view_can_execute_editing_command().
  *
- * Returns: %TRUE if a selection can be cut or %FALSE otherwise
+ * Returns: %TRUE if the editing command can be executed or %FALSE otherwise
  */
 gboolean webkit_web_view_can_execute_editing_command_finish(WebKitWebView* webView, GAsyncResult* result, GError** error)
 {
@@ -1918,13 +1939,13 @@ void webkit_web_view_run_javascript(WebKitWebView* webView, const gchar* script,
  *     context = webkit_javascript_result_get_global_context (js_result);
  *     value = webkit_javascript_result_get_value (js_result);
  *     if (JSValueIsString (context, value)) {
- *         JSStringRef *js_str_value;
- *         gchar       *str_value;
- *         gsize        str_length;
+ *         JSStringRef js_str_value;
+ *         gchar      *str_value;
+ *         gsize       str_length;
  *
- *         js_str_value = JSValueToStringCopy (context, value, NULL));
+ *         js_str_value = JSValueToStringCopy (context, value, NULL);
  *         str_length = JSStringGetMaximumUTF8CStringSize (js_str_value);
- *         str_value = (gchar *)g_malloc (str_length));
+ *         str_value = (gchar *)g_malloc (str_length);
  *         JSStringGetUTF8CString (js_str_value, str_value, str_length);
  *         JSStringRelease (js_str_value);
  *         g_print ("Script result: %s\n", str_value);
@@ -1942,7 +1963,7 @@ void webkit_web_view_run_javascript(WebKitWebView* webView, const gchar* script,
  *     gchar *script;
  *
  *     script = g_strdup_printf ("window.document.getElementById('%s').href;", link_id);
- *     webkit_web_view_run_javascript (web_view, script, web_view_javascript_finished, NULL);
+ *     webkit_web_view_run_javascript (web_view, script, NULL, web_view_javascript_finished, NULL);
  *     g_free (script);
  * }
  * </programlisting></informalexample>
@@ -2022,4 +2043,22 @@ WebKitWebInspector* webkit_web_view_get_inspector(WebKitWebView* webView)
     }
 
     return webView->priv->inspector.get();
+}
+
+/**
+ * webkit_web_view_can_show_mime_type:
+ * @web_view: a #WebKitWebView
+ * @mime_type: a MIME type
+ *
+ * Whether or not a MIME type can be displayed in @web_view.
+ *
+ * Returns: %TRUE if the MIME type @mime_type can be displayed or %FALSE otherwise
+ */
+gboolean webkit_web_view_can_show_mime_type(WebKitWebView* webView, const char* mimeType)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), FALSE);
+    g_return_val_if_fail(mimeType, FALSE);
+
+    WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
+    return page->canShowMIMEType(String::fromUTF8(mimeType));
 }

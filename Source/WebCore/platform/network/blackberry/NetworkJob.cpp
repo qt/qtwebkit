@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2011 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2009, 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -208,6 +208,13 @@ void NetworkJob::handleNotifyStatusReceived(int status, const String& message)
         m_response.setHTTPStatusCode(status);
 
     m_response.setHTTPStatusText(message);
+
+    if (!isError(m_extendedStatusCode))
+        storeCredentials();
+    else if (isUnauthorized(m_extendedStatusCode)) {
+        purgeCredentials();
+        BlackBerry::Platform::log(BlackBerry::Platform::LogLevelCritical, "Authentication failed, purge the stored credentials for this site.");
+    }
 }
 
 void NetworkJob::notifyHeadersReceived(BlackBerry::Platform::NetworkRequest::HeaderList& headers)
@@ -247,6 +254,36 @@ void NetworkJob::notifyMultipartHeaderReceived(const char* key, const char* valu
         handleNotifyMultipartHeaderReceived(key, value);
 }
 
+void NetworkJob::notifyAuthReceived(BlackBerry::Platform::NetworkRequest::AuthType authType, const char* realm)
+{
+    using BlackBerry::Platform::NetworkRequest;
+
+    ProtectionSpaceServerType serverType = ProtectionSpaceServerHTTP;
+    ProtectionSpaceAuthenticationScheme scheme = ProtectionSpaceAuthenticationSchemeDefault;
+    switch (authType) {
+    case NetworkRequest::AuthHTTPBasic:
+        scheme = ProtectionSpaceAuthenticationSchemeHTTPBasic;
+        break;
+    case NetworkRequest::AuthHTTPDigest:
+        scheme = ProtectionSpaceAuthenticationSchemeHTTPDigest;
+        break;
+    case NetworkRequest::AuthHTTPNTLM:
+        scheme = ProtectionSpaceAuthenticationSchemeNTLM;
+        break;
+    case NetworkRequest::AuthFTP:
+        serverType = ProtectionSpaceServerFTP;
+        break;
+    case NetworkRequest::AuthProxy:
+        serverType = ProtectionSpaceProxyHTTP;
+        break;
+    case NetworkRequest::AuthNone:
+    default:
+        return;
+    }
+
+    sendRequestWithCredentials(serverType, scheme, realm);
+}
+
 void NetworkJob::notifyStringHeaderReceived(const String& key, const String& value)
 {
     if (shouldDeferLoading())
@@ -279,11 +316,7 @@ void NetworkJob::handleNotifyHeaderReceived(const String& key, const String& val
             m_response.setHTTPHeaderField(key, m_response.httpHeaderField(key) + "\r\n" + value);
             return;
         }
-    } else if (m_extendedStatusCode == 401 && lowerKey == "www-authenticate")
-        handleAuthHeader(ProtectionSpaceServerHTTP, value);
-    else if (m_extendedStatusCode == 407 && lowerKey == "proxy-authenticate" && !BlackBerry::Platform::Client::get()->getProxyAddress().empty())
-        handleAuthHeader(ProtectionSpaceProxyHTTP, value);
-    else if (equalIgnoringCase(key, BlackBerry::Platform::NetworkRequest::HEADER_BLACKBERRY_FTP))
+    } else if (equalIgnoringCase(key, BlackBerry::Platform::NetworkRequest::HEADER_BLACKBERRY_FTP))
         handleFTPHeader(value);
 
     m_response.setHTTPHeaderField(key, value);
@@ -441,14 +474,6 @@ void NetworkJob::handleNotifyClose(int status)
             notifyStatusReceived(BlackBerry::Platform::FilterStream::StatusNetworkError, 0);
         }
 
-        // If an HTTP authentication-enabled request is successful, save
-        // the credentials for later reuse. If the request fails, delete
-        // the saved credentials.
-        if (!isError(m_extendedStatusCode))
-            storeCredentials();
-        else if (isUnauthorized(m_extendedStatusCode))
-            purgeCredentials();
-
         if (shouldReleaseClientResource()) {
             if (isRedirect(m_extendedStatusCode) && (m_redirectCount >= s_redirectMaximum))
                 m_extendedStatusCode = BlackBerry::Platform::FilterStream::StatusTooManyRedirects;
@@ -528,8 +553,7 @@ bool NetworkJob::startNewJobWithRequest(ResourceRequest& newRequest, bool increa
 
     // Pass the ownership of the ResourceHandle to the new NetworkJob.
     RefPtr<ResourceHandle> handle = m_handle;
-    m_handle = 0;
-    m_multipartResponse = nullptr;
+    cancelJob();
 
     NetworkManager::instance()->startJob(m_playerId,
         m_pageGroupName,
@@ -649,62 +673,6 @@ void NetworkJob::sendMultipartResponseIfNeeded()
     }
 }
 
-bool NetworkJob::handleAuthHeader(const ProtectionSpaceServerType space, const String& header)
-{
-    if (!m_handle)
-        return false;
-
-    if (!m_handle->getInternal()->m_currentWebChallenge.isNull())
-        return false;
-
-    if (header.isEmpty())
-        return false;
-
-    if (equalIgnoringCase(header, "ntlm"))
-        sendRequestWithCredentials(space, ProtectionSpaceAuthenticationSchemeNTLM, "NTLM");
-
-    // Extract the auth scheme and realm from the header.
-    size_t spacePos = header.find(' ');
-    if (spacePos == notFound) {
-        LOG(Network, "%s-Authenticate field '%s' badly formatted: missing scheme.", space == ProtectionSpaceServerHTTP ? "WWW" : "Proxy", header.utf8().data());
-        return false;
-    }
-
-    String scheme = header.left(spacePos);
-
-    ProtectionSpaceAuthenticationScheme protectionSpaceScheme = ProtectionSpaceAuthenticationSchemeDefault;
-    if (equalIgnoringCase(scheme, "basic"))
-        protectionSpaceScheme = ProtectionSpaceAuthenticationSchemeHTTPBasic;
-    else if (equalIgnoringCase(scheme, "digest"))
-        protectionSpaceScheme = ProtectionSpaceAuthenticationSchemeHTTPDigest;
-    else {
-        notImplemented();
-        return false;
-    }
-
-    size_t realmPos = header.findIgnoringCase("realm=", spacePos);
-    if (realmPos == notFound) {
-        LOG(Network, "%s-Authenticate field '%s' badly formatted: missing realm.", space == ProtectionSpaceServerHTTP ? "WWW" : "Proxy", header.utf8().data());
-        return false;
-    }
-    size_t beginPos = realmPos + 6;
-    String realm  = header.right(header.length() - beginPos);
-    if (realm.startsWith("\"")) {
-        beginPos += 1;
-        size_t endPos = header.find("\"", beginPos);
-        if (endPos == notFound) {
-            LOG(Network, "%s-Authenticate field '%s' badly formatted: invalid realm.", space == ProtectionSpaceServerHTTP ? "WWW" : "Proxy", header.utf8().data());
-            return false;
-        }
-        realm = header.substring(beginPos, endPos - beginPos);
-    }
-
-    // Get the user's credentials and resend the request.
-    sendRequestWithCredentials(space, protectionSpaceScheme, realm);
-
-    return true;
-}
-
 bool NetworkJob::handleFTPHeader(const String& header)
 {
     size_t spacePos = header.find(' ');
@@ -761,12 +729,17 @@ bool NetworkJob::sendRequestWithCredentials(ProtectionSpaceServerType type, Prot
         m_handle->getInternal()->m_currentWebChallenge = AuthenticationChallenge(protectionSpace, credential, 0, m_response, ResourceError());
         m_handle->getInternal()->m_currentWebChallenge.setStored(true);
     } else {
+        if (m_handle->firstRequest().targetType() == ResourceRequest::TargetIsFavicon) {
+            // The favicon loading is triggerred after the main resource has been loaded
+            // and parsed, so if we cancel the authentication challenge when loading the main
+            // resource, we should also cancel loading the favicon when it starts to
+            // load. If not we will receive another challenge which may confuse the user.
+            return false;
+        }
+
         // CredentialStore is empty. Ask the user via dialog.
         String username;
         String password;
-
-        if (!m_frame || !m_frame->loader() || !m_frame->loader()->client())
-            return false;
 
         if (type == ProtectionSpaceProxyHTTP) {
             username = BlackBerry::Platform::Client::get()->getProxyUsername().c_str();
@@ -776,30 +749,27 @@ bool NetworkJob::sendRequestWithCredentials(ProtectionSpaceServerType type, Prot
         if (username.isEmpty() || password.isEmpty()) {
             // Before asking the user for credentials, we check if the URL contains that.
             if (!m_handle->getInternal()->m_user.isEmpty() && !m_handle->getInternal()->m_pass.isEmpty()) {
-                username = m_handle->getInternal()->m_user.utf8().data();
-                password = m_handle->getInternal()->m_pass.utf8().data();
+                username = m_handle->getInternal()->m_user;
+                password = m_handle->getInternal()->m_pass;
 
                 // Prevent them from been used again if they are wrong.
                 // If they are correct, they will the put into CredentialStorage.
                 m_handle->getInternal()->m_user = "";
                 m_handle->getInternal()->m_pass = "";
             } else {
-                Credential inputCredential = m_frame->page()->chrome()->client()->platformPageClient()->authenticationChallenge(newURL, protectionSpace);
+                Credential inputCredential;
+                if (!m_frame->page()->chrome()->client()->platformPageClient()->authenticationChallenge(newURL, protectionSpace, inputCredential))
+                    return false;
                 username = inputCredential.user();
                 password = inputCredential.password();
             }
         }
-
-        if (username.isEmpty() && password.isEmpty())
-            return false;
 
         credential = Credential(username, password, CredentialPersistenceForSession);
 
         m_handle->getInternal()->m_currentWebChallenge = AuthenticationChallenge(protectionSpace, credential, 0, m_response, ResourceError());
     }
 
-    // FIXME: Resend the resource request. Cloned from handleRedirect(). Not sure
-    // if we need everything that follows...
     ResourceRequest newRequest = m_handle->firstRequest();
     newRequest.setURL(newURL);
     newRequest.setMustHandleInternally(true);

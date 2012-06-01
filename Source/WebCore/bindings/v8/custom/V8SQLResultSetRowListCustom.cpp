@@ -64,10 +64,10 @@ v8::Handle<v8::Value> V8SQLResultSetRowList::itemCallback(const v8::Arguments& a
         v8::Handle<v8::Value> value;
         switch(sqlValue.type()) {
             case SQLValue::StringValue:
-                value = v8String(sqlValue.string());
+                value = v8String(sqlValue.string(), args.GetIsolate());
                 break;
             case SQLValue::NullValue:
-                value = v8::Null();
+                value = v8::Null(args.GetIsolate());
                 break;
             case SQLValue::NumberValue:
                 value = v8::Number::New(sqlValue.number());
@@ -76,7 +76,7 @@ v8::Handle<v8::Value> V8SQLResultSetRowList::itemCallback(const v8::Arguments& a
                 ASSERT_NOT_REACHED();
         }
 
-        item->Set(v8String(rowList->columnNames()[i]), value, static_cast<v8::PropertyAttribute>(v8::DontDelete|v8::ReadOnly));
+        item->Set(v8String(rowList->columnNames()[i], args.GetIsolate()), value, static_cast<v8::PropertyAttribute>(v8::DontDelete | v8::ReadOnly));
     }
 
     return item;

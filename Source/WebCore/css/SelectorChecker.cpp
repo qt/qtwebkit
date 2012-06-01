@@ -403,10 +403,13 @@ static inline bool isFastCheckableRelation(CSSSelector::Relation relation)
 
 static inline bool isFastCheckableMatch(const CSSSelector* selector)
 {
-    if (selector->m_match == CSSSelector::Set)
-        return true;
+    if (selector->m_match == CSSSelector::Set) {
+        // Style attribute is generated lazily but the fast path doesn't trigger it.
+        // Disallow them here rather than making the fast path more branchy.
+        return selector->attribute() != styleAttr;
+    }
     if (selector->m_match == CSSSelector::Exact)
-        return !htmlAttributeHasCaseInsensitiveValue(selector->attribute());
+        return selector->attribute() != styleAttr && !htmlAttributeHasCaseInsensitiveValue(selector->attribute());
     return selector->m_match == CSSSelector::None || selector->m_match == CSSSelector::Id || selector->m_match == CSSSelector::Class;
 }
 
@@ -729,10 +732,15 @@ bool SelectorChecker::checkOneSelector(const SelectorCheckingContext& context, P
     if (selector->m_match == CSSSelector::PseudoClass) {
         // Handle :not up front.
         if (selector->pseudoType() == CSSSelector::PseudoNot) {
-            ASSERT(selector->selectorList());
+            CSSSelectorList* selectorList = selector->selectorList();
+
+            // FIXME: We probably should fix the parser and make it never produce :not rules with missing selector list.
+            if (!selectorList)
+                return false;
+
             SelectorCheckingContext subContext(context);
             subContext.isSubSelector = true;
-            for (subContext.selector = selector->selectorList()->first(); subContext.selector; subContext.selector = subContext.selector->tagHistory()) {
+            for (subContext.selector = selectorList->first(); subContext.selector; subContext.selector = subContext.selector->tagHistory()) {
                 // :not cannot nest. I don't really know why this is a
                 // restriction in CSS3, but it is, so let's honor it.
                 // the parser enforces that this never occurs
@@ -1043,7 +1051,7 @@ bool SelectorChecker::checkOneSelector(const SelectorCheckingContext& context, P
             }
             break;
         case CSSSelector::PseudoEnabled:
-            if (element && element->isFormControlElement())
+            if (element && (element->isFormControlElement() || element->hasTagName(optionTag) || element->hasTagName(optgroupTag)))
                 return element->isEnabledFormControl();
             break;
         case CSSSelector::PseudoFullPageMedia:
@@ -1052,7 +1060,7 @@ bool SelectorChecker::checkOneSelector(const SelectorCheckingContext& context, P
         case CSSSelector::PseudoDefault:
             return element && element->isDefaultButtonForForm();
         case CSSSelector::PseudoDisabled:
-            if (element && (element->isFormControlElement() || element->hasTagName(optionTag)))
+            if (element && (element->isFormControlElement() || element->hasTagName(optionTag) || element->hasTagName(optgroupTag)))
                 return !element->isEnabledFormControl();
             break;
         case CSSSelector::PseudoReadOnly:
@@ -1321,13 +1329,19 @@ unsigned SelectorChecker::determineLinkMatchType(const CSSSelector* selector)
     for (; selector; selector = selector->tagHistory()) {
         switch (selector->pseudoType()) {
         case CSSSelector::PseudoNot:
-            // :not(:visited) is equivalent to :link. Parser enforces that :not can't nest.
-            for (CSSSelector* subSelector = selector->selectorList()->first(); subSelector; subSelector = subSelector->tagHistory()) {
-                CSSSelector::PseudoType subType = subSelector->pseudoType();
-                if (subType == CSSSelector::PseudoVisited)
-                    linkMatchType &= ~SelectorChecker::MatchVisited;
-                else if (subType == CSSSelector::PseudoLink)
-                    linkMatchType &= ~SelectorChecker::MatchLink;
+            {
+                // :not(:visited) is equivalent to :link. Parser enforces that :not can't nest.
+                CSSSelectorList* selectorList = selector->selectorList();
+                if (!selectorList)
+                    break;
+
+                for (CSSSelector* subSelector = selectorList->first(); subSelector; subSelector = subSelector->tagHistory()) {
+                    CSSSelector::PseudoType subType = subSelector->pseudoType();
+                    if (subType == CSSSelector::PseudoVisited)
+                        linkMatchType &= ~SelectorChecker::MatchVisited;
+                    else if (subType == CSSSelector::PseudoLink)
+                        linkMatchType &= ~SelectorChecker::MatchLink;
+                }
             }
             break;
         case CSSSelector::PseudoLink:

@@ -441,13 +441,17 @@ class WebKitDriver(Driver):
 
     def __init__(self, port, worker_number, pixel_tests, no_timeout=False):
         Driver.__init__(self, port, worker_number, pixel_tests, no_timeout)
-        self._driver_tempdir = port._filesystem.mkdtemp(prefix='%s-' % self._port.driver_name())
+        self._driver_tempdir = None
         # WebKitTestRunner can report back subprocess crashes by printing
         # "#CRASHED - PROCESSNAME".  Since those can happen at any time
         # and ServerProcess won't be aware of them (since the actual tool
         # didn't crash, just a subprocess) we record the crashed subprocess name here.
         self._crashed_process_name = None
         self._crashed_pid = None
+
+        # WebKitTestRunner can report back subprocesses that became unresponsive
+        # This could mean they crashed.
+        self._subprocess_was_unresponsive = False
 
         # stderr reading is scoped on a per-test (not per-block) basis, so we store the accumulated
         # stderr output, as well as if we've seen #EOF on this driver instance.
@@ -457,10 +461,9 @@ class WebKitDriver(Driver):
         self.err_seen_eof = False
         self._server_process = None
 
-    # FIXME: This may be unsafe, as python does not guarentee any ordering of __del__ calls
-    # I believe it's possible that self._port or self._port._filesystem may already be destroyed.
     def __del__(self):
-        self._port._filesystem.rmtree(str(self._driver_tempdir))
+        assert(self._server_process is None)
+        assert(self._driver_tempdir is None)
 
     def cmd_line(self, pixel_tests, per_test_args):
         cmd = self._command_wrapper(self._port.get_option('wrapper'))
@@ -485,6 +488,7 @@ class WebKitDriver(Driver):
         return cmd
 
     def _start(self, pixel_tests, per_test_args):
+        self._driver_tempdir = self._port._filesystem.mkdtemp(prefix='%s-' % self._port.driver_name())
         server_name = self._port.driver_name()
         environment = self._port.setup_environ_for_server(server_name)
         environment['DYLD_LIBRARY_PATH'] = self._port._build_path()
@@ -513,7 +517,8 @@ class WebKitDriver(Driver):
             # See http://trac.webkit.org/changeset/65537.
             self._crashed_process_name = self._server_process.name()
             self._crashed_pid = self._server_process.pid()
-        elif error_line.startswith("#CRASHED - WebProcess"):
+        elif (error_line.startswith("#CRASHED - WebProcess")
+            or error_line.startswith("#PROCESS UNRESPONSIVE - WebProcess")):
             # WebKitTestRunner uses this to report that the WebProcess subprocess crashed.
             pid = None
             m = re.search('pid (\d+)', error_line)
@@ -523,11 +528,16 @@ class WebKitDriver(Driver):
             self._crashed_pid = pid
             # FIXME: delete this after we're sure this code is working :)
             _log.debug('WebProcess crash, pid = %s, error_line = %s' % (str(pid), error_line))
+            if error_line.startswith("#PROCESS UNRESPONSIVE - WebProcess"):
+                self._subprocess_was_unresponsive = True
             return True
         return self.has_crashed()
 
     def _command_from_driver_input(self, driver_input):
-        if self.is_http_test(driver_input.test_name):
+        # FIXME: performance tests pass in full URLs instead of test names.
+        if driver_input.test_name.startswith('http://') or driver_input.test_name.startswith('https://'):
+            command = driver_input.test_name
+        elif self.is_http_test(driver_input.test_name):
             command = self.test_to_uri(driver_input.test_name)
         else:
             command = self._port.abspath_for_test(driver_input.test_name)
@@ -573,10 +583,17 @@ class WebKitDriver(Driver):
         # FIXME: We may need to also read stderr until the process dies?
         self.error_from_test += self._server_process.pop_all_buffered_stderr()
 
-        crash_log = ''
+        crash_log = None
         if self.has_crashed():
             crash_log = self._port._get_crash_log(self._crashed_process_name, self._crashed_pid, text, self.error_from_test,
                                                   newer_than=start_time)
+
+            # If we don't find a crash log use a placeholder error message instead.
+            if not crash_log:
+                crash_log = 'no crash log found for %s:%d.' % (self._crashed_process_name, self._crashed_pid)
+                # If we were unresponsive append a message informing there may not have been a crash.
+                if self._subprocess_was_unresponsive:
+                    crash_log += '  Process failed to become responsive before timing out.'
 
         timeout = self._server_process.timed_out
         if timeout:
@@ -667,6 +684,10 @@ class WebKitDriver(Driver):
         if self._server_process:
             self._server_process.stop()
             self._server_process = None
+
+        if self._driver_tempdir:
+            self._port._filesystem.rmtree(str(self._driver_tempdir))
+            self._driver_tempdir = None
 
 
 class ContentBlock(object):

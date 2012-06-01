@@ -52,29 +52,26 @@ public:
     ShadowRoot* youngestShadowRoot() const;
     ShadowRoot* oldestShadowRoot() const;
 
+    void removeAllShadowRoots();
     void addShadowRoot(Element* shadowHost, PassRefPtr<ShadowRoot>, ExceptionCode&);
 
     void attach();
     void detach();
-    void reattach();
-    void attachHost(Element*);
-    void detachHost(Element*);
 
     bool childNeedsStyleRecalc();
     bool needsStyleRecalc();
     void recalcStyle(Node::StyleChange);
-    void setNeedsRedistributing();
-    bool needsRedistributing();
-    void hostChildrenChanged();
 
+    void ensureDistribution();
+    void invalidateDistribution();
+ 
     InsertionPoint* insertionPointFor(const Node*) const;
 
     ContentDistributor& distributor();
     const ContentDistributor& distributor() const;
 
 private:
-    void removeAllShadowRoots();
-    void reattachHostChildrenAndShadow();
+    void invalidateDistribution(Element* host);
 
     DoublyLinkedList<ShadowRoot> m_shadowRoots;
     ContentDistributor m_distributor;

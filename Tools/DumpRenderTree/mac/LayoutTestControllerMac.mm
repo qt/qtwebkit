@@ -561,12 +561,6 @@ void LayoutTestController::setIconDatabaseEnabled(bool iconDatabaseEnabled)
     [sharedWebIconDatabase setEnabled:iconDatabaseEnabled];
 }
 
-void LayoutTestController::setJavaScriptProfilingEnabled(bool profilingEnabled)
-{
-    setDeveloperExtrasEnabled(profilingEnabled);
-    [[[mainFrame webView] inspector] setJavaScriptProfilingEnabled:profilingEnabled];
-}
-
 void LayoutTestController::setMainFrameIsFirstResponder(bool flag)
 {
     NSView *documentView = [[mainFrame frameView] documentView];
@@ -965,11 +959,6 @@ void LayoutTestController::evaluateScriptInIsolatedWorld(unsigned worldID, JSObj
     }
 
     [mainFrame _stringByEvaluatingJavaScriptFromString:scriptNS withGlobalObject:globalObject inScriptWorld:world];
-}
-
-void LayoutTestController::allowRoundingHacks()
-{
-    [WebView _setAllowsRoundingHacks:YES];
 }
 
 @interface APITestDelegate : NSObject

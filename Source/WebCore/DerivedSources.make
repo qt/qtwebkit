@@ -34,7 +34,6 @@ VPATH = \
     $(WebCore)/Modules/webaudio \
     $(WebCore)/Modules/webdatabase \
     $(WebCore)/Modules/websockets \
-    $(WebCore)/Resources \
     $(WebCore)/bindings/generic \
     $(WebCore)/bindings/js \
     $(WebCore)/bindings/objc \
@@ -575,6 +574,7 @@ BINDING_IDLS = \
     $(WebCore)/svg/SVGUseElement.idl \
     $(WebCore)/svg/SVGVKernElement.idl \
     $(WebCore)/svg/SVGViewElement.idl \
+    $(WebCore)/svg/SVGViewSpec.idl \
     $(WebCore)/svg/SVGZoomAndPan.idl \
     $(WebCore)/svg/SVGZoomEvent.idl \
     $(WebCore)/testing/Internals.idl \
@@ -667,12 +667,6 @@ ifeq ($(shell $(CC) -x c++ -E -P -dM $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include
 else
     ENABLE_ORIENTATION_EVENTS = 0
 endif
-
-all: DefaultFonts.plist
-
-DefaultFonts.plist : DefaultFonts.plist.in
-	@echo Pre-processing DefaultFonts.plist...
-	$(CC) $(TEXT_PREPROCESSOR_FLAGS) $(FRAMEWORK_FLAGS) $(HEADER_FLAGS) -include "wtf/Platform.h" $< > $@
 
 else
 

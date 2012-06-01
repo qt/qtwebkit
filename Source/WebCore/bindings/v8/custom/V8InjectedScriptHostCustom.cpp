@@ -37,6 +37,7 @@
 #include "InjectedScriptHost.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorValues.h"
+#include "ScriptDebugServer.h"
 #include "ScriptValue.h"
 #include "V8Binding.h"
 #include "V8BindingState.h"
@@ -109,7 +110,7 @@ v8::Handle<v8::Value> V8InjectedScriptHost::isHTMLAllCollectionCallback(const v8
         return v8::Undefined();
 
     if (!args[0]->IsObject())
-        return v8::False();
+        return v8Boolean(false, args.GetIsolate());
 
     v8::HandleScope handleScope;
     return v8::Boolean::New(V8HTMLAllCollection::HasInstance(args[0]));
@@ -181,6 +182,13 @@ v8::Handle<v8::Value> V8InjectedScriptHost::functionDetailsCallback(const v8::Ar
     v8::Handle<v8::Value> inferredName = function->GetInferredName();
     if (inferredName->IsString() && v8::Handle<v8::String>::Cast(inferredName)->Length())
         result->Set(v8::String::New("inferredName"), inferredName);
+
+    InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder());
+    ScriptDebugServer& debugServer = host->scriptDebugServer();
+    v8::Handle<v8::Value> scopes = debugServer.functionScopes(function);
+    if (!scopes.IsEmpty() && scopes->IsArray())
+        result->Set(v8::String::New("rawScopes"), scopes);
+
     return result;
 }
 
@@ -266,7 +274,7 @@ v8::Handle<v8::Value> V8InjectedScriptHost::databaseIdCallback(const v8::Argumen
     InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder());
     Database* database = V8Database::toNative(v8::Handle<v8::Object>::Cast(args[0]));
     if (database)
-        return v8StringOrUndefined(host->databaseIdImpl(database));
+        return v8StringOrUndefined(host->databaseIdImpl(database), args.GetIsolate());
 #endif
     return v8::Undefined();
 }
@@ -279,7 +287,7 @@ v8::Handle<v8::Value> V8InjectedScriptHost::storageIdCallback(const v8::Argument
     InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder());
     Storage* storage = V8Storage::toNative(v8::Handle<v8::Object>::Cast(args[0]));
     if (storage)
-        return v8StringOrUndefined(host->storageIdImpl(storage));
+        return v8StringOrUndefined(host->storageIdImpl(storage), args.GetIsolate());
     return v8::Undefined();
 }
 
