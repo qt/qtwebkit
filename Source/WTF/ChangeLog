@@ -1,3 +1,18 @@
+2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        [Qt][Win] Fix broken QtWebKit5.lib linking
+        https://bugs.webkit.org/show_bug.cgi?id=88321
+
+        Reviewed by NOBODY (OOPS!).
+
+        Instead of letting a module's headers know which other modules depend on them,
+        have depending modules define explicitely that they want its symbols exported too.
+
+        JavaScriptCore should then be compiled with both BUILDING_JavaScriptCore and
+        STATICALLY_LINKED_WITH_WTF.
+
+        * wtf/ExportMacros.h:
+
 2012-06-25  Kent Tamura  <tkent@chromium.org>
 
         Change the serialization format of form control state to make the code simple
