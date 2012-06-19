@@ -72,7 +72,7 @@
 
 // FIXME: When all ports are using the export macros, we should replace
 // WTF_EXPORTDATA with WTF_EXPORT_PRIVATE macros.
-#if defined(BUILDING_WTF)  || defined(BUILDING_JavaScriptCore)
+#if defined(BUILDING_WTF) || defined(STATICALLY_LINKED_WITH_WTF)
 #define WTF_EXPORTDATA WTF_EXPORT
 #else
 #define WTF_EXPORTDATA WTF_IMPORT
@@ -81,7 +81,7 @@
 #else // !USE(EXPORT_MACROS)
 
 #if !PLATFORM(CHROMIUM) && OS(WINDOWS) && !COMPILER(GCC)
-#if defined(BUILDING_WTF) || defined(BUILDING_JavaScriptCore)
+#if defined(BUILDING_WTF) || defined(STATICALLY_LINKED_WITH_WTF)
 #define WTF_EXPORTDATA __declspec(dllexport)
 #else
 #define WTF_EXPORTDATA __declspec(dllimport)
@@ -98,7 +98,7 @@
 
 #endif // USE(EXPORT_MACROS)
 
-#if defined(BUILDING_WTF)  || defined(BUILDING_JavaScriptCore)
+#if defined(BUILDING_WTF) || defined(STATICALLY_LINKED_WITH_WTF)
 #define WTF_EXPORT_PRIVATE WTF_EXPORT
 #else
 #define WTF_EXPORT_PRIVATE WTF_IMPORT
