@@ -1,20 +1,8 @@
-2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+2012-06-20  Simon Hausmann  <simon.hausmann@nokia.com>
 
-        [Qt][Win] Fix broken QtWebKit5.lib linking
-        https://bugs.webkit.org/show_bug.cgi?id=88321
+        Unreviewed trivial permissions fix.
 
-        Reviewed by NOBODY (OOPS!).
-
-        On windows the import/export definition is part of the symbol's signature.
-        Define STATICALLY_LINKED_WITH_$$library for each dependend module
-        that is being linked statically to make sure that they can be linked together
-        later on.
-
-        Also do not compile Assertions.cpp in DumpRenderTree anymore since all the
-        used symbols are exported and it would cause a duplicate symbols error.
-
-        * DumpRenderTree/qt/DumpRenderTree.pro:
-        * qmake/mkspecs/features/default_post.prf:
+        * qmake/mkspecs/features/features.prf: Don't mark this file as executable.
 
 2012-06-19  Ryuan Choi  <ryuan.choi@samsung.com>
 
