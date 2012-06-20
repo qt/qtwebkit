@@ -34,7 +34,15 @@ import cgi
 import difflib
 import errno
 import os
+import optparse
 import re
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    # Needed for Python < 2.7
+    from webkitpy.thirdparty.ordered_dict import OrderedDict
+
 
 from webkitpy.common import find_files
 from webkitpy.common import read_checksum_from_png
@@ -52,19 +60,6 @@ from webkitpy.layout_tests.servers import http_server
 from webkitpy.layout_tests.servers import websocket_server
 
 _log = logutils.get_logger(__file__)
-
-
-class DummyOptions(object):
-    """Fake implementation of optparse.Values. Cloned from webkitpy.tool.mocktool.MockOptions."""
-
-    def __init__(self, *args, **kwargs):
-        # The caller can set option values using keyword arguments. We don't
-        # set any values by default because we don't know how this
-        # object will be used. Generally speaking unit tests should
-        # subclass this or provider wrapper functions that set a common
-        # set of options.
-        for key, value in kwargs.items():
-            self.__dict__[key] = value
 
 
 # FIXME: This class should merge with WebKitPort now that Chromium behaves mostly like other webkit ports.
@@ -104,7 +99,7 @@ class Port(object):
         # FIXME: Ideally we'd have a package-wide way to get a
         # well-formed options object that had all of the necessary
         # options defined on it.
-        self._options = options or DummyOptions()
+        self._options = options or optparse.Values()
 
         self.host = host
         self._executive = host.executive
@@ -159,17 +154,7 @@ class Port(object):
 
     def default_child_processes(self):
         """Return the number of DumpRenderTree instances to use for this port."""
-        cpu_count = self._executive.cpu_count()
-        # Make sure we have enough ram to support that many instances:
-        free_memory = self.host.platform.free_bytes_memory()
-        if free_memory:
-            bytes_per_drt = 200 * 1024 * 1024  # Assume each DRT needs 200MB to run.
-            supportable_instances = max(free_memory / bytes_per_drt, 1)  # Always use one process, even if we don't have space for it.
-            if supportable_instances < cpu_count:
-                # FIXME: The Printer isn't initialized when this is called, so using _log would just show an unitialized logger error.
-                print "This machine could support %s child processes, but only has enough memory for %s." % (cpu_count, supportable_instances)
-            return min(supportable_instances, cpu_count)
-        return cpu_count
+        return self._executive.cpu_count()
 
     def worker_startup_delay_secs(self):
         # FIXME: If we start workers up too quickly, DumpRenderTree appears
@@ -180,6 +165,15 @@ class Port(object):
 
     def baseline_path(self):
         """Return the absolute path to the directory to store new baselines in for this port."""
+        # FIXME: remove once all callers are calling either baseline_version_dir() or baseline_platform_dir()
+        return self.baseline_version_dir()
+
+    def baseline_platform_dir(self):
+        """Return the absolute path to the default (version-independent) platform-specific results."""
+        return self._filesystem.join(self.layout_tests_dir(), 'platform', self.port_name)
+
+    def baseline_version_dir(self):
+        """Return the absolute path to the platform-and-version-specific results."""
         baseline_search_paths = self.get_option('additional_platform_directory', []) + self.baseline_search_path()
         return baseline_search_paths[0]
 
@@ -489,8 +483,22 @@ class Port(object):
         return reftest_list.get(self._filesystem.join(self.layout_tests_dir(), test_name), [])
 
     def tests(self, paths):
-        """Return the list of tests found."""
-        return self._real_tests(paths).union(self._virtual_tests(paths, self.populated_virtual_test_suites()))
+        """Return the list of tests found. Both generic and platform-specific tests matching paths should be returned."""
+        expanded_paths = self._expanded_paths(paths)
+        return self._real_tests(expanded_paths).union(self._virtual_tests(expanded_paths, self.populated_virtual_test_suites()))
+
+    def _expanded_paths(self, paths):
+        expanded_paths = []
+        fs = self._filesystem
+        all_platform_dirs = [path for path in fs.glob(fs.join(self.layout_tests_dir(), 'platform', '*')) if fs.isdir(path)]
+        for path in paths:
+            expanded_paths.append(path)
+            if self.test_isdir(path) and not path.startswith('platform'):
+                for platform_dir in all_platform_dirs:
+                    if fs.isdir(fs.join(platform_dir, path)):
+                        expanded_paths.append(self.relative_test_filename(fs.join(platform_dir, path)))
+
+        return expanded_paths
 
     def _real_tests(self, paths):
         # When collecting test cases, skip these directories
@@ -657,30 +665,31 @@ class Port(object):
         return self._architecture
 
     def get_option(self, name, default_value=None):
-        # FIXME: Eventually we should not have to do a test for
-        # hasattr(), and we should be able to just do
-        # self.options.value. See additional FIXME in the constructor.
-        if hasattr(self._options, name):
-            return getattr(self._options, name)
-        return default_value
+        return getattr(self._options, name, default_value)
 
     def set_option_default(self, name, default_value):
-        # FIXME: Callers could also use optparse_parser.Values.ensure_value,
-        # since this should always be a optparse_parser.Values object.
-        if not hasattr(self._options, name) or getattr(self._options, name) is None:
-            return setattr(self._options, name, default_value)
+        return self._options.ensure_value(name, default_value)
 
     def path_from_webkit_base(self, *comps):
         """Returns the full path to path made by joining the top of the
         WebKit source tree and the list of path components in |*comps|."""
         return self._config.path_from_webkit_base(*comps)
 
+    @memoized
     def path_to_test_expectations_file(self):
         """Update the test expectations to the passed-in string.
 
         This is used by the rebaselining tool. Raises NotImplementedError
         if the port does not use expectations files."""
-        raise NotImplementedError('Port.path_to_test_expectations_file')
+
+        # FIXME: We need to remove this when we make rebaselining work with multiple files and just generalize expectations_files().
+
+        # test_expectations are always in mac/ not mac-leopard/ by convention, hence we use port_name instead of name().
+        port_name = self.port_name
+        if port_name.startswith('chromium') or port_name.startswith('google-chrome'):
+            port_name = 'chromium'
+
+        return self._filesystem.join(self._webkit_baseline_path(port_name), 'TestExpectations')
 
     def relative_test_filename(self, filename):
         """Returns a test_name a realtive unix-style path for a filename under the LayoutTests
@@ -765,7 +774,7 @@ class Port(object):
     def show_results_html_file(self, results_filename):
         """This routine should display the HTML file pointed at by
         results_filename in a users' browser."""
-        return self.host.user.open_url(path.abspath_to_uri(results_filename))
+        return self.host.user.open_url(path.abspath_to_uri(self.host.platform, results_filename))
 
     def create_driver(self, worker_number, no_timeout=False):
         """Return a newly created Driver subclass for starting/stopping the test driver."""
@@ -876,28 +885,32 @@ class Port(object):
         # some ports have Skipped files which are returned as part of test_expectations().
         return self._filesystem.exists(self.path_to_test_expectations_file())
 
-    def test_expectations(self):
-        """Returns the test expectations for this port.
+    def expectations_dict(self):
+        """Returns an OrderedDict of name -> expectations strings.
+        The names are expected to be (but not required to be) paths in the filesystem.
+        If the name is a path, the file can be considered updatable for things like rebaselining,
+        so don't use names that are paths if they're not paths.
+        Generally speaking the ordering should be files in the filesystem in cascade order
+        (TestExpectations followed by Skipped, if the port honors both formats),
+        then any built-in expectations (e.g., from compile-time exclusions), then --additional-expectations options."""
+        # FIXME: rename this to test_expectations() once all the callers are updated to know about the ordered dict.
+        expectations = OrderedDict()
 
-        Basically this string should contain the equivalent of a
-        test_expectations file. See test_expectations.py for more details."""
-        return self._filesystem.read_text_file(self.path_to_test_expectations_file())
+        for path in self.expectations_files():
+            expectations[path] = self._filesystem.read_text_file(path)
 
-    def test_expectations_overrides(self):
-        """Returns an optional set of overrides for the test_expectations.
-
-        This is used by ports that have code in two repositories, and where
-        it is possible that you might need "downstream" expectations that
-        temporarily override the "upstream" expectations until the port can
-        sync up the two repos."""
-        overrides = ''
         for path in self.get_option('additional_expectations', []):
-            if self._filesystem.exists(self._filesystem.expanduser(path)):
+            expanded_path = self._filesystem.expanduser(path)
+            if self._filesystem.exists(expanded_path):
                 _log.debug("reading additional_expectations from path '%s'" % path)
-                overrides += self._filesystem.read_text_file(self._filesystem.expanduser(path))
+                expectations[path] = self._filesystem.read_text_file(expanded_path)
             else:
                 _log.warning("additional_expectations path '%s' does not exist" % path)
-        return overrides or None
+        return expectations
+
+    def expectations_files(self):
+        # FIXME: see comment in path_to_expectations_file().
+        return [self.path_to_test_expectations_file()]
 
     def repository_paths(self):
         """Returns a list of (repository_name, repository_path) tuples of its depending code base.

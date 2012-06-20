@@ -31,11 +31,12 @@
 #include "cc/CCDebugBorderDrawQuad.h"
 #include "cc/CCIOSurfaceDrawQuad.h"
 #include "cc/CCLayerImpl.h"
-#include "cc/CCRenderSurfaceDrawQuad.h"
+#include "cc/CCRenderPassDrawQuad.h"
 #include "cc/CCSolidColorDrawQuad.h"
+#include "cc/CCStreamVideoDrawQuad.h"
 #include "cc/CCTextureDrawQuad.h"
 #include "cc/CCTileDrawQuad.h"
-#include "cc/CCVideoDrawQuad.h"
+#include "cc/CCYUVVideoDrawQuad.h"
 
 namespace WebCore {
 
@@ -84,16 +85,22 @@ const CCIOSurfaceDrawQuad* CCDrawQuad::toIOSurfaceDrawQuad() const
     return static_cast<const CCIOSurfaceDrawQuad*>(this);
 }
 
-const CCRenderSurfaceDrawQuad* CCDrawQuad::toRenderSurfaceDrawQuad() const
+const CCRenderPassDrawQuad* CCDrawQuad::toRenderPassDrawQuad() const
 {
-    ASSERT(m_material == RenderSurface);
-    return static_cast<const CCRenderSurfaceDrawQuad*>(this);
+    ASSERT(m_material == RenderPass);
+    return static_cast<const CCRenderPassDrawQuad*>(this);
 }
 
 const CCSolidColorDrawQuad* CCDrawQuad::toSolidColorDrawQuad() const
 {
     ASSERT(m_material == SolidColor);
     return static_cast<const CCSolidColorDrawQuad*>(this);
+}
+
+const CCStreamVideoDrawQuad* CCDrawQuad::toStreamVideoDrawQuad() const
+{
+    ASSERT(m_material == StreamVideoContent);
+    return static_cast<const CCStreamVideoDrawQuad*>(this);
 }
 
 const CCTextureDrawQuad* CCDrawQuad::toTextureDrawQuad() const
@@ -107,10 +114,10 @@ const CCTileDrawQuad* CCDrawQuad::toTileDrawQuad() const
     return static_cast<const CCTileDrawQuad*>(this);
 }
 
-const CCVideoDrawQuad* CCDrawQuad::toVideoDrawQuad() const
+const CCYUVVideoDrawQuad* CCDrawQuad::toYUVVideoDrawQuad() const
 {
-    ASSERT(m_material == VideoContent);
-    return static_cast<const CCVideoDrawQuad*>(this);
+    ASSERT(m_material == YUVVideoContent);
+    return static_cast<const CCYUVVideoDrawQuad*>(this);
 }
 
 

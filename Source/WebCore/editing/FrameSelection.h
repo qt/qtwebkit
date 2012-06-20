@@ -118,6 +118,7 @@ public:
         ClearTypingStyle = 1 << 2,
         SpellCorrectionTriggered = 1 << 3,
         DoNotSetFocus = 1 << 4,
+        DictationTriggered = 1 << 5
     };
     typedef unsigned SetSelectionOptions; // Union of values in SetSelectionOption and EUserTriggered
     static inline EUserTriggered selectionOptionsToUserTriggered(SetSelectionOptions options)
@@ -197,7 +198,7 @@ public:
     void debugRenderer(RenderObject*, bool selected) const;
 
     void nodeWillBeRemoved(Node*);
-    void textWillBeReplaced(CharacterData*, unsigned offset, unsigned oldLength, unsigned newLength);
+    void textWasReplaced(CharacterData*, unsigned offset, unsigned oldLength, unsigned newLength);
 
     void setCaretVisible(bool caretIsVisible) { setCaretVisibility(caretIsVisible ? Visible : Hidden); }
     void clearCaretRectIfNeeded();

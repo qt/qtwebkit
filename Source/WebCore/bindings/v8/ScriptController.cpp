@@ -177,14 +177,11 @@ void ScriptController::evaluateInIsolatedWorld(unsigned worldID, const Vector<Sc
 void ScriptController::evaluateInIsolatedWorld(unsigned worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup, Vector<ScriptValue>* results)
 {
     v8::HandleScope handleScope;
-    if (results) {
-        Vector<v8::Local<v8::Value> > v8Results;
-        m_proxy->evaluateInIsolatedWorld(worldID, sources, extensionGroup, &v8Results);
-        Vector<v8::Local<v8::Value> >::iterator itr;
-        for (itr = v8Results.begin(); itr != v8Results.end(); ++itr)
-            results->append(ScriptValue(*itr));
-    } else
-        m_proxy->evaluateInIsolatedWorld(worldID, sources, extensionGroup, 0);
+    v8::Local<v8::Array> v8Results = m_proxy->evaluateInIsolatedWorld(worldID, sources, extensionGroup);
+    if (results && !v8Results.IsEmpty()) {
+        for (size_t i = 0; i < v8Results->Length(); ++i)
+            results->append(ScriptValue(v8Results->Get(i)));
+    }
 }
 
 void ScriptController::setIsolatedWorldSecurityOrigin(int worldID, PassRefPtr<SecurityOrigin> securityOrigin)
@@ -279,13 +276,25 @@ bool ScriptController::haveInterpreter() const
     return m_proxy->windowShell()->isContextInitialized();
 }
 
+void ScriptController::enableEval()
+{
+    // We don't call initContextIfNeeded because contexts have eval enabled by default.
+
+    v8::HandleScope handleScope;
+    v8::Handle<v8::Context> v8Context = proxy()->windowShell()->context();
+    if (v8Context.IsEmpty())
+        return;
+
+    v8Context->AllowCodeGenerationFromStrings(true);
+}
+
 void ScriptController::disableEval()
 {
-    if (!m_proxy->windowShell()->initContextIfNeeded())
+    if (!proxy()->windowShell()->initContextIfNeeded())
         return;
 
     v8::HandleScope handleScope;
-    v8::Handle<v8::Context> v8Context = V8Proxy::mainWorldContext(m_frame);
+    v8::Handle<v8::Context> v8Context = proxy()->windowShell()->context();
     if (v8Context.IsEmpty())
         return;
 

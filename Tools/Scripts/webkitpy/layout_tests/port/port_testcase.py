@@ -333,6 +333,30 @@ class PortTestCase(unittest.TestCase):
              u'STDOUT: foo\ufffdbar\n'
              u'STDERR: foo\ufffdbar\n'))
 
+    def assert_build_path(self, options, dirs, expected_path):
+        port = self.make_port(options=options)
+        for directory in dirs:
+            port.host.filesystem.maybe_make_directory(directory)
+        self.assertEquals(port._build_path(), expected_path)
+
+    def test_expectations_ordering(self):
+        port = self.make_port()
+        for path in port.expectations_files():
+            port._filesystem.write_text_file(path, '')
+        ordered_dict = port.expectations_dict()
+        self.assertEquals(port.path_to_test_expectations_file(), ordered_dict.keys()[0])
+
+        options = MockOptions(additional_expectations=['/tmp/foo', '/tmp/bar'])
+        port = self.make_port(options=options)
+        for path in port.expectations_files():
+            port._filesystem.write_text_file(path, '')
+        port._filesystem.write_text_file('/tmp/foo', 'foo')
+        port._filesystem.write_text_file('/tmp/bar', 'bar')
+        ordered_dict = port.expectations_dict()
+        self.assertEquals(ordered_dict.keys()[-2:], options.additional_expectations)
+        self.assertEquals(ordered_dict.values()[-2:], ['foo', 'bar'])
+
+
 # FIXME: This class and main() should be merged into test-webkitpy.
 class EnhancedTestLoader(unittest.TestLoader):
     integration_tests = False

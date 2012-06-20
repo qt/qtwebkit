@@ -1,15 +1,15 @@
-AC_PREREQ(2.59)
+AC_PREREQ(2.60)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [9])
-m4_define([webkit_micro_version], [2])
+m4_define([webkit_micro_version], [3])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
-m4_define([webkit_user_agent_major_version], [536])
-m4_define([webkit_user_agent_minor_version], [10])
+m4_define([webkit_user_agent_major_version], [537])
+m4_define([webkit_user_agent_minor_version], [1])
 
 AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,13 +35,13 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=13:1:13
+LIBWEBKITGTK_VERSION=13:2:13
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
-LIBJAVASCRIPTCOREGTK_VERSION=13:1:13
+LIBJAVASCRIPTCOREGTK_VERSION=13:2:13
 AC_SUBST([LIBJAVASCRIPTCOREGTK_VERSION])
 
-LIBWEBKIT2GTK_VERSION=13:1:13
+LIBWEBKIT2GTK_VERSION=14:0:14
 AC_SUBST([LIBWEBKIT2GTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -103,6 +103,11 @@ fi
 AC_PATH_PROG(PYTHON, python)
 if test -z "$PYTHON"; then
    AC_MSG_ERROR([You need 'python' to compile WebKit])
+fi
+
+AC_PATH_PROG(RUBY, ruby)
+if test -z "$RUBY"; then
+   AC_MSG_ERROR([You need 'ruby' to compile WebKit])
 fi
 
 AC_PATH_PROG(BISON, bison)
@@ -343,7 +348,7 @@ AC_MSG_RESULT([$with_gstreamer])
 
 GSTREAMER_0_10_REQUIRED_VERSION=0.10
 GSTREAMER_0_10_PLUGINS_BASE_REQUIRED_VERSION=0.10.30
-GSTREAMER_1_0_REQUIRED_VERSION=1.0
+GSTREAMER_1_0_REQUIRED_VERSION=0.11.90
 GSTREAMER_1_0_PLUGINS_BASE_REQUIRED_VERSION=0.11.90
 
 case "$with_gstreamer" in
@@ -522,40 +527,59 @@ AC_ARG_ENABLE(optimizations,
               [if test "$enable_debug" = "yes"; then enable_optimizations="no"; else enable_optimizations="yes"; fi])
 AC_MSG_RESULT([$enable_optimizations])
 
-# check whether to enable WebGL support
+found_opengl="no"
+if test "$with_target" = "x11"; then
+    AC_CHECK_HEADERS([GL/gl.h], [found_opengl="yes"], [])
+    AC_CHECK_HEADERS([GL/glx.h], [], [found_opengl="no"])
+fi
+AC_MSG_CHECKING([which GPU acceleration backend to use])
+AC_ARG_WITH(acceleration_backend,
+            AC_HELP_STRING([--with-acceleration-backend=@<:@opengl/clutter/none@:>@],
+                           [Select accelerated backend (Clutter currently unsupported, OpenGL autodetected) [default=autodetect]]), [],
+                           [
+                                if test "$found_opengl" = "yes"; then
+                                   with_acceleration_backend="opengl";
+                                else
+                                   with_acceleration_backend="none";
+                                fi
+                           ])
+AC_MSG_RESULT([$with_acceleration_backend])
+
+# OpenGL is turned on by default (along with WebGL and accelerated compositing), but if
+# Clutter is chosen as the accelerated drawing backend, we want to disable it. COGL does 
+# not play well with OpenGL.
 AC_MSG_CHECKING([whether to enable WebGL support])
 AC_ARG_ENABLE(webgl,
-              AC_HELP_STRING([--enable-webgl], [enable support for WebGL [default=yes]]),
-              [], [if test "$with_target" = "x11"; then enable_webgl="yes"; else enable_webgl="no"; fi])
+              AC_HELP_STRING([--enable-webgl], [enable support for WebGL [default=check]]), [],
+              [
+                if test "$with_acceleration_backend" = "opengl"; then
+                    enable_webgl="yes";
+                else
+                    enable_webgl="no";
+                fi
+             ])
 AC_MSG_RESULT([$enable_webgl])
+if test "$enable_webgl" = "yes" && test "$with_acceleration_backend" != "opengl"; then
+    AC_MSG_ERROR([OpenGL must be active (and Clutter disabled) to use WebGL.])
+fi;
 
-# check whether to enable accelerated compositing support
 AC_MSG_CHECKING([whether to enable accelerated compositing support])
-AC_ARG_WITH(accelerated_compositing,
-            AC_HELP_STRING([--with-accelerated-compositing=@<:@no/opengl/cairo/clutter@:>@],
-                           [use accelerated compositing (experimental) [default=no]]),
-            [], [with_accelerated_compositing="no"])
-AC_MSG_RESULT([$with_accelerated_compositing])
-
-if test "$enable_webgl" = "yes" ||  test "$with_accelerated_compositing" = "opengl" ; then
-    if test "$with_target" != "x11"; then
-        AC_MSG_ERROR([OpenGL support is only available on X11 currently.])
-    fi
-    AC_CHECK_HEADERS([GL/gl.h], [], AC_MSG_ERROR([OpenGL header not found]))
-    AC_CHECK_HEADERS([GL/glx.h], [], AC_MSG_ERROR([GLX header not found]))
-    OPENGL_LIBS="-lGL -ldl"
-fi
-AC_SUBST([OPENGL_LIBS])
-
-if test "$with_accelerated_compositing" = "clutter"; then
-   PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
-   PKG_CHECK_MODULES([CLUTTER_GTK], [clutter-gtk-1.0 >= $CLUTTER_GTK_REQUIRED_VERSION])
-
-   AC_SUBST(CLUTTER_CFLAGS)
-   AC_SUBST(CLUTTER_LIBS)
-   AC_SUBST(CLUTTER_GTK_CFLAGS)
-   AC_SUBST(CLUTTER_GTK_LIBS)
-fi
+AC_ARG_ENABLE(accelerated_compositing,
+            AC_HELP_STRING([--enable-accelerated-compositing], [enable support for accelerated compositing [default=check]]),
+            [
+                if test "$enableval" = "yes" && test "$with_acceleration_backend" = "none"; then
+                    AC_MSG_ERROR([OpenGL or Clutter must be active to use accelerated compositing.])
+                fi
+                enable_accelerated_compositing=$enableval;
+            ],
+            [
+                if test "$with_acceleration_backend" != "none"; then
+                    enable_accelerated_compositing="yes";
+                else
+                    enable_accelerated_compositing="no";
+                fi
+            ])
+AC_MSG_RESULT([$enable_accelerated_compositing])
 
 # check whether to enable channel messaging support
 AC_MSG_CHECKING([whether to enable HTML5 Channel Messaging support])
@@ -863,6 +887,14 @@ if test "$enable_svg" = "no"; then
    enable_svg_fonts=no
 fi
 
+# check whether to enable support for CSS box-decoration-break
+AC_MSG_CHECKING([whether to enable support for CSS box-decoration-break])
+AC_ARG_ENABLE(css_box_decoration_break,
+              AC_HELP_STRING([--enable-css-box-decoration-break],
+                             [enable support for CSS box-decoration-break (experimental) [default=yes]]),
+              [],[enable_css_box_decoration_break="yes"])
+AC_MSG_RESULT([$enable_css_box_decoration_break])
+
 # check whether to enable support for filters
 AC_MSG_CHECKING([whether to enable support for filters])
 AC_ARG_ENABLE(filters,
@@ -1008,10 +1040,6 @@ AC_ARG_ENABLE([link-prefetch],
   [AS_HELP_STRING([--enable-link-prefetch], [Enable Link prefetch support (default: disabled)])],
   [],[enable_link_prefetch=no])
 AC_MSG_RESULT([$enable_link_prefetch])
-
-if test "$enable_link_prefetch" = "yes"; then 
-  AC_DEFINE([ENABLE_LINK_PREFETCH], [1], [Define to enable link prefetch support])
-fi
 
 # GObject Introspection
 AC_MSG_CHECKING([whether to enable GObject introspection support])
@@ -1222,7 +1250,7 @@ if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
 fi
 
 
-if test "$with_accelerated_compositing" = "clutter"; then
+if test "$with_acceleration_backend" = "clutter"; then
    PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
    PKG_CHECK_MODULES([CLUTTER_GTK],
                      [clutter-gtk-1.0 >= $CLUTTER_GTK_REQUIRED_VERSION])
@@ -1232,6 +1260,11 @@ if test "$with_accelerated_compositing" = "clutter"; then
    AC_SUBST(CLUTTER_GTK_CFLAGS)
    AC_SUBST(CLUTTER_GTK_LIBS)
 fi
+
+if test "$with_acceleration_backend" = "opengl"; then
+    OPENGL_LIBS="-lGL -ldl"
+fi
+AC_SUBST([OPENGL_LIBS])
 
 # check if atspi2 is available (only needed for Webkit2 unit tests)
 if test "$enable_webkit2" = "yes"; then
@@ -1330,14 +1363,14 @@ AM_CONDITIONAL([USE_WEBAUDIO_GSTREAMER], [test "$enable_web_audio" = "yes"])
 AM_CONDITIONAL([HAVE_ATSPI2], [test "$have_atspi2" = "yes"])
 
 # Accelerated compositing conditional
-AM_CONDITIONAL([USE_ACCELERATED_COMPOSITING], [test "$with_accelerated_compositing" = "cairo" || test "$with_accelerated_compositing" = "opengl" || test "$with_accelerated_compositing" = "clutter"])
-AM_CONDITIONAL([USE_TEXTURE_MAPPER_CAIRO], [test "$with_accelerated_compositing" = "cairo"])
-AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL], [test "$with_accelerated_compositing" = "opengl"])
-AM_CONDITIONAL([USE_CLUTTER], [test "$with_accelerated_compositing" = "clutter"])
+AM_CONDITIONAL([USE_ACCELERATED_COMPOSITING], [test "$enable_accelerated_compositing" = "yes"])
+AM_CONDITIONAL([USE_TEXTURE_MAPPER_CAIRO], [test "$enable_accelerated_compositing" = "yes" && test "$with_acceleration_backend" = "none"])
+AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL], [test "$enable_accelerated_compositing" = "yes" && test "$with_acceleration_backend" = "opengl"])
+AM_CONDITIONAL([USE_CLUTTER], [test "$with_acceleration_backend" = "clutter"])
 
 # These are the same now, but they will soon be separate.
-AM_CONDITIONAL([USE_GLX], [test "$with_accelerated_compositing" = "opengl" || test "$enable_webgl" = "yes"])
-AM_CONDITIONAL([USE_OPENGL], [test "$with_accelerated_compositing" = "opengl" || test "$enable_webgl" = "yes"])
+AM_CONDITIONAL([USE_GLX], [test "$with_acceleration_backend" = "opengl"])
+AM_CONDITIONAL([USE_OPENGL], [test "$with_acceleration_backend" = "opengl"])
 
 # IndexedDB implies LevelDB, but other features may one day require LevelDB.
 AM_CONDITIONAL([ENABLE_INDEXED_DATABASE],[test "$enable_indexed_database" = "yes"])
@@ -1369,6 +1402,7 @@ AM_CONDITIONAL([ENABLE_INPUT_TYPE_COLOR],[test "$enable_input_type_color" = "yes
 AM_CONDITIONAL([ENABLE_INPUT_SPEECH],[test "$enable_input_speech" = "yes"])
 AM_CONDITIONAL([ENABLE_SCRIPTED_SPEECH],[test "$enable_scripted_speech" = "yes"])
 AM_CONDITIONAL([ENABLE_XSLT],[test "$enable_xslt" = "yes"])
+AM_CONDITIONAL([ENABLE_CSS_BOX_DECORATION_BREAK],[test "$enable_css_box_decoration_break" = "yes"])
 AM_CONDITIONAL([ENABLE_FILTERS],[test "$enable_filters" = "yes"])
 AM_CONDITIONAL([ENABLE_GEOLOCATION], [test "$enable_geolocation" = "yes"])
 AM_CONDITIONAL([ENABLE_MATHML], [test "$enable_mathml" = "yes"])
@@ -1399,6 +1433,7 @@ AM_CONDITIONAL([ENABLE_OPCODE_STATS],[test "$enable_opcode_stats" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBKIT2],[test "$enable_webkit2" = "yes"])
 AM_CONDITIONAL([ENABLE_PLUGIN_PROCESS],[test "$enable_plugin_process" = "yes"])
 AM_CONDITIONAL([ENABLE_SPELLCHECK],[test "$enable_spellcheck" = "yes"])
+AM_CONDITIONAL([ENABLE_LINK_PREFETCH],[test "$enable_link_prefetch" = "yes"])
 AM_CONDITIONAL([ENABLE_ANIMATION_API],[test "$enable_animation_api" = "yes"])
 AM_CONDITIONAL([ENABLE_REQUEST_ANIMATION_FRAME],[test "$enable_request_animation_frame" = "yes"])
 AM_CONDITIONAL([ENABLE_TOUCH_ICON_LOADING],[test "$enable_touch_icon_loading" = "yes"])
@@ -1433,6 +1468,10 @@ Source/JavaScriptCore/javascriptcoregtk-${WEBKITGTK_API_VERSION}.pc:Source/JavaS
 
 if test "$enable_webkit2" = "yes"; then
     AC_CONFIG_FILES([
+    DerivedSources/WebKit2/webkit2gtk/webkit2/WebKitVersion.h:Source/WebKit2/UIProcess/API/gtk/WebKitVersion.h.in
+    ])
+
+    AC_CONFIG_FILES([
     Source/WebKit2/webkit2gtk-${WEBKITGTK_API_VERSION}.pc:Source/WebKit2/webkit2gtk.pc.in
     ]
     ,[WEBKITGTK_API_VERSION=$WEBKITGTK_API_VERSION,WEBKITGTK_PC_NAME=$WEBKITGTK_PC_NAME]
@@ -1453,63 +1492,69 @@ Build configuration:
  Unicode backend                                          : $with_unicode_backend
  Font backend                                             : $with_font_backend
  Optimized memory allocator                               : $enable_fast_malloc
- Accelerated Compositing                                  : $with_accelerated_compositing
+ Accelerated rendering backend                            : $with_acceleration_backend
 
 Features:
+=======
  WebGL                                                    : $enable_webgl
+ Accelerated Compositing                                  : $enable_accelerated_compositing
+ Animation API                                            : $enable_animation_api
  Blob support                                             : $enable_blob
+ Color input support                                      : $enable_input_type_color
  CSS3 Flexbox support                                     : $enable_css3_flexbox
- Legacy WebKitBlobBuilder support                         : $enable_legacy_webkit_blob_builder
+ CSS box-decoration-break support                         : $enable_css_box_decoration_break
  CSS Exclusions support                                   : $enable_css_exclusions
  CSS Regions support                                      : $enable_css_regions
- DOM mutation observer support                            : $enable_mutation_observers
  DeviceOrientation support                                : $enable_device_orientation
  Directory upload                                         : $enable_directory_upload
+ DOM mutation observer support                            : $enable_mutation_observers
  Fast Mobile Scrolling                                    : $enable_fast_mobile_scrolling
- Font Boosting support                                    : $enable_font_boosting
- JIT compilation                                          : $enable_jit
  Filters support                                          : $enable_filters
- Geolocation support                                      : $enable_geolocation
- JavaScript debugger/profiler support                     : $enable_javascript_debugger
+ Font Boosting support                                    : $enable_font_boosting
+ Fullscreen API support                                   : $enable_fullscreen_api
  Gamepad support                                          : $enable_gamepad
+ Geolocation support                                      : $enable_geolocation
+ HTML5 channel messaging support                          : $enable_channel_messaging
+ HTML5 data transfer items support                        : $enable_data_transfer_items
+ HTML5 FileSystem API support                             : $enable_file_system
+ HTML5 iframe seamless attribute support                  : $enable_iframe_seamless
+ HTML5 meter element support                              : $enable_meter_tag
+ HTML5 microdata support                                  : $enable_microdata
+ HTML5 progress element support                           : $enable_progress_tag
+ HTML5 track element support                              : $enable_video_track
+ HTML5 video element support                              : $enable_video
+ Icon database support                                    : $enable_icon_database
+ JavaScript debugger/profiler support                     : $enable_javascript_debugger
+ JIT compilation                                          : $enable_jit
+ Legacy WebKitBlobBuilder support                         : $enable_legacy_webkit_blob_builder
+ Link prefetch support                                    : $enable_link_prefetch
  MathML support                                           : $enable_mathml
  Media source                                             : $enable_media_source
  Media statistics                                         : $enable_media_statistics
- MHTML support                                            : $enable_mhtml
- HTML5 channel messaging support                          : $enable_channel_messaging
- HTML5 meter element support                              : $enable_meter_tag
- HTML5 microdata support                                  : $enable_microdata
- Page Visibility API support                              : $enable_page_visibility_api
- HTML5 progress element support                           : $enable_progress_tag
- SQL client-side database storage support                 : $enable_sql_database
- HTML5 data transfer items support                        : $enable_data_transfer_items
- HTML5 FileSystem API support                             : $enable_file_system
- Quota API support                                        : $enable_quota
- HTML5 iframe seamless attribute support                  : $enable_iframe_seamless
- HTML5 video element support                              : $enable_video
- HTML5 track element support                              : $enable_video_track
- Fullscreen API support                                   : $enable_fullscreen_api
  Media stream support                                     : $enable_media_stream
- Icon database support                                    : $enable_icon_database
- Link prefetch support                                    : $enable_link_prefetch
+ MHTML support                                            : $enable_mhtml
  Opcode stats                                             : $enable_opcode_stats
+ Page Visibility API support                              : $enable_page_visibility_api
+ Quota API support                                        : $enable_quota
+ Register Protocol Handler support                        : $enable_register_protocol_handler
+ RequestAnimationFrame support                            : $enable_request_animation_frame
+ Scripted speech support                                  : $enable_scripted_speech
  Shadow DOM support                                       : $enable_shadow_dom
  SharedWorkers support                                    : $enable_shared_workers
- Color input support                                      : $enable_input_type_color
  Speech input support                                     : $enable_input_speech
- Scripted speech support                                  : $enable_scripted_speech
- SVG support                                              : $enable_svg
+ Spellcheck support                                       : $enable_spellcheck
+ SQL client-side database storage support                 : $enable_sql_database
  SVG fonts support                                        : $enable_svg_fonts
+ SVG support                                              : $enable_svg
+ Touch Icon Loading support                               : $enable_touch_icon_loading
  Web Audio support                                        : $enable_web_audio
+ WebGL                                                    : $enable_webgl
  Web Sockets support                                      : $enable_web_sockets
  Web Timing support                                       : $enable_web_timing
  Web Workers support                                      : $enable_workers
  XSLT support                                             : $enable_xslt
- Spellcheck support                                       : $enable_spellcheck
- Animation API                                            : $enable_animation_api
- RequestAnimationFrame support                            : $enable_request_animation_frame
- Touch Icon Loading support                               : $enable_touch_icon_loading
- Register Protocol Handler support                        : $enable_register_protocol_handler
+
+WebKit2 support:
  WebKit2 support                                          : $enable_webkit2
  WebKit2 plugin process                                   : $enable_plugin_process
 

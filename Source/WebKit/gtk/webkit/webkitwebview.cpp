@@ -61,7 +61,6 @@
 #include "FrameView.h"
 #include "GOwnPtrGtk.h"
 #include "GeolocationClientGtk.h"
-#include "GeolocationClientMock.h"
 #include "GeolocationController.h"
 #include "GraphicsContext.h"
 #include "GtkUtilities.h"
@@ -678,8 +677,8 @@ static gboolean webkit_web_view_draw(GtkWidget* widget, cairo_t* cr)
         return FALSE;
 
     WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW(widget)->priv;
-#if USE(TEXTURE_MAPPER_GL)
-    if (priv->acceleratedCompositingContext->renderLayersToWindow(clipRect))
+#if USE(TEXTURE_MAPPER)
+    if (priv->acceleratedCompositingContext->renderLayersToWindow(cr, clipRect))
         return FALSE;
 #endif
 
@@ -3539,9 +3538,9 @@ static void webkit_web_view_init(WebKitWebView* webView)
 
 #if ENABLE(GEOLOCATION)
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
-        GeolocationClientMock* mock = new GeolocationClientMock;
-        WebCore::provideGeolocationTo(priv->corePage, mock);
-        mock->setController(GeolocationController::from(priv->corePage));
+        priv->geolocationClientMock = adoptPtr(new GeolocationClientMock);
+        WebCore::provideGeolocationTo(priv->corePage, priv->geolocationClientMock.get());
+        priv->geolocationClientMock.get()->setController(GeolocationController::from(priv->corePage));
     } else
         WebCore::provideGeolocationTo(priv->corePage, new WebKit::GeolocationClient(webView));
 #endif

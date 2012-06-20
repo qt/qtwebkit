@@ -66,7 +66,6 @@
 #include "NodeList.h"
 #include "Page.h"
 #include "Pasteboard.h"
-#include "TextCheckingHelper.h"
 #include "RemoveFormatCommand.h"
 #include "RenderBlock.h"
 #include "RenderPart.h"
@@ -481,13 +480,13 @@ bool Editor::shouldShowDeleteInterface(HTMLElement* element) const
     return client() && client()->shouldShowDeleteInterface(element);
 }
 
-void Editor::respondToChangedSelection(const VisibleSelection& oldSelection)
+void Editor::notifyComponentsOnChangedSelection(const VisibleSelection& oldSelection, FrameSelection::SetSelectionOptions options)
 {
     if (client())
         client()->respondToChangedSelection(m_frame);
     setStartNewKillRingSequence(true);
     m_deleteButtonController->respondToChangedSelection(oldSelection);
-    m_alternativeTextController->respondToChangedSelection(oldSelection);
+    m_alternativeTextController->respondToChangedSelection(oldSelection, options);
 }
 
 void Editor::respondToChangedContents(const VisibleSelection& endingSelection)
@@ -790,7 +789,8 @@ void Editor::appliedEditing(PassRefPtr<CompositeEditCommand> cmd)
     m_alternativeTextController->respondToAppliedEditing(cmd.get());
 
     // Don't clear the typing style with this selection change.  We do those things elsewhere if necessary.
-    changeSelectionAfterCommand(newSelection, false, false);
+    FrameSelection::SetSelectionOptions options = cmd->isDictationCommand() ? FrameSelection::DictationTriggered : 0;
+    changeSelectionAfterCommand(newSelection, options);
 
     if (!cmd->preservesTypingStyle())
         m_frame->selection()->clearTypingStyle();
@@ -816,7 +816,7 @@ void Editor::unappliedEditing(PassRefPtr<EditCommandComposition> cmd)
     dispatchEditableContentChangedEvents(cmd->startingRootEditableElement(), cmd->endingRootEditableElement());
     
     VisibleSelection newSelection(cmd->startingSelection());
-    changeSelectionAfterCommand(newSelection, true, true);
+    changeSelectionAfterCommand(newSelection, FrameSelection::CloseTyping | FrameSelection::ClearTypingStyle);
     m_alternativeTextController->respondToUnappliedEditing(cmd.get());
     
     m_lastEditCommand = 0;
@@ -832,7 +832,7 @@ void Editor::reappliedEditing(PassRefPtr<EditCommandComposition> cmd)
     dispatchEditableContentChangedEvents(cmd->startingRootEditableElement(), cmd->endingRootEditableElement());
     
     VisibleSelection newSelection(cmd->endingSelection());
-    changeSelectionAfterCommand(newSelection, true, true);
+    changeSelectionAfterCommand(newSelection, FrameSelection::CloseTyping | FrameSelection::ClearTypingStyle);
     
     m_lastEditCommand = 0;
     if (client())
@@ -1116,7 +1116,7 @@ int Editor::spellCheckerDocumentTag()
     return client() ? client()->spellCheckerDocumentTag() : 0;
 }
 
-#if PLATFORM(MAC)
+#if USE(APPKIT)
 
 void Editor::uppercaseWord()
 {
@@ -2203,7 +2203,7 @@ void Editor::unappliedSpellCorrection(const VisibleSelection& selectionOfCorrect
 
 void Editor::updateMarkersForWordsAffectedByEditing(bool doNotRemoveIfSelectionAtWordBoundary)
 {
-    if (!m_alternativeTextController->shouldRemoveMarkersUponEditing())
+    if (!m_alternativeTextController->shouldRemoveMarkersUponEditing() && (!textChecker() || textChecker()->shouldEraseMarkersAfterChangeSelection(TextCheckingTypeSpelling)))
         return;
 
     // We want to remove the markers from a word if an editing command will change the word. This can happen in one of
@@ -2267,7 +2267,11 @@ void Editor::updateMarkersForWordsAffectedByEditing(bool doNotRemoveIfSelectionA
     Document* document = m_frame->document();
     RefPtr<Range> wordRange = Range::create(document, startOfFirstWord.deepEquivalent(), endOfLastWord.deepEquivalent());
 
-    document->markers()->removeMarkers(wordRange.get(), DocumentMarker::Spelling | DocumentMarker::CorrectionIndicator | DocumentMarker::SpellCheckingExemption | DocumentMarker::DictationAlternatives, DocumentMarkerController::RemovePartiallyOverlappingMarker);
+    Vector<DocumentMarker*> markers = document->markers()->markersInRange(wordRange.get(), DocumentMarker::DictationAlternatives);
+    for (size_t i = 0; i < markers.size(); ++i)
+        m_alternativeTextController->removeDictationAlternativesForMarker(markers[i]);
+
+    document->markers()->removeMarkers(wordRange.get(), DocumentMarker::Spelling | DocumentMarker::Grammar | DocumentMarker::CorrectionIndicator | DocumentMarker::SpellCheckingExemption | DocumentMarker::DictationAlternatives, DocumentMarkerController::RemovePartiallyOverlappingMarker);
     document->markers()->clearDescriptionOnMarkersIntersectingRange(wordRange.get(), DocumentMarker::Replacement);
 }
 
@@ -2414,145 +2418,7 @@ void Editor::dismissCorrectionPanelAsIgnored()
     m_alternativeTextController->dismiss(ReasonForDismissingAlternativeTextIgnored);
 }
 
-bool Editor::insideVisibleArea(const LayoutPoint& point) const
-{
-    if (m_frame->excludeFromTextSearch())
-        return false;
-    
-    // Right now, we only check the visibility of a point for disconnected frames. For all other
-    // frames, we assume visibility.
-    Frame* frame = m_frame->isDisconnected() ? m_frame : m_frame->tree()->top(true);
-    if (!frame->isDisconnected())
-        return true;
-    
-    RenderPart* renderer = frame->ownerRenderer();
-    if (!renderer)
-        return false;
-
-    RenderBlock* container = renderer->containingBlock();
-    if (!(container->style()->overflowX() == OHIDDEN || container->style()->overflowY() == OHIDDEN))
-        return true;
-
-    LayoutRect rectInPageCoords = container->overflowClipRect(IntPoint(), 0); // FIXME: Incorrect for CSS regions.
-    LayoutRect rectInFrameCoords = LayoutRect(renderer->x() * -1, renderer->y() * -1,
-                                              rectInPageCoords.width(), rectInPageCoords.height());
-
-    return rectInFrameCoords.contains(point);
-}
-
-bool Editor::insideVisibleArea(Range* range) const
-{
-    if (!range)
-        return true;
-
-    if (m_frame->excludeFromTextSearch())
-        return false;
-    
-    // Right now, we only check the visibility of a range for disconnected frames. For all other
-    // frames, we assume visibility.
-    Frame* frame = m_frame->isDisconnected() ? m_frame : m_frame->tree()->top(true);
-    if (!frame->isDisconnected())
-        return true;
-    
-    RenderPart* renderer = frame->ownerRenderer();
-    if (!renderer)
-        return false;
-
-    RenderBlock* container = renderer->containingBlock();
-    if (!(container->style()->overflowX() == OHIDDEN || container->style()->overflowY() == OHIDDEN))
-        return true;
-
-    LayoutRect rectInPageCoords = container->overflowClipRect(LayoutPoint(), 0); // FIXME: Incorrect for CSS regions.
-    LayoutRect rectInFrameCoords = LayoutRect(renderer->x() * -1, renderer->y() * -1,
-                                    rectInPageCoords.width(), rectInPageCoords.height());
-    LayoutRect resultRect = range->boundingBox();
-    
-    return rectInFrameCoords.contains(resultRect);
-}
-
-PassRefPtr<Range> Editor::firstVisibleRange(const String& target, FindOptions options)
-{
-    RefPtr<Range> searchRange(rangeOfContents(m_frame->document()));
-    RefPtr<Range> resultRange = findPlainText(searchRange.get(), target, options & ~Backwards);
-    ExceptionCode ec = 0;
-
-    while (!insideVisibleArea(resultRange.get())) {
-        searchRange->setStartAfter(resultRange->endContainer(), ec);
-        if (searchRange->startContainer() == searchRange->endContainer())
-            return Range::create(m_frame->document());
-        resultRange = findPlainText(searchRange.get(), target, options & ~Backwards);
-    }
-    
-    return resultRange;
-}
-
-PassRefPtr<Range> Editor::lastVisibleRange(const String& target, FindOptions options)
-{
-    RefPtr<Range> searchRange(rangeOfContents(m_frame->document()));
-    RefPtr<Range> resultRange = findPlainText(searchRange.get(), target, options | Backwards);
-    ExceptionCode ec = 0;
-
-    while (!insideVisibleArea(resultRange.get())) {
-        searchRange->setEndBefore(resultRange->startContainer(), ec);
-        if (searchRange->startContainer() == searchRange->endContainer())
-            return Range::create(m_frame->document());
-        resultRange = findPlainText(searchRange.get(), target, options | Backwards);
-    }
-    
-    return resultRange;
-}
-
-PassRefPtr<Range> Editor::nextVisibleRange(Range* currentRange, const String& target, FindOptions options)
-{
-    if (m_frame->excludeFromTextSearch())
-        return Range::create(m_frame->document());
-
-    RefPtr<Range> resultRange = currentRange;
-    RefPtr<Range> searchRange(rangeOfContents(m_frame->document()));
-    ExceptionCode ec = 0;
-    bool forward = !(options & Backwards);
-    for ( ; !insideVisibleArea(resultRange.get()); resultRange = findPlainText(searchRange.get(), target, options)) {
-        if (resultRange->collapsed(ec)) {
-            if (!resultRange->startContainer()->isInShadowTree())
-                break;
-            searchRange = rangeOfContents(m_frame->document());
-            if (forward)
-                searchRange->setStartAfter(resultRange->startContainer()->shadowAncestorNode(), ec);
-            else
-                searchRange->setEndBefore(resultRange->startContainer()->shadowAncestorNode(), ec);
-            continue;
-        }
-
-        if (forward)
-            searchRange->setStartAfter(resultRange->endContainer(), ec);
-        else
-            searchRange->setEndBefore(resultRange->startContainer(), ec);
-
-        ShadowRoot* shadowRoot = searchRange->shadowRoot();
-        if (searchRange->collapsed(ec) && shadowRoot) {
-            if (forward)
-                searchRange->setEnd(shadowRoot, shadowRoot->childNodeCount(), ec);
-            else
-                searchRange->setStartBefore(shadowRoot, ec);
-        }
-        
-        if (searchRange->startContainer()->isDocumentNode() && searchRange->endContainer()->isDocumentNode())
-            break;
-    }
-    
-    if (insideVisibleArea(resultRange.get()))
-        return resultRange;
-    
-    if (!(options & WrapAround))
-        return Range::create(m_frame->document());
-
-    if (options & Backwards)
-        return lastVisibleRange(target, options);
-
-    return firstVisibleRange(target, options);
-}
-
-void Editor::changeSelectionAfterCommand(const VisibleSelection& newSelection, bool closeTyping, bool clearTypingStyle)
+void Editor::changeSelectionAfterCommand(const VisibleSelection& newSelection,  FrameSelection::SetSelectionOptions options)
 {
     // If the new selection is orphaned, then don't update the selection.
     if (newSelection.start().isOrphan() || newSelection.end().isOrphan())
@@ -2563,14 +2429,8 @@ void Editor::changeSelectionAfterCommand(const VisibleSelection& newSelection, b
     // The old selection can be invalid here and calling shouldChangeSelection can produce some strange calls.
     // See <rdar://problem/5729315> Some shouldChangeSelectedDOMRange contain Ranges for selections that are no longer valid
     bool selectionDidNotChangeDOMPosition = newSelection == m_frame->selection()->selection();
-    if (selectionDidNotChangeDOMPosition || m_frame->selection()->shouldChangeSelection(newSelection)) {
-        FrameSelection::SetSelectionOptions options = 0;
-        if (closeTyping)
-            options |= FrameSelection::CloseTyping;
-        if (clearTypingStyle)
-            options |= FrameSelection::ClearTypingStyle;
+    if (selectionDidNotChangeDOMPosition || m_frame->selection()->shouldChangeSelection(newSelection))
         m_frame->selection()->setSelection(newSelection, options);
-    }
 
     // Some editing operations change the selection visually without affecting its position within the DOM.
     // For example when you press return in the following (the caret is marked by ^):
@@ -2750,9 +2610,6 @@ PassRefPtr<Range> Editor::rangeOfString(const String& target, Range* referenceRa
     if (target.isEmpty())
         return 0;
 
-    if (m_frame->excludeFromTextSearch())
-        return 0;
-
     // Start from an edge of the reference range, if there's a reference range that's not in shadow content. Which edge
     // is used depends on whether we're searching forward or backward, and whether startInSelection is set.
     RefPtr<Range> searchRange(rangeOfContents(m_frame->document()));
@@ -2804,12 +2661,6 @@ PassRefPtr<Range> Editor::rangeOfString(const String& target, Range* referenceRa
             searchRange->setEndBefore(shadowTreeRoot->shadowAncestorNode());
 
         resultRange = findPlainText(searchRange.get(), target, options);
-    }
-
-    if (!insideVisibleArea(resultRange.get())) {
-        resultRange = nextVisibleRange(resultRange.get(), target, options);
-        if (!resultRange)
-            return 0;
     }
 
     // If we didn't find anything and we're wrapping, search again in the entire document (this will
@@ -2874,12 +2725,9 @@ unsigned Editor::countMatchesForText(const String& target, Range* range, FindOpt
             continue;
         }
 
-        // Only treat the result as a match if it is visible
-        if (insideVisibleArea(resultRange.get())) {
-            ++matchCount;
-            if (markMatches)
-                m_frame->document()->markers()->addMarker(resultRange.get(), DocumentMarker::TextMatch);
-        }
+        ++matchCount;
+        if (markMatches)
+            m_frame->document()->markers()->addMarker(resultRange.get(), DocumentMarker::TextMatch);
 
         // Stop looking if we hit the specified limit. A limit of 0 means no limit.
         if (limit > 0 && matchCount >= limit)
@@ -2977,7 +2825,7 @@ void Editor::respondToChangedSelection(const VisibleSelection& oldSelection, Fra
     if (!isContinuousGrammarCheckingEnabled)
         m_frame->document()->markers()->removeMarkers(DocumentMarker::Grammar);
 
-    respondToChangedSelection(oldSelection);
+    notifyComponentsOnChangedSelection(oldSelection, options);
 }
 
 static Node* findFirstMarkable(Node* node)
@@ -3066,6 +2914,16 @@ void Editor::willDetachPage()
 {
     if (EditorClient* editorClient = client())
         editorClient->frameWillDetachPage(frame());
+}
+
+Vector<String> Editor::dictationAlternativesForMarker(const DocumentMarker* marker)
+{
+    return m_alternativeTextController->dictationAlternativesForMarker(marker);
+}
+
+void Editor::applyDictationAlternativelternative(const String& alternativeString)
+{
+    m_alternativeTextController->applyDictationAlternative(alternativeString);
 }
 
 } // namespace WebCore

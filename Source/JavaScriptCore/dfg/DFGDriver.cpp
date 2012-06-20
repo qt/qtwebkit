@@ -82,10 +82,11 @@ inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlo
         changed |= performConstantFolding(dfg);
         changed |= performArgumentsSimplification(dfg);
         changed |= performCFGSimplification(dfg);
+        changed |= performCSE(dfg, FixpointNotConverged);
         if (!changed)
             break;
-        performCSE(dfg, FixpointNotConverged);
         dfg.resetExitStates();
+        performFixup(dfg);
     }
     performCSE(dfg, FixpointConverged);
 #if DFG_ENABLE(DEBUG_VERBOSE)
@@ -94,10 +95,13 @@ inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlo
     dfg.m_dominators.compute(dfg);
     performVirtualRegisterAllocation(dfg);
 
+    GraphDumpMode modeForFinalValidate = DumpGraph;
 #if DFG_ENABLE(DEBUG_VERBOSE)
     dataLog("Graph after optimization:\n");
     dfg.dump();
+    modeForFinalValidate = DontDumpGraph;
 #endif
+    validate(dfg, modeForFinalValidate);
     
     JITCompiler dataFlowJIT(dfg);
     bool result;

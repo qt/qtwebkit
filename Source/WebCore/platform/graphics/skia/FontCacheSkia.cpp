@@ -84,7 +84,10 @@ const SimpleFontData* FontCache::getFontDataForCharacters(const Font& font,
         description.setItalic(FontItalicOff);
     }
 
-    FontPlatformData platformData = FontPlatformData(*getCachedFontPlatformData(description, atomicFamily, DoNotRetain));
+    FontPlatformData* substitutePlatformData = getCachedFontPlatformData(description, atomicFamily, DoNotRetain);
+    if (!substitutePlatformData)
+        return 0;
+    FontPlatformData platformData = FontPlatformData(*substitutePlatformData);
     platformData.setFakeBold(shouldSetFakeBold);
     platformData.setFakeItalic(shouldSetFakeItalic);
     return getCachedFontData(&platformData, DoNotRetain);
@@ -113,6 +116,12 @@ SimpleFontData* FontCache::getLastResortFallbackFont(const FontDescription& desc
     default:
         fontPlatformData = getCachedFontPlatformData(description, sansStr);
         break;
+    }
+
+    if (!fontPlatformData) {
+        // we should at least have Arial; this is the SkFontHost_fontconfig last resort fallback
+        DEFINE_STATIC_LOCAL(const AtomicString, arialStr, ("Arial"));
+        fontPlatformData = getCachedFontPlatformData(description, arialStr);
     }
 
     ASSERT(fontPlatformData);

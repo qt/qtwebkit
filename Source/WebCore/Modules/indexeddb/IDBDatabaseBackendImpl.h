@@ -41,6 +41,7 @@ class IDBBackingStore;
 class IDBDatabase;
 class IDBFactoryBackendImpl;
 class IDBObjectStoreBackendImpl;
+class IDBTransactionBackendInterface;
 class IDBTransactionCoordinator;
 
 class IDBDatabaseBackendImpl : public IDBDatabaseBackendInterface {
@@ -53,8 +54,7 @@ public:
     static const int64_t InvalidId = 0;
     int64_t id() const { return m_id; }
 
-    // FIXME: Rename "open" to something more descriptive, like registerFrontEndCallbacks.
-    void open(PassRefPtr<IDBDatabaseCallbacks>);
+    void registerFrontendCallbacks(PassRefPtr<IDBDatabaseCallbacks>);
     void openConnection(PassRefPtr<IDBCallbacks>);
     void deleteDatabase(PassRefPtr<IDBCallbacks>);
 
@@ -103,6 +103,9 @@ private:
 
     RefPtr<IDBTransactionCoordinator> m_transactionCoordinator;
     RefPtr<IDBTransactionBackendInterface> m_runningVersionChangeTransaction;
+
+    typedef HashSet<IDBTransactionBackendInterface*> TransactionSet;
+    TransactionSet m_transactions;
 
     class PendingSetVersionCall;
     Deque<RefPtr<PendingSetVersionCall> > m_pendingSetVersionCalls;

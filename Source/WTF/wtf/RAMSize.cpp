@@ -35,6 +35,8 @@
 #include <unistd.h>
 #elif OS(WINDOWS)
 #include <windows.h>
+#elif OS(QNX)
+#include <sys/stat.h>
 #endif
 
 namespace WTF {
@@ -61,6 +63,13 @@ static size_t computeRAMSize()
     if (pages == -1 || pageSize == -1)
         return ramSizeGuess;
     return pages * pageSize;
+#elif OS(WINCE)
+    MEMORYSTATUS status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatus(&status);
+    if (status.dwTotalPhys <= 0)
+        return ramSizeGuess;
+    return status.dwTotalPhys;
 #elif OS(WINDOWS)
     MEMORYSTATUSEX status;
     status.dwLength = sizeof(status);
@@ -68,6 +77,11 @@ static size_t computeRAMSize()
     if (!result)
         return ramSizeGuess;
     return status.ullTotalPhys;
+#elif OS(QNX)
+    struct stat mst;
+    if (stat("/proc", &mst))
+        return ramSizeGuess;
+    return mst.st_size;
 #endif
 }
 

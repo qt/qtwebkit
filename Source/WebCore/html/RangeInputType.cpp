@@ -54,11 +54,16 @@ namespace WebCore {
 using namespace HTMLNames;
 using namespace std;
 
-static const double rangeDefaultMinimum = 0.0;
-static const double rangeDefaultMaximum = 100.0;
-static const double rangeDefaultStep = 1.0;
-static const double rangeDefaultStepBase = 0.0;
-static const double rangeStepScaleFactor = 1.0;
+static const int rangeDefaultMinimum = 0;
+static const int rangeDefaultMaximum = 100;
+static const int rangeDefaultStep = 1;
+static const int rangeDefaultStepBase = 0;
+static const int rangeStepScaleFactor = 1;
+
+static Decimal ensureMaximum(const Decimal& proposedValue, const Decimal& minimum, const Decimal& fallbackValue)
+{
+    return proposedValue >= minimum ? proposedValue : std::max(minimum, fallbackValue);
+}
 
 PassOwnPtr<InputType> RangeInputType::create(HTMLInputElement* element)
 {
@@ -75,12 +80,12 @@ const AtomicString& RangeInputType::formControlType() const
     return InputTypeNames::range();
 }
 
-double RangeInputType::valueAsNumber() const
+double RangeInputType::valueAsDouble() const
 {
-    return parseToDouble(element()->value(), numeric_limits<double>::quiet_NaN());
+    return parseToDoubleForNumberType(element()->value());
 }
 
-void RangeInputType::setValueAsNumber(double newValue, TextFieldEventBehavior eventBehavior, ExceptionCode&) const
+void RangeInputType::setValueAsDecimal(const Decimal& newValue, TextFieldEventBehavior eventBehavior, ExceptionCode&) const
 {
     element()->setValue(serialize(newValue), eventBehavior);
 }
@@ -94,18 +99,16 @@ StepRange RangeInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
     DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (rangeDefaultStep, rangeDefaultStepBase, rangeStepScaleFactor));
 
-    double minimum = parseToDouble(element()->fastGetAttribute(minAttr), rangeDefaultMinimum);
-    double maximum = parseToDouble(element()->fastGetAttribute(maxAttr), rangeDefaultMaximum);
-    if (maximum < minimum)
-        maximum = max(minimum, rangeDefaultMaximum);
+    const Decimal minimum = parseToNumber(element()->fastGetAttribute(minAttr), rangeDefaultMinimum);
+    const Decimal maximum = ensureMaximum(parseToNumber(element()->fastGetAttribute(maxAttr), rangeDefaultMaximum), minimum, rangeDefaultMaximum);
 
     const AtomicString& precisionValue = element()->fastGetAttribute(precisionAttr);
     if (!precisionValue.isNull()) {
-        StepRange::DoubleWithDecimalPlacesOrMissing step(1, !equalIgnoringCase(precisionValue, "float"));
+        const Decimal step = equalIgnoringCase(precisionValue, "float") ? Decimal::nan() : 1;
         return StepRange(minimum, minimum, maximum, step, stepDescription);
     }
 
-    StepRange::DoubleWithDecimalPlacesOrMissing step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    const Decimal step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
     return StepRange(minimum, minimum, maximum, step, stepDescription);
 }
 
@@ -138,25 +141,16 @@ void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
 
     const String& key = event->keyIdentifier();
 
-    double current = parseToDouble(element()->value(), numeric_limits<double>::quiet_NaN());
-    ASSERT(isfinite(current));
+    const Decimal current = parseToNumberOrNaN(element()->value());
+    ASSERT(current.isFinite());
 
     StepRange stepRange(createStepRange(RejectAny));
 
-    double step, bigStep;
-    if (equalIgnoringCase(element()->fastGetAttribute(stepAttr), "any")) {
-        // FIXME: We can't use stepUp() for the step value "any". So, we increase
-        // or decrease the value by 1/100 of the value range. Is it reasonable?
-        step = (stepRange.maximum() - stepRange.minimum()) / 100;
-        bigStep = step * 10;
-    } else {
-        if (!element()->getAllowedValueStep(&step))
-            ASSERT_NOT_REACHED();
 
-        bigStep = (stepRange.maximum() - stepRange.minimum()) / 10;
-        if (bigStep < step)
-            bigStep = step;
-    }
+    // FIXME: We can't use stepUp() for the step value "any". So, we increase
+    // or decrease the value by 1/100 of the value range. Is it reasonable?
+    const Decimal step = equalIgnoringCase(element()->fastGetAttribute(stepAttr), "any") ? (stepRange.maximum() - stepRange.minimum()) / 100 : stepRange.step();
+    const Decimal bigStep = max((stepRange.maximum() - stepRange.minimum()) / 10, step);
 
     bool isVertical = false;
     if (element()->renderer()) {
@@ -164,7 +158,7 @@ void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
         isVertical = part == SliderVerticalPart || part == MediaVolumeSliderPart;
     }
 
-    double newValue;
+    Decimal newValue;
     if (key == "Up")
         newValue = current + step;
     else if (key == "Down")
@@ -189,7 +183,7 @@ void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
     if (newValue != current) {
         ExceptionCode ec;
         TextFieldEventBehavior eventBehavior = DispatchChangeEvent;
-        setValueAsNumber(newValue, eventBehavior, ec);
+        setValueAsDecimal(newValue, eventBehavior, ec);
 
         if (AXObjectCache::accessibilityEnabled())
             element()->document()->axObjectCache()->postNotification(element()->renderer(), AXObjectCache::AXValueChanged, true);
@@ -219,14 +213,14 @@ RenderObject* RangeInputType::createRenderer(RenderArena* arena, RenderStyle*) c
     return new (arena) RenderSlider(element());
 }
 
-double RangeInputType::parseToDouble(const String& src, double defaultValue) const
+Decimal RangeInputType::parseToNumber(const String& src, const Decimal& defaultValue) const
 {
-    return parseToDoubleForNumberType(src, defaultValue);
+    return parseToDecimalForNumberType(src, defaultValue);
 }
 
-String RangeInputType::serialize(double value) const
+String RangeInputType::serialize(const Decimal& value) const
 {
-    if (!isfinite(value))
+    if (!value.isFinite())
         return String();
     return serializeForNumberType(value);
 }
@@ -269,8 +263,8 @@ String RangeInputType::fallbackValue() const
 String RangeInputType::sanitizeValue(const String& proposedValue) const
 {
     StepRange stepRange(createStepRange(RejectAny));
-    double proposedDoubleValue = parseToDouble(proposedValue, stepRange.defaultValue());
-    return serializeForNumberType(stepRange.clampValue(proposedDoubleValue));
+    const Decimal proposedNumericValue = parseToNumber(proposedValue, stepRange.defaultValue());
+    return serializeForNumberType(stepRange.clampValue(proposedNumericValue));
 }
 
 bool RangeInputType::shouldRespectListAttribute()

@@ -111,6 +111,7 @@ public:
             m_hasRadius = true;
     }
     void move(LayoutUnit x, LayoutUnit y) { m_rect.move(x, y); }
+    void move(const LayoutSize& size) { m_rect.move(size); }
 
     bool isEmpty() const { return m_rect.isEmpty(); }
     bool intersects(const LayoutRect& rect) { return m_rect.intersects(rect); }
@@ -140,7 +141,7 @@ public:
     }
 
     ClipRects()
-        : m_refCnt(0)
+        : m_refCnt(1)
         , m_fixed(false)
     {
     }
@@ -194,7 +195,7 @@ private:
         : m_overflowClipRect(r)
         , m_fixedClipRect(r)
         , m_posClipRect(r)
-        , m_refCnt(0)
+        , m_refCnt(1)
         , m_fixed(false)
     {
     }
@@ -203,7 +204,7 @@ private:
         : m_overflowClipRect(other.overflowClipRect())
         , m_fixedClipRect(other.fixedClipRect())
         , m_posClipRect(other.posClipRect())
-        , m_refCnt(0)
+        , m_refCnt(1)
         , m_fixed(other.fixed())
     {
     }
@@ -275,7 +276,7 @@ public:
     RenderMarquee* marquee() const { return m_marquee; }
 
     bool isNormalFlowOnly() const { return m_isNormalFlowOnly; }
-    bool isSelfPaintingLayer() const;
+    bool isSelfPaintingLayer() const { return m_isSelfPaintingLayer; }
 
     bool cannotBlitToWindow() const;
 
@@ -367,8 +368,8 @@ public:
     bool inResizeMode() const { return m_inResizeMode; }
     void setInResizeMode(bool b) { m_inResizeMode = b; }
 
-    bool isRootLayer() const { return renderer()->isRenderView(); }
-    
+    bool isRootLayer() const { return m_isRootLayer; }
+
 #if USE(ACCELERATED_COMPOSITING)
     RenderLayerCompositor* compositor() const;
     
@@ -392,6 +393,8 @@ public:
     // Providing |cachedOffset| prevents a outlineBoxForRepaint from walking back to the root for each layer in our subtree.
     // This is an optimistic optimization that is not guaranteed to succeed.
     void updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerPositionsFlags = defaultFlags);
+    
+    bool isPaginated() const { return m_isPaginated; }
 
     void updateTransform();
 
@@ -438,8 +441,13 @@ public:
     // ditto for hasVisibleDescendant(), see https://bugs.webkit.org/show_bug.cgi?id=71277
     bool hasVisibleContent() const { return m_hasVisibleContent; }
     bool hasVisibleDescendant() const { return m_hasVisibleDescendant; }
-    void setHasVisibleContent(bool);
+
+    void setHasVisibleContent();
     void dirtyVisibleContentStatus();
+
+    // FIXME: We should ASSERT(!m_hasSelfPaintingLayerDescendantDirty); here but we hit the same bugs as visible content above.
+    // Part of the issue is with subtree relayout: we don't check if our ancestors have some descendant flags dirty, missing some updates.
+    bool hasSelfPaintingLayerDescendant() const { return m_hasSelfPaintingLayerDescendant; }
 
     // Gets the nearest enclosing positioned ancestor layer (also includes
     // the <html> layer and the root layer).
@@ -645,8 +653,11 @@ private:
 
     void updateNormalFlowList();
 
-    bool isStackingContext(const RenderStyle* style) const { return !style->hasAutoZIndex() || renderer()->isRenderView(); }
+    bool isStackingContext(const RenderStyle* style) const { return !style->hasAutoZIndex() || isRootLayer(); }
     bool isDirtyStackingContext() const { return m_zOrderListsDirty && isStackingContext(); }
+
+    void setAncestorChainHasSelfPaintingLayerDescendant();
+    void dirtyAncestorChainHasSelfPaintingLayerDescendantStatus();
 
     void computeRepaintRects(LayoutPoint* offsetFromRoot = 0);
     void clearRepaintRects();
@@ -657,6 +668,7 @@ private:
 
     bool shouldRepaintAfterLayout() const;
 
+    void updateSelfPaintingLayerAfterStyleChange(const RenderStyle* oldStyle);
     void updateStackingContextsAfterStyleChange(const RenderStyle* oldStyle);
 
     void updateScrollbarsAfterStyleChange(const RenderStyle* oldStyle);
@@ -729,7 +741,9 @@ private:
     bool hasHorizontalOverflow() const;
     bool hasVerticalOverflow() const;
 
-    bool shouldBeNormalFlowOnly() const; 
+    bool shouldBeNormalFlowOnly() const;
+
+    bool shouldBeSelfPaintingLayer() const;
 
     int scrollPosition(Scrollbar*) const;
     
@@ -769,9 +783,10 @@ private:
     
     void updateScrollableAreaSet(bool hasOverflow);
 
-    void childVisibilityChanged(bool newVisibility);
-    void dirtyVisibleDescendantStatus();
-    void updateVisibilityStatus();
+    void dirtyAncestorChainVisibleDescendantStatus();
+    void setAncestorChainHasVisibleDescendant();
+
+    void updateDescendantDependentFlags();
 
     // This flag is computed by RenderLayerCompositor, which knows more about 3d hierarchies than we do.
     void setHas3DTransformedDescendant(bool b) { m_has3DTransformedDescendant = b; }
@@ -810,14 +825,23 @@ private:
     void drawPlatformResizerImage(GraphicsContext*, IntRect resizerCornerRect);
 
     void updatePagination();
-    bool isPaginated() const { return m_isPaginated; }
-
+    
 #if USE(ACCELERATED_COMPOSITING)    
     bool hasCompositingDescendant() const { return m_hasCompositingDescendant; }
     void setHasCompositingDescendant(bool b)  { m_hasCompositingDescendant = b; }
     
-    bool mustOverlapCompositedLayers() const { return m_mustOverlapCompositedLayers; }
-    void setMustOverlapCompositedLayers(bool b) { m_mustOverlapCompositedLayers = b; }
+    enum IndirectCompositingReason {
+        NoIndirectCompositingReason,
+        IndirectCompositingForOverlap,
+        IndirectCompositingForBackgroundLayer,
+        IndirectCompositingForGraphicalEffect, // opacity, mask, filter, transform etc.
+        IndirectCompositingForPerspective,
+        IndirectCompositingForPreserve3D
+    };
+    
+    void setIndirectCompositingReason(IndirectCompositingReason reason) { m_indirectCompositingReason = reason; }
+    IndirectCompositingReason indirectCompositingReason() const { return static_cast<IndirectCompositingReason>(m_indirectCompositingReason); }
+    bool mustCompositeForIndirectReasons() const { return m_indirectCompositingReason; }
 #endif
 
     friend class RenderLayerBacking;
@@ -856,6 +880,15 @@ protected:
     bool m_normalFlowListDirty: 1;
     bool m_isNormalFlowOnly : 1;
 
+    bool m_isSelfPaintingLayer : 1;
+
+    // If have no self-painting descendants, we don't have to walk our children during painting. This can lead to
+    // significant savings, especially if the tree has lots of non-self-painting layers grouped together (e.g. table cells).
+    bool m_hasSelfPaintingLayerDescendant : 1;
+    bool m_hasSelfPaintingLayerDescendantDirty : 1;
+
+    const bool m_isRootLayer : 1;
+
     bool m_usedTransparency : 1; // Tracks whether we need to close a transparent layer, i.e., whether
                                  // we ended up painting this layer or any descendants (and therefore need to
                                  // blend).
@@ -875,7 +908,7 @@ protected:
                                             // in a preserves3D hierarchy. Hint to do 3D-aware hit testing.
 #if USE(ACCELERATED_COMPOSITING)
     bool m_hasCompositingDescendant : 1; // In the z-order tree.
-    bool m_mustOverlapCompositedLayers : 1;
+    unsigned m_indirectCompositingReason : 3;
 #endif
 
     bool m_containsDirtyOverlayScrollbars : 1;
@@ -885,7 +918,7 @@ protected:
     // This is an optimization added for <table>.
     // Currently cells do not need to update their repaint rectangles when scrolling. This also
     // saves a lot of time when scrolling on a table.
-    bool m_canSkipRepaintRectsUpdateOnScroll : 1;
+    const bool m_canSkipRepaintRectsUpdateOnScroll : 1;
 
 #if ENABLE(CSS_FILTERS)
     bool m_hasFilterInfo : 1;

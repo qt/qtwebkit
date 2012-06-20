@@ -540,6 +540,8 @@ void FrameLoader::clear(bool clearWindowProperties, bool clearScriptObjects, boo
     if (clearScriptObjects)
         m_frame->script()->clearScriptObjects();
 
+    m_frame->script()->enableEval();
+
     m_frame->navigationScheduler()->clear();
 
     m_checkTimer.stop();
@@ -869,10 +871,8 @@ bool FrameLoader::isMixedContent(SecurityOrigin* context, const KURL& url)
     if (context->protocol() != "https")
         return false;  // We only care about HTTPS security origins.
 
-    if (!url.isValid() || SchemeRegistry::shouldTreatURLSchemeAsSecure(url.protocol()))
-        return false;  // Loading these protocols is secure.
-
-    return true;
+    // We're in a secure context, so |url| is mixed content if it's insecure.
+    return !SecurityOrigin::isSecure(url);
 }
 
 bool FrameLoader::checkIfDisplayInsecureContent(SecurityOrigin* context, const KURL& url)
@@ -2933,7 +2933,7 @@ Frame* FrameLoader::findFrameForNavigation(const AtomicString& name, Document* a
     // browsing context flag set, and continue these steps as if that
     // browsing context was the one that was going to be navigated instead.
     if (frame == m_frame && name != "_self" && m_frame->document()->shouldDisplaySeamlesslyWithParent()) {
-        for (Frame* ancestor = m_frame; ancestor; ancestor = ancestor->tree()->parent(true)) {
+        for (Frame* ancestor = m_frame; ancestor; ancestor = ancestor->tree()->parent()) {
             if (!ancestor->document()->shouldDisplaySeamlesslyWithParent()) {
                 frame = ancestor;
                 break;

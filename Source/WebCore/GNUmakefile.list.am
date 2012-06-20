@@ -20,6 +20,7 @@ webcore_built_sources += \
 	DerivedSources/WebCore/HTMLNames.cpp \
 	DerivedSources/WebCore/HTMLNames.h \
 	DerivedSources/WebCore/InjectedScriptSource.h \
+	DerivedSources/WebCore/InjectedWebGLScriptSource.h \
 	DerivedSources/WebCore/InspectorBackendDispatcher.cpp \
 	DerivedSources/WebCore/InspectorBackendDispatcher.h \
 	DerivedSources/WebCore/InspectorFrontend.cpp \
@@ -173,6 +174,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSEvent.h \
 	DerivedSources/WebCore/JSEventSource.cpp \
 	DerivedSources/WebCore/JSEventSource.h \
+	DerivedSources/WebCore/JSEventTarget.cpp \
+	DerivedSources/WebCore/JSEventTarget.h \
 	DerivedSources/WebCore/JSFile.cpp \
 	DerivedSources/WebCore/JSFileError.cpp \
 	DerivedSources/WebCore/JSFileError.h \
@@ -436,8 +439,6 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSOESTextureFloat.h \
 	DerivedSources/WebCore/JSOESVertexArrayObject.cpp \
 	DerivedSources/WebCore/JSOESVertexArrayObject.h \
-	DerivedSources/WebCore/JSOperationNotAllowedException.cpp \
-	DerivedSources/WebCore/JSOperationNotAllowedException.h \
 	DerivedSources/WebCore/JSOscillator.cpp \
 	DerivedSources/WebCore/JSOscillator.h \
 	DerivedSources/WebCore/JSOverflowEvent.cpp \
@@ -509,10 +510,6 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSStorage.h \
 	DerivedSources/WebCore/JSStorageEvent.cpp \
 	DerivedSources/WebCore/JSStorageEvent.h \
-	DerivedSources/WebCore/JSStorageInfo.h \
-	DerivedSources/WebCore/JSStorageInfoErrorCallback.h \
-	DerivedSources/WebCore/JSStorageInfoQuotaCallback.h \
-	DerivedSources/WebCore/JSStorageInfoUsageCallback.h \
 	DerivedSources/WebCore/JSStyleMedia.cpp \
 	DerivedSources/WebCore/JSStyleMedia.h \
 	DerivedSources/WebCore/JSStyleSheet.cpp \
@@ -557,6 +554,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSUint8Array.h \
 	DerivedSources/WebCore/JSUint8ClampedArray.cpp \
 	DerivedSources/WebCore/JSUint8ClampedArray.h \
+	DerivedSources/WebCore/JSUndoManager.cpp \
+	DerivedSources/WebCore/JSUndoManager.h \
 	DerivedSources/WebCore/JSValidityState.cpp \
 	DerivedSources/WebCore/JSValidityState.h \
 	DerivedSources/WebCore/JSVoidCallback.cpp \
@@ -575,6 +574,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSWebGLContextAttributes.h \
 	DerivedSources/WebCore/JSWebGLContextEvent.cpp \
 	DerivedSources/WebCore/JSWebGLContextEvent.h \
+	DerivedSources/WebCore/JSWebGLDepthTexture.cpp \
+	DerivedSources/WebCore/JSWebGLDepthTexture.h \
 	DerivedSources/WebCore/JSWebGLFramebuffer.cpp \
 	DerivedSources/WebCore/JSWebGLFramebuffer.h \
 	DerivedSources/WebCore/JSWebGLLoseContext.cpp \
@@ -757,6 +758,7 @@ dom_binding_idls += \
 	$(WebCore)/dom/EntityReference.idl \
 	$(WebCore)/dom/ErrorEvent.idl \
 	$(WebCore)/dom/Event.idl \
+	$(WebCore)/dom/EventTarget.idl \
 	$(WebCore)/dom/EventException.idl \
 	$(WebCore)/dom/HashChangeEvent.idl \
 	$(WebCore)/dom/KeyboardEvent.idl \
@@ -793,6 +795,7 @@ dom_binding_idls += \
 	$(WebCore)/dom/WebKitNamedFlow.idl \
 	$(WebCore)/dom/WebKitTransitionEvent.idl \
 	$(WebCore)/dom/WheelEvent.idl \
+	$(WebCore)/editing/UndoManager.idl \
 	$(WebCore)/fileapi/Blob.idl \
 	$(WebCore)/fileapi/File.idl \
 	$(WebCore)/fileapi/FileError.idl \
@@ -800,7 +803,6 @@ dom_binding_idls += \
 	$(WebCore)/fileapi/FileList.idl \
 	$(WebCore)/fileapi/FileReader.idl \
 	$(WebCore)/fileapi/FileReaderSync.idl \
-	$(WebCore)/fileapi/OperationNotAllowedException.idl \
 	$(WebCore)/fileapi/WebKitBlobBuilder.idl \
 	$(WebCore)/html/DOMFormData.idl \
 	$(WebCore)/html/DOMSettableTokenList.idl \
@@ -914,6 +916,7 @@ dom_binding_idls += \
 	$(WebCore)/html/canvas/WebGLCompressedTextureS3TC.idl \
 	$(WebCore)/html/canvas/WebGLContextAttributes.idl \
 	$(WebCore)/html/canvas/WebGLContextEvent.idl \
+	$(WebCore)/html/canvas/WebGLDepthTexture.idl \
 	$(WebCore)/html/canvas/WebGLFramebuffer.idl \
 	$(WebCore)/html/canvas/WebGLLoseContext.idl \
 	$(WebCore)/html/canvas/WebGLProgram.idl \
@@ -1306,8 +1309,6 @@ webcore_sources += \
 	Source/WebCore/accessibility/AXObjectCache.h \
 	Source/WebCore/bindings/generic/ActiveDOMCallback.cpp \
 	Source/WebCore/bindings/generic/ActiveDOMCallback.h \
-	Source/WebCore/bindings/generic/ContextEnabledFeatures.cpp \
-	Source/WebCore/bindings/generic/ContextEnabledFeatures.h \
 	Source/WebCore/bindings/generic/BindingSecurityBase.cpp \
 	Source/WebCore/bindings/generic/BindingSecurityBase.h \
 	Source/WebCore/bindings/generic/BindingSecurity.h \
@@ -1362,6 +1363,7 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSDOMMimeTypeArrayCustom.cpp \
 	Source/WebCore/bindings/js/JSDOMPluginArrayCustom.cpp \
 	Source/WebCore/bindings/js/JSDOMPluginCustom.cpp \
+	Source/WebCore/bindings/js/JSDOMStringListCustom.cpp \
 	Source/WebCore/bindings/js/JSDOMStringMapCustom.cpp \
 	Source/WebCore/bindings/js/JSDOMStringMapCustom.h \
 	Source/WebCore/bindings/js/JSDOMTokenListCustom.cpp \
@@ -1389,8 +1391,7 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSEventCustom.cpp \
 	Source/WebCore/bindings/js/JSEventListener.cpp \
 	Source/WebCore/bindings/js/JSEventListener.h \
-	Source/WebCore/bindings/js/JSEventTarget.cpp \
-	Source/WebCore/bindings/js/JSEventTarget.h \
+	Source/WebCore/bindings/js/JSEventTargetCustom.cpp \
 	Source/WebCore/bindings/js/JSErrorHandler.cpp \
 	Source/WebCore/bindings/js/JSErrorHandler.h \
 	Source/WebCore/bindings/js/JSExceptionBase.cpp \
@@ -1687,6 +1688,7 @@ webcore_sources += \
 	Source/WebCore/css/CSSValueList.h \
 	Source/WebCore/css/CSSValuePool.cpp \
 	Source/WebCore/css/CSSValuePool.h \
+	Source/WebCore/css/CSSVariableValue.h \
 	Source/WebCore/css/DashboardRegion.h \
 	Source/WebCore/css/FontFeatureValue.cpp \
 	Source/WebCore/css/FontFeatureValue.h \
@@ -1800,6 +1802,8 @@ webcore_sources += \
 	Source/WebCore/dom/ContainerNode.h \
 	Source/WebCore/dom/ContextDestructionObserver.cpp \
 	Source/WebCore/dom/ContextDestructionObserver.h \
+	Source/WebCore/dom/ContextFeatures.cpp \
+	Source/WebCore/dom/ContextFeatures.h \
 	Source/WebCore/dom/CrossThreadTask.h \
 	Source/WebCore/dom/CustomEvent.cpp \
 	Source/WebCore/dom/CustomEvent.h \
@@ -2154,6 +2158,8 @@ webcore_sources += \
 	Source/WebCore/editing/TextIterator.h \
 	Source/WebCore/editing/TypingCommand.cpp \
 	Source/WebCore/editing/TypingCommand.h \
+	Source/WebCore/editing/UndoManager.cpp \
+	Source/WebCore/editing/UndoManager.h \
 	Source/WebCore/editing/UndoStep.h \
 	Source/WebCore/editing/UnlinkCommand.cpp \
 	Source/WebCore/editing/UnlinkCommand.h \
@@ -2190,8 +2196,6 @@ webcore_sources += \
 	Source/WebCore/fileapi/FileThread.cpp \
 	Source/WebCore/fileapi/FileThread.h \
 	Source/WebCore/fileapi/FileThreadTask.h \
-	Source/WebCore/fileapi/OperationNotAllowedException.cpp \
-	Source/WebCore/fileapi/OperationNotAllowedException.h \
 	Source/WebCore/fileapi/ThreadableBlobRegistry.cpp \
 	Source/WebCore/fileapi/ThreadableBlobRegistry.h \
 	Source/WebCore/fileapi/WebKitBlobBuilder.cpp \
@@ -2264,6 +2268,8 @@ webcore_sources += \
 	Source/WebCore/html/FileInputType.h \
 	Source/WebCore/html/FormAssociatedElement.cpp \
 	Source/WebCore/html/FormAssociatedElement.h \
+	Source/WebCore/html/FormController.cpp \
+	Source/WebCore/html/FormController.h \
 	Source/WebCore/html/FormDataList.cpp \
 	Source/WebCore/html/FormDataList.h \
 	Source/WebCore/html/FTPDirectoryDocument.cpp \
@@ -2649,6 +2655,8 @@ webcore_sources += \
 	Source/WebCore/inspector/IdentifiersFactory.h \
 	Source/WebCore/inspector/InjectedScript.cpp \
 	Source/WebCore/inspector/InjectedScript.h \
+	Source/WebCore/inspector/InjectedScriptBase.cpp \
+	Source/WebCore/inspector/InjectedScriptBase.h \
 	Source/WebCore/inspector/InjectedScriptHost.cpp \
 	Source/WebCore/inspector/InjectedScriptHost.h \
 	Source/WebCore/inspector/InjectedScriptManager.cpp \
@@ -2720,6 +2728,9 @@ webcore_sources += \
 	Source/WebCore/inspector/InspectorTimelineAgent.h \
 	Source/WebCore/inspector/InspectorValues.cpp \
 	Source/WebCore/inspector/InspectorValues.h \
+	Source/WebCore/inspector/InspectorWebGLAgent.cpp \
+	Source/WebCore/inspector/InspectorWebGLAgent.h \
+	Source/WebCore/inspector/InspectorWebGLInstrumentation.h \
 	Source/WebCore/inspector/InspectorWorkerAgent.cpp \
 	Source/WebCore/inspector/InspectorWorkerAgent.h \
 	Source/WebCore/inspector/InspectorWorkerResource.h \
@@ -3174,6 +3185,8 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/cairo/RefPtrCairo.cpp \
 	Source/WebCore/platform/graphics/cairo/RefPtrCairo.h \
 	Source/WebCore/platform/graphics/cairo/TransformationMatrixCairo.cpp \
+	Source/WebCore/platform/graphics/filters/CustomFilterGlobalContext.cpp \
+	Source/WebCore/platform/graphics/filters/CustomFilterGlobalContext.h \
 	Source/WebCore/platform/graphics/filters/CustomFilterMesh.cpp \
 	Source/WebCore/platform/graphics/filters/CustomFilterMesh.h \
 	Source/WebCore/platform/graphics/filters/CustomFilterNumberParameter.h \
@@ -3350,6 +3363,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/TextRenderingMode.h \
 	Source/WebCore/platform/graphics/TextRun.cpp \
 	Source/WebCore/platform/graphics/TextRun.h \
+	Source/WebCore/platform/graphics/TiledBacking.h \
 	Source/WebCore/platform/graphics/transforms/AffineTransform.cpp \
 	Source/WebCore/platform/graphics/transforms/AffineTransform.h \
 	Source/WebCore/platform/graphics/transforms/IdentityTransformOperation.h \
@@ -3580,6 +3594,7 @@ webcore_sources += \
 	Source/WebCore/platform/PrerenderHandle.h \
 	Source/WebCore/platform/PurgeableBuffer.h \
 	Source/WebCore/platform/PurgePriority.h \
+	Source/WebCore/platform/RefCountedSupplement.h \
 	Source/WebCore/platform/ReferrerPolicy.h \
 	Source/WebCore/platform/RunLoop.cpp \
 	Source/WebCore/platform/RunLoop.h \
@@ -3898,6 +3913,8 @@ webcore_sources += \
 	Source/WebCore/rendering/RenderScrollbarPart.h \
 	Source/WebCore/rendering/RenderScrollbarTheme.cpp \
 	Source/WebCore/rendering/RenderScrollbarTheme.h \
+	Source/WebCore/rendering/RenderSearchField.cpp \
+	Source/WebCore/rendering/RenderSearchField.h \
 	Source/WebCore/rendering/RenderSelectionInfo.h \
 	Source/WebCore/rendering/RenderSlider.cpp \
 	Source/WebCore/rendering/RenderSlider.h \
@@ -4030,6 +4047,7 @@ webcore_sources += \
 	Source/WebCore/rendering/style/StyleSurroundData.h \
 	Source/WebCore/rendering/style/StyleTransformData.cpp \
 	Source/WebCore/rendering/style/StyleTransformData.h \
+	Source/WebCore/rendering/style/StyleVariableData.h \
 	Source/WebCore/rendering/style/StyleVisualData.cpp \
 	Source/WebCore/rendering/style/StyleVisualData.h \
 	Source/WebCore/rendering/style/SVGRenderStyle.cpp \
@@ -4160,11 +4178,6 @@ webcore_sources += \
 	Source/WebCore/storage/StorageEvent.h \
 	Source/WebCore/storage/StorageEventDispatcher.cpp \
 	Source/WebCore/storage/StorageEventDispatcher.h \
-	Source/WebCore/storage/StorageInfo.cpp \
-	Source/WebCore/storage/StorageInfo.h \
-	Source/WebCore/storage/StorageInfoErrorCallback.h \
-	Source/WebCore/storage/StorageInfoQuotaCallback.h \
-	Source/WebCore/storage/StorageInfoUsageCallback.h \
 	Source/WebCore/storage/StorageMap.cpp \
 	Source/WebCore/storage/StorageMap.h \
 	Source/WebCore/storage/StorageNamespace.cpp \
@@ -5937,6 +5950,8 @@ webcore_sources += \
 	Source/WebCore/html/canvas/WebGLDebugRendererInfo.h \
 	Source/WebCore/html/canvas/WebGLDebugShaders.cpp \
 	Source/WebCore/html/canvas/WebGLDebugShaders.h \
+	Source/WebCore/html/canvas/WebGLDepthTexture.cpp \
+	Source/WebCore/html/canvas/WebGLDepthTexture.h \
 	Source/WebCore/html/canvas/WebGLFramebuffer.cpp \
 	Source/WebCore/html/canvas/WebGLFramebuffer.h \
 	Source/WebCore/html/canvas/WebGLGetInfo.cpp \
@@ -6044,6 +6059,8 @@ endif  # END USE_CLUTTER
 
 if USE_TEXTURE_MAPPER_CAIRO
 webcore_sources += \
+	Source/WebCore/platform/graphics/texmap/TextureMapperShaderManager.cpp \
+	Source/WebCore/platform/graphics/texmap/TextureMapperShaderManager.h \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.h \
 	Source/WebCore/platform/graphics/texmap/LayerTransform.cpp \
@@ -6059,9 +6076,6 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/TextureMapperLayer.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperLayer.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperPlatformLayer.h
-webcoregtk_sources += \
-	Source/WebCore/platform/graphics/cairo/TextureMapperCairo.cpp \
-	Source/WebCore/platform/graphics/cairo/TextureMapperCairo.h
 endif  # END USE_TEXTURE_MAPPER_CAIRO
 
 if USE_TEXTURE_MAPPER_GL
@@ -6102,3 +6116,36 @@ dom_binding_idls += \
 	$(WebCore)/html/shadow/HTMLShadowElement.idl
 
 endif  # END ENABLE_SHADOW_DOM
+
+# ----
+# Quota support
+# ----
+if ENABLE_QUOTA
+webcore_sources += \
+	Source/WebCore/Modules/quota/DOMWindowQuota.cpp \
+	Source/WebCore/Modules/quota/DOMWindowQuota.h \
+	Source/WebCore/Modules/quota/StorageInfo.cpp \
+	Source/WebCore/Modules/quota/StorageInfo.h \
+	Source/WebCore/Modules/quota/StorageInfoErrorCallback.h \
+	Source/WebCore/Modules/quota/StorageInfoQuotaCallback.h \
+	Source/WebCore/Modules/quota/StorageInfoUsageCallback.h
+
+webcore_built_sources += \
+	DerivedSources/WebCore/JSStorageInfo.cpp \
+	DerivedSources/WebCore/JSStorageInfo.h \
+	DerivedSources/WebCore/JSStorageInfoErrorCallback.cpp \
+	DerivedSources/WebCore/JSStorageInfoErrorCallback.h \
+	DerivedSources/WebCore/JSStorageInfoQuotaCallback.cpp \
+	DerivedSources/WebCore/JSStorageInfoQuotaCallback.h \
+	DerivedSources/WebCore/JSStorageInfoUsageCallback.cpp \
+	DerivedSources/WebCore/JSStorageInfoUsageCallback.h
+
+dom_binding_idls += \
+	$(WebCore)/Modules/quota/DOMWindowQuota.idl \
+	$(WebCore)/Modules/quota/StorageInfo.idl \
+	$(WebCore)/Modules/quota/StorageInfoErrorCallback.idl \
+	$(WebCore)/Modules/quota/StorageInfoQuotaCallback.idl \
+	$(WebCore)/Modules/quota/StorageInfoUsageCallback.idl
+
+endif  # END ENABLE_QUOTA
+

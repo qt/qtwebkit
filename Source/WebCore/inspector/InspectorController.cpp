@@ -61,6 +61,7 @@
 #include "InspectorResourceAgent.h"
 #include "InspectorState.h"
 #include "InspectorTimelineAgent.h"
+#include "InspectorWebGLAgent.h"
 #include "InspectorWorkerAgent.h"
 #include "InstrumentingAgents.h"
 #include "PageConsoleAgent.h"
@@ -106,14 +107,14 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
 #endif
 
 #if ENABLE(FILE_SYSTEM)
-    m_agents.append(InspectorFileSystemAgent::create(m_instrumentingAgents.get(), m_state.get()));
+    m_agents.append(InspectorFileSystemAgent::create(m_instrumentingAgents.get(), pageAgent, m_state.get()));
 #endif
     OwnPtr<InspectorDOMStorageAgent> domStorageAgentPtr(InspectorDOMStorageAgent::create(m_instrumentingAgents.get(), m_state.get()));
     InspectorDOMStorageAgent* domStorageAgent = domStorageAgentPtr.get();
     m_agents.append(domStorageAgentPtr.release());
     m_agents.append(InspectorMemoryAgent::create(m_instrumentingAgents.get(), m_state.get(), m_page, m_domAgent));
-    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), m_state.get(), InspectorTimelineAgent::PageInspector,
-       inspectorClient->supportsFrameInstrumentation() ? InspectorTimelineAgent::FrameInstrumentationSupported : InspectorTimelineAgent::FrameInstrumentationNotSupported));
+    m_agents.append(InspectorTimelineAgent::create(m_instrumentingAgents.get(), pageAgent, m_state.get(), InspectorTimelineAgent::PageInspector,
+       inspectorClient));
     m_agents.append(InspectorApplicationCacheAgent::create(m_instrumentingAgents.get(), m_state.get(), pageAgent));
 
     OwnPtr<InspectorResourceAgent> resourceAgentPtr(InspectorResourceAgent::create(m_instrumentingAgents.get(), pageAgent, inspectorClient, m_state.get()));
@@ -142,6 +143,10 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
 
 #if ENABLE(WORKERS)
     m_agents.append(InspectorWorkerAgent::create(m_instrumentingAgents.get(), m_state.get()));
+#endif
+
+#if ENABLE(WEBGL)
+    m_agents.append(InspectorWebGLAgent::create(m_instrumentingAgents.get(), m_state.get(), m_injectedScriptManager.get()));
 #endif
 
     ASSERT_ARG(inspectorClient, inspectorClient);

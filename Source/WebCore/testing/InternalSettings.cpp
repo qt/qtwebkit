@@ -106,6 +106,7 @@ InternalSettings::InternalSettings(Frame* frame)
 #endif
     , m_originalWindowFocusRestricted(settings()->windowFocusRestricted())
     , m_originalDeviceSupportsTouch(settings()->deviceSupportsTouch())
+    , m_originalDeviceSupportsMouse(settings()->deviceSupportsMouse())
 {
 }
 
@@ -126,6 +127,7 @@ void InternalSettings::restoreTo(Settings* settings)
 #endif
     settings->setWindowFocusRestricted(m_originalWindowFocusRestricted);
     settings->setDeviceSupportsTouch(m_originalDeviceSupportsTouch);
+    settings->setDeviceSupportsMouse(m_originalDeviceSupportsMouse);
 }
 
 Settings* InternalSettings::settings() const
@@ -232,12 +234,6 @@ void InternalSettings::setPageScaleFactor(float scaleFactor, int x, int y, Excep
     page()->setPageScaleFactor(scaleFactor, IntPoint(x, y));
 }
 
-void InternalSettings::setPerTileDrawingEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setPerTileDrawingEnabled(enabled);
-}
-
 void InternalSettings::setShadowDOMEnabled(bool enabled, ExceptionCode& ec)
 {
 #if ENABLE(SHADOW_DOM)
@@ -266,6 +262,18 @@ void InternalSettings::setDeviceSupportsTouch(bool enabled, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
     settings()->setDeviceSupportsTouch(enabled);
+}
+
+void InternalSettings::setDeviceSupportsMouse(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setDeviceSupportsMouse(enabled);
+}
+
+void InternalSettings::setDeviceScaleFactor(float scaleFactor, ExceptionCode& ec)
+{
+    InternalSettingsGuardForPage();
+    page()->setDeviceScaleFactor(scaleFactor);
 }
 
 typedef void (Settings::*SetFontFamilyFunction)(const AtomicString&, UScriptCode);
@@ -371,10 +379,10 @@ void InternalSettings::setFixedPositionCreatesStackingContext(bool creates, Exce
     settings()->setFixedPositionCreatesStackingContext(creates);
 }
 
-void InternalSettings::setSyncXHRInDocumentsEnabled(bool creates, ExceptionCode& ec)
+void InternalSettings::setSyncXHRInDocumentsEnabled(bool enabled, ExceptionCode& ec)
 {
-    InternalSettingsGuardForFrameView();
-    settings()->setSyncXHRInDocumentsEnabled(creates);
+    InternalSettingsGuardForSettings();
+    settings()->setSyncXHRInDocumentsEnabled(enabled);
 }
 
 void InternalSettings::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)

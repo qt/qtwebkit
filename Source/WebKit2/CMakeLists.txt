@@ -79,8 +79,9 @@ SET(WebKit2_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/assembler"
     "${JAVASCRIPTCORE_DIR}/bytecode"
     "${JAVASCRIPTCORE_DIR}/bytecompiler"
-    "${JAVASCRIPTCORE_DIR}/dfg"
     "${JAVASCRIPTCORE_DIR}/collector/handles"
+    "${JAVASCRIPTCORE_DIR}/dfg"
+    "${JAVASCRIPTCORE_DIR}/disassembler"
     "${JAVASCRIPTCORE_DIR}/heap"
     "${JAVASCRIPTCORE_DIR}/interpreter"
     "${JAVASCRIPTCORE_DIR}/jit"
@@ -122,6 +123,8 @@ SET(WebKit2_SOURCES
     Shared/FontInfo.cpp
     Shared/ImmutableArray.cpp
     Shared/ImmutableDictionary.cpp
+    Shared/IntentData.cpp
+    Shared/IntentServiceInfo.cpp
     Shared/MutableArray.cpp
     Shared/MutableDictionary.cpp
     Shared/OriginAndDatabases.cpp
@@ -236,6 +239,8 @@ SET(WebKit2_SOURCES
     UIProcess/WebIconDatabase.cpp
     UIProcess/WebIconDatabaseClient.cpp
     UIProcess/WebInspectorProxy.cpp
+    UIProcess/WebIntentData.cpp
+    UIProcess/WebIntentServiceInfo.cpp
     UIProcess/WebKeyValueStorageManagerProxy.cpp
     UIProcess/WebLayerTreeRenderer.cpp
     UIProcess/WebLoaderClient.cpp
@@ -316,7 +321,6 @@ SET(WebKit2_SOURCES
     UIProcess/Plugins/WebPluginSiteDataManager.cpp
 
     WebProcess/WebConnectionToUIProcess.cpp
-    WebProcess/WebKitMain.cpp
     WebProcess/WebProcess.cpp
 
     WebProcess/ApplicationCache/WebApplicationCacheManager.cpp
@@ -494,7 +498,7 @@ SET(WebKit2_MESSAGES_IN_FILES
     WebProcess/WebPage/WebPage.messages.in
 )
 
-SET(WebProcess_NAME bin/WebProcess)
+SET(WebProcess_EXECUTABLE_NAME WebProcess)
 
 SET(WebProcess_LIBRARIES
     ${JavaScriptCore_LIBRARY_NAME}
@@ -533,15 +537,14 @@ TARGET_LINK_LIBRARIES(${WebKit2_LIBRARY_NAME} ${WebKit2_LIBRARIES})
 SET_TARGET_PROPERTIES(${WebKit2_LIBRARY_NAME} PROPERTIES FOLDER "WebKit")
 SET_TARGET_PROPERTIES(${WebKit2_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
 
-ADD_EXECUTABLE(${WebProcess_NAME} ${WebProcess_SOURCES})
-TARGET_LINK_LIBRARIES(${WebProcess_NAME} ${WebProcess_LIBRARIES})
-SET_TARGET_PROPERTIES(${WebProcess_NAME} PROPERTIES FOLDER "WebKit")
-SET_TARGET_PROPERTIES(${WebProcess_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+ADD_EXECUTABLE(${WebProcess_EXECUTABLE_NAME} ${WebProcess_SOURCES})
+TARGET_LINK_LIBRARIES(${WebProcess_EXECUTABLE_NAME} ${WebProcess_LIBRARIES})
+SET_TARGET_PROPERTIES(${WebProcess_EXECUTABLE_NAME} PROPERTIES FOLDER "WebKit")
 
 SET_TARGET_PROPERTIES(${WebKit2_LIBRARY_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 IF (WebKit2_LINK_FLAGS)
     ADD_TARGET_PROPERTIES(${WebKit2_LIBRARY_NAME} LINK_FLAGS "${WebKit2_LINK_FLAGS}")
-    ADD_TARGET_PROPERTIES(${WebProcess_NAME} LINK_FLAGS "${WebKit2_LINK_FLAGS}")
+    ADD_TARGET_PROPERTIES(${WebProcess_EXECUTABLE_NAME} LINK_FLAGS "${WebKit2_LINK_FLAGS}")
 ENDIF ()
 
 INSTALL(TARGETS ${WebKit2_LIBRARY_NAME} DESTINATION "${LIB_INSTALL_DIR}")

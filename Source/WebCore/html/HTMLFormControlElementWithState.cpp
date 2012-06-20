@@ -25,6 +25,7 @@
 #include "config.h"
 #include "HTMLFormControlElementWithState.h"
 
+#include "FormController.h"
 #include "HTMLFormElement.h"
 
 namespace WebCore {
@@ -32,19 +33,19 @@ namespace WebCore {
 HTMLFormControlElementWithState::HTMLFormControlElementWithState(const QualifiedName& tagName, Document* doc, HTMLFormElement* f)
     : HTMLFormControlElement(tagName, doc, f)
 {
-    document()->registerFormElementWithState(this);
+    document()->formController()->registerFormElementWithState(this);
 }
 
 HTMLFormControlElementWithState::~HTMLFormControlElementWithState()
 {
-    document()->unregisterFormElementWithState(this);
+    document()->formController()->unregisterFormElementWithState(this);
 }
 
 void HTMLFormControlElementWithState::didMoveToNewDocument(Document* oldDocument)
 {
     if (oldDocument)
-        oldDocument->unregisterFormElementWithState(this);
-    document()->registerFormElementWithState(this);
+        oldDocument->formController()->unregisterFormElementWithState(this);
+    document()->formController()->registerFormElementWithState(this);
     HTMLFormControlElement::didMoveToNewDocument(oldDocument);
 }
 
@@ -61,6 +62,11 @@ bool HTMLFormControlElementWithState::shouldSaveAndRestoreFormControlState() con
     return attached() && shouldAutocomplete();
 }
 
+FormControlState HTMLFormControlElementWithState::saveFormControlState() const
+{
+    return FormControlState();
+}
+
 void HTMLFormControlElementWithState::finishParsingChildren()
 {
     HTMLFormControlElement::finishParsingChildren();
@@ -72,9 +78,9 @@ void HTMLFormControlElementWithState::finishParsingChildren()
         return;
 
     Document* doc = document();
-    if (doc->hasStateForNewFormElements()) {
-        String state;
-        if (doc->takeStateForFormElement(name().impl(), type().impl(), state))
+    if (doc->formController()->hasStateForNewFormElements()) {
+        FormControlState state = doc->formController()->takeStateForFormElement(name().impl(), type().impl());
+        if (state.hasValue())
             restoreFormControlState(state);
     }
 }

@@ -1,5 +1,5 @@
 # Copyright (C) 2006, 2007, 2008, 2012 Apple Inc. All rights reserved.
-# Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com> 
+# Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
 # Copyright (C) 2009 Cameron McCormack <cam@mcc.id.au>
 #
 # Redistribution and use in source and binary forms, with or without
@@ -7,13 +7,13 @@
 # are met:
 #
 # 1.  Redistributions of source code must retain the above copyright
-#     notice, this list of conditions and the following disclaimer. 
+#     notice, this list of conditions and the following disclaimer.
 # 2.  Redistributions in binary form must reproduce the above copyright
 #     notice, this list of conditions and the following disclaimer in the
-#     documentation and/or other materials provided with the distribution. 
+#     documentation and/or other materials provided with the distribution.
 # 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
 #     its contributors may be used to endorse or promote products derived
-#     from this software without specific prior written permission. 
+#     from this software without specific prior written permission.
 #
 # THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
 # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -31,6 +31,7 @@ VPATH = \
     $(WebCore)/Modules/filesystem \
     $(WebCore)/Modules/geolocation \
     $(WebCore)/Modules/indexeddb \
+    $(WebCore)/Modules/quota \
     $(WebCore)/Modules/webaudio \
     $(WebCore)/Modules/webdatabase \
     $(WebCore)/Modules/websockets \
@@ -39,6 +40,7 @@ VPATH = \
     $(WebCore)/bindings/objc \
     $(WebCore)/css \
     $(WebCore)/dom \
+    $(WebCore)/editing \
     $(WebCore)/fileapi \
     $(WebCore)/html \
     $(WebCore)/html/canvas \
@@ -103,6 +105,11 @@ BINDING_IDLS = \
     $(WebCore)/Modules/indexeddb/IDBVersionChangeEvent.idl \
     $(WebCore)/Modules/indexeddb/IDBVersionChangeRequest.idl \
     $(WebCore)/Modules/indexeddb/WorkerContextIndexedDatabase.idl \
+    $(WebCore)/Modules/quota/DOMWindowQuota.idl \
+    $(WebCore)/Modules/quota/StorageInfo.idl \
+    $(WebCore)/Modules/quota/StorageInfoErrorCallback.idl \
+    $(WebCore)/Modules/quota/StorageInfoQuotaCallback.idl \
+    $(WebCore)/Modules/quota/StorageInfoUsageCallback.idl \
     $(WebCore)/Modules/webaudio/AudioBuffer.idl \
     $(WebCore)/Modules/webaudio/AudioBufferCallback.idl \
     $(WebCore)/Modules/webaudio/AudioBufferSourceNode.idl \
@@ -246,6 +253,7 @@ BINDING_IDLS = \
     $(WebCore)/dom/WebKitNamedFlow.idl \
     $(WebCore)/dom/WebKitTransitionEvent.idl \
     $(WebCore)/dom/WheelEvent.idl \
+    $(WebCore)/editing/UndoManager.idl \
     $(WebCore)/fileapi/Blob.idl \
     $(WebCore)/fileapi/File.idl \
     $(WebCore)/fileapi/FileError.idl \
@@ -253,7 +261,6 @@ BINDING_IDLS = \
     $(WebCore)/fileapi/FileList.idl \
     $(WebCore)/fileapi/FileReader.idl \
     $(WebCore)/fileapi/FileReaderSync.idl \
-    $(WebCore)/fileapi/OperationNotAllowedException.idl \
     $(WebCore)/fileapi/WebKitBlobBuilder.idl \
     $(WebCore)/html/DOMFormData.idl \
     $(WebCore)/html/DOMSettableTokenList.idl \
@@ -364,6 +371,7 @@ BINDING_IDLS = \
     $(WebCore)/html/canvas/WebGLCompressedTextureS3TC.idl \
     $(WebCore)/html/canvas/WebGLContextAttributes.idl \
     $(WebCore)/html/canvas/WebGLContextEvent.idl \
+    $(WebCore)/html/canvas/WebGLDepthTexture.idl \
     $(WebCore)/html/canvas/WebGLFramebuffer.idl \
     $(WebCore)/html/canvas/WebGLLoseContext.idl \
     $(WebCore)/html/canvas/WebGLProgram.idl \
@@ -420,10 +428,6 @@ BINDING_IDLS = \
     $(WebCore)/plugins/DOMPluginArray.idl \
     $(WebCore)/storage/Storage.idl \
     $(WebCore)/storage/StorageEvent.idl \
-    $(WebCore)/storage/StorageInfo.idl \
-    $(WebCore)/storage/StorageInfoErrorCallback.idl \
-    $(WebCore)/storage/StorageInfoQuotaCallback.idl \
-    $(WebCore)/storage/StorageInfoUsageCallback.idl \
     $(WebCore)/svg/ElementTimeControl.idl \
     $(WebCore)/svg/SVGAElement.idl \
     $(WebCore)/svg/SVGAltGlyphDefElement.idl \
@@ -604,7 +608,7 @@ BINDING_IDLS = \
 
 DOM_CLASSES=$(basename $(notdir $(BINDING_IDLS)))
 
-JS_DOM_HEADERS=$(filter-out JSMediaQueryListListener.h JSEventListener.h JSEventTarget.h, $(DOM_CLASSES:%=JS%.h))
+JS_DOM_HEADERS=$(filter-out JSMediaQueryListListener.h JSEventListener.h, $(DOM_CLASSES:%=JS%.h))
 
 WEB_DOM_HEADERS :=
 ifeq ($(findstring BUILDING_WX,$(FEATURE_DEFINES)), BUILDING_WX)
@@ -612,6 +616,7 @@ WEB_DOM_HEADERS := $(filter-out WebDOMXSLTProcessor.h WebDOMEventTarget.h, $(DOM
 endif # BUILDING_WX
 
 all : \
+    $(SUPPLEMENTAL_DEPENDENCY_FILE) \
     $(JS_DOM_HEADERS) \
     $(WEB_DOM_HEADERS) \
     \
@@ -780,10 +785,10 @@ XPathGrammar.cpp : xml/XPathGrammar.y $(PROJECT_FILE)
 
 # user agent style sheets
 
-USER_AGENT_STYLE_SHEETS = $(WebCore)/css/html.css $(WebCore)/css/quirks.css $(WebCore)/css/view-source.css $(WebCore)/css/themeWin.css $(WebCore)/css/themeWinQuirks.css 
+USER_AGENT_STYLE_SHEETS = $(WebCore)/css/html.css $(WebCore)/css/quirks.css $(WebCore)/css/view-source.css $(WebCore)/css/themeWin.css $(WebCore)/css/themeWinQuirks.css
 
 ifeq ($(findstring ENABLE_SVG,$(FEATURE_DEFINES)), ENABLE_SVG)
-    USER_AGENT_STYLE_SHEETS := $(USER_AGENT_STYLE_SHEETS) $(WebCore)/css/svg.css 
+    USER_AGENT_STYLE_SHEETS := $(USER_AGENT_STYLE_SHEETS) $(WebCore)/css/svg.css
 endif
 
 ifeq ($(findstring ENABLE_MATHML,$(FEATURE_DEFINES)), ENABLE_MATHML)
@@ -892,7 +897,7 @@ XLinkNames.cpp : dom/make_names.pl svg/xlinkattrs.in
 	perl -I $(WebCore)/bindings/scripts $< --attrs $(WebCore)/svg/xlinkattrs.in
 
 # --------
- 
+
 # Register event constructors and targets
 
 EventFactory.cpp EventHeaders.h EventInterfaces.h : dom/make_event_factory.pl dom/EventNames.in
@@ -905,7 +910,7 @@ ExceptionCodeDescription.cpp ExceptionCodeDescription.h ExceptionHeaders.h Excep
 	perl -I $(WebCore)/bindings/scripts $< --input $(WebCore)/dom/DOMExceptions.in
 
 # --------
- 
+
 # MathML tag and attribute names, and element factory
 
 MathMLElementFactory.cpp MathMLNames.cpp : dom/make_names.pl mathml/mathtags.in mathml/mathattrs.in
@@ -946,7 +951,8 @@ IDL_COMMON_ARGS = $(IDL_INCLUDES:%=--include %) --write-dependencies --outputDir
 
 JS_BINDINGS_SCRIPTS = $(GENERATE_SCRIPTS) bindings/scripts/CodeGeneratorJS.pm
 
-SUPPLEMENTAL_DEPENDENCY_FILE = ./supplemental_dependency.tmp
+SUPPLEMENTAL_DEPENDENCY_FILE = ./SupplementalDependencies.txt
+SUPPLEMENTAL_MAKEFILE_DEPS = ./SupplementalDependencies.dep
 IDL_FILES_TMP = ./idl_files.tmp
 ADDITIONAL_IDLS = $(WebCore)/inspector/JavaScriptCallFrame.idl
 IDL_ATTRIBUTES_FILE = $(WebCore)/bindings/scripts/IDLAttributes.txt
@@ -956,14 +962,15 @@ IDL_ATTRIBUTES_FILE = $(WebCore)/bindings/scripts/IDLAttributes.txt
 space :=
 space +=
 
-$(SUPPLEMENTAL_DEPENDENCY_FILE) : $(PREPROCESS_IDLS_SCRIPTS) $(BINDING_IDLS) $(ADDITIONAL_IDLS) $(IDL_ATTRIBUTES_FILE)
+$(SUPPLEMENTAL_MAKEFILE_DEPS) : $(PREPROCESS_IDLS_SCRIPTS) $(BINDING_IDLS) $(ADDITIONAL_IDLS) $(IDL_ATTRIBUTES_FILE)
 	printf "$(subst $(space),,$(patsubst %,%\n,$(BINDING_IDLS) $(ADDITIONAL_IDLS)))" > $(IDL_FILES_TMP)
-	$(call preprocess_idls_script, $(PREPROCESS_IDLS_SCRIPTS)) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --idlFilesList $(IDL_FILES_TMP) --supplementalDependencyFile $@ --idlAttributesFile $(IDL_ATTRIBUTES_FILE)
+	$(call preprocess_idls_script, $(PREPROCESS_IDLS_SCRIPTS)) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --idlFilesList $(IDL_FILES_TMP) --supplementalDependencyFile $(SUPPLEMENTAL_DEPENDENCY_FILE) --supplementalMakefileDeps $@ --idlAttributesFile $(IDL_ATTRIBUTES_FILE)
 	rm -f $(IDL_FILES_TMP)
 
-JS%.h : %.idl $(JS_BINDINGS_SCRIPTS) $(SUPPLEMENTAL_DEPENDENCY_FILE)
+JS%.h : %.idl $(JS_BINDINGS_SCRIPTS)
 	$(call generator_script, $(JS_BINDINGS_SCRIPTS)) $(IDL_COMMON_ARGS) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_JAVASCRIPT" --generator JS --supplementalDependencyFile $(SUPPLEMENTAL_DEPENDENCY_FILE) $<
 
+include $(SUPPLEMENTAL_MAKEFILE_DEPS)
 
 # Inspector interfaces generator
 
@@ -984,12 +991,17 @@ all : InjectedScriptSource.h
 InjectedScriptSource.h : InjectedScriptSource.js
 	perl $(WebCore)/inspector/xxd.pl InjectedScriptSource_js $(WebCore)/inspector/InjectedScriptSource.js InjectedScriptSource.h
 
+all : InjectedWebGLScriptSource.h
+
+InjectedWebGLScriptSource.h : InjectedWebGLScriptSource.js
+	perl $(WebCore)/inspector/xxd.pl InjectedWebGLScriptSource_js $(WebCore)/inspector/InjectedWebGLScriptSource.js InjectedWebGLScriptSource.h
+
 -include $(JS_DOM_HEADERS:.h=.dep)
 
 ifeq ($(findstring BUILDING_WX,$(FEATURE_DEFINES)), BUILDING_WX)
 CPP_BINDINGS_SCRIPTS = $(GENERATE_SCRIPTS) bindings/scripts/CodeGeneratorCPP.pm
 
-WebDOM%.h : %.idl $(CPP_BINDINGS_SCRIPTS) $(SUPPLEMENTAL_DEPENDENCY_FILE)
+WebDOM%.h : %.idl $(CPP_BINDINGS_SCRIPTS)
 	$(call generator_script, $(CPP_BINDINGS_SCRIPTS)) $(IDL_COMMON_ARGS) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_CPP" --generator CPP --supplementalDependencyFile $(SUPPLEMENTAL_DEPENDENCY_FILE) $<
 endif # BUILDING_WX
 
@@ -1032,7 +1044,7 @@ endif # installhdrs
 # Objective-C bindings
 
 DOM_BINDINGS_SCRIPTS = $(GENERATE_BINDING_SCRIPTS) bindings/scripts/CodeGeneratorObjC.pm
-DOM%.h : %.idl $(DOM_BINDINGS_SCRIPTS) $(SUPPLEMENTAL_DEPENDENCY_FILE) bindings/objc/PublicDOMInterfaces.h
+DOM%.h : %.idl $(DOM_BINDINGS_SCRIPTS) bindings/objc/PublicDOMInterfaces.h
 	$(call generator_script, $(DOM_BINDINGS_SCRIPTS)) $(IDL_COMMON_ARGS) --defines "$(FEATURE_DEFINES) $(ADDITIONAL_IDL_DEFINES) LANGUAGE_OBJECTIVE_C" --generator ObjC --supplementalDependencyFile $(SUPPLEMENTAL_DEPENDENCY_FILE) $<
 
 -include $(OBJC_DOM_HEADERS:.h=.dep)

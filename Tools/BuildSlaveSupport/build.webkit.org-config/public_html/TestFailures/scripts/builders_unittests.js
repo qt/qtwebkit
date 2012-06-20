@@ -46,6 +46,15 @@ var kExampleBuilderStatusJSON =  {
         "slaves": ["vm124-m1"],
         "state": "building"
     },
+    "Webkit ASAN": {
+        "basedir": "Webkit_Linux",
+        "cachedBuilds": [11459, 11460, 11461, 11462],
+        "category": "6webkit linux latest",
+        "currentBuilds": [11461, 11462],
+        "pendingBuilds": 0,
+        "slaves": ["vm124-m1"],
+        "state": "building"
+    },
 };
 
 var kExampleBuildInfoJSON = {
@@ -582,6 +591,77 @@ var kExampleBuildInfoWithWebKitTestCrashJSON = {
     "times": [1318364210.066524, 1318366408.0732119]
 };
 
+var kExampleBuildInfoWithTaskKillWarning = {
+    "blame": ["asvitkine@chromium.org", "derat@chromium.org", "nirnimesh@chromium.org"],
+    "builderName": "Webkit Win (deps)(dbg)(2)",
+    "currentStep": null,
+    "eta": null,
+    "logs": [
+        ["stdio", "http://build.chromium.org/p/chromium.webkitbuilders/Webkit%20Win%20%28deps%29%28dbg%29%282%29/builds/7653/steps/svnkill/logs/stdio"],
+    ],
+    "number": 7653,
+    "properties": [
+        ["blamelist", ["asvitkine@chromium.org", "derat@chromium.org", "nirnimesh@chromium.org"], "Build"],
+        ["branch", "src", "Build"],
+        ["buildername", "Webkit Win (deps)(dbg)(2)", "Builder"],
+        ["buildnumber", 7653, "Build"],
+        ["got_revision", "104939", "Source"],
+        ["gtest_filter", null, "Factory"],
+        ["mastername", "chromium.webkit", "master.cfg"],
+        ["project", "", "Build"],
+        ["repository", "svn://svn-mirror.golo.chromium.org/chrome/trunk", "Build"],
+        ["revision", "104939", "Build"],
+        ["scheduler", "s1_chromium_dbg_dep", "Scheduler"],
+        ["slavename", "vm114-m1", "BuildSlave"]
+    ],
+    "reason": "downstream",
+    "results": 2,
+    "slave": "vm114-m1",
+    "sourceStamp": {
+        "branch": "src",
+        "changes": [{
+            "at": "Tue 11 Oct 2011 12:18:40",
+            "branch": "src",
+            "category": null,
+            "comments": "Disable prefs.PrefsTest.testGeolocationPref on win\n\nTBR=dennisjeffrey@chromium.org\nBUG=99865\nTEST=\n\nReview URL: http://codereview.chromium.org/8234007",
+            "files": [{
+                "name": "chrome/test/functional/PYAUTO_TESTS",
+                "url": null
+            }],
+            "number": 1397,
+            "project": "",
+            "properties": [],
+            "repository": "svn://svn-mirror.golo.chromium.org/chrome/trunk",
+            "rev": "104936",
+            "revision": "104936",
+            "revlink": "http://src.chromium.org/viewvc/chrome?view=rev&revision=104936",
+            "when": 1318360720,
+            "who": "nirnimesh@chromium.org"
+        }],
+        "hasPatch": false,
+        "project": "",
+        "repository": "svn://svn-mirror.golo.chromium.org/chrome/trunk",
+        "revision": "104939"
+    },
+    "steps": [{
+        "eta": null,
+        "expectations": [["output",1776,1534.0625014267862]],
+        "isFinished": true,
+        "isStarted": true,
+        "logs": [["stdio","http://build.chromium.org/p/chromium.webkitbuilders/Vista%20Perf/builds/10268/steps/taskkill/logs/stdio"]],
+        "name": "taskkill",
+        "results": [1,[]],
+        "statistics": {},
+        "step_number": 2,
+        "text": ["taskkill","warning"],
+        "times": [1339438214.177362,1339438222.555572],
+        "urls": {}
+    }],
+    "text": ["failed", "webkit_tests", "archive_webkit_tests_results", "webkit_gpu_tests", "archive_webkit_tests_gpu_results"],
+    "times": [1318364210.066524, 1318366408.0732119]
+};
+
+
 var kExamplePerfBuilderStatusJSON =  {
     "Webkit Linux": {
         "basedir": "Webkit_Linux",
@@ -866,6 +946,7 @@ var kExamplePerfBuildInfoJSON = {
 
 test("buildersFailing", 3, function() {
     var simulator = new NetworkSimulator();
+    builders.clearBuildInfoCache();
 
     var failingBuildInfoJSON = JSON.parse(JSON.stringify(kExampleBuildInfoJSON));
     failingBuildInfoJSON.number = 11460;
@@ -881,6 +962,8 @@ test("buildersFailing", 3, function() {
             else if (/Webkit%20Linux/.exec(url))
                 callback(kExampleBuildInfoJSON);
             else if (/Webkit%20Mac10\.6/.exec(url))
+                callback(failingBuildInfoJSON);
+            else if (/Webkit%20ASAN/.exec(url))
                 callback(failingBuildInfoJSON);
             else {
                 ok(false, "Unexpected URL: " + url);
@@ -912,6 +995,7 @@ test("buildersFailing", 3, function() {
 
 test("buildersFailing (run-webkit-tests crash)", 3, function() {
     var simulator = new NetworkSimulator();
+    builders.clearBuildInfoCache();
 
     var builderStatusJSON = JSON.parse(JSON.stringify(kExampleBuilderStatusJSON));
     delete builderStatusJSON['Webkit Mac10.6'];
@@ -941,7 +1025,6 @@ test("buildersFailing (run-webkit-tests crash)", 3, function() {
         builders.buildersFailingNonLayoutTests(function(builderNameList) {
             deepEqual(builderNameList, {
                 "Webkit Linux": [
-                    "extract_build",
                     "webkit_tests",
                     "archive_webkit_tests_results",
                     "webkit_gpu_tests",
@@ -957,8 +1040,50 @@ test("buildersFailing (run-webkit-tests crash)", 3, function() {
     ]);
 });
 
+test("buildersFailing (taskkill warning)", 3, function() {
+    var simulator = new NetworkSimulator();
+    builders.clearBuildInfoCache();
+
+    var builderStatusJSON = JSON.parse(JSON.stringify(kExampleBuilderStatusJSON));
+    delete builderStatusJSON['Webkit Mac10.6'];
+    builderStatusJSON['Webkit Linux'].cachedBuilds = [21460];
+    builderStatusJSON['Webkit Linux'].currentBuilds = [];
+
+    var failingBuildInfoJSON = JSON.parse(JSON.stringify(kExampleBuildInfoWithTaskKillWarning));
+    failingBuildInfoJSON.number = 21460;
+
+    var requestedURLs = [];
+    simulator.get = function(url, callback)
+    {
+        requestedURLs.push(url);
+        simulator.scheduleCallback(function() {
+            if (/\/json\/builders$/.exec(url))
+                callback(builderStatusJSON);
+            else if (/Webkit%20Linux/.exec(url))
+                callback(failingBuildInfoJSON);
+            else {
+                ok(false, "Unexpected URL: " + url);
+                callback();
+            }
+        });
+    };
+
+    simulator.runTest(function() {
+        builders.buildersFailingNonLayoutTests(function(builderNameList) {
+            deepEqual(builderNameList, {});
+        });
+    });
+
+    deepEqual(requestedURLs, [
+      "http://build.chromium.org/p/chromium.webkit/json/builders",
+      "http://build.chromium.org/p/chromium.webkit/json/builders/Webkit%20Linux/builds/21460",
+    ]);
+});
+
 test("builders.perfBuilders", 2, function() {
     var simulator = new NetworkSimulator();
+    builders.clearBuildInfoCache();
+
     var builderStatusJSON = JSON.parse(JSON.stringify(kExamplePerfBuilderStatusJSON));
     var failingBuildInfoJSON = JSON.parse(JSON.stringify(kExamplePerfBuildInfoJSON));
 

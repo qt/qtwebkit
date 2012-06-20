@@ -59,15 +59,16 @@ public:
     virtual void setSansSerifFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setCursiveFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
+    virtual void setPictographFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setDefaultFontSize(int) = 0;
     virtual void setDefaultFixedFontSize(int) = 0;
     virtual void setMinimumFontSize(int) = 0;
     virtual void setMinimumLogicalFontSize(int) = 0;
-    virtual void setDefaultDeviceScaleFactor(int) = 0;
     virtual void setApplyDefaultDeviceScaleFactorInCompositor(bool) = 0;
     virtual void setFontBoostingEnabled(bool) = 0;
     virtual void setDefaultTextEncodingName(const WebString&) = 0;
     virtual void setDeviceSupportsTouch(bool) = 0;
+    virtual void setDeviceSupportsMouse(bool) = 0;
     virtual void setJavaScriptEnabled(bool) = 0;
     virtual void setWebSecurityEnabled(bool) = 0;
     virtual void setJavaScriptCanOpenWindowsAutomatically(bool) = 0;
@@ -114,6 +115,7 @@ public:
     virtual void setEditingBehavior(EditingBehavior) = 0;
     virtual void setAcceleratedCompositingEnabled(bool) = 0;
     virtual void setForceCompositingMode(bool) = 0;
+    virtual void setForceSoftwareCompositing(bool) = 0;
     virtual void setMockScrollbarsEnabled(bool) = 0;
     virtual void setAcceleratedCompositingFor3DTransformsEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForVideoEnabled(bool) = 0;
@@ -145,9 +147,6 @@ public:
     virtual void setHixie76WebSocketProtocolEnabled(bool) = 0;
     virtual void setVisualWordMovementEnabled(bool) = 0;
     virtual void setAcceleratedPaintingEnabled(bool) = 0;
-    virtual void setPerTilePaintingEnabled(bool) = 0;
-    virtual void setPartialSwapEnabled(bool) = 0;
-    virtual void setThreadedAnimationEnabled(bool) = 0;
     virtual void setViewportEnabled(bool) = 0;
     virtual void setMediaPlaybackRequiresUserGesture(bool) = 0;
     virtual bool viewportEnabled() const = 0;
@@ -155,6 +154,11 @@ public:
     virtual void setMaxUntiledLayerSize(WebSize) = 0;
     virtual void setFixedPositionCreatesStackingContext(bool) = 0;
     virtual void setSyncXHRInDocumentsEnabled(bool) = 0;
+
+    virtual bool forceSoftwareCompositing() const = 0;
+
+    // DEPRECATED
+    virtual void setDefaultDeviceScaleFactor(int) { }
 
 protected:
     ~WebSettings() { }

@@ -182,7 +182,6 @@ PlatformContextSkia::PlatformContextSkia(SkCanvas* canvas)
     , m_trackOpaqueRegion(false)
     , m_printing(false)
     , m_accelerated(false)
-    , m_deferred(false)
     , m_drawingToImageBuffer(false)
 {
     m_stateStack.append(State());
@@ -372,6 +371,7 @@ void PlatformContextSkia::setupShader(SkPaint* paint, Gradient* grad, Pattern* p
     } else if (pat) {
         shader = pat->platformPattern(m_gc->getCTM());
         color = SK_ColorBLACK;
+        paint->setFilterBitmap(interpolationQuality() != InterpolationNone);
     }
 
     paint->setColor(m_state->applyAlpha(color));

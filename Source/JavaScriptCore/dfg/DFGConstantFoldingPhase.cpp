@@ -56,15 +56,44 @@ public:
                 continue;
             if (!block->cfaFoundConstants)
                 continue;
+#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+            dataLog("Constant folding considering Block #%u.\n", blockIndex);
+#endif
             state.beginBasicBlock(block);
             for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
                 if (!state.isValid())
                     break;
-                state.execute(indexInBlock);
                 NodeIndex nodeIndex = block->at(indexInBlock);
                 Node& node = m_graph[nodeIndex];
+                
+                bool eliminated = false;
+                    
+                switch (node.op()) {
+                case CheckArgumentsNotCreated: {
+                    if (!isEmptySpeculation(
+                            state.variables().operand(
+                                m_graph.argumentsRegisterFor(node.codeOrigin)).m_type))
+                        break;
+                    ASSERT(node.refCount() == 1);
+                    node.setOpAndDefaultFlags(Phantom);
+                    eliminated = true;
+                    break;
+                }
+                    
+                // FIXME: This would be a great place to remove CheckStructure's.
+                    
+                default:
+                    break;
+                }
+                
+                if (eliminated) {
+                    changed = true;
+                    continue;
+                }
+                
+                state.execute(indexInBlock);
                 if (!node.shouldGenerate()
-                    || m_graph.clobbersWorld(node)
+                    || state.didClobber()
                     || node.hasConstant())
                     continue;
                 JSValue value = state.forNode(nodeIndex).value();
@@ -74,11 +103,9 @@ public:
                 Node phantom(Phantom, node.codeOrigin);
                 
                 if (node.op() == GetLocal) {
-                    ASSERT(m_graph[node.child1()].op() == Phi);
-                    ASSERT(!m_graph[node.child1()].hasResult());
-                    
                     NodeIndex previousLocalAccess = NoNode;
-                    if (block->variablesAtHead.operand(node.local()) == nodeIndex) {
+                    if (block->variablesAtHead.operand(node.local()) == nodeIndex
+                        && m_graph[node.child1()].op() == Phi) {
                         // We expect this to be the common case.
                         ASSERT(block->isInPhis(node.child1().index()));
                         previousLocalAccess = node.child1().index();
@@ -86,7 +113,7 @@ public:
                     } else {
                         ASSERT(indexInBlock > 0);
                         // Must search for the previous access to this local.
-                        for (BlockIndex subIndexInBlock = indexInBlock - 1; subIndexInBlock--;) {
+                        for (BlockIndex subIndexInBlock = indexInBlock; subIndexInBlock--;) {
                             NodeIndex subNodeIndex = block->at(subIndexInBlock);
                             Node& subNode = m_graph[subNodeIndex];
                             if (!subNode.shouldGenerate())
@@ -97,13 +124,6 @@ public:
                                 continue;
                             // The two must have been unified.
                             ASSERT(subNode.variableAccessData() == node.variableAccessData());
-                            // Currently, the previous node must be a flush.
-                            // NOTE: This assertion should be removed if we ever do
-                            // constant folding on captured variables. In particular,
-                            // this code does not require the previous node to be a flush,
-                            // but we are asserting this anyway because it is a constraint
-                            // of the IR and this is as good a place as any to assert it.
-                            ASSERT(subNode.op() == Flush);
                             previousLocalAccess = subNodeIndex;
                             break;
                         }

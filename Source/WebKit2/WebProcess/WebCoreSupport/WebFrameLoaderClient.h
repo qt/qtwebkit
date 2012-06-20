@@ -194,6 +194,12 @@ private:
     
     virtual PassRefPtr<WebCore::Widget> createJavaAppletWidget(const WebCore::IntSize&, WebCore::HTMLAppletElement*, const WebCore::KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) OVERRIDE;
     
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    virtual PassRefPtr<WebCore::Widget> createMediaPlayerProxyPlugin(const WebCore::IntSize&, WebCore::HTMLMediaElement*, const WebCore::KURL&, const Vector<String>&, const Vector<String>&, const String&) OVERRIDE;
+    virtual void hideMediaPlayerProxyPlugin(WebCore::Widget*) OVERRIDE;
+    virtual void showMediaPlayerProxyPlugin(WebCore::Widget*) OVERRIDE;
+#endif
+
     virtual WebCore::ObjectContentType objectContentType(const WebCore::KURL&, const String& mimeType, bool shouldPreferPlugInsForImages) OVERRIDE;
     virtual String overrideMediaType() const OVERRIDE;
 
@@ -224,6 +230,9 @@ private:
 
 #if ENABLE(WEB_INTENTS)
     virtual void dispatchIntent(PassRefPtr<WebCore::IntentRequest>) OVERRIDE;
+#endif
+#if ENABLE(WEB_INTENTS_TAG)
+    virtual void registerIntentService(const String& action, const String& type, const WebCore::KURL& href, const String& title, const String& disposition) OVERRIDE;
 #endif
 
     virtual bool shouldUsePluginDocument(const String& /*mimeType*/) const OVERRIDE;

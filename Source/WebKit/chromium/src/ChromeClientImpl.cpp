@@ -521,7 +521,6 @@ void ChromeClientImpl::invalidateContentsAndRootView(const IntRect& updateRect, 
 
 void ChromeClientImpl::invalidateContentsForSlowScroll(const IntRect& updateRect, bool immediate)
 {
-    m_webView->hidePopups();
     invalidateContentsAndRootView(updateRect, immediate);
 }
 
@@ -536,7 +535,6 @@ void ChromeClientImpl::scroll(
     const IntSize& scrollDelta, const IntRect& scrollRect,
     const IntRect& clipRect)
 {
-    m_webView->hidePopups();
 #if USE(ACCELERATED_COMPOSITING)
     if (!m_webView->isAcceleratedCompositingActive()) {
 #endif
@@ -636,12 +634,10 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
     if (!m_webView->settings()->viewportEnabled() || !m_webView->isFixedLayoutModeEnabled() || !m_webView->client() || !m_webView->page())
         return;
 
-    bool useDefaultDeviceScaleFactor = false;
     ViewportArguments args;
     if (arguments == args) {
         // Default viewport arguments passed in. This is a signal to reset the viewport.
         args.width = ViewportArguments::ValueDesktopWidth;
-        useDefaultDeviceScaleFactor = true;
     } else
         args = arguments;
 
@@ -666,10 +662,7 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
     m_webView->setFixedLayoutSize(IntSize(layoutWidth, layoutHeight));
 
     bool needInitializePageScale = !m_webView->isPageScaleFactorSet();
-    if (useDefaultDeviceScaleFactor && settings->defaultDeviceScaleFactor())
-        m_webView->setDeviceScaleFactor(settings->defaultDeviceScaleFactor());
-    else
-        m_webView->setDeviceScaleFactor(computed.devicePixelRatio);
+    m_webView->setDeviceScaleFactor(computed.devicePixelRatio);
     m_webView->setPageScaleFactorLimits(computed.minimumScale, computed.maximumScale);
     if (needInitializePageScale)
         m_webView->setPageScaleFactorPreservingScrollOffset(computed.initialScale * computed.devicePixelRatio);
@@ -725,8 +718,7 @@ void ChromeClientImpl::runOpenPanel(Frame* frame, PassRefPtr<FileChooser> fileCh
 #else
     params.directory = false;
 #endif
-    params.acceptTypes = fileChooser->settings().acceptMIMETypes;
-    params.acceptMIMETypes = fileChooser->settings().acceptMIMETypes; // FIXME: Remove this once https://chromiumcodereview.appspot.com/10414085 lands.
+    params.acceptTypes = fileChooser->settings().acceptTypes();
     params.selectedFiles = fileChooser->settings().selectedFiles;
     if (params.selectedFiles.size() > 0)
         params.initialValue = params.selectedFiles[0];

@@ -48,6 +48,7 @@
 
 class LayoutTestController;
 class MockWebSpeechInputController;
+class MockWebSpeechRecognizer;
 class SkCanvas;
 class TestShell;
 
@@ -117,6 +118,10 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     MockWebSpeechInputController* speechInputControllerMock() { return m_speechInputControllerMock.get(); }
 #endif
 
+#if ENABLE(SCRIPTED_SPEECH)
+    MockWebSpeechRecognizer* mockSpeechRecognizer() { return m_mockSpeechRecognizer.get(); }
+#endif
+
 #if ENABLE(POINTER_LOCK)
     void didLosePointerLock();
     void setPointerLockWillFailAsynchronously() { m_pointerLockPlannedResult = PointerLockWillFailAsync; }
@@ -131,6 +136,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
 
     // WebKit::WebSpellCheckClient
     virtual void spellCheck(const WebKit::WebString&, int& offset, int& length, WebKit::WebVector<WebKit::WebString>* optionalSuggestions);
+    virtual void checkTextOfParagraph(const WebKit::WebString&, WebKit::WebTextCheckingTypeMask, WebKit::WebVector<WebKit::WebTextCheckingResult>*);
     virtual void requestCheckingOfText(const WebKit::WebString&, WebKit::WebTextCheckingCompletion*);
     virtual WebKit::WebString autoCorrectWord(const WebKit::WebString&);
 
@@ -176,7 +182,10 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
 #if ENABLE(INPUT_SPEECH)
     virtual WebKit::WebSpeechInputController* speechInputController(WebKit::WebSpeechInputListener*);
 #endif
-    virtual WebKit::WebDeviceOrientationClient* deviceOrientationClient();
+#if ENABLE(SCRIPTED_SPEECH)
+    virtual WebKit::WebSpeechRecognizer* speechRecognizer() OVERRIDE;
+#endif
+    virtual WebKit::WebDeviceOrientationClient* deviceOrientationClient() OVERRIDE;
 #if ENABLE(MEDIA_STREAM)
     virtual WebKit::WebUserMediaClient* userMediaClient();
 #endif
@@ -410,6 +419,10 @@ private:
     OwnPtr<WebKit::WebDeviceOrientationClientMock> m_deviceOrientationClientMock;
 #if ENABLE(INPUT_SPEECH)
     OwnPtr<MockWebSpeechInputController> m_speechInputControllerMock;
+#endif
+
+#if ENABLE(SCRIPTED_SPEECH)
+    OwnPtr<MockWebSpeechRecognizer> m_mockSpeechRecognizer;
 #endif
 
 #if ENABLE(MEDIA_STREAM)

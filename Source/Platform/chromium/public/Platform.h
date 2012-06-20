@@ -38,6 +38,7 @@
 #include "WebGraphicsContext3D.h"
 #include "WebLocalizedString.h"
 #include "WebString.h"
+#include "WebVector.h"
 
 namespace WebKit {
 
@@ -49,6 +50,7 @@ class WebFileSystem;
 class WebFileUtilities;
 class WebMediaStreamCenter;
 class WebMediaStreamCenterClient;
+class WebMessagePortChannel;
 class WebMimeRegistry;
 class WebPeerConnection00Handler;
 class WebPeerConnection00HandlerClient;
@@ -58,6 +60,7 @@ class WebURL;
 class WebURLLoader;
 class WebSandboxSupport;
 class WebSocketStreamHandle;
+class WebStorageNamespace;
 class WebThemeEngine;
 class WebThread;
 class WebWorkerRunLoop;
@@ -99,6 +102,12 @@ public:
 
     // Must return non-null.
     virtual WebBlobRegistry* blobRegistry() { return 0; }
+
+
+    // DOM Storage --------------------------------------------------
+
+    // Return a LocalStorage namespace that corresponds to the following path.
+    virtual WebStorageNamespace* createLocalStorageNamespace(const WebString& path, unsigned quota) { return 0; }
 
 
     // FileSystem ----------------------------------------------------------
@@ -157,6 +166,14 @@ public:
     // memory currently allocated to this process that cannot be shared. Returns
     // false on platform specific error conditions.
     virtual bool processMemorySizesInBytes(size_t* privateBytes, size_t* sharedBytes) { return false; }
+
+
+    // Message Ports -------------------------------------------------------
+
+    // Creates a Message Port Channel. This can be called on any thread.
+    // The returned object should only be used on the thread it was created on.
+    virtual WebMessagePortChannel* createMessagePortChannel() { return 0; }
+
 
     // Network -------------------------------------------------------------
 
@@ -221,6 +238,12 @@ public:
     // It's OK for this value to be conservitive (i.e. true even if the
     // sandbox isn't active).
     virtual bool sandboxEnabled() { return false; }
+
+
+    // Screen -------------------------------------------------------------
+
+    // Supplies the system monitor color profile ("monitor") or a named ICC profile.
+    virtual void screenColorProfile(const WebString& type, WebVector<char>* profile) { }
 
 
     // Sudden Termination --------------------------------------------------
@@ -347,7 +370,7 @@ public:
     // This value must be checked again after a context loss event as the platform's capabilities may have changed.
     virtual bool canAccelerate2dCanvas() { return false; }
 
-    
+
     // WebRTC ----------------------------------------------------------
 
     // DEPRECATED

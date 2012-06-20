@@ -170,9 +170,17 @@ public:
                     break;
                 }
                     
+                case TearOffArguments: {
+                    // Ignore arguments tear off, because it's only relevant if we actually
+                    // need to create the arguments.
+                    break;
+                }
+                    
                 case SetLocal: {
                     Node& source = m_graph[node.child1()];
                     VariableAccessData* variableAccessData = node.variableAccessData();
+                    int argumentsRegister =
+                        m_graph.uncheckedArgumentsRegisterFor(node.codeOrigin);
                     if (source.op() != CreateArguments) {
                         // Make sure that the source of the SetLocal knows that if it's
                         // a variable that we think is aliased to the arguments, then it
@@ -180,8 +188,28 @@ public:
                         // aliasing. But not yet.
                         observeBadArgumentsUse(node.child1());
                         
-                        if (variableAccessData->isCaptured())
+                        if (variableAccessData->isCaptured()) {
+                            // If this is an assignment to the arguments register, then
+                            // pretend as if the arguments were created. We don't want to
+                            // optimize code that explicitly assigns to the arguments,
+                            // because that seems too ugly.
+                            
+                            // But, before getting rid of CreateArguments, we will have
+                            // an assignment to the arguments registers with JSValue().
+                            // That's because CSE will refuse to get rid of the
+                            // init_lazy_reg since it treats CreateArguments as reading
+                            // local variables. That could be fixed, but it's easier to
+                            // work around this here.
+                            if (source.op() == JSConstant
+                                && !source.valueOfJSConstant(codeBlock()))
+                                break;
+                            
+                            if (argumentsRegister != InvalidVirtualRegister
+                                && (variableAccessData->local() == argumentsRegister
+                                    || variableAccessData->local() == unmodifiedArgumentsRegister(argumentsRegister)))
+                                m_createsArguments.add(node.codeOrigin.inlineCallFrame);
                             break;
+                        }
                         
                         // Make sure that if it's a variable that we think is aliased to
                         // the arguments, that we know that it might actually not be.
@@ -191,11 +219,9 @@ public:
                         data.mergeCallContext(node.codeOrigin.inlineCallFrame);
                         break;
                     }
-                    int argumentsRegister =
-                        m_graph.uncheckedArgumentsRegisterFor(node.codeOrigin);
-                    if (variableAccessData->local() == argumentsRegister
-                        || variableAccessData->local() ==
-                            unmodifiedArgumentsRegister(argumentsRegister)) {
+                    if (argumentsRegister != InvalidVirtualRegister
+                        && (variableAccessData->local() == argumentsRegister
+                            || variableAccessData->local() == unmodifiedArgumentsRegister(argumentsRegister))) {
                         if (node.codeOrigin.inlineCallFrame == source.codeOrigin.inlineCallFrame)
                             break;
                         m_createsArguments.add(source.codeOrigin.inlineCallFrame);
@@ -258,7 +284,7 @@ public:
                         break;
                     }
                     
-                    if (!isActionableArrayPrediction(m_graph[node.child1()].prediction())
+                    if (!isActionableArraySpeculation(m_graph[node.child1()].prediction())
                         || !m_graph[node.child2()].shouldSpeculateInteger()) {
                         observeBadArgumentsUses(node);
                         break;
@@ -398,10 +424,25 @@ public:
                     if (source.op() != CreateArguments)
                         break;
                     
+                    if (m_createsArguments.contains(source.codeOrigin.inlineCallFrame))
+                        break;
+                    
                     VariableAccessData* variableAccessData = node.variableAccessData();
                     
-                    if (variableAccessData->isCaptured())
+                    if (variableAccessData->isCaptured()) {
+                        ASSERT(m_graph.argumentsRegisterFor(node.codeOrigin) == variableAccessData->local()
+                               || unmodifiedArgumentsRegister(m_graph.argumentsRegisterFor(node.codeOrigin)) == variableAccessData->local());
+                        // The child of this store should really be the empty value.
+                        Node emptyJSValue(JSConstant, node.codeOrigin, OpInfo(codeBlock()->addOrFindConstant(JSValue())));
+                        emptyJSValue.ref();
+                        NodeIndex emptyJSValueIndex = m_graph.size();
+                        m_graph.deref(node.child1());
+                        node.children.child1() = Edge(emptyJSValueIndex);
+                        m_graph.append(emptyJSValue);
+                        insertionSet.append(indexInBlock, emptyJSValueIndex);
+                        changed = true;
                         break;
+                    }
                     
                     // If this is a store into a VariableAccessData* that is marked as
                     // arguments aliasing for an InlineCallFrame* that does not create
@@ -410,11 +451,8 @@ public:
                     // things. Note also that the SetLocal should become dead as soon as
                     // we replace all uses of this variable with GetMyArgumentsLength and
                     // GetMyArgumentByVal.
-                    if (m_argumentsAliasing.find(variableAccessData)->second.isValid()
-                        && !m_createsArguments.contains(source.codeOrigin.inlineCallFrame)) {
-                        changed |= variableAccessData->mergeIsArgumentsAlias(true);
-                        break;
-                    }
+                    ASSERT(m_argumentsAliasing.find(variableAccessData)->second.isValid());
+                    changed |= variableAccessData->mergeIsArgumentsAlias(true);
                     break;
                 }
                     
@@ -439,7 +477,7 @@ public:
                         || !m_graph[node.child2()].prediction())
                         break;
                     
-                    if (!isActionableArrayPrediction(m_graph[node.child1()].prediction())
+                    if (!isActionableArraySpeculation(m_graph[node.child1()].prediction())
                         || !m_graph[node.child2()].shouldSpeculateInteger())
                         break;
                     
@@ -487,19 +525,21 @@ public:
                         node.setOp(GetMyArgumentsLength);
                         changed = true;
                     }
-                    if (!node.codeOrigin.inlineCallFrame)
+                    
+                    CodeOrigin codeOrigin = node.codeOrigin;
+                    if (!codeOrigin.inlineCallFrame)
                         break;
                     
                     // We know exactly what this will return. But only after we have checked
                     // that nobody has escaped our arguments.
-                    Node check(CheckArgumentsNotCreated, node.codeOrigin);
+                    Node check(CheckArgumentsNotCreated, codeOrigin);
                     check.ref();
                     NodeIndex checkIndex = m_graph.size();
                     m_graph.append(check);
                     insertionSet.append(indexInBlock, checkIndex);
                     
                     m_graph.convertToConstant(
-                        nodeIndex, jsNumber(node.codeOrigin.inlineCallFrame->arguments.size() - 1));
+                        nodeIndex, jsNumber(codeOrigin.inlineCallFrame->arguments.size() - 1));
                     changed = true;
                     break;
                 }
@@ -559,6 +599,16 @@ public:
                     break;
                 }
                     
+                case TearOffArguments: {
+                    if (m_createsArguments.contains(node.codeOrigin.inlineCallFrame))
+                        continue;
+                    
+                    node.setOpAndDefaultFlags(Nop);
+                    m_graph.clearAndDerefChild1(node);
+                    node.setRefCount(0);
+                    break;
+                }
+                    
                 default:
                     break;
                 }
@@ -573,8 +623,6 @@ public:
             for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
                 NodeIndex nodeIndex = block->at(indexInBlock);
                 Node& node = m_graph[nodeIndex];
-                if (!node.shouldGenerate())
-                    continue;
                 if (node.op() != CreateArguments)
                     continue;
                 // If this is a CreateArguments for an InlineCallFrame* that does
@@ -583,14 +631,16 @@ public:
                 // empty value) in DFG and arguments creation for OSR exit.
                 if (m_createsArguments.contains(node.codeOrigin.inlineCallFrame))
                     continue;
-                Node phantom(Phantom, node.codeOrigin);
-                phantom.children = node.children;
-                phantom.ref();
+                if (node.shouldGenerate()) {
+                    Node phantom(Phantom, node.codeOrigin);
+                    phantom.children = node.children;
+                    phantom.ref();
+                    NodeIndex phantomNodeIndex = m_graph.size();
+                    m_graph.append(phantom);
+                    insertionSet.append(indexInBlock, phantomNodeIndex);
+                }
                 node.setOpAndDefaultFlags(PhantomArguments);
                 node.children.reset();
-                NodeIndex phantomNodeIndex = m_graph.size();
-                m_graph.append(phantom);
-                insertionSet.append(indexInBlock, phantomNodeIndex);
             }
             insertionSet.execute(*block);
         }
@@ -622,7 +672,10 @@ private:
         }
             
         case GetLocal: {
-            if (child.local() == m_graph.uncheckedArgumentsRegisterFor(child.codeOrigin)) {
+            int argumentsRegister = m_graph.uncheckedArgumentsRegisterFor(child.codeOrigin);
+            if (argumentsRegister != InvalidVirtualRegister
+                && (child.local() == argumentsRegister
+                    || child.local() == unmodifiedArgumentsRegister(argumentsRegister))) {
                 m_createsArguments.add(child.codeOrigin.inlineCallFrame);
                 break;
             }
@@ -684,25 +737,31 @@ private:
     
     bool isOKToOptimize(Node& source)
     {
+        if (m_createsArguments.contains(source.codeOrigin.inlineCallFrame))
+            return false;
+        
         switch (source.op()) {
         case GetLocal: {
             VariableAccessData* variableAccessData = source.variableAccessData();
-            if (variableAccessData->isCaptured())
+            if (variableAccessData->isCaptured()) {
+                int argumentsRegister = m_graph.uncheckedArgumentsRegisterFor(source.codeOrigin);
+                if (argumentsRegister == InvalidVirtualRegister)
+                    break;
+                if (argumentsRegister == variableAccessData->local())
+                    return true;
+                if (unmodifiedArgumentsRegister(argumentsRegister) == variableAccessData->local())
+                    return true;
                 break;
+            }
             ArgumentsAliasingData& data =
                 m_argumentsAliasing.find(variableAccessData)->second;
             if (!data.isValid())
-                break;
-            if (m_createsArguments.contains(source.codeOrigin.inlineCallFrame))
                 break;
                             
             return true;
         }
                             
         case CreateArguments: {
-            if (m_createsArguments.contains(source.codeOrigin.inlineCallFrame))
-                break;
-                            
             return true;
         }
                             

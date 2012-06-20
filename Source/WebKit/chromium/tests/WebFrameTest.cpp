@@ -36,6 +36,7 @@
 #include "FrameTestHelpers.h"
 #include "FrameView.h"
 #include "ResourceError.h"
+#include "WebDataSource.h"
 #include "WebDocument.h"
 #include "WebFindOptions.h"
 #include "WebFormElement.h"
@@ -225,13 +226,12 @@ TEST_F(WebFrameTest, DeviceScaleFactorUsesDefaultWithoutViewportTag)
     int viewportHeight = 480;
 
     FixedLayoutTestWebViewClient client;
-    client.m_screenInfo.horizontalDPI = 160;
+    client.m_screenInfo.horizontalDPI = 320;
     client.m_windowRect = WebRect(0, 0, viewportWidth, viewportHeight);
 
     WebView* webView = static_cast<WebView*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "no_viewport_tag.html", true, 0, &client));
 
     webView->settings()->setViewportEnabled(true);
-    webView->settings()->setDefaultDeviceScaleFactor(2);
     webView->enableFixedLayoutMode(true);
     webView->resize(WebSize(viewportWidth, viewportHeight));
     webView->layout();
@@ -395,6 +395,28 @@ TEST_F(WebFrameTest, ReloadDoesntSetRedirect)
     // start reload before request is delivered.
     webView->mainFrame()->reload(true);
     webkit_support::ServeAsynchronousMockedRequests();
+}
+
+TEST_F(WebFrameTest, IframeRedirect)
+{
+    registerMockedHttpURLLoad("iframe_redirect.html");
+    registerMockedHttpURLLoad("visible_iframe.html");
+
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "iframe_redirect.html", true);
+    webkit_support::RunAllPendingMessages(); // Queue the iframe.
+    webkit_support::ServeAsynchronousMockedRequests(); // Load the iframe.
+
+    WebFrame* iframe = webView->findFrameByName(WebString::fromUTF8("ifr"));
+    ASSERT_TRUE(iframe);
+    WebDataSource* iframeDataSource = iframe->dataSource();
+    ASSERT_TRUE(iframeDataSource);
+    WebVector<WebURL> redirects;
+    iframeDataSource->redirectChain(redirects);
+    ASSERT_EQ(2U, redirects.size());
+    EXPECT_EQ(GURL("about:blank"), GURL(redirects[0]));
+    EXPECT_EQ(GURL("http://www.test.com/visible_iframe.html"), GURL(redirects[1]));
+
+    webView->close();
 }
 
 TEST_F(WebFrameTest, ClearFocusedNodeTest)

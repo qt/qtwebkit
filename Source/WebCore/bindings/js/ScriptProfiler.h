@@ -56,7 +56,7 @@ public:
 
     static void collectGarbage();
     static ScriptObject objectByHeapObjectId(unsigned id);
-    static unsigned getHeapObjectId(ScriptValue);
+    static unsigned getHeapObjectId(const ScriptValue&);
     static void start(ScriptState* state, const String& title);
     static void startForPage(Page*, const String& title);
 #if ENABLE(WORKERS)
@@ -74,6 +74,7 @@ public:
     // FIXME: Implement this counter for JSC. See bug 73936 for more details.
     static void visitJSDOMWrappers(DOMWrapperVisitor*) { }
     static void visitExternalJSStrings(DOMWrapperVisitor*) { }
+    static size_t profilerSnapshotsSize() { return 0; }
 };
 
 } // namespace WebCore

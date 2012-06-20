@@ -111,7 +111,9 @@ namespace JSC {
             // The resolved binding is immutable.
             ReadOnlyFlag = 0x20,
             // The base object is the global object.
-            GlobalFlag = 0x40
+            GlobalFlag = 0x40,
+            // The property is being watched, so writes should be special.
+            WatchedFlag = 0x80
         };
         enum Type {
             // The property is local, and stored in a register.
@@ -131,6 +133,8 @@ namespace JSC {
             // binding created with "var" at the top level. At runtime we'll
             // just index into the global object.
             IndexedGlobal = IndexedFlag | GlobalFlag | StaticFlag,
+            // Like IndexedGlobal, but the property is being watched.
+            WatchedIndexedGlobal = IndexedFlag | GlobalFlag | StaticFlag | WatchedFlag,
             // Like IndexedGlobal, but the property is also read-only, like NaN,
             // Infinity, or undefined.
             ReadOnlyIndexedGlobal = IndexedFlag | ReadOnlyFlag | GlobalFlag | StaticFlag,
@@ -197,6 +201,7 @@ namespace JSC {
         int index() const { ASSERT (isIndexed() || isRegister()); return m_index; }
         size_t depth() const { ASSERT(isScoped()); return m_depth; }
         JSObject* globalObject() const { ASSERT(isGlobal()); ASSERT(m_globalObject); return m_globalObject; }
+        WriteBarrier<Unknown>* registerPointer() const;
 
         bool isRegister() const { return m_type & RegisterFlag; }
         bool isDynamic() const { return m_type & DynamicFlag; }
@@ -440,8 +445,8 @@ namespace JSC {
         RegisterID* emitTypeOf(RegisterID* dst, RegisterID* src) { return emitUnaryOp(op_typeof, dst, src); }
         RegisterID* emitIn(RegisterID* dst, RegisterID* property, RegisterID* base) { return emitBinaryOp(op_in, dst, property, base, OperandTypes()); }
 
-        RegisterID* emitGetStaticVar(RegisterID* dst, const ResolveResult&);
-        RegisterID* emitPutStaticVar(const ResolveResult&, RegisterID* value);
+        RegisterID* emitGetStaticVar(RegisterID* dst, const ResolveResult&, const Identifier&);
+        RegisterID* emitPutStaticVar(const ResolveResult&, const Identifier&, RegisterID* value);
 
         RegisterID* emitResolve(RegisterID* dst, const ResolveResult&, const Identifier& property);
         RegisterID* emitResolveBase(RegisterID* dst, const ResolveResult&, const Identifier& property);
@@ -541,6 +546,7 @@ namespace JSC {
         ValueProfile* emitProfiledOpcode(OpcodeID);
         void retrieveLastBinaryOp(int& dstIndex, int& src1Index, int& src2Index);
         void retrieveLastUnaryOp(int& dstIndex, int& srcIndex);
+        void retrieveLastUnaryOp(WriteBarrier<Unknown>*& dstPointer, int& srcIndex);
         ALWAYS_INLINE void rewindBinaryOp();
         ALWAYS_INLINE void rewindUnaryOp();
 
@@ -572,7 +578,9 @@ namespace JSC {
         }
 
         // Returns the index of the added var.
-        int addGlobalVar(const Identifier&, bool isConstant);
+        enum ConstantMode { IsConstant, IsVariable };
+        enum FunctionMode { IsFunctionToSpecialize, NotFunctionOrNotSpecializable };
+        int addGlobalVar(const Identifier&, ConstantMode, FunctionMode);
 
         void addParameter(const Identifier&, int parameterIndex);
         
@@ -608,10 +616,7 @@ namespace JSC {
 
         void addLineInfo(unsigned lineNo)
         {
-#if !ENABLE(OPCODE_SAMPLING)
-            if (m_shouldEmitRichSourceInfo)
-#endif
-                m_codeBlock->addLineInfo(instructions().size(), lineNo);
+            m_codeBlock->addLineInfo(instructions().size(), lineNo);
         }
 
         RegisterID* emitInitLazyRegister(RegisterID*);

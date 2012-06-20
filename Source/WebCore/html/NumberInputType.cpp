@@ -50,23 +50,48 @@ namespace WebCore {
 using namespace HTMLNames;
 using namespace std;
 
-static const double numberDefaultStep = 1.0;
-static const double numberDefaultStepBase = 0.0;
-static const double numberStepScaleFactor = 1.0;
+static const int numberDefaultStep = 1;
+static const int numberDefaultStepBase = 0;
+static const int numberStepScaleFactor = 1;
 
-static unsigned lengthBeforeDecimalPoint(double value)
+struct RealNumberRenderSize
 {
-    // If value is negative, '-' should be counted.
+    unsigned sizeBeforeDecimalPoint;
+    unsigned sizeAfteDecimalPoint;
 
-    double absoluteValue = fabs(value);
-    if (absoluteValue < 1)
-        return value < 0 ? 2 : 1;
+    RealNumberRenderSize(unsigned before, unsigned after)
+        : sizeBeforeDecimalPoint(before)
+        , sizeAfteDecimalPoint(after)
+    {
+    }
 
-    unsigned length = static_cast<unsigned>(log10(floor(absoluteValue))) + 1;
-    if (value < 0)
-        length += 1;
+    RealNumberRenderSize max(const RealNumberRenderSize& other) const
+    {
+        return RealNumberRenderSize(
+            std::max(sizeBeforeDecimalPoint, other.sizeBeforeDecimalPoint),
+            std::max(sizeAfteDecimalPoint, other.sizeAfteDecimalPoint));
+    }
+};
 
-    return length;
+static RealNumberRenderSize calculateRenderSize(const Decimal& value)
+{
+    ASSERT(value.isFinite());
+    const unsigned sizeOfDigits = String::number(value.value().coefficient()).length();
+    const unsigned sizeOfSign = value.isNegative() ? 1 : 0;
+    const int exponent = value.exponent();
+    if (exponent >= 0)
+        return RealNumberRenderSize(sizeOfSign + sizeOfDigits, 0);
+
+    const int sizeBeforeDecimalPoint = exponent + sizeOfDigits;
+    if (sizeBeforeDecimalPoint > 0) {
+        // In case of "123.456"
+        return RealNumberRenderSize(sizeOfSign + sizeBeforeDecimalPoint, sizeOfDigits - sizeBeforeDecimalPoint);
+    }
+
+    // In case of "0.00012345"
+    const unsigned sizeOfZero = 1;
+    const unsigned numberOfZeroAfterDecimalPoint = -sizeBeforeDecimalPoint;
+    return RealNumberRenderSize(sizeOfSign + sizeOfZero , numberOfZeroAfterDecimalPoint + sizeOfDigits);
 }
 
 PassOwnPtr<InputType> NumberInputType::create(HTMLInputElement* element)
@@ -79,22 +104,39 @@ const AtomicString& NumberInputType::formControlType() const
     return InputTypeNames::number();
 }
 
-double NumberInputType::valueAsNumber() const
+double NumberInputType::valueAsDouble() const
 {
-    return parseToDouble(element()->value(), numeric_limits<double>::quiet_NaN());
+    return parseToDoubleForNumberType(element()->value());
 }
 
-void NumberInputType::setValueAsNumber(double newValue, TextFieldEventBehavior eventBehavior, ExceptionCode& ec) const
+void NumberInputType::setValueAsDouble(double newValue, TextFieldEventBehavior eventBehavior, ExceptionCode& ec) const
 {
-    if (newValue < -numeric_limits<float>::max()) {
+    // FIXME: We should use numeric_limits<double>::max for number input type.
+    const double floatMax = numeric_limits<float>::max();
+    if (newValue < -floatMax) {
         ec = INVALID_STATE_ERR;
         return;
     }
-    if (newValue > numeric_limits<float>::max()) {
+    if (newValue > floatMax) {
         ec = INVALID_STATE_ERR;
         return;
     }
-    element()->setValue(serialize(newValue), eventBehavior);
+    element()->setValue(serializeForNumberType(newValue), eventBehavior);
+}
+
+void NumberInputType::setValueAsDecimal(const Decimal& newValue, TextFieldEventBehavior eventBehavior, ExceptionCode& ec) const
+{
+    // FIXME: We should use numeric_limits<double>::max for number input type.
+    const Decimal floatMax = Decimal::fromDouble(numeric_limits<float>::max());
+    if (newValue < -floatMax) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+    if (newValue > floatMax) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+    element()->setValue(serializeForNumberType(newValue), eventBehavior);
 }
 
 bool NumberInputType::typeMismatchFor(const String& value) const
@@ -111,14 +153,12 @@ bool NumberInputType::typeMismatch() const
 StepRange NumberInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
     DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (numberDefaultStep, numberDefaultStepBase, numberStepScaleFactor));
-
-    unsigned stepBaseDecimalPlaces;
-    double stepBaseValue = parseToDoubleWithDecimalPlaces(element()->fastGetAttribute(minAttr), numberDefaultStepBase, &stepBaseDecimalPlaces);
-    StepRange::DoubleWithDecimalPlaces stepBase(stepBaseValue, min(stepBaseDecimalPlaces, 16u));
-    double minimum = parseToDouble(element()->fastGetAttribute(minAttr), -numeric_limits<float>::max());
-    double maximum = parseToDouble(element()->fastGetAttribute(maxAttr), numeric_limits<float>::max());
-
-    StepRange::DoubleWithDecimalPlacesOrMissing step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    const Decimal stepBase = parseToDecimalForNumberType(element()->fastGetAttribute(minAttr), numberDefaultStepBase);
+    // FIXME: We should use numeric_limits<double>::max for number input type.
+    const Decimal floatMax = Decimal::fromDouble(numeric_limits<float>::max());
+    const Decimal minimum = parseToNumber(element()->fastGetAttribute(minAttr), -floatMax);
+    const Decimal maximum = parseToNumber(element()->fastGetAttribute(maxAttr), floatMax);
+    const Decimal step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
     return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 
@@ -126,46 +166,25 @@ bool NumberInputType::sizeShouldIncludeDecoration(int defaultSize, int& preferre
 {
     preferredSize = defaultSize;
 
-    unsigned minValueDecimalPlaces;
-    String minValue = element()->fastGetAttribute(minAttr);
-    double minValueDouble = parseToDoubleForNumberTypeWithDecimalPlaces(minValue, &minValueDecimalPlaces);
-    if (!isfinite(minValueDouble))
+    const String stepString = element()->fastGetAttribute(stepAttr);
+    if (equalIgnoringCase(stepString, "any"))
         return false;
 
-    unsigned maxValueDecimalPlaces;
-    String maxValue = element()->fastGetAttribute(maxAttr);
-    double maxValueDouble = parseToDoubleForNumberTypeWithDecimalPlaces(maxValue, &maxValueDecimalPlaces);
-    if (!isfinite(maxValueDouble))
+    const Decimal minimum = parseToDecimalForNumberType(element()->fastGetAttribute(minAttr));
+    if (!minimum.isFinite())
         return false;
 
-    if (maxValueDouble < minValueDouble) {
-        maxValueDouble = minValueDouble;
-        maxValueDecimalPlaces = minValueDecimalPlaces;
-    }
-
-    String stepValue = element()->fastGetAttribute(stepAttr);
-    if (equalIgnoringCase(stepValue, "any"))
+    const Decimal maximum = parseToDecimalForNumberType(element()->fastGetAttribute(maxAttr));
+    if (!maximum.isFinite())
         return false;
-    unsigned stepValueDecimalPlaces;
-    double stepValueDouble = parseToDoubleForNumberTypeWithDecimalPlaces(stepValue, &stepValueDecimalPlaces);
-    if (!isfinite(stepValueDouble)) {
-        stepValueDouble = 1;
-        stepValueDecimalPlaces = 0;
-    }
 
-    unsigned length = lengthBeforeDecimalPoint(minValueDouble);
-    length = max(length, lengthBeforeDecimalPoint(maxValueDouble));
-    length = max(length, lengthBeforeDecimalPoint(stepValueDouble));
+    const Decimal step = parseToDecimalForNumberType(stepString, 1);
+    ASSERT(step.isFinite());
 
-    unsigned lengthAfterDecimalPoint = minValueDecimalPlaces;
-    lengthAfterDecimalPoint = max(lengthAfterDecimalPoint, maxValueDecimalPlaces);
-    lengthAfterDecimalPoint = max(lengthAfterDecimalPoint, stepValueDecimalPlaces);
+    RealNumberRenderSize size = calculateRenderSize(minimum).max(calculateRenderSize(maximum).max(calculateRenderSize(step)));
 
-    // '.' should be counted if the value has decimal places.
-    if (lengthAfterDecimalPoint > 0)
-        length += lengthAfterDecimalPoint + 1;
+    preferredSize = size.sizeBeforeDecimalPoint + size.sizeAfteDecimalPoint + (size.sizeAfteDecimalPoint ? 1 : 0);
 
-    preferredSize = length;
     return true;
 }
 
@@ -186,19 +205,14 @@ void NumberInputType::handleWheelEvent(WheelEvent* event)
     handleWheelEventForSpinButton(event);
 }
 
-double NumberInputType::parseToDouble(const String& src, double defaultValue) const
+Decimal NumberInputType::parseToNumber(const String& src, const Decimal& defaultValue) const
 {
-    return parseToDoubleForNumberType(src, defaultValue);
+    return parseToDecimalForNumberType(src, defaultValue);
 }
 
-double NumberInputType::parseToDoubleWithDecimalPlaces(const String& src, double defaultValue, unsigned *decimalPlaces) const
+String NumberInputType::serialize(const Decimal& value) const
 {
-    return parseToDoubleForNumberTypeWithDecimalPlaces(src, decimalPlaces, defaultValue);
-}
-
-String NumberInputType::serialize(double value) const
-{
-    if (!isfinite(value))
+    if (!value.isFinite())
         return String();
     return serializeForNumberType(value);
 }
@@ -252,7 +266,7 @@ String NumberInputType::convertFromVisibleValue(const String& visibleValue) cons
 bool NumberInputType::isAcceptableValue(const String& proposedValue)
 {
     String standardValue = convertFromVisibleValue(proposedValue);
-    return standardValue.isEmpty() || parseToDoubleForNumberType(standardValue, 0);
+    return standardValue.isEmpty() || isfinite(parseToDoubleForNumberType(standardValue));
 }
 
 String NumberInputType::sanitizeValue(const String& proposedValue) const

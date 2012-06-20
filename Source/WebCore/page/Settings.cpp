@@ -129,14 +129,12 @@ Settings::Settings(Page* page)
     , m_minimumLogicalFontSize(0)
     , m_defaultFontSize(0)
     , m_defaultFixedFontSize(0)
-    , m_defaultDeviceScaleFactor(1)
     , m_validationMessageTimerMagnification(50)
     , m_minimumAccelerated2dCanvasSize(257 * 256)
     , m_layoutFallbackWidth(980)
-    , m_devicePixelRatio(1.0)
     , m_maximumDecodedImageSize(numeric_limits<size_t>::max())
-    , m_deviceWidth(480)
-    , m_deviceHeight(854)
+    , m_deviceWidth(0)
+    , m_deviceHeight(0)
     , m_sessionStorageQuota(StorageMap::noQuota)
     , m_editingBehaviorType(editingBehaviorTypeForPlatform())
     , m_maximumHTMLParserDOMTreeDepth(defaultMaximumHTMLParserDOMTreeDepth)
@@ -258,19 +256,17 @@ Settings::Settings(Page* page)
     , m_shouldDisplayCaptions(false)
     , m_shouldDisplayTextDescriptions(false)
 #endif
-    , m_perTileDrawingEnabled(false)
-    , m_partialSwapEnabled(false)
     , m_scrollingCoordinatorEnabled(false)
     , m_notificationsEnabled(true)
     , m_needsIsLoadingInAPISenseQuirk(false)
 #if ENABLE(TOUCH_EVENTS)
     , m_touchEventEmulationEnabled(false)
 #endif
-    , m_threadedAnimationEnabled(false)
     , m_shouldRespectImageOrientation(false)
     , m_wantsBalancedSetDefersLoadingBehavior(false)
     , m_requestAnimationFrameEnabled(true)
     , m_deviceSupportsTouch(false)
+    , m_deviceSupportsMouse(true)
     , m_needsDidFinishLoadOrderQuirk(false)
     , m_fixedPositionCreatesStackingContext(false)
     , m_syncXHRInDocumentsEnabled(true)
@@ -401,11 +397,6 @@ void Settings::setDefaultFixedFontSize(int defaultFontSize)
 
     m_defaultFixedFontSize = defaultFontSize;
     m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setDefaultDeviceScaleFactor(int defaultDeviceScaleFactor)
-{
-    m_defaultDeviceScaleFactor = defaultDeviceScaleFactor;
 }
 
 void Settings::setFontBoostingEnabled(bool fontBoostingEnabled)

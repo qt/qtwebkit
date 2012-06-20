@@ -26,7 +26,13 @@
 #import "config.h"
 #import "WKView.h"
 
+#if USE(DICTATION_ALTERNATIVES)
+#import <AppKit/NSTextAlternatives.h>
+#import <AppKit/NSAttributedString.h>
+#endif
+
 #import "AttributedString.h"
+#import "ColorSpaceData.h"
 #import "DataReference.h"
 #import "DrawingAreaProxyImpl.h"
 #import "EditorState.h"
@@ -73,6 +79,7 @@
 #import <WebCore/Region.h>
 #import <WebCore/RunLoop.h>
 #import <WebCore/SharedBuffer.h>
+#import <WebCore/TextAlternativeWithRange.h>
 #import <WebCore/WebCoreNSStringExtras.h>
 #import <WebCore/FileSystem.h>
 #import <WebKitSystemInterface.h>
@@ -201,6 +208,9 @@ struct WKViewInterpretKeyEventsParameters {
     // We use this flag to determine when we need to paint the background (white or clear)
     // when the web process is unresponsive or takes too long to paint.
     BOOL _windowHasValidBackingStore;
+
+    RetainPtr<NSColorSpace> _colorSpace;
+
     RefPtr<WebCore::Image> _promisedImage;
     String _promisedFilename;
     String _promisedURL;
@@ -1173,7 +1183,12 @@ static const short kIOHIDEventTypeScroll = 6;
     NSString *text;
     bool isFromInputMethod = _data->_page->editorState().hasComposition;
 
+    Vector<TextAlternativeWithRange> dictationAlternatives;
+
     if (isAttributedString) {
+#if USE(DICTATION_ALTERNATIVES)
+        collectDictationTextAlternatives(string, dictationAlternatives);
+#endif
         // FIXME: We ignore most attributes from the string, so for example inserting from Character Palette loses font and glyph variation data.
         text = [string string];
     } else
@@ -1195,7 +1210,11 @@ static const short kIOHIDEventTypeScroll = 6;
 
     String eventText = text;
     eventText.replace(NSBackTabCharacter, NSTabCharacter); // same thing is done in KeyEventMac.mm in WebCore
-    bool eventHandled = _data->_page->insertText(eventText, replacementRange.location, NSMaxRange(replacementRange));
+    bool eventHandled;
+    if (!dictationAlternatives.isEmpty())
+        eventHandled = _data->_page->insertDictatedText(eventText, replacementRange.location, NSMaxRange(replacementRange), dictationAlternatives);
+    else
+        eventHandled = _data->_page->insertText(eventText, replacementRange.location, NSMaxRange(replacementRange));
 
     if (parameters)
         parameters->eventInterpretationHadSideEffects |= eventHandled;
@@ -1447,7 +1466,11 @@ static const short kIOHIDEventTypeScroll = 6;
     if (!validAttributes) {
         validAttributes = [[NSArray alloc] initWithObjects:
                            NSUnderlineStyleAttributeName, NSUnderlineColorAttributeName,
-                           NSMarkedClauseSegmentAttributeName, nil];
+                           NSMarkedClauseSegmentAttributeName,
+#if USE(DICTATION_ALTERNATIVES)
+                           NSTextAlternativesAttributeName,
+#endif
+                           nil];
         // NSText also supports the following attributes, but it's
         // hard to tell which are really required for text input to
         // work well; I have not seen any input method make use of them yet.
@@ -1876,9 +1899,9 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     // update the active state.
     if ([self window]) {
         _data->_windowHasValidBackingStore = NO;
+        [self _updateWindowVisibility];
         _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
         _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible | WebPageProxy::ViewIsInWindow);
-        [self _updateWindowVisibility];
         [self _updateWindowAndViewFrames];
 
         if (!_data->_flagsChangedEventMonitor) {
@@ -1967,27 +1990,29 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
 
 - (void)_windowDidOrderOffScreen:(NSNotification *)notification
 {
+    [self _updateWindowVisibility];
+
     // We want to make sure to update the active state while hidden, so since the view is about to be hidden,
     // we hide it first and then update the active state.
     _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
     _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
-    [self _updateWindowVisibility];
 }
 
 - (void)_windowDidOrderOnScreen:(NSNotification *)notification
 {
+    [self _updateWindowVisibility];
+
     // We want to make sure to update the active state while hidden, so since the view is about to become visible,
     // we update the active state first and then make it visible.
     _data->_page->viewStateDidChange(WebPageProxy::ViewWindowIsActive);
     _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
-    [self _updateWindowVisibility];
 }
 
 - (void)_windowDidChangeBackingProperties:(NSNotification *)notification
 {
-    CGFloat oldBackingScaleFactor = [[notification.userInfo objectForKey:backingPropertyOldScaleFactorKey] doubleValue]; 
+    CGFloat oldBackingScaleFactor = [[notification.userInfo objectForKey:backingPropertyOldScaleFactorKey] doubleValue];
     CGFloat newBackingScaleFactor = [self _intrinsicDeviceScaleFactor]; 
-    if (oldBackingScaleFactor == newBackingScaleFactor) 
+    if (oldBackingScaleFactor == newBackingScaleFactor)
         return; 
 
     _data->_windowHasValidBackingStore = NO;
@@ -2070,6 +2095,17 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
 - (void)viewDidUnhide
 {
     _data->_page->viewStateDidChange(WebPageProxy::ViewIsVisible);
+}
+
+- (void)viewDidChangeBackingProperties
+{
+    NSColorSpace *colorSpace = [[self window] colorSpace];
+    if ([colorSpace isEqualTo:_data->_colorSpace.get()])
+        return;
+
+    _data->_colorSpace = nullptr;
+    if (DrawingAreaProxy *drawingArea = _data->_page->drawingArea())
+        drawingArea->colorSpaceDidChange();
 }
 
 - (void)_accessibilityRegisterUIProcessTokens
@@ -2225,6 +2261,21 @@ static void drawPageBackground(CGContextRef context, WebPageProxy* page, const I
     if (_data->_inResignFirstResponder)
         return NO;
     return [[self window] firstResponder] == self;
+}
+
+- (WebKit::ColorSpaceData)_colorSpace
+{
+    if (!_data->_colorSpace) {
+        if ([self window])
+            _data->_colorSpace = [[self window] colorSpace];
+        else
+            _data->_colorSpace = [[NSScreen mainScreen] colorSpace];
+    }
+        
+    ColorSpaceData colorSpaceData;
+    colorSpaceData.cgColorSpace = [_data->_colorSpace.get() CGColorSpace];
+
+    return colorSpaceData;    
 }
 
 - (void)_processDidCrash
@@ -2660,10 +2711,10 @@ static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension
     if (!matchesExtensionOrEquivalent(filename, extension))
         filename = [[filename stringByAppendingString:@"."] stringByAppendingString:extension];
 
-    [pasteboard setString:url forType:NSURLPboardType];
+    [pasteboard setString:visibleUrl forType:NSStringPboardType];
     [pasteboard setString:visibleUrl forType:PasteboardTypes::WebURLPboardType];
     [pasteboard setString:title forType:PasteboardTypes::WebURLNamePboardType];
-    [pasteboard setPropertyList:[NSArray arrayWithObjects:[NSArray arrayWithObject:url], [NSArray arrayWithObject:title], nil] forType:PasteboardTypes::WebURLsWithTitlesPboardType];
+    [pasteboard setPropertyList:[NSArray arrayWithObjects:[NSArray arrayWithObject:visibleUrl], [NSArray arrayWithObject:title], nil] forType:PasteboardTypes::WebURLsWithTitlesPboardType];
     [pasteboard setPropertyList:[NSArray arrayWithObject:extension] forType:NSFilesPromisePboardType];
 
     if (archiveBuffer)
@@ -2874,9 +2925,19 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     return _data->_spellCheckerDocumentTag;
 }
 
-- (void)handleCorrectionPanelResult:(NSString*)result
+- (void)handleAcceptedAlternativeText:(NSString*)text
 {
-    _data->_page->handleAlternativeTextUIResult(result);
+    _data->_page->handleAlternativeTextUIResult(text);
+}
+
+- (void)_setSuppressVisibilityUpdates:(BOOL)suppressVisibilityUpdates
+{
+    _data->_page->setSuppressVisibilityUpdates(suppressVisibilityUpdates);
+}
+
+- (BOOL)_suppressVisibilityUpdates
+{
+    return _data->_page->suppressVisibilityUpdates();
 }
 
 @end

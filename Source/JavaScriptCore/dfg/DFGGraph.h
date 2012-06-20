@@ -187,9 +187,9 @@ public:
 
     BlockIndex blockIndexForBytecodeOffset(Vector<BlockIndex>& blocks, unsigned bytecodeBegin);
 
-    PredictedType getJSConstantPrediction(Node& node)
+    SpeculatedType getJSConstantSpeculation(Node& node)
     {
-        return predictionFromValue(node.valueOfJSConstant(m_codeBlock));
+        return speculationFromValue(node.valueOfJSConstant(m_codeBlock));
     }
     
     bool addShouldSpeculateInteger(Node& add)
@@ -258,6 +258,13 @@ public:
     {
         return at(nodeIndex).isBooleanConstant(m_codeBlock);
     }
+    bool isCellConstant(NodeIndex nodeIndex)
+    {
+        if (!isJSConstant(nodeIndex))
+            return false;
+        JSValue value = valueOfJSConstant(nodeIndex);
+        return value.isCell() && !!value;
+    }
     bool isFunctionConstant(NodeIndex nodeIndex)
     {
         if (!isJSConstant(nodeIndex))
@@ -308,6 +315,11 @@ public:
     {
         m_structureTransitionData.append(structureTransitionData);
         return &m_structureTransitionData.last();
+    }
+    
+    JSGlobalObject* globalObjectFor(CodeOrigin codeOrigin)
+    {
+        return m_codeBlock->globalObjectFor(codeOrigin);
     }
     
     ExecutableBase* executableFor(InlineCallFrame* inlineCallFrame)
@@ -424,17 +436,17 @@ public:
     
     bool isPredictedNumerical(Node& node)
     {
-        PredictedType left = at(node.child1()).prediction();
-        PredictedType right = at(node.child2()).prediction();
-        return isNumberPrediction(left) && isNumberPrediction(right);
+        SpeculatedType left = at(node.child1()).prediction();
+        SpeculatedType right = at(node.child2()).prediction();
+        return isNumberSpeculation(left) && isNumberSpeculation(right);
     }
     
     bool byValIsPure(Node& node)
     {
         return at(node.child2()).shouldSpeculateInteger()
             && ((node.op() == PutByVal || node.op() == PutByValAlias)
-                ? isActionableMutableArrayPrediction(at(node.child1()).prediction())
-                : isActionableArrayPrediction(at(node.child1()).prediction()));
+                ? isActionableMutableArraySpeculation(at(node.child1()).prediction())
+                : isActionableArraySpeculation(at(node.child1()).prediction()));
     }
     
     bool clobbersWorld(Node& node)

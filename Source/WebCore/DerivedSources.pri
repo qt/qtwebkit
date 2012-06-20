@@ -61,6 +61,8 @@ INSPECTOR_BACKEND_COMMANDS_QRC = $$PWD/inspector/front-end/InspectorBackendComma
 
 INJECTED_SCRIPT_SOURCE = $$PWD/inspector/InjectedScriptSource.js
 
+INJECTED_WEBGL_SCRIPT_SOURCE = $$PWD/inspector/InjectedWebGLScriptSource.js
+
 DEBUGGER_SCRIPT_SOURCE = $$PWD/bindings/v8/DebuggerScript.js
 
 ARRAY_BUFFER_VIEW_CUSTOM_SCRIPT_SOURCE = $$PWD/bindings/v8/custom/V8ArrayBufferViewCustomScript.js
@@ -128,6 +130,11 @@ IDL_BINDINGS += \
     $$PWD/Modules/indexeddb/IDBRequest.idl \
     $$PWD/Modules/indexeddb/IDBTransaction.idl \
     $$PWD/Modules/indexeddb/WorkerContextIndexedDatabase.idl \
+    $$PWD/Modules/quota/DOMWindowQuota.idl \
+    $$PWD/Modules/quota/StorageInfo.idl \
+    $$PWD/Modules/quota/StorageInfoErrorCallback.idl \
+    $$PWD/Modules/quota/StorageInfoQuotaCallback.idl \
+    $$PWD/Modules/quota/StorageInfoUsageCallback.idl \
     $$PWD/Modules/webaudio/AudioBuffer.idl \
     $$PWD/Modules/webaudio/AudioBufferSourceNode.idl \
     $$PWD/Modules/webaudio/AudioChannelMerger.idl \
@@ -223,7 +230,7 @@ IDL_BINDINGS += \
     $$PWD/dom/Event.idl \
     $$PWD/dom/EventException.idl \
 #    $$PWD/dom/EventListener.idl \
-#    $$PWD/dom/EventTarget.idl \
+    $$PWD/dom/EventTarget.idl \
     $$PWD/dom/HashChangeEvent.idl \
     $$PWD/dom/KeyboardEvent.idl \
     $$PWD/dom/MouseEvent.idl \
@@ -258,6 +265,7 @@ IDL_BINDINGS += \
     $$PWD/dom/WebKitNamedFlow.idl \
     $$PWD/dom/WebKitTransitionEvent.idl \
     $$PWD/dom/WheelEvent.idl \
+    $$PWD/editing/UndoManager.idl \
     $$PWD/fileapi/Blob.idl \
     $$PWD/fileapi/File.idl \
     $$PWD/fileapi/FileError.idl \
@@ -265,7 +273,6 @@ IDL_BINDINGS += \
     $$PWD/fileapi/FileList.idl \
     $$PWD/fileapi/FileReader.idl \
     $$PWD/fileapi/FileReaderSync.idl \
-    $$PWD/fileapi/OperationNotAllowedException.idl \
     $$PWD/fileapi/WebKitBlobBuilder.idl \
     $$PWD/html/canvas/ArrayBufferView.idl \
     $$PWD/html/canvas/ArrayBuffer.idl \
@@ -289,6 +296,7 @@ IDL_BINDINGS += \
     $$PWD/html/canvas/WebGLContextEvent.idl \
     $$PWD/html/canvas/WebGLDebugRendererInfo.idl \
     $$PWD/html/canvas/WebGLDebugShaders.idl \
+    $$PWD/html/canvas/WebGLDepthTexture.idl \
     $$PWD/html/canvas/WebGLFramebuffer.idl \
     $$PWD/html/canvas/WebGLLoseContext.idl \
     $$PWD/html/canvas/WebGLProgram.idl \
@@ -432,10 +440,6 @@ IDL_BINDINGS += \
     $$PWD/plugins/DOMMimeTypeArray.idl \
     $$PWD/storage/Storage.idl \
     $$PWD/storage/StorageEvent.idl \
-    $$PWD/storage/StorageInfo.idl \
-    $$PWD/storage/StorageInfoErrorCallback.idl \
-    $$PWD/storage/StorageInfoQuotaCallback.idl \
-    $$PWD/storage/StorageInfoUsageCallback.idl \
     $$PWD/testing/Internals.idl \
     $$PWD/testing/InternalSettings.idl \
     $$PWD/workers/AbstractWorker.idl \
@@ -682,7 +686,8 @@ EOC = $$escape_expand(\\n\\t)
 win_cmd_shell: preprocessIdls.commands = type nul > $$IDL_FILES_TMP $$EOC
 else: preprocessIdls.commands = cat /dev/null > $$IDL_FILES_TMP $$EOC
 for(binding, IDL_BINDINGS) {
-    preprocessIdls.commands += echo $$binding >> $$IDL_FILES_TMP $$EOC
+    # We need "$$binding" instead of "$$binding ", because Windows' echo writes trailing whitespaces. (http://wkb.ug/88304)
+    preprocessIdls.commands += echo $$binding>> $$IDL_FILES_TMP $$EOC
 }
 preprocessIdls.commands += perl -I$$PWD/bindings/scripts $$preprocessIdls.script \
                                --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
@@ -706,6 +711,7 @@ generateBindings.commands = perl -I$$PWD/bindings/scripts $$generateBindings.scr
                             --include $$PWD/Modules/filesystem \
                             --include $$PWD/Modules/geolocation \
                             --include $$PWD/Modules/indexeddb \
+                            --include $$PWD/Modules/quota \
                             --include $$PWD/Modules/webaudio \
                             --include $$PWD/Modules/webdatabase \
                             --include $$PWD/Modules/websockets \
@@ -767,11 +773,18 @@ GENERATORS += inspectorBackendCommands
 # GENERATOR 2-a: inspector injected script source compiler
 injectedScriptSource.output = InjectedScriptSource.h
 injectedScriptSource.input = INJECTED_SCRIPT_SOURCE
-injectedScriptSource.commands = perl $$PWD/inspector/xxd.pl InjectedScriptSource_js $$PWD/inspector/InjectedScriptSource.js ${QMAKE_FILE_OUT}
+injectedScriptSource.commands = perl $$PWD/inspector/xxd.pl InjectedScriptSource_js ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
 injectedScriptSource.add_output_to_sources = false
 GENERATORS += injectedScriptSource
 
-# GENERATOR 2-b: inspector debugger script source compiler
+# GENERATOR 2-b: inspector webgl injected script source compiler
+InjectedWebGLScriptSource.output = InjectedWebGLScriptSource.h
+InjectedWebGLScriptSource.input = INJECTED_WEBGL_SCRIPT_SOURCE
+InjectedWebGLScriptSource.commands = perl $$PWD/inspector/xxd.pl InjectedWebGLScriptSource_js ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
+InjectedWebGLScriptSource.add_output_to_sources = false
+GENERATORS += InjectedWebGLScriptSource
+
+# GENERATOR 2-c: inspector debugger script source compiler
 debuggerScriptSource.output = DebuggerScriptSource.h
 debuggerScriptSource.input = DEBUGGER_SCRIPT_SOURCE
 debuggerScriptSource.commands = perl $$PWD/inspector/xxd.pl DebuggerScriptSource_js ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}

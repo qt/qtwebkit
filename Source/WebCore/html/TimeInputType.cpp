@@ -45,9 +45,9 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static const double timeDefaultStep = 60.0;
-static const double timeDefaultStepBase = 0.0;
-static const double timeStepScaleFactor = 1000.0;
+static const int timeDefaultStep = 60;
+static const int timeDefaultStepBase = 0;
+static const int timeStepScaleFactor = 1000;
 
 PassOwnPtr<InputType> TimeInputType::create(HTMLInputElement* element)
 {
@@ -64,7 +64,7 @@ DateComponents::Type TimeInputType::dateType() const
     return DateComponents::Time;
 }
 
-double TimeInputType::defaultValueForStepUp() const
+Decimal TimeInputType::defaultValueForStepUp() const
 {
     double current = currentTimeMS();
     double utcOffset = calculateUTCOffset();
@@ -76,17 +76,17 @@ double TimeInputType::defaultValueForStepUp() const
     date.setMillisecondsSinceMidnight(current);
     double milliseconds = date.millisecondsSinceEpoch();
     ASSERT(isfinite(milliseconds));
-    return milliseconds;
+    return Decimal::fromDouble(milliseconds);
 }
 
 StepRange TimeInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
     DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (timeDefaultStep, timeDefaultStepBase, timeStepScaleFactor, StepRange::ScaledStepValueShouldBeInteger));
 
-    double stepBase = parseToDouble(element()->fastGetAttribute(minAttr), 0);
-    double minimum = parseToDouble(element()->fastGetAttribute(minAttr), DateComponents::minimumTime());
-    double maximum = parseToDouble(element()->fastGetAttribute(maxAttr), DateComponents::maximumTime());
-    StepRange::DoubleWithDecimalPlacesOrMissing step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    const Decimal stepBase = parseToNumber(element()->fastGetAttribute(minAttr), 0);
+    const Decimal minimum = parseToNumber(element()->fastGetAttribute(minAttr), Decimal::fromDouble(DateComponents::minimumTime()));
+    const Decimal maximum = parseToNumber(element()->fastGetAttribute(maxAttr), Decimal::fromDouble(DateComponents::maximumTime()));
+    const Decimal step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
     return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 

@@ -150,9 +150,13 @@ void LayerTreeHostProxy::didChangeScrollPosition(const IntPoint& position)
     dispatchUpdate(bind(&WebLayerTreeRenderer::didChangeScrollPosition, m_renderer.get(), position));
 }
 
+void LayerTreeHostProxy::syncCanvas(uint32_t id, const IntSize& canvasSize, uint32_t graphicsSurfaceToken)
+{
+    dispatchUpdate(bind(&WebLayerTreeRenderer::syncCanvas, m_renderer.get(), id, canvasSize, graphicsSurfaceToken));
+}
+
 void LayerTreeHostProxy::purgeBackingStores()
 {
-    m_renderer->setActive(false);
     m_drawingAreaProxy->page()->process()->send(Messages::LayerTreeHost::PurgeBackingStores(), m_drawingAreaProxy->page()->pageID());
 }
 

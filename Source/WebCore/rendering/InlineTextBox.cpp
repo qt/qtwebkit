@@ -851,8 +851,8 @@ void InlineTextBox::paintSelection(GraphicsContext* context, const FloatPoint& b
     LayoutUnit selectionBottom = root()->selectionBottom();
     LayoutUnit selectionTop = root()->selectionTopAdjustedForPrecedingBlock();
 
-    LayoutUnit deltaY = renderer()->style()->isFlippedLinesWritingMode() ? selectionBottom - logicalBottom() : logicalTop() - selectionTop;
-    LayoutUnit selHeight = max<LayoutUnit>(ZERO_LAYOUT_UNIT, selectionBottom - selectionTop);
+    int deltaY = roundToInt(renderer()->style()->isFlippedLinesWritingMode() ? selectionBottom - logicalBottom() : logicalTop() - selectionTop);
+    int selHeight = max(0, roundToInt(selectionBottom - selectionTop));
 
     FloatPoint localOrigin(boxOrigin.x(), boxOrigin.y() - deltaY);
     FloatRect clipRect(localOrigin, FloatSize(m_logicalWidth, selHeight));
@@ -1030,7 +1030,8 @@ void InlineTextBox::paintDocumentMarker(GraphicsContext* pt, const FloatPoint& b
     if (m_truncation != cNoTruncation)
         markerSpansWholeBox = false;
 
-    if (!markerSpansWholeBox || grammar) {
+    bool isDictationMarker = marker->type() == DocumentMarker::DictationAlternatives;
+    if (!markerSpansWholeBox || grammar || isDictationMarker) {
         int startPosition = max<int>(marker->startOffset() - m_start, 0);
         int endPosition = min<int>(marker->endOffset() - m_start, m_len);
         
@@ -1050,7 +1051,7 @@ void InlineTextBox::paintDocumentMarker(GraphicsContext* pt, const FloatPoint& b
         
         // Store rendered rects for bad grammar markers, so we can hit-test against it elsewhere in order to
         // display a toolTip. We don't do this for misspelling markers.
-        if (grammar) {
+        if (grammar || isDictationMarker) {
             markerRect.move(-boxOrigin.x(), -boxOrigin.y());
             markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect)).enclosingBoundingBox();
             toRenderedDocumentMarker(marker)->setRenderedRect(markerRect);

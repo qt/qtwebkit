@@ -874,6 +874,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\runtime\JSSegmentedVariableObject.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\JSSegmentedVariableObject.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\runtime\JSStaticScopeObject.cpp"
 				>
 			</File>
@@ -897,6 +905,14 @@
                                 RelativePath="..\..\runtime\JSStringJoiner.h"
                                 >
                         </File>
+			<File
+				RelativePath="..\..\runtime\JSSymbolTableObject.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\JSSymbolTableObject.h"
+				>
+			</File>
 			<File
 				RelativePath="..\..\runtime\JSType.h"
 				>
@@ -1235,6 +1251,10 @@
 			</File>
 			<File
 				RelativePath="..\..\runtime\StructureTransitionTable.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\SymbolTable.cpp"
 				>
 			</File>
 			<File
@@ -1630,11 +1650,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\bytecode\PredictedType.cpp"
+				RelativePath="..\..\bytecode\SpeculatedType.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\bytecode\PredictedType.h"
+				RelativePath="..\..\bytecode\SpeculatedType.h"
 				>
 			</File>
 			<File
@@ -1663,6 +1683,14 @@
 			</File>
 			<File
 				RelativePath="..\..\bytecode\ValueProfile.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\Watchpoint.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\Watchpoint.h"
 				>
 			</File>
 		</Filter>
@@ -1707,6 +1735,10 @@
 			</File>
 			<File
 				RelativePath="..\..\assembler\CodeLocation.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\assembler\LinkBuffer.cpp"
 				>
 			</File>
 			<File
@@ -1907,6 +1939,14 @@
 			>
 			<File
 				RelativePath="..\..\llint\LLIntData.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="disassembler"
+			>
+			<File
+				RelativePath="..\..\disassembler\Disassembler.h"
 				>
 			</File>
 		</Filter>
@@ -2155,6 +2195,14 @@
 			</File>
 			<File
 				RelativePath="..\..\heap\HandleSet.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\HeapTimer.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\HeapTimer.h"
 				>
 			</File>
 			<File

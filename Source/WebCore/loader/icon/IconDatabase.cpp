@@ -34,6 +34,7 @@
 #include "FileSystem.h"
 #include "IconDatabaseClient.h"
 #include "IconRecord.h"
+#include "Image.h"
 #include "IntSize.h"
 #include "Logging.h"
 #include "SQLiteStatement.h"
@@ -292,6 +293,16 @@ Image* IconDatabase::synchronousIconForPageURL(const String& pageURLOriginal, co
     return iconRecord->image(size);
 }
 
+NativeImagePtr IconDatabase::synchronousNativeIconForPageURL(const String& pageURLOriginal, const IntSize& size)
+{
+    Image* icon = synchronousIconForPageURL(pageURLOriginal, size);
+    if (!icon)
+        return 0;
+
+    MutexLocker locker(m_urlAndIconLock);
+    return icon->nativeImageForCurrentFrame();
+}
+
 void IconDatabase::readIconForPageURLFromDisk(const String& pageURL)
 {
     // The effect of asking for an Icon for a pageURL automatically queues it to be read from disk
@@ -400,7 +411,7 @@ void IconDatabase::retainIconForPageURL(const String& pageURL)
 
     {
         MutexLocker locker(m_urlsToRetainOrReleaseLock);
-        m_urlsToRetain.add(pageURL);
+        m_urlsToRetain.add(pageURL.isolatedCopy());
         m_retainOrReleaseIconRequested = true;
     }
 
@@ -453,7 +464,7 @@ void IconDatabase::releaseIconForPageURL(const String& pageURL)
 
     {
         MutexLocker locker(m_urlsToRetainOrReleaseLock);
-        m_urlsToRelease.add(pageURL);
+        m_urlsToRelease.add(pageURL.isolatedCopy());
         m_retainOrReleaseIconRequested = true;
     }
     scheduleOrDeferSyncTimer();
@@ -810,7 +821,7 @@ void IconDatabase::notifyPendingLoadDecisions()
     
     // This method should only be called upon completion of the initial url import from the database
     ASSERT(m_iconURLImportComplete);
-    LOG(IconDatabase, "Notifying all DocumentLoaders that were waiting on a load decision for thier icons");
+    LOG(IconDatabase, "Notifying all DocumentLoaders that were waiting on a load decision for their icons");
     
     HashSet<RefPtr<DocumentLoader> >::iterator i = m_loadersPendingDecision.begin();
     HashSet<RefPtr<DocumentLoader> >::iterator end = m_loadersPendingDecision.end();
@@ -1528,10 +1539,15 @@ void IconDatabase::performPendingRetainAndReleaseOperations()
         m_retainOrReleaseIconRequested = false;
     }
 
-    for (HashCountedSet<String>::const_iterator it = toRetain.begin(), end = toRetain.end(); it != end; ++it)
+    for (HashCountedSet<String>::const_iterator it = toRetain.begin(), end = toRetain.end(); it != end; ++it) {
+        ASSERT(!it->first.impl() || it->first.impl()->hasOneRef());
         performRetainIconForPageURL(it->first, it->second);
-    for (HashCountedSet<String>::const_iterator it = toRelease.begin(), end = toRelease.end(); it != end; ++it)
+    }
+
+    for (HashCountedSet<String>::const_iterator it = toRelease.begin(), end = toRelease.end(); it != end; ++it) {
+        ASSERT(!it->first.impl() || it->first.impl()->hasOneRef());
         performReleaseIconForPageURL(it->first, it->second);
+    }
 }
 
 bool IconDatabase::readFromDatabase()
@@ -1591,7 +1607,7 @@ bool IconDatabase::readFromDatabase()
                     HashSet<String>::const_iterator end = outerHash->end();
                     for (; iter != end; ++iter) {
                         if (innerHash->contains(*iter)) {
-                            LOG(IconDatabase, "%s is interesting in the icon we just read.  Adding it to the list and removing it from the interested set", urlForLogging(*iter).ascii().data());
+                            LOG(IconDatabase, "%s is interested in the icon we just read. Adding it to the notification list and removing it from the interested set", urlForLogging(*iter).ascii().data());
                             urlsToNotify.add(*iter);
                         }
                         

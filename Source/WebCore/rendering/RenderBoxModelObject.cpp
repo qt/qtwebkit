@@ -811,7 +811,11 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
                                    scrolledPaintRect.width() - bLeft - bRight - (includePadding ? pLeft + pRight : ZERO_LAYOUT_UNIT),
                                    scrolledPaintRect.height() - borderTop() - borderBottom() - (includePadding ? paddingTop() + paddingBottom() : ZERO_LAYOUT_UNIT));
         backgroundClipStateSaver.save();
-        context->clip(clipRect);
+        if (clipToBorderRadius && includePadding) {
+            RoundedRect rounded = getBackgroundRoundedRect(clipRect, box, boxSize.width(), boxSize.height(), includeLeftEdge, includeRightEdge);
+            context->addRoundedRectClip(rounded);
+        } else
+            context->clip(clipRect);
     } else if (bgLayer->clip() == TextFillBox) {
         // We have to draw our text into a mask that can then be used to clip background drawing.
         // First figure out how big the mask has to be.  It should be no bigger than what we need
@@ -977,7 +981,7 @@ static inline IntSize resolveAgainstIntrinsicRatio(const IntSize& size, const Fl
     return IntSize(size.width(), solutionHeight);
 }
 
-IntSize RenderBoxModelObject::calculateImageIntrinsicDimensions(StyleImage* image, const IntSize& positioningAreaSize) const
+IntSize RenderBoxModelObject::calculateImageIntrinsicDimensions(StyleImage* image, const IntSize& positioningAreaSize, ScaleByEffectiveZoomOrNot shouldScaleOrNot) const
 {
     // A generated image without a fixed size, will always return the container size as intrinsic size.
     if (image->isGeneratedImage() && image->usesImageContainerSize())
@@ -1001,7 +1005,8 @@ IntSize RenderBoxModelObject::calculateImageIntrinsicDimensions(StyleImage* imag
 
     IntSize resolvedSize(intrinsicWidth.isFixed() ? intrinsicWidth.value() : 0, intrinsicHeight.isFixed() ? intrinsicHeight.value() : 0);
     IntSize minimumSize(resolvedSize.width() > 0 ? 1 : 0, resolvedSize.height() > 0 ? 1 : 0);
-    resolvedSize.scale(style()->effectiveZoom());
+    if (shouldScaleOrNot == ScaleByEffectiveZoom)
+        resolvedSize.scale(style()->effectiveZoom());
     resolvedSize.clampToMinimumSize(minimumSize);
 
     if (!resolvedSize.isEmpty())
@@ -1030,7 +1035,7 @@ IntSize RenderBoxModelObject::calculateFillTileSize(const FillLayer* fillLayer, 
     StyleImage* image = fillLayer->image();
     EFillSizeType type = fillLayer->size().type;
 
-    IntSize imageIntrinsicSize = calculateImageIntrinsicDimensions(image, positioningAreaSize);
+    IntSize imageIntrinsicSize = calculateImageIntrinsicDimensions(image, positioningAreaSize, ScaleByEffectiveZoom);
     imageIntrinsicSize.scale(1 / image->imageScaleFactor(), 1 / image->imageScaleFactor());
     RenderView* renderView = view();
     switch (type) {
@@ -1241,13 +1246,13 @@ bool RenderBoxModelObject::paintNinePieceImage(GraphicsContext* graphicsContext,
     LayoutUnit rightWithOutset = rect.maxX() + rightOutset;
     IntRect borderImageRect = pixelSnappedIntRect(leftWithOutset, topWithOutset, rightWithOutset - leftWithOutset, bottomWithOutset - topWithOutset);
 
-    IntSize imageSize = calculateImageIntrinsicDimensions(styleImage, borderImageRect.size());
+    IntSize imageSize = calculateImageIntrinsicDimensions(styleImage, borderImageRect.size(), DoNotScaleByEffectiveZoom);
 
     // If both values are ‘auto’ then the intrinsic width and/or height of the image should be used, if any.
     styleImage->setContainerSizeForRenderer(this, imageSize, style->effectiveZoom());
 
-    int imageWidth = imageSize.width() / style->effectiveZoom();
-    int imageHeight = imageSize.height() / style->effectiveZoom();
+    int imageWidth = imageSize.width();
+    int imageHeight = imageSize.height();
     RenderView* renderView = view();
 
     float imageScaleFactor = styleImage->imageScaleFactor();
@@ -1493,7 +1498,6 @@ static bool allCornersClippedOut(const RoundedRect& border, const LayoutRect& cl
     return true;
 }
 
-#if HAVE(PATH_BASED_BORDER_RADIUS_DRAWING)
 static bool borderWillArcInnerEdge(const LayoutSize& firstRadius, const FloatSize& secondRadius)
 {
     return !firstRadius.isZero() || !secondRadius.isZero();
@@ -2100,337 +2104,17 @@ void RenderBoxModelObject::drawBoxSideFromPath(GraphicsContext* graphicsContext,
     graphicsContext->setFillColor(color, style->colorSpace());
     graphicsContext->drawRect(pixelSnappedIntRect(borderRect));
 }
-#else
-void RenderBoxModelObject::paintBorder(const PaintInfo& info, const IntRect& rect, const RenderStyle* style,
-                                       BackgroundBleedAvoidance, bool includeLogicalLeftEdge, bool includeLogicalRightEdge)
-{
-    GraphicsContext* graphicsContext = info.context;
-    // FIXME: This old version of paintBorder should be removed when all ports implement 
-    // GraphicsContext::clipConvexPolygon()!! This should happen soon.
-    if (paintNinePieceImage(graphicsContext, rect, style, style->borderImage()))
-        return;
-
-    const Color& topColor = style->visitedDependentColor(CSSPropertyBorderTopColor);
-    const Color& bottomColor = style->visitedDependentColor(CSSPropertyBorderBottomColor);
-    const Color& leftColor = style->visitedDependentColor(CSSPropertyBorderLeftColor);
-    const Color& rightColor = style->visitedDependentColor(CSSPropertyBorderRightColor);
-
-    bool topTransparent = style->borderTopIsTransparent();
-    bool bottomTransparent = style->borderBottomIsTransparent();
-    bool rightTransparent = style->borderRightIsTransparent();
-    bool leftTransparent = style->borderLeftIsTransparent();
-
-    EBorderStyle topStyle = style->borderTopStyle();
-    EBorderStyle bottomStyle = style->borderBottomStyle();
-    EBorderStyle leftStyle = style->borderLeftStyle();
-    EBorderStyle rightStyle = style->borderRightStyle();
-
-    bool horizontal = style->isHorizontalWritingMode();
-    bool renderTop = topStyle > BHIDDEN && !topTransparent && (horizontal || includeLogicalLeftEdge);
-    bool renderLeft = leftStyle > BHIDDEN && !leftTransparent && (!horizontal || includeLogicalLeftEdge);
-    bool renderRight = rightStyle > BHIDDEN && !rightTransparent && (!horizontal || includeLogicalRightEdge);
-    bool renderBottom = bottomStyle > BHIDDEN && !bottomTransparent && (horizontal || includeLogicalRightEdge);
-
-
-    RoundedRect border(rect);
-    
-    GraphicsContextStateSaver stateSaver(*graphicsContext, false);
-    if (style->hasBorderRadius()) {
-        border.includeLogicalEdges(style->getRoundedBorderFor(border.rect(), view()).radii(),
-                                   horizontal, includeLogicalLeftEdge, includeLogicalRightEdge);
-        if (border.isRounded()) {
-            stateSaver.save();
-            graphicsContext->addRoundedRectClip(border);
-        }
-    }
-
-    int firstAngleStart, secondAngleStart, firstAngleSpan, secondAngleSpan;
-    float thickness;
-    bool renderRadii = border.isRounded();
-    bool upperLeftBorderStylesMatch = renderLeft && (topStyle == leftStyle) && (topColor == leftColor);
-    bool upperRightBorderStylesMatch = renderRight && (topStyle == rightStyle) && (topColor == rightColor) && (topStyle != OUTSET) && (topStyle != RIDGE) && (topStyle != INSET) && (topStyle != GROOVE);
-    bool lowerLeftBorderStylesMatch = renderLeft && (bottomStyle == leftStyle) && (bottomColor == leftColor) && (bottomStyle != OUTSET) && (bottomStyle != RIDGE) && (bottomStyle != INSET) && (bottomStyle != GROOVE);
-    bool lowerRightBorderStylesMatch = renderRight && (bottomStyle == rightStyle) && (bottomColor == rightColor);
-
-    if (renderTop) {
-        bool ignoreLeft = (renderRadii && border.radii().topLeft().width() > 0)
-            || (topColor == leftColor && topTransparent == leftTransparent && topStyle >= OUTSET
-                && (leftStyle == DOTTED || leftStyle == DASHED || leftStyle == SOLID || leftStyle == OUTSET));
-        
-        bool ignoreRight = (renderRadii && border.radii().topRight().width() > 0)
-            || (topColor == rightColor && topTransparent == rightTransparent && topStyle >= OUTSET
-                && (rightStyle == DOTTED || rightStyle == DASHED || rightStyle == SOLID || rightStyle == INSET));
-
-        int x = rect.x();
-        int x2 = rect.maxX();
-        if (renderRadii) {
-            x += border.radii().topLeft().width();
-            x2 -= border.radii().topRight().width();
-        }
-
-        drawLineForBoxSide(graphicsContext, x, rect.y(), x2, rect.y() + style->borderTopWidth(), BSTop, topColor, topStyle,
-                   ignoreLeft ? 0 : style->borderLeftWidth(), ignoreRight ? 0 : style->borderRightWidth());
-
-        if (renderRadii) {
-            int leftY = rect.y();
-
-            // We make the arc double thick and let the clip rect take care of clipping the extra off.
-            // We're doing this because it doesn't seem possible to match the curve of the clip exactly
-            // with the arc-drawing function.
-            thickness = style->borderTopWidth() * 2;
-
-            if (border.radii().topLeft().width()) {
-                int leftX = rect.x();
-                // The inner clip clips inside the arc. This is especially important for 1px borders.
-                bool applyLeftInnerClip = (style->borderLeftWidth() < border.radii().topLeft().width())
-                    && (style->borderTopWidth() < border.radii().topLeft().height())
-                    && (topStyle != DOUBLE || style->borderTopWidth() > 6);
-                
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyLeftInnerClip);
-                if (applyLeftInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(leftX, leftY, border.radii().topLeft().width() * 2, border.radii().topLeft().height() * 2),
-                                                             style->borderTopWidth());
-
-                firstAngleStart = 90;
-                firstAngleSpan = upperLeftBorderStylesMatch ? 90 : 45;
-
-                // Draw upper left arc
-                drawArcForBoxSide(graphicsContext, leftX, leftY, thickness, border.radii().topLeft(), firstAngleStart, firstAngleSpan,
-                              BSTop, topColor, topStyle, true);
-            }
-
-            if (border.radii().topRight().width()) {
-                int rightX = rect.maxX() - border.radii().topRight().width() * 2;
-                bool applyRightInnerClip = (style->borderRightWidth() < border.radii().topRight().width())
-                    && (style->borderTopWidth() < border.radii().topRight().height())
-                    && (topStyle != DOUBLE || style->borderTopWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyRightInnerClip);
-                if (applyRightInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(rightX, leftY, border.radii().topRight().width() * 2, border.radii().topRight().height() * 2),
-                                                             style->borderTopWidth());
-
-                if (upperRightBorderStylesMatch) {
-                    secondAngleStart = 0;
-                    secondAngleSpan = 90;
-                } else {
-                    secondAngleStart = 45;
-                    secondAngleSpan = 45;
-                }
-
-                // Draw upper right arc
-                drawArcForBoxSide(graphicsContext, rightX, leftY, thickness, border.radii().topRight(), secondAngleStart, secondAngleSpan,
-                              BSTop, topColor, topStyle, false);
-            }
-        }
-    }
-
-    if (renderBottom) {
-        bool ignoreLeft = (renderRadii && border.radii().bottomLeft().width() > 0)
-            || (bottomColor == leftColor && bottomTransparent == leftTransparent && bottomStyle >= OUTSET
-                && (leftStyle == DOTTED || leftStyle == DASHED || leftStyle == SOLID || leftStyle == OUTSET));
-
-        bool ignoreRight = (renderRadii && border.radii().bottomRight().width() > 0)
-            || (bottomColor == rightColor && bottomTransparent == rightTransparent && bottomStyle >= OUTSET
-                && (rightStyle == DOTTED || rightStyle == DASHED || rightStyle == SOLID || rightStyle == INSET));
-
-        int x = rect.x();
-        int x2 = rect.maxX();
-        if (renderRadii) {
-            x += border.radii().bottomLeft().width();
-            x2 -= border.radii().bottomRight().width();
-        }
-
-        drawLineForBoxSide(graphicsContext, x, rect.maxY() - style->borderBottomWidth(), x2, rect.maxY(), BSBottom, bottomColor, bottomStyle,
-                   ignoreLeft ? 0 : style->borderLeftWidth(), ignoreRight ? 0 : style->borderRightWidth());
-
-        if (renderRadii) {
-            thickness = style->borderBottomWidth() * 2;
-
-            if (border.radii().bottomLeft().width()) {
-                int leftX = rect.x();
-                int leftY = rect.maxY() - border.radii().bottomLeft().height() * 2;
-                bool applyLeftInnerClip = (style->borderLeftWidth() < border.radii().bottomLeft().width())
-                    && (style->borderBottomWidth() < border.radii().bottomLeft().height())
-                    && (bottomStyle != DOUBLE || style->borderBottomWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyLeftInnerClip);
-                if (applyLeftInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(leftX, leftY, border.radii().bottomLeft().width() * 2, border.radii().bottomLeft().height() * 2),
-                                                             style->borderBottomWidth());
-
-                if (lowerLeftBorderStylesMatch) {
-                    firstAngleStart = 180;
-                    firstAngleSpan = 90;
-                } else {
-                    firstAngleStart = 225;
-                    firstAngleSpan = 45;
-                }
-
-                // Draw lower left arc
-                drawArcForBoxSide(graphicsContext, leftX, leftY, thickness, border.radii().bottomLeft(), firstAngleStart, firstAngleSpan,
-                              BSBottom, bottomColor, bottomStyle, true);
-            }
-
-            if (border.radii().bottomRight().width()) {
-                int rightY = rect.maxY() - border.radii().bottomRight().height() * 2;
-                int rightX = rect.maxX() - border.radii().bottomRight().width() * 2;
-                bool applyRightInnerClip = (style->borderRightWidth() < border.radii().bottomRight().width())
-                    && (style->borderBottomWidth() < border.radii().bottomRight().height())
-                    && (bottomStyle != DOUBLE || style->borderBottomWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyRightInnerClip);
-                if (applyRightInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(rightX, rightY, border.radii().bottomRight().width() * 2, border.radii().bottomRight().height() * 2),
-                                                             style->borderBottomWidth());
-
-                secondAngleStart = 270;
-                secondAngleSpan = lowerRightBorderStylesMatch ? 90 : 45;
-
-                // Draw lower right arc
-                drawArcForBoxSide(graphicsContext, rightX, rightY, thickness, border.radii().bottomRight(), secondAngleStart, secondAngleSpan,
-                              BSBottom, bottomColor, bottomStyle, false);
-            }
-        }
-    }
-
-    if (renderLeft) {
-        bool ignoreTop = (renderRadii && border.radii().topLeft().height() > 0)
-            || (topColor == leftColor && topTransparent == leftTransparent && leftStyle >= OUTSET
-                && (topStyle == DOTTED || topStyle == DASHED || topStyle == SOLID || topStyle == OUTSET));
-
-        bool ignoreBottom = (renderRadii && border.radii().bottomLeft().height() > 0)
-            || (bottomColor == leftColor && bottomTransparent == leftTransparent && leftStyle >= OUTSET
-                && (bottomStyle == DOTTED || bottomStyle == DASHED || bottomStyle == SOLID || bottomStyle == INSET));
-
-        int y = rect.y();
-        int y2 = rect.maxY();
-        if (renderRadii) {
-            y += border.radii().topLeft().height();
-            y2 -= border.radii().bottomLeft().height();
-        }
-
-        drawLineForBoxSide(graphicsContext, rect.x(), y, rect.x() + style->borderLeftWidth(), y2, BSLeft, leftColor, leftStyle,
-                   ignoreTop ? 0 : style->borderTopWidth(), ignoreBottom ? 0 : style->borderBottomWidth());
-
-        if (renderRadii && (!upperLeftBorderStylesMatch || !lowerLeftBorderStylesMatch)) {
-            int topX = rect.x();
-            thickness = style->borderLeftWidth() * 2;
-
-            if (!upperLeftBorderStylesMatch && border.radii().topLeft().width()) {
-                int topY = rect.y();
-                bool applyTopInnerClip = (style->borderLeftWidth() < border.radii().topLeft().width())
-                    && (style->borderTopWidth() < border.radii().topLeft().height())
-                    && (leftStyle != DOUBLE || style->borderLeftWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyTopInnerClip);
-                if (applyTopInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(topX, topY, border.radii().topLeft().width() * 2, border.radii().topLeft().height() * 2),
-                                                             style->borderLeftWidth());
-
-                firstAngleStart = 135;
-                firstAngleSpan = 45;
-
-                // Draw top left arc
-                drawArcForBoxSide(graphicsContext, topX, topY, thickness, border.radii().topLeft(), firstAngleStart, firstAngleSpan,
-                              BSLeft, leftColor, leftStyle, true);
-            }
-
-            if (!lowerLeftBorderStylesMatch && border.radii().bottomLeft().width()) {
-                int bottomY = rect.maxY() - border.radii().bottomLeft().height() * 2;
-                bool applyBottomInnerClip = (style->borderLeftWidth() < border.radii().bottomLeft().width())
-                    && (style->borderBottomWidth() < border.radii().bottomLeft().height())
-                    && (leftStyle != DOUBLE || style->borderLeftWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyBottomInnerClip);
-                if (applyBottomInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(topX, bottomY, border.radii().bottomLeft().width() * 2, border.radii().bottomLeft().height() * 2),
-                                                             style->borderLeftWidth());
-
-                secondAngleStart = 180;
-                secondAngleSpan = 45;
-
-                // Draw bottom left arc
-                drawArcForBoxSide(graphicsContext, topX, bottomY, thickness, border.radii().bottomLeft(), secondAngleStart, secondAngleSpan,
-                              BSLeft, leftColor, leftStyle, false);
-            }
-        }
-    }
-
-    if (renderRight) {
-        bool ignoreTop = (renderRadii && border.radii().topRight().height() > 0)
-            || ((topColor == rightColor) && (topTransparent == rightTransparent)
-                && (rightStyle >= DOTTED || rightStyle == INSET)
-                && (topStyle == DOTTED || topStyle == DASHED || topStyle == SOLID || topStyle == OUTSET));
-
-        bool ignoreBottom = (renderRadii && border.radii().bottomRight().height() > 0)
-            || ((bottomColor == rightColor) && (bottomTransparent == rightTransparent)
-                && (rightStyle >= DOTTED || rightStyle == INSET)
-                && (bottomStyle == DOTTED || bottomStyle == DASHED || bottomStyle == SOLID || bottomStyle == INSET));
-
-        int y = rect.y();
-        int y2 = rect.maxY();
-        if (renderRadii) {
-            y += border.radii().topRight().height();
-            y2 -= border.radii().bottomRight().height();
-        }
-
-        drawLineForBoxSide(graphicsContext, rect.maxX() - style->borderRightWidth(), y, rect.maxX(), y2, BSRight, rightColor, rightStyle,
-                   ignoreTop ? 0 : style->borderTopWidth(), ignoreBottom ? 0 : style->borderBottomWidth());
-
-        if (renderRadii && (!upperRightBorderStylesMatch || !lowerRightBorderStylesMatch)) {
-            thickness = style->borderRightWidth() * 2;
-
-            if (!upperRightBorderStylesMatch && border.radii().topRight().width()) {
-                int topX = rect.maxX() - border.radii().topRight().width() * 2;
-                int topY = rect.y();
-                bool applyTopInnerClip = (style->borderRightWidth() < border.radii().topRight().width())
-                    && (style->borderTopWidth() < border.radii().topRight().height())
-                    && (rightStyle != DOUBLE || style->borderRightWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyTopInnerClip);
-                if (applyTopInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(topX, topY, border.radii().topRight().width() * 2, border.radii().topRight().height() * 2),
-                                                             style->borderRightWidth());
-
-                firstAngleStart = 0;
-                firstAngleSpan = 45;
-
-                // Draw top right arc
-                drawArcForBoxSide(graphicsContext, topX, topY, thickness, border.radii().topRight(), firstAngleStart, firstAngleSpan,
-                              BSRight, rightColor, rightStyle, true);
-            }
-
-            if (!lowerRightBorderStylesMatch && border.radii().bottomRight().width()) {
-                int bottomX = rect.maxX() - border.radii().bottomRight().width() * 2;
-                int bottomY = rect.maxY() - border.radii().bottomRight().height() * 2;
-                bool applyBottomInnerClip = (style->borderRightWidth() < border.radii().bottomRight().width())
-                    && (style->borderBottomWidth() < border.radii().bottomRight().height())
-                    && (rightStyle != DOUBLE || style->borderRightWidth() > 6);
-
-                GraphicsContextStateSaver stateSaver(*graphicsContext, applyBottomInnerClip);
-                if (applyBottomInnerClip)
-                    graphicsContext->addInnerRoundedRectClip(IntRect(bottomX, bottomY, border.radii().bottomRight().width() * 2, border.radii().bottomRight().height() * 2),
-                                                             style->borderRightWidth());
-
-                secondAngleStart = 315;
-                secondAngleSpan = 45;
-
-                // Draw bottom right arc
-                drawArcForBoxSide(graphicsContext, bottomX, bottomY, thickness, border.radii().bottomRight(), secondAngleStart, secondAngleSpan,
-                              BSRight, rightColor, rightStyle, false);
-            }
-        }
-    }
-}
-#endif
 
 static void findInnerVertex(const FloatPoint& outerCorner, const FloatPoint& innerCorner, const FloatPoint& centerPoint, FloatPoint& result)
 {
     // If the line between outer and inner corner is towards the horizontal, intersect with a vertical line through the center,
     // otherwise with a horizontal line through the center. The points that form this line are arbitrary (we use 0, 100).
     // Note that if findIntersection fails, it will leave result untouched.
-    if (fabs(outerCorner.x() - innerCorner.x()) > fabs(outerCorner.y() - innerCorner.y()))
+    float diffInnerOuterX = fabs(innerCorner.x() - outerCorner.x());
+    float diffInnerOuterY = fabs(innerCorner.y() - outerCorner.y());
+    float diffCenterOuterX = fabs(centerPoint.x() - outerCorner.x());
+    float diffCenterOuterY = fabs(centerPoint.y() - outerCorner.y());
+    if (diffInnerOuterY * diffCenterOuterX < diffCenterOuterY * diffInnerOuterX)
         findIntersection(outerCorner, innerCorner, FloatPoint(centerPoint.x(), 0), FloatPoint(centerPoint.x(), 100), result);
     else
         findIntersection(outerCorner, innerCorner, FloatPoint(0, centerPoint.y()), FloatPoint(100, centerPoint.y()), result);
@@ -2968,6 +2652,72 @@ void RenderBoxModelObject::setFirstLetterRemainingText(RenderObject* remainingTe
         firstLetterRemainingTextMap->set(this, remainingText);
     } else if (firstLetterRemainingTextMap)
         firstLetterRemainingTextMap->remove(this);
+}
+
+LayoutRect RenderBoxModelObject::localCaretRectForEmptyElement(LayoutUnit width, LayoutUnit textIndentOffset)
+{
+    ASSERT(!firstChild());
+
+    // FIXME: This does not take into account either :first-line or :first-letter
+    // However, as soon as some content is entered, the line boxes will be
+    // constructed and this kludge is not called any more. So only the caret size
+    // of an empty :first-line'd block is wrong. I think we can live with that.
+    RenderStyle* currentStyle = firstLineStyle();
+    LayoutUnit height = lineHeight(true, currentStyle->isHorizontalWritingMode() ? HorizontalLine : VerticalLine);
+
+    enum CaretAlignment { alignLeft, alignRight, alignCenter };
+
+    CaretAlignment alignment = alignLeft;
+
+    switch (currentStyle->textAlign()) {
+    case LEFT:
+    case WEBKIT_LEFT:
+        break;
+    case CENTER:
+    case WEBKIT_CENTER:
+        alignment = alignCenter;
+        break;
+    case RIGHT:
+    case WEBKIT_RIGHT:
+        alignment = alignRight;
+        break;
+    case JUSTIFY:
+    case TASTART:
+        if (!currentStyle->isLeftToRightDirection())
+            alignment = alignRight;
+        break;
+    case TAEND:
+        if (currentStyle->isLeftToRightDirection())
+            alignment = alignRight;
+        break;
+    }
+
+    LayoutUnit x = borderLeft() + paddingLeft();
+    LayoutUnit maxX = width - borderRight() - paddingRight();
+
+    switch (alignment) {
+    case alignLeft:
+        if (currentStyle->isLeftToRightDirection())
+            x += textIndentOffset;
+        break;
+    case alignCenter:
+        x = (x + maxX) / 2;
+        if (currentStyle->isLeftToRightDirection())
+            x += textIndentOffset / 2;
+        else
+            x -= textIndentOffset / 2;
+        break;
+    case alignRight:
+        x = maxX - caretWidth;
+        if (!currentStyle->isLeftToRightDirection())
+            x -= textIndentOffset;
+        break;
+    }
+    x = min(x, max(maxX - caretWidth, ZERO_LAYOUT_UNIT));
+
+    LayoutUnit y = paddingTop() + borderTop();
+
+    return LayoutRect(x, y, caretWidth, height);
 }
 
 bool RenderBoxModelObject::shouldAntialiasLines(GraphicsContext* context)

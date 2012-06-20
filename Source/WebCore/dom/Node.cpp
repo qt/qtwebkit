@@ -938,33 +938,6 @@ unsigned Node::nodeIndex() const
     return count;
 }
 
-static void removeNodeListCacheIfPossible(Node* node, NodeRareData* data)
-{
-    if (!data->nodeLists()->isEmpty())
-        return;
-    data->clearNodeLists();
-    node->treeScope()->removeNodeListCache();
-}
-
-// FIXME: Move this function to Document
-void Node::registerDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
-{
-    ASSERT(isDocumentNode());
-    NodeRareData* data = ensureRareData();
-    data->ensureNodeLists(this)->m_listsInvalidatedAtDocument.add(list);
-}
-
-// FIXME: Move this function to Document
-void Node::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
-{
-    ASSERT(isDocumentNode());
-    ASSERT(hasRareData());
-    ASSERT(rareData()->nodeLists());
-    NodeRareData* data = rareData();
-    data->nodeLists()->m_listsInvalidatedAtDocument.remove(list);
-    removeNodeListCacheIfPossible(this, data);
-}
-
 void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& attrName, Element* attributeOwnerElement)
 {
     if (hasRareData() && isAttributeNode()) {
@@ -994,6 +967,11 @@ void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& at
         && (attrName != idAttr || !attributeOwnerElement->isFormControlElement()))
         return;
 
+    if (document()->hasRareData()) {
+        if (NodeListsNodeData* nodeLists = document()->rareData()->nodeLists())
+            nodeLists->invalidateCachesForDocument();
+    }
+
     if (!treeScope()->hasNodeListCaches())
         return;
 
@@ -1013,6 +991,11 @@ void Node::invalidateNodeListsCacheAfterChildrenChanged()
 {
     if (hasRareData())
         rareData()->clearChildNodeListCache();
+
+    if (document()->hasRareData()) {
+        if (NodeListsNodeData* nodeLists = document()->rareData()->nodeLists())
+            nodeLists->invalidateCachesForDocument();
+    }
 
     if (!treeScope()->hasNodeListCaches())
         return;
@@ -1672,54 +1655,30 @@ PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
     return list.release();
 }
 
-PassRefPtr<Element> Node::querySelector(const String& selectors, ExceptionCode& ec)
+PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionCode& ec)
 {
     if (selectors.isEmpty()) {
         ec = SYNTAX_ERR;
         return 0;
     }
-    CSSParser parser(document());
-    CSSSelectorList querySelectorList;
-    parser.parseSelector(selectors, querySelectorList);
 
-    if (!querySelectorList.first() || querySelectorList.hasUnknownPseudoElements()) {
-        ec = SYNTAX_ERR;
+    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selectors, document(), ec);
+    if (!selectorQuery)
         return 0;
-    }
-
-    // throw a NAMESPACE_ERR if the selector includes any namespace prefixes.
-    if (querySelectorList.selectorsNeedNamespaceResolution()) {
-        ec = NAMESPACE_ERR;
-        return 0;
-    }
-    
-    SelectorQuery selectorQuery(querySelectorList);
-    return selectorQuery.queryFirst(this);
+    return selectorQuery->queryFirst(this);
 }
 
-PassRefPtr<NodeList> Node::querySelectorAll(const String& selectors, ExceptionCode& ec)
+PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionCode& ec)
 {
     if (selectors.isEmpty()) {
         ec = SYNTAX_ERR;
         return 0;
     }
-    CSSParser p(document());
-    CSSSelectorList querySelectorList;
-    p.parseSelector(selectors, querySelectorList);
 
-    if (!querySelectorList.first() || querySelectorList.hasUnknownPseudoElements()) {
-        ec = SYNTAX_ERR;
+    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selectors, document(), ec);
+    if (!selectorQuery)
         return 0;
-    }
-
-    // Throw a NAMESPACE_ERR if the selector includes any namespace prefixes.
-    if (querySelectorList.selectorsNeedNamespaceResolution()) {
-        ec = NAMESPACE_ERR;
-        return 0;
-    }
-
-    SelectorQuery selectorQuery(querySelectorList);
-    return selectorQuery.queryAll(this);
+    return selectorQuery->queryAll(this);
 }
 
 Document *Node::ownerDocument() const
@@ -2366,13 +2325,15 @@ void NodeListsNodeData::invalidateCaches()
     invalidateCachesThatDependOnAttributes();
 }
 
-void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
+void NodeListsNodeData::invalidateCachesForDocument()
 {
-    // Used by labels and region node lists on document.
     NodeListsNodeData::NodeListSet::iterator end = m_listsInvalidatedAtDocument.end();
     for (NodeListsNodeData::NodeListSet::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
         (*it)->invalidateCache();
+}
 
+void NodeListsNodeData::invalidateCachesThatDependOnAttributes()
+{
     ClassNodeListCache::iterator classCacheEnd = m_classNodeListCache.end();
     for (ClassNodeListCache::iterator it = m_classNodeListCache.begin(); it != classCacheEnd; ++it)
         it->second->invalidateCache();
@@ -2939,7 +2900,7 @@ PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
     if (!result.isNewEntry)
         return PassRefPtr<RadioNodeList>(result.iterator->second);
 
-    RefPtr<RadioNodeList> list = RadioNodeList::create(name, toElement(this));
+    RefPtr<RadioNodeList> list = RadioNodeList::create(toElement(this), name);
     result.iterator->second = list.get();
     return list.release();
 }
@@ -2952,6 +2913,23 @@ void Node::removeCachedRadioNodeList(RadioNodeList* list, const AtomicString& na
     NodeListsNodeData* data = rareData()->nodeLists();
     ASSERT_UNUSED(list, list == data->m_radioNodeListCache.get(name));
     data->m_radioNodeListCache.remove(name);
+}
+
+// It's important not to inline removedLastRef, because we don't want to inline the code to
+// delete a Node at each deref call site.
+void Node::removedLastRef()
+{
+    // An explicit check for Document here is better than a virtual function since it is
+    // faster for non-Document nodes, and because the call to removedLastRef that is inlined
+    // at all deref call sites is smaller if it's a non-virtual function.
+    if (isDocumentNode()) {
+        static_cast<Document*>(this)->removedLastRef();
+        return;
+    }
+#ifndef NDEBUG
+    m_deletionHasBegun = true;
+#endif
+    delete this;
 }
 
 } // namespace WebCore

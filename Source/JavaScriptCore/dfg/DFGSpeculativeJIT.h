@@ -81,13 +81,13 @@ public:
         ASSERT(kind() == HaveNode);
     }
     
-    static ValueSource forPrediction(PredictedType prediction)
+    static ValueSource forSpeculation(SpeculatedType prediction)
     {
-        if (isInt32Prediction(prediction))
+        if (isInt32Speculation(prediction))
             return ValueSource(Int32InRegisterFile);
-        if (isArrayPrediction(prediction))
+        if (isArraySpeculation(prediction))
             return ValueSource(CellInRegisterFile);
-        if (isBooleanPrediction(prediction))
+        if (isBooleanSpeculation(prediction))
             return ValueSource(BooleanInRegisterFile);
         return ValueSource(ValueInRegisterFile);
     }
@@ -1294,6 +1294,11 @@ public:
         m_jit.setupArgumentsWithExecState(TrustedImm32(arg1), arg2);
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
+    JITCompiler::Call callOperation(J_DFGOperation_EZIcfZ operation, GPRReg result, int32_t arg1, InlineCallFrame* inlineCallFrame, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(TrustedImm32(arg1), TrustedImmPtr(inlineCallFrame), arg2);
+        return appendCallWithExceptionCheckSetResult(operation, result);
+    }
     JITCompiler::Call callOperation(C_DFGOperation_E operation, GPRReg result)
     {
         m_jit.setupArgumentsExecState();
@@ -1408,6 +1413,11 @@ public:
     {
         m_jit.setupArgumentsWithExecState(arg1, TrustedImm32(arg2));
         return appendCallWithExceptionCheck(operation);
+    }
+    JITCompiler::Call callOperation(V_DFGOperation_W operation, WatchpointSet* watchpointSet)
+    {
+        m_jit.setupArguments(TrustedImmPtr(watchpointSet));
+        return appendCall(operation);
     }
     template<typename FunctionType, typename ArgumentType1>
     JITCompiler::Call callOperation(FunctionType operation, NoResultTag, ArgumentType1 arg1)
@@ -1547,6 +1557,11 @@ public:
         m_jit.setupArgumentsWithExecState(TrustedImm32(arg1));
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
+    JITCompiler::Call callOperation(J_DFGOperation_EZIcfZ operation, GPRReg resultTag, GPRReg resultPayload, int32_t arg1, InlineCallFrame* inlineCallFrame, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(TrustedImm32(arg1), TrustedImmPtr(inlineCallFrame), arg2);
+        return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
+    }
     JITCompiler::Call callOperation(J_DFGOperation_EZZ operation, GPRReg resultTag, GPRReg resultPayload, int32_t arg1, GPRReg arg2)
     {
         m_jit.setupArgumentsWithExecState(TrustedImm32(arg1), arg2);
@@ -1661,6 +1676,11 @@ public:
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
         return appendCallWithExceptionCheck(operation);
+    }
+    JITCompiler::Call callOperation(V_DFGOperation_W operation, WatchpointSet* watchpointSet)
+    {
+        m_jit.setupArguments(TrustedImmPtr(watchpointSet));
+        return appendCall(operation);
     }
     template<typename FunctionType, typename ArgumentType1>
     JITCompiler::Call callOperation(FunctionType operation, NoResultTag, ArgumentType1 arg1)
@@ -1782,6 +1802,11 @@ public:
         JITCompiler::Call call = m_jit.appendCall(function);
         m_jit.move(GPRInfo::returnValueGPR, result);
         return call;
+    }
+    JITCompiler::Call appendCall(const FunctionPtr& function)
+    {
+        prepareForExternalCall();
+        return m_jit.appendCall(function);
     }
     JITCompiler::Call appendCallWithExceptionCheckSetResult(const FunctionPtr& function, GPRReg result1, GPRReg result2)
     {
@@ -2034,12 +2059,12 @@ public:
     bool compilePeepHoleBranch(Node&, MacroAssembler::RelationalCondition, MacroAssembler::DoubleCondition, S_DFGOperation_EJJ);
     void compilePeepHoleIntegerBranch(Node&, NodeIndex branchNodeIndex, JITCompiler::RelationalCondition);
     void compilePeepHoleDoubleBranch(Node&, NodeIndex branchNodeIndex, JITCompiler::DoubleCondition);
-    void compilePeepHoleObjectEquality(Node&, NodeIndex branchNodeIndex, const ClassInfo*, PredictionChecker);
+    void compilePeepHoleObjectEquality(Node&, NodeIndex branchNodeIndex, const ClassInfo*, SpeculatedTypeChecker);
     void compilePeepHoleObjectToObjectOrOtherEquality(
-        Edge leftChild, Edge rightChild, NodeIndex branchNodeIndex, const ClassInfo*, PredictionChecker);
-    void compileObjectEquality(Node&, const ClassInfo*, PredictionChecker);
+        Edge leftChild, Edge rightChild, NodeIndex branchNodeIndex, const ClassInfo*, SpeculatedTypeChecker);
+    void compileObjectEquality(Node&, const ClassInfo*, SpeculatedTypeChecker);
     void compileObjectToObjectOrOtherEquality(
-        Edge leftChild, Edge rightChild, const ClassInfo*, PredictionChecker);
+        Edge leftChild, Edge rightChild, const ClassInfo*, SpeculatedTypeChecker);
     void compileValueAdd(Node&);
     void compileObjectOrOtherLogicalNot(Edge value, const ClassInfo*, bool needSpeculationCheck);
     void compileLogicalNot(Node&);
@@ -2183,6 +2208,32 @@ public:
         ASSERT(at(m_compileIndex).canExit() || m_isCheckingArgumentTypes);
         speculationCheck(kind, jsValueSource, nodeUse.index(), jumpToFail, recovery);
     }
+    // Use this like you would use speculationCheck(), except that you don't pass it a jump
+    // (because you don't have to execute a branch; that's kind of the whole point), and you
+    // must register the returned Watchpoint with something relevant. In general, this should
+    // be used with extreme care. Use speculationCheck() unless you've got an amazing reason
+    // not to.
+    Watchpoint* speculationWatchpoint(ExitKind kind, JSValueSource jsValueSource, NodeIndex nodeIndex)
+    {
+        if (!m_compileOkay)
+            return 0;
+        ASSERT(at(m_compileIndex).canExit() || m_isCheckingArgumentTypes);
+        OSRExit& exit = m_jit.codeBlock()->osrExit(
+            m_jit.codeBlock()->appendOSRExit(
+                OSRExit(kind, jsValueSource,
+                        m_jit.graph().methodOfGettingAValueProfileFor(nodeIndex),
+                        JITCompiler::Jump(), this)));
+        exit.m_watchpointIndex = m_jit.codeBlock()->appendWatchpoint(
+            Watchpoint(m_jit.watchpointLabel()));
+        return &m_jit.codeBlock()->watchpoint(exit.m_watchpointIndex);
+    }
+    // The default for speculation watchpoints is that they're uncounted, because the
+    // act of firing a watchpoint invalidates it. So, future recompilations will not
+    // attempt to set this watchpoint again.
+    Watchpoint* speculationWatchpoint()
+    {
+        return speculationWatchpoint(UncountableWatchpoint, JSValueSource(), NoNode);
+    }
     void forwardSpeculationCheck(ExitKind kind, JSValueSource jsValueSource, NodeIndex nodeIndex, MacroAssembler::Jump jumpToFail, const ValueRecovery& valueRecovery)
     {
         ASSERT(at(m_compileIndex).canExit() || m_isCheckingArgumentTypes);
@@ -2197,7 +2248,7 @@ public:
             setLocal = &at(m_jit.graph().m_blocks[m_block]->at(++setLocalIndexInBlock));
             hadInt32ToDouble = true;
         }
-        if (setLocal->op() == Flush)
+        if (setLocal->op() == Flush || setLocal->op() == Phantom)
             setLocal = &at(m_jit.graph().m_blocks[m_block]->at(++setLocalIndexInBlock));
         
         if (hadInt32ToDouble)

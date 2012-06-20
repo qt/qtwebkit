@@ -37,20 +37,17 @@
 using namespace WebCore;
 
 namespace WebKit {
-WebLayerTreeView::Settings::operator CCSettings() const
+
+WebLayerTreeView::Settings::operator CCLayerTreeSettings() const
 {
-    CCSettings settings;
-    settings.acceleratePainting = acceleratePainting;
+    CCLayerTreeSettings settings;
+    settings.forceSoftwareCompositing = forceSoftwareCompositing;
     settings.showFPSCounter = showFPSCounter;
     settings.showPlatformLayerTree = showPlatformLayerTree;
     settings.showPaintRects = showPaintRects;
     settings.refreshRate = refreshRate;
-    settings.perTilePainting = perTilePainting;
-    settings.partialSwapEnabled = partialSwapEnabled;
-    settings.threadedAnimationEnabled = threadedAnimationEnabled;
     settings.defaultTileSize = defaultTileSize;
     settings.maxUntiledLayerSize = maxUntiledLayerSize;
-    settings.deviceScaleFactor = deviceScaleFactor;
 
     // FIXME: showFPSCounter / showPlatformLayerTree / maxPartialTextureUpdates aren't supported currently.
     return settings;
@@ -101,9 +98,24 @@ WebSize WebLayerTreeView::viewportSize() const
     return WebSize(m_private->layerTreeHost()->viewportSize());
 }
 
+void WebLayerTreeView::setDeviceScaleFactor(const float deviceScaleFactor)
+{
+    m_private->layerTreeHost()->setDeviceScaleFactor(deviceScaleFactor);
+}
+
+float WebLayerTreeView::deviceScaleFactor() const
+{
+    return m_private->layerTreeHost()->deviceScaleFactor();
+}
+
 void WebLayerTreeView::setBackgroundColor(WebColor color)
 {
     m_private->layerTreeHost()->setBackgroundColor(color);
+}
+
+void WebLayerTreeView::setHasTransparentBackground(bool transparent)
+{
+    m_private->layerTreeHost()->setHasTransparentBackground(transparent);
 }
 
 void WebLayerTreeView::setVisible(bool visible)
@@ -161,7 +173,7 @@ void WebLayerTreeView::finishAllRendering()
 
 WebGraphicsContext3D* WebLayerTreeView::context()
 {
-    return GraphicsContext3DPrivate::extractWebGraphicsContext3D(m_private->layerTreeHost()->context());
+    return GraphicsContext3DPrivate::extractWebGraphicsContext3D(m_private->layerTreeHost()->context()->context3D());
 }
 
 void WebLayerTreeView::loseCompositorContext(int numTimes)

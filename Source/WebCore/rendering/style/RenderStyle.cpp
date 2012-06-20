@@ -139,7 +139,6 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
     rareNonInheritedData.access()->m_gridItem.init();
     rareInheritedData.init();
     inherited.init();
-
 #if ENABLE(SVG)
     m_svgStyle.init();
 #endif
@@ -162,9 +161,15 @@ ALWAYS_INLINE RenderStyle::RenderStyle(const RenderStyle& o)
 {
 }
 
-void RenderStyle::inheritFrom(const RenderStyle* inheritParent)
+void RenderStyle::inheritFrom(const RenderStyle* inheritParent, IsAtShadowBoundary isAtShadowBoundary)
 {
-    rareInheritedData = inheritParent->rareInheritedData;
+    if (isAtShadowBoundary == AtShadowBoundary) {
+        // Even if surrounding content is user-editable, shadow DOM should act as a single unit, and not necessarily be editable
+        EUserModify currentUserModify = userModify();
+        rareInheritedData = inheritParent->rareInheritedData;
+        setUserModify(currentUserModify);
+    } else
+        rareInheritedData = inheritParent->rareInheritedData;
     inherited = inheritParent->inherited;
     inherited_flags = inheritParent->inherited_flags;
 #if ENABLE(SVG)
@@ -396,6 +401,12 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         if (rareNonInheritedData->m_flexibleBox.get() != other->rareNonInheritedData->m_flexibleBox.get()
             && *rareNonInheritedData->m_flexibleBox.get() != *other->rareNonInheritedData->m_flexibleBox.get())
             return StyleDifferenceLayout;
+        if (rareNonInheritedData->m_order != other->rareNonInheritedData->m_order
+            || rareNonInheritedData->m_alignContent != other->rareNonInheritedData->m_alignContent
+            || rareNonInheritedData->m_alignItems != other->rareNonInheritedData->m_alignItems
+            || rareNonInheritedData->m_alignSelf != other->rareNonInheritedData->m_alignSelf
+            || rareNonInheritedData->m_justifyContent != other->rareNonInheritedData->m_justifyContent)
+            return StyleDifferenceLayout;
 
         // FIXME: We should add an optimized form of layout that just recomputes visual overflow.
         if (!rareNonInheritedData->shadowDataEquivalent(*other->rareNonInheritedData.get()))
@@ -461,6 +472,10 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             || rareInheritedData->m_tabSize != other->rareInheritedData->m_tabSize
             || rareInheritedData->m_lineBoxContain != other->rareInheritedData->m_lineBoxContain
             || rareInheritedData->m_lineGrid != other->rareInheritedData->m_lineGrid
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+            || rareInheritedData->m_imageResolutionSource != other->rareInheritedData->m_imageResolutionSource
+            || rareInheritedData->m_imageResolution != other->rareInheritedData->m_imageResolution
+#endif
             || rareInheritedData->m_lineSnap != other->rareInheritedData->m_lineSnap
             || rareInheritedData->m_lineAlign != other->rareInheritedData->m_lineAlign)
             return StyleDifferenceLayout;

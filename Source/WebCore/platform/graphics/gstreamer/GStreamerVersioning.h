@@ -21,8 +21,15 @@
 #define GStreamerVersioning_h
 
 #include <gst/gst.h>
+#include <gst/video/video.h>
+
+namespace WebCore {
+class IntSize;
+};
 
 void webkitGstObjectRefSink(GstObject*);
-GstCaps* webkitGstElementGetPadCaps(GstElement*, const char*);
-
+GstCaps* webkitGstGetPadCaps(GstPad*);
+bool getVideoSizeAndFormatFromCaps(GstCaps*, WebCore::IntSize&, GstVideoFormat&, int& pixelAspectRatioNumerator, int& pixelAspectRatioDenominator, int& stride);
+GstBuffer* createGstBuffer(GstBuffer*);
+void setGstElementClassMetadata(GstElementClass*, const char* name, const char* longName, const char* description, const char* author);
 #endif // GStreamerVersioning_h

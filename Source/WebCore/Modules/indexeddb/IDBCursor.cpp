@@ -77,6 +77,7 @@ IDBCursor::IDBCursor(PassRefPtr<IDBCursorBackendInterface> backend, IDBRequest* 
     , m_transaction(transaction)
     , m_transactionNotifier(transaction, this)
     , m_gotValue(false)
+    , m_valueIsDirty(true)
 {
     ASSERT(m_backend);
     ASSERT(m_request);
@@ -109,9 +110,10 @@ PassRefPtr<IDBKey> IDBCursor::primaryKey() const
     return m_currentPrimaryKey;
 }
 
-PassRefPtr<IDBAny> IDBCursor::value() const
+PassRefPtr<IDBAny> IDBCursor::value()
 {
     IDB_TRACE("IDBCursor::value");
+    m_valueIsDirty = false;
     return m_currentValue;
 }
 
@@ -128,6 +130,12 @@ PassRefPtr<IDBRequest> IDBCursor::update(ScriptExecutionContext* context, PassRe
         ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return 0;
     }
+
+    if (m_transaction->isReadOnly()) {
+        ec = IDBDatabaseException::READ_ONLY_ERR;
+        return 0;
+    }
+
     RefPtr<SerializedScriptValue> value = prpValue;
     if (value->blobURLs().size() > 0) {
         // FIXME: Add Blob/File/FileList support
@@ -158,13 +166,13 @@ void IDBCursor::advance(unsigned long count, ExceptionCode& ec)
     }
 
     if (!count) {
-        // FIXME: should be a JavaScript TypeError. See https://bugs.webkit.org/show_bug.cgi?id=85513
-        ec = IDBDatabaseException::IDB_TYPE_MISMATCH_ERR;
+        ec = IDBDatabaseException::IDB_TYPE_ERR;
         return;
     }
 
     if (!m_request->resetReadyState(m_transaction.get())) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ASSERT_NOT_REACHED();
+        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return;
     }
     m_request->setCursor(this);
@@ -196,13 +204,20 @@ void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionCode& ec)
         m_request->setCursor(this);
         m_gotValue = false;
         m_backend->continueFunction(key, m_request, ec);
-    } else
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+    } else {
+        ASSERT_NOT_REACHED();
+        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
+    }
 }
 
 PassRefPtr<IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* context, ExceptionCode& ec)
 {
     IDB_TRACE("IDBCursor::delete");
+    if (m_transaction->isReadOnly()) {
+        ec = IDBDatabaseException::READ_ONLY_ERR;
+        return 0;
+    }
+
     if (!m_gotValue) {
         ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return 0;
@@ -234,6 +249,7 @@ void IDBCursor::setValueReady()
     m_currentPrimaryKey = m_backend->primaryKey();
     m_currentValue = IDBAny::create(m_backend->value());
     m_gotValue = true;
+    m_valueIsDirty = true;
 }
 
 unsigned short IDBCursor::stringToDirection(const String& directionString, ExceptionCode& ec)
@@ -247,8 +263,7 @@ unsigned short IDBCursor::stringToDirection(const String& directionString, Excep
     if (directionString == IDBCursor::directionPrevUnique())
         return IDBCursor::PREV_NO_DUPLICATE;
 
-    // FIXME: should be a JavaScript TypeError. See https://bugs.webkit.org/show_bug.cgi?id=85513
-    ec = IDBDatabaseException::NON_TRANSIENT_ERR;
+    ec = IDBDatabaseException::IDB_TYPE_ERR;
     return 0;
 }
 
@@ -268,7 +283,7 @@ const AtomicString& IDBCursor::directionToString(unsigned short direction, Excep
         return IDBCursor::directionPrevUnique();
 
     default:
-        ec = IDBDatabaseException::NON_TRANSIENT_ERR;
+        ec = IDBDatabaseException::IDB_TYPE_ERR;
         return IDBCursor::directionNext();
     }
 }

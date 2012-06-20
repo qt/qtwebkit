@@ -32,6 +32,8 @@ namespace JSC { namespace Options {
 
 extern bool useJIT;
 
+extern bool showDisassembly;
+
 extern unsigned maximumOptimizationCandidateInstructionCount;
 
 extern unsigned maximumFunctionForCallInlineCandidateInstructionCount;
@@ -75,9 +77,6 @@ extern double doubleVoteRatioForDoubleFormat;
 
 extern unsigned minimumNumberOfScansBetweenRebalance;
 extern unsigned gcMarkStackSegmentSize;
-extern unsigned minimumNumberOfCellsToKeep;
-extern unsigned maximumNumberOfSharedSegments;
-extern unsigned sharedStackWakeupThreshold;
 JS_EXPORTDATA extern unsigned numberOfGCMarkers;
 JS_EXPORTDATA extern unsigned opaqueRootMergeThreshold;
 

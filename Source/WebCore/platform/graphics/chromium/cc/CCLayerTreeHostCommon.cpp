@@ -67,6 +67,43 @@ IntRect CCLayerTreeHostCommon::calculateVisibleRect(const IntRect& targetSurface
     return layerRect;
 }
 
+template<typename LayerType, typename RenderSurfaceType>
+static IntRect calculateLayerScissorRect(LayerType* layer, const FloatRect& rootScissorRect)
+{
+    RenderSurfaceType* targetSurface = layer->targetRenderSurface();
+
+    FloatRect rootScissorRectInTargetSurface = targetSurface->computeRootScissorRectInCurrentSurface(rootScissorRect);
+    FloatRect clipAndDamage;
+    if (layer->usesLayerClipping())
+        clipAndDamage = intersection(rootScissorRectInTargetSurface, layer->clipRect());
+    else
+        clipAndDamage = intersection(rootScissorRectInTargetSurface, targetSurface->contentRect());
+
+    return enclosingIntRect(clipAndDamage);
+}
+
+template<typename LayerType, typename RenderSurfaceType>
+static IntRect calculateSurfaceScissorRect(LayerType* layer, const FloatRect& rootScissorRect)
+{
+    LayerType* parentLayer = layer->parent();
+    RenderSurfaceType* targetSurface = parentLayer->targetRenderSurface();
+    ASSERT(targetSurface);
+
+    RenderSurfaceType* currentSurface = layer->renderSurface();
+    ASSERT(currentSurface);
+
+    FloatRect clipRect = currentSurface->clipRect();
+
+    // For surfaces, empty clipRect means the same as CCLayerImpl::usesLayerClipping being false
+    if (clipRect.isEmpty())
+        clipRect = intersection(targetSurface->contentRect(), currentSurface->drawableContentRect());
+
+    FloatRect rootScissorRectInTargetSurface = targetSurface->computeRootScissorRectInCurrentSurface(rootScissorRect);
+
+    FloatRect clipAndDamage = intersection(rootScissorRectInTargetSurface, clipRect);
+    return enclosingIntRect(clipAndDamage);
+}
+
 template<typename LayerType>
 static inline bool layerIsInExisting3DRenderingContext(LayerType* layer)
 {
@@ -128,7 +165,7 @@ static IntRect calculateVisibleLayerRect(LayerType* layer)
         targetSurfaceRect.intersect(layer->clipRect());
 
     if (targetSurfaceRect.isEmpty() || layer->contentBounds().isEmpty())
-        return targetSurfaceRect;
+        return IntRect();
 
     // Note carefully these are aliases
     const IntSize& bounds = layer->bounds();
@@ -232,11 +269,6 @@ static inline bool subtreeShouldBeSkipped(LayerChromium* layer)
 template<typename LayerType>
 static bool subtreeShouldRenderToSeparateSurface(LayerType* layer, bool axisAlignedWithRespectToParent)
 {
-    // FIXME: If we decide to create a render surface here while this layer does
-    //        preserve-3d, then we may be sorting incorrectly because we will not be
-    //        sorting the individual layers of this subtree with other layers outside of
-    //        this subtree.
-
     // Cache this value, because otherwise it walks the entire subtree several times.
     bool descendantDrawsContent = layer->descendantDrawsContent();
 
@@ -281,10 +313,95 @@ static bool subtreeShouldRenderToSeparateSurface(LayerType* layer, bool axisAlig
     return false;
 }
 
+WebTransformationMatrix computeScrollCompensationForThisLayer(CCLayerImpl* scrollingLayer, const WebTransformationMatrix& parentMatrix)
+{
+    // For every layer that has non-zero scrollDelta, we have to compute a transform that can undo the
+    // scrollDelta translation. In particular, we want this matrix to premultiply a fixed-position layer's
+    // parentMatrix, so we design this transform in three steps as follows. The steps described here apply
+    // from right-to-left, so Step 1 would be the right-most matrix:
+    //
+    //     Step 1. transform from target surface space to the exact space where scrollDelta is actually applied.
+    //           -- this is inverse of the matrix in step 3
+    //     Step 2. undo the scrollDelta
+    //           -- this is just a translation by scrollDelta.
+    //     Step 3. transform back to target surface space.
+    //           -- this transform is the "partialLayerOriginTransform" = (parentMatrix * scale(layer->pageScaleDelta()));
+    //
+    // These steps create a matrix that both start and end in targetSurfaceSpace. So this matrix can
+    // pre-multiply any fixed-position layer's drawTransform to undo the scrollDeltas -- as long as
+    // that fixed position layer is fixed onto the same targetRenderSurface as this scrollingLayer.
+    //
+
+    WebTransformationMatrix partialLayerOriginTransform = parentMatrix;
+    partialLayerOriginTransform.scale(scrollingLayer->pageScaleDelta());
+
+    WebTransformationMatrix scrollCompensationForThisLayer = partialLayerOriginTransform; // Step 3
+    scrollCompensationForThisLayer.translate(scrollingLayer->scrollDelta().width(), scrollingLayer->scrollDelta().height()); // Step 2
+    scrollCompensationForThisLayer.multiply(partialLayerOriginTransform.inverse()); // Step 1
+    return scrollCompensationForThisLayer;
+}
+
+WebTransformationMatrix computeScrollCompensationMatrixForChildren(LayerChromium* currentLayer, const WebTransformationMatrix& currentParentMatrix, const WebTransformationMatrix& currentScrollCompensation)
+{
+    // The main thread (i.e. LayerChromium) does not need to worry about scroll compensation.
+    // So we can just return an identity matrix here.
+    return WebTransformationMatrix();
+}
+
+WebTransformationMatrix computeScrollCompensationMatrixForChildren(CCLayerImpl* layer, const WebTransformationMatrix& parentMatrix, const WebTransformationMatrix& currentScrollCompensationMatrix)
+{
+    // "Total scroll compensation" is the transform needed to cancel out all scrollDelta translations that
+    // occurred since the nearest container layer, even if there are renderSurfaces in-between.
+    //
+    // There are some edge cases to be aware of, that are not explicit in the code:
+    //  - A layer that is both a fixed-position and container should not be its own container, instead, that means
+    //    it is fixed to an ancestor, and is a container for any fixed-position descendants.
+    //  - A layer that is a fixed-position container and has a renderSurface should behave the same as a container
+    //    without a renderSurface, the renderSurface is irrelevant in that case.
+    //  - A layer that does not have an explicit container is simply fixed to the viewport
+    //    (i.e. the root renderSurface, and it would still compensate for root layer's scrollDelta).
+    //  - If the fixed-position layer has its own renderSurface, then the renderSurface is
+    //    the one who gets fixed.
+    //
+    // This function needs to be called AFTER layers create their own renderSurfaces.
+    //
+
+    // Avoid the overheads (including stack allocation and matrix initialization/copy) if we know that the scroll compensation doesn't need to be reset or adjusted.
+    if (!layer->isContainerForFixedPositionLayers() && layer->scrollDelta().isZero() && !layer->renderSurface())
+        return currentScrollCompensationMatrix;
+
+    // Start as identity matrix.
+    WebTransformationMatrix nextScrollCompensationMatrix;
+
+    // If this layer is not a container, then it inherits the existing scroll compensations.
+    if (!layer->isContainerForFixedPositionLayers())
+        nextScrollCompensationMatrix = currentScrollCompensationMatrix;
+
+    // If the current layer has a non-zero scrollDelta, then we should compute its local scrollCompensation
+    // and accumulate it to the nextScrollCompensationMatrix.
+    if (!layer->scrollDelta().isZero()) {
+        WebTransformationMatrix scrollCompensationForThisLayer = computeScrollCompensationForThisLayer(layer, parentMatrix);
+        nextScrollCompensationMatrix.multiply(scrollCompensationForThisLayer);
+    }
+
+    // If the layer created its own renderSurface, we have to adjust nextScrollCompensationMatrix.
+    // The adjustment allows us to continue using the scrollCompensation on the next surface.
+    //  Step 1 (right-most in the math): transform from the new surface to the original ancestor surface
+    //  Step 2: apply the scroll compensation
+    //  Step 3: transform back to the new surface.
+    if (layer->renderSurface() && !nextScrollCompensationMatrix.isIdentity())
+        nextScrollCompensationMatrix = layer->renderSurface()->originTransform().inverse() * nextScrollCompensationMatrix * layer->renderSurface()->originTransform();
+
+    return nextScrollCompensationMatrix;
+}
+
 // Recursively walks the layer tree starting at the given node and computes all the
 // necessary transformations, clipRects, render surfaces, etc.
 template<typename LayerType, typename LayerList, typename RenderSurfaceType, typename LayerSorter>
-static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, LayerType* rootLayer, const WebTransformationMatrix& parentMatrix, const WebTransformationMatrix& fullHierarchyMatrix, RenderSurfaceType* nearestAncestorThatMovesPixels, LayerList& renderSurfaceLayerList, LayerList& layerList, LayerSorter* layerSorter, int maxTextureSize)
+static bool calculateDrawTransformsInternal(LayerType* layer, LayerType* rootLayer, const WebTransformationMatrix& parentMatrix,
+                                            const WebTransformationMatrix& fullHierarchyMatrix, const WebTransformationMatrix& currentScrollCompensationMatrix,
+                                            RenderSurfaceType* nearestAncestorThatMovesPixels, LayerList& renderSurfaceLayerList, LayerList& layerList,
+                                            LayerSorter* layerSorter, int maxTextureSize)
 {
     // This function computes the new matrix transformations recursively for this
     // layer and all its descendants. It also computes the appropriate render surfaces.
@@ -411,8 +528,17 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
     // LT = Tr[origin] * S[pageScaleDelta] * Tr[origin2anchor] * M[layer] * Tr[anchor2center]
     layerLocalTransform.translate3d(centerOffsetX, centerOffsetY, -layer->anchorPointZ());
 
+    // The combinedTransform that gets computed below is effectively the layer's drawTransform, unless
+    // the layer itself creates a renderSurface. In that case, the renderSurface re-parents the transforms.
     WebTransformationMatrix combinedTransform = parentMatrix;
     combinedTransform.multiply(layerLocalTransform);
+
+    if (layer->fixedToContainerLayer()) {
+        // Special case: this layer is a composited fixed-position layer; we need to
+        // explicitly compensate for all ancestors' nonzero scrollDeltas to keep this layer
+        // fixed correctly.
+        combinedTransform = currentScrollCompensationMatrix * combinedTransform;
+    }
 
     bool animatingTransformToTarget = layer->transformIsAnimating();
     bool animatingTransformToScreen = animatingTransformToTarget;
@@ -570,9 +696,11 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
     if (!layerShouldBeSkipped(layer))
         descendants.append(layer);
 
+    WebTransformationMatrix nextScrollCompensationMatrix = computeScrollCompensationMatrixForChildren(layer, parentMatrix, currentScrollCompensationMatrix);;
+
     for (size_t i = 0; i < layer->children().size(); ++i) {
         LayerType* child = layer->children()[i].get();
-        bool drawsContent = calculateDrawTransformsAndVisibilityInternal<LayerType, LayerList, RenderSurfaceType, LayerSorter>(child, rootLayer, sublayerMatrix, nextHierarchyMatrix, nearestAncestorThatMovesPixels, renderSurfaceLayerList, descendants, layerSorter, maxTextureSize);
+        bool drawsContent = calculateDrawTransformsInternal<LayerType, LayerList, RenderSurfaceType, LayerSorter>(child, rootLayer, sublayerMatrix, nextHierarchyMatrix, nextScrollCompensationMatrix, nearestAncestorThatMovesPixels, renderSurfaceLayerList, descendants, layerSorter, maxTextureSize);
 
         if (drawsContent) {
             if (child->renderSurface()) {
@@ -693,32 +821,125 @@ static bool calculateDrawTransformsAndVisibilityInternal(LayerType* layer, Layer
 
 // FIXME: Instead of using the following function to set visibility rects on a second
 // tree pass, revise calculateVisibleLayerRect() so that this can be done in a single
-// pass inside calculateDrawTransformsAndVisibilityInternal<>().
+// pass inside calculateDrawTransformsInternal<>().
 template<typename LayerType, typename LayerList, typename RenderSurfaceType>
-static void walkLayersAndCalculateVisibleLayerRects(const LayerList& renderSurfaceLayerList)
+static void calculateVisibleAndScissorRectsInternal(const LayerList& renderSurfaceLayerList, const FloatRect& rootScissorRect)
 {
     // Use BackToFront since it's cheap and this isn't order-dependent.
     typedef CCLayerIterator<LayerType, LayerList, RenderSurfaceType, CCLayerIteratorActions::BackToFront> CCLayerIteratorType;
 
     CCLayerIteratorType end = CCLayerIteratorType::end(&renderSurfaceLayerList);
     for (CCLayerIteratorType it = CCLayerIteratorType::begin(&renderSurfaceLayerList); it != end; ++it) {
-        if (!it.representsTargetRenderSurface()) {
+        if (it.representsTargetRenderSurface()) {
+            LayerType* maskLayer = it->maskLayer();
+            if (maskLayer)
+                maskLayer->setVisibleLayerRect(IntRect(IntPoint(), it->contentBounds()));
+            LayerType* replicaMaskLayer = it->replicaLayer() ? it->replicaLayer()->maskLayer() : 0;
+            if (replicaMaskLayer)
+                replicaMaskLayer->setVisibleLayerRect(IntRect(IntPoint(), it->contentBounds()));
+        } else if (it.representsItself()) {
             IntRect visibleLayerRect = calculateVisibleLayerRect(*it);
             it->setVisibleLayerRect(visibleLayerRect);
+
+            IntRect scissorRect = calculateLayerScissorRect<LayerType, RenderSurfaceType>(*it, rootScissorRect);
+            it->setScissorRect(scissorRect);
+        } else if (it.representsContributingRenderSurface()) {
+            IntRect scissorRect = calculateSurfaceScissorRect<LayerType, RenderSurfaceType>(*it, rootScissorRect);
+            it->renderSurface()->setScissorRect(scissorRect);
         }
     }
 }
 
-void CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(LayerChromium* layer, LayerChromium* rootLayer, const WebTransformationMatrix& parentMatrix, const WebTransformationMatrix& fullHierarchyMatrix, Vector<RefPtr<LayerChromium> >& renderSurfaceLayerList, Vector<RefPtr<LayerChromium> >& layerList, int maxTextureSize)
+void CCLayerTreeHostCommon::calculateDrawTransforms(LayerChromium* layer, LayerChromium* rootLayer, const WebTransformationMatrix& parentMatrix, const WebTransformationMatrix& fullHierarchyMatrix, Vector<RefPtr<LayerChromium> >& renderSurfaceLayerList, Vector<RefPtr<LayerChromium> >& layerList, int maxTextureSize)
 {
-    WebCore::calculateDrawTransformsAndVisibilityInternal<LayerChromium, Vector<RefPtr<LayerChromium> >, RenderSurfaceChromium, void>(layer, rootLayer, parentMatrix, fullHierarchyMatrix, 0, renderSurfaceLayerList, layerList, 0, maxTextureSize);
-    walkLayersAndCalculateVisibleLayerRects<LayerChromium, Vector<RefPtr<LayerChromium> >, RenderSurfaceChromium>(renderSurfaceLayerList);
+    WebTransformationMatrix scrollCompensationMatrix;
+    WebCore::calculateDrawTransformsInternal<LayerChromium, Vector<RefPtr<LayerChromium> >, RenderSurfaceChromium, void>(layer, rootLayer, parentMatrix, fullHierarchyMatrix, scrollCompensationMatrix, 0, renderSurfaceLayerList, layerList, 0, maxTextureSize);
 }
 
-void CCLayerTreeHostCommon::calculateDrawTransformsAndVisibility(CCLayerImpl* layer, CCLayerImpl* rootLayer, const WebTransformationMatrix& parentMatrix, const WebTransformationMatrix& fullHierarchyMatrix, Vector<CCLayerImpl*>& renderSurfaceLayerList, Vector<CCLayerImpl*>& layerList, CCLayerSorter* layerSorter, int maxTextureSize)
+void CCLayerTreeHostCommon::calculateDrawTransforms(CCLayerImpl* layer, CCLayerImpl* rootLayer, const WebTransformationMatrix& parentMatrix, const WebTransformationMatrix& fullHierarchyMatrix, Vector<CCLayerImpl*>& renderSurfaceLayerList, Vector<CCLayerImpl*>& layerList, CCLayerSorter* layerSorter, int maxTextureSize)
 {
-    calculateDrawTransformsAndVisibilityInternal<CCLayerImpl, Vector<CCLayerImpl*>, CCRenderSurface, CCLayerSorter>(layer, rootLayer, parentMatrix, fullHierarchyMatrix, 0, renderSurfaceLayerList, layerList, layerSorter, maxTextureSize);
-    walkLayersAndCalculateVisibleLayerRects<CCLayerImpl, Vector<CCLayerImpl*>, CCRenderSurface>(renderSurfaceLayerList);
+    WebTransformationMatrix scrollCompensationMatrix;
+    WebCore::calculateDrawTransformsInternal<CCLayerImpl, Vector<CCLayerImpl*>, CCRenderSurface, CCLayerSorter>(layer, rootLayer, parentMatrix, fullHierarchyMatrix, scrollCompensationMatrix, 0, renderSurfaceLayerList, layerList, layerSorter, maxTextureSize);
+}
+
+void CCLayerTreeHostCommon::calculateVisibleAndScissorRects(Vector<RefPtr<LayerChromium> >& renderSurfaceLayerList, const FloatRect& rootScissorRect)
+{
+    calculateVisibleAndScissorRectsInternal<LayerChromium, Vector<RefPtr<LayerChromium> >, RenderSurfaceChromium>(renderSurfaceLayerList, rootScissorRect);
+}
+
+void CCLayerTreeHostCommon::calculateVisibleAndScissorRects(Vector<CCLayerImpl*>& renderSurfaceLayerList, const FloatRect& rootScissorRect)
+{
+    calculateVisibleAndScissorRectsInternal<CCLayerImpl, Vector<CCLayerImpl*>, CCRenderSurface>(renderSurfaceLayerList, rootScissorRect);
+}
+
+static bool pointHitsRect(const IntPoint& viewportPoint, const WebTransformationMatrix& localSpaceToScreenSpaceTransform, FloatRect localSpaceRect)
+{
+    // If the transform is not invertible, then assume that this point doesn't hit this rect.
+    if (!localSpaceToScreenSpaceTransform.isInvertible())
+        return false;
+
+    // Transform the hit test point from screen space to the local space of the given rect.
+    bool clipped = false;
+    FloatPoint hitTestPointInLocalSpace = CCMathUtil::projectPoint(localSpaceToScreenSpaceTransform.inverse(), FloatPoint(viewportPoint), clipped);
+
+    // If projectPoint could not project to a valid value, then we assume that this point doesn't hit this rect.
+    if (clipped)
+        return false;
+
+    return localSpaceRect.contains(hitTestPointInLocalSpace);
+}
+
+static bool pointIsClippedBySurfaceOrClipRect(const IntPoint& viewportPoint, CCLayerImpl* layer)
+{
+    CCLayerImpl* currentLayer = layer;
+
+    // Walk up the layer tree and hit-test any renderSurfaces and any layer clipRects that are active.
+    while (currentLayer) {
+        if (currentLayer->renderSurface() && !pointHitsRect(viewportPoint, currentLayer->renderSurface()->screenSpaceTransform(), currentLayer->renderSurface()->contentRect()))
+            return true;
+
+        // Note that clipRects are actually in targetSurface space, so the transform we
+        // have to provide is the target surface's screenSpaceTransform.
+        if (currentLayer->usesLayerClipping() && !pointHitsRect(viewportPoint, currentLayer->targetRenderSurface()->screenSpaceTransform(), currentLayer->clipRect()))
+            return true;
+
+        currentLayer = currentLayer->parent();
+    }
+
+    // If we have finished walking all ancestors without having already exited, then the point is not clipped by any ancestors.
+    return false;
+}
+
+CCLayerImpl* CCLayerTreeHostCommon::findLayerThatIsHitByPoint(const IntPoint& viewportPoint, Vector<CCLayerImpl*>& renderSurfaceLayerList)
+{
+    CCLayerImpl* foundLayer = 0;
+
+    typedef CCLayerIterator<CCLayerImpl, Vector<CCLayerImpl*>, CCRenderSurface, CCLayerIteratorActions::FrontToBack> CCLayerIteratorType;
+    CCLayerIteratorType end = CCLayerIteratorType::end(&renderSurfaceLayerList);
+
+    for (CCLayerIteratorType it = CCLayerIteratorType::begin(&renderSurfaceLayerList); it != end; ++it) {
+        // We don't want to consider renderSurfaces for hit testing.
+        if (!it.representsItself())
+            continue;
+
+        CCLayerImpl* currentLayer = (*it);
+
+        FloatRect layerRect(FloatPoint::zero(), currentLayer->bounds());
+        if (!pointHitsRect(viewportPoint, currentLayer->screenSpaceTransform(), layerRect))
+            continue;
+
+        // At this point, we think the point does hit the layer, but we need to walk up
+        // the parents to ensure that the layer was not clipped in such a way that the
+        // hit point actually should not hit the layer.
+        if (pointIsClippedBySurfaceOrClipRect(viewportPoint, currentLayer))
+            continue;
+
+        foundLayer = currentLayer;
+        break;
+    }
+
+    // This can potentially return 0, which means the viewportPoint did not successfully hit test any layers, not even the root layer.
+    return foundLayer;
 }
 
 } // namespace WebCore

@@ -45,9 +45,9 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static const double monthDefaultStep = 1.0;
-static const double monthDefaultStepBase = 0.0;
-static const double monthStepScaleFactor = 1.0;
+static const int monthDefaultStep = 1;
+static const int monthDefaultStepBase = 0;
+static const int monthStepScaleFactor = 1;
 
 PassOwnPtr<InputType> MonthInputType::create(HTMLInputElement* element)
 {
@@ -82,7 +82,7 @@ String MonthInputType::serializeWithMilliseconds(double value) const
     return serializeWithComponents(date);
 }
 
-double MonthInputType::defaultValueForStepUp() const
+Decimal MonthInputType::defaultValueForStepUp() const
 {
     double current = currentTimeMS();
     double utcOffset = calculateUTCOffset();
@@ -94,28 +94,28 @@ double MonthInputType::defaultValueForStepUp() const
     date.setMillisecondsSinceEpochForMonth(current);
     double months = date.monthsSinceEpoch();
     ASSERT(isfinite(months));
-    return months;
+    return Decimal::fromDouble(months);
 }
 
 StepRange MonthInputType::createStepRange(AnyStepHandling anyStepHandling) const
 {
     DEFINE_STATIC_LOCAL(const StepRange::StepDescription, stepDescription, (monthDefaultStep, monthDefaultStepBase, monthStepScaleFactor, StepRange::ParsedStepValueShouldBeInteger));
 
-    double stepBase = parseToDouble(element()->fastGetAttribute(minAttr), DateComponents::minimumMonth());
-    double minimum = parseToDouble(element()->fastGetAttribute(minAttr), DateComponents::minimumMonth());
-    double maximum = parseToDouble(element()->fastGetAttribute(maxAttr), DateComponents::maximumMonth());
-    StepRange::DoubleWithDecimalPlacesOrMissing step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
+    const Decimal stepBase = parseToNumber(element()->fastGetAttribute(minAttr), Decimal::fromDouble(DateComponents::minimumMonth()));
+    const Decimal minimum = parseToNumber(element()->fastGetAttribute(minAttr), Decimal::fromDouble(DateComponents::minimumMonth()));
+    const Decimal maximum = parseToNumber(element()->fastGetAttribute(maxAttr), Decimal::fromDouble(DateComponents::maximumMonth()));
+    const Decimal step = StepRange::parseStep(anyStepHandling, stepDescription, element()->fastGetAttribute(stepAttr));
     return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 
-double MonthInputType::parseToDouble(const String& src, double defaultValue) const
+Decimal MonthInputType::parseToNumber(const String& src, const Decimal& defaultValue) const
 {
     DateComponents date;
     if (!parseToDateComponents(src, &date))
         return defaultValue;
     double months = date.monthsSinceEpoch();
     ASSERT(isfinite(months));
-    return months;
+    return Decimal::fromDouble(months);
 }
 
 bool MonthInputType::parseToDateComponentsInternal(const UChar* characters, unsigned length, DateComponents* out) const

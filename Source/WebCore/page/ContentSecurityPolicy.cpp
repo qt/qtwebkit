@@ -34,6 +34,7 @@
 #include "InspectorInstrumentation.h"
 #include "InspectorValues.h"
 #include "PingLoader.h"
+#include "SchemeRegistry.h"
 #include "ScriptCallStack.h"
 #include "SecurityOrigin.h"
 #include "TextEncoding.h"
@@ -77,6 +78,11 @@ bool isNotASCIISpace(UChar c)
     return !isASCIISpace(c);
 }
 
+bool isNotColonOrSlash(UChar c)
+{
+    return c != ':' && c != '/';
+}
+
 } // namespace
 
 static bool skipExactly(const UChar*& position, const UChar* end, UChar delimiter)
@@ -98,7 +104,7 @@ static bool skipExactly(const UChar*& position, const UChar* end)
     return false;
 }
 
-static void skipUtil(const UChar*& position, const UChar* end, UChar delimiter)
+static void skipUntil(const UChar*& position, const UChar* end, UChar delimiter)
 {
     while (position < end && *position != delimiter)
         ++position;
@@ -191,6 +197,7 @@ private:
     bool parseScheme(const UChar* begin, const UChar* end, String& scheme);
     bool parseHost(const UChar* begin, const UChar* end, String& host, bool& hostHasWildcard);
     bool parsePort(const UChar* begin, const UChar* end, int& port, bool& portHasWildcard);
+    bool parsePath(const UChar* begin, const UChar* end, String& path);
 
     void addSourceSelf();
     void addSourceStar();
@@ -263,13 +270,15 @@ void CSPSourceList::parse(const UChar* begin, const UChar* end)
 }
 
 // source            = scheme ":"
-//                   / ( [ scheme "://" ] host [ port ] )
+//                   / ( [ scheme "://" ] host [ port ] [ path ] )
 //                   / "'self'"
 //
 bool CSPSourceList::parseSource(const UChar* begin, const UChar* end,
                                 String& scheme, String& host, int& port,
                                 bool& hostHasWildcard, bool& portHasWildcard)
 {
+    String path; // FIXME: We're ignoring the path component for now.
+
     if (begin == end)
         return false;
 
@@ -294,52 +303,80 @@ bool CSPSourceList::parseSource(const UChar* begin, const UChar* end,
     }
 
     const UChar* position = begin;
-
     const UChar* beginHost = begin;
-    skipUtil(position, end, ':');
+    const UChar* beginPath = end;
+    const UChar* beginPort = 0;
+
+    skipWhile<isNotColonOrSlash>(position, end);
 
     if (position == end) {
-        // This must be a host-only source.
-        if (!parseHost(beginHost, position, host, hostHasWildcard))
+        // host
+        //     ^
+        return parseHost(beginHost, position, host, hostHasWildcard);
+    }
+
+    if (position < end && *position == '/') {
+        // host/path || host/ || /
+        //     ^            ^    ^
+        if (!parseHost(beginHost, position, host, hostHasWildcard)
+            || !parsePath(position, end, path)
+            || position != end)
             return false;
         return true;
     }
 
-    if (end - position == 1) {
-        ASSERT(*position == ':');
-        // This must be a scheme-only source.
-        if (!parseScheme(begin, position, scheme))
-            return false;
-        return true;
+    if (position < end && *position == ':') {
+        if (end - position == 1) {
+            // scheme:
+            //       ^
+            return parseScheme(begin, position, scheme);
+        }
+
+        if (position[1] == '/') {
+            // scheme://host || scheme://
+            //       ^                ^
+            if (!parseScheme(begin, position, scheme)
+                || !skipExactly(position, end, ':')
+                || !skipExactly(position, end, '/')
+                || !skipExactly(position, end, '/'))
+                return false;
+            if (position == end)
+                return true;
+            beginHost = position;
+            skipWhile<isNotColonOrSlash>(position, end);
+        }
+
+        if (position < end && *position == ':') {
+            // host:port || scheme://host:port
+            //     ^                     ^
+            beginPort = position;
+            skipUntil(position, end, '/');
+        }
     }
 
-    ASSERT(end - position >= 2);
-    if (position[1] == '/') {
-        if (!parseScheme(begin, position, scheme)
-            || !skipExactly(position, end, ':')
-            || !skipExactly(position, end, '/')
-            || !skipExactly(position, end, '/'))
+    if (position < end && *position == '/') {
+        // scheme://host/path || scheme://host:port/path
+        //              ^                          ^
+        if (position == beginHost)
             return false;
-        beginHost = position;
-        skipUtil(position, end, ':');
+
+        beginPath = position;
     }
 
-    if (position == beginHost)
+    if (!parseHost(beginHost, beginPort ? beginPort : beginPath, host, hostHasWildcard))
         return false;
 
-    if (!parseHost(beginHost, position, host, hostHasWildcard))
-        return false;
-
-    if (position == end) {
+    if (beginPort) {
+        if (!parsePort(beginPort, beginPath, port, portHasWildcard))
+            return false;
+    } else {
         port = 0;
-        return true;
     }
 
-    if (!skipExactly(position, end, ':'))
-        ASSERT_NOT_REACHED();
-
-    if (!parsePort(position, end, port, portHasWildcard))
-        return false;
+    if (beginPath != end) {
+        if (!parsePath(beginPath, end, path))
+            return false;
+    }
 
     return true;
 }
@@ -411,6 +448,19 @@ bool CSPSourceList::parseHost(const UChar* begin, const UChar* end, String& host
     return true;
 }
 
+// FIXME: Deal with an actual path. This just sucks up everything to the end of the string.
+bool CSPSourceList::parsePath(const UChar* begin, const UChar* end, String& path)
+{
+    ASSERT(begin <= end);
+    ASSERT(path.isEmpty());
+
+    if (begin == end)
+        return false;
+
+    path = String(begin, end - begin);
+    return true;
+}
+
 // port              = ":" ( 1*DIGIT / "*" )
 //
 bool CSPSourceList::parsePort(const UChar* begin, const UChar* end, int& port, bool& portHasWildcard)
@@ -418,6 +468,9 @@ bool CSPSourceList::parsePort(const UChar* begin, const UChar* end, int& port, b
     ASSERT(begin <= end);
     ASSERT(!port);
     ASSERT(!portHasWildcard);
+
+    if (!skipExactly(begin, end, ':'))
+        ASSERT_NOT_REACHED();
 
     if (begin == end)
         return false;
@@ -513,15 +566,16 @@ private:
     void parse(const String&);
 
     bool parseDirective(const UChar* begin, const UChar* end, String& name, String& value);
-    void parseReportURI(const String&);
+    void parseReportURI(const String& name, const String& value);
     void addDirective(const String& name, const String& value);
-    void applySandboxPolicy(const String& sandboxPolicy);
+    void applySandboxPolicy(const String& name, const String& sandboxPolicy);
 
-    PassOwnPtr<CSPDirective> createCSPDirective(const String& name, const String& value);
+    void setCSPDirective(const String& name, const String& value, OwnPtr<CSPDirective>&);
 
     CSPDirective* operativeDirective(CSPDirective*) const;
     void reportViolation(const String& directiveText, const String& consoleMessage, const KURL& blockedURL = KURL(), const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), PassRefPtr<ScriptCallStack> = 0) const;
     void logUnrecognizedDirective(const String& name) const;
+    void logDuplicateDirective(const String& name) const;
     bool checkEval(CSPDirective*) const;
 
     bool checkInlineAndReportViolation(CSPDirective*, const String& consoleMessage, const String& contextURL, const WTF::OrdinalNumber& contextLine) const;
@@ -627,6 +681,12 @@ void CSPDirectiveList::reportViolation(const String& directiveText, const String
 void CSPDirectiveList::logUnrecognizedDirective(const String& name) const
 {
     String message = makeString("Unrecognized Content-Security-Policy directive '", name, "'.\n");
+    m_scriptExecutionContext->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
+}
+
+void CSPDirectiveList::logDuplicateDirective(const String& name) const
+{
+    String message = makeString("Ignoring duplicate Content-Security-Policy directive '", name, "'.\n");
     m_scriptExecutionContext->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
 }
 
@@ -760,7 +820,7 @@ void CSPDirectiveList::parse(const String& policy)
 
     while (position < end) {
         const UChar* directiveBegin = position;
-        skipUtil(position, end, ';');
+        skipUntil(position, end, ';');
 
         String name, value;
         if (parseDirective(directiveBegin, position, name, value)) {
@@ -816,8 +876,12 @@ bool CSPDirectiveList::parseDirective(const UChar* begin, const UChar* end, Stri
     return true;
 }
 
-void CSPDirectiveList::parseReportURI(const String& value)
+void CSPDirectiveList::parseReportURI(const String& name, const String& value)
 {
+    if (!m_reportURIs.isEmpty()) {
+        logDuplicateDirective(name);
+        return;
+    }
     const UChar* position = value.characters();
     const UChar* end = position + value.length();
 
@@ -834,14 +898,21 @@ void CSPDirectiveList::parseReportURI(const String& value)
     }
 }
 
-PassOwnPtr<CSPDirective> CSPDirectiveList::createCSPDirective(const String& name, const String& value)
+void CSPDirectiveList::setCSPDirective(const String& name, const String& value, OwnPtr<CSPDirective>& directive)
 {
-    return adoptPtr(new CSPDirective(name, value, m_scriptExecutionContext));
+    if (directive) {
+        logDuplicateDirective(name);
+        return;
+    }
+    directive = adoptPtr(new CSPDirective(name, value, m_scriptExecutionContext));
 }
 
-void CSPDirectiveList::applySandboxPolicy(const String& sandboxPolicy)
+void CSPDirectiveList::applySandboxPolicy(const String& name, const String& sandboxPolicy)
 {
-    ASSERT(!m_haveSandboxPolicy);
+    if (m_haveSandboxPolicy) {
+        logDuplicateDirective(name);
+        return;
+    }
     m_haveSandboxPolicy = true;
     m_scriptExecutionContext->enforceSandboxFlags(SecurityContext::parseSandboxPolicy(sandboxPolicy));
 }
@@ -862,28 +933,28 @@ void CSPDirectiveList::addDirective(const String& name, const String& value)
 
     ASSERT(!name.isEmpty());
 
-    if (!m_defaultSrc && equalIgnoringCase(name, defaultSrc))
-        m_defaultSrc = createCSPDirective(name, value);
-    else if (!m_scriptSrc && equalIgnoringCase(name, scriptSrc))
-        m_scriptSrc = createCSPDirective(name, value);
-    else if (!m_objectSrc && equalIgnoringCase(name, objectSrc))
-        m_objectSrc = createCSPDirective(name, value);
-    else if (!m_frameSrc && equalIgnoringCase(name, frameSrc))
-        m_frameSrc = createCSPDirective(name, value);
-    else if (!m_imgSrc && equalIgnoringCase(name, imgSrc))
-        m_imgSrc = createCSPDirective(name, value);
-    else if (!m_styleSrc && equalIgnoringCase(name, styleSrc))
-        m_styleSrc = createCSPDirective(name, value);
-    else if (!m_fontSrc && equalIgnoringCase(name, fontSrc))
-        m_fontSrc = createCSPDirective(name, value);
-    else if (!m_mediaSrc && equalIgnoringCase(name, mediaSrc))
-        m_mediaSrc = createCSPDirective(name, value);
-    else if (!m_connectSrc && equalIgnoringCase(name, connectSrc))
-        m_connectSrc = createCSPDirective(name, value);
-    else if (!m_haveSandboxPolicy && equalIgnoringCase(name, sandbox))
-        applySandboxPolicy(value);
-    else if (m_reportURIs.isEmpty() && equalIgnoringCase(name, reportURI))
-        parseReportURI(value);
+    if (equalIgnoringCase(name, defaultSrc))
+        setCSPDirective(name, value, m_defaultSrc);
+    else if (equalIgnoringCase(name, scriptSrc))
+        setCSPDirective(name, value, m_scriptSrc);
+    else if (equalIgnoringCase(name, objectSrc))
+        setCSPDirective(name, value, m_objectSrc);
+    else if (equalIgnoringCase(name, frameSrc))
+        setCSPDirective(name, value, m_frameSrc);
+    else if (equalIgnoringCase(name, imgSrc))
+        setCSPDirective(name, value, m_imgSrc);
+    else if (equalIgnoringCase(name, styleSrc))
+        setCSPDirective(name, value, m_styleSrc);
+    else if (equalIgnoringCase(name, fontSrc))
+        setCSPDirective(name, value, m_fontSrc);
+    else if (equalIgnoringCase(name, mediaSrc))
+        setCSPDirective(name, value, m_mediaSrc);
+    else if (equalIgnoringCase(name, connectSrc))
+        setCSPDirective(name, value, m_connectSrc);
+    else if (equalIgnoringCase(name, sandbox))
+        applySandboxPolicy(name, value);
+    else if (equalIgnoringCase(name, reportURI))
+        parseReportURI(name, value);
     else
         logUnrecognizedDirective(name);
 }
@@ -948,6 +1019,9 @@ bool isAllowedByAllWithContext(const CSPDirectiveListVector& policies, const Str
 template<bool (CSPDirectiveList::*allowFromURL)(const KURL&) const>
 bool isAllowedByAllWithURL(const CSPDirectiveListVector& policies, const KURL& url)
 {
+    if (SchemeRegistry::schemeShouldBypassContentSecurityPolicy(url.protocol()))
+        return true;
+
     for (size_t i = 0; i < policies.size(); ++i) {
         if (!(policies[i].get()->*allowFromURL)(url))
             return false;

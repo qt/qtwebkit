@@ -301,6 +301,12 @@ base.AsynchronousCache.prototype.get = function(key, callback)
     });
 };
 
+base.AsynchronousCache.prototype.clear = function()
+{
+    this._dataCache = {};
+    this._callbackCache = {};
+}
+
 /*
     Maintains a dictionary of items, tracking their updates and removing items that haven't been updated.
     An "update" is a call to the "update" method.
@@ -428,6 +434,29 @@ base.relativizeTime = function(time)
         return true;
     });
     return result;
+}
+
+base.getURLParameter = function(name)
+{
+    return decodeURI(
+        (RegExp(name + '=' + '(.+?)(&|$)').exec(location.search)||[,null])[1]
+    );
+}
+
+
+base.underscoredBuilderName = function(builderName)
+{
+    return builderName.replace(/[ .()]/g, '_');
+}
+
+base.createLinkNode = function(url, textContent, opt_target)
+{
+    var link = document.createElement('a');
+    link.href = url;
+    if (opt_target)
+        link.target = opt_target;
+    link.appendChild(document.createTextNode(textContent));
+    return link;
 }
 
 })();

@@ -32,6 +32,7 @@
 #define WebFrame_h
 
 #include "WebIconURL.h"
+#include "WebMessagePortChannel.h"
 #include "WebNode.h"
 #include "WebURLLoaderOptions.h"
 #include "platform/WebCanvas.h"
@@ -162,7 +163,7 @@ public:
     // The minimum and maxium scroll positions in pixels.
     virtual WebSize minimumScrollOffset() const = 0;
     virtual WebSize maximumScrollOffset() const = 0;
- 
+
     // The size of the contents area.
     virtual WebSize contentsSize() const = 0;
 
@@ -433,6 +434,7 @@ public:
     virtual void enableContinuousSpellChecking(bool) = 0;
     virtual bool isContinuousSpellCheckingEnabled() const = 0;
     virtual void requestTextChecking(const WebElement&) = 0;
+    virtual void replaceMisspelledRange(const WebString&) = 0;
 
     // Selection -----------------------------------------------------------
 
@@ -591,7 +593,9 @@ public:
     // Web Intents ---------------------------------------------------------
 
     // Called on a target service page to deliver an intent to the window.
-    virtual void deliverIntent(const WebIntent&, WebDeliveredIntentClient*) = 0;
+    // The ports are any transferred ports that accompany the intent as a result
+    // of MessagePort transfer.
+    virtual void deliverIntent(const WebIntent&, WebMessagePortChannelArray* ports, WebDeliveredIntentClient*) = 0;
 
 
     // Utility -------------------------------------------------------------
@@ -614,10 +618,6 @@ public:
     // to support layout tests.
     virtual WebString renderTreeAsText(RenderAsTextControls toShow = RenderAsTextNormal) const = 0;
 
-    // Returns the counter value for the specified element.  This method is
-    // used to support layout tests.
-    virtual WebString counterValueForElementById(const WebString& id) const = 0;
-
     // Calls markerTextForListItem() defined in WebCore/rendering/RenderTreeAsText.h.
     virtual WebString markerTextForListItem(const WebElement&) const = 0;
 
@@ -637,7 +637,7 @@ public:
     // empty ((0,0), (0,0)).
     virtual WebRect selectionBoundsRect() const = 0;
 
-    // Only for testing purpose: 
+    // Only for testing purpose:
     // Returns true if selection.anchorNode has a marker on range from |from| with |length|.
     virtual bool selectionStartHasSpellingMarkerFor(int from, int length) const = 0;
 

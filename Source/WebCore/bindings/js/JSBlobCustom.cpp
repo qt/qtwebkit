@@ -35,6 +35,7 @@
 #include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
 #include "JSArrayBuffer.h"
+#include "JSArrayBufferView.h"
 #include "JSDOMBinding.h"
 #include "JSDictionary.h"
 #include "JSFile.h"
@@ -53,9 +54,9 @@ JSValue toJS(ExecState* exec, JSDOMGlobalObject* globalObject, Blob* blob)
         return jsNull();
 
     if (blob->isFile())
-        return CREATE_DOM_WRAPPER(exec, globalObject, File, blob);
+        return wrap<JSFile>(exec, globalObject, static_cast<File*>(blob));
 
-    return CREATE_DOM_WRAPPER(exec, globalObject, Blob, blob);
+    return wrap<JSBlob>(exec, globalObject, blob);    
 }
 
 EncodedJSValue JSC_HOST_CALL JSBlobConstructor::constructJSBlob(ExecState* exec)
@@ -103,6 +104,9 @@ EncodedJSValue JSC_HOST_CALL JSBlobConstructor::constructJSBlob(ExecState* exec)
         dictionary.get("type", type);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
+        if (!type.containsOnlyASCII())
+            return throwVMError(exec, createSyntaxError(exec, "type must consist of ASCII characters"));
+        type.makeLower();
     }
 
     ASSERT(endings == "transparent" || endings == "native");
@@ -117,7 +121,9 @@ EncodedJSValue JSC_HOST_CALL JSBlobConstructor::constructJSBlob(ExecState* exec)
         JSValue item = array->getIndex(i);
 #if ENABLE(BLOB)
         if (item.inherits(&JSArrayBuffer::s_info))
-            blobBuilder->append(toArrayBuffer(item));
+            blobBuilder->append(context, toArrayBuffer(item));
+        else if (item.inherits(&JSArrayBufferView::s_info))
+            blobBuilder->append(toArrayBufferView(item));
         else
 #endif
         if (item.inherits(&JSBlob::s_info))

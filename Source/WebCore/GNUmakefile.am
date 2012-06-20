@@ -459,6 +459,15 @@ endif
 endif # END ENABLE_FILTERS
 
 # ----
+# CSS box decoration break
+# ----
+if ENABLE_CSS_BOX_DECORATION_BREAK
+FEATURE_DEFINES += ENABLE_CSS_BOX_DECORATION_BREAK=1
+webcore_cppflags += -DENABLE_CSS_BOX_DECORATION_BREAK=1
+
+endif # END ENABLE_CSS_BOX_DECORATION_BREAK
+
+# ----
 # Regions
 # ----
 if ENABLE_CSS_REGIONS
@@ -698,6 +707,14 @@ FEATURE_DEFINES += ENABLE_CSS3_FLEXBOX=1
 webcore_cppflags += -DENABLE_CSS3_FLEXBOX=1
 endif  # END ENABLE_CSS3_FLEXBOX
 
+# ---
+# Link prefetch support
+# ---
+if ENABLE_LINK_PREFETCH
+FEATURE_DEFINES += ENABLE_LINK_PREFETCH=1
+webcore_cppflags += -DENABLE_LINK_PREFETCH=1
+endif  # END ENABLE_LINK_PREFETCH
+
 DerivedSources/WebCore/CSSPropertyNames.cpp: DerivedSources/WebCore/CSSPropertyNames.h
 DerivedSources/WebCore/CSSPropertyNames.h: $(WEBCORE_CSS_PROPERTY_NAMES) $(WebCore)/css/makeprop.pl
 	$(AM_V_GEN)
@@ -821,6 +838,8 @@ DerivedSources/WebCore/InspectorBackendCommands.js: DerivedSources/WebCore/Inspe
 DerivedSources/WebCore/InspectorBackendDispatcher.h: DerivedSources/WebCore/InspectorBackendDispatcher.cpp
 DerivedSources/WebCore/InjectedScriptSource.h: $(WebCore)/inspector/InjectedScriptSource.js
 	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptSource_js $(WebCore)/inspector/InjectedScriptSource.js $(GENSOURCES_WEBCORE)/InjectedScriptSource.h
+DerivedSources/WebCore/InjectedWebGLScriptSource.h: $(WebCore)/inspector/InjectedWebGLScriptSource.js
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedWebGLScriptSource_js $(WebCore)/inspector/InjectedWebGLScriptSource.js $(GENSOURCES_WEBCORE)/InjectedWebGLScriptSource.h
 
 if ENABLE_WEB_AUDIO
 # Installing HRTF database wav files
@@ -848,6 +867,7 @@ IDL_PATH := \
     $(WebCore)/bindings/js \
     $(WebCore)/css \
     $(WebCore)/dom \
+    $(WebCore)/editing \
     $(WebCore)/fileapi \
     $(WebCore)/html \
     $(WebCore)/html/canvas \
@@ -1007,6 +1027,7 @@ EXTRA_DIST += \
 	$(shell ls $(srcdir)/Source/WebCore/Modules/websockets/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/css/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/dom/*.idl) \
+	$(shell ls $(srcdir)/Source/WebCore/editing/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/fileapi/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/html/canvas/*.idl) \
 	$(shell ls $(srcdir)/Source/WebCore/html/shadow/*.idl) \
@@ -1070,6 +1091,7 @@ EXTRA_DIST += \
 	Source/WebCore/icu/LICENSE \
 	Source/WebCore/inspector/CodeGeneratorInspector.py \
 	Source/WebCore/inspector/InjectedScriptSource.js \
+	Source/WebCore/inspector/InjectedWebGLScriptSource.js \
 	Source/WebCore/inspector/Inspector.json \
 	Source/WebCore/inspector/Inspector-1.0.json \
 	Source/WebCore/inspector/generate-inspector-protocol-version \

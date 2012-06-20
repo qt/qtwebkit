@@ -54,6 +54,7 @@
 #include "RegExpObject.h"
 #include "StrictEvalActivation.h"
 #include "StrongInlines.h"
+#include <wtf/RetainPtr.h>
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
 
@@ -100,13 +101,10 @@ static bool enableAssembler(ExecutableAllocator& executableAllocator)
         return false;
 
 #if USE(CF)
-    CFStringRef canUseJITKey = CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman);
-    CFBooleanRef canUseJIT = (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey, kCFPreferencesCurrentApplication);
-    if (canUseJIT) {
-        return kCFBooleanTrue == canUseJIT;
-        CFRelease(canUseJIT);
-    }
-    CFRelease(canUseJITKey);
+    RetainPtr<CFStringRef> canUseJITKey(AdoptCF, CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman));
+    RetainPtr<CFBooleanRef> canUseJIT(AdoptCF, (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey.get(), kCFPreferencesCurrentApplication));
+    if (canUseJIT)
+        return kCFBooleanTrue == canUseJIT.get();
 #endif
 
 #if USE(CF) || OS(UNIX)
@@ -159,6 +157,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , dynamicGlobalObject(0)
     , cachedUTCOffset(std::numeric_limits<double>::quiet_NaN())
     , maxReentryDepth(threadStackType == ThreadStackTypeSmall ? MaxSmallThreadReentryDepth : MaxLargeThreadReentryDepth)
+    , m_enabledProfiler(0)
     , m_regExpCache(new RegExpCache(this))
 #if ENABLE(REGEXP_TRACING)
     , m_rtTraceList(new RTTraceList())
@@ -418,7 +417,7 @@ struct StackPreservingRecompiler : public MarkedBlock::VoidFunctor {
         FunctionExecutable* executable = jsCast<FunctionExecutable*>(cell);
         if (currentlyExecutingFunctions.contains(executable))
             return;
-        executable->discardCode();
+        executable->clearCodeIfNotCompiling();
     }
 };
 

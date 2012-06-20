@@ -120,13 +120,11 @@ InputHandler::InputHandler(WebPagePrivate* page)
     , m_composingTextEnd(0)
     , m_pendingKeyboardVisibilityChange(NoChange)
     , m_delayKeyboardVisibilityChange(false)
-    , m_selectClient(0)
 {
 }
 
 InputHandler::~InputHandler()
 {
-    delete m_selectClient;
 }
 
 static BlackBerryInputType convertInputType(const HTMLInputElement* inputElement)
@@ -1142,23 +1140,24 @@ bool InputHandler::openSelectPopup(HTMLSelectElement* select)
     ScopeArray<WebString> labels;
     labels.reset(new WebString[size]);
 
-    if (!size) {
-        if (!m_selectClient)
-            m_selectClient = new SelectPopupClient(multiple, size, labels, 0, 0, 0, m_webPage, select);
-        else
-            m_selectClient->update(multiple, size, labels, enableds, itemTypes, selecteds, m_webPage, select);
-    } else {
-        bool* enableds = new bool[size];
-        int* itemTypes = new int[size];
-        bool* selecteds = new bool[size];
+    // Check if popup already exists, close it if does.
+    m_webPage->m_page->chrome()->client()->closePagePopup(0);
 
+    bool* enableds = 0;
+    int* itemTypes = 0;
+    bool* selecteds = 0;
+
+    if (size) {
+        enableds = new bool[size];
+        itemTypes = new int[size];
+        selecteds = new bool[size];
         for (int i = 0; i < size; i++) {
             if (listItems[i]->hasTagName(HTMLNames::optionTag)) {
                 HTMLOptionElement* option = static_cast<HTMLOptionElement*>(listItems[i]);
                 labels[i] = option->textIndentedToRespectGroupLabel();
                 enableds[i] = option->disabled() ? 0 : 1;
                 selecteds[i] = option->selected();
-                itemTypes[i] = TypeOption;
+                itemTypes[i] = option->parentNode() && option->parentNode()->hasTagName(HTMLNames::optgroupTag) ? TypeOptionInGroup : TypeOption;
             } else if (listItems[i]->hasTagName(HTMLNames::optgroupTag)) {
                 HTMLOptGroupElement* optGroup = static_cast<HTMLOptGroupElement*>(listItems[i]);
                 labels[i] = optGroup->groupLabelText();
@@ -1171,15 +1170,11 @@ bool InputHandler::openSelectPopup(HTMLSelectElement* select)
                 itemTypes[i] = TypeSeparator;
             }
         }
-
-        if (!m_selectClient)
-            m_selectClient = new SelectPopupClient(multiple, size, labels, enableds, itemTypes, selecteds, m_webPage, select);
-        else
-            m_selectClient->update(multiple, size, labels, enableds, itemTypes, selecteds, m_webPage, select);
     }
 
+    SelectPopupClient* selectClient = new SelectPopupClient(multiple, size, labels, enableds, itemTypes, selecteds, m_webPage, select);
     WebCore::IntRect elementRectInRootView = select->document()->view()->contentsToRootView(select->getRect());
-    m_webPage->m_page->chrome()->client()->openPagePopup(m_selectClient, elementRectInRootView);
+    m_webPage->m_page->chrome()->client()->openPagePopup(selectClient, elementRectInRootView);
     return true;
 }
 

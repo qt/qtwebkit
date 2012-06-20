@@ -27,6 +27,7 @@
 
 #include "ContentType.h"
 #include "CSSStyleSheet.h"
+#include "ContextFeatures.h"
 #include "DocumentType.h"
 #include "Element.h"
 #include "ExceptionCode.h"
@@ -147,7 +148,7 @@ static bool isSVG11Feature(const String &feature, const String &version)
         addString(svgFeatures, "Style");
         addString(svgFeatures, "ViewportAttribute");
         addString(svgFeatures, "Shape");
-//      addString(svgFeatures, "Text"); // requires altGlyph, bug 6426
+        addString(svgFeatures, "Text");
         addString(svgFeatures, "BasicText");
         addString(svgFeatures, "PaintAttribute");
         addString(svgFeatures, "BasicPaintAttribute");
@@ -162,7 +163,7 @@ static bool isSVG11Feature(const String &feature, const String &version)
         addString(svgFeatures, "BasicClip");
         addString(svgFeatures, "Mask");
 #if ENABLE(FILTERS)
-//      addString(svgFeatures, "Filter");
+        addString(svgFeatures, "Filter");
         addString(svgFeatures, "BasicFilter");
 #endif
         addString(svgFeatures, "DocumentEventsAttribute");
@@ -172,7 +173,7 @@ static bool isSVG11Feature(const String &feature, const String &version)
         addString(svgFeatures, "Hyperlinking");
         addString(svgFeatures, "XlinkAttribute");
         addString(svgFeatures, "ExternalResourcesRequired");
-//      addString(svgFeatures, "View"); // buggy <view> support, bug 16962
+        addString(svgFeatures, "View");
         addString(svgFeatures, "Script");
         addString(svgFeatures, "Animation"); 
 #if ENABLE(SVG_FONTS)
@@ -295,6 +296,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceUR
         doc = Document::create(0, KURL());
 
     doc->setSecurityOrigin(m_document->securityOrigin());
+    doc->setContextFeatures(m_document->contextFeatures());
 
     RefPtr<Node> documentElement;
     if (!qualifiedName.isEmpty()) {
@@ -372,6 +374,7 @@ PassRefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(const String& tit
     d->write("<!doctype html><html><body></body></html>");
     d->setTitle(title);
     d->setSecurityOrigin(m_document->securityOrigin());
+    d->setContextFeatures(m_document->contextFeatures());
     return d.release();
 }
 

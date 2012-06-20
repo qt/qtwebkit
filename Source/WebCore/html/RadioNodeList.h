@@ -36,9 +36,9 @@ namespace WebCore {
 
 class RadioNodeList : public DynamicSubtreeNodeList {
 public:
-    static PassRefPtr<RadioNodeList> create(const AtomicString& name, Element* baseElement)
+    static PassRefPtr<RadioNodeList> create(Element* baseElement, const AtomicString& name)
     {
-        return adoptRef(new RadioNodeList(name, baseElement));
+        return adoptRef(new RadioNodeList(baseElement, name));
     }
 
     ~RadioNodeList();
@@ -50,7 +50,7 @@ protected:
     virtual bool nodeMatches(Element*) const;
 
 private:
-    RadioNodeList(const AtomicString& name, Element*);
+    RadioNodeList(Element*, const AtomicString& name);
     bool checkElementMatchesRadioNodeListFilter(Element*) const;
 
     AtomicString m_name;

@@ -47,6 +47,7 @@ SOURCES += \
     API/OpaqueJSString.cpp \
     assembler/ARMAssembler.cpp \
     assembler/ARMv7Assembler.cpp \
+    assembler/LinkBuffer.cpp \
     assembler/MacroAssemblerARM.cpp \
     assembler/MacroAssemblerSH4.cpp \
     bytecode/CallLinkInfo.cpp \
@@ -62,10 +63,11 @@ SOURCES += \
     bytecode/MethodOfGettingAValueProfile.cpp \
     bytecode/Opcode.cpp \
     bytecode/PolymorphicPutByIdList.cpp \
-    bytecode/PredictedType.cpp \
     bytecode/PutByIdStatus.cpp \
     bytecode/SamplingTool.cpp \
+    bytecode/SpeculatedType.cpp \
     bytecode/StructureStubInfo.cpp \
+    bytecode/Watchpoint.cpp \
     bytecompiler/BytecodeGenerator.cpp \
     bytecompiler/NodesCodegen.cpp \
     heap/CopiedSpace.cpp \
@@ -78,6 +80,7 @@ SOURCES += \
     heap/HandleStack.cpp \
     heap/BlockAllocator.cpp \
     heap/Heap.cpp \
+    heap/HeapTimer.cpp \
     heap/IncrementalSweeper.cpp \
     heap/MachineStackMarker.cpp \
     heap/MarkStack.cpp \
@@ -194,9 +197,11 @@ SOURCES += \
     runtime/JSObject.cpp \
     runtime/JSONObject.cpp \
     runtime/JSPropertyNameIterator.cpp \
+    runtime/JSSegmentedVariableObject.cpp \
     runtime/JSStaticScopeObject.cpp \
     runtime/JSString.cpp \
     runtime/JSStringJoiner.cpp \
+    runtime/JSSymbolTableObject.cpp \
     runtime/JSValue.cpp \
     runtime/JSVariableObject.cpp \
     runtime/JSWrapperObject.cpp \
@@ -234,6 +239,7 @@ SOURCES += \
     runtime/StringRecursionChecker.cpp \
     runtime/StructureChain.cpp \
     runtime/Structure.cpp \
+    runtime/SymbolTable.cpp \
     runtime/TimeoutChecker.cpp \
     runtime/UString.cpp \
     tools/CodeProfile.cpp \

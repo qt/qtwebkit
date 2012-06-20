@@ -51,6 +51,10 @@
 
 #include <math.h>
 
+#if OS(WINDOWS) && HAVE(QT5)
+Q_GUI_EXPORT QPixmap qt_pixmapFromWinHBITMAP(HBITMAP, int hbitmapFormat = 0);
+#endif
+
 typedef QHash<QByteArray, QPixmap> WebGraphicHash;
 Q_GLOBAL_STATIC(WebGraphicHash, _graphics)
 
@@ -289,7 +293,13 @@ void BitmapImage::checkForSolidColor()
 #if OS(WINDOWS)
 PassRefPtr<BitmapImage> BitmapImage::create(HBITMAP hBitmap)
 {
-    return BitmapImage::create(new QPixmap(QPixmap::fromWinHBITMAP(hBitmap)));
+#if HAVE(QT5)
+    QPixmap* qPixmap = new QPixmap(qt_pixmapFromWinHBITMAP(hBitmap));
+#else
+    QPixmap* qPixmap = new QPixmap(QPixmap::fromWinHBITMAP(hBitmap));
+#endif
+
+    return BitmapImage::create(qPixmap);
 }
 #endif
 

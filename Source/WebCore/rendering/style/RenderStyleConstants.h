@@ -173,11 +173,11 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 
 // CSS3 Flexbox Properties
 
-enum EAlignItems { AlignAuto, AlignStart, AlignEnd, AlignCenter, AlignStretch, AlignBaseline };
-enum EFlexPack { PackStart, PackEnd, PackCenter, PackSpaceBetween, PackSpaceAround };
+enum EAlignContent { AlignContentFlexStart, AlignContentFlexEnd, AlignContentCenter, AlignContentSpaceBetween, AlignContentSpaceAround, AlignContentStretch };
+enum EAlignItems { AlignAuto, AlignFlexStart, AlignFlexEnd, AlignCenter, AlignStretch, AlignBaseline };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
-enum EFlexLinePack { LinePackStart, LinePackEnd, LinePackCenter, LinePackSpaceBetween, LinePackSpaceAround, LinePackStretch };
 enum EFlexWrap { FlexWrapNone, FlexWrap, FlexWrapReverse };
+enum EJustifyContent { JustifyFlexStart, JustifyFlexEnd, JustifyCenter, JustifySpaceBetween, JustifySpaceAround };
 
 enum ETextSecurity {
     TSNONE, TSDISC, TSCIRCLE, TSSQUARE
@@ -217,10 +217,6 @@ enum ENBSPMode {
 
 enum EKHTMLLineBreak {
     LBNORMAL, AFTER_WHITE_SPACE
-};
-
-enum EMatchNearestMailBlockquoteColor {
-    BCNORMAL, MATCH
 };
 
 enum EResize {
@@ -335,7 +331,7 @@ enum EWhiteSpace {
 
 // The order of this enum must match the order of the text align values in CSSValueKeywords.in.
 enum ETextAlign {
-    TAAUTO, LEFT, RIGHT, CENTER, JUSTIFY, WEBKIT_LEFT, WEBKIT_RIGHT, WEBKIT_CENTER, TASTART, TAEND,
+    LEFT, RIGHT, CENTER, JUSTIFY, WEBKIT_LEFT, WEBKIT_RIGHT, WEBKIT_CENTER, TASTART, TAEND,
 };
 
 enum ETextTransform {
@@ -454,11 +450,15 @@ enum TextOverflow { TextOverflowClip = 0, TextOverflowEllipsis };
 
 enum EImageRendering { ImageRenderingAuto, ImageRenderingOptimizeSpeed, ImageRenderingOptimizeQuality, ImageRenderingOptimizeContrast };
 
+enum ImageResolutionSource { ImageResolutionSpecified = 0, ImageResolutionFromImage };
+
 enum Order { LogicalOrder = 0, VisualOrder };
 
 enum RegionOverflow { AutoRegionOverflow, BreakRegionOverflow };
 
 enum ColumnAxis { HorizontalColumnAxis, VerticalColumnAxis, AutoColumnAxis };
+
+enum ColumnProgression { NormalColumnProgression, ReverseColumnProgression };
 
 enum LineSnap { LineSnapNone, LineSnapBaseline, LineSnapContain };
 

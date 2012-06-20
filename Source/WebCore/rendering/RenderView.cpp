@@ -44,6 +44,10 @@
 #include "RenderLayerCompositor.h"
 #endif
 
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+#include "CustomFilterGlobalContext.h"
+#endif
+
 namespace WebCore {
 
 RenderView::RenderView(Node* node, FrameView* view)
@@ -390,7 +394,7 @@ void RenderView::computeRectForRepaint(RenderBoxModelObject* repaintContainer, L
     }
 
     if (fixed && m_frameView)
-        rect.move(m_frameView->scrollXForFixedPosition(), m_frameView->scrollYForFixedPosition());
+        rect.move(m_frameView->scrollOffsetForFixedPosition());
         
     // Apply our transform if we have one (because of full page zooming).
     if (!repaintContainer && m_layer && m_layer->transform())
@@ -656,8 +660,7 @@ bool RenderView::shouldUsePrintingLayout() const
     if (!printing() || !m_frameView)
         return false;
     Frame* frame = m_frameView->frame();
-    // Only root frame should have special handling for printing.
-    return frame && !frame->tree()->parent();
+    return frame && frame->shouldUsePrintingLayout();
 }
 
 size_t RenderView::getRetainedWidgets(Vector<RenderWidget*>& renderWidgets)
@@ -899,6 +902,15 @@ void RenderView::willMoveOffscreen()
 #endif
 }
 
+#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+CustomFilterGlobalContext* RenderView::customFilterGlobalContext()
+{
+    if (!m_customFilterGlobalContext)
+        m_customFilterGlobalContext = adoptPtr(new CustomFilterGlobalContext());
+    return m_customFilterGlobalContext.get();
+}
+#endif
+
 void RenderView::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderBlock::styleDidChange(diff, oldStyle);
@@ -944,22 +956,6 @@ void RenderView::setFixedPositionedObjectsNeedLayout()
         RenderBox* currBox = *it;
         currBox->setNeedsLayout(true);
     }
-}
-
-void RenderView::insertFixedPositionedObject(RenderBox* object)
-{
-    if (!m_positionedObjects)
-        m_positionedObjects = adoptPtr(new PositionedObjectsListHashSet);
-
-    m_positionedObjects->add(object);
-}
-
-void RenderView::removeFixedPositionedObject(RenderBox* object)
-{
-    if (!m_positionedObjects)
-        return;
-
-    m_positionedObjects->remove(object);
 }
 
 } // namespace WebCore

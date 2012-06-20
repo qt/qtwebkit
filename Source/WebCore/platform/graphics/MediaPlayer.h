@@ -101,6 +101,8 @@ class TimeRanges;
 
 class MediaPlayerClient {
 public:
+    enum CORSMode { Unspecified, Anonymous, UseCredentials };
+
     virtual ~MediaPlayerClient() { }
 
     // Get the document which the media player is owned by
@@ -178,6 +180,7 @@ public:
 
     virtual String mediaPlayerReferrer() const { return String(); }
     virtual String mediaPlayerUserAgent() const { return String(); }
+    virtual CORSMode mediaPlayerCORSMode() const { return Unspecified; }
 };
 
 class MediaPlayerSupportsTypeClient {
@@ -260,6 +263,7 @@ public:
     bool paused() const;
     bool seeking() const;
 
+    static float invalidTime() { return -1.0f;}
     float duration() const;
     float currentTime() const;
     void seek(float time);
@@ -353,6 +357,8 @@ public:
 #endif
 
     bool hasSingleSecurityOrigin() const;
+
+    bool didPassCORSAccessCheck() const;
 
     float mediaTimeForTimeValue(float) const;
 

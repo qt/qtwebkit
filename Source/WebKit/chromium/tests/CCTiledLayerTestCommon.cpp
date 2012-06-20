@@ -40,7 +40,7 @@ FakeLayerTextureUpdater::Texture::~Texture()
 {
 }
 
-void FakeLayerTextureUpdater::Texture::updateRect(GraphicsContext3D*, TextureAllocator* allocator, const IntRect&, const IntRect&)
+void FakeLayerTextureUpdater::Texture::updateRect(CCGraphicsContext*, TextureAllocator* allocator, const IntRect&, const IntRect&)
 {
     if (allocator)
         texture()->allocate(allocator);
@@ -63,7 +63,7 @@ FakeLayerTextureUpdater::~FakeLayerTextureUpdater()
 {
 }
 
-void FakeLayerTextureUpdater::prepareToUpdate(const IntRect& contentRect, const IntSize&, int, float, IntRect& resultingOpaqueRect)
+void FakeLayerTextureUpdater::prepareToUpdate(const IntRect& contentRect, const IntSize&, float, IntRect& resultingOpaqueRect)
 {
     m_prepareCount++;
     m_lastUpdateRect = contentRect;

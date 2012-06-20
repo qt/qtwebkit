@@ -47,12 +47,12 @@ namespace WebCore {
 using namespace HTMLNames;
 using namespace std;
 
-static const double msecPerMinute = 60 * 1000;
-static const double msecPerSecond = 1000;
+static const int msecPerMinute = 60 * 1000;
+static const int msecPerSecond = 1000;
 
 double BaseDateAndTimeInputType::valueAsDate() const
 {
-    return parseToDouble(element()->value(), DateComponents::invalidMilliseconds());
+    return valueAsDouble();
 }
 
 void BaseDateAndTimeInputType::setValueAsDate(double value, ExceptionCode&) const
@@ -60,12 +60,12 @@ void BaseDateAndTimeInputType::setValueAsDate(double value, ExceptionCode&) cons
     element()->setValue(serializeWithMilliseconds(value));
 }
 
-double BaseDateAndTimeInputType::valueAsNumber() const
+double BaseDateAndTimeInputType::valueAsDouble() const
 {
-    return parseToDouble(element()->value(), numeric_limits<double>::quiet_NaN());
+    return parseToDouble(element()->value());
 }
 
-void BaseDateAndTimeInputType::setValueAsNumber(double newValue, TextFieldEventBehavior eventBehavior, ExceptionCode&) const
+void BaseDateAndTimeInputType::setValueAsDecimal(const Decimal& newValue, TextFieldEventBehavior eventBehavior, ExceptionCode&) const
 {
     element()->setValue(serialize(newValue), eventBehavior);
 }
@@ -80,13 +80,13 @@ bool BaseDateAndTimeInputType::typeMismatch() const
     return typeMismatchFor(element()->value());
 }
 
-double BaseDateAndTimeInputType::defaultValueForStepUp() const
+Decimal BaseDateAndTimeInputType::defaultValueForStepUp() const
 {
     double ms = currentTimeMS();
     double utcOffset = calculateUTCOffset();
     double dstOffset = calculateDSTOffset(ms, utcOffset);
     int offset = static_cast<int>((utcOffset + dstOffset) / msPerMinute);
-    return ms + (offset * msPerMinute);
+    return Decimal::fromDouble(ms + (offset * msPerMinute));
 }
 
 bool BaseDateAndTimeInputType::isSteppable() const
@@ -108,14 +108,20 @@ void BaseDateAndTimeInputType::handleWheelEvent(WheelEvent* event)
         handleWheelEventForSpinButton(event);
 }
 
-double BaseDateAndTimeInputType::parseToDouble(const String& src, double defaultValue) const
+double BaseDateAndTimeInputType::parseToDouble(const String& source) const
 {
     DateComponents date;
-    if (!parseToDateComponents(src, &date))
-        return defaultValue;
+    if (!parseToDateComponents(source, &date))
+        return DateComponents::invalidMilliseconds();
     double msec = date.millisecondsSinceEpoch();
     ASSERT(isfinite(msec));
     return msec;
+}
+
+Decimal BaseDateAndTimeInputType::parseToNumber(const String& source, const Decimal& defaultValue) const
+{
+    const double doubleValue = parseToDouble(source);
+    return isfinite(doubleValue) ? Decimal::fromDouble(doubleValue) : defaultValue;
 }
 
 bool BaseDateAndTimeInputType::parseToDateComponents(const String& source, DateComponents* out) const
@@ -128,31 +134,31 @@ bool BaseDateAndTimeInputType::parseToDateComponents(const String& source, DateC
     return parseToDateComponentsInternal(source.characters(), source.length(), out);
 }
 
-String BaseDateAndTimeInputType::serialize(double value) const
+String BaseDateAndTimeInputType::serialize(const Decimal& value) const
 {
-    if (!isfinite(value))
+    if (!value.isFinite())
         return String();
     DateComponents date;
-    if (!setMillisecondToDateComponents(value, &date))
+    if (!setMillisecondToDateComponents(value.toDouble(), &date))
         return String();
     return serializeWithComponents(date);
 }
 
 String BaseDateAndTimeInputType::serializeWithComponents(const DateComponents& date) const
 {
-    double step;
+    Decimal step;
     if (!element()->getAllowedValueStep(&step))
         return date.toString();
-    if (!fmod(step, msecPerMinute))
+    if (step.remainder(msecPerMinute).isZero())
         return date.toString(DateComponents::None);
-    if (!fmod(step, msecPerSecond))
+    if (step.remainder(msecPerSecond).isZero())
         return date.toString(DateComponents::Second);
     return date.toString(DateComponents::Millisecond);
 }
 
 String BaseDateAndTimeInputType::serializeWithMilliseconds(double value) const
 {
-    return serialize(value);
+    return serialize(Decimal::fromDouble(value));
 }
 
 String BaseDateAndTimeInputType::localizeValue(const String& proposedValue) const

@@ -32,54 +32,32 @@
 #include "Extensions3DChromium.h"
 #include "GraphicsContext3D.h"
 #include "LayerRendererChromium.h"
+#include "LayerTextureSubImage.h"
 #include "NotImplemented.h"
 #include "ProgramBinding.h"
+#include "TextureManager.h" // For TextureAllocator
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCProxy.h"
 #include "cc/CCQuadCuller.h"
-#include "cc/CCVideoDrawQuad.h"
+#include "cc/CCStreamVideoDrawQuad.h"
+#include "cc/CCTextureDrawQuad.h"
+#include "cc/CCYUVVideoDrawQuad.h"
 #include <public/WebVideoFrame.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-// These values are magic numbers that are used in the transformation
-// from YUV to RGB color values.
-// They are taken from the following webpage:
-// http://www.fourcc.org/fccyvrgb.php
-const float CCVideoLayerImpl::yuv2RGB[9] = {
-    1.164f, 1.164f, 1.164f,
-    0.f, -.391f, 2.018f,
-    1.596f, -.813f, 0.f,
-};
-
-// These values map to 16, 128, and 128 respectively, and are computed
-// as a fraction over 256 (e.g. 16 / 256 = 0.0625).
-// They are used in the YUV to RGBA conversion formula:
-//   Y - 16   : Gives 16 values of head and footroom for overshooting
-//   U - 128  : Turns unsigned U into signed U [-128,127]
-//   V - 128  : Turns unsigned V into signed V [-128,127]
-const float CCVideoLayerImpl::yuvAdjust[3] = {
-    -0.0625f,
-    -0.5f,
-    -0.5f,
-};
-
-// This matrix is the default transformation for stream textures.
-const float CCVideoLayerImpl::flipTransform[16] = {
-    1, 0, 0, 0,
-    0, -1, 0, 0,
-    0, 0, 1, 0,
-    0, 1, 0, 1,
-};
-
 CCVideoLayerImpl::CCVideoLayerImpl(int id, WebKit::WebVideoFrameProvider* provider)
     : CCLayerImpl(id)
     , m_provider(provider)
-    , m_layerTreeHostImpl(0)
     , m_frame(0)
 {
-    memcpy(m_streamTextureMatrix, flipTransform, sizeof(m_streamTextureMatrix));
+    // This matrix is the default transformation for stream textures, and flips on the Y axis.
+    m_streamTextureMatrix = WebKit::WebTransformationMatrix(
+        1, 0, 0, 0,
+        0, -1, 0, 0,
+        0, 0, 1, 0,
+        0, 1, 0, 1);
 
     // This only happens during a commit on the compositor thread while the main
     // thread is blocked. That makes this a thread-safe call to set the video
@@ -97,8 +75,12 @@ CCVideoLayerImpl::~CCVideoLayerImpl()
         m_provider->setVideoFrameProviderClient(0);
         m_provider = 0;
     }
-    for (unsigned i = 0; i < MaxPlanes; ++i)
-        m_textures[i].m_texture.clear();
+    freePlaneData(layerTreeHostImpl()->layerRenderer());
+
+#if !ASSERT_DISABLED
+    for (unsigned i = 0; i < WebKit::WebVideoFrame::maxPlanes; ++i)
+        ASSERT(!m_framePlanes[i].textureId);
+#endif
 }
 
 void CCVideoLayerImpl::stopUsingProvider()
@@ -128,10 +110,10 @@ static GC3Denum convertVFCFormatToGC3DFormat(const WebKit::WebVideoFrame& frame)
     return GraphicsContext3D::INVALID_VALUE;
 }
 
-void CCVideoLayerImpl::willDraw(LayerRendererChromium* layerRenderer)
+void CCVideoLayerImpl::willDraw(CCRenderer* layerRenderer, CCGraphicsContext* context)
 {
     ASSERT(CCProxy::isImplThread());
-    CCLayerImpl::willDraw(layerRenderer);
+    CCLayerImpl::willDraw(layerRenderer, context);
 
     // Explicitly lock and unlock the provider mutex so it can be held from
     // willDraw to didDraw. Since the compositor thread is in the middle of
@@ -142,13 +124,14 @@ void CCVideoLayerImpl::willDraw(LayerRendererChromium* layerRenderer)
     // lock should not cause a deadlock.
     m_providerMutex.lock();
 
-    willDrawInternal(layerRenderer);
+    willDrawInternal(layerRenderer, context);
+    freeUnusedPlaneData(layerRenderer);
 
     if (!m_frame)
         m_providerMutex.unlock();
 }
 
-void CCVideoLayerImpl::willDrawInternal(LayerRendererChromium* layerRenderer)
+void CCVideoLayerImpl::willDrawInternal(CCRenderer* layerRenderer, CCGraphicsContext* context)
 {
     ASSERT(CCProxy::isImplThread());
 
@@ -170,9 +153,22 @@ void CCVideoLayerImpl::willDrawInternal(LayerRendererChromium* layerRenderer)
         return;
     }
 
-    if (!reserveTextures(*m_frame, m_format, layerRenderer)) {
+    if (m_frame->planes() > WebKit::WebVideoFrame::maxPlanes) {
         m_provider->putCurrentFrame(m_frame);
         m_frame = 0;
+        return;
+    }
+
+    if (!allocatePlaneData(layerRenderer)) {
+        m_provider->putCurrentFrame(m_frame);
+        m_frame = 0;
+        return;
+    }
+
+    if (!copyPlaneData(layerRenderer, context)) {
+        m_provider->putCurrentFrame(m_frame);
+        m_frame = 0;
+        return;
     }
 }
 
@@ -183,13 +179,57 @@ void CCVideoLayerImpl::appendQuads(CCQuadCuller& quadList, const CCSharedQuadSta
     if (!m_frame)
         return;
 
+    // FIXME: When we pass quads out of process, we need to double-buffer, or
+    // otherwise synchonize use of all textures in the quad.
+
     IntRect quadRect(IntPoint(), bounds());
-    OwnPtr<CCVideoDrawQuad> videoQuad = CCVideoDrawQuad::create(sharedQuadState, quadRect, m_textures, m_frame, m_format);
 
-    if (m_format == Extensions3DChromium::GL_TEXTURE_EXTERNAL_OES)
-        videoQuad->setMatrix(m_streamTextureMatrix);
+    switch (m_format) {
+    case GraphicsContext3D::LUMINANCE: {
+        // YUV software decoder.
+        const FramePlane& yPlane = m_framePlanes[WebKit::WebVideoFrame::yPlane];
+        const FramePlane& uPlane = m_framePlanes[WebKit::WebVideoFrame::uPlane];
+        const FramePlane& vPlane = m_framePlanes[WebKit::WebVideoFrame::vPlane];
+        OwnPtr<CCYUVVideoDrawQuad> yuvVideoQuad = CCYUVVideoDrawQuad::create(sharedQuadState, quadRect, yPlane, uPlane, vPlane);
+        quadList.append(yuvVideoQuad.release());
+        break;
+    }
+    case GraphicsContext3D::RGBA: {
+        // RGBA software decoder.
+        const FramePlane& plane = m_framePlanes[WebKit::WebVideoFrame::rgbPlane];
+        float widthScaleFactor = static_cast<float>(plane.visibleSize.width()) / plane.size.width();
 
-    quadList.append(videoQuad.release());
+        bool premultipliedAlpha = true;
+        FloatRect uvRect(0, 0, widthScaleFactor, 1);
+        bool flipped = false;
+        OwnPtr<CCTextureDrawQuad> textureQuad = CCTextureDrawQuad::create(sharedQuadState, quadRect, plane.textureId, premultipliedAlpha, uvRect, flipped);
+        quadList.append(textureQuad.release());
+        break;
+    }
+    case GraphicsContext3D::TEXTURE_2D: {
+        // NativeTexture hardware decoder.
+        bool premultipliedAlpha = true;
+        FloatRect uvRect(0, 0, 1, 1);
+#if defined(OS_CHROMEOS) && defined(__ARMEL__)
+        bool flipped = true; // Under the covers, implemented by OpenMAX IL.
+#elif defined(OS_WINDOWS)
+        bool flipped = true; // Under the covers, implemented by DXVA.
+#else
+        bool flipped = false; // LibVA (cros/intel), MacOS.
+#endif
+        OwnPtr<CCTextureDrawQuad> textureQuad = CCTextureDrawQuad::create(sharedQuadState, quadRect, m_frame->textureId(), premultipliedAlpha, uvRect, flipped);
+        quadList.append(textureQuad.release());
+        break;
+    }
+    case Extensions3DChromium::GL_TEXTURE_EXTERNAL_OES: {
+        // StreamTexture hardware decoder.
+        OwnPtr<CCStreamVideoDrawQuad> streamVideoQuad = CCStreamVideoDrawQuad::create(sharedQuadState, quadRect, m_frame->textureId(), m_streamTextureMatrix);
+        quadList.append(streamVideoQuad.release());
+        break;
+    }
+    default:
+        CRASH(); // Someone updated convertVFCFormatToGC3DFormat above but update this!
+    }
 }
 
 void CCVideoLayerImpl::didDraw()
@@ -200,8 +240,6 @@ void CCVideoLayerImpl::didDraw()
     if (!m_frame)
         return;
 
-    for (unsigned plane = 0; plane < m_frame->planes(); ++plane)
-        m_textures[plane].m_texture->unreserve();
     m_provider->putCurrentFrame(m_frame);
     m_frame = 0;
 
@@ -244,33 +282,86 @@ IntSize CCVideoLayerImpl::computeVisibleSize(const WebKit::WebVideoFrame& frame,
     return IntSize(visibleWidth, visibleHeight);
 }
 
-bool CCVideoLayerImpl::reserveTextures(const WebKit::WebVideoFrame& frame, GC3Denum format, LayerRendererChromium* layerRenderer)
+bool CCVideoLayerImpl::FramePlane::allocateData(CCRenderer* layerRenderer)
 {
-    if (frame.planes() > MaxPlanes)
-        return false;
+    if (textureId)
+        return true;
+
+    textureId = layerRenderer->contentsTextureAllocator()->createTexture(size, format);
+    return textureId;
+}
+
+void CCVideoLayerImpl::FramePlane::freeData(CCRenderer* layerRenderer)
+{
+    if (!textureId)
+        return;
+
+    layerRenderer->contentsTextureAllocator()->deleteTexture(textureId, size, format);
+    textureId = 0;
+}
+
+bool CCVideoLayerImpl::allocatePlaneData(CCRenderer* layerRenderer)
+{
     int maxTextureSize = layerRenderer->capabilities().maxTextureSize;
-    for (unsigned plane = 0; plane < frame.planes(); ++plane) {
-        IntSize requiredTextureSize(frame.stride(plane), videoFrameDimension(frame.height(), plane, frame.format()));
-        // If the renderer cannot handle this large of a texture, return false.
-        // FIXME: Remove this test when tiled layers are implemented.
+    for (unsigned planeIndex = 0; planeIndex < m_frame->planes(); ++planeIndex) {
+        CCVideoLayerImpl::FramePlane& plane = m_framePlanes[planeIndex];
+
+        IntSize requiredTextureSize(m_frame->stride(planeIndex), videoFrameDimension(m_frame->height(), planeIndex, m_frame->format()));
+        // FIXME: Remove the test against maxTextureSize when tiled layers are implemented.
         if (requiredTextureSize.isZero() || requiredTextureSize.width() > maxTextureSize || requiredTextureSize.height() > maxTextureSize)
             return false;
-        if (!m_textures[plane].m_texture) {
-            m_textures[plane].m_texture = ManagedTexture::create(layerRenderer->renderSurfaceTextureManager());
-            if (!m_textures[plane].m_texture)
-                return false;
-            m_textures[plane].m_visibleSize = IntSize();
-        } else {
-            // The renderSurfaceTextureManager may have been destroyed and recreated since the last frame, so pass the new one.
-            // This is a no-op if the TextureManager is still around.
-            m_textures[plane].m_texture->setTextureManager(layerRenderer->renderSurfaceTextureManager());
+
+        if (plane.size != requiredTextureSize || plane.format != m_format) {
+            plane.freeData(layerRenderer);
+            plane.size = requiredTextureSize;
+            plane.format = m_format;
         }
-        if (m_textures[plane].m_texture->size() != requiredTextureSize)
-            m_textures[plane].m_visibleSize = computeVisibleSize(frame, plane);
-        if (!m_textures[plane].m_texture->reserve(requiredTextureSize, format))
-            return false;
+
+        if (!plane.textureId) {
+            if (!plane.allocateData(layerRenderer))
+                return false;
+            plane.visibleSize = computeVisibleSize(*m_frame, planeIndex);
+        }
     }
     return true;
+}
+
+bool CCVideoLayerImpl::copyPlaneData(CCRenderer* layerRenderer, CCGraphicsContext* context)
+{
+    size_t softwarePlaneCount = m_frame->planes();
+    if (!softwarePlaneCount)
+        return true;
+
+    GraphicsContext3D* context3d = context->context3D();
+    if (!context3d) {
+        // FIXME: Implement this path for software compositing.
+        return false;
+    }
+
+    LayerTextureSubImage uploader(true);
+    for (size_t softwarePlaneIndex = 0; softwarePlaneIndex < softwarePlaneCount; ++softwarePlaneIndex) {
+        CCVideoLayerImpl::FramePlane& plane = m_framePlanes[softwarePlaneIndex];
+        const uint8_t* softwarePlanePixels = static_cast<const uint8_t*>(m_frame->data(softwarePlaneIndex));
+        IntRect planeRect(IntPoint(), plane.size);
+
+        context3d->bindTexture(GraphicsContext3D::TEXTURE_2D, plane.textureId);
+        uploader.setSubImageSize(plane.size);
+        uploader.upload(softwarePlanePixels, planeRect, planeRect, planeRect, plane.format, context);
+    }
+    return true;
+}
+
+void CCVideoLayerImpl::freePlaneData(CCRenderer* layerRenderer)
+{
+    for (unsigned i = 0; i < WebKit::WebVideoFrame::maxPlanes; ++i)
+        m_framePlanes[i].freeData(layerRenderer);
+}
+
+void CCVideoLayerImpl::freeUnusedPlaneData(CCRenderer* layerRenderer)
+{
+    unsigned firstUnusedPlane = m_frame ? m_frame->planes() : 0;
+    for (unsigned i = firstUnusedPlane; i < WebKit::WebVideoFrame::maxPlanes; ++i)
+        m_framePlanes[i].freeData(layerRenderer);
 }
 
 void CCVideoLayerImpl::didReceiveFrame()
@@ -280,20 +371,22 @@ void CCVideoLayerImpl::didReceiveFrame()
 
 void CCVideoLayerImpl::didUpdateMatrix(const float matrix[16])
 {
-    memcpy(m_streamTextureMatrix, matrix, sizeof(m_streamTextureMatrix));
+    m_streamTextureMatrix = WebKit::WebTransformationMatrix(
+        matrix[0], matrix[1], matrix[2], matrix[3],
+        matrix[4], matrix[5], matrix[6], matrix[7],
+        matrix[8], matrix[9], matrix[10], matrix[11],
+        matrix[12], matrix[13], matrix[14], matrix[15]);
     setNeedsRedraw();
 }
 
 void CCVideoLayerImpl::didLoseContext()
 {
-    for (unsigned i = 0; i < MaxPlanes; ++i)
-        m_textures[i].m_texture.clear();
+    freePlaneData(layerTreeHostImpl()->layerRenderer());
 }
 
 void CCVideoLayerImpl::setNeedsRedraw()
 {
-    if (m_layerTreeHostImpl)
-        m_layerTreeHostImpl->setNeedsRedraw();
+    layerTreeHostImpl()->setNeedsRedraw();
 }
 
 void CCVideoLayerImpl::dumpLayerProperties(TextStream& ts, int indent) const

@@ -76,6 +76,8 @@ HEADERS += \
     Shared/ImageOptions.h \
     Shared/ImmutableArray.h \
     Shared/ImmutableDictionary.h \
+    Shared/IntentData.h \
+    Shared/IntentServiceInfo.h \
     Shared/LayerTreeContext.h \
     Shared/MutableArray.h \
     Shared/MutableDictionary.h \
@@ -137,6 +139,7 @@ HEADERS += \
     Shared/qt/ArgumentCodersQt.h \
     Shared/qt/PlatformCertificateInfo.h \
     Shared/qt/WebEventFactoryQt.h \
+    Shared/qt/QtDefaultDataLocation.h \
     Shared/qt/QtNetworkReplyData.h \
     Shared/qt/QtNetworkRequestData.h \
     UIProcess/API/C/WKAPICast.h \
@@ -251,6 +254,8 @@ HEADERS += \
     UIProcess/WebIconDatabase.h \
     UIProcess/WebIconDatabaseClient.h \
     UIProcess/WebInspectorProxy.h \
+    UIProcess/WebIntentData.h \
+    UIProcess/WebIntentServiceInfo.h \
     UIProcess/WebKeyValueStorageManagerProxy.h \
     UIProcess/WebLayerTreeRenderer.h \
     UIProcess/WebLoaderClient.h \
@@ -281,7 +286,7 @@ HEADERS += \
     UIProcess/qt/QtWebPagePolicyClient.h \
     UIProcess/qt/QtWebPageSGNode.h \
     UIProcess/qt/QtWebPageUIClient.h \
-    UIProcess/qt/QtViewportInteractionEngine.h \
+    UIProcess/qt/QtViewportHandler.h \
     UIProcess/qt/QtWebUndoController.h \
     UIProcess/qt/QtWebIconDatabaseClient.h \
     UIProcess/qt/WebContextMenuProxyQt.h \
@@ -388,6 +393,7 @@ SOURCES += \
     Platform/Logging.cpp \
     Platform/Module.cpp \
     Platform/WorkQueue.cpp \
+    Platform/qt/LoggingQt.cpp \
     Platform/qt/ModuleQt.cpp \
     PluginProcess/PluginControllerProxy.cpp \
     PluginProcess/PluginCreationParameters.cpp \
@@ -438,6 +444,8 @@ SOURCES += \
     Shared/FontInfo.cpp \
     Shared/ImmutableArray.cpp \
     Shared/ImmutableDictionary.cpp \
+    Shared/IntentData.cpp \
+    Shared/IntentServiceInfo.cpp \
     Shared/MutableArray.cpp \
     Shared/MutableDictionary.cpp \
     Shared/OriginAndDatabases.cpp \
@@ -488,6 +496,7 @@ SOURCES += \
     Shared/qt/ProcessExecutablePathQt.cpp \
     Shared/qt/WebCoreArgumentCodersQt.cpp \
     Shared/qt/WebEventFactoryQt.cpp \
+    Shared/qt/QtDefaultDataLocation.cpp \
     Shared/qt/QtNetworkReplyData.cpp \
     Shared/qt/QtNetworkRequestData.cpp \
     Shared/qt/WebURLRequestQt.cpp \
@@ -593,6 +602,8 @@ SOURCES += \
     UIProcess/WebIconDatabase.cpp \
     UIProcess/WebIconDatabaseClient.cpp \
     UIProcess/WebInspectorProxy.cpp \
+    UIProcess/WebIntentData.cpp \
+    UIProcess/WebIntentServiceInfo.cpp \
     UIProcess/WebKeyValueStorageManagerProxy.cpp \
     UIProcess/WebLayerTreeRenderer.cpp \
     UIProcess/WebLoaderClient.cpp \
@@ -624,7 +635,7 @@ SOURCES += \
     UIProcess/qt/QtWebPageSGNode.cpp \
     UIProcess/qt/QtWebPageUIClient.cpp \
     UIProcess/qt/TextCheckerQt.cpp \
-    UIProcess/qt/QtViewportInteractionEngine.cpp \
+    UIProcess/qt/QtViewportHandler.cpp \
     UIProcess/qt/WebContextMenuProxyQt.cpp \
     UIProcess/qt/WebContextQt.cpp \
     UIProcess/qt/WebGeolocationProviderQt.cpp \

@@ -377,6 +377,10 @@ WebInspector.ProfilesPanel.prototype = {
         this._profileGroups = {};
         this._profileGroupsForLinks = {};
         this._profilesWereRequested = false;
+        this.recordButton.toggled = false;
+        if (this._selectedProfileType)
+            this.recordButton.title = this._selectedProfileType.buttonTooltip;
+        this._launcherView.profileFinished();
 
         this.sidebarTreeElement.removeStyleClass("some-expandable");
 
@@ -1249,6 +1253,7 @@ WebInspector.ProfileSidebarTreeElement.prototype = {
         if (profile.canSaveToFile())
             contextMenu.appendItem(WebInspector.UIString("Save profile\u2026"), profile.saveToFile.bind(profile));
         contextMenu.appendItem(WebInspector.UIString("Load profile\u2026"), WebInspector.panels.profiles._fileSelectorElement.click.bind(WebInspector.panels.profiles._fileSelectorElement));
+        contextMenu.appendItem(WebInspector.UIString("Delete profile"), this.ondelete.bind(this));
         contextMenu.show(event);
     }
 }

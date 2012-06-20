@@ -75,7 +75,15 @@ module core {
         Node               adoptNode(in [Optional=DefaultIsUndefined] Node source)
             raises (DOMException);
 
+#if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
+        // document.documentURI was writable in DOM3 Core, but is read-only in DOM4
+        // (see http://www.w3.org/TR/2011/WD-dom-20110915/#document). We need to keep
+        // the writable version around for Objective C clients, but are moving to
+        // read-only for other clients.
                  attribute [TreatReturnedNullStringAs=Null, TreatNullAs=NullString] DOMString documentURI;
+#else
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString documentURI;
+#endif
 
         // DOM Level 2 Events (DocumentEvents interface)
 
@@ -208,6 +216,10 @@ module core {
         CSSStyleDeclaration createCSSStyleDeclaration();
 #endif
 
+#if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
+        readonly attribute [Conditional=UNDO_MANAGER] UndoManager undoManager;
+#endif
+
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
         // DOM Level 2 Style Interface
         [ObjCLegacyUnnamedParameters, ObjCUseDefaultView] CSSStyleDeclaration getComputedStyle(in Element element,
@@ -252,6 +264,9 @@ module core {
         readonly attribute [V8EnabledAtRuntime] Element webkitFullscreenElement;
         [V8EnabledAtRuntime] void webkitExitFullscreen();
 #endif
+
+        [Conditional=POINTER_LOCK, V8EnabledAtRuntime=pointerLock] void webkitExitPointerLock();
+        readonly attribute [Conditional=POINTER_LOCK, V8EnabledAtRuntime=pointerLock] Element webkitPointerLockElement;
 
 #if defined(ENABLE_CSS_REGIONS) && ENABLE_CSS_REGIONS
         WebKitNamedFlow webkitGetFlowByName(in DOMString name);
@@ -330,6 +345,8 @@ module core {
         attribute [NotEnumerable,Conditional=TOUCH_EVENTS,V8EnabledAtRuntime] EventListener ontouchcancel;
         attribute [NotEnumerable, Conditional=FULLSCREEN_API] EventListener onwebkitfullscreenchange;
         attribute [NotEnumerable, Conditional=FULLSCREEN_API] EventListener onwebkitfullscreenerror;
+        attribute [NotEnumerable, Conditional=POINTER_LOCK, V8EnabledAtRuntime=pointerLock] EventListener onwebkitpointerlockchange;
+        attribute [NotEnumerable, Conditional=POINTER_LOCK, V8EnabledAtRuntime=pointerLock] EventListener onwebkitpointerlockerror;
 #endif
 
 #if defined(ENABLE_TOUCH_EVENTS) && ENABLE_TOUCH_EVENTS

@@ -94,9 +94,16 @@ class WebKitPortTest(port_testcase.PortTestCase):
     def test_path_to_test_expectations_file(self):
         port = TestWebKitPort()
         port._options = MockOptions(webkit_test_runner=False)
-        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/test_expectations.txt')
+        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations')
+
+        port = TestWebKitPort()
         port._options = MockOptions(webkit_test_runner=True)
-        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/test_expectations.txt')
+        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations')
+
+        port = TestWebKitPort()
+        port.host.filesystem.files['/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations'] = 'some content'
+        port._options = MockOptions(webkit_test_runner=False)
+        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations')
 
     def test_skipped_directories_for_symbols(self):
         # This first test confirms that the commonly found symbols result in the expected skipped directories.
@@ -165,10 +172,10 @@ class WebKitPortTest(port_testcase.PortTestCase):
     def test_test_expectations(self):
         # Check that we read the expectations file
         host = MockSystemHost()
-        host.filesystem.write_text_file('/mock-checkout/LayoutTests/platform/testwebkitport/test_expectations.txt',
-            'BUG_TESTEXPECTATIONS SKIP : fast/html/article-element.html = FAIL\n')
+        host.filesystem.write_text_file('/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations',
+            'BUG_TESTEXPECTATIONS SKIP : fast/html/article-element.html = TEXT\n')
         port = TestWebKitPort(host=host)
-        self.assertEqual(port.test_expectations(), 'BUG_TESTEXPECTATIONS SKIP : fast/html/article-element.html = FAIL\n')
+        self.assertEqual(''.join(port.expectations_dict().values()), 'BUG_TESTEXPECTATIONS SKIP : fast/html/article-element.html = TEXT\n')
 
     def test_build_driver(self):
         output = OutputCapture()
@@ -349,7 +356,7 @@ class WebKitDriverTest(unittest.TestCase):
         driver._server_process = FakeServerProcess(False)
         driver._subprocess_was_unresponsive = False
         assert_crash(driver, '#CRASHED - WebProcess (pid 8675)\n', True, 'WebProcess', 8675)
-        
+
         driver._crashed_process_name = None
         driver._crashed_pid = None
         driver._server_process = FakeServerProcess(False)
@@ -375,4 +382,12 @@ class WebKitDriverTest(unittest.TestCase):
         last_tmpdir = port._filesystem.last_tmpdir
         self.assertNotEquals(last_tmpdir, None)
         driver.stop()
+        self.assertFalse(port._filesystem.isdir(last_tmpdir))
+
+    def test_two_starts_cleans_up_properly(self):
+        port = TestWebKitPort()
+        driver = WebKitDriver(port, 0, pixel_tests=True)
+        driver.start(True, [])
+        last_tmpdir = port._filesystem.last_tmpdir
+        driver._start(True, [])
         self.assertFalse(port._filesystem.isdir(last_tmpdir))

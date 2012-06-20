@@ -508,7 +508,8 @@ WebInspector.HeapSnapshotNode.prototype = {
 
     retainedSize: function()
     {
-        return this._snapshot._retainedSizes[this.nodeIndex / this._snapshot._nodeFieldCount];
+        var snapshot = this._snapshot;
+        return snapshot._nodes[this.nodeIndex + snapshot._nodeRetainedSizeOffset];
     },
 
     retainers: function()
@@ -535,14 +536,17 @@ WebInspector.HeapSnapshotNode.prototype = {
 
     _edgeIndexesStart: function()
     {
-        var snapshot = this._snapshot;
-        return snapshot._nodes[this.nodeIndex + snapshot._firstEdgeIndexOffset];
+        return this._snapshot._firstEdgeIndexes[this._ordinal()];
     },
 
     _edgeIndexesEnd: function()
     {
-        var snapshot = this._snapshot;
-        return snapshot._nodes[this._nextNodeIndex() + snapshot._firstEdgeIndexOffset]
+        return this._snapshot._firstEdgeIndexes[this._ordinal() + 1];
+    },
+
+    _ordinal: function()
+    {
+        return this.nodeIndex / this._snapshot._nodeFieldCount;
     },
 
     _nextNodeIndex: function()
@@ -563,7 +567,7 @@ WebInspector.HeapSnapshotNode.prototype = {
 WebInspector.HeapSnapshotNodeIterator = function(node)
 {
     this.node = node;
-    this._nodesLength = node._snapshot._realNodesLength;
+    this._nodesLength = node._snapshot._nodes.length;
 }
 
 WebInspector.HeapSnapshotNodeIterator.prototype = {
@@ -655,7 +659,7 @@ WebInspector.HeapSnapshot.prototype = {
         this._nodeNameOffset = meta.node_fields.indexOf("name");
         this._nodeIdOffset = meta.node_fields.indexOf("id");
         this._nodeSelfSizeOffset = meta.node_fields.indexOf("self_size");
-        this._firstEdgeIndexOffset = meta.node_fields.indexOf("edges_index");
+        this._nodeEdgeCountOffset = meta.node_fields.indexOf("edge_count");
         this._nodeFieldCount = meta.node_fields.length;
 
         this._nodeTypes = meta.node_types[this._nodeTypeOffset];
@@ -688,16 +692,10 @@ WebInspector.HeapSnapshot.prototype = {
             visitedMarker:     0x10000  // bits: 1,0000,0000,0000,0000
         };
 
-        this._realNodesLength = this._nodes.length;
-        this.nodeCount = this._realNodesLength / this._nodeFieldCount;
+        this.nodeCount = this._nodes.length / this._nodeFieldCount;
         this._edgeCount = this._containmentEdges.length / this._edgeFieldsCount;
 
-        // Add an extra node and make its first edge field point to the end of edges array.
-        var nodes = this._nodes;
-        this._nodes = new Uint32Array(this._realNodesLength + this._nodeFieldCount);
-        this._nodes.set(nodes);
-        this._nodes[this._realNodesLength + this._firstEdgeIndexOffset] = this._containmentEdges.length;
-
+        this._buildEdgeIndexes();
         this._markInvisibleEdges();
         this._buildRetainers();
         this._calculateFlags();
@@ -705,8 +703,37 @@ WebInspector.HeapSnapshot.prototype = {
         var result = this._buildPostOrderIndex();
         // Actually it is array that maps node ordinal number to dominator node ordinal number.
         this._dominatorsTree = this._buildDominatorTree(result.postOrderIndex2NodeOrdinal, result.nodeOrdinal2PostOrderIndex);
-        this._calculateRetainedSizes();
+        this._calculateRetainedSizes(result.postOrderIndex2NodeOrdinal);
         this._buildDominatedNodes();
+    },
+
+    _buildEdgeIndexes: function()
+    {
+        // Support for old serialization.
+        if (this._nodeEdgeCountOffset === -1) {
+            var nodes = this._nodes;
+            var nodeCount = this.nodeCount;
+            var firstEdgeIndexes = this._firstEdgeIndexes = new Uint32Array(nodeCount + 1);
+            var nodeFieldCount = this._nodeFieldCount;
+            var nodeEdgesIndexOffset = this._metaNode.node_fields.indexOf("edges_index");
+            firstEdgeIndexes[nodeCount] = this._containmentEdges.length;
+            for (var nodeOrdinal = 0; nodeOrdinal < nodeCount; ++nodeOrdinal) {
+                firstEdgeIndexes[nodeOrdinal] = nodes[nodeOrdinal * nodeFieldCount + nodeEdgesIndexOffset];
+            }
+            return;
+        }
+
+        var nodes = this._nodes;
+        var nodeCount = this.nodeCount;
+        var firstEdgeIndexes = this._firstEdgeIndexes = new Uint32Array(nodeCount + 1);
+        var nodeFieldCount = this._nodeFieldCount;
+        var edgeFieldsCount = this._edgeFieldsCount;
+        var nodeEdgeCountOffset = this._nodeEdgeCountOffset;
+        firstEdgeIndexes[nodeCount] = this._containmentEdges.length;
+        for (var nodeOrdinal = 0, edgeIndex = 0; nodeOrdinal < nodeCount; ++nodeOrdinal) {
+            firstEdgeIndexes[nodeOrdinal] = edgeIndex;
+            edgeIndex += nodes[nodeOrdinal * nodeFieldCount + nodeEdgeCountOffset] * edgeFieldsCount;
+        }
     },
 
     _buildRetainers: function()
@@ -722,7 +749,8 @@ WebInspector.HeapSnapshot.prototype = {
         var nodeFieldCount = this._nodeFieldCount;
         var edgeToNodeOffset = this._edgeToNodeOffset;
         var nodes = this._nodes;
-        var firstEdgeIndexOffset = this._firstEdgeIndexOffset;
+        var firstEdgeIndexes = this._firstEdgeIndexes;
+        var nodeCount = this.nodeCount;
 
         for (var toNodeFieldIndex = edgeToNodeOffset, l = containmentEdges.length; toNodeFieldIndex < l; toNodeFieldIndex += edgeFieldsCount) {
             var toNodeIndex = containmentEdges[toNodeFieldIndex];
@@ -730,21 +758,19 @@ WebInspector.HeapSnapshot.prototype = {
                 throw new Error("Invalid toNodeIndex " + toNodeIndex);
             ++firstRetainerIndex[toNodeIndex / nodeFieldCount];
         }
-        for (var i = 0, firstUnusedRetainerSlot = 0, l = this.nodeCount; i < l; i++) {
+        for (var i = 0, firstUnusedRetainerSlot = 0; i < nodeCount; i++) {
             var retainersCount = firstRetainerIndex[i];
             firstRetainerIndex[i] = firstUnusedRetainerSlot;
             retainingNodes[firstUnusedRetainerSlot] = retainersCount;
             firstUnusedRetainerSlot += retainersCount;
         }
-        firstRetainerIndex[this.nodeCount] = retainingNodes.length;
+        firstRetainerIndex[nodeCount] = retainingNodes.length;
 
-        var srcNodeIndex = 0;
-        var nextNodeFirstEdgeIndex = nodes[firstEdgeIndexOffset];
-        var nodesLength = this._realNodesLength;
-        while (srcNodeIndex < nodesLength) {
+        var nextNodeFirstEdgeIndex = firstEdgeIndexes[0];
+        for (var srcNodeOrdinal = 0; srcNodeOrdinal < nodeCount; ++srcNodeOrdinal) {
             var firstEdgeIndex = nextNodeFirstEdgeIndex;
-            var nextNodeIndex = srcNodeIndex + nodeFieldCount;
-            nextNodeFirstEdgeIndex = nodes[nextNodeIndex + firstEdgeIndexOffset];
+            nextNodeFirstEdgeIndex = firstEdgeIndexes[srcNodeOrdinal + 1];
+            var srcNodeIndex = srcNodeOrdinal * nodeFieldCount;
             for (var edgeIndex = firstEdgeIndex; edgeIndex < nextNodeFirstEdgeIndex; edgeIndex += edgeFieldsCount) {
                 var toNodeIndex = containmentEdges[edgeIndex + edgeToNodeOffset];
                 if (toNodeIndex % nodeFieldCount)
@@ -754,7 +780,6 @@ WebInspector.HeapSnapshot.prototype = {
                 retainingNodes[nextUnusedRetainerSlotIndex] = srcNodeIndex;
                 retainingEdges[nextUnusedRetainerSlotIndex] = edgeIndex;
             }
-            srcNodeIndex = nextNodeIndex;
         }
     },
 
@@ -911,9 +936,9 @@ WebInspector.HeapSnapshot.prototype = {
     {
         // Peload fields into local variables for better performance.
         var edgeFieldsCount = this._edgeFieldsCount;
-        var containmentEdges = this._containmentEdges;
         var nodeFieldCount = this._nodeFieldCount;
-        var firstEdgeIndexOffset = this._firstEdgeIndexOffset;
+        var containmentEdges = this._containmentEdges;
+        var firstEdgeIndexes = this._firstEdgeIndexes;
         var edgeToNodeOffset = this._edgeToNodeOffset;
         var nodes = this._nodes;
         var nodeCount = this.nodeCount;
@@ -924,8 +949,8 @@ WebInspector.HeapSnapshot.prototype = {
             var nodeIndex = nodesToVisit[index++]; // shift generates too much garbage.
             var nodeOrdinal = nodeIndex / nodeFieldCount;
             var distance = distances[nodeOrdinal] + 1;
-            var firstEdgeIndex = nodes[nodeIndex + firstEdgeIndexOffset];
-            var edgesEnd = nodes[nodeIndex + firstEdgeIndexOffset + nodeFieldCount];
+            var firstEdgeIndex = firstEdgeIndexes[nodeOrdinal];
+            var edgesEnd = firstEdgeIndexes[nodeOrdinal + 1];
             for (var edgeToNodeIndex = firstEdgeIndex + edgeToNodeOffset; edgeToNodeIndex < edgesEnd; edgeToNodeIndex += edgeFieldsCount) {
                 var childNodeIndex = containmentEdges[edgeToNodeIndex];
                 var childNodeOrdinal = childNodeIndex / nodeFieldCount;
@@ -946,7 +971,7 @@ WebInspector.HeapSnapshot.prototype = {
         var classIndexes = [];
         var nodes = this._nodes;
         var flags = this._flags;
-        var nodesLength = this._realNodesLength;
+        var nodesLength = nodes.length;
         var nodeNativeType = this._nodeNativeType;
         var nodeFieldCount = this._nodeFieldCount;
         var selfSizeOffset = this._nodeSelfSizeOffset;
@@ -1066,13 +1091,13 @@ WebInspector.HeapSnapshot.prototype = {
         var nodeFieldCount = this._nodeFieldCount;
         var nodes = this._nodes;
         var nodeCount = this.nodeCount;
-        var rootNodeIndex = this._rootNodeIndex;
+        var rootNodeOrdinal = this._rootNodeIndex / nodeFieldCount;
 
         var edgeFieldsCount = this._edgeFieldsCount;
-        var edgeToNodeOffset = this._edgeToNodeOffset;
         var edgeTypeOffset = this._edgeTypeOffset;
+        var edgeToNodeOffset = this._edgeToNodeOffset;
         var edgeShortcutType = this._edgeShortcutType;
-        var firstEdgeIndexOffset = this._firstEdgeIndexOffset;
+        var firstEdgeIndexes = this._firstEdgeIndexes;
         var containmentEdges = this._containmentEdges;
         var containmentEdgesLength = this._containmentEdges.length;
 
@@ -1088,30 +1113,29 @@ WebInspector.HeapSnapshot.prototype = {
         var grey = 1;
         var black = 2;
 
-        nodesToVisit[nodesToVisitLength++] = this._rootNodeIndex;
-        painted[this._rootNodeIndex / nodeFieldCount] = grey;
+        nodesToVisit[nodesToVisitLength++] = rootNodeOrdinal;
+        painted[rootNodeOrdinal] = grey;
 
         while (nodesToVisitLength) {
-            var nodeIndex = nodesToVisit[nodesToVisitLength - 1];
-            var nodeOrdinal = nodeIndex / nodeFieldCount;
+            var nodeOrdinal = nodesToVisit[nodesToVisitLength - 1];
             if (painted[nodeOrdinal] === grey) {
                 painted[nodeOrdinal] = black;
                 var nodeFlag = flags[nodeOrdinal] & flag;
-                var beginEdgeIndex = nodes[nodeIndex + firstEdgeIndexOffset];
-                var endEdgeIndex = nodes[nodeIndex + firstEdgeIndexOffset + nodeFieldCount];
+                var beginEdgeIndex = firstEdgeIndexes[nodeOrdinal];
+                var endEdgeIndex = firstEdgeIndexes[nodeOrdinal + 1];
                 for (var edgeIndex = beginEdgeIndex; edgeIndex < endEdgeIndex; edgeIndex += edgeFieldsCount) {
-                    if (nodeIndex !== rootNodeIndex && containmentEdges[edgeIndex + edgeTypeOffset] === edgeShortcutType)
+                    if (nodeOrdinal !== rootNodeOrdinal && containmentEdges[edgeIndex + edgeTypeOffset] === edgeShortcutType)
                         continue;
                     var childNodeIndex = containmentEdges[edgeIndex + edgeToNodeOffset];
                     var childNodeOrdinal = childNodeIndex / nodeFieldCount;
                     var childNodeFlag = flags[childNodeOrdinal] & flag;
                     // We are skipping the edges from non-page-owned nodes to page-owned nodes.
                     // Otherwise the dominators for the objects that also were retained by debugger would be affected.
-                    if (nodeIndex !== rootNodeIndex && childNodeFlag && !nodeFlag)
+                    if (nodeOrdinal !== rootNodeOrdinal && childNodeFlag && !nodeFlag)
                         continue;
                     if (!painted[childNodeOrdinal]) {
                         painted[childNodeOrdinal] = grey;
-                        nodesToVisit[nodesToVisitLength++] = childNodeIndex;
+                        nodesToVisit[nodesToVisitLength++] = childNodeOrdinal;
                     }
                 }
             } else {
@@ -1142,10 +1166,10 @@ WebInspector.HeapSnapshot.prototype = {
         var retainingNodes = this._retainingNodes;
         var retainingEdges = this._retainingEdges;
         var edgeFieldsCount = this._edgeFieldsCount;
-        var edgeToNodeOffset = this._edgeToNodeOffset;
         var edgeTypeOffset = this._edgeTypeOffset;
+        var edgeToNodeOffset = this._edgeToNodeOffset;
         var edgeShortcutType = this._edgeShortcutType;
-        var firstEdgeIndexOffset = this._firstEdgeIndexOffset;
+        var firstEdgeIndexes = this._firstEdgeIndexes;
         var containmentEdges = this._containmentEdges;
         var containmentEdgesLength = this._containmentEdges.length;
         var rootNodeIndex = this._rootNodeIndex;
@@ -1164,11 +1188,12 @@ WebInspector.HeapSnapshot.prototype = {
         // The affected array is used to mark entries which dominators
         // have to be racalculated because of changes in their retainers.
         var affected = new Uint8Array(nodesCount);
+        var nodeOrdinal;
 
         { // Mark the root direct children as affected.
-            var nodeIndex = this._rootNodeIndex;
-            var beginEdgeToNodeFieldIndex = nodes[nodeIndex + firstEdgeIndexOffset] + edgeToNodeOffset;
-            var endEdgeToNodeFieldIndex = nodes[nodeIndex + nodeFieldCount + firstEdgeIndexOffset];
+            nodeOrdinal = this._rootNodeIndex / nodeFieldCount;
+            var beginEdgeToNodeFieldIndex = firstEdgeIndexes[nodeOrdinal] + edgeToNodeOffset;
+            var endEdgeToNodeFieldIndex = firstEdgeIndexes[nodeOrdinal + 1];
             for (var toNodeFieldIndex = beginEdgeToNodeFieldIndex;
                  toNodeFieldIndex < endEdgeToNodeFieldIndex;
                  toNodeFieldIndex += edgeFieldsCount) {
@@ -1188,7 +1213,7 @@ WebInspector.HeapSnapshot.prototype = {
                 // then it can't propagate any further.
                 if (dominators[postOrderIndex] === rootPostOrderedIndex)
                     continue;
-                var nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
+                nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
                 var nodeFlag = !!(flags[nodeOrdinal] & flag);
                 var newDominatorIndex = noEntry;
                 var beginRetainerIndex = firstRetainerIndex[nodeOrdinal];
@@ -1227,9 +1252,8 @@ WebInspector.HeapSnapshot.prototype = {
                     dominators[postOrderIndex] = newDominatorIndex;
                     changed = true;
                     nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
-                    nodeIndex = nodeOrdinal * nodeFieldCount;
-                    beginEdgeToNodeFieldIndex = nodes[nodeIndex + firstEdgeIndexOffset] + edgeToNodeOffset;
-                    endEdgeToNodeFieldIndex = nodes[nodeIndex + firstEdgeIndexOffset + nodeFieldCount];
+                    beginEdgeToNodeFieldIndex = firstEdgeIndexes[nodeOrdinal] + edgeToNodeOffset;
+                    endEdgeToNodeFieldIndex = firstEdgeIndexes[nodeOrdinal + 1];
                     for (var toNodeFieldIndex = beginEdgeToNodeFieldIndex;
                          toNodeFieldIndex < endEdgeToNodeFieldIndex;
                          toNodeFieldIndex += edgeFieldsCount) {
@@ -1242,36 +1266,33 @@ WebInspector.HeapSnapshot.prototype = {
 
         var dominatorsTree = new Uint32Array(nodesCount);
         for (var postOrderIndex = 0, l = dominators.length; postOrderIndex < l; ++postOrderIndex) {
-            var nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
+            nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
             dominatorsTree[nodeOrdinal] = postOrderIndex2NodeOrdinal[dominators[postOrderIndex]];
         }
         return dominatorsTree;
     },
 
-    _calculateRetainedSizes: function()
+    _calculateRetainedSizes: function(postOrderIndex2NodeOrdinal)
     {
-        // As for the dominators tree we only know parent nodes, not
-        // children, to sum up total sizes we "bubble" node's self size
-        // adding it to all of its parents.
+        var nodeCount = this.nodeCount;
         var nodes = this._nodes;
         var nodeSelfSizeOffset = this._nodeSelfSizeOffset;
         var nodeFieldCount = this._nodeFieldCount;
         var dominatorsTree = this._dominatorsTree;
-        var retainedSizes = new Uint32Array(this.nodeCount);
-        var rootNodeOrdinal = this._rootNodeIndex / nodeFieldCount;
+        // Reuse now unused edge_count field to store retained size.
+        var nodeRetainedSizeOffset = this._nodeRetainedSizeOffset = this._nodeEdgeCountOffset;
+        delete this._nodeEdgeCountOffset;
 
-        for (var nodeOrdinal = 0, nodeSelfSizeIndex = nodeSelfSizeOffset, l = this.nodeCount;
-             nodeOrdinal < l;
-             ++nodeOrdinal, nodeSelfSizeIndex += nodeFieldCount) {
-            var nodeSelfSize = nodes[nodeSelfSizeIndex];
-            var currentNodeOrdinal = nodeOrdinal;
-            retainedSizes[currentNodeOrdinal] += nodeSelfSize;
-            do {
-                currentNodeOrdinal = dominatorsTree[currentNodeOrdinal];
-                retainedSizes[currentNodeOrdinal] += nodeSelfSize;
-            } while (currentNodeOrdinal !== rootNodeOrdinal);
+        for (var nodeIndex = 0, l = nodes.length; nodeIndex < l; nodeIndex += nodeFieldCount)
+            nodes[nodeIndex + nodeRetainedSizeOffset] = nodes[nodeIndex + nodeSelfSizeOffset];
+
+        // Propagate retained sizes for each node excluding root.
+        for (var postOrderIndex = 0; postOrderIndex < nodeCount - 1; ++postOrderIndex) {
+            var nodeOrdinal = postOrderIndex2NodeOrdinal[postOrderIndex];
+            var nodeIndex = nodeOrdinal * nodeFieldCount;
+            var dominatorIndex = dominatorsTree[nodeOrdinal] * nodeFieldCount;
+            nodes[dominatorIndex + nodeRetainedSizeOffset] += nodes[nodeIndex + nodeRetainedSizeOffset];
         }
-        this._retainedSizes = retainedSizes;
     },
 
     _buildDominatedNodes: function()
@@ -1373,7 +1394,7 @@ WebInspector.HeapSnapshot.prototype = {
         var edgeTypeOffset = this._edgeTypeOffset;
         var edgeFieldsCount = this._edgeFieldsCount;
         var edgeWeakType = this._edgeWeakType;
-        var firstEdgeIndexOffset = this._firstEdgeIndexOffset;
+        var firstEdgeIndexes = this._firstEdgeIndexes;
         var containmentEdges = this._containmentEdges;
         var containmentEdgesLength = containmentEdges.length;
         var nodes = this._nodes;
@@ -1389,25 +1410,23 @@ WebInspector.HeapSnapshot.prototype = {
         var nodesToVisit = new Uint32Array(nodesCount);
         var nodesToVisitLength = 0;
 
-        for (var edgeIndex = nodes[this._rootNodeIndex + firstEdgeIndexOffset], endEdgeIndex = nodes[this._rootNodeIndex + nodeFieldCount + firstEdgeIndexOffset];
+        var rootNodeOrdinal = this._rootNodeIndex / nodeFieldCount;
+        for (var edgeIndex = firstEdgeIndexes[rootNodeOrdinal], endEdgeIndex = firstEdgeIndexes[rootNodeOrdinal + 1];
              edgeIndex < endEdgeIndex;
              edgeIndex += edgeFieldsCount) {
             if (containmentEdges[edgeIndex + edgeTypeOffset] === edgeShortcutType) {
-                var nodeIndex = containmentEdges[edgeIndex + edgeToNodeOffset];
-                nodesToVisit[nodesToVisitLength++] = nodeIndex;
-                flags[nodeIndex / nodeFieldCount] |= visitedMarker;
+                var nodeOrdinal = containmentEdges[edgeIndex + edgeToNodeOffset] / nodeFieldCount;
+                nodesToVisit[nodesToVisitLength++] = nodeOrdinal;
+                flags[nodeOrdinal] |= visitedMarker;
             }
         }
 
         while (nodesToVisitLength) {
-            var nodeIndex = nodesToVisit[--nodesToVisitLength];
-            var nodeOrdinal = nodeIndex / nodeFieldCount;
+            var nodeOrdinal = nodesToVisit[--nodesToVisitLength];
             flags[nodeOrdinal] |= flag;
             flags[nodeOrdinal] &= visitedMarkerMask;
-            var beginEdgeIndex = nodes[nodeIndex + firstEdgeIndexOffset];
-            var endEdgeIndex = nodeOrdinal < nodesCount - 1
-                ? nodes[nodeIndex + firstEdgeIndexOffset + nodeFieldCount]
-                : containmentEdgesLength;
+            var beginEdgeIndex = firstEdgeIndexes[nodeOrdinal];
+            var endEdgeIndex = firstEdgeIndexes[nodeOrdinal + 1];
             for (var edgeIndex = beginEdgeIndex; edgeIndex < endEdgeIndex; edgeIndex += edgeFieldsCount) {
                 var childNodeIndex = containmentEdges[edgeIndex + edgeToNodeOffset];
                 var childNodeOrdinal = childNodeIndex / nodeFieldCount;
@@ -1416,7 +1435,7 @@ WebInspector.HeapSnapshot.prototype = {
                 var type = containmentEdges[edgeIndex + edgeTypeOffset];
                 if (type === edgeWeakType)
                     continue;
-                nodesToVisit[nodesToVisitLength++] = childNodeIndex;
+                nodesToVisit[nodesToVisitLength++] = childNodeOrdinal;
                 flags[childNodeOrdinal] |= visitedMarker;
             }
         }
@@ -1438,32 +1457,32 @@ WebInspector.HeapSnapshot.prototype = {
         var nodes = this._nodes;
         var nodeCount = this.nodeCount;
         var nodeFieldCount = this._nodeFieldCount;
-        var firstEdgeIndexOffset = this._firstEdgeIndexOffset;
+        var firstEdgeIndexes = this._firstEdgeIndexes;
 
         var flags = this._flags;
         var list = [];
 
         for (var iter = this.rootNode().edges(); iter.hasNext(); iter.next()) {
             if (iter.edge.node().isWindow())
-                list.push(iter.edge.node().nodeIndex);
+                list.push(iter.edge.node().nodeIndex / nodeFieldCount);
         }
 
         while (list.length) {
-            var nodeIndex = list.pop();
-            var nodeOrdinal = nodeIndex / nodeFieldCount;
+            var nodeOrdinal = list.pop();
             if (flags[nodeOrdinal] & flag)
                 continue;
             flags[nodeOrdinal] |= flag;
-            var beginEdgeIndex = nodes[nodeIndex + firstEdgeIndexOffset];
-            var endEdgeIndex = nodes[nodeIndex + firstEdgeIndexOffset + nodeFieldCount];
+            var beginEdgeIndex = firstEdgeIndexes[nodeOrdinal];
+            var endEdgeIndex = firstEdgeIndexes[nodeOrdinal + 1];
             for (var edgeIndex = beginEdgeIndex; edgeIndex < endEdgeIndex; edgeIndex += edgeFieldsCount) {
                 var childNodeIndex = containmentEdges[edgeIndex + edgeToNodeOffset];
-                if (flags[childNodeIndex / nodeFieldCount] & flag)
+                var childNodeOrdinal = childNodeIndex / nodeFieldCount;
+                if (flags[childNodeOrdinal] & flag)
                     continue;
                 var type = containmentEdges[edgeIndex + edgeTypeOffset];
                 if (type === hiddenEdgeType || type === invisibleEdgeType || type === internalEdgeType)
                     continue;
-                list.push(childNodeIndex);
+                list.push(childNodeOrdinal);
             }
         }
     },
@@ -1841,11 +1860,11 @@ WebInspector.HeapSnapshotEdgesProvider.prototype = {
         {
             edgeA.edgeIndex = indexA;
             nodeA.nodeIndex = edgeA.nodeIndex();
-            var valueA = nodeA[fieldName];
+            var valueA = nodeA[fieldName]();
 
             edgeB.edgeIndex = indexB;
             nodeB.nodeIndex = edgeB.nodeIndex();
-            var valueB = nodeB[fieldName];
+            var valueB = nodeB[fieldName]();
 
             var result = valueA < valueB ? -1 : (valueA > valueB ? 1 : 0);
             return ascending ? result : -result;

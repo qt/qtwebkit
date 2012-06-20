@@ -152,6 +152,12 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
     def __init__(self, host, port_name, **kwargs):
         chromium.ChromiumPort.__init__(self, host, port_name, **kwargs)
 
+        # FIXME: Stop using test_shell mode: https://bugs.webkit.org/show_bug.cgi?id=88542
+        if not hasattr(self._options, 'additional_drt_flag'):
+            self._options.additional_drt_flag = []
+        if not '--test-shell' in self._options.additional_drt_flag:
+            self._options.additional_drt_flag.append('--test-shell')
+
         # The Chromium port for Android always uses the hardware GPU path.
         self._options.enable_hardware_gpu = True
 
@@ -209,7 +215,7 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         # chromium-android.
         # FIXME: This is a temporary measure to reduce the manual work when
         # updating WebKit. This method should be removed when we merge
-        # test_expectations_android.txt into test_expectations.txt.
+        # test_expectations_android.txt into TestExpectations.
         expectations = chromium.ChromiumPort.test_expectations(self)
         return expectations.replace('LINUX ', 'LINUX ANDROID ')
 
@@ -267,7 +273,7 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
     def _path_to_driver(self, configuration=None):
         if not configuration:
             configuration = self.get_option('configuration')
-        return self._build_path(configuration, 'DumpRenderTree_apk/ChromeNativeTests-debug.apk')
+        return self._build_path(configuration, 'DumpRenderTree_apk/DumpRenderTree-debug.apk')
 
     def _path_to_helper(self):
         return self._build_path(self.get_option('configuration'), 'forwarder')
@@ -477,9 +483,23 @@ class ChromiumAndroidDriver(chromium.ChromiumDriver):
 
         ChromiumAndroidDriver._started_driver = self
 
+        retries = 0
+        while not self._start_once(pixel_tests, per_test_args):
+            _log.error('Failed to start DumpRenderTree application. Log:\n' + self._port._get_logcat())
+            retries += 1
+            if retries >= 3:
+                raise AssertionError('Failed to start DumpRenderTree application multiple times. Give up.')
+            self.stop()
+            time.sleep(2)
+
+    def _start_once(self, pixel_tests, per_test_args):
         self._port._run_adb_command(['logcat', '-c'])
         self._port._run_adb_command(['shell', 'echo'] + self.cmd_line(pixel_tests, per_test_args) + ['>', COMMAND_LINE_FILE])
-        self._port._run_adb_command(['shell', 'am', 'start', '-n', DRT_ACTIVITY_FULL_NAME])
+        start_result = self._port._run_adb_command(['shell', 'am', 'start', '-n', DRT_ACTIVITY_FULL_NAME])
+        if start_result.find('Exception') != -1:
+            _log.error('Failed to start DumpRenderTree application. Exception:\n' + start_result)
+            return False
+
         seconds = 0
         while (not self._file_exists_on_device(self._in_fifo_path) or
                not self._file_exists_on_device(self._out_fifo_path) or
@@ -487,8 +507,7 @@ class ChromiumAndroidDriver(chromium.ChromiumDriver):
             time.sleep(1)
             seconds += 1
             if seconds >= DRT_START_STOP_TIMEOUT_SECS:
-                _log.error('Failed to start DumpRenderTreeApplication. Log:\n' + self._port._get_logcat())
-                raise AssertionError('Failed to start DumpRenderTree application.')
+                return False
 
         shell_cmd = self._port._adb_command + ['shell']
         executive = self._port._executive
@@ -531,7 +550,7 @@ class ChromiumAndroidDriver(chromium.ChromiumDriver):
         else:
             # Inform the deadlock detector that the startup is successful without deadlock.
             normal_startup_event.set()
-            return
+            return True
 
     def run_test(self, driver_input):
         driver_output = chromium.ChromiumDriver.run_test(self, driver_input)

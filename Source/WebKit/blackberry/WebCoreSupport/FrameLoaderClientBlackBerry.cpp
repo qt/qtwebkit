@@ -369,7 +369,8 @@ void FrameLoaderClientBlackBerry::receivedData(const char* data, int length, con
 void FrameLoaderClientBlackBerry::finishedLoading(DocumentLoader*)
 {
     if (m_pluginView) {
-        m_pluginView->didFinishLoading();
+        if (m_hasSentResponseToPlugin)
+            m_pluginView->didFinishLoading();
         m_pluginView = 0;
         m_hasSentResponseToPlugin = false;
     }
@@ -608,7 +609,8 @@ void FrameLoaderClientBlackBerry::dispatchDidFinishLoad()
     }
 
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-    if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled())
+    if (m_webPagePrivate->m_webSettings->isCredentialAutofillEnabled()
+        && !m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled())
         credentialManager().autofillPasswordForms(m_frame->document()->forms());
 #endif
 }
@@ -703,15 +705,8 @@ void FrameLoaderClientBlackBerry::dispatchDidFailProvisionalLoad(const ResourceE
     }
 }
 
-void FrameLoaderClientBlackBerry::dispatchWillSubmitForm(FramePolicyFunction function, PassRefPtr<FormState> formState)
+void FrameLoaderClientBlackBerry::dispatchWillSubmitForm(FramePolicyFunction function, PassRefPtr<FormState>)
 {
-    if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled()) {
-        m_webPagePrivate->m_autofillManager->saveTextFields(formState->form());
-#if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-        credentialManager().saveCredentialIfConfirmed(m_webPagePrivate, CredentialTransformData(formState->form()));
-#endif
-    }
-
     // FIXME: Stub.
     (m_frame->loader()->policyChecker()->*function)(PolicyUse);
 }
@@ -719,9 +714,11 @@ void FrameLoaderClientBlackBerry::dispatchWillSubmitForm(FramePolicyFunction fun
 void FrameLoaderClientBlackBerry::dispatchWillSendSubmitEvent(PassRefPtr<FormState> prpFormState)
 {
     if (!m_webPagePrivate->m_webSettings->isPrivateBrowsingEnabled()) {
-        m_webPagePrivate->m_autofillManager->saveTextFields(prpFormState->form());
+        if (m_webPagePrivate->m_webSettings->isFormAutofillEnabled())
+            m_webPagePrivate->m_autofillManager->saveTextFields(prpFormState->form());
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-    credentialManager().saveCredentialIfConfirmed(m_webPagePrivate, CredentialTransformData(prpFormState->form()));
+        if (m_webPagePrivate->m_webSettings->isCredentialAutofillEnabled())
+            credentialManager().saveCredentialIfConfirmed(m_webPagePrivate, CredentialTransformData(prpFormState->form()));
 #endif
     }
 }
@@ -828,10 +825,7 @@ void FrameLoaderClientBlackBerry::dispatchDidFirstVisuallyNonEmptyLayout()
 
     readyToRender(true);
 
-    // FIXME: We shouldn't be getting here if we are not in the Committed state but we are
-    // so we can not assert on that right now. But we only want to do this on load.
-    // RIM Bug #555
-    if (m_webPagePrivate->loadState() == WebPagePrivate::Committed) {
+    if (m_webPagePrivate->shouldZoomToInitialScaleOnLoad()) {
         m_webPagePrivate->zoomToInitialScaleOnLoad(); // Set the proper zoom level first.
         m_webPagePrivate->m_backingStore->d->clearVisibleZoom(); // Clear the visible zoom since we're explicitly rendering+blitting below.
         m_webPagePrivate->m_backingStore->d->renderVisibleContents();
@@ -1155,13 +1149,10 @@ void FrameLoaderClientBlackBerry::download(ResourceHandle* handle, const Resourc
 void FrameLoaderClientBlackBerry::dispatchDidReceiveIcon()
 {
     String url = m_frame->document()->url().string();
-    Image* img = iconDatabase().synchronousIconForPageURL(url, IntSize(10, 10));
-    if (!img || !img->data())
-        return;
-
-    NativeImageSkia* bitmap = img->nativeImageForCurrentFrame();
+    NativeImageSkia* bitmap = iconDatabase().synchronousNativeIconForPageURL(url, IntSize(10, 10));
     if (!bitmap)
         return;
+
     bitmap->lockPixels();
     String iconUrl = iconDatabase().synchronousIconURLForPageURL(url);
     m_webPagePrivate->m_client->setFavicon(img->width(), img->height(), (unsigned char*)bitmap->getPixels(), iconUrl.utf8().data());

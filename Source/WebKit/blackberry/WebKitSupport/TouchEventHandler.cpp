@@ -94,9 +94,9 @@ static bool shouldConvertTouchToMouse(Element* element)
     // won't operate on the shadow node of other element type, because the webpages
     // aren't able to attach listeners to shadow content.
     do {
-        element = toElement(element->shadowAncestorNode()); // If an element is not in shadow tree, shadowAncestorNode returns itself.
         if (isRangeControlElement(element))
             return true;
+        element = toElement(element->shadowAncestorNode()); // If an element is not in shadow tree, shadowAncestorNode returns itself.
     } while (element->isInShadowTree());
 
     // Check if the element has a mouse listener and no touch listener. If so,
@@ -126,11 +126,11 @@ void TouchEventHandler::touchEventCancel()
 {
     m_webPage->m_inputHandler->processPendingKeyboardVisibilityChange();
 
-    if (!shouldSuppressMouseDownOnTouchDown()) {
-        // Input elements delay mouse down and do not need to be released on touch cancel.
+    // Input elements delay mouse down and do not need to be released on touch cancel.
+    if (!shouldSuppressMouseDownOnTouchDown())
         m_webPage->m_page->focusController()->focusedOrMainFrame()->eventHandler()->setMousePressed(false);
-    }
-    m_convertTouchToMouse = false;
+
+    m_convertTouchToMouse = m_webPage->m_touchEventMode == PureTouchEventsWithMouseConversion;
     m_didCancelTouch = true;
 
     // If we cancel a single touch event, we need to also clean up any hover
@@ -172,6 +172,7 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
 {
     // Enable input mode on any touch event.
     m_webPage->m_inputHandler->enableInputMode();
+    bool pureWithMouseConversion = m_webPage->m_touchEventMode == PureTouchEventsWithMouseConversion;
 
     switch (point.m_state) {
     case Platform::TouchPoint::TouchPressed:
@@ -192,7 +193,7 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
 
             // Set or reset the touch mode.
             Element* possibleTargetNodeForMouseMoveEvents = static_cast<Element*>(m_lastFatFingersResult.positionWasAdjusted() ? elementUnderFatFinger : m_lastFatFingersResult.node());
-            m_convertTouchToMouse = shouldConvertTouchToMouse(possibleTargetNodeForMouseMoveEvents);
+            m_convertTouchToMouse = pureWithMouseConversion ? true : shouldConvertTouchToMouse(possibleTargetNodeForMouseMoveEvents);
 
             if (elementUnderFatFinger)
                 drawTapHighlight();
@@ -230,7 +231,7 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
             IntPoint adjustedPoint;
             if (m_convertTouchToMouse) {
                 adjustedPoint = point.m_pos;
-                m_convertTouchToMouse = false;
+                m_convertTouchToMouse = pureWithMouseConversion;
             } else // Fat finger point in viewport coordinates.
                 adjustedPoint = m_webPage->mapFromContentsToViewport(m_lastFatFingersResult.adjustedPosition());
 
@@ -249,7 +250,7 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point)
             PlatformMouseEvent mouseEvent(point.m_pos, m_lastScreenPoint, PlatformEvent::MouseMoved, 1, LeftButton, TouchScreen);
             m_lastScreenPoint = point.m_screenPos;
             if (!m_webPage->handleMouseEvent(mouseEvent)) {
-                m_convertTouchToMouse = false;
+                m_convertTouchToMouse = pureWithMouseConversion;
                 return false;
             }
             return true;

@@ -52,7 +52,7 @@ void BitmapSkPictureCanvasLayerTextureUpdater::Texture::prepareRect(const IntRec
     textureUpdater()->paintContentsRect(&canvas, sourceRect);
 }
 
-void BitmapSkPictureCanvasLayerTextureUpdater::Texture::updateRect(GraphicsContext3D* context, TextureAllocator* allocator, const IntRect& sourceRect, const IntRect& destRect)
+void BitmapSkPictureCanvasLayerTextureUpdater::Texture::updateRect(CCGraphicsContext* context, TextureAllocator* allocator, const IntRect& sourceRect, const IntRect& destRect)
 {
     texture()->bindTexture(context, allocator);
 
@@ -89,10 +89,10 @@ LayerTextureUpdater::SampledTexelFormat BitmapSkPictureCanvasLayerTextureUpdater
             LayerTextureUpdater::SampledTexelFormatRGBA : LayerTextureUpdater::SampledTexelFormatBGRA;
 }
 
-void BitmapSkPictureCanvasLayerTextureUpdater::prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, int borderTexels, float contentsScale, IntRect& resultingOpaqueRect)
+void BitmapSkPictureCanvasLayerTextureUpdater::prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, float contentsScale, IntRect& resultingOpaqueRect)
 {
     m_texSubImage.setSubImageSize(tileSize);
-    SkPictureCanvasLayerTextureUpdater::prepareToUpdate(contentRect, tileSize, borderTexels, contentsScale, resultingOpaqueRect);
+    SkPictureCanvasLayerTextureUpdater::prepareToUpdate(contentRect, tileSize, contentsScale, resultingOpaqueRect);
 }
 
 void BitmapSkPictureCanvasLayerTextureUpdater::paintContentsRect(SkCanvas* canvas, const IntRect& sourceRect)
@@ -103,7 +103,7 @@ void BitmapSkPictureCanvasLayerTextureUpdater::paintContentsRect(SkCanvas* canva
     drawPicture(canvas);
 }
 
-void BitmapSkPictureCanvasLayerTextureUpdater::updateTextureRect(GraphicsContext3D* context, GC3Denum format, const IntRect& destRect, const uint8_t* pixels)
+void BitmapSkPictureCanvasLayerTextureUpdater::updateTextureRect(CCGraphicsContext* context, GC3Denum format, const IntRect& destRect, const uint8_t* pixels)
 {
     m_texSubImage.upload(pixels, destRect, destRect, destRect, format, context);
 }

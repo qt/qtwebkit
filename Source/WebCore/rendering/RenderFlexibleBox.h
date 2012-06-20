@@ -59,8 +59,7 @@ private:
         NoFlipForRowReverse,
     };
 
-    struct OrderHashTraits;
-    typedef HashSet<int, DefaultHash<int>::Hash, OrderHashTraits> OrderHashSet;
+    typedef HashSet<float> OrderHashSet;
 
     class OrderIterator;
     typedef WTF::HashMap<const RenderBox*, LayoutUnit> InflexibleFlexItemSize;
@@ -74,7 +73,7 @@ private:
     bool isLeftToRightFlow() const;
     bool isMultiline() const;
     Length crossAxisLength() const;
-    Length preferredLengthForChild(RenderBox* child) const;
+    Length flexBasisForChild(RenderBox* child) const;
     void setCrossAxisExtent(LayoutUnit);
     LayoutUnit crossAxisExtentForChild(RenderBox* child);
     LayoutUnit mainAxisExtentForChild(RenderBox* child);
@@ -118,17 +117,17 @@ private:
     void computeMainAxisPreferredSizes(bool relayoutChildren, OrderHashSet&);
     LayoutUnit lineBreakLength();
     LayoutUnit adjustChildSizeForMinAndMax(RenderBox*, LayoutUnit childSize, LayoutUnit flexboxAvailableContentExtent);
-    bool computeNextFlexLine(OrderIterator&, OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, float& totalPositiveFlexibility, float& totalWeightedNegativeFlexibility, LayoutUnit& minMaxAppliedMainAxisExtent);
+    bool computeNextFlexLine(OrderIterator&, OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, float& totalFlexGrow, float& totalWeightedFlexShrink, LayoutUnit& minMaxAppliedMainAxisExtent);
     LayoutUnit computeAvailableFreeSpace(LayoutUnit preferredMainAxisExtent);
 
-    bool resolveFlexibleLengths(FlexSign, const OrderedFlexItemList&, LayoutUnit& availableFreeSpace, float& totalPositiveFlexibility, float& totalWeightedNegativeFlexibility, InflexibleFlexItemSize&, WTF::Vector<LayoutUnit>& childSizes);
-    void freezeViolations(const WTF::Vector<Violation>&, LayoutUnit& availableFreeSpace, float& totalPositiveFlexibility, float& totalWeightedNegativeFlexibility, InflexibleFlexItemSize&);
+    bool resolveFlexibleLengths(FlexSign, const OrderedFlexItemList&, LayoutUnit& availableFreeSpace, float& totalFlexGrow, float& totalWeightedFlexShrink, InflexibleFlexItemSize&, WTF::Vector<LayoutUnit>& childSizes);
+    void freezeViolations(const WTF::Vector<Violation>&, LayoutUnit& availableFreeSpace, float& totalFlexGrow, float& totalWeightedFlexShrink, InflexibleFlexItemSize&);
 
     void setLogicalOverrideSize(RenderBox* child, LayoutUnit childPreferredSize);
     void prepareChildForPositionedLayout(RenderBox* child, LayoutUnit mainAxisOffset, LayoutUnit crossAxisOffset, PositionedLayoutMode);
     void layoutAndPlaceChildren(LayoutUnit& crossAxisOffset, const OrderedFlexItemList&, const WTF::Vector<LayoutUnit>& childSizes, LayoutUnit availableFreeSpace, WTF::Vector<LineContext>&);
     void layoutColumnReverse(const OrderedFlexItemList&, const WTF::Vector<LayoutUnit>& childSizes, LayoutUnit crossAxisOffset, LayoutUnit availableFreeSpace);
-    void packFlexLines(OrderIterator&, WTF::Vector<LineContext>&);
+    void alignFlexLines(OrderIterator&, WTF::Vector<LineContext>&);
     void alignChildren(OrderIterator&, const WTF::Vector<LineContext>&);
     void applyStretchAlignmentToChild(RenderBox*, LayoutUnit lineCrossAxisExtent);
     void flipForRightToLeftColumn(OrderIterator&);

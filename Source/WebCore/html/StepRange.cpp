@@ -37,8 +37,6 @@ StepRange::StepRange()
     , m_minimum(0)
     , m_step(1)
     , m_stepBase(0)
-    , m_stepBaseDecimalPlaces(0)
-    , m_stepDecimalPlaces(0)
     , m_hasStep(false)
 {
 }
@@ -49,126 +47,122 @@ StepRange::StepRange(const StepRange& stepRange)
     , m_step(stepRange.m_step)
     , m_stepBase(stepRange.m_stepBase)
     , m_stepDescription(stepRange.m_stepDescription)
-    , m_stepBaseDecimalPlaces(stepRange.m_stepBaseDecimalPlaces)
-    , m_stepDecimalPlaces(stepRange.m_stepDecimalPlaces)
     , m_hasStep(stepRange.m_hasStep)
 {
 }
 
-StepRange::StepRange(const DoubleWithDecimalPlaces& stepBase, double minimum, double maximum, const DoubleWithDecimalPlacesOrMissing& step, const StepDescription& stepDescription)
+StepRange::StepRange(const Decimal& stepBase, const Decimal& minimum, const Decimal& maximum, const Decimal& step, const StepDescription& stepDescription)
     : m_maximum(maximum)
     , m_minimum(minimum)
-    , m_step(step.value.value)
-    , m_stepBase(stepBase.value)
+    , m_step(step.isFinite() ? step : 1)
+    , m_stepBase(stepBase.isFinite() ? stepBase : 1)
     , m_stepDescription(stepDescription)
-    , m_stepBaseDecimalPlaces(stepBase.decimalPlaces)
-    , m_stepDecimalPlaces(step.value.decimalPlaces)
-    , m_hasStep(step.hasValue)
+    , m_hasStep(step.isFinite())
 {
-    ASSERT(isfinite(m_maximum));
-    ASSERT(isfinite(m_minimum));
-    ASSERT(isfinite(m_step));
-    ASSERT(isfinite(m_stepBase));
+    ASSERT(m_maximum.isFinite());
+    ASSERT(m_minimum.isFinite());
+    ASSERT(m_step.isFinite());
+    ASSERT(m_stepBase.isFinite());
 }
 
-double StepRange::acceptableError() const
+Decimal StepRange::acceptableError() const
 {
-    return m_step / pow(2.0, FLT_MANT_DIG);
+    // FIXME: We should use DBL_MANT_DIG instead of FLT_MANT_DIG regarding to HTML5 specification.
+    DEFINE_STATIC_LOCAL(const Decimal, twoPowerOfFloatMantissaBits, (Decimal::Positive, 0, UINT64_C(1) << FLT_MANT_DIG));
+    return m_step / twoPowerOfFloatMantissaBits;
 }
 
-double StepRange::alignValueForStep(double currentValue, unsigned currentDecimalPlaces, double newValue) const
+Decimal StepRange::alignValueForStep(const Decimal& currentValue, const Decimal& newValue) const
 {
-    if (newValue >= pow(10.0, 21.0))
+    DEFINE_STATIC_LOCAL(const Decimal, tenPowerOf21, (Decimal::Positive, 21, 1));
+    if (newValue >= tenPowerOf21)
         return newValue;
 
-    if (stepMismatch(currentValue)) {
-        double scale = pow(10.0, static_cast<double>(max(m_stepDecimalPlaces, currentDecimalPlaces)));
-        newValue = round(newValue * scale) / scale;
-    } else {
-        double scale = pow(10.0, static_cast<double>(max(m_stepDecimalPlaces, m_stepBaseDecimalPlaces)));
-        newValue = round((m_stepBase + round((newValue - m_stepBase) / m_step) * m_step) * scale) / scale;
-    }
-
-    return newValue;
+    return stepMismatch(currentValue) ? newValue : roundByStep(newValue, m_stepBase);
 }
-double StepRange::clampValue(double value) const
+
+Decimal StepRange::clampValue(const Decimal& value) const
 {
-    double clampedValue = max(m_minimum, min(value, m_maximum));
+    const Decimal inRangeValue = max(m_minimum, min(value, m_maximum));
     if (!m_hasStep)
-        return clampedValue;
-    // Rounds clampedValue to minimum + N * step.
-    clampedValue = m_minimum + round((clampedValue - m_minimum) / m_step) * m_step;
-    if (clampedValue > m_maximum)
-       clampedValue -= m_step;
+        return inRangeValue;
+    // Rounds inRangeValue to minimum + N * step.
+    const Decimal roundedValue = roundByStep(inRangeValue, m_minimum);
+    const Decimal clampedValue = roundedValue > m_maximum ? roundedValue - m_step : roundedValue;
     ASSERT(clampedValue >= m_minimum);
     ASSERT(clampedValue <= m_maximum);
     return clampedValue;
 }
 
-StepRange::DoubleWithDecimalPlacesOrMissing StepRange::parseStep(AnyStepHandling anyStepHandling, const StepDescription& stepDescription, const String& stepString)
+Decimal StepRange::parseStep(AnyStepHandling anyStepHandling, const StepDescription& stepDescription, const String& stepString)
 {
     if (stepString.isEmpty())
-        return DoubleWithDecimalPlacesOrMissing(stepDescription.defaultValue());
+        return stepDescription.defaultValue();
 
     if (equalIgnoringCase(stepString, "any")) {
         switch (anyStepHandling) {
         case RejectAny:
-            return DoubleWithDecimalPlacesOrMissing(DoubleWithDecimalPlaces(1), false);
+            return Decimal::nan();
         case AnyIsDefaultStep:
-            return DoubleWithDecimalPlacesOrMissing(stepDescription.defaultValue());
+            return stepDescription.defaultValue();
         default:
             ASSERT_NOT_REACHED();
         }
     }
 
-    DoubleWithDecimalPlacesOrMissing step(0);
-    step.value.value = parseToDoubleForNumberTypeWithDecimalPlaces(stepString, &step.value.decimalPlaces);
-    if (!isfinite(step.value.value) || step.value.value <= 0.0)
-        return DoubleWithDecimalPlacesOrMissing(stepDescription.defaultValue());
+    Decimal step = parseToDecimalForNumberType(stepString);
+    if (!step.isFinite() || step <= 0)
+        return stepDescription.defaultValue();
 
     switch (stepDescription.stepValueShouldBe) {
     case StepValueShouldBeReal:
-        step.value.value *= stepDescription.stepScaleFactor;
+        step *= stepDescription.stepScaleFactor;
         break;
     case ParsedStepValueShouldBeInteger:
         // For date, month, and week, the parsed value should be an integer for some types.
-        step.value.value = max(round(step.value.value), 1.0);
-        step.value.value *= stepDescription.stepScaleFactor;
+        step = max(step.round(), Decimal(1));
+        step *= stepDescription.stepScaleFactor;
         break;
     case ScaledStepValueShouldBeInteger:
         // For datetime, datetime-local, time, the result should be an integer.
-        step.value.value *= stepDescription.stepScaleFactor;
-        step.value.value = max(round(step.value.value), 1.0);
+        step *= stepDescription.stepScaleFactor;
+        step = max(step.round(), Decimal(1));
         break;
     default:
         ASSERT_NOT_REACHED();
     }
 
-    ASSERT(step.value.value > 0);
+    ASSERT(step > 0);
     return step;
 }
 
-bool StepRange::stepMismatch(double doubleValue) const
+Decimal StepRange::roundByStep(const Decimal& value, const Decimal& base) const
+{
+    return base + ((value - base) / m_step).round() * m_step;
+}
+
+bool StepRange::stepMismatch(const Decimal& valueForCheck) const
 {
     if (!m_hasStep)
         return false;
-    if (!isfinite(doubleValue))
+    if (!valueForCheck.isFinite())
         return false;
-    doubleValue = fabs(doubleValue - m_stepBase);
-    if (isinf(doubleValue))
+    const Decimal value = (valueForCheck - m_stepBase).abs();
+    if (!value.isFinite())
         return false;
-    // double's fractional part size is DBL_MAN_DIG-bit. If the current value
+    // Decimal's fractional part size is DBL_MAN_DIG-bit. If the current value
     // is greater than step*2^DBL_MANT_DIG, the following computation for
     // remainder makes no sense.
-    if (doubleValue / pow(2.0, DBL_MANT_DIG) > m_step)
+    DEFINE_STATIC_LOCAL(const Decimal, twoPowerOfDoubleMantissaBits, (Decimal::Positive, 0, UINT64_C(1) << DBL_MANT_DIG));
+    if (value / twoPowerOfDoubleMantissaBits > m_step)
         return false;
     // The computation follows HTML5 4.10.7.2.10 `The step attribute' :
     // ... that number subtracted from the step base is not an integral multiple
     // of the allowed value step, the element is suffering from a step mismatch.
-    double remainder = fabs(doubleValue - m_step * round(doubleValue / m_step));
+    const Decimal remainder = (value - m_step * (value / m_step).round()).abs();
     // Accepts erros in lower fractional part which IEEE 754 single-precision
     // can't represent.
-    double computedAcceptableError = acceptableError();
+    const Decimal computedAcceptableError = acceptableError();
     return computedAcceptableError < remainder && remainder < (m_step - computedAcceptableError);
 }
 

@@ -148,6 +148,8 @@ bool ChromeClientBlackBerry::runJavaScriptPrompt(Frame* frame, const String& mes
 
 void ChromeClientBlackBerry::chromeDestroyed()
 {
+    // Destroy popup if we have.
+    closePagePopup(0);
     delete this;
 }
 
@@ -301,28 +303,21 @@ PassRefPtr<SearchPopupMenu> ChromeClientBlackBerry::createSearchPopupMenu(PopupM
 
 PagePopup* ChromeClientBlackBerry::openPagePopup(PagePopupClient* client, const IntRect& originBoundsInRootView)
 {
-    PagePopupBlackBerry* webPopup;
+    closePagePopup(0);
 
-    if (!hasOpenedPopup()) {
-        webPopup = new PagePopupBlackBerry(m_webPagePrivate, client,
-                rootViewToScreen(originBoundsInRootView));
-        m_webPagePrivate->m_webPage->popupOpened(webPopup);
-    } else {
-        webPopup = m_webPagePrivate->m_webPage->popup();
-        webPopup->closeWebPage();
-    }
+    PagePopupBlackBerry* webPopup = new PagePopupBlackBerry(m_webPagePrivate, client, rootViewToScreen(originBoundsInRootView));
+    m_webPagePrivate->m_webPage->popupOpened(webPopup);
     webPopup->sendCreatePopupWebViewRequest();
     return webPopup;
 }
 
-void ChromeClientBlackBerry::closePagePopup(PagePopup* popup)
+void ChromeClientBlackBerry::closePagePopup(PagePopup*)
 {
-    if (!popup)
-        return;
-
-    PagePopupBlackBerry* webPopup = m_webPagePrivate->m_webPage->popup();
-    webPopup->closePopup();
-    m_webPagePrivate->m_webPage->popupClosed();
+    if (hasOpenedPopup()) {
+        PagePopupBlackBerry* webPopup = m_webPagePrivate->m_webPage->popup();
+        webPopup->closePopup();
+        m_webPagePrivate->m_webPage->popupClosed();
+    }
 }
 
 void ChromeClientBlackBerry::setToolbarsVisible(bool)
@@ -736,6 +731,16 @@ void ChromeClientBlackBerry::exitFullScreenForElement(WebCore::Element* element)
     element->document()->webkitWillExitFullScreenForElement(element);
     m_webPagePrivate->exitFullScreenForElement(element);
     element->document()->webkitDidExitFullScreenForElement(element);
+}
+
+void ChromeClientBlackBerry::fullScreenRendererChanged(RenderBox* fullScreenRenderer)
+{
+    // Once we go fullscreen using the new FULLSCREEN_API code path, we have to take into account
+    // our port specific page scaling.
+    if (fullScreenRenderer) {
+        int width = m_webPagePrivate->m_mainFrame->view()->visibleContentRect().size().width();
+        fullScreenRenderer->style()->setWidth(Length(width, Fixed));
+    }
 }
 #endif
 

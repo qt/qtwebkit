@@ -3,6 +3,7 @@ LIST(APPEND WebKit2_LINK_FLAGS
     ${EDJE_LDFLAGS}
     ${EFLDEPS_LDFLAGS}
     ${EVAS_LDFLAGS}
+    ${LIBSOUP24_LDFLAGS}
 )
 
 LIST(APPEND WebKit2_SOURCES
@@ -28,7 +29,9 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/C/soup/WKSoupRequestManager.cpp
 
     UIProcess/API/efl/PageClientImpl.cpp
+    UIProcess/API/efl/ewk_context.cpp
     UIProcess/API/efl/ewk_view.cpp
+    UIProcess/API/efl/ewk_view_loader_client.cpp
 
     UIProcess/cairo/BackingStoreCairo.cpp
 

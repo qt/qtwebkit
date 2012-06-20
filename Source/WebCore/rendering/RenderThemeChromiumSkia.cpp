@@ -378,18 +378,6 @@ bool RenderThemeChromiumSkia::paintSearchFieldResultsButton(RenderObject* magnif
     return false;
 }
 
-bool RenderThemeChromiumSkia::paintMediaControlsBackground(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
-{
-#if ENABLE(VIDEO)
-    return RenderMediaControlsChromium::paintMediaControlsPart(MediaTimelineContainer, object, paintInfo, rect);
-#else
-    UNUSED_PARAM(object);
-    UNUSED_PARAM(paintInfo);
-    UNUSED_PARAM(rect);
-    return false;
-#endif
-}
-
 bool RenderThemeChromiumSkia::paintMediaSliderTrack(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
 #if ENABLE(VIDEO)
@@ -414,7 +402,7 @@ bool RenderThemeChromiumSkia::paintMediaVolumeSliderTrack(RenderObject* object, 
 #endif
 }
 
-void RenderThemeChromiumSkia::adjustSliderThumbSize(RenderStyle* style) const
+void RenderThemeChromiumSkia::adjustSliderThumbSize(RenderStyle* style, Element*) const
 {
 #if ENABLE(VIDEO)
     RenderMediaControlsChromium::adjustMediaSliderThumbSize(style);
@@ -471,6 +459,50 @@ bool RenderThemeChromiumSkia::paintMediaMuteButton(RenderObject* object, const P
 #endif
 }
 
+String RenderThemeChromiumSkia::formatMediaControlsTime(float time) const
+{
+#if ENABLE(VIDEO)
+    return RenderMediaControlsChromium::formatMediaControlsTime(time);
+#else
+    UNUSED_PARAM(time);
+    return 0;
+#endif
+}
+
+String RenderThemeChromiumSkia::formatMediaControlsCurrentTime(float currentTime, float duration) const
+{
+#if ENABLE(VIDEO)
+    return RenderMediaControlsChromium::formatMediaControlsCurrentTime(currentTime, duration);
+#else
+    UNUSED_PARAM(currentTime);
+    UNUSED_PARAM(duration);
+    return 0;
+#endif
+}
+
+String RenderThemeChromiumSkia::formatMediaControlsRemainingTime(float currentTime, float duration) const
+{
+#if ENABLE(VIDEO)
+    return RenderMediaControlsChromium::formatMediaControlsRemainingTime(currentTime, duration);
+#else
+    UNUSED_PARAM(currentTime);
+    UNUSED_PARAM(duration);
+    return 0;
+#endif
+}
+
+bool RenderThemeChromiumSkia::paintMediaFullscreenButton(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
+{
+#if ENABLE(VIDEO)
+    return RenderMediaControlsChromium::paintMediaControlsPart(MediaEnterFullscreenButton, object, paintInfo, rect);
+#else
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(paintInfo);
+    UNUSED_PARAM(rect);
+    return false;
+#endif
+}
+
 void RenderThemeChromiumSkia::adjustMenuListStyle(StyleResolver*, RenderStyle* style, WebCore::Element*) const
 {
     // Height is locked to auto on all browsers.
@@ -519,6 +551,11 @@ double RenderThemeChromiumSkia::caretBlinkIntervalInternal() const
     return RenderTheme::caretBlinkInterval();
 }
 
+int RenderThemeChromiumSkia::menuListArrowPadding() const
+{
+    return ScrollbarTheme::theme()->scrollbarThickness();
+}
+
 // static
 void RenderThemeChromiumSkia::setSizeIfAuto(RenderStyle* style, const IntSize& size)
 {
@@ -541,7 +578,7 @@ int RenderThemeChromiumSkia::menuListInternalPadding(RenderStyle* style, int pad
     // we don't draw a button, so don't reserve space for it.
     const int barType = style->direction() == LTR ? RightPadding : LeftPadding;
     if (paddingType == barType && style->appearance() != NoControlPart)
-        padding += ScrollbarTheme::theme()->scrollbarThickness();
+        padding += menuListArrowPadding();
 
     return padding;
 }

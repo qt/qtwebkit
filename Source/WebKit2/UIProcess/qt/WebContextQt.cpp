@@ -29,35 +29,32 @@
 
 #include "ApplicationCacheStorage.h"
 #include "FileSystem.h"
+#include "QtDefaultDataLocation.h"
 #include "WKSharedAPICast.h"
 #if ENABLE(GEOLOCATION)
 #include "WebGeolocationProviderQt.h"
 #endif
 #include "WebProcessCreationParameters.h"
 #include <QCoreApplication>
-#include <QStandardPaths>
 #include <QDir>
 #include <QProcess>
 
 namespace WebKit {
 
-static QString defaultDataLocation()
-{
-    static QString s_dataLocation;
-
-    if (!s_dataLocation.isEmpty())
-        return s_dataLocation;
-
-    QString dataLocation = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
-    if (dataLocation.isEmpty())
-        dataLocation = WebCore::pathByAppendingComponent(QDir::homePath(), QCoreApplication::applicationName());
-    s_dataLocation = WebCore::pathByAppendingComponent(dataLocation, ".QtWebKit/");
-    WebCore::makeAllDirectories(s_dataLocation);
-    return s_dataLocation;
-}
-
 static QString s_defaultDatabaseDirectory;
 static QString s_defaultLocalStorageDirectory;
+
+static String defaultDiskCacheDirectory()
+{
+    static String s_defaultDiskCacheDirectory;
+
+    if (!s_defaultDiskCacheDirectory.isEmpty())
+        return s_defaultDiskCacheDirectory;
+
+    s_defaultDiskCacheDirectory = WebCore::pathByAppendingComponent(defaultDataLocation(), "cache/");
+    WebCore::makeAllDirectories(s_defaultDiskCacheDirectory);
+    return s_defaultDiskCacheDirectory;
+}
 
 String WebContext::applicationCacheDirectory()
 {
@@ -68,6 +65,7 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
 {
     qRegisterMetaType<QProcess::ExitStatus>("QProcess::ExitStatus");
     parameters.cookieStorageDirectory = defaultDataLocation();
+    parameters.diskCacheDirectory = defaultDiskCacheDirectory();
 #if ENABLE(GEOLOCATION)
     static WebGeolocationProviderQt* location = WebGeolocationProviderQt::create(toAPI(geolocationManagerProxy()));
     WKGeolocationManagerSetProvider(toAPI(geolocationManagerProxy()), WebGeolocationProviderQt::provider(location));

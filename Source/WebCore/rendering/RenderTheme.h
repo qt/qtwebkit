@@ -172,7 +172,7 @@ public:
 
     virtual int minimumMenuListSize(RenderStyle*) const { return 0; }
 
-    virtual void adjustSliderThumbSize(RenderStyle*) const;
+    virtual void adjustSliderThumbSize(RenderStyle*, Element*) const;
 
     virtual int popupInternalPaddingLeft(RenderStyle*) const { return 0; }
     virtual int popupInternalPaddingRight(RenderStyle*) const { return 0; }
@@ -198,6 +198,7 @@ public:
     virtual bool hasOwnDisabledStateHandlingFor(ControlPart) const { return false; }
     virtual bool usesMediaControlStatusDisplay() { return false; }
     virtual bool usesMediaControlVolumeSlider() const { return true; }
+    virtual bool usesVerticalVolumeSlider() const { return true; }
     virtual double mediaControlsFadeInDuration() { return 0.1; }
     virtual double mediaControlsFadeOutDuration() { return 0.3; }
     virtual String formatMediaControlsTime(float time) const;
@@ -305,6 +306,7 @@ protected:
     virtual void adjustSearchFieldResultsButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintSearchFieldResultsButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
 
+    virtual void adjustMediaControlStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintMediaFullscreenButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaPlayButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaMuteButton(RenderObject*, const PaintInfo&, const IntRect&) { return true; }

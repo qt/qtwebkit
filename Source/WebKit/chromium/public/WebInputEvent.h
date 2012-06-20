@@ -116,6 +116,7 @@ public:
         GestureTap,
         GestureTapDown,
         GestureDoubleTap,
+        GestureTwoFingerTap,
         GestureLongPress,
         GesturePinchBegin,
         GesturePinchEnd,
@@ -197,16 +198,25 @@ public:
             || type == TouchEnd;
     }
 
-    // Returns true if the WebInputEvent |type| should be handled as scroll gesture.
-    static bool isScrollGestureEventType(int type)
+    // Returns true if the WebInputEvent is a gesture event.
+    static bool isGestureEventType(int type)
     {
         return type == GestureScrollBegin
             || type == GestureScrollEnd
             || type == GestureScrollUpdate
             || type == GestureFlingStart
             || type == GestureFlingCancel
+            || type == GesturePinchBegin
+            || type == GesturePinchEnd
+            || type == GesturePinchUpdate
+            || type == GestureTap
             || type == GestureTapDown
-            || type == GestureTap; // FIXME: Why is GestureTap on this list?
+            || type == GestureDoubleTap
+            || type == GestureTwoFingerTap
+            || type == GestureLongPress
+            || type == GesturePinchBegin
+            || type == GesturePinchEnd
+            || type == GesturePinchUpdate;
     }
 };
 
@@ -379,7 +389,9 @@ public:
 
 class WebTouchEvent : public WebInputEvent {
 public:
-    enum { touchesLengthCap = 8 };
+    // Maximum number of simultaneous touches supported on
+    // Ash/Aura.
+    enum { touchesLengthCap = 12 };
 
     unsigned touchesLength;
     // List of all touches which are currently down.

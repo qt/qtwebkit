@@ -32,6 +32,7 @@
 #include <wtf/HashSet.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/StringHash.h>
 
 namespace WebCore {
@@ -208,6 +209,7 @@ public:
     void applyPropertyToCurrentStyle(CSSPropertyID, CSSValue*);
 
     void updateFont();
+    void initializeFontStyle(Settings*);
 
     static float getComputedSizeFromSpecifiedSize(Document*, float zoomFactor, bool isAbsoluteSize, float specifiedSize, ESmartMinimumForFontSize = UseSmartMinimumForFontFize);
 
@@ -352,8 +354,11 @@ private:
 
     bool checkSelector(const RuleData&, const ContainerNode* scope = 0);
     bool checkRegionSelector(CSSSelector* regionSelector, Element* regionElement);
-    void applyMatchedProperties(const MatchResult&);
+    void applyMatchedProperties(const MatchResult&, const Element*);
     enum StyleApplicationPass {
+#if ENABLE(CSS_VARIABLES)
+        VariableDefinitions,
+#endif
         HighPriorityProperties,
         LowPriorityProperties
     };
@@ -361,11 +366,15 @@ private:
     void applyMatchedProperties(const MatchResult&, bool important, int startIndex, int endIndex, bool inheritedOnly);
     template <StyleApplicationPass pass>
     void applyProperties(const StylePropertySet* properties, StyleRule*, bool isImportant, bool inheritedOnly, bool filterRegionProperties);
-
+#if ENABLE(CSS_VARIABLES)
+    void resolveVariables(CSSPropertyID, CSSValue*, Vector<std::pair<CSSPropertyID, String> >& knownExpressions);
+#endif
     static bool isValidRegionStyleProperty(CSSPropertyID);
 
     void matchPageRules(MatchResult&, RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(Vector<StyleRulePage*>& matchedRules, const Vector<StyleRulePage*>&, bool isLeftPage, bool isFirstPage, const String& pageName);
+    Settings* documentSettings() { return m_checker.document()->settings(); }
+
     bool isLeftPage(int pageIndex) const;
     bool isRightPage(int pageIndex) const { return !isLeftPage(pageIndex); }
     bool isFirstPage(int pageIndex) const;

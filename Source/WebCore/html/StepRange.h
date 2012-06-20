@@ -21,6 +21,7 @@
 #ifndef StepRange_h
 #define StepRange_h
 
+#include "Decimal.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 
@@ -32,28 +33,6 @@ enum AnyStepHandling { RejectAny, AnyIsDefaultStep };
 
 class StepRange {
 public:
-    struct DoubleWithDecimalPlaces {
-        unsigned decimalPlaces;
-        double value;
-
-        DoubleWithDecimalPlaces(double value = 0, unsigned decimalPlaces = 0)
-            : decimalPlaces(decimalPlaces)
-            , value(value)
-        {
-        }
-    };
-
-    struct DoubleWithDecimalPlacesOrMissing {
-        bool hasValue;
-        DoubleWithDecimalPlaces value;
-
-        DoubleWithDecimalPlacesOrMissing(DoubleWithDecimalPlaces value, bool hasValue = true)
-            : hasValue(hasValue)
-            , value(value)
-        {
-        }
-    };
-
     enum StepValueShouldBe {
         StepValueShouldBeReal,
         ParsedStepValueShouldBeInteger,
@@ -82,7 +61,7 @@ public:
         {
         }
 
-        double defaultValue() const
+        Decimal defaultValue() const
         {
             return defaultStep * stepScaleFactor;
         }
@@ -90,29 +69,27 @@ public:
 
     StepRange();
     StepRange(const StepRange&);
-    StepRange(const DoubleWithDecimalPlaces& stepBase, double minimum, double maximum, const DoubleWithDecimalPlacesOrMissing& step, const StepDescription&);
-    double acceptableError() const;
-    double alignValueForStep(double currentValue, unsigned currentDecimalPlaces, double newValue) const;
-    double clampValue(double value) const;
+    StepRange(const Decimal& stepBase, const Decimal& minimum, const Decimal& maximum, const Decimal& step, const StepDescription&);
+    Decimal acceptableError() const;
+    Decimal alignValueForStep(const Decimal& currentValue, const Decimal& newValue) const;
+    Decimal clampValue(const Decimal& value) const;
     bool hasStep() const { return m_hasStep; }
-    double maximum() const { return m_maximum; }
-    double minimum() const { return m_minimum; }
-    static DoubleWithDecimalPlacesOrMissing parseStep(AnyStepHandling, const StepDescription&, const String&);
-    double step() const { return m_step; }
-    double stepBase() const { return m_stepBase; }
-    unsigned stepBaseDecimalPlaces() const { return m_stepBaseDecimalPlaces; }
-    unsigned stepDecimalPlaces() const { return m_stepDecimalPlaces; }
+    Decimal maximum() const { return m_maximum; }
+    Decimal minimum() const { return m_minimum; }
+    static Decimal parseStep(AnyStepHandling, const StepDescription&, const String&);
+    Decimal step() const { return m_step; }
+    Decimal stepBase() const { return m_stepBase; }
     int stepScaleFactor() const { return m_stepDescription.stepScaleFactor; }
-    bool stepMismatch(double) const;
+    bool stepMismatch(const Decimal&) const;
 
     // Clamp the middle value according to the step
-    double defaultValue() const
+    Decimal defaultValue() const
     {
         return clampValue((m_minimum + m_maximum) / 2);
     }
 
     // Map value into 0-1 range
-    double proportionFromValue(double value) const
+    Decimal proportionFromValue(const Decimal& value) const
     {
         if (m_minimum == m_maximum)
             return 0;
@@ -121,21 +98,20 @@ public:
     }
 
     // Map from 0-1 range to value
-    double valueFromProportion(double proportion) const
+    Decimal valueFromProportion(const Decimal& proportion) const
     {
         return m_minimum + proportion * (m_maximum - m_minimum);
     }
 
 private:
     StepRange& operator =(const StepRange&);
+    Decimal roundByStep(const Decimal& value, const Decimal& base) const;
 
-    const double m_maximum; // maximum must be >= minimum.
-    const double m_minimum;
-    const double m_step;
-    const double m_stepBase;
+    const Decimal m_maximum; // maximum must be >= minimum.
+    const Decimal m_minimum;
+    const Decimal m_step;
+    const Decimal m_stepBase;
     const StepDescription m_stepDescription;
-    const unsigned m_stepBaseDecimalPlaces;
-    const unsigned m_stepDecimalPlaces;
     const bool m_hasStep;
 };
 

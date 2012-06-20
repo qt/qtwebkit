@@ -32,18 +32,16 @@
 #include "WebPagePopupImpl.h"
 
 #include "Chrome.h"
+#include "ContextFeatures.h"
 #include "DOMWindowPagePopup.h"
+#include "DocumentLoader.h"
 #include "EmptyClients.h"
-#include "FileChooser.h"
 #include "FocusController.h"
-#include "FormState.h"
 #include "FrameView.h"
-#include "HTMLFormElement.h"
 #include "Page.h"
 #include "PagePopupClient.h"
 #include "PageWidgetDelegate.h"
 #include "Settings.h"
-#include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
 #include "WebPagePopup.h"
 #include "WebViewImpl.h"
@@ -128,9 +126,16 @@ private:
     WebPagePopupImpl* m_popup;
 };
 
-class PagePopupFrameLoaderClient : public EmptyFrameLoaderClient {
-    virtual bool allowPagePopup() OVERRIDE { return true; }
+class PagePopupFeaturesClient : public ContextFeaturesClient {
+    virtual bool isEnabled(Document*, ContextFeatures::FeatureType, bool) OVERRIDE;
 };
+
+bool PagePopupFeaturesClient::isEnabled(Document*, ContextFeatures::FeatureType type, bool defaultValue)
+{
+    if (type == ContextFeatures::PagePopup)
+        return true;
+    return defaultValue;
+}
 
 // WebPagePopupImpl ----------------------------------------------------------------
 
@@ -186,8 +191,10 @@ bool WebPagePopupImpl::initPage()
     m_page->settings()->setScriptEnabled(true);
     m_page->settings()->setAllowScriptsToCloseWindows(true);
 
-    static FrameLoaderClient* pagePopupFrameLoaderClient =  new PagePopupFrameLoaderClient;
-    RefPtr<Frame> frame = Frame::create(m_page.get(), 0, pagePopupFrameLoaderClient);
+    static ContextFeaturesClient* pagePopupFeaturesClient =  new PagePopupFeaturesClient();
+    provideContextFeaturesTo(m_page.get(), pagePopupFeaturesClient);
+    static FrameLoaderClient* emptyFrameLoaderClient =  new EmptyFrameLoaderClient();
+    RefPtr<Frame> frame = Frame::create(m_page.get(), 0, emptyFrameLoaderClient);
     frame->setView(FrameView::create(frame.get()));
     frame->init();
     frame->view()->resize(m_popupClient->contentSize());
@@ -230,7 +237,7 @@ void WebPagePopupImpl::layout()
 
 void WebPagePopupImpl::paint(WebCanvas* canvas, const WebRect& rect)
 {
-    PageWidgetDelegate::paint(m_page.get(), 0, canvas, rect);
+    PageWidgetDelegate::paint(m_page.get(), 0, canvas, rect, PageWidgetDelegate::Opaque);
 }
 
 void WebPagePopupImpl::resize(const WebSize& newSize)
@@ -287,6 +294,8 @@ void WebPagePopupImpl::setFocus(bool enable)
 
 void WebPagePopupImpl::close()
 {
+    if (m_page && m_page->mainFrame())
+        m_page->mainFrame()->loader()->frameDetached();
     m_page.clear();
     m_widgetClient = 0;
     deref();

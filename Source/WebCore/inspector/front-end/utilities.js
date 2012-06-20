@@ -27,6 +27,23 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+Object.isEmpty = function(obj)
+{
+    for (var i in obj)
+        return false;
+    return true;
+}
+
+Object.values = function(obj)
+{
+    var keys = Object.keys(obj);
+    var result = [];
+
+    for (var i = 0; i < keys.length; ++i)
+        result.push(obj[keys[i]]);
+    return result;
+}
+
 String.prototype.hasSubstring = function(string, caseInsensitive)
 {
     if (!caseInsensitive)
@@ -675,4 +692,4 @@ Map.prototype = {
     {
         this._map = {};
     }
-}
+};

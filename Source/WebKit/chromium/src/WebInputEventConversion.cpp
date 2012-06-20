@@ -123,8 +123,8 @@ PlatformWheelEventBuilder::PlatformWheelEventBuilder(Widget* widget, const WebMo
     if (e.modifiers & WebInputEvent::MetaKey)
         m_modifiers |= PlatformEvent::MetaKey;
 
-#if OS(DARWIN)
     m_hasPreciseScrollingDeltas = e.hasPreciseScrollingDeltas;
+#if OS(DARWIN)
     m_phase = static_cast<WebCore::PlatformWheelEventPhase>(e.phase);
     m_momentumPhase = static_cast<WebCore::PlatformWheelEventPhase>(e.momentumPhase);
     m_timestamp = e.timeStampSeconds;
@@ -158,6 +158,9 @@ PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const W
         break;
     case WebInputEvent::GestureDoubleTap:
         m_type = PlatformEvent::GestureDoubleTap;
+        break;
+    case WebInputEvent::GestureTwoFingerTap:
+        m_type = PlatformEvent::GestureTwoFingerTap;
         break;
     case WebInputEvent::GestureLongPress:
         m_type = PlatformEvent::GestureLongPress;

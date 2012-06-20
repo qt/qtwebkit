@@ -77,7 +77,7 @@ void TextureMapperLayer::computeTransformsRecursive()
         parentTransform = m_effectTarget->m_transform.combined();
     m_transform.combineTransforms(parentTransform);
 
-    m_state.visible = m_state.backfaceVisibility || m_transform.combined().inverse().m33() >= 0;
+    m_state.visible = m_state.backfaceVisibility || !m_transform.combined().isBackFaceVisible();
 
     if (m_parent && m_parent->m_state.preserves3D)
         m_centerZ = m_transform.combined().mapPoint(FloatPoint3D(m_size.width() / 2, m_size.height() / 2, 0)).z();
@@ -154,6 +154,9 @@ void TextureMapperLayer::paint()
 
 void TextureMapperLayer::paintSelf(const TextureMapperPaintOptions& options)
 {
+    if (!m_state.visible)
+        return;
+
     // We apply the following transform to compensate for painting into a surface, and then apply the offset so that the painting fits in the target rect.
     TransformationMatrix transform;
     transform.translate(options.offset.width(), options.offset.height());
@@ -216,6 +219,20 @@ IntRect TextureMapperLayer::intermediateSurfaceRect(const TransformationMatrix& 
             rect.unite(m_children[i]->intermediateSurfaceRect(matrix));
     }
 
+#if ENABLE(CSS_FILTERS)
+    if (m_state.filters.hasOutsets()) {
+        int leftOutset;
+        int topOutset;
+        int bottomOutset;
+        int rightOutset;
+        m_state.filters.getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
+        IntRect unfilteredTargetRect(rect);
+        rect.move(std::max(0, -leftOutset), std::max(0, -topOutset));
+        rect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
+        rect.unite(unfilteredTargetRect);
+    }
+#endif
+
     if (m_state.replicaLayer)
         rect.unite(m_state.replicaLayer->intermediateSurfaceRect(matrix));
 
@@ -272,7 +289,9 @@ bool TextureMapperLayer::isVisible() const
 {
     if (m_size.isEmpty() && (m_state.masksToBounds || m_state.maskLayer || m_children.isEmpty()))
         return false;
-    if (!m_state.visible || m_opacity < 0.01)
+    if (!m_state.visible && m_children.isEmpty())
+        return false;
+    if (m_opacity < 0.01)
         return false;
     return true;
 }
@@ -296,22 +315,28 @@ void TextureMapperLayer::paintSelfAndChildrenWithReplica(const TextureMapperPain
 }
 
 #if ENABLE(CSS_FILTERS)
+static bool shouldKeepContentTexture(const FilterOperations& filters)
+{
+    for (int i = 0; i < filters.size(); ++i) {
+        switch (filters.operations().at(i)->getOperationType()) {
+        // The drop-shadow filter requires the content texture, because it needs to composite it
+        // on top of the blurred shadow color.
+        case FilterOperation::DROP_SHADOW:
+            return true;
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
+
 static PassRefPtr<BitmapTexture> applyFilters(const FilterOperations& filters, TextureMapper* textureMapper, BitmapTexture* source, IntRect& targetRect)
 {
     if (!filters.size())
         return source;
 
-    RefPtr<BitmapTexture> filterSurface(source);
-    int leftOutset, topOutset, bottomOutset, rightOutset;
-    if (filters.hasOutsets()) {
-        filters.getOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
-        IntRect unfilteredTargetRect(targetRect);
-        targetRect.move(std::max(0, -leftOutset), std::max(0, -topOutset));
-        targetRect.expand(leftOutset + rightOutset, topOutset + bottomOutset);
-        targetRect.unite(unfilteredTargetRect);
-        filterSurface = textureMapper->acquireTextureFromPool(targetRect.size());
-    }
-
+    RefPtr<BitmapTexture> filterSurface = shouldKeepContentTexture(filters) ? textureMapper->acquireTextureFromPool(source->size()) : source;
     return filterSurface->applyFilters(*source, filters);
 }
 #endif
@@ -488,14 +513,6 @@ void TextureMapperLayer::syncAnimations()
         setTransform(m_state.transform);
     if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
         setOpacity(m_state.opacity);
-}
-
-void TextureMapperLayer::syncAnimationsRecursively()
-{
-    syncAnimations();
-
-    for (int i = m_children.size() - 1; i >= 0; --i)
-        m_children[i]->syncAnimationsRecursively();
 }
 
 void TextureMapperLayer::syncCompositingState(GraphicsLayerTextureMapper* graphicsLayer, TextureMapper* textureMapper, int options)

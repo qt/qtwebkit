@@ -31,6 +31,10 @@
 
 #include "LayerChromium.h"
 
+namespace WebKit {
+class WebGraphicsContext3D;
+}
+
 namespace WebCore {
 
 class TextureLayerChromiumClient {
@@ -41,7 +45,7 @@ public:
     virtual unsigned prepareTexture(CCTextureUpdater&) = 0;
 
     // Returns the context that is providing the texture. Used for rate limiting and detecting lost context.
-    virtual GraphicsContext3D* context() = 0;
+    virtual WebKit::WebGraphicsContext3D* context() = 0;
 
 protected:
     virtual ~TextureLayerChromiumClient() { }
@@ -76,6 +80,8 @@ public:
 
     // Code path for plugins which supply their own texture ID.
     void setTextureId(unsigned);
+
+    void willModifyTexture();
 
     virtual void setNeedsDisplayRect(const FloatRect&) OVERRIDE;
 

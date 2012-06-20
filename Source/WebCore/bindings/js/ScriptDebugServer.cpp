@@ -152,7 +152,11 @@ void ScriptDebugServer::setPauseOnNextStatement(bool pause)
 
 void ScriptDebugServer::breakProgram()
 {
-    // FIXME(WK43332): implement this.
+    if (m_paused || !m_currentCallFrame)
+        return;
+
+    m_pauseOnNextStatement = true;
+    pauseIfNeeded(m_currentCallFrame->dynamicGlobalObject());
 }
 
 void ScriptDebugServer::continueProgram()
@@ -200,6 +204,13 @@ bool ScriptDebugServer::setScriptSource(const String&, const String&, bool, Stri
 {
     // FIXME(40300): implement this.
     return false;
+}
+
+
+void ScriptDebugServer::updateCallStack(ScriptValue*)
+{
+    // This method is used for restart frame feature that is not implemented yet.
+    // FIXME(40300): implement this.
 }
 
 void ScriptDebugServer::dispatchDidPause(ScriptDebugListener* listener)

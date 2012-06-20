@@ -133,7 +133,7 @@ ScriptValue ScriptFunctionCall::call(bool& hadException, bool reportExceptions)
 
     v8::Local<v8::Value> result;
     {
-        V8RecursionScope scope(getScriptExecutionContext());
+        V8RecursionScope innerScope(getScriptExecutionContext());
         result = function->Call(thisObject, m_arguments.size(), args.get());
     }
     if (!scope.success()) {
@@ -177,7 +177,7 @@ ScriptObject ScriptFunctionCall::construct(bool& hadException, bool reportExcept
     return ScriptObject(m_scriptState, result);
 }
 
-ScriptCallback::ScriptCallback(ScriptState* state, ScriptValue function)
+ScriptCallback::ScriptCallback(ScriptState* state, const ScriptValue& function)
     : ScriptCallArgumentHandler(state)
     , m_function(function)
 {

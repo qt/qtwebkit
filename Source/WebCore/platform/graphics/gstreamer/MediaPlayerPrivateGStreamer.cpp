@@ -254,10 +254,12 @@ MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
         m_mediaLocations = 0;
     }
 
+#ifndef GST_API_VERSION_1
     if (m_videoSinkBin) {
         gst_object_unref(m_videoSinkBin);
         m_videoSinkBin = 0;
     }
+#endif
 
     if (m_playBin) {
         gst_element_set_state(m_playBin, GST_STATE_NULL);
@@ -331,7 +333,7 @@ float MediaPlayerPrivateGStreamer::playbackPosition() const
     // Position is available only if the pipeline is not in GST_STATE_NULL or
     // GST_STATE_READY state.
     if (position != static_cast<gint64>(GST_CLOCK_TIME_NONE))
-        ret = static_cast<float>(position) / static_cast<float>(GST_SECOND);
+        ret = static_cast<double>(position) / GST_SECOND;
 
     LOG_VERBOSE(Media, "Position %" GST_TIME_FORMAT, GST_TIME_ARGS(position));
 
@@ -411,7 +413,7 @@ float MediaPlayerPrivateGStreamer::duration() const
 
     LOG_VERBOSE(Media, "Duration: %" GST_TIME_FORMAT, GST_TIME_ARGS(timeLength));
 
-    return (float) ((guint64) timeLength / 1000000000.0);
+    return static_cast<double>(timeLength) / GST_SECOND;
     // FIXME: handle 3.14.9.5 properly
 }
 
@@ -493,13 +495,10 @@ IntSize MediaPlayerPrivateGStreamer::naturalSize() const
     if (!hasVideo())
         return IntSize();
 
-    GstCaps* caps = webkitGstElementGetPadCaps(m_webkitVideoSink, "sink");
+    GstCaps* caps = webkitGstGetPadCaps(m_videoSinkPad.get());
     if (!caps)
         return IntSize();
 
-    int pixelAspectRatioNumerator, pixelAspectRatioDenominator;
-    int displayWidth, displayHeight, displayAspectRatioGCD;
-    int originalWidth = 0, originalHeight = 0;
 
     // TODO: handle possible clean aperture data. See
     // https://bugzilla.gnome.org/show_bug.cgi?id=596571
@@ -508,50 +507,38 @@ IntSize MediaPlayerPrivateGStreamer::naturalSize() const
 
     // Get the video PAR and original size, if this fails the
     // video-sink has likely not yet negotiated its caps.
-#ifdef GST_API_VERSION_1
-    GstVideoInfo info;
-    if (!gst_video_info_from_caps(&info, caps))
+    int pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride;
+    IntSize originalSize;
+    GstVideoFormat format;
+    if (!getVideoSizeAndFormatFromCaps(caps, originalSize, format, pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride))
         return IntSize();
 
-    originalWidth = GST_VIDEO_INFO_WIDTH(&info);
-    originalHeight = GST_VIDEO_INFO_HEIGHT(&info);
-    pixelAspectRatioNumerator = GST_VIDEO_INFO_PAR_N(&info);
-    pixelAspectRatioDenominator = GST_VIDEO_INFO_PAR_D(&info);
-#else
-    // Get the video PAR and original size.
-    if (!GST_IS_CAPS(caps) || !gst_caps_is_fixed(caps)
-        || !gst_video_format_parse_caps(caps, 0, &originalWidth, &originalHeight)
-        || !gst_video_parse_caps_pixel_aspect_ratio(caps, &pixelAspectRatioNumerator,
-                                                    &pixelAspectRatioDenominator))
-        return IntSize();
-#endif
-
-    LOG_VERBOSE(Media, "Original video size: %dx%d", originalWidth, originalHeight);
+    LOG_VERBOSE(Media, "Original video size: %dx%d", originalSize.width(), originalSize.height());
     LOG_VERBOSE(Media, "Pixel aspect ratio: %d/%d", pixelAspectRatioNumerator, pixelAspectRatioDenominator);
 
     // Calculate DAR based on PAR and video size.
-    displayWidth = originalWidth * pixelAspectRatioNumerator;
-    displayHeight = originalHeight * pixelAspectRatioDenominator;
+    int displayWidth = originalSize.width() * pixelAspectRatioNumerator;
+    int displayHeight = originalSize.height() * pixelAspectRatioDenominator;
 
     // Divide display width and height by their GCD to avoid possible overflows.
-    displayAspectRatioGCD = greatestCommonDivisor(displayWidth, displayHeight);
+    int displayAspectRatioGCD = greatestCommonDivisor(displayWidth, displayHeight);
     displayWidth /= displayAspectRatioGCD;
     displayHeight /= displayAspectRatioGCD;
 
     // Apply DAR to original video size. This is the same behavior as in xvimagesink's setcaps function.
     guint64 width = 0, height = 0;
-    if (!(originalHeight % displayHeight)) {
+    if (!(originalSize.height() % displayHeight)) {
         LOG_VERBOSE(Media, "Keeping video original height");
-        width = gst_util_uint64_scale_int(originalHeight, displayWidth, displayHeight);
-        height = static_cast<guint64>(originalHeight);
-    } else if (!(originalWidth % displayWidth)) {
+        width = gst_util_uint64_scale_int(originalSize.height(), displayWidth, displayHeight);
+        height = static_cast<guint64>(originalSize.height());
+    } else if (!(originalSize.width() % displayWidth)) {
         LOG_VERBOSE(Media, "Keeping video original width");
-        height = gst_util_uint64_scale_int(originalWidth, displayHeight, displayWidth);
-        width = static_cast<guint64>(originalWidth);
+        height = gst_util_uint64_scale_int(originalSize.width(), displayHeight, displayWidth);
+        width = static_cast<guint64>(originalSize.width());
     } else {
         LOG_VERBOSE(Media, "Approximating while keeping original video height");
-        width = gst_util_uint64_scale_int(originalHeight, displayWidth, displayHeight);
-        height = static_cast<guint64>(originalHeight);
+        width = gst_util_uint64_scale_int(originalSize.height(), displayWidth, displayHeight);
+        height = static_cast<guint64>(originalSize.height());
     }
 
     LOG_VERBOSE(Media, "Natural size: %" G_GUINT64_FORMAT "x%" G_GUINT64_FORMAT, width, height);
@@ -957,7 +944,7 @@ unsigned MediaPlayerPrivateGStreamer::totalBytes() const
     bool done = false;
     while (!done) {
 #ifdef GST_API_VERSION_1
-        GValue item = {0, };
+        GValue item = G_VALUE_INIT;
         switch (gst_iterator_next(iter, &item)) {
         case GST_ITERATOR_OK: {
             GstPad* pad = static_cast<GstPad*>(g_value_get_object(&item));
@@ -1355,9 +1342,9 @@ void MediaPlayerPrivateGStreamer::timeChanged()
 
 void MediaPlayerPrivateGStreamer::didEnd()
 {
-    // EOS was reached but in case of reverse playback the position is
-    // not always 0. So to not confuse the HTMLMediaElement, if we're
-    // doing reverse playback, we synchronize position and duration values.
+    // EOS was reached but the position is not always 0 in case of
+    // reverse playback. So to not confuse the HTMLMediaElement, we
+    // synchronize position and duration values.
     float now = currentTime();
     if (now > 0 && m_playbackRate < 0) {
         m_mediaDuration = now;
@@ -1481,17 +1468,20 @@ void MediaPlayerPrivateGStreamer::paint(GraphicsContext* context, const IntRect&
     if (!m_buffer)
         return;
 
-    RefPtr<ImageGStreamer> gstImage = ImageGStreamer::createImage(m_buffer);
+    GstCaps* caps = webkitGstGetPadCaps(m_videoSinkPad.get());
+    if (!caps)
+        return;
+
+    RefPtr<ImageGStreamer> gstImage = ImageGStreamer::createImage(m_buffer, caps);
     if (!gstImage)
         return;
 
     context->drawImage(reinterpret_cast<Image*>(gstImage->image().get()), ColorSpaceSRGB,
-                       rect, CompositeCopy, DoNotRespectImageOrientation, false);
+                       rect, gstImage->rect(), CompositeCopy, DoNotRespectImageOrientation, false);
 }
 
 static HashSet<String> mimeTypeCache()
 {
-
     initializeGStreamerAndRegisterWebKitElements();
 
     DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
@@ -1673,7 +1663,12 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
     g_signal_connect(m_playBin, "video-changed", G_CALLBACK(mediaPlayerPrivateVideoChangedCallback), this);
     g_signal_connect(m_playBin, "audio-changed", G_CALLBACK(mediaPlayerPrivateAudioChangedCallback), this);
 
+#ifndef GST_API_VERSION_1
     m_webkitVideoSink = webkitVideoSinkNew(m_gstGWorld.get());
+#else
+    m_webkitVideoSink = webkitVideoSinkNew();
+#endif
+    m_videoSinkPad = adoptGRef(gst_element_get_static_pad(m_webkitVideoSink, "sink"));
 
     g_signal_connect(m_webkitVideoSink, "repaint-requested", G_CALLBACK(mediaPlayerPrivateRepaintCallback), this);
 

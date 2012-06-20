@@ -21,11 +21,11 @@
 #include "TextureMapperBackingStore.h"
 
 #include "GraphicsLayer.h"
-#include "GraphicsSurface.h"
 #include "ImageBuffer.h"
 #include "TextureMapper.h"
 
 #if USE(GRAPHICS_SURFACE)
+#include "GraphicsSurface.h"
 #include "TextureMapperGL.h"
 #endif
 
@@ -89,7 +89,8 @@ void TextureMapperTile::updateContents(TextureMapper* textureMapper, Image* imag
 
 void TextureMapperTile::paint(TextureMapper* textureMapper, const TransformationMatrix& transform, float opacity, BitmapTexture* mask)
 {
-    textureMapper->drawTexture(*texture().get(), rect(), transform, opacity, mask);
+    if (texture().get())
+        textureMapper->drawTexture(*texture().get(), rect(), transform, opacity, mask);
 }
 
 TextureMapperTiledBackingStore::TextureMapperTiledBackingStore()

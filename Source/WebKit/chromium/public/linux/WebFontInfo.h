@@ -42,6 +42,11 @@ namespace WebKit {
 
 class WebFontInfo {
 public:
+    // Set a global preference describing whether renderStyleForStrike() should
+    // enable subpixel positioning or not. FontConfig doesn't currently provide
+    // a parameter for controlling this.
+    WEBKIT_EXPORT static void setSubpixelPositioning(bool);
+
     // Return a font family which provides glyphs for the Unicode code points
     // specified by |utf16|
     //   characters: a native-endian UTF16 string
@@ -55,7 +60,7 @@ public:
     WEBKIT_EXPORT static void familyForChars(const WebUChar* characters, size_t numCharacters, const char* preferredLocale, WebFontFamily*);
 
     // Fill out the given WebFontRenderStyle with the user's preferences for
-    // rendering the given font at the given size.
+    // rendering the given font at the given size (in pixels).
     //   family: i.e. "Times New Roman"
     //   sizeAndStyle:
     //      3322222222221111111111

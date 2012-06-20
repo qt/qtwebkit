@@ -75,6 +75,8 @@
  *  - "perform,client,redirect", Ewk_View_Redirection_Data*: reports that view performed a client redirect and gives the redirection details.
  *  - "perform,server,redirect", Ewk_View_Redirection_Data*: reports that view performed a server redirect and gives the redirection details.
  *  - "protocolhandler,registration,requested", Ewk_Custom_Handler_Data: add a handler url for the given protocol.
+ *  - "protocolhandler,isregistered", Ewk_Custom_Handler_Data: query whether the handler is registered or not.
+ *  - "protocolhandler,unregistration,requested", Ewk_Custom_Handler_Data: remove a handler url for the given protocol.
  *  - "onload,event", Evas_Object*: a frame onload event has been received.
  *  - "populate,visited,links": tells the client to fill the visited links set.
  *  - "ready", void: page is fully loaded.
@@ -345,6 +347,15 @@ struct _Ewk_Color {
     unsigned char a; /**< Alpha channel. */
 };
 
+/// Defines the handler states.
+enum _Ewk_Custom_Handlers_State {
+    EWK_CUSTOM_HANDLERS_NEW,
+    EWK_CUSTOM_HANDLERS_REGISTERED,
+    EWK_CUSTOM_HANDLERS_DECLINED
+};
+/// Creates a type name for @a _Ewk_Custom_Handlers_State.
+typedef enum _Ewk_Custom_Handlers_State Ewk_Custom_Handlers_State;
+
 /// Creates a type name for @a _Ewk_Custom_Handler_Data.
 typedef struct _Ewk_Custom_Handler_Data Ewk_Custom_Handler_Data;
 /// Contains the target scheme and the url which take care of the target.
@@ -354,6 +365,7 @@ struct _Ewk_Custom_Handler_Data {
     const char *base_url; /**< Reference to the resolved url if the url is relative url. (eg. "https://www.example.com/") */
     const char *url; /**< Reference to the url which will handle the given protocol. (eg. "soup?url=%s") */
     const char *title; /**< Reference to the descriptive title of the handler. (eg. "SoupWeb") */
+    Ewk_Custom_Handlers_State result; /**< Result of the query that the protocol handler is registered or not. */
 };
 
 /**
@@ -2232,135 +2244,6 @@ EAPI Ewk_View_Smart_Data *ewk_view_smart_data_get(const Evas_Object *o);
  */
 EAPI void ewk_view_scrolls_process(Ewk_View_Smart_Data *sd);
 
-/// Creates a type name for @a _Ewk_View_Paint_Context.
-typedef struct _Ewk_View_Paint_Context Ewk_View_Paint_Context;
-
-/**
- * Creates a new paint context using the view as source and cairo as output.
- *
- * @param priv the pointer to the private data of the view to use as paint source
- * @param cr cairo context to use as paint destination, a new
- *        reference is taken, so it's safe to call @c cairo_destroy()
- *        after this function returns.
- *
- * @return a newly allocated instance of @c Ewk_View_Paint_Context on success,
- *         or @c 0 on failure
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI Ewk_View_Paint_Context *ewk_view_paint_context_new(Ewk_View_Private_Data *priv, cairo_t *cr);
-
-/**
- * Destroys the previously created the paint context.
- *
- * @param ctxt the paint context to destroy, must @b not be @c 0
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI void ewk_view_paint_context_free(Ewk_View_Paint_Context *ctxt);
-
-/**
- * Saves (push to stack) the paint context status.
- *
- * @param ctxt the paint context to save, must @b not be @c 0
- *
- * @see ewk_view_paint_context_restore()
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI void ewk_view_paint_context_save(Ewk_View_Paint_Context *ctxt);
-
-/**
- * Restores (pop from stack) the paint context status.
- *
- * @param ctxt the paint context to restore, must @b not be @c 0
- *
- * @see ewk_view_paint_context_save()
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI void ewk_view_paint_context_restore(Ewk_View_Paint_Context *ctxt);
-
-/**
- * Clips the paint context drawings to the given area.
- *
- * @param ctxt the paint context to clip, must @b not be @c 0
- * @param area clip area to use, must @b not be @c 0
- *
- * @see ewk_view_paint_context_save()
- * @see ewk_view_paint_context_restore()
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI void ewk_view_paint_context_clip(Ewk_View_Paint_Context *ctxt, const Eina_Rectangle *area);
-
-/**
- * Paints the context using given area.
- *
- * @param ctxt the paint context to paint, must @b not be @c 0
- * @param area the paint area to use, coordinates are relative to current viewport,
- *        thus "scrolled", must @b not be @c 0
- *
- * @note One may use cairo functions on the cairo context to
- *       translate, scale or any modification that may fit his desires.
- *
- * @see ewk_view_paint_context_clip()
- * @see ewk_view_paint_context_paint_contents()
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI void ewk_view_paint_context_paint(Ewk_View_Paint_Context *ctxt, const Eina_Rectangle *area);
-
-/**
- * Paints just contents using context using given area.
- *
- * Unlike ewk_view_paint_context_paint(), this function paint just
- * bare contents and ignores any scrolling, scrollbars and extras. It
- * will walk the rendering tree and paint contents inside the given
- * area to the cairo context specified in @a ctxt.
- *
- * @param ctxt the paint context to paint, must @b not be @c 0.
- * @param area the paint area to use, coordinates are absolute to page, must @b not be @c 0
- *
- * @note One may use cairo functions on the cairo context to
- *       translate, scale or any modification that may fit his desires.
- *
- * @see ewk_view_paint_context_clip()
- * @see ewk_view_paint_context_paint()
- *
- * @note This is not for general use but just for subclasses that want
- *       to define their own backing store.
- */
-EAPI void ewk_view_paint_context_paint_contents(Ewk_View_Paint_Context *ctxt, const Eina_Rectangle *area);
-
-/**
- * Scales the contents by the given factors.
- *
- * This function applies a scaling transformation using Cairo.
- *
- * @param ctxt the paint context to scale, must @b not be @c 0
- * @param scale_x the scale factor for the X dimension
- * @param scale_y the scale factor for the Y dimension
- */
-EAPI void ewk_view_paint_context_scale(Ewk_View_Paint_Context *ctxt, float scale_x, float scale_y);
-
-/**
- * Performs a translation of the origin coordinates.
- *
- * This function moves the origin coordinates by @a x and @a y pixels.
- *
- * @param ctxt the paint context to translate, must @b not be @c 0
- * @param x amount of pixels to translate in the X dimension
- * @param y amount of pixels to translate in the Y dimension
- */
-EAPI void ewk_view_paint_context_translate(Ewk_View_Paint_Context *ctxt, float x, float y);
-
 /**
  * Paints using given graphics context the given area.
  *
@@ -2492,6 +2375,14 @@ EAPI Eina_Bool ewk_view_user_scalable_get(const Evas_Object *o);
  * @return the device pixel ratio value on success or @c -1.0 on failure
  */
 EAPI float ewk_view_device_pixel_ratio_get(const Evas_Object *o);
+
+/**
+ * Changes the text direction of the selected input node.
+ *
+ * @param o view object to set text direction.
+ * @param direction text direction.
+ */
+EAPI void ewk_view_text_direction_set(Evas_Object *o, Ewk_Text_Direction direction);
 
 /**
  * Sets the view mode.

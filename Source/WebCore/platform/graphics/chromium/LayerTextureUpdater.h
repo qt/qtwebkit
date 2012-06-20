@@ -31,11 +31,12 @@
 
 #include "ManagedTexture.h"
 #include "GraphicsTypes3D.h"
+#include "cc/CCGraphicsContext.h"
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
 
-class GraphicsContext3D;
+class CCGraphicsContext;
 class IntRect;
 class IntSize;
 class TextureAllocator;
@@ -50,7 +51,7 @@ public:
 
         ManagedTexture* texture() { return m_texture.get(); }
         virtual void prepareRect(const IntRect& /* sourceRect */) { }
-        virtual void updateRect(GraphicsContext3D*, TextureAllocator*, const IntRect& sourceRect, const IntRect& destRect) = 0;
+        virtual void updateRect(CCGraphicsContext*, TextureAllocator*, const IntRect& sourceRect, const IntRect& destRect) = 0;
     protected:
         explicit Texture(PassOwnPtr<ManagedTexture> texture) : m_texture(texture) { }
 
@@ -73,8 +74,7 @@ public:
     virtual SampledTexelFormat sampledTexelFormat(GC3Denum textureFormat) = 0;
     // The |resultingOpaqueRect| gives back a region of the layer that was painted opaque. If the layer is marked opaque in the updater,
     // then this region should be ignored in preference for the entire layer's area.
-    virtual void prepareToUpdate(const IntRect& /* contentRect */, const IntSize& /* tileSize */, int /* borderTexels */, float /* contentsScale */,
-                                 IntRect& /* resultingOpaqueRect */) { }
+    virtual void prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, float contentsScale, IntRect& resultingOpaqueRect) { }
 
     // Set true by the layer when it is known that the entire output is going to be opaque.
     virtual void setOpaque(bool) { }

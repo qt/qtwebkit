@@ -86,10 +86,12 @@ namespace WebKit {
 class AutocompletePopupMenuClient;
 class AutofillPopupMenuClient;
 class BatteryClientImpl;
+class ContextFeaturesClientImpl;
 class ContextMenuClientImpl;
 class DeviceOrientationClientProxy;
 class DragScrollTimer;
 class GeolocationClientProxy;
+class WebHelperPluginImpl;
 class NonCompositedContentHost;
 class PrerendererClientImpl;
 class SpeechInputClientImpl;
@@ -162,6 +164,7 @@ public:
 
     // WebView methods:
     virtual void initializeMainFrame(WebFrameClient*);
+    virtual void initializeHelperPluginFrame(WebFrameClient*);
     virtual void setAutofillClient(WebAutofillClient*);
     virtual void setDevToolsAgentClient(WebDevToolsAgentClient*);
     virtual void setPermissionClient(WebPermissionClient*);
@@ -488,6 +491,8 @@ public:
 
     void hideAutofillPopup();
 
+    WebHelperPluginImpl* createHelperPlugin(const String& pluginType);
+
     // Returns the input event we're currently processing. This is used in some
     // cases where the WebCore DOM event doesn't have the information we need.
     static const WebInputEvent* currentInputEvent()
@@ -501,6 +506,7 @@ public:
     void scheduleCompositingLayerSync();
     void scrollRootLayerRect(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& clipRect);
     void invalidateRootLayerRect(const WebCore::IntRect&);
+    void paintRootLayer(WebCore::GraphicsContext&, const WebCore::IntRect& contentRect);
     NonCompositedContentHost* nonCompositedContentHost();
     void setBackgroundColor(const WebCore::Color&);
 #endif
@@ -728,6 +734,9 @@ private:
     // When not equal to DragOperationNone, the drag data can be dropped onto the
     // current drop target in this WebView (the drop target can accept the drop).
     WebDragOperation m_dragOperation;
+
+    // Context-based feature switches.
+    OwnPtr<ContextFeaturesClientImpl> m_featureSwitchClient;
 
     // Whether an Autofill popup is currently showing.
     bool m_autofillPopupShowing;

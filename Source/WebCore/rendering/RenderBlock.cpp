@@ -590,7 +590,13 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
     RenderBoxModelObject* curr = toRenderBoxModelObject(parent());
     RenderBoxModelObject* currChild = this;
     RenderObject* currChildNextSibling = currChild->nextSibling();
-    
+    bool documentUsesBeforeAfterRules = document()->usesBeforeAfterRules(); 
+
+    // Note: |this| can be destroyed inside this loop if it is an empty anonymous
+    // block and we try to call updateBeforeAfterContent inside which removes the
+    // generated content and additionally cleans up |this| empty anonymous block.
+    // See RenderBlock::removeChild(). DO NOT reference any local variables to |this|
+    // after this point.
     while (curr && curr != fromBlock) {
         ASSERT(curr->isRenderBlock());
         
@@ -617,7 +623,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
         // has to move into the inline continuation.  Call updateBeforeAfterContent to ensure that the inline's :after
         // content gets properly destroyed.
         bool isLastChild = (currChildNextSibling == blockCurr->lastChild());
-        if (document()->usesBeforeAfterRules())
+        if (documentUsesBeforeAfterRules)
             blockCurr->children()->updateBeforeAfterContent(blockCurr, AFTER);
         if (isLastChild && currChildNextSibling != blockCurr->lastChild())
             currChildNextSibling = 0; // We destroyed the last child, so now we need to update
@@ -627,8 +633,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
         // Since we are doing layout anyway, it is easier to blow away the entire list, than
         // traversing down the subtree looking for positioned children and then remove them
         // from our positioned objects list.
-        if (currChildNextSibling)
-            blockCurr->removePositionedObjects(0);
+        blockCurr->removePositionedObjects(0);
 
         // Now we need to take all of the children starting from the first child
         // *after* currChild and append them all to the clone.
@@ -1228,6 +1233,32 @@ void RenderBlock::removeChild(RenderObject* oldChild)
         // If this was our last child be sure to clear out our line boxes.
         if (childrenInline())
             deleteLineBoxTree();
+
+        // If we are an empty anonymous block in the continuation chain,
+        // we need to remove ourself and fix the continuation chain.
+        if (!beingDestroyed() && isAnonymousBlockContinuation()) {
+            RenderObject* containingBlockIgnoringAnonymous = containingBlock();
+            while (containingBlockIgnoringAnonymous && containingBlockIgnoringAnonymous->isAnonymousBlock())
+                containingBlockIgnoringAnonymous = containingBlockIgnoringAnonymous->containingBlock();
+            for (RenderObject* curr = this; curr; curr = curr->previousInPreOrder(containingBlockIgnoringAnonymous)) {
+                if (curr->virtualContinuation() != this)
+                    continue;
+
+                // Found our previous continuation. We just need to point it to
+                // |this|'s next continuation.
+                RenderBoxModelObject* nextContinuation = continuation();
+                if (curr->isRenderInline())
+                    toRenderInline(curr)->setContinuation(nextContinuation);
+                else if (curr->isRenderBlock())
+                    toRenderBlock(curr)->setContinuation(nextContinuation);
+                else
+                    ASSERT_NOT_REACHED();
+
+                break;
+            }
+            setContinuation(0);
+            destroy();
+        }
     }
 }
 
@@ -2643,17 +2674,18 @@ void RenderBlock::paintColumnRules(PaintInfo& paintInfo, const LayoutPoint& pain
     bool antialias = shouldAntialiasLines(paintInfo.context);
 
     if (colInfo->progressionAxis() == ColumnInfo::InlineAxis) {
-        LayoutUnit currLogicalLeftOffset = style()->isLeftToRightDirection() ? ZERO_LAYOUT_UNIT : contentLogicalWidth();
+        bool leftToRight = style()->isLeftToRightDirection() ^ colInfo->progressionIsReversed();
+        LayoutUnit currLogicalLeftOffset = leftToRight ? ZERO_LAYOUT_UNIT : contentLogicalWidth();
         LayoutUnit ruleAdd = logicalLeftOffsetForContent();
-        LayoutUnit ruleLogicalLeft = style()->isLeftToRightDirection() ? ZERO_LAYOUT_UNIT : contentLogicalWidth();
+        LayoutUnit ruleLogicalLeft = leftToRight ? ZERO_LAYOUT_UNIT : contentLogicalWidth();
         LayoutUnit inlineDirectionSize = colInfo->desiredColumnWidth();
         BoxSide boxSide = isHorizontalWritingMode()
-            ? style()->isLeftToRightDirection() ? BSLeft : BSRight
-            : style()->isLeftToRightDirection() ? BSTop : BSBottom;
+            ? leftToRight ? BSLeft : BSRight
+            : leftToRight ? BSTop : BSBottom;
 
         for (unsigned i = 0; i < colCount; i++) {
             // Move to the next position.
-            if (style()->isLeftToRightDirection()) {
+            if (leftToRight) {
                 ruleLogicalLeft += inlineDirectionSize + colGap / 2;
                 currLogicalLeftOffset += inlineDirectionSize + colGap;
             } else {
@@ -2674,20 +2706,31 @@ void RenderBlock::paintColumnRules(PaintInfo& paintInfo, const LayoutPoint& pain
             ruleLogicalLeft = currLogicalLeftOffset;
         }
     } else {
-        LayoutUnit ruleLeft = isHorizontalWritingMode() ? borderLeft() + paddingLeft() : colGap / 2 - colGap - ruleThickness / 2 + borderBefore() + paddingBefore();
+        bool topToBottom = !style()->isFlippedBlocksWritingMode() ^ colInfo->progressionIsReversed();
+        LayoutUnit ruleLeft = isHorizontalWritingMode()
+            ? borderLeft() + paddingLeft()
+            : colGap / 2 - colGap - ruleThickness / 2 + (!colInfo->progressionIsReversed() ? borderBefore() + paddingBefore() : borderAfter() + paddingAfter());
         LayoutUnit ruleWidth = isHorizontalWritingMode() ? contentWidth() : ruleThickness;
-        LayoutUnit ruleTop = isHorizontalWritingMode() ? colGap / 2 - colGap - ruleThickness / 2 + borderBefore() + paddingBefore() : borderStart() + paddingStart();
+        LayoutUnit ruleTop = isHorizontalWritingMode()
+            ? colGap / 2 - colGap - ruleThickness / 2 + (!colInfo->progressionIsReversed() ? borderBefore() + paddingBefore() : borderAfter() + paddingAfter())
+            : borderStart() + paddingStart();
         LayoutUnit ruleHeight = isHorizontalWritingMode() ? ruleThickness : contentHeight();
         LayoutRect ruleRect(ruleLeft, ruleTop, ruleWidth, ruleHeight);
 
-        flipForWritingMode(ruleRect);
+        if (!topToBottom) {
+            if (isHorizontalWritingMode())
+                ruleRect.setY(height() - ruleRect.maxY());
+            else
+                ruleRect.setX(width() - ruleRect.maxX());
+        }
+
         ruleRect.moveBy(paintOffset);
 
         BoxSide boxSide = isHorizontalWritingMode()
-            ? !style()->isFlippedBlocksWritingMode() ? BSTop : BSBottom
-            : !style()->isFlippedBlocksWritingMode() ? BSLeft : BSRight;
+            ? topToBottom ? BSTop : BSBottom
+            : topToBottom ? BSLeft : BSRight;
 
-        LayoutSize step(0, !style()->isFlippedBlocksWritingMode() ? colInfo->columnHeight() + colGap : -(colInfo->columnHeight() + colGap));
+        LayoutSize step(0, topToBottom ? colInfo->columnHeight() + colGap : -(colInfo->columnHeight() + colGap));
         if (!isHorizontalWritingMode())
             step = step.transposedSize();
 
@@ -2739,7 +2782,7 @@ void RenderBlock::paintColumnContents(PaintInfo& paintInfo, const LayoutPoint& p
             // like overflow:hidden.
             // FIXME: Content and column rules that extend outside column boxes at the edges of the multi-column element
             // are clipped according to the 'overflow' property.
-            context->clip(clipRect);
+            context->clip(pixelSnappedIntRect(clipRect));
 
             // Adjust our x and y when painting.
             LayoutPoint adjustedPaintOffset = paintOffset + offset;
@@ -3166,12 +3209,12 @@ static void clipOutPositionedObjects(const PaintInfo* paintInfo, const LayoutPoi
     }
 }
 
-static int blockDirectionOffset(RenderBlock* rootBlock, const LayoutSize& offsetFromRootBlock)
+static LayoutUnit blockDirectionOffset(RenderBlock* rootBlock, const LayoutSize& offsetFromRootBlock)
 {
     return rootBlock->isHorizontalWritingMode() ? offsetFromRootBlock.height() : offsetFromRootBlock.width();
 }
 
-static int inlineDirectionOffset(RenderBlock* rootBlock, const LayoutSize& offsetFromRootBlock)
+static LayoutUnit inlineDirectionOffset(RenderBlock* rootBlock, const LayoutSize& offsetFromRootBlock)
 {
     return rootBlock->isHorizontalWritingMode() ? offsetFromRootBlock.width() : offsetFromRootBlock.height();
 }
@@ -3377,15 +3420,8 @@ LayoutRect RenderBlock::blockSelectionGap(RenderBlock* rootBlock, const LayoutPo
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(logicalLeft, logicalTop, logicalWidth, logicalHeight));
     if (paintInfo)
-        paintInfo->context->fillRect(gapRect, selectionBackgroundColor(), style()->colorSpace());
+        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selectionBackgroundColor(), style()->colorSpace());
     return gapRect;
-}
-
-static inline void alignSelectionRectToDevicePixels(LayoutRect& rect)
-{
-    LayoutUnit maxX = floorToInt(rect.maxX());
-    rect.setX(floorToInt(rect.x()));
-    rect.setWidth((maxX - rect.x()).round());
 }
 
 LayoutRect RenderBlock::logicalLeftSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
@@ -3393,15 +3429,14 @@ LayoutRect RenderBlock::logicalLeftSelectionGap(RenderBlock* rootBlock, const La
 {
     LayoutUnit rootBlockLogicalTop = blockDirectionOffset(rootBlock, offsetFromRootBlock) + logicalTop;
     LayoutUnit rootBlockLogicalLeft = max(logicalLeftSelectionOffset(rootBlock, logicalTop), logicalLeftSelectionOffset(rootBlock, logicalTop + logicalHeight));
-    LayoutUnit rootBlockLogicalRight = min(inlineDirectionOffset(rootBlock, offsetFromRootBlock) + logicalLeft, min(logicalRightSelectionOffset(rootBlock, logicalTop), logicalRightSelectionOffset(rootBlock, logicalTop + logicalHeight)));
+    LayoutUnit rootBlockLogicalRight = min(inlineDirectionOffset(rootBlock, offsetFromRootBlock) + floorToInt(logicalLeft), min(logicalRightSelectionOffset(rootBlock, logicalTop), logicalRightSelectionOffset(rootBlock, logicalTop + logicalHeight)));
     LayoutUnit rootBlockLogicalWidth = rootBlockLogicalRight - rootBlockLogicalLeft;
     if (rootBlockLogicalWidth <= ZERO_LAYOUT_UNIT)
         return LayoutRect();
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
-    alignSelectionRectToDevicePixels(gapRect);
     if (paintInfo)
-        paintInfo->context->fillRect(gapRect, selObj->selectionBackgroundColor(), selObj->style()->colorSpace());
+        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selObj->selectionBackgroundColor(), selObj->style()->colorSpace());
     return gapRect;
 }
 
@@ -3409,16 +3444,15 @@ LayoutRect RenderBlock::logicalRightSelectionGap(RenderBlock* rootBlock, const L
                                                  RenderObject* selObj, LayoutUnit logicalRight, LayoutUnit logicalTop, LayoutUnit logicalHeight, const PaintInfo* paintInfo)
 {
     LayoutUnit rootBlockLogicalTop = blockDirectionOffset(rootBlock, offsetFromRootBlock) + logicalTop;
-    LayoutUnit rootBlockLogicalLeft = max(inlineDirectionOffset(rootBlock, offsetFromRootBlock) + logicalRight, max(logicalLeftSelectionOffset(rootBlock, logicalTop), logicalLeftSelectionOffset(rootBlock, logicalTop + logicalHeight)));
+    LayoutUnit rootBlockLogicalLeft = max(inlineDirectionOffset(rootBlock, offsetFromRootBlock) + floorToInt(logicalRight), max(logicalLeftSelectionOffset(rootBlock, logicalTop), logicalLeftSelectionOffset(rootBlock, logicalTop + logicalHeight)));
     LayoutUnit rootBlockLogicalRight = min(logicalRightSelectionOffset(rootBlock, logicalTop), logicalRightSelectionOffset(rootBlock, logicalTop + logicalHeight));
     LayoutUnit rootBlockLogicalWidth = rootBlockLogicalRight - rootBlockLogicalLeft;
     if (rootBlockLogicalWidth <= ZERO_LAYOUT_UNIT)
         return LayoutRect();
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
-    alignSelectionRectToDevicePixels(gapRect);
     if (paintInfo)
-        paintInfo->context->fillRect(gapRect, selObj->selectionBackgroundColor(), selObj->style()->colorSpace());
+        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selObj->selectionBackgroundColor(), selObj->style()->colorSpace());
     return gapRect;
 }
 
@@ -3513,18 +3547,12 @@ void RenderBlock::insertPositionedObject(RenderBox* o)
         m_positionedObjects = adoptPtr(new PositionedObjectsListHashSet);
 
     m_positionedObjects->add(o);
-
-    if (o->style()->position() == FixedPosition && view())
-        view()->insertFixedPositionedObject(o);
 }
 
 void RenderBlock::removePositionedObject(RenderBox* o)
 {
     if (m_positionedObjects)
         m_positionedObjects->remove(o);
-
-    if (view())
-        view()->removeFixedPositionedObject(o);
 }
 
 void RenderBlock::removePositionedObjects(RenderBlock* o)
@@ -4963,6 +4991,7 @@ void RenderBlock::setDesiredColumnCountAndWidth(int count, LayoutUnit width)
         info->setDesiredColumnCount(count);
         info->setDesiredColumnWidth(width);
         info->setProgressionAxis(style()->hasInlineColumnAxis() ? ColumnInfo::InlineAxis : ColumnInfo::BlockAxis);
+        info->setProgressionIsReversed(style()->columnProgression() == ReverseColumnProgression);
     }
 }
 
@@ -5005,12 +5034,16 @@ LayoutRect RenderBlock::columnRectAt(ColumnInfo* colInfo, unsigned index) const
     LayoutUnit colLogicalLeft = logicalLeftOffsetForContent();
     int colGap = columnGap();
     if (colInfo->progressionAxis() == ColumnInfo::InlineAxis) {
-        if (style()->isLeftToRightDirection())
+        if (style()->isLeftToRightDirection() ^ colInfo->progressionIsReversed())
             colLogicalLeft += index * (colLogicalWidth + colGap);
         else
             colLogicalLeft += contentLogicalWidth() - colLogicalWidth - index * (colLogicalWidth + colGap);
-    } else
-        colLogicalTop += index * (colLogicalHeight + colGap);
+    } else {
+        if (!colInfo->progressionIsReversed())
+            colLogicalTop += index * (colLogicalHeight + colGap);
+        else
+            colLogicalTop += contentLogicalHeight() - colLogicalHeight - index * (colLogicalHeight + colGap);
+    }
 
     if (isHorizontalWritingMode())
         return LayoutRect(colLogicalLeft, colLogicalTop, colLogicalWidth, colLogicalHeight);
@@ -5696,9 +5729,6 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
     updatePreferredWidth(m_minPreferredLogicalWidth, inlineMin);
     updatePreferredWidth(m_maxPreferredLogicalWidth, inlineMax);
 }
-
-// Use a very large value (in effect infinite).
-#define BLOCK_MAX_WIDTH 15000
 
 void RenderBlock::computeBlockPreferredLogicalWidths()
 {
@@ -6493,80 +6523,17 @@ LayoutRect RenderBlock::localCaretRect(InlineBox* inlineBox, int caretOffset, La
     if (firstChild())
         return RenderBox::localCaretRect(inlineBox, caretOffset, extraWidthToEndOfLine);
 
-    // This is a special case:
-    // The element is not an inline element, and it's empty. So we have to
-    // calculate a fake position to indicate where objects are to be inserted.
-    
-    // FIXME: This does not take into account either :first-line or :first-letter
-    // However, as soon as some content is entered, the line boxes will be
-    // constructed and this kludge is not called any more. So only the caret size
-    // of an empty :first-line'd block is wrong. I think we can live with that.
-    RenderStyle* currentStyle = firstLineStyle();
-    LayoutUnit height = lineHeight(true, currentStyle->isHorizontalWritingMode() ? HorizontalLine : VerticalLine);
-
-    enum CaretAlignment { alignLeft, alignRight, alignCenter };
-
-    CaretAlignment alignment = alignLeft;
-
-    switch (currentStyle->textAlign()) {
-        case TAAUTO:
-        case JUSTIFY:
-            if (!currentStyle->isLeftToRightDirection())
-                alignment = alignRight;
-            break;
-        case LEFT:
-        case WEBKIT_LEFT:
-            break;
-        case CENTER:
-        case WEBKIT_CENTER:
-            alignment = alignCenter;
-            break;
-        case RIGHT:
-        case WEBKIT_RIGHT:
-            alignment = alignRight;
-            break;
-        case TASTART:
-            if (!currentStyle->isLeftToRightDirection())
-                alignment = alignRight;
-            break;
-        case TAEND:
-            if (currentStyle->isLeftToRightDirection())
-                alignment = alignRight;
-            break;
-    }
-
-    LayoutUnit x = borderLeft() + paddingLeft();
-    LayoutUnit w = width();
-
-    switch (alignment) {
-        case alignLeft:
-            if (currentStyle->isLeftToRightDirection())
-                x += textIndentOffset();
-            break;
-        case alignCenter:
-            x = (x + w - (borderRight() + paddingRight())) / 2;
-            if (currentStyle->isLeftToRightDirection())
-                x += textIndentOffset() / 2;
-            else
-                x -= textIndentOffset() / 2;
-            break;
-        case alignRight:
-            x = w - (borderRight() + paddingRight()) - caretWidth;
-            if (!currentStyle->isLeftToRightDirection())
-                x -= textIndentOffset();
-            break;
-    }
-    x = min(x, w - borderRight() - paddingRight() - caretWidth);
+    LayoutRect caretRect = localCaretRectForEmptyElement(width(), textIndentOffset());
 
     if (extraWidthToEndOfLine) {
         if (isRenderBlock()) {
-            *extraWidthToEndOfLine = w - (x + caretWidth);
+            *extraWidthToEndOfLine = width() - caretRect.maxX();
         } else {
             // FIXME: This code looks wrong.
             // myRight and containerRight are set up, but then clobbered.
             // So *extraWidthToEndOfLine will always be 0 here.
 
-            LayoutUnit myRight = x + caretWidth;
+            LayoutUnit myRight = caretRect.maxX();
             // FIXME: why call localToAbsoluteForContent() twice here, too?
             FloatPoint absRightPoint = localToAbsolute(FloatPoint(myRight, 0));
 
@@ -6577,9 +6544,7 @@ LayoutRect RenderBlock::localCaretRect(InlineBox* inlineBox, int caretOffset, La
         }
     }
 
-    LayoutUnit y = paddingTop() + borderTop();
-
-    return LayoutRect(x, y, caretWidth, height);
+    return caretRect;
 }
 
 void RenderBlock::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& additionalOffset)

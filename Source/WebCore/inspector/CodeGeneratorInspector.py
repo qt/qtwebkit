@@ -46,6 +46,7 @@ DOMAIN_DEFINE_NAME_MAP = {
     "IndexedDB": "INDEXED_DATABASE",
     "Profiler": "JAVASCRIPT_DEBUGGER",
     "Worker": "WORKERS",
+    "WebGL": "WEBGL",
 }
 
 
@@ -1833,7 +1834,6 @@ public:
 
 $domainClassList
 private:
-    InspectorFrontendChannel* m_inspectorFrontendChannel;
 ${fieldDeclarations}};
 
 #endif // ENABLE(INSPECTOR)
@@ -2189,8 +2189,7 @@ bool InspectorBackendDispatcher::getCommandName(const String& message, String* r
 namespace WebCore {
 
 InspectorFrontend::InspectorFrontend(InspectorFrontendChannel* inspectorFrontendChannel)
-    : m_inspectorFrontendChannel(inspectorFrontendChannel)
-$constructorInit{
+    : $constructorInit{
 }
 
 $methods
@@ -2595,7 +2594,9 @@ class Generator:
                     Generator.process_event(json_event, domain_name, frontend_method_declaration_lines)
 
             Generator.frontend_class_field_lines.append("    %s m_%s;\n" % (domain_name, domain_name_lower))
-            Generator.frontend_constructor_init_list.append("    , m_%s(inspectorFrontendChannel)\n" % domain_name_lower)
+            if Generator.frontend_constructor_init_list:
+                Generator.frontend_constructor_init_list.append("    , ")
+            Generator.frontend_constructor_init_list.append("m_%s(inspectorFrontendChannel)\n" % domain_name_lower)
             Generator.frontend_domain_class_lines.append(Templates.frontend_domain_class.substitute(None,
                 domainClassName=domain_name,
                 domainFieldName=domain_name_lower,

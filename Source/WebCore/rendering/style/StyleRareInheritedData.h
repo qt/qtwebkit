@@ -31,6 +31,11 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/AtomicString.h>
 
+#if ENABLE(CSS_VARIABLES)
+#include "DataRef.h"
+#include "StyleVariableData.h"
+#endif
+
 namespace WebCore {
 
 class CursorList;
@@ -79,7 +84,7 @@ public:
     unsigned wordWrap : 1; // EWordWrap 
     unsigned nbspMode : 1; // ENBSPMode
     unsigned khtmlLineBreak : 1; // EKHTMLLineBreak
-    bool textSizeAdjust : 1; // An Apple extension.
+    unsigned textSizeAdjust : 1; // An Apple extension.
     unsigned resize : 2; // EResize
     unsigned userSelect : 1;  // EUserSelect
     unsigned colorSpace : 1; // ColorSpace
@@ -96,6 +101,9 @@ public:
 #if ENABLE(OVERFLOW_SCROLLING)
     unsigned useTouchOverflowScrolling: 1;
 #endif
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    unsigned m_imageResolutionSource : 1; // ImageResolutionSource
+#endif
 
     AtomicString hyphenationString;
     short hyphenationLimitBefore;
@@ -110,8 +118,16 @@ public:
     AtomicString m_lineGrid;
     unsigned m_tabSize;
 
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    float m_imageResolution;
+#endif
+
 #if ENABLE(TOUCH_EVENTS)
     Color tapHighlightColor;
+#endif
+
+#if ENABLE(CSS_VARIABLES)
+    DataRef<StyleVariableData> m_variables;
 #endif
 
 private:

@@ -36,7 +36,10 @@
 #if PLATFORM(MAC)
 #include "PluginComplexTextInputState.h"
 
+#if USE(APPKIT)
 OBJC_CLASS WKView;
+OBJC_CLASS NSTextAlternatives;
+#endif
 #endif
 
 namespace WebCore {
@@ -61,6 +64,10 @@ class WebPopupMenuProxy;
 
 #if PLATFORM(WIN)
 struct WindowGeometry;
+#endif
+
+#if PLATFORM(MAC)
+struct ColorSpaceData;
 #endif
 
 class PageClient {
@@ -190,9 +197,20 @@ public:
     virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText) = 0;
     virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) = 0;
-    
+
+    virtual ColorSpaceData colorSpace() = 0;
+
+#if USE(APPKIT)
     virtual WKView* wkView() const = 0;
-#endif
+#if USE(DICTATION_ALTERNATIVES)
+    virtual uint64_t addDictationAlternatives(const RetainPtr<NSTextAlternatives>&) = 0;
+    virtual void removeDictationAlternatives(uint64_t dictationContext) = 0;
+    virtual void showDictationAlternativeUI(const WebCore::FloatRect& boundingBoxOfDictatedText, uint64_t dictationContext) = 0;
+    virtual void dismissDictationAlternativeUI() = 0;
+    virtual Vector<String> dictationAlternatives(uint64_t dictationContext) = 0;
+#endif // USE(DICTATION_ALTERNATIVES)
+#endif // USE(APPKIT)
+#endif // PLATFORM(MAC)
 
     virtual void didChangeScrollbarsForMainFrame() const = 0;
 

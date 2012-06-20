@@ -27,6 +27,7 @@
 #include "FunctionPrototype.h"
 #include "Interpreter.h"
 #include "JSArray.h"
+#include "JSContextRefPrivate.h"
 #include "JSDocument.h"
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
@@ -998,9 +999,9 @@ QtRuntimeMethodData::~QtRuntimeMethodData()
 {
 }
 
-void QtRuntimeMethodData::finalize(Handle<Unknown> value, void*)
+void QtRuntimeMethodData::finalize(Handle<Unknown>, void*)
 {
-    m_instance->removeCachedMethod(static_cast<JSObject*>(value.get().asCell()));
+    m_instance->removeUnusedMethods();
 }
 
 QtRuntimeMetaMethodData::~QtRuntimeMetaMethodData()
@@ -1645,8 +1646,7 @@ EncodedJSValue QtRuntimeConnectionMethod::call(ExecState* exec)
                 //  receiver function [from arguments]
                 //  receiver this object [from arguments]
 
-                ExecState* globalExec = exec->lexicalGlobalObject()->globalExec();
-                QtConnectionObject* conn = QtConnectionObject::createWithInternalJSC(globalExec, d->m_instance, signalIndex, thisObject, funcObject);
+                QtConnectionObject* conn = QtConnectionObject::createWithInternalJSC(exec, d->m_instance, signalIndex, thisObject, funcObject);
                 bool ok = QMetaObject::connect(sender, signalIndex, conn, conn->metaObject()->methodOffset());
                 if (!ok) {
                     delete conn;
@@ -1748,7 +1748,7 @@ JSValue QtRuntimeConnectionMethod::lengthGetter(ExecState*, JSValue, PropertyNam
 
 QtConnectionObject::QtConnectionObject(JSContextRef context, PassRefPtr<QtInstance> senderInstance, int signalIndex, JSObjectRef receiver, JSObjectRef receiverFunction)
     : QObject(senderInstance->getObject())
-    , m_context(context)
+    , m_context(JSContextGetGlobalContext(context))
     , m_senderInstance(senderInstance)
     , m_originalSender(m_senderInstance->getObject())
     , m_signalIndex(signalIndex)

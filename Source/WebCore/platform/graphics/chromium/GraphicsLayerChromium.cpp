@@ -46,22 +46,27 @@
 #include "GraphicsLayerChromium.h"
 
 #include "AnimationIdVendor.h"
-#include "Canvas2DLayerChromium.h"
+#include "AnimationTranslationUtil.h"
 #include "ContentLayerChromium.h"
 #include "FloatConversion.h"
 #include "FloatRect.h"
+#include "GraphicsContext.h"
 #include "Image.h"
-#include "ImageLayerChromium.h"
 #include "LayerChromium.h"
 #include "LinkHighlight.h"
+#include "NativeImageSkia.h"
+#include "PlatformContextSkia.h"
 #include "PlatformString.h"
 #include "SkMatrix44.h"
 #include "SystemTime.h"
+
+#include "cc/CCActiveAnimation.h"
 
 #include <public/WebFilterOperation.h>
 #include <public/WebFilterOperations.h>
 #include <public/WebFloatPoint.h>
 #include <public/WebFloatRect.h>
+#include <public/WebImageLayer.h>
 #include <public/WebSize.h>
 #include <public/WebTransformationMatrix.h>
 #include <wtf/CurrentTime.h>
@@ -85,7 +90,9 @@ GraphicsLayerChromium::GraphicsLayerChromium(GraphicsLayerClient* client)
     , m_inSetChildren(false)
     , m_pageScaleChanged(false)
 {
-    m_layer = WebContentLayer(ContentLayerChromium::create(this));
+    m_opaqueRectTrackingContentLayerDelegate = adoptPtr(new OpaqueRectTrackingContentLayerDelegate(this));
+    m_layer = WebContentLayer::create(m_opaqueRectTrackingContentLayerDelegate.get());
+    m_layer.setDrawsContent(m_drawsContent && m_contentsVisible);
 
     updateDebugIndicators();
 }
@@ -453,14 +460,15 @@ void GraphicsLayerChromium::setContentsToImage(Image* image)
     bool childrenChanged = false;
     if (image) {
         if (m_contentsLayer.isNull() || m_contentsLayerPurpose != ContentsLayerForImage) {
-            RefPtr<ImageLayerChromium> imageLayer = ImageLayerChromium::create();
-            setupContentsLayer(imageLayer.get());
+            WebKit::WebImageLayer imageLayer = WebKit::WebImageLayer::create();
+            setupContentsLayer(imageLayer.unwrap<LayerChromium>());
             m_contentsLayerPurpose = ContentsLayerForImage;
             childrenChanged = true;
         }
-        ImageLayerChromium* imageLayer = static_cast<ImageLayerChromium*>(m_contentsLayer.unwrap<LayerChromium>());
-        imageLayer->setContents(image);
-        imageLayer->setOpaque(image->isBitmapImage() && !image->currentFrameHasAlpha());
+        WebKit::WebImageLayer imageLayer = m_contentsLayer.to<WebKit::WebImageLayer>();
+        NativeImageSkia* nativeImage = image->nativeImageForCurrentFrame();
+        imageLayer.setBitmap(nativeImage->bitmap());
+        imageLayer.setOpaque(image->isBitmapImage() && !image->currentFrameHasAlpha());
         updateContentsRect();
     } else {
         if (!m_contentsLayer.isNull()) {
@@ -500,8 +508,28 @@ void GraphicsLayerChromium::setContentsToCanvas(PlatformLayer* platformLayer)
 
 bool GraphicsLayerChromium::addAnimation(const KeyframeValueList& values, const IntSize& boxSize, const Animation* animation, const String& animationName, double timeOffset)
 {
+    // Bail early if we have a large rotation.
+    if (values.property() == AnimatedPropertyWebkitTransform) {
+        bool hasRotationOfMoreThan180Degrees = false;
+        validateTransformOperations(values, hasRotationOfMoreThan180Degrees);
+        if (hasRotationOfMoreThan180Degrees)
+            return false;
+    }
+
     primaryLayer().unwrap<LayerChromium>()->setLayerAnimationDelegate(this);
-    return primaryLayer().unwrap<LayerChromium>()->addAnimation(values, boxSize, animation, mapAnimationNameToId(animationName), AnimationIdVendor::getNextGroupId(), timeOffset);
+
+    int animationId = mapAnimationNameToId(animationName);
+    int groupId = AnimationIdVendor::getNextGroupId();
+
+    OwnPtr<CCActiveAnimation> toAdd(createActiveAnimation(values, animation, animationId, groupId, timeOffset, boxSize));
+
+    if (toAdd.get()) {
+        // Remove any existing animations with the same animation id and target property.
+        primaryLayer().unwrap<LayerChromium>()->layerAnimationController()->removeAnimation(toAdd->id(), toAdd->targetProperty());
+        return primaryLayer().unwrap<LayerChromium>()->addAnimation(toAdd.release());
+    }
+
+    return false;
 }
 
 void GraphicsLayerChromium::pauseAnimation(const String& animationName, double timeOffset)
@@ -852,8 +880,9 @@ void GraphicsLayerChromium::deviceOrPageScaleFactorChanged()
     m_pageScaleChanged = true;
 }
 
-void GraphicsLayerChromium::paintContents(GraphicsContext& context, const IntRect& clip)
+void GraphicsLayerChromium::paint(GraphicsContext& context, const IntRect& clip)
 {
+    context.platformContext()->setDrawingToImageBuffer(true);
     paintGraphicsLayerContents(context, clip);
 }
 

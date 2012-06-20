@@ -122,11 +122,20 @@ static inline RenderView* rootRenderer(const FrameView* view)
     return view->frame() ? view->frame()->contentRenderer() : 0;
 }
 
+static RenderLayer::UpdateLayerPositionsFlags updateLayerPositionFlags(RenderLayer* layer, bool isRelayoutingSubtree, bool didFullRepaint)
+{
+    RenderLayer::UpdateLayerPositionsFlags flags = RenderLayer::defaultFlags;
+    if (didFullRepaint)
+        flags &= ~RenderLayer::CheckForRepaint;
+    if (isRelayoutingSubtree && layer->isPaginated())
+        flags |= RenderLayer::UpdatePagination;
+    return flags;
+}
+
 FrameView::FrameView(Frame* frame)
     : m_frame(frame)
     , m_canHaveScrollbars(true)
     , m_slowRepaintObjectCount(0)
-    , m_fixedObjectCount(0)
     , m_layoutTimer(this, &FrameView::layoutTimerFired)
     , m_layoutRoot(0)
     , m_inSynchronousPostLayout(false)
@@ -1117,10 +1126,8 @@ void FrameView::layout(bool allowSubtree)
     if (m_doFullRepaint)
         root->view()->repaint(); // FIXME: This isn't really right, since the RenderView doesn't fully encompass the visibleContentRect(). It just happens
                                  // to work out most of the time, since first layouts and printing don't have you scrolled anywhere.
-    layer->updateLayerPositions(hasLayerOffset ? &offsetFromRoot : 0,
-                                (m_doFullRepaint ? 0 : RenderLayer::CheckForRepaint)
-                                | RenderLayer::IsCompositingUpdateRoot
-                                | RenderLayer::UpdateCompositingLayers);
+
+    layer->updateLayerPositions(hasLayerOffset ? &offsetFromRoot : 0, updateLayerPositionFlags(layer, subtree, m_doFullRepaint));
     endDeferredRepaints();
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1257,7 +1264,7 @@ void FrameView::adjustMediaTypeForPrinting(bool printing)
 
 bool FrameView::useSlowRepaints(bool considerOverlap) const
 {
-    bool mustBeSlow = m_slowRepaintObjectCount > 0 || (platformWidget() && m_fixedObjectCount > 0);
+    bool mustBeSlow = m_slowRepaintObjectCount > 0 || (platformWidget() && hasFixedObjects());
 
     // FIXME: WidgetMac.mm makes the assumption that useSlowRepaints ==
     // m_contentIsOpaque, so don't take the fast path for composited layers
@@ -1342,28 +1349,32 @@ void FrameView::removeSlowRepaintObject()
     }
 }
 
-void FrameView::addFixedObject()
+void FrameView::addFixedObject(RenderObject* object)
 {
-    if (!m_fixedObjectCount++) {
+    if (!m_fixedObjects)
+        m_fixedObjects = adoptPtr(new FixedObjectSet);
+
+    if (!m_fixedObjects->contains(object)) {
+        m_fixedObjects->add(object);
         if (platformWidget())
             updateCanBlitOnScrollRecursively();
 
         if (Page* page = m_frame->page()) {
             if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                scrollingCoordinator->frameViewHasFixedObjectsDidChange(this);
+                scrollingCoordinator->frameViewFixedObjectsDidChange(this);
         }
     }
 }
 
-void FrameView::removeFixedObject()
+void FrameView::removeFixedObject(RenderObject* object)
 {
-    ASSERT(m_fixedObjectCount > 0);
-    --m_fixedObjectCount;
+    ASSERT(hasFixedObjects());
 
-    if (!m_fixedObjectCount) {
+    if (m_fixedObjects->contains(object)) {
+        m_fixedObjects->remove(object);
         if (Page* page = m_frame->page()) {
             if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                scrollingCoordinator->frameViewHasFixedObjectsDidChange(this);
+                scrollingCoordinator->frameViewFixedObjectsDidChange(this);
         }
 
         // FIXME: In addFixedObject() we only call this if there's a platform widget,
@@ -1372,74 +1383,45 @@ void FrameView::removeFixedObject()
     }
 }
 
-int FrameView::scrollXForFixedPosition() const
+static int fixedPositionScrollOffset(int scrollPosition, int maxValue, int scrollOrigin, float dragFactor)
 {
-    int visibleContentWidth = visibleContentRect().width();
-    int maxX = contentsWidth() - visibleContentWidth;
-
-    if (maxX == 0)
+    if (!maxValue)
         return 0;
 
-    int x = scrollX();
-
-    if (!scrollOrigin().x()) {
-        if (x < 0)
-            x = 0;
-        else if (x > maxX)
-            x = maxX;
+    if (!scrollOrigin) {
+        if (scrollPosition < 0)
+            scrollPosition = 0;
+        else if (scrollPosition > maxValue)
+            scrollPosition = maxValue;
     } else {
-        if (x > 0)
-            x = 0;
-        else if (x < -maxX)
-            x = -maxX;
+        if (scrollPosition > 0)
+            scrollPosition = 0;
+        else if (scrollPosition < -maxValue)
+            scrollPosition = -maxValue;
     }
-
-    if (!m_frame)
-        return x;
-
-    float frameScaleFactor = m_frame->frameScaleFactor();
-
-    // When the page is scaled, the scaled "viewport" with respect to which fixed object are positioned
-    // doesn't move as fast as the content view, so that when the content is scrolled all the way to the
-    // end, the bottom of the scaled "viewport" touches the bottom of the real viewport.
-    float dragFactor = fixedElementsLayoutRelativeToFrame() ? 1 : (contentsWidth() - visibleContentWidth * frameScaleFactor) / maxX;
-
-    return x * dragFactor / frameScaleFactor;
-}
-
-int FrameView::scrollYForFixedPosition() const
-{
-    int visibleContentHeight = visibleContentRect().height();
-
-    int maxY = contentsHeight() - visibleContentHeight;
-    if (maxY == 0)
-        return 0;
-
-    int y = scrollY();
-
-    if (!scrollOrigin().y()) {
-        if (y < 0)
-            y = 0;
-        else if (y > maxY)
-            y = maxY;
-    } else {
-        if (y > 0)
-            y = 0;
-        else if (y < -maxY)
-            y = -maxY;
-    }
-
-    if (!m_frame)
-        return y;
-
-    float frameScaleFactor = m_frame->frameScaleFactor();
-    float dragFactor = fixedElementsLayoutRelativeToFrame() ? 1 : (contentsHeight() - visibleContentHeight * frameScaleFactor) / maxY;
-    return y * dragFactor / frameScaleFactor;
+    
+    return scrollPosition * dragFactor;
 }
 
 IntSize FrameView::scrollOffsetForFixedPosition() const
 {
-    return IntSize(scrollXForFixedPosition(), scrollYForFixedPosition());
+    IntRect visibleContentRect = this->visibleContentRect();
+    IntSize contentsSize = this->contentsSize();
+    IntPoint scrollPosition = this->scrollPosition();
+    IntPoint scrollOrigin = this->scrollOrigin();
+    
+    IntSize maxOffset(contentsSize.width() - visibleContentRect.width(), contentsSize.height() - visibleContentRect.height());
+    
+    float frameScaleFactor = m_frame ? m_frame->frameScaleFactor() : 1;
+
+    FloatSize dragFactor = fixedElementsLayoutRelativeToFrame() ? FloatSize(1, 1) : FloatSize(
+        (contentsSize.width() - visibleContentRect.width() * frameScaleFactor) / maxOffset.width(),
+        (contentsSize.height() - visibleContentRect.height() * frameScaleFactor) / maxOffset.height());
+
+    int x = fixedPositionScrollOffset(scrollPosition.x(), maxOffset.width(), scrollOrigin.x(), dragFactor.width() / frameScaleFactor);
+    int y = fixedPositionScrollOffset(scrollPosition.y(), maxOffset.height(), scrollOrigin.y(), dragFactor.height() / frameScaleFactor);
+
+    return IntSize(x, y);
 }
 
 bool FrameView::fixedElementsLayoutRelativeToFrame() const
@@ -1774,7 +1756,7 @@ void FrameView::repaintFixedElementsAfterScrolling()
 void FrameView::updateFixedElementsAfterScrolling()
 {
 #if USE(ACCELERATED_COMPOSITING)
-    if (!m_nestedLayoutCount && hasFixedObjects()) {
+    if (m_nestedLayoutCount <= 1 && hasFixedObjects()) {
         if (RenderView* root = rootRenderer(this)) {
             root->compositor()->updateCompositingLayers(CompositingUpdateOnScroll);
         }
@@ -2374,7 +2356,8 @@ void FrameView::performPostLayoutTasks()
     m_frame->loader()->client()->dispatchDidLayout();
 
     RenderView* root = rootRenderer(this);
-    root->updateWidgetPositions();
+    if (root)
+        root->updateWidgetPositions();
     
     for (unsigned i = 0; i < maxUpdateWidgetsIterations; i++) {
         if (updateWidgets())
@@ -2395,7 +2378,7 @@ void FrameView::performPostLayoutTasks()
 
     m_actionScheduler->resume();
 
-    if (!root->printing()) {
+    if (root && !root->printing()) {
         IntSize currentSize;
         if (useFixedLayout() && !fixedLayoutSize().isEmpty() && delegatesScrolling())
             currentSize = fixedLayoutSize();

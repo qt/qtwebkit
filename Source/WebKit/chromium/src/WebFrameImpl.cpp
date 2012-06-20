@@ -109,10 +109,12 @@
 #include "IconURL.h"
 #include "InspectorController.h"
 #include "KURL.h"
+#include "MessagePort.h"
 #include "Node.h"
 #include "Page.h"
 #include "PageOverlay.h"
 #include "Performance.h"
+#include "PlatformMessagePortChannel.h"
 #include "PlatformSupport.h"
 #include "PluginDocument.h"
 #include "PrintContext.h"
@@ -504,7 +506,6 @@ private:
     WebPluginContainerImpl* m_plugin;
     int m_pageCount;
     WebPrintParams m_printParams;
-    WebPrintScalingOption m_printScalingOption;
 
 };
 
@@ -1343,6 +1344,24 @@ void WebFrameImpl::requestTextChecking(const WebElement& webElem)
     frame()->editor()->spellChecker()->requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling | TextCheckingTypeGrammar, TextCheckingProcessBatch, rangeToCheck, rangeToCheck));
 }
 
+void WebFrameImpl::replaceMisspelledRange(const WebString& text)
+{
+    // If this caret selection has two or more markers, this function replace the range covered by the first marker with the specified word as Microsoft Word does.
+    if (pluginContainerFromFrame(frame()))
+        return;
+    RefPtr<Range> caretRange = frame()->selection()->toNormalizedRange();
+    if (!caretRange)
+        return;
+    Vector<DocumentMarker*> markers = frame()->document()->markers()->markersInRange(caretRange.get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
+    if (markers.size() < 1 || markers[0]->startOffset() >= markers[0]->endOffset())
+        return;
+    RefPtr<Range> markerRange = TextIterator::rangeFromLocationAndLength(frame()->selection()->rootEditableElementOrDocumentElement(), markers[0]->startOffset(), markers[0]->endOffset() - markers[0]->startOffset());
+    if (!markerRange.get() || !frame()->selection()->shouldChangeSelection(markerRange.get()))
+        return;
+    frame()->selection()->setSelection(markerRange.get(), CharacterGranularity);
+    frame()->editor()->replaceSelectionWithText(text, false, true);
+}
+
 bool WebFrameImpl::hasSelection() const
 {
     WebPluginContainerImpl* pluginContainer = pluginContainerFromFrame(frame());
@@ -1571,11 +1590,13 @@ bool WebFrameImpl::find(int identifier,
 {
     WebFrameImpl* mainFrameImpl = viewImpl()->mainFrameImpl();
 
-    if (!options.findNext) {
+    if (!options.findNext)
         frame()->page()->unmarkAllTextMatches();
-        m_activeMatch = 0;
-    } else
+    else
         setMarkerActive(m_activeMatch.get(), false);
+
+    if (m_activeMatch && m_activeMatch->ownerDocument() != frame()->document())
+        m_activeMatch = 0;
 
     // If the user has selected something since the last Find operation we want
     // to start from there. Otherwise, we start searching from where the last Find
@@ -1731,43 +1752,40 @@ void WebFrameImpl::scopeStringMatches(int identifier,
             continue;
         }
 
-        // Only treat the result as a match if it is visible
-        if (frame()->editor()->insideVisibleArea(resultRange.get())) {
-            ++matchCount;
+        ++matchCount;
 
-            // Catch a special case where Find found something but doesn't know what
-            // the bounding box for it is. In this case we set the first match we find
-            // as the active rect.
-            IntRect resultBounds = resultRange->boundingBox();
-            IntRect activeSelectionRect;
-            if (m_locatingActiveRect) {
-                activeSelectionRect = m_activeMatch.get() ?
-                    m_activeMatch->boundingBox() : resultBounds;
-            }
-
-            // If the Find function found a match it will have stored where the
-            // match was found in m_activeSelectionRect on the current frame. If we
-            // find this rect during scoping it means we have found the active
-            // tickmark.
-            bool foundActiveMatch = false;
-            if (m_locatingActiveRect && (activeSelectionRect == resultBounds)) {
-                // We have found the active tickmark frame.
-                mainFrameImpl->m_currentActiveMatchFrame = this;
-                foundActiveMatch = true;
-                // We also know which tickmark is active now.
-                m_activeMatchIndexInCurrentFrame = matchCount - 1;
-                // To stop looking for the active tickmark, we set this flag.
-                m_locatingActiveRect = false;
-
-                // Notify browser of new location for the selected rectangle.
-                reportFindInPageSelection(
-                    frameView()->contentsToWindow(resultBounds),
-                    m_activeMatchIndexInCurrentFrame + 1,
-                    identifier);
-            }
-
-            addMarker(resultRange.get(), foundActiveMatch);
+        // Catch a special case where Find found something but doesn't know what
+        // the bounding box for it is. In this case we set the first match we find
+        // as the active rect.
+        IntRect resultBounds = resultRange->boundingBox();
+        IntRect activeSelectionRect;
+        if (m_locatingActiveRect) {
+            activeSelectionRect = m_activeMatch.get() ?
+                m_activeMatch->boundingBox() : resultBounds;
         }
+
+        // If the Find function found a match it will have stored where the
+        // match was found in m_activeSelectionRect on the current frame. If we
+        // find this rect during scoping it means we have found the active
+        // tickmark.
+        bool foundActiveMatch = false;
+        if (m_locatingActiveRect && (activeSelectionRect == resultBounds)) {
+            // We have found the active tickmark frame.
+            mainFrameImpl->m_currentActiveMatchFrame = this;
+            foundActiveMatch = true;
+            // We also know which tickmark is active now.
+            m_activeMatchIndexInCurrentFrame = matchCount - 1;
+            // To stop looking for the active tickmark, we set this flag.
+            m_locatingActiveRect = false;
+
+            // Notify browser of new location for the selected rectangle.
+            reportFindInPageSelection(
+                frameView()->contentsToWindow(resultBounds),
+                m_activeMatchIndexInCurrentFrame + 1,
+                identifier);
+        }
+
+        addMarker(resultRange.get(), foundActiveMatch);
 
         // Set the new start for the search range to be the end of the previous
         // result range. There is no need to use a VisiblePosition here,
@@ -1901,15 +1919,27 @@ void WebFrameImpl::dispatchMessageEventWithOriginCheck(const WebSecurityOrigin& 
     m_frame->domWindow()->dispatchMessageEventWithOriginCheck(intendedTargetOrigin.get(), event, 0);
 }
 
-void WebFrameImpl::deliverIntent(const WebIntent& intent, WebDeliveredIntentClient* intentClient)
+void WebFrameImpl::deliverIntent(const WebIntent& intent, WebMessagePortChannelArray* ports, WebDeliveredIntentClient* intentClient)
 {
 #if ENABLE(WEB_INTENTS)
     OwnPtr<WebCore::DeliveredIntentClient> client(adoptPtr(new DeliveredIntentClientImpl(intentClient)));
 
-    OwnPtr<MessagePortArray> ports;
     WebSerializedScriptValue intentData = WebSerializedScriptValue::fromString(intent.data());
     const WebCore::Intent* webcoreIntent = intent;
-    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_frame, client.release(), intent.action(), intent.type(), intentData, ports.release(), webcoreIntent->extras());
+
+    // See PlatformMessagePortChannel.cpp
+    OwnPtr<MessagePortChannelArray> channels;
+    if (ports && ports->size()) {
+        channels = adoptPtr(new MessagePortChannelArray(ports->size()));
+        for (size_t i = 0; i < ports->size(); ++i) {
+            RefPtr<PlatformMessagePortChannel> platformChannel = PlatformMessagePortChannel::create((*ports)[i]);
+            (*ports)[i]->setClient(platformChannel.get());
+            (*channels)[i] = MessagePortChannel::create(platformChannel);
+        }
+    }
+    OwnPtr<MessagePortArray> portArray = WebCore::MessagePort::entanglePorts(*(m_frame->domWindow()->scriptExecutionContext()), channels.release());
+
+    RefPtr<DeliveredIntent> deliveredIntent = DeliveredIntent::create(m_frame, client.release(), intent.action(), intent.type(), intentData, portArray.release(), webcoreIntent->extras());
 
     DOMWindowIntents::from(m_frame->domWindow())->deliver(deliveredIntent.release());
 #endif
@@ -1945,18 +1975,6 @@ WebString WebFrameImpl::renderTreeAsText(RenderAsTextControls toShow) const
         behavior |= RenderAsTextPrintingMode;
 
     return externalRepresentation(m_frame, behavior);
-}
-
-WebString WebFrameImpl::counterValueForElementById(const WebString& id) const
-{
-    if (!m_frame)
-        return WebString();
-
-    Element* element = m_frame->document()->getElementById(id);
-    if (!element)
-        return WebString();
-
-    return counterValueForElement(element);
 }
 
 WebString WebFrameImpl::markerTextForListItem(const WebElement& webElement) const
@@ -2023,6 +2041,7 @@ PassRefPtr<WebFrameImpl> WebFrameImpl::create(WebFrameClient* client)
 WebFrameImpl::WebFrameImpl(WebFrameClient* client)
     : m_frameLoaderClient(this)
     , m_client(client)
+    , m_frame(0)
     , m_currentActiveMatchFrame(0)
     , m_activeMatchIndexInCurrentFrame(-1)
     , m_locatingActiveRect(false)
@@ -2048,9 +2067,9 @@ WebFrameImpl::~WebFrameImpl()
     cancelPendingScopingEffort();
 }
 
-void WebFrameImpl::initializeAsMainFrame(WebViewImpl* webViewImpl)
+void WebFrameImpl::initializeAsMainFrame(WebCore::Page* page)
 {
-    RefPtr<Frame> frame = Frame::create(webViewImpl->page(), 0, &m_frameLoaderClient);
+    RefPtr<Frame> frame = Frame::create(page, 0, &m_frameLoaderClient);
     m_frame = frame.get();
 
     // Add reference on behalf of FrameLoader.  See comments in
@@ -2209,6 +2228,14 @@ void WebFrameImpl::setFindEndstateFocusAndSelection()
         // a link focused, which is weird).
         frame()->selection()->setSelection(m_activeMatch.get());
         frame()->document()->setFocusedNode(0);
+
+        // Finally clear the active match, for two reasons:
+        // We just finished the find 'session' and we don't want future (potentially
+        // unrelated) find 'sessions' operations to start at the same place.
+        // The WebFrameImpl could get reused and the m_activeMatch could end up pointing
+        // to a document that is no longer valid. Keeping an invalid reference around
+        // is just asking for trouble.
+        m_activeMatch = 0;
     }
 }
 

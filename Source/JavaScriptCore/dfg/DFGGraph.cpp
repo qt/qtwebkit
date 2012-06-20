@@ -76,7 +76,7 @@ const char* Graph::nameOfVariableAccessData(VariableAccessData* variableAccessDa
     if (variableAccessData->isCaptured())
         *ptr++ = '*';
     
-    ptr.strcat(predictionToAbbreviatedString(variableAccessData->prediction()));
+    ptr.strcat(speculationToAbbreviatedString(variableAccessData->prediction()));
     
     *ptr++ = 0;
     
@@ -169,7 +169,7 @@ void Graph::dump(NodeIndex nodeIndex)
             dataLog("%s@%u%s",
                     useKindToString(m_varArgChildren[childIdx].useKind()),
                     m_varArgChildren[childIdx].index(),
-                    predictionToAbbreviatedString(
+                    speculationToAbbreviatedString(
                         at(m_varArgChildren[childIdx]).prediction()));
         }
     } else {
@@ -177,19 +177,19 @@ void Graph::dump(NodeIndex nodeIndex)
             dataLog("%s@%u%s",
                     useKindToString(node.child1().useKind()),
                     node.child1().index(),
-                    predictionToAbbreviatedString(at(node.child1()).prediction()));
+                    speculationToAbbreviatedString(at(node.child1()).prediction()));
         }
         if (!!node.child2()) {
             dataLog(", %s@%u%s",
                     useKindToString(node.child2().useKind()),
                     node.child2().index(),
-                    predictionToAbbreviatedString(at(node.child2()).prediction()));
+                    speculationToAbbreviatedString(at(node.child2()).prediction()));
         }
         if (!!node.child3()) {
             dataLog(", %s@%u%s",
                     useKindToString(node.child3().useKind()),
                     node.child3().index(),
-                    predictionToAbbreviatedString(at(node.child3()).prediction()));
+                    speculationToAbbreviatedString(at(node.child3()).prediction()));
         }
         hasPrinted = !!node.child1();
     }
@@ -202,6 +202,13 @@ void Graph::dump(NodeIndex nodeIndex)
         dataLog("%svar%u", hasPrinted ? ", " : "", node.varNumber());
         hasPrinted = true;
     }
+    if (node.hasRegisterPointer()) {
+        dataLog(
+            "%sglobal%u(%p)", hasPrinted ? ", " : "",
+            globalObjectFor(node.codeOrigin)->findRegisterIndex(node.registerPointer()),
+            node.registerPointer());
+        hasPrinted = true;
+    }
     if (node.hasIdentifier()) {
         dataLog("%sid%u{%s}", hasPrinted ? ", " : "", node.identifierNumber(), m_codeBlock->identifier(node.identifierNumber()).ustring().utf8().data());
         hasPrinted = true;
@@ -211,6 +218,10 @@ void Graph::dump(NodeIndex nodeIndex)
             dataLog("%sstruct(%p)", hasPrinted ? ", " : "", node.structureSet()[i]);
             hasPrinted = true;
         }
+    }
+    if (node.hasStructure()) {
+        dataLog("%sstruct(%p)", hasPrinted ? ", " : "", node.structure());
+        hasPrinted = true;
     }
     if (node.hasStructureTransitionData()) {
         dataLog("%sstruct(%p -> %p)", hasPrinted ? ", " : "", node.structureTransitionData().previousStructure, node.structureTransitionData().newStructure);
@@ -269,9 +280,9 @@ void Graph::dump(NodeIndex nodeIndex)
 
     if (!skipped) {
         if (node.hasVariableAccessData())
-            dataLog("  predicting %s, double ratio %lf%s", predictionToString(node.variableAccessData()->prediction()), node.variableAccessData()->doubleVoteRatio(), node.variableAccessData()->shouldUseDoubleFormat() ? ", forcing double" : "");
+            dataLog("  predicting %s, double ratio %lf%s", speculationToString(node.variableAccessData()->prediction()), node.variableAccessData()->doubleVoteRatio(), node.variableAccessData()->shouldUseDoubleFormat() ? ", forcing double" : "");
         else if (node.hasHeapPrediction())
-            dataLog("  predicting %s", predictionToString(node.getHeapPrediction()));
+            dataLog("  predicting %s", speculationToString(node.getHeapPrediction()));
     }
     
     dataLog("\n");
@@ -386,7 +397,7 @@ void Graph::predictArgumentTypes()
         at(m_arguments[arg]).variableAccessData()->predict(profile->computeUpdatedPrediction());
         
 #if DFG_ENABLE(DEBUG_VERBOSE)
-        dataLog("Argument [%zu] prediction: %s\n", arg, predictionToString(at(m_arguments[arg]).variableAccessData()->prediction()));
+        dataLog("Argument [%zu] prediction: %s\n", arg, speculationToString(at(m_arguments[arg]).variableAccessData()->prediction()));
 #endif
     }
 }

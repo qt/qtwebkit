@@ -1079,7 +1079,7 @@ HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, bool 
     Frame* resultFrame = result.innerNonSharedNode() ? result.innerNonSharedNode()->document()->frame() : 0;
     if (Page* page = m_frame->page()) {
         Frame* mainFrame = page->mainFrame();
-        if (m_frame != mainFrame && resultFrame && resultFrame != mainFrame && !resultFrame->editor()->insideVisibleArea(result.point())) {
+        if (m_frame != mainFrame && resultFrame && resultFrame != mainFrame) {
             FrameView* resultView = resultFrame->view();
             FrameView* mainView = mainFrame->view();
             if (resultView && mainView) {
@@ -2628,6 +2628,10 @@ void EventHandler::dispatchFakeMouseMoveEventSoon()
     if (m_mousePressed)
         return;
 
+    Settings* settings = m_frame->settings();
+    if (settings && !settings->deviceSupportsMouse())
+        return;
+
     // If the content has ever taken longer than fakeMouseMoveShortInterval we
     // reschedule the timer and use a longer time. This will cause the content
     // to receive these moves only after the user is done scrolling, reducing
@@ -2663,6 +2667,10 @@ void EventHandler::fakeMouseMoveEventTimerFired(Timer<EventHandler>* timer)
 {
     ASSERT_UNUSED(timer, timer == &m_fakeMouseMoveEventTimer);
     ASSERT(!m_mousePressed);
+
+    Settings* settings = m_frame->settings();
+    if (settings && !settings->deviceSupportsMouse())
+        return;
 
     FrameView* view = m_frame->view();
     if (!view)
@@ -3583,7 +3591,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
     m_touchPressed = touches->length() > 0;
 
     // Now iterate the changedTouches list and m_targets within it, sending events to the targets as required.
-    bool defaultPrevented = false;
+    bool swallowedEvent = false;
     RefPtr<TouchList> emptyList = TouchList::create();
     for (unsigned state = 0; state != PlatformTouchPoint::TouchStateEnd; ++state) {
         if (!changedTouches[state].m_touches)
@@ -3606,11 +3614,11 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
                                    0, 0, 0, 0, event.ctrlKey(), event.altKey(), event.shiftKey(), event.metaKey());
             ExceptionCode ec = 0;
             touchEventTarget->dispatchEvent(touchEvent.get(), ec);
-            defaultPrevented |= touchEvent->defaultPrevented();
+            swallowedEvent = swallowedEvent || touchEvent->defaultPrevented() || touchEvent->defaultHandled();
         }
     }
 
-    return defaultPrevented;
+    return swallowedEvent;
 }
 
 bool EventHandler::dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent& event)

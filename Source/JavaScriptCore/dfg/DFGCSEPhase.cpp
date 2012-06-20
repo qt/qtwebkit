@@ -48,9 +48,10 @@ public:
     
     bool run()
     {
+        m_changed = false;
         for (unsigned block = 0; block < m_graph.m_blocks.size(); ++block)
             performBlockCSE(m_graph.m_blocks[block].get());
-        return true; // Maybe we'll need to make this reason about whether it changed the graph in an actionable way?
+        return m_changed;
     }
     
 private:
@@ -193,18 +194,18 @@ private:
         return NoNode;
     }
     
-    NodeIndex globalVarLoadElimination(unsigned varNumber, JSGlobalObject* globalObject)
+    NodeIndex globalVarLoadElimination(WriteBarrier<Unknown>* registerPointer)
     {
         for (unsigned i = m_indexInBlock; i--;) {
             NodeIndex index = m_currentBlock->at(i);
             Node& node = m_graph[index];
             switch (node.op()) {
             case GetGlobalVar:
-                if (node.varNumber() == varNumber && codeBlock()->globalObjectFor(node.codeOrigin) == globalObject)
+                if (node.registerPointer() == registerPointer)
                     return index;
                 break;
             case PutGlobalVar:
-                if (node.varNumber() == varNumber && codeBlock()->globalObjectFor(node.codeOrigin) == globalObject)
+                if (node.registerPointer() == registerPointer)
                     return node.child1().index();
                 break;
             default:
@@ -216,7 +217,30 @@ private:
         return NoNode;
     }
     
-    NodeIndex globalVarStoreElimination(unsigned varNumber, JSGlobalObject* globalObject)
+    bool globalVarWatchpointElimination(WriteBarrier<Unknown>* registerPointer)
+    {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            Node& node = m_graph[index];
+            switch (node.op()) {
+            case GlobalVarWatchpoint:
+                if (node.registerPointer() == registerPointer)
+                    return true;
+                break;
+            case PutGlobalVar:
+                if (node.registerPointer() == registerPointer)
+                    return false;
+                break;
+            default:
+                break;
+            }
+            if (m_graph.clobbersWorld(index))
+                break;
+        }
+        return false;
+    }
+    
+    NodeIndex globalVarStoreElimination(WriteBarrier<Unknown>* registerPointer)
     {
         for (unsigned i = m_indexInBlock; i--;) {
             NodeIndex index = m_currentBlock->at(i);
@@ -225,12 +249,13 @@ private:
                 continue;
             switch (node.op()) {
             case PutGlobalVar:
-                if (node.varNumber() == varNumber && codeBlock()->globalObjectFor(node.codeOrigin) == globalObject)
+            case PutGlobalVarCheck:
+                if (node.registerPointer() == registerPointer)
                     return index;
                 break;
                 
             case GetGlobalVar:
-                if (node.varNumber() == varNumber && codeBlock()->globalObjectFor(node.codeOrigin) == globalObject)
+                if (node.registerPointer() == registerPointer)
                     return NoNode;
                 break;
                 
@@ -316,6 +341,12 @@ private:
                     return true;
                 break;
                 
+            case StructureTransitionWatchpoint:
+                if (node.child1() == child1
+                    && structureSet.contains(node.structure()))
+                    return true;
+                break;
+                
             case PutStructure:
                 if (node.child1() == child1
                     && structureSet.contains(node.structureTransitionData().newStructure))
@@ -337,6 +368,53 @@ private:
                     break;
                 }
                 return false;
+                
+            default:
+                if (m_graph.clobbersWorld(index))
+                    return false;
+                break;
+            }
+        }
+        return false;
+    }
+    
+    bool structureTransitionWatchpointElimination(Structure* structure, NodeIndex child1)
+    {
+        for (unsigned i = m_indexInBlock; i--;) {
+            NodeIndex index = m_currentBlock->at(i);
+            if (index == child1) 
+                break;
+
+            Node& node = m_graph[index];
+            switch (node.op()) {
+            case CheckStructure:
+                if (node.child1() == child1
+                    && node.structureSet().containsOnly(structure))
+                    return true;
+                break;
+                
+            case PutStructure:
+                ASSERT(node.structureTransitionData().previousStructure != structure);
+                break;
+                
+            case PutByOffset:
+                // Setting a property cannot change the structure.
+                break;
+                
+            case PutByVal:
+            case PutByValAlias:
+                if (m_graph.byValIsPure(node)) {
+                    // If PutByVal speculates that it's accessing an array with an
+                    // integer index, then it's impossible for it to cause a structure
+                    // change.
+                    break;
+                }
+                return false;
+                
+            case StructureTransitionWatchpoint:
+                if (node.structure() == structure && node.child1() == child1)
+                    return true;
+                break;
                 
             default:
                 if (m_graph.clobbersWorld(index))
@@ -538,8 +616,8 @@ private:
             Node& node = m_graph[index];
             switch (node.op()) {
             case GetIndexedPropertyStorage: {
-                PredictedType basePrediction = m_graph[node.child2()].prediction();
-                bool nodeHasIntegerIndexPrediction = !(!(basePrediction & PredictInt32) && basePrediction);
+                SpeculatedType basePrediction = m_graph[node.child2()].prediction();
+                bool nodeHasIntegerIndexPrediction = !(!(basePrediction & SpecInt32) && basePrediction);
                 if (node.child1() == child1 && hasIntegerIndexPrediction == nodeHasIntegerIndexPrediction)
                     return index;
                 break;
@@ -556,7 +634,7 @@ private:
                 break;
                 
             case PutByVal:
-                if (isFixedIndexedStorageObjectPrediction(m_graph[node.child1()].prediction()) && m_graph.byValIsPure(node))
+                if (isFixedIndexedStorageObjectSpeculation(m_graph[node.child1()].prediction()) && m_graph.byValIsPure(node))
                     break;
                 return NoNode;
 
@@ -619,9 +697,22 @@ private:
         return NoNode;
     }
     
-    // This returns the Flush node that is keeping a SetLocal alive.
-    NodeIndex setLocalStoreElimination(VirtualRegister local, NodeIndex expectedNodeIndex)
+    struct SetLocalStoreEliminationResult {
+        SetLocalStoreEliminationResult()
+            : mayBeAccessed(false)
+            , mayExit(false)
+            , mayClobberWorld(false)
+        {
+        }
+        
+        bool mayBeAccessed;
+        bool mayExit;
+        bool mayClobberWorld;
+    };
+    SetLocalStoreEliminationResult setLocalStoreElimination(
+        VirtualRegister local, NodeIndex expectedNodeIndex)
     {
+        SetLocalStoreEliminationResult result;
         for (unsigned i = m_indexInBlock; i--;) {
             NodeIndex index = m_currentBlock->at(i);
             Node& node = m_graph[index];
@@ -631,46 +722,67 @@ private:
             case GetLocal:
             case Flush:
                 if (node.local() == local)
-                    return NoNode;
+                    result.mayBeAccessed = true;
                 break;
                 
             case GetLocalUnlinked:
                 if (node.unlinkedLocal() == local)
-                    return NoNode;
+                    result.mayBeAccessed = true;
                 break;
                 
             case SetLocal: {
                 if (node.local() != local)
                     break;
                 if (index != expectedNodeIndex)
-                    return NoNode;
+                    result.mayBeAccessed = true;
                 if (m_graph[index].refCount() > 1)
-                    return NoNode;
-                return index;
+                    result.mayBeAccessed = true;
+                return result;
             }
                 
             case GetScopeChain:
                 if (m_graph.uncheckedActivationRegisterFor(node.codeOrigin) == local)
-                    return NoNode;
+                    result.mayBeAccessed = true;
                 break;
                 
+            case CheckArgumentsNotCreated:
+            case GetMyArgumentsLength:
+            case GetMyArgumentsLengthSafe:
+                if (m_graph.uncheckedArgumentsRegisterFor(node.codeOrigin) == local)
+                    result.mayBeAccessed = true;
+                break;
+                
+            case GetMyArgumentByVal:
+            case GetMyArgumentByValSafe:
+                result.mayBeAccessed = true;
+                break;
+                
+            case GetByVal:
+                // If this is accessing arguments then it's potentially accessing locals.
+                if (m_graph[node.child1()].shouldSpeculateArguments())
+                    result.mayBeAccessed = true;
+                break;
+                
+            case CreateArguments:
             case TearOffActivation:
             case TearOffArguments:
                 // If an activation is being torn off then it means that captured variables
                 // are live. We could be clever here and check if the local qualifies as an
                 // argument register. But that seems like it would buy us very little since
                 // any kind of tear offs are rare to begin with.
-                return NoNode;
+                result.mayBeAccessed = true;
+                break;
                 
             default:
-                if (m_graph.clobbersWorld(index))
-                    return NoNode;
                 break;
             }
-            if (node.canExit())
-                return NoNode;
+            result.mayExit |= node.canExit();
+            result.mayClobberWorld |= m_graph.clobbersWorld(index);
         }
-        return NoNode;
+        ASSERT_NOT_REACHED();
+        // Be safe in release mode.
+        result.mayBeAccessed = true;
+        return result;
     }
     
     void performSubstitution(Edge& child, bool addRef = true)
@@ -848,35 +960,64 @@ private:
                     m_graph.ref(phiIndex);
                 }
             }
+            m_changed = true;
             break;
         }
             
         case GetLocalUnlinked: {
             NodeIndex relevantLocalOpIgnored;
-            setReplacement(getLocalLoadElimination(node.unlinkedLocal(), relevantLocalOpIgnored));
+            m_changed |= setReplacement(getLocalLoadElimination(node.unlinkedLocal(), relevantLocalOpIgnored));
             break;
         }
             
         case Flush: {
-            if (m_fixpointState == FixpointNotConverged)
-                break;
             VariableAccessData* variableAccessData = node.variableAccessData();
-            if (!variableAccessData->isCaptured())
-                break;
             VirtualRegister local = variableAccessData->local();
-            NodeIndex replacementIndex = setLocalStoreElimination(local, node.child1().index());
-            if (replacementIndex == NoNode)
-                break;
+            NodeIndex replacementIndex = node.child1().index();
             Node& replacement = m_graph[replacementIndex];
+            if (replacement.op() != SetLocal)
+                break;
+            ASSERT(replacement.variableAccessData() == variableAccessData);
+            // FIXME: We should be able to remove SetLocals that can exit; we just need
+            // to replace them with appropriate type checks.
+            if (m_fixpointState == FixpointNotConverged) {
+                // Need to be conservative at this time; if the SetLocal has any chance of performing
+                // any speculations then we cannot do anything.
+                if (variableAccessData->isCaptured()) {
+                    // Captured SetLocals never speculate and hence never exit.
+                } else {
+                    if (variableAccessData->shouldUseDoubleFormat())
+                        break;
+                    SpeculatedType prediction = variableAccessData->argumentAwarePrediction();
+                    if (isInt32Speculation(prediction))
+                        break;
+                    if (isArraySpeculation(prediction))
+                        break;
+                    if (isBooleanSpeculation(prediction))
+                        break;
+                }
+            } else {
+                if (replacement.canExit())
+                    break;
+            }
+            SetLocalStoreEliminationResult result =
+                setLocalStoreElimination(local, replacementIndex);
+            if (result.mayBeAccessed || result.mayClobberWorld)
+                break;
             ASSERT(replacement.op() == SetLocal);
             ASSERT(replacement.refCount() == 1);
             ASSERT(replacement.shouldGenerate());
+            // FIXME: Investigate using mayExit as a further optimization.
             node.setOpAndDefaultFlags(Phantom);
             NodeIndex dataNodeIndex = replacement.child1().index();
             ASSERT(m_graph[dataNodeIndex].hasResult());
             m_graph.clearAndDerefChild1(node);
             node.children.child1() = Edge(dataNodeIndex);
             m_graph.ref(dataNodeIndex);
+            NodeIndex oldTailIndex = m_currentBlock->variablesAtTail.operand(local);
+            if (oldTailIndex == m_compileIndex)
+                m_currentBlock->variablesAtTail.operand(local) = replacementIndex;
+            m_changed = true;
             break;
         }
             
@@ -918,13 +1059,19 @@ private:
         // Finally handle heap accesses. These are not quite pure, but we can still
         // optimize them provided that some subtle conditions are met.
         case GetGlobalVar:
-            setReplacement(globalVarLoadElimination(node.varNumber(), codeBlock()->globalObjectFor(node.codeOrigin)));
+            setReplacement(globalVarLoadElimination(node.registerPointer()));
+            break;
+            
+        case GlobalVarWatchpoint:
+            if (globalVarWatchpointElimination(node.registerPointer()))
+                eliminate();
             break;
             
         case PutGlobalVar:
+        case PutGlobalVarCheck:
             if (m_fixpointState == FixpointNotConverged)
                 break;
-            eliminate(globalVarStoreElimination(node.varNumber(), codeBlock()->globalObjectFor(node.codeOrigin)));
+            eliminate(globalVarStoreElimination(node.registerPointer()));
             break;
             
         case GetByVal:
@@ -944,6 +1091,11 @@ private:
                 eliminate();
             break;
             
+        case StructureTransitionWatchpoint:
+            if (structureTransitionWatchpointElimination(node.structure(), node.child1().index()))
+                eliminate();
+            break;
+            
         case PutStructure:
             if (m_fixpointState == FixpointNotConverged)
                 break;
@@ -956,8 +1108,8 @@ private:
             break;
                 
         case GetIndexedPropertyStorage: {
-            PredictedType basePrediction = m_graph[node.child2()].prediction();
-            bool nodeHasIntegerIndexPrediction = !(!(basePrediction & PredictInt32) && basePrediction);
+            SpeculatedType basePrediction = m_graph[node.child2()].prediction();
+            bool nodeHasIntegerIndexPrediction = !(!(basePrediction & SpecInt32) && basePrediction);
             setReplacement(getIndexedPropertyStorageLoadElimination(node.child1().index(), nodeHasIntegerIndexPrediction));
             break;
         }
@@ -1010,6 +1162,7 @@ private:
     Vector<NodeIndex, 16> m_replacements;
     FixedArray<unsigned, LastNodeType> m_lastSeen;
     OptimizationFixpointState m_fixpointState;
+    bool m_changed; // Only tracks changes that have a substantive effect on other optimizations.
 };
 
 bool performCSE(Graph& graph, OptimizationFixpointState fixpointState)

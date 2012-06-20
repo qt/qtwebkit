@@ -151,7 +151,6 @@ inactivecaption
 inactivecaptiontext
 infobackground
 infotext
-match
 menutext
 scrollbar
 threeddarkshadow
@@ -463,9 +462,11 @@ end
 //center
 //baseline
 
+#if defined(ENABLE_CSS_BOX_DECORATION_BREAK) && ENABLE_CSS_BOX_DECORATION_BREAK
 // CSS_PROP_BOX_DECORATION_BREAK
 clone
 slice
+#endif
 
 // CSS_PROP_BOX_DIRECTION
 // normal
@@ -488,19 +489,27 @@ single
 multiple
 
 #if defined(ENABLE_CSS3_FLEXBOX) && ENABLE_CSS3_FLEXBOX
-// CSS_PROP_FLEX_ALIGN
-// start
-// end
+// CSS_PROP_ALIGN_CONTENT
+flex-start
+flex-end
+// center
+space-between
+space-around
+// stretch
+
+// CSS_PROP_ALIGN_ITEMS / CSS_PROP_ALIGN_SELF
+// flex-start
+// flex-end
 // center
 // baseline
 // stretch
 
-// CSS_PROP_FLEX_PACK
-// start
-// end
+// CSS_PROP_JUSTIFY_CONTENT
+// flex-start
+// flex-end
 // center
-space-between
-space-around
+// space-between
+// space-around
 
 // CSS_PROP_FLEX_FLOW
 row
@@ -511,13 +520,6 @@ column-reverse
 // wrap
 wrap-reverse
 
-// CSS_PROP_FLEX_LINE_PACK
-// start
-// end
-// center
-// space-between
-// space-around
-// stretch
 #endif
 
 // CSS_PROP_MARQUEE_DIRECTION
@@ -819,7 +821,7 @@ no-limit
 manual
 // auto
 
-#if defined(ENABLE_OVERFLOW_SCROLLING)
+#if defined(ENABLE_OVERFLOW_SCROLLING) && ENABLE_OVERFLOW_SCROLLING
 // -webkit-overflow-scrolling
 // auto
 touch
@@ -921,3 +923,7 @@ filter-box
 detached
 #endif // CSS_SHADERS
 #endif // CSS_FILTERS
+
+#if defined(ENABLE_CSS_IMAGE_RESOLUTION) && ENABLE_CSS_IMAGE_RESOLUTION
+from-image
+#endif

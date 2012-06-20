@@ -475,8 +475,10 @@ LLINT_SLOW_PATH_DECL(slow_path_convert_this)
     LLINT_BEGIN();
     JSValue v1 = LLINT_OP(1).jsValue();
     ASSERT(v1.isPrimitive());
+#if ENABLE(VALUE_PROFILER)
     pc[OPCODE_LENGTH(op_convert_this) - 1].u.profile->m_buckets[0] =
         JSValue::encode(v1.structureOrUndefined());
+#endif
     LLINT_RETURN(v1.toThisObject(exec));
 }
 
@@ -621,64 +623,88 @@ LLINT_SLOW_PATH_DECL(slow_path_add)
     LLINT_RETURN(jsAddSlowCase(exec, v1, v2));
 }
 
+// The following arithmetic and bitwise operations need to be sure to run
+// toNumber() on their operands in order.  (A call to toNumber() is idempotent
+// if an exception is already set on the ExecState.)
+
 LLINT_SLOW_PATH_DECL(slow_path_mul)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toNumber(exec) * LLINT_OP_C(3).jsValue().toNumber(exec)));
+    double a = LLINT_OP_C(2).jsValue().toNumber(exec);
+    double b = LLINT_OP_C(3).jsValue().toNumber(exec);
+    LLINT_RETURN(jsNumber(a * b));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_sub)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toNumber(exec) - LLINT_OP_C(3).jsValue().toNumber(exec)));
+    double a = LLINT_OP_C(2).jsValue().toNumber(exec);
+    double b = LLINT_OP_C(3).jsValue().toNumber(exec);
+    LLINT_RETURN(jsNumber(a - b));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_div)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toNumber(exec) / LLINT_OP_C(3).jsValue().toNumber(exec)));
+    double a = LLINT_OP_C(2).jsValue().toNumber(exec);
+    double b = LLINT_OP_C(3).jsValue().toNumber(exec);
+    LLINT_RETURN(jsNumber(a / b));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_mod)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(fmod(LLINT_OP_C(2).jsValue().toNumber(exec), LLINT_OP_C(3).jsValue().toNumber(exec))));
+    double a = LLINT_OP_C(2).jsValue().toNumber(exec);
+    double b = LLINT_OP_C(3).jsValue().toNumber(exec);
+    LLINT_RETURN(jsNumber(fmod(a, b)));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_lshift)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toInt32(exec) << (LLINT_OP_C(3).jsValue().toUInt32(exec) & 31)));
+    int32_t a = LLINT_OP_C(2).jsValue().toInt32(exec);
+    uint32_t b = LLINT_OP_C(3).jsValue().toUInt32(exec);
+    LLINT_RETURN(jsNumber(a << (b & 31)));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_rshift)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toInt32(exec) >> (LLINT_OP_C(3).jsValue().toUInt32(exec) & 31)));
+    int32_t a = LLINT_OP_C(2).jsValue().toInt32(exec);
+    uint32_t b = LLINT_OP_C(3).jsValue().toUInt32(exec);
+    LLINT_RETURN(jsNumber(a >> (b & 31)));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_urshift)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toUInt32(exec) >> (LLINT_OP_C(3).jsValue().toUInt32(exec) & 31)));
+    uint32_t a = LLINT_OP_C(2).jsValue().toUInt32(exec);
+    uint32_t b = LLINT_OP_C(3).jsValue().toUInt32(exec);
+    LLINT_RETURN(jsNumber(a >> (b & 31)));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_bitand)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toInt32(exec) & LLINT_OP_C(3).jsValue().toInt32(exec)));
+    int32_t a = LLINT_OP_C(2).jsValue().toInt32(exec);
+    int32_t b = LLINT_OP_C(3).jsValue().toInt32(exec);
+    LLINT_RETURN(jsNumber(a & b));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_bitor)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toInt32(exec) | LLINT_OP_C(3).jsValue().toInt32(exec)));
+    int32_t a = LLINT_OP_C(2).jsValue().toInt32(exec);
+    int32_t b = LLINT_OP_C(3).jsValue().toInt32(exec);
+    LLINT_RETURN(jsNumber(a | b));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_bitxor)
 {
     LLINT_BEGIN();
-    LLINT_RETURN(jsNumber(LLINT_OP_C(2).jsValue().toInt32(exec) ^ LLINT_OP_C(3).jsValue().toInt32(exec)));
+    int32_t a = LLINT_OP_C(2).jsValue().toInt32(exec);
+    int32_t b = LLINT_OP_C(3).jsValue().toInt32(exec);
+    LLINT_RETURN(jsNumber(a ^ b));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_check_has_instance)
@@ -832,6 +858,14 @@ LLINT_SLOW_PATH_DECL(slow_path_resolve_with_this)
     LLINT_END();
 }
 
+LLINT_SLOW_PATH_DECL(slow_path_put_global_var_check)
+{
+    LLINT_BEGIN();
+    CodeBlock* codeBlock = exec->codeBlock();
+    symbolTablePut(codeBlock->globalObject(), exec, codeBlock->identifier(pc[4].u.operand), LLINT_OP_C(2).jsValue(), true);
+    LLINT_END();
+}
+
 LLINT_SLOW_PATH_DECL(slow_path_get_by_id)
 {
     LLINT_BEGIN();
@@ -902,6 +936,8 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_id)
             
             if (slot.type() == PutPropertySlot::NewProperty) {
                 if (!structure->isDictionary() && structure->previousID()->propertyStorageCapacity() == structure->propertyStorageCapacity()) {
+                    ASSERT(structure->previousID()->transitionWatchpointSetHasBeenInvalidated());
+                    
                     // This is needed because some of the methods we call
                     // below may GC.
                     pc[0].u.opcode = bitwise_cast<void*>(&llint_op_put_by_id);
@@ -987,7 +1023,7 @@ LLINT_SLOW_PATH_DECL(slow_path_get_argument_by_val)
         exec->uncheckedR(unmodifiedArgumentsRegister(pc[2].u.operand)) = arguments;
     }
     
-    LLINT_RETURN(getByVal(exec, arguments, LLINT_OP_C(3).jsValue()));
+    LLINT_RETURN_PROFILED(op_get_argument_by_val, getByVal(exec, arguments, LLINT_OP_C(3).jsValue()));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_get_by_pname)
@@ -1546,14 +1582,16 @@ LLINT_SLOW_PATH_DECL(slow_path_debug)
 LLINT_SLOW_PATH_DECL(slow_path_profile_will_call)
 {
     LLINT_BEGIN();
-    (*Profiler::enabledProfilerReference())->willExecute(exec, LLINT_OP(1).jsValue());
+    if (Profiler* profiler = globalData.enabledProfiler())
+        profiler->willExecute(exec, LLINT_OP(1).jsValue());
     LLINT_END();
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_profile_did_call)
 {
     LLINT_BEGIN();
-    (*Profiler::enabledProfilerReference())->didExecute(exec, LLINT_OP(1).jsValue());
+    if (Profiler* profiler = globalData.enabledProfiler())
+        profiler->didExecute(exec, LLINT_OP(1).jsValue());
     LLINT_END();
 }
 

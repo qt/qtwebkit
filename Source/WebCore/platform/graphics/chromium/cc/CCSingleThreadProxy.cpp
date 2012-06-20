@@ -26,7 +26,6 @@
 
 #include "cc/CCSingleThreadProxy.h"
 
-#include "GraphicsContext3D.h"
 #include "LayerRendererChromium.h"
 #include "TraceEvent.h"
 #include "cc/CCFontAtlas.h"
@@ -45,7 +44,8 @@ public:
 
     virtual void onTimerFired() OVERRIDE
     {
-        m_proxy->compositeImmediately();
+        if (m_proxy->m_layerRendererInitialized)
+            m_proxy->compositeImmediately();
     }
 
 private:
@@ -112,7 +112,7 @@ void CCSingleThreadProxy::startPageScaleAnimation(const IntSize& targetPosition,
     m_layerTreeHostImpl->startPageScaleAnimation(targetPosition, useAnchor, scale, monotonicallyIncreasingTime(), duration);
 }
 
-GraphicsContext3D* CCSingleThreadProxy::context()
+CCGraphicsContext* CCSingleThreadProxy::context()
 {
     ASSERT(CCProxy::isMainThread());
     if (m_contextBeforeInitialization)
@@ -139,7 +139,7 @@ bool CCSingleThreadProxy::isStarted() const
 bool CCSingleThreadProxy::initializeContext()
 {
     ASSERT(CCProxy::isMainThread());
-    RefPtr<GraphicsContext3D> context = m_layerTreeHost->createContext();
+    RefPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
     if (!context)
         return false;
     ASSERT(context->hasOneRef());
@@ -176,7 +176,7 @@ bool CCSingleThreadProxy::recreateContext()
     ASSERT(CCProxy::isMainThread());
     ASSERT(m_contextLost);
 
-    RefPtr<GraphicsContext3D> context = m_layerTreeHost->createContext();
+    RefPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
     if (!context)
         return false;
 
@@ -311,8 +311,8 @@ void CCSingleThreadProxy::postAnimationEventsToMainThreadOnImplThread(PassOwnPtr
 
 void CCSingleThreadProxy::postSetContentsMemoryAllocationLimitBytesToMainThreadOnImplThread(size_t bytes)
 {
-    // FIXME: This is called via a graphics context callback, on main thread in single threaded mode, because its hard to fake the impl thread. This should need to DebugScopedSetMainThread, but is actually already on the main thread.
-    ASSERT(CCProxy::isMainThread());
+    ASSERT(CCProxy::isImplThread());
+    DebugScopedSetMainThread main;
     ASSERT(m_layerTreeHost);
     m_layerTreeHost->setContentsMemoryAllocationLimitBytes(bytes);
 }

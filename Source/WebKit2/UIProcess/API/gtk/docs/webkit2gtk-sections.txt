@@ -33,6 +33,10 @@ webkit_web_context_set_additional_plugins_directory
 webkit_web_context_get_plugins
 webkit_web_context_get_plugins_finish
 
+<SUBSECTION URI Scheme>
+WebKitURISchemeRequestCallback
+webkit_web_context_register_uri_scheme
+
 <SUBSECTION Standard>
 WebKitWebContextClass
 WEBKIT_WEB_CONTEXT
@@ -355,6 +359,7 @@ webkit_download_get_response
 webkit_download_cancel
 webkit_download_get_estimated_progress
 webkit_download_get_elapsed_time
+webkit_download_get_received_data_length
 
 <SUBSECTION Standard>
 WebKitDownloadClass
@@ -385,6 +390,24 @@ WEBKIT_PERMISSION_REQUEST_GET_IFACE
 
 <SUBSECTION Private>
 webkit_permission_request_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitGeolocationPermissionRequest</FILE>
+WebKitGeolocationPermissionRequest
+
+<SUBSECTION Standard>
+WebKitGeolocationPermissionRequestClass
+WEBKIT_TYPE_GEOLOCATION_PERMISSION_REQUEST
+WEBKIT_GEOLOCATION_PERMISSION_REQUEST
+WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST
+WEBKIT_GEOLOCATION_PERMISSION_REQUEST_CLASS
+WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST_CLASS
+WEBKIT_GEOLOCATION_PERMISSION_REQUEST_GET_CLASS
+
+<SUBSECTION Private>
+WebKitGeolocationPermissionRequestPrivate
+webkit_geolocation_permission_request_get_type
 </SECTION>
 
 <SECTION>
@@ -460,6 +483,7 @@ webkit_hit_test_result_get_context
 webkit_hit_test_result_context_is_link
 webkit_hit_test_result_context_is_image
 webkit_hit_test_result_context_is_media
+webkit_hit_test_result_context_is_editable
 webkit_hit_test_result_get_link_uri
 webkit_hit_test_result_get_link_title
 webkit_hit_test_result_get_link_label
@@ -684,4 +708,39 @@ WEBKIT_WEB_INSPECTOR_GET_CLASS
 <SUBSECTION Private>
 webkit_web_inspector_get_type
 WebKitWebInspectorPrivate
+</SECTION>
+
+<SECTION>
+<FILE>WebKitURISchemeRequest</FILE>
+WebKitURISchemeRequest
+webkit_uri_scheme_request_get_scheme
+webkit_uri_scheme_request_get_uri
+webkit_uri_scheme_request_get_path
+webkit_uri_scheme_request_finish
+
+<SUBSECTION Standard>
+WebKitURISchemeRequestClass
+WEBKIT_TYPE_URI_SCHEME_REQUEST
+WEBKIT_URI_SCHEME_REQUEST
+WEBKIT_IS_URI_SCHEME_REQUEST
+WEBKIT_URI_SCHEME_REQUEST_CLASS
+WEBKIT_IS_URI_SCHEME_REQUEST_CLASS
+WEBKIT_URI_SCHEME_REQUEST_GET_CLASS
+
+<SUBSECTION Private>
+WebKitURISchemeRequestPrivate
+webkit_uri_scheme_request_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitVersion</FILE>
+webkit_get_major_version
+webkit_get_minor_version
+webkit_get_micro_version
+
+<SUBSECTION>
+WEBKIT_MAJOR_VERSION
+WEBKIT_MINOR_VERSION
+WEBKIT_MICRO_VERSION
+WEBKIT_CHECK_VERSION
 </SECTION>

@@ -35,14 +35,14 @@
 
 namespace WebCore {
 
-PassOwnPtr<CCLayerImpl> TreeSynchronizer::synchronizeTrees(LayerChromium* layerChromiumRoot, PassOwnPtr<CCLayerImpl> oldCCLayerImplRoot)
+PassOwnPtr<CCLayerImpl> TreeSynchronizer::synchronizeTrees(LayerChromium* layerChromiumRoot, PassOwnPtr<CCLayerImpl> oldCCLayerImplRoot, CCLayerTreeHostImpl* hostImpl)
 {
     OwnPtrCCLayerImplMap oldLayers;
     RawPtrCCLayerImplMap newLayers;
 
     collectExistingCCLayerImplRecursive(oldLayers, oldCCLayerImplRoot);
 
-    OwnPtr<CCLayerImpl> newTree = synchronizeTreeRecursive(newLayers, oldLayers, layerChromiumRoot);
+    OwnPtr<CCLayerImpl> newTree = synchronizeTreeRecursive(newLayers, oldLayers, layerChromiumRoot, hostImpl);
 
     updateScrollbarLayerPointersRecursive(newLayers, layerChromiumRoot);
 
@@ -78,7 +78,7 @@ PassOwnPtr<CCLayerImpl> TreeSynchronizer::reuseOrCreateCCLayerImpl(RawPtrCCLayer
     return ccLayerImpl.release();
 }
 
-PassOwnPtr<CCLayerImpl> TreeSynchronizer::synchronizeTreeRecursive(RawPtrCCLayerImplMap& newLayers, OwnPtrCCLayerImplMap& oldLayers, LayerChromium* layer)
+PassOwnPtr<CCLayerImpl> TreeSynchronizer::synchronizeTreeRecursive(RawPtrCCLayerImplMap& newLayers, OwnPtrCCLayerImplMap& oldLayers, LayerChromium* layer, CCLayerTreeHostImpl* hostImpl)
 {
     if (!layer)
         return nullptr;
@@ -88,12 +88,13 @@ PassOwnPtr<CCLayerImpl> TreeSynchronizer::synchronizeTreeRecursive(RawPtrCCLayer
     ccLayerImpl->clearChildList();
     const Vector<RefPtr<LayerChromium> >& children = layer->children();
     for (size_t i = 0; i < children.size(); ++i)
-        ccLayerImpl->addChild(synchronizeTreeRecursive(newLayers, oldLayers, children[i].get()));
+        ccLayerImpl->addChild(synchronizeTreeRecursive(newLayers, oldLayers, children[i].get(), hostImpl));
 
-    ccLayerImpl->setMaskLayer(synchronizeTreeRecursive(newLayers, oldLayers, layer->maskLayer()));
-    ccLayerImpl->setReplicaLayer(synchronizeTreeRecursive(newLayers, oldLayers, layer->replicaLayer()));
+    ccLayerImpl->setMaskLayer(synchronizeTreeRecursive(newLayers, oldLayers, layer->maskLayer(), hostImpl));
+    ccLayerImpl->setReplicaLayer(synchronizeTreeRecursive(newLayers, oldLayers, layer->replicaLayer(), hostImpl));
 
     layer->pushPropertiesTo(ccLayerImpl.get());
+    ccLayerImpl->setLayerTreeHostImpl(hostImpl);
     return ccLayerImpl.release();
 }
 
@@ -113,6 +114,9 @@ void TreeSynchronizer::updateScrollbarLayerPointersRecursive(const RawPtrCCLayer
     CCScrollbarLayerImpl* ccScrollbarLayerImpl = static_cast<CCScrollbarLayerImpl*>(newLayers.get(scrollbarLayer->id()));
     ASSERT(ccScrollbarLayerImpl);
     ccScrollbarLayerImpl->setScrollLayer(newLayers.get(scrollbarLayer->scrollLayerId()));
+
+    // Scrollbar layers in the tree should always point to a valid scroll layer
+    ASSERT(newLayers.get(scrollbarLayer->scrollLayerId()));
 }
 
 } // namespace WebCore

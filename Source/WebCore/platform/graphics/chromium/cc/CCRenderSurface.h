@@ -41,6 +41,7 @@ namespace WebCore {
 
 class CCDamageTracker;
 class CCQuadCuller;
+class CCRenderPass;
 class CCSharedQuadState;
 class CCLayerImpl;
 class LayerRendererChromium;
@@ -50,17 +51,16 @@ class CCRenderSurface {
     WTF_MAKE_NONCOPYABLE(CCRenderSurface);
 public:
     explicit CCRenderSurface(CCLayerImpl*);
-    ~CCRenderSurface();
+    virtual ~CCRenderSurface();
 
-    bool prepareContentsTexture(LayerRendererChromium*);
+    virtual bool prepareContentsTexture(LayerRendererChromium*);
     void releaseContentsTexture();
     bool hasValidContentsTexture() const;
+    virtual bool hasCachedContentsTexture() const;
 
     bool prepareBackgroundTexture(LayerRendererChromium*);
     void releaseBackgroundTexture();
     bool hasValidBackgroundTexture() const;
-
-    void setScissorRect(LayerRendererChromium*, const FloatRect& surfaceDamageRect) const;
 
     String name() const;
     void dumpSurface(TextStream&, int indent) const;
@@ -112,6 +112,11 @@ public:
     void setClipRect(const IntRect&);
     const IntRect& clipRect() const { return m_clipRect; }
 
+    void setScissorRect(const IntRect& scissorRect) { m_scissorRect = scissorRect; }
+    const IntRect& scissorRect() const { return m_scissorRect; }
+
+    virtual bool contentsChanged() const;
+
     void setContentRect(const IntRect&);
     const IntRect& contentRect() const { return m_contentRect; }
 
@@ -138,12 +143,14 @@ public:
     PassOwnPtr<CCSharedQuadState> createSharedQuadState() const;
     PassOwnPtr<CCSharedQuadState> createReplicaSharedQuadState() const;
 
-    // FIXME: Remove the surfaceDamageRect parameter when the value is removed from CCRenderSurfaceDrawQuad.
-    void appendQuads(CCQuadCuller&, CCSharedQuadState*, bool forReplica, const FloatRect& surfaceDamageRect);
+    void appendQuads(CCQuadCuller&, CCSharedQuadState*, bool forReplica, const CCRenderPass*);
+
+    FloatRect computeRootScissorRectInCurrentSurface(const FloatRect& rootScissorRect) const;
 
 private:
     CCLayerImpl* m_owningLayer;
 
+    // Uses this surface's space.
     IntRect m_contentRect;
     bool m_surfacePropertyChanged;
 
@@ -162,7 +169,14 @@ private:
     bool m_screenSpaceTransformsAreAnimating;
     WebKit::WebFilterOperations m_filters;
     WebKit::WebFilterOperations m_backgroundFilters;
+
+    // Uses the space of the surface's target surface.
     IntRect m_clipRect;
+
+    // During drawing, identifies the region outside of which nothing should be drawn.
+    // Uses the space of the surface's target surface.
+    IntRect m_scissorRect;
+
     Vector<CCLayerImpl*> m_layerList;
 
     // The nearest ancestor target surface that will contain the contents of this surface, and that is going
@@ -170,9 +184,6 @@ private:
     CCRenderSurface* m_nearestAncestorThatMovesPixels;
 
     OwnPtr<CCDamageTracker> m_damageTracker;
-
-    // Stored in the "surface space" where this damage can be used for scissoring.
-    FloatRect m_damageRect;
 
     // For CCLayerIteratorActions
     int m_targetRenderSurfaceLayerIndexHistory;

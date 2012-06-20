@@ -254,7 +254,6 @@
 #include "JSNotation.cpp"
 #include "JSNotificationCenter.cpp"
 #include "JSNotification.cpp"
-#include "JSOperationNotAllowedException.cpp"
 #include "JSOverflowEvent.cpp"
 #include "JSPageTransitionEvent.cpp"
 #include "JSPerformance.cpp"
@@ -462,6 +461,9 @@
 #include "JSUint8Array.cpp"
 #include "JSUint8ClampedArray.cpp"
 #include "JSUIEvent.cpp"
+#if ENABLE(UNDO_MANAGER)
+#include "JSUndoManager.cpp"
+#endif
 #include "JSValidityState.cpp"
 #include "JSWebKitAnimation.cpp"
 #include "JSWebKitAnimationEvent.cpp"

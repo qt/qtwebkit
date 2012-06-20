@@ -1039,34 +1039,52 @@ _llint_op_put_scoped_var:
     dispatch(4)
 
 
-_llint_op_get_global_var:
+macro getGlobalVar(size)
     traceExecution()
-    loadi 8[PC], t1
+    loadp 8[PC], t0
     loadi 4[PC], t3
-    loadp CodeBlock[cfr], t0
-    loadp CodeBlock::m_globalObject[t0], t0
-    loadp JSGlobalObject::m_registers[t0], t0
-    loadi TagOffset[t0, t1, 8], t2
-    loadi PayloadOffset[t0, t1, 8], t1
+    loadi TagOffset[t0], t2
+    loadi PayloadOffset[t0], t1
     storei t2, TagOffset[cfr, t3, 8]
     storei t1, PayloadOffset[cfr, t3, 8]
-    loadi 12[PC], t3
+    loadi (size - 1) * 4[PC], t3
     valueProfile(t2, t1, t3)
-    dispatch(4)
+    dispatch(size)
+end
+
+_llint_op_get_global_var:
+    getGlobalVar(4)
+
+
+_llint_op_get_global_var_watchable:
+    getGlobalVar(5)
 
 
 _llint_op_put_global_var:
     traceExecution()
     loadi 8[PC], t1
-    loadp CodeBlock[cfr], t0
-    loadp CodeBlock::m_globalObject[t0], t0
-    loadp JSGlobalObject::m_registers[t0], t0
+    loadi 4[PC], t0
     loadConstantOrVariable(t1, t2, t3)
-    loadi 4[PC], t1
     writeBarrier(t2, t3)
-    storei t2, TagOffset[t0, t1, 8]
-    storei t3, PayloadOffset[t0, t1, 8]
+    storei t2, TagOffset[t0]
+    storei t3, PayloadOffset[t0]
     dispatch(3)
+
+
+_llint_op_put_global_var_check:
+    traceExecution()
+    loadp 12[PC], t2
+    loadi 8[PC], t1
+    loadi 4[PC], t0
+    btbnz [t2], .opPutGlobalVarCheckSlow
+    loadConstantOrVariable(t1, t2, t3)
+    writeBarrier(t2, t3)
+    storei t2, TagOffset[t0]
+    storei t3, PayloadOffset[t0]
+    dispatch(5)
+.opPutGlobalVarCheckSlow:
+    callSlowPath(_llint_slow_path_put_global_var_check)
+    dispatch(5)
 
 
 _llint_op_get_by_id:

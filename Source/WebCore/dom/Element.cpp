@@ -57,14 +57,17 @@
 #include "NodeRenderStyle.h"
 #include "NodeRenderingContext.h"
 #include "Page.h"
+#include "PointerLockController.h"
 #include "RenderRegion.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "SelectorQuery.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "StyleResolver.h"
 #include "Text.h"
 #include "TextIterator.h"
+#include "VoidCallback.h"
 #include "WebKitMutationObserver.h"
 #include "WebKitAnimationList.h"
 #include "XMLNSNames.h"
@@ -556,21 +559,7 @@ PassRefPtr<ClientRectList> Element::getClientRects()
 
     Vector<FloatQuad> quads;
     renderBoxModelObject->absoluteQuads(quads);
-
-    float pageScale = 1;
-    if (Page* page = document()->page()) 
-        pageScale = page->pageScaleFactor();
-
-    if (FrameView* view = document()->view()) {
-        LayoutRect visibleContentRect = view->visibleContentRect();
-        for (size_t i = 0; i < quads.size(); ++i) {
-            quads[i].move(-visibleContentRect.x(), -visibleContentRect.y());
-            adjustFloatQuadForAbsoluteZoom(quads[i], renderBoxModelObject);
-            if (pageScale != 1)
-                adjustFloatQuadForPageScale(quads[i], pageScale);
-        }
-    }
-
+    document()->adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(quads, renderBoxModelObject);
     return ClientRectList::create(quads);
 }
 
@@ -601,15 +590,7 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect()
     for (size_t i = 1; i < quads.size(); ++i)
         result.unite(quads[i].boundingBox());
 
-    if (FrameView* view = document()->view()) {
-        LayoutRect visibleContentRect = view->visibleContentRect();
-        result.move(-visibleContentRect.x(), -visibleContentRect.y());
-    }
-
-    adjustFloatRectForAbsoluteZoom(result, renderer());
-    if (Page* page = document()->page())
-        adjustFloatRectForPageScale(result, page->pageScaleFactor());
-
+    document()->adjustFloatRectForScrollAndAbsoluteZoomAndFrameScale(result, renderer());
     return ClientRect::create(result);
 }
     
@@ -1764,29 +1745,11 @@ bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
         ec = SYNTAX_ERR;
         return false;
     }
-    CSSParserContext parserContext(document());
-    CSSParser parser(parserContext);
-    CSSSelectorList selectorList;
-    parser.parseSelector(selector, selectorList);
 
-    if (!selectorList.first()) {
-        ec = SYNTAX_ERR;
+    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selector, document(), ec);
+    if (!selectorQuery)
         return false;
-    }
-
-    // Throw a NAMESPACE_ERR if the selector includes any namespace prefixes.
-    if (selectorList.selectorsNeedNamespaceResolution()) {
-        ec = NAMESPACE_ERR;
-        return false;
-    }
-
-    SelectorChecker selectorChecker(document(), parserContext.mode == CSSStrictMode);
-    for (CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
-        if (selectorChecker.checkSelector(selector, this))
-            return true;
-    }
-
-    return false;
+    return selectorQuery->matches(this);
 }
 
 DOMTokenList* Element::classList()
@@ -1905,6 +1868,13 @@ void Element::setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(boo
         element->setContainsFullScreenElement(flag);
 }
 #endif    
+
+#if ENABLE(POINTER_LOCK)
+void Element::webkitRequestPointerLock()
+{
+    document()->frame()->page()->pointerLockController()->requestPointerLock(this, 0, 0);
+}
+#endif
 
 SpellcheckAttributeState Element::spellcheckAttributeState() const
 {

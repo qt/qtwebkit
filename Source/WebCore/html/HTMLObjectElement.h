@@ -58,8 +58,8 @@ public:
     bool checkValidity() { return true; }
     virtual void setCustomValidity(const String&) OVERRIDE { }
 
-    using TreeShared<ContainerNode>::ref;
-    using TreeShared<ContainerNode>::deref;
+    using Node::ref;
+    using Node::deref;
 
     virtual bool canContainRangeEndPoint() const { return useFallbackContent(); }
 
@@ -100,8 +100,6 @@ private:
     virtual void refFormAssociatedElement() { ref(); }
     virtual void derefFormAssociatedElement() { deref(); }
     virtual HTMLFormElement* virtualForm() const;
-
-    virtual const AtomicString& formControlName() const;
 
 #if ENABLE(MICRODATA)
     virtual String itemValueText() const OVERRIDE;

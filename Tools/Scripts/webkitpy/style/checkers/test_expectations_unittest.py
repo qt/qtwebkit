@@ -75,16 +75,16 @@ class TestExpectationsTestCase(unittest.TestCase):
 
     def test_determine_port_from_expectations_path(self):
         self._expect_port_for_expectations_path(None, '/')
-        self._expect_port_for_expectations_path(None, 'LayoutTests/chromium-mac/test_expectations.txt')
-        self._expect_port_for_expectations_path('chromium', 'LayoutTests/platform/chromium/test_expectations.txt')
-        self._expect_port_for_expectations_path(None, '/mock-checkout/LayoutTests/platform/win/test_expectations.txt')
-        self._expect_port_for_expectations_path('win', 'LayoutTests/platform/win/test_expectations.txt')
+        self._expect_port_for_expectations_path(None, 'LayoutTests/chromium-mac/TestExpectations')
+        self._expect_port_for_expectations_path('chromium', 'LayoutTests/platform/chromium/TestExpectations')
+        self._expect_port_for_expectations_path(None, '/mock-checkout/LayoutTests/platform/win/TestExpectations')
+        self._expect_port_for_expectations_path('win', 'LayoutTests/platform/win/TestExpectations')
 
     def assert_lines_lint(self, lines, should_pass, expected_output=None):
         self._error_collector.reset_errors()
 
         host = MockHost()
-        checker = TestExpectationsChecker('test/test_expectations.txt',
+        checker = TestExpectationsChecker('test/TestExpectations',
                                           self._error_collector, host=host)
 
         # We should have failed to find a valid port object for that path.
@@ -105,7 +105,7 @@ class TestExpectationsTestCase(unittest.TestCase):
         self.assertTrue(self._error_collector.turned_off_filtering)
 
     def test_valid_expectations(self):
-        self.assert_lines_lint(["BUGCR1234 MAC : passes/text.html = PASS FAIL"], should_pass=True)
+        self.assert_lines_lint(["BUGCR1234 MAC : passes/text.html = PASS TEXT"], should_pass=True)
 
     def test_invalid_expectations(self):
         self.assert_lines_lint(["BUG1234 : passes/text.html = GIVE UP"], should_pass=False)

@@ -592,11 +592,10 @@ void RenderTable::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffs
         size_t count = m_collapsedBorders.size();
         for (size_t i = 0; i < count; ++i) {
             m_currentBorder = &m_collapsedBorders[i];
-            for (RenderObject* child = firstChild(); child; child = child->nextSibling())
-                if (child->isTableSection()) {
-                    LayoutPoint childPoint = flipForWritingModeForChild(toRenderTableSection(child), paintOffset);
-                    child->paint(info, childPoint);
-                }
+            for (RenderTableSection* section = bottomSection(); section; section = sectionAbove(section)) {
+                LayoutPoint childPoint = flipForWritingModeForChild(section, paintOffset);
+                section->paint(info, childPoint);
+            }
         }
         m_currentBorder = 0;
     }
@@ -842,113 +841,116 @@ void RenderTable::recalcSections() const
 
 int RenderTable::calcBorderStart() const
 {
-    if (collapseBorders()) {
-        // Determined by the first cell of the first row. See the CSS 2.1 spec, section 17.6.2.
-        if (!numEffCols())
+    if (!collapseBorders())
+        return RenderBlock::borderStart();
+
+    // Determined by the first cell of the first row. See the CSS 2.1 spec, section 17.6.2.
+    if (!numEffCols())
+        return 0;
+
+    unsigned borderWidth = 0;
+
+    const BorderValue& tableStartBorder = style()->borderStart();
+    if (tableStartBorder.style() == BHIDDEN)
+        return 0;
+    if (tableStartBorder.style() > BHIDDEN)
+        borderWidth = tableStartBorder.width();
+
+    if (RenderTableCol* column = colElement(0)) {
+        // FIXME: We don't account for direction on columns and column groups.
+        const BorderValue& columnAdjoiningBorder = column->style()->borderStart();
+        if (columnAdjoiningBorder.style() == BHIDDEN)
             return 0;
-
-        unsigned borderWidth = 0;
-
-        const BorderValue& tb = style()->borderStart();
-        if (tb.style() == BHIDDEN)
-            return 0;
-        if (tb.style() > BHIDDEN)
-            borderWidth = tb.width();
-
-        if (RenderTableCol* colGroup = colElement(0)) {
-            const BorderValue& gb = colGroup->style()->borderStart();
-            if (gb.style() == BHIDDEN)
-                return 0;
-            if (gb.style() > BHIDDEN)
-                borderWidth = max(borderWidth, gb.width());
-        }
-        
-        if (const RenderTableSection* topNonEmptySection = this->topNonEmptySection()) {
-            const BorderValue& sb = topNonEmptySection->style()->borderStart();
-            if (sb.style() == BHIDDEN)
-                return 0;
-
-            if (sb.style() > BHIDDEN)
-                borderWidth = max(borderWidth, sb.width());
-
-            const RenderTableSection::CellStruct& cs = topNonEmptySection->cellAt(0, 0);
-            
-            if (cs.hasCells()) {
-                const BorderValue& cb = cs.primaryCell()->style()->borderStart(); // FIXME: Make this work with perpendicualr and flipped cells.
-                if (cb.style() == BHIDDEN)
-                    return 0;
-
-                const BorderValue& rb = cs.primaryCell()->parent()->style()->borderStart();
-                if (rb.style() == BHIDDEN)
-                    return 0;
-
-                if (cb.style() > BHIDDEN)
-                    borderWidth = max(borderWidth, cb.width());
-                if (rb.style() > BHIDDEN)
-                    borderWidth = max(borderWidth, rb.width());
-            }
-        }
-        return (borderWidth + (style()->isLeftToRightDirection() ? 0 : 1)) / 2;
+        if (columnAdjoiningBorder.style() > BHIDDEN)
+            borderWidth = max(borderWidth, columnAdjoiningBorder.width());
+        // FIXME: This logic doesn't properly account for the first column in the first column-group case.
     }
-    return RenderBlock::borderStart();
+
+    if (const RenderTableSection* topNonEmptySection = this->topNonEmptySection()) {
+        const BorderValue& sectionAdjoiningBorder = topNonEmptySection->borderAdjoiningTableStart();
+        if (sectionAdjoiningBorder.style() == BHIDDEN)
+            return 0;
+
+        if (sectionAdjoiningBorder.style() > BHIDDEN)
+            borderWidth = max(borderWidth, sectionAdjoiningBorder.width());
+
+        if (const RenderTableCell* adjoiningStartCell = topNonEmptySection->firstRowCellAdjoiningTableStart()) {
+            // FIXME: Make this work with perpendicular and flipped cells.
+            const BorderValue& startCellAdjoiningBorder = adjoiningStartCell->borderAdjoiningTableStart();
+            if (startCellAdjoiningBorder.style() == BHIDDEN)
+                return 0;
+
+            const BorderValue& firstRowAdjoiningBorder = adjoiningStartCell->row()->borderAdjoiningTableStart();
+            if (firstRowAdjoiningBorder.style() == BHIDDEN)
+                return 0;
+
+            if (startCellAdjoiningBorder.style() > BHIDDEN)
+                borderWidth = max(borderWidth, startCellAdjoiningBorder.width());
+            if (firstRowAdjoiningBorder.style() > BHIDDEN)
+                borderWidth = max(borderWidth, firstRowAdjoiningBorder.width());
+        }
+    }
+    return (borderWidth + (style()->isLeftToRightDirection() ? 0 : 1)) / 2;
 }
 
 int RenderTable::calcBorderEnd() const
 {
-    if (collapseBorders()) {
-        // Determined by the last cell of the first row. See the CSS 2.1 spec, section 17.6.2.
-        if (!numEffCols())
+    if (!collapseBorders())
+        return RenderBlock::borderEnd();
+
+    // Determined by the last cell of the first row. See the CSS 2.1 spec, section 17.6.2.
+    if (!numEffCols())
+        return 0;
+
+    unsigned borderWidth = 0;
+
+    const BorderValue& tableEndBorder = style()->borderEnd();
+    if (tableEndBorder.style() == BHIDDEN)
+        return 0;
+    if (tableEndBorder.style() > BHIDDEN)
+        borderWidth = tableEndBorder.width();
+
+    unsigned endColumn = numEffCols() - 1;
+    if (RenderTableCol* column = colElement(endColumn)) {
+        // FIXME: We don't account for direction on columns and column groups.
+        const BorderValue& columnAdjoiningBorder = column->style()->borderEnd();
+        if (columnAdjoiningBorder.style() == BHIDDEN)
             return 0;
-
-        unsigned borderWidth = 0;
-
-        const BorderValue& tb = style()->borderEnd();
-        if (tb.style() == BHIDDEN)
-            return 0;
-        if (tb.style() > BHIDDEN)
-            borderWidth = tb.width();
-
-        unsigned endColumn = numEffCols() - 1;
-        if (RenderTableCol* colGroup = colElement(endColumn)) {
-            const BorderValue& gb = colGroup->style()->borderEnd();
-            if (gb.style() == BHIDDEN)
-                return 0;
-            if (gb.style() > BHIDDEN)
-                borderWidth = max(borderWidth, gb.width());
-        }
-
-        if (const RenderTableSection* topNonEmptySection = this->topNonEmptySection()) {
-            const BorderValue& sb = topNonEmptySection->style()->borderEnd();
-            if (sb.style() == BHIDDEN)
-                return 0;
-
-            if (sb.style() > BHIDDEN)
-                borderWidth = max(borderWidth, sb.width());
-
-            const RenderTableSection::CellStruct& cs = topNonEmptySection->cellAt(0, endColumn);
-            
-            if (cs.hasCells()) {
-                const BorderValue& cb = cs.primaryCell()->style()->borderEnd(); // FIXME: Make this work with perpendicular and flipped cells.
-                if (cb.style() == BHIDDEN)
-                    return 0;
-
-                const BorderValue& rb = cs.primaryCell()->parent()->style()->borderEnd();
-                if (rb.style() == BHIDDEN)
-                    return 0;
-
-                if (cb.style() > BHIDDEN)
-                    borderWidth = max(borderWidth, cb.width());
-                if (rb.style() > BHIDDEN)
-                    borderWidth = max(borderWidth, rb.width());
-            }
-        }
-        return (borderWidth + (style()->isLeftToRightDirection() ? 1 : 0)) / 2;
+        if (columnAdjoiningBorder.style() > BHIDDEN)
+            borderWidth = max(borderWidth, columnAdjoiningBorder.width());
+        // FIXME: This logic doesn't properly account for the last column in the last column-group case.
     }
-    return RenderBlock::borderEnd();
+
+    if (const RenderTableSection* topNonEmptySection = this->topNonEmptySection()) {
+        const BorderValue& sectionAdjoiningBorder = topNonEmptySection->borderAdjoiningTableEnd();
+        if (sectionAdjoiningBorder.style() == BHIDDEN)
+            return 0;
+
+        if (sectionAdjoiningBorder.style() > BHIDDEN)
+            borderWidth = max(borderWidth, sectionAdjoiningBorder.width());
+
+        if (const RenderTableCell* adjoiningEndCell = topNonEmptySection->firstRowCellAdjoiningTableEnd()) {
+            // FIXME: Make this work with perpendicular and flipped cells.
+            const BorderValue& endCellAdjoiningBorder = adjoiningEndCell->borderAdjoiningTableEnd();
+            if (endCellAdjoiningBorder.style() == BHIDDEN)
+                return 0;
+
+            const BorderValue& firstRowAdjoiningBorder = adjoiningEndCell->row()->borderAdjoiningTableEnd();
+            if (firstRowAdjoiningBorder.style() == BHIDDEN)
+                return 0;
+
+            if (endCellAdjoiningBorder.style() > BHIDDEN)
+                borderWidth = max(borderWidth, endCellAdjoiningBorder.width());
+            if (firstRowAdjoiningBorder.style() > BHIDDEN)
+                borderWidth = max(borderWidth, firstRowAdjoiningBorder.width());
+        }
+    }
+    return (borderWidth + (style()->isLeftToRightDirection() ? 1 : 0)) / 2;
 }
 
 void RenderTable::recalcBordersInRowDirection()
 {
+    // FIXME: We need to compute the collapsed before / after borders in the same fashion.
     m_borderStart = calcBorderStart();
     m_borderEnd = calcBorderEnd();
 }
@@ -1107,6 +1109,21 @@ RenderTableSection* RenderTable::sectionBelow(const RenderTableSection* section,
     if (!nextSection && m_foot && (skipEmptySections == DoNotSkipEmptySections || m_foot->numRows()))
         nextSection = m_foot;
     return toRenderTableSection(nextSection);
+}
+
+RenderTableSection* RenderTable::bottomSection() const
+{
+    recalcSectionsIfNeeded();
+
+    if (m_foot)
+        return m_foot;
+
+    for (RenderObject* child = lastChild(); child; child = child->previousSibling()) {
+        if (child->isTableSection())
+            return toRenderTableSection(child);
+    }
+
+    return 0;
 }
 
 RenderTableCell* RenderTable::cellAbove(const RenderTableCell* cell) const
@@ -1292,6 +1309,24 @@ RenderTable* RenderTable::createAnonymousWithParentRenderer(const RenderObject* 
     RenderTable* newTable = new (parent->renderArena()) RenderTable(parent->document() /* is anonymous */);
     newTable->setStyle(newStyle.release());
     return newTable;
+}
+
+const BorderValue& RenderTable::tableStartBorderAdjoiningCell(const RenderTableCell* cell) const
+{
+    ASSERT(cell->isFirstOrLastCellInRow());
+    if (cell->section()->hasSameDirectionAsTable())
+        return style()->borderStart();
+
+    return style()->borderEnd();
+}
+
+const BorderValue& RenderTable::tableEndBorderAdjoiningCell(const RenderTableCell* cell) const
+{
+    ASSERT(cell->isFirstOrLastCellInRow());
+    if (cell->section()->hasSameDirectionAsTable())
+        return style()->borderEnd();
+
+    return style()->borderStart();
 }
 
 }

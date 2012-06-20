@@ -25,6 +25,7 @@
 #include "Frame.h"
 #include "Page.h"
 #include "Widget.h"
+#include "ewk_paint_context_private.h"
 #include "ewk_view.h"
 
 namespace WebCore {
@@ -33,6 +34,7 @@ class Color;
 class ColorChooserClient;
 #endif
 
+class Cursor;
 class PopupMenuClient;
 }
 
@@ -47,6 +49,7 @@ const char ewkViewSingleName[] = "Ewk_View_Single";
         return __VA_ARGS__; \
     }
 
+void ewk_view_cursor_set(Evas_Object* ewkView, const WebCore::Cursor& cursor);
 void ewk_view_ready(Evas_Object* ewkView);
 void ewk_view_input_method_state_set(Evas_Object* ewkView, bool active);
 void ewk_view_title_set(Evas_Object* ewkView, const Ewk_Text_With_Direction* title);
@@ -120,6 +123,9 @@ void ewk_view_editor_client_selection_changed(Evas_Object* ewkView);
 bool ewk_view_focus_can_cycle(Evas_Object* ewkView, Ewk_Focus_Direction direction);
 void ewk_view_frame_view_creation_notify(Evas_Object* ewkView);
 
+Eina_Bool ewk_view_paint(Ewk_View_Private_Data* priv, Ewk_Paint_Context* context, const Eina_Rectangle* area);
+Eina_Bool ewk_view_paint_contents(Ewk_View_Private_Data* priv, Ewk_Paint_Context* context, const Eina_Rectangle* area);
+
 #if ENABLE(NETSCAPE_PLUGIN_API)
 void ewk_view_js_window_object_clear(Evas_Object* ewkView, Evas_Object* frame);
 #endif
@@ -148,10 +154,6 @@ void ewk_view_mixed_content_run_set(Evas_Object* ewkView, bool hasRun);
 #if USE(ACCELERATED_COMPOSITING)
 bool ewk_view_accelerated_compositing_object_create(Evas_Object* ewkView, Evas_Native_Surface* nativeSurface, const WebCore::IntRect& rect);
 WebCore::GraphicsContext3D* ewk_view_accelerated_compositing_context_get(Evas_Object* ewkView);
-#endif
-
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-bool ewk_custom_handler_register_protocol_handler(Ewk_Custom_Handler_Data* data);
 #endif
 
 namespace EWKPrivate {

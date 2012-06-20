@@ -138,7 +138,7 @@ public:
     bool scrollBy(int deltaX, int deltaY, bool scrollMainFrame = true);
 
     void enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling(WebCore::Node*);
-    std::vector<Platform::ScrollViewBase> inRegionScrollableAreasForPoint(const Platform::IntPoint&);
+    std::vector<Platform::ScrollViewBase*> inRegionScrollableAreasForPoint(const Platform::IntPoint&);
     void notifyInRegionScrollStatusChanged(bool status);
     void setScrollOriginPoint(const Platform::IntPoint&);
     void setHasInRegionScrollableAreas(bool);
@@ -204,6 +204,7 @@ public:
     void notifyPopupAutofillDialog(const Vector<String>&, const WebCore::IntRect&);
     void notifyDismissAutofillDialog();
 
+    bool shouldZoomToInitialScaleOnLoad() const;
     // Called according to our heuristic or from setLoadState depending on whether we have a virtual viewport.
     void zoomToInitialScaleOnLoad();
 
@@ -396,6 +397,7 @@ public:
     bool isAcceleratedCompositingActive() const { return m_compositor; }
     WebPageCompositorPrivate* compositor() const { return m_compositor.get(); }
     void setCompositor(PassRefPtr<WebPageCompositorPrivate>, EGLContext compositingContext);
+    void setCompositorBackgroundColor(const WebCore::Color&);
     bool createCompositor();
     void destroyCompositor();
     void syncDestroyCompositorOnCompositingThread();
@@ -488,6 +490,13 @@ public:
 #if ENABLE(EVENT_MODE_METATAGS)
     WebCore::CursorEventMode m_cursorEventMode;
     WebCore::TouchEventMode m_touchEventMode;
+#endif
+
+#if ENABLE(FULLSCREEN_API)
+#if ENABLE(EVENT_MODE_METATAGS)
+    WebCore::TouchEventMode m_touchEventModePriorGoingFullScreen;
+#endif
+    int m_xScrollOffsetPriorGoingFullScreen;
 #endif
 
     Platform::BlackBerryCursor m_currentCursor;

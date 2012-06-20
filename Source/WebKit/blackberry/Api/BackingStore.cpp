@@ -1557,10 +1557,8 @@ void BackingStorePrivate::blitContents(const Platform::IntRect& dstRect,
 
 #if ENABLE_SCROLLBARS
     if (isScrollingOrZooming() && m_client->isMainFrame()) {
-        if (m_client->scrollsHorizontally())
-            blitHorizontalScrollbar(origin);
-        if (m_client->scrollsVertically())
-            blitVerticalScrollbar(origin);
+        blitHorizontalScrollbar(origin);
+        blitVerticalScrollbar(origin);
     }
 #endif
 
@@ -1637,7 +1635,7 @@ void BackingStorePrivate::blitContents(const Platform::IntRect& dstRect,
 }
 
 #if USE(ACCELERATED_COMPOSITING)
-void BackingStorePrivate::compositeContents(WebCore::LayerRenderer* layerRenderer, const WebCore::TransformationMatrix& transform, const WebCore::FloatRect& contents)
+void BackingStorePrivate::compositeContents(WebCore::LayerRenderer* layerRenderer, const WebCore::TransformationMatrix& transform, const WebCore::FloatRect& contents, bool contentsOpaque)
 {
     const Platform::IntRect transformedContentsRect = Platform::IntRect(Platform::IntPoint(0, 0), m_client->transformedContentsSize());
     Platform::IntRect transformedContents = enclosingIntRect(m_webPage->d->m_transformationMatrix->mapRect(contents));
@@ -1691,7 +1689,7 @@ void BackingStorePrivate::compositeContents(WebCore::LayerRenderer* layerRendere
         if (!committed)
             layerRenderer->drawCheckerboardPattern(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(dirtyRect)));
         else {
-            layerRenderer->compositeBuffer(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(wholeRect)), tileBuffer->nativeBuffer(), 1.0f);
+            layerRenderer->compositeBuffer(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(wholeRect)), tileBuffer->nativeBuffer(), contentsOpaque, 1.0f);
 
             // Intersect the rendered region.
             Platform::IntRectRegion notRenderedRegion = Platform::IntRectRegion::subtractRegions(dirtyTileRect, tileBuffer->renderedRegion());
@@ -1800,8 +1798,6 @@ void BackingStorePrivate::blitHorizontalScrollbar(const Platform::IntPoint& scro
     if (!m_webPage->isVisible())
         return;
 
-    ASSERT(m_client->scrollsHorizontally());
-
     m_webPage->client()->drawHorizontalScrollbar();
 }
 
@@ -1809,8 +1805,6 @@ void BackingStorePrivate::blitVerticalScrollbar(const Platform::IntPoint& scroll
 {
     if (!m_webPage->isVisible())
         return;
-
-    ASSERT(m_client->scrollsVertically());
 
     m_webPage->client()->drawVerticalScrollbar();
 }
@@ -2448,15 +2442,6 @@ void BackingStorePrivate::renderContents(BlackBerry::Platform::Graphics::Buffer*
         // Let WebCore render the page contents into the drawing surface.
         m_client->frame()->view()->paintContents(&graphicsContext, untransformedContentsRect);
 
-#if ENABLE(INSPECTOR)
-        if (m_webPage->d->m_page->inspectorController()->enabled()) {
-            WebCore::IntPoint scrollPosition = m_client->frame()->view()->scrollPosition();
-            graphicsContext.translate(scrollPosition.x(), scrollPosition.y());
-            if (m_webPage->d->m_inspectorOverlay)
-                m_webPage->d->m_inspectorOverlay->paintWebFrame(graphicsContext);
-        }
-#endif
-
         graphicsContext.restore();
     }
 
@@ -2669,6 +2654,8 @@ void BackingStorePrivate::setScrollingOrZooming(bool scrollingOrZooming, bool sh
 
     if (!m_webPage->settings()->shouldRenderAnimationsOnScrollOrZoom())
         m_suspendRegularRenderJobs = scrollingOrZooming; // Suspend the rendering of animations.
+
+    m_webPage->d->m_mainFrame->view()->setConstrainsScrollingToContentEdge(!scrollingOrZooming);
 
     // Clear this flag since we don't care if the render queue is under pressure
     // or not since we are scrolling and it is more important to not lag than

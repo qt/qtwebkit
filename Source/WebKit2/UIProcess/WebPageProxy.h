@@ -58,6 +58,9 @@
 #include "WebPopupMenuProxy.h"
 #include "WebResourceLoadClient.h"
 #include "WebUIClient.h"
+#include <WebCore/AlternativeTextClient.h>
+#include <WebCore/DragActions.h>
+#include <WebCore/DragSession.h>
 #include <WebCore/HitTestResult.h>
 #include <WebCore/Page.h>
 #include <WebCore/PlatformScreen.h>
@@ -95,6 +98,7 @@ namespace WebCore {
     class IntSize;
     class ProtectionSpace;
     struct FileChooserSettings;
+    struct TextAlternativeWithRange;
     struct TextCheckingResult;
     struct ViewportAttributes;
     struct WindowFeatures;
@@ -104,7 +108,7 @@ namespace WebCore {
 class QQuickNetworkReply;
 #endif
 
-#if PLATFORM(MAC)
+#if USE(APPKIT)
 #ifdef __OBJC__
 @class WKView;
 #else
@@ -140,6 +144,7 @@ class WebProcessProxy;
 class WebURLRequest;
 class WebWheelEvent;
 struct AttributedString;
+struct ColorSpaceData;
 struct DictionaryPopupInfo;
 struct EditorState;
 struct PlatformPopupMenuData;
@@ -153,6 +158,14 @@ struct WindowGeometry;
 
 #if ENABLE(GESTURE_EVENTS)
 class WebGestureEvent;
+#endif
+
+#if ENABLE(WEB_INTENTS)
+struct IntentData;
+#endif
+
+#if ENABLE(WEB_INTENTS_TAG)
+struct IntentServiceInfo;
 #endif
 
 typedef GenericCallback<WKStringRef, StringImpl*> StringCallback;
@@ -352,6 +365,7 @@ public:
     void confirmComposition();
     void cancelComposition();
     bool insertText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
+    bool insertDictatedText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd, const Vector<WebCore::TextAlternativeWithRange>& dictationAlternatives);
     void getMarkedRange(uint64_t& location, uint64_t& length);
     void getSelectedRange(uint64_t& location, uint64_t& length);
     void getAttributedSubstringFromRange(uint64_t location, uint64_t length, AttributedString&);
@@ -364,7 +378,9 @@ public:
     bool shouldDelayWindowOrderingForEvent(const WebMouseEvent&);
     bool acceptsFirstMouse(int eventNumber, const WebMouseEvent&);
     
+#if USE(APPKIT)
     WKView* wkView() const;
+#endif
 #endif
 #if PLATFORM(WIN)
     void didChangeCompositionSelection(bool);
@@ -477,6 +493,8 @@ public:
     String stringSelectionForPasteboard();
     PassRefPtr<WebCore::SharedBuffer> dataSelectionForPasteboard(const String& pasteboardType);
     void makeFirstResponder();
+
+    ColorSpaceData colorSpace();
 #endif
 
     void pageScaleFactorDidChange(double);
@@ -604,11 +622,13 @@ public:
 
     void advanceToNextMisspelling(bool startBeforeSelection) const;
     void changeSpellingToWord(const String& word) const;
-#if PLATFORM(MAC)
+#if USE(APPKIT)
     void uppercaseWord();
     void lowercaseWord();
     void capitalizeWord();
+#endif
 
+#if PLATFORM(MAC)
     bool isSmartInsertDeleteEnabled() const { return m_isSmartInsertDeleteEnabled; }
     void setSmartInsertDeleteEnabled(bool);
 #endif
@@ -661,6 +681,13 @@ public:
     // WebPopupMenuProxy::Client
     virtual NativeWebMouseEvent* currentlyProcessedMouseDownEvent();
 
+#if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
+    void widgetMapped(uint64_t nativeWindowId);
+#endif
+
+    void setSuppressVisibilityUpdates(bool flag) { m_suppressVisibilityUpdates = flag; }
+    bool suppressVisibilityUpdates() { return m_suppressVisibilityUpdates; }
+
 private:
     WebPageProxy(PageClient*, PassRefPtr<WebProcessProxy>, WebPageGroup*, uint64_t pageID);
 
@@ -702,6 +729,13 @@ private:
     void didStartProgress();
     void didChangeProgress(double);
     void didFinishProgress();
+
+#if ENABLE(WEB_INTENTS)
+    void didReceiveIntentForFrame(uint64_t frameID, const IntentData&);
+#endif
+#if ENABLE(WEB_INTENTS_TAG)
+    void registerIntentServiceForFrame(uint64_t frameID, const IntentServiceInfo&);
+#endif
     
     void decidePolicyForNavigationAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, const WebCore::ResourceRequest&, uint64_t listenerID, CoreIPC::ArgumentDecoder*, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID);
     void decidePolicyForNewWindowAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, const WebCore::ResourceRequest&, const String& frameName, uint64_t listenerID, CoreIPC::ArgumentDecoder*);
@@ -895,6 +929,13 @@ private:
     void dismissCorrectionPanelSoon(int32_t reason, String& result);
     void recordAutocorrectionResponse(int32_t responseType, const String& replacedString, const String& replacementString);
 #endif // !defined(BUILDING_ON_SNOW_LEOPARD)
+
+#if USE(DICTATION_ALTERNATIVES)
+    void showDictationAlternativeUI(const WebCore::FloatRect& boundingBoxOfDictatedText, uint64_t dictationContext);
+    void dismissDictationAlternativeUI();
+    void removeDictationAlternatives(uint64_t dictationContext);
+    void dictationAlternatives(uint64_t dictationContext, Vector<String>& result);
+#endif
 #endif // PLATFORM(MAC)
 
     void clearLoadDependentCallbacks();
@@ -1091,7 +1132,9 @@ private:
     static WKPageDebugPaintFlags s_debugPaintFlags;
 
     bool m_shouldSendEventsSynchronously;
-    
+
+    bool m_suppressVisibilityUpdates;
+
     float m_mediaVolume;
 
 #if PLATFORM(QT)

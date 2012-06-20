@@ -58,6 +58,7 @@ public:
     // Returns true if the property was found in the dictionary, and the value could be converted to the desired type.
     template <typename Result>
     bool get(const char* propertyName, Result&) const;
+    bool getWithUndefinedOrNullCheck(const String& propertyName, String& value) const;
 
     JSC::ExecState* execState() const { return m_exec; }
     JSC::JSObject* initializerObject() const { return m_initializerObject; }
@@ -91,6 +92,7 @@ private:
     static void convertValue(JSC::ExecState*, JSC::JSValue, Dictionary& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, String& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, ScriptValue& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, Vector<String>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<SerializedScriptValue>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<DOMWindow>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<EventTarget>& result);

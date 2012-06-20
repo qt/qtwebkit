@@ -72,6 +72,9 @@ public:
     bool isPrivateBrowsingEnabled() const;
     void setPrivateBrowsingEnabled(bool);
 
+    void setDeviceSupportsMouse(bool);
+    bool deviceSupportsMouse() const;
+
     int defaultFixedFontSize() const;
     void setDefaultFixedFontSize(int);
 
@@ -173,6 +176,9 @@ public:
     WebString localStoragePath() const;
     void setLocalStoragePath(const WebString&);
 
+    WebString indexedDataBasePath() const;
+    void setIndexedDataBasePath(const WebString&);
+
     WebString databasePath() const;
     void setDatabasePath(const WebString&);
 
@@ -222,6 +228,12 @@ public:
 
     bool fullScreenVideoCapable() const;
     void setFullScreenVideoCapable(bool);
+
+    bool isCredentialAutofillEnabled() const;
+    void setCredentialAutofillEnabled(bool);
+
+    bool isFormAutofillEnabled() const;
+    void setFormAutofillEnabled(bool);
 
 private:
     WebSettingsPrivate* m_private;

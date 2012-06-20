@@ -33,6 +33,7 @@
 #include "LayerPainterChromium.h"
 #include "PlatformColor.h"
 #include "PlatformContextSkia.h"
+#include "skia/ext/platform_canvas.h"
 
 namespace WebCore {
 
@@ -46,7 +47,7 @@ BitmapCanvasLayerTextureUpdater::Texture::~Texture()
 {
 }
 
-void BitmapCanvasLayerTextureUpdater::Texture::updateRect(GraphicsContext3D* context, TextureAllocator* allocator, const IntRect& sourceRect, const IntRect& destRect)
+void BitmapCanvasLayerTextureUpdater::Texture::updateRect(CCGraphicsContext* context, TextureAllocator* allocator, const IntRect& sourceRect, const IntRect& destRect)
 {
     textureUpdater()->updateTextureRect(context, allocator, texture(), sourceRect, destRect);
 }
@@ -58,6 +59,7 @@ PassRefPtr<BitmapCanvasLayerTextureUpdater> BitmapCanvasLayerTextureUpdater::cre
 
 BitmapCanvasLayerTextureUpdater::BitmapCanvasLayerTextureUpdater(PassOwnPtr<LayerPainterChromium> painter, bool useMapTexSubImage)
     : CanvasLayerTextureUpdater(painter)
+    , m_opaque(false)
     , m_texSubImage(useMapTexSubImage)
 {
 }
@@ -78,34 +80,35 @@ LayerTextureUpdater::SampledTexelFormat BitmapCanvasLayerTextureUpdater::sampled
             LayerTextureUpdater::SampledTexelFormatRGBA : LayerTextureUpdater::SampledTexelFormatBGRA;
 }
 
-void BitmapCanvasLayerTextureUpdater::prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, int borderTexels, float contentsScale, IntRect& resultingOpaqueRect)
+void BitmapCanvasLayerTextureUpdater::prepareToUpdate(const IntRect& contentRect, const IntSize& tileSize, float contentsScale, IntRect& resultingOpaqueRect)
 {
     m_texSubImage.setSubImageSize(tileSize);
 
-    bool layerIsOpaque = m_canvas.opaque();
+    if (m_canvasSize != contentRect.size()) {
+        m_canvasSize = contentRect.size();
+        m_canvas = adoptPtr(skia::CreateBitmapCanvas(m_canvasSize.width(), m_canvasSize.height(), m_opaque));
+    }
 
-    m_canvas.resize(contentRect.size());
-    // Assumption: if a tiler is using border texels, then it is because the
-    // layer is likely to be filtered or transformed. Because of it might be
-    // transformed, draw the text in grayscale instead of subpixel antialiasing.
-    PlatformCanvas::Painter::TextOption textOption =
-        borderTexels ? PlatformCanvas::Painter::GrayscaleText : PlatformCanvas::Painter::SubpixelText;
-    PlatformCanvas::Painter canvasPainter(&m_canvas, textOption);
-    canvasPainter.skiaContext()->setTrackOpaqueRegion(!layerIsOpaque);
-    paintContents(*canvasPainter.context(), *canvasPainter.skiaContext(), contentRect, contentsScale, resultingOpaqueRect);
+    paintContents(m_canvas.get(), contentRect, contentsScale, resultingOpaqueRect);
 }
 
-void BitmapCanvasLayerTextureUpdater::updateTextureRect(GraphicsContext3D* context, TextureAllocator* allocator, ManagedTexture* texture, const IntRect& sourceRect, const IntRect& destRect)
+void BitmapCanvasLayerTextureUpdater::updateTextureRect(CCGraphicsContext* context, TextureAllocator* allocator, ManagedTexture* texture, const IntRect& sourceRect, const IntRect& destRect)
 {
-    PlatformCanvas::AutoLocker locker(&m_canvas);
+    const SkBitmap& bitmap = m_canvas->getDevice()->accessBitmap(false);
+    bitmap.lockPixels();
 
     texture->bindTexture(context, allocator);
-    m_texSubImage.upload(locker.pixels(), contentRect(), sourceRect, destRect, texture->format(), context);
+    m_texSubImage.upload(static_cast<const uint8_t*>(bitmap.getPixels()), contentRect(), sourceRect, destRect, texture->format(), context);
+    bitmap.unlockPixels();
 }
 
 void BitmapCanvasLayerTextureUpdater::setOpaque(bool opaque)
 {
-    m_canvas.setOpaque(opaque);
+    if (opaque != m_opaque) {
+        m_canvas.clear();
+        m_canvasSize = IntSize();
+    }
+    m_opaque = opaque;
 }
 
 } // namespace WebCore

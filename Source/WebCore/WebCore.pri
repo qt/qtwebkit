@@ -22,6 +22,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/Modules/filesystem \
     $$SOURCE_DIR/Modules/geolocation \
     $$SOURCE_DIR/Modules/indexeddb \
+    $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
     $$SOURCE_DIR/Modules/webdatabase \
     $$SOURCE_DIR/Modules/websockets \
@@ -70,6 +71,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/platform/image-decoders/gif \
     $$SOURCE_DIR/platform/image-decoders/jpeg \
     $$SOURCE_DIR/platform/image-decoders/png \
+    $$SOURCE_DIR/platform/image-decoders/webp \
     $$SOURCE_DIR/platform/leveldb \
     $$SOURCE_DIR/platform/mock \
     $$SOURCE_DIR/platform/network \
@@ -132,6 +134,10 @@ contains(DEFINES, ENABLE_XSLT=1) {
 
 contains(DEFINES, WTF_USE_LIBXML2=1) {
     PKGCONFIG += libxml-2.0
+}
+
+contains(DEFINES, WTF_USE_ZLIB=1) {
+    LIBS += -lz
 }
 
 contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
@@ -228,28 +234,27 @@ contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1)|contains(DEFINES, ENABLE_WEBGL=1)
     LIBS += -lsqlite3
 }
 
-contains(DEFINES, WTF_USE_WEBP=1) {
-    INCLUDEPATH += $$SOURCE_DIR/platform/image-decoders/webp
-    LIBS += -lwebp
-}
-
 haveQt(5) {
     # Qt5 allows us to use config tests to check for the presence of these libraries
     contains(config_test_libjpeg, yes) {
-        DEFINES += HAVE_LIBJPEG=1
+        DEFINES += WTF_USE_LIBJPEG=1
         LIBS += -ljpeg
     } else {
         warning("JPEG library not found! QImageDecoder will decode JPEG images.")
     }
     contains(config_test_libpng, yes) {
-        DEFINES += HAVE_LIBPNG=1
+        DEFINES += WTF_USE_LIBPNG=1
         LIBS += -lpng
     } else {
         warning("PNG library not found! QImageDecoder will decode PNG images.")
     }
+    contains(config_test_libwebp, yes) {
+        DEFINES += WTF_USE_WEBP=1
+        LIBS += -lwebp
+    }
 } else {
     !win32-*:!mac {
-        DEFINES += HAVE_LIBJPEG=1 HAVE_LIBPNG=1
+        DEFINES += WTF_USE_LIBJPEG=1 WTF_USE_LIBPNG=1
         LIBS += -ljpeg -lpng
     }
 }

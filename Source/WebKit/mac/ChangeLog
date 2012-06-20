@@ -1,3 +1,234 @@
+2012-06-19  Dan Bernstein  <mitz@apple.com>
+
+        WebKit/mac part of: Paginated display API doesn’t allow setting the page progression direction
+        https://bugs.webkit.org/show_bug.cgi?id=89394
+
+        Reviewed by Darin Adler.
+
+        * WebView/WebView.mm:
+        (-[WebView _setPaginationMode:]): Changed to map new WebPaginationMode values to new
+        Pagination::Mode values.
+        (-[WebView _paginationMode]): Similarly, in the opposite direction.
+        * WebView/WebViewPrivate.h: Replaced WebPaginationMode values with ones that specify an
+        axis and a direction along that axis.
+
+2012-06-18  Andy Estes  <aestes@apple.com>
+
+        [Mac] -[WebPDFView _menuItemsFromPDFKitForEvent:] leaks NSMenuItems
+        https://bugs.webkit.org/show_bug.cgi?id=89434
+
+        Reviewed by Darin Adler.
+
+        * WebView/WebPDFView.mm:
+        (-[WebPDFView _menuItemsFromPDFKitForEvent:]): Release copied
+        NSMenuItems once they're stored in copiedItems.
+
+2012-06-19  Mike West  <mkwst@chromium.org>
+
+        Introduce ENABLE_CSP_NEXT configuration flag.
+        https://bugs.webkit.org/show_bug.cgi?id=89300
+
+        Reviewed by Adam Barth.
+
+        The 1.0 draft of the Content Security Policy spec is just about to
+        move to Last Call. We'll hide work on the upcoming 1.1 spec behind
+        this ENABLE flag, disabled by default.
+
+        Spec: https://dvcs.w3.org/hg/content-security-policy/raw-file/tip/csp-specification.dev.html
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-06-14  Jia Pu  <jpu@apple.com>
+
+        Mark text with text alternative with blue underline.
+        https://bugs.webkit.org/show_bug.cgi?id=83047
+
+        Reviewed by Enrica Casucci.
+
+        Changes in WebKit include implementation of new functions declared in AlternativeTextClient,
+        and logic for calling Editor::insertDictatedText() instead of Editor::insertText() when there's
+        alternatives attached to the input string.
+
+        * WebCoreSupport/CorrectionPanel.mm:
+        (correctionIndicatorType):
+        (CorrectionPanel::handleAcceptedReplacement):
+        * WebCoreSupport/WebAlternativeTextClient.h:
+        (WebAlternativeTextClient):
+        * WebCoreSupport/WebAlternativeTextClient.mm:
+        (WebAlternativeTextClient::showCorrectionAlternative):
+        (WebAlternativeTextClient::dismissAlternative):
+        (WebAlternativeTextClient::dismissAlternativeSoon):
+        (WebAlternativeTextClient::recordAutocorrectionResponse):
+        (WebAlternativeTextClient::removeDictationAlternatives):
+        (WebAlternativeTextClient::showDictationAlternativeUI):
+        (WebAlternativeTextClient::dismissDictationAlternativeUI):
+        (WebAlternativeTextClient::dictationAlternatives):
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView validAttributesForMarkedText]):
+        (-[WebHTMLView insertText:]):
+        * WebView/WebView.mm:
+        (-[WebView handleAcceptedAlternativeText:]):
+        (-[WebView _getWebCoreDictationAlternatives:fromTextAlternatives:]):
+        (-[WebView _showDictationAlternativeUI:WebCore::forDictationContext:]):
+        (-[WebView _dismissDictationAlternativeUI]):
+        (-[WebView _removeDictationAlternatives:]):
+        (-[WebView _dictationAlternatives:]):
+        * WebView/WebViewData.h:
+        * WebView/WebViewData.mm:
+        (-[WebViewPrivate init]):
+        * WebView/WebViewInternal.h:
+        * WebView/WebViewPrivate.h:
+
+2012-06-11  Alexis Menard  <alexis.menard@openbossa.org>
+
+        [CSS3 Backgrounds and Borders] Protect box-decoration-break behind a feature flag.
+        https://bugs.webkit.org/show_bug.cgi?id=88804
+
+        Reviewed by Tony Chang.
+
+        Protect box-decoration-break behind a feature flag enabled by default.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-06-11  Sam Weinig  <sam@webkit.org>
+
+        Remove support for disconnected/excluded from search frames, they are not used by Safari anymore
+        https://bugs.webkit.org/show_bug.cgi?id=88723
+
+        Reviewed by Dan Bernstein.
+
+        * WebView/WebFrame.mm:
+        * WebView/WebFramePrivate.h:
+        Remove -[WebFrame _setIsDisconnected:] and -[WebFrame _setExcludeFromTextSearch:]
+
+2012-06-10  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r119955.
+        http://trac.webkit.org/changeset/119955
+        https://bugs.webkit.org/show_bug.cgi?id=88758
+
+        Breaks Chromium compile - Chromium depends on removed API
+        (Requested by dominicc on #webkit).
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame _setIsDisconnected:]):
+        (-[WebFrame _setExcludeFromTextSearch:]):
+        * WebView/WebFramePrivate.h:
+
+2012-06-10  Sam Weinig  <sam@webkit.org>
+
+        Remove support for disconnected/excluded from search frames, they are not used by Safari anymore
+        https://bugs.webkit.org/show_bug.cgi?id=88723
+
+        Reviewed by Dan Bernstein.
+
+        * WebView/WebFrame.mm:
+        * WebView/WebFramePrivate.h:
+        Remove -[WebFrame _setIsDisconnected:] and -[WebFrame _setExcludeFromTextSearch:]
+
+2012-06-09  Sukolsak Sakshuwong  <sukolsak@google.com>
+
+        Add UNDO_MANAGER flag
+        https://bugs.webkit.org/show_bug.cgi?id=87908
+
+        Reviewed by Tony Chang.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-06-07  Kentaro Hara  <haraken@chromium.org>
+
+        Reduce Node object size from 72 byte to 64 byte
+        https://bugs.webkit.org/show_bug.cgi?id=88528
+
+        Reviewed by Ryosuke Niwa.
+
+        Added a symbol for callRemovedLastRef().
+
+        * WebKit.order:
+
+2012-06-06  Andy Estes  <aestes@apple.com>
+
+        Wrap uppercaseWord, lowercaseWord, and capitalizeWord with USE(APPKIT)
+        https://bugs.webkit.org/show_bug.cgi?id=88504
+
+        Reviewed by Dan Bernstein.
+
+        uppercaseWord, lowercaseWord, and capitalizeWord are methods declared
+        by NSResponder that subclasses are expected to implement. WebKit should
+        only support these implementations on platforms that use AppKit.
+
+        * WebCoreSupport/WebEditorClient.h:
+        * WebCoreSupport/WebEditorClient.mm:
+
+2012-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Build fix.
+
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+        (WebFrameLoaderClient::createPlugin):
+        The error constant has been renamed.
+
+2012-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Rename a plug-in loading error constant
+        https://bugs.webkit.org/show_bug.cgi?id=88381
+        <rdar://problem/11602601>
+
+        Reviewed by Sam Weinig.
+
+        * Misc/WebKitErrors.h:
+
+2012-06-05  Dongwoo Im  <dw.im@samsung.com>
+
+        Add 'isProtocolHandlerRegistered' and 'unregisterProtocolHandler'.
+        https://bugs.webkit.org/show_bug.cgi?id=73176
+
+        Reviewed by Adam Barth.
+
+        Two more APIs are added in Custom Scheme Handler specification.
+        http://dev.w3.org/html5/spec/Overview.html#custom-handlers
+        One is 'isProtocolHandlerRegistered' to query whether the specific URL
+        is registered or not.
+        The other is 'unregisterProtocolHandler' to remove the registered URL.
+
+        * Configurations/FeatureDefines.xcconfig: Add a macro 'ENABLE_CUSTOM_SCHEME_HANDLER'.
+
+2012-06-04  David Kilzer  <ddkilzer@apple.com>
+
+        BUILD FIX: FeatureDefines.xcconfig should match across projects
+
+        * Configurations/FeatureDefines.xcconfig:
+        - Fix sort order of ENABLE_CSS3_FLEXBOX.
+        - Fix typo in ENABLE_FONT_BOOSTING.
+        - Add missing ENABLE_LEGACY_CSS_VENDOR_PREFIXES.
+
+2012-06-02  Yongjun Zhang  <yongjun_zhang@apple.com>
+
+        loadRequest should check for empty URLs.
+        https://bugs.webkit.org/show_bug.cgi?id=88154
+
+        In [WebFrame loadRequest], if the url is invalid and not nil, we transform it to file: url.
+        However, WebKit client could send down an empty URL that makes us transform it to file: url
+        as well.  We should skip that as we did for nil URLs.
+
+        Reviewed by Brady Eidson.
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame loadRequest:]):
+
+2012-06-01  Michael Saboff  <msaboff@apple.com>
+
+        WebFrame::_stringByEvaluatingJavaScriptFromString methods don't handle nil string
+        https://bugs.webkit.org/show_bug.cgi?id=88109
+
+        Reviewed by Geoffrey Garen.
+
+        Added short circuit return when the NSString to evaluate is nil.
+
+        * WebView/WebFrame.mm:
+        (-[WebFrame _stringByEvaluatingJavaScriptFromString:forceUserGesture:]):
+        (-[WebFrame _stringByEvaluatingJavaScriptFromString:withGlobalObject:inScriptWorld:]):
+
 2012-05-31  Hajime Morrita  <morrita@chromium.org>
 
         REGRESSION(r117572): editing/spelling/spellcheck-async-remove-frame.html crashes on Mac

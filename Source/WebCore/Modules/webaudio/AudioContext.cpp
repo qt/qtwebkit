@@ -196,7 +196,7 @@ void AudioContext::constructCommon()
 AudioContext::~AudioContext()
 {
 #if DEBUG_AUDIONODE_REFERENCES
-    printf("%p: AudioContext::~AudioContext()\n", this);
+    fprintf(stderr, "%p: AudioContext::~AudioContext()\n", this);
 #endif
     // AudioNodes keep a reference to their context, so there should be no way to be in the destructor if there are still AudioNodes around.
     ASSERT(!m_nodesToDelete.size());
@@ -659,10 +659,10 @@ bool AudioContext::isGraphOwner() const
     return currentThread() == m_graphOwnerThread;
 }
 
-void AudioContext::addDeferredFinishDeref(AudioNode* node, AudioNode::RefType refType)
+void AudioContext::addDeferredFinishDeref(AudioNode* node)
 {
     ASSERT(isAudioThread());
-    m_deferredFinishDerefList.append(AudioContext::RefInfo(node, refType));
+    m_deferredFinishDerefList.append(node);
 }
 
 void AudioContext::handlePreRenderTasks()
@@ -718,9 +718,8 @@ void AudioContext::handleDeferredFinishDerefs()
 {
     ASSERT(isAudioThread() && isGraphOwner());
     for (unsigned i = 0; i < m_deferredFinishDerefList.size(); ++i) {
-        AudioNode* node = m_deferredFinishDerefList[i].m_node;
-        AudioNode::RefType refType = m_deferredFinishDerefList[i].m_refType;
-        node->finishDeref(refType);
+        AudioNode* node = m_deferredFinishDerefList[i];
+        node->finishDeref(AudioNode::RefTypeConnection);
     }
     
     m_deferredFinishDerefList.clear();

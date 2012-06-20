@@ -42,6 +42,7 @@
 #include "ExceptionCode.h"
 #include "FileInputType.h"
 #include "FileList.h"
+#include "FormController.h"
 #include "FormDataList.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
@@ -168,18 +169,17 @@ bool InputType::isRangeControl() const
     return false;
 }
 
-bool InputType::saveFormControlState(String& result) const
+FormControlState InputType::saveFormControlState() const
 {
     String currentValue = element()->value();
     if (currentValue == element()->defaultValue())
-        return false;
-    result = currentValue;
-    return true;
+        return FormControlState();
+    return FormControlState(currentValue);
 }
 
-void InputType::restoreFormControlState(const String& state)
+void InputType::restoreFormControlState(const FormControlState& state)
 {
-    element()->setValue(state);
+    element()->setValue(state.value());
 }
 
 bool InputType::isFormDataAppendable() const
@@ -205,12 +205,17 @@ void InputType::setValueAsDate(double, ExceptionCode& ec) const
     ec = INVALID_STATE_ERR;
 }
 
-double InputType::valueAsNumber() const
+double InputType::valueAsDouble() const
 {
     return numeric_limits<double>::quiet_NaN();
 }
 
-void InputType::setValueAsNumber(double, TextFieldEventBehavior, ExceptionCode& ec) const
+void InputType::setValueAsDouble(double doubleValue, TextFieldEventBehavior eventBehavior, ExceptionCode& ec) const
+{
+    setValueAsDecimal(Decimal::fromDouble(doubleValue), eventBehavior, ec);
+}
+
+void InputType::setValueAsDecimal(const Decimal&, TextFieldEventBehavior, ExceptionCode& ec) const
 {
     ec = INVALID_STATE_ERR;
 }
@@ -251,11 +256,11 @@ bool InputType::rangeUnderflow(const String& value) const
     if (!isSteppable())
         return false;
 
-    double doubleValue = parseToDouble(value, numeric_limits<double>::quiet_NaN());
-    if (isnan(doubleValue))
+    const Decimal numericValue = parseToNumberOrNaN(value);
+    if (!numericValue.isFinite())
         return false;
 
-    return doubleValue < createStepRange(RejectAny).minimum();
+    return numericValue < createStepRange(RejectAny).minimum();
 }
 
 bool InputType::rangeOverflow(const String& value) const
@@ -263,26 +268,26 @@ bool InputType::rangeOverflow(const String& value) const
     if (!isSteppable())
         return false;
 
-    double doubleValue = parseToDouble(value, numeric_limits<double>::quiet_NaN());
-    if (isnan(doubleValue))
+    const Decimal numericValue = parseToNumberOrNaN(value);
+    if (!numericValue.isFinite())
         return false;
 
-    return doubleValue > createStepRange(RejectAny).maximum();
+    return numericValue > createStepRange(RejectAny).maximum();
 }
 
-double InputType::defaultValueForStepUp() const
+Decimal InputType::defaultValueForStepUp() const
 {
     return 0;
 }
 
 double InputType::minimum() const
 {
-    return createStepRange(RejectAny).minimum();
+    return createStepRange(RejectAny).minimum().toDouble();
 }
 
 double InputType::maximum() const
 {
-    return createStepRange(RejectAny).maximum();
+    return createStepRange(RejectAny).maximum().toDouble();
 }
 
 bool InputType::sizeShouldIncludeDecoration(int, int& preferredSize) const
@@ -296,12 +301,12 @@ bool InputType::isInRange(const String& value) const
     if (!isSteppable())
         return false;
 
-    double doubleValue = parseToDouble(value, numeric_limits<double>::quiet_NaN());
-    if (isnan(doubleValue))
+    const Decimal numericValue = parseToNumberOrNaN(value);
+    if (!numericValue.isFinite())
         return true;
 
     StepRange stepRange(createStepRange(RejectAny));
-    return doubleValue >= stepRange.minimum() && doubleValue <= stepRange.maximum();
+    return numericValue >= stepRange.minimum() && numericValue <= stepRange.maximum();
 }
 
 bool InputType::isOutOfRange(const String& value) const
@@ -309,12 +314,12 @@ bool InputType::isOutOfRange(const String& value) const
     if (!isSteppable())
         return false;
 
-    double doubleValue = parseToDouble(value, numeric_limits<double>::quiet_NaN());
-    if (isnan(doubleValue))
+    const Decimal numericValue = parseToNumberOrNaN(value);
+    if (!numericValue.isFinite())
         return true;
 
     StepRange stepRange(createStepRange(RejectAny));
-    return doubleValue < stepRange.minimum() || doubleValue > stepRange.maximum();
+    return numericValue < stepRange.minimum() || numericValue > stepRange.maximum();
 }
 
 bool InputType::stepMismatch(const String& value) const
@@ -322,11 +327,11 @@ bool InputType::stepMismatch(const String& value) const
     if (!isSteppable())
         return false;
 
-    double doubleValue = parseToDouble(value, numeric_limits<double>::quiet_NaN());
-    if (isnan(doubleValue))
+    const Decimal numericValue = parseToNumberOrNaN(value);
+    if (!numericValue.isFinite())
         return false;
 
-    return createStepRange(RejectAny).stepMismatch(doubleValue);
+    return createStepRange(RejectAny).stepMismatch(numericValue);
 }
 
 String InputType::typeMismatchText() const
@@ -360,19 +365,19 @@ String InputType::validationMessage() const
     if (!isSteppable())
         return emptyString();
 
-    double doubleValue = parseToDouble(value, numeric_limits<double>::quiet_NaN());
-    if (isnan(doubleValue))
+    const Decimal numericValue = parseToNumberOrNaN(value);
+    if (!numericValue.isFinite())
         return emptyString();
 
     StepRange stepRange(createStepRange(RejectAny));
 
-    if (doubleValue < stepRange.minimum())
+    if (numericValue < stepRange.minimum())
         return validationMessageRangeUnderflowText(serialize(stepRange.minimum()));
 
-    if (doubleValue < stepRange.maximum())
+    if (numericValue < stepRange.maximum())
         return validationMessageRangeOverflowText(serialize(stepRange.maximum()));
 
-    if (stepRange.stepMismatch(doubleValue)) {
+    if (stepRange.stepMismatch(numericValue)) {
         const String stepString = stepRange.hasStep() ? serializeForNumberType(stepRange.step() / stepRange.stepScaleFactor()) : emptyString();
         return validationMessageStepMismatchText(serialize(stepRange.stepBase()), stepString);
     }
@@ -453,17 +458,15 @@ void InputType::destroyShadowSubtree()
     }
 }
 
-double InputType::parseToDouble(const String&, double defaultValue) const
+Decimal InputType::parseToNumber(const String&, const Decimal& defaultValue) const
 {
     ASSERT_NOT_REACHED();
     return defaultValue;
 }
 
-double InputType::parseToDoubleWithDecimalPlaces(const String& src, double defaultValue, unsigned *decimalPlaces) const
+Decimal InputType::parseToNumberOrNaN(const String& string) const
 {
-    if (decimalPlaces)
-        *decimalPlaces = 0;
-    return parseToDouble(src, defaultValue);
+    return parseToNumber(string, Decimal::nan());
 }
 
 bool InputType::parseToDateComponents(const String&, DateComponents*) const
@@ -472,7 +475,7 @@ bool InputType::parseToDateComponents(const String&, DateComponents*) const
     return false;
 }
 
-String InputType::serialize(double) const
+String InputType::serialize(const Decimal&) const
 {
     ASSERT_NOT_REACHED();
     return String();
@@ -497,9 +500,14 @@ bool InputType::canSetStringValue() const
     return true;
 }
 
-bool InputType::isKeyboardFocusable() const
+bool InputType::isKeyboardFocusable(KeyboardEvent* event) const
 {
-    return true;
+    return element()->isTextFormControlKeyboardFocusable(event);
+}
+
+bool InputType::isMouseFocusable() const
+{
+    return element()->isTextFormControlMouseFocusable();
 }
 
 bool InputType::shouldUseInputMethod() const
@@ -518,6 +526,10 @@ void InputType::handleBlurEvent()
 void InputType::accessKeyAction(bool)
 {
     element()->focus(false);
+}
+
+void InputType::addSearchResult()
+{
 }
 
 void InputType::attach()
@@ -664,10 +676,19 @@ bool InputType::hasUnacceptableValue()
     return false;
 }
 
-void InputType::receiveDroppedFiles(const Vector<String>&)
+bool InputType::receiveDroppedFiles(const DragData*)
 {
     ASSERT_NOT_REACHED();
+    return false;
 }
+
+#if ENABLE(FILE_SYSTEM)
+String InputType::droppedFileSystemId()
+{
+    ASSERT_NOT_REACHED();
+    return String();
+}
+#endif
 
 Icon* InputType::icon() const
 {
@@ -848,6 +869,10 @@ void InputType::readonlyAttributeChanged()
 {
 }
 
+void InputType::subtreeHasChanged()
+{
+}
+
 String InputType::defaultToolTip() const
 {
     return String();
@@ -868,7 +893,7 @@ unsigned InputType::width() const
     return 0;
 }
 
-void InputType::applyStep(double count, AnyStepHandling anyStepHandling, TextFieldEventBehavior eventBehavior, ExceptionCode& ec)
+void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldEventBehavior eventBehavior, ExceptionCode& ec)
 {
     StepRange stepRange(createStepRange(anyStepHandling));
     if (!stepRange.hasStep()) {
@@ -876,20 +901,18 @@ void InputType::applyStep(double count, AnyStepHandling anyStepHandling, TextFie
         return;
     }
 
-    const double nan = numeric_limits<double>::quiet_NaN();
-    unsigned currentDecimalPlaces;
-    double current = parseToDoubleWithDecimalPlaces(element()->value(), nan, &currentDecimalPlaces);
-    if (!isfinite(current)) {
+    const Decimal current = parseToNumberOrNaN(element()->value());
+    if (!current.isFinite()) {
         ec = INVALID_STATE_ERR;
         return;
     }
-    double newValue = current + stepRange.step() * count;
-    if (isinf(newValue)) {
+    Decimal newValue = current + stepRange.step() * count;
+    if (!newValue.isFinite()) {
         ec = INVALID_STATE_ERR;
         return;
     }
 
-    double acceptableErrorValue = stepRange.acceptableError();
+    const Decimal acceptableErrorValue = stepRange.acceptableError();
     if (newValue - stepRange.minimum() < -acceptableErrorValue) {
         ec = INVALID_STATE_ERR;
         return;
@@ -899,7 +922,7 @@ void InputType::applyStep(double count, AnyStepHandling anyStepHandling, TextFie
 
     const AtomicString& stepString = element()->fastGetAttribute(stepAttr);
     if (!equalIgnoringCase(stepString, "any"))
-        newValue = stepRange.alignValueForStep(current, currentDecimalPlaces, newValue);
+        newValue = stepRange.alignValueForStep(current, newValue);
 
     if (newValue - stepRange.maximum() > acceptableErrorValue) {
         ec = INVALID_STATE_ERR;
@@ -908,13 +931,13 @@ void InputType::applyStep(double count, AnyStepHandling anyStepHandling, TextFie
     if (newValue > stepRange.maximum())
         newValue = stepRange.maximum();
 
-    element()->setValueAsNumber(newValue, ec, eventBehavior);
+    setValueAsDecimal(newValue, eventBehavior, ec);
 
     if (AXObjectCache::accessibilityEnabled())
          element()->document()->axObjectCache()->postNotification(element()->renderer(), AXObjectCache::AXValueChanged, true);
 }
 
-bool InputType::getAllowedValueStep(double* step) const
+bool InputType::getAllowedValueStep(Decimal* step) const
 {
     StepRange stepRange(createStepRange(RejectAny));
     *step = stepRange.step();
@@ -987,7 +1010,7 @@ void InputType::stepUpFromRenderer(int n)
     if (!stepRange.hasStep())
       return;
 
-    double step = stepRange.step();
+    const Decimal step = stepRange.step();
 
     int sign;
     if (step > 0)
@@ -997,33 +1020,31 @@ void InputType::stepUpFromRenderer(int n)
     else
         sign = 0;
 
-    const double nan = numeric_limits<double>::quiet_NaN();
     String currentStringValue = element()->value();
-    double current = parseToDouble(currentStringValue, nan);
-    if (!isfinite(current)) {
+    Decimal current = parseToNumberOrNaN(currentStringValue);
+    if (!current.isFinite()) {
         ExceptionCode ec;
         current = defaultValueForStepUp();
-        double nextDiff = step * n;
+        const Decimal nextDiff = step * n;
         if (current < stepRange.minimum() - nextDiff)
             current = stepRange.minimum() - nextDiff;
         if (current > stepRange.maximum() - nextDiff)
             current = stepRange.maximum() - nextDiff;
-        element()->setValueAsNumber(current, ec, DispatchInputAndChangeEvent);
+        setValueAsDecimal(current, DispatchInputAndChangeEvent, ec);
     }
-    if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum()))
-        element()->setValue(serialize(sign > 0 ? stepRange.minimum() : stepRange.maximum()), DispatchInputAndChangeEvent);
-    else {
+    if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum())) {
+        ExceptionCode ec;
+        setValueAsDecimal(sign > 0 ? stepRange.minimum() : stepRange.maximum(), DispatchInputAndChangeEvent, ec);
+    } else {
         ExceptionCode ec;
         if (stepMismatch(element()->value())) {
-            ASSERT(step);
-            double newValue;
-            double scale = pow(10.0, static_cast<double>(max(stepRange.stepDecimalPlaces(), stepRange.stepBaseDecimalPlaces())));
-            double base = stepRange.stepBase();
-
+            ASSERT(!step.isZero());
+            const Decimal base = stepRange.stepBase();
+            Decimal newValue;
             if (sign < 0)
-                newValue = round((base + floor((current - base) / step) * step) * scale) / scale;
+                newValue = base + ((current - base) / step).floor() * step;
             else if (sign > 0)
-                newValue = round((base + ceil((current - base) / step) * step) * scale) / scale;
+                newValue = base + ((current - base) / step).ceiling() * step;
             else
                 newValue = current;
 
@@ -1032,8 +1053,7 @@ void InputType::stepUpFromRenderer(int n)
             if (newValue > stepRange.maximum())
                 newValue = stepRange.maximum();
 
-            element()->setValueAsNumber(newValue, ec, n == 1 || n == -1 ? DispatchInputAndChangeEvent : DispatchNoEvent);
-            current = newValue;
+            setValueAsDecimal(newValue, n == 1 || n == -1 ? DispatchInputAndChangeEvent : DispatchNoEvent, ec);
             if (n > 1)
                 applyStep(n - 1, AnyIsDefaultStep, DispatchInputAndChangeEvent, ec);
             else if (n < -1)

@@ -33,6 +33,7 @@
 #include "PlatformString.h"
 #include <time.h>
 #include <wtf/Forward.h>
+#include <wtf/MathExtras.h>
 #include <wtf/Vector.h>
 
 #if USE(CF)
@@ -174,6 +175,9 @@ CString fileSystemRepresentation(const String&);
 
 inline bool isHandleValid(const PlatformFileHandle& handle) { return handle != invalidPlatformFileHandle; }
 
+inline double invalidFileTime() { return std::numeric_limits<double>::quiet_NaN(); }
+inline bool isValidFileTime(double time) { return isfinite(time); }
+
 // Prefix is what the filename should be prefixed with, not the full path.
 String openTemporaryFile(const String& prefix, PlatformFileHandle&);
 PlatformFileHandle openFile(const String& path, FileOpenMode);
@@ -205,6 +209,8 @@ String filenameToString(const char*);
 String filenameForDisplay(const String&);
 CString applicationDirectoryPath();
 CString sharedResourcesPath();
+#endif
+#if PLATFORM(GTK) || PLATFORM(QT)
 uint64_t getVolumeFreeSizeForPath(const char*);
 #endif
 

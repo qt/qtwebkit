@@ -110,6 +110,10 @@ Evas_Object* DumpRenderTreeChrome::createView() const
     evas_object_smart_callback_add(view, "mixedcontent,run", onInsecureContentRun, 0);
     evas_object_smart_callback_add(view, "mixedcontent,displayed", onInsecureContentDisplayed, 0);
     evas_object_smart_callback_add(view, "frame,created", onFrameCreated, 0);
+    evas_object_smart_callback_add(view, "navigate,with,data", onWebViewNavigatedWithData, 0);
+    evas_object_smart_callback_add(view, "perform,server,redirect", onWebViewServerRedirect, 0);
+    evas_object_smart_callback_add(view, "perform,client,redirect", onWebViewClientRedirect, 0);
+    evas_object_smart_callback_add(view, "populate,visited,links", onWebViewPopulateVisitedLinks, 0);
 
     connectEditingCallbacks(view);
 
@@ -213,6 +217,7 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
 
     ewk_settings_memory_cache_clear();
     ewk_settings_application_cache_clear();
+    ewk_settings_shadow_dom_enable_set(EINA_TRUE);
 
     ewk_view_setting_private_browsing_set(mainView(), EINA_FALSE);
     ewk_view_setting_spatial_navigation_set(mainView(), EINA_FALSE);
@@ -240,13 +245,15 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     ewk_view_setting_minimum_timer_interval_set(browser->mainView(), 0.010); // 10 milliseconds (DOMTimer::s_minDefaultTimerInterval)
     ewk_view_setting_enable_webgl_set(mainView(), EINA_TRUE);
     ewk_view_setting_enable_hyperlink_auditing_set(mainView(), EINA_FALSE);
-    ewk_view_setting_include_links_in_focus_chain_set(mainView(), EINA_TRUE);
+    ewk_view_setting_include_links_in_focus_chain_set(mainView(), EINA_FALSE);
     ewk_view_setting_scripts_can_access_clipboard_set(mainView(), EINA_TRUE);
+    ewk_view_setting_web_audio_set(mainView(), EINA_FALSE);
 
     ewk_view_zoom_set(mainView(), 1.0, 0, 0);
     ewk_view_scale_set(mainView(), 1.0, 0, 0);
     ewk_view_text_zoom_set(mainView(), 1.0);
     ewk_view_visibility_state_set(mainView(), EWK_PAGE_VISIBILITY_STATE_VISIBLE, true);
+    ewk_view_text_direction_set(mainView(), EWK_TEXT_DIRECTION_DEFAULT);
 
     ewk_history_clear(ewk_view_history_get(mainView()));
 
@@ -268,7 +275,12 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     DumpRenderTreeSupportEfl::setDefersLoading(mainView(), false);
     DumpRenderTreeSupportEfl::setLoadsSiteIconsIgnoringImageLoadingSetting(mainView(), false);
     DumpRenderTreeSupportEfl::setSerializeHTTPLoads(false);
+
+    // Reset capacities for the memory cache for dead objects.
+    static const unsigned cacheTotalCapacity =  8192 * 1024;
+    ewk_settings_object_cache_capacity_set(0, cacheTotalCapacity, cacheTotalCapacity);
     DumpRenderTreeSupportEfl::setDeadDecodedDataDeletionInterval(0);
+    ewk_settings_page_cache_capacity_set(3);
 
     if (m_currentIntentRequest) {
         ewk_intent_request_unref(m_currentIntentRequest);
@@ -454,6 +466,12 @@ void DumpRenderTreeChrome::onFrameTitleChanged(void*, Evas_Object* frame, void* 
 
     if (!done && gLayoutTestController->dumpTitleChanges())
         printf("TITLE CHANGED: %s\n", (titleText && titleText->string) ? titleText->string : "");
+
+    if (!done && gLayoutTestController->dumpHistoryDelegateCallbacks())
+        printf("WebView updated the title for history URL \"%s\" to \"%s\".\n", ewk_frame_uri_get(frame)
+               , (titleText && titleText->string) ? titleText->string : "");
+
+    gLayoutTestController->setTitleTextDirection(titleText->direction == EWK_TEXT_DIRECTION_LEFT_TO_RIGHT ? "ltr" : "rtl");
 }
 
 void DumpRenderTreeChrome::onDocumentLoadFinished(void*, Evas_Object*, void* eventInfo)
@@ -548,6 +566,57 @@ void DumpRenderTreeChrome::onFrameCreated(void*, Evas_Object*, void* eventInfo)
     evas_object_smart_callback_add(frame, "redirect,requested", onFrameRedirectRequested, 0);
     evas_object_smart_callback_add(frame, "title,changed", onFrameTitleChanged, 0);
     evas_object_smart_callback_add(frame, "xss,detected", onDidDetectXSS, 0);
+}
+
+void DumpRenderTreeChrome::onWebViewNavigatedWithData(void*, Evas_Object*, void* eventInfo)
+{
+    if (done || !gLayoutTestController->dumpHistoryDelegateCallbacks())
+        return;
+
+    ASSERT(eventInfo);
+    const Ewk_View_Navigation_Data* navigationData = static_cast<Ewk_View_Navigation_Data*>(eventInfo);
+
+    ASSERT(navigationData->request);
+    ASSERT(navigationData->response);
+
+    const bool wasFailure = navigationData->has_substitute_data || navigationData->response->status_code >= 400;
+    const bool wasRedirected = navigationData->client_redirect_source && *(navigationData->client_redirect_source);
+
+    printf("WebView navigated to url \"%s\" with title \"%s\" with HTTP equivalent method \"%s\".  The navigation was %s and was %s%s.\n",
+        navigationData->url,
+        navigationData->title,
+        navigationData->request->http_method,
+        wasFailure? "a failure" : "successful",
+        (wasRedirected ? "a client redirect from " : "not a client redirect"),
+        (wasRedirected ? navigationData->client_redirect_source : ""));
+}
+
+void DumpRenderTreeChrome::onWebViewServerRedirect(void*, Evas_Object*, void* eventInfo)
+{
+    if (done || !gLayoutTestController->dumpHistoryDelegateCallbacks())
+        return;
+
+    ASSERT(eventInfo);
+    const Ewk_View_Redirection_Data* data = static_cast<Ewk_View_Redirection_Data*>(eventInfo);
+    printf("WebView performed a server redirect from \"%s\" to \"%s\".\n", data->source_url, data->destination_url);
+}
+
+void DumpRenderTreeChrome::onWebViewClientRedirect(void*, Evas_Object*, void* eventInfo)
+{
+    if (done || !gLayoutTestController->dumpHistoryDelegateCallbacks())
+        return;
+
+    ASSERT(eventInfo);
+    const Ewk_View_Redirection_Data* data = static_cast<Ewk_View_Redirection_Data*>(eventInfo);
+    printf("WebView performed a client redirect from \"%s\" to \"%s\".\n", data->source_url, data->destination_url);
+}
+
+void DumpRenderTreeChrome::onWebViewPopulateVisitedLinks(void*, Evas_Object* ewkView, void*)
+{
+    if (done || !gLayoutTestController->dumpHistoryDelegateCallbacks())
+        return;
+
+    printf("Asked to populate visited links for WebView \"%s\"\n", ewk_view_uri_get(ewkView));
 }
 
 void DumpRenderTreeChrome::onFrameProvisionalLoad(void*, Evas_Object* frame, void*)

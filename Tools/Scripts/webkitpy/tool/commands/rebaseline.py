@@ -43,14 +43,10 @@ from webkitpy.common.system.user import User
 from webkitpy.layout_tests.controllers.test_result_writer import TestResultWriter
 from webkitpy.layout_tests.models import test_failures
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
-from webkitpy.layout_tests.models.test_expectations import TestExpectations
+from webkitpy.layout_tests.models.test_expectations import TestExpectations, suffixes_for_expectations, BASELINE_SUFFIX_LIST
 from webkitpy.layout_tests.port import builders
 from webkitpy.tool.grammar import pluralize
 from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
-
-
-# FIXME: Pull this from Port.baseline_extensions().
-_baseline_suffix_list = ['png', 'wav', 'txt']
 
 
 _log = logging.getLogger(__name__)
@@ -64,10 +60,10 @@ class AbstractRebaseliningCommand(AbstractDeclarativeCommand):
     def __init__(self, options=None):
         options = options or []
         options.extend([
-            optparse.make_option('--suffixes', default=','.join(_baseline_suffix_list), action='store',
+            optparse.make_option('--suffixes', default=','.join(BASELINE_SUFFIX_LIST), action='store',
                                  help='file types to rebaseline')])
         AbstractDeclarativeCommand.__init__(self, options=options)
-        self._baseline_suffix_list = _baseline_suffix_list
+        self._baseline_suffix_list = BASELINE_SUFFIX_LIST
 
 
 class RebaselineTest(AbstractRebaseliningCommand):
@@ -140,7 +136,7 @@ class RebaselineTest(AbstractRebaseliningCommand):
 
     def _update_expectations_file(self, builder_name, test_name):
         port = self._tool.port_factory.get_from_builder_name(builder_name)
-        expectations = TestExpectations(port)
+        expectations = TestExpectations(port, include_overrides=False)
 
         for test_configuration in port.all_test_configurations():
             if test_configuration.version == port.test_configuration().version:
@@ -239,7 +235,7 @@ class AnalyzeBaselines(AbstractRebaseliningCommand):
 
 class RebaselineExpectations(AbstractDeclarativeCommand):
     name = "rebaseline-expectations"
-    help_text = "Rebaselines the tests indicated in test_expectations.txt."
+    help_text = "Rebaselines the tests indicated in TestExpectations."
 
     def __init__(self):
         options = [
@@ -260,19 +256,25 @@ class RebaselineExpectations(AbstractDeclarativeCommand):
         # FIXME: Support non-Chromium ports.
         return port_name.startswith('chromium-')
 
-    def _expectations(self, port):
-        return TestExpectations(port)
-
     def _update_expectations_file(self, port_name):
         if not self._is_supported_port(port_name):
             return
         port = self._tool.port_factory.get(port_name)
-        expectations = self._expectations(port)
+
+        # FIXME: This will intentionally skip over any REBASELINE expectations that were in an overrides file.
+        # This is not good, but avoids having the overrides getting written into the main file.
+        # See https://bugs.webkit.org/show_bug.cgi?id=88456 for context. This will no longer be needed
+        # once we properly support cascading expectations files.
+        expectations = TestExpectations(port, include_overrides=False)
         path = port.path_to_test_expectations_file()
         self._tool.filesystem.write_text_file(path, expectations.remove_rebaselined_tests(expectations.get_rebaselining_failures()))
 
     def _tests_to_rebaseline(self, port):
-        return self._expectations(port).get_rebaselining_failures()
+        tests_to_rebaseline = {}
+        expectations = TestExpectations(port, include_overrides=True)
+        for test in expectations.get_rebaselining_failures():
+            tests_to_rebaseline[test] = suffixes_for_expectations(expectations.get_expectations(test))
+        return tests_to_rebaseline
 
     def _rebaseline_port(self, port_name):
         if not self._is_supported_port(port_name):
@@ -281,23 +283,23 @@ class RebaselineExpectations(AbstractDeclarativeCommand):
         if not builder_name:
             return
         _log.info("Retrieving results for %s from %s." % (port_name, builder_name))
-        for test_name in self._tests_to_rebaseline(self._tool.port_factory.get(port_name)):
-            self._touched_test_names.add(test_name)
-            _log.info("    %s" % test_name)
-            # FIXME: need to extract the correct list of suffixes here.
-            self._run_webkit_patch(['rebaseline-test', builder_name, test_name])
+        for test_name, suffixes in self._tests_to_rebaseline(self._tool.port_factory.get(port_name)).iteritems():
+            self._touched_tests.setdefault(test_name, set()).update(set(suffixes))
+            _log.info("    %s (%s)" % (test_name, ','.join(suffixes)))
+            # FIXME: we should use executive.run_in_parallel() to speed this up.
+            self._run_webkit_patch(['rebaseline-test', '--suffixes', ','.join(suffixes), builder_name, test_name])
 
     def execute(self, options, args, tool):
-        self._touched_test_names = set([])
+        self._touched_tests = {}
         for port_name in tool.port_factory.all_port_names():
             self._rebaseline_port(port_name)
         for port_name in tool.port_factory.all_port_names():
             self._update_expectations_file(port_name)
         if not options.optimize:
             return
-        for test_name in self._touched_test_names:
-            _log.info("Optimizing baselines for %s." % test_name)
-            self._run_webkit_patch(['optimize-baselines', test_name])
+        for test_name, suffixes in self._touched_tests.iteritems():
+            _log.info("Optimizing baselines for %s (%s)." % (test_name, ','.join(suffixes)))
+            self._run_webkit_patch(['optimize-baselines', '--suffixes', ','.join(suffixes), test_name])
 
 
 class Rebaseline(AbstractDeclarativeCommand):

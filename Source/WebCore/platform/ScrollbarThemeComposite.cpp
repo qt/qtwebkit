@@ -242,7 +242,7 @@ int ScrollbarThemeComposite::thumbLength(ScrollbarThemeClient* scrollbar)
 
     float proportion = scrollbar->visibleSize() / usedTotalSize(scrollbar);
     int trackLen = trackLength(scrollbar);
-    int length = proportion * trackLen;
+    int length = round(proportion * trackLen);
     length = max(length, minimumThumbLength(scrollbar));
     if (length > trackLen)
         length = 0; // Once the thumb is below the track length, it just goes away (to make more room for the track).
@@ -269,6 +269,20 @@ int ScrollbarThemeComposite::trackLength(ScrollbarThemeClient* scrollbar)
 void ScrollbarThemeComposite::paintScrollCorner(ScrollView*, GraphicsContext* context, const IntRect& cornerRect)
 {
     context->fillRect(cornerRect, Color::white, ColorSpaceDeviceRGB);
+}
+
+IntRect ScrollbarThemeComposite::thumbRect(ScrollbarThemeClient* scrollbar)
+{
+    if (!hasThumb(scrollbar))
+        return IntRect();
+
+    IntRect track = trackRect(scrollbar);
+    IntRect startTrackRect;
+    IntRect thumbRect;
+    IntRect endTrackRect;
+    splitTrack(scrollbar, track, startTrackRect, thumbRect, endTrackRect);
+
+    return thumbRect;
 }
 
 void ScrollbarThemeComposite::paintOverhangAreas(ScrollView*, GraphicsContext* context, const IntRect& horizontalOverhangRect, const IntRect& verticalOverhangRect, const IntRect& dirtyRect)

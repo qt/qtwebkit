@@ -23,6 +23,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define __STDC_FORMAT_MACROS
 #include "config.h"
 #include "DumpRenderTreeView.h"
 
@@ -36,6 +37,7 @@
 #include <Evas.h>
 #include <cstdio>
 #include <cstdlib>
+#include <inttypes.h>
 #include <wtf/NotFound.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -129,7 +131,7 @@ static int64_t onExceededApplicationCacheQuota(Ewk_View_Smart_Data*, Ewk_Securit
         // sufficient to just get a range of 10000 to determine if we were
         // above or below a threshold.
         int64_t truncatedSpaceNeeded = (totalSpaceNeeded / 10000) * 10000;
-        printf("UI DELEGATE APPLICATION CACHE CALLBACK: exceededApplicationCacheOriginQuotaForSecurityOrigin:{%s, %s, %i} totalSpaceNeeded:~%lld\n",
+        printf("UI DELEGATE APPLICATION CACHE CALLBACK: exceededApplicationCacheOriginQuotaForSecurityOrigin:{%s, %s, %i} totalSpaceNeeded:~%" PRId64 "\n",
                ewk_security_origin_protocol_get(origin),
                ewk_security_origin_host_get(origin),
                ewk_security_origin_port_get(origin),
@@ -187,6 +189,12 @@ static Eina_Bool onNavigationPolicyDecision(Ewk_View_Smart_Data*, Ewk_Frame_Reso
     return policyDelegatePermissive;
 }
 
+static Eina_Bool onFocusCanCycle(Ewk_View_Smart_Data*, Ewk_Focus_Direction)
+{
+    // This is the behavior of Mac and Chromium ports and is expected by some test cases.
+    return true;
+}
+
 Evas_Object* drtViewAdd(Evas* evas)
 {
     static Ewk_View_Smart_Class api = EWK_VIEW_SMART_CLASS_INIT_NAME_VERSION("DRT_View");
@@ -206,6 +214,7 @@ Evas_Object* drtViewAdd(Evas* evas)
     api.exceeded_application_cache_quota = onExceededApplicationCacheQuota;
     api.exceeded_database_quota = onExceededDatabaseQuota;
     api.navigation_policy_decision = onNavigationPolicyDecision;
+    api.focus_can_cycle = onFocusCanCycle;
 
     return evas_object_smart_add(evas, evas_smart_class_new(&api.sc));
 }

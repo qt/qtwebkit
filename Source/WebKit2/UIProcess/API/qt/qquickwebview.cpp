@@ -25,7 +25,7 @@
 #include "DrawingAreaProxyImpl.h"
 #include "QtDialogRunner.h"
 #include "QtDownloadManager.h"
-#include "QtViewportInteractionEngine.h"
+#include "QtViewportHandler.h"
 #include "QtWebContext.h"
 #include "QtWebError.h"
 #include "QtWebIconDatabaseClient.h"
@@ -34,6 +34,8 @@
 #include "QtWebPagePolicyClient.h"
 #include "UtilsQt.h"
 #include "WebBackForwardList.h"
+#include "WebInspectorProxy.h"
+#include "WebInspectorServer.h"
 #if ENABLE(FULLSCREEN_API)
 #include "WebFullScreenManagerProxy.h"
 #endif
@@ -775,6 +777,8 @@ void QQuickWebViewLegacyPrivate::updateViewportSize()
 {
     Q_Q(QQuickWebView);
     QSize viewportSize = q->boundingRect().size().toSize();
+    if (viewportSize.isEmpty())
+        return;
     pageView->setContentsSize(viewportSize);
     // The fixed layout is handled by the FrameView and the drawing area doesn't behave differently
     // whether its fixed or not. We still need to tell the drawing area which part of it
@@ -821,7 +825,7 @@ QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate(QQuickWebView* view
 
 QQuickWebViewFlickablePrivate::~QQuickWebViewFlickablePrivate()
 {
-    interactionEngine->disconnect();
+    m_viewportHandler->disconnect();
 }
 
 void QQuickWebViewFlickablePrivate::initialize(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
@@ -834,8 +838,8 @@ void QQuickWebViewFlickablePrivate::onComponentComplete()
 {
     Q_Q(QQuickWebView);
 
-    interactionEngine.reset(new QtViewportInteractionEngine(webPageProxy.get(), q, pageView.data()));
-    pageView->eventHandler()->setViewportInteractionEngine(interactionEngine.data());
+    m_viewportHandler.reset(new QtViewportHandler(webPageProxy.get(), q, pageView.data()));
+    pageView->eventHandler()->setViewportHandler(m_viewportHandler.data());
 
     // Trigger setting of correct visibility flags after everything was allocated and initialized.
     _q_onVisibleChanged();
@@ -843,20 +847,20 @@ void QQuickWebViewFlickablePrivate::onComponentComplete()
 
 void QQuickWebViewFlickablePrivate::didChangeViewportProperties(const WebCore::ViewportAttributes& newAttributes)
 {
-    if (interactionEngine)
-        interactionEngine->viewportAttributesChanged(newAttributes);
+    if (m_viewportHandler)
+        m_viewportHandler->viewportAttributesChanged(newAttributes);
 }
 
 void QQuickWebViewFlickablePrivate::updateViewportSize()
 {
-    // FIXME: Examine why there is not an interactionEngine here in the beginning.
-    if (interactionEngine)
-        interactionEngine->viewportItemSizeChanged();
+    // FIXME: Examine why there is not an viewportHandler here in the beginning.
+    if (m_viewportHandler)
+        m_viewportHandler->viewportItemSizeChanged();
 }
 
 void QQuickWebViewFlickablePrivate::pageDidRequestScroll(const QPoint& pos)
 {
-    interactionEngine->pageContentPositionRequested(pos);
+    m_viewportHandler->pageContentPositionRequested(pos);
 }
 
 void QQuickWebViewFlickablePrivate::didChangeContentsSize(const QSize& newSize)
@@ -864,7 +868,7 @@ void QQuickWebViewFlickablePrivate::didChangeContentsSize(const QSize& newSize)
     Q_Q(QQuickWebView);
 
     pageView->setContentsSize(newSize); // emits contentsSizeChanged()
-    interactionEngine->pageContentsSizeChanged(newSize, q->boundingRect().size().toSize());
+    m_viewportHandler->pageContentsSizeChanged(newSize, q->boundingRect().size().toSize());
 }
 
 /*!
@@ -959,7 +963,13 @@ int QQuickWebViewExperimental::preferredMinimumContentsWidth() const
 void QQuickWebViewExperimental::setPreferredMinimumContentsWidth(int width)
 {
     Q_D(QQuickWebView);
-    d->webPageProxy->pageGroup()->preferences()->setLayoutFallbackWidth(width);
+    WebPreferences* webPreferences = d->webPageProxy->pageGroup()->preferences();
+
+    if (width == webPreferences->layoutFallbackWidth())
+        return;
+
+    webPreferences->setLayoutFallbackWidth(width);
+    emit preferredMinimumContentsWidthChanged();
 }
 
 void QQuickWebViewExperimental::setFlickableViewportEnabled(bool enable)
@@ -1187,12 +1197,12 @@ void QQuickWebViewExperimental::setUserAgent(const QString& userAgent)
 
     If the above is used on a device with device pixel ratio of 1.5, it will be scaled
     down but still provide a better looking image.
- */
+*/
 
 double QQuickWebViewExperimental::devicePixelRatio() const
 {
     Q_D(const QQuickWebView);
-    return d->webPageProxy->pageGroup()->preferences()->devicePixelRatio();
+    return d->webPageProxy->deviceScaleFactor();
 }
 
 void QQuickWebViewExperimental::setDevicePixelRatio(double devicePixelRatio)
@@ -1201,8 +1211,56 @@ void QQuickWebViewExperimental::setDevicePixelRatio(double devicePixelRatio)
     if (devicePixelRatio == this->devicePixelRatio())
         return;
 
-    d->webPageProxy->pageGroup()->preferences()->setDevicePixelRatio(devicePixelRatio);
+    d->webPageProxy->setCustomDeviceScaleFactor(devicePixelRatio);
     emit devicePixelRatioChanged();
+}
+
+/*!
+    \internal
+
+    \qmlproperty int WebViewExperimental::deviceWidth
+    \brief The device width used by the viewport calculations.
+
+    The value used when calculation the viewport, eg. what is used for 'device-width' when
+    used in the viewport meta tag. If unset (zero or negative width), the width of the
+    actual viewport is used instead.
+*/
+
+int QQuickWebViewExperimental::deviceWidth() const
+{
+    Q_D(const QQuickWebView);
+    return d->webPageProxy->pageGroup()->preferences()->deviceWidth();
+}
+
+void QQuickWebViewExperimental::setDeviceWidth(int value)
+{
+    Q_D(QQuickWebView);
+    d->webPageProxy->pageGroup()->preferences()->setDeviceWidth(qMax(0, value));
+    emit deviceWidthChanged();
+}
+
+/*!
+    \internal
+
+    \qmlproperty int WebViewExperimental::deviceHeight
+    \brief The device width used by the viewport calculations.
+
+    The value used when calculation the viewport, eg. what is used for 'device-height' when
+    used in the viewport meta tag. If unset (zero or negative height), the height of the
+    actual viewport is used instead.
+*/
+
+int QQuickWebViewExperimental::deviceHeight() const
+{
+    Q_D(const QQuickWebView);
+    return d->webPageProxy->pageGroup()->preferences()->deviceHeight();
+}
+
+void QQuickWebViewExperimental::setDeviceHeight(int value)
+{
+    Q_D(QQuickWebView);
+    d->webPageProxy->pageGroup()->preferences()->setDeviceHeight(qMax(0, value));
+    emit deviceHeightChanged();
 }
 
 /*!
@@ -1237,6 +1295,11 @@ void QQuickWebViewExperimental::setUserScripts(const QList<QUrl>& userScripts)
     d->userScripts = userScripts;
     d->updateUserScripts();
     emit userScriptsChanged();
+}
+
+QUrl QQuickWebViewExperimental::remoteInspectorUrl() const
+{
+    return QUrl(WebInspectorServer::shared().inspectorUrlForPageID(d_ptr->webPageProxy->inspector()->remoteInspectionPageID()));
 }
 
 QQuickUrlSchemeDelegate* QQuickWebViewExperimental::schemeDelegates_At(QQmlListProperty<QQuickUrlSchemeDelegate>* property, int index)
@@ -1743,6 +1806,10 @@ QPointF QQuickWebView::contentPos() const
 void QQuickWebView::setContentPos(const QPointF& pos)
 {
     Q_D(QQuickWebView);
+
+    if (pos == contentPos())
+        return;
+
     d->setContentPos(pos);
 }
 

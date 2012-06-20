@@ -35,6 +35,7 @@
 #include "KURL.h"
 #include "SchemeRegistry.h"
 #include "SecurityPolicy.h"
+#include "ThreadableBlobRegistry.h"
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
@@ -87,6 +88,15 @@ static KURL extractInnerURL(const KURL& url)
     // FIXME: Update this callsite to use the innerURL member function when
     // we finish implementing it.
     return KURL(ParsedURLString, decodeURLEscapeSequences(url.path()));
+}
+
+static PassRefPtr<SecurityOrigin> getCachedOrigin(const KURL& url)
+{
+#if ENABLE(BLOB)
+    if (url.protocolIs("blob"))
+        return ThreadableBlobRegistry::getCachedOrigin(url);
+#endif
+    return 0;
 }
 
 static bool shouldTreatAsUniqueOrigin(const KURL& url)
@@ -171,6 +181,10 @@ SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
 
 PassRefPtr<SecurityOrigin> SecurityOrigin::create(const KURL& url)
 {
+    RefPtr<SecurityOrigin> cachedOrigin = getCachedOrigin(url);
+    if (cachedOrigin.get())
+        return cachedOrigin;
+
     if (shouldTreatAsUniqueOrigin(url)) {
         RefPtr<SecurityOrigin> origin = adoptRef(new SecurityOrigin());
 
@@ -207,6 +221,19 @@ void SecurityOrigin::setDomainFromDOM(const String& newDomain)
 {
     m_domainWasSetInDOM = true;
     m_domain = newDomain.lower();
+}
+
+bool SecurityOrigin::isSecure(const KURL& url)
+{
+    // Invalid URLs are secure, as are URLs which have a secure protocol.
+    if (!url.isValid() || SchemeRegistry::shouldTreatURLSchemeAsSecure(url.protocol()))
+        return true;
+
+    // URLs that wrap inner URLs are secure if those inner URLs are secure.
+    if (shouldUseInnerURL(url) && SchemeRegistry::shouldTreatURLSchemeAsSecure(extractInnerURL(url).protocol()))
+        return true;
+
+    return false;
 }
 
 bool SecurityOrigin::canAccess(const SecurityOrigin* other) const
@@ -270,6 +297,9 @@ bool SecurityOrigin::passesFileCheck(const SecurityOrigin* other) const
 bool SecurityOrigin::canRequest(const KURL& url) const
 {
     if (m_universalAccess)
+        return true;
+
+    if (getCachedOrigin(url) == this)
         return true;
 
     if (isUnique())

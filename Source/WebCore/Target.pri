@@ -68,7 +68,6 @@ SOURCES += \
     accessibility/AccessibilityTableRow.cpp \
     accessibility/AXObjectCache.cpp \
     bindings/generic/ActiveDOMCallback.cpp \
-    bindings/generic/ContextEnabledFeatures.cpp \
     bindings/generic/RuntimeEnabledFeatures.cpp
 
 v8 {
@@ -216,6 +215,7 @@ v8 {
         bindings/v8/custom/V8StorageCustom.cpp \
         bindings/v8/custom/V8StyleSheetCustom.cpp \
         bindings/v8/custom/V8StyleSheetListCustom.cpp \
+        bindings/v8/custom/V8TextTrackListCustom.cpp \
         bindings/v8/custom/V8WebKitAnimationCustom.cpp \
         bindings/v8/custom/V8WebKitMutationObserverCustom.cpp \
         bindings/v8/custom/V8WebKitPointConstructor.cpp \
@@ -274,6 +274,7 @@ v8 {
         bindings/js/JSDOMMimeTypeArrayCustom.cpp \
         bindings/js/JSDOMPluginArrayCustom.cpp \
         bindings/js/JSDOMPluginCustom.cpp \
+        bindings/js/JSDOMStringListCustom.cpp \
         bindings/js/JSDOMStringMapCustom.cpp \
         bindings/js/JSDOMTokenListCustom.cpp \
         bindings/js/JSDOMWindowBase.cpp \
@@ -291,7 +292,7 @@ v8 {
         bindings/js/JSErrorHandler.cpp \
         bindings/js/JSEventCustom.cpp \
         bindings/js/JSEventListener.cpp \
-        bindings/js/JSEventTarget.cpp \
+        bindings/js/JSEventTargetCustom.cpp \
         bindings/js/JSExceptionBase.cpp \
         bindings/js/JSFileReaderCustom.cpp \
         bindings/js/JSFloat32ArrayCustom.cpp \
@@ -524,6 +525,7 @@ SOURCES += \
     dom/ContainerNode.cpp \
     dom/ContainerNodeAlgorithms.cpp \
     dom/ContextDestructionObserver.cpp \
+    dom/ContextFeatures.cpp \
     dom/CustomEvent.cpp \
     dom/DecodedDataDocumentParser.cpp \
     dom/DeviceMotionController.cpp \
@@ -702,7 +704,6 @@ SOURCES += \
     fileapi/FileReaderLoader.cpp \
     fileapi/FileReaderSync.cpp \
     fileapi/FileThread.cpp \
-    fileapi/OperationNotAllowedException.cpp \
     fileapi/ThreadableBlobRegistry.cpp \
     fileapi/WebKitBlobBuilder.cpp \
     history/BackForwardController.cpp \
@@ -732,6 +733,7 @@ SOURCES += \
     html/FTPDirectoryDocument.cpp \
     html/FileInputType.cpp \
     html/FormAssociatedElement.cpp \
+    html/FormController.cpp \
     html/FormDataList.cpp \
     html/HTMLAllCollection.cpp \
     html/HTMLAnchorElement.cpp \
@@ -889,6 +891,7 @@ SOURCES += \
     inspector/DOMPatchSupport.cpp \
     inspector/IdentifiersFactory.cpp \
     inspector/InjectedScript.cpp \
+    inspector/InjectedScriptBase.cpp \
     inspector/InjectedScriptHost.cpp \
     inspector/InjectedScriptManager.cpp \
     inspector/InspectorAgent.cpp \
@@ -920,6 +923,7 @@ SOURCES += \
     inspector/InspectorStyleTextEditor.cpp \
     inspector/InspectorTimelineAgent.cpp \
     inspector/InspectorValues.cpp \
+    inspector/InspectorWebGLAgent.cpp \
     inspector/InspectorWorkerAgent.cpp \
     inspector/InstrumentingAgents.cpp \
     inspector/NetworkResourcesData.cpp \
@@ -1306,6 +1310,7 @@ SOURCES += \
     rendering/RenderScrollbar.cpp \
     rendering/RenderScrollbarPart.cpp \
     rendering/RenderScrollbarTheme.cpp \
+    rendering/RenderSearchField.cpp \
     rendering/RenderSlider.cpp \
     rendering/RenderTable.cpp \
     rendering/RenderTableCaption.cpp \
@@ -1418,7 +1423,6 @@ HEADERS += \
     accessibility/AXObjectCache.h \
     bindings/ScriptControllerBase.h \
     bindings/generic/ActiveDOMCallback.h \
-    bindings/generic/ContextEnabledFeatures.h \
     bindings/generic/RuntimeEnabledFeatures.h
 
 v8 {
@@ -1508,7 +1512,6 @@ v8 {
         bindings/js/JSDOMWrapper.h \
         bindings/js/JSErrorHandler.h \
         bindings/js/JSEventListener.h \
-        bindings/js/JSEventTarget.h \
         bindings/js/JSHTMLAppletElementCustom.h \
         bindings/js/JSHTMLEmbedElementCustom.h \
         bindings/js/JSHTMLInputElementCustom.h \
@@ -1647,6 +1650,7 @@ HEADERS += \
     css/CSSValue.h \
     css/CSSValueList.h \
     css/CSSValuePool.h \
+    css/CSSVariableValue.h \
     css/CSSWrapShapes.h \
     css/FontFeatureValue.h \
     css/FontValue.h \
@@ -1697,6 +1701,7 @@ HEADERS += \
     dom/ComposedShadowTreeWalker.h \
     dom/ContainerNode.h \
     dom/ContainerNodeAlgorithms.h \
+    dom/ContextFeatures.h \
     dom/CustomEvent.h \
     dom/default/PlatformMessagePortChannel.h \
     dom/DeviceMotionClient.h \
@@ -1867,7 +1872,6 @@ HEADERS += \
     fileapi/FileReaderSync.h \
     fileapi/FileThread.h \
     fileapi/FileThreadTask.h \
-    fileapi/OperationNotAllowedException.h \
     fileapi/WebKitBlobBuilder.h \
     history/BackForwardController.h \
     history/BackForwardListImpl.h \
@@ -1888,6 +1892,7 @@ HEADERS += \
     html/DOMTokenList.h \
     html/DOMURL.h \
     html/FormAssociatedElement.h \
+    html/FormController.h \
     html/FormDataList.h \
     html/FTPDirectoryDocument.h \
     html/HTMLAllCollection.h \
@@ -2034,6 +2039,7 @@ HEADERS += \
     inspector/DOMWrapperVisitor.h \
     inspector/IdentifiersFactory.h \
     inspector/InjectedScript.h \
+    inspector/InjectedScriptBase.h \
     inspector/InjectedScriptHost.h \
     inspector/InjectedScriptManager.h \
     inspector/InspectorAgent.h \
@@ -2066,6 +2072,8 @@ HEADERS += \
     inspector/InspectorStyleSheet.h \
     inspector/InspectorStyleTextEditor.h \
     inspector/InspectorTimelineAgent.h \
+    inspector/InspectorWebGLAgent.h \
+    inspector/InspectorWebGLInstrumentation.h \
     inspector/InspectorWorkerAgent.h \
     inspector/InstrumentingAgents.h \
     inspector/NetworkResourcesData.h \
@@ -2219,6 +2227,7 @@ HEADERS += \
     platform/graphics/BitmapImage.h \
     platform/graphics/Color.h \
     platform/graphics/CrossfadeGeneratedImage.h \
+    platform/graphics/filters/CustomFilterGlobalContext.h \
     platform/graphics/filters/CustomFilterMesh.h \
     platform/graphics/filters/CustomFilterNumberParameter.h \
     platform/graphics/filters/CustomFilterShader.h \
@@ -2509,6 +2518,7 @@ HEADERS += \
     rendering/RenderScrollbar.h \
     rendering/RenderScrollbarPart.h \
     rendering/RenderScrollbarTheme.h \
+    rendering/RenderSearchField.h \
     rendering/RenderSlider.h \
     rendering/RenderTableCaption.h \
     rendering/RenderTableCell.h \
@@ -2558,6 +2568,7 @@ HEADERS += \
     rendering/style/StyleShader.h \
     rendering/style/StyleSurroundData.h \
     rendering/style/StyleTransformData.h \
+    rendering/style/StyleVariableData.h \
     rendering/style/StyleVisualData.h \
     rendering/style/SVGRenderStyleDefs.h \
     rendering/style/SVGRenderStyle.h \
@@ -3248,13 +3259,15 @@ contains(DEFINES, ENABLE_SCRIPTED_SPEECH=1) {
 
 contains(DEFINES, ENABLE_QUOTA=1) {
     HEADERS += \
-        storage/StorageInfo.h \
-        storage/StorageInfoErrorCallback.h \
-        storage/StorageInfoQuotaCallback.h \
-        storage/StorageInfoUsageCallback.h
+        Modules/quota/DOMWindowQuota.idl \
+        Modules/quota/StorageInfo.h \
+        Modules/quota/StorageInfoErrorCallback.h \
+        Modules/quota/StorageInfoQuotaCallback.h \
+        Modules/quota/StorageInfoUsageCallback.h
 
     SOURCES += \
-        storage/StorageInfo.cpp
+        Modules/quota/DOMWindowQuota.cpp
+        Modules/quota/StorageInfo.cpp
 }
 
 contains(DEFINES, ENABLE_VIDEO=1) {
@@ -3395,6 +3408,7 @@ contains(DEFINES, ENABLE_XSLT=1) {
 
 contains(DEFINES, ENABLE_FILTERS=1) {
     SOURCES += \
+        platform/graphics/filters/CustomFilterGlobalContext.cpp \
         platform/graphics/filters/CustomFilterOperation.cpp \
         platform/graphics/filters/CustomFilterProgram.cpp \
         platform/graphics/filters/CustomFilterShader.cpp \
@@ -3844,6 +3858,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLContextObject.h \
         html/canvas/WebGLDebugRendererInfo.h \
         html/canvas/WebGLDebugShaders.h \
+        html/canvas/WebGLDepthTexture.h \
         html/canvas/WebGLExtension.h \
         html/canvas/WebGLFramebuffer.h \
         html/canvas/WebGLGetInfo.h \
@@ -3886,6 +3901,7 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLContextObject.cpp \
         html/canvas/WebGLDebugRendererInfo.cpp \
         html/canvas/WebGLDebugShaders.cpp \
+        html/canvas/WebGLDepthTexture.cpp \
         html/canvas/WebGLExtension.cpp \
         html/canvas/WebGLFramebuffer.cpp \
         html/canvas/WebGLGetInfo.cpp \
@@ -3907,18 +3923,21 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         platform/graphics/GraphicsContext3D.cpp \
         platform/graphics/gpu/DrawingBuffer.cpp \
         platform/graphics/gpu/qt/DrawingBufferQt.cpp \
-        platform/graphics/qt/Extensions3DQt.cpp \
         platform/graphics/qt/GraphicsContext3DQt.cpp
 
     INCLUDEPATH += $$PWD/platform/graphics/gpu
 
-    !contains(QT_CONFIG, opengles2) {
-        HEADERS += \
-            platform/graphics/opengl/Extensions3DOpenGL.h
+    contains(QT_CONFIG, opengl) | contains(QT_CONFIG, opengles2) {
+        !contains(QT_CONFIG, opengles2) {
+            SOURCES += platform/graphics/opengl/GraphicsContext3DOpenGL.cpp
+        } else {
+            SOURCES += platform/graphics/opengl/GraphicsContext3DOpenGLES.cpp
+        }
+
+        HEADERS += platform/graphics/opengl/Extensions3DOpenGL.h
 
         SOURCES += \
             platform/graphics/opengl/Extensions3DOpenGL.cpp \
-            platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
             platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
 
         ANGLE_DIR = $$replace(PWD, "WebCore", "ThirdParty/ANGLE")
@@ -4064,17 +4083,16 @@ contains(DEFINES, ENABLE_MHTML=1) {
         page/PageSerializer.cpp
 }
 
-contains(DEFINES, HAVE_LIBPNG=1) {
+contains(DEFINES, WTF_USE_LIBPNG=1) {
     SOURCES += platform/image-decoders/ico/ICOImageDecoder.cpp \
                platform/image-decoders/png/PNGImageDecoder.cpp
 }
 
-contains(DEFINES, HAVE_LIBJPEG=1) {
+contains(DEFINES, WTF_USE_LIBJPEG=1) {
     SOURCES += platform/image-decoders/jpeg/JPEGImageDecoder.cpp
 }
 
 contains(DEFINES, WTF_USE_WEBP=1) {
-    INCLUDEPATH += platform/image-decoders/webp
     HEADERS += platform/image-decoders/webp/WEBPImageDecoder.h
     SOURCES += platform/image-decoders/webp/WEBPImageDecoder.cpp
 }

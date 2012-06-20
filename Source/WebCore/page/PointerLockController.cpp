@@ -48,12 +48,21 @@ PassOwnPtr<PointerLockController> PointerLockController::create(Page* page)
 
 void PointerLockController::requestPointerLock(Element* target, PassRefPtr<VoidCallback> successCallback, PassRefPtr<VoidCallback> failureCallback)
 {
+    if (!target)
+        return;
+
     if (isLocked()) {
+        // FIXME: Keep enqueueEvent usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
+        enqueueEvent(eventNames().webkitpointerlockchangeEvent, target);
+        if (m_element->document() != target->document())
+            enqueueEvent(eventNames().webkitpointerlockchangeEvent, m_element.get());
+
+        // FIXME: Remove callback usage, keep assignment of m_element = target. (https://bugs.webkit.org/show_bug.cgi?id=84402)
         if (m_element == target) {
             if (successCallback)
                 successCallback->handleEvent();
         } else {
-            didLosePointerLock();
+            didLosePointerLock(false);
             m_element = target;
             if (successCallback)
                 successCallback->handleEvent();
@@ -62,8 +71,14 @@ void PointerLockController::requestPointerLock(Element* target, PassRefPtr<VoidC
         m_element = target;
         m_successCallback = successCallback;
         m_failureCallback = failureCallback;
-    } else if (failureCallback)
-        failureCallback->handleEvent();
+    } else {
+        // FIXME: Keep enqueueEvent usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
+        enqueueEvent(eventNames().webkitpointerlockerrorEvent, target);
+
+        // FIXME: Remove callback usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
+        if (failureCallback)
+            failureCallback->handleEvent();
+    }
 }
 
 void PointerLockController::requestPointerUnlock()
@@ -76,8 +91,17 @@ bool PointerLockController::isLocked()
     return m_page->chrome()->client()->isPointerLocked();
 }
 
+Element* PointerLockController::element() const
+{
+    return m_element.get();
+}
+
 void PointerLockController::didAcquirePointerLock()
 {
+    // FIXME: Keep enqueueEvent usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
+    enqueueEvent(eventNames().webkitpointerlockchangeEvent, m_element.get());
+
+    // FIXME: Remove callback usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
     RefPtr<Element> elementToNotify(m_element);
     RefPtr<VoidCallback> callbackToIssue(m_successCallback);
     m_successCallback = 0;
@@ -89,6 +113,10 @@ void PointerLockController::didAcquirePointerLock()
 
 void PointerLockController::didNotAcquirePointerLock()
 {
+    // FIXME: Keep enqueueEvent usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
+    enqueueEvent(eventNames().webkitpointerlockerrorEvent, m_element.get());
+
+    // FIXME: Remove callback usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
     RefPtr<Element> elementToNotify(m_element);
     RefPtr<VoidCallback> callbackToIssue(m_failureCallback);
     m_element = 0;
@@ -99,8 +127,13 @@ void PointerLockController::didNotAcquirePointerLock()
         callbackToIssue->handleEvent();
 }
 
-void PointerLockController::didLosePointerLock()
+void PointerLockController::didLosePointerLock(bool sendChangeEvent)
 {
+    // FIXME: Keep enqueueEvent usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
+    if (sendChangeEvent)
+        enqueueEvent(eventNames().webkitpointerlockchangeEvent, m_element.get());
+
+    // FIXME: Remove callback usage. (https://bugs.webkit.org/show_bug.cgi?id=84402)
     RefPtr<Element> elementToNotify(m_element);
     m_element = 0;
     m_successCallback = 0;
@@ -119,6 +152,13 @@ void PointerLockController::dispatchLockedMouseEvent(const PlatformMouseEvent& e
     // Create click events
     if (eventType == eventNames().mouseupEvent)
         m_element->dispatchMouseEvent(event, eventNames().clickEvent, event.clickCount());
+}
+
+void PointerLockController::enqueueEvent(const AtomicString& type, Element* element)
+{
+    if (!element)
+        return;
+    element->document()->enqueueDocumentEvent(Event::create(type, true, false));
 }
 
 } // namespace WebCore

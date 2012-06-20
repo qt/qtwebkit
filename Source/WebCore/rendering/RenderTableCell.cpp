@@ -193,7 +193,7 @@ void RenderTableCell::layout()
 
 LayoutUnit RenderTableCell::paddingTop() const
 {
-    LayoutUnit result = computedCSSPaddingTop();
+    int result = computedCSSPaddingTop();
     if (!isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == TopToBottomWritingMode ? intrinsicPaddingBefore() : intrinsicPaddingAfter());
@@ -201,7 +201,7 @@ LayoutUnit RenderTableCell::paddingTop() const
 
 LayoutUnit RenderTableCell::paddingBottom() const
 {
-    LayoutUnit result = computedCSSPaddingBottom();
+    int result = computedCSSPaddingBottom();
     if (!isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == TopToBottomWritingMode ? intrinsicPaddingAfter() : intrinsicPaddingBefore());
@@ -209,16 +209,15 @@ LayoutUnit RenderTableCell::paddingBottom() const
 
 LayoutUnit RenderTableCell::paddingLeft() const
 {
-    LayoutUnit result = computedCSSPaddingLeft();
+    int result = computedCSSPaddingLeft();
     if (isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == LeftToRightWritingMode ? intrinsicPaddingBefore() : intrinsicPaddingAfter());
-    
 }
 
 LayoutUnit RenderTableCell::paddingRight() const
 {   
-    LayoutUnit result = computedCSSPaddingRight();
+    int result = computedCSSPaddingRight();
     if (isHorizontalWritingMode())
         return result;
     return result + (style()->writingMode() == LeftToRightWritingMode ? intrinsicPaddingAfter() : intrinsicPaddingBefore());
@@ -226,18 +225,18 @@ LayoutUnit RenderTableCell::paddingRight() const
 
 LayoutUnit RenderTableCell::paddingBefore() const
 {
-    return computedCSSPaddingBefore() + intrinsicPaddingBefore();
+    return static_cast<int>(computedCSSPaddingBefore()) + intrinsicPaddingBefore();
 }
 
 LayoutUnit RenderTableCell::paddingAfter() const
 {
-    return computedCSSPaddingAfter() + intrinsicPaddingAfter();
+    return static_cast<int>(computedCSSPaddingAfter()) + intrinsicPaddingAfter();
 }
 
-void RenderTableCell::setOverrideHeightFromRowHeight(LayoutUnit rowHeight)
+void RenderTableCell::setOverrideLogicalContentHeightFromRowHeight(LayoutUnit rowHeight)
 {
     clearIntrinsicPadding();
-    RenderBlock::setOverrideHeight(max<LayoutUnit>(0, rowHeight - borderBefore() - paddingBefore() - borderAfter() - paddingAfter()));
+    setOverrideLogicalContentHeight(max<LayoutUnit>(0, rowHeight - borderAndPaddingLogicalHeight()));
 }
 
 LayoutSize RenderTableCell::offsetFromContainer(RenderObject* o, const LayoutPoint& point, bool* offsetDependsOnPoint) const
@@ -468,7 +467,7 @@ CollapsedBorderValue RenderTableCell::computeCollapsedStartBorder(IncludeBorderC
         }
     } else {
         // (7) The table's start border.
-        result = chooseBorder(result, CollapsedBorderValue(table->style()->borderStart(), includeColor ? table->style()->visitedDependentColor(startColorProperty) : Color(), BTABLE));
+        result = chooseBorder(result, CollapsedBorderValue(table->tableStartBorderAdjoiningCell(this), includeColor ? table->style()->visitedDependentColor(startColorProperty) : Color(), BTABLE));
         if (!result.exists())
             return result;
     }
@@ -542,7 +541,7 @@ CollapsedBorderValue RenderTableCell::computeCollapsedEndBorder(IncludeBorderCol
         }
     } else {
         // (7) The table's end border.
-        result = chooseBorder(result, CollapsedBorderValue(table->style()->borderEnd(), includeColor ? table->style()->visitedDependentColor(endColorProperty) : Color(), BTABLE));
+        result = chooseBorder(result, CollapsedBorderValue(table->tableEndBorderAdjoiningCell(this), includeColor ? table->style()->visitedDependentColor(endColorProperty) : Color(), BTABLE));
         if (!result.exists())
             return result;
     }

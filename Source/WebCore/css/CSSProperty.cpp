@@ -268,6 +268,9 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyFontVariant:
     case CSSPropertyFontWeight:
     case CSSPropertyImageRendering:
+#if ENABLE(CSS_IMAGE_RESOLUTION)
+    case CSSPropertyImageResolution:
+#endif
     case CSSPropertyLetterSpacing:
     case CSSPropertyLineHeight:
     case CSSPropertyListStyle:
@@ -286,6 +289,9 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyTextRendering:
     case CSSPropertyTextShadow:
     case CSSPropertyTextTransform:
+#if ENABLE(CSS_VARIABLES)
+    case CSSPropertyVariable:
+#endif
     case CSSPropertyVisibility:
     case CSSPropertyWebkitAspectRatio:
     case CSSPropertyWebkitBorderHorizontalSpacing:
@@ -513,7 +519,9 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitBorderStartStyle:
     case CSSPropertyWebkitBorderStartWidth:
     case CSSPropertyWebkitBoxAlign:
+#if ENABLE(CSS_BOX_DECORATION_BREAK)
     case CSSPropertyWebkitBoxDecorationBreak:
+#endif
     case CSSPropertyWebkitBoxFlex:
     case CSSPropertyWebkitBoxFlexGroup:
     case CSSPropertyWebkitBoxLines:
@@ -528,6 +536,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitColumnBreakInside:
     case CSSPropertyWebkitColumnCount:
     case CSSPropertyWebkitColumnGap:
+    case CSSPropertyWebkitColumnProgression:
     case CSSPropertyWebkitColumnRule:
     case CSSPropertyWebkitColumnRuleColor:
     case CSSPropertyWebkitColumnRuleStyle:
@@ -539,14 +548,15 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitFilter:
 #endif
 #if ENABLE(CSS3_FLEXBOX)
+    case CSSPropertyWebkitAlignContent:
     case CSSPropertyWebkitAlignItems:
     case CSSPropertyWebkitAlignSelf:
     case CSSPropertyWebkitFlex:
-    case CSSPropertyWebkitFlexPack:
     case CSSPropertyWebkitFlexDirection:
     case CSSPropertyWebkitFlexFlow:
-    case CSSPropertyWebkitFlexLinePack:
     case CSSPropertyWebkitFlexWrap:
+    case CSSPropertyWebkitJustifyContent:
+    case CSSPropertyWebkitOrder:
 #endif
     case CSSPropertyWebkitFontSizeDelta:
     case CSSPropertyWebkitGridColumns:
@@ -590,12 +600,10 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitMaskRepeatX:
     case CSSPropertyWebkitMaskRepeatY:
     case CSSPropertyWebkitMaskSize:
-    case CSSPropertyWebkitMatchNearestMailBlockquoteColor:
     case CSSPropertyWebkitMaxLogicalWidth:
     case CSSPropertyWebkitMaxLogicalHeight:
     case CSSPropertyWebkitMinLogicalWidth:
     case CSSPropertyWebkitMinLogicalHeight:
-    case CSSPropertyWebkitOrder:
     case CSSPropertyWebkitPaddingAfter:
     case CSSPropertyWebkitPaddingBefore:
     case CSSPropertyWebkitPaddingEnd:

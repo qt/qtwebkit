@@ -28,18 +28,46 @@
 
 #include "CopiedSpace.h"
 #include "HandleTypes.h"
-#include "Options.h"
 #include "JSValue.h"
+#include "Options.h"
 #include "Register.h"
 #include "UnconditionalFinalizer.h"
 #include "VTableSpectrum.h"
 #include "WeakReferenceHarvester.h"
+#include <wtf/DataLog.h>
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/Vector.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/OSAllocator.h>
 #include <wtf/PageBlock.h>
+#include <wtf/TCSpinLock.h>
+#include <wtf/text/StringHash.h>
+#include <wtf/Vector.h>
+
+#if ENABLE(OBJECT_MARK_LOGGING)
+#define MARK_LOG_MESSAGE0(message) dataLog(message)
+#define MARK_LOG_MESSAGE1(message, arg1) dataLog(message, arg1)
+#define MARK_LOG_MESSAGE2(message, arg1, arg2) dataLog(message, arg1, arg2)
+#define MARK_LOG_ROOT(visitor, rootName) \
+    dataLog("\n%s: ", rootName); \
+    (visitor).resetChildCount()
+#define MARK_LOG_PARENT(visitor, parent) \
+    dataLog("\n%p (%s): ", parent, parent->className() ? parent->className() : "unknown"); \
+    (visitor).resetChildCount()
+#define MARK_LOG_CHILD(visitor, child) \
+    if ((visitor).childCount()) \
+    dataLogString(", "); \
+    dataLog("%p", child); \
+    (visitor).incrementChildCount()
+#else
+#define MARK_LOG_MESSAGE0(message) do { } while (false)
+#define MARK_LOG_MESSAGE1(message, arg1) do { } while (false)
+#define MARK_LOG_MESSAGE2(message, arg1, arg2) do { } while (false)
+#define MARK_LOG_ROOT(visitor, rootName) do { } while (false)
+#define MARK_LOG_PARENT(visitor, parent) do { } while (false)
+#define MARK_LOG_CHILD(visitor, child) do { } while (false)
+#endif
 
 namespace JSC {
 
@@ -85,7 +113,7 @@ namespace JSC {
         void shrinkReserve();
         
     private:
-        Mutex m_lock;
+        SpinLock m_lock;
         MarkStackSegment* m_nextFreeSegment;
     };
 
@@ -102,10 +130,9 @@ namespace JSC {
         
         bool isEmpty();
         
-        bool canDonateSomeCells(); // Returns false if you should definitely not call doanteSomeCellsTo().
-        bool donateSomeCellsTo(MarkStackArray& other); // Returns true if some cells were donated.
+        void donateSomeCellsTo(MarkStackArray& other);
         
-        void stealSomeCellsFrom(MarkStackArray& other);
+        void stealSomeCellsFrom(MarkStackArray& other, size_t idleThreadCount);
 
         size_t size();
 
@@ -171,13 +198,19 @@ namespace JSC {
         ~MarkStackThreadSharedData();
         
         void reset();
+
+#if ENABLE(PARALLEL_GC)
+        void resetChildren();
+        size_t childVisitCount();
+        size_t childDupStrings();
+#endif
     
     private:
         friend class MarkStack;
         friend class SlotVisitor;
 
 #if ENABLE(PARALLEL_GC)
-        void markingThreadMain();
+        void markingThreadMain(SlotVisitor*);
         static void markingThreadStartFunc(void* heap);
 #endif
 
@@ -187,6 +220,7 @@ namespace JSC {
         MarkStackSegmentAllocator m_segmentAllocator;
         
         Vector<ThreadIdentifier> m_markingThreads;
+        Vector<MarkStack*> m_markingThreadsMarkStack;
         
         Mutex m_markingLock;
         ThreadCondition m_markingCondition;
@@ -221,7 +255,8 @@ namespace JSC {
         void addOpaqueRoot(void*);
         bool containsOpaqueRoot(void*);
         int opaqueRootCount();
-        
+
+        MarkStackThreadSharedData& sharedData() { return m_shared; }
         bool isEmpty() { return m_stack.isEmpty(); }
 
         void reset();
@@ -241,6 +276,12 @@ namespace JSC {
         {
             m_shared.m_unconditionalFinalizers.addThreadSafe(unconditionalFinalizer);
         }
+
+#if ENABLE(OBJECT_MARK_LOGGING)
+        inline void resetChildCount() { m_logChildCount = 0; }
+        inline unsigned childCount() { return m_logChildCount; }
+        inline void incrementChildCount() { m_logChildCount++; }
+#endif
 
     protected:
         JS_EXPORT_PRIVATE static void validate(JSCell*);
@@ -283,6 +324,10 @@ namespace JSC {
         bool m_isInParallelMode;
         
         MarkStackThreadSharedData& m_shared;
+
+#if ENABLE(OBJECT_MARK_LOGGING)
+        unsigned m_logChildCount;
+#endif
     };
 
     inline MarkStack::MarkStack(MarkStackThreadSharedData& shared)
@@ -366,22 +411,6 @@ namespace JSC {
             ASSERT(m_topSegment->m_previous->m_top == m_segmentCapacity);
             return false;
         }
-        return true;
-    }
-
-    inline bool MarkStackArray::canDonateSomeCells()
-    {
-        size_t numberOfCellsToKeep = Options::minimumNumberOfCellsToKeep;
-        // Another check: see if we have enough cells to warrant donation.
-        if (m_top <= numberOfCellsToKeep) {
-            // This indicates that we might not want to donate anything; check if we have
-            // another full segment. If not, then don't donate.
-            if (!m_topSegment->m_previous)
-                return false;
-            
-            ASSERT(m_topSegment->m_previous->m_top == m_segmentCapacity);
-        }
-        
         return true;
     }
 

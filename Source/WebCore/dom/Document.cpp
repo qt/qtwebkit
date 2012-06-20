@@ -44,6 +44,7 @@
 #include "Comment.h"
 #include "Console.h"
 #include "ContentSecurityPolicy.h"
+#include "ContextFeatures.h"
 #include "CookieJar.h"
 #include "DOMImplementation.h"
 #include "DOMSelection.h"
@@ -71,7 +72,7 @@
 #include "ExceptionCode.h"
 #include "FlowThreadController.h"
 #include "FocusController.h"
-#include "FormAssociatedElement.h"
+#include "FormController.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
@@ -92,7 +93,6 @@
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLHeadElement.h"
 #include "HTMLIFrameElement.h"
-#include "HTMLInputElement.h"
 #include "HTMLLinkElement.h"
 #include "HTMLMapElement.h"
 #include "HTMLNameCollection.h"
@@ -115,12 +115,14 @@
 #include "NewXMLDocumentParser.h"
 #include "NodeFilter.h"
 #include "NodeIterator.h"
+#include "NodeRareData.h"
 #include "NodeWithIndex.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
 #include "PlatformKeyboardEvent.h"
 #include "PluginDocument.h"
+#include "PointerLockController.h"
 #include "PopStateEvent.h"
 #include "ProcessingInstruction.h"
 #include "RegisteredEventListener.h"
@@ -140,6 +142,7 @@
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "SegmentedString.h"
+#include "SelectorQuery.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "StaticHashSetNodeList.h"
@@ -150,6 +153,7 @@
 #include "Timer.h"
 #include "TransformSource.h"
 #include "TreeWalker.h"
+#include "UndoManager.h"
 #include "UserContentURLPattern.h"
 #include "WebKitNamedFlow.h"
 #include "XMLDocumentParser.h"
@@ -426,6 +430,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     : ContainerNode(0, CreateDocument)
     , TreeScope(this)
     , m_guardRefCount(0)
+    , m_contextFeatures(ContextFeatures::defaultSwitch())
     , m_compatibilityMode(NoQuirksMode)
     , m_compatibilityModeLocked(false)
     , m_domTreeVersion(++s_globalTreeVersion)
@@ -483,6 +488,9 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_writeRecursionDepth(0)
     , m_wheelEventHandlerCount(0)
     , m_touchEventHandlerCount(0)
+#if ENABLE(UNDO_MANAGER)
+    , m_undoManager(0)
+#endif
     , m_pendingTasksTimer(this, &Document::pendingTasksTimerFired)
     , m_scheduledTasksAreSuspended(false)
     , m_visualUpdatesAllowed(true)
@@ -501,6 +509,8 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     m_ignoreAutofocus = false;
 
     m_frame = frame;
+    if (m_frame)
+        provideContextFeaturesToDocumentFrom(this, m_frame->page());
 
     // We depend on the url getting immediately set in subframes, but we
     // also depend on the url NOT getting immediately set in opened windows.
@@ -630,6 +640,11 @@ Document::~Document()
     clearStyleResolver(); // We need to destory CSSFontSelector before destroying m_cachedResourceLoader.
     m_cachedResourceLoader.clear();
 
+#if ENABLE(UNDO_MANAGER)
+    if (m_undoManager)
+        m_undoManager->undoScopeHostDestroyed();
+#endif
+
     // We must call clearRareData() here since a Document class inherits TreeScope
     // as well as Node. See a comment on TreeScope.h for the reason.
     if (hasRareData())
@@ -656,10 +671,13 @@ void Document::removedLastRef()
         m_activeNode = 0;
         m_titleElement = 0;
         m_documentElement = 0;
+        m_contextFeatures = ContextFeatures::defaultSwitch();
 #if ENABLE(FULLSCREEN_API)
         m_fullScreenElement = 0;
         m_fullScreenElementStack.clear();
 #endif
+
+        detachParser();
 
         // removeAllChildren() doesn't always unregister IDs,
         // so tear down scope information upfront to avoid having stale references in the map.
@@ -667,8 +685,6 @@ void Document::removedLastRef()
         removeAllChildren();
 
         m_markers->detach();
-
-        detachParser();
 
         m_cssCanvasElements.clear();
 
@@ -685,9 +701,9 @@ void Document::removedLastRef()
 
         guardDeref();
     } else {
-#ifndef NDEBUG
-        m_deletionHasBegun = true;
-#endif
+#ifndef NDEBUG 
+        m_deletionHasBegun = true; 
+#endif 
         delete this;
     }
 }
@@ -731,6 +747,13 @@ void Document::invalidateAccessKeyMap()
     m_elementsByAccessKey.clear();
 }
 
+SelectorQueryCache* Document::selectorQueryCache()
+{
+    if (!m_selectorQueryCache)
+        m_selectorQueryCache = adoptPtr(new SelectorQueryCache());
+    return m_selectorQueryCache.get();
+}
+
 MediaQueryMatcher* Document::mediaQueryMatcher()
 {
     if (!m_mediaQueryMatcher)
@@ -745,6 +768,7 @@ void Document::setCompatibilityMode(CompatibilityMode mode)
     ASSERT(!m_styleSheets->length());
     bool wasInQuirksMode = inQuirksMode();
     m_compatibilityMode = mode;
+    selectorQueryCache()->invalidate();
     if (inQuirksMode() != wasInQuirksMode) {
         // All user stylesheets have to reparse using the different mode.
         clearPageUserSheet();
@@ -779,7 +803,7 @@ void Document::setDocType(PassRefPtr<DocumentType> docType)
     m_docType = docType;
     if (m_docType) {
         this->adoptIfNeeded(m_docType.get());
-#if USE(LEGACY_VIEWPORT_ADAPTION)
+#if ENABLE(LEGACY_VIEWPORT_ADAPTION)
         ASSERT(m_viewportArguments.type == ViewportArguments::Implicit);
         if (m_docType->publicId().startsWith("-//wapforum//dtd xhtml mobile 1.", /* caseSensitive */ false))
             processViewport("width=device-width, height=device-height", ViewportArguments::XHTMLMobileProfile);
@@ -1298,6 +1322,7 @@ void Document::setXMLStandalone(bool standalone, ExceptionCode& ec)
 
 void Document::setDocumentURI(const String& uri)
 {
+    // This property is read-only from JavaScript, but writable from Objective-C.
     m_documentURI = uri;
     updateBaseURL();
 }
@@ -1615,6 +1640,27 @@ String Document::nodeName() const
 Node::NodeType Document::nodeType() const
 {
     return DOCUMENT_NODE;
+}
+
+FormController* Document::formController()
+{
+    if (!m_formController)
+        m_formController = FormController::create();
+    return m_formController.get();
+}
+
+Vector<String> Document::formElementsState() const
+{
+    if (!m_formController)
+        return Vector<String>();
+    return m_formController->formElementsState();
+}
+
+void Document::setStateForNewFormElements(const Vector<String>& stateVector)
+{
+    if (!stateVector.size() && !m_formController)
+        return;
+    formController()->setStateForNewFormElements(stateVector);
 }
 
 FrameView* Document::view() const
@@ -2649,10 +2695,12 @@ void Document::updateBaseURL()
     else if (!m_baseURLOverride.isEmpty())
         m_baseURL = m_baseURLOverride;
     else {
-        // The documentURI attribute is an arbitrary string. DOM 3 Core does not specify how it should be resolved,
-        // so we use a null base URL.
+        // The documentURI attribute is read-only from JavaScript, but writable from Objective C, so we need to retain
+        // this fallback behavior. We use a null base URL, since the documentURI attribute is an arbitrary string
+        // and DOM 3 Core does not specify how it should be resolved.
         m_baseURL = KURL(KURL(), documentURI());
     }
+    selectorQueryCache()->invalidate();
 
     if (!m_baseURL.isValid())
         m_baseURL = KURL();
@@ -3150,7 +3198,7 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
     
     // Then, see how many doctypes and elements might be added by the new child.
     if (newChild->nodeType() == DOCUMENT_FRAGMENT_NODE) {
-        for (Node* c = firstChild(); c; c = c->nextSibling()) {
+        for (Node* c = newChild->firstChild(); c; c = c->nextSibling()) {
             switch (c->nodeType()) {
             case ATTRIBUTE_NODE:
             case CDATA_SECTION_NODE:
@@ -3812,6 +3860,18 @@ void Document::setCSSTarget(Element* n)
     m_cssTarget = n;
     if (n)
         n->setNeedsStyleRecalc();
+}
+
+void Document::registerDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
+{
+    ensureRareData()->ensureNodeLists(this)->m_listsInvalidatedAtDocument.add(list);
+}
+
+void Document::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
+{
+    ASSERT(hasRareData());
+    ASSERT(rareData()->nodeLists());
+    rareData()->nodeLists()->m_listsInvalidatedAtDocument.remove(list);
 }
 
 void Document::attachNodeIterator(NodeIterator* ni)
@@ -4737,26 +4797,6 @@ void Document::finishedParsing()
     }
 }
 
-Vector<String> Document::formElementsState() const
-{
-    Vector<String> stateVector;
-    stateVector.reserveInitialCapacity(m_formElementsWithState.size() * 3);
-    typedef FormElementListHashSet::const_iterator Iterator;
-    Iterator end = m_formElementsWithState.end();
-    for (Iterator it = m_formElementsWithState.begin(); it != end; ++it) {
-        HTMLFormControlElementWithState* elementWithState = *it;
-        if (!elementWithState->shouldSaveAndRestoreFormControlState())
-            continue;
-        String value;
-        if (!elementWithState->saveFormControlState(value))
-            continue;
-        stateVector.append(elementWithState->formControlName().string());
-        stateVector.append(elementWithState->formControlType().string());
-        stateVector.append(value);
-    }
-    return stateVector;
-}
-
 PassRefPtr<XPathExpression> Document::createExpression(const String& expression,
                                                        XPathNSResolver* resolver,
                                                        ExceptionCode& ec)
@@ -4785,96 +4825,6 @@ PassRefPtr<XPathResult> Document::evaluate(const String& expression,
     return m_xpathEvaluator->evaluate(expression, contextNode, resolver, type, result, ec);
 }
 
-void Document::setStateForNewFormElements(const Vector<String>& stateVector)
-{
-    // Walk the state vector backwards so that the value to use for each
-    // name/type pair first is the one at the end of each individual vector
-    // in the FormElementStateMap. We're using them like stacks.
-    typedef FormElementStateMap::iterator Iterator;
-    m_formElementsWithState.clear();
-    for (size_t i = stateVector.size() / 3 * 3; i; i -= 3) {
-        AtomicString a = stateVector[i - 3];
-        AtomicString b = stateVector[i - 2];
-        const String& c = stateVector[i - 1];
-        FormElementKey key(a.impl(), b.impl());
-        Iterator it = m_stateForNewFormElements.find(key);
-        if (it != m_stateForNewFormElements.end())
-            it->second.append(c);
-        else {
-            Vector<String> v(1);
-            v[0] = c;
-            m_stateForNewFormElements.set(key, v);
-        }
-    }
-}
-
-bool Document::hasStateForNewFormElements() const
-{
-    return !m_stateForNewFormElements.isEmpty();
-}
-
-bool Document::takeStateForFormElement(AtomicStringImpl* name, AtomicStringImpl* type, String& state)
-{
-    typedef FormElementStateMap::iterator Iterator;
-    Iterator it = m_stateForNewFormElements.find(FormElementKey(name, type));
-    if (it == m_stateForNewFormElements.end())
-        return false;
-    ASSERT(it->second.size());
-    state = it->second.last();
-    if (it->second.size() > 1)
-        it->second.removeLast();
-    else
-        m_stateForNewFormElements.remove(it);
-    return true;
-}
-
-FormElementKey::FormElementKey(AtomicStringImpl* name, AtomicStringImpl* type)
-    : m_name(name), m_type(type)
-{
-    ref();
-}
-
-FormElementKey::~FormElementKey()
-{
-    deref();
-}
-
-FormElementKey::FormElementKey(const FormElementKey& other)
-    : m_name(other.name()), m_type(other.type())
-{
-    ref();
-}
-
-FormElementKey& FormElementKey::operator=(const FormElementKey& other)
-{
-    other.ref();
-    deref();
-    m_name = other.name();
-    m_type = other.type();
-    return *this;
-}
-
-void FormElementKey::ref() const
-{
-    if (name())
-        name()->ref();
-    if (type())
-        type()->ref();
-}
-
-void FormElementKey::deref() const
-{
-    if (name())
-        name()->deref();
-    if (type())
-        type()->deref();
-}
-
-unsigned FormElementKeyHash::hash(const FormElementKey& key)
-{
-    return StringHasher::hashMemory<sizeof(FormElementKey)>(&key);
-}
-
 const Vector<IconURL>& Document::iconURLs() const
 {
     return m_iconURLs;
@@ -4894,25 +4844,6 @@ void Document::addIconURL(const String& url, const String& mimeType, const Strin
         if (iconURL == newURL)
             f->loader()->didChangeIcons(iconType);
     }
-}
-
-void Document::registerFormElementWithFormAttribute(FormAssociatedElement* element)
-{
-    ASSERT(toHTMLElement(element)->fastHasAttribute(formAttr));
-    m_formElementsWithFormAttribute.add(element);
-}
-
-void Document::unregisterFormElementWithFormAttribute(FormAssociatedElement* element)
-{
-    m_formElementsWithFormAttribute.remove(element);
-}
-
-void Document::resetFormElementsOwner()
-{
-    typedef FormAssociatedElementListHashSet::iterator Iterator;
-    Iterator end = m_formElementsWithFormAttribute.end();
-    for (Iterator it = m_formElementsWithFormAttribute.begin(); it != end; ++it)
-        (*it)->resetFormOwner();
 }
 
 void Document::setUseSecureKeyboardEntryWhenActive(bool usesSecureKeyboard)
@@ -5821,6 +5752,19 @@ void Document::addDocumentToFullScreenChangeEventQueue(Document* doc)
 }
 #endif
 
+#if ENABLE(POINTER_LOCK)
+void Document::webkitExitPointerLock()
+{
+    if (page())
+        page()->pointerLockController()->requestPointerUnlock();
+}
+
+Element* Document::webkitPointerLockElement() const
+{
+    return page() ? page()->pointerLockController()->element() : 0;
+}
+#endif
+
 void Document::decrementLoadEventDelayCount()
 {
     ASSERT(m_loadEventDelayCount);
@@ -6027,5 +5971,53 @@ Node* eventTargetNodeForDocument(Document* doc)
         node = doc->documentElement();
     return node;
 }
+
+void Document::adjustFloatQuadsForScrollAndAbsoluteZoomAndFrameScale(Vector<FloatQuad>& quads, RenderObject* renderer)
+{
+    if (!view())
+        return;
+
+    float inverseFrameScale = 1;
+    if (frame())
+        inverseFrameScale = 1 / frame()->frameScaleFactor();
+
+    LayoutRect visibleContentRect = view()->visibleContentRect();
+    for (size_t i = 0; i < quads.size(); ++i) {
+        quads[i].move(-visibleContentRect.x(), -visibleContentRect.y());
+        adjustFloatQuadForAbsoluteZoom(quads[i], renderer);
+        if (inverseFrameScale != 1)
+            quads[i].scale(inverseFrameScale, inverseFrameScale);
+    }
+}
+
+void Document::adjustFloatRectForScrollAndAbsoluteZoomAndFrameScale(FloatRect& rect, RenderObject* renderer)
+{
+    if (!view())
+        return;
+
+    float inverseFrameScale = 1;
+    if (frame())
+        inverseFrameScale = 1 / frame()->frameScaleFactor();
+
+    LayoutRect visibleContentRect = view()->visibleContentRect();
+    rect.move(-visibleContentRect.x(), -visibleContentRect.y());
+    adjustFloatRectForAbsoluteZoom(rect, renderer);
+    if (inverseFrameScale != 1)
+        rect.scale(inverseFrameScale);
+}
+
+void Document::setContextFeatures(PassRefPtr<ContextFeatures> features)
+{
+    m_contextFeatures = features;
+}
+
+#if ENABLE(UNDO_MANAGER)
+PassRefPtr<UndoManager> Document::undoManager()
+{
+    if (!m_undoManager)
+        m_undoManager = UndoManager::create(this);
+    return m_undoManager;
+}
+#endif
 
 } // namespace WebCore

@@ -42,6 +42,8 @@ WebInspector.UISourceCode = function(url, resource, contentProvider, sourceMappi
 {
     this._url = url;
     this._resource = resource;
+    if (resource)
+        resource.setUISourceCode(this);
     this._parsedURL = new WebInspector.ParsedURL(url);
     this._contentProvider = contentProvider;
     this._sourceMapping = sourceMapping;
@@ -206,8 +208,7 @@ WebInspector.UISourceCode.prototype = {
         function innerCallback(error)
         {
             delete this._committingWorkingCopy;
-            if (!error)
-                this.contentChanged(newContent, this._mimeType);
+            this.contentChanged(newContent, this._mimeType);
             callback(error);
         }
 
@@ -287,7 +288,7 @@ WebInspector.UISourceCode.prototype = {
     /**
      * @param {number} lineNumber
      * @param {number} columnNumber
-     * @return {DebuggerAgent.Location}
+     * @return {WebInspector.RawLocation}
      */
     uiLocationToRawLocation: function(lineNumber, columnNumber)
     {
@@ -420,10 +421,17 @@ WebInspector.UILocation = function(uiSourceCode, lineNumber, columnNumber)
 
 WebInspector.UILocation.prototype = {
     /**
-     * @return {DebuggerAgent.Location}
+     * @return {WebInspector.RawLocation}
      */
     uiLocationToRawLocation: function()
     {
         return this.uiSourceCode.uiLocationToRawLocation(this.lineNumber, this.columnNumber);
     }
+}
+
+/**
+ * @interface
+ */
+WebInspector.RawLocation = function()
+{
 }

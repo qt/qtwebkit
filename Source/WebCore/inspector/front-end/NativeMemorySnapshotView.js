@@ -93,6 +93,22 @@ WebInspector.NativeMemoryProfileType.prototype = {
         profilesPanel.addProfileHeader(profileHeader);
         function didReceiveMemorySnapshot(error, memoryBlock)
         {
+            if (memoryBlock.size && memoryBlock.children) {
+                var knownSize = 0;
+                for (var i = 0; i < memoryBlock.children.length; i++) {
+                    var size = memoryBlock.children[i].size;
+                    if (size)
+                        knownSize += size;
+                }
+                var otherSize = memoryBlock.size - knownSize;
+
+                if (otherSize) {
+                    memoryBlock.children.push({
+                        name: "Other",
+                        size: otherSize
+                    });
+                }
+            }
             profileHeader._memoryBlock = memoryBlock;
             profileHeader.isTemporary = false;
         }
@@ -198,12 +214,14 @@ WebInspector.MemoryBlockViewProperties._initialize = function()
     {
         WebInspector.MemoryBlockViewProperties._standardBlocks[name] = new WebInspector.MemoryBlockViewProperties(fillStyle, name, WebInspector.UIString(description));
     }
-    addBlock("rgba(240, 240, 250, 0.8)", "ProcessPrivateMemory", "Total");
-    addBlock("rgba(250, 200, 200, 0.8)", "JSHeapAllocated", "JavaScript heap");
-    addBlock("rgba(200, 250, 200, 0.8)", "JSHeapUsed", "Used JavaScript heap");
-    addBlock("rgba(200, 170, 200, 0.8)", "MemoryCache", "Memory cache resources");
-    addBlock("rgba(250, 250, 150, 0.8)", "RenderTreeAllocated", "Render tree");
-    addBlock("rgba(200, 150, 150, 0.8)", "RenderTreeUsed", "Render tree used");
+    addBlock("hsl(  0,  0%, 100%)", "ProcessPrivateMemory", "Total");
+    addBlock("hsl(  0,  0%,  80%)", "Other", "Other");
+    addBlock("hsl( 90, 60%,  80%)", "JSHeapAllocated", "JavaScript heap");
+    addBlock("hsl( 90, 80%,  80%)", "JSHeapUsed", "Used JavaScript heap");
+    addBlock("hsl(210, 60%,  80%)", "InspectorData", "Inspector data");
+    addBlock("hsl( 30, 60%,  80%)", "MemoryCache", "Memory cache resources");
+    addBlock("hsl( 60, 60%,  80%)", "RenderTreeAllocated", "Render tree");
+    addBlock("hsl( 60, 60%,  80%)", "RenderTreeUsed", "Render tree used");
 }
 
 WebInspector.MemoryBlockViewProperties._forMemoryBlock = function(memoryBlock)
@@ -281,68 +299,63 @@ WebInspector.NativeMemoryPieChart.prototype = {
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, Math.PI*2, false);
         ctx.lineWidth = 1;
-        ctx.fillStyle = WebInspector.MemoryBlockViewProperties._forMemoryBlock(this._memorySnapshot)._fillStyle;
         ctx.strokeStyle = "rgba(130, 130, 130, 0.8)";
-        ctx.fill();
         ctx.stroke();
         ctx.closePath();
 
-        var startAngle = - Math.PI / 2;
-        var currentAngle = startAngle;
+        var currentAngle = 0;
         var memoryBlock = this._memorySnapshot;
 
         function paintPercentAndLabel(fraction, title, midAngle)
         {
             ctx.beginPath();
-            ctx.font = "14px Arial";
+            ctx.font = "13px Arial";
             ctx.fillStyle = "rgba(10, 10, 10, 0.8)";
 
-            var textX = x + radius * Math.cos(midAngle) / 2;
-            var textY = y + radius * Math.sin(midAngle) / 2;
-            ctx.fillText((100 * fraction).toFixed(0) + "%", textX, textY);
-
-            textX = x + radius * Math.cos(midAngle);
-            textY = y + radius * Math.sin(midAngle);
-            if (midAngle <= startAngle + Math.PI) {
-                textX += 10;
-                textY += 10;
-            } else {
-                var metrics = ctx.measureText(title);
-                textX -= metrics.width + 10;
-            }
+            var textX = x + (radius + 10) * Math.cos(midAngle);
+            var textY = y + (radius + 10) * Math.sin(midAngle);
+            var relativeOffset = -Math.cos(midAngle) / Math.sin(Math.PI / 12);
+            relativeOffset = Number.constrain(relativeOffset, -1, 1);
+            var metrics = ctx.measureText(title);
+            textX -= metrics.width * (relativeOffset + 1) / 2;
+            textY += 5;
             ctx.fillText(title, textX, textY);
+
+            // Do not print percentage if the sector is too narrow.
+            if (fraction > 0.03) {
+                textX = x + radius * Math.cos(midAngle) / 2;
+                textY = y + radius * Math.sin(midAngle) / 2;
+                ctx.fillText((100 * fraction).toFixed(0) + "%", textX - 8, textY + 5);
+            }
+
             ctx.closePath();
         }
 
-        if (memoryBlock.children) {
-            var total = memoryBlock.size;
-            for (var i = 0; i < memoryBlock.children.length; i++) {
-                var child = memoryBlock.children[i];
-                if (!child.size)
-                    continue;
-                var viewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(child);
-                var angleSpan = Math.PI * 2 * (child.size / total);
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(x + radius * Math.cos(currentAngle), y + radius * Math.sin(currentAngle));
-                ctx.arc(x, y, radius, currentAngle, currentAngle + angleSpan, false);
-                ctx.lineWidth = 0.5;
-                ctx.lineTo(x, y);
-                ctx.fillStyle = viewProperties._fillStyle;
-                ctx.strokeStyle = "rgba(100, 100, 100, 0.8)";
-                ctx.fill();
-                ctx.stroke();
-                ctx.closePath();
+        if (!memoryBlock.children)
+            return;
+        var total = memoryBlock.size;
+        for (var i = 0; i < memoryBlock.children.length; i++) {
+            var child = memoryBlock.children[i];
+            if (!child.size)
+                continue;
+            var viewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(child);
+            var angleSpan = Math.PI * 2 * (child.size / total);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + radius * Math.cos(currentAngle), y + radius * Math.sin(currentAngle));
+            ctx.arc(x, y, radius, currentAngle, currentAngle + angleSpan, false);
+            ctx.lineWidth = 0.5;
+            ctx.lineTo(x, y);
+            ctx.fillStyle = viewProperties._fillStyle;
+            ctx.strokeStyle = "rgba(100, 100, 100, 0.8)";
+            ctx.fill();
+            ctx.stroke();
+            ctx.closePath();
 
-                paintPercentAndLabel(child.size / total, viewProperties._description, currentAngle + angleSpan / 2);
+            paintPercentAndLabel(child.size / total, viewProperties._description, currentAngle + angleSpan / 2);
 
-                currentAngle += angleSpan;
-            }
+            currentAngle += angleSpan;
         }
-
-        var fraction = 1 - (currentAngle - startAngle) / (2 * Math.PI);
-        var midAngle = (currentAngle + startAngle + 2 * Math.PI) / 2;
-        paintPercentAndLabel(fraction, WebInspector.UIString("Unknown"), midAngle);
     },
 
     _clear: function() {

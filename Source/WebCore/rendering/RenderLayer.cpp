@@ -129,6 +129,9 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     : m_inResizeMode(false)
     , m_scrollDimensionsDirty(true)
     , m_normalFlowListDirty(true)
+    , m_hasSelfPaintingLayerDescendant(false)
+    , m_hasSelfPaintingLayerDescendantDirty(false)
+    , m_isRootLayer(renderer->isRenderView())
     , m_usedTransparency(false)
     , m_paintingInsideReflection(false)
     , m_inOverflowRelayout(false)
@@ -142,7 +145,7 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_has3DTransformedDescendant(false)
 #if USE(ACCELERATED_COMPOSITING)
     , m_hasCompositingDescendant(false)
-    , m_mustOverlapCompositedLayers(false)
+    , m_indirectCompositingReason(NoIndirectCompositingReason)
 #endif
     , m_containsDirtyOverlayScrollbars(false)
 #if !ASSERT_DISABLED
@@ -169,6 +172,8 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_resizer(0)
 {
     m_isNormalFlowOnly = shouldBeNormalFlowOnly();
+    m_isSelfPaintingLayer = shouldBeSelfPaintingLayer();
+
     // Non-stacking contexts should have empty z-order lists. As this is already the case,
     // there is no need to dirty / recompute these lists.
     m_zOrderListsDirty = isStackingContext();
@@ -360,7 +365,7 @@ void RenderLayer::updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerP
     }
     positionOverflowControls(toSize(roundedIntPoint(offset)));
 
-    updateVisibilityStatus();
+    updateDescendantDependentFlags();
 
     if (flags & UpdatePagination)
         updatePagination();
@@ -439,6 +444,30 @@ LayoutRect RenderLayer::repaintRectIncludingNonCompositingDescendants() const
     return repaintRect;
 }
 
+void RenderLayer::setAncestorChainHasSelfPaintingLayerDescendant()
+{
+    for (RenderLayer* layer = this; layer; layer = layer->parent()) {
+        if (!layer->m_hasSelfPaintingLayerDescendantDirty && layer->hasSelfPaintingLayerDescendant())
+            break;
+
+        layer->m_hasSelfPaintingLayerDescendantDirty = false;
+        layer->m_hasSelfPaintingLayerDescendant = true;
+    }
+}
+
+void RenderLayer::dirtyAncestorChainHasSelfPaintingLayerDescendantStatus()
+{
+    for (RenderLayer* layer = this; layer; layer = layer->parent()) {
+        layer->m_hasSelfPaintingLayerDescendantDirty = true;
+        // If we have reached a self-painting layer, we know our parent should have a self-painting descendant
+        // in this case, there is no need to dirty our ancestors further.
+        if (layer->isSelfPaintingLayer()) {
+            ASSERT(!parent() || parent()->m_hasSelfPaintingLayerDescendantDirty || parent()->hasSelfPaintingLayerDescendant());
+            break;
+        }
+    }
+}
+
 void RenderLayer::computeRepaintRects(LayoutPoint* offsetFromRoot)
 {
     ASSERT(!m_visibleContentStatusDirty);
@@ -461,7 +490,7 @@ void RenderLayer::updateLayerPositionsAfterScroll(UpdateLayerPositionsAfterScrol
 {
     // FIXME: This shouldn't be needed, but there are some corner cases where
     // these flags are still dirty. Update so that the check below is valid.
-    updateVisibilityStatus();
+    updateDescendantDependentFlags();
 
     // If we have no visible content and no visible descendants, there is no point recomputing
     // our rectangles as they will be empty. If our visibility changes, we are expected to
@@ -603,68 +632,78 @@ void RenderLayer::updatePagination()
     }
 }
 
-void RenderLayer::setHasVisibleContent(bool b)
+void RenderLayer::setHasVisibleContent()
 { 
-    if (m_hasVisibleContent == b && !m_visibleContentStatusDirty)
+    if (m_hasVisibleContent && !m_visibleContentStatusDirty) {
+        ASSERT(!parent() || parent()->hasVisibleDescendant());
         return;
+    }
+
     m_visibleContentStatusDirty = false; 
-    m_hasVisibleContent = b;
-    if (m_hasVisibleContent) {
-        computeRepaintRects();
-        if (!isNormalFlowOnly()) {
-            for (RenderLayer* sc = stackingContext(); sc; sc = sc->stackingContext()) {
-                sc->dirtyZOrderLists();
-                if (sc->hasVisibleContent())
-                    break;
-            }
+    m_hasVisibleContent = true;
+    computeRepaintRects();
+    if (!isNormalFlowOnly()) {
+        // We don't collect invisible layers in z-order lists if we are not in compositing mode.
+        // As we became visible, we need to dirty our stacking contexts ancestors to be properly
+        // collected. FIXME: When compositing, we could skip this dirtying phase.
+        for (RenderLayer* sc = stackingContext(); sc; sc = sc->stackingContext()) {
+            sc->dirtyZOrderLists();
+            if (sc->hasVisibleContent())
+                break;
         }
     }
+
     if (parent())
-        parent()->childVisibilityChanged(m_hasVisibleContent);
+        parent()->setAncestorChainHasVisibleDescendant();
 }
 
 void RenderLayer::dirtyVisibleContentStatus() 
 { 
     m_visibleContentStatusDirty = true; 
     if (parent())
-        parent()->dirtyVisibleDescendantStatus();
+        parent()->dirtyAncestorChainVisibleDescendantStatus();
 }
 
-void RenderLayer::childVisibilityChanged(bool newVisibility) 
-{ 
-    if (m_hasVisibleDescendant == newVisibility || m_visibleDescendantStatusDirty)
-        return;
-    if (newVisibility) {
-        RenderLayer* l = this;
-        while (l && !l->m_visibleDescendantStatusDirty && !l->m_hasVisibleDescendant) {
-            l->m_hasVisibleDescendant = true;
-            l = l->parent();
-        }
-    } else 
-        dirtyVisibleDescendantStatus();
-}
-
-void RenderLayer::dirtyVisibleDescendantStatus()
+void RenderLayer::dirtyAncestorChainVisibleDescendantStatus()
 {
-    RenderLayer* l = this;
-    while (l && !l->m_visibleDescendantStatusDirty) {
-        l->m_visibleDescendantStatusDirty = true;
-        l = l->parent();
+    for (RenderLayer* layer = this; layer; layer = layer->parent()) {
+        if (layer->m_visibleDescendantStatusDirty)
+            break;
+
+        layer->m_visibleDescendantStatusDirty = true;
     }
 }
 
-void RenderLayer::updateVisibilityStatus()
+void RenderLayer::setAncestorChainHasVisibleDescendant()
 {
-    if (m_visibleDescendantStatusDirty) {
+    for (RenderLayer* layer = this; layer; layer = layer->parent()) {
+        if (!layer->m_visibleDescendantStatusDirty && layer->hasVisibleDescendant())
+            break;
+
+        layer->m_hasVisibleDescendant = true;
+        layer->m_visibleDescendantStatusDirty = false;
+    }
+}
+
+void RenderLayer::updateDescendantDependentFlags()
+{
+    if (m_visibleDescendantStatusDirty || m_hasSelfPaintingLayerDescendantDirty) {
         m_hasVisibleDescendant = false;
+        m_hasSelfPaintingLayerDescendant = false;
         for (RenderLayer* child = firstChild(); child; child = child->nextSibling()) {
-            child->updateVisibilityStatus();        
-            if (child->m_hasVisibleContent || child->m_hasVisibleDescendant) {
-                m_hasVisibleDescendant = true;
+            child->updateDescendantDependentFlags();
+
+            bool hasVisibleDescendant = child->m_hasVisibleContent || child->m_hasVisibleDescendant;
+            bool hasSelfPaintingLayerDescendant = child->isSelfPaintingLayer() || child->hasSelfPaintingLayerDescendant();
+
+            m_hasVisibleDescendant |= hasVisibleDescendant;
+            m_hasSelfPaintingLayerDescendant |= hasSelfPaintingLayerDescendant;
+
+            if (m_hasVisibleDescendant && m_hasSelfPaintingLayerDescendant)
                 break;
-            }
         }
         m_visibleDescendantStatusDirty = false;
+        m_hasSelfPaintingLayerDescendantDirty = false;
     }
 
     if (m_visibleContentStatusDirty) {
@@ -863,21 +902,20 @@ FloatPoint RenderLayer::perspectiveOrigin() const
 RenderLayer* RenderLayer::stackingContext() const
 {
     RenderLayer* layer = parent();
-    while (layer && !layer->renderer()->isRenderView() && !layer->renderer()->isRoot() && layer->renderer()->style()->hasAutoZIndex())
+    while (layer && !layer->isRootLayer() && !layer->renderer()->isRoot() && layer->renderer()->style()->hasAutoZIndex())
         layer = layer->parent();
     return layer;
 }
 
 static inline bool isPositionedContainer(RenderLayer* layer)
 {
-    RenderObject* o = layer->renderer();
-    return o->isRenderView() || o->isPositioned() || o->isRelPositioned() || layer->hasTransform();
+    RenderBoxModelObject* layerRenderer = layer->renderer();
+    return layer->isRootLayer() || layerRenderer->isPositioned() || layerRenderer->isRelPositioned() || layer->hasTransform();
 }
 
 static inline bool isFixedPositionedContainer(RenderLayer* layer)
 {
-    RenderObject* o = layer->renderer();
-    return o->isRenderView() || layer->hasTransform();
+    return layer->isRootLayer() || layer->hasTransform();
 }
 
 RenderLayer* RenderLayer::enclosingPositionedAncestor() const
@@ -907,7 +945,7 @@ IntRect RenderLayer::scrollableAreaBoundingBox() const
 RenderLayer* RenderLayer::enclosingTransformedAncestor() const
 {
     RenderLayer* curr = parent();
-    while (curr && !curr->renderer()->isRenderView() && !curr->transform())
+    while (curr && !curr->isRootLayer() && !curr->transform())
         curr = curr->parent();
 
     return curr;
@@ -1056,7 +1094,7 @@ RenderLayer* RenderLayer::clippingRootForPainting() const
 
     const RenderLayer* current = this;
     while (current) {
-        if (current->renderer()->isRenderView())
+        if (current->isRootLayer())
             return const_cast<RenderLayer*>(current);
 
         current = compositingContainer(current);
@@ -1240,10 +1278,13 @@ void RenderLayer::addChild(RenderLayer* child, RenderLayer* beforeChild)
         child->dirtyStackingContextZOrderLists();
     }
 
-    child->updateVisibilityStatus();
+    child->updateDescendantDependentFlags();
     if (child->m_hasVisibleContent || child->m_hasVisibleDescendant)
-        childVisibilityChanged(true);
-    
+        setAncestorChainHasVisibleDescendant();
+
+    if (child->isSelfPaintingLayer() || child->hasSelfPaintingLayerDescendant())
+        setAncestorChainHasSelfPaintingLayerDescendant();
+
 #if USE(ACCELERATED_COMPOSITING)
     compositor()->layerWasAdded(this, child);
 #endif
@@ -1280,10 +1321,13 @@ RenderLayer* RenderLayer::removeChild(RenderLayer* oldChild)
     oldChild->setNextSibling(0);
     oldChild->setParent(0);
     
-    oldChild->updateVisibilityStatus();
+    oldChild->updateDescendantDependentFlags();
     if (oldChild->m_hasVisibleContent || oldChild->m_hasVisibleDescendant)
-        childVisibilityChanged(false);
-    
+        dirtyAncestorChainVisibleDescendantStatus();
+
+    if (oldChild->isSelfPaintingLayer() || oldChild->hasSelfPaintingLayerDescendant())
+        dirtyAncestorChainHasSelfPaintingLayerDescendantStatus();
+
     return oldChild;
 }
 
@@ -2849,7 +2893,7 @@ static inline bool shouldSuppressPaintingLayer(RenderLayer* layer)
     // Avoid painting descendants of the root layer when stylesheets haven't loaded. This eliminates FOUC.
     // It's ok not to draw, because later on, when all the stylesheets do load, updateStyleSelector on the Document
     // will do a full repaint().
-    if (layer->renderer()->document()->didLayoutWithPendingStylesheets() && !layer->renderer()->isRenderView() && !layer->renderer()->isRoot())
+    if (layer->renderer()->document()->didLayoutWithPendingStylesheets() && !layer->isRootLayer() && !layer->renderer()->isRoot())
         return true;
 
     // Avoid painting all layers if the document is in a state where visual updates aren't allowed.
@@ -2879,15 +2923,15 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* context,
     }
 #endif
 
+    // Non self-painting leaf layers don't need to be painted as their renderer() should properly paint itself.
+    if (!isSelfPaintingLayer() && !hasSelfPaintingLayerDescendant())
+        return;
+
     if (shouldSuppressPaintingLayer(this))
         return;
     
     // If this layer is totally invisible then there is nothing to paint.
     if (!renderer()->opacity())
-        return;
-
-    // Non self-painting leaf layers don't need to be painted as their renderer() should properly paint itself.
-    if (!isSelfPaintingLayer() && !firstChild())
         return;
 
     if (paintsWithTransparency(paintBehavior))
@@ -2950,6 +2994,8 @@ void RenderLayer::paintLayerContentsAndReflection(RenderLayer* rootLayer, Graphi
                         RenderObject* paintingRoot, RenderRegion* region, OverlapTestRequestMap* overlapTestRequests,
                         PaintLayerFlags paintFlags)
 {
+    ASSERT(isSelfPaintingLayer() || hasSelfPaintingLayerDescendant());
+
     PaintLayerFlags localPaintFlags = paintFlags & ~(PaintLayerAppliedTransform);
 
     // Paint the reflection first if we have one.
@@ -2969,6 +3015,8 @@ void RenderLayer::paintLayerContents(RenderLayer* rootLayer, GraphicsContext* co
                         RenderObject* paintingRoot, RenderRegion* region, OverlapTestRequestMap* overlapTestRequests,
                         PaintLayerFlags paintFlags)
 {
+    ASSERT(isSelfPaintingLayer() || hasSelfPaintingLayerDescendant());
+
     PaintLayerFlags localPaintFlags = paintFlags & ~(PaintLayerAppliedTransform);
     bool haveTransparency = localPaintFlags & PaintLayerHaveTransparency;
     bool isSelfPaintingLayer = this->isSelfPaintingLayer();
@@ -3163,6 +3211,9 @@ void RenderLayer::paintList(Vector<RenderLayer*>* list, RenderLayer* rootLayer, 
     if (!list)
         return;
 
+    if (!hasSelfPaintingLayerDescendant())
+        return;
+
 #if !ASSERT_DISABLED
     LayerListMutationDetector mutationChecker(this);
 #endif
@@ -3220,12 +3271,12 @@ void RenderLayer::paintChildLayerIntoColumns(RenderLayer* childLayer, RenderLaye
 
     ColumnInfo* colInfo = columnBlock->columnInfo();
     unsigned colCount = columnBlock->columnCount(colInfo);
-    int currLogicalTopOffset = 0;
+    LayoutUnit currLogicalTopOffset = 0;
     for (unsigned i = 0; i < colCount; i++) {
         // For each rect, we clip to the rect, and then we adjust our coords.
         LayoutRect colRect = columnBlock->columnRectAt(colInfo, i);
         columnBlock->flipForWritingMode(colRect);
-        int logicalLeftOffset = (isHorizontal ? colRect.x() : colRect.y()) - columnBlock->logicalLeftOffsetForContent();
+        LayoutUnit logicalLeftOffset = (isHorizontal ? colRect.x() : colRect.y()) - columnBlock->logicalLeftOffsetForContent();
         LayoutSize offset;
         if (isHorizontal) {
             if (colInfo->progressionAxis() == ColumnInfo::InlineAxis)
@@ -3249,7 +3300,7 @@ void RenderLayer::paintChildLayerIntoColumns(RenderLayer* childLayer, RenderLaye
             
             // Each strip pushes a clip, since column boxes are specified as being
             // like overflow:hidden.
-            context->clip(colRect);
+            context->clip(pixelSnappedIntRect(colRect));
 
             if (!colIndex) {
                 // Apply a translation transform to change where the layer paints.
@@ -3258,7 +3309,7 @@ void RenderLayer::paintChildLayerIntoColumns(RenderLayer* childLayer, RenderLaye
                 if (oldHasTransform)
                     oldTransform = *childLayer->transform();
                 TransformationMatrix newTransform(oldTransform);
-                newTransform.translateRight(offset.width(), offset.height());
+                newTransform.translateRight(roundToInt(offset.width()), roundToInt(offset.height()));
                 
                 childLayer->m_transform = adoptPtr(new TransformationMatrix(newTransform));
                 childLayer->paintLayer(rootLayer, context, localDirtyRect, paintBehavior, paintingRoot, region, overlapTestRequests, paintFlags);
@@ -3272,7 +3323,7 @@ void RenderLayer::paintChildLayerIntoColumns(RenderLayer* childLayer, RenderLaye
                 LayoutPoint childOffset;
                 columnLayers[colIndex - 1]->convertToLayerCoords(rootLayer, childOffset);
                 TransformationMatrix transform;
-                transform.translateRight(childOffset.x() + offset.width(), childOffset.y() + offset.height());
+                transform.translateRight(roundToInt(childOffset.x() + offset.width()), roundToInt(childOffset.y() + offset.height()));
                 
                 // Apply the transform.
                 context->concatCTM(transform.toAffineTransform());
@@ -3285,7 +3336,7 @@ void RenderLayer::paintChildLayerIntoColumns(RenderLayer* childLayer, RenderLaye
         }
 
         // Move to the next position.
-        int blockDelta = isHorizontal ? colRect.height() : colRect.width();
+        LayoutUnit blockDelta = isHorizontal ? colRect.height() : colRect.width();
         if (columnBlock->style()->isFlippedBlocksWritingMode())
             currLogicalTopOffset += blockDelta;
         else
@@ -3315,7 +3366,7 @@ bool RenderLayer::hitTest(const HitTestRequest& request, HitTestResult& result)
         // We didn't hit any layer. If we are the root layer and the mouse is -- or just was -- down, 
         // return ourselves. We do this so mouse events continue getting delivered after a drag has 
         // exited the WebView, and so hit testing over a scrollbar hits the content document.
-        if ((request.active() || request.release()) && renderer()->isRenderView()) {
+        if ((request.active() || request.release()) && isRootLayer()) {
             renderer()->updateHitTestResult(result, result.point());
             insideLayer = this;
         }
@@ -3794,7 +3845,6 @@ void RenderLayer::updateClipRects(const RenderLayer* rootLayer, RenderRegion* re
     else
         m_clipRectsCache->m_clipRects[clipRectsType] = ClipRects::create(clipRects);
 
-    m_clipRectsCache->m_clipRects[clipRectsType]->ref();
 #ifndef NDEBUG
     m_clipRectsCache->m_clipRectsRoot[clipRectsType] = rootLayer;
 #endif
@@ -3901,7 +3951,7 @@ ClipRect RenderLayer::backgroundClipRect(const RenderLayer* rootLayer, RenderReg
 
     // Note: infinite clipRects should not be scrolled here, otherwise they will accidentally no longer be considered infinite.
     if (parentRects.fixed() && rootLayer->renderer() == view && backgroundClipRect != PaintInfo::infiniteRect())
-        backgroundClipRect.move(view->frameView()->scrollXForFixedPosition(), view->frameView()->scrollYForFixedPosition());
+        backgroundClipRect.move(view->frameView()->scrollOffsetForFixedPosition());
 
     return backgroundClipRect;
 }
@@ -4037,7 +4087,7 @@ bool RenderLayer::intersectsDamageRect(const LayoutRect& layerBounds, const Layo
     // Always examine the canvas and the root.
     // FIXME: Could eliminate the isRoot() check if we fix background painting so that the RenderView
     // paints the root's background.
-    if (renderer()->isRenderView() || renderer()->isRoot())
+    if (isRootLayer() || renderer()->isRoot())
         return true;
 
     // If we aren't an inline flow, and our layer bounds do intersect the damage rect, then we 
@@ -4537,7 +4587,7 @@ void RenderLayer::updateNormalFlowList()
 
 void RenderLayer::collectLayers(bool includeHiddenLayers, Vector<RenderLayer*>*& posBuffer, Vector<RenderLayer*>*& negBuffer)
 {
-    updateVisibilityStatus();
+    updateDescendantDependentFlags();
 
     // Overflow layers are just painted by their enclosing layers, so they don't get put in zorder lists.
     bool includeHiddenLayer = includeHiddenLayers || (m_hasVisibleContent || (m_hasVisibleDescendant && isStackingContext()));
@@ -4660,7 +4710,7 @@ bool RenderLayer::shouldBeNormalFlowOnly() const
             && !isTransparent();
 }
 
-bool RenderLayer::isSelfPaintingLayer() const
+bool RenderLayer::shouldBeSelfPaintingLayer() const
 {
     return !isNormalFlowOnly()
         || renderer()->hasReflection()
@@ -4671,6 +4721,21 @@ bool RenderLayer::isSelfPaintingLayer() const
         || renderer()->isEmbeddedObject()
         || renderer()->isApplet()
         || renderer()->isRenderIFrame();
+}
+
+void RenderLayer::updateSelfPaintingLayerAfterStyleChange(const RenderStyle*)
+{
+    bool isSelfPaintingLayer = shouldBeSelfPaintingLayer();
+    if (m_isSelfPaintingLayer == isSelfPaintingLayer)
+        return;
+
+    m_isSelfPaintingLayer = isSelfPaintingLayer;
+    if (!parent())
+        return;
+    if (isSelfPaintingLayer)
+        parent()->setAncestorChainHasSelfPaintingLayerDescendant();
+    else
+        parent()->dirtyAncestorChainHasSelfPaintingLayerDescendantStatus();
 }
 
 void RenderLayer::updateStackingContextsAfterStyleChange(const RenderStyle* oldStyle)
@@ -4753,6 +4818,7 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
         m_marquee = 0;
     }
 
+    updateSelfPaintingLayerAfterStyleChange(oldStyle);
     updateStackingContextsAfterStyleChange(oldStyle);
     updateScrollbarsAfterStyleChange(oldStyle);
 
@@ -4778,7 +4844,7 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
-    updateVisibilityStatus();
+    updateDescendantDependentFlags();
     updateTransform();
 
     if (compositor()->updateLayerCompositingState(this))

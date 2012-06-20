@@ -4,7 +4,7 @@
  * Copyright (C) 2008 Kenneth Rohde Christiansen
  * Copyright (C) 2008 Diego Gonzalez
  * Copyright (C) 2009-2010 ProFUSION embedded systems
- * Copyright (C) 2009-2010 Samsung Electronics
+ * Copyright (C) 2009-2012 Samsung Electronics
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
  *
  * All rights reserved.
@@ -52,6 +52,7 @@
 #include "SecurityOrigin.h"
 #include "ViewportArguments.h"
 #include "WindowFeatures.h"
+#include "ewk_custom_handler_private.h"
 #include "ewk_frame_private.h"
 #include "ewk_private.h"
 #include "ewk_security_origin_private.h"
@@ -498,9 +499,9 @@ void ChromeClientEfl::formStateDidChange(const Node*)
     notImplemented();
 }
 
-void ChromeClientEfl::setCursor(const Cursor&)
+void ChromeClientEfl::setCursor(const Cursor& cursor)
 {
-    notImplemented();
+    ewk_view_cursor_set(m_view, cursor);
 }
 
 void ChromeClientEfl::setCursorHiddenUntilMouseMoves(bool)
@@ -638,15 +639,14 @@ void ChromeClientEfl::exitFullScreenForElement(WebCore::Element* element)
 }
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-static Ewk_Custom_Handler_Data* customHandlerDataCreate(Evas_Object* ewkView, const char* scheme, const char* baseURL, const char* url, const char* title)
+#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
+static Ewk_Custom_Handler_Data* customHandlerDataCreate(Evas_Object* ewkView, const char* scheme, const char* baseURL, const char* url)
 {
     Ewk_Custom_Handler_Data* data = new Ewk_Custom_Handler_Data;
     data->ewkView = ewkView;
     data->scheme = eina_stringshare_add(scheme);
     data->base_url = eina_stringshare_add(baseURL);
     data->url = eina_stringshare_add(url);
-    data->title = eina_stringshare_add(title);
     return data;
 }
 
@@ -655,16 +655,38 @@ static void customHandlerDataDelete(Ewk_Custom_Handler_Data* data)
     eina_stringshare_del(data->scheme);
     eina_stringshare_del(data->base_url);
     eina_stringshare_del(data->url);
-    eina_stringshare_del(data->title);
     delete data;
 }
 
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
 void ChromeClientEfl::registerProtocolHandler(const String& scheme, const String& baseURL, const String& url, const String& title)
 {
-    Ewk_Custom_Handler_Data* data = customHandlerDataCreate(m_view, scheme.utf8().data(), baseURL.utf8().data(), url.utf8().data(), title.utf8().data());
+    Ewk_Custom_Handler_Data* data = customHandlerDataCreate(m_view, scheme.utf8().data(), baseURL.utf8().data(), url.utf8().data());
+    data->title = eina_stringshare_add(title.utf8().data());
+    ewk_custom_handler_register_protocol_handler(data);
+    eina_stringshare_del(data->title);
+    customHandlerDataDelete(data);
+}
+#endif
+
+#if ENABLE(CUSTOM_SCHEME_HANDLER)
+ChromeClient::CustomHandlersState ChromeClientEfl::isProtocolHandlerRegistered(const String& scheme, const String& baseURL, const String& url)
+{
+    Ewk_Custom_Handler_Data* data = customHandlerDataCreate(m_view, scheme.utf8().data(), baseURL.utf8().data(), url.utf8().data());
+    ChromeClient::CustomHandlersState result = static_cast<CustomHandlersState>(ewk_custom_handler_register_protocol_handler(data));
+    customHandlerDataDelete(data);
+
+    return result;
+}
+
+void ChromeClientEfl::unregisterProtocolHandler(const String& scheme, const String& baseURL, const String& url)
+{
+    Ewk_Custom_Handler_Data* data = customHandlerDataCreate(m_view, scheme.utf8().data(), baseURL.utf8().data(), url.utf8().data());
     ewk_custom_handler_register_protocol_handler(data);
     customHandlerDataDelete(data);
 }
 #endif
+
+#endif // ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
 
 }

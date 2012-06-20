@@ -33,6 +33,7 @@
 
 #include "Dictionary.h"
 #include "V8ArrayBuffer.h"
+#include "V8ArrayBufferView.h"
 #include "V8Binding.h"
 #include "V8BindingMacros.h"
 #include "V8Blob.h"
@@ -102,6 +103,9 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
         dictionary.get("type", type);
         if (tryCatchType.HasCaught())
             return throwError(tryCatchType.Exception(), args.GetIsolate());
+        if (!type.containsOnlyASCII())
+            return V8Proxy::throwError(V8Proxy::SyntaxError, "type must consist of ASCII characters", args.GetIsolate());
+        type.makeLower();
     }
 
     ASSERT(endings == "transparent" || endings == "native");
@@ -118,7 +122,11 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
         if (V8ArrayBuffer::HasInstance(item)) {
             ArrayBuffer* arrayBuffer = V8ArrayBuffer::toNative(v8::Handle<v8::Object>::Cast(item));
             ASSERT(arrayBuffer);
-            blobBuilder->append(arrayBuffer);
+            blobBuilder->append(context, arrayBuffer);
+        } else if (V8ArrayBufferView::HasInstance(item)) {
+            ArrayBufferView* arrayBufferView = V8ArrayBufferView::toNative(v8::Handle<v8::Object>::Cast(item));
+            ASSERT(arrayBufferView);
+            blobBuilder->append(arrayBufferView);
         } else
 #endif
         if (V8Blob::HasInstance(item)) {
@@ -126,7 +134,7 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
             ASSERT(blob);
             blobBuilder->append(blob);
         } else {
-            EXCEPTION_BLOCK(String, stringValue, toWebCoreString(item->ToString()));
+            EXCEPTION_BLOCK(String, stringValue, toWebCoreString(item));
             blobBuilder->append(stringValue, endings, ASSERT_NO_EXCEPTION);
         }
     }

@@ -77,9 +77,6 @@ public:
 
     const AtomicString& type() const { return formControlType(); }
 
-    void setName(const AtomicString& name);
-
-    virtual const AtomicString& formControlName() const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE = 0;
     virtual bool isEnabledFormControl() const { return !disabled(); }
     virtual bool isReadOnlyFormControl() const { return readOnly(); }
@@ -109,8 +106,8 @@ public:
 
     static HTMLFormControlElement* enclosingFormControlElement(Node*);
 
-    using TreeShared<ContainerNode>::ref;
-    using TreeShared<ContainerNode>::deref;
+    using Node::ref;
+    using Node::deref;
 
 protected:
     HTMLFormControlElement(const QualifiedName& tagName, Document*, HTMLFormElement*);

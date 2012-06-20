@@ -104,7 +104,7 @@ enum StyleChangeType {
     SyntheticStyleChange = 3 << nodeStyleChangeShift
 };
 
-class Node : public EventTarget, public ScriptWrappable, public TreeShared<ContainerNode> {
+class Node : public EventTarget, public ScriptWrappable, public TreeShared<Node, ContainerNode> {
     friend class Document;
     friend class TreeScope;
     friend class TreeScopeAdopter;
@@ -556,8 +556,6 @@ public:
     void showTreeForThisAcrossFrame() const;
 #endif
 
-    void registerDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
-    void unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
     void invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName&, Element* attributeOwnerElement);
     void invalidateNodeListsCacheAfterChildrenChanged();
     void removeCachedClassNodeList(ClassNodeList*, const String&);
@@ -571,14 +569,15 @@ public:
 
     PassRefPtr<RadioNodeList> radioNodeList(const AtomicString&);
     void removeCachedRadioNodeList(RadioNodeList*, const AtomicString&);
+    void resetCachedRadioNodeListRootNode();
 
     PassRefPtr<NodeList> getElementsByTagName(const AtomicString&);
     PassRefPtr<NodeList> getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName);
     PassRefPtr<NodeList> getElementsByName(const String& elementName);
     PassRefPtr<NodeList> getElementsByClassName(const String& classNames);
 
-    PassRefPtr<Element> querySelector(const String& selectors, ExceptionCode&);
-    PassRefPtr<NodeList> querySelectorAll(const String& selectors, ExceptionCode&);
+    PassRefPtr<Element> querySelector(const AtomicString& selectors, ExceptionCode&);
+    PassRefPtr<NodeList> querySelectorAll(const AtomicString& selectors, ExceptionCode&);
 
     unsigned short compareDocumentPosition(Node*);
 
@@ -628,8 +627,8 @@ public:
     // to event listeners, and prevents DOMActivate events from being sent at all.
     virtual bool disabled() const;
 
-    using TreeShared<ContainerNode>::ref;
-    using TreeShared<ContainerNode>::deref;
+    using TreeShared<Node, ContainerNode>::ref;
+    using TreeShared<Node, ContainerNode>::deref;
 
     virtual EventTargetData* eventTargetData();
     virtual EventTargetData* ensureEventTargetData();
@@ -740,6 +739,10 @@ protected:
     void setHasCustomCallbacks() { setFlag(true, HasCustomCallbacksFlag); }
 
 private:
+    friend class TreeShared<Node, ContainerNode>;
+
+    void removedLastRef();
+
     // These API should be only used for a tree scope migration.
     // setTreeScope() returns NodeRareData to save extra nodeRareData() invocations on the caller site.
     NodeRareData* setTreeScope(TreeScope*);
@@ -775,8 +778,8 @@ private:
     // Use Node::parentNode as the consistent way of querying a parent node.
     // This method is made private to ensure a compiler error on call sites that
     // don't follow this rule.
-    using TreeShared<ContainerNode>::parent;
-    using TreeShared<ContainerNode>::setParent;
+    using TreeShared<Node, ContainerNode>::parent;
+    using TreeShared<Node, ContainerNode>::setParent;
 
     void trackForDebugging();
 

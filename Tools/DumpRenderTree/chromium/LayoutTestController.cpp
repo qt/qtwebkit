@@ -34,6 +34,7 @@
 
 #include "DRTDevToolsAgent.h"
 #include "MockWebSpeechInputController.h"
+#include "MockWebSpeechRecognizer.h"
 #include "TestShell.h"
 #include "WebAnimationController.h"
 #include "WebBindings.h"
@@ -77,6 +78,10 @@
 #include <wtf/OwnArrayPtr.h>
 #endif
 
+#if OS(LINUX) || OS(ANDROID)
+#include "linux/WebFontRendering.h"
+#endif
+
 using namespace WebCore;
 using namespace WebKit;
 using namespace std;
@@ -110,12 +115,15 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("addMockSpeechInputResult", &LayoutTestController::addMockSpeechInputResult);
     bindMethod("setMockSpeechInputDumpRect", &LayoutTestController::setMockSpeechInputDumpRect);
 #endif
+#if ENABLE(SCRIPTED_SPEECH)
+    bindMethod("addMockSpeechRecognitionResult", &LayoutTestController::addMockSpeechRecognitionResult);
+    bindMethod("setMockSpeechRecognitionError", &LayoutTestController::setMockSpeechRecognitionError);
+#endif
     bindMethod("addOriginAccessWhitelistEntry", &LayoutTestController::addOriginAccessWhitelistEntry);
     bindMethod("addUserScript", &LayoutTestController::addUserScript);
     bindMethod("addUserStyleSheet", &LayoutTestController::addUserStyleSheet);
     bindMethod("clearAllDatabases", &LayoutTestController::clearAllDatabases);
     bindMethod("closeWebInspector", &LayoutTestController::closeWebInspector);
-    bindMethod("counterValueForElementById", &LayoutTestController::counterValueForElementById);
 #if ENABLE(POINTER_LOCK)
     bindMethod("didLosePointerLock", &LayoutTestController::didLosePointerLock);
 #endif
@@ -211,6 +219,7 @@ LayoutTestController::LayoutTestController(TestShell* shell)
     bindMethod("setPrinting", &LayoutTestController::setPrinting);
     bindMethod("setScrollbarPolicy", &LayoutTestController::setScrollbarPolicy);
     bindMethod("setSelectTrailingWhitespaceEnabled", &LayoutTestController::setSelectTrailingWhitespaceEnabled);
+    bindMethod("setTextSubpixelPositioning", &LayoutTestController::setTextSubpixelPositioning);
     bindMethod("setSmartInsertDeleteEnabled", &LayoutTestController::setSmartInsertDeleteEnabled);
     bindMethod("setStopProvisionalFrameLoads", &LayoutTestController::setStopProvisionalFrameLoads);
     bindMethod("setTabKeyCyclesThroughElements", &LayoutTestController::setTabKeyCyclesThroughElements);
@@ -692,6 +701,9 @@ void LayoutTestController::reset()
     m_taskList.revokeAll();
     m_shouldStayOnPageAfterHandlingBeforeUnload = false;
     m_hasCustomFullScreenBehavior = false;
+#if OS(LINUX) || OS(ANDROID)
+    WebFontRendering::setSubpixelPositioning(false);
+#endif
 }
 
 void LayoutTestController::locationChangeDone()
@@ -1644,20 +1656,6 @@ void LayoutTestController::setPOSIXLocale(const CppArgumentList& arguments, CppV
         setlocale(LC_ALL, arguments[0].toString().c_str());
 }
 
-void LayoutTestController::counterValueForElementById(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() < 1 || !arguments[0].isString())
-        return;
-    WebFrame* frame = m_shell->webView()->mainFrame();
-    if (!frame)
-        return;
-    WebString counterValue = frame->counterValueForElementById(cppVariantToWebString(arguments[0]));
-    if (counterValue.isNull())
-        return;
-    result->set(counterValue.utf8());
-}
-
 // Parse a single argument. The method returns true if there is an argument that
 // is a number or if there is no argument at all. It returns false only if there
 // is some argument that is not a number. The value parameter is filled with the
@@ -1874,7 +1872,15 @@ void LayoutTestController::setMockDeviceOrientation(const CppArgumentList& argum
     if (arguments.size() < 6 || !arguments[0].isBool() || !arguments[1].isNumber() || !arguments[2].isBool() || !arguments[3].isNumber() || !arguments[4].isBool() || !arguments[5].isNumber())
         return;
 
-    WebDeviceOrientation orientation(arguments[0].toBoolean(), arguments[1].toDouble(), arguments[2].toBoolean(), arguments[3].toDouble(), arguments[4].toBoolean(), arguments[5].toDouble());
+    WebDeviceOrientation orientation;
+    orientation.setNull(false);
+    if (arguments[0].toBoolean())
+        orientation.setAlpha(arguments[1].toDouble());
+    if (arguments[2].toBoolean())
+        orientation.setBeta(arguments[3].toDouble());
+    if (arguments[4].toBoolean())
+        orientation.setGamma(arguments[5].toDouble());
+
     // Note that we only call setOrientation on the main page's mock since this is all that the
     // tests require. If necessary, we could get a list of WebViewHosts from the TestShell and
     // call setOrientation on each DeviceOrientationClientMock.
@@ -1937,6 +1943,28 @@ void LayoutTestController::setMockSpeechInputDumpRect(const CppArgumentList& arg
 
     if (MockWebSpeechInputController* controller = m_shell->webViewHost()->speechInputControllerMock())
         controller->setDumpRect(arguments[0].value.boolValue);
+}
+#endif
+
+#if ENABLE(SCRIPTED_SPEECH)
+void LayoutTestController::addMockSpeechRecognitionResult(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (arguments.size() < 2 || !arguments[0].isString() || !arguments[1].isNumber())
+        return;
+
+    if (MockWebSpeechRecognizer* recognizer = m_shell->webViewHost()->mockSpeechRecognizer())
+        recognizer->addMockResult(cppVariantToWebString(arguments[0]), arguments[1].toDouble());
+}
+
+void LayoutTestController::setMockSpeechRecognitionError(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (arguments.size() < 2 || !arguments[0].isNumber() || !arguments[1].isString())
+        return;
+
+    if (MockWebSpeechRecognizer* recognizer = m_shell->webViewHost()->mockSpeechRecognizer())
+        recognizer->setError(arguments[0].toInt32(), cppVariantToWebString(arguments[1]));
 }
 #endif
 
@@ -2159,9 +2187,20 @@ void LayoutTestController::deliverWebIntent(const CppArgumentList& arguments, Cp
     WebSerializedScriptValue serializedData = WebSerializedScriptValue::serialize(
         v8::String::New(data.data(), data.length()));
 
-    WebIntent intent(action, type, serializedData.toString());
+    WebIntent intent = WebIntent::create(action, type, serializedData.toString(), WebVector<WebString>(), WebVector<WebString>());
 
-    m_shell->webView()->mainFrame()->deliverIntent(intent, m_intentClient.get());
+    m_shell->webView()->mainFrame()->deliverIntent(intent, 0, m_intentClient.get());
+}
+
+void LayoutTestController::setTextSubpixelPositioning(const CppArgumentList& arguments, CppVariant* result)
+{
+#if OS(LINUX) || OS(ANDROID)
+    // Since FontConfig doesn't provide a variable to control subpixel positioning, we'll fall back
+    // to setting it globally for all fonts.
+    if (arguments.size() > 0 && arguments[0].isBool())
+        WebFontRendering::setSubpixelPositioning(arguments[0].value.boolValue);
+#endif
+    result->setNull();
 }
 
 void LayoutTestController::setPluginsEnabled(const CppArgumentList& arguments, CppVariant* result)

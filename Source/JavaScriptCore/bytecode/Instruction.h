@@ -191,6 +191,10 @@ namespace JSC {
         Instruction(LLIntCallLinkInfo* callLinkInfo) { u.callLinkInfo = callLinkInfo; }
         
         Instruction(ValueProfile* profile) { u.profile = profile; }
+        
+        Instruction(WriteBarrier<Unknown>* registerPointer) { u.registerPointer = registerPointer; }
+        
+        Instruction(bool* predicatePointer) { u.predicatePointer = predicatePointer; }
 
         union {
             Opcode opcode;
@@ -198,10 +202,12 @@ namespace JSC {
             WriteBarrierBase<Structure> structure;
             WriteBarrierBase<StructureChain> structureChain;
             WriteBarrierBase<JSCell> jsCell;
+            WriteBarrier<Unknown>* registerPointer;
             PropertySlot::GetValueFunc getterFunc;
             LLIntCallLinkInfo* callLinkInfo;
             ValueProfile* profile;
             void* pointer;
+            bool* predicatePointer;
         } u;
         
     private:

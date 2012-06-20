@@ -7,6 +7,7 @@
  * Copyright (C) 2010 Joone Hur <joone@kldp.org>
  * Copyright (C) 2011 ProFUSION Embedded Systems
  * Copyright (C) 2011 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,6 +55,13 @@
 #include <stdio.h>
 #include <wtf/text/WTFString.h>
 
+// Same as Mac cache model enum in Source/WebKit/mac/WebView/WebPreferences.h.
+enum {
+    WebCacheModelDocumentViewer = 0,
+    WebCacheModelDocumentBrowser = 1,
+    WebCacheModelPrimaryWebBrowser = 2
+};
+
 LayoutTestController::~LayoutTestController()
 {
 }
@@ -97,13 +105,6 @@ void LayoutTestController::dispatchPendingLoadRequests()
 void LayoutTestController::display()
 {
     displayWebView();
-}
-
-JSRetainPtr<JSStringRef> LayoutTestController::counterValueForElementById(JSStringRef id)
-{
-    const Evas_Object* mainFrame = browser->mainFrame();
-    const String counterValue(DumpRenderTreeSupportEfl::counterValueByElementId(mainFrame, id->ustring().utf8().data()));
-    return JSRetainPtr<JSStringRef>(Adopt, JSStringCreateWithUTF8CString(counterValue.utf8().data()));
 }
 
 void LayoutTestController::keepWebHistory()
@@ -177,8 +178,28 @@ void LayoutTestController::notifyDone()
 
 JSStringRef LayoutTestController::pathToLocalResource(JSContextRef context, JSStringRef url)
 {
-    // Function introduced in r28690. This may need special-casing on Windows.
-    return JSStringRetain(url); // Do nothing on Unix.
+    String requestedUrl(url->characters(), url->length());
+    String resourceRoot;
+    String requestedRoot;
+
+    if (requestedUrl.find("LayoutTests") != notFound) {
+        // If the URL contains LayoutTests we need to remap that to
+        // LOCAL_RESOURCE_ROOT which is the path of the LayoutTests directory
+        // within the WebKit source tree.
+        requestedRoot = "/tmp/LayoutTests";
+        resourceRoot = getenv("LOCAL_RESOURCE_ROOT");
+    } else if (requestedUrl.find("tmp") != notFound) {
+        // If the URL is a child of /tmp we need to convert it to be a child
+        // DUMPRENDERTREE_TEMP replace tmp with DUMPRENDERTREE_TEMP
+        requestedRoot = "/tmp";
+        resourceRoot = getenv("DUMPRENDERTREE_TEMP");
+    }
+
+    size_t indexOfRootStart = requestedUrl.reverseFind(requestedRoot);
+    size_t indexOfSeparatorAfterRoot = indexOfRootStart + requestedRoot.length();
+    String fullPathToUrl = "file://" + resourceRoot + requestedUrl.substring(indexOfSeparatorAfterRoot);
+
+    return JSStringCreateWithUTF8CString(fullPathToUrl.utf8().data());
 }
 
 void LayoutTestController::queueLoad(JSStringRef url, JSStringRef target)
@@ -527,21 +548,21 @@ void LayoutTestController::setCacheModel(int cacheModel)
 
     // These constants are derived from the Mac cache model enum in Source/WebKit/mac/WebView/WebPreferences.h.
     switch (cacheModel) {
-    case 0: // WebCacheModelDocumentViewer
+    case WebCacheModelDocumentViewer:
         pageCacheCapacity = 0;
         cacheTotalCapacity = 0;
         cacheMinDeadCapacity = 0;
         cacheMaxDeadCapacity = 0;
         deadDecodedDataDeletionInterval = 0;
         break;
-    case 1: // WebCacheModelDocumentBrowser
+    case WebCacheModelDocumentBrowser:
         pageCacheCapacity = 2;
         cacheTotalCapacity = 16 * 1024 * 1024;
         cacheMinDeadCapacity = cacheTotalCapacity / 8;
         cacheMaxDeadCapacity = cacheTotalCapacity / 4;
         deadDecodedDataDeletionInterval = 0;
         break;
-    case 3: // WebCacheModelPrimaryWebBrowser
+    case WebCacheModelPrimaryWebBrowser:
         pageCacheCapacity = 3;
         cacheTotalCapacity = 32 * 1024 * 1024;
         cacheMinDeadCapacity = cacheTotalCapacity / 4;
@@ -645,9 +666,9 @@ void LayoutTestController::syncLocalStorage()
     notImplemented();
 }
 
-void LayoutTestController::setDomainRelaxationForbiddenForURLScheme(bool, JSStringRef)
+void LayoutTestController::setDomainRelaxationForbiddenForURLScheme(bool forbidden, JSStringRef scheme)
 {
-    notImplemented();
+    DumpRenderTreeSupportEfl::setDomainRelaxationForbiddenForURLScheme(forbidden, WTF::String(scheme->ustring().impl()));
 }
 
 void LayoutTestController::goBack()
@@ -716,6 +737,8 @@ void LayoutTestController::overridePreference(JSStringRef key, JSStringRef value
         DumpRenderTreeSupportEfl::setLoadsSiteIconsIgnoringImageLoadingSetting(browser->mainView(), toBool(value));
     else if (equals(key, "WebKitCSSGridLayoutEnabled"))
         DumpRenderTreeSupportEfl::setCSSGridLayoutEnabled(browser->mainView(), toBool(value));
+    else if (equals(key, "WebKitWebAudioEnabled"))
+        ewk_view_setting_web_audio_set(browser->mainView(), toBool(value));
     else
         fprintf(stderr, "LayoutTestController::overridePreference tried to override unknown preference '%s'.\n", value->ustring().utf8().data());
 }
@@ -828,9 +851,21 @@ void LayoutTestController::setMinimumTimerInterval(double minimumTimerInterval)
     ewk_view_setting_minimum_timer_interval_set(browser->mainView(), minimumTimerInterval);
 }
 
-void LayoutTestController::setTextDirection(JSStringRef)
+void LayoutTestController::setTextDirection(JSStringRef direction)
 {
-    notImplemented();
+    Ewk_Text_Direction ewkDirection;
+    if (JSStringIsEqualToUTF8CString(direction, "auto"))
+        ewkDirection = EWK_TEXT_DIRECTION_DEFAULT;
+    else if (JSStringIsEqualToUTF8CString(direction, "rtl"))
+        ewkDirection = EWK_TEXT_DIRECTION_RIGHT_TO_LEFT;
+    else if (JSStringIsEqualToUTF8CString(direction, "ltr"))
+        ewkDirection = EWK_TEXT_DIRECTION_LEFT_TO_RIGHT;
+    else {
+        fprintf(stderr, "LayoutTestController::setTextDirection called with unknown direction: '%s'.\n", direction->ustring().utf8().data());
+        return;
+    }
+
+    ewk_view_text_direction_set(browser->mainView(), ewkDirection);
 }
 
 void LayoutTestController::addChromeInputField()

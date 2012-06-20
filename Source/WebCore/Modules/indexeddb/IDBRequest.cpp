@@ -79,7 +79,7 @@ IDBRequest::~IDBRequest()
 PassRefPtr<IDBAny> IDBRequest::result(ExceptionCode& ec) const
 {
     if (m_readyState != DONE) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return 0;
     }
     return m_result;
@@ -97,7 +97,7 @@ PassRefPtr<DOMError> IDBRequest::error(ExceptionCode& ec) const
 unsigned short IDBRequest::errorCode(ExceptionCode& ec) const
 {
     if (m_readyState != DONE) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return 0;
     }
     return m_errorCode;
@@ -106,7 +106,7 @@ unsigned short IDBRequest::errorCode(ExceptionCode& ec) const
 String IDBRequest::webkitErrorMessage(ExceptionCode& ec) const
 {
     if (m_readyState != DONE) {
-        ec = IDBDatabaseException::NOT_ALLOWED_ERR;
+        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return String();
     }
     return m_errorMessage;
@@ -254,7 +254,7 @@ void IDBRequest::onSuccess(PassRefPtr<IDBDatabaseBackendInterface> backend)
         return;
 
     RefPtr<IDBDatabase> idbDatabase = IDBDatabase::create(scriptExecutionContext(), backend);
-    idbDatabase->open();
+    idbDatabase->registerFrontendCallbacks();
 
     m_result = IDBAny::create(idbDatabase.release());
     enqueueEvent(createSuccessEvent());
@@ -282,13 +282,12 @@ void IDBRequest::onSuccess(PassRefPtr<IDBTransactionBackendInterface> prpBackend
         return;
     }
 
-    RefPtr<IDBTransaction> frontend = IDBTransaction::create(scriptExecutionContext(), backend, m_source->idbDatabase().get());
+    RefPtr<IDBTransaction> frontend = IDBTransaction::create(scriptExecutionContext(), backend, IDBTransaction::VERSION_CHANGE, m_source->idbDatabase().get());
     backend->setCallbacks(frontend.get());
     m_transaction = frontend;
 
     ASSERT(m_source->type() == IDBAny::IDBDatabaseType);
-    ASSERT(m_transaction->mode() == IDBTransaction::modeVersionChange());
-    m_source->idbDatabase()->setVersionChangeTransaction(frontend.get());
+    ASSERT(m_transaction->isVersionChange());
 
     IDBPendingTransactionMonitor::removePendingTransaction(m_transaction->backend());
 

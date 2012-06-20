@@ -237,6 +237,8 @@ protected:
     RenderBoxModelObject* continuation() const;
     void setContinuation(RenderBoxModelObject*);
 
+    LayoutRect localCaretRectForEmptyElement(LayoutUnit width, LayoutUnit textIndentOffset);
+
     static bool shouldAntialiasLines(GraphicsContext*);
 
 public:
@@ -272,7 +274,9 @@ private:
     virtual bool isBoxModelObject() const { return true; }
 
     IntSize calculateFillTileSize(const FillLayer*, const IntSize& scaledPositioningAreaSize) const;
-    IntSize calculateImageIntrinsicDimensions(StyleImage*, const IntSize& scaledPositioningAreaSize) const;
+
+    enum ScaleByEffectiveZoomOrNot { ScaleByEffectiveZoom, DoNotScaleByEffectiveZoom };
+    IntSize calculateImageIntrinsicDimensions(StyleImage*, const IntSize& scaledPositioningAreaSize, ScaleByEffectiveZoomOrNot) const;
 
     RoundedRect getBackgroundRoundedRect(const LayoutRect&, InlineFlowBox*, LayoutUnit inlineBoxWidth, LayoutUnit inlineBoxHeight,
         bool includeLogicalLeftEdge, bool includeLogicalRightEdge);

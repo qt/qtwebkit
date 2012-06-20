@@ -114,7 +114,6 @@ TestShell::TestShell()
     , m_accelerated2dCanvasEnabled(false)
     , m_deferred2dCanvasEnabled(false)
     , m_acceleratedPaintingEnabled(false)
-    , m_perTilePaintingEnabled(false)
     , m_stressOpt(false)
     , m_stressDeopt(false)
     , m_dumpWhenFinished(true)
@@ -231,7 +230,6 @@ void TestShell::resetWebSettings(WebView& webView)
     m_prefs.accelerated2dCanvasEnabled = m_accelerated2dCanvasEnabled;
     m_prefs.deferred2dCanvasEnabled = m_deferred2dCanvasEnabled;
     m_prefs.acceleratedPaintingEnabled = m_acceleratedPaintingEnabled;
-    m_prefs.perTilePaintingEnabled = m_perTilePaintingEnabled;
     m_prefs.applyTo(&webView);
 }
 
@@ -375,6 +373,11 @@ void TestShell::testTimedOut()
 {
     m_printer->handleTimedOut();
     testFinished();
+}
+
+void TestShell::setPerTilePaintingEnabled(bool enabled)
+{
+    WebCompositor::setPerTilePaintingEnabled(enabled);
 }
 
 static string dumpDocumentText(WebFrame* frame)
@@ -726,6 +729,7 @@ void TestShell::bindJSObjectsToWindow(WebFrame* frame)
     m_accessibilityController->bindToJavascript(frame, WebString::fromUTF8("accessibilityController"));
     m_gamepadController->bindToJavascript(frame, WebString::fromUTF8("gamepadController"));
     m_layoutTestController->bindToJavascript(frame, WebString::fromUTF8("layoutTestController"));
+    m_layoutTestController->bindToJavascript(frame, WebString::fromUTF8("testRunner"));
     m_eventSender->bindToJavascript(frame, WebString::fromUTF8("eventSender"));
     m_textInputController->bindToJavascript(frame, WebString::fromUTF8("textInputController"));
 }

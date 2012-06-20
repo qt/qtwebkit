@@ -51,20 +51,12 @@ class WebApplicationCacheHostClient; // FIXME: Does this belong in platform?
 class WebIDBFactory; // FIXME: Does this belong in platform?
 class WebIDBKey; // FIXME: Does this belong in platform?
 class WebIDBKeyPath; // FIXME: Does this belong in platform?
-class WebMessagePortChannel; // FIXME: Does this belong in platform?
 class WebPluginListBuilder; // FIXME: Does this belong in platform?
 class WebSharedWorkerRepository; // FIXME: Does this belong in platform?
-class WebStorageNamespace; // FIXME: Does this belong in platform?
 
 // FIXME: Eventually all these API will need to move to WebKit::Platform.
 class WebKitPlatformSupport : public Platform {
 public:
-    // DOM Storage --------------------------------------------------
-
-    // Return a LocalStorage namespace that corresponds to the following path.
-    virtual WebStorageNamespace* createLocalStorageNamespace(const WebString& path, unsigned quota) { return 0; }
-
-
     // HTML5 Database ------------------------------------------------------
 
 #ifdef WIN32
@@ -95,13 +87,6 @@ public:
     virtual WebIDBFactory* idbFactory() { return 0; }
     virtual void createIDBKeysFromSerializedValuesAndKeyPath(const WebVector<WebSerializedScriptValue>& values,  const WebIDBKeyPath& keyPath, WebVector<WebIDBKey>& keys) { }
     virtual WebSerializedScriptValue injectIDBKeyIntoSerializedValue(const WebIDBKey& key, const WebSerializedScriptValue& value, const WebIDBKeyPath& keyPath) { return WebSerializedScriptValue(); }
-
-
-    // Message Ports -------------------------------------------------------
-
-    // Creates a Message Port Channel. This can be called on any thread.
-    // The returned object should only be used on the thread it was created on.
-    virtual WebMessagePortChannel* createMessagePortChannel() { return 0; }
 
 
     // Plugins -------------------------------------------------------------

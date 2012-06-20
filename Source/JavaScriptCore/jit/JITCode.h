@@ -29,6 +29,7 @@
 #if ENABLE(JIT)
 #include "CallFrame.h"
 #include "JSValue.h"
+#include "Disassembler.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Profiler.h"
 #endif
@@ -105,6 +106,11 @@ namespace JSC {
             return reinterpret_cast<char*>(m_ref.code().executableAddress()) + offset;
         }
         
+        void* executableAddress() const
+        {
+            return executableAddressAtOffset(0);
+        }
+        
         void* dataAddressAtOffset(size_t offset) const
         {
             ASSERT(offset <= size()); // use <= instead of < because it is valid to ask for an address at the exclusive end of the code.
@@ -124,7 +130,7 @@ namespace JSC {
         // Execute the code!
         inline JSValue execute(RegisterFile* registerFile, CallFrame* callFrame, JSGlobalData* globalData)
         {
-            JSValue result = JSValue::decode(ctiTrampoline(m_ref.code().executableAddress(), registerFile, callFrame, 0, Profiler::enabledProfilerReference(), globalData));
+            JSValue result = JSValue::decode(ctiTrampoline(m_ref.code().executableAddress(), registerFile, callFrame, 0, 0, globalData));
             return globalData->exception ? jsNull() : result;
         }
 
@@ -137,6 +143,11 @@ namespace JSC {
         {
             ASSERT(m_ref.code().executableAddress());
             return m_ref.size();
+        }
+        
+        bool tryToDisassemble(const char* prefix) const
+        {
+            return m_ref.tryToDisassemble(prefix);
         }
 
         ExecutableMemoryHandle* getExecutableMemory()

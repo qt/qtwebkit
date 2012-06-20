@@ -26,6 +26,10 @@
 #import "config.h"
 #import "PageClientImpl.h"
 
+#if USE(DICTATION_ALTERNATIVES)
+#import <AppKit/NSTextAlternatives.h>
+#endif
+#import "ColorSpaceData.h"
 #import "DataReference.h"
 #import "DictionaryPopupInfo.h"
 #import "FindIndicator.h"
@@ -37,6 +41,7 @@
 #import "WebContextMenuProxyMac.h"
 #import "WebEditCommandProxy.h"
 #import "WebPopupMenuProxyMac.h"
+#import <WebCore/AlternativeTextUIController.h>
 #import <WebCore/BitmapImage.h>
 #import <WebCore/Cursor.h>
 #import <WebCore/FloatRect.h>
@@ -122,6 +127,9 @@ PassOwnPtr<PageClientImpl> PageClientImpl::create(WKView* wkView)
 PageClientImpl::PageClientImpl(WKView* wkView)
     : m_wkView(wkView)
     , m_undoTarget(AdoptNS, [[WKEditorUndoTargetObjC alloc] init])
+#if USE(DICTATION_ALTERNATIVES)
+    , m_alternativeTextUIController(adoptPtr(new AlternativeTextUIController))
+#endif
 {
 }
 
@@ -205,14 +213,22 @@ LayerHostingMode PageClientImpl::viewLayerHostingMode()
 #endif
 }
 
+ColorSpaceData PageClientImpl::colorSpace()
+{
+    return [m_wkView _colorSpace];
+}
+
 void PageClientImpl::processDidCrash()
 {
     [m_wkView _processDidCrash];
 }
-    
+
 void PageClientImpl::pageClosed()
 {
     [m_wkView _pageClosed];
+#if USE(DICTATION_ALTERNATIVES)
+    m_alternativeTextUIController->clear();
+#endif
 }
 
 void PageClientImpl::didRelaunchProcess()
@@ -465,7 +481,7 @@ void PageClientImpl::dismissDictionaryLookupPanel()
 
 void PageClientImpl::showCorrectionPanel(AlternativeTextType type, const FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings)
 {
-#if !defined(BUILDING_ON_SNOW_LEOPARD)
+#if USE(AUTOCORRECTION_PANEL)
     if (!isViewVisible() || !isViewInWindow())
         return;
     m_correctionPanel.show(m_wkView, type, boundingBoxOfReplacedString, replacedString, replacementString, alternativeReplacementStrings);
@@ -474,14 +490,14 @@ void PageClientImpl::showCorrectionPanel(AlternativeTextType type, const FloatRe
 
 void PageClientImpl::dismissCorrectionPanel(ReasonForDismissingAlternativeText reason)
 {
-#if !defined(BUILDING_ON_SNOW_LEOPARD)
+#if USE(AUTOCORRECTION_PANEL)
     m_correctionPanel.dismiss(reason);
 #endif
 }
 
 String PageClientImpl::dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText reason)
 {
-#if !defined(BUILDING_ON_SNOW_LEOPARD)
+#if USE(AUTOCORRECTION_PANEL)
     return m_correctionPanel.dismiss(reason);
 #else
     return String();
@@ -528,5 +544,36 @@ bool PageClientImpl::executeSavedCommandBySelector(const String& selectorString)
 {
     return [m_wkView _executeSavedCommandBySelector:NSSelectorFromString(selectorString)];
 }
+
+#if USE(DICTATION_ALTERNATIVES)
+uint64_t PageClientImpl::addDictationAlternatives(const RetainPtr<NSTextAlternatives>& alternatives)
+{
+    return m_alternativeTextUIController->addAlternatives(alternatives);
+}
+
+void PageClientImpl::removeDictationAlternatives(uint64_t dictationContext)
+{
+    m_alternativeTextUIController->removeAlternatives(dictationContext);
+}
+
+void PageClientImpl::showDictationAlternativeUI(const WebCore::FloatRect& boundingBoxOfDictatedText, uint64_t dictationContext)
+{
+    if (!isViewVisible() || !isViewInWindow())
+        return;
+    m_alternativeTextUIController->showAlternatives(m_wkView, boundingBoxOfDictatedText, dictationContext, ^(NSString* acceptedAlternative){
+        [m_wkView handleAcceptedAlternativeText:acceptedAlternative];
+    });
+}
+
+Vector<String> PageClientImpl::dictationAlternatives(uint64_t dictationContext)
+{
+    return m_alternativeTextUIController->alternativesForContext(dictationContext);
+}
+
+void PageClientImpl::dismissDictationAlternativeUI()
+{
+    m_alternativeTextUIController->dismissAlternatives();
+}
+#endif
 
 } // namespace WebKit

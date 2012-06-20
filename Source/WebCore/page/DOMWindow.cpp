@@ -88,7 +88,6 @@
 #include "Settings.h"
 #include "Storage.h"
 #include "StorageArea.h"
-#include "StorageInfo.h"
 #include "StorageNamespace.h"
 #include "StyleMedia.h"
 #include "StyleResolver.h"
@@ -422,9 +421,6 @@ DOMWindow::~DOMWindow()
 #if ENABLE(BLOB)
         ASSERT(!m_domURL);
 #endif
-#if ENABLE(QUOTA)
-        ASSERT(!m_storageInfo);
-#endif
     }
 #endif
 
@@ -593,9 +589,6 @@ void DOMWindow::clearDOMWindowProperties()
     m_applicationCache = 0;
 #if ENABLE(BLOB)
     m_domURL = 0;
-#endif
-#if ENABLE(QUOTA)
-    m_storageInfo = 0;
 #endif
 }
 
@@ -1287,7 +1280,7 @@ DOMWindow* DOMWindow::parent() const
     if (!m_frame)
         return 0;
 
-    Frame* parent = m_frame->tree()->parent(true);
+    Frame* parent = m_frame->tree()->parent();
     if (parent)
         return parent->domWindow();
 
@@ -1303,7 +1296,7 @@ DOMWindow* DOMWindow::top() const
     if (!page)
         return 0;
 
-    return m_frame->tree()->top(true)->domWindow();
+    return m_frame->tree()->top()->domWindow();
 }
 
 Document* DOMWindow::document() const
@@ -1934,16 +1927,5 @@ void DOMWindow::showModalDialog(const String& urlString, const String& dialogFea
 
     dialogFrame->page()->chrome()->runModal();
 }
-
-#if ENABLE(QUOTA)
-StorageInfo* DOMWindow::webkitStorageInfo() const
-{
-    if (!isCurrentlyDisplayedInFrame())
-        return 0;
-    if (!m_storageInfo)
-        m_storageInfo = StorageInfo::create();
-    return m_storageInfo.get();
-}
-#endif
 
 } // namespace WebCore

@@ -601,6 +601,7 @@ PassOwnPtr<ScrollAnimator> ScrollAnimator::create(ScrollableArea* scrollableArea
 ScrollAnimatorMac::ScrollAnimatorMac(ScrollableArea* scrollableArea)
     : ScrollAnimator(scrollableArea)
     , m_initialScrollbarPaintTimer(this, &ScrollAnimatorMac::initialScrollbarPaintTimerFired)
+    , m_sendContentAreaScrolledTimer(this, &ScrollAnimatorMac::sendContentAreaScrolledTimerFired)
 #if ENABLE(RUBBER_BANDING)
     , m_scrollElasticityController(this)
     , m_snapRubberBandTimer(this, &ScrollAnimatorMac::snapRubberBandTimerFired)
@@ -634,7 +635,7 @@ ScrollAnimatorMac::~ScrollAnimatorMac()
 
 static bool scrollAnimationEnabledForSystem()
 {
-#if defined(BUILDING_ON_SNOW_LEOPARD) || defined(BUILDING_ON_LION)
+#if defined(BUILDING_ON_SNOW_LEOPARD) || defined(BUILDING_ON_LION) || PLATFORM(CHROMIUM)
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"AppleScrollAnimationEnabled"];
 #else
     return [[NSUserDefaults standardUserDefaults] boolForKey:@"NSScrollAnimationEnabled"];
@@ -946,7 +947,7 @@ void ScrollAnimatorMac::notifyContentAreaScrolled()
     // isn't really scrolling in that case. We should only pass the message on to the
     // ScrollbarPainterController when we're really scrolling on an active page.
     if (scrollableArea()->isOnActivePage())
-        [m_scrollbarPainterController.get() contentAreaScrolled];
+        sendContentAreaScrolledSoon();
 }
 
 void ScrollAnimatorMac::cancelAnimations()
@@ -1230,6 +1231,17 @@ void ScrollAnimatorMac::initialScrollbarPaintTimerFired(Timer<ScrollAnimatorMac>
         [m_scrollbarPainterController.get() hideOverlayScrollers];
         [m_scrollbarPainterController.get() flashScrollers];
     }
+}
+
+void ScrollAnimatorMac::sendContentAreaScrolledSoon()
+{
+    if (!m_sendContentAreaScrolledTimer.isActive())
+        m_sendContentAreaScrolledTimer.startOneShot(0);
+}
+
+void ScrollAnimatorMac::sendContentAreaScrolledTimerFired(Timer<ScrollAnimatorMac>*)
+{
+    [m_scrollbarPainterController.get() contentAreaScrolled];
 }
 
 void ScrollAnimatorMac::setVisibleScrollerThumbRect(const IntRect& scrollerThumb)

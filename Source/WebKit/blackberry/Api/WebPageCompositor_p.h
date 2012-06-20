@@ -24,7 +24,7 @@
 #include "LayerCompositingThread.h"
 #include "LayerRenderer.h"
 
-#include <BlackBerryPlatformAnimation.h>
+#include <BlackBerryPlatformAnimationFrameRateController.h>
 #include <BlackBerryPlatformGLES2Context.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
@@ -84,6 +84,9 @@ public:
     WebCore::LayerRenderingResults lastCompositingResults() const { return m_lastCompositingResults; }
     void setLastCompositingResults(const WebCore::LayerRenderingResults& results) { m_lastCompositingResults = results; }
 
+    WebCore::Color backgroundColor() const { return m_backgroundColor; }
+    void setBackgroundColor(const WebCore::Color&);
+
     void releaseLayerResources();
 
     WebPagePrivate* page() const { return m_webPage; }
@@ -111,6 +114,7 @@ private:
     WebCore::IntRect m_layoutRectForCompositing;
     WebCore::IntSize m_contentsSizeForCompositing;
     WebCore::LayerRenderingResults m_lastCompositingResults;
+    WebCore::Color m_backgroundColor;
     bool m_drawsRootLayer;
 };
 

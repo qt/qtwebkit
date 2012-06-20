@@ -48,13 +48,16 @@ my (
     $batteryStatusSupport,
     $blobSupport,
     $channelMessagingSupport,
+    $cspNextSupport,
     $css3FlexboxSupport,
+    $cssBoxDecorationBreakSupport,
     $cssExclusionsSupport,
     $cssFiltersSupport,
     $cssImageResolutionSupport,
     $cssRegionsSupport,
     $cssShadersSupport,
     $cssVariablesSupport,
+    $customSchemeHandlerSupport,
     $dataTransferItemsSupport,
     $datalistSupport,
     $detailsSupport,
@@ -116,6 +119,7 @@ my (
     $tiledBackingStoreSupport,
     $touchEventsSupport,
     $touchIconLoadingSupport,
+    $undoManagerSupport,
     $vibrationSupport,
     $videoSupport,
     $videoTrackSupport,
@@ -146,6 +150,9 @@ my @features = (
     { option => "channel-messaging", desc => "Toggle Channel Messaging support",
       define => "ENABLE_CHANNEL_MESSAGING", default => 1, value => \$channelMessagingSupport },
 
+    { option => "csp-next", desc => "Toggle Content Security Policy 1.1 support",
+      define => "ENABLE_CSP_NEXT", default => 0, value => \$cspNextSupport },
+
     { option => "css-exclusions", desc => "Toggle CSS Exclusions support",
       define => "ENABLE_CSS_EXCLUSIONS", default => 1, value => \$cssExclusionsSupport },
 
@@ -154,6 +161,9 @@ my @features = (
 
     { option => "css3-flexbox", desc => "Toggle CSS3 Flexbox support",
       define => "ENABLE_CSS3_FLEXBOX", default => 1, value => \$css3FlexboxSupport },
+
+    { option => "css-box-decoration-break", desc => "Toggle CSS box-decoration-break support",
+      define => "ENABLE_CSS_BOX_DECORATION_BREAK", default => 1, value => \$cssBoxDecorationBreakSupport },
 
     { option => "css-image-resolution", desc => "Toggle CSS image-resolution support",
       define => "ENABLE_CSS_IMAGE_RESOLUTION", default => 0, value => \$cssImageResolutionSupport },
@@ -166,6 +176,9 @@ my @features = (
 
     { option => "css-variables", desc => "Toggle CSS Variable support",
       define => "ENABLE_CSS_VARIABLES", default => 0, value => \$cssVariablesSupport },
+
+    { option => "custom-scheme-handler", desc => "Toggle Custom Scheme Handler support",
+      define => "ENABLE_CUSTOM_SCHEME_HANDLER", default => 0, value => \$customSchemeHandlerSupport },
 
     { option => "datalist", desc => "Toggle Datalist support",
       define => "ENABLE_DATALIST", default => 0, value => \$datalistSupport },
@@ -252,10 +265,10 @@ my @features = (
       define => "ENABLE_LEGACY_NOTIFICATIONS", default => isBlackBerry(), value => \$legacyNotificationsSupport },
 
     { option => "legacy-webkit-blob-builder", desc => "Toggle Legacy WebKit Blob Builder support",
-      define => "ENABLE_LEGACY_WEBKIT_BLOB_BUILDER", default => (isGtk() || isChromium() || isBlackBerry()), value => \$legacyWebKitBlobBuilderSupport },
+      define => "ENABLE_LEGACY_WEBKIT_BLOB_BUILDER", default => (isGtk() || isChromium() || isBlackBerry() || isEfl()), value => \$legacyWebKitBlobBuilderSupport },
 
     { option => "link-prefetch", desc => "Toggle Link Prefetch support",
-      define => "ENABLE_LINK_PREFETCH", default => 0, value => \$linkPrefetchSupport },
+      define => "ENABLE_LINK_PREFETCH", default => isGtk(), value => \$linkPrefetchSupport },
 
     { option => "link-prerender", desc => "Toggle Link Prerender support",
       define => "ENABLE_LINK_PRERENDER", default => 0, value => \$linkPrerenderSupport },
@@ -270,7 +283,7 @@ my @features = (
       define => "ENABLE_MEDIA_STATISTICS", default => 0, value => \$mediaStatisticsSupport },
 
     { option => "media-stream", desc => "Toggle Media Stream support",
-      define => "ENABLE_MEDIA_STREAM", default => (isChromium() || isGtk()), value => \$mediaStreamSupport },
+      define => "ENABLE_MEDIA_STREAM", default => (isChromium() || isGtk() || isBlackBerry()), value => \$mediaStreamSupport },
 
     { option => "meter-tag", desc => "Toggle Meter Tag support",
       define => "ENABLE_METER_TAG", default => !isAppleWinWebKit(), value => \$meterTagSupport },
@@ -315,7 +328,7 @@ my @features = (
       define => "ENABLE_SCRIPTED_SPEECH", default => 0, value => \$scriptedSpeechSupport },
 
     { option => "shadow-dom", desc => "Toggle Shadow DOM support",
-      define => "ENABLE_SHADOW_DOM", default => isGtk(), value => \$shadowDOMSupport },
+      define => "ENABLE_SHADOW_DOM", default => (isGtk() || isEfl()), value => \$shadowDOMSupport },
 
     { option => "shared-workers", desc => "Toggle Shared Workers support",
       define => "ENABLE_SHARED_WORKERS", default => (isAppleWebKit() || isGtk() || isBlackBerry() || isEfl()), value => \$sharedWorkersSupport },
@@ -346,6 +359,9 @@ my @features = (
 
     { option => "touch-icon-loading", desc => "Toggle Touch Icon Loading Support",
       define => "ENABLE_TOUCH_ICON_LOADING", default => 0, value => \$touchIconLoadingSupport },
+
+    { option => "undo-manager", desc => "Toggle Undo Manager support",
+      define => "ENABLE_UNDO_MANAGER", default => 0, value => \$undoManagerSupport },
 
     { option => "vibration", desc => "Toggle Vibration support",
       define => "ENABLE_VIBRATION", default => (isEfl() || isBlackBerry()), value => \$vibrationSupport },

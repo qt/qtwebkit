@@ -78,7 +78,6 @@
 
 #include "NativeImageSkia.h"
 
-#include "AsyncFileSystemChromium.h"
 #include "BitmapImage.h"
 #include "Cookie.h"
 #include "Document.h"
@@ -96,7 +95,6 @@
 #include <public/WebCookie.h>
 #include <public/WebCookieJar.h>
 #include <public/WebMimeRegistry.h>
-#include <public/WebWorkerRunLoop.h>
 #include <wtf/Assertions.h>
 
 // We are part of the WebKit implementation.
@@ -207,15 +205,6 @@ bool PlatformSupport::cookiesEnabled(const Document* document)
         result = cookieJar->cookiesEnabled(document->cookieURL(), document->firstPartyForCookies());
     return result;
 }
-
-// File ------------------------------------------------------------------------
-
-#if ENABLE(FILE_SYSTEM)
-PassOwnPtr<AsyncFileSystem> PlatformSupport::createAsyncFileSystem()
-{
-    return AsyncFileSystemChromium::create();
-}
-#endif
 
 // Font -----------------------------------------------------------------------
 
@@ -371,18 +360,6 @@ PassOwnPtr<AudioBus> PlatformSupport::decodeAudioFileData(const char* data, size
 }
 
 #endif // ENABLE(WEB_AUDIO)
-
-// SharedTimers ---------------------------------------------------------------
-
-void PlatformSupport::setSharedTimerFiredFunction(void (*func)())
-{
-    webKitPlatformSupport()->setSharedTimerFiredFunction(func);
-}
-
-void PlatformSupport::setSharedTimerFireInterval(double interval)
-{
-    webKitPlatformSupport()->setSharedTimerFireInterval(interval);
-}
 
 // Theming --------------------------------------------------------------------
 
@@ -721,16 +698,6 @@ bool PlatformSupport::popupsAllowed(NPP npp)
 }
 
 #if ENABLE(WORKERS)
-void PlatformSupport::didStartWorkerRunLoop(WorkerRunLoop* loop)
-{
-    WebKit::Platform::current()->didStartWorkerRunLoop(WebWorkerRunLoop(loop));
-}
-
-void PlatformSupport::didStopWorkerRunLoop(WorkerRunLoop* loop)
-{
-    WebKit::Platform::current()->didStopWorkerRunLoop(WebWorkerRunLoop(loop));
-}
-
 WorkerContextProxy* WorkerContextProxy::create(Worker* worker)
 {
     return WebWorkerClientImpl::createWorkerContextProxy(worker);

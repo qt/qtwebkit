@@ -41,10 +41,6 @@
 #include <wtf/HashSet.h>
 #include <wtf/UnusedParam.h>
 
-#if USE(CG) || USE(CAIRO) || USE(SKIA) || PLATFORM(QT) || PLATFORM(WX)
-#define HAVE_PATH_BASED_BORDER_RADIUS_DRAWING 1
-#endif
-
 namespace WebCore {
 
 class AffineTransform;
@@ -197,6 +193,7 @@ public:
     RenderObject* nextInPreOrderAfterChildren() const;
     RenderObject* nextInPreOrderAfterChildren(const RenderObject* stayWithin) const;
     RenderObject* previousInPreOrder() const;
+    RenderObject* previousInPreOrder(const RenderObject* stayWithin) const;
     RenderObject* childAt(unsigned) const;
 
     RenderObject* firstLeafChild() const;
@@ -489,6 +486,9 @@ public:
             && !isRenderFullScreen()
             && !isRenderFullScreenPlaceholder()
 #endif
+#if ENABLE(MATHML)
+            && !isRenderMathMLBlock()
+#endif
             ;
     }
     bool isAnonymousColumnsBlock() const { return style()->specifiesColumns() && isAnonymousBlock(); }
@@ -551,13 +551,6 @@ public:
 #endif
 
     inline bool preservesNewline() const;
-
-#if !HAVE(PATH_BASED_BORDER_RADIUS_DRAWING)
-    // FIXME: This function should be removed when all ports implement GraphicsContext::clipConvexPolygon()!!
-    // At that time, everyone can use RenderObject::drawBoxSideFromPath() instead. This should happen soon.
-    void drawArcForBoxSide(GraphicsContext*, int x, int y, float thickness, const IntSize& radius, int angleStart,
-                           int angleSpan, BoxSide, Color, EBorderStyle, bool firstCorner);
-#endif
 
     // The pseudo element style can be cached or uncached.  Use the cached method if the pseudo element doesn't respect
     // any pseudo classes (and therefore has no concept of changing state).
@@ -1212,18 +1205,6 @@ inline void adjustFloatRectForAbsoluteZoom(FloatRect& rect, RenderObject* render
     float zoom = renderer->style()->effectiveZoom();
     if (zoom != 1)
         rect.scale(1 / zoom, 1 / zoom);
-}
-
-inline void adjustFloatQuadForPageScale(FloatQuad& quad, float pageScale)
-{
-    if (pageScale != 1)
-        quad.scale(1 / pageScale, 1 / pageScale);
-}
-
-inline void adjustFloatRectForPageScale(FloatRect& rect, float pageScale)
-{
-    if (pageScale != 1)
-        rect.scale(1 / pageScale, 1 / pageScale);
 }
 
 } // namespace WebCore

@@ -207,7 +207,7 @@ PassRefPtr<ExecutableMemoryHandle> JIT::privateCompileCTIMachineTrampolines(JSGl
     patchBuffer.link(callCallNotJSFunction, FunctionPtr(cti_op_call_NotJSFunction));
     patchBuffer.link(callConstructNotJSFunction, FunctionPtr(cti_op_construct_NotJSConstruct));
 
-    CodeRef finalCode = patchBuffer.finalizeCode();
+    CodeRef finalCode = FINALIZE_CODE(patchBuffer, ("JIT CTI machine trampolines"));
     RefPtr<ExecutableMemoryHandle> executableMemory = finalCode.executableMemory();
 
     trampolines->ctiVirtualCallLink = patchBuffer.trampolineAt(virtualCallLinkBegin);
@@ -497,7 +497,7 @@ JIT::CodeRef JIT::privateCompileCTINativeCall(JSGlobalData* globalData, NativeFu
     LinkBuffer patchBuffer(*m_globalData, this, GLOBAL_THUNK_ID);
 
     patchBuffer.link(nativeCall, FunctionPtr(func));
-    return patchBuffer.finalizeCode();
+    return FINALIZE_CODE(patchBuffer, ("JIT CTI native call"));
 }
 
 void JIT::emit_op_mov(Instruction* currentInstruction)
@@ -1590,24 +1590,16 @@ void JIT::emitSlow_op_convert_this(Instruction* currentInstruction, Vector<SlowC
 
 void JIT::emit_op_profile_will_call(Instruction* currentInstruction)
 {
-    peek(regT2, OBJECT_OFFSETOF(JITStackFrame, enabledProfilerReference) / sizeof(void*));
-    Jump noProfiler = branchTestPtr(Zero, Address(regT2));
-
     JITStubCall stubCall(this, cti_op_profile_will_call);
     stubCall.addArgument(currentInstruction[1].u.operand);
     stubCall.call();
-    noProfiler.link(this);
 }
 
 void JIT::emit_op_profile_did_call(Instruction* currentInstruction)
 {
-    peek(regT2, OBJECT_OFFSETOF(JITStackFrame, enabledProfilerReference) / sizeof(void*));
-    Jump noProfiler = branchTestPtr(Zero, Address(regT2));
-
     JITStubCall stubCall(this, cti_op_profile_did_call);
     stubCall.addArgument(currentInstruction[1].u.operand);
     stubCall.call();
-    noProfiler.link(this);
 }
 
 void JIT::emit_op_get_arguments_length(Instruction* currentInstruction)
@@ -1672,7 +1664,7 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     JITStubCall stubCall(this, cti_op_get_by_val);
     stubCall.addArgument(arguments);
     stubCall.addArgument(property);
-    stubCall.call(dst);
+    stubCall.callWithValueProfiling(dst);
 }
 
 } // namespace JSC

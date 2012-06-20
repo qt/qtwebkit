@@ -62,7 +62,7 @@ AudioNode::~AudioNode()
 {
 #if DEBUG_AUDIONODE_REFERENCES
     --s_nodeCount[nodeType()];
-    printf("%p: %d: AudioNode::~AudioNode() %d %d\n", this, nodeType(), m_normalRefCount, m_connectionRefCount);
+    fprintf(stderr, "%p: %d: AudioNode::~AudioNode() %d %d\n", this, nodeType(), m_normalRefCount, m_connectionRefCount);
 #endif
 }
 
@@ -316,7 +316,7 @@ void AudioNode::ref(RefType refType)
     }
 
 #if DEBUG_AUDIONODE_REFERENCES
-    printf("%p: %d: AudioNode::ref(%d) %d %d\n", this, nodeType(), refType, m_normalRefCount, m_connectionRefCount);
+    fprintf(stderr, "%p: %d: AudioNode::ref(%d) %d %d\n", this, nodeType(), refType, m_normalRefCount, m_connectionRefCount);
 #endif
 
     // See the disabling code in finishDeref() below. This handles the case where a node
@@ -350,7 +350,8 @@ void AudioNode::deref(RefType refType)
     } else {
         // We were unable to get the lock, so put this in a list to finish up later.
         ASSERT(context()->isAudioThread());
-        context()->addDeferredFinishDeref(this, refType);
+        ASSERT(refType == RefTypeConnection);
+        context()->addDeferredFinishDeref(this);
     }
 
     // Once AudioContext::uninitialize() is called there's no more chances for deleteMarkedNodes() to get called, so we call here.
@@ -378,7 +379,7 @@ void AudioNode::finishDeref(RefType refType)
     }
     
 #if DEBUG_AUDIONODE_REFERENCES
-    printf("%p: %d: AudioNode::deref(%d) %d %d\n", this, nodeType(), refType, m_normalRefCount, m_connectionRefCount);
+    fprintf(stderr, "%p: %d: AudioNode::deref(%d) %d %d\n", this, nodeType(), refType, m_normalRefCount, m_connectionRefCount);
 #endif
 
     if (!m_connectionRefCount) {
@@ -404,15 +405,15 @@ int AudioNode::s_nodeCount[NodeTypeEnd];
 
 void AudioNode::printNodeCounts()
 {
-    printf("\n\n");
-    printf("===========================\n");
-    printf("AudioNode: reference counts\n");
-    printf("===========================\n");
+    fprintf(stderr, "\n\n");
+    fprintf(stderr, "===========================\n");
+    fprintf(stderr, "AudioNode: reference counts\n");
+    fprintf(stderr, "===========================\n");
 
     for (unsigned i = 0; i < NodeTypeEnd; ++i)
-        printf("%d: %d\n", i, s_nodeCount[i]);
+        fprintf(stderr, "%d: %d\n", i, s_nodeCount[i]);
 
-    printf("===========================\n\n\n");
+    fprintf(stderr, "===========================\n\n\n");
 }
 
 #endif // DEBUG_AUDIONODE_REFERENCES

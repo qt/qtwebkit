@@ -29,11 +29,12 @@ module core {
     interface [
         Conditional=SHADOW_DOM,
         Constructor(in Element host),
-        ConstructorRaisesException
+        ConstructorRaisesException,
+        JSGenerateToJSObject
     ] ShadowRoot : DocumentFragment {
-        readonly attribute Element host;
         readonly attribute Element activeElement;
         attribute boolean applyAuthorStyles;
+        attribute boolean resetStyleInheritance;
 
         attribute [TreatNullAs=NullString] DOMString innerHTML
             setter raises(DOMException);

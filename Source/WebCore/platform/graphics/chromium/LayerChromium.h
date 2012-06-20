@@ -57,13 +57,22 @@
 
 namespace WebCore {
 
+class CCActiveAnimation;
 struct CCAnimationEvent;
 class CCLayerAnimationDelegate;
 class CCLayerImpl;
 class CCLayerTreeHost;
 class CCTextureUpdater;
-class GraphicsContext3D;
 class ScrollbarLayerChromium;
+
+// Delegate for handling scroll input for a LayerChromium.
+class LayerChromiumScrollDelegate {
+public:
+    virtual void didScroll(const IntSize&) = 0;
+
+protected:
+    virtual ~LayerChromiumScrollDelegate() { }
+};
 
 // Base class for composited layers. Special layer types are derived from
 // this class.
@@ -79,7 +88,6 @@ public:
     virtual float opacity() const OVERRIDE { return m_opacity; }
     virtual void setTransformFromAnimation(const WebKit::WebTransformationMatrix&) OVERRIDE;
     virtual const WebKit::WebTransformationMatrix& transform() const OVERRIDE { return m_transform; }
-    virtual const IntSize& bounds() const OVERRIDE { return m_bounds; }
 
     const LayerChromium* rootLayer() const;
     LayerChromium* parent() const;
@@ -101,6 +109,7 @@ public:
     Color backgroundColor() const { return m_backgroundColor; }
 
     void setBounds(const IntSize&);
+    const IntSize& bounds() const { return m_bounds; }
     virtual IntSize contentBounds() const { return bounds(); }
 
     void setMasksToBounds(bool);
@@ -130,6 +139,12 @@ public:
     void setPosition(const FloatPoint&);
     FloatPoint position() const { return m_position; }
 
+    void setIsContainerForFixedPositionLayers(bool);
+    bool isContainerForFixedPositionLayers() const { return m_isContainerForFixedPositionLayers; }
+
+    void setFixedToContainerLayer(bool);
+    bool fixedToContainerLayer() const { return m_fixedToContainerLayer; }
+
     void setSublayerTransform(const WebKit::WebTransformationMatrix&);
     const WebKit::WebTransformationMatrix& sublayerTransform() const { return m_sublayerTransform; }
 
@@ -139,15 +154,24 @@ public:
     const IntRect& visibleLayerRect() const { return m_visibleLayerRect; }
     void setVisibleLayerRect(const IntRect& visibleLayerRect) { m_visibleLayerRect = visibleLayerRect; }
 
+    const IntRect& scissorRect() const { return m_scissorRect; }
+    void setScissorRect(const IntRect& scissorRect) { m_scissorRect = scissorRect; }
+
     void setScrollPosition(const IntPoint&);
     const IntPoint& scrollPosition() const { return m_scrollPosition; }
 
+    void setMaxScrollPosition(const IntSize&);
+    const IntSize& maxScrollPosition() const { return m_maxScrollPosition; }
+
     void setScrollable(bool);
+    bool scrollable() const { return m_scrollable; }
     void setShouldScrollOnMainThread(bool);
     void setHaveWheelEventHandlers(bool);
     const Region& nonFastScrollableRegion() { return m_nonFastScrollableRegion; }
     void setNonFastScrollableRegion(const Region&);
     void setNonFastScrollableRegionChanged() { m_nonFastScrollableRegionChanged = true; }
+    void setLayerScrollDelegate(LayerChromiumScrollDelegate* layerScrollDelegate) { m_layerScrollDelegate = layerScrollDelegate; }
+    void scrollBy(const IntSize&);
 
     void setDrawCheckerboardForMissingTiles(bool);
     bool drawCheckerboardForMissingTiles() const { return m_drawCheckerboardForMissingTiles; }
@@ -234,7 +258,7 @@ public:
     void setAlwaysReserveTextures(bool alwaysReserveTextures) { m_alwaysReserveTextures = alwaysReserveTextures; }
     bool alwaysReserveTextures() const { return m_alwaysReserveTextures; }
 
-    bool addAnimation(const KeyframeValueList&, const IntSize& boxSize, const Animation*, int animationId, int groupId, double timeOffset);
+    bool addAnimation(PassOwnPtr<CCActiveAnimation>);
     void pauseAnimation(int animationId, double timeOffset);
     void removeAnimation(int animationId);
 
@@ -285,6 +309,7 @@ protected:
 private:
     void setParent(LayerChromium*);
     bool hasAncestor(LayerChromium*) const;
+    bool descendantIsFixedToContainerLayer() const;
 
     size_t numChildren() const { return m_children.size(); }
 
@@ -306,8 +331,17 @@ private:
 
     // Layer properties.
     IntSize m_bounds;
+
+    // Uses layer's content space.
     IntRect m_visibleLayerRect;
+
+    // During drawing, identifies the region outside of which nothing should be drawn.
+    // Currently this is set to layer's clipRect if usesLayerClipping is true, otherwise
+    // it's targetRenderSurface's contentRect.
+    // Uses target surface's space.
+    IntRect m_scissorRect;
     IntPoint m_scrollPosition;
+    IntSize m_maxScrollPosition;
     bool m_scrollable;
     bool m_shouldScrollOnMainThread;
     bool m_haveWheelEventHandlers;
@@ -323,6 +357,8 @@ private:
     WebKit::WebFilterOperations m_filters;
     WebKit::WebFilterOperations m_backgroundFilters;
     float m_anchorPointZ;
+    bool m_isContainerForFixedPositionLayers;
+    bool m_fixedToContainerLayer;
     bool m_isDrawable;
     bool m_masksToBounds;
     bool m_opaque;
@@ -344,16 +380,21 @@ private:
     OwnPtr<RenderSurfaceChromium> m_renderSurface;
     float m_drawOpacity;
     bool m_drawOpacityIsAnimating;
+
+    // Uses target surface space.
     IntRect m_clipRect;
     RenderSurfaceChromium* m_targetRenderSurface;
     WebKit::WebTransformationMatrix m_drawTransform;
     WebKit::WebTransformationMatrix m_screenSpaceTransform;
     bool m_drawTransformIsAnimating;
     bool m_screenSpaceTransformIsAnimating;
+
+    // Uses target surface space.
     IntRect m_drawableContentRect;
     float m_contentsScale;
 
     CCLayerAnimationDelegate* m_layerAnimationDelegate;
+    LayerChromiumScrollDelegate* m_layerScrollDelegate;
 };
 
 void sortLayers(Vector<RefPtr<LayerChromium> >::iterator, Vector<RefPtr<LayerChromium> >::iterator, void*);

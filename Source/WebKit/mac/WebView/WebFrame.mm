@@ -580,6 +580,9 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 
 - (NSString *)_stringByEvaluatingJavaScriptFromString:(NSString *)string forceUserGesture:(BOOL)forceUserGesture
 {
+    if (!string)
+        return @"";
+
     ASSERT(_private->coreFrame->document());
     RetainPtr<WebFrame> protect(self); // Executing arbitrary JavaScript can destroy the frame.
     
@@ -907,16 +910,6 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     return _private->coreFrame->domWindow()->pendingUnloadEventListeners();
 }
 
-- (void)_setIsDisconnected:(bool)isDisconnected
-{
-    _private->coreFrame->setIsDisconnected(isDisconnected);
-}
-
-- (void)_setExcludeFromTextSearch:(bool)exclude
-{
-    _private->coreFrame->setExcludeFromTextSearch(exclude);
-}
-
 #if ENABLE(NETSCAPE_PLUGIN_API)
 - (void)_recursive_resumeNullEventsForAllNetscapePlugins
 {
@@ -1103,6 +1096,9 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
 
 - (NSString *)_stringByEvaluatingJavaScriptFromString:(NSString *)string withGlobalObject:(JSObjectRef)globalObjectRef inScriptWorld:(WebScriptWorld *)world
 {
+    if (!string)
+        return @"";
+
     // Start off with some guess at a frame and a global object, we'll try to do better...!
     JSDOMWindow* anyWorldGlobalObject = _private->coreFrame->script()->globalObject(mainThreadNormalWorld());
 
@@ -1369,9 +1365,9 @@ static bool needsMicrosoftMessengerDOMDocumentWorkaround()
     // Some users of WebKit API incorrectly use "file path as URL" style requests which are invalid.
     // By re-writing those URLs here we technically break the -[WebDataSource initialRequest] API
     // but that is necessary to implement this quirk only at the API boundary.
-    // Note that other users of WebKit API use nil requests or requests with nil URLs, so we
-    // only implement this workaround when the request had a non-nil URL.
-    if (!resourceRequest.url().isValid() && [request URL])
+    // Note that other users of WebKit API use nil requests or requests with nil URLs or empty URLs, so we
+    // only implement this workaround when the request had a non-nil or non-empty URL.
+    if (!resourceRequest.url().isValid() && !resourceRequest.url().isEmpty())
         resourceRequest.setURL([NSURL URLWithString:[@"file:" stringByAppendingString:[[request URL] absoluteString]]]);
 
     coreFrame->loader()->load(resourceRequest, false);

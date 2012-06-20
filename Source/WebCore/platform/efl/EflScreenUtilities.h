@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Samsung Electronics
+ * Copyright (C) 2012 Samsung Electronics
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -19,9 +19,15 @@
 #ifndef EflScreenUtilities_h
 #define EflScreenUtilities_h
 
+#include <wtf/text/WTFString.h>
+
+typedef struct _Evas Evas;
+
 namespace WebCore {
 
+void applyFallbackCursor(Ecore_Evas*, const char*);
 int getDPI();
+bool isUsingEcoreX(const Evas*);
 
 } // namespace WebCore
 

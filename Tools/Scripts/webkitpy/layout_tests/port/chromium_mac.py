@@ -68,6 +68,8 @@ class ChromiumMacPort(chromium.ChromiumPort):
         ],
     }
 
+    DEFAULT_BUILD_DIRECTORIES = ('xcodebuild', 'out')
+
     @classmethod
     def determine_full_port_name(cls, host, options, port_name):
         if port_name.endswith('-mac'):
@@ -99,39 +101,9 @@ class ChromiumMacPort(chromium.ChromiumPort):
     def operating_system(self):
         return 'mac'
 
-    def default_child_processes(self):
-        # FIXME: As a temporary workaround while we figure out what's going
-        # on with https://bugs.webkit.org/show_bug.cgi?id=83076, reduce by
-        # half the # of workers we run by default on bigger machines.
-        default_count = super(ChromiumMacPort, self).default_child_processes()
-        if default_count >= 8:
-            cpu_count = self._executive.cpu_count()
-            return max(1, min(default_count, int(cpu_count / 2)))
-        return default_count
-
     #
     # PROTECTED METHODS
     #
-
-    def _build_path(self, *comps):
-        if self.get_option('build_directory'):
-            return self._filesystem.join(self.get_option('build_directory'),
-                                         *comps)
-        base = self.path_from_chromium_base()
-        path = self._filesystem.join(base, 'out', *comps)
-        if self._filesystem.exists(path):
-            return path
-
-        path = self._filesystem.join(base, 'xcodebuild', *comps)
-        if self._filesystem.exists(path):
-            return path
-
-        base = self.path_from_webkit_base()
-        path = self._filesystem.join(base, 'out', *comps)
-        if self._filesystem.exists(path):
-            return path
-
-        return self._filesystem.join(base, 'xcodebuild', *comps)
 
     def check_wdiff(self, logging=True):
         try:

@@ -77,10 +77,6 @@ class WebKitPort(Port):
             search_paths.append(self.port_name)
         return map(self._webkit_baseline_path, search_paths)
 
-    def path_to_test_expectations_file(self):
-        # test_expectations are always in mac/ not mac-leopard/ by convention, hence we use port_name instead of name().
-        return self._filesystem.join(self._webkit_baseline_path(self.port_name), 'test_expectations.txt')
-
     def _port_flag_for_scripts(self):
         # This is overrriden by ports which need a flag passed to scripts to distinguish the use of that port.
         # For example --qt on linux, since a user might have both Gtk and Qt libraries installed.
@@ -118,13 +114,16 @@ class WebKitPort(Port):
         # These two projects should be factored out into their own
         # projects.
         try:
-            self._run_script("build-dumprendertree", env=env)
+            self._run_script("build-dumprendertree", args=self._build_driver_flags(), env=env)
             if self.get_option('webkit_test_runner'):
-                self._run_script("build-webkittestrunner", env=env)
+                self._run_script("build-webkittestrunner", args=self._build_driver_flags(), env=env)
         except ScriptError, e:
             _log.error(e.message_with_output(output_limit=None))
             return False
         return True
+
+    def _build_driver_flags(self):
+        return []
 
     def _check_driver(self):
         driver_path = self._path_to_driver()
@@ -360,15 +359,6 @@ class WebKitPort(Port):
 
         return search_paths
 
-    def test_expectations(self):
-        # This allows ports to use a combination of test_expectations.txt files and Skipped lists.
-        expectations = ''
-        expectations_path = self.path_to_test_expectations_file()
-        if self._filesystem.exists(expectations_path):
-            _log.debug("Using test_expectations.txt: %s" % expectations_path)
-            expectations = self._filesystem.read_text_file(expectations_path)
-        return expectations
-
     def skipped_layout_tests(self, test_list):
         tests_to_skip = set(self._expectations_from_skipped_files(self._skipped_file_search_paths()))
         tests_to_skip.update(self._tests_for_other_platforms())
@@ -462,8 +452,7 @@ class WebKitDriver(Driver):
         self._server_process = None
 
     def __del__(self):
-        assert(self._server_process is None)
-        assert(self._driver_tempdir is None)
+        self.stop()
 
     def cmd_line(self, pixel_tests, per_test_args):
         cmd = self._command_wrapper(self._port.get_option('wrapper'))
@@ -488,6 +477,7 @@ class WebKitDriver(Driver):
         return cmd
 
     def _start(self, pixel_tests, per_test_args):
+        self.stop()
         self._driver_tempdir = self._port._filesystem.mkdtemp(prefix='%s-' % self._port.driver_name())
         server_name = self._port.driver_name()
         environment = self._port.setup_environ_for_server(server_name)
@@ -565,8 +555,7 @@ class WebKitDriver(Driver):
 
     def run_test(self, driver_input):
         start_time = time.time()
-        if not self._server_process:
-            self._start(driver_input.should_run_pixel_test, driver_input.args)
+        self.start(driver_input.should_run_pixel_test, driver_input.args)
         self.error_from_test = str()
         self.err_seen_eof = False
 

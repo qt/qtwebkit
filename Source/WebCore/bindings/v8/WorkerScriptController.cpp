@@ -47,6 +47,11 @@
 #include "WorkerThread.h"
 #include <v8.h>
 
+#if PLATFORM(CHROMIUM)
+#include <public/Platform.h>
+#include <public/WebWorkerRunLoop.h>
+#endif
+
 namespace WebCore {
 
 WorkerScriptController::WorkerScriptController(WorkerContext* workerContext)
@@ -69,7 +74,7 @@ WorkerScriptController::~WorkerScriptController()
     // The corresponding call to didStartWorkerRunLoop is in
     // WorkerThread::workerThread().
     // See http://webkit.org/b/83104#c14 for why this is here.
-    PlatformSupport::didStopWorkerRunLoop(&m_workerContext->thread()->runLoop());
+    WebKit::Platform::current()->didStopWorkerRunLoop(WebKit::WebWorkerRunLoop(&m_workerContext->thread()->runLoop()));
 #endif
     m_proxy.clear();
     m_isolate->Exit();
@@ -132,7 +137,7 @@ void WorkerScriptController::disableEval()
 {
 }
 
-void WorkerScriptController::setException(ScriptValue exception)
+void WorkerScriptController::setException(const ScriptValue& exception)
 {
     throwError(*exception.v8Value());
 }

@@ -116,7 +116,7 @@ void WebPageCompositorPrivate::render(const IntRect& targetRect, const IntRect& 
     // For thread safety, we have to do it using a round-trip to the WebKit thread, so the
     // embedder might call this before the round-trip to WebPagePrivate::setCompositor() is
     // done.
-    if (m_webPage->compositor() != this)
+    if (!m_webPage || m_webPage->compositor() != this)
         return;
 
     m_layerRenderer->setClearSurfaceOnDrawLayers(false);
@@ -129,7 +129,7 @@ void WebPageCompositorPrivate::render(const IntRect& targetRect, const IntRect& 
     transform *= *m_webPage->m_transformationMatrix;
 
     if (!drawsRootLayer())
-        m_webPage->m_backingStore->d->compositeContents(m_layerRenderer.get(), transform, contents);
+        m_webPage->m_backingStore->d->compositeContents(m_layerRenderer.get(), transform, contents, !m_backgroundColor.hasAlpha());
 
     compositeLayers(transform);
 }
@@ -190,6 +190,11 @@ bool WebPageCompositorPrivate::drawLayers(const IntRect& dstRect, const FloatRec
     compositeLayers(transform);
 
     return true;
+}
+
+void WebPageCompositorPrivate::setBackgroundColor(const Color& color)
+{
+    m_backgroundColor = color;
 }
 
 void WebPageCompositorPrivate::releaseLayerResources()

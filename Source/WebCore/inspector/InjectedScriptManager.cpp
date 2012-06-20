@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Matt Lilek <webkit@mattlilek.com>
- * Copyright (C) 2010-2011 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,11 @@
 #include "InjectedScript.h"
 #include "InjectedScriptHost.h"
 #include "InjectedScriptSource.h"
+#if ENABLE(WEBGL)
+#include "InjectedWebGLScriptSource.h"
+#endif
 #include "InspectorValues.h"
+#include "ScriptObject.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/StdLibExtras.h>
 
@@ -113,9 +117,6 @@ InjectedScript InjectedScriptManager::injectedScriptForObjectId(const String& ob
 
 void InjectedScriptManager::discardInjectedScripts()
 {
-    IdToInjectedScriptMap::iterator end = m_idToInjectedScript.end();
-    for (IdToInjectedScriptMap::iterator it = m_idToInjectedScript.begin(); it != end; ++it)
-        discardInjectedScript(it->second.scriptState());
     m_idToInjectedScript.clear();
     m_scriptStateToId.clear();
 }
@@ -131,7 +132,6 @@ void InjectedScriptManager::discardInjectedScriptsFor(DOMWindow* window)
         ScriptState* scriptState = it->second.scriptState();
         if (window != domWindowFromScriptState(scriptState))
             continue;
-        discardInjectedScript(scriptState);
         m_scriptStateToId.remove(scriptState);
         idsToRemove.append(it->first);
     }
@@ -171,6 +171,37 @@ pair<int, ScriptObject> InjectedScriptManager::injectScript(const String& source
     int id = injectedScriptIdFor(scriptState);
     return std::make_pair(id, createInjectedScript(source, scriptState, id));
 }
+
+InjectedScript InjectedScriptManager::injectedScriptFor(ScriptState* inspectedScriptState)
+{
+    ScriptStateToId::iterator it = m_scriptStateToId.find(inspectedScriptState);
+    if (it != m_scriptStateToId.end()) {
+        IdToInjectedScriptMap::iterator it1 = m_idToInjectedScript.find(it->second);
+        if (it1 != m_idToInjectedScript.end())
+            return it1->second;
+    }
+
+    if (!m_inspectedStateAccessCheck(inspectedScriptState))
+        return InjectedScript();
+
+    pair<int, ScriptObject> injectedScript = injectScript(injectedScriptSource(), inspectedScriptState);
+    InjectedScript result(injectedScript.second, m_inspectedStateAccessCheck);
+    m_idToInjectedScript.set(injectedScript.first, result);
+    return result;
+}
+
+#if ENABLE(WEBGL)
+ScriptObject InjectedScriptManager::wrapWebGLRenderingContextForInstrumentation(const ScriptObject&)
+{
+    // FIXME(88973): Inject via this.injectScript()
+    return ScriptObject();
+}
+
+String InjectedScriptManager::injectedWebGLScriptSource()
+{
+    return String(reinterpret_cast<const char*>(InjectedWebGLScriptSource_js), sizeof(InjectedWebGLScriptSource_js));
+}
+#endif
 
 } // namespace WebCore
 

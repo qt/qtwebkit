@@ -4,6 +4,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/geolocation"
     "${WEBCORE_DIR}/Modules/indexeddb"
     "${WEBCORE_DIR}/Modules/intents"
+    "${WEBCORE_DIR}/Modules/quota"
     "${WEBCORE_DIR}/Modules/webaudio"
     "${WEBCORE_DIR}/Modules/webdatabase"
     "${WEBCORE_DIR}/Modules/websockets"
@@ -77,6 +78,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/bytecode"
     "${JAVASCRIPTCORE_DIR}/bytecompiler"
     "${JAVASCRIPTCORE_DIR}/dfg"
+    "${JAVASCRIPTCORE_DIR}/disassembler"
     "${JAVASCRIPTCORE_DIR}/heap"
     "${JAVASCRIPTCORE_DIR}/debugger"
     "${JAVASCRIPTCORE_DIR}/interpreter"
@@ -96,6 +98,7 @@ SET(WebCore_IDL_INCLUDES
     Modules/filesystem
     Modules/geolocation
     Modules/indexeddb
+    Modules/quota
     Modules/webaudio
     Modules/webdatabase
     Modules/websockets
@@ -210,6 +213,7 @@ SET(WebCore_IDL_FILES
     dom/ErrorEvent.idl
     dom/EventException.idl
     dom/Event.idl
+    dom/EventTarget.idl
     dom/HashChangeEvent.idl
     dom/KeyboardEvent.idl
     dom/MessageChannel.idl
@@ -245,6 +249,8 @@ SET(WebCore_IDL_FILES
     dom/WebKitNamedFlow.idl
     dom/WebKitTransitionEvent.idl
     dom/WheelEvent.idl
+
+    editing/UndoManager.idl
 
     fileapi/Blob.idl
     fileapi/FileError.idl
@@ -406,10 +412,6 @@ SET(WebCore_IDL_FILES
 
     storage/Storage.idl
     storage/StorageEvent.idl
-    storage/StorageInfo.idl
-    storage/StorageInfoErrorCallback.idl
-    storage/StorageInfoQuotaCallback.idl
-    storage/StorageInfoUsageCallback.idl
 
     xml/DOMParser.idl
     xml/XMLHttpRequest.idl
@@ -458,7 +460,6 @@ SET(WebCore_SOURCES
     bindings/ScriptControllerBase.cpp
 
     bindings/generic/ActiveDOMCallback.cpp
-    bindings/generic/ContextEnabledFeatures.cpp
     bindings/generic/RuntimeEnabledFeatures.cpp
 
     css/CSSAspectRatioValue.cpp
@@ -558,6 +559,7 @@ SET(WebCore_SOURCES
     dom/ContainerNode.cpp
     dom/ContainerNodeAlgorithms.cpp
     dom/ContextDestructionObserver.cpp
+    dom/ContextFeatures.cpp
     dom/CustomEvent.cpp
     dom/DatasetDOMStringMap.cpp
     dom/DecodedDataDocumentParser.cpp
@@ -720,6 +722,7 @@ SET(WebCore_SOURCES
     editing/TextInsertionBaseCommand.cpp
     editing/TextIterator.cpp
     editing/TypingCommand.cpp
+    editing/UndoManager.cpp
     editing/UnlinkCommand.cpp
     editing/VisiblePosition.cpp
     editing/VisibleSelection.cpp
@@ -733,7 +736,6 @@ SET(WebCore_SOURCES
     fileapi/File.cpp
     fileapi/FileException.cpp
     fileapi/FileList.cpp
-    fileapi/OperationNotAllowedException.cpp
     fileapi/ThreadableBlobRegistry.cpp
     fileapi/WebKitBlobBuilder.cpp
 
@@ -764,6 +766,7 @@ SET(WebCore_SOURCES
     html/FTPDirectoryDocument.cpp
     html/FileInputType.cpp
     html/FormAssociatedElement.cpp
+    html/FormController.cpp
     html/FormDataList.cpp
     html/HTMLAllCollection.cpp
     html/HTMLAnchorElement.cpp
@@ -928,6 +931,7 @@ SET(WebCore_SOURCES
     inspector/DOMPatchSupport.cpp
     inspector/IdentifiersFactory.cpp
     inspector/InjectedScript.cpp
+    inspector/InjectedScriptBase.cpp
     inspector/InjectedScriptHost.cpp
     inspector/InjectedScriptManager.cpp
     inspector/InspectorAgent.cpp
@@ -961,6 +965,7 @@ SET(WebCore_SOURCES
     inspector/InspectorStyleTextEditor.cpp
     inspector/InspectorTimelineAgent.cpp
     inspector/InspectorValues.cpp
+    inspector/InspectorWebGLAgent.cpp
     inspector/InspectorWorkerAgent.cpp
     inspector/InstrumentingAgents.cpp
     inspector/NetworkResourcesData.cpp
@@ -1195,6 +1200,7 @@ SET(WebCore_SOURCES
     platform/graphics/TextRun.cpp
     platform/graphics/WidthIterator.cpp
 
+    platform/graphics/filters/CustomFilterGlobalContext.cpp
     platform/graphics/filters/CustomFilterMesh.cpp
     platform/graphics/filters/CustomFilterProgram.cpp
     platform/graphics/filters/CustomFilterShader.cpp
@@ -1384,6 +1390,7 @@ SET(WebCore_SOURCES
     rendering/RenderScrollbar.cpp
     rendering/RenderScrollbarPart.cpp
     rendering/RenderScrollbarTheme.cpp
+    rendering/RenderSearchField.cpp
     rendering/RenderSlider.cpp
     rendering/RenderTable.cpp
     rendering/RenderTableCaption.cpp
@@ -1439,7 +1446,6 @@ SET(WebCore_SOURCES
     storage/StorageAreaSync.cpp
     storage/StorageEvent.cpp
     storage/StorageEventDispatcher.cpp
-    storage/StorageInfo.cpp
     storage/StorageMap.cpp
     storage/StorageNamespace.cpp
     storage/StorageNamespaceImpl.cpp
@@ -1513,7 +1519,6 @@ IF (ENABLE_BLOB)
     LIST(APPEND WebCore_IDL_FILES
         fileapi/FileException.idl
         fileapi/FileReaderSync.idl
-        fileapi/OperationNotAllowedException.idl
     )
 ENDIF ()
 
@@ -1692,7 +1697,7 @@ IF (ENABLE_NETWORK_INFO)
         Modules/networkinfo/NetworkInfoConnection.cpp
         Modules/networkinfo/NetworkInfoController.cpp
     )
- 
+
     LIST(APPEND WebCore_IDL_FILES
         Modules/networkinfo/NavigatorNetworkInfoConnection.idl
         Modules/networkinfo/NetworkInfoConnection.idl
@@ -2198,7 +2203,9 @@ ENDIF ()
 
 IF (ENABLE_SMOOTH_SCROLLING)
     LIST(APPEND WebCore_SOURCES
+        platform/ActivePlatformGestureAnimation.cpp
         platform/ScrollAnimatorNone.cpp
+        platform/TouchpadFlingPlatformGestureCurve.cpp
     )
 ENDIF ()
 
@@ -2342,6 +2349,7 @@ IF (ENABLE_WEBGL)
         html/canvas/WebGLContextObject.cpp
         html/canvas/WebGLDebugRendererInfo.cpp
         html/canvas/WebGLDebugShaders.cpp
+        html/canvas/WebGLDepthTexture.cpp
         html/canvas/WebGLFramebuffer.cpp
         html/canvas/WebGLGetInfo.cpp
         html/canvas/WebGLLoseContext.cpp
@@ -2376,6 +2384,7 @@ IF (ENABLE_WEBGL)
         html/canvas/WebGLContextEvent.idl
         html/canvas/WebGLDebugRendererInfo.idl
         html/canvas/WebGLDebugShaders.idl
+        html/canvas/WebGLDepthTexture.idl
         html/canvas/WebGLFramebuffer.idl
         html/canvas/WebGLLoseContext.idl
         html/canvas/WebGLProgram.idl
@@ -2443,6 +2452,55 @@ IF (ENABLE_BATTERY_STATUS)
         Modules/battery/BatteryController.cpp
         Modules/battery/BatteryManager.cpp
         Modules/battery/BatteryStatus.cpp
+    )
+ENDIF ()
+
+IF (ENABLE_MEDIA_STREAM)
+    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${WEBCORE_DIR}/Modules/mediastream
+        ${WEBCORE_DIR}/platform/mediastream
+    )
+    LIST(APPEND WebCore_IDL_FILES
+        Modules/mediastream/DeprecatedPeerConnection.idl
+        Modules/mediastream/DOMWindowMediaStream.idl
+        Modules/mediastream/IceCallback.idl
+        Modules/mediastream/IceCandidate.idl
+        Modules/mediastream/LocalMediaStream.idl
+        Modules/mediastream/MediaStream.idl
+        Modules/mediastream/MediaStreamEvent.idl
+        Modules/mediastream/MediaStreamList.idl
+        Modules/mediastream/MediaStreamTrack.idl
+        Modules/mediastream/MediaStreamTrackList.idl
+        Modules/mediastream/NavigatorMediaStream.idl
+        Modules/mediastream/NavigatorUserMediaError.idl
+        Modules/mediastream/NavigatorUserMediaErrorCallback.idl
+        Modules/mediastream/NavigatorUserMediaSuccessCallback.idl
+        Modules/mediastream/PeerConnection00.idl
+        Modules/mediastream/SessionDescription.idl
+        Modules/mediastream/SignalingCallback.idl
+    )
+    LIST(APPEND WebCore_SOURCES
+        Modules/mediastream/DeprecatedPeerConnection.cpp
+        Modules/mediastream/IceCandidate.cpp
+        Modules/mediastream/LocalMediaStream.cpp
+        Modules/mediastream/MediaStream.cpp
+        Modules/mediastream/MediaStreamEvent.cpp
+        Modules/mediastream/MediaStreamList.cpp
+        Modules/mediastream/MediaStreamRegistry.cpp
+        Modules/mediastream/MediaStreamTrack.cpp
+        Modules/mediastream/MediaStreamTrackList.cpp
+        Modules/mediastream/NavigatorMediaStream.cpp
+        Modules/mediastream/PeerConnection00.cpp
+        Modules/mediastream/SessionDescription.cpp
+        Modules/mediastream/UserMediaController.cpp
+        Modules/mediastream/UserMediaRequest.cpp
+
+        platform/mediastream/IceCandidateDescriptor.cpp
+        platform/mediastream/IceOptions.cpp
+        platform/mediastream/MediaHints.cpp
+        platform/mediastream/MediaStreamCenter.cpp
+        platform/mediastream/PeerConnection00Handler.cpp
+        platform/mediastream/SessionDescriptionDescriptor.cpp
     )
 ENDIF ()
 
@@ -2541,6 +2599,20 @@ IF (ENABLE_WEB_INTENTS)
     )
 ENDIF ()
 
+if (ENABLE_QUOTA)
+    LIST(APPEND WebCore_SOURCES
+        Modules/quota/DOMWindowQuota.cpp
+        Modules/quota/StorageInfo.cpp
+    )
+    LIST(APPEND WebCore_IDL_FILES
+        Modules/quota/DOMWindowQuota.idl
+        Modules/quota/StorageInfo.idl
+        Modules/quota/StorageInfoErrorCallback.idl
+        Modules/quota/StorageInfoQuotaCallback.idl
+        Modules/quota/StorageInfoUsageCallback.idl
+    )
+ENDIF ()
+
 # Modules that the bindings generator scripts may use
 SET(SCRIPTS_RESOLVE_SUPPLEMENTAL
     ${WEBCORE_DIR}/bindings/scripts/IDLParser.pm
@@ -2601,6 +2673,17 @@ ADD_CUSTOM_COMMAND(
     COMMAND ${PERL_EXECUTABLE} ${WEBCORE_DIR}/inspector/xxd.pl InjectedScriptSource_js ${WEBCORE_DIR}/inspector/InjectedScriptSource.js ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedScriptSource.h
     VERBATIM)
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedScriptSource.h)
+
+
+# Generate InjectedWebGLScriptSource.h
+IF (ENABLE_WEBGL)
+    ADD_CUSTOM_COMMAND(
+        OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedWebGLScriptSource.h
+        MAIN_DEPENDENCY inspector/InjectedWebGLScriptSource.js
+        COMMAND ${PERL_EXECUTABLE} ${WEBCORE_DIR}/inspector/xxd.pl InjectedWebGLScriptSource_js ${WEBCORE_DIR}/inspector/InjectedWebGLScriptSource.js ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedWebGLScriptSource.h
+        VERBATIM)
+    LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedWebGLScriptSource.h)
+ENDIF ()
 
 
 MAKE_HASH_TOOLS(${WEBCORE_DIR}/platform/ColorData)

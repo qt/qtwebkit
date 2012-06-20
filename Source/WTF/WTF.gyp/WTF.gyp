@@ -94,20 +94,12 @@
           }],
         ],
       },
-      'conditions': [
-        ['OS=="android" and android_build_type==0', {
-          # Android builds ImageDiff for host, which has a dependency on wtf.
-          # That means we need to build this target for both host and target.
-          'toolsets': ['host', 'target'],
-        }],
-      ]
     },
     {
       'target_name': 'wtf',
       'type': 'static_library',
       'include_dirs': [
         '../',
-        '../../JavaScriptCore',
         '../wtf',
         '../wtf/unicode',
       ],
@@ -188,11 +180,6 @@
               },
             }],
           ],
-        }],
-        ['OS=="android" and android_build_type==0', {
-          # Android builds ImageDiff for host, which has a dependency on wtf.
-          # That means we need to build this target for both host and target.
-          'toolsets': ['host', 'target'],
         }],
       ],
     },

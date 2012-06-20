@@ -1,3 +1,30 @@
+2012-06-19  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [CMake] Unreviewed speculative buildfix after r120786.
+
+        * CMakeLists.txt:
+
+2012-06-13  Robin Cao  <robin.cao@torchmobile.com.cn>
+
+        [BlackBerry] Enable MEDIA_STREAM by default
+        https://bugs.webkit.org/show_bug.cgi?id=88849
+
+        Reviewed by Antonio Gomes.
+
+        * PlatformBlackBerry.cmake:
+
+2012-06-12  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Enable SHADOW_DOM flag
+        https://bugs.webkit.org/show_bug.cgi?id=87732
+
+        Reviewed by Kentaro Hara.
+
+        Add WebCore/bindings/generic to include directories so
+        that we can include RuntimeEnabledFeatures.h.
+
+        * CMakeLists.txt:
+
 2012-06-04  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
 
         [Qt] Don't use WebKit HAVE() macro in public Qt headers
@@ -5,6 +32,17 @@
         Reviewed by Kenneth Rohde Christiansen.
 
         * WebKit.pri:
+
+2012-06-04  Tomasz Morawski  <t.morawski@samsung.com>
+
+        [EFL] Refactor ewk_view_context_paint code.
+        https://bugs.webkit.org/show_bug.cgi?id=85588
+
+        Reviewed by Hajime Morita.
+
+        Added new ewk_paint_context.cpp file to source list.
+
+        * PlatformEfl.cmake:
 
 2012-06-01  Christophe Dumez  <christophe.dumez@intel.com>
 

@@ -167,6 +167,7 @@
                 'public/WebGeolocationPermissionRequestManager.h',
                 'public/WebGeolocationPosition.h',
                 'public/WebGlyphCache.h',
+                'public/WebHelperPlugin.h',
                 'public/WebHistoryItem.h',
                 'public/WebHitTestResult.h',
                 'public/WebIDBCallbacks.h',
@@ -180,6 +181,7 @@
                 'public/WebIDBKey.h',
                 'public/WebIDBKeyPath.h',
                 'public/WebIDBKeyRange.h',
+                'public/WebIDBMetadata.h',
                 'public/WebIDBObjectStore.h',
                 'public/WebIDBTransaction.h',
                 'public/WebIDBTransactionCallbacks.h',
@@ -198,8 +200,6 @@
                 'public/WebMediaPlayerClient.h',
                 'public/WebMediaStreamRegistry.h',
                 'public/WebMenuItemInfo.h',
-                'public/WebMessagePortChannel.h',
-                'public/WebMessagePortChannelClient.h',
                 'public/WebNavigationType.h',
                 'public/WebNetworkStateNotifier.h',
                 'public/WebNode.h',
@@ -258,9 +258,7 @@
                 'public/WebSpeechRecognizerClient.h',
                 'public/WebSpeechRecognizer.h',
                 'public/WebSpellCheckClient.h',
-                'public/WebStorageArea.h',
                 'public/WebStorageEventDispatcher.h',
-                'public/WebStorageNamespace.h',
                 'public/WebStorageQuotaCallbacks.h',
                 'public/WebStorageQuotaType.h',
                 'public/WebSurroundingText.h',
@@ -374,6 +372,8 @@
                 'src/CompositionUnderlineBuilder.h',
                 'src/CompositionUnderlineVectorBuilder.cpp',
                 'src/CompositionUnderlineVectorBuilder.h',
+                'src/ContextFeaturesClientImpl.cpp',
+                'src/ContextFeaturesClientImpl.h',
                 'src/ContextMenuClientImpl.cpp',
                 'src/ContextMenuClientImpl.h',
                 'src/DatabaseObserver.cpp',
@@ -391,7 +391,6 @@
                 'src/EditorClientImpl.h',
                 'src/EventListenerWrapper.cpp',
                 'src/EventListenerWrapper.h',
-                'src/Extensions3DChromium.cpp',
                 'src/ExternalPopupMenu.cpp',
                 'src/ExternalPopupMenu.h',
                 'src/FrameLoaderClientImpl.cpp',
@@ -399,9 +398,9 @@
                 'src/FrameNetworkingContextImpl.h',
                 'src/GeolocationClientProxy.cpp',
                 'src/GeolocationClientProxy.h',
-                'src/GraphicsContext3DChromium.cpp',
-                'src/GraphicsContext3DPrivate.h',
                 'src/gtk/WebInputEventFactory.cpp',
+                'src/WebHelperPluginImpl.cpp',
+                'src/WebHelperPluginImpl.h',
                 'src/IDBCallbacksProxy.cpp',
                 'src/IDBCallbacksProxy.h',
                 'src/IDBCursorBackendProxy.cpp',
@@ -571,6 +570,7 @@
                 'src/WebIOSurfaceLayer.cpp',
                 'src/WebImageCG.cpp',
                 'src/WebImageDecoder.cpp',
+                'src/WebImageLayer.cpp',
                 'src/WebImageSkia.cpp',
                 'src/WebInputElement.cpp',
                 'src/WebInputEvent.cpp',
@@ -800,6 +800,7 @@
                 ['OS=="android"', {
                     'include_dirs': [
                         'public/android',
+                        'public/linux', # We need linux/WebFontRendering.h on Android.
                     ],
                 }, { # else: OS!="android"
                     'sources/': [
@@ -848,6 +849,13 @@
                     'xcode_settings': {
                         'WARNING_CFLAGS': ['-Wglobal-constructors'],
                     },
+                }],
+            ],
+            'target_conditions': [
+                ['OS=="android"', {
+                    'sources/': [
+                        ['include', '^src/linux/WebFontRendering\\.cpp$'],
+                    ],
                 }],
             ],
         },

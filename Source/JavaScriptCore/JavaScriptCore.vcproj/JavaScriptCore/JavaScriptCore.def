@@ -140,7 +140,7 @@ EXPORTS
     ?deleteOwnedPtr@WTF@@YAXPAUHFONT__@@@Z
     ?deleteOwnedPtr@WTF@@YAXPAUHRGN__@@@Z
     ?deleteProperty@JSObject@JSC@@SA_NPAVJSCell@2@PAVExecState@2@VPropertyName@2@@Z
-    ?deleteProperty@JSVariableObject@JSC@@SA_NPAVJSCell@2@PAVExecState@2@VPropertyName@2@@Z
+    ?deleteProperty@JSSymbolTableObject@JSC@@SA_NPAVJSCell@2@PAVExecState@2@VPropertyName@2@@Z
     ?deletePropertyByIndex@JSObject@JSC@@SA_NPAVJSCell@2@PAVExecState@2@I@Z
     ?deleteTable@HashTable@JSC@@QBEXXZ
     ?despecifyDictionaryFunction@Structure@JSC@@QAEXAAVJSGlobalData@2@VPropertyName@2@@Z
@@ -151,7 +151,7 @@ EXPORTS
     ?detach@Debugger@JSC@@UAEXPAVJSGlobalObject@2@@Z
     ?detachThread@WTF@@YAXI@Z
     ?didTimeOut@TimeoutChecker@JSC@@QAE_NPAVExecState@2@@Z
-    ?discardAllCompiledCode@Heap@JSC@@QAEXXZ
+    ?deleteAllCompiledCode@Heap@JSC@@QAEXXZ
     ?displayName@JSFunction@JSC@@QAE?BVUString@2@PAVExecState@2@@Z
     ?dtoa@WTF@@YAXQADNAA_NAAHAAI@Z
     ?dumpSampleData@JSGlobalData@JSC@@QAEXPAVExecState@2@@Z
@@ -181,6 +181,7 @@ EXPORTS
     ?finishCreation@RegExpObject@JSC@@IAEXPAVJSGlobalObject@2@@Z
     ?finishCreation@StringObject@JSC@@IAEXAAVJSGlobalData@2@PAVJSString@2@@Z
     ?focus@Profile@JSC@@QAEXPBVProfileNode@2@@Z
+    ?freeFatEntrySlow@SymbolTableEntry@JSC@@AAEXXZ
     ?from@Identifier@JSC@@SA?AV12@PAVExecState@2@H@Z
     ?from@Identifier@JSC@@SA?AV12@PAVExecState@2@I@Z
     ?functionGetter@PropertySlot@JSC@@ABE?AVJSValue@2@PAVExecState@2@@Z
@@ -194,7 +195,7 @@ EXPORTS
     ?getOwnPropertyDescriptor@JSGlobalObject@JSC@@SA_NPAVJSObject@2@PAVExecState@2@VPropertyName@2@AAVPropertyDescriptor@2@@Z
     ?getOwnPropertyDescriptor@JSObject@JSC@@SA_NPAV12@PAVExecState@2@VPropertyName@2@AAVPropertyDescriptor@2@@Z
     ?getOwnPropertyNames@JSObject@JSC@@SAXPAV12@PAVExecState@2@AAVPropertyNameArray@2@W4EnumerationMode@2@@Z
-    ?getOwnPropertyNames@JSVariableObject@JSC@@SAXPAVJSObject@2@PAVExecState@2@AAVPropertyNameArray@2@W4EnumerationMode@2@@Z
+    ?getOwnPropertyNames@JSSymbolTableObject@JSC@@SAXPAVJSObject@2@PAVExecState@2@AAVPropertyNameArray@2@W4EnumerationMode@2@@Z
     ?getOwnPropertySlot@JSGlobalObject@JSC@@SA_NPAVJSCell@2@PAVExecState@2@VPropertyName@2@AAVPropertySlot@2@@Z
     ?getOwnPropertySlotByIndex@JSArray@JSC@@SA_NPAVJSCell@2@PAVExecState@2@IAAVPropertySlot@2@@Z
     ?getOwnPropertySlotByIndex@JSObject@JSC@@SA_NPAVJSCell@2@PAVExecState@2@IAAVPropertySlot@2@@Z
@@ -246,6 +247,7 @@ EXPORTS
     ?name@JSFunction@JSC@@QAEABVUString@2@PAVExecState@2@@Z
     ?neuter@ArrayBufferView@WTF@@MAEXXZ
     ?newUninitialized@CString@WTF@@SA?AV12@IAAPAD@Z
+    ?notifyWriteSlow@SymbolTableEntry@JSC@@AAEXXZ
     ?nullptr@@3Vnullptr_t@std@@A
     ?number@String@WTF@@SA?AV12@NII@Z
     ?number@UString@JSC@@SA?AV12@H@Z

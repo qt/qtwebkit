@@ -65,7 +65,6 @@ typedef struct HFONT__* HFONT;
 
 namespace WebCore {
 
-class AsyncFileSystem;
 class Color;
 class Cursor;
 class Document;
@@ -81,7 +80,6 @@ class IntRect;
 class KURL;
 class SerializedScriptValue;
 class Widget;
-class WorkerRunLoop;
 
 struct Cookie;
 struct FontRenderStyle;
@@ -99,10 +97,6 @@ public:
     static bool rawCookies(const Document*, const KURL&, Vector<Cookie>&);
     static void deleteCookie(const Document*, const KURL&, const String& cookieName);
     static bool cookiesEnabled(const Document*);
-
-#if ENABLE(FILE_SYSTEM)
-    static PassOwnPtr<AsyncFileSystem> createAsyncFileSystem();
-#endif
 
     // Font ---------------------------------------------------------------
 #if OS(WINDOWS)
@@ -167,10 +161,6 @@ public:
     static bool screenIsMonochrome(Widget*);
     static IntRect screenRect(Widget*);
     static IntRect screenAvailableRect(Widget*);
-
-    // SharedTimers -------------------------------------------------------
-    static void setSharedTimerFiredFunction(void (*func)());
-    static void setSharedTimerFireInterval(double);
 
     // Returns private and shared usage, in bytes. Private bytes is the amount of
     // memory currently allocated to this process that cannot be shared. Returns
@@ -331,9 +321,6 @@ public:
     // Visited links ------------------------------------------------------
     static LinkHash visitedLinkHash(const UChar* url, unsigned length);
     static LinkHash visitedLinkHash(const KURL& base, const AtomicString& attributeURL);
-
-    static void didStartWorkerRunLoop(WorkerRunLoop*);
-    static void didStopWorkerRunLoop(WorkerRunLoop*);
 };
 
 } // namespace WebCore

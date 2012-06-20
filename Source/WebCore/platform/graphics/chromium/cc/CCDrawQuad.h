@@ -33,11 +33,12 @@ namespace WebCore {
 class CCCheckerboardDrawQuad;
 class CCDebugBorderDrawQuad;
 class CCIOSurfaceDrawQuad;
-class CCRenderSurfaceDrawQuad;
+class CCRenderPassDrawQuad;
 class CCSolidColorDrawQuad;
+class CCStreamVideoDrawQuad;
 class CCTextureDrawQuad;
 class CCTileDrawQuad;
-class CCVideoDrawQuad;
+class CCYUVVideoDrawQuad;
 
 // CCDrawQuad is a bag of data used for drawing a quad. Because different
 // materials need different bits of per-quad data to render, classes that derive
@@ -50,7 +51,7 @@ public:
     const WebKit::WebTransformationMatrix& quadTransform() const { return m_sharedQuadState->quadTransform(); }
     const WebKit::WebTransformationMatrix& layerTransform() const { return m_sharedQuadState->layerTransform(); }
     const IntRect& layerRect() const { return m_sharedQuadState->layerRect(); }
-    const IntRect& clipRect() const { return m_sharedQuadState->clipRect(); }
+    const IntRect& scissorRect() const { return m_sharedQuadState->scissorRect(); }
     float opacity() const { return m_sharedQuadState->opacity(); }
     // For the purposes of blending, what part of the contents of this quad are opaque?
     IntRect opaqueRect() const;
@@ -67,11 +68,12 @@ public:
         Checkerboard,
         DebugBorder,
         IOSurfaceContent,
-        RenderSurface,
+        RenderPass,
         TextureContent,
         SolidColor,
         TiledContent,
-        VideoContent,
+        YUVVideoContent,
+        StreamVideoContent,
     };
 
     Material material() const { return m_material; }
@@ -80,11 +82,12 @@ public:
     const CCCheckerboardDrawQuad* toCheckerboardDrawQuad() const;
     const CCDebugBorderDrawQuad* toDebugBorderDrawQuad() const;
     const CCIOSurfaceDrawQuad* toIOSurfaceDrawQuad() const;
-    const CCRenderSurfaceDrawQuad* toRenderSurfaceDrawQuad() const;
+    const CCRenderPassDrawQuad* toRenderPassDrawQuad() const;
     const CCSolidColorDrawQuad* toSolidColorDrawQuad() const;
+    const CCStreamVideoDrawQuad* toStreamVideoDrawQuad() const;
     const CCTextureDrawQuad* toTextureDrawQuad() const;
     const CCTileDrawQuad* toTileDrawQuad() const;
-    const CCVideoDrawQuad* toVideoDrawQuad() const;
+    const CCYUVVideoDrawQuad* toYUVVideoDrawQuad() const;
 
     const CCSharedQuadState* sharedQuadState() const { return m_sharedQuadState; }
 

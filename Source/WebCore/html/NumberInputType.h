@@ -42,8 +42,9 @@ public:
 private:
     NumberInputType(HTMLInputElement* element) : TextFieldInputType(element) { }
     virtual const AtomicString& formControlType() const OVERRIDE;
-    virtual double valueAsNumber() const OVERRIDE;
-    virtual void setValueAsNumber(double, TextFieldEventBehavior, ExceptionCode&) const OVERRIDE;
+    virtual double valueAsDouble() const OVERRIDE;
+    virtual void setValueAsDouble(double, TextFieldEventBehavior, ExceptionCode&) const OVERRIDE;
+    virtual void setValueAsDecimal(const Decimal&, TextFieldEventBehavior, ExceptionCode&) const OVERRIDE;
     virtual bool typeMismatchFor(const String&) const OVERRIDE;
     virtual bool typeMismatch() const OVERRIDE;
     virtual bool sizeShouldIncludeDecoration(int defaultSize, int& preferredSize) const OVERRIDE;
@@ -51,9 +52,8 @@ private:
     virtual StepRange createStepRange(AnyStepHandling) const OVERRIDE;
     virtual void handleKeydownEvent(KeyboardEvent*) OVERRIDE;
     virtual void handleWheelEvent(WheelEvent*) OVERRIDE;
-    virtual double parseToDouble(const String&, double) const OVERRIDE;
-    virtual double parseToDoubleWithDecimalPlaces(const String&, double, unsigned*) const OVERRIDE;
-    virtual String serialize(double) const OVERRIDE;
+    virtual Decimal parseToNumber(const String&, const Decimal&) const OVERRIDE;
+    virtual String serialize(const Decimal&) const OVERRIDE;
     virtual void handleBlurEvent() OVERRIDE;
     virtual String localizeValue(const String&) const OVERRIDE;
     virtual String visibleValue() const OVERRIDE;

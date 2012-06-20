@@ -33,6 +33,7 @@
 #include <webkit2/WebKitError.h>
 #include <webkit2/WebKitFileChooserRequest.h>
 #include <webkit2/WebKitFindController.h>
+#include <webkit2/WebKitGeolocationPermissionRequest.h>
 #include <webkit2/WebKitHitTestResult.h>
 #include <webkit2/WebKitJavascriptResult.h>
 #include <webkit2/WebKitMimeInfo.h>
@@ -45,6 +46,8 @@
 #include <webkit2/WebKitSettings.h>
 #include <webkit2/WebKitURIRequest.h>
 #include <webkit2/WebKitURIResponse.h>
+#include <webkit2/WebKitURISchemeRequest.h>
+#include <webkit2/WebKitVersion.h>
 #include <webkit2/WebKitWebContext.h>
 #include <webkit2/WebKitWebInspector.h>
 #include <webkit2/WebKitWebResource.h>

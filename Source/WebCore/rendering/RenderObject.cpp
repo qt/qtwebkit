@@ -389,6 +389,14 @@ RenderObject* RenderObject::previousInPreOrder() const
     return parent();
 }
 
+RenderObject* RenderObject::previousInPreOrder(const RenderObject* stayWithin) const
+{
+    if (this == stayWithin)
+        return 0;
+
+    return previousInPreOrder();
+}
+
 RenderObject* RenderObject::childAt(unsigned index) const
 {
     RenderObject* child = firstChild();
@@ -716,20 +724,36 @@ RenderBlock* RenderObject::containingBlock() const
     if (!o && isRenderScrollbarPart())
         o = toRenderScrollbarPart(this)->rendererOwningScrollbar();
     if (!isText() && m_style->position() == FixedPosition) {
-        while (o && !o->isRenderView() && !(o->hasTransform() && o->isRenderBlock()))
+        while (o) {
+            if (o->isRenderView())
+                break;
+            if (o->hasTransform() && o->isRenderBlock())
+                break;
+#if ENABLE(SVG)
+            // foreignObject is the containing block for its contents.
+            if (o->isSVGForeignObject())
+                break;
+#endif
             o = o->parent();
+        }
+        ASSERT(!o->isAnonymousBlock());
     } else if (!isText() && m_style->position() == AbsolutePosition) {
-        while (o && (o->style()->position() == StaticPosition || (o->isInline() && !o->isReplaced())) && !o->isRenderView() && !(o->hasTransform() && o->isRenderBlock())) {
+        while (o) {
             // For relpositioned inlines, we return the nearest non-anonymous enclosing block. We don't try
             // to return the inline itself.  This allows us to avoid having a positioned objects
             // list in all RenderInlines and lets us return a strongly-typed RenderBlock* result
             // from this method.  The container() method can actually be used to obtain the
             // inline directly.
+            if (!o->style()->position() == StaticPosition && !(o->isInline() && !o->isReplaced()))
+                break;
+            if (o->isRenderView())
+                break;
+            if (o->hasTransform() && o->isRenderBlock())
+                break;
+
             if (o->style()->position() == RelativePosition && o->isInline() && !o->isReplaced()) {
-                RenderBlock* relPositionedInlineContainingBlock = o->containingBlock();
-                while (relPositionedInlineContainingBlock->isAnonymousBlock())
-                    relPositionedInlineContainingBlock = relPositionedInlineContainingBlock->containingBlock();
-                return relPositionedInlineContainingBlock;
+                o = o->containingBlock();
+                break;
             }
 #if ENABLE(SVG)
             if (o->isSVGForeignObject()) //foreignObject is the containing block for contents inside it
@@ -738,6 +762,9 @@ RenderBlock* RenderObject::containingBlock() const
 
             o = o->parent();
         }
+
+        while (o && o->isAnonymousBlock())
+            o = o->containingBlock();
     } else {
         while (o && ((o->isInline() && !o->isReplaced()) || !o->isRenderBlock()))
             o = o->parent();
@@ -1014,91 +1041,6 @@ void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, 
     }
 }
 
-#if !HAVE(PATH_BASED_BORDER_RADIUS_DRAWING)
-void RenderObject::drawArcForBoxSide(GraphicsContext* graphicsContext, int x, int y, float thickness, const IntSize& radius,
-                                     int angleStart, int angleSpan, BoxSide s, Color color,
-                                     EBorderStyle style, bool firstCorner)
-{
-    // FIXME: This function should be removed when all ports implement GraphicsContext::clipConvexPolygon()!!
-    // At that time, everyone can use RenderObject::drawBoxSideFromPath() instead. This should happen soon.
-    if ((style == DOUBLE && thickness / 2 < 3) || ((style == RIDGE || style == GROOVE) && thickness / 2 < 2))
-        style = SOLID;
-
-    switch (style) {
-        case BNONE:
-        case BHIDDEN:
-            return;
-        case DOTTED:
-        case DASHED:
-            graphicsContext->setStrokeColor(color, m_style->colorSpace());
-            graphicsContext->setStrokeStyle(style == DOTTED ? DottedStroke : DashedStroke);
-            graphicsContext->setStrokeThickness(thickness);
-            graphicsContext->strokeArc(IntRect(x, y, radius.width() * 2, radius.height() * 2), angleStart, angleSpan);
-            break;
-        case DOUBLE: {
-            float third = thickness / 3.0f;
-            float innerThird = (thickness + 1.0f) / 6.0f;
-            int shiftForInner = static_cast<int>(innerThird * 2.5f);
-
-            int outerY = y;
-            int outerHeight = radius.height() * 2;
-            int innerX = x + shiftForInner;
-            int innerY = y + shiftForInner;
-            int innerWidth = (radius.width() - shiftForInner) * 2;
-            int innerHeight = (radius.height() - shiftForInner) * 2;
-            if (innerThird > 1 && (s == BSTop || (firstCorner && (s == BSLeft || s == BSRight)))) {
-                outerHeight += 2;
-                innerHeight += 2;
-            }
-
-            graphicsContext->setStrokeStyle(SolidStroke);
-            graphicsContext->setStrokeColor(color, m_style->colorSpace());
-            graphicsContext->setStrokeThickness(third);
-            graphicsContext->strokeArc(IntRect(x, outerY, radius.width() * 2, outerHeight), angleStart, angleSpan);
-            graphicsContext->setStrokeThickness(innerThird > 2 ? innerThird - 1 : innerThird);
-            graphicsContext->strokeArc(IntRect(innerX, innerY, innerWidth, innerHeight), angleStart, angleSpan);
-            break;
-        }
-        case GROOVE:
-        case RIDGE: {
-            Color c2;
-            if ((style == RIDGE && (s == BSTop || s == BSLeft)) ||
-                    (style == GROOVE && (s == BSBottom || s == BSRight)))
-                c2 = color.dark();
-            else {
-                c2 = color;
-                color = color.dark();
-            }
-
-            graphicsContext->setStrokeStyle(SolidStroke);
-            graphicsContext->setStrokeColor(color, m_style->colorSpace());
-            graphicsContext->setStrokeThickness(thickness);
-            graphicsContext->strokeArc(IntRect(x, y, radius.width() * 2, radius.height() * 2), angleStart, angleSpan);
-
-            float halfThickness = (thickness + 1.0f) / 4.0f;
-            int shiftForInner = static_cast<int>(halfThickness * 1.5f);
-            graphicsContext->setStrokeColor(c2, m_style->colorSpace());
-            graphicsContext->setStrokeThickness(halfThickness > 2 ? halfThickness - 1 : halfThickness);
-            graphicsContext->strokeArc(IntRect(x + shiftForInner, y + shiftForInner, (radius.width() - shiftForInner) * 2,
-                                       (radius.height() - shiftForInner) * 2), angleStart, angleSpan);
-            break;
-        }
-        case INSET:
-            if (s == BSTop || s == BSLeft)
-                color = color.dark();
-        case OUTSET:
-            if (style == OUTSET && (s == BSBottom || s == BSRight))
-                color = color.dark();
-        case SOLID:
-            graphicsContext->setStrokeStyle(SolidStroke);
-            graphicsContext->setStrokeColor(color, m_style->colorSpace());
-            graphicsContext->setStrokeThickness(thickness);
-            graphicsContext->strokeArc(IntRect(x, y, radius.width() * 2, radius.height() * 2), angleStart, angleSpan);
-            break;
-    }
-}
-#endif
-    
 void RenderObject::paintFocusRing(GraphicsContext* context, const LayoutPoint& paintOffset, RenderStyle* style)
 {
     Vector<IntRect> focusRingRects;
@@ -1107,7 +1049,7 @@ void RenderObject::paintFocusRing(GraphicsContext* context, const LayoutPoint& p
         context->drawFocusRing(focusRingRects, style->outlineWidth(), style->outlineOffset(), style->visitedDependentColor(CSSPropertyOutlineColor));
     else
         addPDFURLRect(context, unionRect(focusRingRects));
-}        
+}
 
 void RenderObject::addPDFURLRect(GraphicsContext* context, const LayoutRect& rect)
 {
@@ -1847,7 +1789,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
             if (m_style->visibility() != newStyle->visibility()) {
                 if (RenderLayer* l = enclosingLayer()) {
                     if (newStyle->visibility() == VISIBLE)
-                        l->setHasVisibleContent(true);
+                        l->setHasVisibleContent();
                     else if (l->hasVisibleContent() && (this == l->renderer() || l->renderer()->style()->visibility() != VISIBLE)) {
                         l->dirtyVisibleContentStatus();
                         if (diff > StyleDifferenceRepaintLayer)
@@ -2272,8 +2214,14 @@ RenderObject* RenderObject::container(const RenderBoxModelObject* repaintContain
         // FIXME: The definition of view() has changed to not crawl up the render tree.  It might
         // be safe now to use it.
         while (o && o->parent() && !(o->hasTransform() && o->isRenderBlock())) {
+#if ENABLE(SVG)
+            // foreignObject is the containing block for its contents.
+            if (o->isSVGForeignObject())
+                break;
+#endif
             if (repaintContainerSkipped && o == repaintContainer)
                 *repaintContainerSkipped = true;
+
             o = o->parent();
         }
     } else if (pos == AbsolutePosition) {
@@ -2281,12 +2229,13 @@ RenderObject* RenderObject::container(const RenderBoxModelObject* repaintContain
         // we may not have one if we're part of an uninstalled subtree.  We'll
         // climb as high as we can though.
         while (o && o->style()->position() == StaticPosition && !o->isRenderView() && !(o->hasTransform() && o->isRenderBlock())) {
-            if (repaintContainerSkipped && o == repaintContainer)
-                *repaintContainerSkipped = true;
 #if ENABLE(SVG)
             if (o->isSVGForeignObject()) // foreignObject is the containing block for contents inside it
                 break;
 #endif
+            if (repaintContainerSkipped && o == repaintContainer)
+                *repaintContainerSkipped = true;
+
             o = o->parent();
         }
     }

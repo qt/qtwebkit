@@ -81,7 +81,7 @@ public:
     bool hasInterchangeNewlineAtEnd() const { return m_hasInterchangeNewlineAtEnd; }
     
     void removeNode(PassRefPtr<Node>);
-    void removeNodePreservingChildren(Node*);
+    void removeNodePreservingChildren(PassRefPtr<Node>);
 
 private:
     PassRefPtr<StyledElement> insertFragmentForTestRendering(Node* rootEditableNode);
@@ -93,7 +93,6 @@ private:
 
     RefPtr<Document> m_document;
     RefPtr<DocumentFragment> m_fragment;
-    bool m_matchStyle;
     bool m_hasInterchangeNewlineAtStart;
     bool m_hasInterchangeNewlineAtEnd;
 };
@@ -135,10 +134,9 @@ static Position positionAvoidingPrecedingNodes(Position pos)
     return pos;
 }
 
-ReplacementFragment::ReplacementFragment(Document* document, DocumentFragment* fragment, bool matchStyle, const VisibleSelection& selection)
+ReplacementFragment::ReplacementFragment(Document* document, DocumentFragment* fragment, bool, const VisibleSelection& selection)
     : m_document(document),
       m_fragment(fragment),
-      m_matchStyle(matchStyle), 
       m_hasInterchangeNewlineAtStart(false), 
       m_hasInterchangeNewlineAtEnd(false)
 {
@@ -211,14 +209,14 @@ Node *ReplacementFragment::lastChild() const
     return m_fragment ? m_fragment->lastChild() : 0; 
 }
 
-void ReplacementFragment::removeNodePreservingChildren(Node *node)
+void ReplacementFragment::removeNodePreservingChildren(PassRefPtr<Node> node)
 {
     if (!node)
         return;
 
     while (RefPtr<Node> n = node->firstChild()) {
         removeNode(n);
-        insertNodeBefore(n.release(), node);
+        insertNodeBefore(n.release(), node.get());
     }
     removeNode(node);
 }
@@ -329,18 +327,12 @@ void ReplacementFragment::removeInterchangeNodes(Node* container)
     
     node = container->firstChild();
     while (node) {
-        Node *next = node->traverseNextNode();
+        RefPtr<Node> next = node->traverseNextNode();
         if (isInterchangeConvertedSpaceSpan(node)) {
-            RefPtr<Node> n = 0;
-            while ((n = node->firstChild())) {
-                removeNode(n);
-                insertNodeBefore(n, node);
-            }
-            removeNode(node);
-            if (n)
-                next = n->traverseNextNode();
+            next = node->traverseNextSibling();
+            removeNodePreservingChildren(node);
         }
-        node = next;
+        node = next.get();
     }
 }
 

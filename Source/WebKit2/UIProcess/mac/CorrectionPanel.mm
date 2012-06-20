@@ -26,7 +26,8 @@
 #import "config.h"
 #import "CorrectionPanel.h"
 
-#if !defined(BUILDING_ON_SNOW_LEOPARD)
+#if USE(AUTOCORRECTION_PANEL)
+
 #import "WebPageProxy.h"
 #import "WKView.h"
 #import "WKViewInternal.h"
@@ -42,6 +43,9 @@ static inline NSCorrectionIndicatorType correctionIndicatorType(AlternativeTextT
         return NSCorrectionIndicatorTypeReversion;
     case AlternativeTextTypeSpellingSuggestions:
         return NSCorrectionIndicatorTypeGuesses;
+    case AlternativeTextTypeDictationAlternatives:
+        ASSERT_NOT_REACHED();
+        break;
     }
     ASSERT_NOT_REACHED();
     return NSCorrectionIndicatorTypeDefault;
@@ -137,7 +141,7 @@ void CorrectionPanel::handleAcceptedReplacement(NSString* acceptedReplacement, N
         break;
     }
 
-    [m_view.get() handleCorrectionPanelResult:acceptedReplacement];
+    [m_view.get() handleAcceptedAlternativeText:acceptedReplacement];
     m_view.clear();
     if (acceptedReplacement)
         m_resultForDismissal.adoptNS([acceptedReplacement copy]);
@@ -145,5 +149,4 @@ void CorrectionPanel::handleAcceptedReplacement(NSString* acceptedReplacement, N
 
 } // namespace WebKit
 
-#endif // !defined(BUILDING_ON_SNOW_LEOPARD)
-
+#endif // USE(AUTOCORRECTION_PANEL)
