@@ -172,7 +172,7 @@ my @features = (
       define => "ENABLE_CSS_REGIONS", default => 1, value => \$cssRegionsSupport },
 
     { option => "css-shaders", desc => "Toggle CSS Shaders support",
-      define => "ENABLE_CSS_SHADERS", default => 0, value => \$cssShadersSupport },
+      define => "ENABLE_CSS_SHADERS", default => isAppleMacWebKit(), value => \$cssShadersSupport },
 
     { option => "css-variables", desc => "Toggle CSS Variable support",
       define => "ENABLE_CSS_VARIABLES", default => 0, value => \$cssVariablesSupport },
@@ -235,7 +235,7 @@ my @features = (
       define => "ENABLE_INPUT_SPEECH", default => 0, value => \$inputSpeechSupport },
 
     { option => "input-type-color", desc => "Toggle Input Type Color support",
-      define => "ENABLE_INPUT_TYPE_COLOR", default => (isBlackBerry() || isEfl()), value => \$inputTypeColorSupport },
+      define => "ENABLE_INPUT_TYPE_COLOR", default => (isBlackBerry() || isEfl() || isQt()), value => \$inputTypeColorSupport },
 
     { option => "input-type-date", desc => "Toggle Input Type Date support",
       define => "ENABLE_INPUT_TYPE_DATE", default => 0, value => \$inputTypeDateSupport },

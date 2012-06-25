@@ -194,6 +194,9 @@ CSSParserContext::CSSParserContext(CSSParserMode mode, const KURL& baseURL)
     , isCSSCustomFilterEnabled(false)
     , isCSSRegionsEnabled(false)
     , isCSSGridLayoutEnabled(false)
+#if ENABLE(CSS_VARIABLES)
+    , isCSSVariablesEnabled(false)
+#endif
     , needsSiteSpecificQuirks(false)
     , enforcesCSSMIMETypeInNoQuirksMode(true)
 {
@@ -207,6 +210,9 @@ CSSParserContext::CSSParserContext(Document* document, const KURL& baseURL, cons
     , isCSSCustomFilterEnabled(document->settings() ? document->settings()->isCSSCustomFilterEnabled() : false)
     , isCSSRegionsEnabled(document->cssRegionsEnabled())
     , isCSSGridLayoutEnabled(document->cssGridLayoutEnabled())
+#if ENABLE(CSS_VARIABLES)
+    , isCSSVariablesEnabled(document->settings() ? document->settings()->cssVariablesEnabled() : false)
+#endif
     , needsSiteSpecificQuirks(document->settings() ? document->settings()->needsSiteSpecificQuirks() : false)
     , enforcesCSSMIMETypeInNoQuirksMode(!document->settings() || document->settings()->enforceCSSMIMETypeInNoQuirksMode())
 {
@@ -221,6 +227,9 @@ bool operator==(const CSSParserContext& a, const CSSParserContext& b)
         && a.isCSSCustomFilterEnabled == b.isCSSCustomFilterEnabled
         && a.isCSSRegionsEnabled == b.isCSSRegionsEnabled
         && a.isCSSGridLayoutEnabled == b.isCSSGridLayoutEnabled
+#if ENABLE(CSS_VARIABLES)
+        && a.isCSSVariablesEnabled == b.isCSSVariablesEnabled
+#endif
         && a.needsSiteSpecificQuirks == b.needsSiteSpecificQuirks
         && a.enforcesCSSMIMETypeInNoQuirksMode == b.enforcesCSSMIMETypeInNoQuirksMode;
 }
@@ -1013,6 +1022,25 @@ PassRefPtr<CSSValueList> CSSParser::parseFontFaceValue(const AtomicString& strin
         return 0;
     return static_pointer_cast<CSSValueList>(dummyStyle->getPropertyCSSValue(CSSPropertyFontFamily));
 }
+
+#if ENABLE(CSS_VARIABLES)
+bool CSSParser::parseValue(StylePropertySet* declaration, CSSPropertyID propertyID, const String& string, bool important, Document* document)
+{
+    ASSERT(!string.isEmpty());
+
+    CSSParserContext context(document);
+
+    if (parseSimpleLengthValue(declaration, propertyID, string, important, context.mode))
+        return true;
+    if (parseColorValue(declaration, propertyID, string, important, context.mode))
+        return true;
+    if (parseKeywordValue(declaration, propertyID, string, important, context))
+        return true;
+
+    CSSParser parser(context);
+    return parser.parseValue(declaration, propertyID, string, important, static_cast<StyleSheetContents*>(0));
+}
+#endif
 
 bool CSSParser::parseValue(StylePropertySet* declaration, CSSPropertyID propertyID, const String& string, bool important, CSSParserMode cssParserMode, StyleSheetContents* contextStyleSheet)
 {
@@ -1889,18 +1917,29 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         validPrimitive = (!id && validUnit(value, FLength | FPercent | FNonNeg));
         break;
 
-    case CSSPropertyMaxHeight:           // <length> | <percentage> | none | inherit
-    case CSSPropertyMaxWidth:            // <length> | <percentage> | none | inherit
+    case CSSPropertyMaxWidth: // <length> | <percentage> | none | inherit
     case CSSPropertyWebkitMaxLogicalWidth:
+        if (id == CSSValueNone) {
+            validPrimitive = true;
+            break;
+        }
+        /* nobreak */
+    case CSSPropertyMinWidth: // <length> | <percentage> | inherit
+    case CSSPropertyWebkitMinLogicalWidth:
+        if (id == CSSValueIntrinsic || id == CSSValueMinIntrinsic || id == CSSValueWebkitMinContent || id == CSSValueWebkitMaxContent || id == CSSValueWebkitFillAvailable || id == CSSValueWebkitFitContent)
+            validPrimitive = true;
+        else
+            validPrimitive = (!id && validUnit(value, FLength | FPercent | FNonNeg));
+        break;
+
+    case CSSPropertyMaxHeight: // <length> | <percentage> | none | inherit
     case CSSPropertyWebkitMaxLogicalHeight:
         if (id == CSSValueNone) {
             validPrimitive = true;
             break;
         }
         /* nobreak */
-    case CSSPropertyMinHeight:           // <length> | <percentage> | inherit
-    case CSSPropertyMinWidth:            // <length> | <percentage> | inherit
-    case CSSPropertyWebkitMinLogicalWidth:
+    case CSSPropertyMinHeight: // <length> | <percentage> | inherit
     case CSSPropertyWebkitMinLogicalHeight:
         if (id == CSSValueIntrinsic || id == CSSValueMinIntrinsic)
             validPrimitive = true;
@@ -1924,9 +1963,14 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             validPrimitive = (!id && validUnit(value, FLength | FPercent));
         break;
 
-    case CSSPropertyHeight:               // <length> | <percentage> | auto | inherit
-    case CSSPropertyWidth:                // <length> | <percentage> | auto | inherit
+    case CSSPropertyWidth: // <length> | <percentage> | auto | inherit
     case CSSPropertyWebkitLogicalWidth:
+        if (id == CSSValueWebkitMinContent || id == CSSValueWebkitMaxContent || id == CSSValueWebkitFillAvailable || id == CSSValueWebkitFitContent) {
+            validPrimitive = true;
+            break;
+        }
+        /* nobreak */
+    case CSSPropertyHeight: // <length> | <percentage> | auto | inherit
     case CSSPropertyWebkitLogicalHeight:
         if (id == CSSValueAuto || id == CSSValueIntrinsic || id == CSSValueMinIntrinsic)
             validPrimitive = true;
@@ -2877,6 +2921,11 @@ bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* pr
 }
 
 #if ENABLE(CSS_VARIABLES)
+bool CSSParser::cssVariablesEnabled() const
+{
+    return m_context.isCSSVariablesEnabled;
+}
+
 void CSSParser::storeVariableDeclaration(const CSSParserString& name, PassOwnPtr<CSSParserValueList> value, bool important)
 {
     StringBuilder builder;
@@ -6888,12 +6937,16 @@ PassRefPtr<CSSValue> CSSParser::parseImageResolution(CSSParserValueList* valueLi
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
     bool haveResolution = false;
     bool haveFromImage = false;
+    bool haveSnap = false;
 
     CSSParserValue* value = valueList->current();
     while (value) {
         if (!haveFromImage && value->id == CSSValueFromImage) {
             list->append(cssValuePool().createIdentifierValue(value->id));
             haveFromImage = true;
+        } else if (!haveSnap && value->id == CSSValueSnap) {
+            list->append(cssValuePool().createIdentifierValue(value->id));
+            haveSnap = true;
         } else if (!haveResolution && validUnit(value, FResolution | FNonNeg) && value->fValue > 0) {
             list->append(createPrimitiveNumericValue(value));
             haveResolution = true;
@@ -6902,6 +6955,8 @@ PassRefPtr<CSSValue> CSSParser::parseImageResolution(CSSParserValueList* valueLi
         value = m_valueList->next();
     }
     if (!list->length())
+        return 0;
+    if (!haveFromImage && !haveResolution)
         return 0;
     return list;
 }
@@ -8500,7 +8555,7 @@ inline void CSSParser::detectDashToken(int length)
         else if (isASCIIAlphaCaselessEqual(name[10], 'x') && isEqualToCSSIdentifier(name + 1, "webkit-ma"))
             m_token = MAXFUNCTION;
 #if ENABLE(CSS_VARIABLES)
-        else if (isASCIIAlphaCaselessEqual(name[10], 'r') && isEqualToCSSIdentifier(name + 1, "webkit-va"))
+        else if (cssVariablesEnabled() && isASCIIAlphaCaselessEqual(name[10], 'r') && isEqualToCSSIdentifier(name + 1, "webkit-va"))
             m_token = VARFUNCTION;
 #endif
     } else if (length == 12 && isEqualToCSSIdentifier(name + 1, "webkit-calc"))
@@ -8842,7 +8897,7 @@ restartAfterComment:
 
     case CharacterDash:
 #if ENABLE(CSS_VARIABLES)
-        if (m_currentCharacter[10] == '-' && isEqualToCSSIdentifier(m_currentCharacter, "webkit-var") && isIdentifierStartAfterDash(m_currentCharacter + 11)) {
+        if (cssVariablesEnabled() && m_currentCharacter[10] == '-' && isEqualToCSSIdentifier(m_currentCharacter, "webkit-var") && isIdentifierStartAfterDash(m_currentCharacter + 11)) {
             // handle variable declarations
             m_currentCharacter += 11;
             parseIdentifier(result, hasEscape);

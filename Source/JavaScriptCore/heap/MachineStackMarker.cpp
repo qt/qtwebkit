@@ -45,7 +45,6 @@
 
 #elif OS(UNIX)
 
-#include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -142,8 +141,10 @@ MachineThreads::MachineThreads(Heap* heap)
 
 MachineThreads::~MachineThreads()
 {
-    if (m_threadSpecific)
-        ThreadSpecificKeyDelete(m_threadSpecific);
+    if (m_threadSpecific) {
+        int error = pthread_key_delete(m_threadSpecific);
+        ASSERT_UNUSED(error, !error);
+    }
 
     MutexLocker registeredThreadsLock(m_registeredThreadsMutex);
     for (Thread* t = m_registeredThreads; t;) {
@@ -180,17 +181,19 @@ void MachineThreads::makeUsableFromMultipleThreads()
     if (m_threadSpecific)
         return;
 
-    ThreadSpecificKeyCreate(&m_threadSpecific, removeThread);
+    int error = pthread_key_create(&m_threadSpecific, removeThread);
+    if (error)
+        CRASH();
 }
 
 void MachineThreads::addCurrentThread()
 {
     ASSERT(!m_heap->globalData()->exclusiveThread || m_heap->globalData()->exclusiveThread == currentThread());
 
-    if (!m_threadSpecific || ThreadSpecificGet(m_threadSpecific))
+    if (!m_threadSpecific || pthread_getspecific(m_threadSpecific))
         return;
 
-    ThreadSpecificSet(m_threadSpecific, this);
+    pthread_setspecific(m_threadSpecific, this);
     Thread* thread = new Thread(getCurrentPlatformThread(), wtfThreadData().stack().origin());
 
     MutexLocker lock(m_registeredThreadsMutex);

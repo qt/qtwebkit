@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -186,6 +187,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_gapBetweenPages(0)
     , m_isValid(true)
     , m_isClosed(false)
+    , m_canRunModal(false)
     , m_isInPrintingMode(false)
     , m_isPerformingDOMPrintOperation(false)
     , m_inDecidePolicyForResponse(false)
@@ -304,7 +306,7 @@ void WebPageProxy::initializeUIClient(const WKPageUIClient* client)
     m_uiClient.initialize(client);
 
     process()->send(Messages::WebPage::SetCanRunBeforeUnloadConfirmPanel(m_uiClient.canRunBeforeUnloadConfirmPanel()), m_pageID);
-    process()->send(Messages::WebPage::SetCanRunModal(m_uiClient.canRunModal()), m_pageID);
+    setCanRunModal(m_uiClient.canRunModal());
 }
 
 void WebPageProxy::initializeFindClient(const WKPageFindClient* client)
@@ -402,6 +404,13 @@ void WebPageProxy::close()
         m_openPanelResultListener->invalidate();
         m_openPanelResultListener = 0;
     }
+
+#if ENABLE(INPUT_TYPE_COLOR)
+    if (m_colorChooser) {
+        m_colorChooser->invalidate();
+        m_colorChooser = nullptr;
+    }
+#endif
 
 #if ENABLE(GEOLOCATION)
     m_geolocationPermissionRequestManager.invalidateRequests();
@@ -1126,7 +1135,7 @@ void WebPageProxy::handleKeyboardEvent(const NativeWebKeyboardEvent& event)
     if (m_shouldSendEventsSynchronously) {
         bool handled = false;
         process()->sendSync(Messages::WebPage::KeyEventSyncForTesting(event), Messages::WebPage::KeyEventSyncForTesting::Reply(handled), m_pageID);
-        didReceiveEvent(event.type(), handled);
+        didReceiveKeyEvent(event.type(), handled);
     } else
         process()->send(Messages::WebPage::KeyEvent(event), m_pageID);
 }
@@ -2641,6 +2650,50 @@ void WebPageProxy::needTouchEvents(bool needTouchEvents)
 }
 #endif
 
+#if ENABLE(INPUT_TYPE_COLOR)
+void WebPageProxy::showColorChooser(const WebCore::Color& initialColor)
+{
+    ASSERT(!m_colorChooser);
+
+    m_colorChooser = m_pageClient->createColorChooserProxy(this, initialColor);
+}
+
+void WebPageProxy::setColorChooserColor(const WebCore::Color& color)
+{
+    ASSERT(m_colorChooser);
+
+    m_colorChooser->setSelectedColor(color);
+}
+
+void WebPageProxy::endColorChooser()
+{
+    ASSERT(m_colorChooser);
+
+    m_colorChooser->endChooser();
+}
+
+void WebPageProxy::didChooseColor(const WebCore::Color& color)
+{
+    if (!isValid())
+        return;
+
+    process()->send(Messages::WebPage::DidChooseColor(color), m_pageID);
+}
+
+void WebPageProxy::didEndColorChooser()
+{
+    if (!isValid())
+        return;
+
+    ASSERT(m_colorChooser);
+
+    m_colorChooser->invalidate();
+    m_colorChooser = nullptr;
+
+    process()->send(Messages::WebPage::DidEndColorChooser(), m_pageID);
+}
+#endif
+
 void WebPageProxy::didDraw()
 {
     m_uiClient.didDraw(this);
@@ -3096,6 +3149,42 @@ void WebPageProxy::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
     m_pageClient->setCursorHiddenUntilMouseMoves(hiddenUntilMouseMoves);
 }
 
+void WebPageProxy::didReceiveKeyEvent(uint32_t opaqueType, bool handled)
+{
+    process()->responsivenessTimer()->stop();
+
+    WebEvent::Type type = static_cast<WebEvent::Type>(opaqueType);
+
+    switch (type) {
+    case WebEvent::KeyDown:
+    case WebEvent::KeyUp:
+    case WebEvent::RawKeyDown:
+    case WebEvent::Char: {
+        LOG(KeyHandling, "WebPageProxy::didReceiveKeyEvent: %s", webKeyboardEventTypeString(type));
+
+        NativeWebKeyboardEvent event = m_keyEventQueue.first();
+        MESSAGE_CHECK(type == event.type());
+
+        m_keyEventQueue.removeFirst();
+
+        m_pageClient->doneWithKeyEvent(event, handled);
+
+        if (handled)
+            break;
+
+        if (m_uiClient.implementsDidNotHandleKeyEvent())
+            m_uiClient.didNotHandleKeyEvent(this, event);
+#if PLATFORM(WIN)
+        else
+            ::TranslateMessage(event.nativeEvent());
+#endif
+        break;
+    }
+    default:
+        ASSERT_NOT_REACHED();
+    }
+}
+
 void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
 {
     WebEvent::Type type = static_cast<WebEvent::Type>(opaqueType);
@@ -3108,10 +3197,6 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
     case WebEvent::MouseDown:
     case WebEvent::MouseUp:
     case WebEvent::Wheel:
-    case WebEvent::KeyDown:
-    case WebEvent::KeyUp:
-    case WebEvent::RawKeyDown:
-    case WebEvent::Char:
 #if ENABLE(GESTURE_EVENTS)
     case WebEvent::GestureScrollBegin:
     case WebEvent::GestureScrollEnd:
@@ -3125,6 +3210,8 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
 #endif
         process()->responsivenessTimer()->stop();
         break;
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     switch (type) {
@@ -3169,30 +3256,6 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
         break;
     }
 
-    case WebEvent::KeyDown:
-    case WebEvent::KeyUp:
-    case WebEvent::RawKeyDown:
-    case WebEvent::Char: {
-        LOG(KeyHandling, "WebPageProxy::didReceiveEvent: %s", webKeyboardEventTypeString(type));
-
-        NativeWebKeyboardEvent event = m_keyEventQueue.first();
-        MESSAGE_CHECK(type == event.type());
-
-        m_keyEventQueue.removeFirst();
-
-        m_pageClient->doneWithKeyEvent(event, handled);
-
-        if (handled)
-            break;
-
-        if (m_uiClient.implementsDidNotHandleKeyEvent())
-            m_uiClient.didNotHandleKeyEvent(this, event);
-#if PLATFORM(WIN)
-        else
-            ::TranslateMessage(event.nativeEvent());
-#endif
-        break;
-    }
 #if ENABLE(TOUCH_EVENTS)
     case WebEvent::TouchStart:
     case WebEvent::TouchMove:
@@ -3210,6 +3273,8 @@ void WebPageProxy::didReceiveEvent(uint32_t opaqueType, bool handled)
         break;
     }
 #endif
+    default:
+        ASSERT_NOT_REACHED();
     }
 }
 
@@ -3393,6 +3458,13 @@ void WebPageProxy::processDidCrash()
         m_openPanelResultListener = nullptr;
     }
 
+#if ENABLE(INPUT_TYPE_COLOR)
+    if (m_colorChooser) {
+        m_colorChooser->invalidate();
+        m_colorChooser = nullptr;
+    }
+#endif
+
 #if ENABLE(GEOLOCATION)
     m_geolocationPermissionRequestManager.invalidateRequests();
 #endif
@@ -3491,7 +3563,7 @@ WebPageCreationParameters WebPageProxy::creationParameters() const
     parameters.sessionState = SessionState(m_backForwardList->entries(), m_backForwardList->currentIndex());
     parameters.highestUsedBackForwardItemID = WebBackForwardListItem::highedUsedItemID();
     parameters.canRunBeforeUnloadConfirmPanel = m_uiClient.canRunBeforeUnloadConfirmPanel();
-    parameters.canRunModal = m_uiClient.canRunModal();
+    parameters.canRunModal = m_canRunModal;
     parameters.deviceScaleFactor = m_intrinsicDeviceScaleFactor;
     parameters.mediaVolume = m_mediaVolume;
 
@@ -3622,6 +3694,12 @@ void WebPageProxy::runModal()
     // Since runModal() can (and probably will) spin a nested run loop we need to turn off the responsiveness timer.
     process()->responsivenessTimer()->stop();
 
+    // Our Connection's run loop might have more messages waiting to be handled after this RunModal message.
+    // To make sure they are handled inside of the the nested modal run loop we must first signal the Connection's
+    // run loop so we're guaranteed that it has a chance to wake up.
+    // See http://webkit.org/b/89590 for more discussion.
+    process()->connection()->wakeUpRunLoop();
+
     m_uiClient.runModal(this);
 }
 
@@ -3690,6 +3768,23 @@ void WebPageProxy::didFinishLoadingDataForCustomRepresentation(const String& sug
 void WebPageProxy::backForwardRemovedItem(uint64_t itemID)
 {
     process()->send(Messages::WebPage::DidRemoveBackForwardItem(itemID), m_pageID);
+}
+
+void WebPageProxy::setCanRunModal(bool canRunModal)
+{
+    if (!isValid())
+        return;
+
+    // It's only possible to change the state for a WebPage which
+    // already qualifies for running modal child web pages, otherwise
+    // there's no other possibility than not allowing it.
+    m_canRunModal = m_uiClient.canRunModal() && canRunModal;
+    process()->send(Messages::WebPage::SetCanRunModal(m_canRunModal), m_pageID);
+}
+
+bool WebPageProxy::canRunModal()
+{
+    return isValid() ? m_canRunModal : false;
 }
 
 void WebPageProxy::beginPrinting(WebFrameProxy* frame, const PrintInfo& printInfo)

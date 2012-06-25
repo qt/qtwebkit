@@ -161,6 +161,7 @@ HEADERS += \
     UIProcess/API/C/WKHitTestResult.h \
     UIProcess/API/C/WKIconDatabase.h \
     UIProcess/API/C/WKInspector.h \
+    UIProcess/API/C/WKIntentData.h \
     UIProcess/API/C/WKOpenPanelParameters.h \
     UIProcess/API/C/WKOpenPanelResultListener.h \
     UIProcess/API/C/WKNavigationData.h \
@@ -229,6 +230,7 @@ HEADERS += \
     UIProcess/VisitedLinkProvider.h \
     UIProcess/WebApplicationCacheManagerProxy.h \
     UIProcess/WebBackForwardList.h \
+    UIProcess/WebColorChooserProxy.h \
     UIProcess/WebConnectionToWebProcess.h \
     UIProcess/WebContext.h \
     UIProcess/WebContextConnectionClient.h \
@@ -345,6 +347,7 @@ HEADERS += \
     WebProcess/Plugins/PluginProcessConnection.h \
     WebProcess/Plugins/PluginProcessConnectionManager.h \
     WebProcess/WebCoreSupport/WebChromeClient.h \
+    WebProcess/WebCoreSupport/WebColorChooser.h \
     WebProcess/WebCoreSupport/WebContextMenuClient.h \
     WebProcess/WebCoreSupport/WebDatabaseManager.h \
     WebProcess/WebCoreSupport/WebDragClient.h \
@@ -517,6 +520,7 @@ SOURCES += \
     UIProcess/API/C/WKHitTestResult.cpp \
     UIProcess/API/C/WKIconDatabase.cpp \
     UIProcess/API/C/WKInspector.cpp \
+    UIProcess/API/C/WKIntentData.cpp \
     UIProcess/API/C/WKNotification.cpp \
     UIProcess/API/C/WKNotificationManager.cpp \
     UIProcess/API/C/WKNotificationPermissionRequest.cpp \
@@ -711,6 +715,7 @@ SOURCES += \
     WebProcess/Plugins/PluginProcessConnection.cpp \
     WebProcess/Plugins/PluginProcessConnectionManager.cpp \
     WebProcess/WebCoreSupport/WebChromeClient.cpp \
+    WebProcess/WebCoreSupport/WebColorChooser.cpp \
     WebProcess/WebCoreSupport/WebContextMenuClient.cpp \
     WebProcess/WebCoreSupport/WebDatabaseManager.cpp \
     WebProcess/WebCoreSupport/WebDragClient.cpp \
@@ -804,6 +809,13 @@ contains(DEFINES, ENABLE_TOUCH_EVENTS=1) {
         Shared/NativeWebTouchEvent.h
     SOURCES += \
         Shared/qt/NativeWebTouchEventQt.cpp
+}
+
+contains(DEFINES, ENABLE_INPUT_TYPE_COLOR=1) {
+    HEADERS += \
+        UIProcess/qt/WebColorChooserProxyQt.h
+    SOURCES += \
+        UIProcess/qt/WebColorChooserProxyQt.cpp
 }
 
 contains(DEFINES, ENABLE_GEOLOCATION=1): QT += location

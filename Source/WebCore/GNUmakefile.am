@@ -155,6 +155,14 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/pango
 endif # END USE_PANGO
 
+# ---
+# Windows plugin support
+# ---
+if TARGET_WIN32
+webcoregtk_cppflags += \
+	-I$(srcdir)/Source/WebCore/platform/graphics/win
+endif # END TARGET_WIN32
+
 # ----
 # HTML Details Element
 # ----
@@ -838,8 +846,8 @@ DerivedSources/WebCore/InspectorBackendCommands.js: DerivedSources/WebCore/Inspe
 DerivedSources/WebCore/InspectorBackendDispatcher.h: DerivedSources/WebCore/InspectorBackendDispatcher.cpp
 DerivedSources/WebCore/InjectedScriptSource.h: $(WebCore)/inspector/InjectedScriptSource.js
 	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptSource_js $(WebCore)/inspector/InjectedScriptSource.js $(GENSOURCES_WEBCORE)/InjectedScriptSource.h
-DerivedSources/WebCore/InjectedWebGLScriptSource.h: $(WebCore)/inspector/InjectedWebGLScriptSource.js
-	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedWebGLScriptSource_js $(WebCore)/inspector/InjectedWebGLScriptSource.js $(GENSOURCES_WEBCORE)/InjectedWebGLScriptSource.h
+DerivedSources/WebCore/InjectedScriptWebGLModuleSource.h: $(WebCore)/inspector/InjectedScriptWebGLModuleSource.js
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptWebGLModuleSource_js $(WebCore)/inspector/InjectedScriptWebGLModuleSource.js $(GENSOURCES_WEBCORE)/InjectedScriptWebGLModuleSource.h
 
 if ENABLE_WEB_AUDIO
 # Installing HRTF database wav files
@@ -964,6 +972,11 @@ libWebCore_la_CPPFLAGS = \
 	$(UNICODE_CFLAGS) \
 	$(XRENDER_CFLAGS) \
 	$(XT_CFLAGS)
+
+if TARGET_WIN32
+# PluginPackageWin.cpp needs the symbols from version dll
+libWebCore_la_LIBADD = -lversion
+endif
 
 libWebCoreModules_la_SOURCES = \
 	$(webcore_modules_sources)
@@ -1091,7 +1104,7 @@ EXTRA_DIST += \
 	Source/WebCore/icu/LICENSE \
 	Source/WebCore/inspector/CodeGeneratorInspector.py \
 	Source/WebCore/inspector/InjectedScriptSource.js \
-	Source/WebCore/inspector/InjectedWebGLScriptSource.js \
+	Source/WebCore/inspector/InjectedScriptWebGLModuleSource.js \
 	Source/WebCore/inspector/Inspector.json \
 	Source/WebCore/inspector/Inspector-1.0.json \
 	Source/WebCore/inspector/generate-inspector-protocol-version \

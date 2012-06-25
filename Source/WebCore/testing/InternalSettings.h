@@ -64,7 +64,6 @@ public:
     void setTouchEventEmulationEnabled(bool enabled, ExceptionCode&);
     void setDeviceSupportsTouch(bool enabled, ExceptionCode&);
     void setDeviceSupportsMouse(bool enabled, ExceptionCode&);
-    void setDeviceScaleFactor(float scaleFactor, ExceptionCode&);
     void setShadowDOMEnabled(bool enabled, ExceptionCode&);
     void setStandardFontFamily(const String& family, const String& script, ExceptionCode&);
     void setSerifFontFamily(const String& family, const String& script, ExceptionCode&);
@@ -76,6 +75,8 @@ public:
     void setEnableScrollAnimator(bool enabled, ExceptionCode&);
     bool scrollAnimatorEnabled(ExceptionCode&);
     void setCSSExclusionsEnabled(bool enabled, ExceptionCode&);
+    void setCSSVariablesEnabled(bool enabled, ExceptionCode&);
+    bool cssVariablesEnabled(ExceptionCode&);
     void setMediaPlaybackRequiresUserGesture(bool, ExceptionCode&);
     void setEditingBehavior(const String&, ExceptionCode&);
     void setFixedPositionCreatesStackingContext(bool, ExceptionCode&);

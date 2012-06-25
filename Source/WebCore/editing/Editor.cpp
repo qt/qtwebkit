@@ -2296,12 +2296,12 @@ PassRefPtr<Range> Editor::rangeForPoint(const IntPoint& windowPoint)
     return avoidIntersectionWithNode(selection.toNormalizedRange().get(), m_deleteButtonController->containerElement());
 }
 
-void Editor::revealSelectionAfterEditingOperation(const ScrollAlignment& alignment)
+void Editor::revealSelectionAfterEditingOperation(const ScrollAlignment& alignment, RevealExtentOption revealExtentOption)
 {
     if (m_ignoreCompositionSelectionChange)
         return;
 
-    m_frame->selection()->revealSelection(alignment);
+    m_frame->selection()->revealSelection(alignment, revealExtentOption);
 }
 
 void Editor::setIgnoreCompositionSelectionChange(bool ignore)
@@ -2311,7 +2311,7 @@ void Editor::setIgnoreCompositionSelectionChange(bool ignore)
 
     m_ignoreCompositionSelectionChange = ignore;
     if (!ignore)
-        revealSelectionAfterEditingOperation();
+        revealSelectionAfterEditingOperation(ScrollAlignment::alignToEdgeIfNeeded, RevealExtent);
 }
 
 PassRefPtr<Range> Editor::compositionRange() const
@@ -2345,6 +2345,19 @@ bool Editor::getCompositionSelection(unsigned& selectionStart, unsigned& selecti
     selectionStart = start.deprecatedEditingOffset() - m_compositionStart;
     selectionEnd = start.deprecatedEditingOffset() - m_compositionEnd;
     return true;
+}
+
+bool Editor::setSelectionOffsets(int selectionStart, int selectionEnd)
+{
+    Element* rootEditableElement = m_frame->selection()->rootEditableElement();
+    if (!rootEditableElement)
+        return false;
+
+    RefPtr<Range> range = TextIterator::rangeFromLocationAndLength(rootEditableElement, selectionStart, selectionEnd - selectionStart);
+    if (!range)
+        return false;
+
+    return m_frame->selection()->setSelectedRange(range.get(), VP_DEFAULT_AFFINITY, false);
 }
 
 void Editor::transpose()

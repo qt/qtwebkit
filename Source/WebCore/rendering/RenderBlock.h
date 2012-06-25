@@ -104,13 +104,15 @@ public:
 
     typedef ListHashSet<RenderBox*, 4> PositionedObjectsListHashSet;
     PositionedObjectsListHashSet* positionedObjects() const { return m_positionedObjects.get(); }
+    bool hasPositionedObjects() const { return m_positionedObjects && !m_positionedObjects->isEmpty(); }
 
     void addPercentHeightDescendant(RenderBox*);
     static void removePercentHeightDescendant(RenderBox*);
     HashSet<RenderBox*>* percentHeightDescendants() const;
-#if !ASSERT_DISABLED
+    static bool hasPercentHeightContainerMap();
     static bool hasPercentHeightDescendant(RenderBox*);
-#endif
+    static void clearPercentHeightDescendantsFrom(RenderBox*);
+    static void removePercentHeightDescendantIfNeeded(RenderBox*);
 
     void setHasMarkupTruncation(bool b) { m_hasMarkupTruncation = b; }
     bool hasMarkupTruncation() const { return m_hasMarkupTruncation; }
@@ -245,7 +247,7 @@ public:
 
     static bool shouldSkipCreatingRunsForObject(RenderObject* obj)
     {
-        return obj->isFloating() || (obj->isPositioned() && !obj->style()->isOriginalDisplayInlineType() && !obj->container()->isRenderInline());
+        return obj->isFloating() || (obj->isOutOfFlowPositioned() && !obj->style()->isOriginalDisplayInlineType() && !obj->container()->isRenderInline());
     }
     
     static void appendRunsForObject(BidiRunList<BidiRun>&, int start, int end, RenderObject*, InlineBidiResolver&);
@@ -418,7 +420,7 @@ protected:
     virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
     virtual void adjustInlineDirectionLineBounds(int /* expansionOpportunityCount */, float& /* logicalLeft */, float& /* logicalWidth */) const { }
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual void computePreferredLogicalWidths();
 
@@ -756,9 +758,9 @@ private:
     LayoutUnit lowestFloatLogicalBottom(FloatingObject::Type = FloatingObject::FloatLeftRight) const; 
     LayoutUnit nextFloatLogicalBottomBelow(LayoutUnit) const;
     
-    virtual bool hitTestColumns(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
-    virtual bool hitTestContents(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
-    bool hitTestFloats(const HitTestRequest&, HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset);
+    virtual bool hitTestColumns(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool hitTestContents(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    bool hitTestFloats(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset);
 
     virtual bool isPointInOverflowControl(HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset);
 

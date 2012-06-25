@@ -28,11 +28,6 @@
 
 namespace WebCore {
 
-DynamicSubtreeNodeList::DynamicSubtreeNodeList(PassRefPtr<Node> node, RootType rootType)
-    : DynamicNodeList(node, rootType)
-{
-}
-
 DynamicSubtreeNodeList::~DynamicSubtreeNodeList()
 {
 }
@@ -43,7 +38,7 @@ unsigned DynamicSubtreeNodeList::length() const
         return m_caches.cachedLength;
 
     unsigned length = 0;
-    Node* rootNode = node();
+    Node* rootNode = this->rootNode();
 
     for (Node* n = rootNode->firstChild(); n; n = n->traverseNextNode(rootNode))
         length += n->isElementNode() && nodeMatches(static_cast<Element*>(n));
@@ -57,7 +52,7 @@ unsigned DynamicSubtreeNodeList::length() const
 Node* DynamicSubtreeNodeList::itemForwardsFromCurrent(Node* start, unsigned offset, int remainingOffset) const
 {
     ASSERT(remainingOffset >= 0);
-    Node* rootNode = node();
+    Node* rootNode = this->rootNode();
     for (Node* n = start; n; n = n->traverseNextNode(rootNode)) {
         if (n->isElementNode() && nodeMatches(static_cast<Element*>(n))) {
             if (!remainingOffset) {
@@ -76,7 +71,7 @@ Node* DynamicSubtreeNodeList::itemForwardsFromCurrent(Node* start, unsigned offs
 Node* DynamicSubtreeNodeList::itemBackwardsFromCurrent(Node* start, unsigned offset, int remainingOffset) const
 {
     ASSERT(remainingOffset < 0);
-    Node* rootNode = node();
+    Node* rootNode = this->rootNode();
     for (Node* n = start; n; n = n->traversePreviousNode(rootNode)) {
         if (n->isElementNode() && nodeMatches(static_cast<Element*>(n))) {
             if (!remainingOffset) {
@@ -95,7 +90,7 @@ Node* DynamicSubtreeNodeList::itemBackwardsFromCurrent(Node* start, unsigned off
 Node* DynamicSubtreeNodeList::item(unsigned offset) const
 {
     int remainingOffset = offset;
-    Node* start = node()->firstChild();
+    Node* start = rootNode()->firstChild();
     if (m_caches.isItemCacheValid) {
         if (offset == m_caches.lastItemOffset)
             return m_caches.lastItem;
@@ -112,7 +107,7 @@ Node* DynamicSubtreeNodeList::item(unsigned offset) const
 
 Node* DynamicNodeList::itemWithName(const AtomicString& elementId) const
 {
-    Node* rootNode = node();
+    Node* rootNode = this->rootNode();
 
     if (rootNode->inDocument()) {
         Element* element = rootNode->treeScope()->getElementById(elementId);

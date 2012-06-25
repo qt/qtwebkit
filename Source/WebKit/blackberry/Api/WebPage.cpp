@@ -532,6 +532,7 @@ void WebPagePrivate::init(const WebString& pageGroupName)
 #if USE(ACCELERATED_COMPOSITING)
     m_tapHighlight = DefaultTapHighlight::create(this);
     m_selectionOverlay = SelectionOverlay::create(this);
+    m_page->settings()->setAcceleratedCompositingForFixedPositionEnabled(true);
 #endif
 
     // FIXME: We explicitly call setDelegate() instead of passing ourself in createFromStandardSettings()
@@ -548,7 +549,7 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     m_mainFrame->init();
 
 #if ENABLE(WEBGL)
-    Platform::Settings* settings = Platform::Settings::get();
+    Platform::Settings* settings = Platform::Settings::instance();
     m_page->settings()->setWebGLEnabled(settings && settings->isWebGLSupported());
 #endif
 #if ENABLE(ACCELERATED_2D_CANVAS)
@@ -563,6 +564,8 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     m_page->settings()->setInteractiveFormValidationEnabled(true);
     m_page->settings()->setAllowUniversalAccessFromFileURLs(false);
     m_page->settings()->setAllowFileAccessFromFileURLs(false);
+    m_page->settings()->setShouldUseCrossOriginProtocolCheck(!m_webSettings->allowCrossSiteRequests());
+    m_page->settings()->setWebSecurityEnabled(!m_webSettings->allowCrossSiteRequests());
 
     m_backingStoreClient = BackingStoreClient::create(m_mainFrame, /* parent frame */ 0, m_webPage);
     // The direct access to BackingStore is left here for convenience since it
@@ -888,6 +891,29 @@ void WebPage::prepareToDestroy()
     d->prepareToDestroy();
 }
 
+static void enableCrossSiteXHRRecursively(Frame* frame)
+{
+    frame->document()->securityOrigin()->grantUniversalAccess();
+
+    Vector<RefPtr<Frame>, 10> childFrames;
+    for (RefPtr<Frame> childFrame = frame->tree()->firstChild(); childFrame; childFrame = childFrame->tree()->nextSibling())
+        childFrames.append(childFrame);
+
+    unsigned size = childFrames.size();
+    for (unsigned i = 0; i < size; i++)
+        enableCrossSiteXHRRecursively(childFrames[i].get());
+}
+
+void WebPagePrivate::enableCrossSiteXHR()
+{
+    enableCrossSiteXHRRecursively(m_mainFrame);
+}
+
+void WebPage::enableCrossSiteXHR()
+{
+    d->enableCrossSiteXHR();
+}
+
 void WebPagePrivate::setLoadState(LoadState state)
 {
     if (m_loadState == state)
@@ -956,7 +982,7 @@ void WebPagePrivate::setLoadState(LoadState state)
             static ViewportArguments defaultViewportArguments;
             bool documentHasViewportArguments = false;
             FrameLoadType frameLoadType = FrameLoadTypeStandard;
-            if (m_mainFrame && m_mainFrame->document() && !(m_mainFrame->document()->viewportArguments() == defaultViewportArguments))
+            if (m_mainFrame && m_mainFrame->document() && m_mainFrame->document()->viewportArguments() != defaultViewportArguments)
                 documentHasViewportArguments = true;
             if (m_mainFrame && m_mainFrame->loader())
                 frameLoadType = m_mainFrame->loader()->loadType();
@@ -997,7 +1023,7 @@ void WebPagePrivate::setLoadState(LoadState state)
 #endif
 
             // Notify InputHandler of state change.
-            m_inputHandler->enableInputMode(false);
+            m_inputHandler->setInputModeEnabled(false);
 
             // Set the scroll to origin here and notify the client since we'll be
             // zooming below without any real contents yet thus the contents size
@@ -1311,7 +1337,7 @@ bool WebPagePrivate::shouldSendResizeEvent()
     //            NOTE: Care must be exercised in the use of this option, as it bypasses
     //                  the sanity provided in 'isLoadingInAPISense()' below.
     //
-    static const bool unrestrictedResizeEvents = Platform::Settings::get()->unrestrictedResizeEvents();
+    static const bool unrestrictedResizeEvents = Platform::Settings::instance()->unrestrictedResizeEvents();
     if (unrestrictedResizeEvents)
         return true;
 
@@ -2480,7 +2506,7 @@ typedef bool (*PredicateFunction)(RenderLayer*);
 static bool isPositionedContainer(RenderLayer* layer)
 {
     RenderObject* o = layer->renderer();
-    return o->isRenderView() || o->isPositioned() || o->isRelPositioned() || layer->hasTransform();
+    return o->isRenderView() || o->isOutOfFlowPositioned() || o->isRelPositioned() || layer->hasTransform();
 }
 
 static bool isNonRenderViewFixedPositionedContainer(RenderLayer* layer)
@@ -2489,13 +2515,13 @@ static bool isNonRenderViewFixedPositionedContainer(RenderLayer* layer)
     if (o->isRenderView())
         return false;
 
-    return o->isPositioned() && o->style()->position() == FixedPosition;
+    return o->isOutOfFlowPositioned() && o->style()->position() == FixedPosition;
 }
 
 static bool isFixedPositionedContainer(RenderLayer* layer)
 {
     RenderObject* o = layer->renderer();
-    return o->isRenderView() || (o->isPositioned() && o->style()->position() == FixedPosition);
+    return o->isRenderView() || (o->isOutOfFlowPositioned() && o->style()->position() == FixedPosition);
 }
 
 static RenderLayer* findAncestorOrSelfNotMatching(PredicateFunction predicate, RenderLayer* layer)
@@ -3644,7 +3670,7 @@ void WebPagePrivate::setViewportSize(const IntSize& transformedActualVisibleSize
 
     // Recompute our virtual viewport.
     static ViewportArguments defaultViewportArguments;
-    if (!(m_viewportArguments == defaultViewportArguments)) {
+    if (m_viewportArguments != defaultViewportArguments) {
         // We may need to infer the width and height for the viewport with respect to the rotation.
         IntSize newVirtualViewport = recomputeVirtualViewportFromViewportArguments();
         ASSERT(!newVirtualViewport.isEmpty());
@@ -3943,7 +3969,7 @@ bool WebPagePrivate::handleMouseEvent(PlatformMouseEvent& mouseEvent)
     }
 
     if (mouseEvent.type() == WebCore::PlatformEvent::MousePressed) {
-        m_inputHandler->enableInputMode();
+        m_inputHandler->setInputModeEnabled();
         if (m_inputHandler->willOpenPopupForNode(node)) {
             // Do not allow any human generated mouse or keyboard events to select <option>s in the list box
             // because we use a pop up dialog to handle the actual selections. This prevents options from
@@ -4141,7 +4167,7 @@ bool WebPagePrivate::dispatchTouchEventToFullScreenPlugin(PluginView* plugin, co
     return handled;
 }
 
-bool WebPage::touchPointAsMouseEvent(const Platform::TouchPoint& point)
+bool WebPage::touchPointAsMouseEvent(const Platform::TouchPoint& point, bool useFatFingers)
 {
     if (d->m_page->defersLoading())
         return false;
@@ -4156,7 +4182,7 @@ bool WebPage::touchPointAsMouseEvent(const Platform::TouchPoint& point)
     tPoint.m_pos = d->mapFromTransformed(tPoint.m_pos);
     tPoint.m_screenPos = d->mapFromTransformed(tPoint.m_screenPos);
 
-    return d->m_touchEventHandler->handleTouchPoint(tPoint);
+    return d->m_touchEventHandler->handleTouchPoint(tPoint, useFatFingers);
 }
 
 bool WebPagePrivate::dispatchTouchPointAsMouseEventToFullScreenPlugin(PluginView* pluginView, const Platform::TouchPoint& point)
@@ -4344,7 +4370,7 @@ bool WebPagePrivate::scrollRenderer(RenderObject* renderer, const IntSize& delta
         if (!layerDelta.isZero()) {
             m_inRegionScrollStartingNode = enclosingLayerNode(layer);
             IntPoint newOffset = currentOffset + layerDelta;
-            layer->scrollToOffset(newOffset.x(), newOffset.y());
+            layer->scrollToOffset(toSize(newOffset));
             renderer->repaint(true);
             return true;
         }
@@ -6312,6 +6338,7 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
     coreSettings->setProcessHTTPEquiv(!webSettings->isEmailMode());
 
     coreSettings->setShouldUseCrossOriginProtocolCheck(!webSettings->allowCrossSiteRequests());
+    coreSettings->setWebSecurityEnabled(!webSettings->allowCrossSiteRequests());
 
     cookieManager().setPrivateMode(webSettings->isPrivateBrowsingEnabled());
 

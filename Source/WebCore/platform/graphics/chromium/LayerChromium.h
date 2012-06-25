@@ -37,10 +37,8 @@
 #include "FloatPoint.h"
 #include "GraphicsContext.h"
 #include "PlatformString.h"
-#include "ProgramBinding.h"
 #include "Region.h"
 #include "RenderSurfaceChromium.h"
-#include "ShaderChromium.h"
 #include "cc/CCLayerAnimationController.h"
 #include "cc/CCOcclusionTracker.h"
 
@@ -87,6 +85,9 @@ public:
     virtual void setOpacityFromAnimation(float) OVERRIDE;
     virtual float opacity() const OVERRIDE { return m_opacity; }
     virtual void setTransformFromAnimation(const WebKit::WebTransformationMatrix&) OVERRIDE;
+    // A layer's transform operates layer space. That is, entirely in logical,
+    // non-page-scaled pixels (that is, they have page zoom baked in, but not page scale).
+    // The root layer is a special case -- it operates in physical pixels.
     virtual const WebKit::WebTransformationMatrix& transform() const OVERRIDE { return m_transform; }
 
     const LayerChromium* rootLayer() const;
@@ -108,6 +109,8 @@ public:
     void setBackgroundColor(const Color&);
     Color backgroundColor() const { return m_backgroundColor; }
 
+    // A layer's bounds are in logical, non-page-scaled pixels (however, the
+    // root layer's bounds are in physical pixels).
     void setBounds(const IntSize&);
     const IntSize& bounds() const { return m_bounds; }
     virtual IntSize contentBounds() const { return bounds(); }
@@ -189,6 +192,9 @@ public:
     void setPreserves3D(bool preserve3D) { m_preserves3D = preserve3D; }
     bool preserves3D() const { return m_preserves3D; }
 
+    void setUseParentBackfaceVisibility(bool useParentBackfaceVisibility) { m_useParentBackfaceVisibility = useParentBackfaceVisibility; }
+    bool useParentBackfaceVisibility() const { return m_useParentBackfaceVisibility; }
+
     void setUsesLayerClipping(bool usesLayerClipping) { m_usesLayerClipping = usesLayerClipping; }
     bool usesLayerClipping() const { return m_usesLayerClipping; }
 
@@ -236,14 +242,19 @@ public:
     bool screenSpaceTransformIsAnimating() const { return m_screenSpaceTransformIsAnimating; }
     void setScreenSpaceTransformIsAnimating(bool animating) { m_screenSpaceTransformIsAnimating = animating; }
 
-    // This moves from layer space, with origin in the center to target space with origin in the top left
+    // This moves from layer space, with origin in the center to target space with origin in the top left.
+    // That is, it converts from logical, non-page-scaled, to target pixels (and if the target is the
+    // root render surface, then this converts to physical pixels).
     const WebKit::WebTransformationMatrix& drawTransform() const { return m_drawTransform; }
     void setDrawTransform(const WebKit::WebTransformationMatrix& matrix) { m_drawTransform = matrix; }
-    // This moves from layer space, with origin the top left to screen space with origin in the top left
+    // This moves from layer space, with origin the top left to screen space with origin in the top left.
+    // It converts logical, non-page-scaled pixels to physical pixels.
     const WebKit::WebTransformationMatrix& screenSpaceTransform() const { return m_screenSpaceTransform; }
     void setScreenSpaceTransform(const WebKit::WebTransformationMatrix& matrix) { m_screenSpaceTransform = matrix; }
     const IntRect& drawableContentRect() const { return m_drawableContentRect; }
     void setDrawableContentRect(const IntRect& rect) { m_drawableContentRect = rect; }
+    // The contentsScale converts from logical, non-page-scaled pixels to target pixels.
+    // The contentsScale is 1 for the root layer as it is already in physical pixels.
     float contentsScale() const { return m_contentsScale; }
     void setContentsScale(float);
 
@@ -366,6 +377,7 @@ private:
     bool m_usesLayerClipping;
     bool m_isNonCompositedContent;
     bool m_preserves3D;
+    bool m_useParentBackfaceVisibility;
     bool m_alwaysReserveTextures;
     bool m_drawCheckerboardForMissingTiles;
     bool m_forceRenderSurface;

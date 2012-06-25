@@ -26,13 +26,11 @@
 #define CCLayerTreeHostImpl_h
 
 #include "Color.h"
-#include "LayerRendererChromium.h"
 #include "cc/CCAnimationEvents.h"
 #include "cc/CCInputHandler.h"
 #include "cc/CCLayerSorter.h"
-#include "cc/CCLayerTreeHost.h"
-#include "cc/CCLayerTreeHostCommon.h"
 #include "cc/CCRenderPass.h"
+#include "cc/CCRenderer.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
@@ -59,7 +57,6 @@ public:
     virtual void setNeedsRedrawOnImplThread() = 0;
     virtual void setNeedsCommitOnImplThread() = 0;
     virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) = 0;
-    virtual void postSetContentsMemoryAllocationLimitBytesToMainThreadOnImplThread(size_t) = 0;
 };
 
 // CCLayerTreeHostImpl owns the CCLayerImpl tree as well as associated rendering state
@@ -111,11 +108,12 @@ public:
     virtual void didLoseContext() OVERRIDE;
     virtual void onSwapBuffersComplete() OVERRIDE;
     virtual void setFullRootLayerDamage() OVERRIDE;
-    virtual void setContentsMemoryAllocationLimitBytes(size_t) OVERRIDE;
+    virtual void releaseContentsTextures() OVERRIDE;
+    virtual void setMemoryAllocationLimitBytes(size_t) OVERRIDE;
 
     // Implementation
     bool canDraw();
-    CCGraphicsContext* context();
+    CCGraphicsContext* context() const;
 
     String layerTreeAsText() const;
     void setFontAtlas(PassOwnPtr<CCFontAtlas>);
@@ -148,8 +146,8 @@ public:
     int sourceFrameNumber() const { return m_sourceFrameNumber; }
     void setSourceFrameNumber(int frameNumber) { m_sourceFrameNumber = frameNumber; }
 
-    bool sourceFrameCanBeDrawn() const { return m_sourceFrameCanBeDrawn; }
-    void setSourceFrameCanBeDrawn(bool sourceFrameCanBeDrawn) { m_sourceFrameCanBeDrawn = sourceFrameCanBeDrawn; }
+    bool contentsTexturesWerePurgedSinceLastCommit() const { return m_contentsTexturesWerePurgedSinceLastCommit; }
+    size_t memoryAllocationLimitBytes() const { return m_memoryAllocationLimitBytes; }
 
     const IntSize& viewportSize() const { return m_viewportSize; }
     void setViewportSize(const IntSize&);
@@ -237,7 +235,8 @@ private:
     IntSize m_deviceViewportSize;
     float m_deviceScaleFactor;
     bool m_visible;
-    bool m_sourceFrameCanBeDrawn;
+    bool m_contentsTexturesWerePurgedSinceLastCommit;
+    size_t m_memoryAllocationLimitBytes;
 
     OwnPtr<CCHeadsUpDisplay> m_headsUpDisplay;
 

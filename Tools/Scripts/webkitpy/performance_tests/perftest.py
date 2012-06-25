@@ -95,7 +95,7 @@ class PerfTest(object):
         re.compile(r'^Running \d+ times$'),
         re.compile(r'^Ignoring warm-up '),
         re.compile(r'^Info:'),
-        re.compile(r'^\d+(.\d+)?(\s*(runs\/s|ms))?$'),
+        re.compile(r'^\d+(.\d+)?(\s*(runs\/s|ms|fps))?$'),
         # Following are for handle existing test like Dromaeo
         re.compile(re.escape("""main frame - has 1 onunload handler(s)""")),
         re.compile(re.escape("""frame "<!--framePath //<!--frame0-->-->" - has 1 onunload handler(s)""")),

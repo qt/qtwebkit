@@ -594,7 +594,7 @@
 				>
 			</File>
 			<File
-				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\InjectedWebGLScriptSource.h"
+				RelativePath="$(ConfigurationBuildDir)\obj\$(ProjectName)\DerivedSources\InjectedScriptWebGLModuleSource.h"
 				>
 			</File>
 			<File
@@ -26879,6 +26879,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\page\PerformanceResourceTiming.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\PerformanceResourceTiming.h"
+				>
+			</File>
+			<File
 				RelativePath="..\page\PerformanceTiming.cpp"
 				>
 			</File>
@@ -31469,11 +31477,11 @@
 						>
 					</File>
 					<File
-						RelativePath="..\platform\graphics\filters\CustomFilterShader.cpp"
+						RelativePath="..\platform\graphics\filters\CustomFilterCompiledProgram.cpp"
 						>
 					</File>
 					<File
-						RelativePath="..\platform\graphics\filters\CustomFilterShader.h"
+						RelativePath="..\platform\graphics\filters\CustomFilterCompiledProgram.h"
 						>
 					</File>
 					<File
@@ -39544,6 +39552,14 @@
 			</File>
 			<File
 				RelativePath="..\rendering\RenderGeometryMap.h"
+				>
+			</File>
+                        <File
+				RelativePath="..\rendering\RenderGrid.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\rendering\RenderGrid.h"
 				>
 			</File>
 			<File
@@ -49231,62 +49247,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\dom\DeviceOrientation.cpp"
-				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release_Cairo_CFLite|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Debug_All|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\dom\DeviceOrientation.h"
-				>
-			</File>
-			<File
 				RelativePath="..\dom\DeviceOrientationClient.h"
 				>
 			</File>
@@ -49346,6 +49306,62 @@
 				RelativePath="..\dom\DeviceOrientationController.h"
 				>
 			</File>
+			<File
+				RelativePath="..\dom\DeviceOrientationData.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\DeviceOrientationData.h"
+				>
+			</File>	
 			<File
 				RelativePath="..\dom\DeviceOrientationEvent.cpp"
 				>
@@ -51172,6 +51188,10 @@
 			</File>
 			<File
 				RelativePath="..\dom\KeyboardEvent.h"
+				>
+			</File>
+			<File
+				RelativePath="..\dom\MemoryInstrumentation.h"
 				>
 			</File>
 			<File
@@ -73167,6 +73187,10 @@
 			Name="inspector"
 			>
 			<File
+				RelativePath="..\inspector\BindingVisitors.h"
+				>
+			</File>
+			<File
 				RelativePath="..\inspector\ConsoleMessage.cpp"
 				>
 				<FileConfiguration
@@ -73287,10 +73311,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\inspector\DOMWrapperVisitor.h"
-				>
-			</File>
-			<File
 				RelativePath="..\inspector\IdentifiersFactory.cpp"
 				>
 				<FileConfiguration
@@ -73408,6 +73428,54 @@
 			</File>
 			<File
 				RelativePath="..\inspector\InjectedScriptManager.h"
+				>
+			</File>
+			<File
+				RelativePath="..\inspector\InjectedScriptModule.cpp"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\inspector\InjectedScriptModule.h"
+				>
+			</File>
+			<File
+				RelativePath="..\inspector\InjectedScriptWebGLModule.cpp"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\inspector\InjectedScriptWebGLModule.h"
 				>
 			</File>
 			<File

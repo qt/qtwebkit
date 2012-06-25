@@ -109,6 +109,7 @@ IDBDatabaseBackendImpl::IDBDatabaseBackendImpl(const String& name, IDBBackingSto
     , m_identifier(uniqueIdentifier)
     , m_factory(factory)
     , m_transactionCoordinator(coordinator)
+    , m_pendingConnectionCount(0)
 {
     ASSERT(!m_name.isNull());
 }
@@ -131,6 +132,14 @@ IDBDatabaseBackendImpl::~IDBDatabaseBackendImpl()
 PassRefPtr<IDBBackingStore> IDBDatabaseBackendImpl::backingStore() const
 {
     return m_backingStore;
+}
+
+IDBDatabaseMetadata IDBDatabaseBackendImpl::metadata() const
+{
+    IDBDatabaseMetadata metadata(m_name, m_version);
+    for (ObjectStoreMap::const_iterator it = m_objectStores.begin(); it != m_objectStores.end(); ++it)
+        metadata.objectStores.set(it->first, it->second->metadata());
+    return metadata;
 }
 
 PassRefPtr<DOMStringList> IDBDatabaseBackendImpl::objectStoreNames() const
@@ -222,7 +231,7 @@ void IDBDatabaseBackendImpl::setVersion(const String& version, PassRefPtr<IDBCal
     // FIXME: Only fire onBlocked if there are open connections after the
     // VersionChangeEvents are received, not just set up to fire.
     // https://bugs.webkit.org/show_bug.cgi?id=71130
-    if (m_databaseCallbacksSet.size() > 1) {
+    if (connectionCount() > 1) {
         callbacks->onBlocked();
         RefPtr<PendingSetVersionCall> pendingSetVersionCall = PendingSetVersionCall::create(version, callbacks, databaseCallbacks);
         m_pendingSetVersionCalls.append(pendingSetVersionCall);
@@ -278,9 +287,14 @@ void IDBDatabaseBackendImpl::transactionFinished(PassRefPtr<IDBTransactionBacken
     }
 }
 
+int32_t IDBDatabaseBackendImpl::connectionCount()
+{
+    return m_databaseCallbacksSet.size() + m_pendingConnectionCount;
+}
+
 void IDBDatabaseBackendImpl::processPendingCalls()
 {
-    ASSERT(m_databaseCallbacksSet.size() <= 1);
+    ASSERT(connectionCount() <= 1);
 
     // Pending calls may be requeued or aborted
     Deque<RefPtr<PendingSetVersionCall> > pendingSetVersionCalls;
@@ -345,18 +359,24 @@ PassRefPtr<IDBTransactionBackendInterface> IDBDatabaseBackendImpl::transaction(D
 
 void IDBDatabaseBackendImpl::registerFrontendCallbacks(PassRefPtr<IDBDatabaseCallbacks> callbacks)
 {
+    ASSERT(m_backingStore.get());
+    ASSERT(m_pendingConnectionCount);
+    --m_pendingConnectionCount;
     m_databaseCallbacksSet.add(RefPtr<IDBDatabaseCallbacks>(callbacks));
 }
 
 void IDBDatabaseBackendImpl::openConnection(PassRefPtr<IDBCallbacks> callbacks)
 {
+    ASSERT(m_backingStore.get());
     if (!m_pendingDeleteCalls.isEmpty() || m_runningVersionChangeTransaction || !m_pendingSetVersionCalls.isEmpty())
         m_pendingOpenCalls.append(PendingOpenCall::create(callbacks));
     else {
         if (m_id == InvalidId && !openInternal())
             callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Internal error."));
-        else
+        else {
+            ++m_pendingConnectionCount;
             callbacks->onSuccess(this);
+        }
     }
 }
 
@@ -395,12 +415,12 @@ void IDBDatabaseBackendImpl::close(PassRefPtr<IDBDatabaseCallbacks> prpCallbacks
     RefPtr<IDBDatabaseCallbacks> callbacks = prpCallbacks;
     ASSERT(m_databaseCallbacksSet.contains(callbacks));
     m_databaseCallbacksSet.remove(callbacks);
-    if (m_databaseCallbacksSet.size() > 1)
+    if (connectionCount() > 1)
         return;
 
     processPendingCalls();
 
-    if (!m_databaseCallbacksSet.size()) {
+    if (!connectionCount()) {
         TransactionSet transactions(m_transactions);
         for (TransactionSet::const_iterator it = transactions.begin(); it != transactions.end(); ++it)
             (*it)->abort();

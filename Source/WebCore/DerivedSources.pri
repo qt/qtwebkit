@@ -61,7 +61,7 @@ INSPECTOR_BACKEND_COMMANDS_QRC = $$PWD/inspector/front-end/InspectorBackendComma
 
 INJECTED_SCRIPT_SOURCE = $$PWD/inspector/InjectedScriptSource.js
 
-INJECTED_WEBGL_SCRIPT_SOURCE = $$PWD/inspector/InjectedWebGLScriptSource.js
+INJECTED_SCRIPT_WEBGL_MODULE_SOURCE = $$PWD/inspector/InjectedScriptWebGLModuleSource.js
 
 DEBUGGER_SCRIPT_SOURCE = $$PWD/bindings/v8/DebuggerScript.js
 
@@ -425,6 +425,7 @@ IDL_BINDINGS += \
     $$PWD/page/PerformanceEntry.idl \
     $$PWD/page/PerformanceEntryList.idl \
     $$PWD/page/PerformanceNavigation.idl \
+    $$PWD/page/PerformanceResourceTiming.idl \
     $$PWD/page/PerformanceTiming.idl \
     $$PWD/page/Screen.idl \
     $$PWD/page/SpeechInputEvent.idl \
@@ -778,11 +779,11 @@ injectedScriptSource.add_output_to_sources = false
 GENERATORS += injectedScriptSource
 
 # GENERATOR 2-b: inspector webgl injected script source compiler
-InjectedWebGLScriptSource.output = InjectedWebGLScriptSource.h
-InjectedWebGLScriptSource.input = INJECTED_WEBGL_SCRIPT_SOURCE
-InjectedWebGLScriptSource.commands = perl $$PWD/inspector/xxd.pl InjectedWebGLScriptSource_js ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
-InjectedWebGLScriptSource.add_output_to_sources = false
-GENERATORS += InjectedWebGLScriptSource
+InjectedScriptWebGLModuleSource.output = InjectedScriptWebGLModuleSource.h
+InjectedScriptWebGLModuleSource.input = INJECTED_SCRIPT_WEBGL_MODULE_SOURCE
+InjectedScriptWebGLModuleSource.commands = perl $$PWD/inspector/xxd.pl InjectedScriptWebGLModuleSource_js ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
+InjectedScriptWebGLModuleSource.add_output_to_sources = false
+GENERATORS += InjectedScriptWebGLModuleSource
 
 # GENERATOR 2-c: inspector debugger script source compiler
 debuggerScriptSource.output = DebuggerScriptSource.h

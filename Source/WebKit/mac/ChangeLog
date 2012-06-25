@@ -1,3 +1,169 @@
+2012-06-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r121058.
+        http://trac.webkit.org/changeset/121058
+        https://bugs.webkit.org/show_bug.cgi?id=89809
+
+        Patch causes plugins tests to crash in GTK debug builds
+        (Requested by zdobersek on #webkit).
+
+        * DOM/WebDOMOperations.mm:
+        (JSC):
+        * Misc/WebCoreStatistics.mm:
+        (+[WebCoreStatistics javaScriptObjectsCount]):
+        (+[WebCoreStatistics javaScriptGlobalObjectsCount]):
+        (+[WebCoreStatistics javaScriptProtectedObjectsCount]):
+        (+[WebCoreStatistics javaScriptProtectedGlobalObjectsCount]):
+        (+[WebCoreStatistics javaScriptProtectedObjectTypeCounts]):
+        (+[WebCoreStatistics javaScriptObjectTypeCounts]):
+        (+[WebCoreStatistics shouldPrintExceptions]):
+        (+[WebCoreStatistics setShouldPrintExceptions:]):
+        (+[WebCoreStatistics memoryStatistics]):
+        (+[WebCoreStatistics javaScriptReferencedObjectsCount]):
+        * Plugins/Hosted/NetscapePluginInstanceProxy.mm:
+        (WebKit::NetscapePluginInstanceProxy::evaluate):
+        (WebKit::NetscapePluginInstanceProxy::invoke):
+        (WebKit::NetscapePluginInstanceProxy::invokeDefault):
+        (WebKit::NetscapePluginInstanceProxy::construct):
+        (WebKit::NetscapePluginInstanceProxy::getProperty):
+        (WebKit::NetscapePluginInstanceProxy::setProperty):
+        (WebKit::NetscapePluginInstanceProxy::removeProperty):
+        (WebKit::NetscapePluginInstanceProxy::hasMethod):
+        (WebKit::NetscapePluginInstanceProxy::enumerate):
+        (WebKit::NetscapePluginInstanceProxy::addValueToArray):
+        (WebKit::NetscapePluginInstanceProxy::moveGlobalExceptionToExecState):
+        * Plugins/WebNetscapePluginStream.mm:
+        (WebNetscapePluginStream::wantsAllStreams):
+        * Plugins/WebNetscapePluginView.mm:
+        (-[WebNetscapePluginView sendEvent:isDrawRect:]):
+        (-[WebNetscapePluginView privateBrowsingModeDidChange]):
+        (-[WebNetscapePluginView setWindowIfNecessary]):
+        (-[WebNetscapePluginView createPluginScriptableObject]):
+        (-[WebNetscapePluginView getFormValue:]):
+        (-[WebNetscapePluginView evaluateJavaScriptPluginRequest:]):
+        (-[WebNetscapePluginView webFrame:didFinishLoadWithReason:]):
+        (-[WebNetscapePluginView loadPluginRequest:]):
+        (-[WebNetscapePluginView _printedPluginBitmap]):
+        * Plugins/WebPluginController.mm:
+        (+[WebPluginController plugInViewWithArguments:fromPluginPackage:]):
+        (-[WebPluginController stopOnePlugin:]):
+        (-[WebPluginController destroyOnePlugin:]):
+        (-[WebPluginController startAllPlugins]):
+        (-[WebPluginController addPlugin:]):
+        * WebView/WebFrame.mm:
+        (-[WebFrame _stringByEvaluatingJavaScriptFromString:forceUserGesture:]):
+        (-[WebFrame _stringByEvaluatingJavaScriptFromString:withGlobalObject:inScriptWorld:]):
+        * WebView/WebScriptDebugDelegate.mm:
+        (-[WebScriptCallFrame scopeChain]):
+        (-[WebScriptCallFrame evaluateWebScript:]):
+        * WebView/WebView.mm:
+        (+[WebView _reportException:inContext:]):
+        (-[WebView aeDescByEvaluatingJavaScriptFromString:]):
+        (-[WebView _computedStyleIncludingVisitedInfo:forElement:]):
+
+2012-06-22  Alexandru Chiculita  <achicu@adobe.com>
+
+        [CSS Shaders] Re-enable the CSS Shaders compile time flag on Safari Mac
+        https://bugs.webkit.org/show_bug.cgi?id=89781
+
+        Reviewed by Dean Jackson.
+
+        Added ENABLE_CSS_SHADERS flag as enabled by default on Safari for Mac.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-06-20  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        JSLock should be per-JSGlobalData
+        https://bugs.webkit.org/show_bug.cgi?id=89123
+
+        Reviewed by Gavin Barraclough.
+
+        Changed all sites that used JSLock to instead use the new JSLockHolder
+        and pass in the correct JS context that the code is about to interact with that 
+        needs protection.
+
+        * DOM/WebDOMOperations.mm:
+        (JSC):
+        * Misc/WebCoreStatistics.mm:
+        (+[WebCoreStatistics javaScriptObjectsCount]):
+        (+[WebCoreStatistics javaScriptGlobalObjectsCount]):
+        (+[WebCoreStatistics javaScriptProtectedObjectsCount]):
+        (+[WebCoreStatistics javaScriptProtectedGlobalObjectsCount]):
+        (+[WebCoreStatistics javaScriptProtectedObjectTypeCounts]):
+        (+[WebCoreStatistics javaScriptObjectTypeCounts]):
+        (+[WebCoreStatistics shouldPrintExceptions]):
+        (+[WebCoreStatistics setShouldPrintExceptions:]):
+        (+[WebCoreStatistics memoryStatistics]):
+        (+[WebCoreStatistics javaScriptReferencedObjectsCount]):
+        * Plugins/Hosted/NetscapePluginInstanceProxy.mm:
+        (WebKit::NetscapePluginInstanceProxy::evaluate):
+        (WebKit::NetscapePluginInstanceProxy::invoke):
+        (WebKit::NetscapePluginInstanceProxy::invokeDefault):
+        (WebKit::NetscapePluginInstanceProxy::construct):
+        (WebKit::NetscapePluginInstanceProxy::getProperty):
+        (WebKit::NetscapePluginInstanceProxy::setProperty):
+        (WebKit::NetscapePluginInstanceProxy::removeProperty):
+        (WebKit::NetscapePluginInstanceProxy::hasMethod):
+        (WebKit::NetscapePluginInstanceProxy::enumerate):
+        (WebKit::NetscapePluginInstanceProxy::addValueToArray):
+        (WebKit::NetscapePluginInstanceProxy::moveGlobalExceptionToExecState):
+        * Plugins/WebNetscapePluginStream.mm:
+        (WebNetscapePluginStream::wantsAllStreams):
+        * Plugins/WebNetscapePluginView.mm:
+        (-[WebNetscapePluginView sendEvent:isDrawRect:]):
+        (-[WebNetscapePluginView privateBrowsingModeDidChange]):
+        (-[WebNetscapePluginView setWindowIfNecessary]):
+        (-[WebNetscapePluginView createPluginScriptableObject]):
+        (-[WebNetscapePluginView getFormValue:]):
+        (-[WebNetscapePluginView evaluateJavaScriptPluginRequest:]):
+        (-[WebNetscapePluginView webFrame:didFinishLoadWithReason:]):
+        (-[WebNetscapePluginView loadPluginRequest:]):
+        (-[WebNetscapePluginView _printedPluginBitmap]):
+        * Plugins/WebPluginController.mm:
+        (+[WebPluginController plugInViewWithArguments:fromPluginPackage:]):
+        (-[WebPluginController stopOnePlugin:]):
+        (-[WebPluginController destroyOnePlugin:]):
+        (-[WebPluginController startAllPlugins]):
+        (-[WebPluginController addPlugin:]):
+        * WebView/WebFrame.mm:
+        (-[WebFrame _stringByEvaluatingJavaScriptFromString:forceUserGesture:]):
+        (-[WebFrame _stringByEvaluatingJavaScriptFromString:withGlobalObject:inScriptWorld:]):
+        * WebView/WebScriptDebugDelegate.mm:
+        (-[WebScriptCallFrame scopeChain]):
+        (-[WebScriptCallFrame evaluateWebScript:]):
+        * WebView/WebView.mm:
+        (+[WebView _reportException:inContext:]):
+        (-[WebView aeDescByEvaluatingJavaScriptFromString:]):
+        (-[WebView _computedStyleIncludingVisitedInfo:forElement:]):
+
+2012-06-22  Amy Ousterhout  <aousterh@chromium.org>
+
+        Renamed DeviceOrientation to DeviceOrientationData
+        https://bugs.webkit.org/show_bug.cgi?id=88663
+
+        Reviewed by Steve Block.
+
+        Updated files to use the renamed DeviceOrientationData instead of DeviceOrientation.
+        This change makes DeviceOrientationData consistent with DeviceMotionData.
+        * WebCoreSupport/WebDeviceOrientationClient.h:
+        (WebDeviceOrientationClient):
+        * WebCoreSupport/WebDeviceOrientationClient.mm:
+        (WebDeviceOrientationClient::lastOrientation):
+        * WebView/WebDeviceOrientation.mm:
+        * WebView/WebDeviceOrientationInternal.h:
+
+2012-06-20  Garret Kelly  <gdk@chromium.org>
+
+        Moving cookieEnabled/setCookieEnabled from Page to Settings.
+        https://bugs.webkit.org/show_bug.cgi?id=89545
+
+        Reviewed by Adam Barth.
+
+        * WebView/WebView.mm:
+        (-[WebView _cookieEnabled]):
+        (-[WebView _setCookieEnabled:]):
+
 2012-06-19  Dan Bernstein  <mitz@apple.com>
 
         WebKit/mac part of: Paginated display API doesn’t allow setting the page progression direction

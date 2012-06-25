@@ -26,7 +26,6 @@
 #define CCSingleThreadProxy_h
 
 #include "cc/CCAnimationEvents.h"
-#include "cc/CCCompletionEvent.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCProxy.h"
 #include <limits>
@@ -50,6 +49,7 @@ public:
     virtual bool isStarted() const OVERRIDE;
     virtual bool initializeContext() OVERRIDE;
     virtual void setSurfaceReady() OVERRIDE;
+    virtual void setVisible(bool) OVERRIDE;
     virtual bool initializeLayerRenderer() OVERRIDE;
     virtual bool recreateContext() OVERRIDE;
     virtual int compositorIdentifier() const OVERRIDE { return m_compositorIdentifier; }
@@ -57,7 +57,6 @@ public:
     virtual void loseContext() OVERRIDE;
     virtual void setNeedsAnimate() OVERRIDE;
     virtual void setNeedsCommit() OVERRIDE;
-    virtual void setNeedsForcedCommit() OVERRIDE;
     virtual void setNeedsRedraw() OVERRIDE;
     virtual bool commitRequested() const OVERRIDE;
     virtual void didAddAnimation() OVERRIDE;
@@ -74,7 +73,6 @@ public:
     virtual void setNeedsRedrawOnImplThread() OVERRIDE { m_layerTreeHost->scheduleComposite(); }
     virtual void setNeedsCommitOnImplThread() OVERRIDE { m_layerTreeHost->scheduleComposite(); }
     virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) OVERRIDE;
-    virtual void postSetContentsMemoryAllocationLimitBytesToMainThreadOnImplThread(size_t) OVERRIDE;
 
     // Called by the legacy path where RenderWidget does the scheduling.
     void compositeImmediately();

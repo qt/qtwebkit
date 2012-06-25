@@ -1652,7 +1652,7 @@ bool WebView::gesture(WPARAM wParam, LPARAM lParam)
             return false;
 
         // We negate here since panning up moves the content up, but moves the scrollbar down.
-        m_gestureTargetNode->renderer()->enclosingLayer()->scrollByRecursively(-deltaX, -deltaY);
+        m_gestureTargetNode->renderer()->enclosingLayer()->scrollByRecursively(IntSize(-deltaX, -deltaY));
            
         if (!(UpdatePanningFeedbackPtr() && BeginPanningFeedbackPtr() && EndPanningFeedbackPtr())) {
             CloseGestureInfoHandlePtr()(gestureHandle);
@@ -6020,7 +6020,7 @@ HRESULT STDMETHODCALLTYPE WebView::setCookieEnabled(BOOL enable)
     if (!m_page)
         return E_FAIL;
 
-    m_page->setCookieEnabled(enable);
+    m_page->settings()->setCookieEnabled(enable);
     return S_OK;
 }
 
@@ -6032,7 +6032,7 @@ HRESULT STDMETHODCALLTYPE WebView::cookieEnabled(BOOL* enabled)
     if (!m_page)
         return E_FAIL;
 
-    *enabled = m_page->cookieEnabled();
+    *enabled = m_page->settings()->cookieEnabled();
     return S_OK;
 }
 

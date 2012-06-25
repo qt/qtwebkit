@@ -191,6 +191,10 @@ public:
     // window space.
     virtual void scrollFocusedNodeIntoRect(const WebRect&) { }
 
+    // Advance the focus of the WebView forward to the next element or to the
+    // previous element in the tab sequence (if reverse is true).
+    virtual void advanceFocus(bool reverse) { }
+
 
     // Zoom ----------------------------------------------------------------
 
@@ -452,6 +456,8 @@ public:
     // Called to inform the WebView that a wheel fling animation was started externally (for instance
     // by the compositor) but must be completed by the WebView.
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&) = 0;
+
+    virtual bool setEditableSelectionOffsets(int start, int end) = 0;
 
     // Visibility -----------------------------------------------------------
 

@@ -42,8 +42,9 @@ namespace WebCore {
 
 static const unsigned short defaultDirection = IDBCursor::NEXT;
 
-IDBIndex::IDBIndex(PassRefPtr<IDBIndexBackendInterface> backend, IDBObjectStore* objectStore, IDBTransaction* transaction)
-    : m_backend(backend)
+IDBIndex::IDBIndex(const IDBIndexMetadata& metadata, PassRefPtr<IDBIndexBackendInterface> backend, IDBObjectStore* objectStore, IDBTransaction* transaction)
+    : m_metadata(metadata)
+    , m_backend(backend)
     , m_objectStore(objectStore)
     , m_transaction(transaction)
     , m_deleted(false)
@@ -186,19 +187,9 @@ PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, 
 PassRefPtr<IDBRequest> IDBIndex::get(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec)
 {
     IDB_TRACE("IDBIndex::get");
-    if (m_deleted) {
-        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
-        return 0;
-    }
-    if (key && (key->type() == IDBKey::InvalidType)) {
-        ec = IDBDatabaseException::DATA_ERR;
-        return 0;
-    }
-
     RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
     if (ec)
         return 0;
-
     return get(context, keyRange.release(), ec);
 }
 
@@ -226,15 +217,6 @@ PassRefPtr<IDBRequest> IDBIndex::get(ScriptExecutionContext* context, PassRefPtr
 PassRefPtr<IDBRequest> IDBIndex::getKey(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, ExceptionCode& ec)
 {
     IDB_TRACE("IDBIndex::getKey");
-    if (m_deleted) {
-        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
-        return 0;
-    }
-    if (key && (key->type() == IDBKey::InvalidType)) {
-        ec = IDBDatabaseException::DATA_ERR;
-        return 0;
-    }
-
     RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
     if (ec)
         return 0;

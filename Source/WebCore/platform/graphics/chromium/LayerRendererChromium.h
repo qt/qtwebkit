@@ -34,8 +34,8 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
+#include "Extensions3DChromium.h"
 #include "TextureCopier.h"
-#include "ThrottledTextureUploader.h"
 #include "TrackingTextureAllocator.h"
 #include "cc/CCRenderer.h"
 #include <wtf/PassOwnPtr.h>
@@ -54,11 +54,9 @@ class CCTileDrawQuad;
 class CCYUVVideoDrawQuad;
 class GeometryBinding;
 class GraphicsContext3D;
-class LayerRendererGpuMemoryAllocationChangedCallbackAdapter;
 class LayerRendererSwapBuffersCompleteCallbackAdapter;
+class ManagedTexture;
 class ScopedEnsureFramebufferAllocation;
-
-enum TextureUploaderOption { ThrottledUploader, UnthrottledUploader };
 
 // Class that handles drawing of composited render layers using GL.
 class LayerRendererChromium : public CCRenderer {
@@ -113,9 +111,9 @@ public:
                           float width, float height, float opacity, const FloatQuad&,
                           int matrixLocation, int alphaLocation, int quadLocation);
     void copyTextureToFramebuffer(int textureId, const IntSize& bounds, const WebKit::WebTransformationMatrix& drawMatrix);
+    void setGpuMemoryAllocation(Extensions3DChromium::GpuMemoryAllocationCHROMIUM);
 
 protected:
-    friend class LayerRendererGpuMemoryAllocationChangedCallbackAdapter;
     void discardFramebuffer();
     void ensureFramebuffer();
     bool isFramebufferDiscarded() const { return m_isFramebufferDiscarded; }
@@ -260,6 +258,7 @@ private:
 
     bool m_isViewportChanged;
     bool m_isFramebufferDiscarded;
+    bool m_visible;
     TextureUploaderOption m_textureUploaderSetting;
 };
 

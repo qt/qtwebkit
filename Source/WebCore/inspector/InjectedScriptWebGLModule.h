@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,24 +28,35 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "V8CSSStyleSheet.h"
+#ifndef InjectedScriptWebGLModule_h
+#define InjectedScriptWebGLModule_h
 
-#include "V8DOMWrapper.h"
-#include "V8Node.h"
+#include "InjectedScriptModule.h"
+#include "PlatformString.h"
+#include "ScriptState.h"
 
 namespace WebCore {
 
-v8::Handle<v8::Value> toV8(CSSStyleSheet* impl, v8::Isolate* isolate)
-{
-    if (!impl)
-        return v8NullWithCheck(isolate);
-    v8::Handle<v8::Object> wrapper = V8CSSStyleSheet::wrap(impl, isolate);
-    // Add a hidden reference from stylesheet object to its owner node.
-    Node* ownerNode = impl->ownerNode();
-    if (ownerNode && !wrapper.IsEmpty())
-        V8DOMWrapper::setNamedHiddenReference(wrapper, "ownerNode", toV8(ownerNode, isolate));
-    return wrapper;
-}
+class InjectedScriptManager;
+class ScriptObject;
+
+#if ENABLE(INSPECTOR) && ENABLE(WEBGL)
+
+class InjectedScriptWebGLModule : public InjectedScriptModule {
+public:
+    virtual String source() const;
+
+    static InjectedScriptWebGLModule moduleForState(InjectedScriptManager*, ScriptState*);
+
+    ScriptObject wrapWebGLContext(const ScriptObject& glContext);
+    void captureFrame(ErrorString*, const String& contextId);
+
+private:
+    InjectedScriptWebGLModule();
+};
+
+#endif
 
 } // namespace WebCore
+
+#endif

@@ -295,19 +295,6 @@ WebInspector.TimelinePresentationModel.prototype = {
 
     filteredRecords: function()
     {
-        function filter(record)
-        {
-            for (var i = 0; i < this._filters.length; ++i) {
-                if (!this._filters[i].accept(record))
-                    return false;
-            }
-            return true;
-        }
-        return this._filterRecords(filter.bind(this));
-    },
-
-    _filterRecords: function(filter)
-    {
         var recordsInWindow = [];
 
         var stack = [{children: this._rootRecord.children, index: 0, parentIsCollapsed: false}];
@@ -318,7 +305,7 @@ WebInspector.TimelinePresentationModel.prototype = {
                  var record = records[entry.index];
                  ++entry.index;
 
-                 if (filter(record)) {
+                 if (this.isVisible(record)) {
                      ++record.parent._invisibleChildrenCount;
                      if (!entry.parentIsCollapsed)
                          recordsInWindow.push(record);
@@ -339,6 +326,15 @@ WebInspector.TimelinePresentationModel.prototype = {
         }
 
         return recordsInWindow;
+    },
+
+    isVisible: function(record)
+    {
+        for (var i = 0; i < this._filters.length; ++i) {
+            if (!this._filters[i].accept(record))
+                return false;
+        }
+        return true;
     }
 }
 
@@ -476,15 +472,16 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
     {
         var contentHelper = new WebInspector.TimelinePresentationModel.PopupContentHelper(this.title);
 
-        if (this._children && this._children.length) {
-            contentHelper._appendTextRow(WebInspector.UIString("Self Time"), Number.secondsToString(this._selfTime, true));
-            contentHelper._appendElementRow(WebInspector.UIString("Aggregated Time"),
-                WebInspector.TimelinePresentationModel._generateAggregatedInfo(this._aggregatedStats));
-        }
         var text = WebInspector.UIString("%s (at %s)", Number.secondsToString(this._lastChildEndTime - this.startTime, true),
             Number.secondsToString(this._startTimeOffset));
         contentHelper._appendTextRow(WebInspector.UIString("Duration"), text);
 
+        if (this._children && this._children.length) {
+            contentHelper._appendTextRow(WebInspector.UIString("Self Time"), Number.secondsToString(this._selfTime, true));
+            contentHelper._appendTextRow(WebInspector.UIString("CPU Time"), Number.secondsToString(this._cpuTime, true));
+            contentHelper._appendElementRow(WebInspector.UIString("Aggregated Time"),
+                WebInspector.TimelinePresentationModel._generateAggregatedInfo(this._aggregatedStats));
+        }
         const recordTypes = WebInspector.TimelineModel.RecordType;
 
         switch (this.type) {

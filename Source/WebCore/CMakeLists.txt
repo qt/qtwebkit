@@ -396,6 +396,7 @@ SET(WebCore_IDL_FILES
     page/PerformanceEntry.idl
     page/PerformanceEntryList.idl
     page/PerformanceNavigation.idl
+    page/PerformanceResourceTiming.idl
     page/PerformanceTiming.idl
     page/Screen.idl
     page/SpeechInputEvent.idl
@@ -566,8 +567,8 @@ SET(WebCore_SOURCES
     dom/DeviceMotionController.cpp
     dom/DeviceMotionData.cpp
     dom/DeviceMotionEvent.cpp
-    dom/DeviceOrientation.cpp
     dom/DeviceOrientationController.cpp
+    dom/DeviceOrientationData.cpp
     dom/DeviceOrientationEvent.cpp
     dom/Document.cpp
     dom/DocumentMarkerController.cpp
@@ -934,6 +935,8 @@ SET(WebCore_SOURCES
     inspector/InjectedScriptBase.cpp
     inspector/InjectedScriptHost.cpp
     inspector/InjectedScriptManager.cpp
+    inspector/InjectedScriptModule.cpp
+    inspector/InjectedScriptWebGLModule.cpp
     inspector/InspectorAgent.cpp
     inspector/InspectorApplicationCacheAgent.cpp
     inspector/InspectorBaseAgent.cpp
@@ -1085,6 +1088,7 @@ SET(WebCore_SOURCES
     page/PerformanceEntry.cpp
     page/PerformanceEntryList.cpp
     page/PerformanceNavigation.cpp
+    page/PerformanceResourceTiming.cpp
     page/PerformanceTiming.cpp
     page/PrintContext.cpp
     page/Screen.cpp
@@ -1203,7 +1207,7 @@ SET(WebCore_SOURCES
     platform/graphics/filters/CustomFilterGlobalContext.cpp
     platform/graphics/filters/CustomFilterMesh.cpp
     platform/graphics/filters/CustomFilterProgram.cpp
-    platform/graphics/filters/CustomFilterShader.cpp
+    platform/graphics/filters/CustomFilterCompiledProgram.cpp
     platform/graphics/filters/DistantLightSource.cpp
     platform/graphics/filters/FEBlend.cpp
     platform/graphics/filters/FEColorMatrix.cpp
@@ -1349,6 +1353,7 @@ SET(WebCore_SOURCES
     rendering/RenderFieldset.cpp
     rendering/RenderFileUploadControl.cpp
     rendering/RenderFlexibleBox.cpp
+    rendering/RenderGrid.cpp
     rendering/RenderFlowThread.cpp
     rendering/RenderFrame.cpp
     rendering/RenderFrameBase.cpp
@@ -2291,22 +2296,27 @@ IF (ENABLE_MHTML)
 ENDIF ()
 
 IF (ENABLE_WEBGL)
+    #ANGLE
     LIST(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${OPENGL_INCLUDE_DIR}
         ${THIRDPARTY_DIR}/ANGLE/src
-        ${THIRDPARTY_DIR}/ANGLE/include
+       #${THIRDPARTY_DIR}/ANGLE/include #Defined as SYSTEM include in order to have less priority than actual system headers
         ${THIRDPARTY_DIR}/ANGLE/include/GLSLANG
-        ${WEBCORE_DIR}/platform/graphics/gpu
+    )
+    LIST(APPEND WebCore_LIBRARIES
+        ${OPENGL_gl_LIBRARY}
     )
     LIST(APPEND WebCore_SOURCES
         ${DERIVED_SOURCES_WEBCORE_DIR}/glslang.cpp
         ${DERIVED_SOURCES_WEBCORE_DIR}/glslang_tab.cpp
-        ${THIRDPARTY_DIR}/ANGLE/src/compiler/CodeGenGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/BuiltInFunctionEmulator.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/CodeGenGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Compiler.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/debug.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/DetectRecursion.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ForLoopUnroll.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/glslang_lex.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/glslang_tab.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/InfoSink.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Initialize.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/InitializeDll.cpp
@@ -2334,7 +2344,6 @@ IF (ENABLE_WEBGL)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/SearchSymbol.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ShaderLang.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/SymbolTable.cpp
-        ${THIRDPARTY_DIR}/ANGLE/src/compiler/VersionGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/TranslatorESSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/TranslatorGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/TranslatorHLSL.cpp
@@ -2342,6 +2351,13 @@ IF (ENABLE_WEBGL)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/util.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ValidateLimitations.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/VariableInfo.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/VersionGLSL.cpp
+    )
+
+    LIST(APPEND WebCore_SOURCES
+        html/canvas/OESStandardDerivatives.cpp
+        html/canvas/OESTextureFloat.cpp
+        html/canvas/OESVertexArrayObject.cpp
         html/canvas/WebGLBuffer.cpp
         html/canvas/WebGLCompressedTextureS3TC.cpp
         html/canvas/WebGLContextAttributes.cpp
@@ -2676,14 +2692,14 @@ ADD_CUSTOM_COMMAND(
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedScriptSource.h)
 
 
-# Generate InjectedWebGLScriptSource.h
+# Generate InjectedScriptWebGLModuleSource.h
 IF (ENABLE_WEBGL)
     ADD_CUSTOM_COMMAND(
-        OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedWebGLScriptSource.h
-        MAIN_DEPENDENCY inspector/InjectedWebGLScriptSource.js
-        COMMAND ${PERL_EXECUTABLE} ${WEBCORE_DIR}/inspector/xxd.pl InjectedWebGLScriptSource_js ${WEBCORE_DIR}/inspector/InjectedWebGLScriptSource.js ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedWebGLScriptSource.h
+        OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedScriptWebGLModuleSource.h
+        MAIN_DEPENDENCY inspector/InjectedScriptWebGLModuleSource.js
+        COMMAND ${PERL_EXECUTABLE} ${WEBCORE_DIR}/inspector/xxd.pl InjectedScriptWebGLModuleSource_js ${WEBCORE_DIR}/inspector/InjectedScriptWebGLModuleSource.js ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedScriptWebGLModuleSource.h
         VERBATIM)
-    LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedWebGLScriptSource.h)
+    LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/InjectedScriptWebGLModuleSource.h)
 ENDIF ()
 
 

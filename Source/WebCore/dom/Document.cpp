@@ -3864,14 +3864,19 @@ void Document::setCSSTarget(Element* n)
 
 void Document::registerDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
 {
-    ensureRareData()->ensureNodeLists(this)->m_listsInvalidatedAtDocument.add(list);
+    m_listsInvalidatedAtDocument.add(list);
 }
 
 void Document::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
 {
-    ASSERT(hasRareData());
-    ASSERT(rareData()->nodeLists());
-    rareData()->nodeLists()->m_listsInvalidatedAtDocument.remove(list);
+    m_listsInvalidatedAtDocument.remove(list);
+}
+
+void Document::clearNodeListCaches()
+{
+    HashSet<DynamicSubtreeNodeList*>::iterator end = m_listsInvalidatedAtDocument.end();
+    for (HashSet<DynamicSubtreeNodeList*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
+        (*it)->invalidateCache();
 }
 
 void Document::attachNodeIterator(NodeIterator* ni)
@@ -4126,7 +4131,7 @@ HTMLFrameOwnerElement* Document::ownerElement() const
 
 String Document::cookie(ExceptionCode& ec) const
 {
-    if (page() && !page()->cookieEnabled())
+    if (page() && !page()->settings()->cookieEnabled())
         return String();
 
     // FIXME: The HTML5 DOM spec states that this attribute can raise an
@@ -4147,7 +4152,7 @@ String Document::cookie(ExceptionCode& ec) const
 
 void Document::setCookie(const String& value, ExceptionCode& ec)
 {
-    if (page() && !page()->cookieEnabled())
+    if (page() && !page()->settings()->cookieEnabled())
         return;
 
     // FIXME: The HTML5 DOM spec states that this attribute can raise an
@@ -5921,31 +5926,11 @@ DocumentLoader* Document::loader() const
 #if ENABLE(MICRODATA)
 PassRefPtr<NodeList> Document::getItems(const String& typeNames)
 {
-    NodeListsNodeData* nodeLists = ensureRareData()->ensureNodeLists(this);
-
     // Since documet.getItem() is allowed for microdata, typeNames will be null string.
     // In this case we need to create an unique string identifier to map such request in the cache.
     String localTypeNames = typeNames.isNull() ? String("http://webkit.org/microdata/undefinedItemType") : typeNames;
 
-    NodeListsNodeData::MicroDataItemListCache::AddResult result = nodeLists->m_microDataItemListCache.add(localTypeNames, 0);
-    if (!result.isNewEntry)
-        return PassRefPtr<NodeList>(result.iterator->second);
-
-    RefPtr<MicroDataItemList> list = MicroDataItemList::create(this, typeNames);
-    result.iterator->second = list.get();
-    return list.release();
-}
-
-void Document::removeCachedMicroDataItemList(MicroDataItemList* list, const String& typeNames)
-{
-    ASSERT(rareData());
-    ASSERT(rareData()->nodeLists());
-
-    NodeListsNodeData* data = rareData()->nodeLists();
-
-    String localTypeNames = typeNames.isNull() ? String("http://webkit.org/microdata/undefinedItemType") : typeNames;
-    ASSERT_UNUSED(list, list == data->m_microDataItemListCache.get(localTypeNames));
-    data->m_microDataItemListCache.remove(localTypeNames);
+    return ensureRareData()->ensureNodeLists(this)->addCacheWithName<MicroDataItemList>(this, DynamicNodeList::MicroDataItemListType, localTypeNames);
 }
 #endif
 

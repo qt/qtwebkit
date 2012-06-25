@@ -32,6 +32,7 @@
 #include "FakeWebGraphicsContext3D.h"
 #include "GraphicsContext3DPrivate.h"
 #include "LayerRendererChromium.h"
+#include "ManagedTexture.h"
 #include "cc/CCIOSurfaceLayerImpl.h"
 #include "cc/CCLayerImpl.h"
 #include "cc/CCLayerTilingData.h"
@@ -80,7 +81,6 @@ public:
     virtual void setNeedsRedrawOnImplThread() OVERRIDE { m_didRequestRedraw = true; }
     virtual void setNeedsCommitOnImplThread() OVERRIDE { m_didRequestCommit = true; }
     virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) OVERRIDE { }
-    virtual void postSetContentsMemoryAllocationLimitBytesToMainThreadOnImplThread(size_t) OVERRIDE { }
 
     PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHost(bool partialSwap, PassRefPtr<CCGraphicsContext> graphicsContext, PassOwnPtr<CCLayerImpl> rootPtr)
     {
@@ -1791,7 +1791,7 @@ TEST_F(CCLayerTreeHostImplTest, partialSwapNoUpdate)
     Mock::VerifyAndClearExpectations(&mockContext);
 }
 
-class PartialSwapContext: public FakeWebGraphicsContext3D {
+class PartialSwapContext : public FakeWebGraphicsContext3D {
 public:
     WebString getString(WGC3Denum name)
     {
@@ -2040,12 +2040,17 @@ private:
 // FakeWebGraphicsContext3D have an id of 1).
 class StrictWebGraphicsContext3D : public FakeWebGraphicsContext3D {
 public:
+    StrictWebGraphicsContext3D()
+        : FakeWebGraphicsContext3D()
+    {
+        m_nextTextureId = 7; // Start allocating texture ids larger than any other resource IDs so we can tell if someone's mixing up their resource types.
+    }
+
     virtual WebGLId createBuffer() { return 2; }
     virtual WebGLId createFramebuffer() { return 3; }
     virtual WebGLId createProgram() { return 4; }
     virtual WebGLId createRenderbuffer() { return 5; }
     virtual WebGLId createShader(WGC3Denum) { return 6; }
-    virtual WebGLId createTexture() { return 7; }
 
     virtual void deleteBuffer(WebGLId id)
     {
@@ -2077,10 +2082,17 @@ public:
             ADD_FAILURE() << "Trying to delete shader id " << id;
     }
 
+    virtual WebGLId createTexture()
+    {
+        unsigned textureId = FakeWebGraphicsContext3D::createTexture();
+        m_allocatedTextureIds.add(textureId);
+        return textureId;
+    }
     virtual void deleteTexture(WebGLId id)
     {
-        if (id != 7)
+        if (!m_allocatedTextureIds.contains(id))
             ADD_FAILURE() << "Trying to delete texture id " << id;
+        m_allocatedTextureIds.remove(id);
     }
 
     virtual void bindBuffer(WGC3Denum, WebGLId id)
@@ -2115,7 +2127,7 @@ public:
 
     virtual void bindTexture(WGC3Denum, WebGLId id)
     {
-        if (id != 7 && id)
+        if (id && !m_allocatedTextureIds.contains(id))
             ADD_FAILURE() << "Trying to bind texture id " << id;
     }
 
@@ -2123,6 +2135,9 @@ public:
     {
         return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(new StrictWebGraphicsContext3D()), GraphicsContext3D::RenderDirectlyToHostWindow);
     }
+
+private:
+    HashSet<unsigned> m_allocatedTextureIds;
 };
 
 // Fake video frame that represents a 4x4 YUV video frame.
@@ -2262,14 +2277,13 @@ TEST_F(CCLayerTreeHostImplTest, dontUseOldResourcesAfterLostContext)
 class TrackingWebGraphicsContext3D : public FakeWebGraphicsContext3D {
 public:
     TrackingWebGraphicsContext3D()
-        : m_nextTextureId(1)
+        : FakeWebGraphicsContext3D()
         , m_numTextures(0)
     { }
 
     virtual WebGLId createTexture() OVERRIDE
     {
-        WebGLId id = m_nextTextureId;
-        ++m_nextTextureId;
+        WebGLId id = FakeWebGraphicsContext3D::createTexture();
 
         m_textures.set(id, true);
         ++m_numTextures;
@@ -2301,7 +2315,6 @@ public:
     unsigned numTextures() const { return m_numTextures; }
 
 private:
-    WebGLId m_nextTextureId;
     HashMap<WebGLId, bool> m_textures;
     unsigned m_numTextures;
 };
@@ -2409,20 +2422,15 @@ TEST_F(CCLayerTreeHostImplTest, hasTransparentBackground)
     Mock::VerifyAndClearExpectations(&mockContext);
 }
 
-TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
+static void setupLayersForTextureCaching(CCLayerTreeHostImpl* layerTreeHostImpl, CCLayerImpl*& rootPtr, CCLayerImpl*& intermediateLayerPtr, CCLayerImpl*& surfaceLayerPtr, CCLayerImpl*& childPtr)
 {
-    CCSettings::setPartialSwapEnabled(true);
-    
-    CCLayerTreeSettings settings;
-    OwnPtr<CCLayerTreeHostImpl> myHostImpl = CCLayerTreeHostImpl::create(settings, this);
-    
     RefPtr<CCGraphicsContext> context = CCGraphicsContext::create3D(GraphicsContext3DPrivate::createGraphicsContextFromWebContext(adoptPtr(new PartialSwapContext()), GraphicsContext3D::RenderDirectlyToHostWindow));
 
-    myHostImpl->initializeLayerRenderer(context.release(), UnthrottledUploader);
-    myHostImpl->setViewportSize(IntSize(100, 100));
+    layerTreeHostImpl->initializeLayerRenderer(context.release(), UnthrottledUploader);
+    layerTreeHostImpl->setViewportSize(IntSize(100, 100));
 
     OwnPtr<CCLayerImpl> root = CCLayerImpl::create(1);
-    CCLayerImpl* rootPtr = root.get();
+    rootPtr = root.get();
 
     root->setAnchorPoint(FloatPoint(0, 0));
     root->setPosition(FloatPoint(0, 0));
@@ -2430,11 +2438,11 @@ TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
     root->setContentBounds(IntSize(100, 100));
     root->setVisibleLayerRect(IntRect(0, 0, 100, 100));
     root->setDrawsContent(true);
-    myHostImpl->setRootLayer(root.release());
+    layerTreeHostImpl->setRootLayer(root.release());
 
     // Intermediate layer does not own a surface, and does not draw content.
     OwnPtr<CCLayerImpl> intermediateLayer = CCLayerImpl::create(2);
-    CCLayerImpl* intermediateLayerPtr = intermediateLayer.get();
+    intermediateLayerPtr = intermediateLayer.get();
 
     intermediateLayerPtr->setAnchorPoint(FloatPoint(0, 0));
     intermediateLayerPtr->setPosition(FloatPoint(10, 10));
@@ -2445,7 +2453,7 @@ TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
     rootPtr->addChild(intermediateLayer.release());
 
     OwnPtr<CCLayerImpl> surfaceLayer = CCLayerImpl::create(3);
-    CCLayerImpl* surfaceLayerPtr = surfaceLayer.get();
+    surfaceLayerPtr = surfaceLayer.get();
 
     // Surface layer is the layer that changes its opacity
     // It will contain other layers that draw content.
@@ -2460,7 +2468,7 @@ TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
 
     // Child of the surface layer will produce some quads
     OwnPtr<FakeLayerWithQuads> child = FakeLayerWithQuads::create(4);
-    FakeLayerWithQuads* childPtr = child.get();
+    childPtr = child.get();
 
     childPtr->setAnchorPoint(FloatPoint(0, 0));
     childPtr->setPosition(FloatPoint(5, 5));
@@ -2470,6 +2478,21 @@ TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
     childPtr->setDrawsContent(true);
 
     surfaceLayerPtr->addChild(child.release());
+}
+
+TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
+{
+    CCSettings::setPartialSwapEnabled(true);
+
+    CCLayerTreeSettings settings;
+    OwnPtr<CCLayerTreeHostImpl> myHostImpl = CCLayerTreeHostImpl::create(settings, this);
+
+    CCLayerImpl* rootPtr;
+    CCLayerImpl* intermediateLayerPtr;
+    CCLayerImpl* surfaceLayerPtr;
+    CCLayerImpl* childPtr;
+
+    setupLayersForTextureCaching(myHostImpl.get(), rootPtr, intermediateLayerPtr, surfaceLayerPtr, childPtr);
 
     {
         CCLayerTreeHostImpl::FrameData frame;
@@ -2588,6 +2611,165 @@ TEST_F(CCLayerTreeHostImplTest, surfaceTextureCaching)
         ASSERT_EQ(2U, frame.renderPasses.size());
         EXPECT_EQ(0U, frame.renderPasses[0]->quadList().size());
         EXPECT_EQ(0U, frame.renderPasses[1]->quadList().size());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+
+    // Change opacity on the intermediate layer
+    WebTransformationMatrix transform = intermediateLayerPtr->transform();
+    transform.setM11(1.0001);
+    intermediateLayerPtr->setTransform(transform);
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Must receive one render pass, as the other one should be culled.
+        ASSERT_EQ(1U, frame.renderPasses.size());
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
+
+        EXPECT_EQ(CCDrawQuad::RenderPass, frame.renderPasses[0]->quadList()[0]->material());
+        CCRenderPassDrawQuad* quad = static_cast<CCRenderPassDrawQuad*>(frame.renderPasses[0]->quadList()[0].get());
+        EXPECT_FALSE(quad->renderPass()->targetSurface()->contentsChanged());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+}
+
+TEST_F(CCLayerTreeHostImplTest, surfaceTextureCachingNoPartialSwap)
+{
+    CCSettings::setPartialSwapEnabled(false);
+
+    CCLayerTreeSettings settings;
+    OwnPtr<CCLayerTreeHostImpl> myHostImpl = CCLayerTreeHostImpl::create(settings, this);
+
+    CCLayerImpl* rootPtr;
+    CCLayerImpl* intermediateLayerPtr;
+    CCLayerImpl* surfaceLayerPtr;
+    CCLayerImpl* childPtr;
+
+    setupLayersForTextureCaching(myHostImpl.get(), rootPtr, intermediateLayerPtr, surfaceLayerPtr, childPtr);
+
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Must receive two render passes, each with one quad
+        ASSERT_EQ(2U, frame.renderPasses.size());
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
+        EXPECT_EQ(1U, frame.renderPasses[1]->quadList().size());
+
+        EXPECT_EQ(CCDrawQuad::RenderPass, frame.renderPasses[1]->quadList()[0]->material());
+        CCRenderPassDrawQuad* quad = static_cast<CCRenderPassDrawQuad*>(frame.renderPasses[1]->quadList()[0].get());
+        EXPECT_TRUE(quad->renderPass()->targetSurface()->contentsChanged());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+
+    // Draw without any change
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Even though there was no change, we set the damage to entire viewport.
+        // One of the passes should be culled as a result, since contents didn't change
+        // and we have cached texture.
+        ASSERT_EQ(1U, frame.renderPasses.size());
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+
+    // Change opacity and draw
+    surfaceLayerPtr->setOpacity(0.6f);
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Must receive one render pass, as the other one should be culled
+        ASSERT_EQ(1U, frame.renderPasses.size());
+
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
+        EXPECT_EQ(CCDrawQuad::RenderPass, frame.renderPasses[0]->quadList()[0]->material());
+        CCRenderPassDrawQuad* quad = static_cast<CCRenderPassDrawQuad*>(frame.renderPasses[0]->quadList()[0].get());
+        EXPECT_FALSE(quad->renderPass()->targetSurface()->contentsChanged());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+
+    // Change less benign property and draw - should have contents changed flag
+    surfaceLayerPtr->setStackingOrderChanged(true);
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Must receive two render passes, each with one quad
+        ASSERT_EQ(2U, frame.renderPasses.size());
+
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
+        EXPECT_EQ(CCDrawQuad::SolidColor, frame.renderPasses[0]->quadList()[0]->material());
+
+        EXPECT_EQ(CCDrawQuad::RenderPass, frame.renderPasses[1]->quadList()[0]->material());
+        CCRenderPassDrawQuad* quad = static_cast<CCRenderPassDrawQuad*>(frame.renderPasses[1]->quadList()[0].get());
+        EXPECT_TRUE(quad->renderPass()->targetSurface()->contentsChanged());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+
+    // Change opacity again, but evict the cached surface texture
+    surfaceLayerPtr->setOpacity(0.5f);
+    ManagedTexture* contentsTexture = surfaceLayerPtr->renderSurface()->contentsTexture();
+    ASSERT_TRUE(contentsTexture->isValid(contentsTexture->size(), contentsTexture->format()));
+    CCRenderer* renderer = myHostImpl->layerRenderer();
+    TextureManager* textureManager = renderer->implTextureManager();
+    size_t maxMemoryLimit = textureManager->maxMemoryLimitBytes();
+
+    // This should evice all cached surfaces
+    textureManager->setMaxMemoryLimitBytes(0);
+
+    // Restore original limit
+    textureManager->setMaxMemoryLimitBytes(maxMemoryLimit);
+
+    // Was our surface evicted?
+    ASSERT_FALSE(contentsTexture->isValid(contentsTexture->size(), contentsTexture->format()));
+
+    // Change opacity and draw
+    surfaceLayerPtr->setOpacity(0.6f);
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Must receive two render passes
+        ASSERT_EQ(2U, frame.renderPasses.size());
+
+        // Even though not enough properties changed, the entire thing must be
+        // redrawn as we don't have cached textures
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
+        EXPECT_EQ(1U, frame.renderPasses[1]->quadList().size());
+
+        EXPECT_EQ(CCDrawQuad::RenderPass, frame.renderPasses[1]->quadList()[0]->material());
+        CCRenderPassDrawQuad* quad = static_cast<CCRenderPassDrawQuad*>(frame.renderPasses[1]->quadList()[0].get());
+        EXPECT_FALSE(quad->renderPass()->targetSurface()->contentsChanged());
+
+        myHostImpl->drawLayers(frame);
+        myHostImpl->didDrawAllLayers(frame);
+    }
+
+    // Draw without any change, to make sure the state is clear
+    {
+        CCLayerTreeHostImpl::FrameData frame;
+        EXPECT_TRUE(myHostImpl->prepareToDraw(frame));
+
+        // Even though there was no change, we set the damage to entire viewport.
+        // One of the passes should be culled as a result, since contents didn't change
+        // and we have cached texture.
+        ASSERT_EQ(1U, frame.renderPasses.size());
+        EXPECT_EQ(1U, frame.renderPasses[0]->quadList().size());
 
         myHostImpl->drawLayers(frame);
         myHostImpl->didDrawAllLayers(frame);

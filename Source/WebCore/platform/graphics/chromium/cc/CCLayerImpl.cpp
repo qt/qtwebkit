@@ -29,13 +29,13 @@
 
 #include "cc/CCLayerImpl.h"
 
-#include "LayerChromium.h"
-#include "LayerRendererChromium.h"
+#include "TextStream.h"
+#include "TraceEvent.h"
 #include "cc/CCDebugBorderDrawQuad.h"
 #include "cc/CCLayerSorter.h"
 #include "cc/CCMathUtil.h"
+#include "cc/CCProxy.h"
 #include "cc/CCQuadCuller.h"
-#include "cc/CCSolidColorDrawQuad.h"
 #include <wtf/text/WTFString.h>
 
 using WebKit::WebTransformationMatrix;
@@ -50,6 +50,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_layerTreeHostImpl(0)
     , m_anchorPoint(0.5, 0.5)
     , m_anchorPointZ(0)
+    , m_contentsScale(1)
     , m_scrollable(false)
     , m_shouldScrollOnMainThread(false)
     , m_haveWheelEventHandlers(false)
@@ -60,6 +61,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_opaque(false)
     , m_opacity(1.0)
     , m_preserves3D(false)
+    , m_useParentBackfaceVisibility(false)
     , m_drawCheckerboardForMissingTiles(false)
     , m_usesLayerClipping(false)
     , m_isNonCompositedContent(false)
@@ -82,6 +84,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_layerAnimationController(CCLayerAnimationController::create(this))
 {
     ASSERT(CCProxy::isImplThread());
+    ASSERT(m_layerId >= 0);
 }
 
 CCLayerImpl::~CCLayerImpl()

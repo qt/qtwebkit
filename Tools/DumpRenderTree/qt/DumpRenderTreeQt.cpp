@@ -666,7 +666,7 @@ void DumpRenderTree::processArgsLine(const QStringList &args)
         for (int i = 0; i < m_standAloneModeTestList.size(); ++i)
             m_standAloneModeTestList[i] = folderEntry.absoluteFilePath(m_standAloneModeTestList[i]);
     }
-    connect(this, SIGNAL(ready()), this, SLOT(loadNextTestInStandAloneMode()));
+    connect(this, SIGNAL(ready()), this, SLOT(loadNextTestInStandAloneMode()), Qt::QueuedConnection);
 
     if (!m_standAloneModeTestList.isEmpty()) {
         QString first = m_standAloneModeTestList.takeFirst();
@@ -700,7 +700,8 @@ void DumpRenderTree::processLine(const QString &input)
 
     if (line.startsWith(QLatin1String("http:"))
             || line.startsWith(QLatin1String("https:"))
-            || line.startsWith(QLatin1String("file:"))) {
+            || line.startsWith(QLatin1String("file:"))
+            || line == QLatin1String("about:blank")) {
         open(QUrl(line));
     } else {
         QFileInfo fi(line);

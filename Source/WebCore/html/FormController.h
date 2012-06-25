@@ -23,6 +23,7 @@
 #define FormController_h
 
 #include "CheckedRadioButtons.h"
+#include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/Vector.h>
@@ -76,24 +77,36 @@ struct FormElementKeyHashTraits : WTF::GenericHashTraits<FormElementKey> {
 class FormControlState {
 public:
     FormControlState() : m_type(TypeSkip) { }
-    explicit FormControlState(const String& value) : m_type(TypeRestore), m_value(value) { }
-    FormControlState(const FormControlState& another) : m_type(another.m_type), m_value(another.m_value) { }
+    explicit FormControlState(const String& value) : m_type(TypeRestore) { m_values.append(value); }
+    static FormControlState deserialize(const String&);
+    FormControlState(const FormControlState& another) : m_type(another.m_type), m_values(another.m_values) { }
     FormControlState& operator=(const FormControlState&);
 
-    bool hasValue() const { return m_type == TypeRestore; }
-    String value() const { return m_value; }
+    bool isFailure() const { return m_type == TypeFailure; }
+    size_t valueSize() const { return m_values.size(); }
+    const String& operator[](size_t i) const { return m_values[i]; }
+    void append(const String&);
+    String serialize() const;
 
 private:
-    enum Type { TypeSkip, TypeRestore };
+    enum Type { TypeSkip, TypeRestore, TypeFailure };
+    explicit FormControlState(Type type) : m_type(type) { }
+
     Type m_type;
-    String m_value;
+    Vector<String> m_values;
 };
 
 inline FormControlState& FormControlState::operator=(const FormControlState& another)
 {
     m_type = another.m_type;
-    m_value = another.m_value;
+    m_values = another.m_values;
     return *this;
+}
+
+inline void FormControlState::append(const String& value)
+{
+    m_type = TypeRestore;
+    m_values.append(value);
 }
 
 class FormController {
@@ -129,7 +142,7 @@ private:
     typedef ListHashSet<RefPtr<FormAssociatedElement>, 32> FormAssociatedElementListHashSet;
     FormAssociatedElementListHashSet m_formElementsWithFormAttribute;
 
-    typedef HashMap<FormElementKey, Vector<String>, FormElementKeyHash, FormElementKeyHashTraits> FormElementStateMap;
+    typedef HashMap<FormElementKey, Deque<FormControlState>, FormElementKeyHash, FormElementKeyHashTraits> FormElementStateMap;
     FormElementStateMap m_stateForNewFormElements;
     
 };

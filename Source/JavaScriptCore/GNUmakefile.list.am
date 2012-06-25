@@ -126,6 +126,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/PutByIdStatus.cpp \
 	Source/JavaScriptCore/bytecode/PutByIdStatus.h \
 	Source/JavaScriptCore/bytecode/PutKind.h \
+	Source/JavaScriptCore/bytecode/ResolveGlobalStatus.cpp \
+	Source/JavaScriptCore/bytecode/ResolveGlobalStatus.h \
 	Source/JavaScriptCore/bytecode/SamplingTool.cpp \
 	Source/JavaScriptCore/bytecode/SamplingTool.h \
 	Source/JavaScriptCore/bytecode/StructureSet.h \
@@ -168,6 +170,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGConstantFoldingPhase.h \
 	Source/JavaScriptCore/dfg/DFGCSEPhase.cpp \
 	Source/JavaScriptCore/dfg/DFGCSEPhase.h \
+	Source/JavaScriptCore/dfg/DFGDisassembler.cpp \
+	Source/JavaScriptCore/dfg/DFGDisassembler.h \
 	Source/JavaScriptCore/dfg/DFGDominators.cpp \
 	Source/JavaScriptCore/dfg/DFGDominators.h \
 	Source/JavaScriptCore/dfg/DFGDoubleFormatState.h \

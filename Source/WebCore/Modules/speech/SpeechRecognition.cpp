@@ -46,8 +46,11 @@ PassRefPtr<SpeechRecognition> SpeechRecognition::create(ScriptExecutionContext* 
 
 void SpeechRecognition::start()
 {
-    ASSERT(m_controller); // FIXME: Spec should say what to do if we are already started.
-    m_controller->start(this, m_grammars.get(), m_lang, m_continuous);
+    ASSERT(m_controller);
+    // FIXME: Spec should say what to do if we are already started.
+
+    setPendingActivity(this);
+    m_controller->start(this, m_grammars.get(), m_lang, m_continuous, m_maxAlternatives);
 }
 
 void SpeechRecognition::stopFunction()
@@ -64,7 +67,6 @@ void SpeechRecognition::abort()
 
 void SpeechRecognition::didStartAudio()
 {
-    // FIXME: The spec should specify whether these events can bubble and are cancelable.
     dispatchEvent(Event::create(eventNames().audiostartEvent, /*canBubble=*/false, /*cancelable=*/false));
 }
 
@@ -121,6 +123,7 @@ void SpeechRecognition::didStart()
 void SpeechRecognition::didEnd()
 {
     dispatchEvent(Event::create(eventNames().endEvent, /*canBubble=*/false, /*cancelable=*/false));
+    unsetPendingActivity(this);
 }
 
 const AtomicString& SpeechRecognition::interfaceName() const
@@ -133,10 +136,17 @@ ScriptExecutionContext* SpeechRecognition::scriptExecutionContext() const
     return ActiveDOMObject::scriptExecutionContext();
 }
 
+void SpeechRecognition::stop()
+{
+    if (hasPendingActivity())
+        abort();
+}
+
 SpeechRecognition::SpeechRecognition(ScriptExecutionContext* context)
     : ActiveDOMObject(context, this)
     , m_grammars(SpeechGrammarList::create()) // FIXME: The spec is not clear on the default value for the grammars attribute.
     , m_continuous(false)
+    , m_maxAlternatives(1)
     , m_controller(0)
 {
     ASSERT(scriptExecutionContext()->isDocument());

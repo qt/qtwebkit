@@ -187,7 +187,7 @@ bool WebLayer::masksToBounds() const
 void WebLayer::setMaskLayer(const WebLayer& maskLayer)
 {
     WebLayer ref = maskLayer;
-    return m_private->setMaskLayer(ref.unwrap<LayerChromium>());
+    m_private->setMaskLayer(ref.unwrap<LayerChromium>());
 }
 
 WebLayer WebLayer::maskLayer() const
@@ -268,6 +268,11 @@ bool WebLayer::drawsContent() const
 void WebLayer::setPreserves3D(bool preserve3D)
 {
     m_private->setPreserves3D(preserve3D);
+}
+
+void WebLayer::setUseParentBackfaceVisibility(bool useParentBackfaceVisibility)
+{
+    m_private->setUseParentBackfaceVisibility(useParentBackfaceVisibility);
 }
 
 void WebLayer::setBackgroundColor(WebColor color)

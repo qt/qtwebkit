@@ -58,6 +58,7 @@ public:
     void openConnection(PassRefPtr<IDBCallbacks>);
     void deleteDatabase(PassRefPtr<IDBCallbacks>);
 
+    virtual IDBDatabaseMetadata metadata() const;
     virtual String name() const { return m_name; }
     virtual String version() const { return m_version; }
     virtual PassRefPtr<DOMStringList> objectStoreNames() const;
@@ -78,6 +79,7 @@ private:
 
     bool openInternal();
     void loadObjectStores();
+    int32_t connectionCount();
     void processPendingCalls();
 
     static void createObjectStoreInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl>, PassRefPtr<IDBObjectStoreBackendImpl>, PassRefPtr<IDBTransactionBackendInterface>);
@@ -115,6 +117,10 @@ private:
 
     class PendingDeleteCall;
     Deque<RefPtr<PendingDeleteCall> > m_pendingDeleteCalls;
+
+    // FIXME: Eliminate the limbo state between openConnection() and registerFrontendCallbacks()
+    // that this counter tracks.
+    int32_t m_pendingConnectionCount;
 
     typedef ListHashSet<RefPtr<IDBDatabaseCallbacks> > DatabaseCallbacksSet;
     DatabaseCallbacksSet m_databaseCallbacksSet;

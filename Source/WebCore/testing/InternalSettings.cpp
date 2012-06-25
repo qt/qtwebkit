@@ -270,12 +270,6 @@ void InternalSettings::setDeviceSupportsMouse(bool enabled, ExceptionCode& ec)
     settings()->setDeviceSupportsMouse(enabled);
 }
 
-void InternalSettings::setDeviceScaleFactor(float scaleFactor, ExceptionCode& ec)
-{
-    InternalSettingsGuardForPage();
-    page()->setDeviceScaleFactor(scaleFactor);
-}
-
 typedef void (Settings::*SetFontFamilyFunction)(const AtomicString&, UScriptCode);
 static void setFontFamily(Settings* settings, const String& family, const String& script, SetFontFamilyFunction setter)
 {
@@ -352,6 +346,18 @@ void InternalSettings::setCSSExclusionsEnabled(bool enabled, ExceptionCode& ec)
 {
     UNUSED_PARAM(ec);
     RuntimeEnabledFeatures::setCSSExclusionsEnabled(enabled);
+}
+
+void InternalSettings::setCSSVariablesEnabled(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setCSSVariablesEnabled(enabled);
+}
+
+bool InternalSettings::cssVariablesEnabled(ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettingsReturn(false);
+    return settings()->cssVariablesEnabled();
 }
 
 void InternalSettings::setMediaPlaybackRequiresUserGesture(bool enabled, ExceptionCode& ec)

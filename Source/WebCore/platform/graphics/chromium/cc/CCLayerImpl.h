@@ -34,7 +34,6 @@
 #include "cc/CCInputHandler.h"
 #include "cc/CCLayerAnimationController.h"
 #include "cc/CCRenderSurface.h"
-#include "cc/CCSharedQuadState.h"
 #include <public/WebFilterOperations.h>
 #include <public/WebTransformationMatrix.h>
 #include <wtf/OwnPtr.h>
@@ -49,6 +48,7 @@ class CCLayerSorter;
 class CCLayerTreeHostImpl;
 class CCQuadCuller;
 class CCRenderer;
+class CCSharedQuadState;
 class LayerChromium;
 
 class CCLayerImpl : public CCLayerAnimationControllerClient {
@@ -141,6 +141,9 @@ public:
     void setPreserves3D(bool);
     bool preserves3D() const { return m_preserves3D; }
 
+    void setUseParentBackfaceVisibility(bool useParentBackfaceVisibility) { m_useParentBackfaceVisibility = useParentBackfaceVisibility; }
+    bool useParentBackfaceVisibility() const { return m_useParentBackfaceVisibility; }
+
     void setUsesLayerClipping(bool usesLayerClipping) { m_usesLayerClipping = usesLayerClipping; }
     bool usesLayerClipping() const { return m_usesLayerClipping; }
 
@@ -186,6 +189,9 @@ public:
 
     const IntSize& contentBounds() const { return m_contentBounds; }
     void setContentBounds(const IntSize&);
+
+    void setContentsScale(float contentsScale) { m_contentsScale = contentsScale; }
+    float contentsScale() const { return m_contentsScale; }
 
     const IntPoint& scrollPosition() const { return m_scrollPosition; }
     void setScrollPosition(const IntPoint&);
@@ -305,6 +311,7 @@ private:
     float m_anchorPointZ;
     IntSize m_bounds;
     IntSize m_contentBounds;
+    float m_contentsScale;
     IntPoint m_scrollPosition;
     bool m_scrollable;
     bool m_shouldScrollOnMainThread;
@@ -331,6 +338,7 @@ private:
     float m_opacity;
     FloatPoint m_position;
     bool m_preserves3D;
+    bool m_useParentBackfaceVisibility;
     bool m_drawCheckerboardForMissingTiles;
     WebKit::WebTransformationMatrix m_sublayerTransform;
     WebKit::WebTransformationMatrix m_transform;

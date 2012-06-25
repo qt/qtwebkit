@@ -29,29 +29,51 @@
  */
 
 #include "config.h"
-#include "V8TextTrackList.h"
 
-#include "TextTrackList.h"
-#include "V8Binding.h"
-#include "V8DOMWrapper.h"
-#include "V8HTMLMediaElement.h"
+#if ENABLE(INSPECTOR)
+
+#include "InjectedScriptModule.h"
+
+#include "InjectedScript.h"
+#include "InjectedScriptManager.h"
+#include "ScriptFunctionCall.h"
+#include "ScriptObject.h"
 
 namespace WebCore {
 
-v8::Handle<v8::Value> toV8(TextTrackList* impl, v8::Isolate* isolate)
+InjectedScriptModule::InjectedScriptModule(const String& name)
+    : InjectedScriptBase(name)
 {
-    if (!impl)
-        return v8NullWithCheck(isolate);
-    v8::Handle<v8::Object> wrapper = V8TextTrackList::wrap(impl, isolate);
+}
 
-    // Add a hidden reference from the media element to the text track list.
-    Node* element = impl->owner();
-    if (!wrapper.IsEmpty() && element) {
-        v8::Handle<v8::Value> elementValue = toV8(element, isolate);
-        if (!elementValue.IsEmpty() && elementValue->IsObject())
-            elementValue.As<v8::Object>()->SetHiddenValue(V8HiddenPropertyName::textTracks(), wrapper);
+void InjectedScriptModule::ensureInjected(InjectedScriptManager* injectedScriptManager, ScriptState* scriptState)
+{
+    InjectedScript injectedScript = injectedScriptManager->injectedScriptFor(scriptState);
+    ASSERT(!injectedScript.hasNoValue());
+    if (injectedScript.hasNoValue())
+        return;
+
+    // FIXME: Make the InjectedScript a module itself.
+    ScriptFunctionCall function(injectedScript.injectedScriptObject(), "module");
+    function.appendArgument(name());
+    bool hadException = false;
+    ScriptValue resultValue = injectedScript.callFunctionWithEvalEnabled(function, hadException);
+    ASSERT(!hadException);
+    if (hadException || resultValue.hasNoValue() || !resultValue.isObject()) {
+        ScriptFunctionCall function(injectedScript.injectedScriptObject(), "injectModule");
+        function.appendArgument(name());
+        function.appendArgument(source());
+        resultValue = injectedScript.callFunctionWithEvalEnabled(function, hadException);
+        if (hadException || resultValue.hasNoValue() || !resultValue.isObject()) {
+            ASSERT_NOT_REACHED();
+            return;
+        }
     }
-    return wrapper;
+
+    ScriptObject moduleObject(scriptState, resultValue);
+    initialize(moduleObject, injectedScriptManager->inspectedStateAccessCheck());
 }
 
 } // namespace WebCore
+
+#endif // ENABLE(INSPECTOR)

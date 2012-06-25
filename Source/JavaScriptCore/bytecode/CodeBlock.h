@@ -69,7 +69,6 @@
 #include <wtf/RefPtr.h>
 #include <wtf/SegmentedVector.h>
 #include <wtf/Vector.h>
-#include "StructureStubInfo.h"
 
 namespace JSC {
 
@@ -553,6 +552,8 @@ namespace JSC {
         }
         GlobalResolveInfo& globalResolveInfo(int index) { return m_globalResolveInfos[index]; }
         bool hasGlobalResolveInfoAtBytecodeOffset(unsigned bytecodeOffset);
+        GlobalResolveInfo& globalResolveInfoForBytecodeOffset(unsigned bytecodeOffset);
+        unsigned numberOfGlobalResolveInfos() { return m_globalResolveInfos.size(); }
 
         void setNumberOfCallLinkInfos(size_t size) { m_callLinkInfos.grow(size); }
         size_t numberOfCallLinkInfos() const { return m_callLinkInfos.size(); }
@@ -1104,15 +1105,7 @@ namespace JSC {
 #endif
         
 #if ENABLE(JIT)
-        void reoptimize()
-        {
-            ASSERT(replacement() != this);
-            ASSERT(replacement()->alternative() == this);
-            replacement()->tallyFrequentExitSites();
-            replacement()->jettison();
-            countReoptimization();
-            optimizeAfterWarmUp();
-        }
+        void reoptimize();
 #endif
 
 #if ENABLE(VERBOSE_VALUE_PROFILE)

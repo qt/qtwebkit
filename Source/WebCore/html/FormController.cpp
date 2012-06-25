@@ -22,10 +22,75 @@
 #include "FormController.h"
 
 #include "HTMLFormControlElementWithState.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
+
+// ----------------------------------------------------------------------------
+
+// Serilized form of FormControlState:
+//
+// SerializedControlState ::= SkipState | RestoreState
+// SkipState ::= ''
+// RestoreState ::= (',' EscapedValue )+
+// EscapedValue ::= ('\\' | '\,' | [^\,])+
+
+String FormControlState::serialize() const
+{
+    ASSERT(!isFailure());
+    if (!m_values.size())
+        return emptyString();
+
+    size_t enoughSize = 0;
+    for (size_t i = 0; i < m_values.size(); ++i)
+        enoughSize += 1 + m_values[i].length() * 2;
+    StringBuilder builder;
+    builder.reserveCapacity(enoughSize);
+    for (size_t i = 0; i < m_values.size(); ++i) {
+        builder.append(',');
+        builder.appendEscaped(m_values[i], '\\', ',');
+    }
+    return builder.toString();
+}
+
+FormControlState FormControlState::deserialize(const String& escaped)
+{
+    if (!escaped.length())
+        return FormControlState();
+    if (escaped[0] != ',')
+        return FormControlState(TypeFailure);
+
+    size_t valueSize = 1;
+    for (unsigned i = 1; i < escaped.length(); ++i) {
+        if (escaped[i] == '\\') {
+            if (++i >= escaped.length())
+                return FormControlState(TypeFailure);
+        } else if (escaped[i] == ',')
+            valueSize++;
+    }
+
+    FormControlState state;
+    state.m_values.reserveCapacity(valueSize);
+    StringBuilder builder;
+    for (unsigned i = 1; i < escaped.length(); ++i) {
+        if (escaped[i] == '\\') {
+            if (++i >= escaped.length())
+                return FormControlState(TypeFailure);
+            builder.append(escaped[i]);
+        } else if (escaped[i] == ',') {
+            state.append(builder.toString());
+            builder.clear();
+        } else
+            builder.append(escaped[i]);
+    }
+    state.append(builder.toString());
+    return state;
+}
+
+// ----------------------------------------------------------------------------
+
 
 FormController::FormController()
 {
@@ -35,22 +100,29 @@ FormController::~FormController()
 {
 }
 
+static String formStateSignature()
+{
+    // In the legacy version of serialized state, the first item was a name
+    // attribute value of a form control. The following string literal should
+    // contain some characters which are rarely used for name attribute values.
+    DEFINE_STATIC_LOCAL(String, signature, ("\n\r?% WebKit serialized form state version 4 \n\r=&"));
+    return signature;
+}
+
 Vector<String> FormController::formElementsState() const
 {
     Vector<String> stateVector;
-    stateVector.reserveInitialCapacity(m_formElementsWithState.size() * 3);
+    stateVector.reserveInitialCapacity(m_formElementsWithState.size() * 3 + 1);
+    stateVector.append(formStateSignature());
     typedef FormElementListHashSet::const_iterator Iterator;
     Iterator end = m_formElementsWithState.end();
     for (Iterator it = m_formElementsWithState.begin(); it != end; ++it) {
         HTMLFormControlElementWithState* elementWithState = *it;
         if (!elementWithState->shouldSaveAndRestoreFormControlState())
             continue;
-        FormControlState state = elementWithState->saveFormControlState();
-        if (!state.hasValue())
-            continue;
         stateVector.append(elementWithState->name().string());
         stateVector.append(elementWithState->formControlType().string());
-        stateVector.append(state.value());
+        stateVector.append(elementWithState->saveFormControlState().serialize());
     }
     return stateVector;
 }
@@ -62,31 +134,29 @@ static bool isNotFormControlTypeCharacter(UChar ch)
 
 void FormController::setStateForNewFormElements(const Vector<String>& stateVector)
 {
-    // Walk the state vector backwards so that the value to use for each
-    // name/type pair first is the one at the end of each individual vector
-    // in the FormElementStateMap. We're using them like stacks.
     typedef FormElementStateMap::iterator Iterator;
     m_formElementsWithState.clear();
 
-    if (stateVector.size() % 3)
+    if (stateVector.size() < 1 || stateVector[0] != formStateSignature())
         return;
-    for (size_t i = 0; i < stateVector.size(); i += 3) {
-        if (stateVector[i + 1].find(isNotFormControlTypeCharacter) != notFound)
-            return;
-    }
+    if ((stateVector.size() - 1) % 3)
+        return;
 
-    for (size_t i = stateVector.size() / 3 * 3; i; i -= 3) {
-        AtomicString name = stateVector[i - 3];
-        AtomicString type = stateVector[i - 2];
-        const String& value = stateVector[i - 1];
+    for (size_t i = 1; i < stateVector.size(); i += 3) {
+        AtomicString name = stateVector[i];
+        AtomicString type = stateVector[i + 1];
+        FormControlState state = FormControlState::deserialize(stateVector[i + 2]);
+        if (type.isEmpty() || type.impl()->find(isNotFormControlTypeCharacter) != notFound || state.isFailure())
+            break;
+
         FormElementKey key(name.impl(), type.impl());
         Iterator it = m_stateForNewFormElements.find(key);
         if (it != m_stateForNewFormElements.end())
-            it->second.append(value);
+            it->second.append(state);
         else {
-            Vector<String> valueList(1);
-            valueList[0] = value;
-            m_stateForNewFormElements.set(key, valueList);
+            Deque<FormControlState> stateList;
+            stateList.append(state);
+            m_stateForNewFormElements.set(key, stateList);
         }
     }
 }
@@ -103,10 +173,8 @@ FormControlState FormController::takeStateForFormElement(AtomicStringImpl* name,
     if (it == m_stateForNewFormElements.end())
         return FormControlState();
     ASSERT(it->second.size());
-    FormControlState state(it->second.last());
-    if (it->second.size() > 1)
-        it->second.removeLast();
-    else
+    FormControlState state = it->second.takeFirst();
+    if (!it->second.size())
         m_stateForNewFormElements.remove(it);
     return state;
 }

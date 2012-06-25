@@ -21,7 +21,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef Settings_h
@@ -331,6 +331,14 @@ namespace WebCore {
         bool cssRegionsEnabled() const { return false; }
 #endif
 
+#if ENABLE(CSS_VARIABLES)
+        void setCSSVariablesEnabled(bool enabled) { m_cssVariablesEnabled = enabled; }
+        bool cssVariablesEnabled() const { return true; }
+#else
+        void setCSSVariablesEnabled(bool) { }
+        bool cssVariablesEnabled() const { return false; }
+#endif
+
         void setRegionBasedColumnsEnabled(bool enabled) { m_regionBasedColumnsEnabled = enabled; }
         bool regionBasedColumnsEnabled() const { return m_regionBasedColumnsEnabled; }
 
@@ -586,6 +594,9 @@ namespace WebCore {
         static bool shouldRespectPriorityInCSSAttributeSetters();
 #endif
 
+        void setCookieEnabled(bool enabled) { m_cookieEnabled = enabled; }
+        bool cookieEnabled() const { return m_cookieEnabled; }
+
     private:
         Settings(Page*);
 
@@ -674,6 +685,9 @@ namespace WebCore {
 #if ENABLE(CSS_REGIONS)
         bool m_cssRegionsEnabled : 1;
 #endif
+#if ENABLE(CSS_VARIABLES)
+        bool m_cssVariablesEnabled : 1;
+#endif
         bool m_regionBasedColumnsEnabled : 1;
         bool m_cssGridLayoutEnabled : 1;
         bool m_downloadableBinaryFontsEnabled : 1;
@@ -750,6 +764,7 @@ namespace WebCore {
 
         bool m_fixedPositionCreatesStackingContext : 1;
         bool m_syncXHRInDocumentsEnabled : 1;
+        bool m_cookieEnabled : 1;
 
         bool m_windowFocusRestricted : 1;
 

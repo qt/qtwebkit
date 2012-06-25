@@ -28,8 +28,8 @@
 
 #include "TextureManager.h"
 
-#include "LayerRendererChromium.h"
 #include "ManagedTexture.h"
+#include "TraceEvent.h"
 
 using namespace std;
 
@@ -239,6 +239,13 @@ void TextureManager::deleteEvictedTextures(TextureAllocator* allocator)
             }
         }
     }
+    m_evictedTextures.clear();
+}
+
+void TextureManager::evictAndRemoveAllDeletedTextures()
+{
+    unprotectAllTextures();
+    reduceMemoryToLimit(0);
     m_evictedTextures.clear();
 }
 

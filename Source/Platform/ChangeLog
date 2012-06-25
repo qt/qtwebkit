@@ -1,3 +1,66 @@
+2012-06-22  Kenneth Russell  <kbr@google.com>
+
+        Unreviewed, rolling out r121064.
+        http://trac.webkit.org/changeset/121064
+        https://bugs.webkit.org/show_bug.cgi?id=88268
+
+        Broke Chromium Mac build.
+
+        * Platform.gypi:
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit):
+        (WebLayerTreeView):
+        * chromium/public/WebRenderingStats.h: Removed.
+
+2012-06-22  Dave Tu  <dtu@chromium.org>
+
+        [chromium] Expose rendering statistics to WebWidget.
+        https://bugs.webkit.org/show_bug.cgi?id=88268
+
+        Reviewed by James Robinson.
+
+        The WebKit side of a basic framework for exposing rendering statistics
+        to Chromium's --enable-benchmarking extension.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebRenderingStatistics):
+        (WebKit):
+        (WebLayerTreeView):
+
+2012-06-22  Jeff Timanus  <twiz@chromium.org>
+
+        [Chromium] Change implementing a fast-path for copying GPU-accelerated Canvas2D instances to WebGL textures.
+        https://bugs.webkit.org/show_bug.cgi?id=86275
+
+        This change adds the necessary plumbing to the various rendering contexts to copy the backing store texture of
+        a Canvas2D instance to be copied to a WebGL texture.  The GL_CHROMIUM_copy_texture extension is necessary
+        because the backing-store for a GPU-accelerated skia Canvas2D is normally in BGRA format, which is not supported
+        by glCopyTexImage.
+
+        Reviewed by Kenneth Russell.
+
+        * chromium/public/WebGraphicsContext3D.h:
+        (WebGraphicsContext3D):
+        (WebKit::WebGraphicsContext3D::copyTextureCHROMIUM):
+
+2012-06-20  Christopher Cameron  <ccameron@chromium.org>
+
+        [chromium] webkit-backface-visibility doesn't work with video
+        https://bugs.webkit.org/show_bug.cgi?id=88908
+
+        When determining a contents layer's backface culling, use the parent
+        layer's transform and backface-visibility properties. Track which
+        layers need this special treatment with useParentBackfaceVisibility
+        and setUseParentBackfaceVisibility functions in WebCore::LayerChromium,
+        WebKit::WebLayer, and WebCore::CCLayerImpl.
+
+        Reviewed by Adrienne Walker.
+
+        * chromium/public/WebLayer.h:
+            (WebLayer):
+                Add an accessor to specify that a layer should use its parent's
+                backface culling behavior.
+
 2012-06-19  Tony Payne  <tpayne@chromium.org>
 
         Add monitor profile support for Win

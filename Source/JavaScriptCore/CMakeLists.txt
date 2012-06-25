@@ -54,6 +54,7 @@ SET(JavaScriptCore_SOURCES
     bytecode/PolymorphicPutByIdList.cpp
     bytecode/SpeculatedType.cpp
     bytecode/PutByIdStatus.cpp
+    bytecode/ResolveGlobalStatus.cpp
     bytecode/SamplingTool.cpp
     bytecode/StructureStubInfo.cpp
     bytecode/Watchpoint.cpp
@@ -71,6 +72,7 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGConstantFoldingPhase.cpp
     dfg/DFGCorrectableJumpPoint.cpp
     dfg/DFGCSEPhase.cpp
+    dfg/DFGDisassembler.cpp
     dfg/DFGDominators.cpp
     dfg/DFGDriver.cpp
     dfg/DFGFixupPhase.cpp

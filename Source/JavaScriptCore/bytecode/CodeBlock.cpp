@@ -1583,7 +1583,7 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_source(other.m_source)
     , m_sourceOffset(other.m_sourceOffset)
 #if ENABLE(JIT)
-    , m_globalResolveInfos(other.m_globalResolveInfos)
+    , m_globalResolveInfos(other.m_globalResolveInfos.size())
 #endif
 #if ENABLE(VALUE_PROFILER)
     , m_executionEntryCount(0)
@@ -1608,6 +1608,11 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     setNumParameters(other.numParameters());
     optimizeAfterWarmUp();
     jitAfterWarmUp();
+
+#if ENABLE(JIT)
+    for (unsigned i = m_globalResolveInfos.size(); i--;)
+        m_globalResolveInfos[i] = GlobalResolveInfo(other.m_globalResolveInfos[i].bytecodeOffset);
+#endif
 
     if (other.m_rareData) {
         createRareDataIfNecessary();
@@ -2258,6 +2263,10 @@ bool CodeBlock::hasGlobalResolveInfoAtBytecodeOffset(unsigned bytecodeOffset)
         return false;
     return true;
 }
+GlobalResolveInfo& CodeBlock::globalResolveInfoForBytecodeOffset(unsigned bytecodeOffset)
+{
+    return *(binarySearch<GlobalResolveInfo, unsigned, getGlobalResolveInfoBytecodeOffset>(m_globalResolveInfos.begin(), m_globalResolveInfos.size(), bytecodeOffset));
+}
 #endif
 
 void CodeBlock::shrinkToFit(ShrinkMode shrinkMode)
@@ -2269,7 +2278,8 @@ void CodeBlock::shrinkToFit(ShrinkMode shrinkMode)
 #endif
 #if ENABLE(JIT)
     m_structureStubInfos.shrinkToFit();
-    m_globalResolveInfos.shrinkToFit();
+    if (shrinkMode == EarlyShrink)
+        m_globalResolveInfos.shrinkToFit();
     m_callLinkInfos.shrinkToFit();
     m_methodCallLinkInfos.shrinkToFit();
 #endif
@@ -2454,6 +2464,16 @@ void CodeBlock::copyPostParseDataFromAlternative()
 }
 
 #if ENABLE(JIT)
+void CodeBlock::reoptimize()
+{
+    ASSERT(replacement() != this);
+    ASSERT(replacement()->alternative() == this);
+    replacement()->tallyFrequentExitSites();
+    replacement()->jettison();
+    countReoptimization();
+    optimizeAfterWarmUp();
+}
+
 CodeBlock* ProgramCodeBlock::replacement()
 {
     return &static_cast<ProgramExecutable*>(ownerExecutable())->generatedBytecode();

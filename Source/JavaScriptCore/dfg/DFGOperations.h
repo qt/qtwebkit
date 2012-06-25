@@ -65,7 +65,7 @@ typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EA)(ExecState*, JSArray*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_ECC)(ExecState*, JSCell*, JSCell*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_ECI)(ExecState*, JSCell*, Identifier*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_ECJ)(ExecState*, JSCell*, EncodedJSValue);
-typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EGI)(ExecState*, GlobalResolveInfo*, Identifier*);
+typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EGriJsgI)(ExecState*, GlobalResolveInfo*, JSGlobalObject*, Identifier*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EI)(ExecState*, Identifier*);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EJ)(ExecState*, EncodedJSValue);
 typedef EncodedJSValue DFG_OPERATION (*J_DFGOperation_EJA)(ExecState*, EncodedJSValue, JSArray*);
@@ -121,7 +121,7 @@ void DFG_OPERATION operationNotifyGlobalVarWrite(WatchpointSet* watchpointSet) W
 EncodedJSValue DFG_OPERATION operationResolve(ExecState*, Identifier*) WTF_INTERNAL;
 EncodedJSValue DFG_OPERATION operationResolveBase(ExecState*, Identifier*) WTF_INTERNAL;
 EncodedJSValue DFG_OPERATION operationResolveBaseStrictPut(ExecState*, Identifier*) WTF_INTERNAL;
-EncodedJSValue DFG_OPERATION operationResolveGlobal(ExecState*, GlobalResolveInfo*, Identifier*) WTF_INTERNAL;
+EncodedJSValue DFG_OPERATION operationResolveGlobal(ExecState*, GlobalResolveInfo*, JSGlobalObject*, Identifier*) WTF_INTERNAL;
 EncodedJSValue DFG_OPERATION operationToPrimitive(ExecState*, EncodedJSValue) WTF_INTERNAL;
 EncodedJSValue DFG_OPERATION operationStrCat(ExecState*, void*, size_t) WTF_INTERNAL;
 EncodedJSValue DFG_OPERATION operationNewArray(ExecState*, void*, size_t) WTF_INTERNAL;
@@ -226,6 +226,8 @@ size_t DFG_OPERATION dfgConvertJSValueToBoolean(ExecState*, EncodedJSValue) WTF_
 #if DFG_ENABLE(VERBOSE_SPECULATION_FAILURE)
 void DFG_OPERATION debugOperationPrintSpeculationFailure(ExecState*, void*) WTF_INTERNAL;
 #endif
+
+void DFG_OPERATION triggerReoptimizationNow(CodeBlock*) WTF_INTERNAL;
 
 } // extern "C"
 } } // namespace JSC::DFG

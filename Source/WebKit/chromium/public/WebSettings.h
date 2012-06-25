@@ -105,6 +105,7 @@ public:
     virtual void setExperimentalCSSRegionsEnabled(bool) = 0;
     virtual void setExperimentalCSSGridLayoutEnabled(bool) = 0;
     virtual void setExperimentalCSSCustomFilterEnabled(bool) = 0;
+    virtual void setExperimentalCSSVariablesEnabled(bool) = 0;
     virtual void setOpenGLMultisamplingEnabled(bool) = 0;
     virtual void setPrivilegedWebGLExtensionsEnabled(bool) = 0;
     virtual void setWebGLErrorsToConsoleEnabled(bool) = 0;
@@ -154,6 +155,7 @@ public:
     virtual void setMaxUntiledLayerSize(WebSize) = 0;
     virtual void setFixedPositionCreatesStackingContext(bool) = 0;
     virtual void setSyncXHRInDocumentsEnabled(bool) = 0;
+    virtual void setCookieEnabled(bool) = 0;
 
     virtual bool forceSoftwareCompositing() const = 0;
 

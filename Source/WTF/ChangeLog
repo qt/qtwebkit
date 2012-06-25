@@ -1,17 +1,103 @@
-2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+2012-06-25  Kent Tamura  <tkent@chromium.org>
 
-        [Qt][Win] Fix broken QtWebKit5.lib linking
-        https://bugs.webkit.org/show_bug.cgi?id=88321
+        Change the serialization format of form control state to make the code simple
+        https://bugs.webkit.org/show_bug.cgi?id=89847
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Hajime Morita.
 
-        Instead of letting a module's headers know which other modules depend on them,
-        have depending modules define explicitely that they want its symbols exported too.
+        * wtf/text/StringBuilder.h:
+        (WTF::StringBuilder::appendEscaped): Added. This function adds the
+        escaped form of the input string. e.g. if stiring="foo,bar" escape='\'
+        special=',', the appended string is foo\,bar.
 
-        JavaScriptCore should then be compiled with both BUILDING_JavaScriptCore and
-        STATICALLY_LINKED_WITH_WTF.
+2012-06-24  Adam Barth  <abarth@webkit.org>
 
-        * wtf/ExportMacros.h:
+        Remove USE(CHROMIUM_NET) because it is unused
+        https://bugs.webkit.org/show_bug.cgi?id=89850
+
+        Reviewed by Eric Seidel.
+
+        I didn't see any mentions of CHROMIUM_NET when I grepped the Source
+        directory. Also, this USE macro isn't defined on OS(DARWIN) or
+        OS(ANDROID), which seems a bit odd given that Chromium uses the same
+        network stack on all platforms.
+
+        * wtf/Platform.h:
+
+2012-06-22  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Disable c++0x compatibility warnings in JavaScriptCore.gyp when building for Android
+        https://bugs.webkit.org/show_bug.cgi?id=88853
+
+        Reviewed by Steve Block.
+
+        The Android exclusions were necessary to fix a gyp generation error, as
+        the gcc_version variable wasn't being defined for Android. Remove these
+        exceptions when Chromium is able to define the gcc_version variable.
+
+        * WTF.gyp/WTF.gyp:
+
+2012-06-18  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        Causes crashes in LLVMPipe
+        https://bugs.webkit.org/show_bug.cgi?id=89358
+
+        Reviewed by Martin Robinson.
+
+        Change suggested by Dave Airlie and Xan Lopez.
+
+        * wtf/Platform.h: disable global fastMalloc for GTK+
+
+2012-06-22  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        Memory corruption on HashTable.h
+        https://bugs.webkit.org/show_bug.cgi?id=88419
+
+        Reviewed by Martin Robinson.
+
+        Simplify definition of WTF_USE_PTHREADS and HAVE_PTHREAD_RWLOCK
+        for the GTK platform using OS(LINUX) instead of HAVE(PTHREAD_H).
+
+        * wtf/Platform.h:
+
+2012-06-21  Parth Patel  <parpatel@rim.com>
+
+        [Blackberry] BlackBerry::Platform::Settings::get() rename to BlackBerry::Platform::Settings::instance() to make it consistent with our other singletons
+        https://bugs.webkit.org/show_bug.cgi?id=89684
+
+        Reviewed by Yong Li.
+        
+        Update setting instance access to use instance() instead of get().
+
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::createThreadInternal):
+
+2012-06-21  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] Fix NPAPI plugins on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=54531
+
+        Reviewed by Martin Robinson.
+
+        Define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH for the GTK+ port, and
+        include OwnPtrWin.cpp in the list of files built on Windows.
+
+        * GNUmakefile.am:
+        * GNUmakefile.list.am:
+        * wtf/Platform.h:
+
+2012-06-21  Balazs Kelemen  <kbalazs@webkit.org>
+
+        Compile error: 'bool std::isinf(float)' is not 'constexpr' with GCC 4.6 in C++11 mode
+        https://bugs.webkit.org/show_bug.cgi?id=88721
+
+        Reviewed by Csaba Osztrogonác.
+
+        Don't define these as consexpr because with gcc 4.6
+        they call non constexpr functions.
+        * wtf/MathExtras.h:
+        (std::wtf_isinf):
+        (std::wtf_isnan):
 
 2012-06-17  Filip Pizlo  <fpizlo@apple.com>
 

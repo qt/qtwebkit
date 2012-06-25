@@ -63,6 +63,7 @@ webkit2_h_api += \
 	$(WebKit2)/UIProcess/API/C/WKGrammarDetail.h \
 	$(WebKit2)/UIProcess/API/C/WKHitTestResult.h \
 	$(WebKit2)/UIProcess/API/C/WKInspector.h \
+	$(WebKit2)/UIProcess/API/C/WKIntentData.h \
 	$(WebKit2)/UIProcess/API/C/WKKeyValueStorageManager.h \
 	$(WebKit2)/UIProcess/API/C/WKMediaCacheManager.h \
 	$(WebKit2)/UIProcess/API/C/WKNativeEvent.h \
@@ -88,6 +89,9 @@ webkit2_h_api += \
 webkit2gtk_h_api += \
 	$(WebKit2)/UIProcess/API/gtk/WebKitBackForwardList.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitBackForwardListItem.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitContextMenu.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitContextMenuActions.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitContextMenuItem.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitCookieManager.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitDefines.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitDownload.h \
@@ -532,6 +536,8 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/C/WKIconDatabase.h \
 	Source/WebKit2/UIProcess/API/C/WKInspector.cpp \
 	Source/WebKit2/UIProcess/API/C/WKInspector.h \
+	Source/WebKit2/UIProcess/API/C/WKIntentData.cpp \
+	Source/WebKit2/UIProcess/API/C/WKIntentData.h \
 	Source/WebKit2/UIProcess/API/C/WKKeyValueStorageManager.cpp \
 	Source/WebKit2/UIProcess/API/C/WKKeyValueStorageManager.h \
 	Source/WebKit2/UIProcess/API/C/WKMediaCacheManager.cpp \
@@ -575,8 +581,17 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitBackForwardListItem.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitBackForwardListItem.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitBackForwardListPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenu.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenu.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuActions.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuActions.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuActionsPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuClient.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuClient.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuItem.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuItem.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitContextMenuItemPrivate.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitCookieManager.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitCookieManager.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitCookieManagerPrivate.h \
@@ -756,6 +771,7 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/WebApplicationCacheManagerProxy.cpp \
 	Source/WebKit2/UIProcess/WebBackForwardList.cpp \
 	Source/WebKit2/UIProcess/WebBackForwardList.h \
+	Source/WebKit2/UIProcess/WebColorChooserProxy.h \
 	Source/WebKit2/UIProcess/WebConnectionToWebProcess.cpp \
 	Source/WebKit2/UIProcess/WebConnectionToWebProcess.h \
 	Source/WebKit2/UIProcess/WebContext.cpp \
@@ -999,6 +1015,8 @@ webkit2_sources += \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebAlternativeTextClient.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebChromeClient.cpp \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebChromeClient.h \
+	Source/WebKit2/WebProcess/WebCoreSupport/WebColorChooser.cpp \
+	Source/WebKit2/WebProcess/WebCoreSupport/WebColorChooser.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebContextMenuClient.cpp \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebContextMenuClient.h \
 	Source/WebKit2/WebProcess/WebCoreSupport/WebDatabaseManager.cpp \

@@ -1,3 +1,28 @@
+/*
+ * Copyright (C) 2012 Apple Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ */
+
 #include "config.h"
 #include "IncrementalSweeper.h"
 
@@ -14,9 +39,10 @@ namespace JSC {
 
 #if USE(CF)
 
-static const CFTimeInterval sweepTimeSlicePerBlock = 0.01;
-static const CFTimeInterval sweepTimeMultiplier = 1.0 / sweepTimeSlicePerBlock;
- 
+static const CFTimeInterval sweepTimeSlice = .01; // seconds
+static const CFTimeInterval sweepTimeTotal = .10;
+static const CFTimeInterval sweepTimeMultiplier = 1.0 / sweepTimeTotal;
+
 void IncrementalSweeper::doWork()
 {
     APIEntryShim shim(m_globalData);
@@ -26,7 +52,6 @@ void IncrementalSweeper::doWork()
 IncrementalSweeper::IncrementalSweeper(Heap* heap, CFRunLoopRef runLoop)
     : HeapTimer(heap->globalData(), runLoop)
     , m_currentBlockToSweepIndex(0)
-    , m_lengthOfLastSweepIncrement(0.0)
 {
 }
 
@@ -37,7 +62,7 @@ PassOwnPtr<IncrementalSweeper> IncrementalSweeper::create(Heap* heap)
 
 void IncrementalSweeper::scheduleTimer()
 {
-    CFRunLoopTimerSetNextFireDate(m_timer.get(), CFAbsoluteTimeGetCurrent() + (m_lengthOfLastSweepIncrement * sweepTimeMultiplier));
+    CFRunLoopTimerSetNextFireDate(m_timer.get(), CFAbsoluteTimeGetCurrent() + (sweepTimeSlice * sweepTimeMultiplier));
 }
 
 void IncrementalSweeper::cancelTimer()
@@ -47,14 +72,17 @@ void IncrementalSweeper::cancelTimer()
 
 void IncrementalSweeper::doSweep(double sweepBeginTime)
 {
-    for (; m_currentBlockToSweepIndex < m_blocksToSweep.size(); m_currentBlockToSweepIndex++) {
-        MarkedBlock* nextBlock = m_blocksToSweep[m_currentBlockToSweepIndex];
-        if (!nextBlock->needsSweeping())
+    while (m_currentBlockToSweepIndex < m_blocksToSweep.size()) {
+        MarkedBlock* block = m_blocksToSweep[m_currentBlockToSweepIndex++];
+        if (!block->needsSweeping())
             continue;
 
-        nextBlock->sweep();
-        m_blocksToSweep[m_currentBlockToSweepIndex++] = 0;
-        m_lengthOfLastSweepIncrement = WTF::monotonicallyIncreasingTime() - sweepBeginTime;
+        block->sweep();
+
+        CFTimeInterval elapsedTime = WTF::monotonicallyIncreasingTime() - sweepBeginTime;
+        if (elapsedTime < sweepTimeSlice)
+            continue;
+
         scheduleTimer();
         return;
     }

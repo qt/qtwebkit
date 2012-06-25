@@ -344,7 +344,7 @@ class ManagerTest(unittest.TestCase):
 
     def test_servers_started(self):
 
-        def start_http_server():
+        def start_http_server(number_of_servers=None):
             self.http_started = True
 
         def start_websocket_server():
@@ -366,7 +366,7 @@ class ManagerTest(unittest.TestCase):
         self.http_started = self.http_stopped = self.websocket_started = self.websocket_stopped = False
         manager = Manager(port=port, options=MockOptions(http=True), printer=Mock())
         manager._test_files = ['http/tests/pass.txt']
-        manager.start_servers_with_lock()
+        manager.start_servers_with_lock(number_of_servers=4)
         self.assertEquals(self.http_started, True)
         self.assertEquals(self.websocket_started, False)
         manager.stop_servers_with_lock()
@@ -376,7 +376,7 @@ class ManagerTest(unittest.TestCase):
         self.http_started = self.http_stopped = self.websocket_started = self.websocket_stopped = False
         manager = Manager(port=port, options=MockOptions(http=True), printer=Mock())
         manager._test_files = ['websocket/pass.txt']
-        manager.start_servers_with_lock()
+        manager.start_servers_with_lock(number_of_servers=4)
         self.assertEquals(self.http_started, True)
         self.assertEquals(self.websocket_started, True)
         manager.stop_servers_with_lock()
@@ -386,7 +386,7 @@ class ManagerTest(unittest.TestCase):
         self.http_started = self.http_stopped = self.websocket_started = self.websocket_stopped = False
         manager = Manager(port=port, options=MockOptions(http=True), printer=Mock())
         manager._test_files = ['perf/foo/test.html']
-        manager.start_servers_with_lock()
+        manager.start_servers_with_lock(number_of_servers=4)
         self.assertEquals(self.http_started, False)
         self.assertEquals(self.websocket_started, False)
         manager.stop_servers_with_lock()
@@ -516,17 +516,17 @@ class ResultSummaryTest(unittest.TestCase):
         return expected_results, unexpected_results
 
     def test_no_svn_revision(self):
-        host = MockHost()
+        host = MockHost(initialize_scm_by_default=False)
         port = host.port_factory.get('test')
         expected_results, unexpected_results = self.summarized_results(port, expected=False, passing=False, flaky=False)
         self.assertTrue('revision' not in unexpected_results)
 
     def test_svn_revision(self):
-        host = MockHost()
+        host = MockHost(initialize_scm_by_default=False)
         port = host.port_factory.get('test')
         port._options.builder_name = 'dummy builder'
         expected_results, unexpected_results = self.summarized_results(port, expected=False, passing=False, flaky=False)
-        self.assertTrue('revision' in unexpected_results)
+        self.assertNotEquals(unexpected_results['revision'], '')
 
     def test_summarized_results_wontfix(self):
         host = MockHost()

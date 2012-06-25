@@ -26,6 +26,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
  */
 
 #ifndef CSSParserMode_h
@@ -65,6 +66,9 @@ struct CSSParserContext {
     bool isCSSCustomFilterEnabled;
     bool isCSSRegionsEnabled;
     bool isCSSGridLayoutEnabled;
+#if ENABLE(CSS_VARIABLES)
+    bool isCSSVariablesEnabled;
+#endif
     bool needsSiteSpecificQuirks;
     bool enforcesCSSMIMETypeInNoQuirksMode;
 };

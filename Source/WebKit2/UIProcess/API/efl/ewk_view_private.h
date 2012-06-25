@@ -36,4 +36,6 @@ void ewk_view_title_changed(Evas_Object* ewkView, const char* title);
 
 Evas_Object* ewk_view_base_add(Evas* canvas, WKContextRef, WKPageGroupRef);
 
+WebKit::WebPageProxy* ewk_view_page_get(const Evas_Object* ewkView);
+
 #endif // ewk_view_private_h

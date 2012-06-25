@@ -19,7 +19,6 @@
  * along with this library; see the file COPYING.LIB.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
  */
 
 #ifndef StyleRareInheritedData_h
@@ -103,6 +102,7 @@ public:
 #endif
 #if ENABLE(CSS_IMAGE_RESOLUTION)
     unsigned m_imageResolutionSource : 1; // ImageResolutionSource
+    unsigned m_imageResolutionSnap : 1; // ImageResolutionSnap
 #endif
 
     AtomicString hyphenationString;

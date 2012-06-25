@@ -279,6 +279,7 @@ SET(WebKit2_SOURCES
     UIProcess/API/C/WKHitTestResult.cpp
     UIProcess/API/C/WKIconDatabase.cpp
     UIProcess/API/C/WKInspector.cpp
+    UIProcess/API/C/WKIntentData.cpp
     UIProcess/API/C/WKKeyValueStorageManager.cpp
     UIProcess/API/C/WKMediaCacheManager.cpp
     UIProcess/API/C/WKNavigationData.cpp
@@ -401,6 +402,7 @@ SET(WebKit2_SOURCES
     WebProcess/ResourceCache/WebResourceCacheManager.cpp
 
     WebProcess/WebCoreSupport/WebChromeClient.cpp
+    WebProcess/WebCoreSupport/WebColorChooser.cpp
     WebProcess/WebCoreSupport/WebContextMenuClient.cpp
     WebProcess/WebCoreSupport/WebDatabaseManager.cpp
     WebProcess/WebCoreSupport/WebDragClient.cpp
@@ -548,3 +550,4 @@ IF (WebKit2_LINK_FLAGS)
 ENDIF ()
 
 INSTALL(TARGETS ${WebKit2_LIBRARY_NAME} DESTINATION "${LIB_INSTALL_DIR}")
+INSTALL(TARGETS ${WebProcess_EXECUTABLE_NAME} DESTINATION "${EXEC_INSTALL_DIR}")

@@ -671,7 +671,7 @@ void RenderLayerCompositor::addToOverlapMapRecursive(OverlapMap& overlapMap, Ren
 
     // A null ancestorLayer is an indication that 'layer' has already been pushed.
     if (ancestorLayer)
-        overlapMap.geometryMap().pushMappingsToAncestor(layer->renderer(), ancestorLayer->renderer());
+        overlapMap.geometryMap().pushMappingsToAncestor(layer, ancestorLayer);
     
     IntRect bounds;
     bool haveComputedBounds = false;
@@ -710,7 +710,7 @@ void RenderLayerCompositor::addToOverlapMapRecursive(OverlapMap& overlapMap, Ren
     }
     
     if (ancestorLayer)
-        overlapMap.geometryMap().popMappingsToAncestor(ancestorLayer->renderer());
+        overlapMap.geometryMap().popMappingsToAncestor(ancestorLayer);
 }
 
 //  Recurse through the layers in z-index and overflow order (which is equivalent to painting order)
@@ -727,7 +727,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
     layer->updateLayerListsIfNeeded();
     
     if (overlapMap)
-        overlapMap->geometryMap().pushMappingsToAncestor(layer->renderer(), ancestorLayer ? ancestorLayer->renderer() : 0);
+        overlapMap->geometryMap().pushMappingsToAncestor(layer, ancestorLayer);
     
     // Clear the flag
     layer->setHasCompositingDescendant(false);
@@ -910,7 +910,7 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
     descendantHas3DTransform |= anyDescendantHas3DTransform || layer->has3DTransform();
 
     if (overlapMap)
-        overlapMap->geometryMap().popMappingsToAncestor(ancestorLayer ? ancestorLayer->renderer() : 0);
+        overlapMap->geometryMap().popMappingsToAncestor(ancestorLayer);
 }
 
 void RenderLayerCompositor::setCompositingParent(RenderLayer* childLayer, RenderLayer* parentLayer)
@@ -1813,7 +1813,7 @@ bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* rendere
     // position:fixed elements that create their own stacking context (e.g. have an explicit z-index,
     // opacity, transform) can get their own composited layer. A stacking context is required otherwise
     // z-index and clipping will be broken.
-    if (!(renderer->isPositioned() && renderer->style()->position() == FixedPosition && layer->isStackingContext()))
+    if (!(renderer->isOutOfFlowPositioned() && renderer->style()->position() == FixedPosition && layer->isStackingContext()))
         return false;
 
     if (Settings* settings = m_renderView->document()->settings())

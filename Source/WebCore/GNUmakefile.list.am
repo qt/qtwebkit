@@ -20,7 +20,7 @@ webcore_built_sources += \
 	DerivedSources/WebCore/HTMLNames.cpp \
 	DerivedSources/WebCore/HTMLNames.h \
 	DerivedSources/WebCore/InjectedScriptSource.h \
-	DerivedSources/WebCore/InjectedWebGLScriptSource.h \
+	DerivedSources/WebCore/InjectedScriptWebGLModuleSource.h \
 	DerivedSources/WebCore/InspectorBackendDispatcher.cpp \
 	DerivedSources/WebCore/InspectorBackendDispatcher.h \
 	DerivedSources/WebCore/InspectorFrontend.cpp \
@@ -957,6 +957,7 @@ dom_binding_idls += \
 	$(WebCore)/page/PerformanceEntry.idl \
 	$(WebCore)/page/PerformanceEntryList.idl \
 	$(WebCore)/page/PerformanceNavigation.idl \
+	$(WebCore)/page/PerformanceResourceTiming.idl \
 	$(WebCore)/page/PerformanceTiming.idl \
 	$(WebCore)/page/Screen.idl \
 	$(WebCore)/page/SpeechInputEvent.idl \
@@ -1823,10 +1824,10 @@ webcore_sources += \
 	Source/WebCore/dom/DeviceOrientationClient.h \
 	Source/WebCore/dom/DeviceOrientationController.cpp \
 	Source/WebCore/dom/DeviceOrientationController.h \
-	Source/WebCore/dom/DeviceOrientation.cpp \
+	Source/WebCore/dom/DeviceOrientationData.cpp \
+	Source/WebCore/dom/DeviceOrientationData.h \
 	Source/WebCore/dom/DeviceOrientationEvent.cpp \
 	Source/WebCore/dom/DeviceOrientationEvent.h \
-	Source/WebCore/dom/DeviceOrientation.h \
 	Source/WebCore/dom/Document.cpp \
 	Source/WebCore/dom/DocumentFragment.cpp \
 	Source/WebCore/dom/DocumentFragment.h \
@@ -1906,6 +1907,7 @@ webcore_sources += \
 	Source/WebCore/dom/HashChangeEvent.h \
 	Source/WebCore/dom/KeyboardEvent.cpp \
 	Source/WebCore/dom/KeyboardEvent.h \
+	Source/WebCore/dom/MemoryInstrumentation.h \
 	Source/WebCore/dom/MessageChannel.cpp \
 	Source/WebCore/dom/MessageChannel.h \
 	Source/WebCore/dom/MessageEvent.cpp \
@@ -2640,6 +2642,7 @@ webcore_sources += \
 	Source/WebCore/icu/unicode/utf_old.h \
 	Source/WebCore/icu/unicode/utypes.h \
 	Source/WebCore/icu/unicode/uversion.h \
+	Source/WebCore/inspector/BindingVisitors.h \
 	Source/WebCore/inspector/ConsoleMessage.cpp \
 	Source/WebCore/inspector/ConsoleMessage.h \
 	Source/WebCore/inspector/ContentSearchUtils.cpp \
@@ -2650,7 +2653,6 @@ webcore_sources += \
 	Source/WebCore/inspector/DOMNodeHighlighter.h \
 	Source/WebCore/inspector/DOMPatchSupport.cpp \
 	Source/WebCore/inspector/DOMPatchSupport.h \
-	Source/WebCore/inspector/DOMWrapperVisitor.h \
 	Source/WebCore/inspector/IdentifiersFactory.cpp \
 	Source/WebCore/inspector/IdentifiersFactory.h \
 	Source/WebCore/inspector/InjectedScript.cpp \
@@ -2661,6 +2663,10 @@ webcore_sources += \
 	Source/WebCore/inspector/InjectedScriptHost.h \
 	Source/WebCore/inspector/InjectedScriptManager.cpp \
 	Source/WebCore/inspector/InjectedScriptManager.h \
+	Source/WebCore/inspector/InjectedScriptModule.cpp \
+	Source/WebCore/inspector/InjectedScriptModule.h \
+	Source/WebCore/inspector/InjectedScriptWebGLModule.cpp \
+	Source/WebCore/inspector/InjectedScriptWebGLModule.h \
 	Source/WebCore/inspector/InspectorAgent.cpp \
 	Source/WebCore/inspector/InspectorAgent.h \
 	Source/WebCore/inspector/InspectorApplicationCacheAgent.cpp \
@@ -3038,6 +3044,8 @@ webcore_sources += \
 	Source/WebCore/page/PerformanceEntryList.h \
 	Source/WebCore/page/PerformanceNavigation.cpp \
 	Source/WebCore/page/PerformanceNavigation.h \
+	Source/WebCore/page/PerformanceResourceTiming.cpp \
+	Source/WebCore/page/PerformanceResourceTiming.h \
 	Source/WebCore/page/PerformanceTiming.cpp \
 	Source/WebCore/page/PerformanceTiming.h \
 	Source/WebCore/page/PointerLock.h \
@@ -3195,8 +3203,8 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/filters/CustomFilterParameter.h \
 	Source/WebCore/platform/graphics/filters/CustomFilterProgram.cpp \
 	Source/WebCore/platform/graphics/filters/CustomFilterProgram.h \
-	Source/WebCore/platform/graphics/filters/CustomFilterShader.cpp \
-	Source/WebCore/platform/graphics/filters/CustomFilterShader.h \
+	Source/WebCore/platform/graphics/filters/CustomFilterCompiledProgram.cpp \
+	Source/WebCore/platform/graphics/filters/CustomFilterCompiledProgram.h \
 	Source/WebCore/platform/graphics/filters/DistantLightSource.cpp \
 	Source/WebCore/platform/graphics/filters/DistantLightSource.h \
 	Source/WebCore/platform/graphics/filters/FEBlend.cpp \
@@ -3835,6 +3843,8 @@ webcore_sources += \
 	Source/WebCore/rendering/RenderFrameSet.h \
 	Source/WebCore/rendering/RenderFullScreen.cpp \
 	Source/WebCore/rendering/RenderFullScreen.h \
+	Source/WebCore/rendering/RenderGrid.cpp \
+	Source/WebCore/rendering/RenderGrid.h \
 	Source/WebCore/rendering/RenderGeometryMap.cpp \
 	Source/WebCore/rendering/RenderGeometryMap.h \
 	Source/WebCore/rendering/RenderHTMLCanvas.cpp \
@@ -4814,9 +4824,7 @@ webcoregtk_sources += \
 	Source/WebCore/platform/gtk/SoundGtk.cpp \
 	Source/WebCore/platform/gtk/WidgetGtk.cpp \
 	Source/WebCore/platform/gtk/WidgetRenderingContext.cpp \
-	Source/WebCore/platform/gtk/WidgetRenderingContext.h \
-	Source/WebCore/plugins/gtk/PluginPackageGtk.cpp \
-	Source/WebCore/plugins/gtk/PluginViewGtk.cpp
+	Source/WebCore/platform/gtk/WidgetRenderingContext.h
 
 if TARGET_X11
 webcoregtk_sources += \
@@ -4827,19 +4835,36 @@ webcoregtk_sources += \
 	Source/WebCore/platform/gtk/GtkWidgetBackingStoreX11.cpp \
 	Source/WebCore/plugins/gtk/gtk2xtbin.c \
 	Source/WebCore/plugins/gtk/gtk2xtbin.h \
+	Source/WebCore/plugins/gtk/PluginPackageGtk.cpp \
+	Source/WebCore/plugins/gtk/PluginViewGtk.cpp \
 	Source/WebCore/plugins/gtk/xembed.h
-endif
-
+else
 if TARGET_WIN32
 webcore_sources += \
+	Source/WebCore/platform/graphics/win/DIBPixelData.cpp \
+	Source/WebCore/platform/graphics/win/GraphicsContextCairoWin.cpp \
+	Source/WebCore/platform/graphics/win/GraphicsContextWin.cpp \
+	Source/WebCore/platform/graphics/win/LocalWindowsContext.h \
+	Source/WebCore/platform/graphics/win/TransformationMatrixWin.cpp \
+	Source/WebCore/platform/win/BitmapInfo.cpp \
+	Source/WebCore/platform/win/BitmapInfo.h \
 	Source/WebCore/platform/win/SystemInfo.cpp \
 	Source/WebCore/platform/win/SystemInfo.h \
+	Source/WebCore/platform/win/WebCoreInstanceHandle.cpp \
+	Source/WebCore/platform/win/WebCoreInstanceHandle.h \
 	Source/WebCore/plugins/win/PluginDatabaseWin.cpp \
 	Source/WebCore/plugins/win/PluginMessageThrottlerWin.cpp \
-	Source/WebCore/plugins/win/PluginMessageThrottlerWin.h
+	Source/WebCore/plugins/win/PluginMessageThrottlerWin.h \
+	Source/WebCore/plugins/win/PluginPackageWin.cpp
 webcoregtk_sources += \
-	Source/WebCore/platform/cairo/WidgetBackingStoreCairo.cpp
-endif
+	Source/WebCore/platform/cairo/WidgetBackingStoreCairo.cpp \
+	Source/WebCore/plugins/win/PluginViewWin.cpp
+else
+webcore_sources += \
+	Source/WebCore/plugins/PluginPackageNone.cpp \
+	Source/WebCore/plugins/PluginViewNone.cpp
+endif # END TARGET_WIN32
+endif # END TARGET_X11
 
 # ----
 # icu unicode backend

@@ -275,7 +275,7 @@
         'cflags!': ['-g'],
       },
     }],
-    ['os_posix==1 and OS!="mac" and OS!="android" and gcc_version==46', {
+    ['os_posix==1 and OS!="mac" and gcc_version==46', {
       'target_defaults': {
         # Disable warnings about c++0x compatibility, as some names (such as nullptr) conflict
         # with upcoming c++0x types.
@@ -441,21 +441,21 @@
       'type': 'none',
       'actions': [
         {
-          'action_name': 'generateInjectedWebGLScriptSource',
+          'action_name': 'generateInjectedScriptWebGLModuleSource',
           'inputs': [
-            '../inspector/InjectedWebGLScriptSource.js',
+            '../inspector/InjectedScriptWebGLModuleSource.js',
           ],
           'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/InjectedWebGLScriptSource.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InjectedScriptWebGLModuleSource.h',
           ],
           'action': [
             'perl',
             '../inspector/xxd.pl',
-            'InjectedWebGLScriptSource_js',
+            'InjectedScriptWebGLModuleSource_js',
             '<@(_inputs)',
             '<@(_outputs)'
           ],
-          'message': 'Generating InjectedWebGLScriptSource.h from InjectedWebGLScriptSource.js',
+          'message': 'Generating InjectedScriptWebGLModuleSource.h from InjectedScriptWebGLModuleSource.js',
         },
       ]
     },
@@ -1825,7 +1825,7 @@
         },{ # OS!="mac"
           'sources/': [['exclude', 'Mac\\.(cpp|mm?)$']]
         }],
-        ['os_posix == 1 and OS != "mac" and OS != "android" and gcc_version == 42', {
+        ['os_posix == 1 and OS != "mac" and gcc_version == 42', {
           # Due to a bug in gcc 4.2.1 (the current version on hardy), we get
           # warnings about uninitialized this.
           'cflags': ['-Wno-uninitialized'],
@@ -1979,7 +1979,7 @@
             ['exclude', '/(Windows|Uniscribe)[^/]*\\.cpp$']
           ],
         }],
-        ['os_posix == 1 and OS != "mac" and OS != "android" and gcc_version == 42', {
+        ['os_posix == 1 and OS != "mac" and gcc_version == 42', {
           # Due to a bug in gcc 4.2.1 (the current version on hardy), we get
           # warnings about uninitialized this.
           'cflags': ['-Wno-uninitialized'],
