@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,24 +22,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CompositorFakeGraphicsContext3D_h
-#define CompositorFakeGraphicsContext3D_h
+#ifndef WebPluginScrollbar_h
+#define WebPluginScrollbar_h
 
-#include "CompositorFakeWebGraphicsContext3D.h"
-#include "GraphicsContext3D.h"
-#include "GraphicsContext3DPrivate.h"
+#include "WebScrollbar.h"
 
-namespace WebCore {
+namespace WebKit {
 
-static PassRefPtr<GraphicsContext3D> createCompositorMockGraphicsContext3D(GraphicsContext3D::Attributes attrs)
-{
-    WebKit::WebGraphicsContext3D::Attributes webAttrs;
-    webAttrs.alpha = attrs.alpha;
+typedef WebScrollbar WebPluginScrollbar;
 
-    OwnPtr<WebKit::WebGraphicsContext3D> webContext = WebKit::CompositorFakeWebGraphicsContext3D::create(webAttrs);
-    return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), GraphicsContext3D::RenderDirectlyToHostWindow);
-}
-
-}
+} // namespace WebKit
 
 #endif

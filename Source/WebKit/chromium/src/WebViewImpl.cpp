@@ -386,6 +386,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_pageDefinedMaximumPageScaleFactor(-1)
     , m_minimumPageScaleFactor(minPageScaleFactor)
     , m_maximumPageScaleFactor(maxPageScaleFactor)
+    , m_ignoreViewportTagMaximumScale(false)
     , m_pageScaleFactorIsSet(false)
     , m_contextMenuAllowed(false)
     , m_doingDragAndDrop(false)
@@ -726,6 +727,13 @@ void WebViewImpl::transferActiveWheelFlingAnimation(const WebActiveWheelFlingPar
     OwnPtr<PlatformGestureCurve> curve = TouchpadFlingPlatformGestureCurve::create(parameters.delta, IntPoint(parameters.cumulativeScroll));
     m_gestureAnimation = ActivePlatformGestureAnimation::create(curve.release(), this, parameters.startTime);
     scheduleAnimation();
+}
+
+void WebViewImpl::renderingStats(WebRenderingStats& stats) const
+{
+    ASSERT(isAcceleratedCompositingActive());
+    if (!m_layerTreeView.isNull())
+        m_layerTreeView.renderingStats(stats);
 }
 
 void WebViewImpl::startPageScaleAnimation(const IntPoint& scroll, bool useAnchor, float newScale, double durationSec)
@@ -2607,6 +2615,16 @@ void WebViewImpl::setPageScaleFactorLimits(float minPageScale, float maxPageScal
     computePageScaleFactorLimits();
 }
 
+void WebViewImpl::setIgnoreViewportTagMaximumScale(bool flag)
+{
+    m_ignoreViewportTagMaximumScale = flag;
+
+    if (!page() || !page()->mainFrame())
+        return;
+
+    m_page->chrome()->client()->dispatchViewportPropertiesDidChange(page()->mainFrame()->document()->viewportArguments());
+}
+
 bool WebViewImpl::computePageScaleFactorLimits()
 {
     if (m_pageDefinedMinimumPageScaleFactor == -1 || m_pageDefinedMaximumPageScaleFactor == -1)
@@ -3696,30 +3714,6 @@ void WebViewImpl::updateLayerTreeViewport()
 
     m_layerTreeView.setViewportSize(size());
     m_layerTreeView.setPageScaleFactorAndLimits(pageScaleFactor(), m_minimumPageScaleFactor, m_maximumPageScaleFactor);
-}
-
-WebGraphicsContext3D* WebViewImpl::graphicsContext3D()
-{
-#if USE(ACCELERATED_COMPOSITING)
-    if (m_page->settings()->acceleratedCompositingEnabled() && allowsAcceleratedCompositing()) {
-        if (!m_layerTreeView.isNull()) {
-            WebGraphicsContext3D* context = m_layerTreeView.context();
-            if (context && !context->isContextLost())
-                return context;
-        }
-        // If we get here it means that some system needs access to the context the compositor will use but the compositor itself
-        // hasn't requested a context or it was unable to successfully instantiate a context.
-        // We need to return the context that the compositor will later use so we allocate a new context (if needed) and stash it
-        // until the compositor requests and takes ownership of the context via createLayerTreeHost3D().
-        if (!m_temporaryOnscreenGraphicsContext3D)
-            m_temporaryOnscreenGraphicsContext3D = createCompositorGraphicsContext3D();
-
-        WebGraphicsContext3D* webContext = m_temporaryOnscreenGraphicsContext3D.get();
-        if (webContext && !webContext->isContextLost())
-            return webContext;
-    }
-#endif
-    return 0;
 }
 
 WebGraphicsContext3D* WebViewImpl::sharedGraphicsContext3D()

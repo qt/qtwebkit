@@ -119,9 +119,9 @@ public:
     void setFontAtlas(PassOwnPtr<CCFontAtlas>);
 
     void finishAllRendering();
-    int frameNumber() const { return m_frameNumber; }
+    int sourceAnimationFrameNumber() const { return m_sourceAnimationFrameNumber; }
 
-    bool initializeLayerRenderer(PassRefPtr<CCGraphicsContext>, TextureUploaderOption);
+    bool initializeLayerRenderer(PassOwnPtr<CCGraphicsContext>, TextureUploaderOption);
     bool isContextLost();
     CCRenderer* layerRenderer() { return m_layerRenderer.get(); }
     const LayerRendererCapabilities& layerRendererCapabilities() const;
@@ -196,7 +196,7 @@ protected:
 
     CCLayerTreeHostImplClient* m_client;
     int m_sourceFrameNumber;
-    int m_frameNumber;
+    int m_sourceAnimationFrameNumber;
 
 private:
     void computeDoubleTapZoomDeltas(CCScrollAndScaleSet* scrollInfo);
@@ -224,7 +224,7 @@ private:
 
     void dumpRenderSurfaces(TextStream&, int indent, const CCLayerImpl*) const;
 
-    RefPtr<CCGraphicsContext> m_context;
+    OwnPtr<CCGraphicsContext> m_context;
     OwnPtr<CCRenderer> m_layerRenderer;
     OwnPtr<CCLayerImpl> m_rootLayerImpl;
     CCLayerImpl* m_rootScrollLayerImpl;

@@ -4510,6 +4510,11 @@ void WebPage::setSpellCheckingEnabled(bool enabled)
     static_cast<EditorClientBlackBerry*>(d->m_page->editorClient())->enableSpellChecking(enabled);
 }
 
+void WebPage::spellCheckingRequestProcessed(int32_t id, spannable_string_t* spannableString)
+{
+    d->m_inputHandler->spellCheckingRequestProcessed(id, spannableString);
+}
+
 class DeferredTaskSelectionCancelled: public DeferredTask<&WebPagePrivate::m_wouldCancelSelection> {
 public:
     explicit DeferredTaskSelectionCancelled(WebPagePrivate* webPagePrivate)
@@ -5572,8 +5577,10 @@ void WebPage::notifyAppActivationStateChange(ActivationStateType activationState
 
 void WebPage::notifySwipeEvent()
 {
-    FOR_EACH_PLUGINVIEW(d->m_pluginViews)
-       (*it)->handleSwipeEvent();
+    if (d->m_fullScreenPluginView.get())
+       d->m_fullScreenPluginView->handleSwipeEvent();
+    else
+       notifyFullScreenVideoExited(true);
 }
 
 void WebPage::notifyScreenPowerStateChanged(bool powered)
@@ -6310,6 +6317,7 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
     coreSettings->setOfflineWebApplicationCacheEnabled(webSettings->isAppCacheEnabled());
 
     m_page->group().groupSettings()->setLocalStorageQuotaBytes(webSettings->localStorageQuota());
+    coreSettings->setSessionStorageQuota(webSettings->sessionStorageQuota());
     coreSettings->setUsesPageCache(webSettings->maximumPagesInCache());
     coreSettings->setFrameFlatteningEnabled(webSettings->isFrameFlatteningEnabled());
 #endif

@@ -46,12 +46,13 @@ class CCGraphicsContext;
 class CCLayerChromium;
 class CCLayerTreeHostImpl;
 class CCLayerTreeHostImplClient;
-struct CCScrollAndScaleSet;
 class CCTextureUpdater;
 class ManagedTexture;
 class Region;
 class TextureAllocator;
 class TextureManager;
+struct CCRenderingStats;
+struct CCScrollAndScaleSet;
 
 class CCLayerTreeHostClient {
 public:
@@ -61,7 +62,7 @@ public:
     virtual void updateAnimations(double frameBeginTime) = 0;
     virtual void layout() = 0;
     virtual void applyScrollAndScale(const IntSize& scrollDelta, float pageScale) = 0;
-    virtual PassRefPtr<GraphicsContext3D> createContext3D() = 0;
+    virtual PassOwnPtr<WebKit::WebGraphicsContext3D> createContext3D() = 0;
     virtual void didRecreateContext(bool success) = 0;
     virtual void willCommit() = 0;
     virtual void didCommit() = 0;
@@ -117,6 +118,7 @@ struct LayerRendererCapabilities {
         , usingTextureStorageExtension(false)
         , usingGpuMemoryManager(false)
         , usingDiscardFramebuffer(false)
+        , usingEglImage(false)
         , maxTextureSize(0) { }
 
     GC3Denum bestTextureFormat;
@@ -130,6 +132,7 @@ struct LayerRendererCapabilities {
     bool usingTextureStorageExtension;
     bool usingGpuMemoryManager;
     bool usingDiscardFramebuffer;
+    bool usingEglImage;
     int maxTextureSize;
 };
 
@@ -146,6 +149,7 @@ public:
 
     static bool needsFilterContext() { return s_needsFilterContext; }
     static void setNeedsFilterContext(bool needsFilterContext) { s_needsFilterContext = needsFilterContext; }
+    bool needsSharedContext() const { return needsFilterContext() || settings().acceleratePainting; }
 
     // CCLayerTreeHost interface to CCProxy.
     void willBeginFrame() { m_client->willBeginFrame(); }
@@ -155,7 +159,7 @@ public:
     void beginCommitOnImplThread(CCLayerTreeHostImpl*);
     void finishCommitOnImplThread(CCLayerTreeHostImpl*);
     void commitComplete();
-    PassRefPtr<CCGraphicsContext> createContext();
+    PassOwnPtr<CCGraphicsContext> createContext();
     virtual PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHostImpl(CCLayerTreeHostImplClient*);
     void didLoseContext();
     enum RecreateResult {
@@ -181,10 +185,6 @@ public:
     void composite();
     void scheduleComposite();
 
-    // NOTE: The returned value can only be used to make GL calls or make the
-    // context current on the thread the compositor is running on!
-    CCGraphicsContext* context();
-
     // Composites and attempts to read back the result into the provided
     // buffer. If it wasn't possible, e.g. due to context lost, will return
     // false.
@@ -192,7 +192,11 @@ public:
 
     void finishAllRendering();
 
-    int frameNumber() const { return m_frameNumber; }
+    int animationFrameNumber() const { return m_animationFrameNumber; }
+
+    int commitNumber() const { return m_commitNumber; }
+
+    void renderingStats(CCRenderingStats&) const;
 
     const LayerRendererCapabilities& layerRendererCapabilities() const;
 
@@ -284,7 +288,8 @@ private:
 
     CCLayerTreeHostClient* m_client;
 
-    int m_frameNumber;
+    int m_animationFrameNumber;
+    int m_commitNumber;
 
     OwnPtr<CCProxy> m_proxy;
     bool m_layerRendererInitialized;

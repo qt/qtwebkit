@@ -1,17 +1,36 @@
-2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+2012-06-25  Kent Tamura  <tkent@chromium.org>
 
-        [Qt][Win] Fix broken QtWebKit5.lib linking
-        https://bugs.webkit.org/show_bug.cgi?id=88321
+        Unreviewed, rolling out r121145.
+        http://trac.webkit.org/changeset/121145
+        https://bugs.webkit.org/show_bug.cgi?id=89847
 
-        Reviewed by NOBODY (OOPS!).
+        Had an objection for the change.
 
-        Instead of letting a module's headers know which other modules depend on them,
-        have depending modules define explicitely that they want its symbols exported too.
+        * wtf/text/StringBuilder.h:
 
-        JavaScriptCore should then be compiled with both BUILDING_JavaScriptCore and
-        STATICALLY_LINKED_WITH_WTF.
+2012-06-25  Yong Li  <yoli@rim.com>
 
-        * wtf/ExportMacros.h:
+        [BlackBerry] Add JSC statistics into about:memory
+        https://bugs.webkit.org/show_bug.cgi?id=89779
+
+        Reviewed by Rob Buis.
+
+        Turn on WTF_USE_EXPORT_MACROS for BlackBerry port.
+        This will make macros like JS_EXPORT_PRIVATE work without
+        extra porting.
+
+        * wtf/Platform.h:
+
+2012-06-25  Adam Barth  <abarth@webkit.org>
+
+        Use InterpolationLow on chromium-android
+        https://bugs.webkit.org/show_bug.cgi?id=89849
+
+        Reviewed by Daniel Bates.
+
+        Introduce a USE macro to control image interpolation quality.
+
+        * wtf/Platform.h:
 
 2012-06-25  Kent Tamura  <tkent@chromium.org>
 

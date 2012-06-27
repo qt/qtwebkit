@@ -1,3 +1,133 @@
+2012-06-26  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Add WebPage interface for Async spell check.
+        https://bugs.webkit.org/show_bug.cgi?id=89999
+
+        Reviewed by Rob Buis.
+
+        PR 124517.
+
+        Add interface for IMS async spell checking.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::spellCheckingRequestProcessed):
+        (WebKit):
+        * Api/WebPage.h:
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::InputHandler::spellCheckingRequestProcessed):
+        * WebKitSupport/InputHandler.h:
+        (InputHandler):
+
+2012-06-26  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] Limit session storage quota to 5MB by default
+        https://bugs.webkit.org/show_bug.cgi?id=89941
+
+        Reviewed by Rob Buis.
+
+        Limit session storage quota to 5MB by default for BlackBerry
+        porting.
+        Internally reviewed by George Staikos.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::didChangeSettings):
+        * Api/WebSettings.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebSettings::standardSettings):
+        (BlackBerry::WebKit::WebSettings::sessionStorageQuota):
+        (BlackBerry::WebKit::WebSettings::setSessionStorageQuota):
+        * Api/WebSettings.h:
+
+2012-06-26  Charles Wei  <charles.wei@torchmobile.com.cn>
+
+        [BlackBerry] Use gesture SwipeDown to exit fullscreen for both video and plugin.
+        https://bugs.webkit.org/show_bug.cgi?id=89960
+
+        Reviewed by Antonio Gomes.
+
+        We used to use gesture swipedown to exit fullscreen for plugin, but not fullscreen
+        HTML5 video; When a swipe down happens, it applies this event to all the pluginviews
+        in a page, even though only the one in fullscreen mode will process this.
+
+        With this patch, the SwipeDown gesture will only apply to the fullscreen elemement,
+        which is either a plugin, or an Video element.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::notifySwipeEvent):
+
+2012-06-25  Leo Yang  <leo.yang@torchmobile.com.cn>
+
+        [BlackBerry] Fill more data in device motion event
+        https://bugs.webkit.org/show_bug.cgi?id=89857
+
+        Reviewed by Antonio Gomes.
+
+        Reviewed internally by Robin Cao.
+
+        Fill acceleration and rotation rate into DeviceMotionData.
+
+        * WebCoreSupport/DeviceMotionClientBlackBerry.cpp:
+        (DeviceMotionClientBlackBerry::onMotion):
+
+2012-06-25  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Add JSC statistics into about:memory
+        https://bugs.webkit.org/show_bug.cgi?id=89779
+
+        Reviewed by Rob Buis.
+
+        Add detailed JS memory statistics to about:memory page.
+
+        * WebCoreSupport/AboutData.cpp:
+        (WebCore::dumpJSCTypeCountSetToTableHTML):
+        (WebCore):
+        (WebCore::memoryPage):
+
+2012-06-25  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Use AIR controls if client doesn't support HTML control
+        https://bugs.webkit.org/show_bug.cgi?id=89777
+
+        Reviewed by Yong Li.
+
+        Currently HTML controls depend on client implementing CreateWindow event, for those clients
+        that don't implement CreateWindow event, use old AIR controls so we don't break them.
+
+        PR 163818.
+
+        Internal reviewed by Mike Fenton.
+
+        * Api/WebPageClient.h:
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::openPagePopup):
+        * WebCoreSupport/PagePopupBlackBerry.cpp:
+        (WebCore::PagePopupBlackBerry::sendCreatePopupWebViewRequest):
+        * WebCoreSupport/PagePopupBlackBerry.h:
+        (PagePopupBlackBerry):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::openSelectPopup):
+
+2012-06-25  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Require text editable element to be enabled for VKB
+        https://bugs.webkit.org/show_bug.cgi?id=89876
+
+        Reviewed by Yong Li.
+
+        After bug 58837 got in, children of <fieldset> now can inherit the disabled
+        state of the fieldset. When trying for instance fast/forms/fieldset/fieldset-disabled.html,
+        it can be seen that when they are visually disabled, the input handling can still be triggered. So
+        add an extra check to isTextBasedContentEditableElement that the element is enabled.
+
+        Reviewed internally by Mike Fenton.
+
+        * WebKitSupport/DOMSupport.cpp:
+        (BlackBerry::WebKit::DOMSupport::isTextBasedContentEditableElement):
+
 2012-06-24  Simon Fraser  <simon.fraser@apple.com>
 
         Rename isPositioned to isOutOfFlowPositioned for clarity

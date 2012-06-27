@@ -466,6 +466,7 @@ SOURCES += \
     css/CSSStyleRule.cpp \
     css/CSSStyleSheet.cpp \
     css/CSSTimingFunctionValue.cpp \
+    css/CSSToStyleMap.cpp \
     css/CSSUnicodeRangeValue.cpp \
     css/CSSValue.cpp \
     css/CSSValueList.cpp \
@@ -1648,6 +1649,7 @@ HEADERS += \
     css/CSSStyleRule.h \
     css/CSSStyleSheet.h \
     css/CSSTimingFunctionValue.h \
+    css/CSSToStyleMap.h \
     css/CSSUnicodeRangeValue.h \
     css/CSSValue.cpp \
     css/CSSValue.h \
@@ -2035,7 +2037,7 @@ HEADERS += \
     html/track/WebVTTParser.h \
     html/track/WebVTTToken.h \
     html/track/WebVTTTokenizer.h \
-    inspector/BindingVisitor.h \
+    inspector/BindingVisitors.h \
     inspector/ConsoleMessage.h \
     inspector/ContentSearchUtils.h \
     inspector/DOMEditor.h \
@@ -4144,7 +4146,7 @@ contains(CONFIG, texmap) {
         platform/graphics/texmap/TextureMapperLayer.cpp \
         platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
 
-    !win32-*:contains(QT_CONFIG, opengl) {
+    contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1) {
         HEADERS += \
             platform/graphics/texmap/TextureMapperGL.h \
             platform/graphics/texmap/TextureMapperShaderManager.h
@@ -4154,7 +4156,6 @@ contains(CONFIG, texmap) {
             platform/graphics/texmap/TextureMapperShaderManager.cpp
 
         CONFIG += opengl-shims
-        DEFINES += WTF_USE_TEXTURE_MAPPER_GL
     }
 } else {
     HEADERS += platform/graphics/qt/GraphicsLayerQt.h

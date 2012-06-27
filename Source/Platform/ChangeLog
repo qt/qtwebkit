@@ -1,3 +1,94 @@
+2012-06-26  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove WebView::graphicsContext3D getter
+        https://bugs.webkit.org/show_bug.cgi?id=89916
+
+        Reviewed by Adrienne Walker.
+
+        Remove unused getter.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebLayerTreeView):
+
+2012-06-26  Dave Tu  <dtu@chromium.org>
+
+        [chromium] Expose rendering statistics to WebWidget.
+        https://bugs.webkit.org/show_bug.cgi?id=88268
+
+        Reviewed by James Robinson.
+
+        The WebKit side of a basic framework for exposing rendering statistics
+        to Chromium's --enable-benchmarking extension.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebRenderingStatistics):
+        (WebKit):
+        (WebLayerTreeView):
+
+2012-06-25  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Add WebLayer API for scrolling
+        https://bugs.webkit.org/show_bug.cgi?id=89913
+
+        Reviewed by Adrienne Walker.
+
+        Adds WebScrollableLayer type to represent a layer that can be scrolled by the user. Currently WebContentLayers
+        are scrollable and no other layer types are, although this might change in the future.
+
+        * chromium/public/WebContentLayer.h:
+        (WebKit::WebContentLayer::WebContentLayer):
+        * chromium/public/WebLayer.h:
+        (WebLayer):
+        * chromium/public/WebScrollableLayer.h:
+        (WebKit):
+        (WebScrollableLayer):
+        (WebKit::WebScrollableLayer::WebScrollableLayer):
+        (WebKit::WebScrollableLayer::~WebScrollableLayer):
+        (WebKit::WebScrollableLayer::operator=):
+
+2012-06-25  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r121176.
+        http://trac.webkit.org/changeset/121176
+        https://bugs.webkit.org/show_bug.cgi?id=89934
+
+        [chromium] browser_tests assert failed:
+        FATAL:native_theme_win.cc(1541)] Check failed: false. Invalid
+        part: 16 (Requested by ukai on #webkit).
+
+        * chromium/public/win/WebThemeEngine.h:
+        (WebKit::WebThemeEngine::paintProgressBar):
+
+2012-06-25  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Use WebGraphicsContext3D in compositor implementation
+        https://bugs.webkit.org/show_bug.cgi?id=89700
+
+        Reviewed by Adrienne Walker.
+
+        Puts all callback destructors in protected section and removes obsolete memory callback signature.
+
+        * chromium/public/WebGraphicsContext3D.h:
+        (WebGraphicsContextLostCallback):
+        (WebGraphicsErrorMessageCallback):
+        (WebGraphicsSwapBuffersCompleteCallbackCHROMIUM):
+        (WebGraphicsMemoryAllocationChangedCallbackCHROMIUM):
+
+2012-06-25  Scott Graham  <scottmg@chromium.org>
+
+        Plumb Scrollbar button dimensions through WebThemeEngine
+        https://bugs.webkit.org/show_bug.cgi?id=89264
+
+        Reviewed by James Robinson.
+
+        Rather than making the height of the scrollbar buttons the same as the
+        width of the scrollbar, delegate to the WebThemeEngine. This allows
+        matching the Aura theme rather than the standard Windows theme.
+
+        * chromium/public/win/WebThemeEngine.h:
+        (WebKit):
+        (WebThemeEngine):
+
 2012-06-22  Kenneth Russell  <kbr@google.com>
 
         Unreviewed, rolling out r121064.

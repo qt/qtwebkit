@@ -1005,7 +1005,7 @@ void Internals::setBatteryStatus(Document* document, const String& eventType, bo
 #endif
 }
 
-void Internals::setNetworkInformation(Document* document, const String& eventType, long bandwidth, bool metered, ExceptionCode& ec)
+void Internals::setNetworkInformation(Document* document, const String& eventType, double bandwidth, bool metered, ExceptionCode& ec)
 {
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
@@ -1027,6 +1027,14 @@ bool Internals::hasSpellingMarker(Document* document, int from, int length, Exce
         return 0;
 
     return document->frame()->editor()->selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
+}
+    
+bool Internals::hasAutocorrectedMarker(Document* document, int from, int length, ExceptionCode&)
+{
+    if (!document || !document->frame())
+        return 0;
+    
+    return document->frame()->editor()->selectionStartHasMarkerFor(DocumentMarker::Autocorrected, from, length);
 }
 
 #if ENABLE(INSPECTOR)

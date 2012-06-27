@@ -36,6 +36,7 @@
 #include "cc/CCGraphicsContext.h"
 #include "cc/CCInputHandler.h"
 #include "cc/CCLayerTreeHost.h"
+#include "cc/CCRenderingStats.h"
 #include "cc/CCScheduler.h"
 #include "cc/CCScopedThreadProxy.h"
 #include "cc/CCTextureUpdater.h"
@@ -156,11 +157,6 @@ void CCThreadProxy::requestStartPageScaleAnimationOnImplThread(IntSize targetPos
         m_layerTreeHostImpl->startPageScaleAnimation(targetPosition, useAnchor, scale, monotonicallyIncreasingTime(), duration);
 }
 
-CCGraphicsContext* CCThreadProxy::context()
-{
-    return 0;
-}
-
 void CCThreadProxy::finishAllRendering()
 {
     ASSERT(CCProxy::isMainThread());
@@ -180,17 +176,12 @@ bool CCThreadProxy::isStarted() const
 bool CCThreadProxy::initializeContext()
 {
     TRACE_EVENT("CCThreadProxy::initializeContext", this, 0);
-    RefPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
+    OwnPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
     if (!context)
         return false;
-    ASSERT(context->hasOneRef());
-
-    // Leak the context pointer so we can transfer ownership of it to the other side...
-    CCGraphicsContext* contextPtr = context.release().leakRef();
-    ASSERT(contextPtr->hasOneRef());
 
     CCProxy::implThread()->postTask(createCCThreadTask(this, &CCThreadProxy::initializeContextOnImplThread,
-                                                       AllowCrossThreadAccess(contextPtr)));
+                                                       AllowCrossThreadAccess(context.leakPtr())));
     return true;
 }
 
@@ -249,18 +240,12 @@ bool CCThreadProxy::recreateContext()
     ASSERT(isMainThread());
 
     // Try to create the context.
-    RefPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
+    OwnPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
     if (!context)
         return false;
-    if (CCLayerTreeHost::needsFilterContext() && !m_layerTreeHost->settings().forceSoftwareCompositing)
+    if (m_layerTreeHost->needsSharedContext() && !m_layerTreeHost->settings().forceSoftwareCompositing)
         if (!SharedGraphicsContext3D::createForImplThread())
             return false;
-
-    ASSERT(context->hasOneRef());
-
-    // Leak the context pointer so we can transfer ownership of it to the other side...
-    CCGraphicsContext* contextPtr = context.release().leakRef();
-    ASSERT(contextPtr->hasOneRef());
 
     // Make a blocking call to recreateContextOnImplThread. The results of that
     // call are pushed into the recreateSucceeded and capabilities local
@@ -270,7 +255,7 @@ bool CCThreadProxy::recreateContext()
     LayerRendererCapabilities capabilities;
     CCProxy::implThread()->postTask(createCCThreadTask(this, &CCThreadProxy::recreateContextOnImplThread,
                                                        AllowCrossThreadAccess(&completion),
-                                                       AllowCrossThreadAccess(contextPtr),
+                                                       AllowCrossThreadAccess(context.leakPtr()),
                                                        AllowCrossThreadAccess(&recreateSucceeded),
                                                        AllowCrossThreadAccess(&capabilities)));
     completion.wait();
@@ -284,6 +269,17 @@ int CCThreadProxy::compositorIdentifier() const
 {
     ASSERT(isMainThread());
     return m_compositorIdentifier;
+}
+
+void CCThreadProxy::implSideRenderingStats(CCRenderingStats& stats)
+{
+    ASSERT(isMainThread());
+
+    CCCompletionEvent completion;
+    CCProxy::implThread()->postTask(createCCThreadTask(this, &CCThreadProxy::implSideRenderingStatsOnImplThread,
+                                                       AllowCrossThreadAccess(&completion),
+                                                       AllowCrossThreadAccess(&stats)));
+    completion.wait();
 }
 
 const LayerRendererCapabilities& CCThreadProxy::layerRendererCapabilities() const
@@ -480,7 +476,7 @@ void CCThreadProxy::beginFrame()
         return;
     }
 
-    if (CCLayerTreeHost::needsFilterContext() && !m_layerTreeHost->settings().forceSoftwareCompositing && !SharedGraphicsContext3D::haveForImplThread())
+    if (m_layerTreeHost->needsSharedContext() && !m_layerTreeHost->settings().forceSoftwareCompositing && !SharedGraphicsContext3D::haveForImplThread())
         SharedGraphicsContext3D::createForImplThread();
 
     OwnPtr<BeginFrameAndCommitState> request(m_pendingBeginFrameRequest.release());
@@ -621,7 +617,6 @@ void CCThreadProxy::scheduledActionCommit()
 
     m_layerTreeHost->beginCommitOnImplThread(m_layerTreeHostImpl.get());
     m_layerTreeHost->finishCommitOnImplThread(m_layerTreeHostImpl.get());
-    m_schedulerOnImplThread->setVisible(m_layerTreeHostImpl->visible());
 
     m_layerTreeHostImpl->commitComplete();
 
@@ -629,6 +624,9 @@ void CCThreadProxy::scheduledActionCommit()
 
     m_commitCompletionEventOnImplThread->signal();
     m_commitCompletionEventOnImplThread = 0;
+
+    // SetVisible kicks off the next scheduler action, so this must be last.
+    m_schedulerOnImplThread->setVisible(m_layerTreeHostImpl->visible());
 }
 
 void CCThreadProxy::scheduledActionBeginContextRecreation()
@@ -828,7 +826,7 @@ void CCThreadProxy::initializeContextOnImplThread(CCGraphicsContext* context)
 {
     TRACE_EVENT("CCThreadProxy::initializeContextOnImplThread", this, 0);
     ASSERT(isImplThread());
-    m_contextBeforeInitializationOnImplThread = adoptRef(context);
+    m_contextBeforeInitializationOnImplThread = adoptPtr(context);
 }
 
 void CCThreadProxy::initializeLayerRendererOnImplThread(CCCompletionEvent* completion, bool* initializeSucceeded, LayerRendererCapabilities* capabilities)
@@ -887,11 +885,18 @@ void CCThreadProxy::recreateContextOnImplThread(CCCompletionEvent* completion, C
     TRACE_EVENT0("cc", "CCThreadProxy::recreateContextOnImplThread");
     ASSERT(isImplThread());
     m_layerTreeHost->deleteContentsTexturesOnImplThread(m_layerTreeHostImpl->contentsTextureAllocator());
-    *recreateSucceeded = m_layerTreeHostImpl->initializeLayerRenderer(adoptRef(contextPtr), textureUploader);
+    *recreateSucceeded = m_layerTreeHostImpl->initializeLayerRenderer(adoptPtr(contextPtr), textureUploader);
     if (*recreateSucceeded) {
         *capabilities = m_layerTreeHostImpl->layerRendererCapabilities();
         m_schedulerOnImplThread->didRecreateContext();
     }
+    completion->signal();
+}
+
+void CCThreadProxy::implSideRenderingStatsOnImplThread(CCCompletionEvent* completion, CCRenderingStats* stats)
+{
+    ASSERT(isImplThread());
+    stats->numFramesSentToScreen = m_layerTreeHostImpl->sourceAnimationFrameNumber();
     completion->signal();
 }
 

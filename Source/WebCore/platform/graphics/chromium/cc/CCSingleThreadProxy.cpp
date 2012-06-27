@@ -31,6 +31,7 @@
 #include "cc/CCFontAtlas.h"
 #include "cc/CCGraphicsContext.h"
 #include "cc/CCLayerTreeHost.h"
+#include "cc/CCRenderingStats.h"
 #include "cc/CCTextureUpdater.h"
 #include "cc/CCTimer.h"
 #include <wtf/CurrentTime.h>
@@ -38,26 +39,6 @@
 using namespace WTF;
 
 namespace WebCore {
-
-class CCSingleThreadProxyAnimationTimer : public CCTimer, CCTimerClient {
-public:
-    static PassOwnPtr<CCSingleThreadProxyAnimationTimer> create(CCSingleThreadProxy* proxy) { return adoptPtr(new CCSingleThreadProxyAnimationTimer(proxy)); }
-
-    virtual void onTimerFired() OVERRIDE
-    {
-        if (m_proxy->m_layerRendererInitialized)
-            m_proxy->compositeImmediately();
-    }
-
-private:
-    explicit CCSingleThreadProxyAnimationTimer(CCSingleThreadProxy* proxy)
-        : CCTimer(CCProxy::mainThread(), this)
-        , m_proxy(proxy)
-    {
-    }
-
-    CCSingleThreadProxy* m_proxy;
-};
 
 PassOwnPtr<CCProxy> CCSingleThreadProxy::create(CCLayerTreeHost* layerTreeHost)
 {
@@ -68,7 +49,6 @@ CCSingleThreadProxy::CCSingleThreadProxy(CCLayerTreeHost* layerTreeHost)
     : m_layerTreeHost(layerTreeHost)
     , m_contextLost(false)
     , m_compositorIdentifier(-1)
-    , m_animationTimer(CCSingleThreadProxyAnimationTimer::create(this))
     , m_layerRendererInitialized(false)
     , m_nextFrameIsNewlyCommittedFrame(false)
 {
@@ -113,15 +93,6 @@ void CCSingleThreadProxy::startPageScaleAnimation(const IntSize& targetPosition,
     m_layerTreeHostImpl->startPageScaleAnimation(targetPosition, useAnchor, scale, monotonicallyIncreasingTime(), duration);
 }
 
-CCGraphicsContext* CCSingleThreadProxy::context()
-{
-    ASSERT(CCProxy::isMainThread());
-    if (m_contextBeforeInitialization)
-        return m_contextBeforeInitialization.get();
-    DebugScopedSetImplThread impl;
-    return m_layerTreeHostImpl->context();
-}
-
 void CCSingleThreadProxy::finishAllRendering()
 {
     ASSERT(CCProxy::isMainThread());
@@ -140,11 +111,10 @@ bool CCSingleThreadProxy::isStarted() const
 bool CCSingleThreadProxy::initializeContext()
 {
     ASSERT(CCProxy::isMainThread());
-    RefPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
+    OwnPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
     if (!context)
         return false;
-    ASSERT(context->hasOneRef());
-    m_contextBeforeInitialization = context;
+    m_contextBeforeInitialization = context.release();
     return true;
 }
 
@@ -169,9 +139,7 @@ bool CCSingleThreadProxy::initializeLayerRenderer()
         if (ok) {
             m_layerRendererInitialized = true;
             m_layerRendererCapabilitiesForMainThread = m_layerTreeHostImpl->layerRendererCapabilities();
-        } else
-            // If we couldn't initialize the layer renderer, we shouldn't process any future animation events.
-            m_animationTimer->stop();
+        }
 
         return ok;
     }
@@ -183,16 +151,15 @@ bool CCSingleThreadProxy::recreateContext()
     ASSERT(CCProxy::isMainThread());
     ASSERT(m_contextLost);
 
-    RefPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
+    OwnPtr<CCGraphicsContext> context = m_layerTreeHost->createContext();
     if (!context)
         return false;
 
-    ASSERT(context->hasOneRef());
     bool initialized;
     {
         DebugScopedSetImplThread impl;
         m_layerTreeHost->deleteContentsTexturesOnImplThread(m_layerTreeHostImpl->contentsTextureAllocator());
-        initialized = m_layerTreeHostImpl->initializeLayerRenderer(context, UnthrottledUploader);
+        initialized = m_layerTreeHostImpl->initializeLayerRenderer(context.release(), UnthrottledUploader);
         if (initialized) {
             m_layerRendererCapabilitiesForMainThread = m_layerTreeHostImpl->layerRendererCapabilities();
         }
@@ -202,6 +169,11 @@ bool CCSingleThreadProxy::recreateContext()
         m_contextLost = false;
 
     return initialized;
+}
+
+void CCSingleThreadProxy::implSideRenderingStats(CCRenderingStats& stats)
+{
+    stats.numFramesSentToScreen = m_layerTreeHostImpl->sourceAnimationFrameNumber();
 }
 
 const LayerRendererCapabilities& CCSingleThreadProxy::layerRendererCapabilities() const
@@ -279,7 +251,6 @@ bool CCSingleThreadProxy::commitRequested() const
 
 void CCSingleThreadProxy::didAddAnimation()
 {
-    m_animationTimer->startOneShot(animationTimerDelay());
 }
 
 void CCSingleThreadProxy::stop()
@@ -318,11 +289,6 @@ void CCSingleThreadProxy::compositeImmediately()
         m_layerTreeHostImpl->swapBuffers();
         didSwapFrame();
     }
-}
-
-double CCSingleThreadProxy::animationTimerDelay()
-{
-    return 1 / 60.0;
 }
 
 void CCSingleThreadProxy::forceSerializeOnSwapBuffers()

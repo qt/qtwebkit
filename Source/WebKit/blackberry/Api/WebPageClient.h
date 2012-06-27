@@ -144,6 +144,8 @@ public:
     virtual void checkSpellingOfString(const unsigned short* text, int length, int& misspellingLocation, int& misspellingLength) = 0;
     virtual void requestSpellingSuggestionsForString(unsigned start, unsigned end) = 0;
 
+    virtual int32_t checkSpellingOfStringAsync(wchar_t* text, int length) = 0;
+
     virtual void notifySelectionDetailsChanged(const Platform::IntRect& start, const Platform::IntRect& end, const Platform::IntRectRegion&, bool overrideTouchHandling = false) = 0;
     virtual void cancelSelectionVisuals() = 0;
     virtual void notifySelectionHandlesReversed() = 0;
@@ -160,6 +162,7 @@ public:
 
     virtual void resetBackForwardList(unsigned listSize, unsigned currentIndex) = 0;
 
+    virtual void openPopupList(bool multiple, int size, const ScopeArray<WebString>& labels, const bool* enableds, const int* itemType, const bool* selecteds) = 0;
     virtual void openDateTimePopup(int type, const WebString& value, const WebString& min, const WebString& max, double step) = 0;
     virtual void openColorPopup(const WebString& value) = 0;
 
@@ -251,7 +254,7 @@ public:
     virtual void clearCache() = 0;
 
     virtual bool hasKeyboardFocus() = 0;
-    virtual void createPopupWebView(const Platform::IntRect& webViewRect) = 0;
+    virtual bool createPopupWebView(const Platform::IntRect&) = 0;
     virtual void closePopupWebView() = 0;
 };
 } // namespace WebKit

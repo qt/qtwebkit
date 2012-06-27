@@ -50,6 +50,9 @@ config.kPlatforms = {
         resultsDirectoryForBuildNumber: function(buildNumber, revision) {
             return encodeURIComponent('r' + revision + ' (' + buildNumber + ')');
         },
+        builderApplies: function(builderName) {
+            return builderName.indexOf('Apple') != -1;
+        },
     },
     'chromium' : {
         label : 'Chromium',
@@ -58,7 +61,6 @@ config.kPlatforms = {
         waterfallURL: 'http://build.chromium.org/p/chromium.webkit/waterfall',
         builders: {
             'Webkit Win': {version: 'xp'},
-            'Webkit Vista': {version: 'vista'},
             'Webkit Win7': {version: 'win7'},
             'Webkit Win (dbg)(1)': {version: 'xp', debug: true},
             'Webkit Win (dbg)(2)': {version: 'xp', debug: true},
@@ -81,6 +83,12 @@ config.kPlatforms = {
         resultsDirectoryForBuildNumber: function(buildNumber, revision) {
             return buildNumber;
         },
+        builderApplies: function(builderName) {
+            // FIXME: Should garden-o-matic show these? I can imagine showing the deps bots being useful at least so
+            // that the gardener only need to look at garden-o-matic and never at the waterfall. Not really sure who
+            // watches the GPU bots.
+            return builderName.indexOf('GPU') == -1 && builderName.indexOf('deps') == -1 && builderName.indexOf('ASAN') == -1;
+        },
     },
     'gtk' : {
         label : 'GTK',
@@ -90,7 +98,7 @@ config.kPlatforms = {
         builders: {
             'GTK Linux 32-bit Release' : {version: '32-bit release'},
             'GTK Linux 64-bit Release' : {version: '64-bit release'},
-            'GTK Linux 64-bit Debug' : {version: '64-bit debug',debug: true},
+            'GTK Linux 64-bit Debug' : {version: '64-bit debug', debug: true},
         },
         haveBuilderAccumulatedResults : false,
         useDirectoryListingForOldBuilds: false,
@@ -100,6 +108,9 @@ config.kPlatforms = {
         },
         resultsDirectoryForBuildNumber: function(buildNumber, revision) {
             return encodeURIComponent('r' + revision + ' (' + buildNumber + ')');
+        },
+        builderApplies: function(builderName) {
+            return builderName.indexOf('GTK') != -1;
         },
     },
 };

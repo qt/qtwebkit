@@ -3401,14 +3401,11 @@ void Document::removeStyleSheetCandidateNode(Node* node)
 
 void Document::collectActiveStylesheets(Vector<RefPtr<StyleSheet> >& sheets)
 {
-    bool matchAuthorAndUserStyles = true;
-    if (Settings* settings = this->settings())
-        matchAuthorAndUserStyles = settings->authorAndUserStylesEnabled();
+    if (settings() && !settings()->authorAndUserStylesEnabled())
+        return;
 
     StyleSheetCandidateListHashSet::iterator begin = m_styleSheetCandidateNodes.begin();
     StyleSheetCandidateListHashSet::iterator end = m_styleSheetCandidateNodes.end();
-    if (!matchAuthorAndUserStyles)
-        end = begin;
     for (StyleSheetCandidateListHashSet::iterator it = begin; it != end; ++it) {
         Node* n = *it;
         StyleSheet* sheet = 0;
@@ -4581,7 +4578,7 @@ KURL Document::openSearchDescriptionURL()
         return KURL();
 
     HTMLCollection* children = head()->children();
-    for (Node* child = children->firstItem(); child; child = children->nextItem()) {
+    for (unsigned i = 0; Node* child = children->item(i); i++) {
         if (!child->hasTagName(linkTag))
             continue;
         HTMLLinkElement* linkElement = static_cast<HTMLLinkElement*>(child);
@@ -5928,7 +5925,7 @@ PassRefPtr<NodeList> Document::getItems(const String& typeNames)
 {
     // Since documet.getItem() is allowed for microdata, typeNames will be null string.
     // In this case we need to create an unique string identifier to map such request in the cache.
-    String localTypeNames = typeNames.isNull() ? String("http://webkit.org/microdata/undefinedItemType") : typeNames;
+    String localTypeNames = typeNames.isNull() ? MicroDataItemList::undefinedItemType() : typeNames;
 
     return ensureRareData()->ensureNodeLists(this)->addCacheWithName<MicroDataItemList>(this, DynamicNodeList::MicroDataItemListType, localTypeNames);
 }

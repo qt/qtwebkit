@@ -1,20 +1,321 @@
-2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+2012-06-26  Mark Hahnenberg  <mhahnenberg@apple.com>
 
-        [Qt][Win] Fix broken QtWebKit5.lib linking
-        https://bugs.webkit.org/show_bug.cgi?id=88321
+        Add support for preciseTime() to WebKitTestRunner
+        https://bugs.webkit.org/show_bug.cgi?id=90027
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Darin Adler.
 
-        On windows the import/export definition is part of the symbol's signature.
-        Define STATICALLY_LINKED_WITH_$$library for each dependend module
-        that is being linked statically to make sure that they can be linked together
-        later on.
+        It would be nice to be able to use preciseTime() in WebKitTestRunner like we can in DumpRenderTree.
 
-        Also do not compile Assertions.cpp in DumpRenderTree anymore since all the
-        used symbols are exported and it would cause a duplicate symbols error.
+        * WebKitTestRunner/InjectedBundle/Bindings/LayoutTestController.idl:
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.cpp: 
+        (WTR::LayoutTestController::preciseTime): 
+        (WTR):
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.h:
+        (LayoutTestController):
 
-        * DumpRenderTree/qt/DumpRenderTree.pro:
-        * qmake/mkspecs/features/default_post.prf:
+2012-06-26  Lucas Forschler  <lforschler@apple.com>
+
+      Teach the Apple port how to build the test tools in build-webkit
+      https://bugs.webkit.org/show_bug.cgi?id=89540
+
+      Reviewed by Jon Lee & Simon Fraser.
+
+      * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+      (RunWebKitTests.start): pass --no-build since tools should now be in the downloaded archive
+      (RunUnitTests.start): ditto
+      * Scripts/build-webkit: add tools to the projects build list
+
+2012-06-26  Ojan Vafai  <ojan@chromium.org>
+
+        Only show the platform-appropriate builders for non-layout test failures in garden-o-matic
+        https://bugs.webkit.org/show_bug.cgi?id=90025
+
+        Reviewed by Simon Fraser.
+
+        Move the chromium-specific filtering code into config.js and replace it with a method on each platform
+        config. Also, let the webkit test step name be webkit_tests (build.chromium.org) or layout-test (build.webkit.org).
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/builders.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/builders_unittests.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/config.js:
+
+2012-06-26  Ojan Vafai  <ojan@chromium.org>
+
+        Fix failing garden-o-matic unittests
+        https://bugs.webkit.org/show_bug.cgi?id=90021
+
+        Reviewed by Adam Barth.
+
+        These had all just fallen out of date.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/checkout_unittests.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui/notifications_unittests.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui_unittests.js:
+
+2012-06-26  Ojan Vafai  <ojan@chromium.org>
+
+        Fix platform picker change handler in garden-o-matic
+        https://bugs.webkit.org/show_bug.cgi?id=90010
+
+        Reviewed by Simon Fraser.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui.js:
+        The old code never worked. This is hard to test because change handlers require
+        a user-initiated action and the code is changing the window's location, which would
+        navigate the test page.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/styles/onebar.css:
+        Fix the CSS so it doesn't cause the tabstrip to be disconnected from the tabs on Linux
+        due to the large margin-bottom.
+
+2012-06-26  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        webkitpy: Make webkit-patch patches-to-review useful
+        https://bugs.webkit.org/show_bug.cgi?id=89470
+
+        Reviewed by Eric Seidel.
+
+        webkit-patch patches-to-review will now output the list of
+        bugs with patches pending for review that has the user on CC,
+        excluding patches with cq-, sorted by the age of the patch.
+
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla.py:
+        (BugzillaQueries.fetch_bugs_from_review_queue):
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla_mock.py:
+        (MockBugzillaQueries.fetch_bugs_from_review_queue):
+        (MockBugzilla.__init__):
+        (MockBugzilla.authenticate):
+        * Scripts/webkitpy/tool/commands/queries.py:
+        (PatchesToReview):
+        (PatchesToReview.__init__):
+        (PatchesToReview._print_report):
+        (PatchesToReview._generate_report):
+        (PatchesToReview.execute):
+        * Scripts/webkitpy/tool/commands/queries_unittest.py:
+        (QueryCommandsTest.test_patches_to_review):
+
+2012-06-26  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: broken for chromium on vista
+        https://bugs.webkit.org/show_bug.cgi?id=89988
+
+        Reviewed by Tony Chang.
+
+        r121194 removed support for 'chromium-win-vista' as a separate
+        port, but this actually prevented the code from running on vista
+        at all, which is unduly harsh and broke the websocket tests on
+        the (non-webkit) chromium bots that are still running on vista.
+
+        It's probably good enough to pretend that vista is win7 instead;
+        some layout tests will still fail but at least things'll run.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_win.py:
+        (ChromiumWinPort.determine_full_port_name):
+        * Scripts/webkitpy/layout_tests/port/chromium_win_unittest.py:
+        (ChromiumWinTest.test_versions):
+
+2012-06-26  Csaba Osztrogonác  <ossy@webkit.org>
+
+        master.cfg cleanup: Pass CheckOutSource instance instead of class to BuildStep.addStep
+        https://bugs.webkit.org/show_bug.cgi?id=89215
+
+        We need it because it is deprecated and will be dropped in buildbot 0.8.7
+
+        Reviewed by Tony Chang.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (CheckOutSource.__init__):
+        (Factory.__init__):
+
+2012-06-26  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt][Win] Symbols are not exported in QtWebKit5.dll
+        https://bugs.webkit.org/show_bug.cgi?id=88873
+
+        Reviewed by Tor Arne Vestbø.
+
+        When linking the target dll make sure to re-export the symbols from
+        the static libraries marked as export, with the help of a little python
+        script and a qmake extra compiler.
+
+        * Scripts/generate-win32-export-forwards: Added.
+        * qmake/mkspecs/features/win32/default_post.prf:
+
+2012-06-25  Jocelyn Turcotte  <turcotte.j@gmail.com>
+
+        Add a note about hostname completion not working well with --cc completion
+
+        Reviewed by Simon Hausmann.
+
+        Hostname completion tries to resolve anything after an @ sign which is present
+        in the completed list of contributor emails to CC.
+
+        * Scripts/webkit-tools-completion.sh:
+
+2012-06-26  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r121244.
+        http://trac.webkit.org/changeset/121244
+        https://bugs.webkit.org/show_bug.cgi?id=89966
+
+        skip list path is incorrect now. (Requested by Ossy on
+        #webkit).
+
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort.baseline_search_path):
+        (QtPort._skipped_file_search_paths):
+        * Scripts/webkitpy/layout_tests/port/qt_unittest.py:
+        (QtPortTest.test_baseline_search_path):
+
+2012-06-26  János Badics  <jbadics@inf.u-szeged.hu>
+
+        [Qt][NRWT] Fix baseline and skipped file search path.
+        https://bugs.webkit.org/show_bug.cgi?id=89882
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort.baseline_search_path):
+        * Scripts/webkitpy/layout_tests/port/qt_unittest.py:
+        (QtPortTest.test_baseline_search_path):
+
+2012-06-26  Tony Chang  <tony@chromium.org>
+
+        [Qt] Enable grid layout LayoutTests
+        https://bugs.webkit.org/show_bug.cgi?id=89909
+
+        Reviewed by Csaba Osztrogonác.
+
+        These tests pass, we just need to hook up the overridePreference.
+
+        * DumpRenderTree/qt/DumpRenderTreeQt.cpp:
+        (WebCore::WebPage::resetSettings): Reset grid layout and regions between tests.
+        * DumpRenderTree/qt/LayoutTestControllerQt.cpp:
+        (LayoutTestController::overridePreference): Add WebKitCSSGridLayoutEnabled.
+
+2012-06-26  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r121236.
+        http://trac.webkit.org/changeset/121236
+        https://bugs.webkit.org/show_bug.cgi?id=89956
+
+        It's broke the nrwt on qt and gtk platform (Requested by
+        kkristof on #webkit).
+
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort._build_driver):
+        * Scripts/webkitpy/layout_tests/port/xvfbdriver.py:
+        (XvfbDriver._start):
+        (XvfbDriver._start.x_filter):
+        (XvfbDriver.stop):
+
+2012-06-26  Kristóf Kosztyó  <kkristof@inf.u-szeged.hu>
+
+        [NRWT] XvfbDriver should choose the next free display
+        https://bugs.webkit.org/show_bug.cgi?id=88414
+
+        Reviewed by Dirk Pranke.
+
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort._driver_class):
+        * Scripts/webkitpy/layout_tests/port/xvfbdriver.py:
+        (XvfbDriver.__init__):
+        (XvfbDriver._start):
+        (XvfbDriver._start.next_free_id):
+        (XvfbDriver.stop):
+
+2012-06-25  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Make it possible to build WebKit without QtWidgets
+        https://bugs.webkit.org/show_bug.cgi?id=78109
+
+        Reviewed by Tor Arne Vestbø.
+
+        * Tools.pro: Disable various tools that depend on WK1.
+        * qmake/mkspecs/features/default_post.prf: Add WK1 as supported static lib in WEBKIT
+        * qmake/mkspecs/features/default_pre.prf: Disable WK1 if QtWidgets is not built.
+        * qmake/mkspecs/modules/webkit1.prf: Added.
+
+2012-06-25  Dirk Pranke  <dpranke@chromium.org>
+
+        put vista back for chromium (non-webkit) bots ...
+        https://bugs.webkit.org/show_bug.cgi?id=89929
+
+        Unreviewed, build fix.
+
+        Turns out we've only gotten rid of vista on the webkit tests so
+        far. Put vista back for the other chromium bots ...
+
+        * TestResultServer/static-dashboards/flakiness_dashboard.js:
+        (chromiumPlatform):
+        * TestResultServer/static-dashboards/flakiness_dashboard_unittests.js:
+        (test):
+
+2012-06-25  Dirk Pranke  <dpranke@chromium.org>
+
+        update flakiness dashboard after removing chromium-vista bots
+        https://bugs.webkit.org/show_bug.cgi?id=89925
+
+        Unreviewed, build fix.
+
+        More changes missed in r121194 :(.
+
+        * TestResultServer/static-dashboards/flakiness_dashboard.js:
+        (chromiumPlatform):
+        * TestResultServer/static-dashboards/flakiness_dashboard_unittests.js:
+        (test):
+
+2012-06-25  Dirk Pranke  <dpranke@chromium.org>
+
+        remove support for chromium vista from tools
+        https://bugs.webkit.org/show_bug.cgi?id=89915
+
+        Reviewed by Tony Chang.
+
+        This change is all deleting code and updating tests to handle
+        the configuration being gone. All tests now pass except for a
+        few unittests for the flakiness dashboard which were failing
+        before this patch.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/builders_unittests.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/checkout_unittests.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/config.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui/notifications_unittests.js:
+        * Scripts/webkitpy/common/checkout/baselineoptimizer_unittest.py:
+        (BaselineOptimizerTest.test_complex_shadowing):
+        * Scripts/webkitpy/layout_tests/port/builders.py:
+        * Scripts/webkitpy/layout_tests/port/chromium.py:
+        * Scripts/webkitpy/layout_tests/port/chromium_unittest.py:
+        * Scripts/webkitpy/layout_tests/port/chromium_win.py:
+        (ChromiumWinPort):
+        * Scripts/webkitpy/layout_tests/port/chromium_win_unittest.py:
+        (ChromiumWinTest.test_versions):
+        (ChromiumWinTest.test_baseline_path):
+        * Scripts/webkitpy/tool/commands/rebaseline_unittest.py:
+        * Scripts/webkitpy/tool/servers/gardeningserver_unittest.py:
+        (BuildCoverageExtrapolatorTest.test_extrapolate):
+
+2012-06-25  Scott Graham  <scottmg@chromium.org>
+
+        [Chromium] add empty impl of WebThemeEngine::getSize() for DRT
+        https://bugs.webkit.org/show_bug.cgi?id=89907
+
+        Not reviewed. Fix build in Chromium.
+
+        * DumpRenderTree/chromium/WebThemeEngineDRTWin.cpp:
+        (WebThemeEngineDRTWin::getSize):
+        * DumpRenderTree/chromium/WebThemeEngineDRTWin.h:
+        (WebThemeEngineDRTWin):
+
+2012-06-25  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Implement Network Information API
+        https://bugs.webkit.org/show_bug.cgi?id=87067
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * efl/jhbuild.modules: Add eeze library dependency.
 
 2012-06-25  Simon Hausmann  <simon.hausmann@nokia.com>
 

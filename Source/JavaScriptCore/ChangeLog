@@ -1,33 +1,223 @@
-2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+2012-06-26  Geoffrey Garen  <ggaren@apple.com>
 
-        [Qt][Win] Fix broken QtWebKit5.lib linking
-        https://bugs.webkit.org/show_bug.cgi?id=88321
+        Reduced (but did not eliminate) use of "berzerker GC"
+        https://bugs.webkit.org/show_bug.cgi?id=89237
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Gavin Barraclough.
 
-        Also update the Wx build to use the new define.
+        (PART 2)
 
-        * API/JSBase.h:
-        * runtime/JSExportMacros.h:
-        * wscript:
+        This part turns off "berzerker GC" and turns on incremental shrinking.
 
-2012-06-13  Patrick Gansterer  <paroga@webkit.org>
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::doSweep): Free or shrink after sweeping to
+        maintain the behavior we used to get from the occasional berzerker GC,
+        which would run all finalizers and then free or shrink all blocks
+        synchronously.
 
-        [WIN] Remove dependency on pthread from MachineStackMarker
-        https://bugs.webkit.org/show_bug.cgi?id=68429
+        * heap/MarkedBlock.h:
+        (JSC::MarkedBlock::needsSweeping): Sweep zapped blocks, too. It's always
+        safe to sweep a zapped block (that's the point of zapping), and it's
+        sometimes profitable. For example, consider this case: Block A does some
+        allocation (transitioning Block A from Marked to FreeListed), then GC
+        happens (transitioning Block A to Zapped), then all objects in Block A
+        are free, then the incremental sweeper visits Block A. If we skipped
+        Zapped blocks, we'd skip Block A, even though it would be profitable to
+        run its destructors and free its memory.
 
-        Reviewed by NOBODY (OOPS!).
+        * runtime/GCActivityCallback.cpp:
+        (JSC::DefaultGCActivityCallback::doWork): Don't sweep eagerly; we'll do
+        this incrementally.
 
-        Implement pthread TLS functionality with native windows functions.
+2012-06-26  Filip Pizlo  <fpizlo@apple.com>
 
-        * heap/MachineStackMarker.cpp: Use the new functions instead of pthread directly.
-        * heap/MachineStackMarker.h:
-        * wtf/ThreadSpecific.h:
-        (WTF::ThreadSpecificKeyCreate): Added wrapper around pthread_key_create.
-        (WTF::ThreadSpecificKeyDelete): Added wrapper around pthread_key_delete.
-        (WTF::ThreadSpecificSet): Added wrapper around pthread_setspecific.
-        (WTF::ThreadSpecificGet): Added wrapper around pthread_getspecific.
-        * wtf/ThreadSpecificWin.cpp:
+        DFG PutByValAlias is too aggressive
+        https://bugs.webkit.org/show_bug.cgi?id=90026
+        <rdar://problem/11751830>
+
+        Reviewed by Gavin Barraclough.
+        
+        For CSE on normal arrays, we now treat PutByVal as impure. This does not appear to affect
+        performance by much.
+        
+        For CSE on typed arrays, we fix PutByValAlias by making GetByVal speculate that the access
+        is within bounds. This also has the effect of making our out-of-bounds handling consistent
+        with WebCore.
+
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGGraph.h:
+        (JSC::DFG::Graph::byValIsPure):
+        (JSC::DFG::Graph::clobbersWorld):
+        * dfg/DFGNodeType.h:
+        (DFG):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileGetByValOnIntTypedArray):
+        (JSC::DFG::SpeculativeJIT::compileGetByValOnFloatTypedArray):
+
+2012-06-26  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Add JSC statistics into about:memory
+        https://bugs.webkit.org/show_bug.cgi?id=89779
+
+        Reviewed by Rob Buis.
+
+        Fix non-JIT build on BlackBerry broken by r121196.
+
+        * runtime/MemoryStatistics.cpp:
+        (JSC::globalMemoryStatistics):
+
+2012-06-25  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG::operationNewArray is unnecessarily slow, and may use the wrong array
+        prototype when inlined
+        https://bugs.webkit.org/show_bug.cgi?id=89821
+
+        Reviewed by Geoffrey Garen.
+        
+        Fixes all array allocations to use the right structure, and hence the right prototype. Adds
+        inlining of new Array(...) with a non-zero number of arguments. Optimizes allocations of
+        empty arrays.
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::handleConstantInternalFunction):
+        * dfg/DFGCCallHelpers.h:
+        (JSC::DFG::CCallHelpers::setupArgumentsWithExecState):
+        (CCallHelpers):
+        * dfg/DFGNodeType.h:
+        (DFG):
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * runtime/JSArray.h:
+        (JSC):
+        (JSC::constructArray):
+        * runtime/JSGlobalObject.h:
+        (JSC):
+        (JSC::constructArray):
+
+2012-06-26  Filip Pizlo  <fpizlo@apple.com>
+
+        New fast/js/dfg-store-unexpected-value-into-argument-and-osr-exit.html fails on 32 bit
+        https://bugs.webkit.org/show_bug.cgi?id=89953
+
+        Reviewed by Zoltan Herczeg.
+        
+        DFG 32-bit JIT was confused about the difference between a predicted type and a
+        proven type. This is easy to get confused about, since a local that is predicted int32
+        almost always means that the local must be an int32 since speculations are hoisted to
+        stores to locals. But that is less likely to be the case for arguments, where there is
+        an additional least-upper-bounding step: any store to an argument with a weird type
+        may force the argument to be any type.
+        
+        This patch basically duplicates the functionality in DFGSpeculativeJIT64.cpp for
+        GetLocal: the decision of whether to load a local as an int32 (or as an array, or as
+        a boolean) is made based on the AbstractValue::m_type, which is a type proof, rather
+        than the VariableAccessData::prediction(), which is a predicted type.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-06-25  Filip Pizlo  <fpizlo@apple.com>
+
+        JSC should try to make profiling deterministic because otherwise reproducing failures is
+        nearly impossible
+        https://bugs.webkit.org/show_bug.cgi?id=89940
+
+        Rubber stamped by Gavin Barraclough.
+        
+        This rolls out the part of http://trac.webkit.org/changeset/121215 that introduced randomness
+        into the system. Now, instead of randomizing the tier-up threshold, we always set it to an
+        artificially low (and statically predetermined!) value. This gives most of the benefit of
+        threshold randomization without actually making the system behave completely differently on
+        each invocation.
+
+        * bytecode/ExecutionCounter.cpp:
+        (JSC::ExecutionCounter::setThreshold):
+        * runtime/Options.cpp:
+        (Options):
+        (JSC::Options::initializeOptions):
+        * runtime/Options.h:
+        (Options):
+
+2012-06-22  Filip Pizlo  <fpizlo@apple.com>
+
+        Value profiling should use tier-up threshold randomization to get more coverage
+        https://bugs.webkit.org/show_bug.cgi?id=89802
+
+        Reviewed by Gavin Barraclough.
+        
+        This patch causes both LLInt and Baseline JIT code to take the OSR slow path several
+        times before actually doing OSR. If we take the OSR slow path before the execution
+        count threshold is reached, then we just call CodeBlock::updateAllPredictions() to
+        compute the current latest least-upper-bound SpecType of all values seen in each
+        ValueProfile.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+        (JSC::CodeBlock::updateAllPredictionsAndCountLiveness):
+        (JSC):
+        (JSC::CodeBlock::updateAllPredictions):
+        (JSC::CodeBlock::shouldOptimizeNow):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::llintExecuteCounter):
+        (JSC::CodeBlock::jitExecuteCounter):
+        (CodeBlock):
+        (JSC::CodeBlock::updateAllPredictions):
+        * bytecode/ExecutionCounter.cpp:
+        (JSC::ExecutionCounter::setThreshold):
+        (JSC::ExecutionCounter::status):
+        (JSC):
+        * bytecode/ExecutionCounter.h:
+        (JSC::ExecutionCounter::count):
+        (ExecutionCounter):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::jitCompileAndSetHeuristics):
+        (JSC::LLInt::entryOSR):
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::JSGlobalObject):
+        (JSC):
+        * runtime/JSGlobalObject.h:
+        (JSGlobalObject):
+        (JSC::JSGlobalObject::weakRandomInteger):
+        * runtime/Options.cpp:
+        (Options):
+        (JSC::Options::initializeOptions):
+        * runtime/Options.h:
+        (Options):
+        * runtime/WeakRandom.h:
+        (WeakRandom):
+        (JSC::WeakRandom::seedUnsafe):
+
+2012-06-25  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Add JSC statistics into about:memory
+        https://bugs.webkit.org/show_bug.cgi?id=89779
+
+        Reviewed by Rob Buis.
+
+        Add MemoryStatistics.cpp into build, and fill JITBytes for BlackBerry port.
+
+        * PlatformBlackBerry.cmake:
+        * runtime/MemoryStatistics.cpp:
+        (JSC::globalMemoryStatistics):
 
 2012-06-23  Sheriff Bot  <webkit.review.bot@gmail.com>
 

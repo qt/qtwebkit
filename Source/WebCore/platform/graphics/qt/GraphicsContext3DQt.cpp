@@ -35,6 +35,7 @@
 #include "SharedBuffer.h"
 #if HAVE(QT5)
 #include <QWindow>
+#include <qpa/qplatformpixmap.h>
 #endif
 #include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
@@ -312,6 +313,7 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
 GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWindow* hostWindow, bool)
     : m_currentWidth(0)
     , m_currentHeight(0)
+    , m_compiler(isGLES2Compliant() ? SH_ESSL_OUTPUT : SH_GLSL_OUTPUT)
     , m_attrs(attrs)
     , m_texture(0)
     , m_compositorTexture(0)
@@ -412,6 +414,7 @@ GraphicsContext3D::~GraphicsContext3D()
     // If GraphicsContext3D init failed in constructor, m_private set to nullptr and no buffers are allocated.
     if (!m_private)
         return;
+
     makeContextCurrent();
     glDeleteTextures(1, &m_texture);
     glDeleteFramebuffers(1, &m_fbo);
@@ -484,25 +487,46 @@ bool GraphicsContext3D::getImageData(Image* image,
     UNUSED_PARAM(ignoreGammaAndColorProfile);
     if (!image)
         return false;
-    QImage nativeImage;
+
+    QImage qtImage;
     // Is image already loaded? If not, load it.
     if (image->data())
-        nativeImage = QImage::fromData(reinterpret_cast<const uchar*>(image->data()->data()), image->data()->size()).convertToFormat(QImage::Format_ARGB32);
+        qtImage = QImage::fromData(reinterpret_cast<const uchar*>(image->data()->data()), image->data()->size());
     else {
         QPixmap* nativePixmap = image->nativeImageForCurrentFrame();
-        nativeImage = nativePixmap->toImage().convertToFormat(QImage::Format_ARGB32);
+#if HAVE(QT5)
+        // With QPA, we can avoid a deep copy.
+        qtImage = *nativePixmap->handle()->buffer();
+#else
+        // This might be a deep copy, depending on other references to the pixmap.
+        qtImage = nativePixmap->toImage();
+#endif
     }
-    AlphaOp neededAlphaOp = AlphaDoNothing;
-    if (premultiplyAlpha)
-        neededAlphaOp = AlphaDoPremultiply;
+
+    AlphaOp alphaOp = AlphaDoNothing;
+    switch (qtImage.format()) {
+    case QImage::Format_ARGB32:
+        if (premultiplyAlpha)
+            alphaOp = AlphaDoPremultiply;
+        break;
+    case QImage::Format_ARGB32_Premultiplied:
+        if (!premultiplyAlpha)
+            alphaOp = AlphaDoUnmultiply;
+        break;
+    default:
+        // The image has a format that is not supported in packPixels. We have to convert it here.
+        qtImage = qtImage.convertToFormat(premultiplyAlpha ? QImage::Format_ARGB32_Premultiplied : QImage::Format_ARGB32);
+        break;
+    }
 
     unsigned int packedSize;
     // Output data is tightly packed (alignment == 1).
     if (computeImageSizeInBytes(format, type, image->width(), image->height(), 1, &packedSize, 0) != GraphicsContext3D::NO_ERROR)
         return false;
+
     outputVector.resize(packedSize);
 
-    return packPixels(nativeImage.bits(), SourceFormatBGRA8, image->width(), image->height(), 0, format, type, neededAlphaOp, outputVector.data());
+    return packPixels(qtImage.bits(), SourceFormatBGRA8, image->width(), image->height(), 0, format, type, alphaOp, outputVector.data());
 }
 
 void GraphicsContext3D::setContextLostCallback(PassOwnPtr<ContextLostCallback>)

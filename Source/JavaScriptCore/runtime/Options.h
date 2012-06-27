@@ -53,6 +53,9 @@ extern int32_t thresholdForOptimizeNextInvocation;
 extern int32_t executionCounterIncrementForLoop;
 extern int32_t executionCounterIncrementForReturn;
 
+extern bool randomizeExecutionCountsBetweenCheckpoints;
+extern int32_t maximumExecutionCountsBetweenCheckpoints;
+
 extern unsigned desiredSpeculativeSuccessFailRatio;
 
 extern double likelyToTakeSlowCaseThreshold;
@@ -80,6 +83,9 @@ extern unsigned minimumNumberOfScansBetweenRebalance;
 extern unsigned gcMarkStackSegmentSize;
 JS_EXPORTDATA extern unsigned numberOfGCMarkers;
 JS_EXPORTDATA extern unsigned opaqueRootMergeThreshold;
+
+extern bool forceWeakRandomSeed;
+extern unsigned forcedWeakRandomSeed;
 
 void initializeOptions();
 

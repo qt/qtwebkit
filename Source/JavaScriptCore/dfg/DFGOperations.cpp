@@ -1005,12 +1005,22 @@ EncodedJSValue DFG_OPERATION operationStrCat(ExecState* exec, void* buffer, size
     return JSValue::encode(jsString(exec, static_cast<Register*>(buffer), size));
 }
 
-EncodedJSValue DFG_OPERATION operationNewArray(ExecState* exec, void* buffer, size_t size)
+EncodedJSValue DFG_OPERATION operationNewArray(ExecState* exec, Structure* arrayStructure, void* buffer, size_t size)
 {
     JSGlobalData* globalData = &exec->globalData();
     NativeCallFrameTracer tracer(globalData, exec);
 
-    return JSValue::encode(constructArray(exec, static_cast<JSValue*>(buffer), size));
+    return JSValue::encode(constructArray(exec, arrayStructure, static_cast<JSValue*>(buffer), size));
+}
+
+EncodedJSValue DFG_OPERATION operationNewEmptyArray(ExecState* exec, Structure* arrayStructure)
+{
+    return JSValue::encode(JSArray::create(exec->globalData(), arrayStructure));
+}
+
+EncodedJSValue DFG_OPERATION operationNewArrayWithSize(ExecState* exec, Structure* arrayStructure, int32_t size)
+{
+    return JSValue::encode(JSArray::create(exec->globalData(), arrayStructure, size));
 }
 
 EncodedJSValue DFG_OPERATION operationNewArrayBuffer(ExecState* exec, size_t start, size_t size)
@@ -1238,12 +1248,12 @@ void DFG_OPERATION debugOperationPrintSpeculationFailure(ExecState* exec, void* 
     SpeculationFailureDebugInfo* debugInfo = static_cast<SpeculationFailureDebugInfo*>(debugInfoRaw);
     CodeBlock* codeBlock = debugInfo->codeBlock;
     CodeBlock* alternative = codeBlock->alternative();
-    dataLog("Speculation failure in %p at @%u with executeCounter = %d, "
+    dataLog("Speculation failure in %p at @%u with executeCounter = %s, "
             "reoptimizationRetryCounter = %u, optimizationDelayCounter = %u, "
             "success/fail %u/(%u+%u)\n",
             codeBlock,
             debugInfo->nodeIndex,
-            alternative ? alternative->jitExecuteCounter() : 0,
+            alternative ? alternative->jitExecuteCounter().status() : 0,
             alternative ? alternative->reoptimizationRetryCounter() : 0,
             alternative ? alternative->optimizationDelayCounter() : 0,
             codeBlock->speculativeSuccessCounter(),

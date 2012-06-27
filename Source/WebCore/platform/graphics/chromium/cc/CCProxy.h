@@ -36,6 +36,7 @@ namespace WebCore {
 class CCFontAtlas;
 class CCThread;
 class CCGraphicsContext;
+struct CCRenderingStats;
 struct LayerRendererCapabilities;
 
 // Abstract class responsible for proxying commands from the main-thread side of
@@ -81,6 +82,8 @@ public:
 
     virtual int compositorIdentifier() const = 0;
 
+    virtual void implSideRenderingStats(CCRenderingStats&) = 0;
+
     virtual const LayerRendererCapabilities& layerRendererCapabilities() const = 0;
 
     virtual void setNeedsAnimate() = 0;
@@ -112,9 +115,6 @@ public:
     static bool isMainThreadBlocked();
     static void setMainThreadBlocked(bool);
 #endif
-
-    // Temporary hack while render_widget still does scheduling for CCLayerTreeHostMainThreadI
-    virtual CCGraphicsContext* context() = 0;
 
     // Testing hooks
     virtual void loseContext() = 0;
