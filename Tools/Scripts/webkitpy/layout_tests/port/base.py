@@ -136,8 +136,12 @@ class Port(object):
         self._reftest_list = {}
         self._results_directory = None
 
-    def default_test_timeout_ms(self):
-        return 6 * 1000
+    def default_pixel_tests(self):
+        # FIXME: Disable until they are run by default on build.webkit.org.
+        return False
+
+    def default_timeout_ms(self):
+        return 35 * 1000
 
     def wdiff_available(self):
         if self._wdiff_available is None:
@@ -650,6 +654,9 @@ class Port(object):
                 return True
         return False
 
+    def is_chromium(self):
+        return False
+
     def name(self):
         """Returns a name that uniquely identifies this particular type of port
         (e.g., "mac-snowleopard" or "chromium-linux-x86_x64" and can be passed
@@ -693,7 +700,7 @@ class Port(object):
 
         # test_expectations are always in mac/ not mac-leopard/ by convention, hence we use port_name instead of name().
         port_name = self.port_name
-        if port_name.startswith('chromium') or port_name.startswith('google-chrome'):
+        if port_name.startswith('chromium'):
             port_name = 'chromium'
 
         return self._filesystem.join(self._webkit_baseline_path(port_name), 'TestExpectations')

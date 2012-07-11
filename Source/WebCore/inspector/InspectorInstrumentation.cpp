@@ -68,6 +68,7 @@
 #include "WorkerThread.h"
 #include "XMLHttpRequest.h"
 #include <wtf/StdLibExtras.h>
+#include <wtf/ThreadSpecific.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
@@ -629,11 +630,11 @@ void InspectorInstrumentation::didLoadResourceFromMemoryCacheImpl(InstrumentingA
         resourceAgent->didLoadResourceFromMemoryCache(loader, cachedResource);
 }
 
-InspectorInstrumentationCookie InspectorInstrumentation::willReceiveResourceDataImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, Frame* frame)
+InspectorInstrumentationCookie InspectorInstrumentation::willReceiveResourceDataImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, Frame* frame, int length)
 {
     int timelineAgentId = 0;
     if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent()) {
-        timelineAgent->willReceiveResourceData(identifier, frame);
+        timelineAgent->willReceiveResourceData(identifier, frame, length);
         timelineAgentId = timelineAgent->id();
     }
     return InspectorInstrumentationCookie(instrumentingAgents, timelineAgentId);
@@ -879,6 +880,8 @@ void InspectorInstrumentation::consoleCountImpl(InstrumentingAgents* instrumenti
 
 void InspectorInstrumentation::startConsoleTimingImpl(InstrumentingAgents* instrumentingAgents, const String& title)
 {
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->time(title);
     if (InspectorConsoleAgent* consoleAgent = instrumentingAgents->inspectorConsoleAgent())
         consoleAgent->startTiming(title);
 }
@@ -887,6 +890,8 @@ void InspectorInstrumentation::stopConsoleTimingImpl(InstrumentingAgents* instru
 {
     if (InspectorConsoleAgent* consoleAgent = instrumentingAgents->inspectorConsoleAgent())
         consoleAgent->stopTiming(title, stack);
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->timeEnd(title);
 }
 
 void InspectorInstrumentation::consoleTimeStampImpl(InstrumentingAgents* instrumentingAgents, PassRefPtr<ScriptArguments> arguments)
@@ -1132,6 +1137,22 @@ void InspectorInstrumentation::didFireAnimationFrameImpl(const InspectorInstrume
         timelineAgent->didFireAnimationFrame();
 }
 
+InspectorTimelineAgent* InspectorInstrumentation::timelineAgentForOrphanEvents()
+{
+    return *threadSpecificTimelineAgentForOrphanEvents();
+}
+
+void InspectorInstrumentation::setTimelineAgentForOrphanEvents(InspectorTimelineAgent* inspectorTimelineAgent)
+{
+    *threadSpecificTimelineAgentForOrphanEvents() = inspectorTimelineAgent;
+}
+
+WTF::ThreadSpecific<InspectorTimelineAgent*>& InspectorInstrumentation::threadSpecificTimelineAgentForOrphanEvents()
+{
+    AtomicallyInitializedStatic(WTF::ThreadSpecific<InspectorTimelineAgent*>*, instance = new WTF::ThreadSpecific<InspectorTimelineAgent*>());
+    return *instance;
+}
+
 InspectorTimelineAgent* InspectorInstrumentation::retrieveTimelineAgent(const InspectorInstrumentationCookie& cookie)
 {
     if (!cookie.first)
@@ -1162,6 +1183,19 @@ InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForNonDocument
     if (context->isWorkerContext())
         return instrumentationForWorkerContext(static_cast<WorkerContext*>(context));
     return 0;
+}
+#endif
+
+#if ENABLE(GEOLOCATION)
+GeolocationPosition* InspectorInstrumentation::checkGeolocationPositionOrErrorImpl(InstrumentingAgents* instrumentingAgents, GeolocationPosition* position)
+{
+    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent()) {
+        if (pageAgent->sendGeolocationError())
+            return 0;
+        if (pageAgent->geolocationPosition())
+            position = pageAgent->geolocationPosition();
+    }
+    return position;
 }
 #endif
 

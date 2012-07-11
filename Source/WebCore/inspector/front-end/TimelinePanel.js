@@ -157,7 +157,6 @@ WebInspector.TimelinePanel.prototype = {
         var top = event.pageY + this._dragOffset
         this._setSplitterPosition(top);
         event.preventDefault();
-        this._refresh();
     },
 
     /**
@@ -180,6 +179,8 @@ WebInspector.TimelinePanel.prototype = {
         this.splitView.element.style.height = (top - overviewHeight) + "px";
         this._timelineMemorySplitter.style.top = (top - 2) + "px";
         this._memoryStatistics.setTopPosition(top);
+        this._containerElementHeight = this._containerElement.clientHeight;
+        this.onResize();
     },
 
     get calculator()
@@ -231,6 +232,8 @@ WebInspector.TimelinePanel.prototype = {
         var categories = WebInspector.TimelinePresentationModel.categories();
         for (var categoryName in categories) {
             var category = categories[categoryName];
+            if (category.overviewStripGroupIndex < 0)
+                continue;
             this.statusBarFilters.appendChild(this._createTimelineCategoryStatusBarCheckbox(category, this._onCategoryCheckboxClicked.bind(this, category)));
         }
     },
@@ -436,13 +439,13 @@ WebInspector.TimelinePanel.prototype = {
             this._memoryStatistics.hide();
             this.splitView.element.style.height = "auto";
             this.splitView.element.style.bottom = "0";
+            this.onResize();
         } else {
             this._timelineMemorySplitter.removeStyleClass("hidden");
             this._memoryStatistics.show();
             this.splitView.element.style.bottom = "auto";
             this._setSplitterPosition(WebInspector.settings.memoryCounterGraphsHeight.get());
         }
-        this._refresh();
     },
 
     _toggleTimelineButtonClicked: function()
@@ -494,8 +497,8 @@ WebInspector.TimelinePanel.prototype = {
 
     _innerAddRecordToTimeline: function(record, parentRecord)
     {
-        var formattedRecord = this._presentationModel.addRecord(record, parentRecord);
-        ++this._allRecordsCount;
+        var records = this._presentationModel.addRecord(record, parentRecord);
+        this._allRecordsCount += records.length;
         var recordTypes = WebInspector.TimelineModel.RecordType;
         var timeStampRecords = this._timeStampRecords;
         var hasVisibleRecords = false;
@@ -506,10 +509,14 @@ WebInspector.TimelinePanel.prototype = {
                 timeStampRecords.push(record);
             hasVisibleRecords |= presentationModel.isVisible(record);
         }
-        var records = [ formattedRecord ];
         WebInspector.TimelinePresentationModel.forAllRecords(records, processRecord);
+
+        function isAdoptedRecord(record)
+        {
+            return record.parent !== presentationModel.rootRecord;
+        }
         // Tell caller update is necessary either if we added a visible record or if we re-parented a record.
-        return hasVisibleRecords || formattedRecord.parent !== this._presentationModel.rootRecord;
+        return hasVisibleRecords || records.some(isAdoptedRecord);
     },
 
     sidebarResized: function(event)

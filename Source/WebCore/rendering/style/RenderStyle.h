@@ -1506,6 +1506,13 @@ public:
             || originalDisplay() == INLINE_BOX || originalDisplay() == INLINE_TABLE || originalDisplay() == INLINE_GRID;
     }
 
+    bool isDisplayRegionType() const
+    {
+        return display() == BLOCK || display() == INLINE_BLOCK
+            || display() == TABLE_CELL || display() == TABLE_CAPTION
+            || display() == LIST_ITEM;
+    }
+
     void setWritingMode(WritingMode v) { inherited_flags.m_writingMode = v; }
 
     // To tell if this style matched attribute selectors. This makes it impossible to share.
@@ -1581,7 +1588,7 @@ public:
     static unsigned short initialOutlineWidth() { return 3; }
     static int initialLetterWordSpacing() { return 0; }
     static Length initialSize() { return Length(); }
-    static Length initialMinSize() { return Length(0, Fixed); }
+    static Length initialMinSize() { return Length(); }
     static Length initialMaxSize() { return Length(Undefined); }
     static Length initialOffset() { return Length(); }
     static Length initialMargin() { return Length(Fixed); }

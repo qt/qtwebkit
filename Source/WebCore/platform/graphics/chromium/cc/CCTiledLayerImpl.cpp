@@ -29,6 +29,8 @@
 
 #include "cc/CCTiledLayerImpl.h"
 
+#include "GraphicsContext3D.h"
+#include "SkColor.h"
 #include "TextStream.h"
 #include "cc/CCCheckerboardDrawQuad.h"
 #include "cc/CCDebugBorderDrawQuad.h"
@@ -153,12 +155,12 @@ void CCTiledLayerImpl::appendQuads(CCQuadCuller& quadList, const CCSharedQuadSta
             for (int i = left; i <= right; ++i) {
                 DrawableTile* tile = tileAt(i, j);
                 IntRect tileRect = m_tiler->tileBounds(i, j);
-                Color borderColor;
+                SkColor borderColor;
 
                 if (m_skipsDraw || !tile || !tile->textureId())
-                    borderColor = Color(debugTileBorderMissingTileColorRed, debugTileBorderMissingTileColorGreen, debugTileBorderMissingTileColorBlue, debugTileBorderAlpha);
+                    borderColor = SkColorSetARGB(debugTileBorderAlpha, debugTileBorderMissingTileColorRed, debugTileBorderMissingTileColorGreen, debugTileBorderMissingTileColorBlue);
                 else
-                    borderColor = Color(debugTileBorderColorRed, debugTileBorderColorGreen, debugTileBorderColorBlue, debugTileBorderAlpha);
+                    borderColor = SkColorSetARGB(debugTileBorderAlpha, debugTileBorderColorRed, debugTileBorderColorGreen, debugTileBorderColorBlue);
                 quadList.append(CCDebugBorderDrawQuad::create(sharedQuadState, tileRect, borderColor, debugTileBorderWidth));
             }
         }
@@ -219,7 +221,7 @@ void CCTiledLayerImpl::setTilingData(const CCLayerTilingData& tiler)
     *m_tiler = tiler;
 }
 
-void CCTiledLayerImpl::pushTileProperties(int i, int j, Platform3DObject textureId, const IntRect& opaqueRect)
+void CCTiledLayerImpl::pushTileProperties(int i, int j, unsigned textureId, const IntRect& opaqueRect)
 {
     DrawableTile* tile = tileAt(i, j);
     if (!tile)

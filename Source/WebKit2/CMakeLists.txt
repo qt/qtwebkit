@@ -22,10 +22,12 @@ SET(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess"
     "${WEBKIT2_DIR}/WebProcess/ApplicationCache"
     "${WEBKIT2_DIR}/WebProcess/Authentication"
+    "${WEBKIT2_DIR}/WebProcess/Battery"
     "${WEBKIT2_DIR}/WebProcess/Cookies"
     "${WEBKIT2_DIR}/WebProcess/Downloads"
     "${WEBKIT2_DIR}/WebProcess/FullScreen"
     "${WEBKIT2_DIR}/WebProcess/Geolocation"
+    "${WEBKIT2_DIR}/WebProcess/NetworkInfo"
     "${WEBKIT2_DIR}/WebProcess/IconDatabase"
     "${WEBKIT2_DIR}/WebProcess/InjectedBundle"
     "${WEBKIT2_DIR}/WebProcess/InjectedBundle/API"
@@ -41,6 +43,7 @@ SET(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport"
     "${WEBKIT2_DIR}/WebProcess/WebPage"
     "${WEBCORE_DIR}"
+    "${WEBCORE_DIR}/Modules/battery"
     "${WEBCORE_DIR}/Modules/intents"
     "${WEBCORE_DIR}/accessibility"
     "${WEBCORE_DIR}/bindings/js"
@@ -137,6 +140,7 @@ SET(WebKit2_SOURCES
     Shared/UpdateInfo.cpp
     Shared/VisitedLinkTable.cpp
     Shared/WebBackForwardListItem.cpp
+    Shared/WebBatteryStatus.cpp
     Shared/WebConnection.cpp
     Shared/WebConnectionClient.cpp
     Shared/WebContextMenuItem.cpp
@@ -154,6 +158,7 @@ SET(WebKit2_SOURCES
     Shared/WebLayerTreeInfo.cpp
     Shared/WebMemorySampler.cpp
     Shared/WebMouseEvent.cpp
+    Shared/WebNetworkInfo.cpp
     Shared/WebOpenPanelParameters.cpp
     Shared/WebPageCreationParameters.cpp
     Shared/WebPageGroupData.cpp
@@ -214,6 +219,8 @@ SET(WebKit2_SOURCES
     UIProcess/VisitedLinkProvider.cpp
     UIProcess/WebApplicationCacheManagerProxy.cpp
     UIProcess/WebBackForwardList.cpp
+    UIProcess/WebBatteryManagerProxy.cpp
+    UIProcess/WebBatteryProvider.cpp
     UIProcess/WebConnectionToWebProcess.cpp
     UIProcess/WebContext.cpp
     UIProcess/WebContextConnectionClient.cpp
@@ -246,6 +253,8 @@ SET(WebKit2_SOURCES
     UIProcess/WebLoaderClient.cpp
     UIProcess/WebMediaCacheManagerProxy.cpp
     UIProcess/WebNavigationData.cpp
+    UIProcess/WebNetworkInfoManagerProxy.cpp
+    UIProcess/WebNetworkInfoProvider.cpp
     UIProcess/WebOpenPanelResultListenerProxy.cpp
     UIProcess/WebPageContextMenuClient.cpp
     UIProcess/WebPageGroup.cpp
@@ -258,12 +267,16 @@ SET(WebKit2_SOURCES
     UIProcess/WebTextChecker.cpp
     UIProcess/WebTextCheckerClient.cpp
     UIProcess/WebUIClient.cpp
+    UIProcess/WebVibrationProvider.cpp
+    UIProcess/WebVibrationProxy.cpp
 
     UIProcess/API/C/WKApplicationCacheManager.cpp
     UIProcess/API/C/WKAuthenticationChallenge.cpp
     UIProcess/API/C/WKAuthenticationDecisionListener.cpp
     UIProcess/API/C/WKBackForwardList.cpp
     UIProcess/API/C/WKBackForwardListItem.cpp
+    UIProcess/API/C/WKBatteryManager.cpp
+    UIProcess/API/C/WKBatteryStatus.cpp
     UIProcess/API/C/WKContext.cpp
     UIProcess/API/C/WKCookieManager.cpp
     UIProcess/API/C/WKCredential.cpp
@@ -280,9 +293,11 @@ SET(WebKit2_SOURCES
     UIProcess/API/C/WKIconDatabase.cpp
     UIProcess/API/C/WKInspector.cpp
     UIProcess/API/C/WKIntentData.cpp
+    UIProcess/API/C/WKIntentServiceInfo.cpp
     UIProcess/API/C/WKKeyValueStorageManager.cpp
     UIProcess/API/C/WKMediaCacheManager.cpp
     UIProcess/API/C/WKNavigationData.cpp
+    UIProcess/API/C/WKNetworkInfoManager.cpp
     UIProcess/API/C/WKNotification.cpp
     UIProcess/API/C/WKNotificationManager.cpp
     UIProcess/API/C/WKNotificationPermissionRequest.cpp
@@ -295,6 +310,7 @@ SET(WebKit2_SOURCES
     UIProcess/API/C/WKProtectionSpace.cpp
     UIProcess/API/C/WKResourceCacheManager.cpp
     UIProcess/API/C/WKTextChecker.cpp
+    UIProcess/API/C/WKVibration.cpp
 
     UIProcess/Authentication/AuthenticationChallengeProxy.cpp
     UIProcess/Authentication/AuthenticationDecisionListener.cpp
@@ -327,6 +343,8 @@ SET(WebKit2_SOURCES
     WebProcess/ApplicationCache/WebApplicationCacheManager.cpp
 
     WebProcess/Authentication/AuthenticationManager.cpp
+
+    WebProcess/Battery/WebBatteryManager.cpp
 
     WebProcess/Cookies/WebCookieManager.cpp
 
@@ -380,6 +398,8 @@ SET(WebKit2_SOURCES
 
     WebProcess/MediaCache/WebMediaCacheManager.cpp
 
+    WebProcess/NetworkInfo/WebNetworkInfoManager.cpp
+
     WebProcess/Notifications/NotificationPermissionRequestManager.cpp
     WebProcess/Notifications/WebNotificationManager.cpp
 
@@ -401,6 +421,7 @@ SET(WebKit2_SOURCES
 
     WebProcess/ResourceCache/WebResourceCacheManager.cpp
 
+    WebProcess/WebCoreSupport/WebBatteryClient.cpp
     WebProcess/WebCoreSupport/WebChromeClient.cpp
     WebProcess/WebCoreSupport/WebColorChooser.cpp
     WebProcess/WebCoreSupport/WebContextMenuClient.cpp
@@ -411,10 +432,12 @@ SET(WebKit2_SOURCES
     WebProcess/WebCoreSupport/WebGeolocationClient.cpp
     WebProcess/WebCoreSupport/WebInspectorClient.cpp
     WebProcess/WebCoreSupport/WebInspectorFrontendClient.cpp
+    WebProcess/WebCoreSupport/WebNetworkInfoClient.cpp
     WebProcess/WebCoreSupport/WebNotificationClient.cpp
     WebProcess/WebCoreSupport/WebPlatformStrategies.cpp
     WebProcess/WebCoreSupport/WebPopupMenu.cpp
     WebProcess/WebCoreSupport/WebSearchPopupMenu.cpp
+    WebProcess/WebCoreSupport/WebVibrationClient.cpp
 
     WebProcess/WebPage/DecoderAdapter.cpp
     WebProcess/WebPage/DrawingArea.cpp
@@ -447,6 +470,7 @@ SET(WebKit2_MESSAGES_IN_FILES
     UIProcess/DrawingAreaProxy.messages.in
     UIProcess/LayerTreeCoordinatorProxy.messages.in
     UIProcess/WebApplicationCacheManagerProxy.messages.in
+    UIProcess/WebBatteryManagerProxy.messages.in
     UIProcess/WebContext.messages.in
     UIProcess/WebCookieManagerProxy.messages.in
     UIProcess/WebDatabaseManagerProxy.messages.in
@@ -456,9 +480,11 @@ SET(WebKit2_MESSAGES_IN_FILES
     UIProcess/WebInspectorProxy.messages.in
     UIProcess/WebKeyValueStorageManagerProxy.messages.in
     UIProcess/WebMediaCacheManagerProxy.messages.in
+    UIProcess/WebNetworkInfoManagerProxy.messages.in
     UIProcess/WebPageProxy.messages.in
     UIProcess/WebProcessProxy.messages.in
     UIProcess/WebResourceCacheManagerProxy.messages.in
+    UIProcess/WebVibrationProxy.messages.in
 
     UIProcess/Downloads/DownloadProxy.messages.in
 
@@ -472,6 +498,8 @@ SET(WebKit2_MESSAGES_IN_FILES
 
     WebProcess/Authentication/AuthenticationManager.messages.in
 
+    WebProcess/Battery/WebBatteryManager.messages.in
+
     WebProcess/Cookies/WebCookieManager.messages.in
 
     WebProcess/FullScreen/WebFullScreenManager.messages.in
@@ -483,6 +511,8 @@ SET(WebKit2_MESSAGES_IN_FILES
     WebProcess/KeyValueStorage/WebKeyValueStorageManager.messages.in
 
     WebProcess/MediaCache/WebMediaCacheManager.messages.in
+
+    WebProcess/NetworkInfo/WebNetworkInfoManager.messages.in
 
     WebProcess/Notifications/WebNotificationManager.messages.in
 

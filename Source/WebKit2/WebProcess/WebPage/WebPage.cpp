@@ -126,6 +126,10 @@
 #endif
 #endif
 
+#if ENABLE(BATTERY_STATUS)
+#include "WebBatteryClient.h"
+#endif
+
 #if ENABLE(WEB_INTENTS)
 #include "IntentData.h"
 #endif
@@ -262,6 +266,9 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     
     m_page = adoptPtr(new Page(pageClients));
 
+#if ENABLE(BATTERY_STATUS)
+    WebCore::provideBatteryTo(m_page.get(), new WebBatteryClient(this));
+#endif
 #if ENABLE(GEOLOCATION)
     WebCore::provideGeolocationTo(m_page.get(), new WebGeolocationClient(this));
 #endif
@@ -868,18 +875,12 @@ void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSiz
     if (view->fixedLayoutSize() == targetLayoutSize)
         return;
 
-    // Always reset even when empty.
-    view->setFixedLayoutSize(targetLayoutSize);
-
     m_page->settings()->setAcceleratedCompositingForFixedPositionEnabled(true);
     m_page->settings()->setFixedElementsLayoutRelativeToFrame(true);
     m_page->settings()->setFixedPositionCreatesStackingContext(true);
 
-    // Schedule a layout to use the new target size.
-    if (!view->layoutPending()) {
-        view->setNeedsLayout();
-        view->scheduleRelayout();
-    }
+    // Always reset even when empty. This also takes care of the relayout.
+    setFixedLayoutSize(targetLayoutSize);
 }
 
 void WebPage::resizeToContentsIfNeeded()
@@ -918,7 +919,7 @@ void WebPage::sendViewportAttributesChanged()
     int deviceWidth = (settings->deviceWidth() > 0) ? settings->deviceWidth() : m_viewportSize.width();
     int deviceHeight = (settings->deviceHeight() > 0) ? settings->deviceHeight() : m_viewportSize.height();
 
-    ViewportAttributes attr = computeViewportAttributes(m_page->viewportArguments(), minimumLayoutFallbackWidth, deviceWidth, deviceHeight, static_cast<int>(160 * m_page->deviceScaleFactor()), m_viewportSize);
+    ViewportAttributes attr = computeViewportAttributes(m_page->viewportArguments(), minimumLayoutFallbackWidth, deviceWidth, deviceHeight, m_page->deviceScaleFactor(), m_viewportSize);
 
     setResizesToContentsUsingLayoutSize(IntSize(static_cast<int>(attr.layoutSize.width()), static_cast<int>(attr.layoutSize.height())));
     send(Messages::WebPageProxy::DidChangeViewportProperties(attr));
@@ -1080,7 +1081,7 @@ void WebPage::setUseFixedLayout(bool fixed)
 
     view->setUseFixedLayout(fixed);
     if (!fixed)
-        view->setFixedLayoutSize(IntSize());
+        setFixedLayoutSize(IntSize());
 }
 
 void WebPage::setFixedLayoutSize(const IntSize& size)
@@ -1439,7 +1440,7 @@ void WebPage::keyEvent(const WebKeyboardEvent& keyboardEvent)
     if (!handled)
         handled = performDefaultBehaviorForKeyEvent(keyboardEvent);
 
-    sendSync(Messages::WebPageProxy::DidReceiveKeyEvent(static_cast<uint32_t>(keyboardEvent.type()), handled), Messages::WebPageProxy::DidReceiveKeyEvent::Reply());
+    send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(keyboardEvent.type()), handled));
 }
 
 void WebPage::keyEventSyncForTesting(const WebKeyboardEvent& keyboardEvent, bool& handled)
@@ -1813,7 +1814,7 @@ void WebPage::runJavaScriptInMainFrame(const String& script, uint64_t callbackID
     RefPtr<SerializedScriptValue> serializedResultValue;
     CoreIPC::DataReference dataReference;
 
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(JSDOMWindow::commonJSGlobalData());
     if (JSValue resultValue = m_mainFrame->coreFrame()->script()->executeScript(script, true).jsValue()) {
         if ((serializedResultValue = SerializedScriptValue::create(m_mainFrame->jsContext(), toRef(m_mainFrame->coreFrame()->script()->globalObject(mainThreadNormalWorld())->globalExec(), resultValue), 0)))
             dataReference = serializedResultValue->data();
@@ -2041,10 +2042,6 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
 #if USE(AVFOUNDATION)
     settings->setAVFoundationEnabled(store.getBoolValueForKey(WebPreferencesKey::isAVFoundationEnabledKey()));
-#endif
-
-#if ENABLE(WEB_SOCKETS)
-    settings->setUseHixie76WebSocketProtocol(store.getBoolValueForKey(WebPreferencesKey::hixie76WebSocketProtocolEnabledKey()));
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -3117,15 +3114,6 @@ void WebPage::simulateMouseUp(int button, WebCore::IntPoint position, int clickC
 void WebPage::simulateMouseMotion(WebCore::IntPoint position, double time)
 {
     mouseEvent(WebMouseEvent(WebMouseEvent::MouseMove, WebMouseEvent::NoButton, position, position, 0, 0, 0, 0, WebMouseEvent::Modifiers(), time));
-}
-
-String WebPage::viewportConfigurationAsText(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
-{
-    ViewportArguments arguments = mainFrame()->document()->viewportArguments();
-    ViewportAttributes attrs = WebCore::computeViewportAttributes(arguments, /* default layout width for non-mobile pages */ 980, deviceWidth, deviceHeight, deviceDPI, IntSize(availableWidth, availableHeight));
-    WebCore::restrictMinimumScaleFactorToViewportSize(attrs, IntSize(availableWidth, availableHeight));
-    WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(attrs);
-    return String::format("viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", static_cast<int>(attrs.layoutSize.width()), static_cast<int>(attrs.layoutSize.height()), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
 }
 
 void WebPage::setCompositionForTesting(const String& compositionString, uint64_t from, uint64_t length)

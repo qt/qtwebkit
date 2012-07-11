@@ -29,7 +29,7 @@
 #include "config.h"
 #include "GraphicsContext3D.h"
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 
 #include "Extensions3DOpenGL.h"
 #include "GraphicsContext3DPrivate.h"
@@ -52,6 +52,11 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attributes, H
 }
 
 GraphicsContext3D::~GraphicsContext3D()
+{
+    notImplemented();
+}
+
+void GraphicsContext3D::releaseShaderCompiler()
 {
     notImplemented();
 }
@@ -100,4 +105,4 @@ PlatformLayer* GraphicsContext3D::platformLayer() const
 
 } // namespace WebCore
 
-#endif // ENABLE(WEBGL)
+#endif // USE(3D_GRAPHICS)

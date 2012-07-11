@@ -201,6 +201,11 @@ void LayoutTestController::deleteAllLocalStorage()
     [[WebStorageManager sharedWebStorageManager] deleteAllOrigins];
 }
 
+void LayoutTestController::setStorageDatabaseIdleInterval(double interval)
+{
+    [WebStorageManager setStorageDatabaseIdleInterval:interval];
+}
+
 JSValueRef LayoutTestController::originsWithLocalStorage(JSContextRef context)
 {
     return originsArrayToJS(context, [[WebStorageManager sharedWebStorageManager] origins]);
@@ -1116,11 +1121,6 @@ void LayoutTestController::authenticateSession(JSStringRef url, JSStringRef user
 void LayoutTestController::abortModal()
 {
     [NSApp abortModal];
-}
-
-void LayoutTestController::dumpConfigurationForViewport(int /*deviceDPI*/, int /*deviceWidth*/, int /*deviceHeight*/, int /*availableWidth*/, int /*availableHeight*/)
-{
-
 }
 
 void LayoutTestController::setSerializeHTTPLoads(bool serialize)

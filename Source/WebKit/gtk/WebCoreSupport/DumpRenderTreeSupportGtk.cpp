@@ -50,6 +50,7 @@
 #include "JSLock.h"
 #include "JSNodeList.h"
 #include "JSValue.h"
+#include "MutationObserver.h"
 #include "NodeList.h"
 #include "PageGroup.h"
 #include "PlatformString.h"
@@ -64,7 +65,6 @@
 #include "Settings.h"
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
-#include "WebKitMutationObserver.h"
 #include "WorkerThread.h"
 #include "webkitglobalsprivate.h"
 #include "webkitwebframe.h"
@@ -600,7 +600,7 @@ void DumpRenderTreeSupportGtk::gcCollectJavascriptObjectsOnAlternateThread(bool 
 
 unsigned long DumpRenderTreeSupportGtk::gcCountJavascriptObjects()
 {
-    JSC::JSLock lock(JSC::SilenceAssertionsOnly);
+    JSC::JSLockHolder lock(JSDOMWindow::commonJSGlobalData());
     return JSDOMWindow::commonJSGlobalData()->heap.objectCount();
 }
 
@@ -615,18 +615,6 @@ void DumpRenderTreeSupportGtk::layoutFrame(WebKitWebFrame* frame)
         return;
 
     view->layout();
-}
-
-// For testing fast/viewport.
-void DumpRenderTreeSupportGtk::dumpConfigurationForViewport(WebKitWebView* webView, gint deviceDPI, gint deviceWidth, gint deviceHeight, gint availableWidth, gint availableHeight)
-{
-    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
-
-    ViewportArguments arguments = webView->priv->corePage->mainFrame()->document()->viewportArguments();
-    ViewportAttributes attrs = computeViewportAttributes(arguments, /* default layout width for non-mobile pages */ 980, deviceWidth, deviceHeight, deviceDPI, IntSize(availableWidth, availableHeight));
-    restrictMinimumScaleFactorToViewportSize(attrs, IntSize(availableWidth, availableHeight));
-    restrictScaleFactorToInitialScaleIfNotUserScalable(attrs);
-    fprintf(stdout, "viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", static_cast<int>(attrs.layoutSize.width()), static_cast<int>(attrs.layoutSize.height()), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
 }
 
 void DumpRenderTreeSupportGtk::clearOpener(WebKitWebFrame* frame)
@@ -781,19 +769,19 @@ int DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(WebKi
 #endif
 }
 
-void DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(WebKitWebView* webView, bool enabled)
-{
-#if ENABLE(WEB_SOCKETS)
-    core(webView)->settings()->setUseHixie76WebSocketProtocol(enabled);
-#else
-    UNUSED_PARAM(webView);
-    UNUSED_PARAM(enabled);
-#endif
-}
-
 void DumpRenderTreeSupportGtk::setPageCacheSupportsPlugins(WebKitWebView* webView, bool enabled)
 {
     core(webView)->settings()->setPageCacheSupportsPlugins(enabled);
+}
+
+void DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(WebKitWebView* webView, bool enabled)
+{
+    core(webView)->settings()->setCSSGridLayoutEnabled(enabled);
+}
+
+void DumpRenderTreeSupportGtk::setCSSRegionsEnabled(WebKitWebView* webView, bool enabled)
+{
+    core(webView)->settings()->setCSSRegionsEnabled(enabled);
 }
 
 bool DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId(WebKitWebFrame* frame, JSStringRef id)
@@ -838,7 +826,7 @@ JSValueRef DumpRenderTreeSupportGtk::computedStyleIncludingVisitedInfo(JSContext
 void DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary()
 {
 #if ENABLE(MUTATION_OBSERVERS)
-    WebKitMutationObserver::deliverAllMutations();
+    MutationObserver::deliverAllMutations();
 #endif
 }
 

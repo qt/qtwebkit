@@ -191,10 +191,12 @@ void WebPage::resetSettings()
     settings()->resetAttribute(QWebSettings::ZoomTextOnly);
     settings()->resetAttribute(QWebSettings::CSSRegionsEnabled);
     settings()->resetAttribute(QWebSettings::CSSGridLayoutEnabled);
+    settings()->resetAttribute(QWebSettings::AcceleratedCompositingEnabled);
 
     m_drt->layoutTestController()->setCaretBrowsingEnabled(false);
     m_drt->layoutTestController()->setAuthorAndUserStylesEnabled(true);
     m_drt->layoutTestController()->setFrameFlatteningEnabled(false);
+    m_drt->layoutTestController()->setMockScrollbarsEnabled(false);
     m_drt->layoutTestController()->setSmartInsertDeleteEnabled(true);
     m_drt->layoutTestController()->setSelectTrailingWhitespaceEnabled(false);
     m_drt->layoutTestController()->setDefersLoading(false);
@@ -206,7 +208,6 @@ void WebPage::resetSettings()
     settings()->setUserStyleSheetUrl(QUrl()); // reset to default
 
     DumpRenderTreeSupportQt::setMinimumTimerInterval(this, DumpRenderTreeSupportQt::defaultMinimumTimerInterval());
-    DumpRenderTreeSupportQt::setHixie76WebSocketProtocolEnabled(this, DumpRenderTreeSupportQt::defaultHixie76WebSocketProtocolEnabled());
 
     DumpRenderTreeSupportQt::resetInternalsObject(mainFrame());
 
@@ -536,10 +537,11 @@ void DumpRenderTree::resetToConsistentStateBeforeTesting(const QUrl& url)
 #ifndef QT_NO_UNDOSTACK
     m_page->undoStack()->clear();
 #endif
-    
+
     clearHistory(m_page);
     DumpRenderTreeSupportQt::scalePageBy(m_page->mainFrame(), 1, QPoint(0, 0));
     DumpRenderTreeSupportQt::clearFrameName(m_page->mainFrame());
+    DumpRenderTreeSupportQt::removeUserStyleSheets(m_page);
 
     m_page->mainFrame()->setScrollBarPolicy(Qt::Vertical, Qt::ScrollBarAsNeeded);
     m_page->mainFrame()->setScrollBarPolicy(Qt::Horizontal, Qt::ScrollBarAsNeeded);

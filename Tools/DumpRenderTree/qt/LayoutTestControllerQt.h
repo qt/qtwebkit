@@ -120,7 +120,6 @@ public slots:
     void dumpResourceResponseMIMETypes();
     void dumpWillCacheResponse();
     void dumpHistoryCallbacks();
-    void dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight);
     void setWillSendRequestReturnsNullOnRedirect(bool enabled);
     void setWillSendRequestReturnsNull(bool enabled);
     void setWillSendRequestClearHeader(const QStringList& headers);
@@ -154,6 +153,7 @@ public slots:
     void removeAllVisitedLinks();
     void setMediaType(const QString& type);
     void setFrameFlatteningEnabled(bool enable);
+    void setMockScrollbarsEnabled(bool enable);
     void setAllowUniversalAccessFromFileURLs(bool enable);
     void setAllowFileAccessFromFileURLs(bool enable);
     void setAppCacheMaximumSize(unsigned long long quota);

@@ -70,14 +70,12 @@ public:
 
     void detach();
 
-    void setPaused(bool paused) { m_isPaused = paused; }
-    bool isPaused() const { return m_isPaused; }
-
     // The token really should be passed as a const& since it's never modified.
     void constructTreeFromToken(HTMLToken&);
     void constructTreeFromAtomicToken(AtomicHTMLToken&);
 
-    // Must be called when parser is paused before calling the parser again.
+    bool hasParserBlockingScript() const { return !!m_scriptToProcess; }
+    // Must be called to take the parser-blocking script before calling the parser again.
     PassRefPtr<Element> takeScriptToProcess(TextPosition& scriptStartPosition);
 
     // Done, close any open tags, etc.
@@ -216,7 +214,6 @@ private:
     HTMLConstructionSite m_tree;
 
     bool m_reportErrors;
-    bool m_isPaused;
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/parsing.html#insertion-mode
     InsertionMode m_insertionMode;
@@ -235,11 +232,6 @@ private:
 
     RefPtr<Element> m_scriptToProcess; // <script> tag which needs processing before resuming the parser.
     TextPosition m_scriptToProcessStartPosition; // Starting line number of the script tag needing processing.
-
-    // FIXME: We probably want to remove this member.  Originally, it was
-    // created to service the legacy tree builder, but it seems to be used for
-    // some other things now.
-    TextPosition m_lastScriptElementStartPosition;
 
     bool m_usePreHTML5ParserQuirks;
 };

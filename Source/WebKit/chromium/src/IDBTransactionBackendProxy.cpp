@@ -62,9 +62,9 @@ PassRefPtr<IDBObjectStoreBackendInterface> IDBTransactionBackendProxy::objectSto
     return IDBObjectStoreBackendProxy::create(objectStore.release());
 }
 
-unsigned short IDBTransactionBackendProxy::mode() const
+void IDBTransactionBackendProxy::commit()
 {
-    return m_webIDBTransaction->mode();
+    m_webIDBTransaction->commit();
 }
 
 void IDBTransactionBackendProxy::abort()

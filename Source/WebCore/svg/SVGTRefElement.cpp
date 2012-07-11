@@ -155,7 +155,7 @@ SVGTRefElement::~SVGTRefElement()
 
 void SVGTRefElement::createShadowSubtree()
 {
-    ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot, ASSERT_NO_EXCEPTION);
+    ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot, ASSERT_NO_EXCEPTION);
 }
 
 void SVGTRefElement::updateReferencedText()
@@ -184,6 +184,8 @@ void SVGTRefElement::detachTarget()
     Node* container = shadow()->oldestShadowRoot()->firstChild();
     if (container)
         container->setTextContent(emptyContent, ignore);
+
+    ASSERT(inDocument());
 
     // Mark the referenced ID as pending.
     String id;

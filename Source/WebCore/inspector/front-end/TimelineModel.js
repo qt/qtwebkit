@@ -44,6 +44,7 @@ WebInspector.TimelineModel = function()
 
 WebInspector.TimelineModel.RecordType = {
     Root: "Root",
+    Program: "Program",
     EventDispatch: "EventDispatch",
 
     BeginFrame: "BeginFrame",
@@ -62,10 +63,12 @@ WebInspector.TimelineModel.RecordType = {
     XHRLoad: "XHRLoad",
     EvaluateScript: "EvaluateScript",
 
-    TimeStamp: "TimeStamp",
-
     MarkLoad: "MarkLoad",
     MarkDOMContent: "MarkDOMContent",
+
+    TimeStamp: "TimeStamp",
+    Time: "Time",
+    TimeEnd: "TimeEnd",
 
     ScheduleResourceRequest: "ScheduleResourceRequest",
     ResourceSendRequest: "ResourceSendRequest",

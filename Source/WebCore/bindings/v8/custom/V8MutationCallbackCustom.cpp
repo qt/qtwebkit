@@ -37,9 +37,9 @@
 #include "ScriptExecutionContext.h"
 #include "V8Binding.h"
 #include "V8CustomVoidCallback.h"
+#include "V8MutationObserver.h"
 #include "V8MutationRecord.h"
 #include "V8Proxy.h"
-#include "V8WebKitMutationObserver.h"
 #include <wtf/Assertions.h>
 #include <wtf/GetPtr.h>
 #include <wtf/RefCounted.h>
@@ -47,7 +47,7 @@
 
 namespace WebCore {
 
-bool V8MutationCallback::handleEvent(MutationRecordArray* mutations, WebKitMutationObserver* observer)
+bool V8MutationCallback::handleEvent(MutationRecordArray* mutations, MutationObserver* observer)
 {
     ASSERT(mutations);
     if (!mutations)
@@ -66,7 +66,7 @@ bool V8MutationCallback::handleEvent(MutationRecordArray* mutations, WebKitMutat
 
     v8::Local<v8::Array> mutationsArray = v8::Array::New(mutations->size());
     for (size_t i = 0; i < mutations->size(); ++i)
-        mutationsArray->Set(v8::Integer::New(i), toV8(mutations->at(i).get()));
+        mutationsArray->Set(v8Integer(i), toV8(mutations->at(i).get()));
 
     v8::Handle<v8::Value> observerHandle = toV8(observer);
     if (observerHandle.IsEmpty()) {

@@ -237,9 +237,26 @@ WebInspector.FileSystemModel.prototype = {
         callback(errorCode, entries);
     },
 
+    /**
+     * @param {WebInspector.FileSystemModel.Entry} entry
+     * @param {function(number, FileSystemAgent.Metadata=)} callback
+     */
     requestMetadata: function(entry, callback)
     {
         this._agentWrapper.requestMetadata(entry.url, callback);
+    },
+
+    /**
+     * @param {WebInspector.FileSystemModel.File} file
+     * @param {boolean} readAsText
+     * @param {number=} start
+     * @param {number=} end
+     * @param {string=} charset
+     * @param {function(number, string=, string=)=} callback
+     */
+    requestFileContent: function(file, readAsText, start, end, charset, callback)
+    {
+        this._agentWrapper.requestFileContent(file.url, readAsText, start, end, charset, callback);
     }
 }
 
@@ -289,6 +306,18 @@ WebInspector.FileSystemModel.Entry = function(fileSystemModel, fileSystem, backe
     this._url = backendEntry.url;
     this._name = backendEntry.name;
     this._isDirectory = backendEntry.isDirectory;
+}
+
+/**
+ * @param {WebInspector.FileSystemModel.Entry} x
+ * @param {WebInspector.FileSystemModel.Entry} y
+ * @return {number}
+ */
+WebInspector.FileSystemModel.Entry.compare = function(x, y)
+{
+    if (x.isDirectory != y.isDirectory)
+        return y.isDirectory ? 1 : -1;
+    return x.name.localeCompare(y.name);
 }
 
 WebInspector.FileSystemModel.Entry.prototype = {
@@ -378,6 +407,7 @@ WebInspector.FileSystemModel.File = function(fileSystemModel, fileSystem, backen
 
     this._mimeType = backendEntry.mimeType;
     this._resourceType = WebInspector.resourceTypes[backendEntry.resourceType];
+    this._isTextFile = backendEntry.isTextFile;
 }
 
 WebInspector.FileSystemModel.File.prototype = {
@@ -395,6 +425,26 @@ WebInspector.FileSystemModel.File.prototype = {
     get resourceType()
     {
         return this._resourceType;
+    },
+
+    /**
+     * @type {boolean}
+     */
+    get isTextFile()
+    {
+        return this._isTextFile;
+    },
+
+    /**
+     * @param {boolean} readAsText
+     * @param {number=} start
+     * @param {number=} end
+     * @param {string=} charset
+     * @param {function(number, string=)=} callback
+     */
+    requestFileContent: function(readAsText, start, end, charset, callback)
+    {
+        this.fileSystemModel.requestFileContent(this, readAsText, start, end, charset, callback);
     }
 }
 
@@ -408,6 +458,7 @@ WebInspector.FileSystemRequestManager = function()
     this._pendingFileSystemRootRequests = {};
     this._pendingDirectoryContentRequests = {};
     this._pendingMetadataRequests = {};
+    this._pendingFileContentRequests = {};
 
     InspectorBackend.registerFileSystemDispatcher(new WebInspector.FileSystemDispatcher(this));
     FileSystemAgent.enable();
@@ -417,7 +468,7 @@ WebInspector.FileSystemRequestManager.prototype = {
     /**
      * @param {string} origin
      * @param {string} type
-     * @param {function(number, FileSystemAgent.Entry)} callback
+     * @param {function(number, FileSystemAgent.Entry=)=} callback
      */
     requestFileSystemRoot: function(origin, type, callback)
     {
@@ -426,8 +477,10 @@ WebInspector.FileSystemRequestManager.prototype = {
 
         function requestAccepted(error, requestId)
         {
-            if (!error)
-                store[requestId] = callback;
+            if (error)
+                callback(FileError.SECURITY_ERR);
+            else
+                store[requestId] = callback || function() {};
         }
     },
 
@@ -447,7 +500,7 @@ WebInspector.FileSystemRequestManager.prototype = {
 
     /**
      * @param {string} url
-     * @param {function(number, Array.<FileSystemAgent.Entry>=)} callback
+     * @param {function(number, Array.<FileSystemAgent.Entry>=)=} callback
      */
     requestDirectoryContent: function(url, callback)
     {
@@ -456,8 +509,10 @@ WebInspector.FileSystemRequestManager.prototype = {
 
         function requestAccepted(error, requestId)
         {
-            if (!error)
-                store[requestId] = callback;
+            if (error)
+                callback(FileError.SECURITY_ERR);
+            else
+                store[requestId] = callback || function() {};
         }
     },
 
@@ -477,7 +532,7 @@ WebInspector.FileSystemRequestManager.prototype = {
 
     /**
      * @param {string} url
-     * @param {function(number, FileSystemAgent.Metadata=)} callback
+     * @param {function(number, FileSystemAgent.Metadata=)=} callback
      */
     requestMetadata: function(url, callback)
     {
@@ -486,8 +541,10 @@ WebInspector.FileSystemRequestManager.prototype = {
 
         function requestAccepted(error, requestId)
         {
-            if (!error)
-                store[requestId] = callback;
+            if (error)
+                callback(FileError.SECURITY_ERR);
+            else
+                store[requestId] = callback || function() {};
         }
     },
 
@@ -498,6 +555,43 @@ WebInspector.FileSystemRequestManager.prototype = {
             return;
         delete this._pendingMetadataRequests[requestId];
         callback(errorCode, metadata);
+    },
+
+    /**
+     * @param {string} url
+     * @param {boolean} readAsText
+     * @param {number=} start
+     * @param {number=} end
+     * @param {string=} charset
+     * @param {function(number, string=, string=)=} callback
+     */
+    requestFileContent: function(url, readAsText, start, end, charset, callback)
+    {
+        var store = this._pendingFileContentRequests;
+        FileSystemAgent.requestFileContent(url, readAsText, start, end, charset, requestAccepted);
+
+        function requestAccepted(error, requestId)
+        {
+            if (error)
+                callback(FileError.SECURITY_ERR);
+            else
+                store[requestId] = callback || function() {};
+        }
+    },
+
+    /**
+     * @param {number} requestId
+     * @param {number} errorCode
+     * @param {string=} content
+     * @param {string=} charset
+     */
+    _fileContentReceived: function(requestId, errorCode, content, charset)
+    {
+        var callback = /** @type {function(number, string=, string=)} */ this._pendingFileContentRequests[requestId];
+        if (!callback)
+            return;
+        delete this._pendingFileContentRequests[requestId];
+        callback(errorCode, content, charset);
     }
 }
 
@@ -540,5 +634,16 @@ WebInspector.FileSystemDispatcher.prototype = {
     metadataReceived: function(requestId, errorCode, metadata)
     {
         this._agentWrapper._metadataReceived(requestId, errorCode, metadata);
+    },
+
+    /**
+     * @param {number} requestId
+     * @param {number} errorCode
+     * @param {string=} content
+     * @param {string=} charset
+     */
+    fileContentReceived: function(requestId, errorCode, content, charset)
+    {
+        this._agentWrapper._fileContentReceived(requestId, errorCode, content, charset);
     }
 }

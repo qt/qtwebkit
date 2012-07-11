@@ -581,8 +581,8 @@ static NSString *createUserVisibleWebKitVersionString()
     if (!exception || !context)
         return;
 
-    JSLock lock(SilenceAssertionsOnly);
     JSC::ExecState* execState = toJS(context);
+    JSLockHolder lock(execState);
 
     // Make sure the context has a DOMWindow global object, otherwise this context didn't originate from a WebView.
     if (!toJSDOMWindow(execState->lexicalGlobalObject()))
@@ -723,8 +723,10 @@ static bool shouldRespectPriorityInCSSAttributeSetters()
 
     static bool didOneTimeInitialization = false;
     if (!didOneTimeInitialization) {
+#if !LOG_DISABLED
         WebKitInitializeLoggingChannelsIfNecessary();
         WebCore::initializeLoggingChannelsIfNecessary();
+#endif // !LOG_DISABLED
         [WebHistoryItem initWindowWatcherIfNecessary];
 #if ENABLE(SQL_DATABASE)
         WebKitInitializeDatabasesIfNecessary();
@@ -1522,9 +1524,6 @@ static bool needsSelfRetainWhileLoadingQuirk()
 #else
     settings->setAVFoundationEnabled(false);
 #endif
-#endif
-#if ENABLE(WEB_SOCKETS)
-    settings->setUseHixie76WebSocketProtocol([preferences isHixie76WebSocketProtocolEnabled]);
 #endif
     settings->setMediaPlaybackRequiresUserGesture([preferences mediaPlaybackRequiresUserGesture]);
     settings->setMediaPlaybackAllowsInline([preferences mediaPlaybackAllowsInline]);
@@ -4851,7 +4850,7 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSValue jsValu
     JSValue result = coreFrame->script()->executeScript(script, true).jsValue();
     if (!result) // FIXME: pass errors
         return 0;
-    JSLock lock(SilenceAssertionsOnly);
+    JSLockHolder lock(coreFrame->script()->globalObject(mainThreadNormalWorld())->globalExec());
     return aeDescFromJSValue(coreFrame->script()->globalObject(mainThreadNormalWorld())->globalExec(), result);
 }
 
@@ -6560,8 +6559,8 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
 
 - (JSValueRef)_computedStyleIncludingVisitedInfo:(JSContextRef)context forElement:(JSValueRef)value
 {
-    JSLock lock(SilenceAssertionsOnly);
     ExecState* exec = toJS(context);
+    JSLockHolder lock(exec);
     if (!value)
         return JSValueMakeUndefined(context);
     JSValue jsValue = toJS(exec, value);

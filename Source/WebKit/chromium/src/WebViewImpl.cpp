@@ -164,6 +164,7 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 #include <wtf/RefPtr.h>
+#include <wtf/TemporaryChange.h>
 #include <wtf/Uint8ClampedArray.h>
 
 #if ENABLE(GESTURE_EVENTS)
@@ -1760,7 +1761,7 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
     if (m_ignoreInputEvents)
         return false;
 
-    m_currentInputEvent = &inputEvent;
+    TemporaryChange<const WebInputEvent*> currentEventChange(m_currentInputEvent, &inputEvent);
 
 #if ENABLE(POINTER_LOCK)
     if (isPointerLocked() && WebInputEvent::isMouseEventType(inputEvent.type)) {
@@ -1798,12 +1799,10 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
         node->dispatchMouseEvent(
               PlatformMouseEventBuilder(mainFrameImpl()->frameView(), *static_cast<const WebMouseEvent*>(&inputEvent)),
               eventType, static_cast<const WebMouseEvent*>(&inputEvent)->clickCount);
-        m_currentInputEvent = 0;
         return true;
     }
 
     bool handled = PageWidgetDelegate::handleInputEvent(m_page.get(), *this, inputEvent);
-    m_currentInputEvent = 0;
     return handled;
 }
 
@@ -1987,7 +1986,7 @@ WebTextInputInfo WebViewImpl::textInputInfo()
     if (!selection)
         return info;
 
-    Node* node = focusedWebCoreNode();
+    Node* node = selection->selection().rootEditableElement();
     if (!node)
         return info;
 
@@ -1995,33 +1994,22 @@ WebTextInputInfo WebViewImpl::textInputInfo()
     if (info.type == WebTextInputTypeNone)
         return info;
 
-    if (node->hasTagName(HTMLNames::textareaTag))
-        info.value = static_cast<HTMLTextAreaElement*>(node)->value();
-    else if (node->hasTagName(HTMLNames::inputTag))
-        info.value = static_cast<HTMLInputElement*>(node)->value();
-    else if (node->shouldUseInputMethod())
-        info.value = node->nodeValue();
-    else
-        return info;
+    info.value = plainText(rangeOfContents(node).get());
 
     if (info.value.isEmpty())
         return info;
 
-    if (node->hasTagName(HTMLNames::textareaTag) || node->hasTagName(HTMLNames::inputTag)) {
-        HTMLTextFormControlElement* formElement = static_cast<HTMLTextFormControlElement*>(node);
-        info.selectionStart = formElement->selectionStart();
-        info.selectionEnd = formElement->selectionEnd();
-        if (editor->hasComposition()) {
-            info.compositionStart = formElement->indexForVisiblePosition(Position(editor->compositionNode(), editor->compositionStart()));
-            info.compositionEnd = formElement->indexForVisiblePosition(Position(editor->compositionNode(), editor->compositionEnd()));
-        }
-    } else {
-        info.selectionStart = selection->start().computeOffsetInContainerNode();
-        info.selectionEnd = selection->end().computeOffsetInContainerNode();
-        if (editor->hasComposition()) {
-            info.compositionStart = static_cast<int>(editor->compositionStart());
-            info.compositionEnd = static_cast<int>(editor->compositionEnd());
-        }
+    size_t location;
+    size_t length;
+    RefPtr<Range> range = selection->selection().firstRange();
+    if (range && TextIterator::getLocationAndLengthFromRange(selection->rootEditableElement(), range.get(), location, length)) {
+        info.selectionStart = location;
+        info.selectionEnd = location + length;
+    }
+    range = editor->compositionRange();
+    if (range && TextIterator::getLocationAndLengthFromRange(selection->rootEditableElement(), range.get(), location, length)) {
+        info.compositionStart = location;
+        info.compositionEnd = location + length;
     }
 
     return info;
@@ -2551,15 +2539,15 @@ void WebViewImpl::setDeviceScaleFactor(float scaleFactor)
 
     page()->setDeviceScaleFactor(scaleFactor);
 
+    if (!m_layerTreeView.isNull() && m_webSettings->applyDefaultDeviceScaleFactorInCompositor()) {
+        m_deviceScaleInCompositor = page()->deviceScaleFactor();
+        m_layerTreeView.setDeviceScaleFactor(m_deviceScaleInCompositor);
+    }
     if (m_deviceScaleInCompositor != 1) {
         // Don't allow page scaling when compositor scaling is being used,
         // as they are currently incompatible. This means the deviceScale
         // needs to match the one in the compositor.
         ASSERT(scaleFactor == m_deviceScaleInCompositor);
-    }
-    if (!m_layerTreeView.isNull() && m_webSettings->applyDefaultDeviceScaleFactorInCompositor()) {
-        m_deviceScaleInCompositor = page()->deviceScaleFactor();
-        m_layerTreeView.setDeviceScaleFactor(m_deviceScaleInCompositor);
     }
 }
 

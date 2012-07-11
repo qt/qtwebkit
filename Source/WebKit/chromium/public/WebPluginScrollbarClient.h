@@ -25,12 +25,19 @@
 #ifndef WebPluginScrollbarClient_h
 #define WebPluginScrollbarClient_h
 
-#include "WebPluginScrollbar.h"
-#include "WebScrollbarClient.h"
-
 namespace WebKit {
 
-typedef WebScrollbarClient WebPluginScrollbarClient;
+class WebPluginScrollbar;
+struct WebRect;
+template <typename T> class WebVector;
+
+class WebPluginScrollbarClient {
+public:
+    virtual void valueChanged(WebPluginScrollbar*) = 0;
+    virtual void overlayChanged(WebPluginScrollbar*) = 0;
+    virtual void invalidateScrollbarRect(WebPluginScrollbar*, const WebRect&) = 0;
+    virtual void getTickmarks(WebPluginScrollbar*, WebVector<WebRect>*) const = 0;
+};
 
 } // namespace WebKit
 

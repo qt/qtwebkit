@@ -165,7 +165,7 @@ bool HTMLDocumentParser::processingData() const
 
 void HTMLDocumentParser::pumpTokenizerIfPossible(SynchronousMode mode)
 {
-    if (isStopped() || m_treeBuilder->isPaused())
+    if (isStopped() || isWaitingForScripts())
         return;
 
     // Once a resume is scheduled, HTMLParserScheduler controls when we next pump.
@@ -195,16 +195,13 @@ void HTMLDocumentParser::resumeParsingAfterYield()
     endIfDelayed();
 }
 
-bool HTMLDocumentParser::runScriptsForPausedTreeBuilder()
+void HTMLDocumentParser::runScriptsForPausedTreeBuilder()
 {
-    ASSERT(m_treeBuilder->isPaused());
-
     TextPosition scriptStartPosition = TextPosition::belowRangePosition();
     RefPtr<Element> scriptElement = m_treeBuilder->takeScriptToProcess(scriptStartPosition);
     // We will not have a scriptRunner when parsing a DocumentFragment.
-    if (!m_scriptRunner)
-        return true;
-    return m_scriptRunner->execute(scriptElement.release(), scriptStartPosition);
+    if (m_scriptRunner)
+        m_scriptRunner->execute(scriptElement.release(), scriptStartPosition);
 }
 
 bool HTMLDocumentParser::canTakeNextToken(SynchronousMode mode, PumpSession& session)
@@ -212,8 +209,7 @@ bool HTMLDocumentParser::canTakeNextToken(SynchronousMode mode, PumpSession& ses
     if (isStopped())
         return false;
 
-    // The parser will pause itself when waiting on a script to load or run.
-    if (m_treeBuilder->isPaused()) {
+    if (isWaitingForScripts()) {
         if (mode == AllowYield)
             m_parserScheduler->checkForYieldBeforeScript(session);
 
@@ -222,9 +218,8 @@ bool HTMLDocumentParser::canTakeNextToken(SynchronousMode mode, PumpSession& ses
             return false;
 
         // If we're paused waiting for a script, we try to execute scripts before continuing.
-        bool shouldContinueParsing = runScriptsForPausedTreeBuilder();
-        m_treeBuilder->setPaused(!shouldContinueParsing);
-        if (!shouldContinueParsing || isStopped())
+        runScriptsForPausedTreeBuilder();
+        if (isWaitingForScripts() || isStopped())
             return false;
     }
 
@@ -258,7 +253,7 @@ void HTMLDocumentParser::pumpTokenizer(SynchronousMode mode)
     // FIXME: m_input.current().length() is only accurate if we
     // end up parsing the whole buffer in this pump.  We should pass how
     // much we parsed as part of didWriteHTML instead of willWriteHTML.
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willWriteHTML(document(), m_input.current().length(), m_tokenizer->lineNumber().zeroBasedInt());
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willWriteHTML(document(), m_input.current().length(), m_input.current().currentLine().zeroBasedInt());
 
     while (canTakeNextToken(mode, session) && !session.needsYield) {
         if (!isParsingFragment())
@@ -298,7 +293,7 @@ void HTMLDocumentParser::pumpTokenizer(SynchronousMode mode)
         m_preloadScanner->scan();
     }
 
-    InspectorInstrumentation::didWriteHTML(cookie, m_tokenizer->lineNumber().zeroBasedInt());
+    InspectorInstrumentation::didWriteHTML(cookie, m_input.current().currentLine().zeroBasedInt());
 }
 
 bool HTMLDocumentParser::hasInsertionPoint()
@@ -448,7 +443,7 @@ String HTMLDocumentParser::sourceForToken(const HTMLToken& token)
 
 OrdinalNumber HTMLDocumentParser::lineNumber() const
 {
-    return m_tokenizer->lineNumber();
+    return m_input.current().currentLine();
 }
 
 TextPosition HTMLDocumentParser::textPosition() const
@@ -456,20 +451,30 @@ TextPosition HTMLDocumentParser::textPosition() const
     const SegmentedString& currentString = m_input.current();
     OrdinalNumber line = currentString.currentLine();
     OrdinalNumber column = currentString.currentColumn();
-    ASSERT(m_tokenizer->lineNumber() == line);
 
     return TextPosition(line, column);
 }
 
 bool HTMLDocumentParser::isWaitingForScripts() const
 {
-    return m_treeBuilder->isPaused();
+    // When the TreeBuilder encounters a </script> tag, it returns to the HTMLDocumentParser
+    // where the script is transfered from the treebuilder to the script runner.
+    // The script runner will hold the script until its loaded and run. During
+    // any of this time, we want to count ourselves as "waiting for a script" and thus
+    // run the preload scanner, as well as delay completion of parsing.
+    bool treeBuilderHasBlockingScript = m_treeBuilder->hasParserBlockingScript();
+    bool scriptRunnerHasBlockingScript = m_scriptRunner && m_scriptRunner->hasParserBlockingScript();
+    // Since the parser is paused while a script runner has a blocking script, it should
+    // never be possible to end up with both objects holding a blocking script.
+    ASSERT(!(treeBuilderHasBlockingScript && scriptRunnerHasBlockingScript));
+    // If either object has a blocking script, the parser should be paused.
+    return treeBuilderHasBlockingScript || scriptRunnerHasBlockingScript;
 }
 
 void HTMLDocumentParser::resumeParsingAfterScriptExecution()
 {
     ASSERT(!isExecutingScript());
-    ASSERT(!m_treeBuilder->isPaused());
+    ASSERT(!isWaitingForScripts());
 
     m_insertionPreloadScanner.clear();
     pumpTokenizerIfPossible(AllowYield);
@@ -510,13 +515,8 @@ void HTMLDocumentParser::notifyFinished(CachedResource* cachedResource)
         return;
     }
 
-    ASSERT(m_treeBuilder->isPaused());
-    // Note: We only ever wait on one script at a time, so we always know this
-    // is the one we were waiting on and can un-pause the tree builder.
-    m_treeBuilder->setPaused(false);
-    bool shouldContinueParsing = m_scriptRunner->executeScriptsWaitingForLoad(cachedResource);
-    m_treeBuilder->setPaused(!shouldContinueParsing);
-    if (shouldContinueParsing)
+    m_scriptRunner->executeScriptsWaitingForLoad(cachedResource);
+    if (!isWaitingForScripts())
         resumeParsingAfterScriptExecution();
 }
 
@@ -534,15 +534,8 @@ void HTMLDocumentParser::executeScriptsWaitingForStylesheets()
     // pumpTokenizer can cause this parser to be detached from the Document,
     // but we need to ensure it isn't deleted yet.
     RefPtr<HTMLDocumentParser> protect(this);
-
-    ASSERT(!m_scriptRunner->isExecutingScript());
-    ASSERT(m_treeBuilder->isPaused());
-    // Note: We only ever wait on one script at a time, so we always know this
-    // is the one we were waiting on and can un-pause the tree builder.
-    m_treeBuilder->setPaused(false);
-    bool shouldContinueParsing = m_scriptRunner->executeScriptsWaitingForStylesheets();
-    m_treeBuilder->setPaused(!shouldContinueParsing);
-    if (shouldContinueParsing)
+    m_scriptRunner->executeScriptsWaitingForStylesheets();
+    if (!isWaitingForScripts())
         resumeParsingAfterScriptExecution();
 }
 

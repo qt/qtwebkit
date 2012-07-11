@@ -248,6 +248,11 @@ void DumpRenderTreeSupportQt::setFrameFlatteningEnabled(QWebPage* page, bool ena
     QWebPagePrivate::core(page)->settings()->setFrameFlatteningEnabled(enabled);
 }
 
+void DumpRenderTreeSupportQt::setMockScrollbarsEnabled(QWebPage* page, bool enabled)
+{
+    QWebPagePrivate::core(page)->settings()->setMockScrollbarsEnabled(enabled);
+}
+
 void DumpRenderTreeSupportQt::webPageSetGroupName(QWebPage* page, const QString& groupName)
 {
     page->handle()->page->setGroupName(groupName);
@@ -737,10 +742,10 @@ QString DumpRenderTreeSupportQt::viewportAsText(QWebPage* page, int deviceDPI, c
     WebCore::ViewportArguments args = page->d->viewportArguments();
 
     WebCore::ViewportAttributes conf = WebCore::computeViewportAttributes(args,
-        /* desktop-width */ 980,
-        /* device-width  */ deviceSize.width(),
-        /* device-height */ deviceSize.height(),
-        /* device-dpi    */ deviceDPI,
+        /* desktop-width    */ 980,
+        /* device-width     */ deviceSize.width(),
+        /* device-height    */ deviceSize.height(),
+        /* devicePixelRatio */ deviceDPI / WebCore::ViewportArguments::deprecatedTargetDPI,
         availableSize);
     WebCore::restrictMinimumScaleFactorToViewportSize(conf, availableSize);
     WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(conf);
@@ -917,6 +922,11 @@ void DumpRenderTreeSupportQt::addUserStyleSheet(QWebPage* page, const QString& s
     page->handle()->page->group().addUserStyleSheetToWorld(mainThreadNormalWorld(), sourceCode, QUrl(), nullptr, nullptr, WebCore::InjectInAllFrames);
 }
 
+void DumpRenderTreeSupportQt::removeUserStyleSheets(QWebPage* page)
+{
+    page->handle()->page->group().removeUserStyleSheetsFromWorld(mainThreadNormalWorld());
+}
+
 void DumpRenderTreeSupportQt::simulateDesktopNotificationClick(const QString& title)
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
@@ -1086,13 +1096,12 @@ void DumpRenderTreeSupportQt::injectInternalsObject(QWebFrame* frame)
 {
     WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
 #if USE(JSC)
-    JSC::JSLock lock(JSC::SilenceAssertionsOnly);
-
     JSDOMWindow* window = toJSDOMWindow(coreFrame, mainThreadNormalWorld());
     Q_ASSERT(window);
 
     JSC::ExecState* exec = window->globalExec();
     Q_ASSERT(exec);
+    JSC::JSLockHolder lock(exec);
 
     JSContextRef context = toRef(exec);
     WebCoreTestSupport::injectInternalsObject(context);
@@ -1113,35 +1122,18 @@ void DumpRenderTreeSupportQt::resetInternalsObject(QWebFrame* frame)
 {
     WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
 #if USE(JSC)
-    JSC::JSLock lock(JSC::SilenceAssertionsOnly);
-
     JSDOMWindow* window = toJSDOMWindow(coreFrame, mainThreadNormalWorld());
     Q_ASSERT(window);
 
     JSC::ExecState* exec = window->globalExec();
     Q_ASSERT(exec);
+    JSC::JSLockHolder lock(exec);
 
     JSContextRef context = toRef(exec);
     WebCoreTestSupport::resetInternalsObject(context);
 #elif USE(V8)
     v8::HandleScope handleScope;
     WebCoreTestSupport::resetInternalsObject(V8Proxy::mainWorldContext(coreFrame));
-#endif
-}
-
-bool DumpRenderTreeSupportQt::defaultHixie76WebSocketProtocolEnabled()
-{
-    return true;
-}
-
-void DumpRenderTreeSupportQt::setHixie76WebSocketProtocolEnabled(QWebPage* page, bool enabled)
-{
-#if ENABLE(WEB_SOCKETS)
-    if (Page* corePage = QWebPagePrivate::core(page))
-        corePage->settings()->setUseHixie76WebSocketProtocol(enabled);
-#else
-    UNUSED_PARAM(page);
-    UNUSED_PARAM(enabled);
 #endif
 }
 

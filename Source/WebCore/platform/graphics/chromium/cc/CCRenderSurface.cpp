@@ -31,7 +31,6 @@
 
 #include "GraphicsContext3D.h"
 #include "LayerRendererChromium.h"
-#include "ManagedTexture.h"
 #include "TextStream.h"
 #include "cc/CCDamageTracker.h"
 #include "cc/CCDebugBorderDrawQuad.h"
@@ -78,80 +77,11 @@ FloatRect CCRenderSurface::drawableContentRect() const
 {
     FloatRect localContentRect(-0.5 * m_contentRect.width(), -0.5 * m_contentRect.height(),
                                m_contentRect.width(), m_contentRect.height());
-    FloatRect drawableContentRect = m_drawTransform.mapRect(localContentRect);
+    FloatRect drawableContentRect = CCMathUtil::mapClippedRect(m_drawTransform, localContentRect);
     if (hasReplica())
-        drawableContentRect.unite(m_replicaDrawTransform.mapRect(localContentRect));
+        drawableContentRect.unite(CCMathUtil::mapClippedRect(m_replicaDrawTransform, localContentRect));
 
     return drawableContentRect;
-}
-
-bool CCRenderSurface::prepareContentsTexture(LayerRendererChromium* layerRenderer)
-{
-    // FIXME: This method should be separated into two: one to reserve an
-    // existing surface, and one to create a new one. That way we will not
-    // need to pass null layerRenderer.
-    if (layerRenderer) {
-        TextureManager* textureManager = layerRenderer->implTextureManager();
-
-        if (!m_contentsTexture)
-            m_contentsTexture = ManagedTexture::create(textureManager);
-    }
-
-    if (!m_contentsTexture)
-        return false;
-
-    if (m_contentsTexture->isReserved())
-        return true;
-
-    if (!m_contentsTexture->reserve(m_contentRect.size(), GraphicsContext3D::RGBA))
-        return false;
-
-    return true;
-}
-
-void CCRenderSurface::releaseContentsTexture()
-{
-    if (!m_contentsTexture || !m_contentsTexture->isReserved())
-        return;
-    m_contentsTexture->unreserve();
-}
-
-bool CCRenderSurface::hasValidContentsTexture() const
-{
-    return m_contentsTexture && m_contentsTexture->isReserved() && m_contentsTexture->isValid(m_contentRect.size(), GraphicsContext3D::RGBA);
-}
-
-bool CCRenderSurface::hasCachedContentsTexture() const
-{
-    return m_contentsTexture && m_contentsTexture->isValid(m_contentRect.size(), GraphicsContext3D::RGBA);
-}
-
-bool CCRenderSurface::prepareBackgroundTexture(LayerRendererChromium* layerRenderer)
-{
-    TextureManager* textureManager = layerRenderer->implTextureManager();
-
-    if (!m_backgroundTexture)
-        m_backgroundTexture = ManagedTexture::create(textureManager);
-
-    if (m_backgroundTexture->isReserved())
-        return true;
-
-    if (!m_backgroundTexture->reserve(m_contentRect.size(), GraphicsContext3D::RGBA))
-        return false;
-
-    return true;
-}
-
-void CCRenderSurface::releaseBackgroundTexture()
-{
-    if (!m_backgroundTexture || !m_backgroundTexture->isReserved())
-        return;
-    m_backgroundTexture->unreserve();
-}
-
-bool CCRenderSurface::hasValidBackgroundTexture() const
-{
-    return m_backgroundTexture && m_backgroundTexture->isReserved() && m_backgroundTexture->isValid(m_contentRect.size(), GraphicsContext3D::RGBA);
 }
 
 String CCRenderSurface::name() const
@@ -281,7 +211,7 @@ void CCRenderSurface::appendQuads(CCQuadCuller& quadList, CCSharedQuadState* sha
         int red = forReplica ? debugReplicaBorderColorRed : debugSurfaceBorderColorRed;
         int green = forReplica ?  debugReplicaBorderColorGreen : debugSurfaceBorderColorGreen;
         int blue = forReplica ? debugReplicaBorderColorBlue : debugSurfaceBorderColorBlue;
-        Color color(red, green, blue, debugSurfaceBorderAlpha);
+        SkColor color = SkColorSetARGB(debugSurfaceBorderAlpha, red, green, blue);
         quadList.appendSurface(CCDebugBorderDrawQuad::create(sharedQuadState, contentRect(), color, debugSurfaceBorderWidth));
     }
 
@@ -302,8 +232,9 @@ void CCRenderSurface::appendQuads(CCQuadCuller& quadList, CCSharedQuadState* sha
     }
 
     int maskTextureId = maskLayer ? maskLayer->contentsTextureId() : 0;
+    IntRect contentsChangedSinceLastFrame = contentsChanged() ? m_contentRect : IntRect();
 
-    quadList.appendSurface(CCRenderPassDrawQuad::create(sharedQuadState, contentRect(), renderPass, forReplica, filters(), backgroundFilters(), maskTextureId));
+    quadList.appendSurface(CCRenderPassDrawQuad::create(sharedQuadState, contentRect(), renderPass, forReplica, filters(), backgroundFilters(), maskTextureId, contentsChangedSinceLastFrame));
 }
 
 }

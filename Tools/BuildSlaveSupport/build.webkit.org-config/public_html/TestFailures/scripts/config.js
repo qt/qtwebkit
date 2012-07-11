@@ -67,9 +67,6 @@ config.kPlatforms = {
             'Webkit Linux': {version: 'lucid', is64bit: true},
             'Webkit Linux 32': {version: 'lucid'},
             'Webkit Linux (dbg)': {version: 'lucid', is64bit: true, debug: true},
-            'Webkit Mac10.5': {version: 'leopard'},
-            'Webkit Mac10.5 (dbg)(1)': {version: 'leopard', debug: true},
-            'Webkit Mac10.5 (dbg)(2)': {version: 'leopard', debug: true},
             'Webkit Mac10.6': {version: 'snowleopard'},
             'Webkit Mac10.6 (dbg)': {version: 'snowleopard', debug: true},
             'Webkit Mac10.7': {version: 'lion'},
@@ -111,6 +108,27 @@ config.kPlatforms = {
         },
         builderApplies: function(builderName) {
             return builderName.indexOf('GTK') != -1;
+        },
+    },
+    'qt' : {
+        label : 'Qt',
+        buildConsoleURL: 'http://build.webkit.org',
+        layoutTestResultsURL: 'http://build.webkit.org/results',
+        waterfallURL: 'http://build.webkit.org/waterfall',
+        builders: {
+            'Qt Linux Release' : {version : '32-bit release'},
+        },
+        haveBuilderAccumulatedResults : false,
+        useDirectoryListingForOldBuilds: false,
+        useFlakinessDashboard: false,
+        resultsDirectoryNameFromBuilderName: function(builderName) {
+            return encodeURIComponent(builderName);
+        },
+        resultsDirectoryForBuildNumber: function(buildNumber, revision) {
+            return encodeURIComponent('r' + revision + ' (' + buildNumber + ')');
+        },
+        builderApplies: function(builderName) {
+            return builderName.indexOf('Qt') != -1;
         },
     },
 };

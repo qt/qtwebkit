@@ -28,11 +28,12 @@
 #include "config.h"
 #include "GraphicsContext3D.h"
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 
 #include "Extensions3DOpenGL.h"
 #include "GraphicsContext3DPrivate.h"
 #include "Image.h"
+#include "NotImplemented.h"
 #include "OpenGLShims.h"
 #include "PlatformContextCairo.h"
 #include "RefPtrCairo.h"
@@ -144,6 +145,11 @@ GraphicsContext3D::~GraphicsContext3D()
             ::glDeleteRenderbuffersEXT(1, &m_depthStencilBuffer);
     }
     ::glDeleteFramebuffersEXT(1, &m_fbo);
+}
+
+void GraphicsContext3D::releaseShaderCompiler()
+{
+    notImplemented();
 }
 
 bool GraphicsContext3D::getImageData(Image* image, unsigned int format, unsigned int type, bool premultiplyAlpha, bool ignoreGammaAndColorProfile, Vector<uint8_t>& outputVector)
@@ -258,4 +264,4 @@ PlatformLayer* GraphicsContext3D::platformLayer() const
 
 } // namespace WebCore
 
-#endif // ENABLE(WEBGL)
+#endif // USE(3D_GRAPHICS)

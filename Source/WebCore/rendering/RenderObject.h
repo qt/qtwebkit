@@ -541,6 +541,7 @@ public:
 
     bool hasClip() const { return isOutOfFlowPositioned() && style()->hasClip(); }
     bool hasOverflowClip() const { return m_bitfields.hasOverflowClip(); }
+    bool hasClipOrOverflowClip() const { return hasClip() || hasOverflowClip(); }
 
     bool hasTransform() const { return m_bitfields.hasTransform(); }
     bool hasMask() const { return style() && style()->hasMask(); }
@@ -932,7 +933,11 @@ private:
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;
 
     Color selectionColor(int colorProperty) const;
-    
+
+#ifndef NDEBUG
+    void checkBlockPositionedObjectsNeedLayout();
+#endif
+
     RefPtr<RenderStyle> m_style;
 
     Node* m_node;
@@ -1104,6 +1109,9 @@ inline void RenderObject::setNeedsLayout(bool needsLayout, MarkingBehavior markP
         setNormalChildNeedsLayout(false);
         setNeedsPositionedMovementLayout(false);
         setAncestorLineBoxDirty(false);
+#ifndef NDEBUG
+        checkBlockPositionedObjectsNeedLayout();
+#endif
     }
 }
 

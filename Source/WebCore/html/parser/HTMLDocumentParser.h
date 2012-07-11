@@ -124,10 +124,9 @@ private:
     void pumpTokenizer(SynchronousMode);
     void pumpTokenizerIfPossible(SynchronousMode);
 
-    bool runScriptsForPausedTreeBuilder();
+    void runScriptsForPausedTreeBuilder();
     void resumeParsingAfterScriptExecution();
 
-    void begin();
     void attemptToEnd();
     void endIfDelayed();
     void attemptToRunDeferredScriptsAndEnd();

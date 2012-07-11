@@ -43,6 +43,9 @@ typedef UINT_PTR PlatformTimerRef;
 typedef QTimer PlatformTimerRef;
 #elif PLATFORM(GTK)
 typedef unsigned int PlatformTimerRef;
+#elif PLATFORM(EFL)
+typedef struct _Ecore_Timer Ecore_Timer;
+typedef Ecore_Timer* PlatformTimerRef;
 #endif
 
 namespace WTR {
@@ -74,7 +77,6 @@ public:
     void dumpTitleChanges() { m_dumpTitleChanges = true; }
     void dumpFullScreenCallbacks() { m_dumpFullScreenCallbacks = true; }
     void dumpFrameLoadCallbacks() { setShouldDumpFrameLoadCallbacks(true); }
-    void dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight);
     void dumpProgressFinishedCallback() { setShouldDumpProgressFinishedCallback(true); }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }

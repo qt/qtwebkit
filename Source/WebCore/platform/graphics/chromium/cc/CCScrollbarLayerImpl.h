@@ -33,7 +33,6 @@
 
 namespace WebCore {
 
-class GraphicsContext;
 class ScrollView;
 
 class CCScrollbarLayerImpl : public CCLayerImpl {
@@ -54,7 +53,8 @@ public:
 
     void setEnabled(bool enabled) { m_enabled = enabled; }
 
-    void setBackgroundTextureId(unsigned id) { m_backgroundTextureId = id; }
+    void setBackTrackTextureId(unsigned id) { m_backTrackTextureId = id; }
+    void setForeTrackTextureId(unsigned id) { m_foreTrackTextureId = id; }
     void setThumbTextureId(unsigned id) { m_thumbTextureId = id; }
 
     CCLayerImpl* scrollLayer() const { return m_scrollLayer; }
@@ -124,7 +124,8 @@ private:
     };
     CCScrollbar m_scrollbar;
 
-    unsigned m_backgroundTextureId;
+    unsigned m_backTrackTextureId;
+    unsigned m_foreTrackTextureId;
     unsigned m_thumbTextureId;
 
     ScrollbarOverlayStyle m_scrollbarOverlayStyle;

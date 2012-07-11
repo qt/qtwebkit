@@ -489,15 +489,54 @@ class ChangeLogTest(unittest.TestCase):
     # FIXME: We really should be getting this from prepare-ChangeLog itself.
     _new_entry_boilerplate = '''2009-08-19  Eric Seidel  <eric@webkit.org>
 
-        Need a short description and bug URL (OOPS!)
+        Need a short description (OOPS!).
+        Need the bug URL (OOPS!).
 
         Reviewed by NOBODY (OOPS!).
 
         * Scripts/bugzilla-tool:
 '''
 
+    _new_entry_boilerplate_with_bugurl = '''2009-08-19  Eric Seidel  <eric@webkit.org>
+
+        Need a short description (OOPS!).
+        https://bugs.webkit.org/show_bug.cgi?id=12345
+
+        Reviewed by NOBODY (OOPS!).
+
+        * Scripts/bugzilla-tool:
+'''
+
+    _new_entry_boilerplate_with_multiple_bugurl = '''2009-08-19  Eric Seidel  <eric@webkit.org>
+
+        Need a short description (OOPS!).
+        https://bugs.webkit.org/show_bug.cgi?id=12345
+        http://webkit.org/b/12345
+
+        Reviewed by NOBODY (OOPS!).
+
+        * Scripts/bugzilla-tool:
+'''
+
+    _new_entry_boilerplate_without_reviewer_line = '''2009-08-19  Eric Seidel  <eric@webkit.org>
+
+        Need a short description (OOPS!).
+        https://bugs.webkit.org/show_bug.cgi?id=12345
+
+        * Scripts/bugzilla-tool:
+'''
+
+    _new_entry_boilerplate_without_reviewer_multiple_bugurl = '''2009-08-19  Eric Seidel  <eric@webkit.org>
+
+        Need a short description (OOPS!).
+        https://bugs.webkit.org/show_bug.cgi?id=12345
+        http://webkit.org/b/12345
+
+        * Scripts/bugzilla-tool:
+'''
+
     def test_set_reviewer(self):
-        changelog_contents = u"%s\n%s" % (self._new_entry_boilerplate, self._example_changelog)
+        changelog_contents = u"%s\n%s" % (self._new_entry_boilerplate_with_bugurl, self._example_changelog)
         changelog_path = self._write_tmp_file_with_contents(changelog_contents.encode("utf-8"))
         reviewer_name = 'Test Reviewer'
         ChangeLog(changelog_path).set_reviewer(reviewer_name)
@@ -506,14 +545,41 @@ class ChangeLogTest(unittest.TestCase):
         os.remove(changelog_path)
         self.assertEquals(actual_contents.splitlines(), expected_contents.splitlines())
 
+        changelog_contents_without_reviewer_line = u"%s\n%s" % (self._new_entry_boilerplate_without_reviewer_line, self._example_changelog)
+        changelog_path = self._write_tmp_file_with_contents(changelog_contents_without_reviewer_line.encode("utf-8"))
+        ChangeLog(changelog_path).set_reviewer(reviewer_name)
+        actual_contents = self._read_file_contents(changelog_path, "utf-8")
+        os.remove(changelog_path)
+        self.assertEquals(actual_contents.splitlines(), expected_contents.splitlines())
+
+        changelog_contents_without_reviewer_line = u"%s\n%s" % (self._new_entry_boilerplate_without_reviewer_multiple_bugurl, self._example_changelog)
+        changelog_path = self._write_tmp_file_with_contents(changelog_contents_without_reviewer_line.encode("utf-8"))
+        ChangeLog(changelog_path).set_reviewer(reviewer_name)
+        actual_contents = self._read_file_contents(changelog_path, "utf-8")
+        changelog_contents = u"%s\n%s" % (self._new_entry_boilerplate_with_multiple_bugurl, self._example_changelog)
+        expected_contents = changelog_contents.replace('NOBODY (OOPS!)', reviewer_name)
+        os.remove(changelog_path)
+        self.assertEquals(actual_contents.splitlines(), expected_contents.splitlines())
+
     def test_set_short_description_and_bug_url(self):
-        changelog_contents = u"%s\n%s" % (self._new_entry_boilerplate, self._example_changelog)
+        changelog_contents = u"%s\n%s" % (self._new_entry_boilerplate_with_bugurl, self._example_changelog)
         changelog_path = self._write_tmp_file_with_contents(changelog_contents.encode("utf-8"))
         short_description = "A short description"
         bug_url = "http://example.com/b/2344"
         ChangeLog(changelog_path).set_short_description_and_bug_url(short_description, bug_url)
         actual_contents = self._read_file_contents(changelog_path, "utf-8")
         expected_message = "%s\n        %s" % (short_description, bug_url)
-        expected_contents = changelog_contents.replace("Need a short description and bug URL (OOPS!)", expected_message)
+        expected_contents = changelog_contents.replace("Need a short description (OOPS!).", expected_message)
+        os.remove(changelog_path)
+        self.assertEquals(actual_contents.splitlines(), expected_contents.splitlines())
+
+        changelog_contents = u"%s\n%s" % (self._new_entry_boilerplate, self._example_changelog)
+        changelog_path = self._write_tmp_file_with_contents(changelog_contents.encode("utf-8"))
+        short_description = "A short description 2"
+        bug_url = "http://example.com/b/2345"
+        ChangeLog(changelog_path).set_short_description_and_bug_url(short_description, bug_url)
+        actual_contents = self._read_file_contents(changelog_path, "utf-8")
+        expected_message = "%s\n        %s" % (short_description, bug_url)
+        expected_contents = changelog_contents.replace("Need a short description (OOPS!).\n        Need the bug URL (OOPS!).", expected_message)
         os.remove(changelog_path)
         self.assertEquals(actual_contents.splitlines(), expected_contents.splitlines())

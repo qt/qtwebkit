@@ -214,12 +214,14 @@ void V8${implClassName}::visitDOMWrapper(DOMDataStore* store, void* object, v8::
 END
     if (GetGenerateIsReachable($dataNode) eq  "ImplElementRoot" ||
         GetGenerateIsReachable($dataNode) eq  "ImplOwnerRoot" ||
-        GetGenerateIsReachable($dataNode) eq  "ImplOwnerNodeRoot") {
+        GetGenerateIsReachable($dataNode) eq  "ImplOwnerNodeRoot" ||
+        GetGenerateIsReachable($dataNode) eq  "ImplBaseRoot") {
 
         my $methodName;
         $methodName = "element" if (GetGenerateIsReachable($dataNode) eq "ImplElementRoot");
         $methodName = "owner" if (GetGenerateIsReachable($dataNode) eq "ImplOwnerRoot");
         $methodName = "ownerNode" if (GetGenerateIsReachable($dataNode) eq "ImplOwnerNodeRoot");
+        $methodName = "base" if (GetGenerateIsReachable($dataNode) eq "ImplBaseRoot");
 
         push(@implContent, <<END);
     if (Node* owner = impl->${methodName}()) {
@@ -1060,7 +1062,7 @@ END
     MessagePortArray portsCopy(*ports);
     v8::Local<v8::Array> portArray = v8::Array::New(portsCopy.size());
     for (size_t i = 0; i < portsCopy.size(); ++i)
-        portArray->Set(v8::Integer::New(i), toV8(portsCopy[i].get(), info.GetIsolate()));
+        portArray->Set(v8Integer(i, info.GetIsolate()), toV8(portsCopy[i].get(), info.GetIsolate()));
     return portArray;
 END
     } else {
@@ -1355,9 +1357,17 @@ sub GenerateParametersCheckExpression
             push(@andExpression, "(${value}->IsNull() || ${value}->IsFunction())");
         } elsif (IsArrayType($type)) {
             # FIXME: Add proper support for T[], T[]?, sequence<T>.
-            push(@andExpression, "(${value}->IsNull() || ${value}->IsArray())");
+            if ($parameter->isNullable) {
+                push(@andExpression, "(${value}->IsNull() || ${value}->IsArray())");
+            } else {
+                push(@andExpression, "(${value}->IsArray())");
+            }
         } elsif (IsWrapperType($type)) {
-            push(@andExpression, "(${value}->IsNull() || V8${type}::HasInstance($value))");
+            if ($parameter->isNullable) {
+                push(@andExpression, "(${value}->IsNull() || V8${type}::HasInstance($value))");
+            } else {
+                push(@andExpression, "(V8${type}::HasInstance($value))");
+            }
         }
 
         $parameterIndex++;
@@ -3509,8 +3519,6 @@ sub IsRefPtrType
     return 0 if $type eq "unsigned";
     return 0 if $type eq "unsigned long";
     return 0 if $type eq "unsigned short";
-    return 0 if $type eq "float[]";
-    return 0 if $type eq "double[]";
 
     return 1;
 }
@@ -3571,8 +3579,6 @@ sub GetNativeType
     return "RefPtr<MediaQueryListListener>" if $type eq "MediaQueryListListener";
 
     # FIXME: Support T[], T[]?, sequence<T> generically
-    return "Vector<float>" if $type eq "float[]";
-    return "Vector<double>" if $type eq "double[]";
     return "RefPtr<DOMStringList>" if $type eq "DOMStringList";
 
     # Default, assume native type is a pointer with same type name as idl type
@@ -3631,14 +3637,6 @@ sub JSValueToNative
     return "v8ValueToWebCoreDOMStringList($value)" if $type eq "DOMStringList";
     # FIXME: Add proper support for T[], T[]? and sequence<T>.
     return "v8ValueToWebCoreDOMStringList($value)" if $type eq "DOMString[]";
-    if ($type eq "float[]") {
-        AddToImplIncludes("wtf/Vector.h");
-        return "v8NumberArrayToVector<float>($value)";
-    }
-    if ($type eq "double[]") {
-        AddToImplIncludes("wtf/Vector.h");
-        return "v8NumberArrayToVector<double>($value)";
-    }
 
     if ($type eq "DOMString" or $type eq "DOMUserData") {
         return $value;
@@ -3818,9 +3816,7 @@ my %non_wrapper_types = (
     'SerializedScriptValue' => 1,
     'boolean' => 1,
     'double' => 1,
-    'double[]' => 1,
     'float' => 1,
-    'float[]' => 1,
     'int' => 1,
     'long long' => 1,
     'long' => 1,
@@ -3892,23 +3888,20 @@ sub NativeToJSValue
     # should be returned instead.
     if ($signature->extendedAttributes->{"Reflect"} and ($type eq "unsigned long" or $type eq "unsigned short")) {
         $value =~ s/getUnsignedIntegralAttribute/getIntegralAttribute/g;
-        return "v8::Integer::NewFromUnsigned(std::max(0, " . $value . "))";
+        return "v8UnsignedInteger(std::max(0, " . $value . ")$getIsolateArg)";
     }
 
     # For all the types where we use 'int' as the representation type,
-    # we use Integer::New which has a fast Smi conversion check.
+    # we use v8Integer() which has a fast small integer conversion check.
     my $nativeType = GetNativeType($type);
-    return "v8::Integer::New($value)" if $nativeType eq "int";
-    return "v8::Integer::NewFromUnsigned($value)" if $nativeType eq "unsigned";
+    return "v8Integer($value$getIsolateArg)" if $nativeType eq "int";
+    return "v8UnsignedInteger($value$getIsolateArg)" if $nativeType eq "unsigned";
 
     return "v8DateOrNull($value$getIsolateArg)" if $type eq "Date";
     # long long and unsigned long long are not representable in ECMAScript.
     return "v8::Number::New(static_cast<double>($value))" if $type eq "long long" or $type eq "unsigned long long" or $type eq "DOMTimeStamp";
     return "v8::Number::New($value)" if $codeGenerator->IsPrimitiveType($type);
     return "$value.v8Value()" if $nativeType eq "ScriptValue";
-
-    return "v8NumberArray($value)" if $type eq "float[]";
-    return "v8NumberArray($value)" if $type eq "double[]";
 
     if ($codeGenerator->IsStringType($type)) {
         my $conv = $signature->extendedAttributes->{"TreatReturnedNullStringAs"};

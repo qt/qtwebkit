@@ -23,13 +23,16 @@
 
 #include <QGraphicsScene>
 #include <QGraphicsView>
+
 #if defined(Q_WS_X11)
 #include <QX11Info>
 #endif
 
-#if ENABLE(WEBGL)
+#ifdef QT_OPENGL_LIB
 #include <QGLWidget>
+#endif
 
+#if USE(3D_GRAPHICS)
 #if HAVE(QT5)
 #include <QWindow>
 #endif
@@ -37,6 +40,7 @@
 static void createPlatformGraphicsContext3DFromWidget(QWidget* widget, PlatformGraphicsContext3D* context,
                                                       PlatformGraphicsSurface3D* surface)
 {
+#ifdef QT_OPENGL_LIB
     *context = 0;
     *surface = 0;
     QAbstractScrollArea* scrollArea = qobject_cast<QAbstractScrollArea*>(widget);
@@ -61,10 +65,11 @@ static void createPlatformGraphicsContext3DFromWidget(QWidget* widget, PlatformG
         delete glWidget;
         glWidget = 0;
     }
+#endif
 }
 #endif
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(ACCELERATED_COMPOSITING)
 #include "TextureMapper.h"
 #include "texmap/TextureMapperLayer.h"
 #endif
@@ -85,7 +90,7 @@ QWindow* QWebPageClient::ownerWindow() const
 
 namespace WebCore {
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(ACCELERATED_COMPOSITING)
 TextureMapperLayerClientQt::TextureMapperLayerClientQt(QWebFrame* frame, GraphicsLayer* layer)
     : m_frame(frame)
     , m_rootGraphicsLayer(GraphicsLayer::create(0))
@@ -237,7 +242,7 @@ void PageClientQWidget::setWidgetVisible(Widget* widget, bool visible)
     qtWidget->setVisible(visible);
 }
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 void PageClientQWidget::createPlatformGraphicsContext3D(PlatformGraphicsContext3D* context,
                                                         PlatformGraphicsSurface3D* surface)
 {
@@ -249,13 +254,6 @@ void PageClientQWidget::createPlatformGraphicsContext3D(PlatformGraphicsContext3
 PageClientQGraphicsWidget::~PageClientQGraphicsWidget()
 {
     delete overlay;
-#if USE(ACCELERATED_COMPOSITING) && !USE(TEXTURE_MAPPER)
-    if (!rootGraphicsLayer)
-        return;
-    // we don't need to delete the root graphics layer. The lifecycle is managed in GraphicsLayerQt.cpp.
-    rootGraphicsLayer.data()->setParentItem(0);
-    view->scene()->removeItem(rootGraphicsLayer.data());
-#endif
 }
 
 void PageClientQGraphicsWidget::scroll(int dx, int dy, const QRect& rectToScroll)
@@ -267,62 +265,26 @@ void PageClientQGraphicsWidget::update(const QRect& dirtyRect)
 {
     view->update(dirtyRect);
 
-    createOrDeleteOverlay();
     if (overlay)
         overlay->update(QRectF(dirtyRect));
-#if USE(ACCELERATED_COMPOSITING) && !USE(TEXTURE_MAPPER)
-    syncLayers();
-#endif
-}
-
-void PageClientQGraphicsWidget::createOrDeleteOverlay()
-{
-    // We don't use an overlay with TextureMapper. Instead, the overlay is drawn inside QWebFrame.
-#if !USE(TEXTURE_MAPPER)
-    bool useOverlay = false;
-    if (!viewResizesToContents) {
-#if USE(ACCELERATED_COMPOSITING)
-        useOverlay = useOverlay || rootGraphicsLayer;
-#endif
-#if USE(TILED_BACKING_STORE)
-        useOverlay = useOverlay || QWebFramePrivate::core(page->mainFrame())->tiledBackingStore();
-#endif
-    }
-    if (useOverlay == !!overlay)
-        return;
-
-    if (useOverlay) {
-        overlay = new QGraphicsItemOverlay(view, page);
-        overlay->setZValue(OverlayZValue);
-    } else {
-        // Changing the overlay might be done inside paint events.
-        overlay->deleteLater();
-        overlay = 0;
-    }
-#endif // !USE(TEXTURE_MAPPER)
 }
 
 #if USE(ACCELERATED_COMPOSITING)
 void PageClientQGraphicsWidget::syncLayers()
 {
-#if USE(TEXTURE_MAPPER)
     if (TextureMapperLayerClient)
         TextureMapperLayerClient->syncRootLayer();
-#endif
 
     QWebFramePrivate::core(page->mainFrame())->view()->syncCompositingStateIncludingSubframes();
 
-#if USE(TEXTURE_MAPPER)
     if (!TextureMapperLayerClient)
         return;
 
     if (TextureMapperLayerClient->rootLayer()->descendantsOrSelfHaveRunningAnimations() && !syncTimer.isActive())
         syncTimer.startOneShot(1.0 / 60.0);
     update(view->boundingRect().toAlignedRect());
-#endif
 }
 
-#if USE(TEXTURE_MAPPER)
 void PageClientQGraphicsWidget::setRootGraphicsLayer(GraphicsLayer* layer)
 {
     if (layer) {
@@ -339,24 +301,6 @@ void PageClientQGraphicsWidget::setRootGraphicsLayer(GraphicsLayer* layer)
     }
     TextureMapperLayerClient.clear();
 }
-#else
-void PageClientQGraphicsWidget::setRootGraphicsLayer(GraphicsLayer* layer)
-{
-    if (rootGraphicsLayer) {
-        rootGraphicsLayer.data()->setParentItem(0);
-        view->scene()->removeItem(rootGraphicsLayer.data());
-        QWebFramePrivate::core(page->mainFrame())->view()->syncCompositingStateIncludingSubframes();
-    }
-
-    rootGraphicsLayer = layer ? layer->platformLayer() : 0;
-
-    if (rootGraphicsLayer) {
-        rootGraphicsLayer.data()->setParentItem(view);
-        rootGraphicsLayer.data()->setZValue(RootGraphicsLayerZValue);
-    }
-    createOrDeleteOverlay();
-}
-#endif
 
 void PageClientQGraphicsWidget::markForSync(bool scheduleSync)
 {
@@ -487,7 +431,7 @@ QRectF PageClientQGraphicsWidget::windowRect() const
 }
 #endif // QT_NO_GRAPHICSVIEW
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 void PageClientQGraphicsWidget::createPlatformGraphicsContext3D(PlatformGraphicsContext3D* context,
                                                                 PlatformGraphicsSurface3D* surface)
 {

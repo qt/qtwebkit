@@ -7,8 +7,6 @@
 TEMPLATE = lib
 TARGET = WebKit2
 
-load(features)
-
 include(WebKit2.pri)
 
 WEBKIT += wtf javascriptcore webcore
@@ -99,6 +97,7 @@ HEADERS += \
     Shared/VisitedLinkTable.h \
     Shared/WebCoreArgumentCoders.h \
     Shared/WebBackForwardListItem.h \
+    Shared/WebBatteryStatus.h \
     Shared/WebCertificateInfo.h \
     Shared/WebConnection.h \
     Shared/WebConnectionClient.h \
@@ -147,6 +146,8 @@ HEADERS += \
     UIProcess/API/C/WKAuthenticationDecisionListener.h \
     UIProcess/API/C/WKBackForwardList.h \
     UIProcess/API/C/WKBackForwardListItem.h \
+    UIProcess/API/C/WKBatteryManager.h \
+    UIProcess/API/C/WKBatteryStatus.h \
     UIProcess/API/C/WKContext.h \
     UIProcess/API/C/WKContextPrivate.h \
     UIProcess/API/C/WKCredential.h \
@@ -162,9 +163,11 @@ HEADERS += \
     UIProcess/API/C/WKIconDatabase.h \
     UIProcess/API/C/WKInspector.h \
     UIProcess/API/C/WKIntentData.h \
+    UIProcess/API/C/WKIntentServiceInfo.h \
     UIProcess/API/C/WKOpenPanelParameters.h \
     UIProcess/API/C/WKOpenPanelResultListener.h \
     UIProcess/API/C/WKNavigationData.h \
+    UIProcess/API/C/WKNetworkInfoManager.h \
     UIProcess/API/C/WKNotification.h \
     UIProcess/API/C/WKNotificationManager.h \
     UIProcess/API/C/WKNotificationPermissionRequest.h \
@@ -177,6 +180,7 @@ HEADERS += \
     UIProcess/API/C/WKPreferencesPrivate.h \
     UIProcess/API/C/WKProtectionSpace.h \
     UIProcess/API/C/WKProtectionSpaceTypes.h \
+    UIProcess/API/C/WKVibration.h \
     UIProcess/API/C/WebKit2.h \
     UIProcess/API/C/qt/WKNativeEvent.h \
     UIProcess/API/cpp/WKRetainPtr.h \
@@ -200,6 +204,8 @@ HEADERS += \
     UIProcess/API/qt/qquicknetworkrequest_p.h \
     UIProcess/API/qt/qquickurlschemedelegate_p.h \
     UIProcess/API/qt/qwebkittest_p.h \
+    UIProcess/API/qt/raw/qrawwebview_p.h \
+    UIProcess/API/qt/raw/qrawwebview_p_p.h \
     UIProcess/Authentication/AuthenticationChallengeProxy.h \
     UIProcess/Authentication/AuthenticationDecisionListener.h \
     UIProcess/Authentication/WebCredential.h \
@@ -230,6 +236,8 @@ HEADERS += \
     UIProcess/VisitedLinkProvider.h \
     UIProcess/WebApplicationCacheManagerProxy.h \
     UIProcess/WebBackForwardList.h \
+    UIProcess/WebBatteryManagerProxy.h \
+    UIProcess/WebBatteryProvider.h \
     UIProcess/WebColorChooserProxy.h \
     UIProcess/WebConnectionToWebProcess.h \
     UIProcess/WebContext.h \
@@ -273,6 +281,8 @@ HEADERS += \
     UIProcess/WebResourceCacheManagerProxy.h \
     UIProcess/WebResourceLoadClient.h \
     UIProcess/WebUIClient.h \
+    UIProcess/WebVibrationProvider.h \
+    UIProcess/WebVibrationProxy.h \
     UIProcess/qt/QtWebContext.h \
     UIProcess/qt/QtWebPageEventHandler.h \
     UIProcess/qt/QtGestureRecognizer.h \
@@ -296,6 +306,7 @@ HEADERS += \
     UIProcess/texmap/LayerBackingStore.h \
     WebProcess/ApplicationCache/WebApplicationCacheManager.h \
     WebProcess/Authentication/AuthenticationManager.h \
+    WebProcess/Battery/WebBatteryManager.h \
     WebProcess/Cookies/WebCookieManager.h \
     WebProcess/Downloads/Download.h \
     WebProcess/Downloads/DownloadManager.h \
@@ -329,6 +340,7 @@ HEADERS += \
     WebProcess/InjectedBundle/InjectedBundleUserMessageCoders.h \
     WebProcess/KeyValueStorage/WebKeyValueStorageManager.h \
     WebProcess/MediaCache/WebMediaCacheManager.h \
+    WebProcess/NetworkInfo/WebNetworkInfoManager.h \
     WebProcess/Notifications/NotificationPermissionRequestManager.h \
     WebProcess/Notifications/WebNotificationManager.h \
     WebProcess/ResourceCache/WebResourceCacheManager.h \
@@ -346,6 +358,7 @@ HEADERS += \
     WebProcess/Plugins/PluginProxy.h \
     WebProcess/Plugins/PluginProcessConnection.h \
     WebProcess/Plugins/PluginProcessConnectionManager.h \
+    WebProcess/WebCoreSupport/WebBatteryClient.h \
     WebProcess/WebCoreSupport/WebChromeClient.h \
     WebProcess/WebCoreSupport/WebColorChooser.h \
     WebProcess/WebCoreSupport/WebContextMenuClient.h \
@@ -357,10 +370,12 @@ HEADERS += \
     WebProcess/WebCoreSupport/WebGeolocationClient.h \
     WebProcess/WebCoreSupport/WebInspectorClient.h \
     WebProcess/WebCoreSupport/WebInspectorFrontendClient.h \
+    WebProcess/WebCoreSupport/WebNetworkInfoClient.h \
     WebProcess/WebCoreSupport/WebNotificationClient.h \
     WebProcess/WebCoreSupport/WebPlatformStrategies.h \
     WebProcess/WebCoreSupport/WebPopupMenu.h \
     WebProcess/WebCoreSupport/WebSearchPopupMenu.h \
+    WebProcess/WebCoreSupport/WebVibrationClient.h \
     WebProcess/WebCoreSupport/qt/WebFrameNetworkingContext.h \
     WebProcess/WebPage/DrawingArea.h \
     WebProcess/WebPage/DrawingAreaImpl.h \
@@ -461,6 +476,7 @@ SOURCES += \
     Shared/UpdateInfo.cpp \
     Shared/VisitedLinkTable.cpp \
     Shared/WebBackForwardListItem.cpp \
+    Shared/WebBatteryStatus.cpp \
     Shared/WebConnection.cpp \
     Shared/WebConnectionClient.cpp \
     Shared/WebContextMenuItem.cpp \
@@ -477,6 +493,7 @@ SOURCES += \
     Shared/WebImage.cpp \
     Shared/WebLayerTreeInfo.cpp \
     Shared/WebMouseEvent.cpp \
+    Shared/WebNetworkInfo.cpp \
     Shared/WebOpenPanelParameters.cpp \
     Shared/WebPageCreationParameters.cpp \
     Shared/WebPageGroupData.cpp \
@@ -508,6 +525,8 @@ SOURCES += \
     UIProcess/API/C/WKAuthenticationDecisionListener.cpp \
     UIProcess/API/C/WKBackForwardList.cpp \
     UIProcess/API/C/WKBackForwardListItem.cpp \
+    UIProcess/API/C/WKBatteryManager.cpp \
+    UIProcess/API/C/WKBatteryStatus.cpp \
     UIProcess/API/C/WKContext.cpp \
     UIProcess/API/C/WKCredential.cpp \
     UIProcess/API/C/WKDatabaseManager.cpp \
@@ -521,18 +540,21 @@ SOURCES += \
     UIProcess/API/C/WKIconDatabase.cpp \
     UIProcess/API/C/WKInspector.cpp \
     UIProcess/API/C/WKIntentData.cpp \
+    UIProcess/API/C/WKIntentServiceInfo.cpp \
     UIProcess/API/C/WKNotification.cpp \
     UIProcess/API/C/WKNotificationManager.cpp \
     UIProcess/API/C/WKNotificationPermissionRequest.cpp \
     UIProcess/API/C/WKOpenPanelParameters.cpp \
     UIProcess/API/C/WKOpenPanelResultListener.cpp \
     UIProcess/API/C/WKNavigationData.cpp \
+    UIProcess/API/C/WKNetworkInfoManager.cpp \
     UIProcess/API/C/WKPage.cpp \
     UIProcess/API/C/WKPageGroup.cpp \
     UIProcess/API/C/WKPluginSiteDataManager.cpp \
     UIProcess/API/C/WKPreferences.cpp \
     UIProcess/API/C/WKProtectionSpace.cpp \
     UIProcess/API/C/WKResourceCacheManager.cpp \
+    UIProcess/API/C/WKVibration.cpp \
     UIProcess/API/cpp/qt/WKStringQt.cpp \
     UIProcess/API/cpp/qt/WKURLQt.cpp \
     UIProcess/API/qt/qwebdownloaditem.cpp \
@@ -549,6 +571,7 @@ SOURCES += \
     UIProcess/API/qt/qquickurlschemedelegate.cpp \
     UIProcess/API/qt/qwebpreferences.cpp \
     UIProcess/API/qt/qwebkittest.cpp \
+    UIProcess/API/qt/raw/qrawwebview.cpp \
     UIProcess/Authentication/AuthenticationChallengeProxy.cpp \
     UIProcess/Authentication/AuthenticationDecisionListener.cpp \
     UIProcess/Authentication/WebCredential.cpp \
@@ -582,6 +605,8 @@ SOURCES += \
     UIProcess/VisitedLinkProvider.cpp \
     UIProcess/WebApplicationCacheManagerProxy.cpp \
     UIProcess/WebBackForwardList.cpp \
+    UIProcess/WebBatteryManagerProxy.cpp \
+    UIProcess/WebBatteryProvider.cpp \
     UIProcess/WebConnectionToWebProcess.cpp \
     UIProcess/WebContext.cpp \
     UIProcess/WebContextConnectionClient.cpp \
@@ -613,6 +638,8 @@ SOURCES += \
     UIProcess/WebLoaderClient.cpp \
     UIProcess/WebMediaCacheManagerProxy.cpp \
     UIProcess/WebNavigationData.cpp \
+    UIProcess/WebNetworkInfoManagerProxy.cpp \
+    UIProcess/WebNetworkInfoProvider.cpp \
     UIProcess/WebOpenPanelResultListenerProxy.cpp \
     UIProcess/WebPageContextMenuClient.cpp \
     UIProcess/WebPageGroup.cpp \
@@ -623,6 +650,8 @@ SOURCES += \
     UIProcess/WebResourceCacheManagerProxy.cpp \
     UIProcess/WebResourceLoadClient.cpp \
     UIProcess/WebUIClient.cpp \
+    UIProcess/WebVibrationProvider.cpp \
+    UIProcess/WebVibrationProxy.cpp \
     UIProcess/qt/QtWebContext.cpp \
     UIProcess/qt/QtWebPageEventHandler.cpp \
     UIProcess/qt/QtGestureRecognizer.cpp \
@@ -651,6 +680,7 @@ SOURCES += \
     UIProcess/texmap/LayerBackingStore.cpp \
     WebProcess/ApplicationCache/WebApplicationCacheManager.cpp \
     WebProcess/Authentication/AuthenticationManager.cpp \
+    WebProcess/Battery/WebBatteryManager.cpp \
     WebProcess/Cookies/WebCookieManager.cpp \
     WebProcess/Cookies/qt/WebCookieManagerQt.cpp \
     WebProcess/Downloads/Download.cpp \
@@ -695,6 +725,7 @@ SOURCES += \
     WebProcess/InjectedBundle/qt/InjectedBundleQt.cpp \
     WebProcess/KeyValueStorage/WebKeyValueStorageManager.cpp \
     WebProcess/MediaCache/WebMediaCacheManager.cpp \
+    WebProcess/NetworkInfo/WebNetworkInfoManager.cpp \
     WebProcess/Notifications/NotificationPermissionRequestManager.cpp \
     WebProcess/Notifications/WebNotificationManager.cpp \
     WebProcess/ResourceCache/WebResourceCacheManager.cpp \
@@ -714,6 +745,7 @@ SOURCES += \
     WebProcess/Plugins/PluginProxy.cpp \
     WebProcess/Plugins/PluginProcessConnection.cpp \
     WebProcess/Plugins/PluginProcessConnectionManager.cpp \
+    WebProcess/WebCoreSupport/WebBatteryClient.cpp \
     WebProcess/WebCoreSupport/WebChromeClient.cpp \
     WebProcess/WebCoreSupport/WebColorChooser.cpp \
     WebProcess/WebCoreSupport/WebContextMenuClient.cpp \
@@ -724,10 +756,12 @@ SOURCES += \
     WebProcess/WebCoreSupport/WebGeolocationClient.cpp \
     WebProcess/WebCoreSupport/WebInspectorClient.cpp \
     WebProcess/WebCoreSupport/WebInspectorFrontendClient.cpp \
+    WebProcess/WebCoreSupport/WebNetworkInfoClient.cpp \
     WebProcess/WebCoreSupport/WebNotificationClient.cpp \
     WebProcess/WebCoreSupport/WebPlatformStrategies.cpp \
     WebProcess/WebCoreSupport/WebPopupMenu.cpp \
     WebProcess/WebCoreSupport/WebSearchPopupMenu.cpp \
+    WebProcess/WebCoreSupport/WebVibrationClient.cpp \
     WebProcess/WebCoreSupport/qt/WebContextMenuClientQt.cpp \
     WebProcess/WebCoreSupport/qt/WebErrorsQt.cpp \
     WebProcess/WebCoreSupport/qt/WebDragClientQt.cpp \
@@ -766,6 +800,16 @@ SOURCES += \
     WebProcess/qt/WebProcessQt.cpp
 
 mac: {
+
+    contains(DEFINES, WTF_USE_QTKIT=1) {
+        DEFINES += NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES
+        INCLUDEPATH += \
+            $$PWD/../../WebKitLibraries/
+        HEADERS += \
+            WebProcess/WebCoreSupport/qt/WebSystemInterface.h
+        SOURCES += \
+            WebProcess/WebCoreSupport/qt/WebSystemInterface.mm
+    }
     INCLUDEPATH += \
         Platform/mac \
         Platform/CoreIPC/mac

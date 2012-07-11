@@ -31,10 +31,10 @@
 
 #include "FloatRect.h"
 #include "IntRect.h"
-#include "TextureManager.h"
 #include <public/WebFilterOperations.h>
 #include <public/WebTransformationMatrix.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -44,22 +44,13 @@ class CCRenderPass;
 class CCSharedQuadState;
 class CCLayerImpl;
 class LayerRendererChromium;
-class ManagedTexture;
+class TextStream;
 
 class CCRenderSurface {
     WTF_MAKE_NONCOPYABLE(CCRenderSurface);
 public:
     explicit CCRenderSurface(CCLayerImpl*);
     virtual ~CCRenderSurface();
-
-    virtual bool prepareContentsTexture(LayerRendererChromium*);
-    void releaseContentsTexture();
-    bool hasValidContentsTexture() const;
-    virtual bool hasCachedContentsTexture() const;
-
-    bool prepareBackgroundTexture(LayerRendererChromium*);
-    void releaseBackgroundTexture();
-    bool hasValidBackgroundTexture() const;
 
     String name() const;
     void dumpSurface(TextStream&, int indent) const;
@@ -114,16 +105,13 @@ public:
     void setScissorRect(const IntRect& scissorRect) { m_scissorRect = scissorRect; }
     const IntRect& scissorRect() const { return m_scissorRect; }
 
-    virtual bool contentsChanged() const;
+    bool contentsChanged() const;
 
     void setContentRect(const IntRect&);
     const IntRect& contentRect() const { return m_contentRect; }
 
     void clearLayerList() { m_layerList.clear(); }
     Vector<CCLayerImpl*>& layerList() { return m_layerList; }
-
-    ManagedTexture* contentsTexture() const { return m_contentsTexture.get(); }
-    ManagedTexture* backgroundTexture() const { return m_backgroundTexture.get(); }
 
     int owningLayerId() const;
     CCRenderSurface* targetRenderSurface() const;
@@ -152,9 +140,6 @@ private:
     // Uses this surface's space.
     IntRect m_contentRect;
     bool m_surfacePropertyChanged;
-
-    OwnPtr<ManagedTexture> m_contentsTexture;
-    OwnPtr<ManagedTexture> m_backgroundTexture;
 
     float m_drawOpacity;
     bool m_drawOpacityIsAnimating;

@@ -68,8 +68,6 @@ bool PagePopupBlackBerry::init(WebPage* webpage)
 
     installDomFunction(webpage->d->mainFrame());
 
-    webpage->d->setParentPopup(this);
-
     return true;
 }
 
@@ -122,13 +120,12 @@ static JSStaticValue popUpExtensionStaticValues[] =
 
 void PagePopupBlackBerry::installDomFunction(Frame* frame)
 {
-    JSC::JSLock lock(JSC::SilenceAssertionsOnly);
-
     JSDOMWindow* window = toJSDOMWindow(frame, mainThreadNormalWorld());
     ASSERT(window);
 
     JSC::ExecState* exec = window->globalExec();
     ASSERT(exec);
+    JSC::JSLockHolder lock(exec);
 
     JSContextRef context = ::toRef(exec);
     JSObjectRef globalObject = JSContextGetGlobalObject(context);
@@ -163,6 +160,7 @@ void PagePopupBlackBerry::closePopup()
 {
     m_client->didClosePopup();
     m_webPagePrivate->client()->closePopupWebView();
+    m_webPagePrivate->m_webPage->popupClosed();
 }
 
 }

@@ -48,6 +48,8 @@
 
     'enable_wexit_time_destructors': 1,
 
+    'use_harfbuzz_ng%': 0,
+
     'webcore_include_dirs': [
       '../',
       '../..',
@@ -59,6 +61,7 @@
       '../Modules/intents',
       '../Modules/indexeddb',
       '../Modules/mediastream',
+      '../Modules/notifications',
       '../Modules/quota',
       '../Modules/speech',
       '../Modules/webaudio',
@@ -95,7 +98,6 @@
       '../loader/cache',
       '../loader/icon',
       '../mathml',
-      '../notifications',
       '../page',
       '../page/animation',
       '../page/chromium',
@@ -229,6 +231,11 @@
       ['use_x11==1 or OS=="android"', {
         'webcore_include_dirs': [
           '../platform/graphics/harfbuzz',
+        ],
+      }],
+      ['use_x11==1 and use_harfbuzz_ng==1', {
+        'webcore_include_dirs': [
+          '../platform/graphics/harfbuzz/ng',
         ],
       }],
       ['OS=="win" and buildtype=="Official"', {
@@ -1047,13 +1054,13 @@
               '--include', '../Modules/indexeddb',
               '--include', '../Modules/intents',
               '--include', '../Modules/mediastream',
+              '--include', '../Modules/notifications',
               '--include', '../Modules/webaudio',
               '--include', '../Modules/webdatabase',
               '--include', '../css',
               '--include', '../dom',
               '--include', '../fileapi',
               '--include', '../html',
-              '--include', '../notifications',
               '--include', '../page',
               '--include', '../plugins',
               '--include', '../storage',
@@ -1566,6 +1573,16 @@
             ['exclude', 'Harfbuzz[^/]+\\.(cpp|h)$'],
           ],
         }],
+        ['use_x11==1 and use_harfbuzz_ng==1', {
+          'sources/': [
+            ['exclude', 'platform/graphics/harfbuzz/ComplexTextControllerHarfBuzz\\.cpp$'],
+            ['exclude', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
+
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzFace\\.(cpp|h)$'],
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzFaceSkia\\.cpp$'],
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzShaper\\.(cpp|h)$'],
+          ],
+        }],
         ['toolkit_uses_gtk == 1', {
           'sources/': [
             # Cherry-pick files excluded by the broader regular expressions above.
@@ -1648,9 +1665,10 @@
 
             ['include', 'WebKit/mac/WebCoreSupport/WebSystemInterface\\.mm$'],
 
-            # We use LocalizedDateMac.mm instead of LocalizedDateICU.cpp.
+            # We use LocalizedDateMac.cpp with LocaleMac.mm instead of LocalizedDateICU.cpp.
             ['exclude', 'platform/text/LocalizedDateICU\\.cpp$'],
-            ['include', 'platform/text/mac/LocalizedDateMac\\.mm$'],
+            ['include', 'platform/text/mac/LocaleMac\\.mm$'],
+            ['include', 'platform/text/mac/LocalizedDateMac\\.cpp$'],
 
             # The Mac uses platform/mac/KillRingMac.mm instead of the dummy
             # implementation.
@@ -1754,6 +1772,19 @@
             ['exclude', 'Android\\.cpp$'],
           ],
         }],
+      ],
+    },
+    {
+      'target_name': 'webcore_chromium_compositor',
+      'type': 'static_library',
+      'dependencies': [
+        'webcore_prerequisites',
+      ],
+      'defines': [
+        'WEBKIT_IMPLEMENTATION=1',
+      ],
+      'sources': [
+        '<@(webcore_chromium_compositor_files)',
       ],
     },
     # The *NEON.cpp files fail to compile when -mthumb is passed. Force
@@ -2006,10 +2037,12 @@
         'webcore_dom',
         'webcore_html',
         'webcore_platform',
+        'webcore_chromium_compositor',
         'webcore_remaining',
         'webcore_rendering',
         # Exported.
         'webcore_bindings',
+        '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
         '../../WTF/WTF.gyp/WTF.gyp:wtf',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',
@@ -2019,6 +2052,7 @@
       ],
       'export_dependent_settings': [
         'webcore_bindings',
+        '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
         '../../WTF/WTF.gyp/WTF.gyp:wtf',
         '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(chromium_src_dir)/skia/skia.gyp:skia',

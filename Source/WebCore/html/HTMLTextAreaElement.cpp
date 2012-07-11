@@ -89,7 +89,7 @@ PassRefPtr<HTMLTextAreaElement> HTMLTextAreaElement::create(const QualifiedName&
 void HTMLTextAreaElement::createShadowSubtree()
 {
     ASSERT(!shadow());
-    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::CreatingUserAgentShadowRoot);
+    RefPtr<ShadowRoot> root = ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot);
     root->appendChild(TextControlInnerTextElement::create(document()), ASSERT_NO_EXCEPTION);
 }
 
@@ -101,10 +101,7 @@ const AtomicString& HTMLTextAreaElement::formControlType() const
 
 FormControlState HTMLTextAreaElement::saveFormControlState() const
 {
-    String currentValue = value();
-    if (currentValue == defaultValue())
-        return FormControlState();
-    return FormControlState(currentValue);
+    return m_isDirty ? FormControlState(value()) : FormControlState();
 }
 
 void HTMLTextAreaElement::restoreFormControlState(const FormControlState& state)

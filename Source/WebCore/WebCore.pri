@@ -5,12 +5,7 @@
 # See 'Tools/qmake/README' for an overview of the build system
 # -------------------------------------------------------------------
 
-load(features)
-
 SOURCE_DIR = $${ROOT_WEBKIT_DIR}/Source/WebCore
-
-# We enable TextureMapper by default; remove this line to enable GraphicsLayerQt.
-CONFIG += texmap
 
 QT *= network sql
 haveQt(5): QT *= gui-private
@@ -22,6 +17,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/Modules/filesystem \
     $$SOURCE_DIR/Modules/geolocation \
     $$SOURCE_DIR/Modules/indexeddb \
+    $$SOURCE_DIR/Modules/notifications \
     $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
     $$SOURCE_DIR/Modules/webdatabase \
@@ -49,7 +45,6 @@ INCLUDEPATH += \
     $$SOURCE_DIR/loader/cache \
     $$SOURCE_DIR/loader/icon \
     $$SOURCE_DIR/mathml \
-    $$SOURCE_DIR/notifications \
     $$SOURCE_DIR/page \
     $$SOURCE_DIR/page/animation \
     $$SOURCE_DIR/page/qt \
@@ -171,7 +166,7 @@ contains(DEFINES, ENABLE_GEOLOCATION=1) {
     MOBILITY *= location
 }
 
-contains(DEFINES, ENABLE_DEVICE_ORIENTATION=1) {
+contains(DEFINES, ENABLE_ORIENTATION_EVENTS=1)|contains(DEFINES, ENABLE_DEVICE_ORIENTATION=1) {
     haveQt(5) {
         QT += sensors
     } else {
@@ -205,32 +200,16 @@ contains(DEFINES, ENABLE_VIDEO=1) {
     }
 }
 
-contains(DEFINES, ENABLE_WEBGL=1) {
-    !contains(QT_CONFIG, opengl) {
-        error( "This configuration needs an OpenGL enabled Qt. Your Qt is missing OpenGL.")
-    }
-}
-
-contains(CONFIG, texmap) {
-    DEFINES += WTF_USE_TEXTURE_MAPPER=1
-    # TextureMapperGL requires stuff from GraphicsContext3D, hence the WebGL
-    # dependency.
-    !win32-*:contains(QT_CONFIG, opengl):contains(DEFINES, ENABLE_WEBGL=1) {
-        DEFINES += WTF_USE_TEXTURE_MAPPER_GL=1
-        contains(QT_CONFIG, opengles2): LIBS += -lEGL
-    }
+contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
+    contains(QT_CONFIG, opengles2): LIBS += -lEGL
     mac: LIBS += -framework IOSurface -framework CoreFoundation
-}
-
-contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1)|contains(DEFINES, ENABLE_WEBGL=1) {
-    # Only Qt 4 needs the opengl module, for Qt 5 everything we need is part of QtGui.
-    haveQt(4): QT *= opengl
+    # Only WebKit1 needs the opengl module, so it's optional for Qt5.
+    haveQt(4)|contains(QT_CONFIG, opengl): QT *= opengl
 }
 
 !system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {
     INCLUDEPATH += $${SQLITE3SRCDIR}
     DEFINES += SQLITE_CORE SQLITE_OMIT_LOAD_EXTENSION SQLITE_OMIT_COMPLETE
-    CONFIG(release, debug|release): DEFINES *= NDEBUG
 } else {
     INCLUDEPATH += $${SQLITE3SRCDIR}
     LIBS += -lsqlite3
@@ -238,19 +217,19 @@ contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1)|contains(DEFINES, ENABLE_WEBGL=1)
 
 haveQt(5) {
     # Qt5 allows us to use config tests to check for the presence of these libraries
-    contains(config_test_libjpeg, yes) {
+    config_libjpeg {
         DEFINES += WTF_USE_LIBJPEG=1
         LIBS += -ljpeg
     } else {
         warning("JPEG library not found! QImageDecoder will decode JPEG images.")
     }
-    contains(config_test_libpng, yes) {
+    config_libpng {
         DEFINES += WTF_USE_LIBPNG=1
         LIBS += -lpng
     } else {
         warning("PNG library not found! QImageDecoder will decode PNG images.")
     }
-    contains(config_test_libwebp, yes) {
+    config_libwebp {
         DEFINES += WTF_USE_WEBP=1
         LIBS += -lwebp
     }

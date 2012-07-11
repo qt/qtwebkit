@@ -56,11 +56,7 @@ public:
 
     virtual void setLayerTreeHost(CCLayerTreeHost*) OVERRIDE;
 
-    // Reserves all existing and valid tile textures to protect them from being
-    // recycled by the texture manager.
-    void protectTileTextures(const IntRect& layerRect);
-
-    virtual void reserveTextures() OVERRIDE;
+    virtual void setTexturePriorities(const CCPriorityCalculator&) OVERRIDE;
 
     virtual Region visibleContentOpaqueRegion() const OVERRIDE;
 
@@ -89,10 +85,7 @@ protected:
     // Prepare data needed to update textures that intersect with layerRect.
     void updateLayerRect(CCTextureUpdater&, const IntRect& layerRect, const CCOcclusionTracker*);
 
-    // Same as above, but this will try to paint additional surrounding content if idle.
-    void idleUpdateLayerRect(CCTextureUpdater&, const IntRect& layerRect, const CCOcclusionTracker*);
-
-    // After preparing an update, returns true if more pre-painting is needed.
+    // After preparing an update, returns true if more painting is needed.
     bool needsIdlePaint(const IntRect& layerRect);
 
     IntRect idlePaintRect(const IntRect& visibleLayerRect);
@@ -100,7 +93,7 @@ protected:
     bool skipsDraw() const { return m_skipsDraw; }
 
     // Virtual for testing
-    virtual TextureManager* textureManager() const;
+    virtual CCPrioritizedTextureManager* textureManager() const;
 
 private:
     virtual PassOwnPtr<CCLayerImpl> createCCLayerImpl() OVERRIDE;
@@ -110,6 +103,8 @@ private:
 
     bool tileOnlyNeedsPartialUpdate(UpdatableTile*);
     bool tileNeedsBufferedUpdate(UpdatableTile*);
+
+    void setTexturePrioritiesInRect(const CCPriorityCalculator&, const IntRect& visibleLayerRect);
 
     void updateTiles(bool idle, int left, int top, int right, int bottom, CCTextureUpdater&, const CCOcclusionTracker*);
 

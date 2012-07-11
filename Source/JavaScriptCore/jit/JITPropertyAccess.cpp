@@ -29,6 +29,7 @@
 #include "JIT.h"
 
 #include "CodeBlock.h"
+#include "GCAwareJITStubRoutine.h"
 #include "GetterSetter.h"
 #include "Interpreter.h"
 #include "JITInlineMethods.h"
@@ -151,10 +152,26 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     emitValueProfilingSite();
 }
 
-void JIT::compileGetDirectOffset(RegisterID base, RegisterID result, RegisterID offset, RegisterID scratch)
+void JIT::compileGetDirectOffset(RegisterID base, RegisterID result, RegisterID offset, RegisterID scratch, FinalObjectMode finalObjectMode)
 {
-    loadPtr(Address(base, JSObject::offsetOfPropertyStorage()), scratch);
-    loadPtr(BaseIndex(scratch, offset, ScalePtr, 0), result);
+    ASSERT(sizeof(JSValue) == 8);
+    
+    if (finalObjectMode == MayBeFinal) {
+        Jump isInline = branch32(LessThan, offset, TrustedImm32(inlineStorageCapacity));
+        loadPtr(Address(base, JSObject::offsetOfOutOfLineStorage()), scratch);
+        Jump done = jump();
+        isInline.link(this);
+        addPtr(TrustedImm32(JSObject::offsetOfInlineStorage() + inlineStorageCapacity * sizeof(EncodedJSValue)), base, scratch);
+        done.link(this);
+    } else {
+#if !ASSERT_DISABLED
+        Jump isOutOfLine = branch32(GreaterThanOrEqual, offset, TrustedImm32(inlineStorageCapacity));
+        breakpoint();
+        isOutOfLine.link(this);
+#endif
+        loadPtr(Address(base, JSObject::offsetOfOutOfLineStorage()), scratch);
+    }
+    loadPtr(BaseIndex(scratch, offset, ScalePtr, -inlineStorageCapacity * static_cast<ptrdiff_t>(sizeof(JSValue))), result);
 }
 
 void JIT::emit_op_get_by_pname(Instruction* currentInstruction)
@@ -177,6 +194,7 @@ void JIT::emit_op_get_by_pname(Instruction* currentInstruction)
     load32(addressFor(i), regT3);
     sub32(TrustedImm32(1), regT3);
     addSlowCase(branch32(AboveOrEqual, regT3, Address(regT1, OBJECT_OFFSETOF(JSPropertyNameIterator, m_numCacheableSlots))));
+    add32(Address(regT1, OBJECT_OFFSETOF(JSPropertyNameIterator, m_offsetBase)), regT3);
     compileGetDirectOffset(regT0, regT0, regT3, regT1);
 
     emitPutVirtualRegister(dst, regT0);
@@ -283,7 +301,8 @@ void JIT::emit_op_del_by_id(Instruction* currentInstruction)
 void JIT::emit_op_method_check(Instruction* currentInstruction)
 {
     // Assert that the following instruction is a get_by_id.
-    ASSERT(m_interpreter->getOpcodeID((currentInstruction + OPCODE_LENGTH(op_method_check))->u.opcode) == op_get_by_id);
+    ASSERT(m_interpreter->getOpcodeID((currentInstruction + OPCODE_LENGTH(op_method_check))->u.opcode) == op_get_by_id
+        || m_interpreter->getOpcodeID((currentInstruction + OPCODE_LENGTH(op_method_check))->u.opcode) == op_get_by_id_out_of_line);
 
     currentInstruction += OPCODE_LENGTH(op_method_check);
     unsigned resultVReg = currentInstruction[1].u.operand;
@@ -373,14 +392,14 @@ void JIT::compileGetByIdHotPath(int baseVReg, Identifier*)
     PatchableJump structureCheck = patchableBranchPtrWithPatch(NotEqual, Address(regT0, JSCell::structureOffset()), structureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
     addSlowCase(structureCheck);
 
-    loadPtr(Address(regT0, JSObject::offsetOfPropertyStorage()), regT0);
+    ConvertibleLoadLabel propertyStorageLoad = convertibleLoadPtr(Address(regT0, JSObject::offsetOfOutOfLineStorage()), regT0);
     DataLabelCompact displacementLabel = loadPtrWithCompactAddressOffsetPatch(Address(regT0, patchGetByIdDefaultOffset), regT0);
 
     Label putResult(this);
 
     END_UNINTERRUPTED_SEQUENCE(sequenceGetByIdHotPath);
 
-    m_propertyAccessCompilationInfo.append(PropertyStubCompilationInfo(PropertyStubGetById, m_bytecodeOffset, hotPathBegin, structureToCompare, structureCheck, displacementLabel, putResult));
+    m_propertyAccessCompilationInfo.append(PropertyStubCompilationInfo(PropertyStubGetById, m_bytecodeOffset, hotPathBegin, structureToCompare, structureCheck, propertyStorageLoad, displacementLabel, putResult));
 }
 
 void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -440,14 +459,14 @@ void JIT::emit_op_put_by_id(Instruction* currentInstruction)
     DataLabelPtr structureToCompare;
     addSlowCase(branchPtrWithPatch(NotEqual, Address(regT0, JSCell::structureOffset()), structureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure))));
 
-    loadPtr(Address(regT0, JSObject::offsetOfPropertyStorage()), regT2);
+    ConvertibleLoadLabel propertyStorageLoad = convertibleLoadPtr(Address(regT0, JSObject::offsetOfOutOfLineStorage()), regT2);
     DataLabel32 displacementLabel = storePtrWithAddressOffsetPatch(regT1, Address(regT2, patchPutByIdDefaultOffset));
 
     END_UNINTERRUPTED_SEQUENCE(sequencePutById);
 
     emitWriteBarrier(regT0, regT1, regT2, regT3, ShouldFilterImmediates, WriteBarrierForPropertyAccess);
 
-    m_propertyAccessCompilationInfo.append(PropertyStubCompilationInfo(PropertyStubPutById, m_bytecodeOffset, hotPathBegin, structureToCompare, displacementLabel));
+    m_propertyAccessCompilationInfo.append(PropertyStubCompilationInfo(PropertyStubPutById, m_bytecodeOffset, hotPathBegin, structureToCompare, propertyStorageLoad, displacementLabel));
 }
 
 void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -471,28 +490,41 @@ void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCase
 
 // Compile a store into an object's property storage.  May overwrite the
 // value in objectReg.
-void JIT::compilePutDirectOffset(RegisterID base, RegisterID value, size_t cachedOffset)
+void JIT::compilePutDirectOffset(RegisterID base, RegisterID value, PropertyOffset cachedOffset)
 {
-    int offset = cachedOffset * sizeof(JSValue);
-    loadPtr(Address(base, JSObject::offsetOfPropertyStorage()), base);
-    storePtr(value, Address(base, offset));
+    if (isInlineOffset(cachedOffset)) {
+        storePtr(value, Address(base, JSObject::offsetOfInlineStorage() + sizeof(JSValue) * offsetInInlineStorage(cachedOffset)));
+        return;
+    }
+    
+    loadPtr(Address(base, JSObject::offsetOfOutOfLineStorage()), base);
+    storePtr(value, Address(base, sizeof(JSValue) * offsetInOutOfLineStorage(cachedOffset)));
 }
 
 // Compile a load from an object's property storage.  May overwrite base.
-void JIT::compileGetDirectOffset(RegisterID base, RegisterID result, size_t cachedOffset)
+void JIT::compileGetDirectOffset(RegisterID base, RegisterID result, PropertyOffset cachedOffset)
 {
-    int offset = cachedOffset * sizeof(JSValue);
-    loadPtr(Address(base, JSObject::offsetOfPropertyStorage()), result);
-    loadPtr(Address(result, offset), result);
+    if (isInlineOffset(cachedOffset)) {
+        loadPtr(Address(base, JSObject::offsetOfInlineStorage() + sizeof(JSValue) * offsetInInlineStorage(cachedOffset)), result);
+        return;
+    }
+    
+    loadPtr(Address(base, JSObject::offsetOfOutOfLineStorage()), result);
+    loadPtr(Address(result, sizeof(JSValue) * offsetInOutOfLineStorage(cachedOffset)), result);
 }
 
-void JIT::compileGetDirectOffset(JSObject* base, RegisterID result, size_t cachedOffset)
+void JIT::compileGetDirectOffset(JSObject* base, RegisterID result, PropertyOffset cachedOffset)
 {
-    loadPtr(base->addressOfPropertyStorage(), result);
-    loadPtr(Address(result, cachedOffset * sizeof(WriteBarrier<Unknown>)), result);
+    if (isInlineOffset(cachedOffset)) {
+        loadPtr(base->locationForOffset(cachedOffset), result);
+        return;
+    }
+    
+    loadPtr(base->addressOfOutOfLineStorage(), result);
+    loadPtr(Address(result, offsetInOutOfLineStorage(cachedOffset) * sizeof(WriteBarrier<Unknown>)), result);
 }
 
-void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, size_t cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
+void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, PropertyOffset cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
 {
     JumpList failureCases;
     // Check eax is an object of the right Structure.
@@ -522,7 +554,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
 #endif
     
     // emit a call only if storage realloc is needed
-    bool willNeedStorageRealloc = oldStructure->propertyStorageCapacity() != newStructure->propertyStorageCapacity();
+    bool willNeedStorageRealloc = oldStructure->outOfLineCapacity() != newStructure->outOfLineCapacity();
     if (willNeedStorageRealloc) {
         // This trampoline was called to like a JIT stub; before we can can call again we need to
         // remove the return address from the stack, to prevent the stack from becoming misaligned.
@@ -532,7 +564,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
         stubCall.skipArgument(); // base
         stubCall.skipArgument(); // ident
         stubCall.skipArgument(); // value
-        stubCall.addArgument(TrustedImm32(oldStructure->propertyStorageCapacity()));
+        stubCall.addArgument(TrustedImm32(oldStructure->outOfLineCapacity()));
         stubCall.addArgument(TrustedImmPtr(newStructure));
         stubCall.call(regT0);
         emitGetJITStubArg(2, regT1);
@@ -564,15 +596,20 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
         patchBuffer.link(m_calls[0].from, FunctionPtr(cti_op_put_by_id_transition_realloc));
     }
     
-    stubInfo->stubRoutine = FINALIZE_CODE(
-        patchBuffer,
-        ("Baseline put_by_id transition for CodeBlock %p, return point %p",
-         m_codeBlock, returnAddress.value()));
+    stubInfo->stubRoutine = createJITStubRoutine(
+        FINALIZE_CODE(
+            patchBuffer,
+            ("Baseline put_by_id transition for CodeBlock %p, return point %p",
+             m_codeBlock, returnAddress.value())),
+        *m_globalData,
+        m_codeBlock->ownerExecutable(),
+        willNeedStorageRealloc,
+        newStructure);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relinkCallerToTrampoline(returnAddress, CodeLocationLabel(stubInfo->stubRoutine.code()));
+    repatchBuffer.relinkCallerToTrampoline(returnAddress, CodeLocationLabel(stubInfo->stubRoutine->code().code()));
 }
 
-void JIT::patchGetByIdSelf(CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, size_t cachedOffset, ReturnAddressPtr returnAddress)
+void JIT::patchGetByIdSelf(CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress)
 {
     RepatchBuffer repatchBuffer(codeBlock);
 
@@ -580,14 +617,13 @@ void JIT::patchGetByIdSelf(CodeBlock* codeBlock, StructureStubInfo* stubInfo, St
     // Should probably go to cti_op_get_by_id_fail, but that doesn't do anything interesting right now.
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(cti_op_get_by_id_self_fail));
 
-    int offset = sizeof(JSValue) * cachedOffset;
-
     // Patch the offset into the propoerty map to load from, then patch the Structure to look for.
     repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelPtrAtOffset(stubInfo->patch.baseline.u.get.structureToCompare), structure);
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelCompactAtOffset(stubInfo->patch.baseline.u.get.displacementLabel), offset);
+    repatchBuffer.setLoadInstructionIsActive(stubInfo->hotPathBegin.convertibleLoadAtOffset(stubInfo->patch.baseline.u.get.propertyStorageLoad), isOutOfLineOffset(cachedOffset));
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelCompactAtOffset(stubInfo->patch.baseline.u.get.displacementLabel), offsetRelativeToPatchedStorage(cachedOffset));
 }
 
-void JIT::patchPutByIdReplace(CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, size_t cachedOffset, ReturnAddressPtr returnAddress, bool direct)
+void JIT::patchPutByIdReplace(CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress, bool direct)
 {
     RepatchBuffer repatchBuffer(codeBlock);
 
@@ -595,11 +631,10 @@ void JIT::patchPutByIdReplace(CodeBlock* codeBlock, StructureStubInfo* stubInfo,
     // Should probably go to cti_op_put_by_id_fail, but that doesn't do anything interesting right now.
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(direct ? cti_op_put_by_id_direct_generic : cti_op_put_by_id_generic));
 
-    int offset = sizeof(JSValue) * cachedOffset;
-
     // Patch the offset into the propoerty map to load from, then patch the Structure to look for.
     repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelPtrAtOffset(stubInfo->patch.baseline.u.put.structureToCompare), structure);
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(stubInfo->patch.baseline.u.put.displacementLabel), offset);
+    repatchBuffer.setLoadInstructionIsActive(stubInfo->hotPathBegin.convertibleLoadAtOffset(stubInfo->patch.baseline.u.put.propertyStorageLoad), isOutOfLineOffset(cachedOffset));
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(stubInfo->patch.baseline.u.put.displacementLabel), offsetRelativeToPatchedStorage(cachedOffset));
 }
 
 void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
@@ -628,7 +663,7 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
 
     // Track the stub we have created so that it will be deleted later.
-    stubInfo->stubRoutine = FINALIZE_CODE(
+    stubInfo->stubRoutine = FINALIZE_CODE_FOR_STUB(
         patchBuffer,
         ("Basline JIT get_by_id array length stub for CodeBlock %p, return point %p",
          m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
@@ -637,13 +672,13 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubInfo->stubRoutine.code()));
+    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubInfo->stubRoutine->code().code()));
 
     // We don't want to patch more than once - in future go to cti_op_put_by_id_generic.
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(cti_op_get_by_id_array_fail));
 }
 
-void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, ReturnAddressPtr returnAddress, CallFrame* callFrame)
+void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress, CallFrame* callFrame)
 {
     // The prototype object definitely exists (if this stub exists the CodeBlock is referencing a Structure that is
     // referencing the prototype object - let's speculatively load it's table nice and early!)
@@ -695,22 +730,26 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
         }
     }
     // Track the stub we have created so that it will be deleted later.
-    stubInfo->stubRoutine = FINALIZE_CODE(
-        patchBuffer,
-        ("Baseline JIT get_by_id proto stub for CodeBlock %p, return point %p",
-         m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
-             stubInfo->patch.baseline.u.get.putResult).executableAddress()));
+    stubInfo->stubRoutine = createJITStubRoutine(
+        FINALIZE_CODE(
+            patchBuffer,
+            ("Baseline JIT get_by_id proto stub for CodeBlock %p, return point %p",
+             m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
+                 stubInfo->patch.baseline.u.get.putResult).executableAddress())),
+        *m_globalData,
+        m_codeBlock->ownerExecutable(),
+        needsStubLink);
 
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubInfo->stubRoutine.code()));
+    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubInfo->stubRoutine->code().code()));
 
     // We don't want to patch more than once - in future go to cti_op_put_by_id_generic.
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(cti_op_get_by_id_proto_list));
 }
 
-void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset)
+void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, PolymorphicAccessStructureList* polymorphicStructures, int currentIndex, Structure* structure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset)
 {
     Jump failureCase = checkStructure(regT0, structure);
     bool needsStubLink = false;
@@ -747,7 +786,7 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
     }
 
     // Use the patch information to link the failure cases back to the original slow case routine.
-    CodeLocationLabel lastProtoBegin = CodeLocationLabel(polymorphicStructures->list[currentIndex - 1].stubRoutine.code());
+    CodeLocationLabel lastProtoBegin = CodeLocationLabel(JITStubRoutine::asCodePtr(polymorphicStructures->list[currentIndex - 1].stubRoutine));
     if (!lastProtoBegin)
         lastProtoBegin = stubInfo->callReturnLocation.labelAtOffset(-stubInfo->patch.baseline.u.get.coldPathBegin);
 
@@ -756,21 +795,25 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
     // On success return back to the hot patch code, at a point it will perform the store to dest for us.
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
 
-    MacroAssemblerCodeRef stubCode = FINALIZE_CODE(
-        patchBuffer,
-        ("Baseline JIT get_by_id list stub for CodeBlock %p, return point %p",
-         m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
-             stubInfo->patch.baseline.u.get.putResult).executableAddress()));
+    RefPtr<JITStubRoutine> stubCode = createJITStubRoutine(
+        FINALIZE_CODE(
+            patchBuffer,
+            ("Baseline JIT get_by_id list stub for CodeBlock %p, return point %p",
+             m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
+                 stubInfo->patch.baseline.u.get.putResult).executableAddress())),
+        *m_globalData,
+        m_codeBlock->ownerExecutable(),
+        needsStubLink);
 
     polymorphicStructures->list[currentIndex].set(*m_globalData, m_codeBlock->ownerExecutable(), stubCode, structure, isDirect);
 
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubCode.code()));
+    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubCode->code().code()));
 }
 
-void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructures, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, CallFrame* callFrame)
+void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructures, int currentIndex, Structure* structure, Structure* prototypeStructure, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, CallFrame* callFrame)
 {
     // The prototype object definitely exists (if this stub exists the CodeBlock is referencing a Structure that is
     // referencing the prototype object - let's speculatively load it's table nice and early!)
@@ -819,27 +862,31 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     }
 
     // Use the patch information to link the failure cases back to the original slow case routine.
-    CodeLocationLabel lastProtoBegin = CodeLocationLabel(prototypeStructures->list[currentIndex - 1].stubRoutine.code());
+    CodeLocationLabel lastProtoBegin = CodeLocationLabel(JITStubRoutine::asCodePtr(prototypeStructures->list[currentIndex - 1].stubRoutine));
     patchBuffer.link(failureCases1, lastProtoBegin);
     patchBuffer.link(failureCases2, lastProtoBegin);
 
     // On success return back to the hot patch code, at a point it will perform the store to dest for us.
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
 
-    MacroAssemblerCodeRef stubCode = FINALIZE_CODE(
-        patchBuffer,
-        ("Baseline JIT get_by_id proto list stub for CodeBlock %p, return point %p",
-         m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
-             stubInfo->patch.baseline.u.get.putResult).executableAddress()));
+    RefPtr<JITStubRoutine> stubCode = createJITStubRoutine(
+        FINALIZE_CODE(
+            patchBuffer,
+            ("Baseline JIT get_by_id proto list stub for CodeBlock %p, return point %p",
+             m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
+                 stubInfo->patch.baseline.u.get.putResult).executableAddress())),
+        *m_globalData,
+        m_codeBlock->ownerExecutable(),
+        needsStubLink);
     prototypeStructures->list[currentIndex].set(*m_globalData, m_codeBlock->ownerExecutable(), stubCode, structure, prototypeStructure, isDirect);
 
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubCode.code()));
+    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubCode->code().code()));
 }
 
-void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructures, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, CallFrame* callFrame)
+void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, PolymorphicAccessStructureList* prototypeStructures, int currentIndex, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, CallFrame* callFrame)
 {
     ASSERT(count);
     JumpList bucketsOfFail;
@@ -892,18 +939,22 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     }
 
     // Use the patch information to link the failure cases back to the original slow case routine.
-    CodeLocationLabel lastProtoBegin = CodeLocationLabel(prototypeStructures->list[currentIndex - 1].stubRoutine.code());
+    CodeLocationLabel lastProtoBegin = CodeLocationLabel(JITStubRoutine::asCodePtr(prototypeStructures->list[currentIndex - 1].stubRoutine));
 
     patchBuffer.link(bucketsOfFail, lastProtoBegin);
 
     // On success return back to the hot patch code, at a point it will perform the store to dest for us.
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
 
-    CodeRef stubRoutine = FINALIZE_CODE(
-        patchBuffer,
-        ("Baseline JIT get_by_id chain list stub for CodeBlock %p, return point %p",
-         m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
-             stubInfo->patch.baseline.u.get.putResult).executableAddress()));
+    RefPtr<JITStubRoutine> stubRoutine = createJITStubRoutine(
+        FINALIZE_CODE(
+            patchBuffer,
+            ("Baseline JIT get_by_id chain list stub for CodeBlock %p, return point %p",
+             m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
+                 stubInfo->patch.baseline.u.get.putResult).executableAddress())),
+        *m_globalData,
+        m_codeBlock->ownerExecutable(),
+        needsStubLink);
 
     // Track the stub we have created so that it will be deleted later.
     prototypeStructures->list[currentIndex].set(callFrame->globalData(), m_codeBlock->ownerExecutable(), stubRoutine, structure, chain, isDirect);
@@ -911,10 +962,10 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubRoutine.code()));
+    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubRoutine->code().code()));
 }
 
-void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, size_t cachedOffset, ReturnAddressPtr returnAddress, CallFrame* callFrame)
+void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* structure, StructureChain* chain, size_t count, const Identifier& ident, const PropertySlot& slot, PropertyOffset cachedOffset, ReturnAddressPtr returnAddress, CallFrame* callFrame)
 {
     ASSERT(count);
 
@@ -970,17 +1021,21 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
 
     // Track the stub we have created so that it will be deleted later.
-    CodeRef stubRoutine = FINALIZE_CODE(
-        patchBuffer,
-        ("Baseline JIT get_by_id chain stub for CodeBlock %p, return point %p",
-         m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
-             stubInfo->patch.baseline.u.get.putResult).executableAddress()));
+    RefPtr<JITStubRoutine> stubRoutine = createJITStubRoutine(
+        FINALIZE_CODE(
+            patchBuffer,
+            ("Baseline JIT get_by_id chain stub for CodeBlock %p, return point %p",
+             m_codeBlock, stubInfo->hotPathBegin.labelAtOffset(
+                 stubInfo->patch.baseline.u.get.putResult).executableAddress())),
+        *m_globalData,
+        m_codeBlock->ownerExecutable(),
+        needsStubLink);
     stubInfo->stubRoutine = stubRoutine;
 
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(stubInfo->patch.baseline.u.get.structureCheck);
     RepatchBuffer repatchBuffer(m_codeBlock);
-    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubRoutine.code()));
+    repatchBuffer.relink(jumpLocation, CodeLocationLabel(stubRoutine->code().code()));
 
     // We don't want to patch more than once - in future go to cti_op_put_by_id_generic.
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(cti_op_get_by_id_proto_list));

@@ -80,6 +80,7 @@ void LayerBackingStore::updateTile(int id, const IntRect& sourceRect, const IntR
 {
     HashMap<int, LayerBackingStoreTile>::iterator it = m_tiles.find(id);
     ASSERT(it != m_tiles.end());
+    it->second.incrementRepaintCount();
     it->second.setBackBuffer(targetRect, sourceRect, backBuffer, offset);
 }
 
@@ -93,6 +94,14 @@ PassRefPtr<BitmapTexture> LayerBackingStore::texture() const
     }
 
     return PassRefPtr<BitmapTexture>();
+}
+
+static bool shouldShowTileDebugVisuals()
+{
+#if PLATFORM(QT)
+    return (qgetenv("QT_WEBKIT_SHOW_COMPOSITING_DEBUG_VISUALS") == "1");
+#endif
+    return false;
 }
 
 void LayerBackingStore::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity, BitmapTexture* mask)
@@ -121,8 +130,20 @@ void LayerBackingStore::paintToTextureMapper(TextureMapper* textureMapper, const
         tilesToPaint.prepend(&tile);
     }
 
-    for (size_t i = 0; i < tilesToPaint.size(); ++i)
-        tilesToPaint[i]->paint(textureMapper, transform, opacity, mask);
+    // TODO: When the TextureMapper makes a distinction between some edges exposed and no edges
+    // exposed, the value passed should be an accurate reflection of the tile subset that we are
+    // passing. For now we just "estimate" since LayerBackingStore doesn't keep information about
+    // the total tiled surface rect at the moment.
+    unsigned edgesExposed = m_tiles.size() > 1 ? TextureMapper::NoEdges : TextureMapper::AllEdges;
+    for (size_t i = 0; i < tilesToPaint.size(); ++i) {
+        TextureMapperTile* tile = tilesToPaint[i];
+        tile->paint(textureMapper, transform, opacity, mask, edgesExposed);
+        static bool shouldDebug = shouldShowTileDebugVisuals();
+        if (!shouldDebug)
+            continue;
+        textureMapper->drawBorder(QColor(Qt::red), 2, tile->rect(), transform);
+        textureMapper->drawRepaintCounter(static_cast<LayerBackingStoreTile*>(tile)->repaintCount(), 8, tilesToPaint[i]->rect().location(), transform);
+    }
 }
 
 void LayerBackingStore::commitTileOperations(TextureMapper* textureMapper)

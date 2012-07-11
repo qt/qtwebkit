@@ -69,6 +69,7 @@ class LinkBuffer {
     typedef MacroAssembler::DataLabelCompact DataLabelCompact;
     typedef MacroAssembler::DataLabel32 DataLabel32;
     typedef MacroAssembler::DataLabelPtr DataLabelPtr;
+    typedef MacroAssembler::ConvertibleLoadLabel ConvertibleLoadLabel;
 #if ENABLE(BRANCH_COMPACTION)
     typedef MacroAssembler::LinkRecord LinkRecord;
     typedef MacroAssembler::JumpLinkType JumpLinkType;
@@ -180,6 +181,11 @@ public:
         return CodeLocationDataLabelCompact(MacroAssembler::getLinkerAddress(code(), applyOffset(label.m_label)));
     }
 
+    CodeLocationConvertibleLoad locationOf(ConvertibleLoadLabel label)
+    {
+        return CodeLocationConvertibleLoad(MacroAssembler::getLinkerAddress(code(), applyOffset(label.m_label)));
+    }
+
     // This method obtains the return address of the call, given as an offset from
     // the start of the code.
     unsigned returnAddressOffset(Call call)
@@ -257,6 +263,11 @@ private:
 #endif
 };
 
+#define FINALIZE_CODE_IF(condition, linkBufferReference, dataLogArgumentsForHeading)  \
+    (UNLIKELY((condition))                                              \
+     ? ((linkBufferReference).finalizeCodeWithDisassembly dataLogArgumentsForHeading) \
+     : (linkBufferReference).finalizeCodeWithoutDisassembly())
+
 // Use this to finalize code, like so:
 //
 // CodeRef code = FINALIZE_CODE(linkBuffer, ("my super thingy number %d", number));
@@ -274,9 +285,7 @@ private:
 // is true, so you can hide expensive disassembly-only computations inside there.
 
 #define FINALIZE_CODE(linkBufferReference, dataLogArgumentsForHeading)  \
-    (UNLIKELY(Options::showDisassembly)                                 \
-     ? ((linkBufferReference).finalizeCodeWithDisassembly dataLogArgumentsForHeading) \
-     : (linkBufferReference).finalizeCodeWithoutDisassembly())
+    FINALIZE_CODE_IF(Options::showDisassembly(), linkBufferReference, dataLogArgumentsForHeading)
 
 } // namespace JSC
 

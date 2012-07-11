@@ -25,7 +25,7 @@
 
 #include "config.h"
 #include "JSMainThreadExecState.h"
-#include "WebKitMutationObserver.h"
+#include "MutationObserver.h"
 
 #if ENABLE(INDEXED_DATABASE)
 #include "IDBPendingTransactionMonitor.h"
@@ -38,11 +38,13 @@ JSC::ExecState* JSMainThreadExecState::s_mainThreadState = 0;
 void JSMainThreadExecState::didLeaveScriptContext()
 {
 #if ENABLE(INDEXED_DATABASE)
-    IDBPendingTransactionMonitor::abortPendingTransactions();   
+    // Indexed DB requires that transactions are created with an internal |active| flag
+    // set to true, but the flag becomes false when control returns to the event loop.
+    IDBPendingTransactionMonitor::deactivateNewTransactions();
 #endif
 
 #if ENABLE(MUTATION_OBSERVERS)
-    WebKitMutationObserver::deliverAllMutations();
+    MutationObserver::deliverAllMutations();
 #endif
 }
 

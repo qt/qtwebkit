@@ -75,10 +75,7 @@ class ChromiumWinPort(chromium.ChromiumPort):
 
     def __init__(self, host, port_name, **kwargs):
         chromium.ChromiumPort.__init__(self, host, port_name, **kwargs)
-
-        # We're a little generic here because this code is reused by the
-        # 'google-chrome' port as well as the 'mock-' and 'dryrun-' ports.
-        self._version = port_name[port_name.index('-win-') + len('-win-'):]
+        self._version = port_name[port_name.index('chromium-win-') + len('chromium-win-'):]
         assert self._version in self.SUPPORTED_VERSIONS, "%s is not in %s" % (self._version, self.SUPPORTED_VERSIONS)
 
     def setup_environ_for_server(self, server_name=None):
@@ -105,6 +102,11 @@ class ChromiumWinPort(chromium.ChromiumPort):
     def baseline_search_path(self):
         port_names = self.FALLBACK_PATHS[self.version()]
         return map(self._webkit_baseline_path, port_names)
+
+    def _modules_to_search_for_symbols(self):
+        # FIXME: we should return the path to the ffmpeg equivalents to detect if we have the mp3 and aac codecs installed.
+        # See https://bugs.webkit.org/show_bug.cgi?id=89706.
+        return []
 
     def check_build(self, needs_http):
         result = chromium.ChromiumPort.check_build(self, needs_http)

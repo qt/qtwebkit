@@ -52,6 +52,9 @@ public:
     // For LocalizedNumber
     String convertToLocalizedNumber(const String&);
     String convertFromLocalizedNumber(const String&);
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+    String localizedDecimalSeparator();
+#endif
 
     // For LocalizedDate
     double parseLocalizedDate(const String&);
@@ -62,6 +65,12 @@ public:
     const Vector<String>& monthLabels();
     const Vector<String>& weekDayShortLabels();
     unsigned firstDayOfWeek();
+#endif
+
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+    String localizedTimeFormatText();
+    String localizedShortTimeFormatText();
+    const Vector<String>& timeAMPMLabels();
 #endif
 
 private:
@@ -79,8 +88,15 @@ private:
 
 #if ENABLE(CALENDAR_PICKER)
     void initializeLocalizedDateFormatText();
-    PassOwnPtr<Vector<String> > createLabelVector(const UDateFormat*, UDateFormatSymbolType, int32_t startIndex, int32_t size);
     void initializeCalendar();
+#endif
+
+#if ENABLE(CALENDAR_PICKER) || ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+    PassOwnPtr<Vector<String> > createLabelVector(const UDateFormat*, UDateFormatSymbolType, int32_t startIndex, int32_t size);
+#endif
+
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+    void initializeDateTimeFormat();
 #endif
 
     CString m_locale;
@@ -105,6 +121,15 @@ private:
     OwnPtr<Vector<String> > m_monthLabels;
     OwnPtr<Vector<String> > m_weekDayShortLabels;
     unsigned m_firstDayOfWeek;
+#endif
+
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+    UDateFormat* m_mediumTimeFormat;
+    UDateFormat* m_shortTimeFormat;
+    String m_localizedTimeFormatText;
+    String m_localizedShortTimeFormatText;
+    OwnPtr<Vector<String> > m_timeAMPMLabels;
+    bool m_didCreateTimeFormat;
 #endif
 };
 

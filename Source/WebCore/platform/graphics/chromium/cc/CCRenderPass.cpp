@@ -27,8 +27,8 @@
 
 #include "cc/CCRenderPass.h"
 
-#include "Color.h"
 #include "cc/CCLayerImpl.h"
+#include "cc/CCMathUtil.h"
 #include "cc/CCQuadCuller.h"
 #include "cc/CCSharedQuadState.h"
 #include "cc/CCSolidColorDrawQuad.h"
@@ -37,17 +37,19 @@ using WebKit::WebTransformationMatrix;
 
 namespace WebCore {
 
-PassOwnPtr<CCRenderPass> CCRenderPass::create(CCRenderSurface* targetSurface)
+PassOwnPtr<CCRenderPass> CCRenderPass::create(CCRenderSurface* targetSurface, int id)
 {
-    return adoptPtr(new CCRenderPass(targetSurface));
+    return adoptPtr(new CCRenderPass(targetSurface, id));
 }
 
-CCRenderPass::CCRenderPass(CCRenderSurface* targetSurface)
-    : m_targetSurface(targetSurface)
+CCRenderPass::CCRenderPass(CCRenderSurface* targetSurface, int id)
+    : m_id(id)
+    , m_targetSurface(targetSurface)
     , m_framebufferOutputRect(targetSurface->contentRect())
     , m_hasTransparentBackground(true)
 {
-    ASSERT(m_targetSurface);
+    ASSERT(targetSurface);
+    ASSERT(id > 0);
 }
 
 void CCRenderPass::appendQuadsForLayer(CCLayerImpl* layer, CCOcclusionTrackerImpl* occlusionTracker, bool& hadMissingTiles)
@@ -83,9 +85,9 @@ void CCRenderPass::appendQuadsForRenderSurfaceLayer(CCLayerImpl* layer, const CC
     m_sharedQuadStateList.append(replicaSharedQuadState.release());
 }
 
-void CCRenderPass::appendQuadsToFillScreen(CCLayerImpl* rootLayer, const Color& screenBackgroundColor, const CCOcclusionTrackerImpl& occlusionTracker)
+void CCRenderPass::appendQuadsToFillScreen(CCLayerImpl* rootLayer, SkColor screenBackgroundColor, const CCOcclusionTrackerImpl& occlusionTracker)
 {
-    if (!rootLayer || !screenBackgroundColor.isValid())
+    if (!rootLayer || !screenBackgroundColor)
         return;
 
     Region fillRegion = occlusionTracker.computeVisibleRegionInScreen();
@@ -96,7 +98,8 @@ void CCRenderPass::appendQuadsToFillScreen(CCLayerImpl* rootLayer, const Color& 
     WebTransformationMatrix transformToLayerSpace = rootLayer->screenSpaceTransform().inverse();
     Vector<IntRect> fillRects = fillRegion.rects();
     for (size_t i = 0; i < fillRects.size(); ++i) {
-        IntRect layerRect = transformToLayerSpace.mapRect(fillRects[i]);
+        // The root layer transform is composed of translations and scales only, no perspective, so mapping is sufficient.
+        IntRect layerRect = CCMathUtil::mapClippedRect(transformToLayerSpace, fillRects[i]);
         m_quadList.append(CCSolidColorDrawQuad::create(sharedQuadState.get(), layerRect, screenBackgroundColor));
     }
     m_sharedQuadStateList.append(sharedQuadState.release());

@@ -47,7 +47,7 @@ TEST(CCSolidColorLayerImplTest, verifyTilingCompleteAndNoOverlap)
     IntSize layerSize = IntSize(800, 600);
     IntRect visibleLayerRect = IntRect(IntPoint(), layerSize);
 
-    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(0);
+    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(1);
     layer->setVisibleLayerRect(visibleLayerRect);
     layer->setBounds(layerSize);
 
@@ -62,13 +62,13 @@ TEST(CCSolidColorLayerImplTest, verifyCorrectBackgroundColorInQuad)
 {
     DebugScopedSetImplThread scopedImplThread;
 
-    const Color testColor = 0xFFA55AFF;
+    SkColor testColor = 0xFFA55AFF;
 
     MockCCQuadCuller quadCuller;
     IntSize layerSize = IntSize(100, 100);
     IntRect visibleLayerRect = IntRect(IntPoint(), layerSize);
 
-    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(0);
+    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(1);
     layer->setVisibleLayerRect(visibleLayerRect);
     layer->setBounds(layerSize);
     layer->setBackgroundColor(testColor);
@@ -91,7 +91,7 @@ TEST(CCSolidColorLayerImplTest, verifyCorrectOpacityInQuad)
     IntSize layerSize = IntSize(100, 100);
     IntRect visibleLayerRect = IntRect(IntPoint(), layerSize);
 
-    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(0);
+    OwnPtr<CCSolidColorLayerImpl> layer = CCSolidColorLayerImpl::create(1);
     layer->setVisibleLayerRect(visibleLayerRect);
     layer->setBounds(layerSize);
     layer->setDrawOpacity(opacity);

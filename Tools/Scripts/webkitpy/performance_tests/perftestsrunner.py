@@ -85,6 +85,8 @@ class PerfTestsRunner(object):
                 help=("The build number of the builder running this script.")),
             optparse.make_option("--build", dest="build", action="store_true", default=True,
                 help="Check to ensure the DumpRenderTree build is up-to-date (default)."),
+            optparse.make_option("--no-build", dest="build", action="store_false",
+                help="Don't check to see if the DumpRenderTree build is up-to-date."),
             optparse.make_option("--build-directory",
                 help="Path to the directory under which build files are kept (should not include configuration)"),
             optparse.make_option("--time-out-ms", default=600 * 1000,
@@ -101,6 +103,8 @@ class PerfTestsRunner(object):
                 help="Use WebKitTestRunner rather than DumpRenderTree."),
             optparse.make_option("--replay", dest="replay", action="store_true", default=False,
                 help="Run replay tests."),
+            optparse.make_option("--force", dest="skipped", action="store_true", default=False,
+                help="Run all tests, including the ones in the Skipped list."),
             ]
         return optparse.OptionParser(option_list=(perf_option_list)).parse_args(args)
 
@@ -128,7 +132,7 @@ class PerfTestsRunner(object):
         tests = []
         for path in test_files:
             relative_path = self._port.relative_perf_test_filename(path).replace('\\', '/')
-            if self._port.skips_perf_test(relative_path):
+            if self._port.skips_perf_test(relative_path) and not self._options.skipped:
                 continue
             test = PerfTestFactory.create_perf_test(self._port, relative_path, path)
             tests.append(test)

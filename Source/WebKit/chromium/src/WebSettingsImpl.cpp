@@ -139,9 +139,13 @@ void WebSettingsImpl::setApplyDefaultDeviceScaleFactorInCompositor(bool applyDef
     m_applyDefaultDeviceScaleFactorInCompositor = applyDefaultDeviceScaleFactorInCompositor;
 }
 
-void WebSettingsImpl::setFontBoostingEnabled(bool enabled)
+void WebSettingsImpl::setTextAutosizingEnabled(bool enabled)
 {
-    m_settings->setFontBoostingEnabled(enabled);
+#if ENABLE(TEXT_AUTOSIZING)
+    m_settings->setTextAutosizingEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+#endif
 }
 
 void WebSettingsImpl::setDefaultTextEncodingName(const WebString& encoding)
@@ -548,15 +552,6 @@ bool WebSettingsImpl::scrollAnimatorEnabled() const
     return m_settings->scrollAnimatorEnabled();
 #else
     return false;
-#endif
-}
-
-void WebSettingsImpl::setHixie76WebSocketProtocolEnabled(bool enabled)
-{
-#if ENABLE(WEB_SOCKETS)
-    m_settings->setUseHixie76WebSocketProtocol(enabled);
-#else
-    UNUSED_PARAM(enabled);
 #endif
 }
 

@@ -495,6 +495,9 @@ IntSize MediaPlayerPrivateGStreamer::naturalSize() const
     if (!hasVideo())
         return IntSize();
 
+    if (!m_videoSize.isEmpty())
+        return m_videoSize;
+
     GstCaps* caps = webkitGstGetPadCaps(m_videoSinkPad.get());
     if (!caps)
         return IntSize();
@@ -542,7 +545,8 @@ IntSize MediaPlayerPrivateGStreamer::naturalSize() const
     }
 
     LOG_VERBOSE(Media, "Natural size: %" G_GUINT64_FORMAT "x%" G_GUINT64_FORMAT, width, height);
-    return IntSize(static_cast<int>(width), static_cast<int>(height));
+    m_videoSize = IntSize(static_cast<int>(width), static_cast<int>(height));
+    return m_videoSize;
 }
 
 void MediaPlayerPrivateGStreamer::videoChanged()
@@ -561,6 +565,9 @@ void MediaPlayerPrivateGStreamer::notifyPlayerOfVideo()
         g_object_get(m_playBin, "n-video", &videoTracks, NULL);
 
     m_hasVideo = videoTracks > 0;
+
+    m_videoSize = IntSize();
+
     m_player->mediaPlayerClient()->mediaPlayerEngineUpdated(m_player);
 }
 
@@ -1719,9 +1726,13 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
             g_object_set(m_fpsSink, "silent", TRUE , NULL);
 
             // Turn off text overlay unless logging is enabled.
+#if LOG_DISABLED
+            g_object_set(m_fpsSink, "text-overlay", FALSE , NULL);
+#else
             WTFLogChannel* channel = getChannelFromName("Media");
             if (channel->state != WTFLogChannelOn)
                 g_object_set(m_fpsSink, "text-overlay", FALSE , NULL);
+#endif // LOG_DISABLED
 
             if (g_object_class_find_property(G_OBJECT_GET_CLASS(m_fpsSink), "video-sink")) {
                 g_object_set(m_fpsSink, "video-sink", m_webkitVideoSink, NULL);

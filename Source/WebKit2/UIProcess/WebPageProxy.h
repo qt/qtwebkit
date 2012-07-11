@@ -124,6 +124,10 @@ typedef GtkWidget* PlatformWidget;
 typedef Evas_Object* PlatformWidget;
 #endif
 
+#if ENABLE(WEB_INTENTS)
+class WebIntentData;
+#endif
+
 namespace WebKit {
 
 class NativeWebKeyboardEvent;
@@ -530,6 +534,10 @@ public:
     void runJavaScriptInMainFrame(const String&, PassRefPtr<ScriptValueCallback>);
     void forceRepaint(PassRefPtr<VoidCallback>);
 
+#if ENABLE(WEB_INTENTS)
+    void deliverIntentToFrame(WebFrameProxy*, WebIntentData*);
+#endif
+
     float headerHeight(WebFrameProxy*);
     float footerHeight(WebFrameProxy*);
     void drawHeader(WebFrameProxy*, const WebCore::FloatRect&);
@@ -909,7 +917,6 @@ private:
     void setCursorHiddenUntilMouseMoves(bool);
 
     void didReceiveEvent(uint32_t opaqueType, bool handled);
-    void didReceiveKeyEvent(uint32_t opaqueType, bool handled);
     void stopResponsivenessTimer();
 
     void voidCallback(uint64_t);

@@ -40,6 +40,7 @@ enum MessageClass {
     MessageClassInjectedBundle,
     MessageClassLayerTreeCoordinator,
     MessageClassWebApplicationCacheManager,
+    MessageClassWebBatteryManagerProxy,
     MessageClassWebCookieManager,
     MessageClassWebDatabaseManager,
     MessageClassWebFullScreenManager,
@@ -48,6 +49,7 @@ enum MessageClass {
     MessageClassWebInspector,
     MessageClassWebKeyValueStorageManager,
     MessageClassWebMediaCacheManager,
+    MessageClassWebNetworkInfoManagerProxy,
     MessageClassWebNotificationManager,
     MessageClassWebPage,
     MessageClassWebProcess,
@@ -62,6 +64,7 @@ enum MessageClass {
     MessageClassDrawingAreaProxy,
     MessageClassLayerTreeCoordinatorProxy,
     MessageClassWebApplicationCacheManagerProxy,
+    MessageClassWebBatteryManager,
     MessageClassWebContext,
     MessageClassWebContextLegacy,
     MessageClassWebCookieManagerProxy,
@@ -72,6 +75,7 @@ enum MessageClass {
     MessageClassWebInspectorProxy,
     MessageClassWebKeyValueStorageManagerProxy,
     MessageClassWebMediaCacheManagerProxy,
+    MessageClassWebNetworkInfoManager,
     MessageClassWebNotificationManagerProxy,
     MessageClassWebPageProxy,
     MessageClassWebProcessProxy,
@@ -79,6 +83,7 @@ enum MessageClass {
 #if USE(SOUP)
     MessageClassWebSoupRequestManagerProxy,
 #endif
+    MessageClassWebVibrationProxy,
 
     // Messages sent to a WebConnection
     MessageClassWebConnectionLegacy,

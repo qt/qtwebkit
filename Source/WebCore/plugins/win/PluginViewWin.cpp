@@ -537,7 +537,7 @@ bool PluginView::dispatchNPEvent(NPEvent& npEvent)
         shouldPop = true;
     }
 
-    JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
     setCallingPlugin(true);
     bool accepted = !m_plugin->pluginFuncs()->event(m_instance, &npEvent);
     setCallingPlugin(false);
@@ -648,7 +648,15 @@ void PluginView::paint(GraphicsContext* context, const IntRect& rect)
     }
 
     ASSERT(parent()->isFrameView());
+
+    // In the GTK port we draw in an offscreen buffer and don't want to use the window
+    // coordinates.
+#if PLATFORM(GTK)
+    IntRect rectInWindow(rect);
+    rectInWindow.intersect(frameRect());
+#else
     IntRect rectInWindow = static_cast<FrameView*>(parent())->contentsToWindow(frameRect());
+#endif
     LocalWindowsContext windowsContext(context, rectInWindow, m_isTransparent);
 
     // On Safari/Windows without transparency layers the GraphicsContext returns the HDC
@@ -688,7 +696,7 @@ void PluginView::handleKeyboardEvent(KeyboardEvent* event)
     } else
         return;
 
-    JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
     if (dispatchNPEvent(npEvent))
         event->setDefaultHandled();
 }
@@ -758,7 +766,7 @@ void PluginView::handleMouseEvent(MouseEvent* event)
     } else
         return;
 
-    JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+    JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
     // FIXME: Consider back porting the http://webkit.org/b/58108 fix here.
     if (dispatchNPEvent(npEvent))
         event->setDefaultHandled();
@@ -832,7 +840,13 @@ void PluginView::setNPWindowRect(const IntRect& rect)
     m_npWindow.clipRect.right = r.width();
     m_npWindow.clipRect.bottom = r.height();
 #else
+    // In the GTK port we draw in an offscreen buffer and don't want to use the window
+    // coordinates.
+# if PLATFORM(GTK)
+    IntPoint p = rect.location();
+# else
     IntPoint p = static_cast<FrameView*>(parent())->contentsToWindow(rect.location());
+# endif
     m_npWindow.x = p.x();
     m_npWindow.y = p.y();
 
@@ -846,7 +860,7 @@ void PluginView::setNPWindowRect(const IntRect& rect)
     m_npWindow.clipRect.top = 0;
 
     if (m_plugin->pluginFuncs()->setwindow) {
-        JSC::JSLock::DropAllLocks dropAllLocks(JSC::SilenceAssertionsOnly);
+        JSC::JSLock::DropAllLocks dropAllLocks(JSDOMWindowBase::commonJSGlobalData());
         setCallingPlugin(true);
         m_plugin->pluginFuncs()->setwindow(m_instance, &m_npWindow);
         setCallingPlugin(false);

@@ -25,14 +25,18 @@
 #ifndef CCLayerTreeHost_h
 #define CCLayerTreeHost_h
 
-#include "Color.h"
 #include "GraphicsContext3D.h"
 #include "GraphicsTypes3D.h"
 #include "IntRect.h"
 #include "RateLimiter.h"
+#include "SkColor.h"
 #include "cc/CCAnimationEvents.h"
+#include "cc/CCGraphicsContext.h"
+#include "cc/CCLayerTreeHostCommon.h"
 #include "cc/CCOcclusionTracker.h"
+#include "cc/CCPrioritizedTextureManager.h"
 #include "cc/CCProxy.h"
+
 
 #include <limits>
 #include <wtf/HashMap.h>
@@ -50,7 +54,7 @@ class CCTextureUpdater;
 class ManagedTexture;
 class Region;
 class TextureAllocator;
-class TextureManager;
+class CCPrioritizedTextureManager;
 struct CCRenderingStats;
 struct CCScrollAndScaleSet;
 
@@ -85,6 +89,9 @@ struct CCLayerTreeSettings {
             , showPaintRects(false)
             , showPropertyChangedRects(false)
             , showSurfaceDamageRects(false)
+            , showScreenSpaceRects(false)
+            , showReplicaScreenSpaceRects(false)
+            , showOccludingRects(false)
             , refreshRate(0)
             , maxPartialTextureUpdates(std::numeric_limits<size_t>::max())
             , defaultTileSize(IntSize(256, 256))
@@ -98,6 +105,9 @@ struct CCLayerTreeSettings {
     bool showPaintRects;
     bool showPropertyChangedRects;
     bool showSurfaceDamageRects;
+    bool showScreenSpaceRects;
+    bool showReplicaScreenSpaceRects;
+    bool showOccludingRects;
     double refreshRate;
     size_t maxPartialTextureUpdates;
     IntSize defaultTileSize;
@@ -226,11 +236,11 @@ public:
 
     void setPageScaleFactorAndLimits(float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor);
 
-    void setBackgroundColor(const Color& color) { m_backgroundColor = color; }
+    void setBackgroundColor(SkColor color) { m_backgroundColor = color; }
 
     void setHasTransparentBackground(bool transparent) { m_hasTransparentBackground = transparent; }
 
-    TextureManager* contentsTextureManager() const;
+    CCPrioritizedTextureManager* contentsTextureManager() const;
 
     // This will cause contents texture manager to evict all textures, but
     // without deleting them. This happens after all content textures have
@@ -253,7 +263,7 @@ public:
 
     bool bufferedUpdates();
     bool requestPartialTextureUpdate();
-    void deleteTextureAfterCommit(PassOwnPtr<ManagedTexture>);
+    void deleteTextureAfterCommit(PassOwnPtr<CCPrioritizedTexture>);
 
     void setDeviceScaleFactor(float);
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
@@ -264,18 +274,17 @@ protected:
 
 private:
     typedef Vector<RefPtr<LayerChromium> > LayerList;
-    typedef Vector<OwnPtr<ManagedTexture> > TextureList;
+    typedef Vector<OwnPtr<CCPrioritizedTexture> > TextureList;
 
     void initializeLayerRenderer();
 
-    enum PaintType { PaintVisible, PaintIdle };
-    static void update(LayerChromium*, PaintType, CCTextureUpdater&, const CCOcclusionTracker*);
-    void paintLayerContents(const LayerList&, PaintType, CCTextureUpdater&);
-    void paintMasksForRenderSurface(LayerChromium*, PaintType, CCTextureUpdater&);
+    static void update(LayerChromium*, CCTextureUpdater&, const CCOcclusionTracker*);
+    bool paintLayerContents(const LayerList&, CCTextureUpdater&);
+    bool paintMasksForRenderSurface(LayerChromium*, CCTextureUpdater&);
 
     void updateLayers(LayerChromium*, CCTextureUpdater&);
-    // Pre-reserve textures for any layer marked "always reserve textures"
-    void reserveTextures(const LayerList&);
+
+    void prioritizeTextures(const LayerList& updateList);
 
     void animateLayers(double monotonicTime);
     bool animateLayersRecursive(LayerChromium* current, double monotonicTime);
@@ -298,7 +307,7 @@ private:
     int m_numFailedRecreateAttempts;
 
     RefPtr<LayerChromium> m_rootLayer;
-    OwnPtr<TextureManager> m_contentsTextureManager;
+    OwnPtr<CCPrioritizedTextureManager> m_contentsTextureManager;
 
     CCLayerTreeSettings m_settings;
 
@@ -313,8 +322,9 @@ private:
 
     float m_pageScaleFactor;
     float m_minPageScaleFactor, m_maxPageScaleFactor;
-    bool m_triggerIdlePaints;
-    Color m_backgroundColor;
+    bool m_triggerIdleUpdates;
+
+    SkColor m_backgroundColor;
     bool m_hasTransparentBackground;
 
     TextureList m_deleteTextureAfterCommitList;

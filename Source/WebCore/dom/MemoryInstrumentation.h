@@ -31,7 +31,9 @@
 #ifndef MemoryInstrumentation_h
 #define MemoryInstrumentation_h
 
+#include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -46,6 +48,7 @@ public:
         Other,
         DOM,
         CSS,
+        Binding,
         LastTypeEntry
     };
 
@@ -58,11 +61,42 @@ public:
             return;
         countObjectSize(objectType, sizeof(T));
     }
+    template <typename HashMapType> void reportHashMap(const HashMapType&, ObjectType, bool contentOnly = false);
+    template <typename HashSetType> void reportHashSet(const HashSetType&, ObjectType, bool contentOnly = false);
+    template <typename ListHashSetType> void reportListHashSet(const ListHashSetType&, ObjectType, bool contentOnly = false);
+    template <typename VectorType> void reportVector(const VectorType&, ObjectType, bool contentOnly = false);
+
+protected:
+    class InstrumentedPointerBase {
+    public:
+        virtual ~InstrumentedPointerBase() { }
+
+        virtual void process(MemoryInstrumentation*) = 0;
+    };
+
+    template <typename Container>
+    size_t calculateContainerSize(const Container& container, bool contentOnly = false)
+    {
+        return (contentOnly ? 0 : sizeof(container)) + container.capacity() * sizeof(typename Container::ValueType);
+    }
 
 private:
     friend class MemoryObjectInfo;
 
+    template <typename T>
+    class InstrumentedPointer : public InstrumentedPointerBase {
+    public:
+        explicit InstrumentedPointer(const T* pointer) : m_pointer(pointer) { }
+
+        virtual void process(MemoryInstrumentation*) OVERRIDE;
+
+    private:
+        const T* m_pointer;
+    };
+
+    virtual void reportString(ObjectType, const String&) = 0;
     virtual void countObjectSize(ObjectType, size_t) = 0;
+    virtual void deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase>) = 0;
     virtual bool visited(const void*) = 0;
 };
 
@@ -104,8 +138,39 @@ public:
         m_objectSize = sizeof(T);
     }
 
+    template <typename HashMapType>
+    void reportHashMap(const HashMapType& map)
+    {
+        m_memoryInstrumentation->reportHashMap(map, objectType(), true);
+    }
+
+    template <typename HashSetType>
+    void reportHashSet(const HashSetType& set)
+    {
+        m_memoryInstrumentation->reportHashSet(set, objectType(), true);
+    }
+
+    template <typename ListHashSetType>
+    void reportListHashSet(const ListHashSetType& set)
+    {
+        m_memoryInstrumentation->reportListHashSet(set, objectType(), true);
+    }
+
+    template <typename VectorType>
+    void reportVector(const VectorType& vector)
+    {
+        m_memoryInstrumentation->reportVector(vector, objectType(), true);
+    }
+
+    void reportString(const String& string)
+    {
+        m_memoryInstrumentation->reportString(objectType(), string);
+    }
+
     MemoryInstrumentation::ObjectType objectType() const { return m_objectType; }
     size_t objectSize() const { return m_objectSize; }
+
+    MemoryInstrumentation* memoryInstrumentation() { return m_memoryInstrumentation; }
 
  private:
     MemoryInstrumentation* m_memoryInstrumentation;
@@ -118,9 +183,7 @@ void MemoryInstrumentation::reportInstrumentedPointer(const T* const object)
 {
     if (!object || visited(object))
         return;
-    MemoryObjectInfo memoryObjectInfo(this);
-    object->reportMemoryUsage(&memoryObjectInfo);
-    countObjectSize(memoryObjectInfo.objectType(), memoryObjectInfo.objectSize());
+    deferInstrumentedPointer(adoptPtr(new InstrumentedPointer<T>(object)));
 }
 
 template<typename T>
@@ -130,6 +193,45 @@ void MemoryInstrumentation::reportInstrumentedObject(const T& object)
         return;
     MemoryObjectInfo memoryObjectInfo(this);
     object.reportMemoryUsage(&memoryObjectInfo);
+}
+
+template<typename HashMapType>
+void MemoryInstrumentation::reportHashMap(const HashMapType& hashMap, ObjectType objectType, bool contentOnly)
+{
+    countObjectSize(objectType, calculateContainerSize(hashMap, contentOnly));
+}
+
+template<typename HashSetType>
+void MemoryInstrumentation::reportHashSet(const HashSetType& hashSet, ObjectType objectType, bool contentOnly)
+{
+    if (visited(&hashSet))
+        return;
+    countObjectSize(objectType, calculateContainerSize(hashSet, contentOnly));
+}
+
+template<typename ListHashSetType>
+void MemoryInstrumentation::reportListHashSet(const ListHashSetType& hashSet, ObjectType objectType, bool contentOnly)
+{
+    if (visited(&hashSet))
+        return;
+    size_t size = (contentOnly ? 0 : sizeof(ListHashSetType)) + hashSet.capacity() * sizeof(void*) + hashSet.size() * (sizeof(typename ListHashSetType::ValueType) + 2 * sizeof(void*));
+    countObjectSize(objectType, size);
+}
+
+template <typename VectorType>
+void MemoryInstrumentation::reportVector(const VectorType& vector, ObjectType objectType, bool contentOnly)
+{
+    if (visited(vector.data()))
+        return;
+    countObjectSize(objectType, calculateContainerSize(vector, contentOnly));
+}
+
+template<typename T>
+void MemoryInstrumentation::InstrumentedPointer<T>::process(MemoryInstrumentation* memoryInstrumentation)
+{
+    MemoryObjectInfo memoryObjectInfo(memoryInstrumentation);
+    m_pointer->reportMemoryUsage(&memoryObjectInfo);
+    memoryInstrumentation->countObjectSize(memoryObjectInfo.objectType(), memoryObjectInfo.objectSize());
 }
 
 } // namespace WebCore

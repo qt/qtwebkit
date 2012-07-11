@@ -42,9 +42,9 @@
 
 namespace WebCore {
 
-PassRefPtr<IDBCursor> IDBCursor::create(PassRefPtr<IDBCursorBackendInterface> backend, IDBRequest* request, IDBAny* source, IDBTransaction* transaction)
+PassRefPtr<IDBCursor> IDBCursor::create(PassRefPtr<IDBCursorBackendInterface> backend, Direction direction, IDBRequest* request, IDBAny* source, IDBTransaction* transaction)
 {
-    return adoptRef(new IDBCursor(backend, request, source, transaction));
+    return adoptRef(new IDBCursor(backend, direction, request, source, transaction));
 }
 
 const AtomicString& IDBCursor::directionNext()
@@ -72,9 +72,10 @@ const AtomicString& IDBCursor::directionPrevUnique()
 }
 
 
-IDBCursor::IDBCursor(PassRefPtr<IDBCursorBackendInterface> backend, IDBRequest* request, IDBAny* source, IDBTransaction* transaction)
+IDBCursor::IDBCursor(PassRefPtr<IDBCursorBackendInterface> backend, Direction direction, IDBRequest* request, IDBAny* source, IDBTransaction* transaction)
     : m_backend(backend)
     , m_request(request)
+    , m_direction(direction)
     , m_source(source)
     , m_transaction(transaction)
     , m_transactionNotifier(transaction, this)
@@ -95,7 +96,7 @@ const String& IDBCursor::direction() const
 {
     IDB_TRACE("IDBCursor::direction");
     ExceptionCode ec = 0;
-    const AtomicString& direction = directionToString(m_backend->direction(), ec);
+    const AtomicString& direction = directionToString(m_direction, ec);
     ASSERT(!ec);
     return direction;
 }
@@ -266,7 +267,21 @@ void IDBCursor::setValueReady()
 {
     m_currentKey = m_backend->key();
     m_currentPrimaryKey = m_backend->primaryKey();
-    m_currentValue = IDBAny::create(m_backend->value());
+
+    RefPtr<SerializedScriptValue> value = m_backend->value();
+#ifndef NDEBUG
+    if (!isKeyCursor()) {
+        // FIXME: Actually inject the primaryKey at the keyPath.
+        RefPtr<IDBObjectStore> objectStore = effectiveObjectStore();
+        if (objectStore->autoIncrement() && !objectStore->metadata().keyPath.isNull()) {
+            const IDBKeyPath& keyPath = objectStore->metadata().keyPath;
+            RefPtr<IDBKey> expectedKey = createIDBKeyFromSerializedValueAndKeyPath(value, keyPath);
+            ASSERT(expectedKey->isEqual(m_currentPrimaryKey.get()));
+        }
+    }
+#endif
+    m_currentValue = IDBAny::create(value.release());
+
     m_gotValue = true;
     m_valueIsDirty = true;
 }
@@ -279,7 +294,7 @@ PassRefPtr<IDBObjectStore> IDBCursor::effectiveObjectStore()
     return index->objectStore();
 }
 
-unsigned short IDBCursor::stringToDirection(const String& directionString, ExceptionCode& ec)
+IDBCursor::Direction IDBCursor::stringToDirection(const String& directionString, ExceptionCode& ec)
 {
     if (directionString == IDBCursor::directionNext())
         return IDBCursor::NEXT;
@@ -291,7 +306,7 @@ unsigned short IDBCursor::stringToDirection(const String& directionString, Excep
         return IDBCursor::PREV_NO_DUPLICATE;
 
     ec = IDBDatabaseException::IDB_TYPE_ERR;
-    return 0;
+    return IDBCursor::NEXT;
 }
 
 const AtomicString& IDBCursor::directionToString(unsigned short direction, ExceptionCode& ec)

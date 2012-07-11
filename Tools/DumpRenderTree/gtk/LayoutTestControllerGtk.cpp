@@ -801,11 +801,14 @@ void LayoutTestController::overridePreference(JSStringRef key, JSStringRef value
     else if (g_str_equal(originalName.get(), "WebKitTabToLinksPreferenceKey")) {
         DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(booleanFromValue(valueAsString.get()));
         return;
-    } else if (g_str_equal(originalName.get(), "WebKitHixie76WebSocketProtocolEnabled")) {
-        DumpRenderTreeSupportGtk::setHixie76WebSocketProtocolEnabled(webkit_web_frame_get_web_view(mainFrame), booleanFromValue(valueAsString.get()));
-        return;
     } else if (g_str_equal(originalName.get(), "WebKitPageCacheSupportsPluginsPreferenceKey")) {
         DumpRenderTreeSupportGtk::setPageCacheSupportsPlugins(webkit_web_frame_get_web_view(mainFrame), booleanFromValue(valueAsString.get()));
+        return;
+    } else if (g_str_equal(originalName.get(), "WebKitCSSGridLayoutEnabled")) {
+        DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(webkit_web_frame_get_web_view(mainFrame), booleanFromValue(valueAsString.get()));
+        return;
+    } else if (g_str_equal(originalName.get(), "WebKitCSSRegionsEnabled")) {
+        DumpRenderTreeSupportGtk::setCSSRegionsEnabled(webkit_web_frame_get_web_view(mainFrame), booleanFromValue(valueAsString.get()));
         return;
     } else {
         fprintf(stderr, "LayoutTestController::overridePreference tried to override "
@@ -937,13 +940,6 @@ void LayoutTestController::abortModal()
 {
 }
 
-void LayoutTestController::dumpConfigurationForViewport(int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
-{
-    WebKitWebView* webView = webkit_web_frame_get_web_view(mainFrame);
-    ASSERT(webView);
-    DumpRenderTreeSupportGtk::dumpConfigurationForViewport(webView, deviceDPI, deviceWidth, deviceHeight, availableWidth, availableHeight);
-}
-
 void LayoutTestController::setSerializeHTTPLoads(bool serialize)
 {
     DumpRenderTreeSupportGtk::setSerializeHTTPLoads(serialize);
@@ -1001,6 +997,11 @@ void LayoutTestController::sendWebIntentResponse(JSStringRef)
 }
 
 void LayoutTestController::deliverWebIntent(JSStringRef, JSStringRef, JSStringRef)
+{
+    // FIXME: Implement this.
+}
+
+void LayoutTestController::setStorageDatabaseIdleInterval(double)
 {
     // FIXME: Implement this.
 }

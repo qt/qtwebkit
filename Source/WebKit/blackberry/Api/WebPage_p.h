@@ -358,7 +358,7 @@ public:
     // Scroll and/or zoom so that the WebPage fits the new actual
     // visible size.
     void setViewportSize(const WebCore::IntSize& transformedActualVisibleSize, bool ensureFocusElementVisible);
-    void screenRotated(); // Helper method for setViewportSize().
+    void resizeSurfaceIfNeeded(); // Helper method for setViewportSize().
 
     void scheduleDeferrableTimer(WebCore::Timer<WebPagePrivate>*, double timeOut);
     void unscheduleAllDeferrableTimers();
@@ -440,6 +440,9 @@ public:
 
     void setInspectorOverlayClient(WebCore::InspectorOverlay::InspectorOverlayClient*);
 
+    void applySizeOverride(int overrideWidth, int overrideHeight);
+    void setTextZoomFactor(float);
+
     WebPage* m_webPage;
     WebPageClient* m_client;
     WebCore::Page* m_page;
@@ -447,7 +450,7 @@ public:
     RefPtr<WebCore::Node> m_currentContextNode;
     WebSettings* m_webSettings;
     OwnPtr<WebTapHighlight> m_tapHighlight;
-    OwnPtr<WebSelectionOverlay> m_selectionOverlay;
+    WebSelectionOverlay* m_selectionOverlay;
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     OwnPtr<WebCore::JavaScriptDebuggerBlackBerry> m_scriptDebugger;
@@ -498,7 +501,10 @@ public:
 #if ENABLE(EVENT_MODE_METATAGS)
     WebCore::TouchEventMode m_touchEventModePriorGoingFullScreen;
 #endif
-    int m_xScrollOffsetPriorGoingFullScreen;
+#if ENABLE(VIDEO)
+    double m_scaleBeforeFullScreen;
+    int m_xScrollOffsetBeforeFullScreen;
+#endif
 #endif
 
     Platform::BlackBerryCursor m_currentCursor;
@@ -556,6 +562,7 @@ public:
     bool m_suspendRootLayerCommit;
 #endif
 
+    bool m_hasPendingSurfaceSizeChange;
     int m_pendingOrientation;
 
     RefPtr<WebCore::Node> m_fullscreenVideoNode;
@@ -615,8 +622,6 @@ public:
 
     // The popup that opened in this webpage
     WebCore::PagePopupBlackBerry* m_selectPopup;
-    // The popup that owned this webpage
-    WebCore::PagePopupBlackBerry* m_parentPopup;
 
     RefPtr<WebCore::AutofillManager> m_autofillManager;
 protected:

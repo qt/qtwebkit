@@ -66,7 +66,7 @@ def build(bld):
         features = 'cc cxx cshlib',
         includes = '. .. assembler ../WTF ' + ' '.join(includes),
         source = sources,
-        defines = ['BUILDING_JavaScriptCore', 'STATICALLY_LINKED_WITH_WTF'],
+        defines = ['BUILDING_JavaScriptCore'],
         target = 'jscore',
         uselib = 'WX ICU ' + get_config(),
         uselib_local = '',

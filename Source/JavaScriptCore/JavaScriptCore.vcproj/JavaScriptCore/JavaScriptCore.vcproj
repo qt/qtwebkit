@@ -1094,6 +1094,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\runtime\PropertyOffset.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\runtime\PropertySlot.cpp"
 				>
 			</File>
@@ -1562,6 +1566,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\bytecode\Comment.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\EvalCodeCache.h"
 				>
 			</File>
@@ -1850,6 +1858,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\jit\GCAwareJITStubRoutine.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\GCAwareJITStubRoutine.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\jit\JIT.cpp"
 				>
 			</File>
@@ -1907,6 +1923,14 @@
 			</File>
 			<File
 				RelativePath="..\..\jit\JITStubCall.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\JITStubRoutine.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\JITStubRoutine.h"
 				>
 			</File>
 			<File
@@ -2203,6 +2227,14 @@
 			</File>
 			<File
 				RelativePath="..\..\heap\HeapTimer.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\JITStubRoutineSet.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\JITStubRoutineSet.h"
 				>
 			</File>
 			<File

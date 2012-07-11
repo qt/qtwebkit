@@ -88,8 +88,6 @@ void JITCompiler::compileBody(SpeculativeJIT& speculative)
     breakpoint();
 #endif
     
-    addPtr(TrustedImm32(1), AbsoluteAddress(codeBlock()->addressOfSpeculativeSuccessCounter()));
-
     bool compiledSpeculative = speculative.compile();
     ASSERT_UNUSED(compiledSpeculative, compiledSpeculative);
 }
@@ -174,6 +172,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
 #endif
         info.patch.dfg.deltaCallToSlowCase = differenceBetweenCodePtr(callReturnLocation, linkBuffer.locationOf(m_propertyAccesses[i].m_slowPathGenerator->label()));
         info.patch.dfg.deltaCallToDone = differenceBetweenCodePtr(callReturnLocation, linkBuffer.locationOf(m_propertyAccesses[i].m_done));
+        info.patch.dfg.deltaCallToStorageLoad = differenceBetweenCodePtr(callReturnLocation, linkBuffer.locationOf(m_propertyAccesses[i].m_propertyStorageLoad));
         info.patch.dfg.baseGPR = m_propertyAccesses[i].m_baseGPR;
 #if USE(JSVALUE64)
         info.patch.dfg.valueGPR = m_propertyAccesses[i].m_valueGPR;
@@ -205,11 +204,14 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
             codeBlock()->watchpoint(exit.m_watchpointIndex).correctLabels(linkBuffer);
     }
     
+    codeBlock()->minifiedDFG().setOriginalGraphSize(m_graph.size());
     codeBlock()->shrinkToFit(CodeBlock::LateShrink);
 }
 
 bool JITCompiler::compile(JITCode& entry)
 {
+    SamplingRegion samplingRegion("DFG Backend");
+
     setStartOfCode();
     compileEntry();
     SpeculativeJIT speculative(*this);
@@ -243,6 +245,8 @@ bool JITCompiler::compile(JITCode& entry)
 
 bool JITCompiler::compileFunction(JITCode& entry, MacroAssemblerCodePtr& entryWithArityCheck)
 {
+    SamplingRegion samplingRegion("DFG Backend");
+    
     setStartOfCode();
     compileEntry();
 

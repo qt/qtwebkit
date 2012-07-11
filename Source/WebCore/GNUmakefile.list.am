@@ -192,6 +192,10 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSFloat32Array.h \
 	DerivedSources/WebCore/JSFloat64Array.cpp \
 	DerivedSources/WebCore/JSFloat64Array.h \
+	DerivedSources/WebCore/JSGamepad.cpp \
+	DerivedSources/WebCore/JSGamepad.h \
+	DerivedSources/WebCore/JSGamepadList.cpp \
+	DerivedSources/WebCore/JSGamepadList.h \
 	DerivedSources/WebCore/JSGeolocation.cpp \
 	DerivedSources/WebCore/JSGeolocation.h \
 	DerivedSources/WebCore/JSGeoposition.cpp \
@@ -387,6 +391,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSMediaStreamList.h \
 	DerivedSources/WebCore/JSMediaStreamTrack.cpp \
 	DerivedSources/WebCore/JSMediaStreamTrack.h \
+	DerivedSources/WebCore/JSMediaStreamTrackEvent.cpp \
+	DerivedSources/WebCore/JSMediaStreamTrackEvent.h \
 	DerivedSources/WebCore/JSMediaStreamTrackList.cpp \
 	DerivedSources/WebCore/JSMediaStreamTrackList.h \
 	DerivedSources/WebCore/JSMediaQueryList.cpp \
@@ -405,6 +411,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSMutationCallback.h \
 	DerivedSources/WebCore/JSMutationEvent.cpp \
 	DerivedSources/WebCore/JSMutationEvent.h \
+	DerivedSources/WebCore/JSMutationObserver.cpp \
+	DerivedSources/WebCore/JSMutationObserver.h \
 	DerivedSources/WebCore/JSMutationRecord.cpp \
 	DerivedSources/WebCore/JSMutationRecord.h \
 	DerivedSources/WebCore/JSNamedNodeMap.cpp \
@@ -616,8 +624,6 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSWebKitCSSRegionRule.h \
 	DerivedSources/WebCore/JSWebKitCSSTransformValue.cpp \
 	DerivedSources/WebCore/JSWebKitCSSTransformValue.h \
-	DerivedSources/WebCore/JSWebKitMutationObserver.cpp \
-	DerivedSources/WebCore/JSWebKitMutationObserver.h \
 	DerivedSources/WebCore/JSWebKitNamedFlow.cpp \
 	DerivedSources/WebCore/JSWebKitNamedFlow.h \
 	DerivedSources/WebCore/JSWebKitPoint.cpp \
@@ -677,6 +683,9 @@ webcore_built_sources += \
 	DerivedSources/WebCore/XPathGrammar.h
 
 dom_binding_idls += \
+	$(WebCore)/Modules/gamepad/Gamepad.idl \
+	$(WebCore)/Modules/gamepad/GamepadList.idl \
+	$(WebCore)/Modules/gamepad/NavigatorGamepad.idl \
 	$(WebCore)/Modules/geolocation/Geolocation.idl \
 	$(WebCore)/Modules/geolocation/Geoposition.idl \
 	$(WebCore)/Modules/geolocation/NavigatorGeolocation.idl \
@@ -692,6 +701,7 @@ dom_binding_idls += \
 	$(WebCore)/Modules/mediastream/MediaStreamEvent.idl \
 	$(WebCore)/Modules/mediastream/MediaStreamList.idl \
 	$(WebCore)/Modules/mediastream/MediaStreamTrack.idl \
+	$(WebCore)/Modules/mediastream/MediaStreamTrackEvent.idl \
 	$(WebCore)/Modules/mediastream/MediaStreamTrackList.idl \
 	$(WebCore)/Modules/mediastream/NavigatorMediaStream.idl \
 	$(WebCore)/Modules/mediastream/NavigatorUserMediaError.idl \
@@ -700,6 +710,9 @@ dom_binding_idls += \
 	$(WebCore)/Modules/mediastream/PeerConnection00.idl \
 	$(WebCore)/Modules/mediastream/SessionDescription.idl \
 	$(WebCore)/Modules/mediastream/SignalingCallback.idl \
+	$(WebCore)/Modules/notifications/Notification.idl \
+	$(WebCore)/Modules/notifications/NotificationCenter.idl \
+	$(WebCore)/Modules/notifications/NotificationPermissionCallback.idl \
 	$(WebCore)/Modules/webaudio/AudioContext.idl \
 	$(WebCore)/Modules/webaudio/AudioPannerNode.idl \
 	$(WebCore)/Modules/webaudio/DynamicsCompressorNode.idl \
@@ -768,6 +781,7 @@ dom_binding_idls += \
 	$(WebCore)/dom/MouseEvent.idl \
 	$(WebCore)/dom/MutationCallback.idl \
 	$(WebCore)/dom/MutationEvent.idl \
+	$(WebCore)/dom/MutationObserver.idl \
 	$(WebCore)/dom/MutationRecord.idl \
 	$(WebCore)/dom/NamedNodeMap.idl \
 	$(WebCore)/dom/Node.idl \
@@ -791,7 +805,6 @@ dom_binding_idls += \
 	$(WebCore)/dom/TreeWalker.idl \
 	$(WebCore)/dom/UIEvent.idl \
 	$(WebCore)/dom/WebKitAnimationEvent.idl \
-	$(WebCore)/dom/WebKitMutationObserver.idl \
 	$(WebCore)/dom/WebKitNamedFlow.idl \
 	$(WebCore)/dom/WebKitTransitionEvent.idl \
 	$(WebCore)/dom/WheelEvent.idl \
@@ -939,9 +952,6 @@ dom_binding_idls += \
 	$(WebCore)/inspector/ScriptProfile.idl \
 	$(WebCore)/inspector/ScriptProfileNode.idl \
 	$(WebCore)/loader/appcache/DOMApplicationCache.idl \
-	$(WebCore)/notifications/Notification.idl \
-	$(WebCore)/notifications/NotificationCenter.idl \
-	$(WebCore)/notifications/NotificationPermissionCallback.idl \
 	$(WebCore)/page/BarInfo.idl \
 	$(WebCore)/page/Console.idl \
 	$(WebCore)/page/Coordinates.idl \
@@ -1053,6 +1063,12 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/filesystem/WebKitFlags.h \
 	Source/WebCore/Modules/filesystem/WorkerContextFileSystem.cpp \
 	Source/WebCore/Modules/filesystem/WorkerContextFileSystem.h \
+	Source/WebCore/Modules/gamepad/Gamepad.cpp \
+	Source/WebCore/Modules/gamepad/Gamepad.h \
+	Source/WebCore/Modules/gamepad/GamepadList.cpp \
+	Source/WebCore/Modules/gamepad/GamepadList.h \
+	Source/WebCore/Modules/gamepad/NavigatorGamepad.cpp \
+	Source/WebCore/Modules/gamepad/NavigatorGamepad.h \
 	Source/WebCore/Modules/geolocation/Geolocation.cpp \
 	Source/WebCore/Modules/geolocation/Geolocation.h \
 	Source/WebCore/Modules/geolocation/GeolocationController.cpp \
@@ -1159,6 +1175,8 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/mediastream/MediaStreamRegistry.h \
 	Source/WebCore/Modules/mediastream/MediaStreamTrack.cpp \
 	Source/WebCore/Modules/mediastream/MediaStreamTrack.h \
+	Source/WebCore/Modules/mediastream/MediaStreamTrackEvent.cpp \
+	Source/WebCore/Modules/mediastream/MediaStreamTrackEvent.h \
 	Source/WebCore/Modules/mediastream/MediaStreamTrackList.cpp \
 	Source/WebCore/Modules/mediastream/MediaStreamTrackList.h \
 	Source/WebCore/Modules/mediastream/NavigatorMediaStream.cpp \
@@ -1176,6 +1194,18 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/mediastream/UserMediaController.cpp \
 	Source/WebCore/Modules/mediastream/UserMediaRequest.cpp \
 	Source/WebCore/Modules/mediastream/UserMediaRequest.h \
+	Source/WebCore/Modules/notifications/DOMWindowNotifications.cpp \
+	Source/WebCore/Modules/notifications/DOMWindowNotifications.h \
+	Source/WebCore/Modules/notifications/NotificationCenter.cpp \
+	Source/WebCore/Modules/notifications/NotificationCenter.h \
+	Source/WebCore/Modules/notifications/NotificationClient.h \
+	Source/WebCore/Modules/notifications/NotificationController.cpp \
+	Source/WebCore/Modules/notifications/NotificationController.h \
+	Source/WebCore/Modules/notifications/Notification.cpp \
+	Source/WebCore/Modules/notifications/Notification.h \
+	Source/WebCore/Modules/notifications/NotificationPermissionCallback.h \
+	Source/WebCore/Modules/notifications/WorkerContextNotifications.cpp \
+	Source/WebCore/Modules/notifications/WorkerContextNotifications.h \
 	Source/WebCore/Modules/webdatabase/AbstractDatabase.cpp \
 	Source/WebCore/Modules/webdatabase/AbstractDatabase.h \
 	Source/WebCore/Modules/webdatabase/ChangeVersionWrapper.cpp \
@@ -1450,6 +1480,7 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSMessagePortCustom.cpp \
 	Source/WebCore/bindings/js/JSMessagePortCustom.h \
 	Source/WebCore/bindings/js/JSMutationCallbackCustom.cpp \
+	Source/WebCore/bindings/js/JSMutationObserverCustom.cpp \
 	Source/WebCore/bindings/js/JSNamedNodeMapCustom.cpp \
 	Source/WebCore/bindings/js/JSNodeCustom.cpp \
 	Source/WebCore/bindings/js/JSNodeCustom.h \
@@ -1494,7 +1525,6 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp \
 	Source/WebCore/bindings/js/JSWebKitCSSKeyframesRuleCustom.cpp \
 	Source/WebCore/bindings/js/JSWebGLRenderingContextCustom.cpp \
-	Source/WebCore/bindings/js/JSWebKitMutationObserverCustom.cpp \
 	Source/WebCore/bindings/js/JSWebKitPointCustom.cpp \
 	Source/WebCore/bindings/js/JSWebSocketCustom.cpp \
 	Source/WebCore/bindings/js/JSWorkerContextBase.cpp \
@@ -1759,6 +1789,8 @@ webcore_sources += \
 	Source/WebCore/css/WebKitCSSMatrix.h \
 	Source/WebCore/css/WebKitCSSRegionRule.cpp \
 	Source/WebCore/css/WebKitCSSRegionRule.h \
+	Source/WebCore/css/WebKitCSSSVGDocumentValue.cpp \
+	Source/WebCore/css/WebKitCSSSVGDocumentValue.h \
 	Source/WebCore/css/WebKitCSSShaderValue.cpp \
 	Source/WebCore/css/WebKitCSSShaderValue.h \
 	Source/WebCore/css/WebKitCSSTransformValue.cpp \
@@ -1928,6 +1960,8 @@ webcore_sources += \
 	Source/WebCore/dom/MutationCallback.h \
 	Source/WebCore/dom/MutationEvent.cpp \
 	Source/WebCore/dom/MutationEvent.h \
+	Source/WebCore/dom/MutationObserver.cpp \
+	Source/WebCore/dom/MutationObserver.h \
 	Source/WebCore/dom/MutationObserverInterestGroup.cpp \
 	Source/WebCore/dom/MutationObserverInterestGroup.h \
 	Source/WebCore/dom/MutationObserverRegistration.cpp \
@@ -2038,8 +2072,6 @@ webcore_sources += \
 	Source/WebCore/dom/ViewportArguments.h \
 	Source/WebCore/dom/WebKitAnimationEvent.cpp \
 	Source/WebCore/dom/WebKitAnimationEvent.h \
-	Source/WebCore/dom/WebKitMutationObserver.cpp \
-	Source/WebCore/dom/WebKitMutationObserver.h \
 	Source/WebCore/dom/WebKitNamedFlow.cpp \
 	Source/WebCore/dom/WebKitNamedFlow.h \
 	Source/WebCore/dom/WebKitTransitionEvent.cpp \
@@ -2929,18 +2961,6 @@ webcore_sources += \
 	Source/WebCore/mathml/MathMLMathElement.h \
 	Source/WebCore/mathml/MathMLTextElement.cpp \
 	Source/WebCore/mathml/MathMLTextElement.h \
-	Source/WebCore/notifications/DOMWindowNotifications.cpp \
-	Source/WebCore/notifications/DOMWindowNotifications.h \
-	Source/WebCore/notifications/NotificationCenter.cpp \
-	Source/WebCore/notifications/NotificationCenter.h \
-	Source/WebCore/notifications/NotificationClient.h \
-	Source/WebCore/notifications/NotificationController.cpp \
-	Source/WebCore/notifications/NotificationController.h \
-	Source/WebCore/notifications/Notification.cpp \
-	Source/WebCore/notifications/Notification.h \
-	Source/WebCore/notifications/NotificationPermissionCallback.h \
-	Source/WebCore/notifications/WorkerContextNotifications.cpp \
-	Source/WebCore/notifications/WorkerContextNotifications.h \
 	Source/WebCore/page/animation/AnimationBase.cpp \
 	Source/WebCore/page/animation/AnimationBase.h \
 	Source/WebCore/page/animation/AnimationController.cpp \
@@ -3160,6 +3180,7 @@ webcore_sources += \
 	Source/WebCore/platform/FileSystem.h \
 	Source/WebCore/platform/FloatConversion.h \
 	Source/WebCore/platform/FractionalLayoutUnit.h \
+	Source/WebCore/platform/Gamepads.h \
 	Source/WebCore/platform/HashTools.h \
 	Source/WebCore/platform/HistogramSupport.cpp \
 	Source/WebCore/platform/HistogramSupport.h \
@@ -3263,8 +3284,8 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/filters/SourceGraphic.h \
 	Source/WebCore/platform/graphics/filters/SpotLightSource.cpp \
 	Source/WebCore/platform/graphics/filters/SpotLightSource.h \
+	Source/WebCore/platform/graphics/filters/arm/NEONHelpers.h \
 	Source/WebCore/platform/graphics/filters/arm/FECompositeArithmeticNEON.h \
-	Source/WebCore/platform/graphics/filters/arm/FEGaussianBlurNEON.cpp \
 	Source/WebCore/platform/graphics/filters/arm/FEGaussianBlurNEON.h \
 	Source/WebCore/platform/graphics/filters/arm/FELightingNEON.cpp \
 	Source/WebCore/platform/graphics/filters/arm/FELightingNEON.h \
@@ -3354,6 +3375,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/PathTraversalState.h \
 	Source/WebCore/platform/graphics/Pattern.cpp \
 	Source/WebCore/platform/graphics/Pattern.h \
+	Source/WebCore/platform/graphics/PlatformLayer.h \
 	Source/WebCore/platform/graphics/Region.cpp \
 	Source/WebCore/platform/graphics/Region.h \
 	Source/WebCore/platform/graphics/RoundedRect.cpp \
@@ -3408,6 +3430,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/WOFFFileFormat.h \
 	Source/WebCore/platform/gtk/ErrorsGtk.cpp \
 	Source/WebCore/platform/gtk/ErrorsGtk.h \
+	Source/WebCore/platform/gtk/GamepadsGtk.cpp \
 	Source/WebCore/platform/gtk/KURLGtk.cpp \
 	Source/WebCore/platform/gtk/LanguageGtk.cpp \
 	Source/WebCore/platform/gtk/LoggingGtk.cpp \
@@ -3468,6 +3491,8 @@ webcore_sources += \
 	Source/WebCore/platform/image-decoders/webp/WEBPImageDecoder.h \
 	Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp \
 	Source/WebCore/platform/image-decoders/png/PNGImageDecoder.h \
+	Source/WebCore/platform/linux/GamepadDeviceLinux.cpp \
+	Source/WebCore/platform/linux/GamepadDeviceLinux.h \
 	Source/WebCore/platform/mediastream/DeprecatedPeerConnectionHandler.h \
 	Source/WebCore/platform/mediastream/DeprecatedPeerConnectionHandlerClient.h \
 	Source/WebCore/platform/mediastream/IceCandidateDescriptor.cpp \
@@ -3661,6 +3686,8 @@ webcore_sources += \
 	Source/WebCore/platform/text/BidiContext.h \
 	Source/WebCore/platform/text/BidiResolver.h \
 	Source/WebCore/platform/text/BidiRunList.h \
+	Source/WebCore/platform/text/DateTimeFormat.cpp \
+	Source/WebCore/platform/text/DateTimeFormat.h \
 	Source/WebCore/platform/text/DecodeEscapeSequences.h \
 	Source/WebCore/platform/text/Hyphenation.cpp \
 	Source/WebCore/platform/text/Hyphenation.h \
@@ -6027,6 +6054,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/OpenGLShims.cpp \
 	Source/WebCore/platform/graphics/OpenGLShims.h \
 	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGL.cpp \
+	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
 	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGL.h \
 	Source/WebCore/platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
 	Source/WebCore/platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp

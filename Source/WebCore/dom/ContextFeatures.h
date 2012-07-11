@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
@@ -40,20 +39,24 @@ class Page;
 class ContextFeatures : public RefCountedSupplement<Page, ContextFeatures> {
 public:
     enum FeatureType {
+        DialogElement = 0,
         ShadowDOM,
         StyleScoped,
-        PagePopup
+        PagePopup,
+        FeatureTypeSize // Should be the last entry.
     };
 
     static const AtomicString& supplementName();
     static ContextFeatures* defaultSwitch();
     static PassRefPtr<ContextFeatures> create(ContextFeaturesClient*);
 
+    static bool dialogElementEnabled(Document*);
     static bool shadowDOMEnabled(Document*);
     static bool styleScopedEnabled(Document*);
     static bool pagePopupEnabled(Document*);
 
     bool isEnabled(Document*, FeatureType, bool) const;
+    void urlDidChange(Document*);
 
 private:
     explicit ContextFeatures(ContextFeaturesClient* client)
@@ -77,6 +80,7 @@ public:
 
     virtual ~ContextFeaturesClient() { }
     virtual bool isEnabled(Document*, ContextFeatures::FeatureType, bool defaultValue) { return defaultValue; }
+    virtual void urlDidChange(Document*) { }
 };
 
 void provideContextFeaturesTo(Page*, ContextFeaturesClient*);
@@ -92,6 +96,13 @@ inline bool ContextFeatures::isEnabled(Document* document, FeatureType type, boo
     if (!m_client)
         return defaultValue;
     return m_client->isEnabled(document, type, defaultValue);
+}
+
+inline void ContextFeatures::urlDidChange(Document* document)
+{
+    if (m_client)
+        return;
+    m_client->urlDidChange(document);
 }
 
 } // namespace WebCore

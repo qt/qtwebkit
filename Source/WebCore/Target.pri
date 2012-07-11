@@ -201,6 +201,7 @@ v8 {
         bindings/v8/custom/V8MessagePortCustom.cpp \
         bindings/v8/custom/V8MessageEventCustom.cpp \
         bindings/v8/custom/V8MutationCallbackCustom.cpp \
+        bindings/v8/custom/V8MutationObserverCustom.cpp \
         bindings/v8/custom/V8NamedNodeMapCustom.cpp \
         bindings/v8/custom/V8NamedNodesCollection.cpp \
         bindings/v8/custom/V8NodeCustom.cpp \
@@ -215,7 +216,6 @@ v8 {
         bindings/v8/custom/V8StyleSheetCustom.cpp \
         bindings/v8/custom/V8StyleSheetListCustom.cpp \
         bindings/v8/custom/V8WebKitAnimationCustom.cpp \
-        bindings/v8/custom/V8WebKitMutationObserverCustom.cpp \
         bindings/v8/custom/V8WebKitPointConstructor.cpp \
         bindings/v8/custom/V8WorkerContextCustom.cpp \
         bindings/v8/custom/V8WorkerCustom.cpp \
@@ -333,6 +333,7 @@ v8 {
         bindings/js/JSMessagePortCustom.cpp \
         bindings/js/JSMessagePortCustom.h \
         bindings/js/JSMutationCallbackCustom.cpp \
+        bindings/js/JSMutationObserverCustom.cpp \
         bindings/js/JSNamedNodeMapCustom.cpp \
         bindings/js/JSNodeCustom.cpp \
         bindings/js/JSNodeFilterCondition.cpp \
@@ -360,7 +361,6 @@ v8 {
         bindings/js/JSWebKitAnimationListCustom.cpp \
         bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp \
         bindings/js/JSWebKitCSSKeyframesRuleCustom.cpp \
-        bindings/js/JSWebKitMutationObserverCustom.cpp \
         bindings/js/JSWebKitPointCustom.cpp \
         bindings/js/JSXMLHttpRequestCustom.cpp \
         bindings/js/JSXMLHttpRequestUploadCustom.cpp \
@@ -427,6 +427,11 @@ SOURCES += \
     Modules/filesystem/FileWriterSync.cpp \
     Modules/filesystem/LocalFileSystem.cpp \
     Modules/filesystem/WorkerContextFileSystem.cpp \
+    Modules/notifications/DOMWindowNotifications.cpp \
+    Modules/notifications/Notification.cpp \
+    Modules/notifications/NotificationCenter.cpp \
+    Modules/notifications/NotificationController.cpp \
+    Modules/notifications/WorkerContextNotifications.cpp \
     css/CSSAspectRatioValue.cpp \
     css/CSSBorderImageSliceValue.cpp \
     css/CSSBorderImage.cpp \
@@ -502,6 +507,7 @@ SOURCES += \
     css/WebKitCSSKeyframesRule.cpp \
     css/WebKitCSSMatrix.cpp \
     css/WebKitCSSRegionRule.cpp \
+    css/WebKitCSSSVGDocumentValue.cpp \
     css/WebKitCSSShaderValue.cpp \
     css/WebKitCSSTransformValue.cpp \
     dom/ActiveDOMObject.cpp \
@@ -575,6 +581,7 @@ SOURCES += \
     dom/MouseEvent.cpp \
     dom/MouseRelatedEvent.cpp \
     dom/MutationEvent.cpp \
+    dom/MutationObserver.cpp \
     dom/MutationObserverInterestGroup.cpp \
     dom/MutationObserverRegistration.cpp \
     dom/MutationRecord.cpp \
@@ -629,7 +636,6 @@ SOURCES += \
     dom/UserTypingGestureIndicator.cpp \
     dom/ViewportArguments.cpp \
     dom/WebKitAnimationEvent.cpp \
-    dom/WebKitMutationObserver.cpp \
     dom/WebKitNamedFlow.cpp \
     dom/WebKitTransitionEvent.cpp \
     dom/WheelEvent.cpp \
@@ -747,6 +753,7 @@ SOURCES += \
     html/HTMLCollection.cpp \
     html/HTMLDListElement.cpp \
     html/HTMLDataListElement.cpp \
+    html/HTMLDialogElement.cpp \
     html/HTMLDirectoryElement.cpp \
     html/HTMLDetailsElement.cpp \
     html/HTMLDivElement.cpp \
@@ -998,11 +1005,6 @@ SOURCES += \
     loader/SubresourceLoader.cpp \
     loader/TextResourceDecoder.cpp \
     loader/ThreadableLoader.cpp \
-    notifications/DOMWindowNotifications.cpp \
-    notifications/Notification.cpp \
-    notifications/NotificationCenter.cpp \
-    notifications/NotificationController.cpp \
-    notifications/WorkerContextNotifications.cpp \
     page/animation/AnimationBase.cpp \
     page/animation/AnimationController.cpp \
     page/animation/CompositeAnimation.cpp \
@@ -1075,6 +1077,7 @@ SOURCES += \
     platform/Arena.cpp \
     platform/text/Base64.cpp \
     platform/text/BidiContext.cpp \
+    platform/text/DateTimeFormat.cpp \
     platform/text/Hyphenation.cpp \
     platform/text/LocaleToScriptMappingDefault.cpp \
     platform/text/LocalizedDateNone.cpp \
@@ -1585,6 +1588,13 @@ HEADERS += \
     Modules/geolocation/PositionErrorCallback.h \
     Modules/geolocation/PositionOptions.h \
     \
+    Modules/notifications/DOMWindowNotifications.h \
+    Modules/notifications/Notification.h \
+    Modules/notifications/NotificationCenter.h \
+    Modules/notifications/NotificationClient.h \
+    Modules/notifications/NotificationController.h \
+    Modules/notifications/WorkerContextNotifications.h \
+    \
     Modules/webdatabase/AbstractDatabase.h \
     Modules/webdatabase/ChangeVersionWrapper.h \
     Modules/webdatabase/DOMWindowWebDatabase.h \
@@ -1686,6 +1696,7 @@ HEADERS += \
     css/WebKitCSSKeyframesRule.h \
     css/WebKitCSSMatrix.h \
     css/WebKitCSSRegionRule.h \
+    css/WebKitCSSSVGDocumentValue.h \
     css/WebKitCSSShaderValue.h \
     css/WebKitCSSTransformValue.h \
     dom/ActiveDOMObject.h \
@@ -1757,6 +1768,7 @@ HEADERS += \
     dom/MouseRelatedEvent.h \
     dom/MutationCallback.h \
     dom/MutationEvent.h \
+    dom/MutationObserver.h \
     dom/MutationObserverRegistration.h \
     dom/MutationRecord.h \
     dom/NamedNodeMap.h \
@@ -1805,7 +1817,6 @@ HEADERS += \
     dom/UserGestureIndicator.h \
     dom/ViewportArguments.h \
     dom/WebKitAnimationEvent.h \
-    dom/WebKitMutationObserver.h \
     dom/WebKitNamedFlow.h \
     dom/WebKitTransitionEvent.h \
     dom/WheelEvent.h \
@@ -1914,6 +1925,7 @@ HEADERS += \
     html/HTMLButtonElement.h \
     html/HTMLCanvasElement.h \
     html/HTMLCollection.h \
+    html/HTMLDialogElement.h \
     html/HTMLDirectoryElement.h \
     html/HTMLDetailsElement.h \
     html/HTMLDivElement.h \
@@ -2148,12 +2160,6 @@ HEADERS += \
     mathml/MathMLInlineContainerElement.h \
     mathml/MathMLMathElement.h \
     mathml/MathMLTextElement.h \
-    notifications/DOMWindowNotifications.h \
-    notifications/Notification.h \
-    notifications/NotificationCenter.h \
-    notifications/NotificationClient.h \
-    notifications/NotificationController.h \
-    notifications/WorkerContextNotifications.h \
     page/animation/AnimationBase.h \
     page/animation/AnimationController.h \
     page/animation/CompositeAnimation.h \
@@ -2267,6 +2273,7 @@ HEADERS += \
     platform/graphics/filters/LightSource.h \
     platform/graphics/filters/SourceAlpha.h \
     platform/graphics/filters/SourceGraphic.h \
+    platform/graphics/filters/arm/NEONHelpers.h \
     platform/graphics/filters/arm/FECompositeArithmeticNEON.h \
     platform/graphics/filters/arm/FEGaussianBlurNEON.h \
     platform/graphics/filters/arm/FELightingNEON.h \
@@ -2300,6 +2307,7 @@ HEADERS += \
     platform/graphics/Path.h \
     platform/graphics/PathTraversalState.h \
     platform/graphics/Pattern.h \
+    platform/graphics/PlatformLayer.h \
     platform/graphics/Region.h \
     platform/graphics/RoundedRect.h \
     platform/graphics/qt/FontCustomPlatformData.h \
@@ -2309,6 +2317,14 @@ HEADERS += \
     platform/graphics/ShadowBlur.h \
     platform/graphics/SimpleFontData.h \
     platform/graphics/surfaces/GraphicsSurface.h \
+    platform/graphics/texmap/GraphicsLayerTextureMapper.h \
+    platform/graphics/texmap/LayerTransform.h \
+    platform/graphics/texmap/TextureMapper.h \
+    platform/graphics/texmap/TextureMapperAnimation.h \
+    platform/graphics/texmap/TextureMapperBackingStore.h \
+    platform/graphics/texmap/TextureMapperImageBuffer.h \
+    platform/graphics/texmap/TextureMapperLayer.h \
+    platform/graphics/texmap/TextureMapperPlatformLayer.h \
     platform/graphics/Tile.h \
     platform/graphics/TiledBackingStore.h \
     platform/graphics/TiledBackingStoreClient.h \
@@ -2385,6 +2401,7 @@ HEADERS += \
     platform/network/ResourceResponseBase.h \
     platform/network/qt/DnsPrefetchHelper.h \
     platform/network/qt/NetworkStateNotifierPrivate.h \
+    platform/PlatformExportMacros.h \
     platform/PlatformTouchEvent.h \
     platform/PlatformTouchPoint.h \
     platform/PopupMenu.h \
@@ -2410,6 +2427,7 @@ HEADERS += \
     platform/sql/SQLValue.h \
     platform/text/Base64.h \
     platform/text/BidiContext.h \
+    platform/text/DateTimeFormat.h \
     platform/text/DecodeEscapeSequences.h \
     platform/text/Hyphenation.h \
     platform/text/QuotedPrintable.h \
@@ -2917,6 +2935,13 @@ SOURCES += \
     platform/graphics/qt/PathQt.cpp \
     platform/graphics/qt/PatternQt.cpp \
     platform/graphics/qt/StillImageQt.cpp \
+    platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
+    platform/graphics/texmap/LayerTransform.cpp \
+    platform/graphics/texmap/TextureMapper.cpp \
+    platform/graphics/texmap/TextureMapperAnimation.cpp \
+    platform/graphics/texmap/TextureMapperBackingStore.cpp \
+    platform/graphics/texmap/TextureMapperImageBuffer.cpp \
+    platform/graphics/texmap/TextureMapperLayer.cpp \
     platform/network/MIMESniffing.cpp \
     platform/network/qt/CredentialStorageQt.cpp \
     platform/network/qt/ResourceHandleQt.cpp \
@@ -3451,7 +3476,6 @@ contains(DEFINES, ENABLE_FILTERS=1) {
         platform/graphics/filters/SourceAlpha.cpp \
         platform/graphics/filters/SourceGraphic.cpp \
         platform/graphics/filters/arm/FELightingNEON.cpp \
-        platform/graphics/filters/arm/FEGaussianBlurNEON.cpp \
 }
 
 contains(DEFINES, ENABLE_MATHML=1) {
@@ -3494,7 +3518,7 @@ contains(DEFINES, HAVE_QRAWFONT=1) {
         platform/graphics/qt/FontQt4.cpp
 }
 
-contains(DEFINES, ENABLE_FONT_BOOSTING=1) {
+contains(DEFINES, ENABLE_TEXT_AUTOSIZING=1) {
     SOURCES += # FIXME!
 }
 
@@ -3881,11 +3905,6 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/WebGLTexture.h \
         html/canvas/WebGLUniformLocation.h \
         html/canvas/WebGLVertexArrayObjectOES.h \
-        platform/graphics/ANGLEWebKitBridge.h \
-        platform/graphics/Extensions3D.h \
-        platform/graphics/GraphicsContext3D.h \
-        platform/graphics/gpu/DrawingBuffer.h \
-        platform/graphics/qt/Extensions3DQt.h
 
     v8 {
         SOURCES += \
@@ -3923,154 +3942,177 @@ contains(DEFINES, ENABLE_WEBGL=1) {
         html/canvas/OESVertexArrayObject.cpp \
         html/canvas/WebGLTexture.cpp \
         html/canvas/WebGLUniformLocation.cpp \
-        html/canvas/WebGLVertexArrayObjectOES.cpp \
+        html/canvas/WebGLVertexArrayObjectOES.cpp
+}
+
+contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
+    HEADERS += \
+        platform/graphics/ANGLEWebKitBridge.h \
+        platform/graphics/Extensions3D.h \
+        platform/graphics/GraphicsContext3D.h \
+        platform/graphics/gpu/DrawingBuffer.h \
+        platform/graphics/opengl/Extensions3DOpenGL.h \
+        platform/graphics/texmap/TextureMapperGL.h \
+        platform/graphics/texmap/TextureMapperShaderManager.h
+
+    SOURCES += \
         platform/graphics/ANGLEWebKitBridge.cpp \
         platform/graphics/GraphicsContext3D.cpp \
         platform/graphics/gpu/DrawingBuffer.cpp \
         platform/graphics/gpu/qt/DrawingBufferQt.cpp \
-        platform/graphics/qt/GraphicsContext3DQt.cpp
+        platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp \
+        platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
+        platform/graphics/qt/GraphicsContext3DQt.cpp \
+        platform/graphics/texmap/TextureMapperGL.cpp \
+        platform/graphics/texmap/TextureMapperShaderManager.cpp
 
     INCLUDEPATH += $$PWD/platform/graphics/gpu
 
     contains(QT_CONFIG, opengl) | contains(QT_CONFIG, opengles2) {
         !contains(QT_CONFIG, opengles2) {
-            SOURCES += platform/graphics/opengl/GraphicsContext3DOpenGL.cpp
+            SOURCES += \
+               platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
+               platform/graphics/opengl/Extensions3DOpenGL.cpp
         } else {
-            SOURCES += platform/graphics/opengl/GraphicsContext3DOpenGLES.cpp
+            SOURCES += \
+               platform/graphics/opengl/GraphicsContext3DOpenGLES.cpp \
+               platform/graphics/opengl/Extensions3DOpenGLES.cpp
         }
 
         HEADERS += platform/graphics/opengl/Extensions3DOpenGL.h
 
         SOURCES += \
-            platform/graphics/opengl/Extensions3DOpenGL.cpp \
+            platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
             platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
+    }
 
-        ANGLE_DIR = $$replace(PWD, "WebCore", "ThirdParty/ANGLE")
+    ANGLE_DIR = $$replace(PWD, "WebCore", "ThirdParty/ANGLE")
 
-        INCLUDEPATH += $$ANGLE_DIR/src $$ANGLE_DIR/include
+    INCLUDEPATH += $$ANGLE_DIR/src $$ANGLE_DIR/include
 
-        ANGLE_HEADERS += \
-            $$ANGLE_DIR/src/compiler/BaseTypes.h \
-            $$ANGLE_DIR/src/compiler/BuiltInFunctionEmulator.h \
-            $$ANGLE_DIR/src/compiler/Common.h \
-            $$ANGLE_DIR/src/compiler/ConstantUnion.h \
-            $$ANGLE_DIR/src/compiler/debug.h \
-            $$ANGLE_DIR/src/compiler/DetectRecursion.h \
-            $$ANGLE_DIR/src/compiler/ExtensionBehavior.h \
-            $$ANGLE_DIR/src/compiler/ForLoopUnroll.h \
-            $$ANGLE_DIR/src/compiler/glslang.h \
-            $$ANGLE_DIR/src/compiler/glslang_tab.h \
-            $$ANGLE_DIR/src/compiler/InfoSink.h \
-            $$ANGLE_DIR/src/compiler/InitializeDll.h \
-            $$ANGLE_DIR/src/compiler/InitializeGlobals.h \
-            $$ANGLE_DIR/src/compiler/Initialize.h \
-            $$ANGLE_DIR/src/compiler/InitializeParseContext.h \
-            $$ANGLE_DIR/src/compiler/intermediate.h \
-            $$ANGLE_DIR/src/compiler/localintermediate.h \
-            $$ANGLE_DIR/src/compiler/MMap.h \
-            $$ANGLE_DIR/src/compiler/MapLongVariableNames.h \
-            $$ANGLE_DIR/src/compiler/osinclude.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/atom.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/compile.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/cpp.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/length_limits.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/memory.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/parser.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/preprocess.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/scanner.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/slglobals.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/symbols.h \
-            $$ANGLE_DIR/src/compiler/preprocessor/tokens.h \
-            $$ANGLE_DIR/src/compiler/OutputESSL.h \
-            $$ANGLE_DIR/src/compiler/OutputGLSL.h \
-            $$ANGLE_DIR/src/compiler/OutputGLSLBase.h \
-            $$ANGLE_DIR/src/compiler/OutputHLSL.h \
-            $$ANGLE_DIR/src/compiler/ParseHelper.h \
-            $$ANGLE_DIR/src/compiler/PoolAlloc.h \
-            $$ANGLE_DIR/src/compiler/QualifierAlive.h \
-            $$ANGLE_DIR/src/compiler/RemoveTree.h \
-            $$ANGLE_DIR/src/compiler/SearchSymbol.h \
-            $$ANGLE_DIR/src/compiler/ShHandle.h \
-            $$ANGLE_DIR/src/compiler/SymbolTable.h \
-            $$ANGLE_DIR/src/compiler/TranslatorESSL.h \
-            $$ANGLE_DIR/src/compiler/TranslatorGLSL.h \
-            $$ANGLE_DIR/src/compiler/TranslatorHLSL.h \
-            $$ANGLE_DIR/src/compiler/Types.h \
-            $$ANGLE_DIR/src/compiler/UnfoldSelect.h \
-            $$ANGLE_DIR/src/compiler/util.h \
-            $$ANGLE_DIR/src/compiler/ValidateLimitations.h \
-            $$ANGLE_DIR/src/compiler/VariableInfo.h \
-            $$ANGLE_DIR/src/compiler/VersionGLSL.h
+    ANGLE_HEADERS += \
+        $$ANGLE_DIR/src/compiler/BaseTypes.h \
+        $$ANGLE_DIR/src/compiler/BuiltInFunctionEmulator.h \
+        $$ANGLE_DIR/src/compiler/Common.h \
+        $$ANGLE_DIR/src/compiler/ConstantUnion.h \
+        $$ANGLE_DIR/src/compiler/debug.h \
+        $$ANGLE_DIR/src/compiler/DetectRecursion.h \
+        $$ANGLE_DIR/src/compiler/ExtensionBehavior.h \
+        $$ANGLE_DIR/src/compiler/ForLoopUnroll.h \
+        $$ANGLE_DIR/src/compiler/glslang.h \
+        $$ANGLE_DIR/src/compiler/glslang_tab.h \
+        $$ANGLE_DIR/src/compiler/InfoSink.h \
+        $$ANGLE_DIR/src/compiler/InitializeDll.h \
+        $$ANGLE_DIR/src/compiler/InitializeGlobals.h \
+        $$ANGLE_DIR/src/compiler/Initialize.h \
+        $$ANGLE_DIR/src/compiler/InitializeParseContext.h \
+        $$ANGLE_DIR/src/compiler/intermediate.h \
+        $$ANGLE_DIR/src/compiler/localintermediate.h \
+        $$ANGLE_DIR/src/compiler/MMap.h \
+        $$ANGLE_DIR/src/compiler/MapLongVariableNames.h \
+        $$ANGLE_DIR/src/compiler/osinclude.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/atom.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/compile.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/cpp.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/length_limits.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/memory.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/parser.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/preprocess.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/scanner.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/slglobals.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/symbols.h \
+        $$ANGLE_DIR/src/compiler/preprocessor/tokens.h \
+        $$ANGLE_DIR/src/compiler/OutputESSL.h \
+        $$ANGLE_DIR/src/compiler/OutputGLSL.h \
+        $$ANGLE_DIR/src/compiler/OutputGLSLBase.h \
+        $$ANGLE_DIR/src/compiler/OutputHLSL.h \
+        $$ANGLE_DIR/src/compiler/ParseHelper.h \
+        $$ANGLE_DIR/src/compiler/PoolAlloc.h \
+        $$ANGLE_DIR/src/compiler/QualifierAlive.h \
+        $$ANGLE_DIR/src/compiler/RemoveTree.h \
+        $$ANGLE_DIR/src/compiler/SearchSymbol.h \
+        $$ANGLE_DIR/src/compiler/ShHandle.h \
+        $$ANGLE_DIR/src/compiler/SymbolTable.h \
+        $$ANGLE_DIR/src/compiler/TranslatorESSL.h \
+        $$ANGLE_DIR/src/compiler/TranslatorGLSL.h \
+        $$ANGLE_DIR/src/compiler/TranslatorHLSL.h \
+        $$ANGLE_DIR/src/compiler/Types.h \
+        $$ANGLE_DIR/src/compiler/UnfoldSelect.h \
+        $$ANGLE_DIR/src/compiler/util.h \
+        $$ANGLE_DIR/src/compiler/ValidateLimitations.h \
+        $$ANGLE_DIR/src/compiler/VariableInfo.h \
+        $$ANGLE_DIR/src/compiler/VersionGLSL.h
 
-        HEADERS += $$ANGLE_HEADERS
+    HEADERS += $$ANGLE_HEADERS
 
-        ANGLE_SOURCES += \
-            $$ANGLE_DIR/src/compiler/BuiltInFunctionEmulator.cpp \
-            $$ANGLE_DIR/src/compiler/CodeGenGLSL.cpp \
-            $$ANGLE_DIR/src/compiler/Compiler.cpp \
-            $$ANGLE_DIR/src/compiler/debug.cpp \
-            $$ANGLE_DIR/src/compiler/DetectRecursion.cpp \
-            $$ANGLE_DIR/src/compiler/ForLoopUnroll.cpp \
-            $$ANGLE_DIR/src/compiler/glslang_lex.cpp \
-            $$ANGLE_DIR/src/compiler/glslang_tab.cpp \
-            $$ANGLE_DIR/src/compiler/InfoSink.cpp \
-            $$ANGLE_DIR/src/compiler/Initialize.cpp \
-            $$ANGLE_DIR/src/compiler/InitializeDll.cpp \
-            $$ANGLE_DIR/src/compiler/Intermediate.cpp \
-            $$ANGLE_DIR/src/compiler/intermOut.cpp \
-            $$ANGLE_DIR/src/compiler/IntermTraverse.cpp \
-            $$ANGLE_DIR/src/compiler/MapLongVariableNames.cpp \
-            $$ANGLE_DIR/src/compiler/ossource_posix.cpp \
-            $$ANGLE_DIR/src/compiler/OutputESSL.cpp \
-            $$ANGLE_DIR/src/compiler/OutputGLSL.cpp \
-            $$ANGLE_DIR/src/compiler/OutputGLSLBase.cpp \
-            $$ANGLE_DIR/src/compiler/OutputHLSL.cpp \
-            $$ANGLE_DIR/src/compiler/parseConst.cpp \
-            $$ANGLE_DIR/src/compiler/ParseHelper.cpp \
-            $$ANGLE_DIR/src/compiler/PoolAlloc.cpp \
-            $$ANGLE_DIR/src/compiler/QualifierAlive.cpp \
-            $$ANGLE_DIR/src/compiler/RemoveTree.cpp \
-            $$ANGLE_DIR/src/compiler/SearchSymbol.cpp \
-            $$ANGLE_DIR/src/compiler/ShaderLang.cpp \
-            $$ANGLE_DIR/src/compiler/SymbolTable.cpp \
-            $$ANGLE_DIR/src/compiler/TranslatorESSL.cpp \
-            $$ANGLE_DIR/src/compiler/TranslatorGLSL.cpp \
-            $$ANGLE_DIR/src/compiler/TranslatorHLSL.cpp \
-            $$ANGLE_DIR/src/compiler/UnfoldSelect.cpp \
-            $$ANGLE_DIR/src/compiler/util.cpp \
-            $$ANGLE_DIR/src/compiler/ValidateLimitations.cpp \
-            $$ANGLE_DIR/src/compiler/VariableInfo.cpp \
-            $$ANGLE_DIR/src/compiler/VersionGLSL.cpp
+    ANGLE_SOURCES += \
+        $$ANGLE_DIR/src/compiler/BuiltInFunctionEmulator.cpp \
+        $$ANGLE_DIR/src/compiler/CodeGenGLSL.cpp \
+        $$ANGLE_DIR/src/compiler/Compiler.cpp \
+        $$ANGLE_DIR/src/compiler/debug.cpp \
+        $$ANGLE_DIR/src/compiler/DetectRecursion.cpp \
+        $$ANGLE_DIR/src/compiler/ForLoopUnroll.cpp \
+        $$ANGLE_DIR/src/compiler/glslang_lex.cpp \
+        $$ANGLE_DIR/src/compiler/glslang_tab.cpp \
+        $$ANGLE_DIR/src/compiler/InfoSink.cpp \
+        $$ANGLE_DIR/src/compiler/Initialize.cpp \
+        $$ANGLE_DIR/src/compiler/InitializeDll.cpp \
+        $$ANGLE_DIR/src/compiler/Intermediate.cpp \
+        $$ANGLE_DIR/src/compiler/intermOut.cpp \
+        $$ANGLE_DIR/src/compiler/IntermTraverse.cpp \
+        $$ANGLE_DIR/src/compiler/MapLongVariableNames.cpp \
+        $$ANGLE_DIR/src/compiler/ossource_posix.cpp \
+        $$ANGLE_DIR/src/compiler/OutputESSL.cpp \
+        $$ANGLE_DIR/src/compiler/OutputGLSL.cpp \
+        $$ANGLE_DIR/src/compiler/OutputGLSLBase.cpp \
+        $$ANGLE_DIR/src/compiler/OutputHLSL.cpp \
+        $$ANGLE_DIR/src/compiler/parseConst.cpp \
+        $$ANGLE_DIR/src/compiler/ParseHelper.cpp \
+        $$ANGLE_DIR/src/compiler/PoolAlloc.cpp \
+        $$ANGLE_DIR/src/compiler/QualifierAlive.cpp \
+        $$ANGLE_DIR/src/compiler/RemoveTree.cpp \
+        $$ANGLE_DIR/src/compiler/SearchSymbol.cpp \
+        $$ANGLE_DIR/src/compiler/ShaderLang.cpp \
+        $$ANGLE_DIR/src/compiler/SymbolTable.cpp \
+        $$ANGLE_DIR/src/compiler/TranslatorESSL.cpp \
+        $$ANGLE_DIR/src/compiler/TranslatorGLSL.cpp \
+        $$ANGLE_DIR/src/compiler/TranslatorHLSL.cpp \
+        $$ANGLE_DIR/src/compiler/UnfoldSelect.cpp \
+        $$ANGLE_DIR/src/compiler/util.cpp \
+        $$ANGLE_DIR/src/compiler/ValidateLimitations.cpp \
+        $$ANGLE_DIR/src/compiler/VariableInfo.cpp \
+        $$ANGLE_DIR/src/compiler/VersionGLSL.cpp
 
-        SOURCES += \
-            $$ANGLE_DIR/src/compiler/preprocessor/atom.c \
-            $$ANGLE_DIR/src/compiler/preprocessor/cpp.c \
-            $$ANGLE_DIR/src/compiler/preprocessor/cppstruct.c \
-            $$ANGLE_DIR/src/compiler/preprocessor/memory.c \
-            $$ANGLE_DIR/src/compiler/preprocessor/scanner.c \
-            $$ANGLE_DIR/src/compiler/preprocessor/symbols.c \
-            $$ANGLE_DIR/src/compiler/preprocessor/tokens.c
+    SOURCES += \
+        $$ANGLE_DIR/src/compiler/preprocessor/atom.c \
+        $$ANGLE_DIR/src/compiler/preprocessor/cpp.c \
+        $$ANGLE_DIR/src/compiler/preprocessor/cppstruct.c \
+        $$ANGLE_DIR/src/compiler/preprocessor/memory.c \
+        $$ANGLE_DIR/src/compiler/preprocessor/scanner.c \
+        $$ANGLE_DIR/src/compiler/preprocessor/symbols.c \
+        $$ANGLE_DIR/src/compiler/preprocessor/tokens.c
 
-        *g++* {
-            ANGLE_CFLAGS += -Wno-unused-variable
-            ANGLE_CFLAGS += -Wno-missing-noreturn
-            ANGLE_CFLAGS += -Wno-unused-function
-            ANGLE_CFLAGS += -Wno-reorder
-            ANGLE_CFLAGS += -Wno-error
+    *g++* {
+        ANGLE_CFLAGS += -Wno-unused-variable
+        ANGLE_CFLAGS += -Wno-missing-noreturn
+        ANGLE_CFLAGS += -Wno-unused-function
+        ANGLE_CFLAGS += -Wno-reorder
+        ANGLE_CFLAGS += -Wno-error
 
-            angle_cxx.commands = $$QMAKE_CXX -c $(CXXFLAGS) $$ANGLE_CFLAGS $(INCPATH) ${QMAKE_FILE_IN} -o ${QMAKE_FILE_OUT}
-            angle_cxx.output = ${QMAKE_VAR_OBJECTS_DIR}${QMAKE_FILE_BASE}$$QMAKE_EXT_OBJ
-            anglc_cxx.dependency_type = TYPE_C
-            angle_cxx.depends = $$ANGLE_HEADERS
-            angle_cxx.input = ANGLE_SOURCES
-            QMAKE_EXTRA_COMPILERS += angle_cxx
-        } else {
-            SOURCES += $$ANGLE_SOURCES
-        }
+        angle_cxx.commands = $$QMAKE_CXX -c $(CXXFLAGS) $$ANGLE_CFLAGS $(INCPATH) ${QMAKE_FILE_IN} -o ${QMAKE_FILE_OUT}
+        angle_cxx.output = ${QMAKE_VAR_OBJECTS_DIR}${QMAKE_FILE_BASE}$$QMAKE_EXT_OBJ
+        anglc_cxx.dependency_type = TYPE_C
+        angle_cxx.depends = $$ANGLE_HEADERS
+        angle_cxx.input = ANGLE_SOURCES
+        QMAKE_EXTRA_COMPILERS += angle_cxx
+    } else {
+        SOURCES += $$ANGLE_SOURCES
     }
 
     CONFIG += opengl-shims
+    INCLUDEPATH += platform/graphics/gpu
 }
+
 
 contains(DEFINES, ENABLE_MHTML=1) {
 
@@ -4124,42 +4166,6 @@ win32:!win32-g++*:contains(QMAKE_HOST.arch, x86_64):{
         SOURCES += \
             plugins/win/PaintHooks.asm
    }
-}
-
-contains(CONFIG, texmap) {
-    HEADERS += \
-        platform/graphics/texmap/GraphicsLayerTextureMapper.h \
-        platform/graphics/texmap/LayerTransform.h \
-        platform/graphics/texmap/TextureMapper.h \
-        platform/graphics/texmap/TextureMapperAnimation.h \
-        platform/graphics/texmap/TextureMapperBackingStore.h \
-        platform/graphics/texmap/TextureMapperImageBuffer.h \
-        platform/graphics/texmap/TextureMapperLayer.h \
-        platform/graphics/texmap/TextureMapperPlatformLayer.h
-
-    SOURCES += \
-        platform/graphics/texmap/LayerTransform.cpp \
-        platform/graphics/texmap/TextureMapper.cpp \
-        platform/graphics/texmap/TextureMapperAnimation.cpp \
-        platform/graphics/texmap/TextureMapperBackingStore.cpp \
-        platform/graphics/texmap/TextureMapperImageBuffer.cpp \
-        platform/graphics/texmap/TextureMapperLayer.cpp \
-        platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
-
-    contains(DEFINES, WTF_USE_TEXTURE_MAPPER_GL=1) {
-        HEADERS += \
-            platform/graphics/texmap/TextureMapperGL.h \
-            platform/graphics/texmap/TextureMapperShaderManager.h
-
-        SOURCES += \
-            platform/graphics/texmap/TextureMapperGL.cpp \
-            platform/graphics/texmap/TextureMapperShaderManager.cpp
-
-        CONFIG += opengl-shims
-    }
-} else {
-    HEADERS += platform/graphics/qt/GraphicsLayerQt.h
-    SOURCES += platform/graphics/qt/GraphicsLayerQt.cpp
 }
 
 contains(CONFIG, opengl-shims) {

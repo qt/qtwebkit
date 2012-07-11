@@ -54,6 +54,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_scrollable(false)
     , m_shouldScrollOnMainThread(false)
     , m_haveWheelEventHandlers(false)
+    , m_backgroundColor(0)
     , m_doubleSided(true)
     , m_layerPropertyChanged(false)
     , m_layerSurfacePropertyChanged(false)
@@ -74,7 +75,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_drawDepth(0)
     , m_drawOpacity(0)
     , m_drawOpacityIsAnimating(false)
-    , m_debugBorderColor(0, 0, 0, 0)
+    , m_debugBorderColor(0)
     , m_debugBorderWidth(0)
     , m_drawTransformIsAnimating(false)
     , m_screenSpaceTransformIsAnimating(false)
@@ -84,7 +85,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_layerAnimationController(CCLayerAnimationController::create(this))
 {
     ASSERT(CCProxy::isImplThread());
-    ASSERT(m_layerId >= 0);
+    ASSERT(m_layerId > 0);
 }
 
 CCLayerImpl::~CCLayerImpl()
@@ -230,7 +231,7 @@ const IntRect CCLayerImpl::getDrawRect() const
     // Form the matrix used by the shader to map the corners of the layer's
     // bounds into the view space.
     FloatRect layerRect(-0.5 * bounds().width(), -0.5 * bounds().height(), bounds().width(), bounds().height());
-    IntRect mappedRect = enclosingIntRect(drawTransform().mapRect(layerRect));
+    IntRect mappedRect = enclosingIntRect(CCMathUtil::mapClippedRect(drawTransform(), layerRect));
     return mappedRect;
 }
 
@@ -440,7 +441,7 @@ void CCLayerImpl::setAnchorPointZ(float anchorPointZ)
     noteLayerPropertyChangedForSubtree();
 }
 
-void CCLayerImpl::setBackgroundColor(const Color& backgroundColor)
+void CCLayerImpl::setBackgroundColor(SkColor backgroundColor)
 {
     if (m_backgroundColor == backgroundColor)
         return;
@@ -541,7 +542,7 @@ bool CCLayerImpl::transformIsAnimating() const
     return m_layerAnimationController->isAnimatingProperty(CCActiveAnimation::Transform);
 }
 
-void CCLayerImpl::setDebugBorderColor(Color debugBorderColor)
+void CCLayerImpl::setDebugBorderColor(SkColor debugBorderColor)
 {
     if (m_debugBorderColor == debugBorderColor)
         return;
@@ -561,7 +562,7 @@ void CCLayerImpl::setDebugBorderWidth(float debugBorderWidth)
 
 bool CCLayerImpl::hasDebugBorders() const
 {
-    return debugBorderColor().alpha() && debugBorderWidth() > 0;
+    return SkColorGetA(m_debugBorderColor) && debugBorderWidth() > 0;
 }
 
 void CCLayerImpl::setContentBounds(const IntSize& contentBounds)

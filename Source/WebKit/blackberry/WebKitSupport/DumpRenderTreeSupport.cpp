@@ -84,16 +84,6 @@ bool DumpRenderTreeSupport::linksIncludedInFocusChain()
     return s_linksIncludedInTabChain;
 }
 
-void DumpRenderTreeSupport::dumpConfigurationForViewport(Frame* mainFrame, int deviceDPI, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight)
-{
-    ViewportArguments arguments = mainFrame->page()->viewportArguments();
-    ViewportAttributes attrs = computeViewportAttributes(arguments, /* default layout width for non-mobile pages */ 980, deviceWidth, deviceHeight, deviceDPI, IntSize(availableWidth, availableHeight));
-    restrictMinimumScaleFactorToViewportSize(attrs, IntSize(availableWidth, availableHeight));
-    restrictScaleFactorToInitialScaleIfNotUserScalable(attrs);
-
-    fprintf(stdout, "viewport size %dx%d scale %f with limits [%f, %f] and userScalable %f\n", static_cast<int>(attrs.layoutSize.width()), static_cast<int>(attrs.layoutSize.height()), attrs.initialScale, attrs.minimumScale, attrs.maximumScale, attrs.userScalable);
-}
-
 int DumpRenderTreeSupport::numberOfPendingGeolocationPermissionRequests(WebPage* webPage)
 {
     GeolocationClientMock* mockClient = toGeolocationClientMock(GeolocationController(corePage(webPage))->client());
@@ -141,8 +131,8 @@ void DumpRenderTreeSupport::scalePageBy(WebPage* webPage, float scaleFactor, flo
 
 JSValueRef DumpRenderTreeSupport::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
 {
-    JSLock lock(SilenceAssertionsOnly);
     ExecState* exec = toJS(context);
+    JSLockHolder lock(exec);
     if (!value)
         return JSValueMakeUndefined(context);
     JSValue jsValue = toJS(exec, value);

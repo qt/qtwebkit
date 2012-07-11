@@ -63,7 +63,7 @@ bool CCHeadsUpDisplay::showPlatformLayerTree(const CCLayerTreeSettings& settings
 
 bool CCHeadsUpDisplay::showDebugRects(const CCLayerTreeSettings& settings) const
 {
-    return settings.showPaintRects || settings.showPropertyChangedRects || settings.showSurfaceDamageRects;
+    return settings.showPaintRects || settings.showPropertyChangedRects || settings.showSurfaceDamageRects || settings.showScreenSpaceRects || settings.showReplicaScreenSpaceRects || settings.showOccludingRects;
 }
 
 void CCHeadsUpDisplay::draw(CCLayerTreeHostImpl* layerTreeHostImpl)
@@ -75,20 +75,20 @@ void CCHeadsUpDisplay::draw(CCLayerTreeHostImpl* layerTreeHostImpl)
         return;
     }
     if (!m_hudTexture)
-        m_hudTexture = ManagedTexture::create(layerRenderer->implTextureManager());
+        m_hudTexture = CCScopedTexture::create(layerRenderer->implTextureAllocator());
 
     const CCLayerTreeSettings& settings = layerTreeHostImpl->settings();
     // Use a fullscreen texture only if we need to...
     IntSize hudSize;
     if (showPlatformLayerTree(settings) || showDebugRects(settings)) {
-        hudSize.setWidth(min(2048, layerTreeHostImpl->viewportSize().width()));
-        hudSize.setHeight(min(2048, layerTreeHostImpl->viewportSize().height()));
+        hudSize.setWidth(min(2048, layerTreeHostImpl->deviceViewportSize().width()));
+        hudSize.setHeight(min(2048, layerTreeHostImpl->deviceViewportSize().height()));
     } else {
         hudSize.setWidth(512);
         hudSize.setHeight(128);
     }
 
-    if (!m_hudTexture->reserve(hudSize, GraphicsContext3D::RGBA))
+    if (!m_hudTexture->id() && !m_hudTexture->allocate(hudSize, GraphicsContext3D::RGBA))
         return;
 
     // Render pixels into the texture.
@@ -104,7 +104,7 @@ void CCHeadsUpDisplay::draw(CCLayerTreeHostImpl* layerTreeHostImpl)
     {
         PlatformCanvas::AutoLocker locker(&canvas);
 
-        m_hudTexture->bindTexture(layerTreeHostImpl->context(), layerRenderer->implTextureAllocator());
+        GLC(context, context->bindTexture(GraphicsContext3D::TEXTURE_2D, m_hudTexture->id()));
         bool uploadedViaMap = false;
         if (layerRenderer->capabilities().usingMapSub) {
             uint8_t* pixelDest = static_cast<uint8_t*>(context->mapTexSubImage2DCHROMIUM(GraphicsContext3D::TEXTURE_2D, 0, 0, 0, hudSize.width(), hudSize.height(), GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, Extensions3DChromium::WRITE_ONLY));
@@ -122,8 +122,6 @@ void CCHeadsUpDisplay::draw(CCLayerTreeHostImpl* layerTreeHostImpl)
     }
 
     layerRenderer->drawHeadsUpDisplay(m_hudTexture.get(), hudSize);
-
-    m_hudTexture->unreserve();
 }
 
 void CCHeadsUpDisplay::drawHudContents(GraphicsContext* context, CCLayerTreeHostImpl* layerTreeHostImpl, const CCLayerTreeSettings& settings, const IntSize& hudSize)
@@ -242,6 +240,27 @@ void CCHeadsUpDisplay::drawDebugRects(GraphicsContext* context, CCDebugRectHisto
             // Surface damage rects in yellow-orange
             context->setStrokeColor(Color(200, 100, 0, 255), ColorSpaceDeviceRGB);
             context->fillRect(debugRects[i].rect, Color(200, 100, 0, 30), ColorSpaceDeviceRGB);
+            context->strokeRect(debugRects[i].rect, 2.0);
+        }
+
+        if (debugRects[i].type == ReplicaScreenSpaceRectType) {
+            // Screen space rects in green.
+            context->setStrokeColor(Color(100, 200, 0, 255), ColorSpaceDeviceRGB);
+            context->fillRect(debugRects[i].rect, Color(100, 200, 0, 30), ColorSpaceDeviceRGB);
+            context->strokeRect(debugRects[i].rect, 2.0);
+        }
+
+        if (debugRects[i].type == ScreenSpaceRectType) {
+            // Screen space rects in purple.
+            context->setStrokeColor(Color(100, 0, 200, 255), ColorSpaceDeviceRGB);
+            context->fillRect(debugRects[i].rect, Color(100, 0, 200, 10), ColorSpaceDeviceRGB);
+            context->strokeRect(debugRects[i].rect, 2.0);
+        }
+
+        if (debugRects[i].type == OccludingRectType) {
+            // Occluding rects in a reddish color.
+            context->setStrokeColor(Color(200, 0, 100, 255), ColorSpaceDeviceRGB);
+            context->fillRect(debugRects[i].rect, Color(200, 0, 100, 10), ColorSpaceDeviceRGB);
             context->strokeRect(debugRects[i].rect, 2.0);
         }
     }

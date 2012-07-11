@@ -2641,7 +2641,9 @@ HRESULT STDMETHODCALLTYPE WebView::initWithFrame(
 
     static bool didOneTimeInitialization;
     if (!didOneTimeInitialization) {
+#if !LOG_DISABLED
         initializeLoggingChannelsIfNecessary();
+#endif // !LOG_DISABLED
 #if ENABLE(SQL_DATABASE)
         WebKitInitializeWebDatabasesIfNecessary();
 #endif
@@ -3194,8 +3196,8 @@ HRESULT STDMETHODCALLTYPE WebView::stringByEvaluatingJavaScriptFromString(
     if (!scriptExecutionResult)
         return E_FAIL;
     else if (scriptExecutionResult.isString()) {
-        JSLock lock(JSC::SilenceAssertionsOnly);
         JSC::ExecState* exec = coreFrame->script()->globalObject(mainThreadNormalWorld())->globalExec();
+        JSC::JSLockHolder lock(exec);
         *result = BString(ustringToString(scriptExecutionResult.getString(exec)));
     }
 
@@ -4668,6 +4670,11 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
         return hr;
     settings->setPluginsEnabled(!!enabled);
 
+    hr = preferences->isCSSRegionsEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    settings->setCSSRegionsEnabled(!!enabled);
+
     hr = preferences->privateBrowsingEnabled(&enabled);
     if (FAILED(hr))
         return hr;
@@ -4899,13 +4906,6 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     if (FAILED(hr))
         return hr;
     settings->setLoadsSiteIconsIgnoringImageLoadingSetting(!!enabled);
-
-#if ENABLE(WEB_SOCKETS)
-    hr = prefsPrivate->hixie76WebSocketProtocolEnabled(&enabled);
-    if (FAILED(hr))
-        return hr;
-    settings->setUseHixie76WebSocketProtocol(enabled);
-#endif
 
     hr = prefsPrivate->showsToolTipOverTruncatedText(&enabled);
     if (FAILED(hr))
@@ -5851,8 +5851,8 @@ HRESULT STDMETHODCALLTYPE WebView::reportException(
     if (!context || !exception)
         return E_FAIL;
 
-    JSLock lock(JSC::SilenceAssertionsOnly);
     JSC::ExecState* execState = toJS(context);
+    JSC::JSLockHolder lock(execState);
 
     // Make sure the context has a DOMWindow global object, otherwise this context didn't originate from a WebView.
     if (!toJSDOMWindow(execState->lexicalGlobalObject()))
@@ -5878,8 +5878,9 @@ HRESULT STDMETHODCALLTYPE WebView::elementFromJS(
     if (!nodeObject)
         return E_FAIL;
 
-    JSLock lock(JSC::SilenceAssertionsOnly);
-    Element* elt = toElement(toJS(toJS(context), nodeObject));
+    JSC::ExecState* exec = toJS(context);
+    JSC::JSLockHolder lock(exec);
+    Element* elt = toElement(toJS(exec, nodeObject));
     if (!elt)
         return E_FAIL;
 

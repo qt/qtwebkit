@@ -14,6 +14,8 @@ LIST(APPEND WebKit2_SOURCES
     Platform/CoreIPC/unix/ConnectionUnix.cpp
     Platform/CoreIPC/unix/AttachmentUnix.cpp
 
+    Shared/API/c/cairo/WKImageCairo.cpp
+
     Shared/API/c/gtk/WKGraphicsContextGtk.cpp
 
     Shared/cairo/LayerTreeContextCairo.cpp
@@ -30,10 +32,17 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/C/soup/WKContextSoup.cpp
     UIProcess/API/C/soup/WKSoupRequestManager.cpp
 
+    UIProcess/API/efl/BatteryProvider.cpp
     UIProcess/API/efl/PageClientImpl.cpp
     UIProcess/API/efl/ewk_context.cpp
+    UIProcess/API/efl/ewk_intent.cpp
+    UIProcess/API/efl/ewk_intent_service.cpp
+    UIProcess/API/efl/ewk_url_request.cpp
     UIProcess/API/efl/ewk_view.cpp
     UIProcess/API/efl/ewk_view_loader_client.cpp
+    UIProcess/API/efl/ewk_view_resource_load_client.cpp
+    UIProcess/API/efl/ewk_web_error.cpp
+    UIProcess/API/efl/ewk_web_resource.cpp
 
     UIProcess/cairo/BackingStoreCairo.cpp
 

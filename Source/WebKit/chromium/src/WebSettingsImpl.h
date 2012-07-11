@@ -56,7 +56,7 @@ public:
     virtual void setMinimumFontSize(int);
     virtual void setMinimumLogicalFontSize(int);
     virtual void setApplyDefaultDeviceScaleFactorInCompositor(bool);
-    virtual void setFontBoostingEnabled(bool);
+    virtual void setTextAutosizingEnabled(bool);
     virtual void setDefaultTextEncodingName(const WebString&);
     virtual void setDeviceSupportsTouch(bool);
     virtual void setDeviceSupportsMouse(bool);
@@ -139,7 +139,6 @@ public:
     virtual void setShouldPrintBackgrounds(bool);
     virtual void setEnableScrollAnimator(bool);
     virtual bool scrollAnimatorEnabled() const;
-    virtual void setHixie76WebSocketProtocolEnabled(bool);
     virtual void setVisualWordMovementEnabled(bool);
     virtual void setShouldDisplaySubtitles(bool);
     virtual void setShouldDisplayCaptions(bool);

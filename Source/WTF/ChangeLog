@@ -1,9 +1,174 @@
-2012-06-19  Joel Dillon <joel.dillon@codethink.co.uk>  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+2012-07-10  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
+
+        Re-enable __declspec(dl{import,export}) for MinGW when using EXPORT_MACROS
+        https://bugs.webkit.org/show_bug.cgi?id=90612
+
+        Reviewed by Csaba Osztrogonác.
+
+        MinGW was switched to use auto import/export of symbols on r44184.
+        From my understanding of the documentation, MinGW will not auto-export symbols
+        unless there are no explicit __declspec(dlexport) in the DLL already.
+
+        The issues that originally made us rely on the auto-import feature of MinGW
+        should now be resolved with the EXPORT_MACROS work. This patch re-enables them.
+
+        It also removes the GCC check for internal symbols hiding as the visibility should
+        already be hidden by default for both MSVC and GCC on Windows anyway.
+
+        * wtf/ExportMacros.h:
+
+2012-07-09  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        Shared code that is guarded with ENABLE(WEBGL) should be guarded with USE()
+        https://bugs.webkit.org/show_bug.cgi?id=90506
+
+        Reviewed by Martin Robinson.
+
+        Made USE(3D_GRAPHICS) default to true when ENABLE(WEBGL) is true.
+        Also updated the Qt default to always use TEXTURE_MAPPER, and to use TEXTURE_MAPPER_GL when
+        3D_GRAPHICS is used.
+
+        * wtf/Platform.h:
+
+2012-07-08  Laszlo Gombos  <laszlo.1.gombos@nokia.com>
+
+        Introduce a build flag for low quality JPEG images
+        https://bugs.webkit.org/show_bug.cgi?id=90748
+
+        Reviewed by Adam Barth.
+
+        Turn on the newly introduced flags for android.
+
+        * wtf/Platform.h:
+
+2012-07-05  Filip Pizlo  <fpizlo@apple.com>
+
+        INLINE_ARM_FUNCTION(thingy) should make thingy be thumb2 if we're using thumb2
+        https://bugs.webkit.org/show_bug.cgi?id=90644
+
+        Reviewed by Mark Hahnenberg.
+        
+        Fix breakage introduced in http://trac.webkit.org/changeset/121885
+
+        * wtf/InlineASM.h:
+
+2012-07-05  Zoltan Herczeg  <zherczeg@webkit.org>
+
+        Port DFG JIT to traditional ARM
+        https://bugs.webkit.org/show_bug.cgi?id=90198
+
+        Reviewed by Filip Pizlo.
+
+        Enabling DFG JIT on ARM systems with 32 bit instruction set.
+
+        * wtf/InlineASM.h:
+        * wtf/Platform.h:
+
+2012-07-04  Andy Wingo  <wingo@igalia.com>
+
+        [GTK] Enable parallel GC
+        https://bugs.webkit.org/show_bug.cgi?id=90568
+
+        Reviewed by Martin Robinson.
+
+        * wtf/Platform.h: Add GTK to the ENABLE_PARALLEL_GC party.
+
+2012-07-04  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Get rid of un-needed QT += declarative for Qt 5
+
+        The declarative module has been renamed to quick1 in Qt 5, and the
+        engine-only module for Qt 5 is named 'qml'. For many of the instances
+        we could just remove 'declarative', since the project file was only
+        used for Qt5/WebKit2 builds. In the other cases the module was wrapped
+        in a haveQt(4) scope.
+
+        Reviewed by Csaba Osztrogonác.
+
+        * WTF.pri:
+
+2012-07-03  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Turn on DFGJIT in Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=90482
+
+        Set ENABLE_DFG_JIT for PLATFORM(BLACKBERRY).
+
+        Reviewed by Rob Buis.
+
+        * wtf/Platform.h:
+
+2012-07-03  Tony Chang  <tony@chromium.org>
+
+        [chromium] Unreviewed, update .gitignore to handle VS2010 files.
+
+        * WTF.gyp/.gitignore:
+
+2012-07-03  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make use of .qmake.cache for caching features
+
+        Instead of loading() features from the files that need them (and re-running
+        a bunch of checks), we now run feature detection as part of configure.pro,
+        and have build-webkit write the computed feature-defines and CONFIG to
+        .qmake.cache, which is then loaded by qmake _before_ even defaults_pre
+        when building WebKit.pro.
+
+        At some point we'll be able to selectivly prevent running of config tests
+        in configure.pro, which means we don't need a separate code-path for
+        the build-webkit --help case.
+
+        We should also move the code in build-webkit that now uses .webkit.config
+        to detect clean builds, to use .qmake.cache, since we now store the same
+        thing there.
+
+        Original patch by Oswald Buddenhagen <oswald.buddenhagen@nokia.com>
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WTF.pri:
+
+2012-07-03  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r121766.
+        http://trac.webkit.org/changeset/121766
+        https://bugs.webkit.org/show_bug.cgi?id=90465
+
+        It caused flakey build errors on the bots (Requested by Ossy
+        on #webkit).
+
+        * WTF.pri:
+
+2012-07-03  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make use of .qmake.cache for caching features
+
+        Instead of loading() features from the files that need them (and re-running
+        a bunch of checks), we now run feature detection as part of configure.pro,
+        and have build-webkit write the computed feature-defines and CONFIG to
+        .qmake.cache, which is then loaded by qmake _before_ even defaults_pre
+        when building WebKit.pro.
+
+        At some point we'll be able to selectivly prevent running of config tests
+        in configure.pro, which means we don't need a separate code-path for
+        the build-webkit --help case.
+
+        We should also move the code in build-webkit that now uses .webkit.config
+        to detect clean builds, to use .qmake.cache, since we now store the same
+        thing there.
+
+        Original patch by Oswald Buddenhagen <oswald.buddenhagen@nokia.com>
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WTF.pri:
+
+2012-07-03  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>  Joel Dillon <joel.dillon@codethink.co.uk>
 
         [Qt][Win] Fix broken QtWebKit5.lib linking
         https://bugs.webkit.org/show_bug.cgi?id=88321
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Kenneth Rohde Christiansen.
 
         Instead of letting a module's headers know which other modules depend on them,
         have depending modules define explicitely that they want its symbols exported too.
@@ -12,6 +177,92 @@
         STATICALLY_LINKED_WITH_WTF.
 
         * wtf/ExportMacros.h:
+
+2012-06-29  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, rolling out r121572.
+        http://trac.webkit.org/changeset/121572
+        https://bugs.webkit.org/show_bug.cgi?id=90249
+
+        Breaks Mac build since it depends on r121547, which was rolled
+        out
+
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::initializeCurrentThreadInternal):
+
+2012-06-29  Eric Seidel  <eric@webkit.org>
+
+        Remove BUILDING_ON_LEOPARD now that no ports build on Leopard
+        https://bugs.webkit.org/show_bug.cgi?id=90249
+
+        Reviewed by Ryosuke Niwa.
+
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::initializeCurrentThreadInternal):
+
+2012-06-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r121529.
+        http://trac.webkit.org/changeset/121529
+        https://bugs.webkit.org/show_bug.cgi?id=90260
+
+        Failed to compile on Chromium WebKitMacBuilder (Requested by
+        keishi on #webkit).
+
+        * wtf/FastMalloc.cpp:
+        (WTF::TCMalloc_ThreadCache::CreateCacheIfNecessary):
+        * wtf/unicode/icu/CollatorICU.cpp:
+        (WTF::Collator::userDefault):
+
+2012-06-29  Eric Seidel  <eric@webkit.org>
+
+        Remove more BUILDING_ON_LEOPARD branches now that no port builds on Leopard
+        https://bugs.webkit.org/show_bug.cgi?id=90252
+
+        Reviewed by Ryosuke Niwa.
+
+        * wtf/FastMalloc.cpp:
+        (WTF::TCMalloc_ThreadCache::CreateCacheIfNecessary):
+        * wtf/unicode/icu/CollatorICU.cpp:
+        (WTF::Collator::userDefault):
+
+2012-06-29  Eric Seidel  <eric@webkit.org>
+
+        Remove more BUILDING_ON_LEOPARD usage in PLATFORM(MAC) code
+        https://bugs.webkit.org/show_bug.cgi?id=85846
+
+        Reviewed by Adam Barth.
+
+        PLATFORM(MAC) has not supported Leopard for several months now.
+        This change removes about 1/3 of the remaining BUILDING_ON_LEOPARD
+        uses in the PLATFORM(MAC) codepaths.  PLATFORM(CHROMIUM) still
+        supports BUILDING_ON_LEOPARD for now.
+
+        * wtf/Platform.h:
+
+2012-06-28  Kalev Lember  <kalevlember@gmail.com>
+
+        ThreadingWin: Silence GCC compiler warnings
+        https://bugs.webkit.org/show_bug.cgi?id=89491
+
+        Reviewed by Adam Roben.
+
+        * wtf/ThreadingWin.cpp:
+        (WTF::createThreadInternal):
+        (WTF::PlatformCondition::timedWait):
+        (WTF::PlatformCondition::signal): Fix unused-but-set-variable
+        warnings.
+
+2012-06-26  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Add missing heades to HEADERS
+
+        For JavaScriptCore there aren't any Qt specific files, so we include all
+        headers for easy editing in Qt Creator.
+
+        Reviewed by Simon Hausmann.
+
+        * WTF.pro:
 
 2012-06-25  Kent Tamura  <tkent@chromium.org>
 

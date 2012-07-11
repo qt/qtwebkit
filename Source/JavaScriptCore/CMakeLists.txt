@@ -78,6 +78,7 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGFixupPhase.cpp
     dfg/DFGGraph.cpp
     dfg/DFGJITCompiler.cpp
+    dfg/DFGMinifiedNode.cpp
     dfg/DFGNodeFlags.cpp
     dfg/DFGOSREntry.cpp
     dfg/DFGOSRExit.cpp
@@ -93,6 +94,9 @@ SET(JavaScriptCore_SOURCES
     dfg/DFGSpeculativeJIT32_64.cpp
     dfg/DFGSpeculativeJIT64.cpp
     dfg/DFGThunks.cpp
+    dfg/DFGValueSource.cpp
+    dfg/DFGVariableEvent.cpp
+    dfg/DFGVariableEventStream.cpp
     dfg/DFGValidate.cpp
     dfg/DFGVirtualRegisterAllocationPhase.cpp
 
@@ -105,6 +109,7 @@ SET(JavaScriptCore_SOURCES
     heap/Heap.cpp
     heap/HeapTimer.cpp
     heap/IncrementalSweeper.cpp
+    heap/JITStubRoutineSet.cpp
     heap/MachineStackMarker.cpp
     heap/MarkedAllocator.cpp
     heap/MarkedBlock.cpp
@@ -125,6 +130,7 @@ SET(JavaScriptCore_SOURCES
 
     jit/ExecutableAllocator.cpp
     jit/HostCallReturnValue.cpp
+    jit/GCAwareJITStubRoutine.cpp
     jit/JITArithmetic32_64.cpp
     jit/JITArithmetic.cpp
     jit/JITCall32_64.cpp
@@ -135,6 +141,7 @@ SET(JavaScriptCore_SOURCES
     jit/JITOpcodes.cpp
     jit/JITPropertyAccess32_64.cpp
     jit/JITPropertyAccess.cpp
+    jit/JITStubRoutine.cpp
     jit/JITStubs.cpp
     jit/ThunkGenerators.cpp
 

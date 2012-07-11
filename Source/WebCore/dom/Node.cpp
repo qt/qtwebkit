@@ -399,7 +399,6 @@ Node::~Node()
     liveNodeSet.remove(this);
 #endif
 
-    ASSERT(hasRareData() == NodeRareData::rareDataMap().contains(this));
     if (hasRareData())
         clearRareData();
 
@@ -459,17 +458,25 @@ TreeScope* Node::treeScope() const
 NodeRareData* Node::rareData() const
 {
     ASSERT(hasRareData());
-    return NodeRareData::rareDataFromMap(this);
+    NodeRareData* data = isDocumentNode() ? static_cast<const Document*>(this)->documentRareData() : NodeRareData::rareDataFromMap(this);
+    ASSERT(data);
+    return data;
 }
 
 NodeRareData* Node::ensureRareData()
 {
     if (hasRareData())
         return rareData();
-    
-    ASSERT(!NodeRareData::rareDataMap().contains(this));
+
     NodeRareData* data = createRareData().leakPtr();
-    NodeRareData::rareDataMap().set(this, data);
+    if (isDocumentNode()) {
+        // Fast path for a Document. A Document knows a pointer to NodeRareData.
+        ASSERT(!static_cast<Document*>(this)->documentRareData());
+        static_cast<Document*>(this)->setDocumentRareData(data);
+    } else {
+        ASSERT(!NodeRareData::rareDataMap().contains(this));
+        NodeRareData::rareDataMap().set(this, data);
+    }
     setFlag(HasRareDataFlag);
     return data;
 }
@@ -489,11 +496,19 @@ void Node::clearRareData()
     ASSERT(!transientMutationObserverRegistry() || transientMutationObserverRegistry()->isEmpty());
 #endif
 
-    NodeRareData::NodeRareDataMap& dataMap = NodeRareData::rareDataMap();
-    NodeRareData::NodeRareDataMap::iterator it = dataMap.find(this);
-    ASSERT(it != dataMap.end());
-    delete it->second;
-    dataMap.remove(it);
+    if (isDocumentNode()) {
+        Document* document = static_cast<Document*>(this);
+        NodeRareData* data = document->documentRareData();
+        ASSERT(data);
+        delete data;
+        document->setDocumentRareData(0);
+    } else {
+        NodeRareData::NodeRareDataMap& dataMap = NodeRareData::rareDataMap();
+        NodeRareData::NodeRareDataMap::iterator it = dataMap.find(this);
+        ASSERT(it != dataMap.end());
+        delete it->second;
+        dataMap.remove(it);
+    }
     clearFlag(HasRareDataFlag);
 }
 
@@ -2403,16 +2418,16 @@ HashSet<MutationObserverRegistration*>* Node::transientMutationObserverRegistry(
     return hasRareData() ? rareData()->transientMutationObserverRegistry() : 0;
 }
 
-void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, Node* fromNode, WebKitMutationObserver::MutationType type, const QualifiedName* attributeName)
+void Node::collectMatchingObserversForMutation(HashMap<MutationObserver*, MutationRecordDeliveryOptions>& observers, Node* fromNode, MutationObserver::MutationType type, const QualifiedName* attributeName)
 {
-    ASSERT((type == WebKitMutationObserver::Attributes && attributeName) || !attributeName);
+    ASSERT((type == MutationObserver::Attributes && attributeName) || !attributeName);
     if (Vector<OwnPtr<MutationObserverRegistration> >* registry = fromNode->mutationObserverRegistry()) {
         const size_t size = registry->size();
         for (size_t i = 0; i < size; ++i) {
             MutationObserverRegistration* registration = registry->at(i).get();
             if (registration->shouldReceiveMutationFrom(this, type, attributeName)) {
                 MutationRecordDeliveryOptions deliveryOptions = registration->deliveryOptions();
-                HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::AddResult result = observers.add(registration->observer(), deliveryOptions);
+                HashMap<MutationObserver*, MutationRecordDeliveryOptions>::AddResult result = observers.add(registration->observer(), deliveryOptions);
                 if (!result.isNewEntry)
                     result.iterator->second |= deliveryOptions;
 
@@ -2425,7 +2440,7 @@ void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, 
             MutationObserverRegistration* registration = *iter;
             if (registration->shouldReceiveMutationFrom(this, type, attributeName)) {
                 MutationRecordDeliveryOptions deliveryOptions = registration->deliveryOptions();
-                HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>::AddResult result = observers.add(registration->observer(), deliveryOptions);
+                HashMap<MutationObserver*, MutationRecordDeliveryOptions>::AddResult result = observers.add(registration->observer(), deliveryOptions);
                 if (!result.isNewEntry)
                     result.iterator->second |= deliveryOptions;
             }
@@ -2433,15 +2448,15 @@ void Node::collectMatchingObserversForMutation(HashMap<WebKitMutationObserver*, 
     }
 }
 
-void Node::getRegisteredMutationObserversOfType(HashMap<WebKitMutationObserver*, MutationRecordDeliveryOptions>& observers, WebKitMutationObserver::MutationType type, const QualifiedName* attributeName)
+void Node::getRegisteredMutationObserversOfType(HashMap<MutationObserver*, MutationRecordDeliveryOptions>& observers, MutationObserver::MutationType type, const QualifiedName* attributeName)
 {
-    ASSERT((type == WebKitMutationObserver::Attributes && attributeName) || !attributeName);
+    ASSERT((type == MutationObserver::Attributes && attributeName) || !attributeName);
     collectMatchingObserversForMutation(observers, this, type, attributeName);
     for (Node* node = parentNode(); node; node = node->parentNode())
         collectMatchingObserversForMutation(observers, node, type, attributeName);
 }
 
-MutationObserverRegistration* Node::registerMutationObserver(PassRefPtr<WebKitMutationObserver> observer)
+MutationObserverRegistration* Node::registerMutationObserver(PassRefPtr<MutationObserver> observer)
 {
     Vector<OwnPtr<MutationObserverRegistration> >* registry = ensureRareData()->ensureMutationObserverRegistry();
     for (size_t i = 0; i < registry->size(); ++i) {
@@ -2763,10 +2778,6 @@ void Node::setItemType(const String& value)
     ensureRareData()->setItemType(value);
 }
 
-HTMLPropertiesCollection* Node::properties()
-{
-    return ensureRareData()->properties(this);
-}
 #endif
 
 void NodeRareData::createNodeLists(Node* node)

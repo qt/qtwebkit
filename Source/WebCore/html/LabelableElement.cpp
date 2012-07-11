@@ -25,8 +25,8 @@
 #include "config.h"
 #include "LabelableElement.h"
 
-#include "ElementRareData.h"
 #include "LabelsNodeList.h"
+#include "NodeRareData.h"
 #include "RenderStyle.h"
 
 namespace WebCore {
@@ -47,7 +47,7 @@ PassRefPtr<NodeList> LabelableElement::labels()
     if (!document())
         return 0;
 
-    return Node::ensureRareData()->ensureNodeLists(this)->addCacheWithAtomicName<LabelsNodeList>(this, DynamicNodeList::LabelsNodeListType, starAtom);
+    return ensureRareData()->ensureNodeLists(this)->addCacheWithAtomicName<LabelsNodeList>(this, DynamicNodeList::LabelsNodeListType, starAtom);
 }
 
 } // namespace Webcore

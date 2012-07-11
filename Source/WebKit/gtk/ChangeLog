@@ -1,3 +1,190 @@
+2012-07-10  Adam Barth  <abarth@webkit.org>
+
+        WebCore::Settings for Hixie76 WebSocket protocol doesn't do anything and should be removed
+        https://bugs.webkit.org/show_bug.cgi?id=90910
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+
+2012-07-10  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] Fix memory leaks by adopting allocation of GdkPixbuf
+        https://bugs.webkit.org/show_bug.cgi?id=90790
+
+        Reviewed by Carlos Garcia Campos.
+
+        Fixed a memory leak in WebKitFaviconDatabase by adopting an
+        allocation of GdkPixbuf.
+
+        * webkit/webkitfavicondatabase.cpp:
+        (getIconPixbufSynchronously):
+
+2012-07-10  Adam Barth  <abarth@webkit.org>
+
+        LayoutTestController.dumpConfigurationForViewport should move to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=45652
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2012-07-09  Adam Klein  <adamk@chromium.org>
+
+        Rename WebCore::WebKitMutationObserver to WebCore::MutationObserver
+        https://bugs.webkit.org/show_bug.cgi?id=90810
+
+        Reviewed by Ojan Vafai.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary):
+
+2012-07-09  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Implement dumpFrameScrollPosition in DumpRenderTree
+        https://bugs.webkit.org/show_bug.cgi?id=89356
+
+        Reviewed by Martin Robinson.
+
+        Add a new method for returning the WebKitDOMDocument that is loaded
+        in a given frame, webkit_web_frame_get_dom_document.
+
+        * docs/webkitgtk-sections.txt:
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_get_dom_document):
+        * webkit/webkitwebframe.h:
+        * webkit/webkitwebview.cpp: State explicitly that the document being returned
+        when calling webkit_web_view_get_dom_document is loaded in the main frame.
+        Also call the webkit_web_frame_get_dom_document on WebKitWebView's main frame
+        to get the document.
+
+2012-07-09  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Unskip the CSS Regions layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=90771
+
+        Reviewed by Martin Robinson.
+
+        Add a method to DumpRenderTreeSupportGtk for enabling or disabling
+        CSS Regions from DumpRenderTree.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setCSSRegionsEnabled):
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2012-07-09  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] Memory leak in webkitwebnavigationaction.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=90787
+
+        Reviewed by Martin Robinson.
+
+        Fixed a memory leak in WebKitWebNavigationAction.
+
+        * webkit/webkitwebnavigationaction.cpp:
+        (webkit_web_navigation_action_finalize): Free the g_strdup()'d string.
+
+2012-07-07  Zan Dobersek  <zandobersek@gmail.com>
+
+        REGRESSION (r122035): fullscreen/exit-full-screen-iframe.html failing on GTK Linux 64-bit Release
+        https://bugs.webkit.org/show_bug.cgi?id=90719
+
+        Reviewed by Martin Robinson.
+
+        Follow the approach of the BlackBerry port outlined in r122035, using in exitFullScreenForElement
+        the fullscreen element to which the reference was saved when enterFullScreenForElement was called.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::exitFullScreenForElement):
+
+2012-07-02  Benjamin Poulain  <bpoulain@apple.com>
+
+        Do not do any logging initialization when logging is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=90228
+
+        Reviewed by Simon Fraser.
+
+        * webkit/webkitglobals.cpp:
+        (webkitInit):
+
+2012-06-29  Tony Chang  <tony@chromium.org>
+
+        [GTK] Enable CSS grid layout LayoutTests on GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=90226
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled): Pass through to Settings object.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2012-06-29  Konrad Piascik  <kpiascik@rim.com>
+
+        Don't hardcode target dpi of 160 (it should be 96 on desktop)
+        https://bugs.webkit.org/show_bug.cgi?id=88114
+
+        Reviewed by Adam Barth.
+
+        Updated the call to computeViewportAttributes.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::dumpConfigurationForViewport):
+        * webkit/webkitviewportattributes.cpp:
+        (webkitViewportAttributesRecompute):
+
+2012-06-25  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        JSLock should be per-JSGlobalData
+        https://bugs.webkit.org/show_bug.cgi?id=89123
+
+        Reviewed by Geoffrey Garen.
+
+        Changed all sites that used JSLock to instead use the new JSLockHolder
+        and pass in the correct JS context that the code is about to interact with that 
+        needs protection. Also added a couple JSLocks to places that didn't already 
+        have it that needed it.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::gcCountJavascriptObjects):
+
+2012-06-27  Martin Robinson  <mrobinson@igalia.com>
+
+        [gtk] Spell checker doesn't recognize contractions (apostrophes)
+        https://bugs.webkit.org/show_bug.cgi?id=86118
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Work-around a bug in Pango by trying to detect apostrophes
+        that create contractions. This work-around is similar to one
+        found in gtkspell.
+
+        * webkit/webkitspellcheckerenchant.cpp:
+        (wordEndIsAContractionApostrophe): Added this helper which tries to detect
+        situations where a word end is both an apostrophe and followed by a alphabetic
+        character.
+        (checkSpellingOfString): When searching for the end of a word, skip over
+        apostrophes that appear to be part of contractions.
+
+2012-06-27  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Add support for the Gamepad API
+        https://bugs.webkit.org/show_bug.cgi?id=87503
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add the Gamepad feature dependencies libraries to the LIBADD
+        list for the libwebkitgtk library.
+
+        * GNUmakefile.am:
+
 2012-06-25  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         Unreviewed. Update NEWS and configure.ac for 1.9.4 release
