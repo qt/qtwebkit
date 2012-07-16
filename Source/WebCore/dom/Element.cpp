@@ -705,7 +705,7 @@ void Element::attributeChanged(const Attribute& attribute)
             setNeedsStyleRecalc();
     }
 
-    invalidateNodeListsCacheAfterAttributeChanged(attribute.name(), this);
+    invalidateNodeListCachesInAncestors(&attribute.name(), this);
 
     if (!AXObjectCache::accessibilityEnabled())
         return;
@@ -913,6 +913,10 @@ void Element::removedFrom(ContainerNode* insertionPoint)
     if (containsFullScreenElement())
         setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
 #endif
+#if ENABLE(POINTER_LOCK)
+    if (document()->page())
+        document()->page()->pointerLockController()->elementRemoved(this);
+#endif
 
     setSavedLayerScrollOffset(IntSize());
 
@@ -936,6 +940,9 @@ void Element::attach()
 
     createRendererIfNeeded();
     StyleResolverParentPusher parentPusher(this);
+
+    if (parentElement() && parentElement()->isInCanvasSubtree())
+        setIsInCanvasSubtree(true);
 
     // When a shadow root exists, it does the work of attaching the children.
     if (ElementShadow* shadow = this->shadow()) {
@@ -975,8 +982,10 @@ void Element::detach()
     RenderWidget::suspendWidgetHierarchyUpdates();
     unregisterNamedFlowContentNode();
     cancelFocusAppearanceUpdate();
-    if (hasRareData())
+    if (hasRareData()) {
+        setIsInCanvasSubtree(false);
         elementRareData()->resetComputedStyle();
+    }
 
     if (ElementShadow* shadow = this->shadow()) {
         detachChildrenIfNeeded();
@@ -1671,6 +1680,17 @@ bool Element::styleAffectedByEmpty() const
     return hasRareData() && elementRareData()->m_styleAffectedByEmpty;
 }
 
+void Element::setIsInCanvasSubtree(bool isInCanvasSubtree)
+{
+    ElementRareData* data = ensureElementRareData();
+    data->m_isInCanvasSubtree = isInCanvasSubtree;
+}
+
+bool Element::isInCanvasSubtree() const
+{
+    return hasRareData() && elementRareData()->m_isInCanvasSubtree;
+}
+
 AtomicString Element::computeInheritedLanguage() const
 {
     const Node* n = this;
@@ -1874,7 +1894,8 @@ void Element::setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(boo
 #if ENABLE(POINTER_LOCK)
 void Element::webkitRequestPointerLock()
 {
-    document()->frame()->page()->pointerLockController()->requestPointerLock(this, 0, 0);
+    if (document()->page())
+        document()->page()->pointerLockController()->requestPointerLock(this, 0, 0);
 }
 #endif
 

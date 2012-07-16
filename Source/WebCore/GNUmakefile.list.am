@@ -713,6 +713,7 @@ dom_binding_idls += \
 	$(WebCore)/Modules/notifications/Notification.idl \
 	$(WebCore)/Modules/notifications/NotificationCenter.idl \
 	$(WebCore)/Modules/notifications/NotificationPermissionCallback.idl \
+	$(WebCore)/Modules/protocolhandler/NavigatorRegisterProtocolHandler.idl \
 	$(WebCore)/Modules/webaudio/AudioContext.idl \
 	$(WebCore)/Modules/webaudio/AudioPannerNode.idl \
 	$(WebCore)/Modules/webaudio/DynamicsCompressorNode.idl \
@@ -1206,6 +1207,8 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/notifications/NotificationPermissionCallback.h \
 	Source/WebCore/Modules/notifications/WorkerContextNotifications.cpp \
 	Source/WebCore/Modules/notifications/WorkerContextNotifications.h \
+	Source/WebCore/Modules/protocolhandler/NavigatorRegisterProtocolHandler.cpp \
+	Source/WebCore/Modules/protocolhandler/NavigatorRegisterProtocolHandler.h \
 	Source/WebCore/Modules/webdatabase/AbstractDatabase.cpp \
 	Source/WebCore/Modules/webdatabase/AbstractDatabase.h \
 	Source/WebCore/Modules/webdatabase/ChangeVersionWrapper.cpp \
@@ -1939,6 +1942,10 @@ webcore_sources += \
 	Source/WebCore/dom/GenericEventQueue.h \
 	Source/WebCore/dom/IconURL.cpp \
 	Source/WebCore/dom/IconURL.h \
+	Source/WebCore/dom/IdTargetObserver.cpp \
+	Source/WebCore/dom/IdTargetObserver.h \
+	Source/WebCore/dom/IdTargetObserverRegistry.cpp \
+	Source/WebCore/dom/IdTargetObserverRegistry.h \
 	Source/WebCore/dom/HashChangeEvent.h \
 	Source/WebCore/dom/KeyboardEvent.cpp \
 	Source/WebCore/dom/KeyboardEvent.h \
@@ -2074,6 +2081,8 @@ webcore_sources += \
 	Source/WebCore/dom/WebKitAnimationEvent.h \
 	Source/WebCore/dom/WebKitNamedFlow.cpp \
 	Source/WebCore/dom/WebKitNamedFlow.h \
+	Source/WebCore/dom/WebKitNamedFlowCollection.cpp \
+	Source/WebCore/dom/WebKitNamedFlowCollection.h \
 	Source/WebCore/dom/WebKitTransitionEvent.cpp \
 	Source/WebCore/dom/WebKitTransitionEvent.h \
 	Source/WebCore/dom/WheelEvent.cpp \
@@ -3045,8 +3054,6 @@ webcore_sources += \
 	Source/WebCore/page/Navigator.h \
 	Source/WebCore/page/NavigatorBase.cpp \
 	Source/WebCore/page/NavigatorBase.h \
-	Source/WebCore/page/NavigatorRegisterProtocolHandler.cpp \
-	Source/WebCore/page/NavigatorRegisterProtocolHandler.h \
 	Source/WebCore/page/OriginAccessEntry.cpp \
 	Source/WebCore/page/OriginAccessEntry.h \
 	Source/WebCore/page/Page.cpp \
@@ -3285,6 +3292,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/filters/SpotLightSource.cpp \
 	Source/WebCore/platform/graphics/filters/SpotLightSource.h \
 	Source/WebCore/platform/graphics/filters/arm/NEONHelpers.h \
+	Source/WebCore/platform/graphics/filters/arm/FEBlendNEON.h \
 	Source/WebCore/platform/graphics/filters/arm/FECompositeArithmeticNEON.h \
 	Source/WebCore/platform/graphics/filters/arm/FEGaussianBlurNEON.h \
 	Source/WebCore/platform/graphics/filters/arm/FELightingNEON.cpp \
@@ -3680,8 +3688,6 @@ webcore_sources += \
 	Source/WebCore/platform/SuddenTermination.h \
 	Source/WebCore/platform/Supplementable.h \
 	Source/WebCore/platform/SystemTime.h \
-	Source/WebCore/platform/text/Base64.cpp \
-	Source/WebCore/platform/text/Base64.h \
 	Source/WebCore/platform/text/BidiContext.cpp \
 	Source/WebCore/platform/text/BidiContext.h \
 	Source/WebCore/platform/text/BidiResolver.h \
@@ -6121,10 +6127,10 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/TextureMapperShaderManager.h \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.h \
-	Source/WebCore/platform/graphics/texmap/LayerTransform.cpp \
-	Source/WebCore/platform/graphics/texmap/LayerTransform.h \
-	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.cpp \
-	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.h \
+	Source/WebCore/platform/graphics/GraphicsLayerTransform.cpp \
+	Source/WebCore/platform/graphics/GraphicsLayerTransform.h \
+	Source/WebCore/platform/graphics/GraphicsLayerAnimation.cpp \
+	Source/WebCore/platform/graphics/GraphicsLayerAnimation.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperBackingStore.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperBackingStore.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.cpp \
@@ -6144,10 +6150,10 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/texmap/TextureMapperShaderManager.h \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
 	Source/WebCore/platform/graphics/texmap/GraphicsLayerTextureMapper.h \
-	Source/WebCore/platform/graphics/texmap/LayerTransform.cpp \
-	Source/WebCore/platform/graphics/texmap/LayerTransform.h \
-	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.cpp \
-	Source/WebCore/platform/graphics/texmap/TextureMapperAnimation.h \
+	Source/WebCore/platform/graphics/GraphicsLayerTransform.cpp \
+	Source/WebCore/platform/graphics/GraphicsLayerTransform.h \
+	Source/WebCore/platform/graphics/GraphicsLayerAnimation.cpp \
+	Source/WebCore/platform/graphics/GraphicsLayerAnimation.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapperBackingStore.cpp \
 	Source/WebCore/platform/graphics/texmap/TextureMapperBackingStore.h \
 	Source/WebCore/platform/graphics/texmap/TextureMapper.cpp \

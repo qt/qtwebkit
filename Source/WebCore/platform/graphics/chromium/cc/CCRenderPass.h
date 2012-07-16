@@ -27,16 +27,17 @@
 #define CCRenderPass_h
 
 #include "SkColor.h"
+#include "cc/CCDrawQuad.h"
 #include "cc/CCOcclusionTracker.h"
+#include "cc/CCSharedQuadState.h"
+#include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
-class CCDrawQuad;
 class CCLayerImpl;
 class CCRenderSurface;
-class CCSharedQuadState;
 
 // A list of CCDrawQuad objects, sorted internally in front-to-back order.
 class CCQuadList : public Vector<OwnPtr<CCDrawQuad> > {
@@ -81,7 +82,8 @@ protected:
     bool m_hasTransparentBackground;
 };
 
-typedef Vector<OwnPtr<CCRenderPass> > CCRenderPassList;
+typedef Vector<CCRenderPass*> CCRenderPassList;
+typedef HashMap<int, OwnPtr<CCRenderPass> > CCRenderPassIdHashMap;
 
 }
 

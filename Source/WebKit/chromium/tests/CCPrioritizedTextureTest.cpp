@@ -28,6 +28,7 @@
 
 #include "CCTiledLayerTestCommon.h"
 #include "cc/CCPrioritizedTextureManager.h"
+#include "cc/CCTexture.h"
 #include <gtest/gtest.h>
 
 using namespace WebCore;
@@ -50,7 +51,7 @@ public:
 
     size_t texturesMemorySize(size_t textureCount)
     {
-        return TextureManager::memoryUseBytes(m_textureSize, m_textureFormat) * textureCount;
+        return CCTexture::memorySizeBytes(m_textureSize, m_textureFormat) * textureCount;
     }
 
     PassOwnPtr<CCPrioritizedTextureManager> createManager(size_t maxTextures)
@@ -98,7 +99,7 @@ TEST_F(CCPrioritizedTextureTest, requestTextureExceedingMaxLimit)
         textures[i]->setRequestPriority(100 + i);
 
     // Only lower half should be available.
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
     EXPECT_TRUE(validateTexture(textures[0], false));
     EXPECT_TRUE(validateTexture(textures[7], false));
     EXPECT_FALSE(validateTexture(textures[8], false));
@@ -109,7 +110,7 @@ TEST_F(CCPrioritizedTextureTest, requestTextureExceedingMaxLimit)
         textures[i]->setRequestPriority(100 - i);
 
     // Only upper half should be available.
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
     EXPECT_FALSE(validateTexture(textures[0], false));
     EXPECT_FALSE(validateTexture(textures[7], false));
     EXPECT_TRUE(validateTexture(textures[8], false));
@@ -134,7 +135,7 @@ TEST_F(CCPrioritizedTextureTest, changeMemoryLimits)
 
     // Set max limit to 8 textures
     textureManager->setMaxMemoryLimitBytes(texturesMemorySize(8));
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
     for (size_t i = 0; i < maxTextures; ++i)
         validateTexture(textures[i], false);
     textureManager->reduceMemory(allocator());
@@ -144,7 +145,7 @@ TEST_F(CCPrioritizedTextureTest, changeMemoryLimits)
 
     // Set max limit to 5 textures
     textureManager->setMaxMemoryLimitBytes(texturesMemorySize(5));
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
     for (size_t i = 0; i < maxTextures; ++i)
         EXPECT_EQ(validateTexture(textures[i], false), i < 5);
     textureManager->reduceMemory(allocator());
@@ -154,7 +155,7 @@ TEST_F(CCPrioritizedTextureTest, changeMemoryLimits)
 
     // Set max limit to 4 textures
     textureManager->setMaxMemoryLimitBytes(texturesMemorySize(4));
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
     for (size_t i = 0; i < maxTextures; ++i)
         EXPECT_EQ(validateTexture(textures[i], false), i < 4);
     textureManager->reduceMemory(allocator());
@@ -180,7 +181,7 @@ TEST_F(CCPrioritizedTextureTest, textureManagerPartialUpdateTextures)
 
     for (size_t i = 0; i < numTextures; ++i)
         textures[i]->setRequestPriority(200 + i);
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
 
     // Allocate textures which are currently high priority.
     EXPECT_TRUE(validateTexture(textures[0], false));
@@ -195,7 +196,7 @@ TEST_F(CCPrioritizedTextureTest, textureManagerPartialUpdateTextures)
 
     for (size_t i = 0; i < numTextures; ++i)
         moreTextures[i]->setRequestPriority(100 + i);
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
 
     // Textures are now below cutoff.
     EXPECT_FALSE(validateTexture(textures[0], false));
@@ -241,7 +242,7 @@ TEST_F(CCPrioritizedTextureTest, textureManagerPrioritiesAreEqual)
 
     // Set max limit to 8 textures
     textureManager->setMaxMemoryLimitBytes(texturesMemorySize(8));
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
 
     // The two high priority textures should be available, others should not.
     for (size_t i = 0; i < 2; ++i)
@@ -272,7 +273,7 @@ TEST_F(CCPrioritizedTextureTest, textureManagerDestroyedFirst)
     EXPECT_FALSE(texture->haveBackingTexture());
 
     texture->setRequestPriority(100);
-    textureManager->prioritizeTextures(0);
+    textureManager->prioritizeTextures();
 
     EXPECT_TRUE(validateTexture(texture, false));
     EXPECT_TRUE(texture->canAcquireBackingTexture());
@@ -295,7 +296,7 @@ TEST_F(CCPrioritizedTextureTest, textureMovedToNewManager)
     EXPECT_FALSE(texture->haveBackingTexture());
 
     texture->setRequestPriority(100);
-    textureManagerOne->prioritizeTextures(0);
+    textureManagerOne->prioritizeTextures();
 
     EXPECT_TRUE(validateTexture(texture, false));
     EXPECT_TRUE(texture->canAcquireBackingTexture());
@@ -311,7 +312,7 @@ TEST_F(CCPrioritizedTextureTest, textureMovedToNewManager)
 
     texture->setTextureManager(textureManagerTwo.get());
 
-    textureManagerTwo->prioritizeTextures(0);
+    textureManagerTwo->prioritizeTextures();
 
     EXPECT_TRUE(validateTexture(texture, false));
     EXPECT_TRUE(texture->canAcquireBackingTexture());
@@ -325,8 +326,10 @@ TEST_F(CCPrioritizedTextureTest, renderSurfacesReduceMemoryAvailableOutsideRootS
     const size_t maxTextures = 8;
     OwnPtr<CCPrioritizedTextureManager> textureManager = createManager(maxTextures);
 
-    // Half of the memory is taken by surfaces.
-    const size_t renderSurfacesBytes = texturesMemorySize(4);
+    // Half of the memory is taken by surfaces (with high priority place-holder)
+    OwnPtr<CCPrioritizedTexture> renderSurfacePlaceHolder = textureManager->createTexture(m_textureSize, m_textureFormat);
+    renderSurfacePlaceHolder->setToSelfManagedMemoryPlaceholder(texturesMemorySize(4));
+    renderSurfacePlaceHolder->setRequestPriority(CCPriorityCalculator::renderSurfacePriority());
 
     // Create textures to fill our memory limit.
     OwnPtr<CCPrioritizedTexture> textures[maxTextures];
@@ -339,7 +342,7 @@ TEST_F(CCPrioritizedTextureTest, renderSurfacesReduceMemoryAvailableOutsideRootS
         textures[i]->setRequestPriority(100 + i);
 
     // Only lower half should be available.
-    textureManager->prioritizeTextures(renderSurfacesBytes);
+    textureManager->prioritizeTextures();
     EXPECT_TRUE(validateTexture(textures[0], false));
     EXPECT_TRUE(validateTexture(textures[3], false));
     EXPECT_FALSE(validateTexture(textures[4], false));
@@ -350,14 +353,14 @@ TEST_F(CCPrioritizedTextureTest, renderSurfacesReduceMemoryAvailableOutsideRootS
         textures[i]->setRequestPriority(100 - i);
 
     // Only upper half should be available.
-    textureManager->prioritizeTextures(renderSurfacesBytes);
+    textureManager->prioritizeTextures();
     EXPECT_FALSE(validateTexture(textures[0], false));
     EXPECT_FALSE(validateTexture(textures[3], false));
     EXPECT_TRUE(validateTexture(textures[4], false));
     EXPECT_TRUE(validateTexture(textures[7], false));
 
     EXPECT_EQ(texturesMemorySize(4), textureManager->memoryAboveCutoffBytes());
-    EXPECT_EQ(texturesMemorySize(4), textureManager->memoryForRenderSurfacesBytes());
+    EXPECT_EQ(texturesMemorySize(4), textureManager->memoryForSelfManagedTextures());
     EXPECT_LE(textureManager->memoryUseBytes(), textureManager->memoryAboveCutoffBytes());
 
     textureManager->clearAllMemory(allocator());
@@ -368,8 +371,10 @@ TEST_F(CCPrioritizedTextureTest, renderSurfacesReduceMemoryAvailableForRequestLa
     const size_t maxTextures = 8;
     OwnPtr<CCPrioritizedTextureManager> textureManager = createManager(maxTextures);
 
-    // Half of the memory is taken by surfaces.
-    const size_t renderSurfacesBytes = texturesMemorySize(4);
+    // Half of the memory is taken by surfaces (with high priority place-holder)
+    OwnPtr<CCPrioritizedTexture> renderSurfacePlaceHolder = textureManager->createTexture(m_textureSize, m_textureFormat);
+    renderSurfacePlaceHolder->setToSelfManagedMemoryPlaceholder(texturesMemorySize(4));
+    renderSurfacePlaceHolder->setRequestPriority(CCPriorityCalculator::renderSurfacePriority());
 
     // Create textures to fill our memory limit.
     OwnPtr<CCPrioritizedTexture> textures[maxTextures];
@@ -382,7 +387,7 @@ TEST_F(CCPrioritizedTextureTest, renderSurfacesReduceMemoryAvailableForRequestLa
         textures[i]->setRequestPriority(100);
 
     // The first four to be requested late will be available.
-    textureManager->prioritizeTextures(renderSurfacesBytes);
+    textureManager->prioritizeTextures();
     for (unsigned i = 0; i < maxTextures; ++i)
         EXPECT_FALSE(validateTexture(textures[i], false));
     for (unsigned i = 0; i < maxTextures; i += 2)
@@ -391,7 +396,7 @@ TEST_F(CCPrioritizedTextureTest, renderSurfacesReduceMemoryAvailableForRequestLa
         EXPECT_FALSE(validateTexture(textures[i], true));
 
     EXPECT_EQ(texturesMemorySize(4), textureManager->memoryAboveCutoffBytes());
-    EXPECT_EQ(texturesMemorySize(4), textureManager->memoryForRenderSurfacesBytes());
+    EXPECT_EQ(texturesMemorySize(4), textureManager->memoryForSelfManagedTextures());
     EXPECT_LE(textureManager->memoryUseBytes(), textureManager->memoryAboveCutoffBytes());
 
     textureManager->clearAllMemory(allocator());
@@ -402,8 +407,10 @@ TEST_F(CCPrioritizedTextureTest, whenRenderSurfaceNotAvailableTexturesAlsoNotAva
     const size_t maxTextures = 8;
     OwnPtr<CCPrioritizedTextureManager> textureManager = createManager(maxTextures);
 
-    // Half of the memory is taken by surfaces.
-    const size_t renderSurfacesBytes = texturesMemorySize(4);
+    // Half of the memory is taken by surfaces (with high priority place-holder)
+    OwnPtr<CCPrioritizedTexture> renderSurfacePlaceHolder = textureManager->createTexture(m_textureSize, m_textureFormat);
+    renderSurfacePlaceHolder->setToSelfManagedMemoryPlaceholder(texturesMemorySize(4));
+    renderSurfacePlaceHolder->setRequestPriority(CCPriorityCalculator::renderSurfacePriority());
 
     // Create textures to fill our memory limit.
     OwnPtr<CCPrioritizedTexture> textures[maxTextures];
@@ -417,7 +424,7 @@ TEST_F(CCPrioritizedTextureTest, whenRenderSurfaceNotAvailableTexturesAlsoNotAva
     for (size_t i = 6; i < 8; ++i)
         textures[i]->setRequestPriority(CCPriorityCalculator::visiblePriority(false));
 
-    textureManager->prioritizeTextures(renderSurfacesBytes);
+    textureManager->prioritizeTextures();
 
     // Unable to requestLate textures in the child surface.
     EXPECT_FALSE(validateTexture(textures[6], true));
@@ -428,7 +435,7 @@ TEST_F(CCPrioritizedTextureTest, whenRenderSurfaceNotAvailableTexturesAlsoNotAva
         EXPECT_TRUE(validateTexture(textures[i], false));
 
     EXPECT_EQ(texturesMemorySize(6), textureManager->memoryAboveCutoffBytes());
-    EXPECT_EQ(texturesMemorySize(2), textureManager->memoryForRenderSurfacesBytes());
+    EXPECT_EQ(texturesMemorySize(2), textureManager->memoryForSelfManagedTextures());
     EXPECT_LE(textureManager->memoryUseBytes(), textureManager->memoryAboveCutoffBytes());
 
     textureManager->clearAllMemory(allocator());

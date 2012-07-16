@@ -40,7 +40,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static bool shouldIncludeChildren(CollectionType type)
+static bool shouldOnlyIncludeDirectChildren(CollectionType type)
 {
     switch (type) {
     case DocAll:
@@ -63,27 +63,106 @@ static bool shouldIncludeChildren(CollectionType type)
     case ItemProperties:
 #endif
     case FormControls:
-        return true;
+        return false;
     case NodeChildren:
     case TRCells:
     case TSectionRows:
     case TableTBodies:
-        return false;
+        return true;
+    case InvalidCollectionType:
+        break;
     }
     ASSERT_NOT_REACHED();
     return false;
 }
 
-HTMLCollection::HTMLCollection(Node* base, CollectionType type)
-    : HTMLCollectionCacheBase(type, shouldIncludeChildren(type))
+static NodeListRootType rootTypeFromCollectionType(CollectionType type)
+{
+    switch (type) {
+    case DocImages:
+    case DocApplets:
+    case DocEmbeds:
+    case DocObjects:
+    case DocForms:
+    case DocLinks:
+    case DocAnchors:
+    case DocScripts:
+    case DocAll:
+    case WindowNamedItems:
+    case DocumentNamedItems:
+#if ENABLE(MICRODATA)
+    case ItemProperties:
+#endif
+    case FormControls:
+        return NodeListIsRootedAtDocument;
+    case NodeChildren:
+    case TableTBodies:
+    case TSectionRows:
+    case TableRows:
+    case TRCells:
+    case SelectOptions:
+    case SelectedOptions:
+    case DataListOptions:
+    case MapAreas:
+    case InvalidCollectionType:
+        return NodeListIsRootedAtNode;
+    }
+    ASSERT_NOT_REACHED();
+    return NodeListIsRootedAtNode;
+}
+
+static NodeListInvalidationType invalidationTypeExcludingIdAndNameAttributes(CollectionType type)
+{
+    switch (type) {
+    case DocImages:
+    case DocEmbeds:
+    case DocObjects:
+    case DocForms:
+    case DocAnchors: // Depends on name attribute.
+    case DocScripts:
+    case DocAll:
+    case WindowNamedItems: // Depends on id and name attributes.
+    case DocumentNamedItems: // Ditto.
+    case NodeChildren:
+    case TableTBodies:
+    case TSectionRows:
+    case TableRows:
+    case TRCells:
+    case SelectOptions:
+    case MapAreas:
+        return DoNotInvalidateOnAttributeChanges;
+    case DocApplets:
+    case SelectedOptions:
+    case DataListOptions:
+        // FIXME: We can do better some day.
+        return InvalidateOnAnyAttrChange;
+    case DocLinks:
+        return InvalidateOnHRefAttrChange;
+#if ENABLE(MICRODATA)
+    case ItemProperties:
+        return InvalidateOnItemAttrChange;
+#endif
+    case FormControls:
+        return InvalidateForFormControls;
+    case InvalidCollectionType:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return DoNotInvalidateOnAttributeChanges;
+}
+    
+
+HTMLCollection::HTMLCollection(Node* base, CollectionType type, ItemBeforeSupportType itemBeforeSupportType)
+    : HTMLCollectionCacheBase(rootTypeFromCollectionType(type), invalidationTypeExcludingIdAndNameAttributes(type), type, itemBeforeSupportType)
     , m_base(base)
 {
     ASSERT(m_base);
+    m_base->document()->registerNodeListCache(this);
 }
 
 PassRefPtr<HTMLCollection> HTMLCollection::create(Node* base, CollectionType type)
 {
-    return adoptRef(new HTMLCollection(base, type));
+    return adoptRef(new HTMLCollection(base, type, SupportItemBefore));
 }
 
 HTMLCollection::~HTMLCollection()
@@ -96,34 +175,16 @@ HTMLCollection::~HTMLCollection()
         toElement(base())->removeCachedHTMLCollection(this, type());
     } else // HTMLNameCollection removes cache by itself.
         ASSERT(type() == WindowNamedItems || type() == DocumentNamedItems);
+
+    m_base->document()->unregisterNodeListCache(this);
 }
 
-void HTMLCollection::invalidateCacheIfNeeded() const
+static inline bool isAcceptableElement(CollectionType type, Element* element)
 {
-    uint64_t docversion = static_cast<HTMLDocument*>(m_base->document())->domTreeVersion();
-
-    if (cacheTreeVersion() == docversion)
-        return;
-
-    invalidateCache();
-}
-
-void HTMLCollection::invalidateCache() const
-{
-#if ENABLE(MICRODATA)
-    // FIXME: There should be more generic mechanism to clear caches in subclasses.
-    if (type() == ItemProperties)
-        static_cast<const HTMLPropertiesCollection*>(this)->clearCache();
-#endif
-    clearCache(static_cast<HTMLDocument*>(m_base->document())->domTreeVersion());
-}
-
-inline bool HTMLCollection::isAcceptableElement(Element* element) const
-{
-    if (!element->isHTMLElement() && !(type() == DocAll || type() == NodeChildren))
+    if (!element->isHTMLElement() && !(type == DocAll || type == NodeChildren))
         return false;
 
-    switch (type()) {
+    switch (type) {
     case DocImages:
         return element->hasLocalName(imgTag);
     case DocScripts:
@@ -170,70 +231,159 @@ inline bool HTMLCollection::isAcceptableElement(Element* element) const
     case DocumentNamedItems:
     case TableRows:
     case WindowNamedItems:
+    case InvalidCollectionType:
         ASSERT_NOT_REACHED();
     }
     return false;
 }
 
-static Node* nextNodeOrSibling(Node* base, Node* node, bool includeChildren)
+template<bool forward>
+static Node* nextNode(Node* base, Node* previous, bool onlyIncludeDirectChildren)
 {
-    return includeChildren ? node->traverseNextNode(base) : node->traverseNextSibling(base);
+    if (forward)
+        return onlyIncludeDirectChildren ? previous->nextSibling() : previous->traverseNextNode(base);
+    else
+        return onlyIncludeDirectChildren ? previous->previousSibling() : previous->traversePreviousNode(base);
 }
 
-Element* HTMLCollection::itemAfter(Node* previous) const
+template<bool forward>
+static Element* itemBeforeOrAfter(CollectionType type, Node* base, unsigned& offsetInArray, Node* previous)
 {
-    Node* current;
-    if (!previous)
-        current = m_base->firstChild();
-    else
-        current = nextNodeOrSibling(base(), previous, includeChildren());
+    ASSERT_UNUSED(offsetInArray, !offsetInArray);
+    bool onlyIncludeDirectChildren = shouldOnlyIncludeDirectChildren(type);
+    Node* rootNode = base;
+    Node* current = previous ? nextNode<forward>(rootNode, previous, onlyIncludeDirectChildren) : (forward ? base->firstChild() : base->lastChild());
 
-    for (; current; current = nextNodeOrSibling(base(), current, includeChildren())) {
-        if (!current->isElementNode())
-            continue;
-        Element* element = static_cast<Element*>(current);
-        if (isAcceptableElement(element))
-            return element;
+    for (; current; current = nextNode<forward>(rootNode, current, onlyIncludeDirectChildren)) {
+        if (current->isElementNode() && isAcceptableElement(type, toElement(current)))
+            return toElement(current);
     }
 
     return 0;
 }
 
-unsigned HTMLCollection::calcLength() const
+Element* HTMLCollection::itemBefore(unsigned& offsetInArray, Element* previous) const
 {
-    unsigned len = 0;
-    for (Element* current = itemAfter(0); current; current = itemAfter(current))
-        ++len;
-    return len;
+    return itemBeforeOrAfter<false>(type(), base(), offsetInArray, previous);
 }
 
-// since the collections are to be "live", we have to do the
-// calculation every time if anything has changed
+Element* HTMLCollection::itemAfter(unsigned& offsetInArray, Element* previous) const
+{
+    return itemBeforeOrAfter<true>(type(), base(), offsetInArray, previous);
+}
+
+bool ALWAYS_INLINE HTMLCollection::isLastItemCloserThanLastOrCachedItem(unsigned offset) const
+{
+    ASSERT(isLengthCacheValid());
+    unsigned distanceFromLastItem = cachedLength() - offset;
+    if (!isItemCacheValid())
+        return distanceFromLastItem < offset;
+
+    return cachedItemOffset() < offset && distanceFromLastItem < offset - cachedItemOffset();
+}
+    
+bool ALWAYS_INLINE HTMLCollection::isFirstItemCloserThanCachedItem(unsigned offset) const
+{
+    ASSERT(isItemCacheValid());
+    if (cachedItemOffset() < offset)
+        return false;
+
+    unsigned distanceFromCachedItem = cachedItemOffset() - offset;
+    return offset < distanceFromCachedItem;
+}
+
 unsigned HTMLCollection::length() const
 {
-    invalidateCacheIfNeeded();
-    if (!isLengthCacheValid())
-        setLengthCache(calcLength());
-    return cachedLength();
+    if (isLengthCacheValid())
+        return cachedLength();
+
+    if (!isItemCacheValid() && !item(0)) {
+        ASSERT(isLengthCacheValid());
+        return 0;
+    }
+
+    ASSERT(isItemCacheValid());
+    ASSERT(cachedItem());
+    unsigned offset = cachedItemOffset();
+    do {
+        offset++;
+    } while (itemBeforeOrAfterCachedItem(offset));
+
+    setLengthCache(offset);
+    return offset;
 }
 
-Node* HTMLCollection::item(unsigned index) const
+Node* HTMLCollection::item(unsigned offset) const
 {
-    invalidateCacheIfNeeded();
-    if (isItemCacheValid() && cachedItemOffset() == index)
+    if (isItemCacheValid() && cachedItemOffset() == offset)
         return cachedItem();
-    if (isLengthCacheValid() && cachedLength() <= index)
+
+    if (isLengthCacheValid() && cachedLength() <= offset)
         return 0;
-    if (!isItemCacheValid() || cachedItemOffset() > index) {
-        setItemCache(itemAfter(0), 0);
-        if (!cachedItem())
+
+#if ENABLE(MICRODATA)
+    if (type() == ItemProperties)
+        static_cast<const HTMLPropertiesCollection*>(this)->updateRefElements();
+#endif
+
+    if (isLengthCacheValid() && supportsItemBefore() && isLastItemCloserThanLastOrCachedItem(offset)) {
+        // FIXME: Need to figure out the last offset in array for HTMLFormCollection and HTMLPropertiesCollection
+        unsigned unusedOffsetInArray = 0;
+        Node* lastItem = itemBefore(unusedOffsetInArray, 0);
+        ASSERT(!unusedOffsetInArray);
+        ASSERT(lastItem);
+        setItemCache(lastItem, cachedLength() - 1, 0);
+    } else if (!isItemCacheValid() || isFirstItemCloserThanCachedItem(offset) || (!supportsItemBefore() && offset < cachedItemOffset())) {
+        unsigned offsetInArray = 0;
+        Node* firstItem = itemAfter(offsetInArray, 0);
+        if (!firstItem) {
+            setLengthCache(0);
             return 0;
+        }
+        setItemCache(firstItem, 0, offsetInArray);
+        ASSERT(!cachedItemOffset());
     }
-    Node* e = cachedItem();
-    for (unsigned pos = cachedItemOffset(); e && pos < index; pos++)
-        e = itemAfter(e);
-    setItemCache(e, index);
-    return cachedItem();
+
+    if (cachedItemOffset() == offset)
+        return cachedItem();
+
+    return itemBeforeOrAfterCachedItem(offset);
+}
+
+Element* HTMLCollection::itemBeforeOrAfterCachedItem(unsigned offset) const
+{
+    unsigned currentOffset = cachedItemOffset();
+    ASSERT(cachedItem()->isElementNode());
+    Element* currentItem = toElement(cachedItem());
+    ASSERT(currentOffset != offset);
+
+    unsigned offsetInArray = cachedElementsArrayOffset();
+
+    if (offset < cachedItemOffset()) {
+        ASSERT(supportsItemBefore());
+        while ((currentItem = itemBefore(offsetInArray, currentItem))) {
+            ASSERT(currentOffset);
+            currentOffset--;
+            if (currentOffset == offset) {
+                setItemCache(currentItem, currentOffset, offsetInArray);
+                return currentItem;
+            }
+        }
+        ASSERT_NOT_REACHED();
+        return 0;
+    }
+
+    while ((currentItem = itemAfter(offsetInArray, currentItem))) {
+        currentOffset++;
+        if (currentOffset == offset) {
+            setItemCache(currentItem, currentOffset, offsetInArray);
+            return currentItem;
+        }
+    }
+
+    setLengthCache(currentOffset);
+
+    return 0;
 }
 
 static inline bool nameShouldBeVisibleInDocumentAll(HTMLElement* element)
@@ -271,21 +421,21 @@ Node* HTMLCollection::namedItem(const AtomicString& name) const
     // attribute. If a match is not found, the method then searches for an
     // object with a matching name attribute, but only on those elements
     // that are allowed a name attribute.
-    invalidateCacheIfNeeded();
 
+    unsigned arrayOffset = 0;
     unsigned i = 0;
-    for (Element* e = itemAfter(0); e; e = itemAfter(e)) {
+    for (Element* e = itemAfter(arrayOffset, 0); e; e = itemAfter(arrayOffset, e)) {
         if (checkForNameMatch(e, /* checkName */ false, name)) {
-            setItemCache(e, i);
+            setItemCache(e, i, arrayOffset);
             return e;
         }
         i++;
     }
 
     i = 0;
-    for (Element* e = itemAfter(0); e; e = itemAfter(e)) {
+    for (Element* e = itemAfter(arrayOffset, 0); e; e = itemAfter(arrayOffset, e)) {
         if (checkForNameMatch(e, /* checkName */ true, name)) {
-            setItemCache(e, i);
+            setItemCache(e, i, arrayOffset);
             return e;
         }
         i++;
@@ -299,7 +449,8 @@ void HTMLCollection::updateNameCache() const
     if (hasNameCache())
         return;
 
-    for (Element* element = itemAfter(0); element; element = itemAfter(element)) {
+    unsigned arrayOffset = 0;
+    for (Element* element = itemAfter(arrayOffset, 0); element; element = itemAfter(arrayOffset, element)) {
         if (!element->isHTMLElement())
             continue;
         HTMLElement* e = toHTMLElement(element);
@@ -319,7 +470,6 @@ bool HTMLCollection::hasNamedItem(const AtomicString& name) const
     if (name.isEmpty())
         return false;
 
-    invalidateCacheIfNeeded();
     updateNameCache();
 
     if (Vector<Element*>* cache = idCache(name)) {
@@ -341,7 +491,6 @@ void HTMLCollection::namedItems(const AtomicString& name, Vector<RefPtr<Node> >&
     if (name.isEmpty())
         return;
 
-    invalidateCacheIfNeeded();
     updateNameCache();
 
     Vector<Element*>* idResults = idCache(name);

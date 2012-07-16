@@ -24,7 +24,6 @@
 #include "BackForwardListImpl.h"
 #include "BackingStoreClient.h"
 #include "BackingStore_p.h"
-#include "Base64.h"
 #include "Chrome.h"
 #include "ChromeClientBlackBerry.h"
 #include "ClientExtension.h"
@@ -824,6 +823,14 @@ void FrameLoaderClientBlackBerry::dispatchDidFirstVisuallyNonEmptyLayout()
     BlackBerry::Platform::log(BlackBerry::Platform::LogLevelInfo, "dispatchDidFirstVisuallyNonEmptyLayout");
 
     readyToRender(true);
+
+    // For FrameLoadTypeSame or FrameLoadTypeStandard load, the layout timer can be fired which can call
+    // dispatchDidFirstVisuallyNonEmptyLayout() after the load Finished state, in which case the web page
+    // will have no chance to zoom to initial scale. So we should give it a chance, otherwise the scale of
+    // the web page can be incorrect.
+    FrameLoadType frameLoadType = m_frame->loader()->loadType();
+    if (m_webPagePrivate->loadState() == WebPagePrivate::Finished && (frameLoadType == FrameLoadTypeSame || frameLoadType == FrameLoadTypeStandard))
+        m_webPagePrivate->setShouldZoomToInitialScaleAfterLoadFinished(true);
 
     if (m_webPagePrivate->shouldZoomToInitialScaleOnLoad()) {
         m_webPagePrivate->zoomToInitialScaleOnLoad(); // Set the proper zoom level first.

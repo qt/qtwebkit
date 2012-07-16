@@ -36,7 +36,7 @@ public:
 
     virtual bool canContainRangeEndPoint() const { return false; }
 
-    bool shouldSaveAndRestoreFormControlState() const;
+    virtual bool shouldSaveAndRestoreFormControlState() const;
     virtual FormControlState saveFormControlState() const;
     // The specified FormControlState must have at least one string value.
     virtual void restoreFormControlState(const FormControlState&) { }
@@ -47,6 +47,7 @@ protected:
     virtual bool shouldAutocomplete() const;
     virtual void finishParsingChildren();
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
+    virtual bool isFormControlElementWithState() const OVERRIDE;
 };
 
 } // namespace

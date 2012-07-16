@@ -130,9 +130,11 @@ WebInspector.Workspace = function()
     new WebInspector.PresentationConsoleMessageHelper(this);
     
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameNavigated, this._reset, this);
+    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.CachedResourcesLoaded, this._reset, this);
 }
 
 WebInspector.Workspace.Events = {
+    UISourceCodeContentCommitted: "uiSourceCodeContentCommitted",
     WorkspaceReset: "WorkspaceReset"
 }
 
@@ -151,6 +153,7 @@ WebInspector.Workspace.prototype = {
         for (var i = 0; i < uiSourceCodeProviders.length; ++i) {
             uiSourceCodeProviders[i].reset();
         }
+        WebInspector.Revision.filterOutStaleRevisions();
         this.dispatchEventToListeners(WebInspector.Workspace.Events.WorkspaceReset, null);
     }
 }

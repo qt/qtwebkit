@@ -1,20 +1,479 @@
-2012-06-13  Patrick Gansterer  <paroga@webkit.org>
+2012-07-13  Mark Lam  <mark.lam@apple.com>
 
-        [WIN] Remove dependency on pthread from MachineStackMarker
-        https://bugs.webkit.org/show_bug.cgi?id=68429
+        OfflineASM Pretty printing and commenting enhancements.
+        https://bugs.webkit.org/show_bug.cgi?id=91281
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Filip Pizlo.
 
-        Implement pthread TLS functionality with native windows functions.
+        Added some minor pretty printing in the OfflineASM.
+        Also added infrastruture for adding multiple types of comments and
+        annotations with the ability to enable/disable them in the generated
+        output as desired.
 
-        * heap/MachineStackMarker.cpp: Use the new functions instead of pthread directly.
-        * heap/MachineStackMarker.h:
-        * wtf/ThreadSpecific.h:
-        (WTF::ThreadSpecificKeyCreate): Added wrapper around pthread_key_create.
-        (WTF::ThreadSpecificKeyDelete): Added wrapper around pthread_key_delete.
-        (WTF::ThreadSpecificSet): Added wrapper around pthread_setspecific.
-        (WTF::ThreadSpecificGet): Added wrapper around pthread_getspecific.
-        * wtf/ThreadSpecificWin.cpp:
+        * GNUmakefile.list.am: add new file config.rb.
+        * llint/LLIntOfflineAsmConfig.h:
+          Added OFFLINE_ASM_BEGIN, OFFLINE_ASM_END, and OFFLINE_ASM_LOCAL_LABEL macros.
+          This will allow us to redefine these for other backends later.
+        * llint/LowLevelInterpreter32_64.asm:
+          Add a small example of instruction annotations for now.
+        * llint/LowLevelInterpreter64.asm:
+          Add a small example of instruction annotations for now.
+        * offlineasm/armv7.rb: Added handling of annotations.
+        * offlineasm/asm.rb:
+          Added machinery to dump the new comments and annotations.
+          Also added some indentations to make the output a little prettier.
+        * offlineasm/ast.rb: Added annotation field in class Instruction. 
+        * offlineasm/backends.rb:
+        * offlineasm/config.rb: Added.
+          Currently only contains commenting options.  This file is meant to be
+          a centralized place for build config values much like config.h for
+          JavaScriptCore.
+        * offlineasm/generate_offset_extractor.rb:
+        * offlineasm/instructions.rb:
+        * offlineasm/offsets.rb:
+        * offlineasm/opt.rb:
+        * offlineasm/parser.rb: Parse and record annotations.
+        * offlineasm/registers.rb:
+        * offlineasm/self_hash.rb:
+        * offlineasm/settings.rb:
+        * offlineasm/transform.rb:
+        * offlineasm/x86.rb: Added handling of annotations.
+
+2012-07-13  Filip Pizlo  <fpizlo@apple.com>
+
+        ASSERTION FAILED: use.useKind() != DoubleUse
+        https://bugs.webkit.org/show_bug.cgi?id=91082
+
+        Reviewed by Geoffrey Garen.
+
+        The implementation of Branch() was unwisely relying on register allocation state
+        to decide what speculations to perform. That's never correct.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-07-13  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r122640.
+        http://trac.webkit.org/changeset/122640
+        https://bugs.webkit.org/show_bug.cgi?id=91298
+
+        LLInt apparently does not expect to mark these (Requested by
+        olliej on #webkit).
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::visitStructures):
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+
+2012-07-13  Oliver Hunt  <oliver@apple.com>
+
+        LLInt fails to mark structures stored in the bytecode
+        https://bugs.webkit.org/show_bug.cgi?id=91296
+
+        Reviewed by Geoffrey Garen.
+
+        LLInt stores structures in the bytecode, so we need to visit the appropriate
+        instructions as we would if we were running in the classic interpreter.
+        This requires adding additional checks for the LLInt specific opcodes, and
+        the lint specific variants of operand ordering. 
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::visitStructures):
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+
+2012-07-13  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Implement GCActivityCallback with platform timer
+        https://bugs.webkit.org/show_bug.cgi?id=90175
+
+        Reviewed by Rob Buis.
+
+        Implement GCActivityCallback and HeapTimer for BlackBerry port.
+
+        * heap/HeapTimer.cpp:
+        (JSC):
+        (JSC::HeapTimer::HeapTimer):
+        (JSC::HeapTimer::~HeapTimer):
+        (JSC::HeapTimer::timerDidFire):
+        (JSC::HeapTimer::synchronize):
+        (JSC::HeapTimer::invalidate):
+        (JSC::HeapTimer::didStartVMShutdown):
+        * heap/HeapTimer.h:
+        (HeapTimer):
+        * runtime/GCActivityCallbackBlackBerry.cpp:
+        (JSC):
+        (JSC::DefaultGCActivityCallback::doWork):
+        (JSC::DefaultGCActivityCallback::didAllocate):
+        (JSC::DefaultGCActivityCallback::willCollect):
+        (JSC::DefaultGCActivityCallback::cancel):
+
+2012-07-13  Patrick Gansterer  <paroga@webkit.org>
+
+        [WIN] Fix compilation of DFGRepatch.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=91241
+
+        Reviewed by Geoffrey Garen.
+
+        Use intptr_t instead of uintptr_t when calling CodeLocationCommon::dataLabelPtrAtOffset(int)
+        to fix MSVC "unary minus operator applied to unsigned type, result still unsigned" warning.
+
+        * dfg/DFGRepatch.cpp:
+        (JSC::DFG::dfgResetGetByID):
+        (JSC::DFG::dfgResetPutByID):
+
+2012-07-13  Patrick Gansterer  <paroga@webkit.org>
+
+        Fix ARM_TRADITIONAL JIT for COMPILER(MSVC) and COMPILER(RVCT) after r121885
+        https://bugs.webkit.org/show_bug.cgi?id=91238
+
+        Reviewed by Zoltan Herczeg.
+
+        r121885 changed the assembler instruction only for COMPILER(GCC).
+        Use the same instructions for the other compilers too.
+
+        * jit/JITStubs.cpp:
+        (JSC::ctiTrampoline):
+        (JSC::ctiTrampolineEnd):
+        (JSC::ctiVMThrowTrampoline):
+
+2012-07-12  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG property access stubs should use structure transition watchpoints
+        https://bugs.webkit.org/show_bug.cgi?id=91135
+
+        Reviewed by Geoffrey Garen.
+
+        This adds a Watchpoint subclass that will clear a structure stub (i.e.
+        a property access stub) when fired. The DFG stub generation code now
+        uses this optimization.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * bytecode/CodeBlock.cpp:
+        (JSC):
+        (JSC::CodeBlock::finalizeUnconditionally):
+        (JSC::CodeBlock::resetStub):
+        (JSC::CodeBlock::resetStubInternal):
+        * bytecode/CodeBlock.h:
+        (JSC):
+        (CodeBlock):
+        * bytecode/StructureStubClearingWatchpoint.cpp: Added.
+        (JSC):
+        (JSC::StructureStubClearingWatchpoint::~StructureStubClearingWatchpoint):
+        (JSC::StructureStubClearingWatchpoint::push):
+        (JSC::StructureStubClearingWatchpoint::fireInternal):
+        (JSC::WatchpointsOnStructureStubInfo::~WatchpointsOnStructureStubInfo):
+        (JSC::WatchpointsOnStructureStubInfo::addWatchpoint):
+        (JSC::WatchpointsOnStructureStubInfo::ensureReferenceAndAddWatchpoint):
+        * bytecode/StructureStubClearingWatchpoint.h: Added.
+        (JSC):
+        (StructureStubClearingWatchpoint):
+        (JSC::StructureStubClearingWatchpoint::StructureStubClearingWatchpoint):
+        (WatchpointsOnStructureStubInfo):
+        (JSC::WatchpointsOnStructureStubInfo::WatchpointsOnStructureStubInfo):
+        (JSC::WatchpointsOnStructureStubInfo::codeBlock):
+        (JSC::WatchpointsOnStructureStubInfo::stubInfo):
+        * bytecode/StructureStubInfo.h:
+        (JSC::StructureStubInfo::reset):
+        (JSC::StructureStubInfo::addWatchpoint):
+        (StructureStubInfo):
+        * dfg/DFGRepatch.cpp:
+        (JSC::DFG::addStructureTransitionCheck):
+        (DFG):
+        (JSC::DFG::generateProtoChainAccessStub):
+        (JSC::DFG::emitPutTransitionStub):
+        * jit/JumpReplacementWatchpoint.h:
+
+2012-07-12  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG CFA may get overzealous in loops that have code that must exit
+        https://bugs.webkit.org/show_bug.cgi?id=91188
+
+        Reviewed by Gavin Barraclough.
+
+        Ensure that if the CFA assumes that an operation must exit, then it will always exit
+        no matter what happens after. That's necessary to preserve soundness.
+        
+        Remove a broken fixup done by the DFG simplifier, where it was trying to say that the
+        variable-at-head was the first access in the second block in the merge, if the first
+        block did not read the variable. That's totally wrong, if the first block was in fact
+        doing a phantom read. I removed that fixup and instead hardened the rest of the
+        compiler.
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::endBasicBlock):
+        * dfg/DFGBasicBlock.h:
+        (JSC::DFG::BasicBlock::BasicBlock):
+        (BasicBlock):
+        * dfg/DFGCFAPhase.cpp:
+        (JSC::DFG::CFAPhase::performBlockCFA):
+        * dfg/DFGCFGSimplificationPhase.cpp:
+        (JSC::DFG::CFGSimplificationPhase::mergeBlocks):
+        * dfg/DFGConstantFoldingPhase.cpp:
+        (JSC::DFG::ConstantFoldingPhase::ConstantFoldingPhase):
+        (JSC::DFG::ConstantFoldingPhase::run):
+        (ConstantFoldingPhase):
+        (JSC::DFG::ConstantFoldingPhase::foldConstants):
+        (JSC::DFG::ConstantFoldingPhase::paintUnreachableCode):
+        * dfg/DFGVariableEventStream.cpp:
+        (JSC::DFG::VariableEventStream::reconstruct):
+
+2012-07-12  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        [Qt] Implement MemoryUsageSupport
+        https://bugs.webkit.org/show_bug.cgi?id=91094
+
+        Reviewed by Adam Barth.
+
+        Compile in MemoryStatistics so we can make use of the interface.
+
+        * Target.pri:
+
+2012-07-12  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove dead code after r122392.
+        https://bugs.webkit.org/show_bug.cgi?id=91049
+
+        Reviewed by Filip Pizlo.
+
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::emitCall):
+
+2012-07-11  Adenilson Cavalcanti  <cavalcantii@gmail.com>
+
+        Build fix + remove dead code
+        https://bugs.webkit.org/show_bug.cgi?id=91039
+
+        Reviewed by Filip Pizlo.
+
+        An unused variable was breaking compilation (thanks to warnings being treated as errors).
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::emitCall):
+
+2012-07-11  Mark Rowe  <mrowe@apple.com>
+
+        <http://webkit.org/b/91024> Build against the latest SDK when targeting older OS X versions.
+
+        Reviewed by Dan Bernstein.
+
+        The deployment target is already set to the version that we're targeting, and it's that setting
+        which determines which functionality from the SDK is available to us.
+
+        * Configurations/Base.xcconfig:
+
+2012-07-11  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should have fast virtual calls
+        https://bugs.webkit.org/show_bug.cgi?id=90924
+
+        Reviewed by Gavin Barraclough.
+        
+        Implements virtual call support in the style of the old JIT, with the
+        caveat that we still use the same slow path for both InternalFunction
+        calls and JSFunction calls. Also rationalized the way that our
+        CodeOrigin indices tie into exception checks (previously it was a
+        strange one-to-one mapping with fairly limited assertions; now it's a
+        one-to-many mapping for CodeOrigins to exception checks, respectively).
+        I also took the opportunity to clean up
+        CallLinkInfo::callReturnLocation, which previously was either a Call or
+        a NearCall. Now it's just a NearCall. As well, exceptions during slow
+        path call resolution are now handled by returning an exception throwing
+        thunk rather than returning null. And finally, I made a few things
+        public that were previously private-with-lots-of-friends, because I
+        truly despise the thought of listing each thunk generating function as
+        a friend of JSValue and friends.
+        
+        * bytecode/CallLinkInfo.cpp:
+        (JSC::CallLinkInfo::unlink):
+        * bytecode/CallLinkInfo.h:
+        (CallLinkInfo):
+        * bytecode/CodeOrigin.h:
+        (JSC::CodeOrigin::CodeOrigin):
+        (JSC::CodeOrigin::isSet):
+        * dfg/DFGAssemblyHelpers.h:
+        (JSC::DFG::AssemblyHelpers::AssemblyHelpers):
+        * dfg/DFGCCallHelpers.h:
+        (JSC::DFG::CCallHelpers::CCallHelpers):
+        * dfg/DFGGPRInfo.h:
+        (GPRInfo):
+        * dfg/DFGJITCompiler.cpp:
+        (JSC::DFG::JITCompiler::link):
+        (JSC::DFG::JITCompiler::compileFunction):
+        * dfg/DFGJITCompiler.h:
+        (JSC::DFG::CallBeginToken::CallBeginToken):
+        (JSC::DFG::CallBeginToken::~CallBeginToken):
+        (CallBeginToken):
+        (JSC::DFG::CallBeginToken::set):
+        (JSC::DFG::CallBeginToken::registerWithExceptionCheck):
+        (JSC::DFG::CallBeginToken::codeOrigin):
+        (JSC::DFG::CallExceptionRecord::CallExceptionRecord):
+        (CallExceptionRecord):
+        (JSC::DFG::JITCompiler::currentCodeOriginIndex):
+        (JITCompiler):
+        (JSC::DFG::JITCompiler::beginCall):
+        (JSC::DFG::JITCompiler::notifyCall):
+        (JSC::DFG::JITCompiler::prepareForExceptionCheck):
+        (JSC::DFG::JITCompiler::addExceptionCheck):
+        (JSC::DFG::JITCompiler::addFastExceptionCheck):
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGRepatch.cpp:
+        (JSC::DFG::dfgLinkFor):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::appendCallWithExceptionCheck):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::emitCall):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::emitCall):
+        * dfg/DFGThunks.cpp:
+        (JSC::DFG::emitPointerValidation):
+        (DFG):
+        (JSC::DFG::throwExceptionFromCallSlowPathGenerator):
+        (JSC::DFG::slowPathFor):
+        (JSC::DFG::linkForThunkGenerator):
+        (JSC::DFG::linkCallThunkGenerator):
+        (JSC::DFG::linkConstructThunkGenerator):
+        (JSC::DFG::virtualForThunkGenerator):
+        (JSC::DFG::virtualCallThunkGenerator):
+        (JSC::DFG::virtualConstructThunkGenerator):
+        * dfg/DFGThunks.h:
+        (DFG):
+        * jit/JIT.cpp:
+        (JSC::JIT::privateCompile):
+        (JSC::JIT::linkFor):
+        * runtime/Executable.h:
+        (ExecutableBase):
+        (JSC::ExecutableBase::offsetOfJITCodeFor):
+        (JSC::ExecutableBase::offsetOfNumParametersFor):
+        * runtime/JSValue.h:
+        (JSValue):
+
+2012-07-11  Filip Pizlo  <fpizlo@apple.com>
+
+        Accidentally used the wrong license (3-clause instead of 2-clause) in some
+        files I just committed.
+
+        Rubber stamped by Oliver Hunt.
+
+        * bytecode/Watchpoint.cpp:
+        * bytecode/Watchpoint.h:
+        * jit/JumpReplacementWatchpoint.cpp:
+        * jit/JumpReplacementWatchpoint.h:
+
+2012-07-11  Filip Pizlo  <fpizlo@apple.com>
+
+        Watchpoints and jump replacement should be decoupled
+        https://bugs.webkit.org/show_bug.cgi?id=91016
+
+        Reviewed by Oliver Hunt.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * assembler/AbstractMacroAssembler.h:
+        (JSC):
+        (Label):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::appendWatchpoint):
+        (JSC::CodeBlock::watchpoint):
+        (DFGData):
+        * bytecode/Watchpoint.cpp:
+        (JSC):
+        * bytecode/Watchpoint.h:
+        (JSC::Watchpoint::Watchpoint):
+        (Watchpoint):
+        (JSC::Watchpoint::fire):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::speculationWatchpoint):
+        * jit/JumpReplacementWatchpoint.cpp: Added.
+        (JSC):
+        (JSC::JumpReplacementWatchpoint::correctLabels):
+        (JSC::JumpReplacementWatchpoint::fireInternal):
+        * jit/JumpReplacementWatchpoint.h: Added.
+        (JSC):
+        (JumpReplacementWatchpoint):
+        (JSC::JumpReplacementWatchpoint::JumpReplacementWatchpoint):
+        (JSC::JumpReplacementWatchpoint::setDestination):
+
+2012-07-11  Kevin Ollivier  <kevino@theolliviers.com>
+
+        [wx] Unreviewed build fix. Don't try to build udis86_itab.c since it's included by 
+        another file.
+
+        * wscript:
+
+2012-07-11  Chao-ying Fu  <fu@mips.com>
+
+        Add MIPS convertibleLoadPtr and other functions
+        https://bugs.webkit.org/show_bug.cgi?id=90714
+
+        Reviewed by Oliver Hunt.
+
+        * assembler/MIPSAssembler.h:
+        (JSC::MIPSAssembler::labelIgnoringWatchpoints):
+        (MIPSAssembler):
+        (JSC::MIPSAssembler::replaceWithLoad):
+        (JSC::MIPSAssembler::replaceWithAddressComputation):
+        * assembler/MacroAssemblerMIPS.h:
+        (JSC::MacroAssemblerMIPS::convertibleLoadPtr):
+        (MacroAssemblerMIPS):
+
+2012-07-11  Anders Carlsson  <andersca@apple.com>
+
+        Add -Wtautological-compare and -Wsign-compare warning flags
+        https://bugs.webkit.org/show_bug.cgi?id=90994
+
+        Reviewed by Mark Rowe.
+
+        * Configurations/Base.xcconfig:
+
+2012-07-11  Benjamin Poulain  <bpoulain@apple.com>
+
+        Simplify the copying of JSC ARMv7's LinkRecord
+        https://bugs.webkit.org/show_bug.cgi?id=90930
+
+        Reviewed by Filip Pizlo.
+
+        The class LinkRecord is used by value everywhere in ARMv7Assembler. The compiler uses
+        memmove() to move the objects.
+
+        The problem is memmove() is overkill for this object, moving the value can be done with
+        3 load-store. This patch adds an operator= to the class doing more efficient copying.
+        This reduces the link time by 19%.
+
+        * assembler/ARMv7Assembler.h:
+        (JSC::ARMv7Assembler::LinkRecord::LinkRecord):
+        (JSC::ARMv7Assembler::LinkRecord::operator=):
+        (JSC::ARMv7Assembler::LinkRecord::from):
+        (JSC::ARMv7Assembler::LinkRecord::setFrom):
+        (JSC::ARMv7Assembler::LinkRecord::to):
+        (JSC::ARMv7Assembler::LinkRecord::type):
+        (JSC::ARMv7Assembler::LinkRecord::linkType):
+        (JSC::ARMv7Assembler::LinkRecord::setLinkType):
+        (JSC::ARMv7Assembler::LinkRecord::condition):
+
+2012-07-11  Andy Wingo  <wingo@igalia.com>
+
+        jsc: Parse options before creating global data
+        https://bugs.webkit.org/show_bug.cgi?id=90975
+
+        Reviewed by Filip Pizlo.
+
+        This patch moves the options parsing in "jsc" before the creation
+        of the JSGlobalData, so that --useJIT=no has a chance to take
+        effect.
+
+        * jsc.cpp:
+        (CommandLine::parseArguments): Refactor to be a class, and take
+        argc and argv as constructor arguments.
+        (jscmain): Move arg parsing before JSGlobalData creation.
 
 2012-07-10  Filip Pizlo  <fpizlo@apple.com>
 

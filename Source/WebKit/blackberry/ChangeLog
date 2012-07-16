@@ -1,3 +1,241 @@
+2012-07-13  Xianzhu Wang  <wangxianzhu@chromium.org>
+
+        Move WebCore/platform/text/Base64 to WTF/wtf/text
+        https://bugs.webkit.org/show_bug.cgi?id=91162
+
+        Reviewed by Adam Barth.
+
+        * Api/WebKitTextCodec.cpp:
+        (BlackBerry::WebKit::base64DecodePolicyForWTF):
+        (BlackBerry::WebKit::base64Decode):
+        (BlackBerry::WebKit::base64EncodePolicyForWTF):
+        (BlackBerry::WebKit::base64Encode):
+        * Api/WebSettings.cpp:
+        (BlackBerry::WebKit::WebSettings::setUserStyleSheetString):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+
+2012-07-13  George Staikos  <staikos@webkit.org>
+
+        [BlackBerry] Fix crash due to unguarded use of renderer in select
+        popup.
+        https://bugs.webkit.org/show_bug.cgi?id=91287
+
+        Reviewed by Rob Buis.
+
+        No known testcase for this.  Found in the wild.
+
+        * WebCoreSupport/SelectPopupClient.cpp:
+        (WebCore::SelectPopupClient::setValueAndClosePopup):
+
+2012-07-13  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Add support for attributes to define keyboard and enter key type on the Virtual Keyboard
+        https://bugs.webkit.org/show_bug.cgi?id=91248
+
+        Reviewed by Antonio Gomes.
+
+        PR 174733.
+
+        Add data-blackberry-virtual-keyboard-type and
+        data-blackberry-virtual-keyboard-enter-key to
+        enable configuration of the desired virtual keyboard
+        using element attributes.
+
+        Reviewed Internally by Gen Mak.
+
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::convertStringToKeyboardType):
+        (WebKit):
+        (BlackBerry::WebKit::keyboardTypeAttribute):
+        (BlackBerry::WebKit::convertStringToKeyboardEnterKeyType):
+        (BlackBerry::WebKit::keyboardEnterKeyTypeAttribute):
+        (BlackBerry::WebKit::InputHandler::setElementFocused):
+
+2012-07-13  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] resetBitmapZoomScale called while zooming preventing pinch zoom
+        https://bugs.webkit.org/show_bug.cgi?id=91247
+
+        Reviewed by Antonio Gomes.
+
+        PR: 175432
+        On yahoo.com, the web page stopped zooming while trying to pinch as
+        WebPageClient::resetBitmapZoomScale(double) was being called by
+        WebPagePrivate::zoomToInitialScaleOnLoad() after load finished.
+        And also yahoo.com was keeping updating layout, which made it really
+        bad that zoomToInitialScaleOnLoad() was called many times when load
+        finished and the load type was FrameLoadTypeStandard or FrameLoadTypeSame.
+        As we only care about the situation that dispatchDidFirstVisuallyNonEmptyLayout()
+        happens after load finished, we can move the code to that method and
+        set a flag for WebPage layoutFinished() and zoomToInitialScaleOnLoad()
+        instead. In this way, we can ensure that the flag is only enabled when
+        dispatchDidFirstVisuallyNonEmptyLayout() is called after load finished
+        and get rid of calling zoomToInitialScaleOnLoad() lots of times when
+        keeping updating layout in such kind of situation.
+
+        Internally reviewed by Arvid Nilsson
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::setLoadState):
+        (BlackBerry::WebKit::WebPagePrivate::layoutFinished):
+        * Api/WebPage_p.h:
+        (BlackBerry::WebKit::WebPagePrivate::shouldZoomToInitialScaleOnLoad):
+        (BlackBerry::WebKit::WebPagePrivate::setShouldZoomToInitialScaleAfterLoadFinished):
+        (WebPagePrivate):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidFirstVisuallyNonEmptyLayout):
+
+2012-07-13  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Use fillBuffer() instead of a user-defined background image.
+        https://bugs.webkit.org/show_bug.cgi?id=91180
+        RIM PR 171458
+
+        Reviewed by Rob Buis.
+        Internally reviewed by Andrew Lo.
+
+        By using Platform::Graphics::fillBuffer() to fill the
+        overscroll area, we save graphics memory for the buffer
+        that the background image was occupying.
+
+        Also adapt checkerboard drawing as it is now done using
+        fillBuffer() which replaces checkerBuffer().
+
+        In the same go, use the opportunity of the WebSettings
+        API change to make it more consistent, renaming the
+        OverZoomColor setting to OverScrollColor.
+
+        * Api/BackingStore.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::BackingStorePrivate::paintDefaultBackground):
+        (BlackBerry::WebKit::BackingStorePrivate::blitContents):
+        (BlackBerry::WebKit::BackingStorePrivate::fillWindow):
+        * Api/BackingStore_p.h:
+        (BackingStorePrivate):
+        * Api/WebSettings.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebSettings::standardSettings):
+        (BlackBerry::WebKit::WebSettings::overScrollColor):
+        (BlackBerry::WebKit::WebSettings::setOverScrollColor):
+        (BlackBerry::WebKit::WebSettings::isEnableDefaultOverScrollBackground):
+        (BlackBerry::WebKit::WebSettings::setEnableDefaultOverScrollBackground):
+        * Api/WebSettings.h:
+
+2012-07-13  Joshua Netterfield  <jnetterfield@rim.com>
+
+        [BlackBerry] Update about:* pages
+        https://bugs.webkit.org/show_bug.cgi?id=91121
+
+        Reviewed by Yong Li.
+
+        Update the about:config pages, and improve the aesthetics of the about:build, about:version, about:credits, about:memory, about:config, and similar pages.
+
+        No new tests, because there is no new funtionality.
+
+        * WebCoreSupport/AboutData.cpp:
+        (WebCore):
+        (WebCore::writeFeatures):
+        (WebCore::numberToHTMLTr): Converted to template function, added bool specialization to write "true" and "false" instead of "1" and "0"
+        (WebCore::configPage):
+        (WebCore::memoryPage):
+        * WebCoreSupport/AboutTemplate.html.cpp: Template for BlackBerry about:* pages.
+
+2012-07-12  Benjamin C Meyer  <bmeyer@rim.com>
+
+        WebPage::executeJavaScriptFunction crashes when there is an exception
+        https://bugs.webkit.org/show_bug.cgi?id=91098
+        RIM PR #149294
+
+        When there is an exception currently the code tries to get the string of
+        the exception via JSValueToStringCopy to pass back, but this cases a
+        crash inside JavaScriptCore, so change it to simply return false and not
+        set the return value with the exception string.
+
+        Reviewed by George Staikos.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::executeJavaScriptFunction):
+
+2012-07-12  Pawel Chomicki  <pchomicki@rim.com>
+
+        [BlackBerry] WebPage::touchEvent() should use Platform::TouchEvent's toString() for debugging.
+        https://bugs.webkit.org/show_bug.cgi?id=91002
+
+        Reviewed by Antonio Gomes.
+        Reviewed internally by Genevieve Mak.
+
+        Updated DEBUG_TOUCH_EVENTS section of touchEvent method to utilize
+        Platform::TouchEvent's toString method.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::touchEvent):
+
+2012-07-12  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] Cannot use digest proxy auth and NTLM auth at the same time
+        https://bugs.webkit.org/show_bug.cgi?id=91054
+
+        Reviewed by George Staikos.
+
+        Implemented interface function syncProxyCredential() derived
+        from class PageClientBlackBerry.
+
+        Internally reviewed by Jason Liu <jason.liu@torchmobile.com.cn>
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::syncProxyCredential):
+        (WebKit):
+        * Api/WebPageClient.h:
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+
+2012-07-11  Mike Lattanzio  <mlattanzio@rim.com>
+
+        [BlackBerry] UserViewportArguments are not properly respected.
+        https://bugs.webkit.org/show_bug.cgi?id=91005
+
+        Reviewed by Rob Buis.
+
+        PR# 170088.
+        Move scale and zooming reset on Committed before applying
+        the user viewport to avoid overriding it immediately.
+
+        Internal review by Konrad Piascik, Jacky Jiang.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setLoadState):
+
+2012-07-11  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Implement Date/Time picker
+        https://bugs.webkit.org/show_bug.cgi?id=90911
+
+        Reviewed by Rob Buis.
+
+        Implement HTML Date/Time picker, also should delete popup when closing popup.
+
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::closePagePopup):
+        * WebCoreSupport/DatePickerClient.cpp: Added.
+        (WebCore):
+        (WebCore::DatePickerClient::DatePickerClient):
+        (WebCore::DatePickerClient::~DatePickerClient):
+        (WebCore::DatePickerClient::generateHTML):
+        (WebCore::DatePickerClient::closePopup):
+        (WebCore::DatePickerClient::contentSize):
+        (WebCore::DatePickerClient::htmlSource):
+        (WebCore::DatePickerClient::setValueAndClosePopup):
+        (WebCore::DatePickerClient::didClosePopup):
+        (WebCore::DatePickerClient::writeDocument):
+        * WebCoreSupport/DatePickerClient.h: Added.
+        (WebKit):
+        (WebCore):
+        (DatePickerClient):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::openDatePopup):
+
 2012-07-10  Adam Barth  <abarth@webkit.org>
 
         WebCore::Settings for Hixie76 WebSocket protocol doesn't do anything and should be removed

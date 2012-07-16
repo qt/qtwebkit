@@ -43,28 +43,18 @@
 #include "SharedGraphicsContext3D.h"
 #include "SkBitmap.h"
 #include "SkColor.h"
-#include "TextureManager.h"
 #include "ThrottledTextureUploader.h"
 #include "TraceEvent.h"
 #include "TrackingTextureAllocator.h"
-#include "cc/CCCheckerboardDrawQuad.h"
-#include "cc/CCDebugBorderDrawQuad.h"
-#include "cc/CCIOSurfaceDrawQuad.h"
 #include "cc/CCLayerQuad.h"
 #include "cc/CCMathUtil.h"
 #include "cc/CCProxy.h"
 #include "cc/CCRenderPass.h"
-#include "cc/CCRenderPassDrawQuad.h"
 #include "cc/CCRenderSurfaceFilters.h"
 #include "cc/CCScopedTexture.h"
 #include "cc/CCSettings.h"
 #include "cc/CCSingleThreadProxy.h"
-#include "cc/CCSolidColorDrawQuad.h"
-#include "cc/CCStreamVideoDrawQuad.h"
-#include "cc/CCTextureDrawQuad.h"
-#include "cc/CCTileDrawQuad.h"
 #include "cc/CCVideoLayerImpl.h"
-#include "cc/CCYUVVideoDrawQuad.h"
 #include <public/WebGraphicsContext3D.h>
 #include <public/WebVideoFrame.h>
 #include <wtf/CurrentTime.h>
@@ -218,8 +208,6 @@ bool LayerRendererChromium::initialize()
     m_capabilities.usingGpuMemoryManager = extensions.contains("GL_CHROMIUM_gpu_memory_manager");
     if (m_capabilities.usingGpuMemoryManager)
         m_context->setMemoryAllocationChangedCallbackCHROMIUM(this);
-    else
-        m_client->setMemoryAllocationLimitBytes(TextureManager::highLimitBytes(viewportSize()));
 
     m_capabilities.usingDiscardFramebuffer = extensions.contains("GL_CHROMIUM_discard_framebuffer");
 
@@ -327,7 +315,7 @@ void LayerRendererChromium::decideRenderPassAllocationsForFrame(const CCRenderPa
 {
     HashMap<int, const CCRenderPass*> passesInFrame;
     for (size_t i = 0; i < renderPassesInDrawOrder.size(); ++i)
-        passesInFrame.set(renderPassesInDrawOrder[i]->id(), renderPassesInDrawOrder[i].get());
+        passesInFrame.set(renderPassesInDrawOrder[i]->id(), renderPassesInDrawOrder[i]);
 
     Vector<int> passesToDelete;
     HashMap<int, OwnPtr<CCScopedTexture> >::const_iterator passIterator;
@@ -414,7 +402,7 @@ void LayerRendererChromium::drawRenderPass(const CCRenderPass* renderPass, const
         drawQuad(it->get());
 }
 
-void LayerRendererChromium::drawQuad(const CCDrawQuad* quad)
+void LayerRendererChromium::drawQuad(const WebKit::WebCompositorQuad* quad)
 {
     IntRect scissorRect = quad->scissorRect();
 
@@ -430,35 +418,35 @@ void LayerRendererChromium::drawQuad(const CCDrawQuad* quad)
         GLC(m_context, m_context->disable(GraphicsContext3D::BLEND));
 
     switch (quad->material()) {
-    case CCDrawQuad::Invalid:
+    case WebKit::WebCompositorQuad::Invalid:
         ASSERT_NOT_REACHED();
         break;
-    case CCDrawQuad::Checkerboard:
-        drawCheckerboardQuad(quad->toCheckerboardDrawQuad());
+    case WebKit::WebCompositorQuad::Checkerboard:
+        drawCheckerboardQuad(CCCheckerboardDrawQuad::materialCast(quad));
         break;
-    case CCDrawQuad::DebugBorder:
-        drawDebugBorderQuad(quad->toDebugBorderDrawQuad());
+    case WebKit::WebCompositorQuad::DebugBorder:
+        drawDebugBorderQuad(CCDebugBorderDrawQuad::materialCast(quad));
         break;
-    case CCDrawQuad::IOSurfaceContent:
-        drawIOSurfaceQuad(quad->toIOSurfaceDrawQuad());
+    case WebKit::WebCompositorQuad::IOSurfaceContent:
+        drawIOSurfaceQuad(CCIOSurfaceDrawQuad::materialCast(quad));
         break;
-    case CCDrawQuad::RenderPass:
-        drawRenderPassQuad(quad->toRenderPassDrawQuad());
+    case WebKit::WebCompositorQuad::RenderPass:
+        drawRenderPassQuad(CCRenderPassDrawQuad::materialCast(quad));
         break;
-    case CCDrawQuad::SolidColor:
-        drawSolidColorQuad(quad->toSolidColorDrawQuad());
+    case WebKit::WebCompositorQuad::SolidColor:
+        drawSolidColorQuad(WebKit::WebCompositorSolidColorQuad::materialCast(quad));
         break;
-    case CCDrawQuad::StreamVideoContent:
-        drawStreamVideoQuad(quad->toStreamVideoDrawQuad());
+    case WebKit::WebCompositorQuad::StreamVideoContent:
+        drawStreamVideoQuad(CCStreamVideoDrawQuad::materialCast(quad));
         break;
-    case CCDrawQuad::TextureContent:
-        drawTextureQuad(quad->toTextureDrawQuad());
+    case WebKit::WebCompositorQuad::TextureContent:
+        drawTextureQuad(WebKit::WebCompositorTextureQuad::materialCast(quad));
         break;
-    case CCDrawQuad::TiledContent:
-        drawTileQuad(quad->toTileDrawQuad());
+    case WebKit::WebCompositorQuad::TiledContent:
+        drawTileQuad(CCTileDrawQuad::materialCast(quad));
         break;
-    case CCDrawQuad::YUVVideoContent:
-        drawYUVVideoQuad(quad->toYUVVideoDrawQuad());
+    case WebKit::WebCompositorQuad::YUVVideoContent:
+        drawYUVVideoQuad(CCYUVVideoDrawQuad::materialCast(quad));
         break;
     }
 }
@@ -610,7 +598,7 @@ void LayerRendererChromium::drawRenderPassQuad(const CCRenderPassDrawQuad* quad)
     if (!contentsTexture || !contentsTexture->id())
         return;
 
-    WebTransformationMatrix renderTransform = quad->layerTransform();
+    WebTransformationMatrix renderTransform = quad->drawTransform();
     // Apply a scaling factor to size the quad from 1x1 to its intended size.
     renderTransform.scale3d(quad->quadRect().width(), quad->quadRect().height(), 1);
     WebTransformationMatrix contentsDeviceTransform = WebTransformationMatrix(windowMatrix() * projectionMatrix() * renderTransform).to2dTransform();
@@ -633,7 +621,7 @@ void LayerRendererChromium::drawRenderPassQuad(const CCRenderPassDrawQuad* quad)
     // Draw the background texture if there is one.
     if (backgroundTexture) {
         ASSERT(backgroundTexture->size() == quad->quadRect().size());
-        copyTextureToFramebuffer(backgroundTexture->id(), quad->quadRect().size(), quad->layerTransform());
+        copyTextureToFramebuffer(backgroundTexture->id(), quad->quadRect().size(), quad->drawTransform());
     }
 
     bool clipped = false;
@@ -711,11 +699,11 @@ void LayerRendererChromium::drawRenderPassQuad(const CCRenderPassDrawQuad* quad)
         GLC(context(), context()->uniform3fv(shaderEdgeLocation, 8, edge));
     }
 
-    // Map device space quad to surface space. contentsDeviceTransform has no perspective since it was generated with to2dTransform() so we don't need to project.
+    // Map device space quad to surface space. contentsDeviceTransform has no 3d component since it was generated with to2dTransform() so we don't need to project.
     FloatQuad surfaceQuad = CCMathUtil::mapQuad(contentsDeviceTransform.inverse(), deviceLayerEdges.floatQuad(), clipped);
     ASSERT(!clipped);
 
-    drawTexturedQuad(quad->layerTransform(), quad->quadRect().width(), quad->quadRect().height(), quad->opacity(), surfaceQuad,
+    drawTexturedQuad(quad->drawTransform(), quad->quadRect().width(), quad->quadRect().height(), quad->opacity(), surfaceQuad,
                      shaderMatrixLocation, shaderAlphaLocation, shaderQuadLocation);
 }
 
@@ -807,7 +795,7 @@ void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
         return;
 
     bool clipped = false;
-    FloatQuad deviceLayerQuad = CCMathUtil::mapQuad(deviceTransform, FloatQuad(quad->layerRect()), clipped);
+    FloatQuad deviceLayerQuad = CCMathUtil::mapQuad(deviceTransform, FloatQuad(quad->visibleContentRect()), clipped);
     ASSERT(!clipped);
 
     TileProgramUniforms uniforms;
@@ -891,10 +879,12 @@ void LayerRendererChromium::drawTileQuad(const CCTileDrawQuad* quad)
         // Create device space quad.
         CCLayerQuad deviceQuad(leftEdge, topEdge, rightEdge, bottomEdge);
 
-        // Map quad to layer space.
+        // Map device space quad to local space. contentsDeviceTransform has no 3d component since it was generated with to2dTransform() so we don't need to project.
         WebTransformationMatrix inverseDeviceTransform = deviceTransform.inverse();
         localQuad = CCMathUtil::mapQuad(inverseDeviceTransform, deviceQuad.floatQuad(), clipped);
-        ASSERT(!clipped);
+
+        // We should not ASSERT(!clipped) here, because anti-aliasing inflation may cause deviceQuad to become
+        // clipped.  To our knowledge this scenario does not need to be handled differently than the unclipped case.
     } else {
         // Move fragment shader transform to vertex shader. We can do this while
         // still producing correct results as fragmentTexTransformLocation
@@ -968,11 +958,12 @@ void LayerRendererChromium::drawYUVVideoQuad(const CCYUVVideoDrawQuad* quad)
     };
     GLC(context(), context()->uniform3fv(program->fragmentShader().yuvAdjLocation(), 1, yuvAdjust));
 
-    const IntSize& bounds = quad->quadRect().size();
-    drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), FloatQuad(),
-                                    program->vertexShader().matrixLocation(),
-                                    program->fragmentShader().alphaLocation(),
-                                    -1);
+    WebTransformationMatrix quadTransform = quad->quadTransform();
+    IntRect quadRect = quad->quadRect();
+    quadTransform.translate(quadRect.x() + quadRect.width() / 2.0, quadRect.y() + quadRect.height() / 2.0);
+
+    drawTexturedQuad(quadTransform, quadRect.width(), quadRect.height(), quad->opacity(), FloatQuad(),
+                     program->vertexShader().matrixLocation(), program->fragmentShader().alphaLocation(), -1);
 
     // Reset active texture back to texture 0.
     GLC(context(), context()->activeTexture(GraphicsContext3D::TEXTURE0));
@@ -995,11 +986,12 @@ void LayerRendererChromium::drawStreamVideoQuad(const CCStreamVideoDrawQuad* qua
 
     GLC(context(), context()->uniform1i(program->fragmentShader().samplerLocation(), 0));
 
-    const IntSize& bounds = quad->quadRect().size();
-    drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), sharedGeometryQuad(),
-                     program->vertexShader().matrixLocation(),
-                     program->fragmentShader().alphaLocation(),
-                     -1);
+    WebTransformationMatrix quadTransform = quad->quadTransform();
+    IntRect quadRect = quad->quadRect();
+    quadTransform.translate(quadRect.x() + quadRect.width() / 2.0, quadRect.y() + quadRect.height() / 2.0);
+
+    drawTexturedQuad(quadTransform, quadRect.width(), quadRect.height(), quad->opacity(), sharedGeometryQuad(),
+                     program->vertexShader().matrixLocation(), program->fragmentShader().alphaLocation(), -1);
 }
 
 struct TextureProgramBinding {
@@ -1092,9 +1084,11 @@ void LayerRendererChromium::drawIOSurfaceQuad(const CCIOSurfaceDrawQuad* quad)
     GLC(context(), context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE));
     GLC(context(), context()->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE));
 
-    const IntSize& bounds = quad->quadRect().size();
+    WebTransformationMatrix quadTransform = quad->quadTransform();
+    IntRect quadRect = quad->quadRect();
+    quadTransform.translate(quadRect.x() + quadRect.width() / 2.0, quadRect.y() + quadRect.height() / 2.0);
 
-    drawTexturedQuad(quad->layerTransform(), bounds.width(), bounds.height(), quad->opacity(), sharedGeometryQuad(), binding.matrixLocation, binding.alphaLocation, -1);
+    drawTexturedQuad(quadTransform, quadRect.width(), quadRect.height(), quad->opacity(), sharedGeometryQuad(), binding.matrixLocation, binding.alphaLocation, -1);
 
     GLC(context(), context()->bindTexture(Extensions3D::TEXTURE_RECTANGLE_ARB, 0));
 }

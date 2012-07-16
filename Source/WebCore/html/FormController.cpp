@@ -29,6 +29,14 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
+static inline HTMLFormElement* ownerFormForState(const HTMLFormControlElementWithState& control)
+{
+    // Assume controls with form attribute have no owners because we restore
+    // state during parsing and form owners of such controls might be
+    // indeterminate.
+    return control.fastHasAttribute(formAttr) ? 0 : control.form();
+}
+
 // ----------------------------------------------------------------------------
 
 // Serilized form of FormControlState:
@@ -103,10 +111,7 @@ static inline AtomicString createKey(HTMLFormElement* form, unsigned index)
 
 AtomicString FormKeyGenerator::formKey(const HTMLFormControlElementWithState& control)
 {
-    // Assume contorl with form attribute have no owners because we restores
-    // state during parsing and form owners of such controls might be
-    // indeterminate.
-    HTMLFormElement* form = control.fastHasAttribute(formAttr) ? 0 : control.form();
+    HTMLFormElement* form = ownerFormForState(control);
     if (!form) {
         DEFINE_STATIC_LOCAL(AtomicString, formKeyForNoOwner, ("No owner"));
         return formKeyForNoOwner;
@@ -172,6 +177,9 @@ Vector<String> FormController::formElementsState() const
         stateVector.append(keyGenerator->formKey(*elementWithState).string());
         elementWithState->saveFormControlState().serializeTo(stateVector);
     }
+    bool hasOnlySignature = stateVector.size() == 1;
+    if (hasOnlySignature)
+        stateVector.clear();
     return stateVector;
 }
 
@@ -237,23 +245,35 @@ void FormController::willDeleteForm(HTMLFormElement* form)
         m_formKeyGenerator->willDeleteForm(form);
 }
 
-void FormController::registerFormElementWithFormAttribute(FormAssociatedElement* element)
+void FormController::restoreControlStateFor(HTMLFormControlElementWithState& control)
 {
-    ASSERT(toHTMLElement(element)->fastHasAttribute(formAttr));
-    m_formElementsWithFormAttribute.add(element);
+    // We don't save state of a control with shouldSaveAndRestoreFormControlState()
+    // == false. But we need to skip restoring process too because a control in
+    // another form might have the same pair of name and type and saved its state.
+    if (!control.shouldSaveAndRestoreFormControlState())
+        return;
+    if (ownerFormForState(control))
+        return;
+    FormControlState state = takeStateForFormElement(control);
+    if (state.valueSize() > 0)
+        control.restoreFormControlState(state);
 }
 
-void FormController::unregisterFormElementWithFormAttribute(FormAssociatedElement* element)
+void FormController::restoreControlStateIn(HTMLFormElement& form)
 {
-    m_formElementsWithFormAttribute.remove(element);
-}
-
-void FormController::resetFormElementsOwner()
-{
-    typedef FormAssociatedElementListHashSet::iterator Iterator;
-    Iterator end = m_formElementsWithFormAttribute.end();
-    for (Iterator it = m_formElementsWithFormAttribute.begin(); it != end; ++it)
-        (*it)->resetFormOwner();
+    const Vector<FormAssociatedElement*>& elements = form.associatedElements();
+    for (size_t i = 0; i < elements.size(); ++i) {
+        if (!elements[i]->isFormControlElementWithState())
+            continue;
+        HTMLFormControlElementWithState* control = static_cast<HTMLFormControlElementWithState*>(elements[i]);
+        if (!control->shouldSaveAndRestoreFormControlState())
+            continue;
+        if (ownerFormForState(*control) != &form)
+            continue;
+        FormControlState state = takeStateForFormElement(*control);
+        if (state.valueSize() > 0)
+            control->restoreFormControlState(state);
+    }
 }
 
 FormElementKey::FormElementKey(AtomicStringImpl* name, AtomicStringImpl* type, AtomicStringImpl* formKey)

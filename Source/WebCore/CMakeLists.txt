@@ -5,6 +5,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/indexeddb"
     "${WEBCORE_DIR}/Modules/intents"
     "${WEBCORE_DIR}/Modules/notifications"
+    "${WEBCORE_DIR}/Modules/protocolhandler"
     "${WEBCORE_DIR}/Modules/quota"
     "${WEBCORE_DIR}/Modules/webaudio"
     "${WEBCORE_DIR}/Modules/webdatabase"
@@ -126,6 +127,8 @@ SET(WebCore_IDL_FILES
     Modules/geolocation/PositionCallback.idl
     Modules/geolocation/PositionError.idl
     Modules/geolocation/PositionErrorCallback.idl
+
+    Modules/protocolhandler/NavigatorRegisterProtocolHandler.idl
 
     Modules/webaudio/AudioBuffer.idl
     Modules/webaudio/AudioBufferCallback.idl
@@ -393,7 +396,6 @@ SET(WebCore_IDL_FILES
     page/Location.idl
     page/MemoryInfo.idl
     page/Navigator.idl
-    page/NavigatorRegisterProtocolHandler.idl
     page/Performance.idl
     page/PerformanceEntry.idl
     page/PerformanceEntryList.idl
@@ -434,6 +436,8 @@ SET(WebCore_SOURCES
     Modules/geolocation/Geolocation.cpp
     Modules/geolocation/GeolocationController.cpp
     Modules/geolocation/NavigatorGeolocation.cpp
+
+    Modules/protocolhandler/NavigatorRegisterProtocolHandler.cpp
 
     accessibility/AXObjectCache.cpp
     accessibility/AccessibilityARIAGrid.cpp
@@ -606,6 +610,8 @@ SET(WebCore_SOURCES
     dom/ExceptionCodePlaceholder.cpp
     dom/GenericEventQueue.cpp
     dom/IconURL.cpp
+    dom/IdTargetObserver.cpp
+    dom/IdTargetObserverRegistry.cpp
     dom/KeyboardEvent.cpp
     dom/MessageChannel.cpp
     dom/MessageEvent.cpp
@@ -670,6 +676,7 @@ SET(WebCore_SOURCES
     dom/ViewportArguments.cpp
     dom/WebKitAnimationEvent.cpp
     dom/WebKitNamedFlow.cpp
+    dom/WebKitNamedFlowCollection.cpp
     dom/WebKitTransitionEvent.cpp
     dom/WheelEvent.cpp
     dom/WindowEventContext.cpp
@@ -1082,7 +1089,6 @@ SET(WebCore_SOURCES
     page/MouseEventWithHitTestResults.cpp
     page/Navigator.cpp
     page/NavigatorBase.cpp
-    page/NavigatorRegisterProtocolHandler.cpp
     page/OriginAccessEntry.cpp
     page/Page.cpp
     page/PageGroup.cpp
@@ -1242,6 +1248,7 @@ SET(WebCore_SOURCES
     platform/graphics/filters/SourceGraphic.cpp
 
     platform/graphics/filters/arm/NEONHelpers.h
+    platform/graphics/filters/arm/FEBlendNEON.h
     platform/graphics/filters/arm/FECompositeArithmeticNEON.h
     platform/graphics/filters/arm/FEGaussianBlurNEON.h
     platform/graphics/filters/arm/FELightingNEON.cpp
@@ -1297,7 +1304,6 @@ SET(WebCore_SOURCES
     platform/sql/SQLiteStatement.cpp
     platform/sql/SQLiteTransaction.cpp
 
-    platform/text/Base64.cpp
     platform/text/BidiContext.cpp
     platform/text/DateTimeFormat.cpp
     platform/text/Hyphenation.cpp

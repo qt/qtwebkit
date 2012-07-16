@@ -40,18 +40,16 @@ public:
 
     virtual ~HTMLFormCollection();
 
-    virtual Node* item(unsigned index) const;
     virtual Node* namedItem(const AtomicString& name) const;
 
 private:
     HTMLFormCollection(Element*);
 
     virtual void updateNameCache() const;
-    virtual unsigned calcLength() const;
 
     const Vector<FormAssociatedElement*>& formControlElements() const;
     const Vector<HTMLImageElement*>& formImageElements() const;
-    unsigned numberOfFormControlElements() const;
+    virtual Element* itemAfter(unsigned& offsetInArray, Element*) const OVERRIDE;
 };
 
 } //namespace

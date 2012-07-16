@@ -432,6 +432,7 @@ SOURCES += \
     Modules/notifications/NotificationCenter.cpp \
     Modules/notifications/NotificationController.cpp \
     Modules/notifications/WorkerContextNotifications.cpp \
+    Modules/protocolhandler/NavigatorRegisterProtocolHandler.cpp \
     css/CSSAspectRatioValue.cpp \
     css/CSSBorderImageSliceValue.cpp \
     css/CSSBorderImage.cpp \
@@ -572,6 +573,8 @@ SOURCES += \
     dom/ExceptionCodePlaceholder.cpp \
     dom/GenericEventQueue.cpp \
     dom/IconURL.cpp \
+    dom/IdTargetObserver.cpp \
+    dom/IdTargetObserverRegistry.cpp \
     dom/KeyboardEvent.cpp \
     dom/MessageChannel.cpp \
     dom/MessageEvent.cpp \
@@ -637,6 +640,7 @@ SOURCES += \
     dom/ViewportArguments.cpp \
     dom/WebKitAnimationEvent.cpp \
     dom/WebKitNamedFlow.cpp \
+    dom/WebKitNamedFlowCollection.cpp \
     dom/WebKitTransitionEvent.cpp \
     dom/WheelEvent.cpp \
     dom/WindowEventContext.cpp \
@@ -1041,7 +1045,6 @@ SOURCES += \
     page/MouseEventWithHitTestResults.cpp \
     page/Navigator.cpp \
     page/NavigatorBase.cpp \
-    page/NavigatorRegisterProtocolHandler.cpp \
     page/OriginAccessEntry.cpp \
     page/Page.cpp \
     page/PageGroup.cpp \
@@ -1075,7 +1078,6 @@ SOURCES += \
     platform/animation/Animation.cpp \
     platform/animation/AnimationList.cpp \
     platform/Arena.cpp \
-    platform/text/Base64.cpp \
     platform/text/BidiContext.cpp \
     platform/text/DateTimeFormat.cpp \
     platform/text/Hyphenation.cpp \
@@ -1119,6 +1121,8 @@ SOURCES += \
     platform/graphics/Gradient.cpp \
     platform/graphics/GraphicsContext.cpp \
     platform/graphics/GraphicsLayer.cpp \
+    platform/graphics/GraphicsLayerAnimation.cpp \
+    platform/graphics/GraphicsLayerTransform.cpp \
     platform/graphics/GraphicsTypes.cpp \
     platform/graphics/Image.cpp \
     platform/graphics/ImageBuffer.cpp \
@@ -1167,7 +1171,7 @@ SOURCES += \
     platform/LinkHash.cpp \
     platform/Logging.cpp \
     platform/MemoryPressureHandler.cpp \
-    platform/MemoryUsageSupport.cpp \
+    platform/qt/MemoryUsageSupportQt.cpp \
     platform/MIMETypeRegistry.cpp \
     platform/mock/DeviceMotionClientMock.cpp \
     platform/mock/DeviceOrientationClientMock.cpp \
@@ -1757,6 +1761,8 @@ HEADERS += \
     dom/ExceptionBase.h \
     dom/ExceptionCode.h \
     dom/FragmentScriptingPermission.h \
+    dom/IdTargetObserver.h \
+    dom/IdTargetObserverRegistry.h \
     dom/KeyboardEvent.h \
     dom/MemoryInstrumentation.h \
     dom/MessageChannel.h \
@@ -1818,6 +1824,7 @@ HEADERS += \
     dom/ViewportArguments.h \
     dom/WebKitAnimationEvent.h \
     dom/WebKitNamedFlow.h \
+    dom/WebKitNamedFlowCollection.h \
     dom/WebKitTransitionEvent.h \
     dom/WheelEvent.h \
     editing/AlternativeTextController.h \
@@ -2274,6 +2281,7 @@ HEADERS += \
     platform/graphics/filters/SourceAlpha.h \
     platform/graphics/filters/SourceGraphic.h \
     platform/graphics/filters/arm/NEONHelpers.h \
+    platform/graphics/filters/arm/FEBlendNEON.h \
     platform/graphics/filters/arm/FECompositeArithmeticNEON.h \
     platform/graphics/filters/arm/FEGaussianBlurNEON.h \
     platform/graphics/filters/arm/FELightingNEON.h \
@@ -2294,7 +2302,9 @@ HEADERS += \
     platform/graphics/Gradient.h \
     platform/graphics/GraphicsContext.h \
     platform/graphics/GraphicsLayer.h \
+    platform/graphics/GraphicsLayerAnimation.h \
     platform/graphics/GraphicsLayerClient.h \
+    platform/graphics/GraphicsLayerTransform.h \
     platform/graphics/GraphicsTypes.h \
     platform/graphics/GraphicsTypes3D.h \
     platform/graphics/Image.h \
@@ -2318,9 +2328,7 @@ HEADERS += \
     platform/graphics/SimpleFontData.h \
     platform/graphics/surfaces/GraphicsSurface.h \
     platform/graphics/texmap/GraphicsLayerTextureMapper.h \
-    platform/graphics/texmap/LayerTransform.h \
     platform/graphics/texmap/TextureMapper.h \
-    platform/graphics/texmap/TextureMapperAnimation.h \
     platform/graphics/texmap/TextureMapperBackingStore.h \
     platform/graphics/texmap/TextureMapperImageBuffer.h \
     platform/graphics/texmap/TextureMapperLayer.h \
@@ -2425,7 +2433,6 @@ HEADERS += \
     platform/sql/SQLiteStatement.h \
     platform/sql/SQLiteTransaction.h \
     platform/sql/SQLValue.h \
-    platform/text/Base64.h \
     platform/text/BidiContext.h \
     platform/text/DateTimeFormat.h \
     platform/text/DecodeEscapeSequences.h \
@@ -2936,9 +2943,7 @@ SOURCES += \
     platform/graphics/qt/PatternQt.cpp \
     platform/graphics/qt/StillImageQt.cpp \
     platform/graphics/texmap/GraphicsLayerTextureMapper.cpp \
-    platform/graphics/texmap/LayerTransform.cpp \
     platform/graphics/texmap/TextureMapper.cpp \
-    platform/graphics/texmap/TextureMapperAnimation.cpp \
     platform/graphics/texmap/TextureMapperBackingStore.cpp \
     platform/graphics/texmap/TextureMapperImageBuffer.cpp \
     platform/graphics/texmap/TextureMapperLayer.cpp \
@@ -4178,6 +4183,9 @@ contains(DEFINES, WTF_USE_GRAPHICS_SURFACE=1) {
     mac {
         SOURCES += platform/graphics/surfaces/mac/GraphicsSurfaceMac.cpp
         INCLUDEPATH += /System/Library/Frameworks/CoreFoundation.framework/Headers
+    }
+    contains(DEFINES, HAVE_XCOMPOSITE=1)  {
+        SOURCES += platform/graphics/surfaces/qt/GraphicsSurfaceGLX.cpp
     }
 }
 

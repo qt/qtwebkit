@@ -35,6 +35,7 @@ import optparse
 import os
 import signal
 import sys
+import traceback
 
 from webkitpy.common.host import Host
 from webkitpy.common.system import stack_utils
@@ -131,6 +132,7 @@ def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdo
     except Exception:
         exception_type, exception_value, exception_traceback = sys.exc_info()
         if exception_type not in (KeyboardInterrupt, TestRunInterruptedException, WorkerException):
+            print >> sys.stderr, '\n%s raised: %s' % (exception_type.__name__, exception_value)
             stack_utils.log_traceback(_log.error, exception_traceback)
         raise
     finally:
@@ -252,6 +254,11 @@ def parse_args(args=None):
             help="Use per-tile painting of composited pages"),
         optparse.make_option("--adb-args", type="string",
             help="Arguments parsed to Android adb, to select device, etc."),
+    ]))
+
+    option_group_definitions.append(("EFL-specific Options", [
+        optparse.make_option("--webprocess-cmd-prefix", type="string",
+            default=False, help="Prefix used when spawning the Web process (Debug mode only)"),
     ]))
 
     option_group_definitions.append(("WebKit Options", [
@@ -464,6 +471,10 @@ def main(argv=None):
         # FIXME: is this the best way to handle unsupported port names?
         print >> sys.stderr, str(e)
         return EXCEPTIONAL_EXIT_STATUS
+    except Exception, e:
+        print >> sys.stderr, '\n%s raised: %s' % (e.__class__.__name__, str(e))
+        traceback.print_exc(file=sys.stderr)
+        raise
 
     logging.getLogger().setLevel(logging.DEBUG if options.verbose else logging.INFO)
     return run(port, options, args)
@@ -472,7 +483,7 @@ def main(argv=None):
 if '__main__' == __name__:
     try:
         sys.exit(main())
-    except Exception, e:
+    except BaseException, e:
         if e.__class__ in (KeyboardInterrupt, TestRunInterruptedException):
             sys.exit(INTERRUPTED_EXIT_STATUS)
         sys.exit(EXCEPTIONAL_EXIT_STATUS)

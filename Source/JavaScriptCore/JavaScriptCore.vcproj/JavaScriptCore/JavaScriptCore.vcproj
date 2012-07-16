@@ -1682,6 +1682,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\bytecode\StructureStubClearingWatchpoint.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\StructureStubClearingWatchpoint.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\StructureStubInfo.cpp"
 				>
 			</File>
@@ -1939,6 +1947,14 @@
 			</File>
 			<File
 				RelativePath="..\..\jit\JITStubs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\JumpReplacementWatchpoint.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\JumpReplacementWatchpoint.h"
 				>
 			</File>
 			<File

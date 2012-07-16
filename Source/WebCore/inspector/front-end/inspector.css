@@ -264,26 +264,62 @@ body.detached.platform-mac-snowleopard #toolbar-dropdown {
 }
 
 #search {
-    width: 205px;
-    margin-left: 4px;
-    margin-right: 4px;
-    font-size: 11px;
+    -webkit-appearance: none;
+    border: 0;
+    padding: 0 2px;
+    margin: 0;
+    width: 165px;
+}
+
+#search:focus {
+    outline: none;
+}
+
+.toolbar-search-navigation-controls {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 18px;
+    background-image: -webkit-linear-gradient(rgb(228, 228, 228), rgb(204, 204, 204) 75%, rgb(206, 206, 206));
 }
 
 .toolbar-search-navigation {
-    width: 16px;
-    height: 16px;
-    position: relative;
-    top: 4px;
-    margin: 0px 1px;
-    background-repeat: no-repeat;
     display: inline-block;
-    background-position: 2px 5px;
-    border: 1px solid transparent;
+    width: 18px;
+    height: 18px;
+    background-repeat: no-repeat;
+    background-position: 4px 7px;
+    border-left: 1px solid rgb(170, 170, 170);
+    opacity: 0.3;
 }
 
-.toolbar-search-navigation:hover {
-    border: 1px solid rgba(120, 120, 120, 0.6);    
+.toolbar-search-navigation.enabled:hover {
+    border-left: 1px solid rgb(190, 190, 190);
+    opacity: 0.9;
+}
+
+.toolbar-search-navigation.enabled, .toolbar-search-navigation.enabled:active {
+    border-left: 1px solid rgb(170, 170, 170);
+    opacity: 0.7;
+}
+
+#search:focus {
+    outline: none;
+}
+
+.toolbar-search {
+    line-height: 19px;
+}
+
+.toolbar-search-control {
+    display: inline-block;
+    position: relative;
+    background-color: white;
+    border: 1px solid rgb(202, 202, 202);
+    margin: 1px 2px;
+    height: 20px;
+    border-radius: 2px;
+    padding-right: 36px;
 }
 
 .toolbar-search-navigation.toolbar-search-navigation-prev {
@@ -294,18 +330,18 @@ body.detached.platform-mac-snowleopard #toolbar-dropdown {
     background-image: url(Images/searchNext.png);
 }
 
-.toolbar-search-navigation-hidden {
-    background: none;
-}
-
 body.compact #search {
     font-size: 11px;
 }
 
 .search-results-matches {
+    display: inline-block;
+    min-width: 70px;
+    min-height: 10px;
+    text-align: right;
     font-size: 11px;
-    text-shadow: rgba(255, 255, 255, 0.5) 0 1px 0;
-    padding-left: 4px;
+    padding: 0 4px;
+    color: rgb(165, 165, 165);
 }
 
 .toolbar-item.elements .toolbar-icon {
@@ -443,10 +479,15 @@ body.compact #main {
 
 body.drawer-visible #main-status-bar {
     height: 24px;
-    background-image: url(Images/statusbarResizerVertical.png), url(Images/statusbarBackground.png);
-    background-repeat: no-repeat, repeat-x;
-    background-position: right center, center;
+    border-bottom: 1px solid rgb(202, 202, 202);
     cursor: ns-resize;
+}
+
+body.drawer-visible #main-status-bar::after {
+    position: absolute;
+    right: 0;
+    top: 5px;
+    content: url(Images/statusbarResizerVertical.png);
 }
 
 body.drawer-visible #main-status-bar * {
@@ -458,18 +499,18 @@ body.drawer-visible #main-panels {
 }
 
 .status-bar {
-    background-color: rgb(235, 235, 235);
-    background-image: url(Images/statusbarBackground.png);
-    background-repeat: repeat-x;
     white-space: nowrap;
     height: 23px;
     overflow: hidden;
     z-index: 12;
+    background-image: -webkit-linear-gradient(rgb(253,253,253), rgb(230,230,230) 75%, rgb(230,230,230));
+    border-top: 1px solid rgb(202, 202, 202);
 }
 
 .status-bar > div {
     display: inline-block;
     vertical-align: top;
+    overflow: visible;
 }
 
 .status-bar-item {
@@ -490,7 +531,7 @@ body.drawer-visible #main-panels {
 
 .glyph {
     position: absolute;
-    top: 0;
+    top: -1px;
     left: 0;
     right: 0;
     bottom: 0;
@@ -520,12 +561,15 @@ body.drawer-visible #main-panels {
 button.status-bar-item {
     position: relative;
     width: 32px;
-    background-image: url(Images/statusbarButtons.png);
-    background-position: 0 0;
+    border-left: 1px solid rgb(202, 202, 202);
+    border-right: 1px solid rgb(202, 202, 202);
 }
 
-button.status-bar-item:active, button.status-bar-item.emulate-active {
-    background-position: 32px 0 !important;
+.status-bar select.status-bar-item:active,
+.status-bar button.status-bar-item:active {
+    background-color: rgb(163,163,163);
+    border-left: 1px solid rgb(120, 120, 120);
+    border-right: 1px solid rgb(120, 120, 120);
 }
 
 button.status-bar-item .glyph.shadow {
@@ -546,21 +590,33 @@ button.status-bar-item.extension {
     background-color: auto;
 }
 
+.status-bar-select-container {
+    display: inline-block;
+    background-image: url(Images/disclosureTriangleSmallDown.png);
+    background-repeat: no-repeat;
+    background-position-x: right;
+    background-position-y: 6px;
+    padding-right: 10px;
+    border-right: 5px solid transparent;
+}
+
 select.status-bar-item {
     min-width: 48px;
-    border-width: 0 17px 0 2px;
-    padding: 0 2px 0 6px;
     font-weight: bold;
     color: rgb(48, 48, 48);
     text-shadow: rgba(255, 255, 255, 0.75) 0 1px 0;
-    -webkit-border-image: url(Images/statusbarMenuButton.png) 0 17 0 2;
-    -webkit-border-radius: 0;
     -webkit-appearance: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0 15px 0 5px;
+    margin-right: -15px;
+    position: relative;
+    top: -1px;
 }
 
-select.status-bar-item:active {
-    color: black;
-    -webkit-border-image: url(Images/statusbarMenuButtonSelected.png) 0 17 0 2;
+select.status-bar-item, select.status-bar-item:hover {
+    border-left: 1px solid rgb(202, 202, 202);
+    border-right: 1px solid rgb(202, 202, 202);
 }
 
 .status-bar-item > .glyph {
@@ -586,16 +642,28 @@ button.settings-status-bar-item {
     right: 0;
 }
 
+body.detached .alternate-status-bar-buttons-bar {
+    margin-left: 1px;
+}
+
 .alternate-status-bar-buttons-bar {
     position: absolute;
     width: 31px;
     bottom: -3px;
-    margin-left: 1px;
     background: white;
 }
 
 .alternate-status-bar-buttons-bar .status-bar-item {
+    height: 24px;
     margin-top: -1px;
+    border: 1px solid rgb(202, 202, 202);
+    border-bottom: 1px solid transparent;
+}
+
+.alternate-status-bar-buttons-bar .status-bar-item.emulate-active {
+    background-color: rgb(163,163,163);
+    border: 1px solid rgb(120, 120, 120);
+    border-bottom: 1px solid transparent;
 }
 
 .settings-status-bar-item .glyph {
@@ -660,7 +728,6 @@ body.port-qt #dock-status-bar-item {
     right: 0;
     height: 200px;
     background-color: white;
-    background-image: url(Images/statusbarBottomBackground.png);
     background-repeat: repeat-x;
     background-position: bottom;
 }
@@ -668,7 +735,7 @@ body.port-qt #dock-status-bar-item {
 body.drawer-visible #drawer-contents {
     position: absolute;
     top: 0;
-    bottom: 23px;
+    bottom: 24px;
     left: 0;
     right: 0;
 }
@@ -682,7 +749,6 @@ body.drawer-visible #drawer {
     bottom: 0;
     left: 0;
     right: 0;
-    background: none;
 }
 
 body.platform-mac .monospace, body.platform-mac .source-code {
@@ -1763,20 +1829,16 @@ button.edit-source-status-bar-item.toggled-on .glyph {
     margin-top: 23px;
 }
 
-#console-filter {
-    margin-top: 1px;
-}
-
 .scope-bar {
-    height: 23px;
-    padding: 2px 10px 0;
+    line-height: 19px;
+    padding-right: 10px;
     overflow: hidden;
 }
 
 .scope-bar li {
     display: inline-block;
-    margin: 1px 2px 0 0;
-    padding: 1px 7px 3px;
+    margin: 0 2px;
+    padding: 2px 6px;
     font-size: 11px;
     line-height: 12px;
     font-weight: bold;
@@ -1788,7 +1850,6 @@ button.edit-source-status-bar-item.toggled-on .glyph {
 }
 
 .scope-bar-divider {
-    margin: 1px 9px 0 8px;
     background-color: rgba(0, 0, 0, 0.4);
     height: 16px;
     width: 1px;
@@ -1799,6 +1860,10 @@ button.edit-source-status-bar-item.toggled-on .glyph {
 .scope-bar li.selected, .scope-bar li:hover, .scope-bar li:active {
     color: white;
     text-shadow: rgba(0, 0, 0, 0.4) 0 1px 0;
+}
+
+.scope-bar li.all {
+    margin: 0 8px;
 }
 
 .scope-bar li:hover {
@@ -2761,7 +2826,7 @@ body.platform-mac #drawer-status-bar .search-status-bar-progress {
     border-width: 0 0 11px 0;
 }
 
-#console-context {
+.console-context {
     max-width: 200px;
 }
 
@@ -2771,10 +2836,5 @@ body.platform-mac #drawer-status-bar .search-status-bar-progress {
     left: 0;
     right: 0;
     font-size: 11px;
-    padding-left: 7px;
-    padding-bottom: 7px;
-}
-
-.inspector-footer > div {
-    vertical-align: middle;
+    padding-left: 5px;
 }

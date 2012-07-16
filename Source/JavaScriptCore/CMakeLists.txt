@@ -56,6 +56,7 @@ SET(JavaScriptCore_SOURCES
     bytecode/PutByIdStatus.cpp
     bytecode/ResolveGlobalStatus.cpp
     bytecode/SamplingTool.cpp
+    bytecode/StructureStubClearingWatchpoint.cpp
     bytecode/StructureStubInfo.cpp
     bytecode/Watchpoint.cpp
 
@@ -143,6 +144,7 @@ SET(JavaScriptCore_SOURCES
     jit/JITPropertyAccess.cpp
     jit/JITStubRoutine.cpp
     jit/JITStubs.cpp
+    jit/JumpReplacementWatchpoint.cpp
     jit/ThunkGenerators.cpp
 
     parser/Lexer.cpp

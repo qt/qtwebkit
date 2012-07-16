@@ -27,9 +27,11 @@
 #include "WebCoreTestSupport.h"
 
 #include "Document.h"
+#include "InternalSettings.h"
 #include "Internals.h"
 #include "ScriptExecutionContext.h"
 #include "V8Internals.h"
+#include "V8PagePopupController.h"
 
 #include <v8.h>
 
@@ -43,8 +45,8 @@ void injectInternalsObject(v8::Local<v8::Context> context)
     v8::HandleScope scope;
 
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    Document* document = scriptContext->isDocument() ? static_cast<Document*>(scriptContext) : 0;
-    context->Global()->Set(v8::String::New(Internals::internalsId), toV8(Internals::create(document)));
+    if (scriptContext->isDocument())
+        context->Global()->Set(v8::String::New(Internals::internalsId), toV8(Internals::create(static_cast<Document*>(scriptContext))));
 }
 
 void resetInternalsObject(v8::Local<v8::Context> context)
@@ -56,13 +58,19 @@ void resetInternalsObject(v8::Local<v8::Context> context)
     v8::Context::Scope contextScope(context);
     v8::HandleScope scope;
 
-    v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(context->Global()->Get(v8::String::New(Internals::internalsId)));
-    Internals* internals = object->IsUndefined() ? 0 : V8Internals::toNative(object);
-    if (internals) {
-        ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-        if (scriptContext->isDocument())
-            internals->reset(static_cast<Document*>(scriptContext));
-    }
+    ScriptExecutionContext* scriptContext = getScriptExecutionContext();
+    ASSERT(scriptContext->isDocument());
+    InternalSettings::from(static_cast<Document*>(scriptContext)->frame()->page())->reset();
 }
+
+#if ENABLE(PAGE_POPUP)
+void injectPagePopupController(Frame* frame, PagePopupController* controller)
+{
+    ASSERT(frame);
+    ASSERT(controller);
+    v8::HandleScope scope;
+    V8Proxy::mainWorldContext(frame)->Global()->Set(v8::String::New("pagePopupController"), toV8(controller));
+}
+#endif
 
 }

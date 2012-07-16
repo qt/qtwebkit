@@ -1,3 +1,118 @@
+2012-07-14  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, build fix.
+
+        * wtf/Assertions.cpp:
+        * wtf/Platform.h:
+        * wtf/unicode/icu/CollatorICU.cpp:
+        (WTF::Collator::userDefault):
+
+2012-07-13  Xianzhu Wang  <wangxianzhu@chromium.org>
+
+        Move WebCore/platform/text/Base64 to WTF/wtf/text
+        https://bugs.webkit.org/show_bug.cgi?id=91162
+
+        Reviewed by Adam Barth.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/text/Base64.cpp: Renamed from Source/WebCore/platform/text/Base64.cpp.
+        (WTF):
+        (WTF::base64Encode):
+        (WTF::base64Decode):
+        (WTF::base64DecodeInternal):
+        * wtf/text/Base64.h: Renamed from Source/WebCore/platform/text/Base64.h.
+        (WTF):
+        (WTF::base64Encode):
+
+2012-07-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add API to get HTTPS status to WebKit2 GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=91100
+
+        Reviewed by Martin Robinson.
+
+        Add support for GByteArray.
+
+        * wtf/gobject/GRefPtr.cpp:
+        (WTF::refGPtr):
+        (WTF):
+        (WTF::derefGPtr):
+        * wtf/gobject/GRefPtr.h:
+        (WTF):
+        * wtf/gobject/GTypedefs.h:
+
+2012-07-12  Maciej Stachowiak  <mjs@apple.com>
+
+        Document ListHashSet iteration guarantees
+        https://bugs.webkit.org/show_bug.cgi?id=91106
+
+        Reviewed by Eric Seidel.
+
+        * wtf/ListHashSet.h:
+        (WTF): Expand class comment to document this.
+
+2012-07-11  Mark Rowe  <mrowe@apple.com>
+
+        <http://webkit.org/b/91024> Build against the latest SDK when targeting older OS X versions.
+
+        Reviewed by Dan Bernstein.
+
+        The deployment target is already set to the version that we're targeting, and it's that setting
+        which determines which functionality from the SDK is available to us.
+
+        * Configurations/Base.xcconfig:
+
+2012-07-11  Mark Rowe  <mrowe@apple.com>
+
+        Replace definitions of BUILDING_ON / TARGETING macros with macros that will error when used.
+
+        Part of <http://webkit.org/b/91015> Remove BUILDING_ON / TARGETING macros in favor of system availability macros.
+
+        Reviewed by Anders Carlsson.
+
+        * wtf/Platform.h:
+
+2012-07-11  Mark Rowe  <mrowe@apple.com>
+
+        Switch a few cases that care about the SDK over to checking __MAC_OS_X_VERSION_MAX_ALLOWED so that things build.
+
+        Part of <http://webkit.org/b/91015> Remove BUILDING_ON / TARGETING macros in favor of system availability macros
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/FastMalloc.cpp:
+        (WTF::TCMalloc_ThreadCache::CreateCacheIfNecessary): The SDK we're building against determines how many elements
+        the structure is declared as having.
+
+2012-07-11  Mark Rowe  <mrowe@apple.com>
+
+        <http://webkit.org/b/91015> Remove BUILDING_ON / TARGETING macros in favor of system availability macros
+
+        This removal was handled by a script that translates the relevant macros in to the equivalent checks
+        using the system availability macros.
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/Assertions.cpp:
+        * wtf/FastMalloc.cpp:
+        * wtf/Platform.h:
+        * wtf/ThreadingPthreads.cpp:
+        * wtf/unicode/icu/CollatorICU.cpp:
+
+2012-07-11  Anders Carlsson  <andersca@apple.com>
+
+        Add -Wtautological-compare and -Wsign-compare warning flags
+        https://bugs.webkit.org/show_bug.cgi?id=90994
+
+        Reviewed by Mark Rowe.
+
+        * Configurations/Base.xcconfig:
+
 2012-07-10  Jocelyn Turcotte  <jocelyn.turcotte@nokia.com>
 
         Re-enable __declspec(dl{import,export}) for MinGW when using EXPORT_MACROS

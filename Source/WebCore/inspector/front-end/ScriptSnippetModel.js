@@ -41,8 +41,6 @@ WebInspector.ScriptSnippetModel = function()
     this._snippetStorage = new WebInspector.SnippetStorage("script", "Script snippet #");
     this._lastSnippetEvaluationIndexSetting = WebInspector.settings.createSetting("lastSnippetEvaluationIndex", 0);
     this._snippetScriptMapping = new WebInspector.SnippetScriptMapping(this);
-    
-    this._loadSnippets();
 }
 
 WebInspector.ScriptSnippetModel.snippetSourceURLPrefix = "snippets:///";
@@ -128,7 +126,6 @@ WebInspector.ScriptSnippetModel.prototype = {
     {
         var snippet = this._snippetStorage.snippetForId(snippetJavaScriptSource.snippetId);
         snippet.content = newContent;
-        snippetJavaScriptSource.contentChanged(newContent, "text/javascript");
     },
 
     /**

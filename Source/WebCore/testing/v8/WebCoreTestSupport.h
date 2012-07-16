@@ -31,10 +31,19 @@ class Context;
 template <class T> class Local;
 }
 
+namespace WebCore {
+class Frame;
+class PagePopupController;
+}
+
 namespace WebCoreTestSupport {
 
 void injectInternalsObject(v8::Local<v8::Context>);
 void resetInternalsObject(v8::Local<v8::Context>);
+
+#if ENABLE(PAGE_POPUP)
+void injectPagePopupController(WebCore::Frame*, WebCore::PagePopupController*);
+#endif
 
 } // namespace WebCore
 

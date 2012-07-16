@@ -79,6 +79,7 @@ class DocumentMarkerController;
 class DocumentParser;
 class DocumentType;
 class DocumentWeakReference;
+class DynamicNodeListCacheBase;
 class EditingText;
 class Element;
 class EntityReference;
@@ -137,6 +138,7 @@ class TextResourceDecoder;
 class TreeWalker;
 class UndoManager;
 class WebKitNamedFlow;
+class WebKitNamedFlowCollection;
 class XMLHttpRequest;
 class XPathEvaluator;
 class XPathExpression;
@@ -185,6 +187,19 @@ enum PageshowEventPersistence {
 };
 
 enum StyleResolverUpdateFlag { RecalcStyleImmediately, DeferRecalcStyle, RecalcStyleIfNeeded };
+
+enum NodeListInvalidationType {
+    DoNotInvalidateOnAttributeChanges = 0,
+    InvalidateOnClassAttrChange,
+    InvalidateOnIdNameAttrChange,
+    InvalidateOnNameAttrChange,
+    InvalidateOnForAttrChange,
+    InvalidateForFormControls,
+    InvalidateOnHRefAttrChange,
+    InvalidateOnItemAttrChange,
+    InvalidateOnAnyAttrChange,
+};
+const int numNodeListInvalidationTypes = InvalidateOnAnyAttrChange + 1;
 
 class Document : public ContainerNode, public TreeScope, public ScriptExecutionContext {
 public:
@@ -332,13 +347,10 @@ public:
 
     bool cssRegionsEnabled() const;
 #if ENABLE(CSS_REGIONS)
-    enum FlowNameCheck {
-        CheckFlowNameForInvalidValues,
-        DoNotCheckFlowNameForInvalidValues
-    };
     PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
-    PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&, FlowNameCheck);
 #endif
+
+    WebKitNamedFlowCollection* namedFlows();
 
     bool regionBasedColumnsEnabled() const;
 
@@ -723,8 +735,9 @@ public:
     bool isPendingStyleRecalc() const;
     void styleRecalcTimerFired(Timer<Document>*);
 
-    void registerDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
-    void unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList*);
+    void registerNodeListCache(DynamicNodeListCacheBase*);
+    void unregisterNodeListCache(DynamicNodeListCacheBase*);
+    bool shouldInvalidateNodeListCaches(const QualifiedName* attrName = 0) const;
     void clearNodeListCaches();
 
     void attachNodeIterator(NodeIterator*);
@@ -1408,7 +1421,8 @@ private:
 
     InheritedBool m_designMode;
 
-    HashSet<DynamicSubtreeNodeList*> m_listsInvalidatedAtDocument;
+    HashSet<DynamicNodeListCacheBase*> m_listsInvalidatedAtDocument;
+    unsigned m_nodeListCounts[numNodeListInvalidationTypes];
 
     HTMLCollection* m_collections[NumUnnamedDocumentCachedTypes];
     typedef HashMap<AtomicString, HTMLNameCollection*> NamedCollectionMap;
@@ -1515,6 +1529,8 @@ private:
     
     bool m_visualUpdatesAllowed;
     Timer<Document> m_visualUpdatesSuppressionTimer;
+
+    RefPtr<WebKitNamedFlowCollection> m_namedFlows;
 
 #ifndef NDEBUG
     bool m_didDispatchViewportPropertiesChanged;

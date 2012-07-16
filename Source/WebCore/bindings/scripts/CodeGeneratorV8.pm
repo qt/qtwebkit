@@ -922,9 +922,6 @@ END
 
     if ($getterStringUsesImp) {
         my ($functionName, @arguments) = $codeGenerator->GetterExpression(\%implIncludes, $interfaceName, $attribute);
-
-        push(@arguments, GenerateCallWith($attribute->signature->extendedAttributes->{"CallWith"}, \@implContentDecls, "    ", 0, 0));
-
         push(@arguments, "ec") if $useExceptions;
         if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
             my $implementedBy = $attribute->signature->extendedAttributes->{"ImplementedBy"};
@@ -934,6 +931,7 @@ END
         } else {
             $functionName = "imp->${functionName}";
         }
+        unshift(@arguments, GenerateCallWith($attribute->signature->extendedAttributes->{"CallWith"}, \@implContentDecls, "    ", 0, 0));
         $getterString = "${functionName}(" . join(", ", @arguments) . ")";
     } else {
         $getterString = "impInstance";
@@ -1134,20 +1132,8 @@ END
             push(@implContentDecls, "    $svgWrappedNativeType* imp = &impInstance;\n");
         }
     } elsif ($attrExt->{"V8OnProto"}) {
-      if ($interfaceName eq "DOMWindow") {
         push(@implContentDecls, <<END);
-    v8::Handle<v8::Object> holder = info.Holder();
-END
-      } else {
-        # perform lookup first
-        push(@implContentDecls, <<END);
-    v8::Handle<v8::Object> holder = V8DOMWrapper::lookupDOMWrapper(V8${interfaceName}::GetTemplate(), info.This());
-    if (holder.IsEmpty())
-        return;
-END
-      }
-    push(@implContentDecls, <<END);
-    ${implClassName}* imp = V8${implClassName}::toNative(holder);
+    ${implClassName}* imp = V8${implClassName}::toNative(info.Holder());
 END
     } else {
         my $attrType = GetTypeFromSignature($attribute->signature);
@@ -1227,9 +1213,6 @@ END
             push(@implContentDecls, ");\n");
         } else {
             my ($functionName, @arguments) = $codeGenerator->SetterExpression(\%implIncludes, $interfaceName, $attribute);
-
-            push(@arguments, GenerateCallWith($attribute->signature->extendedAttributes->{"CallWith"}, \@implContentDecls, "    ", 1, 0));
-
             push(@arguments, $result);
             push(@arguments, "ec") if $useExceptions;
             if ($attribute->signature->extendedAttributes->{"ImplementedBy"}) {
@@ -1240,6 +1223,7 @@ END
             } else {
                 $functionName = "imp->${functionName}";
             }
+            unshift(@arguments, GenerateCallWith($attribute->signature->extendedAttributes->{"CallWith"}, \@implContentDecls, "    ", 1, 0));
             push(@implContentDecls, "    ${functionName}(" . join(", ", @arguments) . ");\n");
         }
     }
@@ -3386,7 +3370,7 @@ sub GenerateFunctionCallString()
     my @callWithOutput = ();
     my @callWithArgs = GenerateCallWith($callWith, \@callWithOutput, $indent, 0, 1, $function);
     $result .= join("", @callWithOutput);
-    push(@arguments, @callWithArgs);
+    unshift(@arguments, @callWithArgs);
     $index += @callWithArgs;
     $numberOfParameters += @callWithArgs;
 

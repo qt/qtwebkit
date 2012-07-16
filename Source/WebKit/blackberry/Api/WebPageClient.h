@@ -135,7 +135,7 @@ public:
     virtual void notifyContentRendered(const Platform::IntRect&) = 0;
     virtual void resizeSurfaceIfNeeded() = 0;
 
-    virtual void inputFocusGained(Platform::BlackBerryInputType, int inputStyle) = 0;
+    virtual void inputFocusGained(Platform::BlackBerryInputType, int inputStyle, Platform::VirtualKeyboardType, Platform::VirtualKeyboardEnterKeyType) = 0;
     virtual void inputFocusLost() = 0;
     virtual void inputTextChanged() = 0;
     virtual void inputSelectionChanged(unsigned selectionStart, unsigned selectionEnd) = 0;
@@ -215,6 +215,7 @@ public:
     virtual void setPreventsScreenIdleDimming(bool noDimming) = 0;
     virtual bool authenticationChallenge(const unsigned short* realm, unsigned int realmLength, WebString& username, WebString& password) = 0;
     virtual SaveCredentialType notifyShouldSaveCredential(bool isNew) = 0;
+    virtual void syncProxyCredential(const WebString& username, const WebString& password) = 0;
     virtual void notifyPopupAutofillDialog(const std::vector<std::string>&, const Platform::IntRect&) = 0;
     virtual void notifyDismissAutofillDialog() = 0;
 

@@ -24927,6 +24927,18 @@
 				</File>
 			</Filter>
 			<Filter
+				Name="protocolhandler"
+				>
+				<File
+					RelativePath="..\Modules\protocolhandler\NavigatorRegisterProtocolHandler.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\protocolhandler\NavigatorRegisterProtocolHandler.h"
+					>
+				</File>
+			</Filter>
+			<Filter
 				Name="quota"
 				>
 				<File
@@ -26832,14 +26844,6 @@
 			</File>
 			<File
 				RelativePath="..\page\NavigatorBase.h"
-				>
-			</File>
-			<File
-				RelativePath="..\page\NavigatorRegisterProtocolHandler.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\page\NavigatorRegisterProtocolHandler.h"
 				>
 			</File>
 			<File
@@ -31545,6 +31549,10 @@
 						>
 					</File>
 					<File
+						RelativePath="..\platform\graphics\filters\arm\FEBlendNEON.h"
+						>
+					</File>
+					<File
 						RelativePath="..\platform\graphics\filters\FEColorMatrix.cpp"
 						>
 					</File>
@@ -33213,18 +33221,6 @@
 			<Filter
 				Name="text"
 				>
-				<File
-					RelativePath="..\platform\text\AtomicStringImpl.h"
-					>
-				</File>
-				<File
-					RelativePath="..\platform\text\Base64.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\platform\text\Base64.h"
-					>
-				</File>
 				<File
 					RelativePath="..\platform\text\BidiContext.cpp"
 					>
@@ -51195,6 +51191,118 @@
 				>
 			</File>
 			<File
+				RelativePath="..\dom\IdTargetObserver.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\IdTargetObserver.h"
+				>
+			</File>
+			<File
+				RelativePath="..\dom\IdTargetObserverRegistry.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\IdTargetObserverRegistry.h"
+				>
+			</File>
+			<File
 				RelativePath="..\dom\IgnoreDestructiveWriteCountIncrementer.h"
 				>
 			</File>
@@ -54504,6 +54612,62 @@
 			</File>
 			<File
 				RelativePath="..\dom\WebKitNamedFlow.h"
+				>
+			</File>
+		    <File
+				RelativePath="..\dom\WebKitNamedFlowCollection.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release_Cairo_CFLite|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Debug_All|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\dom\WebKitNamedFlowCollection.h"
 				>
 			</File>
 			<File

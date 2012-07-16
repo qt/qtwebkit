@@ -8,7 +8,7 @@
 SOURCE_DIR = $${ROOT_WEBKIT_DIR}/Source/WebCore
 
 QT *= network sql
-haveQt(5): QT *= gui-private
+haveQt(5): QT *= core-private gui-private
 
 WEBCORE_GENERATED_SOURCES_DIR = $${ROOT_BUILD_DIR}/Source/WebCore/$${GENERATED_SOURCES_DESTDIR}
 
@@ -18,6 +18,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/Modules/geolocation \
     $$SOURCE_DIR/Modules/indexeddb \
     $$SOURCE_DIR/Modules/notifications \
+    $$SOURCE_DIR/Modules/protocolhandler \
     $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
     $$SOURCE_DIR/Modules/webdatabase \
@@ -203,6 +204,7 @@ contains(DEFINES, ENABLE_VIDEO=1) {
 contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
     contains(QT_CONFIG, opengles2): LIBS += -lEGL
     mac: LIBS += -framework IOSurface -framework CoreFoundation
+    linux-*:contains(DEFINES, HAVE_XCOMPOSITE=1): LIBS += -lXcomposite
     # Only WebKit1 needs the opengl module, so it's optional for Qt5.
     haveQt(4)|contains(QT_CONFIG, opengl): QT *= opengl
 }

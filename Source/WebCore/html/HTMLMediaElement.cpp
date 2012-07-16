@@ -488,7 +488,11 @@ RenderObject* HTMLMediaElement::createRenderer(RenderArena* arena, RenderStyle*)
 
 bool HTMLMediaElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
-    return childContext.isOnUpperEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext);
+    if (!hasMediaControls())
+        return false;
+    // Only allows nodes from the controls shadow subtree.
+    return (mediaControls()->treeScope() == childContext.node()->treeScope()
+            && childContext.isOnUpperEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext));
 }
 
 Node::InsertionNotificationRequest HTMLMediaElement::insertedInto(ContainerNode* insertionPoint)
@@ -3481,6 +3485,16 @@ void HTMLMediaElement::mediaPlayerRenderingModeChanged(MediaPlayer*)
 }
 #endif
 
+#if PLATFORM(WIN) && USE(AVFOUNDATION)
+GraphicsDeviceAdapter* HTMLMediaElement::mediaPlayerGraphicsDeviceAdapter(const MediaPlayer*) const
+{
+    if (!document() || !document()->page())
+        return 0;
+
+    return document()->page()->chrome()->client()->graphicsDeviceAdapter();
+}
+#endif
+
 void HTMLMediaElement::mediaPlayerEngineUpdated(MediaPlayer*)
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerEngineUpdated");
@@ -4142,12 +4156,12 @@ void HTMLMediaElement::privateBrowsingStateDidChange()
     m_player->setPrivateBrowsingMode(privateMode);
 }
 
-MediaControls* HTMLMediaElement::mediaControls()
+MediaControls* HTMLMediaElement::mediaControls() const
 {
     return toMediaControls(shadow()->oldestShadowRoot()->firstChild());
 }
 
-bool HTMLMediaElement::hasMediaControls()
+bool HTMLMediaElement::hasMediaControls() const
 {
     ElementShadow* elementShadow = shadow();
     if (!elementShadow)

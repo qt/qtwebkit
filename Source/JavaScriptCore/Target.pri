@@ -67,6 +67,7 @@ SOURCES += \
     bytecode/ResolveGlobalStatus.cpp \
     bytecode/SamplingTool.cpp \
     bytecode/SpeculatedType.cpp \
+    bytecode/StructureStubClearingWatchpoint.cpp \
     bytecode/StructureStubInfo.cpp \
     bytecode/Watchpoint.cpp \
     bytecompiler/BytecodeGenerator.cpp \
@@ -151,6 +152,7 @@ SOURCES += \
     jit/JITPropertyAccess32_64.cpp \
     jit/JITStubRoutine.cpp \
     jit/JITStubs.cpp \
+    jit/JumpReplacementWatchpoint.cpp \
     jit/ThunkGenerators.cpp \
     parser/Lexer.cpp \
     parser/Nodes.cpp \
@@ -217,6 +219,7 @@ SOURCES += \
     runtime/LiteralParser.cpp \
     runtime/Lookup.cpp \
     runtime/MathObject.cpp \
+    runtime/MemoryStatistics.cpp \
     runtime/NameConstructor.cpp \
     runtime/NameInstance.cpp \
     runtime/NamePrototype.cpp \

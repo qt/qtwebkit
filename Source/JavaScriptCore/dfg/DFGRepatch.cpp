@@ -30,6 +30,7 @@
 
 #include "DFGCCallHelpers.h"
 #include "DFGSpeculativeJIT.h"
+#include "DFGThunks.h"
 #include "GCAwareJITStubRoutine.h"
 #include "LinkBuffer.h"
 #include "Operations.h"
@@ -68,6 +69,48 @@ static void dfgRepatchByIdSelfAccess(CodeBlock* codeBlock, StructureStubInfo& st
         repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabel32AtOffset(stubInfo.patch.dfg.deltaCallToPayloadLoadOrStore), offsetRelativeToPatchedStorage(offset) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload));
     }
 #endif
+}
+
+static void addStructureTransitionCheck(
+    JSCell* object, Structure* structure, CodeBlock* codeBlock, StructureStubInfo& stubInfo,
+    MacroAssembler& jit, MacroAssembler::JumpList& failureCases, GPRReg scratchGPR)
+{
+    if (object->structure() == structure && structure->transitionWatchpointSetIsStillValid()) {
+        structure->addTransitionWatchpoint(stubInfo.addWatchpoint(codeBlock));
+#if DFG_ENABLE(JIT_ASSERT)
+        // If we execute this code, the object must have the structure we expect. Assert
+        // this in debug modes.
+        jit.move(MacroAssembler::TrustedImmPtr(object), scratchGPR);
+        MacroAssembler::Jump ok = jit.branchPtr(
+            MacroAssembler::Equal,
+            MacroAssembler::Address(scratchGPR, JSCell::structureOffset()),
+            MacroAssembler::TrustedImmPtr(structure));
+        jit.breakpoint();
+        ok.link(&jit);
+#endif
+        return;
+    }
+    
+    jit.move(MacroAssembler::TrustedImmPtr(object), scratchGPR);
+    failureCases.append(
+        jit.branchPtr(
+            MacroAssembler::NotEqual,
+            MacroAssembler::Address(scratchGPR, JSCell::structureOffset()),
+            MacroAssembler::TrustedImmPtr(structure)));
+}
+
+static void addStructureTransitionCheck(
+    JSValue prototype, CodeBlock* codeBlock, StructureStubInfo& stubInfo,
+    MacroAssembler& jit, MacroAssembler::JumpList& failureCases, GPRReg scratchGPR)
+{
+    if (prototype.isNull())
+        return;
+    
+    ASSERT(prototype.isCell());
+    
+    addStructureTransitionCheck(
+        prototype.asCell(), prototype.asCell()->structure(), codeBlock, stubInfo, jit,
+        failureCases, scratchGPR);
 }
 
 static void emitRestoreScratch(MacroAssembler& stubJit, bool needToRestoreScratch, GPRReg scratchGPR, MacroAssembler::Jump& success, MacroAssembler::Jump& fail, MacroAssembler::JumpList failureCases)
@@ -136,8 +179,9 @@ static void generateProtoChainAccessStub(ExecState* exec, StructureStubInfo& stu
     JSObject* protoObject = 0;
     for (unsigned i = 0; i < count; ++i, ++it) {
         protoObject = asObject(currStructure->prototypeForLookup(exec));
-        stubJit.move(MacroAssembler::TrustedImmPtr(protoObject), scratchGPR);
-        failureCases.append(stubJit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(scratchGPR, JSCell::structureOffset()), MacroAssembler::TrustedImmPtr(protoObject->structure())));
+        addStructureTransitionCheck(
+            protoObject, protoObject->structure(), exec->codeBlock(), stubInfo, stubJit,
+            failureCases, scratchGPR);
         currStructure = it->get();
     }
     
@@ -568,17 +612,6 @@ static V_DFGOperation_EJCI appropriateListBuildingPutByIdFunction(const PutPrope
     return operationPutByIdNonStrictBuildList;
 }
 
-static void testPrototype(MacroAssembler &stubJit, GPRReg scratchGPR, JSValue prototype, MacroAssembler::JumpList& failureCases)
-{
-    if (prototype.isNull())
-        return;
-    
-    ASSERT(prototype.isCell());
-    
-    stubJit.move(MacroAssembler::TrustedImmPtr(prototype.asCell()), scratchGPR);
-    failureCases.append(stubJit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(scratchGPR, JSCell::structureOffset()), MacroAssembler::TrustedImmPtr(prototype.asCell()->structure())));
-}
-
 static void emitPutReplaceStub(
     ExecState* exec,
     JSValue,
@@ -707,12 +740,17 @@ static void emitPutTransitionStub(
     ASSERT(oldStructure->transitionWatchpointSetHasBeenInvalidated());
     
     failureCases.append(stubJit.branchPtr(MacroAssembler::NotEqual, MacroAssembler::Address(baseGPR, JSCell::structureOffset()), MacroAssembler::TrustedImmPtr(oldStructure)));
-            
-    testPrototype(stubJit, scratchGPR, oldStructure->storedPrototype(), failureCases);
+    
+    addStructureTransitionCheck(
+        oldStructure->storedPrototype(), exec->codeBlock(), stubInfo, stubJit, failureCases,
+        scratchGPR);
             
     if (putKind == NotDirect) {
-        for (WriteBarrier<Structure>* it = prototypeChain->head(); *it; ++it)
-            testPrototype(stubJit, scratchGPR, (*it)->storedPrototype(), failureCases);
+        for (WriteBarrier<Structure>* it = prototypeChain->head(); *it; ++it) {
+            addStructureTransitionCheck(
+                (*it)->storedPrototype(), exec->codeBlock(), stubInfo, stubJit, failureCases,
+                scratchGPR);
+        }
     }
 
 #if ENABLE(GGC) || ENABLE(WRITE_BARRIER_PROFILING)
@@ -916,6 +954,7 @@ void dfgBuildPutByIdList(ExecState* exec, JSValue baseValue, const Identifier& p
 void dfgLinkFor(ExecState* exec, CallLinkInfo& callLinkInfo, CodeBlock* calleeCodeBlock, JSFunction* callee, MacroAssemblerCodePtr codePtr, CodeSpecializationKind kind)
 {
     CodeBlock* callerCodeBlock = exec->callerFrame()->codeBlock();
+    JSGlobalData* globalData = callerCodeBlock->globalData();
     
     RepatchBuffer repatchBuffer(callerCodeBlock);
     
@@ -928,17 +967,17 @@ void dfgLinkFor(ExecState* exec, CallLinkInfo& callLinkInfo, CodeBlock* calleeCo
         calleeCodeBlock->linkIncomingCall(&callLinkInfo);
     
     if (kind == CodeForCall) {
-        repatchBuffer.relink(CodeLocationCall(callLinkInfo.callReturnLocation), operationVirtualCall);
+        repatchBuffer.relink(callLinkInfo.callReturnLocation, globalData->getCTIStub(virtualCallThunkGenerator).code());
         return;
     }
     ASSERT(kind == CodeForConstruct);
-    repatchBuffer.relink(CodeLocationCall(callLinkInfo.callReturnLocation), operationVirtualConstruct);
+    repatchBuffer.relink(callLinkInfo.callReturnLocation, globalData->getCTIStub(virtualConstructThunkGenerator).code());
 }
 
 void dfgResetGetByID(RepatchBuffer& repatchBuffer, StructureStubInfo& stubInfo)
 {
     repatchBuffer.relink(stubInfo.callReturnLocation, operationGetByIdOptimize);
-    repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabelPtrAtOffset(-(uintptr_t)stubInfo.patch.dfg.deltaCheckImmToCall), reinterpret_cast<void*>(-1));
+    repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabelPtrAtOffset(-(intptr_t)stubInfo.patch.dfg.deltaCheckImmToCall), reinterpret_cast<void*>(-1));
 #if USE(JSVALUE64)
     repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabelCompactAtOffset(stubInfo.patch.dfg.deltaCallToLoadOrStore), 0);
 #else
@@ -963,7 +1002,7 @@ void dfgResetPutByID(RepatchBuffer& repatchBuffer, StructureStubInfo& stubInfo)
         optimizedFunction = operationPutByIdDirectNonStrictOptimize;
     }
     repatchBuffer.relink(stubInfo.callReturnLocation, optimizedFunction);
-    repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabelPtrAtOffset(-(uintptr_t)stubInfo.patch.dfg.deltaCheckImmToCall), reinterpret_cast<void*>(-1));
+    repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabelPtrAtOffset(-(intptr_t)stubInfo.patch.dfg.deltaCheckImmToCall), reinterpret_cast<void*>(-1));
 #if USE(JSVALUE64)
     repatchBuffer.repatch(stubInfo.callReturnLocation.dataLabel32AtOffset(stubInfo.patch.dfg.deltaCallToLoadOrStore), 0);
 #else

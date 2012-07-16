@@ -87,6 +87,9 @@
                     'dependencies': [
                         '../../WebCore/WebCore.gyp/WebCore.gyp:webcore',
                     ],
+                    'defines': [
+                        'WEBKIT_IMPLEMENTATION=1',
+                    ],
                     'sources': [
                         '<@(webkit_unittest_files)',
                     ],
@@ -170,7 +173,9 @@
                         '<(PRODUCT_DIR)/webkit_unit_tests_apk',
                         '--ant-args',
                         '-DPRODUCT_DIR=<(ant_build_out)',
-                        '--ant-compile'
+                        '--ant-compile',
+                        '--app_abi',
+                        '<(android_app_abi)',
                     ],
                 }],
             }],

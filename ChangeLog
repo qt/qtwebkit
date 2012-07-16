@@ -1,3 +1,51 @@
+2012-07-12 Josh Hawn <jhawn@apple.com>
+
+        Fix for WebContext::getWebCoreStatistics() causes crash if no m_process
+        https://bugs.webkit.org/show_bug.cgi?id=91116
+
+        Reviewed by Simon Fraser.
+
+        * Source/WebKit2/UIProcess/WebContext.cpp:
+          WebContext::getWebCoreStatistics():
+                Now invalidates callback if no m_process.
+
+2012-07-13  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [CMake] Proper handling of ENABLE_API_TESTS build option
+        https://bugs.webkit.org/show_bug.cgi?id=91221
+
+        Reviewed by Rob Buis.
+
+        Make the flag reusable across the ports using CMake. We are about to enable the WTF,
+        WebCore and WebKit 2 API's at Tools/TestWebKitAPI and other ports using CMake can get
+        it almost for free.
+
+        * CMakeLists.txt:
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-07-11  Matt Falkenhagen  <falken@chromium.org>
+
+        Add dialog element feature toggle to InternalSettings
+        https://bugs.webkit.org/show_bug.cgi?id=90934
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter: Added newly exported symbol.
+
+2012-07-11  Arnaud Renevier  <a.renevier@sisa.samsung.com>
+
+        [Gtk] allow building with css-filters
+        https://bugs.webkit.org/show_bug.cgi?id=90908
+
+        Add support for css-filters in Source/WebCore/GNUmakefile.am
+        configure.ac
+
+        Reviewed by Eric Seidel.
+
+        * configure.ac:
+
 2012-07-10  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
 
         [CMAKE] Add missing feature macros

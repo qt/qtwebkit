@@ -26,6 +26,7 @@
 #include "DatasetDOMStringMap.h"
 #include "Element.h"
 #include "ElementShadow.h"
+#include "HTMLCollection.h"
 #include "NamedNodeMap.h"
 #include "NodeRareData.h"
 #include <wtf/OwnPtr.h>
@@ -57,11 +58,44 @@ public:
 
         return (*m_cachedCollections)[type - FirstNodeCollectionType];
     }
+
     void removeCachedHTMLCollection(HTMLCollection* collection, CollectionType type)
     {
         ASSERT(m_cachedCollections);
         ASSERT_UNUSED(collection, (*m_cachedCollections)[type - FirstNodeCollectionType] == collection);
         (*m_cachedCollections)[type - FirstNodeCollectionType] = 0;
+    }
+
+    void clearHTMLCollectionCaches(const QualifiedName* attrName)
+    {
+        if (!m_cachedCollections)
+            return;
+
+        bool shouldIgnoreType = !attrName || *attrName == HTMLNames::idAttr || *attrName == HTMLNames::nameAttr;
+
+        for (unsigned i = 0; i < (*m_cachedCollections).size(); i++) {
+            if (HTMLCollection* collection = (*m_cachedCollections)[i]) {
+                if (shouldIgnoreType || DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(collection->invalidationType(), *attrName))
+                    collection->invalidateCache();
+            }
+        }
+    }
+
+    void adoptTreeScope(Document* oldDocument, Document* newDocument)
+    {
+        if (!m_cachedCollections)
+            return;
+
+        for (unsigned i = 0; i < (*m_cachedCollections).size(); i++) {
+            HTMLCollection* collection = (*m_cachedCollections)[i];
+            if (!collection)
+                continue;
+            collection->invalidateCache();
+            if (oldDocument != newDocument) {
+                oldDocument->unregisterNodeListCache(collection);
+                newDocument->registerNodeListCache(collection);
+            }
+        }
     }
 
     typedef FixedArray<HTMLCollection*, NumNodeCollectionTypes> CachedHTMLCollectionArray;
@@ -76,7 +110,8 @@ public:
     OwnPtr<ElementShadow> m_shadow;
     OwnPtr<NamedNodeMap> m_attributeMap;
 
-    bool m_styleAffectedByEmpty;
+    bool m_styleAffectedByEmpty : 1;
+    bool m_isInCanvasSubtree : 1;
 
     IntSize m_savedLayerScrollOffset;
 
@@ -94,6 +129,7 @@ inline ElementRareData::ElementRareData()
     : NodeRareData()
     , m_minimumSizeForResizing(defaultMinimumSizeForResizing())
     , m_styleAffectedByEmpty(false)
+    , m_isInCanvasSubtree(false)
 #if ENABLE(FULLSCREEN_API)
     , m_containsFullScreenElement(false)
 #endif

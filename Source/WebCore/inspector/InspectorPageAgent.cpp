@@ -34,7 +34,6 @@
 
 #include "InspectorPageAgent.h"
 
-#include "Base64.h"
 #include "CachedCSSStyleSheet.h"
 #include "CachedFont.h"
 #include "CachedImage.h"
@@ -51,9 +50,6 @@
 #include "DocumentLoader.h"
 #include "Frame.h"
 #include "FrameView.h"
-#include "GeolocationController.h"
-#include "GeolocationError.h"
-#include "GeolocationPosition.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
 #include "IdentifiersFactory.h"
@@ -79,6 +75,7 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/Vector.h>
+#include <wtf/text/Base64.h>
 
 using namespace std;
 
@@ -321,8 +318,6 @@ InspectorPageAgent::InspectorPageAgent(InstrumentingAgents* instrumentingAgents,
     , m_lastScriptIdentifier(0)
     , m_lastPaintContext(0)
     , m_didLoadEventFire(false)
-    , m_geolocationError()
-    , m_geolocationPosition()
 {
 }
 
@@ -970,52 +965,6 @@ void InspectorPageAgent::updateViewMetrics(int width, int height, double fontSca
     Document* document = mainFrame()->document();
     document->styleResolverChanged(RecalcStyleImmediately);
     InspectorInstrumentation::mediaQueryResultChanged(document);
-}
-
-void InspectorPageAgent::setGeolocationData(ErrorString*, const double* longitude, const double* latitude, const double* accuracy, const String* errorType)
-{
-#if ENABLE (GEOLOCATION)
-    GeolocationController* controller = GeolocationController::from(m_page);
-    if (!controller)
-        return;
-
-    clearGeolocationData(0);
-
-    if (*errorType == "PermissionDenied")
-        m_geolocationError = GeolocationError::create(GeolocationError::PermissionDenied, *errorType).leakRef();
-    else if (*errorType == "PositionUnavailable")
-        m_geolocationError = GeolocationError::create(GeolocationError::PositionUnavailable, *errorType).leakRef();
-
-    if (m_geolocationError.get()) {
-        controller->errorOccurred(m_geolocationError.get());
-        return;
-    }
-
-    m_geolocationPosition = GeolocationPosition::create(currentTimeMS(), *longitude, *latitude, *accuracy).leakRef();
-    controller->positionChanged(m_geolocationPosition.get());
-#endif
-}
-
-void InspectorPageAgent::clearGeolocationData(ErrorString*)
-{
-#if ENABLE(GEOLOCATION)
-    m_geolocationError.clear();
-    m_geolocationPosition.clear();
-#endif
-}
-
-bool InspectorPageAgent::sendGeolocationError()
-{
-#if ENABLE(GEOLOCATION)
-    if (m_geolocationError.get()) {
-        GeolocationController* controller = GeolocationController::from(m_page);
-        if (controller) {
-            controller->errorOccurred(m_geolocationError.get());
-            return true;
-        }
-    }
-#endif
-    return false;
 }
 
 } // namespace WebCore

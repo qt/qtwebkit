@@ -351,7 +351,7 @@ void EventSender::doDragDrop(const WebDragData& dragData, WebDragOperationsMask 
     WebPoint screenPoint(event.globalX, event.globalY);
     currentDragData = dragData;
     currentDragEffectsAllowed = mask;
-    currentDragEffect = webview()->dragTargetDragEnter(dragData, clientPoint, screenPoint, currentDragEffectsAllowed);
+    currentDragEffect = webview()->dragTargetDragEnter(dragData, clientPoint, screenPoint, currentDragEffectsAllowed, 0);
 
     // Finish processing events.
     replaySavedEvents();
@@ -466,9 +466,9 @@ void EventSender::doMouseUp(const WebMouseEvent& e)
     WebPoint clientPoint(e.x, e.y);
     WebPoint screenPoint(e.globalX, e.globalY);
 
-    currentDragEffect = webview()->dragTargetDragOver(clientPoint, screenPoint, currentDragEffectsAllowed);
+    currentDragEffect = webview()->dragTargetDragOver(clientPoint, screenPoint, currentDragEffectsAllowed, 0);
     if (currentDragEffect)
-        webview()->dragTargetDrop(clientPoint, screenPoint);
+        webview()->dragTargetDrop(clientPoint, screenPoint, 0);
     else
         webview()->dragTargetDragLeave();
     webview()->dragSourceEndedAt(clientPoint, screenPoint, currentDragEffect);
@@ -509,7 +509,7 @@ void EventSender::doMouseMove(const WebMouseEvent& e)
         return;
     WebPoint clientPoint(e.x, e.y);
     WebPoint screenPoint(e.globalX, e.globalY);
-    currentDragEffect = webview()->dragTargetDragOver(clientPoint, screenPoint, currentDragEffectsAllowed);
+    currentDragEffect = webview()->dragTargetDragOver(clientPoint, screenPoint, currentDragEffectsAllowed, 0);
 }
 
 void EventSender::keyDown(const CppArgumentList& arguments, CppVariant* result)
@@ -912,7 +912,7 @@ void EventSender::beginDragWithFiles(const CppArgumentList& arguments, CppVarian
     currentDragEffectsAllowed = WebKit::WebDragOperationCopy;
 
     // Provide a drag source.
-    webview()->dragTargetDragEnter(currentDragData, lastMousePos, lastMousePos, currentDragEffectsAllowed);
+    webview()->dragTargetDragEnter(currentDragData, lastMousePos, lastMousePos, currentDragEffectsAllowed, 0);
 
     // dragMode saves events and then replays them later. We don't need/want that.
     dragMode.set(false);
@@ -1043,9 +1043,13 @@ void EventSender::handleMouseWheel(const CppArgumentList& arguments, CppVariant*
     int horizontal = arguments[0].toInt32();
     int vertical = arguments[1].toInt32();
     int paged = false;
+    int hasPreciseScrollingDeltas = false;
 
     if (arguments.size() > 2 && arguments[2].isBool())
         paged = arguments[2].toBoolean();
+
+    if (arguments.size() > 3 && arguments[3].isBool())
+        hasPreciseScrollingDeltas = arguments[3].toBoolean();
 
     WebMouseWheelEvent event;
     initMouseEvent(WebInputEvent::MouseWheel, pressedButton, lastMousePos, &event);
@@ -1054,6 +1058,8 @@ void EventSender::handleMouseWheel(const CppArgumentList& arguments, CppVariant*
     event.deltaX = event.wheelTicksX;
     event.deltaY = event.wheelTicksY;
     event.scrollByPage = paged;
+    event.hasPreciseScrollingDeltas = hasPreciseScrollingDeltas;
+
     if (continuous) {
         event.wheelTicksX /= scrollbarPixelsPerTick;
         event.wheelTicksY /= scrollbarPixelsPerTick;

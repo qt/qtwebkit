@@ -340,41 +340,42 @@ int RenderTableSection::calcRowLogicalHeight()
 
         for (unsigned c = 0; c < totalCols; c++) {
             CellStruct& current = cellAt(r, c);
-            cell = current.primaryCell();
+            for (unsigned i = 0; i < current.cells.size(); i++) {
+                cell = current.cells[i];
+                if (current.inColSpan && cell->rowSpan() == 1)
+                    continue;
 
-            if (!cell || current.inColSpan)
-                continue;
+                // FIXME: We are always adding the height of a rowspan to the last rows which doesn't match
+                // other browsers. See webkit.org/b/52185 for example.
+                if ((cell->rowIndex() + cell->rowSpan() - 1) != r)
+                    continue;
 
-            // FIXME: We are always adding the height of a rowspan to the last rows which doesn't match
-            // other browsers. See webkit.org/b/52185 for example.
-            if ((cell->rowIndex() + cell->rowSpan() - 1) != r)
-                continue;
+                // For row spanning cells, |r| is the last row in the span.
+                unsigned cellStartRow = cell->rowIndex();
 
-            // For row spanning cells, |r| is the last row in the span.
-            unsigned cellStartRow = cell->rowIndex();
-
-            if (cell->hasOverrideHeight()) {
-                if (!statePusher.didPush()) {
-                    // Technically, we should also push state for the row, but since
-                    // rows don't push a coordinate transform, that's not necessary.
-                    statePusher.push(this, locationOffset());
+                if (cell->hasOverrideHeight()) {
+                    if (!statePusher.didPush()) {
+                        // Technically, we should also push state for the row, but since
+                        // rows don't push a coordinate transform, that's not necessary.
+                        statePusher.push(this, locationOffset());
+                    }
+                    cell->clearIntrinsicPadding();
+                    cell->clearOverrideSize();
+                    cell->setChildNeedsLayout(true, MarkOnlyThis);
+                    cell->layoutIfNeeded();
                 }
-                cell->clearIntrinsicPadding();
-                cell->clearOverrideSize();
-                cell->setChildNeedsLayout(true, MarkOnlyThis);
-                cell->layoutIfNeeded();
-            }
 
-            int cellLogicalHeight = cell->logicalHeightForRowSizing();
-            m_rowPos[r + 1] = max(m_rowPos[r + 1], m_rowPos[cellStartRow] + cellLogicalHeight);
+                int cellLogicalHeight = cell->logicalHeightForRowSizing();
+                m_rowPos[r + 1] = max(m_rowPos[r + 1], m_rowPos[cellStartRow] + cellLogicalHeight);
 
-            // find out the baseline
-            EVerticalAlign va = cell->style()->verticalAlign();
-            if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH) {
-                LayoutUnit baselinePosition = cell->cellBaselinePosition();
-                if (baselinePosition > cell->borderBefore() + cell->paddingBefore()) {
-                    m_grid[cellStartRow].baseline = max(m_grid[cellStartRow].baseline, baselinePosition - cell->intrinsicPaddingBefore());
-                    baselineDescent = max(baselineDescent, m_rowPos[cellStartRow] + cellLogicalHeight - (baselinePosition - cell->intrinsicPaddingBefore()));
+                // find out the baseline
+                EVerticalAlign va = cell->style()->verticalAlign();
+                if (va == BASELINE || va == TEXT_BOTTOM || va == TEXT_TOP || va == SUPER || va == SUB || va == LENGTH) {
+                    LayoutUnit baselinePosition = cell->cellBaselinePosition();
+                    if (baselinePosition > cell->borderBefore() + cell->paddingBefore()) {
+                        m_grid[cellStartRow].baseline = max(m_grid[cellStartRow].baseline, baselinePosition - cell->intrinsicPaddingBefore());
+                        baselineDescent = max(baselineDescent, m_rowPos[cellStartRow] + cellLogicalHeight - (baselinePosition - cell->intrinsicPaddingBefore()));
+                    }
                 }
             }
         }
@@ -547,6 +548,8 @@ void RenderTableSection::layoutRows()
             rowRenderer->updateLayerTransform();
         }
 
+        int rowHeightIncreaseForPagination = 0;
+
         for (unsigned c = 0; c < nEffCols; c++) {
             CellStruct& cs = cellAt(r, c);
             RenderTableCell* cell = cs.primaryCell();
@@ -671,13 +674,9 @@ void RenderTableSection::layoutRows()
                 // FIXME: Pagination might have made us change size. For now just shrink or grow the cell to fit without doing a relayout.
                 // We'll also do a basic increase of the row height to accommodate the cell if it's bigger, but this isn't quite right
                 // either. It's at least stable though and won't result in an infinite # of relayouts that may never stabilize.
-                if (cell->logicalHeight() > rHeight) {
-                    unsigned delta = cell->logicalHeight() - rHeight;
-                    for (unsigned rowIndex = rindx + cell->rowSpan(); rowIndex <= totalRows; rowIndex++)
-                        m_rowPos[rowIndex] += delta;
-                    rHeight = cell->logicalHeight();
-                } else
-                    cell->setLogicalHeight(rHeight);
+                if (cell->logicalHeight() > rHeight)
+                    rowHeightIncreaseForPagination = max<int>(rowHeightIncreaseForPagination, cell->logicalHeight() - rHeight);
+                cell->setLogicalHeight(rHeight);
             }
 
             LayoutSize childOffset(cell->location() - oldCellRect.location());
@@ -689,6 +688,15 @@ void RenderTableSection::layoutRows()
                 // repaint ourselves (and the child) anyway.
                 if (!table()->selfNeedsLayout() && cell->checkForRepaintDuringLayout())
                     cell->repaintDuringLayoutIfMoved(oldCellRect);
+            }
+        }
+        if (rowHeightIncreaseForPagination) {
+            for (unsigned rowIndex = r + 1; rowIndex <= totalRows; rowIndex++)
+                m_rowPos[rowIndex] += rowHeightIncreaseForPagination;
+            for (unsigned c = 0; c < nEffCols; ++c) {
+                Vector<RenderTableCell*, 1>& cells = cellAt(r, c).cells;
+                for (size_t i = 0; i < cells.size(); ++i)
+                    cells[i]->setLogicalHeight(cells[i]->logicalHeight() + rowHeightIncreaseForPagination);
             }
         }
     }

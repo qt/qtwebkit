@@ -29,6 +29,7 @@
 #include "IntSize.h"
 #include "LayerTextureUpdater.h"
 #include "Region.h"
+#include "TextureAllocator.h"
 #include "TextureCopier.h"
 #include "TextureUploader.h"
 #include "TiledLayerChromium.h"
@@ -110,8 +111,8 @@ public:
 
     static WebCore::IntSize tileSize() { return WebCore::IntSize(100, 100); }
 
-    using WebCore::TiledLayerChromium::invalidateRect;
-    using WebCore::TiledLayerChromium::updateLayerRect;
+    using WebCore::TiledLayerChromium::invalidateContentRect;
+    using WebCore::TiledLayerChromium::updateContentRect;
     using WebCore::TiledLayerChromium::needsIdlePaint;
     using WebCore::TiledLayerChromium::skipsDraw;
     using WebCore::TiledLayerChromium::numPaintedTiles;
@@ -120,7 +121,7 @@ public:
     virtual void setNeedsDisplayRect(const WebCore::FloatRect&) OVERRIDE;
     const WebCore::FloatRect& lastNeedsDisplayRect() const { return m_lastNeedsDisplayRect; }
 
-    // Updates the visibleLayerRect().
+    // Updates the visibleContentRect().
     virtual void update(WebCore::CCTextureUpdater&, const WebCore::CCOcclusionTracker*) OVERRIDE;
 
     virtual void setTexturePriorities(const WebCore::CCPriorityCalculator&) OVERRIDE;

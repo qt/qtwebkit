@@ -47,6 +47,7 @@
 #include "DocumentType.h"
 #include "DynamicNodeList.h"
 #include "Element.h"
+#include "ElementRareData.h"
 #include "ElementShadow.h"
 #include "Event.h"
 #include "EventContext.h"
@@ -489,8 +490,6 @@ OwnPtr<NodeRareData> Node::createRareData()
 void Node::clearRareData()
 {
     ASSERT(hasRareData());
-    if (treeScope() && rareData()->nodeLists())
-        treeScope()->removeNodeListCache();
 
 #if ENABLE(MUTATION_OBSERVERS)
     ASSERT(!transientMutationObserverRegistry() || transientMutationObserverRegistry()->isEmpty());
@@ -920,7 +919,17 @@ bool Node::isFocusable() const
         // If the node is in a display:none tree it might say it needs style recalc but
         // the whole document is actually up to date.
         ASSERT(!document()->childNeedsStyleRecalc());
-    
+
+    // Elements in canvas fallback content are not rendered, but they are allowed to be
+    // focusable as long as their canvas is displayed and visible.
+    if (isElementNode() && toElement(this)->isInCanvasSubtree()) {
+        const Element* e = toElement(this);
+        while (e && !e->hasLocalName(canvasTag))
+            e = e->parentElement();
+        ASSERT(e);
+        return e->renderer() && e->renderer()->style()->visibility() == VISIBLE;
+    }
+
     // FIXME: Even if we are not visible, we might have a child that is visible.
     // Hyatt wants to fix that some day with a "has visible content" flag or the like.
     if (!renderer() || renderer()->style()->visibility() != VISIBLE)
@@ -953,70 +962,28 @@ unsigned Node::nodeIndex() const
     return count;
 }
 
-void Node::invalidateNodeListsCacheAfterAttributeChanged(const QualifiedName& attrName, Element* attributeOwnerElement)
+void Node::invalidateNodeListCachesInAncestors(const QualifiedName* attrName, Element* attributeOwnerElement)
 {
-    if (hasRareData() && isAttributeNode()) {
-        NodeRareData* data = rareData();
-        ASSERT(!data->nodeLists());
-        data->clearChildNodeListCache();
-    }
-
-    // Modifications to attributes that are not associated with an Element can't invalidate NodeList caches.
-    if (!attributeOwnerElement)
-        return;
-
-    // FIXME: Move the list of attributes each NodeList type cares about to be a static on the
-    // appropriate NodeList class. Then use those lists here and in invalidateCachesThatDependOnAttributes
-    // to only invalidate the cache types that depend on the attribute that changed.
-    // FIXME: Keep track of when we have no caches of a given type so that we can avoid the for-loop
-    // below even if a related attribute changed (e.g. if we have no RadioNodeLists, we don't need
-    // to invalidate any caches when id attributes change.)
-    if (attrName != classAttr
-#if ENABLE(MICRODATA)
-        && attrName != itemscopeAttr
-        && attrName != itempropAttr
-        && attrName != itemtypeAttr
-#endif
-        && attrName != nameAttr
-        && attrName != forAttr
-        && (attrName != idAttr || !attributeOwnerElement->isFormControlElement()))
-        return;
-
-    document()->clearNodeListCaches();
-
-    if (!treeScope()->hasNodeListCaches())
-        return;
-
-    for (Node* node = this; node; node = node->parentNode()) {
-        ASSERT(this == node || !node->isAttributeNode());
-        if (!node->hasRareData())
-            continue;
-        NodeRareData* data = node->rareData();
-        if (!data->nodeLists())
-            continue;
-
-        data->nodeLists()->invalidateCaches(&attrName);
-    }
-}
-
-void Node::invalidateNodeListsCacheAfterChildrenChanged()
-{
-    if (hasRareData())
+    if (hasRareData() && (!attrName || isAttributeNode()))
         rareData()->clearChildNodeListCache();
 
-    document()->clearNodeListCaches();
-
-    if (!treeScope()->hasNodeListCaches())
+    // Modifications to attributes that are not associated with an Element can't invalidate NodeList caches.
+    if (attrName && !attributeOwnerElement)
         return;
+
+    if (!document()->shouldInvalidateNodeListCaches())
+        return;
+
+    document()->clearNodeListCaches();
 
     for (Node* node = this; node; node = node->parentNode()) {
         if (!node->hasRareData())
             continue;
         NodeRareData* data = node->rareData();
-        if (!data->nodeLists())
-            continue;
-
-        data->nodeLists()->invalidateCaches();
+        if (data->nodeLists())
+            data->nodeLists()->invalidateCaches(attrName);
+        if (node->isElementNode())
+            static_cast<ElementRareData*>(data)->clearHTMLCollectionCaches(attrName);
     }
 }
 
@@ -1563,8 +1530,8 @@ PassRefPtr<NodeList> Node::getElementsByTagName(const AtomicString& localName)
         return 0;
 
     if (document()->isHTMLDocument())
-        return ensureRareData()->ensureNodeLists(this)->addCacheWithAtomicName<HTMLTagNodeList>(this, DynamicNodeList::TagNodeListType, localName);
-    return ensureRareData()->ensureNodeLists(this)->addCacheWithAtomicName<TagNodeList>(this, DynamicNodeList::TagNodeListType, localName);
+        return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLTagNodeList>(this, DynamicNodeList::TagNodeListType, localName);
+    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<TagNodeList>(this, DynamicNodeList::TagNodeListType, localName);
 }
 
 PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName)
@@ -1575,23 +1542,23 @@ PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceU
     if (namespaceURI == starAtom)
         return getElementsByTagName(localName);
 
-    return ensureRareData()->ensureNodeLists(this)->addCacheWithQualifiedName(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localName);
+    return ensureRareData()->ensureNodeLists()->addCacheWithQualifiedName(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localName);
 }
 
 PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 {
-    return ensureRareData()->ensureNodeLists(this)->addCacheWithAtomicName<NameNodeList>(this, DynamicNodeList::NameNodeListType, elementName);
+    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<NameNodeList>(this, DynamicNodeList::NameNodeListType, elementName);
 }
 
 PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
 {
-    return ensureRareData()->ensureNodeLists(this)->addCacheWithName<ClassNodeList>(this, DynamicNodeList::ClassNodeListType, classNames);
+    return ensureRareData()->ensureNodeLists()->addCacheWithName<ClassNodeList>(this, DynamicNodeList::ClassNodeListType, classNames);
 }
 
 PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
 {
     ASSERT(hasTagName(formTag) || hasTagName(fieldsetTag));
-    return ensureRareData()->ensureNodeLists(this)->addCacheWithAtomicName<RadioNodeList>(this, DynamicNodeList::RadioNodeListType, name);
+    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<RadioNodeList>(this, DynamicNodeList::RadioNodeListType, name);
 }
 
 PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionCode& ec)
@@ -2257,14 +2224,16 @@ void NodeListsNodeData::invalidateCaches(const QualifiedName* attrName)
 {
     NodeListAtomicNameCacheMap::const_iterator atomicNameCacheEnd = m_atomicNameCaches.end();
     for (NodeListAtomicNameCacheMap::const_iterator it = m_atomicNameCaches.begin(); it != atomicNameCacheEnd; ++it) {
-        if (!attrName || it->second->shouldInvalidateOnAttributeChange())
-            it->second->invalidateCache();
+        DynamicNodeList* list = it->second;
+        if (!attrName || DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(list->invalidationType(), *attrName))
+            list->invalidateCache();
     }
 
     NodeListNameCacheMap::const_iterator nameCacheEnd = m_nameCaches.end();
     for (NodeListNameCacheMap::const_iterator it = m_nameCaches.begin(); it != nameCacheEnd; ++it) {
-        if (!attrName || it->second->shouldInvalidateOnAttributeChange())
-            it->second->invalidateCache();
+        DynamicNodeList* list = it->second;
+        if (!attrName || DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(list->invalidationType(), *attrName))
+            list->invalidateCache();
     }
 
     if (!attrName)
@@ -2779,20 +2748,6 @@ void Node::setItemType(const String& value)
 }
 
 #endif
-
-void NodeRareData::createNodeLists(Node* node)
-{
-    ASSERT(node);
-    setNodeLists(NodeListsNodeData::create());
-    if (TreeScope* treeScope = node->treeScope())
-        treeScope->addNodeListCache();
-}
-
-void NodeRareData::clearChildNodeListCache()
-{
-    if (m_childNodeList)
-        m_childNodeList->invalidateCache();
-}
 
 // It's important not to inline removedLastRef, because we don't want to inline the code to
 // delete a Node at each deref call site.

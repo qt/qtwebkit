@@ -27,6 +27,8 @@ LIST(APPEND WebKit2_SOURCES
     Shared/efl/WebEventFactory.cpp
     Shared/efl/WebCoreArgumentCodersEfl.cpp
 
+    Shared/soup/PlatformCertificateInfo.cpp
+
     UIProcess/API/C/efl/WKView.cpp
 
     UIProcess/API/C/soup/WKContextSoup.cpp
@@ -37,9 +39,12 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/efl/ewk_context.cpp
     UIProcess/API/efl/ewk_intent.cpp
     UIProcess/API/efl/ewk_intent_service.cpp
+    UIProcess/API/efl/ewk_navigation_policy_decision.cpp
     UIProcess/API/efl/ewk_url_request.cpp
+    UIProcess/API/efl/ewk_url_response.cpp
     UIProcess/API/efl/ewk_view.cpp
     UIProcess/API/efl/ewk_view_loader_client.cpp
+    UIProcess/API/efl/ewk_view_policy_client.cpp
     UIProcess/API/efl/ewk_view_resource_load_client.cpp
     UIProcess/API/efl/ewk_web_error.cpp
     UIProcess/API/efl/ewk_web_resource.cpp
@@ -53,6 +58,7 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/efl/WebPageProxyEfl.cpp
     UIProcess/efl/WebPreferencesEfl.cpp
 
+    UIProcess/soup/WebCookieManagerProxySoup.cpp
     UIProcess/soup/WebSoupRequestManagerClient.cpp
     UIProcess/soup/WebSoupRequestManagerProxy.cpp
 
@@ -62,6 +68,7 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/Plugins/unix/PluginInfoStoreUnix.cpp
 
     WebProcess/Cookies/soup/WebCookieManagerSoup.cpp
+    WebProcess/Cookies/soup/WebKitSoupCookieJarSqlite.cpp
 
     WebProcess/Downloads/efl/DownloadEfl.cpp
     WebProcess/Downloads/efl/FileDownloaderEfl.cpp
@@ -96,6 +103,7 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/network/soup"
     "${WEBCORE_DIR}/svg/graphics"
     "${WEBKIT2_DIR}/Shared/efl"
+    "${WEBKIT2_DIR}/Shared/soup"
     "${WEBKIT2_DIR}/UIProcess/API/C/efl"
     "${WEBKIT2_DIR}/UIProcess/API/C/soup"
     "${WEBKIT2_DIR}/UIProcess/API/efl"
@@ -162,8 +170,61 @@ CONFIGURE_FILE(efl/ewebkit2.pc.in ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc @O
 SET (EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/EWebKit2.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_context.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent_service.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_navigation_policy_decision.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_request.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_response.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_view.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_web_error.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_web_resource.h"
 )
 
 INSTALL(FILES ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc DESTINATION lib/pkgconfig)
 INSTALL(FILES ${EWebKit2_HEADERS} DESTINATION include/${WebKit2_LIBRARY_NAME}-${PROJECT_VERSION_MAJOR})
+
+INCLUDE_DIRECTORIES(${THIRDPARTY_DIR}/gtest/include)
+
+SET(EWK2UnitTests_LIBRARIES
+    ${JavaScriptCore_LIBRARY_NAME}
+    ${WebCore_LIBRARY_NAME}
+    ${WebKit2_LIBRARY_NAME}
+    ${ECORE_LIBRARIES}
+    ${ECORE_EVAS_LIBRARIES}
+    ${EVAS_LIBRARIES}
+)
+
+IF (ENABLE_GLIB_SUPPORT)
+    LIST(APPEND EWK2UnitTests_LIBRARIES
+        ${Glib_LIBRARIES}
+        ${Gthread_LIBRARIES}
+    )
+ENDIF()
+
+SET(WEBKIT2_EFL_TEST_DIR "${WEBKIT2_DIR}/UIProcess/API/efl/tests")
+SET(TEST_RESOURCES_DIR ${WEBKIT2_EFL_TEST_DIR}/resources)
+
+ADD_DEFINITIONS(-DTEST_RESOURCES_DIR=\"${TEST_RESOURCES_DIR}\")
+
+ADD_LIBRARY(ewk2UnitTestUtils
+    ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestBase.cpp
+    ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestEnvironment.cpp
+    ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestMain.cpp
+)
+
+TARGET_LINK_LIBRARIES(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
+
+# The "ewk" on the test name needs to be suffixed with "2", otherwise it
+# will clash with tests from the WebKit 1 test suite.
+SET(EWK2UnitTests_BINARIES
+    test_ewk2_view
+)
+
+IF (ENABLE_API_TESTS)
+    FOREACH (testName ${EWK2UnitTests_BINARIES})
+        ADD_EXECUTABLE(${testName} ${WEBKIT2_EFL_TEST_DIR}/${testName}.cpp)
+        ADD_TEST(${testName} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${testName})
+        SET_TESTS_PROPERTIES(${testName} PROPERTIES TIMEOUT 60)
+        TARGET_LINK_LIBRARIES(${testName} ${EWK2UnitTests_LIBRARIES} ewk2UnitTestUtils gtest pthread)
+    ENDFOREACH ()
+ENDIF ()

@@ -157,6 +157,7 @@
 #include "UndoManager.h"
 #include "UserContentURLPattern.h"
 #include "WebKitNamedFlow.h"
+#include "WebKitNamedFlowCollection.h"
 #include "XMLDocumentParser.h"
 #include "XMLHttpRequest.h"
 #include "XMLNSNames.h"
@@ -564,7 +565,10 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 
     static int docID = 0;
     m_docID = docID++;
-    
+
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListCounts); i++)
+        m_nodeListCounts[i] = 0;
+
     for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_collections); i++)
         m_collections[i] = 0;
 
@@ -615,6 +619,9 @@ Document::~Document()
     if (m_styleSheets)
         m_styleSheets->documentDestroyed();
 
+    if (m_namedFlows)
+        m_namedFlows->documentDestroyed();
+
     if (m_elemSheet)
         m_elemSheet->clearOwnerNode();
     if (m_pageUserSheet)
@@ -647,6 +654,14 @@ Document::~Document()
     // as well as Node. See a comment on TreeScope.h for the reason.
     if (hasRareData())
         clearRareData();
+
+    ASSERT(!m_listsInvalidatedAtDocument.size());
+
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListCounts); i++)
+        ASSERT(!m_nodeListCounts[i]);
+
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_collections); i++)
+        ASSERT(!m_collections[i]);
 
     m_document = 0;
 
@@ -804,7 +819,6 @@ void Document::setDocType(PassRefPtr<DocumentType> docType)
     if (m_docType) {
         this->adoptIfNeeded(m_docType.get());
 #if ENABLE(LEGACY_VIEWPORT_ADAPTION)
-        ASSERT(m_viewportArguments.type == ViewportArguments::Implicit);
         if (m_docType->publicId().startsWith("-//wapforum//dtd xhtml mobile 1.", /* caseSensitive */ false))
             processViewport("width=device-width, height=device-height", ViewportArguments::XHTMLMobileProfile);
 #endif
@@ -1116,43 +1130,25 @@ bool Document::cssGridLayoutEnabled() const
 
 #if ENABLE(CSS_REGIONS)
 
-static bool validFlowName(const String& flowName)
-{
-    if (equalIgnoringCase(flowName, "auto")
-        || equalIgnoringCase(flowName, "default")
-        || equalIgnoringCase(flowName, "inherit")
-        || equalIgnoringCase(flowName, "initial")
-        || equalIgnoringCase(flowName, "none"))
-        return false;
-    return true;
-}
-
 PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName)
-{
-    return webkitGetFlowByName(flowName, CheckFlowNameForInvalidValues);
-}
-
-PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName, FlowNameCheck flowNameCheck)
 {
     if (!cssRegionsEnabled() || !renderer())
         return 0;
 
-    if (flowNameCheck == CheckFlowNameForInvalidValues) {
-        if (flowName.isEmpty() || !validFlowName(flowName))
-            return 0;
+    // It's possible to have pending styles not applied that affect the existing flows.
+    updateStyleIfNeeded();
 
-        // Make a slower check for invalid flow name.
-        CSSParser parser(document());
-        if (!parser.parseFlowThread(flowName))
-            return 0;
-    }
-
-    if (RenderView* view = renderer()->view())
-        return view->flowThreadController()->ensureRenderFlowThreadWithName(flowName)->ensureNamedFlow();
-    return 0;
+    return namedFlows()->flowByName(flowName);
 }
-
 #endif
+
+WebKitNamedFlowCollection* Document::namedFlows()
+{
+    if (!m_namedFlows)
+        m_namedFlows = WebKitNamedFlowCollection::create(this);
+
+    return m_namedFlows.get();
+}
 
 PassRefPtr<Element> Document::createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode& ec)
 {
@@ -2083,6 +2079,11 @@ void Document::detach()
 {
     ASSERT(attached());
     ASSERT(!m_inPageCache);
+
+#if ENABLE(POINTER_LOCK)
+    if (page())
+        page()->pointerLockController()->documentDetached(this);
+#endif
 
     if (this == topDocument())
         clearAXObjectCache();
@@ -3865,20 +3866,48 @@ void Document::setCSSTarget(Element* n)
         n->setNeedsStyleRecalc();
 }
 
-void Document::registerDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
+void Document::registerNodeListCache(DynamicNodeListCacheBase* list)
 {
-    m_listsInvalidatedAtDocument.add(list);
+    if (list->type() != InvalidCollectionType)
+        m_nodeListCounts[InvalidateOnIdNameAttrChange]++;
+    m_nodeListCounts[list->invalidationType()]++;
+    if (list->isRootedAtDocument())
+        m_listsInvalidatedAtDocument.add(list);
 }
 
-void Document::unregisterDynamicSubtreeNodeList(DynamicSubtreeNodeList* list)
+void Document::unregisterNodeListCache(DynamicNodeListCacheBase* list)
 {
-    m_listsInvalidatedAtDocument.remove(list);
+    if (list->type() != InvalidCollectionType)
+        m_nodeListCounts[InvalidateOnIdNameAttrChange]--;
+    m_nodeListCounts[list->invalidationType()]--;
+    if (list->isRootedAtDocument()) {
+        ASSERT(m_listsInvalidatedAtDocument.contains(list));
+        m_listsInvalidatedAtDocument.remove(list);
+    }
+}
+
+bool Document::shouldInvalidateNodeListCaches(const QualifiedName* attrName) const
+{
+    if (attrName) {
+        for (int type = DoNotInvalidateOnAttributeChanges + 1; type < numNodeListInvalidationTypes; type++) {
+            if (m_nodeListCounts[type] && DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(static_cast<NodeListInvalidationType>(type), *attrName))
+                return true;
+        }
+        return false;
+    }
+
+    for (int type = 0; type < numNodeListInvalidationTypes; type++) {
+        if (m_nodeListCounts[type])
+            return true;
+    }
+
+    return false;
 }
 
 void Document::clearNodeListCaches()
 {
-    HashSet<DynamicSubtreeNodeList*>::iterator end = m_listsInvalidatedAtDocument.end();
-    for (HashSet<DynamicSubtreeNodeList*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
+    HashSet<DynamicNodeListCacheBase*>::iterator end = m_listsInvalidatedAtDocument.end();
+    for (HashSet<DynamicNodeListCacheBase*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
         (*it)->invalidateCache();
 }
 
@@ -5965,7 +5994,7 @@ PassRefPtr<NodeList> Document::getItems(const String& typeNames)
     // In this case we need to create an unique string identifier to map such request in the cache.
     String localTypeNames = typeNames.isNull() ? MicroDataItemList::undefinedItemType() : typeNames;
 
-    return ensureRareData()->ensureNodeLists(this)->addCacheWithName<MicroDataItemList>(this, DynamicNodeList::MicroDataItemListType, localTypeNames);
+    return ensureRareData()->ensureNodeLists()->addCacheWithName<MicroDataItemList>(this, DynamicNodeList::MicroDataItemListType, localTypeNames);
 }
 #endif
 

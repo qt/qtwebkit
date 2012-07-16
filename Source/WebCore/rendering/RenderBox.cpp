@@ -934,17 +934,7 @@ LayoutRect RenderBox::maskClipRect()
         LayoutRect borderImageRect = borderBoxRect();
         
         // Apply outsets to the border box.
-        LayoutUnit topOutset;
-        LayoutUnit rightOutset;
-        LayoutUnit bottomOutset;
-        LayoutUnit leftOutset;
-        style()->getMaskBoxImageOutsets(topOutset, rightOutset, bottomOutset, leftOutset);
-         
-        borderImageRect.setX(borderImageRect.x() - leftOutset);
-        borderImageRect.setY(borderImageRect.y() - topOutset);
-        borderImageRect.setWidth(borderImageRect.width() + leftOutset + rightOutset);
-        borderImageRect.setHeight(borderImageRect.height() + topOutset + bottomOutset);
-
+        borderImageRect.expand(style()->maskBoxImageOutsets());
         return borderImageRect;
     }
     
@@ -1178,7 +1168,6 @@ LayoutUnit RenderBox::shrinkLogicalWidthToAvoidFloats(LayoutUnit childMarginStar
     }
 
     LayoutUnit result = cb->availableLogicalWidthForLine(logicalTopPosition, false, containingBlockRegion, adjustedPageOffsetForContainingBlock) - childMarginStart - childMarginEnd;
-    result = max(result, minPreferredLogicalWidth()); // Don't shrink below our minimum preferred logical width.
 
     // We need to see if margins on either the start side or the end side can contain the floats in question. If they can,
     // then just using the line width is inaccurate. In the case where a float completely fits, we don't need to use the line
@@ -1741,7 +1730,6 @@ LayoutUnit RenderBox::computeLogicalWidthInRegionUsing(SizeType widthType, Layou
 
     ASSERT(!logicalWidth.isUndefined());
 
-    // FIXME: minWidth:auto on a flex-item needs to go down the intrinsicOrAuto path below.
     if (widthType == MinSize && logicalWidth.isAuto())
         return computeBorderBoxLogicalWidth(0);
     
@@ -2077,10 +2065,8 @@ LayoutUnit RenderBox::computeLogicalHeightUsing(SizeType heightType, const Lengt
 
 LayoutUnit RenderBox::computeContentLogicalHeightUsing(SizeType heightType, const Length& height)
 {
-    // FIXME: For flexboxes, minHeight:auto should be min-content.
     if (height.isAuto())
         return heightType == MinSize ? 0 : -1;
- 
     if (height.isFixed())
         return height.value();
     if (height.isPercent())
@@ -2189,7 +2175,6 @@ LayoutUnit RenderBox::computeReplacedLogicalWidthRespectingMinMaxWidth(LayoutUni
 
 LayoutUnit RenderBox::computeReplacedLogicalWidthUsing(SizeType sizeType, Length logicalWidth) const
 {
-    // FIXME: For flexboxes, minWidth:auto should be min-content.
     if (sizeType == MinSize && logicalWidth.isAuto())
         return computeContentBoxLogicalWidth(0);
 
@@ -2206,7 +2191,10 @@ LayoutUnit RenderBox::computeReplacedLogicalWidthUsing(SizeType sizeType, Length
             // containing block's block-flow.
             // https://bugs.webkit.org/show_bug.cgi?id=46496
             const LayoutUnit cw = isOutOfFlowPositioned() ? containingBlockLogicalWidthForPositioned(toRenderBoxModelObject(container())) : containingBlockLogicalWidthForContent();
-            if (cw > 0)
+            Length containerLogicalWidth = containingBlock()->style()->logicalWidth();
+            // FIXME: Handle cases when containing block width is calculated or viewport percent.
+            // https://bugs.webkit.org/show_bug.cgi?id=91071
+            if (cw > 0 || (!cw && (containerLogicalWidth.isFixed() || containerLogicalWidth.isPercent())))
                 return computeContentBoxLogicalWidth(minimumValueForLength(logicalWidth, cw));
         }
         // fall through
@@ -2229,7 +2217,6 @@ LayoutUnit RenderBox::computeReplacedLogicalHeightRespectingMinMaxHeight(LayoutU
 
 LayoutUnit RenderBox::computeReplacedLogicalHeightUsing(SizeType sizeType, Length logicalHeight) const
 {
-    // FIXME: For flexboxes, minWidth:auto should be min-content.
     if (sizeType == MinSize && logicalHeight.isAuto())
         return computeContentBoxLogicalHeight(0);
 
@@ -2337,7 +2324,7 @@ LayoutUnit RenderBox::availableLogicalHeightUsing(const Length& h) const
     return containingBlock()->availableLogicalHeight();
 }
 
-void RenderBox::computeBlockDirectionMargins(RenderBlock* containingBlock)
+void RenderBox::computeBlockDirectionMargins(const RenderBlock* containingBlock)
 {
     if (isTableCell()) {
         // FIXME: Not right if we allow cells to have different directionality than the table.  If we do allow this, though,
@@ -2667,7 +2654,6 @@ void RenderBox::computePositionedLogicalWidthUsing(SizeType widthSizeType, Lengt
                                                    Length logicalLeft, Length logicalRight, Length marginLogicalLeft, Length marginLogicalRight,
                                                    LayoutUnit& logicalWidthValue, LayoutUnit& marginLogicalLeftValue, LayoutUnit& marginLogicalRightValue, LayoutUnit& logicalLeftPos)
 {
-    // FIXME: What should flex items do here since min-width:auto == min-width:min-content instead of min-width:auto == min-width:0.
     if (widthSizeType == MinSize && logicalWidth.isAuto())
         logicalWidth = Length(0, Fixed);
 
@@ -3001,7 +2987,6 @@ void RenderBox::computePositionedLogicalHeightUsing(SizeType heightSizeType, Len
                                                     Length logicalTop, Length logicalBottom, Length marginBefore, Length marginAfter,
                                                     LayoutUnit& logicalHeightValue, LayoutUnit& marginBeforeValue, LayoutUnit& marginAfterValue, LayoutUnit& logicalTopPos)
 {
-    // FIXME: What should flex items do here since min-height:auto == min-height:min-content instead of min-height:auto == min-height:0.
     if (heightSizeType == MinSize && logicalHeightLength.isAuto())
         logicalHeightLength = Length(0, Fixed);
 
@@ -3013,7 +2998,6 @@ void RenderBox::computePositionedLogicalHeightUsing(SizeType heightSizeType, Len
 
     LayoutUnit logicalTopValue = 0;
 
-    // FIXME: For non-flexboxes + min-height, this needs to treat non-flexboxes as 0.
     bool logicalHeightIsAuto = logicalHeightLength.isAuto();
     bool logicalTopIsAuto = logicalTop.isAuto();
     bool logicalBottomIsAuto = logicalBottom.isAuto();
@@ -3591,18 +3575,14 @@ void RenderBox::addVisualEffectOverflow()
 
     // Now compute border-image-outset overflow.
     if (style()->hasBorderImageOutsets()) {
-        LayoutUnit borderOutsetLeft;
-        LayoutUnit borderOutsetRight;
-        LayoutUnit borderOutsetTop;
-        LayoutUnit borderOutsetBottom;
-        style()->getBorderImageOutsets(borderOutsetTop, borderOutsetRight, borderOutsetBottom, borderOutsetLeft);
+        LayoutBoxExtent borderOutsets = style()->borderImageOutsets();
         
         // In flipped blocks writing modes, the physical sides are inverted. For example in vertical-rl, the right
         // border is at the lower x coordinate value.
-        overflowMinX = min(overflowMinX, borderBox.x() - ((!isFlipped || isHorizontal) ? borderOutsetLeft : borderOutsetRight));
-        overflowMaxX = max(overflowMaxX, borderBox.maxX() + ((!isFlipped || isHorizontal) ? borderOutsetRight : borderOutsetLeft));
-        overflowMinY = min(overflowMinY, borderBox.y() - ((!isFlipped || !isHorizontal) ? borderOutsetTop : borderOutsetBottom));
-        overflowMaxY = max(overflowMaxY, borderBox.maxY() + ((!isFlipped || !isHorizontal) ? borderOutsetBottom : borderOutsetTop));
+        overflowMinX = min(overflowMinX, borderBox.x() - ((!isFlipped || isHorizontal) ? borderOutsets.left() : borderOutsets.right()));
+        overflowMaxX = max(overflowMaxX, borderBox.maxX() + ((!isFlipped || isHorizontal) ? borderOutsets.right() : borderOutsets.left()));
+        overflowMinY = min(overflowMinY, borderBox.y() - ((!isFlipped || !isHorizontal) ? borderOutsets.top() : borderOutsets.bottom()));
+        overflowMaxY = max(overflowMaxY, borderBox.maxY() + ((!isFlipped || !isHorizontal) ? borderOutsets.bottom() : borderOutsets.top()));
     }
 
     // Add in the final overflow with shadows and outsets combined.

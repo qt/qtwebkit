@@ -304,7 +304,7 @@ NativeImagePtr BitmapImage::frameAtIndex(size_t index)
 bool BitmapImage::frameIsCompleteAtIndex(size_t index)
 {
     if (!ensureFrameIsCached(index))
-        return true; // Why would an invalid index return true here?
+        return false;
     return m_frames[index].m_isComplete;
 }
 
@@ -562,12 +562,5 @@ Color BitmapImage::solidColor() const
 {
     return m_solidColor;
 }
-
-#if !USE(CG)
-void BitmapImage::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op, RespectImageOrientationEnum)
-{
-    draw(ctx, dstRect, srcRect, styleColorSpace, op);
-}
-#endif
 
 }

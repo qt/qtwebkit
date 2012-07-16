@@ -25,12 +25,14 @@
 #include "CString.h"
 #include "Chrome.h"
 #include "DOMSupport.h"
+#include "DatePickerClient.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "DocumentMarkerController.h"
 #include "FocusController.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLOptGroupElement.h"
@@ -209,6 +211,117 @@ static int inputStyle(BlackBerryInputType type, const Element* element)
         break;
     }
     return DEFAULT_STYLE;
+}
+
+static VirtualKeyboardType convertStringToKeyboardType(const AtomicString& string)
+{
+    DEFINE_STATIC_LOCAL(AtomicString, Default, ("default"));
+    DEFINE_STATIC_LOCAL(AtomicString, Url, ("url"));
+    DEFINE_STATIC_LOCAL(AtomicString, Email, ("email"));
+    DEFINE_STATIC_LOCAL(AtomicString, Password, ("password"));
+    DEFINE_STATIC_LOCAL(AtomicString, Web, ("web"));
+    DEFINE_STATIC_LOCAL(AtomicString, Number, ("number"));
+    DEFINE_STATIC_LOCAL(AtomicString, Symbol, ("symbol"));
+    DEFINE_STATIC_LOCAL(AtomicString, Phone, ("phone"));
+    DEFINE_STATIC_LOCAL(AtomicString, Pin, ("pin"));
+    DEFINE_STATIC_LOCAL(AtomicString, Hex, ("hexadecimal"));
+
+    if (string.isEmpty())
+        return VKBTypeNotSet;
+    if (equalIgnoringCase(string, Default))
+        return VKBTypeDefault;
+    if (equalIgnoringCase(string, Url))
+        return VKBTypeUrl;
+    if (equalIgnoringCase(string, Email))
+        return VKBTypeEmail;
+    if (equalIgnoringCase(string, Password))
+        return VKBTypePassword;
+    if (equalIgnoringCase(string, Web))
+        return VKBTypeWeb;
+    if (equalIgnoringCase(string, Number))
+        return VKBTypeNumPunc;
+    if (equalIgnoringCase(string, Symbol))
+        return VKBTypeSymbol;
+    if (equalIgnoringCase(string, Phone))
+        return VKBTypePhone;
+    if (equalIgnoringCase(string, Pin) || equalIgnoringCase(string, Hex))
+        return VKBTypePin;
+    return VKBTypeNotSet;
+}
+
+static VirtualKeyboardType keyboardTypeAttribute(const WebCore::Element* element)
+{
+    DEFINE_STATIC_LOCAL(QualifiedName, keyboardTypeAttr, (nullAtom, "data-blackberry-virtual-keyboard-type", nullAtom));
+
+    if (element->fastHasAttribute(keyboardTypeAttr)) {
+        AtomicString attributeString = element->fastGetAttribute(keyboardTypeAttr);
+        return convertStringToKeyboardType(attributeString);
+    }
+
+    if (element->isFormControlElement()) {
+        const HTMLFormControlElement* formElement = static_cast<const HTMLFormControlElement*>(element);
+        if (formElement->form() && formElement->form()->fastHasAttribute(keyboardTypeAttr)) {
+            AtomicString attributeString = formElement->form()->fastGetAttribute(keyboardTypeAttr);
+            return convertStringToKeyboardType(attributeString);
+        }
+    }
+
+    return VKBTypeNotSet;
+}
+
+static VirtualKeyboardEnterKeyType convertStringToKeyboardEnterKeyType(const AtomicString& string)
+{
+    DEFINE_STATIC_LOCAL(AtomicString, Default, ("default"));
+    DEFINE_STATIC_LOCAL(AtomicString, Connect, ("connect"));
+    DEFINE_STATIC_LOCAL(AtomicString, Done, ("done"));
+    DEFINE_STATIC_LOCAL(AtomicString, Go, ("go"));
+    DEFINE_STATIC_LOCAL(AtomicString, Join, ("join"));
+    DEFINE_STATIC_LOCAL(AtomicString, Next, ("next"));
+    DEFINE_STATIC_LOCAL(AtomicString, Search, ("search"));
+    DEFINE_STATIC_LOCAL(AtomicString, Send, ("send"));
+    DEFINE_STATIC_LOCAL(AtomicString, Submit, ("submit"));
+
+    if (string.isEmpty())
+        return VKBEnterKeyNotSet;
+    if (equalIgnoringCase(string, Default))
+        return VKBEnterKeyDefault;
+    if (equalIgnoringCase(string, Connect))
+        return VKBEnterKeyConnect;
+    if (equalIgnoringCase(string, Done))
+        return VKBEnterKeyDone;
+    if (equalIgnoringCase(string, Go))
+        return VKBEnterKeyGo;
+    if (equalIgnoringCase(string, Join))
+        return VKBEnterKeyJoin;
+    if (equalIgnoringCase(string, Next))
+        return VKBEnterKeyNext;
+    if (equalIgnoringCase(string, Search))
+        return VKBEnterKeySearch;
+    if (equalIgnoringCase(string, Send))
+        return VKBEnterKeySend;
+    if (equalIgnoringCase(string, Submit))
+        return VKBEnterKeySubmit;
+    return VKBEnterKeyNotSet;
+}
+
+static VirtualKeyboardEnterKeyType keyboardEnterKeyTypeAttribute(const WebCore::Element* element)
+{
+    DEFINE_STATIC_LOCAL(QualifiedName, keyboardEnterKeyTypeAttr, (nullAtom, "data-blackberry-virtual-keyboard-enter-key", nullAtom));
+
+    if (element->fastHasAttribute(keyboardEnterKeyTypeAttr)) {
+        AtomicString attributeString = element->fastGetAttribute(keyboardEnterKeyTypeAttr);
+        return convertStringToKeyboardEnterKeyType(attributeString);
+    }
+
+    if (element->isFormControlElement()) {
+        const HTMLFormControlElement* formElement = static_cast<const HTMLFormControlElement*>(element);
+        if (formElement->form() && formElement->form()->fastHasAttribute(keyboardEnterKeyTypeAttr)) {
+            AtomicString attributeString = formElement->form()->fastGetAttribute(keyboardEnterKeyTypeAttr);
+            return convertStringToKeyboardEnterKeyType(attributeString);
+        }
+    }
+
+    return VKBEnterKeyNotSet;
 }
 
 WTF::String InputHandler::elementText()
@@ -478,8 +591,11 @@ void InputHandler::setElementFocused(Element* element)
     BlackBerryInputType type = elementType(element);
     m_currentFocusElementTextEditMask = inputStyle(type, element);
 
-    FocusLog(LogLevelInfo, "InputHandler::setElementFocused, Type=%d, Style=%d", type, m_currentFocusElementTextEditMask);
-    m_webPage->m_client->inputFocusGained(type, m_currentFocusElementTextEditMask);
+    VirtualKeyboardType keyboardType = keyboardTypeAttribute(element);
+    VirtualKeyboardEnterKeyType enterKeyType = keyboardEnterKeyTypeAttribute(element);
+
+    FocusLog(LogLevelInfo, "InputHandler::setElementFocused, Type=%d, Style=%d, Keyboard Type=%d, Enter Key=%d", type, m_currentFocusElementTextEditMask, keyboardType, enterKeyType);
+    m_webPage->m_client->inputFocusGained(type, m_currentFocusElementTextEditMask, keyboardType, enterKeyType);
 
     handleInputLocaleChanged(m_webPage->m_webSettings->isWritingDirectionRTL());
 
@@ -495,15 +611,28 @@ bool InputHandler::openDatePopup(HTMLInputElement* element, BlackBerryInputType 
     if (isActiveTextEdit())
         clearCurrentFocusElement();
 
-    m_currentFocusElement = element;
-    m_currentFocusElementType = TextPopup;
+    switch (type) {
+    case BlackBerry::Platform::InputTypeDate:
+    case BlackBerry::Platform::InputTypeTime:
+    case BlackBerry::Platform::InputTypeDateTime:
+    case BlackBerry::Platform::InputTypeDateTimeLocal: {
+        // Check if popup already exists, close it if does.
+        m_webPage->m_page->chrome()->client()->closePagePopup(0);
+        String value = element->value();
+        String min = element->getAttribute(HTMLNames::minAttr).string();
+        String max = element->getAttribute(HTMLNames::maxAttr).string();
+        double step = element->getAttribute(HTMLNames::stepAttr).toDouble();
 
-    WTF::String value = element->value();
-    WTF::String min = element->getAttribute(HTMLNames::minAttr).string();
-    WTF::String max = element->getAttribute(HTMLNames::maxAttr).string();
-    double step = element->getAttribute(HTMLNames::stepAttr).toDouble();
-    m_webPage->m_client->openDateTimePopup(type, value, min, max, step);
-    return true;
+        DatePickerClient* client = new DatePickerClient(type, value, min, max, step,  m_webPage, element);
+        // Fail to create HTML popup, use the old path
+        if (!m_webPage->m_page->chrome()->client()->openPagePopup(client,  WebCore::IntRect()))
+            m_webPage->m_client->openDateTimePopup(type, value, min, max, step);
+
+        return true;
+        }
+    default: // Other types not supported
+        return false;
+    }
 }
 
 bool InputHandler::openColorPopup(HTMLInputElement* element)

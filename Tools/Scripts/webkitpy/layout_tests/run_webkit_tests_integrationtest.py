@@ -51,7 +51,7 @@ from webkitpy.common.host_mock import MockHost
 
 from webkitpy.layout_tests import port
 from webkitpy.layout_tests import run_webkit_tests
-from webkitpy.layout_tests.controllers.manager_worker_broker import WorkerException
+from webkitpy.layout_tests.controllers.manager import WorkerException
 from webkitpy.layout_tests.port import Port
 from webkitpy.layout_tests.port.test import TestPort, TestDriver
 from webkitpy.test.skip import skip_if
@@ -951,11 +951,11 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue("multiple-mismatch-success.html" not in json["tests"]["reftests"]["foo"])
         self.assertTrue("multiple-both-success.html" not in json["tests"]["reftests"]["foo"])
         self.assertEqual(json["tests"]["reftests"]["foo"]["multiple-match-failure.html"],
-            {"expected": "PASS", "ref_file": "reftests/foo/second-mismatching-ref.html", "actual": "IMAGE", "image_diff_percent": 1, 'is_reftest': True})
+            {"expected": "PASS", "actual": "IMAGE", "image_diff_percent": 1, 'is_reftest': True})
         self.assertEqual(json["tests"]["reftests"]["foo"]["multiple-mismatch-failure.html"],
-            {"expected": "PASS", "ref_file": "reftests/foo/matching-ref.html", "actual": "IMAGE", "is_mismatch_reftest": True})
+            {"expected": "PASS", "actual": "IMAGE", "is_mismatch_reftest": True})
         self.assertEqual(json["tests"]["reftests"]["foo"]["multiple-both-failure.html"],
-            {"expected": "PASS", "ref_file": "reftests/foo/matching-ref.html", "actual": "IMAGE", "is_mismatch_reftest": True})
+            {"expected": "PASS", "actual": "IMAGE", "is_mismatch_reftest": True})
 
 
 class RebaselineTest(unittest.TestCase, StreamTestingMixin):
