@@ -1,5 +1,16 @@
 2012-07-16  Simon Hausmann  <simon.hausmann@nokia.com>
 
+        [Qt] Fix Qt5 module dependencies
+        https://bugs.webkit.org/show_bug.cgi?id=91388
+
+        Reviewed by NOBODY (OOPS!).
+
+        Removed ancient qtscript and qtxmlpatterns module dependencies.
+
+        * qmake/qt_webkit.pri:
+
+2012-07-16  Simon Hausmann  <simon.hausmann@nokia.com>
+
         [Qt] MSVC: unresolved external symbol __DllMainCRTStartup@12
         https://bugs.webkit.org/show_bug.cgi?id=91229
 
