@@ -246,13 +246,29 @@ static Node* nextNode(Node* base, Node* previous, bool onlyIncludeDirectChildren
         return onlyIncludeDirectChildren ? previous->previousSibling() : previous->traversePreviousNode(base);
 }
 
+static inline Node* lastDescendent(Node* node)
+{
+    node = node->lastChild();
+    for (Node* current = node; current; current = current->lastChild())
+        node = current;
+    return node;
+}
+
 template<bool forward>
 static Element* itemBeforeOrAfter(CollectionType type, Node* base, unsigned& offsetInArray, Node* previous)
 {
     ASSERT_UNUSED(offsetInArray, !offsetInArray);
     bool onlyIncludeDirectChildren = shouldOnlyIncludeDirectChildren(type);
     Node* rootNode = base;
-    Node* current = previous ? nextNode<forward>(rootNode, previous, onlyIncludeDirectChildren) : (forward ? base->firstChild() : base->lastChild());
+    Node* current;
+    if (previous)
+        current = nextNode<forward>(rootNode, previous, onlyIncludeDirectChildren);
+    else {
+        if (forward)
+            current = rootNode->firstChild();
+        else
+            current = onlyIncludeDirectChildren ? rootNode->lastChild() : lastDescendent(rootNode);
+    }
 
     for (; current; current = nextNode<forward>(rootNode, current, onlyIncludeDirectChildren)) {
         if (current->isElementNode() && isAcceptableElement(type, toElement(current)))
@@ -308,8 +324,8 @@ unsigned HTMLCollection::length() const
     do {
         offset++;
     } while (itemBeforeOrAfterCachedItem(offset));
+    ASSERT(isLengthCacheValid());
 
-    setLengthCache(offset);
     return offset;
 }
 
@@ -381,7 +397,8 @@ Element* HTMLCollection::itemBeforeOrAfterCachedItem(unsigned offset) const
         }
     }
 
-    setLengthCache(currentOffset);
+    unsigned offsetOfLastItem = currentOffset;
+    setLengthCache(offsetOfLastItem + 1);
 
     return 0;
 }

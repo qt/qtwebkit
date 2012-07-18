@@ -814,8 +814,8 @@ public:
     const Vector<Length>& gridColumns() const { return rareNonInheritedData->m_grid->m_gridColumns; }
     const Vector<Length>& gridRows() const { return rareNonInheritedData->m_grid->m_gridRows; }
 
-    const Length& gridItemColumn() const { return rareNonInheritedData->m_gridItem->m_gridColumn; }
-    const Length& gridItemRow() const { return rareNonInheritedData->m_gridItem->m_gridRow; }
+    Length gridItemColumn() const { return rareNonInheritedData->m_gridItem->m_gridColumn; }
+    Length gridItemRow() const { return rareNonInheritedData->m_gridItem->m_gridRow; }
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
     void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
@@ -962,6 +962,10 @@ public:
     bool isHorizontalWritingMode() const { return writingMode() == TopToBottomWritingMode || writingMode() == BottomToTopWritingMode; }
     bool isFlippedLinesWritingMode() const { return writingMode() == LeftToRightWritingMode || writingMode() == BottomToTopWritingMode; }
     bool isFlippedBlocksWritingMode() const { return writingMode() == RightToLeftWritingMode || writingMode() == BottomToTopWritingMode; }
+
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+    ImageOrientationEnum imageOrientation() const { return static_cast<ImageOrientationEnum>(rareInheritedData->m_imageOrientation); }
+#endif
 
     EImageRendering imageRendering() const { return static_cast<EImageRendering>(rareInheritedData->m_imageRendering); }
 
@@ -1135,6 +1139,11 @@ public:
     bool setZoom(float);
     void setZoomWithoutReturnValue(float f) { setZoom(f); }
     bool setEffectiveZoom(float);
+
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+    void setImageOrientation(ImageOrientationEnum v) { SET_VAR(rareInheritedData, m_imageOrientation, static_cast<int>(v)) }
+#endif
+
     void setImageRendering(EImageRendering v) { SET_VAR(rareInheritedData, m_imageRendering, v) }
 
 #if ENABLE(CSS_IMAGE_RESOLUTION)
@@ -1427,22 +1436,22 @@ public:
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
 #endif
 
-    void setWrapShapeInside(PassRefPtr<CSSWrapShape> shape)
+    void setWrapShapeInside(PassRefPtr<WrapShape> shape)
     {
         if (rareNonInheritedData->m_wrapShapeInside != shape)
             rareNonInheritedData.access()->m_wrapShapeInside = shape;
     }
-    CSSWrapShape* wrapShapeInside() const { return rareNonInheritedData->m_wrapShapeInside.get(); }
+    WrapShape* wrapShapeInside() const { return rareNonInheritedData->m_wrapShapeInside.get(); }
 
-    void setWrapShapeOutside(PassRefPtr<CSSWrapShape> shape)
+    void setWrapShapeOutside(PassRefPtr<WrapShape> shape)
     {
         if (rareNonInheritedData->m_wrapShapeOutside != shape)
             rareNonInheritedData.access()->m_wrapShapeOutside = shape;
     }
-    CSSWrapShape* wrapShapeOutside() const { return rareNonInheritedData->m_wrapShapeOutside.get(); }
+    WrapShape* wrapShapeOutside() const { return rareNonInheritedData->m_wrapShapeOutside.get(); }
 
-    static CSSWrapShape* initialWrapShapeInside() { return 0; }
-    static CSSWrapShape* initialWrapShapeOutside() { return 0; }
+    static WrapShape* initialWrapShapeInside() { return 0; }
+    static WrapShape* initialWrapShapeOutside() { return 0; }
 
     Length wrapPadding() const { return rareNonInheritedData->m_wrapPadding; }
     void setWrapPadding(Length wrapPadding) { SET_VAR(rareNonInheritedData, m_wrapPadding, wrapPadding); }
@@ -1658,6 +1667,7 @@ public:
     static const AtomicString& initialTextEmphasisCustomMark() { return nullAtom; }
     static TextEmphasisPosition initialTextEmphasisPosition() { return TextEmphasisPositionOver; }
     static LineBoxContain initialLineBoxContain() { return LineBoxContainBlock | LineBoxContainInline | LineBoxContainReplaced; }
+    static ImageOrientationEnum initialImageOrientation() { return OriginTopLeft; }
     static EImageRendering initialImageRendering() { return ImageRenderingAuto; }
     static ImageResolutionSource initialImageResolutionSource() { return ImageResolutionSpecified; }
     static ImageResolutionSnap initialImageResolutionSnap() { return ImageResolutionNoSnap; }

@@ -1209,6 +1209,7 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/notifications/WorkerContextNotifications.h \
 	Source/WebCore/Modules/protocolhandler/NavigatorRegisterProtocolHandler.cpp \
 	Source/WebCore/Modules/protocolhandler/NavigatorRegisterProtocolHandler.h \
+	Source/WebCore/Modules/protocolhandler/RegisterProtocolHandlerClient.h \
 	Source/WebCore/Modules/webdatabase/AbstractDatabase.cpp \
 	Source/WebCore/Modules/webdatabase/AbstractDatabase.h \
 	Source/WebCore/Modules/webdatabase/ChangeVersionWrapper.cpp \
@@ -1798,6 +1799,8 @@ webcore_sources += \
 	Source/WebCore/css/WebKitCSSShaderValue.h \
 	Source/WebCore/css/WebKitCSSTransformValue.cpp \
 	Source/WebCore/css/WebKitCSSTransformValue.h \
+	Source/WebCore/css/WrapShapeFunctions.cpp \
+	Source/WebCore/css/WrapShapeFunctions.h \
 	Source/WebCore/dom/ActiveDOMObject.cpp \
 	Source/WebCore/dom/ActiveDOMObject.h \
 	Source/WebCore/dom/Attr.cpp \
@@ -2585,6 +2588,8 @@ webcore_sources += \
 	Source/WebCore/html/shadow/HTMLContentElement.h \
 	Source/WebCore/html/shadow/InsertionPoint.cpp \
 	Source/WebCore/html/shadow/InsertionPoint.h \
+	Source/WebCore/html/shadow/ImageInnerElement.cpp \
+	Source/WebCore/html/shadow/ImageInnerElement.h \
 	Source/WebCore/html/shadow/MediaControls.cpp \
 	Source/WebCore/html/shadow/MediaControls.h \
 	Source/WebCore/html/shadow/MediaControlElements.cpp \
@@ -2914,6 +2919,7 @@ webcore_sources += \
 	Source/WebCore/loader/icon/PageURLRecord.h \
 	Source/WebCore/loader/ImageLoader.cpp \
 	Source/WebCore/loader/ImageLoader.h \
+	Source/WebCore/loader/ImageLoaderClient.h \
 	Source/WebCore/loader/LinkLoader.h \
 	Source/WebCore/loader/LinkLoader.cpp \
 	Source/WebCore/loader/LinkLoaderClient.h \
@@ -3062,6 +3068,9 @@ webcore_sources += \
 	Source/WebCore/page/PageGroup.h \
 	Source/WebCore/page/PageGroupLoadDeferrer.cpp \
 	Source/WebCore/page/PageGroupLoadDeferrer.h \
+	Source/WebCore/page/PagePopup.h \
+	Source/WebCore/page/PagePopupClient.h \
+	Source/WebCore/page/PagePopupDriver.h \
 	Source/WebCore/page/PageSerializer.cpp \
 	Source/WebCore/page/PageSerializer.h \
 	Source/WebCore/page/PageVisibilityState.cpp \
@@ -5914,8 +5923,21 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/ConstantUnion.h \
 	Source/ThirdParty/ANGLE/src/compiler/debug.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/debug.h \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraph.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraph.h \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraphBuilder.h \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraphBuilder.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraphOutput.h \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraphOutput.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/depgraph/DependencyGraphTraverse.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/DetectDiscontinuity.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/DetectDiscontinuity.h \
 	Source/ThirdParty/ANGLE/src/compiler/DetectRecursion.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/DetectRecursion.h \
+	Source/ThirdParty/ANGLE/src/compiler/Diagnostics.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/Diagnostics.h \
+	Source/ThirdParty/ANGLE/src/compiler/DirectiveHandler.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/DirectiveHandler.h \
 	Source/ThirdParty/ANGLE/src/compiler/ExtensionBehavior.h \
 	Source/ThirdParty/ANGLE/src/compiler/ForLoopUnroll.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/ForLoopUnroll.h \
@@ -5928,6 +5950,7 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/InitializeGlobals.h \
 	Source/ThirdParty/ANGLE/src/compiler/Initialize.h \
 	Source/ThirdParty/ANGLE/src/compiler/InitializeParseContext.h \
+	Source/ThirdParty/ANGLE/src/compiler/InitializeParseContext.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/Intermediate.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/intermediate.h \
 	Source/ThirdParty/ANGLE/src/compiler/intermOut.cpp \
@@ -5951,6 +5974,7 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/ParseHelper.h \
 	Source/ThirdParty/ANGLE/src/compiler/PoolAlloc.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/PoolAlloc.h \
+	Source/ThirdParty/ANGLE/src/compiler/Pragma.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/atom.c \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/atom.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/compile.h \
@@ -5960,6 +5984,29 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/length_limits.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/memory.c \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/memory.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/DiagnosticsBase.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Diagnostics.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/DirectiveHandlerBase.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/DirectiveHandler.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/DirectiveParser.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/DirectiveParser.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/ExpressionParser.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/ExpressionParser.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Input.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Input.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Lexer.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Lexer.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Macro.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Macro.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/MacroExpander.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/MacroExpander.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Preprocessor.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Preprocessor.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/SourceLocation.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Token.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Token.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Tokenizer.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Tokenizer.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/parser.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/preprocess.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/scanner.c \
@@ -5973,6 +6020,7 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/QualifierAlive.h \
 	Source/ThirdParty/ANGLE/src/compiler/RemoveTree.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/RemoveTree.h \
+	Source/ThirdParty/ANGLE/src/compiler/RenameFunction.h \
 	Source/ThirdParty/ANGLE/src/compiler/SearchSymbol.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/SearchSymbol.h \
 	Source/ThirdParty/ANGLE/src/compiler/ShaderLang.cpp \
@@ -5981,6 +6029,10 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/SymbolTable.h \
 	Source/ThirdParty/ANGLE/src/compiler/VersionGLSL.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/VersionGLSL.h \
+	Source/ThirdParty/ANGLE/src/compiler/timing/RestrictFragmentShaderTiming.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/timing/RestrictFragmentShaderTiming.h \
+	Source/ThirdParty/ANGLE/src/compiler/timing/RestrictVertexShaderTiming.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/timing/RestrictVertexShaderTiming.h \
 	Source/ThirdParty/ANGLE/src/compiler/TranslatorESSL.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/TranslatorESSL.h \
 	Source/ThirdParty/ANGLE/src/compiler/TranslatorGLSL.cpp \
@@ -5988,8 +6040,8 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/TranslatorHLSL.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/TranslatorHLSL.h \
 	Source/ThirdParty/ANGLE/src/compiler/Types.h \
-	Source/ThirdParty/ANGLE/src/compiler/UnfoldSelect.cpp \
-	Source/ThirdParty/ANGLE/src/compiler/UnfoldSelect.h \
+	Source/ThirdParty/ANGLE/src/compiler/UnfoldShortCircuit.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/UnfoldShortCircuit.h \
 	Source/ThirdParty/ANGLE/src/compiler/util.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/util.h \
 	Source/ThirdParty/ANGLE/src/compiler/ValidateLimitations.cpp \
@@ -6060,8 +6112,9 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/OpenGLShims.cpp \
 	Source/WebCore/platform/graphics/OpenGLShims.h \
 	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGL.cpp \
-	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
 	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGL.h \
+	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGLCommon.cpp \
+	Source/WebCore/platform/graphics/opengl/Extensions3DOpenGLCommon.h \
 	Source/WebCore/platform/graphics/opengl/GraphicsContext3DOpenGL.cpp \
 	Source/WebCore/platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
 if USE_CLUTTER

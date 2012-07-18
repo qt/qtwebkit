@@ -35,7 +35,11 @@
  * - "load,provisional,redirect", void: view received redirect for provisional load.
  * - "load,provisional,started", void: view started provisional load.
  * - "policy,decision,navigation", Ewk_Navigation_Policy_Decision*: a navigation policy decision should be taken.
+ *   To make a policy decision asynchronously, simply increment the reference count of the
+ *   #Ewk_Navigation_Policy_Decision object using ewk_navigation_policy_decision_ref().
  * - "policy,decision,new,window", Ewk_Navigation_Policy_Decision*: a new window policy decision should be taken.
+ *   To make a policy decision asynchronously, simply increment the reference count of the
+ *   #Ewk_Navigation_Policy_Decision object using ewk_navigation_policy_decision_ref().
  * - "resource,request,failed", const Ewk_Web_Resource_Load_Error*: a resource failed loading.
  * - "resource,request,finished", const Ewk_Web_Resource*: a resource finished loading.
  * - "resource,request,new", const Ewk_Web_Resource_Request*: a resource request was initiated.
@@ -189,7 +193,7 @@ struct _Ewk_Web_Resource_Load_Error {
  *
  * @param e canvas object where to create the view object
  *
- * @return view object on success or @c 0 on failure
+ * @return view object on success or @c NULL on failure
  */
 EAPI Evas_Object *ewk_view_add(Evas *e);
 
@@ -199,7 +203,7 @@ EAPI Evas_Object *ewk_view_add(Evas *e);
  * @param e canvas object where to create the view object
  * @param context Ewk_Context object to declare process model
  *
- * @return view object on success or @c 0 on failure
+ * @return view object on success or @c NULL on failure
  */
 EAPI Evas_Object *ewk_view_add_with_context(Evas *e, Ewk_Context *context);
 
@@ -221,7 +225,7 @@ EAPI Eina_Bool ewk_view_uri_set(Evas_Object *o, const char *uri);
  *
  * @param o view object to get current URI
  *
- * @return current URI on success or @c 0 on failure
+ * @return current URI on success or @c NULL on failure
  */
 EAPI const char *ewk_view_uri_get(const Evas_Object *o);
 
@@ -311,7 +315,7 @@ EAPI Eina_Bool    ewk_view_forward_possible(Evas_Object *o);
  *
  * @param o view object to get current title
  *
- * @return current title on success or @c 0 on failure
+ * @return current title on success or @c NULL on failure
  */
 EAPI const char *ewk_view_title_get(const Evas_Object *o);
 
@@ -392,6 +396,29 @@ EAPI float ewk_view_device_pixel_ratio_get(const Evas_Object *o);
  * @see ewk_view_device_pixel_ratio_get()
  */
 EAPI Eina_Bool ewk_view_device_pixel_ratio_set(Evas_Object *o, float ratio);
+
+/**
+ * Sets the theme path that will be used by this view.
+ *
+ * This also sets the theme on the main frame. As frames inherit theme
+ * from their parent, this will have all frames with unset theme to
+ * use this one.
+ *
+ * @param o view object to change theme
+ * @param path theme path, may be @c NULL to reset to the default theme
+ */
+EAPI void ewk_view_theme_set(Evas_Object *o, const char *path);
+
+/**
+ * Gets the theme set on this view.
+ *
+ * This returns the value set by ewk_view_theme_set().
+ *
+ * @param o view object to get theme path
+ *
+ * @return the theme path, may be @c NULL if not set
+ */
+EAPI const char *ewk_view_theme_get(const Evas_Object *o);
 
 #ifdef __cplusplus
 }

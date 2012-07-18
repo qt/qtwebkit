@@ -101,7 +101,7 @@ class Finder(object):
                 return tree.to_module(path)
         return None
 
-    def find_names(self, args, skip_integrationtests, find_all):
+    def find_names(self, args, skip_integrationtests, find_all, skip_if_parallel=True):
         suffixes = ['_unittest.py']
         if not skip_integrationtests:
             suffixes.append('_integrationtest.py')
@@ -112,7 +112,7 @@ class Finder(object):
                 names.extend(self._find_names_for_arg(arg, suffixes))
             return names
 
-        return self._default_names(suffixes, find_all)
+        return self._default_names(suffixes, find_all, skip_if_parallel)
 
     def _find_names_for_arg(self, arg, suffixes):
         realpath = self.filesystem.realpath(arg)
@@ -145,7 +145,7 @@ class Finder(object):
                 return tree.find_modules(suffixes, path)
         return []
 
-    def _default_names(self, suffixes, find_all):
+    def _default_names(self, suffixes, find_all, skip_if_parallel):
         modules = []
         for tree in self.trees:
             modules.extend(tree.find_modules(suffixes))

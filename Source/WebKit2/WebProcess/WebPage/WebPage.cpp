@@ -245,6 +245,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #if ENABLE(PAGE_VISIBILITY_API)
     , m_visibilityState(WebCore::PageVisibilityStateVisible)
 #endif
+    , m_inspectorClient(0)
 {
     ASSERT(m_pageID);
     // FIXME: This is a non-ideal location for this Setting and
@@ -262,7 +263,8 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #endif
     pageClients.backForwardClient = WebBackForwardListProxy::create(this);
 #if ENABLE(INSPECTOR)
-    pageClients.inspectorClient = new WebInspectorClient(this);
+    m_inspectorClient = new WebInspectorClient(this);
+    pageClients.inspectorClient = m_inspectorClient;
 #endif
 #if USE(AUTOCORRECTION_PANEL)
     pageClients.alternativeTextClient = new WebAlternativeTextClient(this);
@@ -1339,6 +1341,10 @@ static bool handleMouseEvent(const WebMouseEvent& mouseEvent, WebPage* page, boo
             if (isContextClick(platformMouseEvent))
                 handled = handleContextMenuEvent(platformMouseEvent, page);
 #endif
+#if PLATFORM(GTK)
+            bool gtkMouseButtonPressHandled = page->handleMousePressedEvent(platformMouseEvent);
+            handled = handled || gtkMouseButtonPressHandled;
+#endif
 
             return handled;
         }
@@ -2085,7 +2091,7 @@ WebInspector* WebPage::inspector()
     if (m_isClosed)
         return 0;
     if (!m_inspector)
-        m_inspector = WebInspector::create(this);
+        m_inspector = WebInspector::create(this, m_inspectorClient);
     return m_inspector.get();
 }
 #endif

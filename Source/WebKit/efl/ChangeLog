@@ -1,3 +1,135 @@
+2012-07-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Replace 0 by NULL in public headers documentation
+        https://bugs.webkit.org/show_bug.cgi?id=91470
+
+        Reviewed by Dirk Pranke.
+
+        Use NULL instead of 0 for pointer types in public
+        C headers.
+
+        * ewk/ewk_contextmenu.h:
+        * ewk/ewk_cookies.h:
+        * ewk/ewk_frame.h:
+        * ewk/ewk_intent.h:
+        * ewk/ewk_intent_request.h:
+        * ewk/ewk_network.h:
+        * ewk/ewk_security_origin.h:
+        * ewk/ewk_settings.h:
+        * ewk/ewk_view.h:
+        * ewk/ewk_window_features.h:
+
+2012-07-17  Vivek Galatage  <vivekgalatage@gmail.com>
+
+        Web Inspector: refactor InspectorController::connectFrontend() to accept InspectorFrontendChannel.
+        https://bugs.webkit.org/show_bug.cgi?id=91196
+
+        Reviewed by Pavel Feldman.
+
+        Refactoring InspectorClients. InspectorClient::openInspectorFrontend
+        now returning the InspectorFrontendChannel.
+
+        * WebCoreSupport/InspectorClientEfl.cpp:
+        (WebCore::InspectorClientEfl::openInspectorFrontend):
+        * WebCoreSupport/InspectorClientEfl.h:
+        (InspectorClientEfl):
+
+2012-07-17  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Move codes related to theme setting from Widget to RenderTheme
+        https://bugs.webkit.org/show_bug.cgi?id=89842
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_view_create_for_view): Removed codes which set theme in FrameView.
+        * ewk/ewk_view.cpp:
+        (ewk_view_theme_set): Called RenderThemeEfl::setThemePath instead of setting theme in FrameView.
+
+2012-07-16  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Add RegisterProtocolHandlerClient to the Modules/protocolhandler
+        https://bugs.webkit.org/show_bug.cgi?id=90940
+
+        Reviewed by Hajime Morita.
+
+        As a step to let protocol handler be moved to the modules, RegisterProtocolHandlerClient needs
+        to be added to the Modules/protocolhandler. Because ChromeClient has some virtual functions for
+        protocol handlers, virtual functions should be moved to RegisterProtocolHandlerClient
+
+        In order to support this, RegisterProtocolHandlerClientEfl class is added and ewk_view registers
+        RegisterProtocolHandlerClientEfl. In addition, existing concrete functions in ChromeClientEfl are moved
+        to RegisterProtocolHandlerClientEfl.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore):
+        * WebCoreSupport/ChromeClientEfl.h:
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.cpp: Added.
+        (WebCore):
+        (WebCore::customHandlerDataCreate):
+        (WebCore::customHandlerDataDelete):
+        (WebCore::RegisterProtocolHandlerClientEfl::RegisterProtocolHandlerClientEfl):
+        (WebCore::RegisterProtocolHandlerClientEfl::registerProtocolHandler):
+        (WebCore::RegisterProtocolHandlerClientEfl::isProtocolHandlerRegistered):
+        (WebCore::RegisterProtocolHandlerClientEfl::unregisterProtocolHandler):
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.h: Added.
+        (RegisterProtocolHandlerClientEfl):
+        (WebCore::RegisterProtocolHandlerClientEfl::~RegisterProtocolHandlerClientEfl):
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+
+2012-07-16  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Remove setController from BatteryClient
+        https://bugs.webkit.org/show_bug.cgi?id=90944
+
+        Reviewed by Adam Barth.
+
+        BatteryClient doesn't need to keep m_controller,
+        because BatteryController can be accessed using BatteryController::from().
+        Remove m_controller and Add ewk view evas object to BatteryClientEfl.
+        And change all m_controller to BatteryController::from.
+
+        * WebCoreSupport/BatteryClientEfl.cpp:
+        (BatteryClientEfl::BatteryClientEfl):
+        (BatteryClientEfl::didChangeBatteryStatus):
+        * WebCoreSupport/BatteryClientEfl.h:
+        (BatteryClientEfl):
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+
+2012-07-15  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Add a API for getting security origin string
+        https://bugs.webkit.org/show_bug.cgi?id=90936
+
+        Reviewed by Ryosuke Niwa.
+
+        Support to change from Ewk_Security_Origin to string on the API level.
+        Add ewk_security_origin_string_get for getting security origin string.
+
+        * ewk/ewk_security_origin.cpp:
+        (_Ewk_Security_Origin):
+        (ewk_security_origin_string_get):
+        (ewk_security_origin_free):
+        (ewk_security_origin_new):
+        * ewk/ewk_security_origin.h:
+
+2012-07-15  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Move files guarded by #ifdef to existing file list.
+        https://bugs.webkit.org/show_bug.cgi?id=91336
+
+        Reviewed by Ryosuke Niwa.
+
+        Some EFL files are already guared by #ifdef. So, cmake files doesn't need to guard
+        them again. In addition, some files are missing #ifdef guard its header files. 
+
+        * WebCoreSupport/DeviceMotionClientEfl.h:
+        * WebCoreSupport/InspectorClientEfl.h:
+        * WebCoreSupport/NetworkInfoClientEfl.h:
+        * WebCoreSupport/VibrationClientEfl.h:
+
 2012-07-13  Kihong Kwon  <kihong.kwon@samsung.com>
 
         [EFL] Add const to the parameter of getters in ewk_security_origin

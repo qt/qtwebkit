@@ -121,11 +121,11 @@ void* DOMDataStore::getDOMWrapperMap(DOMWrapperMapType type)
 
 void DOMDataStore::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    memoryObjectInfo->reportObjectInfo(this, MemoryInstrumentation::Binding);
-    memoryObjectInfo->reportInstrumentedPointer(m_domNodeMap);
-    memoryObjectInfo->reportInstrumentedPointer(m_activeDomNodeMap);
-    memoryObjectInfo->reportInstrumentedPointer(m_domObjectMap);
-    memoryObjectInfo->reportInstrumentedPointer(m_activeDomObjectMap);
+    MemoryClassInfo<DOMDataStore> info(memoryObjectInfo, this, MemoryInstrumentation::Binding);
+    info.addInstrumentedMember(m_domNodeMap);
+    info.addInstrumentedMember(m_activeDomNodeMap);
+    info.addInstrumentedMember(m_domObjectMap);
+    info.addInstrumentedMember(m_activeDomObjectMap);
 }
 
 // Called when the object is near death (not reachable from JS roots).

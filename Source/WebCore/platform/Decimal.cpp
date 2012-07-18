@@ -246,7 +246,7 @@ Decimal::EncodedData::EncodedData(Sign sign, int exponent, uint64_t coefficient)
     , m_sign(sign)
 {
     if (exponent >= ExponentMin && exponent <= ExponentMax) {
-        while (coefficient >= MaxCoefficient) {
+        while (coefficient > MaxCoefficient) {
             coefficient /= 10;
             ++exponent;
         }
@@ -967,22 +967,24 @@ String Decimal::toString() const
         builder.append('-');
 
     int originalExponent = exponent();
-
-    const int maxDigits = DBL_DIG;
     uint64_t coefficient = m_data.coefficient();
-    uint64_t lastDigit = 0;
-    while (countDigits(coefficient) > maxDigits) {
-        lastDigit = coefficient % 10;
-        coefficient /= 10;
-        ++originalExponent;
-    }
 
-    if (lastDigit >= 5)
-        ++coefficient;
+    if (originalExponent < 0) {
+        const int maxDigits = DBL_DIG;
+        uint64_t lastDigit = 0;
+        while (countDigits(coefficient) > maxDigits) {
+            lastDigit = coefficient % 10;
+            coefficient /= 10;
+            ++originalExponent;
+        }
 
-    while (originalExponent < 0 && coefficient && !(coefficient % 10)) {
-        coefficient /= 10;
-        ++originalExponent;
+        if (lastDigit >= 5)
+            ++coefficient;
+
+        while (originalExponent < 0 && coefficient && !(coefficient % 10)) {
+            coefficient /= 10;
+            ++originalExponent;
+        }
     }
 
     const String digits = String::number(coefficient);

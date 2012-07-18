@@ -75,11 +75,35 @@
             ],
         },
         {
+            'target_name': 'TestRunner',
+            'type': 'static_library',
+            'dependencies': [
+                '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit',
+                '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
+                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
+            ],
+            'include_dirs': [
+                '<(chromium_src_dir)',
+                '<(source_dir)/WebKit/chromium/public',
+                '<(DEPTH)',
+                '../chromium/TestRunner',
+            ],
+            'direct_dependent_settings': {
+                'include_dirs': [
+                    '../chromium/TestRunner',
+                ],
+            },
+            'sources': [
+                '<@(test_runner_files)',
+            ],
+        },
+        {
             'target_name': 'DumpRenderTree',
             'type': 'executable',
             'mac_bundle': 1,
             'dependencies': [
                 'ImageDiff',
+                'TestRunner',
                 'copy_TestNetscapePlugIn',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:inspector_resources',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit',

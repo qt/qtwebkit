@@ -330,6 +330,7 @@ void WebPage::autofillTextField(const string& item)
 WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const IntRect& rect)
     : m_webPage(webPage)
     , m_client(client)
+    , m_inspectorClient(0)
     , m_page(0) // Initialized by init.
     , m_mainFrame(0) // Initialized by init.
     , m_currentContextNode(0)
@@ -488,9 +489,8 @@ void WebPagePrivate::init(const WebString& pageGroupName)
 #if ENABLE(DRAG_SUPPORT)
     dragClient = new DragClientBlackBerry();
 #endif
-    InspectorClientBlackBerry* inspectorClient = 0;
 #if ENABLE(INSPECTOR)
-    inspectorClient = new InspectorClientBlackBerry(this);
+    m_inspectorClient = new InspectorClientBlackBerry(this);
 #endif
 
     FrameLoaderClientBlackBerry* frameLoaderClient = new FrameLoaderClientBlackBerry();
@@ -500,7 +500,7 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     pageClients.contextMenuClient = contextMenuClient;
     pageClients.editorClient = editorClient;
     pageClients.dragClient = dragClient;
-    pageClients.inspectorClient = inspectorClient;
+    pageClients.inspectorClient = m_inspectorClient;
 
     m_page = new Page(pageClients);
 #if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
@@ -520,7 +520,7 @@ void WebPagePrivate::init(const WebString& pageGroupName)
 #endif
 
 #if ENABLE(BATTERY_STATUS)
-    WebCore::provideBatteryTo(m_page, new WebCore::BatteryClientBlackBerry);
+    WebCore::provideBatteryTo(m_page, new WebCore::BatteryClientBlackBerry(this));
 #endif
 
 #if ENABLE(MEDIA_STREAM)
@@ -1271,7 +1271,6 @@ bool WebPagePrivate::zoomAboutPoint(double unclampedScale, const FloatPoint& anc
 
     // Clear window to make sure there are no artifacts.
     if (shouldRender) {
-        m_backingStore->d->clearWindow();
         // Resume all screen updates to the backingstore and render+blit visible contents to screen.
         m_backingStore->d->resumeScreenAndBackingStoreUpdates(BackingStore::RenderAndBlit);
     } else {
@@ -2383,9 +2382,6 @@ Platform::WebContext WebPagePrivate::webContext(TargetDetectionStrategy strategy
         }
     }
 
-    if (!nodeAllowSelectionOverride && !node->canStartSelection())
-        context.resetFlag(Platform::WebContext::IsSelectable);
-
     if (node->isHTMLElement()) {
         HTMLImageElement* imageElement = 0;
         HTMLMediaElement* mediaElement = 0;
@@ -2429,9 +2425,18 @@ Platform::WebContext WebPagePrivate::webContext(TargetDetectionStrategy strategy
             context.setText(curText->wholeText().utf8().data());
     }
 
+    bool canStartSelection = node->canStartSelection();
+
     if (node->isElementNode()) {
         Element* element = static_cast<Element*>(node->shadowAncestorNode());
         if (DOMSupport::isTextBasedContentEditableElement(element)) {
+            if (!canStartSelection) {
+                // Input fields host node is by spec non-editable unless the field itself has content editable enabled.
+                // Enable selection if the shadow tree for the input field is selectable.
+                Node* nodeUnderFinger = m_touchEventHandler->lastFatFingersResult().isValid() ? m_touchEventHandler->lastFatFingersResult().node(FatFingersResult::ShadowContentAllowed) : 0;
+                if (nodeUnderFinger)
+                    canStartSelection = nodeUnderFinger->canStartSelection();
+            }
             context.setFlag(Platform::WebContext::IsInput);
             if (element->hasTagName(HTMLNames::inputTag))
                 context.setFlag(Platform::WebContext::IsSingleLine);
@@ -2443,6 +2448,9 @@ Platform::WebContext WebPagePrivate::webContext(TargetDetectionStrategy strategy
                 context.setText(elementText.utf8().data());
         }
     }
+
+    if (!nodeAllowSelectionOverride && !canStartSelection)
+        context.resetFlag(Platform::WebContext::IsSelectable);
 
     if (node->isFocusable())
         context.setFlag(Platform::WebContext::IsFocusable);
@@ -3163,7 +3171,6 @@ void WebPagePrivate::zoomBlock()
     }
 
     notifyTransformChanged();
-    m_backingStore->d->clearWindow();
     m_backingStore->d->resumeScreenAndBackingStoreUpdates(BackingStore::RenderAndBlit);
     m_client->zoomChanged(m_webPage->isMinZoomed(), m_webPage->isMaxZoomed(), !shouldZoomOnEscape(), currentScale());
 }
@@ -5709,7 +5716,10 @@ void WebPage::onCertificateStoreLocationSet(const WebString& caPath)
 
 void WebPage::enableWebInspector()
 {
-    d->m_page->inspectorController()->connectFrontend();
+    if (!d->m_inspectorClient)
+        return;
+
+    d->m_page->inspectorController()->connectFrontend(d->m_inspectorClient);
     d->m_page->settings()->setDeveloperExtrasEnabled(true);
 }
 

@@ -3904,11 +3904,11 @@ bool Document::shouldInvalidateNodeListCaches(const QualifiedName* attrName) con
     return false;
 }
 
-void Document::clearNodeListCaches()
+void Document::invalidateNodeListCaches(const QualifiedName* attrName)
 {
     HashSet<DynamicNodeListCacheBase*>::iterator end = m_listsInvalidatedAtDocument.end();
     for (HashSet<DynamicNodeListCacheBase*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
-        (*it)->invalidateCache();
+        (*it)->invalidateCache(attrName);
 }
 
 void Document::attachNodeIterator(NodeIterator* ni)
@@ -4894,8 +4894,31 @@ PassRefPtr<XPathResult> Document::evaluate(const String& expression,
     return m_xpathEvaluator->evaluate(expression, contextNode, resolver, type, result, ec);
 }
 
-const Vector<IconURL>& Document::iconURLs() const
+const Vector<IconURL>& Document::iconURLs()
 {
+    m_iconURLs.clear();
+
+    if (!head() || !(head()->children()))
+        return m_iconURLs;
+
+    // Include any icons where type = link, rel = "shortcut icon".
+    RefPtr<HTMLCollection> children = head()->children();
+    unsigned int length = children->length();
+    for (unsigned int i = 0; i < length; ++i) {
+        Node* child = children->item(i);
+        if (!child->hasTagName(linkTag))
+            continue;
+        HTMLLinkElement* linkElement = static_cast<HTMLLinkElement*>(child);
+        if (linkElement->iconType() != Favicon)
+            continue;
+        if (linkElement->href().isEmpty())
+            continue;
+
+        // Put it at the front to ensure that icons seen later take precedence as required by the spec.
+        IconURL newURL(linkElement->href(), linkElement->iconSizes(), linkElement->type(), linkElement->iconType());
+        m_iconURLs.prepend(newURL);
+    }
+
     return m_iconURLs;
 }
 
@@ -4906,7 +4929,6 @@ void Document::addIconURL(const String& url, const String& mimeType, const Strin
 
     // FIXME - <rdar://problem/4727645> - At some point in the future, we might actually honor the "mimeType"
     IconURL newURL(KURL(ParsedURLString, url), sizes, mimeType, iconType);
-    m_iconURLs.append(newURL);
 
     if (Frame* f = frame()) {
         IconURL iconURL = f->loader()->icon()->iconURL(iconType);
@@ -4919,7 +4941,7 @@ void Document::setUseSecureKeyboardEntryWhenActive(bool usesSecureKeyboard)
 {
     if (m_useSecureKeyboardEntryWhenActive == usesSecureKeyboard)
         return;
-        
+
     m_useSecureKeyboardEntryWhenActive = usesSecureKeyboard;
     m_frame->selection()->updateSecureKeyboardEntryIfActive();
 }
@@ -5374,7 +5396,7 @@ void Document::requestFullScreenForElement(Element* element, unsigned short flag
 
         // The context object's node document, or an ancestor browsing context's document does not have
         // the fullscreen enabled flag set.
-        if (checkType == EnforceIFrameAllowFulScreenRequirement && !fullScreenIsAllowedForElement(element))
+        if (checkType == EnforceIFrameAllowFullScreenRequirement && !fullScreenIsAllowedForElement(element))
             break;
 
         // The context object's node document fullscreen element stack is not empty and its top element
@@ -6062,38 +6084,38 @@ void Document::setContextFeatures(PassRefPtr<ContextFeatures> features)
 
 void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    memoryObjectInfo->reportObjectInfo(this, MemoryInstrumentation::DOM);
-    ContainerNode::reportMemoryUsage(memoryObjectInfo);
-    memoryObjectInfo->reportVector(m_customFonts);
-    memoryObjectInfo->reportString(m_documentURI);
-    memoryObjectInfo->reportString(m_baseTarget);
+    MemoryClassInfo<Document> info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    info.visitBaseClass<ContainerNode>(this);
+    info.addVector(m_customFonts);
+    info.addString(m_documentURI);
+    info.addString(m_baseTarget);
     if (m_pageGroupUserSheets)
-        memoryObjectInfo->reportVector(*m_pageGroupUserSheets.get());
+        info.addVector(*m_pageGroupUserSheets.get());
     if (m_userSheets)
-        memoryObjectInfo->reportVector(*m_userSheets.get());
-    memoryObjectInfo->reportHashSet(m_nodeIterators);
-    memoryObjectInfo->reportHashSet(m_ranges);
-    memoryObjectInfo->reportListHashSet(m_styleSheetCandidateNodes);
-    memoryObjectInfo->reportString(m_preferredStylesheetSet);
-    memoryObjectInfo->reportString(m_selectedStylesheetSet);
-    memoryObjectInfo->reportString(m_title.string());
-    memoryObjectInfo->reportString(m_rawTitle.string());
-    memoryObjectInfo->reportString(m_xmlEncoding);
-    memoryObjectInfo->reportString(m_xmlVersion);
-    memoryObjectInfo->reportString(m_contentLanguage);
-    memoryObjectInfo->reportHashMap(m_documentNamedItemCollections);
-    memoryObjectInfo->reportHashMap(m_windowNamedItemCollections);
+        info.addVector(*m_userSheets.get());
+    info.addHashSet(m_nodeIterators);
+    info.addHashSet(m_ranges);
+    info.addListHashSet(m_styleSheetCandidateNodes);
+    info.addString(m_preferredStylesheetSet);
+    info.addString(m_selectedStylesheetSet);
+    info.addString(m_title.string());
+    info.addString(m_rawTitle.string());
+    info.addString(m_xmlEncoding);
+    info.addString(m_xmlVersion);
+    info.addString(m_contentLanguage);
+    info.addHashMap(m_documentNamedItemCollections);
+    info.addHashMap(m_windowNamedItemCollections);
 #if ENABLE(DASHBOARD_SUPPORT)
-    memoryObjectInfo->reportVector(m_dashboardRegions);
+    info.addVector(m_dashboardRegions);
 #endif
-    memoryObjectInfo->reportHashMap(m_cssCanvasElements);
-    memoryObjectInfo->reportVector(m_iconURLs);
-    memoryObjectInfo->reportHashSet(m_documentSuspensionCallbackElements);
-    memoryObjectInfo->reportHashSet(m_mediaVolumeCallbackElements);
-    memoryObjectInfo->reportHashSet(m_privateBrowsingStateChangedElements);
-    memoryObjectInfo->reportHashMap(m_elementsByAccessKey);
-    memoryObjectInfo->reportHashSet(m_mediaCanStartListeners);
-    memoryObjectInfo->reportVector(m_pendingTasks);
+    info.addHashMap(m_cssCanvasElements);
+    info.addVector(m_iconURLs);
+    info.addHashSet(m_documentSuspensionCallbackElements);
+    info.addHashSet(m_mediaVolumeCallbackElements);
+    info.addHashSet(m_privateBrowsingStateChangedElements);
+    info.addHashMap(m_elementsByAccessKey);
+    info.addHashSet(m_mediaCanStartListeners);
+    info.addVector(m_pendingTasks);
 }
 
 #if ENABLE(UNDO_MANAGER)

@@ -23,11 +23,21 @@
 """code to actually run a list of python tests."""
 
 import logging
+import re
 import time
 import unittest
 
+from webkitpy.common import message_pool
 
 _log = logging.getLogger(__name__)
+
+
+_test_description = re.compile("(\w+) \(([\w.]+)\)")
+
+
+def _test_name(test):
+    m = _test_description.match(str(test))
+    return "%s.%s" % (m.group(2), m.group(1))
 
 
 class Runner(object):
@@ -35,6 +45,8 @@ class Runner(object):
         self.options = options
         self.printer = printer
         self.loader = loader
+        self.result = unittest.TestResult()
+        self.worker_factory = lambda caller: _Worker(caller, self.loader)
 
     def all_test_names(self, suite):
         names = []
@@ -42,34 +54,48 @@ class Runner(object):
             for t in suite._tests:
                 names.extend(self.all_test_names(t))
         else:
-            names.append(self.printer.test_name(suite))
+            names.append(_test_name(suite))
         return names
 
     def run(self, suite):
         run_start_time = time.time()
         all_test_names = self.all_test_names(suite)
+        self.printer.num_tests = len(all_test_names)
+
+        with message_pool.get(self, self.worker_factory, int(self.options.child_processes)) as pool:
+            pool.run(('test', test_name) for test_name in all_test_names)
+
+        self.printer.print_result(self.result, time.time() - run_start_time)
+        return self.result
+
+    def handle(self, message_name, source, test_name, delay=None, result=None):
+        if message_name == 'started_test':
+            self.printer.print_started_test(source, test_name)
+            return
+
+        self.result.testsRun += 1
+        self.result.errors.extend(result.errors)
+        self.result.failures.extend(result.failures)
+        self.printer.print_finished_test(source, test_name, delay, result.failures, result.errors)
+
+
+class _Worker(object):
+    def __init__(self, caller, loader):
+        self._caller = caller
+        self._loader = loader
+
+    def handle(self, message_name, source, test_name):
+        assert message_name == 'test'
         result = unittest.TestResult()
-        stop = run_start_time
-        for test_name in all_test_names:
-            self.printer.print_started_test(test_name)
-            num_failures = len(result.failures)
-            num_errors = len(result.errors)
+        start = time.time()
+        self._caller.post('started_test', test_name)
+        self._loader.loadTestsFromName(test_name, None).run(result)
 
-            start = time.time()
-            # FIXME: it's kinda lame that we re-load the test suites for each
-            # test, and this may slow things down, but this makes implementing
-            # the logging easy and will also allow us to parallelize nicely.
-            self.loader.loadTestsFromName(test_name, None).run(result)
-            stop = time.time()
+        # The tests in the TestResult contain file objects and other unpicklable things; we only
+        # care about the test name, so we rewrite the result to replace the test with the test name.
+        # FIXME: We need an automated test for this, but I don't know how to write an automated
+        # test that will fail in this case that doesn't get picked up by test-webkitpy normally :(.
+        result.failures = [(_test_name(failure[0]), failure[1]) for failure in result.failures]
+        result.errors = [(_test_name(error[0]), error[1]) for error in result.errors]
 
-            err = None
-            failure = None
-            if len(result.failures) > num_failures:
-                failure = result.failures[num_failures][1]
-            elif len(result.errors) > num_errors:
-                err = result.errors[num_errors][1]
-            self.printer.print_finished_test(result, test_name, stop - start, failure, err)
-
-        self.printer.print_result(result, stop - run_start_time)
-
-        return result
+        self._caller.post('finished_test', test_name, time.time() - start, result)

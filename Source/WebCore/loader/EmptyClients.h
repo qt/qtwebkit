@@ -128,15 +128,6 @@ public:
     virtual void resetPagePopupDriver() OVERRIDE { }
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-    virtual void registerProtocolHandler(const String&, const String&, const String&, const String&) { }
-#endif
-
-#if ENABLE(CUSTOM_SCHEME_HANDLER)
-    virtual CustomHandlersState isProtocolHandlerRegistered(const String&, const String&, const String&) { return CustomHandlersDeclined; }
-    virtual void unregisterProtocolHandler(const String&, const String&, const String&) { }
-#endif
-
     virtual void setStatusbarText(const String&) { }
 
     virtual KeyboardUIMode keyboardUIMode() { return KeyboardAccessDefault; }
@@ -569,14 +560,12 @@ public:
 
     virtual void inspectorDestroyed() { }
     
-    virtual void openInspectorFrontend(InspectorController*) { }
+    virtual InspectorFrontendChannel* openInspectorFrontend(InspectorController*) { return 0; }
     virtual void closeInspectorFrontend() { }
     virtual void bringFrontendToFront() { }
 
     virtual void highlight() { }
     virtual void hideHighlight() { }
-
-    virtual bool sendMessageToFrontend(const String&) { return false; }
 };
 
 class EmptyDeviceMotionClient : public DeviceMotionClient {

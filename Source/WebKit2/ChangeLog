@@ -1,3 +1,355 @@
+2012-07-18  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt][WK2] Caching of ShareableSurfaces breaks tiling.
+        https://bugs.webkit.org/show_bug.cgi?id=91609
+
+        A ShareableSurface should only be cached,
+        when it is GraphicsSurface based.
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * UIProcess/LayerTreeCoordinatorProxy.cpp:
+        (WebKit::LayerTreeCoordinatorProxy::updateTileForLayer):
+        * UIProcess/LayerTreeCoordinatorProxy.h:
+        (LayerTreeCoordinatorProxy):
+
+2012-07-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Fix a crash due to an invalid assert
+        https://bugs.webkit.org/show_bug.cgi?id=91614
+
+        Reviewed by Xan Lopez.
+
+        In webkitWebViewBaseContainerAdd() there's
+        ASSERT(priv->inspectorView); that should be the opposite, since we
+        shoulnd't have an inspector view when the inspector view is added.
+
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkitWebViewBaseContainerAdd):
+
+2012-07-18  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [CMake] Make gtest a shared library
+        https://bugs.webkit.org/show_bug.cgi?id=90973
+
+        Reviewed by Daniel Bates.
+
+        No need to link with gtest dependencies now since it is a shared library.
+
+        * PlatformEfl.cmake:
+
+2012-07-18  YoungTaeck Song  <youngtaeck.song@samsung.com>
+
+        [WK2][EFL] Add a common code using Color instead of QColor
+        https://bugs.webkit.org/show_bug.cgi?id=91580
+
+        Reviewed by Simon Hausmann.
+
+        This patch is a subset of Efl's UI_SIDE_COMPOSITING implementation.
+        drawBorder's argument is QColor. So add a common code using Color to be used by Efl.
+
+        * UIProcess/texmap/LayerBackingStore.cpp:
+        (WebKit::LayerBackingStore::paintToTextureMapper):
+
+2012-07-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Replace 0 by NULL in public headers documentation
+        https://bugs.webkit.org/show_bug.cgi?id=91470
+
+        Reviewed by Dirk Pranke.
+
+        Use NULL instead of 0 for pointer types in public
+        C headers.
+
+        * UIProcess/API/efl/ewk_intent.h:
+        * UIProcess/API/efl/ewk_intent_service.h:
+        * UIProcess/API/efl/ewk_url_request.h:
+        * UIProcess/API/efl/ewk_url_response.h:
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/API/efl/ewk_web_resource.h:
+
+2012-07-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use deprecated soup API in WebKit2APITests/TestResources
+        https://bugs.webkit.org/show_bug.cgi?id=91496
+
+        Reviewed by Martin Robinson.
+
+        soup_message_headers_get() is deprecated, use
+        soup_message_headers_get_one() instead.
+
+        * UIProcess/API/gtk/tests/TestResources.cpp:
+        (serverCallback):
+
+2012-07-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Fix a typo in WebKit2APITests/TestResources
+        https://bugs.webkit.org/show_bug.cgi?id=91495
+
+        Reviewed by Xan Lopez.
+
+        * UIProcess/API/gtk/tests/TestResources.cpp:
+        (testWebResourceLoading):
+        (testWebResourceResponse):
+        (testWebResourceMimeType):
+        (testWebResourceActiveURI):
+
+2012-07-17  Vivek Galatage  <vivekgalatage@gmail.com>
+
+        Web Inspector: refactor InspectorController::connectFrontend() to accept InspectorFrontendChannel.
+        https://bugs.webkit.org/show_bug.cgi?id=91196
+
+        Reviewed by Pavel Feldman.
+
+        Refactoring InspectorClients. InspectorClient::openInspectorFrontend
+        now returning the InspectorFrontendChannel.
+
+        * WebProcess/WebCoreSupport/WebInspectorClient.cpp:
+        (WebKit::WebInspectorClient::openInspectorFrontend):
+        * WebProcess/WebCoreSupport/WebInspectorClient.h:
+        (WebInspectorClient):
+
+2012-07-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Paste primary selection when middle clicking in X11 WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=91411
+
+        Reviewed by Xan Lopez.
+
+        Handle middle click events to paste primary selection as expected
+        in any X11 application.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::handleMouseEvent): Call handleMousePressedEvent() for GTK+
+        platform.
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage): Add handleMousePressedEvent() for GTK+ platform.
+        * WebProcess/WebPage/gtk/WebPageGtk.cpp:
+        (WebKit::WebPage::handleMousePressedEvent): Handle middle click
+        events to paste primary selection like we do in WebKit1.
+
+2012-07-17  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Move codes related to theme setting from Widget to RenderTheme
+        https://bugs.webkit.org/show_bug.cgi?id=89842
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * CMakeLists.txt: Added html/shadow to WebKit_INCLUDE_DIRECTORIES.
+        * WebProcess/WebPage/efl/WebPageEfl.cpp:
+        (WebKit::WebPage::setThemePath): Called RenderThemeEfl::setThemePath instead of setting theme in FrameView.
+
+2012-07-17  David Barr  <davidbarr@chromium.org>
+
+        Introduce ENABLE_CSS_IMAGE_ORIENTATION compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=89055
+
+        Reviewed by Kent Tamura.
+
+        The css3-images module is at candidate recommendation.
+        http://www.w3.org/TR/2012/CR-css3-images-20120417/#the-image-orientation
+
+        Add a configuration option for CSS image-orientation support, disabling it by default.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-16  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Add RegisterProtocolHandlerClient to the Modules/protocolhandler
+        https://bugs.webkit.org/show_bug.cgi?id=90940
+
+        Reviewed by Hajime Morita.
+
+        As a step to let protocol handler be moved to the modules, RegisterProtocolHandlerClient needs
+        to be added to the Modules/protocolhandler. Because ChromeClient has some virtual functions for
+        protocol handlers, virtual functions should be moved to RegisterProtocolHandlerClient.
+
+        In order to support this, WebRegisterProtocolHandlerClient class is added. However, this is not implemented yet.
+        In addition, existing virtual functions in WebChromeClient are moved to WebRegisterProtocolHandlerClient.
+
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+        * WebProcess/WebCoreSupport/WebRegisterProtocolHandlerClient.h: Added.
+        (WebKit):
+        (WebRegisterProtoclHandlerClient):
+        (WebKit::WebRegisterProtoclHandlerClient::isProtocolHandlerRegistered):
+        (WebKit::WebRegisterProtoclHandlerClient::unregisterProtocolHandler):
+
+2012-07-16  Pete Williamson  <petewil@google.com>
+
+        Export the iconURL list to make it available to the Internals class for testing
+        https://bugs.webkit.org/show_bug.cgi?id=88665
+
+        Reviewed by Kent Tamura.
+
+        * win/WebKit2.def: export the DocumentL::iconURLs function
+
+2012-07-16  Hajime Morrita  <morrita@chromium.org>
+
+        WebCore needs WEBCORE_TESTING macro to mark methods being exported for testing.
+        https://bugs.webkit.org/show_bug.cgi?id=90764
+
+        Reviewed by Adam Barth.
+
+        Removed symbols which are now covered by WEBCORE_TESTING.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-07-16  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Implement decidePolicyForResponse in policy client
+        https://bugs.webkit.org/show_bug.cgi?id=91401
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Provide implementation for decidePolicyForResponse callback
+        in WebKit2 EFL's policy client.
+
+        * UIProcess/API/efl/ewk_view_policy_client.cpp:
+        (decidePolicyForResponseCallback):
+        (ewk_view_policy_client_attach):
+
+2012-07-16  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][WK2] Add APIs to support theme.
+        https://bugs.webkit.org/show_bug.cgi?id=90107
+
+        Reviewed by Hajime Morita.
+
+        RenderThemeEfl uses edj file to render native theme of form elements.
+        This patch provides default theme and a way to change edj theme file for
+        WebKit2/Efl.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (ewk_view_base_add):
+        (ewk_view_theme_set):
+        (ewk_view_theme_get):
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/efl/WebPageProxyEfl.cpp:
+        (WebKit::WebPageProxy::setThemePath):
+        * WebProcess/WebPage/WebPage.h:
+        * WebProcess/WebPage/WebPage.messages.in:
+        * WebProcess/WebPage/efl/WebPageEfl.cpp:
+        (WebKit::WebPage::setThemePath):
+
+2012-07-16  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Remove setController from BatteryClient
+        https://bugs.webkit.org/show_bug.cgi?id=90944
+
+        Reviewed by Adam Barth.
+
+        Remove WebBatteryClient::setController function.
+
+        * WebProcess/WebCoreSupport/WebBatteryClient.cpp:
+        * WebProcess/WebCoreSupport/WebBatteryClient.h:
+        (WebBatteryClient):
+
+2012-07-16  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Make Ewk_Navigation_Policy_Decision ref counted
+        https://bugs.webkit.org/show_bug.cgi?id=91343
+
+        Reviewed by Antonio Gomes.
+
+        Make Ewk_Navigation_Policy_Decision ref counted so that the
+        client can make navigation policy decisions asynchronously
+        by ref'ing the Ewk_Navigation_Policy_Decision object passed
+        with the "policy,*" signals.
+
+        * UIProcess/API/efl/ewk_navigation_policy_decision.cpp:
+        (_Ewk_Navigation_Policy_Decision):
+        (_Ewk_Navigation_Policy_Decision::_Ewk_Navigation_Policy_Decision):
+        (_Ewk_Navigation_Policy_Decision::~_Ewk_Navigation_Policy_Decision):
+        (ewk_navigation_policy_decision_ref):
+        (ewk_navigation_policy_decision_unref):
+        * UIProcess/API/efl/ewk_navigation_policy_decision.h:
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/API/efl/ewk_view_policy_client.cpp:
+        (decidePolicyForNavigationAction):
+        (decidePolicyForNewWindowAction):
+
+2012-07-16  Zoltan Horvath  <zoltan@webkit.org>
+
+        [Qt] Change NativeImagePtr from QPixmap* to QImage*
+        https://bugs.webkit.org/show_bug.cgi?id=88785
+
+        Reviewed by Simon Hausmann.
+
+        Since we use raster engine there is no difference between QPixmap and QImage, so we are going
+        to use QImage everywhere where it is possible. This refactoring contains the change of the
+        NativeImagePtr typedef from QPixmap* to QImage* and covers the related modifications.
+
+        Part of the change is similar to Viatcheslav Ostapenko's internal work.
+
+        Covered by existing tests.
+
+        * Shared/qt/ShareableBitmapQt.cpp:
+        (WebKit::ShareableBitmap::createImage):
+        * UIProcess/qt/QtWebIconDatabaseClient.cpp:
+        (WebKit::QtWebIconDatabaseClient::iconImageForPageURL):
+        * WebProcess/WebCoreSupport/qt/WebDragClientQt.cpp:
+        (WebKit::convertQImageToShareableBitmap):
+        (WebKit::WebDragClient::startDrag):
+        * WebProcess/WebPage/LayerTreeCoordinator/LayerTreeCoordinator.cpp:
+        (WebKit::LayerTreeCoordinator::adoptImageBackingStore):
+
+2012-07-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * UIProcess/API/gtk/tests/GNUmakefile.am: Add test resources to
+        EXTRA_DIST.
+
+2012-07-15  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Define destructors for Ewk structures
+        https://bugs.webkit.org/show_bug.cgi?id=91338
+
+        Reviewed by Kentaro Hara.
+
+        Add destructors to Ewk structures and move
+        memory freeing code from *_free() or *_unref()
+        functions to the destructors.
+
+        * UIProcess/API/efl/ewk_intent.cpp:
+        (_Ewk_Intent::_Ewk_Intent):
+        (_Ewk_Intent):
+        (_Ewk_Intent::~_Ewk_Intent):
+        (ewk_intent_unref):
+        * UIProcess/API/efl/ewk_intent_service.cpp:
+        (_Ewk_Intent_Service):
+        (_Ewk_Intent_Service::~_Ewk_Intent_Service):
+        (ewk_intent_service_unref):
+        * UIProcess/API/efl/ewk_navigation_policy_decision.cpp:
+        (_Ewk_Navigation_Policy_Decision):
+        (_Ewk_Navigation_Policy_Decision::~_Ewk_Navigation_Policy_Decision):
+        (ewk_navigation_policy_decision_free):
+        * UIProcess/API/efl/ewk_url_request.cpp:
+        (_Ewk_Url_Request):
+        (_Ewk_Url_Request::~_Ewk_Url_Request):
+        (ewk_url_request_unref):
+        * UIProcess/API/efl/ewk_url_response.cpp:
+        (_Ewk_Url_Response):
+        (_Ewk_Url_Response::~_Ewk_Url_Response):
+        (ewk_url_response_unref):
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_Ewk_View_Private_Data::~_Ewk_View_Private_Data):
+        (_ewk_view_priv_del):
+        * UIProcess/API/efl/ewk_web_error.cpp:
+        (_Ewk_Web_Error):
+        (_Ewk_Web_Error::~_Ewk_Web_Error):
+        (ewk_web_error_free):
+        * UIProcess/API/efl/ewk_web_resource.cpp:
+        (_Ewk_Web_Resource):
+        (_Ewk_Web_Resource::~_Ewk_Web_Resource):
+        (ewk_web_resource_unref):
+
 2012-07-14  Eric Carlson  <eric.carlson@apple.com>
 
         Enable AVCF hardware video decoding

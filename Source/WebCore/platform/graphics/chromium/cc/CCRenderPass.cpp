@@ -75,7 +75,7 @@ void CCRenderPass::appendQuadsForRenderSurfaceLayer(CCLayerImpl* layer, const CC
     surface->appendQuads(quadCuller, sharedQuadState.get(), isReplica, contributingRenderPass->id());
     m_sharedQuadStateList.append(sharedQuadState.release());
 
-    if (!surface->hasReplica())
+    if (!layer->hasReplica())
         return;
 
     // Add replica after the surface so that it appears below the surface.
@@ -94,6 +94,8 @@ void CCRenderPass::appendQuadsToFillScreen(CCLayerImpl* rootLayer, SkColor scree
     if (fillRegion.isEmpty())
         return;
 
+    // Manually create the quad state for the gutter quads, as the root layer
+    // doesn't have any bounds and so can't generate this itself.
     OwnPtr<CCSharedQuadState> sharedQuadState = rootLayer->createSharedQuadState();
     WebTransformationMatrix transformToLayerSpace = rootLayer->screenSpaceTransform().inverse();
     Vector<IntRect> fillRects = fillRegion.rects();

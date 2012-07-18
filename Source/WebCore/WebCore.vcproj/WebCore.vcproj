@@ -27299,6 +27299,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\loader\ImageLoaderClient.h"
+				>
+			</File>
+			<File
 				RelativePath="..\loader\LinkLoader.cpp"
 				>
 			</File>
@@ -37645,6 +37649,14 @@
 			<File
 				RelativePath="..\css\WebKitCSSTransformValue.h"
 				>
+			</File>
+			<File
+			    RelativePath="..\css\WrapShapeFunctions.cpp"
+			    >
+			</File>
+			<File
+			    RelativePath="..\css\WrapShapeFunctions.h"
+			    >
 			</File>
 		</Filter>
 		<Filter
@@ -63387,6 +63399,14 @@
 				</File>
 				<File
 					RelativePath="..\html\shadow\InsertionPoint.h"
+					>
+				</File>
+				<File
+					RelativePath="..\html\shadow\ImageInnerElement.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\html\shadow\ImageInnerElement.h"
 					>
 				</File>
 				<File

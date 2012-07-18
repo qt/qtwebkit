@@ -53,7 +53,7 @@
 #include "PopupMenuClient.h"
 #include "ProgressTracker.h"
 #include "RefPtrCairo.h"
-#include "RenderTheme.h"
+#include "RenderThemeEfl.h"
 #include "ResourceHandle.h"
 #include "Settings.h"
 #include "c_instance.h"
@@ -101,6 +101,10 @@
 
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooserClient.h"
+#endif
+
+#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
+#include "RegisterProtocolHandlerClientEfl.h"
 #endif
 
 static const float zoomMinimum = 0.05;
@@ -754,7 +758,11 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
 #endif
 
 #if ENABLE(BATTERY_STATUS)
-    WebCore::provideBatteryTo(priv->page.get(), new BatteryClientEfl);
+    WebCore::provideBatteryTo(priv->page.get(), new BatteryClientEfl(smartData->self));
+#endif
+
+#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
+    WebCore::provideRegisterProtocolHandlerTo(priv->page.get(), new WebCore::RegisterProtocolHandlerClientEfl(smartData->self));
 #endif
 
     priv->pageSettings = priv->page->settings();
@@ -1376,12 +1384,8 @@ void ewk_view_theme_set(Evas_Object* ewkView, const char* path)
     if (!eina_stringshare_replace(&priv->settings.theme, path))
         return;
 
-    WebCore::FrameView* view = priv->mainFrame->view();
-    if (view) {
-        view->setEdjeTheme(WTF::String(path));
-        priv->page->theme()->themeChanged();
-    }
-
+    WebCore::RenderThemeEfl* theme = static_cast<WebCore::RenderThemeEfl*>(priv->page->theme());
+    theme->setThemePath(path);
 }
 
 const char* ewk_view_theme_get(const Evas_Object* ewkView)

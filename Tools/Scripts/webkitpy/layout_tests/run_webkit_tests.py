@@ -109,9 +109,9 @@ def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdo
     unexpected_result_count = -1
     try:
         manager = Manager(port, options, printer)
-        manager.print_config()
+        printer.print_config()
 
-        printer.print_update("Collecting tests ...")
+        printer.write_update("Collecting tests ...")
         try:
             manager.collect_tests(args)
         except IOError, e:
@@ -119,12 +119,12 @@ def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdo
                 return -1
             raise
 
-        printer.print_update("Checking build ...")
+        printer.write_update("Checking build ...")
         if not port.check_build(manager.needs_servers()):
             _log.error("Build check failed")
             return -1
 
-        printer.print_update("Parsing expectations ...")
+        printer.write_update("Parsing expectations ...")
         manager.parse_expectations()
 
         unexpected_result_count = manager.run()
@@ -420,6 +420,11 @@ def parse_args(args=None):
             help="Don't re-try any tests that produce unexpected results."),
         optparse.make_option("--max-locked-shards", type="int",
             help="Set the maximum number of locked shards"),
+        # For chromium-android to reduce the cost of restarting the driver.
+        # FIXME: Remove the option once per-test arg is supported:
+        # https://bugs.webkit.org/show_bug.cgi?id=91539.
+        optparse.make_option("--shard-ref-tests", action="store_true",
+            help="Run ref tests in dedicated shard(s). Enabled on Android by default."),
     ]))
 
     option_group_definitions.append(("Miscellaneous Options", [
@@ -482,8 +487,10 @@ def main(argv=None):
 
 if '__main__' == __name__:
     try:
-        sys.exit(main())
+        return_code = main()
     except BaseException, e:
         if e.__class__ in (KeyboardInterrupt, TestRunInterruptedException):
             sys.exit(INTERRUPTED_EXIT_STATUS)
         sys.exit(EXCEPTIONAL_EXIT_STATUS)
+
+    sys.exit(return_code)

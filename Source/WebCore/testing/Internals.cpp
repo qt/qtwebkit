@@ -79,6 +79,10 @@
 #include "NetworkInfoController.h"
 #endif
 
+#if ENABLE(PAGE_POPUP)
+#include "PagePopupController.h"
+#endif
+
 #if ENABLE(TOUCH_ADJUSTMENT)
 #include "EventHandler.h"
 #include "WebKitPoint.h"
@@ -481,6 +485,16 @@ void Internals::setFormControlStateOfPreviousHistoryItem(PassRefPtr<DOMStringLis
         ec = INVALID_ACCESS_ERR;
 }
 
+#if ENABLE(PAGE_POPUP)
+PassRefPtr<PagePopupController> Internals::pagePopupController()
+{
+    InternalSettings* settings = this->settings();
+    if (!settings)
+        return 0;
+    return settings->pagePopupController();
+}
+#endif
+
 PassRefPtr<ClientRect> Internals::absoluteCaretBounds(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame() || !document->frame()->selection()) {
@@ -628,9 +642,9 @@ void Internals::setScrollViewPosition(Document* document, long x, long y, Except
     frameView->setConstrainsScrollingToContentEdge(constrainsScrollingToContentEdgeOldValue);
 }
 
-void Internals::setPagination(Document*, const String& mode, int gap, ExceptionCode& ec)
+void Internals::setPagination(Document*, const String& mode, int gap, int pageLength, ExceptionCode& ec)
 {
-    settings()->setPagination(mode, gap, ec);
+    settings()->setPagination(mode, gap, pageLength, ec);
 }
 
 String Internals::configurationForViewport(Document*, float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
@@ -1074,6 +1088,18 @@ String Internals::counterValue(Element* element)
         return String();
 
     return counterValueForElement(element);
+}
+
+PassRefPtr<DOMStringList> Internals::iconURLs(Document* document) const
+{
+    Vector<IconURL> iconURLs = document->iconURLs();
+    RefPtr<DOMStringList> stringList = DOMStringList::create();
+
+    Vector<IconURL>::const_iterator iter(iconURLs.begin());
+    for (; iter != iconURLs.end(); ++iter)
+        stringList->append(iter->m_iconURL.string());
+
+    return stringList.release();
 }
 
 #if ENABLE(FULLSCREEN_API)

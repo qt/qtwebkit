@@ -36,6 +36,7 @@
 #include "AutofillPopupMenuClient.h"
 #include "BackForwardListChromium.h"
 #include "BatteryClientImpl.h"
+#include "BatteryController.h"
 #include "CSSValueKeywords.h"
 #include "Chrome.h"
 #include "Color.h"
@@ -427,6 +428,9 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
 #if ENABLE(MEDIA_STREAM)
     , m_userMediaClientImpl(this)
 #endif
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
+    , m_registerProtocolHandlerClient(RegisterProtocolHandlerClientImpl::create(this))
+#endif
     , m_flingModifier(0)
 {
     // WebKit/win/WebView.cpp does the same thing, except they call the
@@ -456,6 +460,9 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     provideNotification(m_page.get(), notificationPresenterImpl());
 #endif
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
+    provideRegisterProtocolHandlerTo(m_page.get(), m_registerProtocolHandlerClient.get());
+#endif
 
     provideContextFeaturesTo(m_page.get(), m_featureSwitchClient.get());
     provideDeviceOrientationTo(m_page.get(), m_deviceOrientationClientProxy.get());
@@ -464,6 +471,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
 
 #if ENABLE(BATTERY_STATUS)
     provideBatteryTo(m_page.get(), m_batteryClient.get());
+    m_batteryClient->setController(BatteryController::from(m_page.get()));
 #endif
 
     m_page->setGroupName(pageGroupName);

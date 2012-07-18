@@ -1580,8 +1580,8 @@
             ['exclude', 'platform/graphics/harfbuzz/ComplexTextControllerHarfBuzz\\.cpp$'],
             ['exclude', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
 
-            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzFace\\.(cpp|h)$'],
-            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzFaceSkia\\.cpp$'],
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzNGFace\\.(cpp|h)$'],
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzNGFaceSkia\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzShaper\\.(cpp|h)$'],
           ],
         }],
@@ -1703,12 +1703,11 @@
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
-            ['exclude', 'platform/chromium/DragImageChromiumMac\\.cpp$'],
 
             # Mac uses Harfbuzz-ng.
             ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
-            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzFaceCoreText\\.cpp$'],
-            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzFace\\.(cpp|h)$'],
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzNGFaceCoreText\\.cpp$'],
+            ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzNGFace\\.(cpp|h)$'],
             ['include', 'platform/graphics/harfbuzz/ng/HarfBuzzShaper\\.(cpp|h)$'],            
           ],
         },{ # OS!="mac"

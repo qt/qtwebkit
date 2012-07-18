@@ -738,7 +738,7 @@ public:
     void registerNodeListCache(DynamicNodeListCacheBase*);
     void unregisterNodeListCache(DynamicNodeListCacheBase*);
     bool shouldInvalidateNodeListCaches(const QualifiedName* attrName = 0) const;
-    void clearNodeListCaches();
+    void invalidateNodeListCaches(const QualifiedName* attrName);
 
     void attachNodeIterator(NodeIterator*);
     void detachNodeIterator(NodeIterator*);
@@ -952,7 +952,7 @@ public:
     
     void setHasNodesWithPlaceholderStyle() { m_hasNodesWithPlaceholderStyle = true; }
 
-    const Vector<IconURL>& iconURLs() const;
+    const Vector<IconURL>& iconURLs();
     void addIconURL(const String& url, const String& mimeType, const String& size, IconType);
 
     void setUseSecureKeyboardEntryWhenActive(bool);
@@ -1061,8 +1061,8 @@ public:
     Element* webkitCurrentFullScreenElement() const { return m_fullScreenElement.get(); }
     
     enum FullScreenCheckType {
-        EnforceIFrameAllowFulScreenRequirement,
-        ExemptIFrameAllowFulScreenRequirement,
+        EnforceIFrameAllowFullScreenRequirement,
+        ExemptIFrameAllowFullScreenRequirement,
     };
 
     void requestFullScreenForElement(Element*, unsigned short flags, FullScreenCheckType);

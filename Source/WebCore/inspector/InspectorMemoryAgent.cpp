@@ -96,6 +96,7 @@ static const char domTreeOther[] = "DOMTreeOther";
 static const char domTreeDOM[] = "DOMTreeDOM";
 static const char domTreeCSS[] = "DOMTreeCSS";
 static const char domTreeBinding[] = "DOMTreeBinding";
+static const char domTreeLoader[] = "DOMTreeLoader";
 }
 
 namespace {
@@ -483,6 +484,7 @@ public:
         addMemoryBlockFor(domChildren.get(), m_totalSizes[DOM], MemoryBlockName::domTreeDOM);
         addMemoryBlockFor(domChildren.get(), m_totalSizes[CSS], MemoryBlockName::domTreeCSS);
         addMemoryBlockFor(domChildren.get(), m_totalSizes[Binding], MemoryBlockName::domTreeBinding);
+        addMemoryBlockFor(domChildren.get(), m_totalSizes[Loader], MemoryBlockName::domTreeLoader);
 
         RefPtr<InspectorMemoryBlock> dom = InspectorMemoryBlock::create().setName(MemoryBlockName::dom);
         dom->setSize(totalSize);
@@ -500,7 +502,7 @@ public:
     }
 
 private:
-    virtual void reportString(ObjectType objectType, const String& string)
+    virtual void addString(const String& string, ObjectType objectType)
     {
         if (string.isNull() || visited(string.impl()))
             return;
@@ -541,7 +543,13 @@ public:
         if (node->document() && node->document()->frame() && m_page != node->document()->frame()->page())
             return;
 
-        m_domMemoryUsage.reportInstrumentedPointer(node);
+        m_domMemoryUsage.addInstrumentedMember(node);
+        m_domMemoryUsage.processDeferredInstrumentedPointers();
+    }
+
+    void visitFrame(Frame* frame)
+    {
+        m_domMemoryUsage.addInstrumentedMember(frame);
         m_domMemoryUsage.processDeferredInstrumentedPointers();
     }
 
@@ -570,8 +578,10 @@ static PassRefPtr<InspectorMemoryBlock> domTreeInfo(Page* page, VisitedObjects& 
 
     // Make sure all documents reachable from the main frame are accounted.
     for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        if (Document* doc = frame->document())
+        if (Document* doc = frame->document()) {
             domTreesIterator.visitNode(doc);
+            domTreesIterator.visitFrame(frame);
+        }
     }
 
     domTreesIterator.visitBindings();

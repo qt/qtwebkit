@@ -490,7 +490,10 @@ bool HTMLMediaElement::childShouldCreateRenderer(const NodeRenderingContext& chi
 {
     if (!hasMediaControls())
         return false;
-    // Only allows nodes from the controls shadow subtree.
+    // <media> doesn't allow its content, including shadow subtree, to
+    // be rendered. So this should return false for most of the children.
+    // One exception is a shadow tree built for rendering controls which should be visible.
+    // So we let them go here by comparing its subtree root with one of the controls.
     return (mediaControls()->treeScope() == childContext.node()->treeScope()
             && childContext.isOnUpperEncapsulationBoundary() && HTMLElement::childShouldCreateRenderer(childContext));
 }
@@ -759,6 +762,7 @@ void HTMLMediaElement::loadInternal()
     // If we can't start a load right away, start it later.
     Page* page = document()->page();
     if (pageConsentRequiredForLoad() && page && !page->canStartMedia()) {
+        setShouldDelayLoadEvent(false);
         if (m_isWaitingUntilMediaCanStart)
             return;
         document()->addMediaCanStartListener(this);
@@ -1854,6 +1858,24 @@ void HTMLMediaElement::progressEventTimerFired(Timer<HTMLMediaElement>*)
         m_sentStalledEvent = true;
         setShouldDelayLoadEvent(false);
     }
+}
+
+void HTMLMediaElement::createShadowSubtree()
+{
+    ASSERT(!shadow() || !shadow()->oldestShadowRoot());
+
+    ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot);
+}
+
+void HTMLMediaElement::willAddAuthorShadowRoot()
+{
+    ASSERT(shadow());
+    if (shadow()->oldestShadowRoot()) {
+        ASSERT(shadow()->oldestShadowRoot()->type() == ShadowRoot::UserAgentShadowRoot);
+        return;
+    }
+
+    createShadowSubtree();
 }
 
 void HTMLMediaElement::rewind(float timeDelta)
@@ -3985,7 +4007,7 @@ void HTMLMediaElement::enterFullscreen()
 
 #if ENABLE(FULLSCREEN_API)
     if (document() && document()->settings() && document()->settings()->fullScreenEnabled()) {
-        document()->requestFullScreenForElement(this, 0, Document::ExemptIFrameAllowFulScreenRequirement);
+        document()->requestFullScreenForElement(this, 0, Document::ExemptIFrameAllowFullScreenRequirement);
         return;
     }
 #endif
@@ -4186,7 +4208,11 @@ bool HTMLMediaElement::createMediaControls()
     if (isFullscreen())
         controls->enteredFullscreen();
 
-    ensureShadowRoot()->appendChild(controls, ec);
+    if (!shadow())
+        createShadowSubtree();
+
+    ASSERT(shadow()->oldestShadowRoot()->type() == ShadowRoot::UserAgentShadowRoot);
+    shadow()->oldestShadowRoot()->appendChild(controls, ec);
     return true;
 }
 

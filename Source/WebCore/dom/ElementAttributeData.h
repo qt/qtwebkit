@@ -102,12 +102,12 @@ public:
 
     void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     {
-        memoryObjectInfo->reportObjectInfo(this, MemoryInstrumentation::DOM);
-        memoryObjectInfo->reportInstrumentedPointer(m_inlineStyleDecl.get());
-        memoryObjectInfo->reportInstrumentedPointer(m_attributeStyle.get());
-        memoryObjectInfo->reportObject(m_classNames);
-        memoryObjectInfo->reportObject(m_idForStyleResolution);
-        memoryObjectInfo->reportObject(m_attributes);
+        MemoryClassInfo<ElementAttributeData> info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+        info.addInstrumentedMember(m_inlineStyleDecl.get());
+        info.addInstrumentedMember(m_attributeStyle.get());
+        info.addMember(m_classNames);
+        info.addString(m_idForStyleResolution);
+        info.addVector(m_attributes);
     }
 
 private:

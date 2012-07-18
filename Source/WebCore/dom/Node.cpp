@@ -974,7 +974,7 @@ void Node::invalidateNodeListCachesInAncestors(const QualifiedName* attrName, El
     if (!document()->shouldInvalidateNodeListCaches())
         return;
 
-    document()->clearNodeListCaches();
+    document()->invalidateNodeListCaches(attrName);
 
     for (Node* node = this; node; node = node->parentNode()) {
         if (!node->hasRareData())
@@ -1397,15 +1397,6 @@ bool Node::canStartSelection() const
 
 Node* Node::shadowAncestorNode() const
 {
-#if ENABLE(SVG)
-    // SVG elements living in a shadow tree only occur when <use> created them.
-    // For these cases we do NOT want to return the shadowParentNode() here
-    // but the actual shadow tree element - as main difference to the HTML forms
-    // shadow tree concept. (This function _could_ be made virtual - opinions?)
-    if (isSVGElement())
-        return const_cast<Node*>(this);
-#endif
-
     if (ShadowRoot* root = shadowRoot())
         return root->host();
 
@@ -2223,18 +2214,12 @@ void Node::showTreeForThisAcrossFrame() const
 void NodeListsNodeData::invalidateCaches(const QualifiedName* attrName)
 {
     NodeListAtomicNameCacheMap::const_iterator atomicNameCacheEnd = m_atomicNameCaches.end();
-    for (NodeListAtomicNameCacheMap::const_iterator it = m_atomicNameCaches.begin(); it != atomicNameCacheEnd; ++it) {
-        DynamicNodeList* list = it->second;
-        if (!attrName || DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(list->invalidationType(), *attrName))
-            list->invalidateCache();
-    }
+    for (NodeListAtomicNameCacheMap::const_iterator it = m_atomicNameCaches.begin(); it != atomicNameCacheEnd; ++it)
+        it->second->invalidateCache(attrName);
 
     NodeListNameCacheMap::const_iterator nameCacheEnd = m_nameCaches.end();
-    for (NodeListNameCacheMap::const_iterator it = m_nameCaches.begin(); it != nameCacheEnd; ++it) {
-        DynamicNodeList* list = it->second;
-        if (!attrName || DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(list->invalidationType(), *attrName))
-            list->invalidateCache();
-    }
+    for (NodeListNameCacheMap::const_iterator it = m_nameCaches.begin(); it != nameCacheEnd; ++it)
+        it->second->invalidateCache(attrName);
 
     if (!attrName)
         return;
@@ -2768,12 +2753,12 @@ void Node::removedLastRef()
 
 void Node::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    memoryObjectInfo->reportObjectInfo(this, MemoryInstrumentation::DOM);
-    TreeShared<Node, ContainerNode>::reportMemoryUsage(memoryObjectInfo);
-    ScriptWrappable::reportMemoryUsage(memoryObjectInfo);
-    memoryObjectInfo->reportPointer(m_document, MemoryInstrumentation::DOM);
-    memoryObjectInfo->reportInstrumentedPointer(m_next);
-    memoryObjectInfo->reportInstrumentedPointer(m_previous);
+    MemoryClassInfo<Node> info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    info.visitBaseClass<TreeShared<Node, ContainerNode> >(this);
+    info.visitBaseClass<ScriptWrappable>(this);
+    info.addInstrumentedMember(m_document);
+    info.addInstrumentedMember(m_next);
+    info.addInstrumentedMember(m_previous);
 }
 
 } // namespace WebCore

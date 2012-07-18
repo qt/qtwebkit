@@ -842,7 +842,11 @@ void RenderLayer::updateLayerPosition()
             // FIXME: Composited layers ignore pagination, so about the best we can do is make sure they're offset into the appropriate column.
             // They won't split across columns properly.
             LayoutSize columnOffset;
-            parent()->renderer()->adjustForColumns(columnOffset, localPoint);
+            if (!parent()->renderer()->hasColumns() && parent()->renderer()->isRoot() && renderer()->view()->hasColumns())
+                renderer()->view()->adjustForColumns(columnOffset, localPoint);
+            else
+                parent()->renderer()->adjustForColumns(columnOffset, localPoint);
+
             localPoint += columnOffset;
         }
 
@@ -1615,8 +1619,8 @@ IntSize RenderLayer::clampScrollOffset(const IntSize& scrollOffset) const
     RenderBox* box = renderBox();
     ASSERT(box);
 
-    int maxX = scrollWidth() - box->clientWidth();
-    int maxY = scrollHeight() - box->clientHeight();
+    int maxX = scrollWidth() - box->pixelSnappedClientWidth();
+    int maxY = scrollHeight() - box->pixelSnappedClientHeight();
 
     int x = min(max(scrollOffset.width(), 0), maxX);
     int y = min(max(scrollOffset.height(), 0), maxY);
@@ -2438,7 +2442,7 @@ int RenderLayer::scrollWidth() const
     ASSERT(renderBox());
     if (m_scrollDimensionsDirty)
         const_cast<RenderLayer*>(this)->computeScrollDimensions();
-    return snapSizeToPixel(m_scrollSize.width(), renderBox()->clientLeft());
+    return snapSizeToPixel(m_scrollSize.width(), renderBox()->clientLeft() + renderBox()->x());
 }
 
 int RenderLayer::scrollHeight() const
@@ -2446,7 +2450,7 @@ int RenderLayer::scrollHeight() const
     ASSERT(renderBox());
     if (m_scrollDimensionsDirty)
         const_cast<RenderLayer*>(this)->computeScrollDimensions();
-    return snapSizeToPixel(m_scrollSize.height(), renderBox()->clientTop());
+    return snapSizeToPixel(m_scrollSize.height(), renderBox()->clientTop() + renderBox()->y());
 }
 
 LayoutUnit RenderLayer::overflowTop() const

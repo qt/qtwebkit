@@ -1,3 +1,357 @@
+2012-07-18  Yoshifumi Inoue  <yosin@chromium.org>
+
+        Decimal::toString should not round integer value.
+        https://bugs.webkit.org/show_bug.cgi?id=91481
+
+        Reviewed by Kent Tamura.
+
+        This patch adds a new test cases for Decimal::toString() for failed
+        value and maximum coefficient value with various exponent.
+
+        * tests/DecimalTest.cpp:
+        (TEST_F): DecimalTest.toString: Add test cases for big coefficient values.
+
+2012-07-18  Hans Wennborg  <hans@chromium.org>
+
+        Add copy constructor to WebSpeechGrammar.h
+        https://bugs.webkit.org/show_bug.cgi?id=91484
+
+        Reviewed by Adam Barth.
+
+        Provide user-defined copy constructor (and assign function) for WebSpeechGrammar.
+        Without this, we were hitting the implicit copy constructor, which in
+        turn used the implicit copy constructor of WebPrivatePtr. This was bad,
+        because the implicit copy constructor wouldn't increace the reference
+        count on the wrapped object, causing us to crash.
+
+        Also add one for WebSpeechRecognitionResult; haven't seen any problems
+        here, but I noticed it was missing.
+
+        * public/WebSpeechGrammar.h:
+        (WebKit::WebSpeechGrammar::WebSpeechGrammar):
+        (WebSpeechGrammar):
+        * public/WebSpeechRecognitionResult.h:
+        (WebKit::WebSpeechRecognitionResult::WebSpeechRecognitionResult):
+        (WebSpeechRecognitionResult):
+        * src/WebSpeechGrammar.cpp:
+        (WebKit::WebSpeechGrammar::assign):
+        (WebKit):
+
+2012-07-17  Yoshifumi Inoue  <yosin@chromium.org>
+
+        Decimal constructor with 99999999999999999 loses last digit
+        https://bugs.webkit.org/show_bug.cgi?id=91579
+
+        Reviewed by Kent Tamura.
+
+        This patch adds test cases for Decimal::EncodedData constructors for
+        testing edge cases in addition to common cases which they aren't
+        covered by other test cases.
+
+        * tests/DecimalTest.cpp:
+        (EXPECT_DECIMAL_ENCODED_DATA_EQ): Introduce a new macro for ease of
+        writing test cases for verifying components of Decimal::EncodedData.
+        (TEST_F): Added a new test entry DecimalTest.Constructor.
+
+2012-07-17  Yoshifumi Inoue  <yosin@chromium.org>
+
+        Test cases in DecimalTest should use EXPECT_STREQ for ease of debugging test case
+        https://bugs.webkit.org/show_bug.cgi?id=91572
+
+        Reviewed by Kent Tamura.
+
+        This patch introduces EXPECT_DECIMAL_STREQ macro to replace EXPECT_EQ
+        with String class for displaying text string rather than object dump
+        for ease of debugging test cases.
+
+        * tests/DecimalTest.cpp:
+        (DecimalTest::stepDown): Changed to return Decimal instead of String
+        to use EXPECT_DECIMAL_STREQ.
+        (DecimalTest::stepUp): ditto.
+        (TEST_F): Replaced EXPECT_EQ + String class to EXPECT_DECIMAL_STREQ.
+
+2012-07-17  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: Key generator state not maintained across connections
+        https://bugs.webkit.org/show_bug.cgi?id=91456
+
+        Reviewed by Tony Chang.
+
+        Add stub method implementations to test class.
+
+        * tests/IDBFakeBackingStore.h:
+
+2012-07-17  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, rolling out r122884.
+        http://trac.webkit.org/changeset/122884
+        https://bugs.webkit.org/show_bug.cgi?id=91408
+
+        Broke the chromium-win build.
+
+        * public/WebIDBMetadata.h:
+        (WebIDBMetadata):
+        (WebKit::WebIDBMetadata::WebIDBMetadata):
+
+2012-07-17  David Grogan  <dgrogan@chromium.org>
+
+        IndexedDB: Add intVersion to chromium/public/WebIDBMetadata.h
+        https://bugs.webkit.org/show_bug.cgi?id=91408
+
+        Reviewed by Adam Barth.
+
+        This is in support of the new upgradeneeded versioning api.
+        intVersion will eventually replace the WebString version member.
+
+        * public/WebIDBMetadata.h:
+        (WebIDBMetadata): The spec uses unsigned long long for version
+        numbers but we use int64_t here so that we can use -1 as a sentinel.
+        It indicates that a database still uses a string version.
+
+2012-07-17  Tony Chang  <tony@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-07-17  Vivek Galatage  <vivekgalatage@gmail.com>
+
+        Web Inspector: refactor InspectorController::connectFrontend() to accept InspectorFrontendChannel.
+        https://bugs.webkit.org/show_bug.cgi?id=91196
+
+        Reviewed by Pavel Feldman.
+
+        Refactoring InspectorClients. InspectorClient::openInspectorFrontend
+        now returning the InspectorFrontendChannel.
+
+        * src/InspectorClientImpl.cpp:
+        (WebKit::InspectorClientImpl::openInspectorFrontend):
+        * src/InspectorClientImpl.h:
+        (InspectorClientImpl):
+        * src/WebDevToolsAgentImpl.cpp:
+        (WebKit::WebDevToolsAgentImpl::reattach):
+        (WebKit::WebDevToolsAgentImpl::openInspectorFrontend):
+        * src/WebDevToolsAgentImpl.h:
+        (WebDevToolsAgentImpl):
+
+2012-07-16  Adam Barth  <abarth@webkit.org>
+
+        Unreviewed. Remove two empty directories.
+
+        * public/linuxish: Removed.
+        * src/linuxish: Removed.
+
+2012-07-16  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Add RegisterProtocolHandlerClient to the Modules/protocolhandler
+        https://bugs.webkit.org/show_bug.cgi?id=90940
+
+        Reviewed by Hajime Morita.
+
+        As a step to let protocol handler be moved to the modules, RegisterProtocolHandlerClient needs
+        to be added to the Modules/protocolhandler. Because ChromeClient has some virtual functions for
+        protocol handlers, virtual functions should be moved to RegisterProtocolHandlerClient.
+
+        In order to support this, RegisterProtocolHandlerClientImpl class is added to ChromeClientImpl files.
+
+        In addition, existing functions related to protocol handler in ChromeClientImpl class are moved to
+        RegisterProtocolHandlerClientImpl class.
+
+        * WebKit.gyp:
+        * src/ChromeClientImpl.cpp: Implement RegisterProtocolHandlerClientImpl class.
+        (WebKit):
+        (WebKit::RegisterProtocolHandlerClientImpl::create):
+        (WebKit::RegisterProtocolHandlerClientImpl::RegisterProtocolHandlerClientImpl):
+        (WebKit::RegisterProtocolHandlerClientImpl::registerProtocolHandler):
+        * src/ChromeClientImpl.h:
+        (ChromeClientImpl):
+        (RegisterProtocolHandlerClientImpl):
+        (WebKit::RegisterProtocolHandlerClientImpl::~RegisterProtocolHandlerClientImpl):
+        (WebKit):
+        * src/WebViewImpl.cpp: Register RegisterProtocolHandlerClientImpl in order to support supplement.
+        (WebKit::WebViewImpl::WebViewImpl):
+        * src/WebViewImpl.h:
+
+2012-07-16  Yoshifumi Inoue  <yosin@chromium.org>
+
+        REGRESSION(r122552): DecimalTest tests (CeilingSmallExponent and FloorSmallExponent) started failing.
+        https://bugs.webkit.org/show_bug.cgi?id=91244
+
+        Reviewed by Kent Tamura.
+
+        This patch enables and updates disabled test cases of DecimalTest
+        caused by fixes in r122552 of Decimal::ceiling() and Decimal::floor()
+        for small fraction numbers and added test cases. Fixes in r122552
+        itself is correct however, it didn't update existing tests for very small
+        fraction numbers.
+
+        * tests/DecimalTest.cpp:
+        (TEST_F): CeilingSmallExponent: Change expected value to 1 for ceiling(1e-1000),
+        ceiling rounds number toward positive infinity.
+        (TEST_F): FloorSmallExponent: Change expected value to -1 for floor(-1e-1000),
+        floor rounds number toward negative infinity.
+
+2012-07-16  Koji Ishii  <kojiishi@gmail.com>
+
+        Vertical alternate glyph (GSUB) support for OpenTypeVerticalData
+        https://bugs.webkit.org/show_bug.cgi?id=81389
+
+        Reviewed by Tony Chang.
+
+        Tests for pointer validations for OpenType tables.
+
+        * WebKit.gypi:
+        * tests/OpenTypeVerticalDataTest.cpp: Added.
+        (WebCore):
+        (TestTable):
+        (WebCore::TestTable::validateOffset):
+        (WebCore::TEST):
+
+2012-07-16  Alexandre Elias  <aelias@google.com>
+
+        [chromium] Fix WebFrameTest flakiness due to synthetic mouse events
+        https://bugs.webkit.org/show_bug.cgi?id=91428
+
+        Reviewed by Adam Barth.
+
+        Synthetic mouse move events on scrolling can cause segfaults in
+        WebFrameTest due to delayed callbacks on the message loop after
+        state destruction. This is currently only affecting
+        the Android port, but has the potential to affect other platforms in the
+        future.
+
+        We can avoid the issue by disabling the deviceSupportsMouse
+        setting, which shouldn't be needed by any WebFrameTest.
+
+        * tests/FrameTestHelpers.cpp:
+        (WebKit::FrameTestHelpers::createWebViewAndLoad):
+
+2012-07-16  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: Introduce putWithIndexKeys and calculate them in the renderer
+        https://bugs.webkit.org/show_bug.cgi?id=90923
+
+        Reviewed by Darin Fisher.
+
+        Stub out implementations of putWithIndexKeys(), already implemented
+        on the chromium side.
+
+        * public/WebIDBObjectStore.h:
+        (WebKit::WebIDBObjectStore::putWithIndexKeys):
+        * src/IDBObjectStoreBackendProxy.cpp:
+        (WebKit::IDBObjectStoreBackendProxy::putWithIndexKeys):
+        (WebKit):
+        * src/IDBObjectStoreBackendProxy.h:
+        (IDBObjectStoreBackendProxy):
+
+2012-07-16  Adrienne Walker  <enne@google.com>
+
+        [chromium] Unify compositor quad transforms into content space
+        https://bugs.webkit.org/show_bug.cgi?id=91350
+
+        Reviewed by Kenneth Russell.
+
+        Update tests to add bounds/contentBounds properties to layers. This
+        exposed a bug in the quad culler tests where the draw transform was
+        incorrectly being set to the origin transform rather than being a
+        transform that operates on centered layer rects. Fixed this bug.
+
+        * tests/CCQuadCullerTest.cpp:
+        * tests/CCSolidColorLayerImplTest.cpp:
+        (CCLayerTestCommon::TEST):
+        * tests/CCTiledLayerImplTest.cpp:
+        (CCLayerTestCommon::createLayer):
+
+2012-07-16  Adrienne Walker  <enne@google.com>
+
+        [chromium] Unify compositor quad transforms into content space
+        https://bugs.webkit.org/show_bug.cgi?id=91350
+
+        Reviewed by Kenneth Russell.
+
+        Update tests to add bounds/contentBounds properties to layers. This
+        exposed a bug in the quad culler tests where the draw transform was
+        incorrectly being set to the origin transform rather than being a
+        transform that operates on centered layer rects. Fixed this bug.
+
+        * tests/CCQuadCullerTest.cpp:
+        * tests/CCSolidColorLayerImplTest.cpp:
+        (CCLayerTestCommon::TEST):
+        * tests/CCTiledLayerImplTest.cpp:
+        (CCLayerTestCommon::createLayer):
+
+2012-07-16  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Remove targetRenderSurface concept, give layers a renderTarget which is the layer whose coordinate space they draw into
+        https://bugs.webkit.org/show_bug.cgi?id=91288
+
+        Reviewed by Adrienne Walker.
+
+        * tests/CCDamageTrackerTest.cpp:
+        (WebKitTests::TEST_F):
+        * tests/CCLayerImplTest.cpp:
+        (WebCore::TEST):
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/CCOcclusionTrackerTest.cpp:
+        (WebKitTests::CCOcclusionTrackerTestOverlappingSurfaceSiblings::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestOverlappingSurfaceSiblingsWithTwoTransforms::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestAnimationOpacity1OnMainThread::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestAnimationOpacity0OnMainThread::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestAnimationTranslateOnMainThread::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestReplicaOccluded::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestSurfaceWithReplicaUnoccluded::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestSurfaceAndReplicaOccludedDifferently::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestSurfaceChildOfSurface::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestTopmostSurfaceIsClippedToScissor::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestSurfaceChildOfClippingSurface::runMyTest):
+        * tests/CCQuadCullerTest.cpp:
+        * tests/CCTiledLayerTestCommon.cpp:
+        (WebKitTests::FakeTiledLayerChromium::setTexturePriorities):
+        * tests/LayerChromiumTest.cpp:
+
+2012-07-16  Sami Kyostila  <skyostil@chromium.org>
+
+        [chromium] Only apply page scale delta to root scroll layer
+        https://bugs.webkit.org/show_bug.cgi?id=91374
+
+        Reviewed by Adrienne Walker.
+
+        New unit test
+        CCLayerTreeHostImplTest.pageScaleDeltaAppliedToRootScrollLayerOnly to verify
+        the transformation of child layer while pinch zooming.
+
+        * tests/CCLayerTreeHostImplTest.cpp:
+
+2012-07-16  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Remove setController from BatteryClient
+        https://bugs.webkit.org/show_bug.cgi?id=90944
+
+        Reviewed by Adam Barth.
+
+        Remove virtual identifier from setController because setController is removed from WebCore::BatteryClient.
+        In addition, BatteryController is set to instance of BatteryClientImpl in the constructor of WebViewImpl.
+
+        * src/BatteryClientImpl.h:
+        (BatteryClientImpl):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+
+2012-07-16  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Incorrect assertion: Replicas will cause a RenderPass to be removed twice
+        https://bugs.webkit.org/show_bug.cgi?id=91328
+
+        Reviewed by Adrienne Walker.
+
+        Add replicas to the surfaces in the test.
+
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::CCLayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit::CCLayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit):
+        (WTF::CCLayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit::beginTest):
+        (WTF::CCLayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit::afterTest):
+        (CCLayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit):
+
 2012-07-13  Eric Penner  <epenner@google.com>
 
         [chromium] Add 'self-managed' option to CCPrioritizedTexture to enable render-surface and canvas use cases.

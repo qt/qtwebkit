@@ -1,3 +1,89 @@
+2012-07-18  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [CMake] Make gtest a shared library
+        https://bugs.webkit.org/show_bug.cgi?id=90973
+
+        Reviewed by Daniel Bates.
+
+        It's nicer to make it a shared library because it might improve
+        linking time and we don't need to force gtest users to link with gtest
+        dependencies like pthreads (which causes linking errors when it is not
+        available).
+
+        * Source/cmake/gtest/CMakeLists.txt:
+
+2012-07-17  Gabor Ballabas  <gaborb@inf.u-szeged.hu>
+
+        [Qt][V8] Remove the V8 related codepaths and configuration
+        https://bugs.webkit.org/show_bug.cgi?id=90863
+
+        Reviewed by Simon Hausmann.
+
+        * Source/api.pri:
+        * WebKit.pro:
+
+2012-07-17  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r122834.
+        http://trac.webkit.org/changeset/122834
+        https://bugs.webkit.org/show_bug.cgi?id=91492
+
+        it broke the chromium (Requested by kkristof on #webkit).
+
+        * Source/api.pri:
+        * WebKit.pro:
+
+2012-07-17  Gabor Ballabas  <gaborb@inf.u-szeged.hu>
+
+        [Qt][V8] Remove the V8 related codepaths and configuration
+        https://bugs.webkit.org/show_bug.cgi?id=90863
+
+        Reviewed by Simon Hausmann.
+
+        * Source/api.pri:
+        * WebKit.pro:
+
+2012-07-17  David Barr  <davidbarr@chromium.org>
+
+        Introduce ENABLE_CSS_IMAGE_ORIENTATION compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=89055
+
+        Reviewed by Kent Tamura.
+
+        The css3-images module is at candidate recommendation.
+        http://www.w3.org/TR/2012/CR-css3-images-20120417/#the-image-orientation
+
+        Add a configuration option for CSS image-orientation support, disabling it by default.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-07-16  Pete Williamson  <petewil@google.com>
+
+        Expose an export for the iconUrl list so Internals can use it
+        https://bugs.webkit.org/show_bug.cgi?id=88665
+
+        Reviewed by Kent Tamura.
+
+        * Source/autotools/symbols.filter: export iconURLs
+
+2012-07-16  Hajime Morrita  <morrita@chromium.org>
+
+        WebCore needs WEBCORE_TESTING macro to mark methods being exported for testing.
+        https://bugs.webkit.org/show_bug.cgi?id=90764
+
+        Reviewed by Adam Barth.
+
+        Removed symbols which are now covered by WEBCORE_TESTING.
+
+        * Source/autotools/symbols.filter:
+
+2012-07-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and configure.ac for 1.9.5 release
+
+        * configure.ac: Bump version number.
+
 2012-07-12 Josh Hawn <jhawn@apple.com>
 
         Fix for WebContext::getWebCoreStatistics() causes crash if no m_process

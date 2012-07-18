@@ -30,7 +30,9 @@
 
 #ifndef MemoryInstrumentation_h
 #define MemoryInstrumentation_h
+#include <stdio.h>
 
+#include <wtf/Assertions.h>
 #include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -49,24 +51,64 @@ public:
         DOM,
         CSS,
         Binding,
+        Loader,
         LastTypeEntry
     };
 
-    template <typename T> void reportInstrumentedObject(const T&);
-    template <typename T> void reportObject(const T&) { }
-    template <typename T> void reportInstrumentedPointer(const T*);
-    template <typename T> void reportPointer(const T* object, ObjectType objectType)
+    template <typename T> void addInstrumentedMember(const T& t)
+    {
+        OwningTraits<T>::addInstrumentedMember(this, t);
+    }
+
+    template <typename T> void addMember(const T& t, ObjectType objectType)
+    {
+        OwningTraits<T>::addMember(this, t, objectType);
+    }
+
+    template <typename HashMapType> void addHashMap(const HashMapType&, ObjectType, bool contentOnly = false);
+    template <typename HashSetType> void addHashSet(const HashSetType&, ObjectType, bool contentOnly = false);
+    template <typename HashSetType> void addInstrumentedHashSet(const HashSetType&, ObjectType, bool contentOnly = false);
+    template <typename ListHashSetType> void addListHashSet(const ListHashSetType&, ObjectType, bool contentOnly = false);
+    template <typename VectorType> void addVector(const VectorType&, ObjectType, bool contentOnly = false);
+    void addRawBuffer(const void* const& buffer, ObjectType objectType, size_t size)
+    {
+        if (!buffer || visited(buffer))
+            return;
+        countObjectSize(objectType, size);
+    }
+
+protected:
+    enum OwningType {
+        byPointer,
+        byReference
+    };
+
+    template <typename T>
+    struct OwningTraits { // Default byReference implementation.
+        static void addInstrumentedMember(MemoryInstrumentation* instrumentation, const T& t) { instrumentation->addInstrumentedMemberImpl(&t, byReference); }
+        static void addMember(MemoryInstrumentation* instrumentation, const T& t, MemoryInstrumentation::ObjectType objectType) { instrumentation->addMemberImpl(&t, objectType, byReference); }
+    };
+
+    template <typename T>
+    struct OwningTraits<T*> { // Custom byPointer implementation.
+        static void addInstrumentedMember(MemoryInstrumentation* instrumentation, const T* const& t) { instrumentation->addInstrumentedMemberImpl(t, byPointer); }
+        static void addMember(MemoryInstrumentation* instrumentation, const T* const& t, MemoryInstrumentation::ObjectType objectType) { instrumentation->addMemberImpl(t, objectType, byPointer); }
+    };
+
+    template <typename T> void addInstrumentedMemberImpl(const T* const&, OwningType);
+    template <typename T> void addInstrumentedMemberImpl(const OwnPtr<T>* const& object, MemoryInstrumentation::OwningType owningType) { addInstrumentedMemberImpl(object->get(), owningType); }
+    template <typename T> void addInstrumentedMemberImpl(const RefPtr<T>* const& object, MemoryInstrumentation::OwningType owningType) { addInstrumentedMemberImpl(object->get(), owningType); }
+
+    template <typename T>
+    void addMemberImpl(const T* const& object, ObjectType objectType, OwningType owningType)
     {
         if (!object || visited(object))
             return;
+        if (owningType == byReference)
+            return;
         countObjectSize(objectType, sizeof(T));
     }
-    template <typename HashMapType> void reportHashMap(const HashMapType&, ObjectType, bool contentOnly = false);
-    template <typename HashSetType> void reportHashSet(const HashSetType&, ObjectType, bool contentOnly = false);
-    template <typename ListHashSetType> void reportListHashSet(const ListHashSetType&, ObjectType, bool contentOnly = false);
-    template <typename VectorType> void reportVector(const VectorType&, ObjectType, bool contentOnly = false);
 
-protected:
     class InstrumentedPointerBase {
     public:
         virtual ~InstrumentedPointerBase() { }
@@ -81,8 +123,7 @@ protected:
     }
 
 private:
-    friend class MemoryObjectInfo;
-
+    template <typename T> friend class MemoryClassInfo;
     template <typename T>
     class InstrumentedPointer : public InstrumentedPointerBase {
     public:
@@ -94,7 +135,7 @@ private:
         const T* m_pointer;
     };
 
-    virtual void reportString(ObjectType, const String&) = 0;
+    virtual void addString(const String&, ObjectType) = 0;
     virtual void countObjectSize(ObjectType, size_t) = 0;
     virtual void deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase>) = 0;
     virtual bool visited(const void*) = 0;
@@ -108,29 +149,15 @@ public:
         , m_objectSize(0)
      { }
 
-    template <typename P>
-    void reportInstrumentedPointer(const P* memberPointer)
-    {
-        m_memoryInstrumentation->reportInstrumentedPointer(memberPointer);
-    }
+    MemoryInstrumentation::ObjectType objectType() const { return m_objectType; }
+    size_t objectSize() const { return m_objectSize; }
 
-    template <typename P>
-    void reportPointer(const P* pointer, MemoryInstrumentation::ObjectType objectType)
-    {
-        m_memoryInstrumentation->reportPointer(pointer, objectType);
-    }
+    MemoryInstrumentation* memoryInstrumentation() { return m_memoryInstrumentation; }
 
-    template <typename T>
-    void reportInstrumentedObject(const T& memberObject)
-    {
-        m_memoryInstrumentation->reportInstrumentedObject(memberObject);
-    }
+private:
+    template <typename T> friend class MemoryClassInfo;
 
-    template <typename T>
-    void reportObject(const T& object) { m_memoryInstrumentation->reportObject(object); }
-
-    template <typename T>
-    void reportObjectInfo(const T*, MemoryInstrumentation::ObjectType objectType)
+    template <typename T> void reportObjectInfo(const T*, MemoryInstrumentation::ObjectType objectType)
     {
         if (m_objectType != MemoryInstrumentation::Other)
             return;
@@ -138,79 +165,87 @@ public:
         m_objectSize = sizeof(T);
     }
 
-    template <typename HashMapType>
-    void reportHashMap(const HashMapType& map)
-    {
-        m_memoryInstrumentation->reportHashMap(map, objectType(), true);
-    }
-
-    template <typename HashSetType>
-    void reportHashSet(const HashSetType& set)
-    {
-        m_memoryInstrumentation->reportHashSet(set, objectType(), true);
-    }
-
-    template <typename ListHashSetType>
-    void reportListHashSet(const ListHashSetType& set)
-    {
-        m_memoryInstrumentation->reportListHashSet(set, objectType(), true);
-    }
-
-    template <typename VectorType>
-    void reportVector(const VectorType& vector)
-    {
-        m_memoryInstrumentation->reportVector(vector, objectType(), true);
-    }
-
-    void reportString(const String& string)
-    {
-        m_memoryInstrumentation->reportString(objectType(), string);
-    }
-
-    MemoryInstrumentation::ObjectType objectType() const { return m_objectType; }
-    size_t objectSize() const { return m_objectSize; }
-
-    MemoryInstrumentation* memoryInstrumentation() { return m_memoryInstrumentation; }
-
- private:
     MemoryInstrumentation* m_memoryInstrumentation;
     MemoryInstrumentation::ObjectType m_objectType;
     size_t m_objectSize;
 };
 
+// Link time guard for string members. They produce link error is a string is reported via addMember.
+template <> void MemoryInstrumentation::addMemberImpl<AtomicString>(const AtomicString* const&, MemoryInstrumentation::ObjectType, MemoryInstrumentation::OwningType);
+template <> void MemoryInstrumentation::addMemberImpl<String>(const String* const&, MemoryInstrumentation::ObjectType, MemoryInstrumentation::OwningType);
+
+
 template <typename T>
-void MemoryInstrumentation::reportInstrumentedPointer(const T* const object)
+void MemoryInstrumentation::addInstrumentedMemberImpl(const T* const& object, MemoryInstrumentation::OwningType owningType)
 {
     if (!object || visited(object))
         return;
-    deferInstrumentedPointer(adoptPtr(new InstrumentedPointer<T>(object)));
+    if (owningType == byReference) {
+        MemoryObjectInfo memoryObjectInfo(this);
+        object->reportMemoryUsage(&memoryObjectInfo);
+    } else
+        deferInstrumentedPointer(adoptPtr(new InstrumentedPointer<T>(object)));
 }
 
-template<typename T>
-void MemoryInstrumentation::reportInstrumentedObject(const T& object)
-{
-    if (visited(&object))
-        return;
-    MemoryObjectInfo memoryObjectInfo(this);
-    object.reportMemoryUsage(&memoryObjectInfo);
-}
+
+template <typename T>
+class MemoryClassInfo {
+public:
+    MemoryClassInfo(MemoryObjectInfo* memoryObjectInfo, const T* ptr, MemoryInstrumentation::ObjectType objectType)
+        : m_memoryObjectInfo(memoryObjectInfo)
+        , m_memoryInstrumentation(memoryObjectInfo->memoryInstrumentation())
+    {
+        m_memoryObjectInfo->reportObjectInfo(ptr, objectType);
+        m_objectType = memoryObjectInfo->objectType();
+    }
+
+    template <typename P> void visitBaseClass(const P* ptr) { ptr->P::reportMemoryUsage(m_memoryObjectInfo); }
+
+    template <typename M> void addInstrumentedMember(const M& member) { m_memoryInstrumentation->addInstrumentedMember(member); }
+    template <typename M> void addMember(const M& member) { m_memoryInstrumentation->addMember(member, m_objectType); }
+
+    template <typename HashMapType> void addHashMap(const HashMapType& map) { m_memoryInstrumentation->addHashMap(map, m_objectType, true); }
+    template <typename HashSetType> void addHashSet(const HashSetType& set) { m_memoryInstrumentation->addHashSet(set, m_objectType, true); }
+    template <typename HashSetType> void addInstrumentedHashSet(const HashSetType& set) { m_memoryInstrumentation->addInstrumentedHashSet(set, m_objectType, true); }
+    template <typename ListHashSetType> void addListHashSet(const ListHashSetType& set) { m_memoryInstrumentation->addListHashSet(set, m_objectType, true); }
+    template <typename VectorType> void addVector(const VectorType& vector) { m_memoryInstrumentation->addVector(vector, m_objectType, true); }
+    void addRawBuffer(const void* const& buffer, size_t size) { m_memoryInstrumentation->addRawBuffer(buffer, m_objectType, size); }
+
+    void addString(const String& string) { m_memoryInstrumentation->addString(string, m_objectType); }
+    void addString(const AtomicString& string) { m_memoryInstrumentation->addString((const String&)string, m_objectType); }
+
+private:
+    MemoryObjectInfo* m_memoryObjectInfo;
+    MemoryInstrumentation* m_memoryInstrumentation;
+    MemoryInstrumentation::ObjectType m_objectType;
+};
 
 template<typename HashMapType>
-void MemoryInstrumentation::reportHashMap(const HashMapType& hashMap, ObjectType objectType, bool contentOnly)
+void MemoryInstrumentation::addHashMap(const HashMapType& hashMap, ObjectType objectType, bool contentOnly)
 {
     countObjectSize(objectType, calculateContainerSize(hashMap, contentOnly));
 }
 
 template<typename HashSetType>
-void MemoryInstrumentation::reportHashSet(const HashSetType& hashSet, ObjectType objectType, bool contentOnly)
+void MemoryInstrumentation::addHashSet(const HashSetType& hashSet, ObjectType objectType, bool contentOnly)
 {
     if (visited(&hashSet))
         return;
     countObjectSize(objectType, calculateContainerSize(hashSet, contentOnly));
 }
 
+template<typename HashSetType>
+void MemoryInstrumentation::addInstrumentedHashSet(const HashSetType& hashSet, ObjectType objectType, bool contentOnly)
+{
+    if (visited(&hashSet))
+        return;
+    countObjectSize(objectType, calculateContainerSize(hashSet, contentOnly));
+    for (typename HashSetType::const_iterator i = hashSet.begin(); i != hashSet.end(); ++i)
+        addInstrumentedMember(*i);
+}
+
 template<typename ListHashSetType>
-void MemoryInstrumentation::reportListHashSet(const ListHashSetType& hashSet, ObjectType objectType, bool contentOnly)
+void MemoryInstrumentation::addListHashSet(const ListHashSetType& hashSet, ObjectType objectType, bool contentOnly)
 {
     if (visited(&hashSet))
         return;
@@ -219,9 +254,9 @@ void MemoryInstrumentation::reportListHashSet(const ListHashSetType& hashSet, Ob
 }
 
 template <typename VectorType>
-void MemoryInstrumentation::reportVector(const VectorType& vector, ObjectType objectType, bool contentOnly)
+void MemoryInstrumentation::addVector(const VectorType& vector, ObjectType objectType, bool contentOnly)
 {
-    if (visited(vector.data()))
+    if (!vector.data() || visited(vector.data()))
         return;
     countObjectSize(objectType, calculateContainerSize(vector, contentOnly));
 }
@@ -233,6 +268,7 @@ void MemoryInstrumentation::InstrumentedPointer<T>::process(MemoryInstrumentatio
     m_pointer->reportMemoryUsage(&memoryObjectInfo);
     memoryInstrumentation->countObjectSize(memoryObjectInfo.objectType(), memoryObjectInfo.objectSize());
 }
+
 
 } // namespace WebCore
 

@@ -144,6 +144,13 @@ InternalSettings::InternalSettings(Page* page)
 {
 }
 
+#if ENABLE(PAGE_POPUP)
+PagePopupController* InternalSettings::pagePopupController()
+{
+    return m_pagePopupDriver ? m_pagePopupDriver->pagePopupController() : 0;
+}
+#endif
+
 void InternalSettings::reset()
 {
     TextRun::setAllowsRoundingHacks(false);
@@ -520,7 +527,7 @@ bool InternalSettings::shouldDisplayTrackKind(const String& kind, ExceptionCode&
 #endif
 }
 
-void InternalSettings::setPagination(const String& mode, int gap, ExceptionCode& ec)
+void InternalSettings::setPagination(const String& mode, int gap, int pageLength, ExceptionCode& ec)
 {
     if (!page()) {
         ec = INVALID_ACCESS_ERR;
@@ -544,6 +551,7 @@ void InternalSettings::setPagination(const String& mode, int gap, ExceptionCode&
     }
 
     pagination.gap = gap;
+    pagination.pageLength = pageLength;
     page()->setPagination(pagination);
 }
 

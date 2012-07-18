@@ -129,12 +129,12 @@ public:
     bool opacityIsAnimating() const;
 
     void setFilters(const WebKit::WebFilterOperations&);
-    const WebKit::WebFilterOperations& filters() { return m_filters; }
+    const WebKit::WebFilterOperations& filters() const { return m_filters; }
 
     // Background filters are filters applied to what is behind this layer, when they are viewed through non-opaque
     // regions in this layer. They are used through the WebLayer interface, and are not exposed to HTML.
     void setBackgroundFilters(const WebKit::WebFilterOperations&);
-    const WebKit::WebFilterOperations& backgroundFilters() { return m_backgroundFilters; }
+    const WebKit::WebFilterOperations& backgroundFilters() const { return m_backgroundFilters; }
 
     virtual void setOpaque(bool);
     bool opaque() const { return m_opaque; }
@@ -208,6 +208,10 @@ public:
     void setReplicaLayer(LayerChromium*);
     LayerChromium* replicaLayer() const { return m_replicaLayer.get(); }
 
+    bool hasMask() const { return m_maskLayer; }
+    bool hasReplica() const { return m_replicaLayer; }
+    bool replicaHasMask() const { return m_replicaLayer && (m_maskLayer || m_replicaLayer->m_maskLayer); }
+
     // These methods typically need to be overwritten by derived classes.
     virtual bool drawsContent() const { return m_isDrawable; }
     virtual void update(CCTextureUpdater&, const CCOcclusionTracker*) { }
@@ -234,8 +238,8 @@ public:
 
     const IntRect& clipRect() const { return m_clipRect; }
     void setClipRect(const IntRect& clipRect) { m_clipRect = clipRect; }
-    RenderSurfaceChromium* targetRenderSurface() const { return m_targetRenderSurface; }
-    void setTargetRenderSurface(RenderSurfaceChromium* surface) { m_targetRenderSurface = surface; }
+    LayerChromium* renderTarget() const { ASSERT(!m_renderTarget || m_renderTarget->renderSurface()); return m_renderTarget; }
+    void setRenderTarget(LayerChromium* target) { m_renderTarget = target; }
 
     bool drawTransformIsAnimating() const { return m_drawTransformIsAnimating; }
     void setDrawTransformIsAnimating(bool animating) { m_drawTransformIsAnimating = animating; }
@@ -348,7 +352,7 @@ private:
 
     // During drawing, identifies the region outside of which nothing should be drawn.
     // Currently this is set to layer's clipRect if usesLayerClipping is true, otherwise
-    // it's targetRenderSurface's contentRect.
+    // it's renderTarget's RenderSurface contentRect.
     // Uses target surface's space.
     IntRect m_scissorRect;
     IntPoint m_scrollPosition;
@@ -395,7 +399,7 @@ private:
 
     // Uses target surface space.
     IntRect m_clipRect;
-    RenderSurfaceChromium* m_targetRenderSurface;
+    LayerChromium* m_renderTarget;
     WebKit::WebTransformationMatrix m_drawTransform;
     WebKit::WebTransformationMatrix m_screenSpaceTransform;
     bool m_drawTransformIsAnimating;

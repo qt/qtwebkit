@@ -58,18 +58,22 @@ private:
 
 typedef CCLayerIterator<CCLayerImpl, Vector<CCLayerImpl*>, CCRenderSurface, CCLayerIteratorActions::FrontToBack> CCLayerIteratorType;
 
-static PassOwnPtr<CCTiledLayerImpl> makeLayer(CCTiledLayerImpl* parent, const WebTransformationMatrix& drawTransform, const IntRect& layerRect, float opacity, bool opaque, const IntRect& layerOpaqueRect, Vector<CCLayerImpl*>& surfaceLayerList)
+static PassOwnPtr<CCTiledLayerImpl> makeLayer(CCTiledLayerImpl* parent, const WebTransformationMatrix& originTransform, const IntRect& layerRect, float opacity, bool opaque, const IntRect& layerOpaqueRect, Vector<CCLayerImpl*>& surfaceLayerList)
 {
     OwnPtr<CCTiledLayerImpl> layer = CCTiledLayerImpl::create(1);
     OwnPtr<CCLayerTilingData> tiler = CCLayerTilingData::create(IntSize(100, 100), CCLayerTilingData::NoBorderTexels);
     tiler->setBounds(layerRect.size());
     layer->setTilingData(*tiler);
     layer->setSkipsDraw(false);
+    WebTransformationMatrix drawTransform = originTransform;
+    drawTransform.translate(0.5 * layerRect.width(), 0.5 * layerRect.height());
     layer->setDrawTransform(drawTransform);
-    layer->setScreenSpaceTransform(drawTransform);
+    layer->setScreenSpaceTransform(originTransform);
     layer->setVisibleContentRect(layerRect);
     layer->setDrawOpacity(opacity);
     layer->setOpaque(opaque);
+    layer->setBounds(layerRect.size());
+    layer->setContentBounds(layerRect.size());
 
     int textureId = 1;
     for (int i = 0; i < tiler->numTilesX(); ++i)
@@ -80,11 +84,10 @@ static PassOwnPtr<CCTiledLayerImpl> makeLayer(CCTiledLayerImpl* parent, const We
 
     if (!parent) {
         layer->createRenderSurface();
-        layer->setTargetRenderSurface(layer->renderSurface());
         surfaceLayerList.append(layer.get());
         layer->renderSurface()->layerList().append(layer.get());
     } else {
-        layer->setTargetRenderSurface(parent->targetRenderSurface());
+        layer->setRenderTarget(parent->renderTarget());
         parent->renderSurface()->layerList().append(layer.get());
     }
 
@@ -195,7 +198,7 @@ TEST(CCQuadCullerTest, verifyCullCenterTileOnly)
 
     appendQuads(quadList, sharedStateList, childLayer.get(), it, occlusionTracker);
     appendQuads(quadList, sharedStateList, rootLayer.get(), it, occlusionTracker);
-    EXPECT_EQ(quadList.size(), 12u);
+    ASSERT_EQ(quadList.size(), 12u);
 
     IntRect quadVisibleRect1 = quadList[5].get()->quadVisibleRect();
     EXPECT_EQ(quadVisibleRect1.height(), 50);

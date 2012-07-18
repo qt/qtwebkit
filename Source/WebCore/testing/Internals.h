@@ -44,6 +44,7 @@ class Element;
 class Frame;
 class InternalSettings;
 class Node;
+class PagePopupController;
 class Range;
 class ScriptExecutionContext;
 class ShadowRoot;
@@ -101,6 +102,9 @@ public:
 #endif
     PassRefPtr<DOMStringList> formControlStateOfPreviousHistoryItem(ExceptionCode&);
     void setFormControlStateOfPreviousHistoryItem(PassRefPtr<DOMStringList>, ExceptionCode&);
+#if ENABLE(PAGE_POPUP)
+    PassRefPtr<PagePopupController> pagePopupController();
+#endif
 
     PassRefPtr<ClientRect> absoluteCaretBounds(Document*, ExceptionCode&);
 
@@ -115,7 +119,8 @@ public:
     String markerDescriptionForNode(Node*, const String& markerType, unsigned index, ExceptionCode&);
 
     void setScrollViewPosition(Document*, long x, long y, ExceptionCode&);
-    void setPagination(Document*, const String& mode, int gap, ExceptionCode&);
+    void setPagination(Document* document, const String& mode, int gap, ExceptionCode& ec) { setPagination(document, mode, gap, 0, ec); }
+    void setPagination(Document*, const String& mode, int gap, int pageLength, ExceptionCode&);
     String configurationForViewport(Document*, float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode&);
 
     bool wasLastChangeUserEdit(Element* textField, ExceptionCode&);
@@ -184,6 +189,7 @@ public:
 #endif
 
     String counterValue(Element*);
+    PassRefPtr<DOMStringList> iconURLs(Document*) const;
 
 #if ENABLE(FULLSCREEN_API)
     void webkitWillEnterFullScreenForElement(Document*, Element*);

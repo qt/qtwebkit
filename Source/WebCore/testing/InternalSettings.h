@@ -44,6 +44,7 @@ class Frame;
 class Document;
 class MockPagePopupDriver;
 class Page;
+class PagePopupController;
 class Settings;
 
 class InternalSettings : public RefCountedSupplement<Page, InternalSettings> {
@@ -81,7 +82,9 @@ public:
     static InternalSettings* from(Page*);
 
     virtual ~InternalSettings();
-
+#if ENABLE(PAGE_POPUP)
+    PagePopupController* pagePopupController();
+#endif
     void reset();
 
     void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
@@ -124,7 +127,8 @@ public:
     void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
-    void setPagination(const String& mode, int gap, ExceptionCode&);
+    void setPagination(const String& mode, int gap, ExceptionCode& ec) { setPagination(mode, gap, 0, ec); }
+    void setPagination(const String& mode, int gap, int pageLength, ExceptionCode&);
     void allowRoundingHacks() const;
     void setShouldDisplayTrackKind(const String& kind, bool enabled, ExceptionCode&);
     bool shouldDisplayTrackKind(const String& kind, ExceptionCode&);
