@@ -71,6 +71,7 @@ webkit2_h_api += \
 	$(WebKit2)/UIProcess/API/C/WKMediaCacheManager.h \
 	$(WebKit2)/UIProcess/API/C/WKNativeEvent.h \
 	$(WebKit2)/UIProcess/API/C/WKNavigationData.h \
+	$(WebKit2)/UIProcess/API/C/WKNetworkInfo.h \
 	$(WebKit2)/UIProcess/API/C/WKNetworkInfoManager.h \
 	$(WebKit2)/UIProcess/API/C/WKNotification.h \
 	$(WebKit2)/UIProcess/API/C/WKNotificationManager.h \
@@ -104,6 +105,7 @@ webkit2gtk_h_api += \
 	$(WebKit2)/UIProcess/API/gtk/WebKitError.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitFileChooserRequest.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitFindController.h \
+	$(WebKit2)/UIProcess/API/gtk/WebKitFormSubmissionRequest.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitGeolocationPermissionRequest.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitHitTestResult.h \
 	$(WebKit2)/UIProcess/API/gtk/WebKitJavascriptResult.h \
@@ -571,6 +573,8 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/C/WKNativeEvent.h \
 	Source/WebKit2/UIProcess/API/C/WKNavigationData.cpp \
 	Source/WebKit2/UIProcess/API/C/WKNavigationData.h \
+	Source/WebKit2/UIProcess/API/C/WKNetworkInfo.cpp \
+	Source/WebKit2/UIProcess/API/C/WKNetworkInfo.h \
 	Source/WebKit2/UIProcess/API/C/WKNetworkInfoManager.cpp \
 	Source/WebKit2/UIProcess/API/C/WKNetworkInfoManager.h \
 	Source/WebKit2/UIProcess/API/C/WKNotification.cpp \
@@ -637,6 +641,11 @@ webkit2_sources += \
 	Source/WebKit2/UIProcess/API/gtk/WebKitFileChooserRequest.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitFileChooserRequest.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitFileChooserRequestPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFormSubmissionRequest.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFormSubmissionRequest.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFormSubmissionRequestPrivate.h \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFormClient.cpp \
+	Source/WebKit2/UIProcess/API/gtk/WebKitFormClient.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitFullscreenClient.cpp \
 	Source/WebKit2/UIProcess/API/gtk/WebKitFullscreenClient.h \
 	Source/WebKit2/UIProcess/API/gtk/WebKitGeolocationPermissionRequest.cpp \
@@ -920,7 +929,9 @@ webkit2_sources += \
 	Source/WebKit2/WebProcess/Downloads/DownloadAuthenticationClient.h \
 	Source/WebKit2/WebProcess/Downloads/DownloadManager.cpp \
 	Source/WebKit2/WebProcess/Downloads/DownloadManager.h \
+	Source/WebKit2/WebProcess/Downloads/gtk/DownloadSoupErrorsGtk.cpp \
 	Source/WebKit2/WebProcess/Downloads/soup/DownloadSoup.cpp \
+	Source/WebKit2/WebProcess/Downloads/soup/DownloadSoupErrors.h \
 	Source/WebKit2/WebProcess/FullScreen/WebFullScreenManager.cpp \
 	Source/WebKit2/WebProcess/FullScreen/WebFullScreenManager.h \
 	Source/WebKit2/WebProcess/Geolocation/GeolocationPermissionRequestManager.cpp \

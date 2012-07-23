@@ -211,11 +211,7 @@ public:
 
     QRectF clipBoundingRect() const
     {
-#if QT_VERSION >= QT_VERSION_CHECK(4, 8, 0)
         return p()->clipBoundingRect();
-#else
-        return p()->clipRegion().boundingRect();
-#endif
     }
 
     void takeOwnershipOfPlatformContext() { platformContextIsOwned = true; }
@@ -326,6 +322,8 @@ void GraphicsContext::drawRect(const IntRect& rect)
 {
     if (paintingDisabled())
         return;
+
+    ASSERT(!rect.isEmpty());
 
     QPainter* p = m_data->p();
     const bool antiAlias = p->testRenderHint(QPainter::Antialiasing);

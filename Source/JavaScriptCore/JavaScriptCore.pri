@@ -34,6 +34,12 @@ INCLUDEPATH += \
 
 win32-* {
     LIBS += -lwinmm
+
+    win32-g++* {
+        LIBS += -lpthreadGC2
+    } else:win32-msvc* {
+        LIBS += -lpthreadVC2
+    }
 }
 
 wince* {

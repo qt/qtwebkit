@@ -39,6 +39,7 @@ class HTMLOptionElement;
 class Icon;
 class InputType;
 class KURL;
+class ListAttributeTargetObserver;
 
 class HTMLInputElement : public HTMLTextFormControlElement, public ImageLoaderClientBase<HTMLInputElement> {
 public:
@@ -122,6 +123,7 @@ public:
 #if ENABLE(INPUT_SPEECH)
     HTMLElement* speechButtonElement() const;
 #endif
+    HTMLElement* sliderThumbElement() const;
     virtual HTMLElement* placeholderElement() const;
 
     bool checked() const { return m_isChecked; }
@@ -232,8 +234,9 @@ public:
     void addSearchResult();
     void onSearch();
 
-#if ENABLE(DATALIST)
+#if ENABLE(DATALIST_ELEMENT)
     HTMLElement* list() const;
+    void listAttributeTargetChanged();
 #endif
 
     HTMLInputElement* checkedRadioButtonForGroup() const;
@@ -359,9 +362,9 @@ private:
     
     virtual void subtreeHasChanged();
 
-
-#if ENABLE(DATALIST)
+#if ENABLE(DATALIST_ELEMENT)
     HTMLDataListElement* dataList() const;
+    void resetListAttributeTargetObserver();
 #endif
     void parseMaxLengthAttribute(const Attribute&);
     void updateValueIfNeeded();
@@ -384,7 +387,7 @@ private:
     bool m_isActivatedSubmit : 1;
     unsigned m_autocomplete : 2; // AutoCompleteSetting
     bool m_isAutofilled : 1;
-#if ENABLE(DATALIST)
+#if ENABLE(DATALIST_ELEMENT)
     bool m_hasNonEmptyList : 1;
 #endif
     bool m_stateRestored : 1;
@@ -394,6 +397,9 @@ private:
     bool m_canReceiveDroppedFiles : 1;
     bool m_hasTouchEventHandler: 1;
     OwnPtr<InputType> m_inputType;
+#if ENABLE(DATALIST_ELEMENT)
+    OwnPtr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
+#endif
 };
 
 } //namespace

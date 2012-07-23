@@ -46,12 +46,12 @@
       'ENABLE_CSS_IMAGE_RESOLUTION=0',
       'ENABLE_CSS_REGIONS=1',
       'ENABLE_CSS_SHADERS=1',
-      'ENABLE_CSS_VARIABLES=0',
+      'ENABLE_CSS_VARIABLES=1',
       'ENABLE_CUSTOM_SCHEME_HANDLER=0',
-      'ENABLE_DATALIST=1',
+      'ENABLE_DATALIST_ELEMENT=1',
       'ENABLE_DASHBOARD_SUPPORT=0',
       'ENABLE_DATA_TRANSFER_ITEMS=1',
-      'ENABLE_DETAILS=1',
+      'ENABLE_DETAILS_ELEMENT=1',
       'ENABLE_DEVICE_ORIENTATION=1',
       'ENABLE_DIALOG_ELEMENT=1',
       'ENABLE_DIRECTORY_UPLOAD=1',
@@ -75,13 +75,13 @@
       'ENABLE_LINK_PRERENDER=1',
       'ENABLE_MEDIA_SOURCE=1',
       'ENABLE_MEDIA_STATISTICS=1',
-      'ENABLE_METER_TAG=1',
+      'ENABLE_METER_ELEMENT=1',
       'ENABLE_MHTML=1',
       'ENABLE_MICRODATA=0',
       'ENABLE_MUTATION_OBSERVERS=<(enable_mutation_observers)',
       'ENABLE_PAGE_VISIBILITY_API=1',
       'ENABLE_POINTER_LOCK=1',
-      'ENABLE_PROGRESS_TAG=1',
+      'ENABLE_PROGRESS_ELEMENT=1',
       'ENABLE_QUOTA=1',
       'ENABLE_REGISTER_PROTOCOL_HANDLER=1',
       'ENABLE_REQUEST_ANIMATION_FRAME=1',
@@ -155,6 +155,7 @@
           'ENABLE_ORIENTATION_EVENTS=1',
           'ENABLE_OVERFLOW_SCROLLING=1',
           'ENABLE_PAGE_POPUP=0',
+          'ENABLE_PRINTING=0',
           # FIXME: Disable once the linking error has been resolved.
           # https://bugs.webkit.org/show_bug.cgi?id=88636
           'ENABLE_SHARED_WORKERS=1',
@@ -175,6 +176,7 @@
           'ENABLE_ORIENTATION_EVENTS=0',
           'ENABLE_OVERFLOW_SCROLLING=0',
           'ENABLE_PAGE_POPUP=1',
+          'ENABLE_PRINTING=1',
           'ENABLE_SHARED_WORKERS=1',
           'ENABLE_WEB_AUDIO=1',
         ],
@@ -187,7 +189,7 @@
         ],
       }],
       # Mac OS X uses Accelerate.framework FFT by default instead of FFmpeg.
-      ['OS!="mac"', {
+      ['OS!="mac" and OS!="android"', {
         'feature_defines': [
           'WTF_USE_WEBAUDIO_FFMPEG=1',
         ],

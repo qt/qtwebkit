@@ -1,3 +1,98 @@
+2012-07-18  Antoine Labour  <piman@chromium.org>
+
+        [chromium] Introduce CCResourceProvider, replacing TextureAllocator and hiding textures from clients to allow transport
+        https://bugs.webkit.org/show_bug.cgi?id=91044
+
+        Reviewed by Adrienne Walker.
+
+        This does several things:
+        - Add a CCResourceProvider class, that hides textures and the 3D context
+        from layers (except those that need it). Instead layers manage
+        "resources". In the future, resources are expected to be transportable
+        to a "parent" CCResourceProvider to allow flattening of nested
+        compositors.
+        - Replace texture ids by resource ids in DrawQuads (allowing them to be
+        serializable).
+        - Replace TextureAllocator uses by the CCResourceProvider class.
+        - Upload of data is done through the CCResourceProvider instead of
+        explicit GL calls.
+        - External textures are wrapped into a resource at draw time (see
+        caveat/FIXME in CCTextureLayerImpl).
+        - Rendering with the resources is done through an explicit
+        beginRenderFrom/endRenderFrom that exposes the texture only between that
+        pair.
+        - Merge all the LayerTextureSubImage instances (one per layer), into a
+        single instance on the CCResourceProvider.
+
+        Added CCResourceProviderTest, the refactoring is covered by existing tests.
+
+        * chromium/public/WebCompositorTextureQuad.h:
+        (WebCompositorTextureQuad):
+        (WebKit::WebCompositorTextureQuad::resourceId):
+        * chromium/public/WebCompositorTileQuad.h:
+        (WebCompositorTileQuad):
+        (WebKit::WebCompositorTileQuad::resourceId):
+
+2012-07-18  Alexandre Elias  <aelias@google.com>
+
+        [chromium] Ubercomp: add id to SharedQuadState
+        https://bugs.webkit.org/show_bug.cgi?id=91670
+
+        Reviewed by Adrienne Walker.
+
+        This assigns an integer ID to SharedQuadState objects and a
+        corresponding ID to quads.  This ID is unique only within a
+        RenderPass and currently is just set to the index in the shared quad
+        state list.  This is redundant with the pointer and exists to
+        simplify serialization.
+
+        I found out that pointer rewriting within a pickler is blocked by
+        pointers to memory being const there, so the reassignment will have to
+        be performed in the application layer anyway.  In that case, it's
+        simplest to add some ID integers.
+
+        * chromium/public/WebCompositorQuad.h:
+        (WebKit::WebCompositorQuad::sharedQuadStateId):
+        (WebCompositorQuad):
+        * chromium/public/WebCompositorSharedQuadState.h:
+        (WebCompositorSharedQuadState):
+
+2012-07-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Another Chromium Windows build fix attempt after r123014.
+
+        * chromium/public/Platform.h:
+
+2012-07-18  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Call SQLiteFileSystem-related functions directly
+        https://bugs.webkit.org/show_bug.cgi?id=91631
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+        
+        * chromium/public/Platform.h:
+        (Platform):
+        (WebKit::Platform::databaseOpenFile):
+        (WebKit::Platform::databaseDeleteFile):
+        (WebKit::Platform::databaseGetFileAttributes):
+        (WebKit::Platform::databaseGetFileSize):
+        (WebKit::Platform::databaseGetSpaceAvailableForOrigin):
+
+2012-07-18  Sailesh Agrawal  <sail@chromium.org>
+
+        Chromium Mac: Add TEXTURE_RECTANGLE_ARB support to CCVideoLayerImpl
+        https://bugs.webkit.org/show_bug.cgi?id=91169
+
+        Reviewed by Adrienne Walker.
+
+        Added a "orientation" field to WebCompositorIOSurfaceQuad. This is used at draw time to flip the texture if necessary.
+
+        * chromium/public/WebCompositorIOSurfaceQuad.h: Added orientation field to the constructor.
+        (WebKit::WebCompositorIOSurfaceQuad::orientation):
+        (WebCompositorIOSurfaceQuad): The new orientation field should be set to Flipped if the texture should be flipped when drawing.
+
 2012-07-13  Tony Payne  <tpayne@chromium.org>
 
         Remove Widget from screenColorProfile

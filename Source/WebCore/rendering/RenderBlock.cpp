@@ -2383,7 +2383,7 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
     LayoutUnit logicalTopEstimate = estimateLogicalTopPosition(child, marginInfo, estimateWithoutPagination);
 
     // Cache our old rect so that we can dirty the proper repaint rects if the child moves.
-    LayoutRect oldRect(child->x(), child->y() , child->width(), child->height());
+    LayoutRect oldRect = child->frameRect();
     LayoutUnit oldLogicalTop = logicalTopForChild(child);
 
 #if !ASSERT_DISABLED
@@ -2478,7 +2478,7 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
     if (childRenderBlock && childRenderBlock->containsFloats())
         maxFloatLogicalBottom = max(maxFloatLogicalBottom, addOverhangingFloats(toRenderBlock(child), !childNeededLayout));
 
-    LayoutSize childOffset(child->x() - oldRect.x(), child->y() - oldRect.y());
+    LayoutSize childOffset = child->location() - oldRect.location();
     if (childOffset.width() || childOffset.height()) {
         view()->addLayoutDelta(childOffset);
 
@@ -2967,8 +2967,11 @@ void RenderBlock::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffs
 
     // Adjust our painting position if we're inside a scrolled layer (e.g., an overflow:auto div).
     LayoutPoint scrolledOffset = paintOffset;
-    if (hasOverflowClip())
+    if (hasOverflowClip()) {
         scrolledOffset.move(-scrolledContentOffset());
+        if (style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
+            scrolledOffset.move(verticalScrollbarWidth(), 0);
+    }
 
     // 2. paint contents
     if (paintPhase != PaintPhaseSelfOutline) {
@@ -3835,7 +3838,7 @@ bool RenderBlock::positionNewFloats()
         RenderBox* childBox = floatingObject->renderer();
         LayoutUnit childLogicalLeftMargin = style()->isLeftToRightDirection() ? marginStartForChild(childBox) : marginEndForChild(childBox);
 
-        LayoutRect oldRect(childBox->x(), childBox->y() , childBox->width(), childBox->height());
+        LayoutRect oldRect = childBox->frameRect();
 
         if (childBox->style()->clear() & CLEFT)
             logicalTop = max(lowestFloatLogicalBottom(FloatingObject::FloatLeft), logicalTop);
@@ -5616,6 +5619,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
 
     InlineMinMaxIterator childIterator(this);
     bool addedTextIndent = false; // Only gets added in once.
+    LayoutUnit textIndent = minimumValueForLength(styleToUse->textIndent(), cw, view());
     RenderObject* prevFloat = 0;
     while (RenderObject* child = childIterator.next()) {
         autoWrap = child->isReplaced() ? child->parent()->style()->autoWrap() : 
@@ -5719,14 +5723,18 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                 // Add in text-indent.  This is added in only once.
                 LayoutUnit ti = 0;
                 if (!addedTextIndent) {
-                    addedTextIndent = true;
-                    ti = minimumValueForLength(styleToUse->textIndent(), cw, view());
+                    ti = textIndent;
                     childMin += ti;
                     childMax += ti;
+
+                    if (childMin < 0)
+                        textIndent = childMin;
+                    else
+                        addedTextIndent = true;
                 }
 
                 // Add our width to the max.
-                inlineMax += childMax;
+                inlineMax += max<float>(0, childMax);
 
                 if (!autoWrap || !canBreakReplacedElement) {
                     if (child->isFloating())
@@ -5790,10 +5798,14 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                 // Add in text-indent.  This is added in only once.
                 LayoutUnit ti = 0;
                 if (!addedTextIndent) {
-                    addedTextIndent = true;
-                    ti = minimumValueForLength(styleToUse->textIndent(), cw, view());
+                    ti = textIndent;
                     childMin+=ti; beginMin += ti;
                     childMax+=ti; beginMax += ti;
+                    
+                    if (childMin < 0)
+                        textIndent = childMin;
+                    else
+                        addedTextIndent = true;
                 }
                 
                 // If we have no breakable characters at all,
@@ -5831,8 +5843,9 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                     updatePreferredWidth(m_maxPreferredLogicalWidth, inlineMax);
                     updatePreferredWidth(m_maxPreferredLogicalWidth, childMax);
                     inlineMax = endMax;
+                    addedTextIndent = true;
                 } else
-                    inlineMax += childMax;
+                    inlineMax += max<float>(0, childMax);
             }
 
             // Ignore spaces after a list marker.
@@ -5844,6 +5857,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
             inlineMin = inlineMax = 0;
             stripFrontSpaces = true;
             trailingSpaceChild = 0;
+            addedTextIndent = true;
         }
 
         oldAutoWrap = autoWrap;

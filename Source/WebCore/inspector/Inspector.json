@@ -28,20 +28,6 @@
                     { "name": "object", "$ref": "Runtime.RemoteObject" },
                     { "name": "hints", "type": "object" }
                 ]
-            },
-            {
-                "name": "didCreateWorker",
-                "parameters": [
-                    { "name": "id", "type": "integer" },
-                    { "name": "url", "type": "string" },
-                    { "name": "isShared", "type": "boolean" }
-                ]
-            },
-            {
-                "name": "didDestroyWorker",
-                "parameters": [
-                    { "name": "id", "type": "integer" }
-                ]
             }
         ]
     },
@@ -2287,6 +2273,17 @@
                 "returns": [
                     { "name": "profile", "$ref": "SelectorProfile" }
                 ]
+            },
+            {
+                "name": "getNamedFlowCollection",
+                "parameters": [
+                    { "name": "nodeId", "$ref": "DOM.NodeId", "description": "The document node id for which to get the Named Flow Collection."}
+                ],
+                "returns": [
+                    { "name": "namedFlows", "type": "array", "items": { "type": "string" }, "description": "An array containing the Named Flows in the document." }
+                ],
+                "description": "Returns the Named Flows from the document.",
+                "hidden": true
             }
         ],
         "events": [
@@ -2630,6 +2627,14 @@
                     { "name": "wasThrown", "type": "boolean", "optional": true, "description": "True if the result was thrown during the script run." }
                 ],
                 "description": "Runs script with given id in a given context."
+            },
+            {
+                "name": "setOverlayMessage",
+                "parameters": [
+                    { "name": "message", "type": "string", "optional": true, "description": "Overlay message to display when paused in debugger." }
+                ],
+                "hidden": true,
+                "description": "Sets overlay message."
             }
         ],
         "events": [

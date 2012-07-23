@@ -50,7 +50,7 @@
 #include "PaintInfo.h"
 #include "QWebPageClient.h"
 #include "RenderBox.h"
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
 #include "RenderProgress.h"
 #endif
 #include "RenderTheme.h"
@@ -372,7 +372,7 @@ void RenderThemeQt::adjustMenuListButtonStyle(StyleResolver*, RenderStyle* style
     setPopupPadding(style);
 }
 
-#if ENABLE(PROGRESS_TAG)
+#if ENABLE(PROGRESS_ELEMENT)
 double RenderThemeQt::animationRepeatIntervalForProgressBar(RenderProgress* renderProgress) const
 {
     if (renderProgress->position() >= 0)
@@ -399,6 +399,20 @@ void RenderThemeQt::adjustSliderThumbStyle(StyleResolver* styleResolver, RenderS
     RenderTheme::adjustSliderThumbStyle(styleResolver, style, element);
     style->setBoxShadow(nullptr);
 }
+
+#if ENABLE(DATALIST_ELEMENT)
+IntSize RenderThemeQt::sliderTickSize() const
+{
+    // FIXME: We need to set this to the size of one tick mark.
+    return IntSize(0, 0);
+}
+
+int RenderThemeQt::sliderTickOffsetFromTrackCenter() const
+{
+    // FIXME: We need to set this to the position of the tick marks.
+    return 0;
+}
+#endif
 
 bool RenderThemeQt::paintSearchField(RenderObject* o, const PaintInfo& pi,
                                      const IntRect& r)

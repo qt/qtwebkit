@@ -52,6 +52,7 @@ class WebNode;
 class WebPageOverlay;
 class WebPermissionClient;
 class WebPrerendererClient;
+class WebViewBenchmarkSupport;
 class WebRange;
 class WebSettings;
 class WebSpellCheckClient;
@@ -195,6 +196,9 @@ public:
     // Advance the focus of the WebView forward to the next element or to the
     // previous element in the tab sequence (if reverse is true).
     virtual void advanceFocus(bool reverse) { }
+
+    // Animate a scale into the specified find-in-page rect.
+    virtual void zoomToFindInPageRect(const WebRect&) = 0;
 
 
     // Zoom ----------------------------------------------------------------
@@ -382,6 +386,8 @@ public:
     // Hides any popup (suggestions, selects...) that might be showing.
     virtual void hidePopups() = 0;
 
+    virtual void selectAutofillSuggestionAtIndex(unsigned listIndex) = 0;
+
 
     // Context menu --------------------------------------------------------
 
@@ -446,9 +452,15 @@ public:
 
     virtual bool setEditableSelectionOffsets(int start, int end) = 0;
 
+    virtual bool isSelectionEditable() const = 0;
+
     // Fills in a WebRenderingStats struct containing information about the state of the compositor.
     // This call is relatively expensive in threaded mode as it blocks on the compositor thread.
     virtual void renderingStats(WebRenderingStats&) const { }
+
+    // Benchmarking support --------------------------------------------
+
+    virtual WebViewBenchmarkSupport* benchmarkSupport() { return 0; }
 
     // Visibility -----------------------------------------------------------
 

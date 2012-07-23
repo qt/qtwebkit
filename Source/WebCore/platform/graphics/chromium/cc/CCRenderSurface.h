@@ -39,7 +39,7 @@
 namespace WebCore {
 
 class CCDamageTracker;
-class CCQuadCuller;
+class CCQuadSink;
 class CCRenderPass;
 class CCLayerImpl;
 class LayerRendererChromium;
@@ -114,10 +114,10 @@ public:
 
     CCDamageTracker* damageTracker() const { return m_damageTracker.get(); }
 
-    PassOwnPtr<CCSharedQuadState> createSharedQuadState() const;
-    PassOwnPtr<CCSharedQuadState> createReplicaSharedQuadState() const;
+    PassOwnPtr<CCSharedQuadState> createSharedQuadState(int id) const;
+    PassOwnPtr<CCSharedQuadState> createReplicaSharedQuadState(int id) const;
 
-    void appendQuads(CCQuadCuller&, CCSharedQuadState*, bool forReplica, int renderPassId);
+    void appendQuads(CCQuadSink&, CCSharedQuadState*, bool forReplica, int renderPassId);
 
     FloatRect computeRootScissorRectInCurrentSurface(const FloatRect& rootScissorRect) const;
 
@@ -157,6 +157,7 @@ private:
     // For CCLayerIteratorActions
     int m_targetRenderSurfaceLayerIndexHistory;
     int m_currentLayerIndexHistory;
+
     friend struct CCLayerIteratorActions;
 };
 

@@ -182,16 +182,11 @@ void IDBCursor::advance(unsigned long count, ExceptionCode& ec)
     }
 
     if (!count) {
-        ec = IDBDatabaseException::IDB_TYPE_ERR;
+        ec = NATIVE_TYPE_ERR;
         return;
     }
 
-    if (!m_request->resetReadyState(m_transaction.get())) {
-        ASSERT_NOT_REACHED();
-        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
-        return;
-    }
-    m_request->setCursor(this);
+    m_request->setPendingCursor(this);
     m_gotValue = false;
     m_backend->advance(count, m_request, ec);
 }
@@ -216,14 +211,9 @@ void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionCode& ec)
 
     // FIXME: We're not using the context from when continue was called, which means the callback
     //        will be on the original context openCursor was called on. Is this right?
-    if (m_request->resetReadyState(m_transaction.get())) {
-        m_request->setCursor(this);
-        m_gotValue = false;
-        m_backend->continueFunction(key, m_request, ec);
-    } else {
-        ASSERT_NOT_REACHED();
-        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
-    }
+    m_request->setPendingCursor(this);
+    m_gotValue = false;
+    m_backend->continueFunction(key, m_request, ec);
 }
 
 PassRefPtr<IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* context, ExceptionCode& ec)
@@ -306,7 +296,7 @@ IDBCursor::Direction IDBCursor::stringToDirection(const String& directionString,
     if (directionString == IDBCursor::directionPrevUnique())
         return IDBCursor::PREV_NO_DUPLICATE;
 
-    ec = IDBDatabaseException::IDB_TYPE_ERR;
+    ec = NATIVE_TYPE_ERR;
     return IDBCursor::NEXT;
 }
 
@@ -326,7 +316,7 @@ const AtomicString& IDBCursor::directionToString(unsigned short direction, Excep
         return IDBCursor::directionPrevUnique();
 
     default:
-        ec = IDBDatabaseException::IDB_TYPE_ERR;
+        ec = NATIVE_TYPE_ERR;
         return IDBCursor::directionNext();
     }
 }

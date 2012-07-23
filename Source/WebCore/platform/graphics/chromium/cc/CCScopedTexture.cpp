@@ -26,14 +26,12 @@
 #include "config.h"
 #include "cc/CCScopedTexture.h"
 
-#include "TextureAllocator.h"
-
 namespace WebCore {
 
-CCScopedTexture::CCScopedTexture(TextureAllocator* allocator)
-    : m_allocator(allocator)
+CCScopedTexture::CCScopedTexture(CCResourceProvider* resourceProvider)
+    : m_resourceProvider(resourceProvider)
 {
-    ASSERT(m_allocator);
+    ASSERT(m_resourceProvider);
 }
 
 CCScopedTexture::~CCScopedTexture()
@@ -41,13 +39,13 @@ CCScopedTexture::~CCScopedTexture()
     free();
 }
 
-bool CCScopedTexture::allocate(const IntSize& size, GC3Denum format)
+bool CCScopedTexture::allocate(int pool, const IntSize& size, GC3Denum format, CCResourceProvider::TextureUsageHint hint)
 {
     ASSERT(!id());
     ASSERT(!size.isEmpty());
 
     setDimensions(size, format);
-    setId(m_allocator->createTexture(size, format));
+    setId(m_resourceProvider->createResource(pool, size, format, hint));
 
 #if !ASSERT_DISABLED
     m_allocateThreadIdentifier = WTF::currentThread();
@@ -60,7 +58,7 @@ void CCScopedTexture::free()
 {
     if (id()) {
         ASSERT(m_allocateThreadIdentifier == WTF::currentThread());
-        m_allocator->deleteTexture(id(), size(), format());
+        m_resourceProvider->deleteResource(id());
     }
     setId(0);
 }

@@ -29,7 +29,6 @@
 #include "LayerRendererChromium.h"
 #include "TextStream.h"
 #include "TraceEvent.h"
-#include "TrackingTextureAllocator.h"
 #include "cc/CCActiveGestureAnimation.h"
 #include "cc/CCDamageTracker.h"
 #include "cc/CCDebugRectHistory.h"
@@ -329,11 +328,16 @@ bool CCLayerTreeHostImpl::calculateRenderPasses(FrameData& frame)
         if (it.representsContributingRenderSurface() && !it->renderSurface()->scissorRect().isEmpty()) {
             CCRenderPass* contributingRenderPass = surfacePassMap.get(it->renderSurface());
             pass->appendQuadsForRenderSurfaceLayer(*it, contributingRenderPass, &occlusionTracker);
-        } else if (it.representsItself() && !occlusionTracker.occluded(*it, it->visibleContentRect()) && !it->visibleContentRect().isEmpty() && !it->scissorRect().isEmpty()) {
-            it->willDraw(m_layerRenderer.get(), context());
-            frame.willDrawLayers.append(*it);
-
-            pass->appendQuadsForLayer(*it, &occlusionTracker, hadMissingTiles);
+        } else if (it.representsItself() && !it->visibleContentRect().isEmpty() && !it->scissorRect().isEmpty()) {
+            bool hasOcclusionFromOutsideTargetSurface;
+            if (occlusionTracker.occluded(*it, it->visibleContentRect(), &hasOcclusionFromOutsideTargetSurface)) {
+                if (hasOcclusionFromOutsideTargetSurface)
+                    pass->setHasOcclusionFromOutsideTargetSurface(hasOcclusionFromOutsideTargetSurface);
+            } else {
+                it->willDraw(m_resourceProvider.get());
+                frame.willDrawLayers.append(*it);
+                pass->appendQuadsForLayer(*it, &occlusionTracker, hadMissingTiles);
+            }
         }
 
         if (hadMissingTiles) {
@@ -523,7 +527,7 @@ bool CCLayerTreeHostImpl::prepareToDraw(FrameData& frame)
 
 void CCLayerTreeHostImpl::releaseContentsTextures()
 {
-    contentsTextureAllocator()->deleteAllTextures();
+    m_resourceProvider->deleteOwnedResources(CCRenderer::ContentPool);
     m_contentsTexturesWerePurgedSinceLastCommit = true;
     m_client->setNeedsCommitOnImplThread();
 }
@@ -547,29 +551,18 @@ void CCLayerTreeHostImpl::drawLayers(const FrameData& frame)
     // FIXME: use the frame begin time from the overall compositor scheduler.
     // This value is currently inaccessible because it is up in Chromium's
     // RenderWidget.
-
-    // The root RenderPass is the last one to be drawn.
-    const CCRenderPass* rootRenderPass = frame.renderPasses.last();
-
     m_fpsCounter->markBeginningOfFrame(currentTime());
-    m_layerRenderer->beginDrawingFrame(rootRenderPass);
 
-    for (size_t i = 0; i < frame.renderPasses.size(); ++i) {
-        const CCRenderPass* renderPass = frame.renderPasses[i];
+    m_layerRenderer->drawFrame(frame.renderPasses, m_rootScissorRect);
+    if (m_headsUpDisplay->enabled(settings()))
+        m_headsUpDisplay->draw(this);
+    m_layerRenderer->finishDrawingFrame();
 
-        FloatRect rootScissorRectInCurrentSurface = renderPass->targetSurface()->computeRootScissorRectInCurrentSurface(m_rootScissorRect);
-        m_layerRenderer->drawRenderPass(renderPass, rootScissorRectInCurrentSurface);
-
-        renderPass->targetSurface()->damageTracker()->didDrawDamagedArea();
-    }
+    for (unsigned int i = 0; i < frame.renderPasses.size(); i++)
+        frame.renderPasses[i]->targetSurface()->damageTracker()->didDrawDamagedArea();
 
     if (m_debugRectHistory->enabled(settings()))
         m_debugRectHistory->saveDebugRectsForCurrentFrame(m_rootLayerImpl.get(), *frame.renderSurfaceLayerList, frame.occludingScreenSpaceRects, settings());
-
-    if (m_headsUpDisplay->enabled(settings()))
-        m_headsUpDisplay->draw(this);
-
-    m_layerRenderer->finishDrawingFrame();
 
     ++m_sourceAnimationFrameNumber;
 
@@ -580,7 +573,7 @@ void CCLayerTreeHostImpl::drawLayers(const FrameData& frame)
 void CCLayerTreeHostImpl::didDrawAllLayers(const FrameData& frame)
 {
     for (size_t i = 0; i < frame.willDrawLayers.size(); ++i)
-        frame.willDrawLayers[i]->didDraw();
+        frame.willDrawLayers[i]->didDraw(m_resourceProvider.get());
 }
 
 void CCLayerTreeHostImpl::finishAllRendering()
@@ -597,11 +590,6 @@ bool CCLayerTreeHostImpl::isContextLost()
 const LayerRendererCapabilities& CCLayerTreeHostImpl::layerRendererCapabilities() const
 {
     return m_layerRenderer->capabilities();
-}
-
-TextureAllocator* CCLayerTreeHostImpl::contentsTextureAllocator() const
-{
-    return m_layerRenderer ? m_layerRenderer->contentsTextureAllocator() : 0;
 }
 
 bool CCLayerTreeHostImpl::swapBuffers()
@@ -709,8 +697,11 @@ bool CCLayerTreeHostImpl::initializeLayerRenderer(PassOwnPtr<CCGraphicsContext> 
         return false;
     }
 
+    OwnPtr<CCGraphicsContext> contextRef(context);
+    OwnPtr<CCResourceProvider> resourceProvider = CCResourceProvider::create(contextRef.get());
     OwnPtr<LayerRendererChromium> layerRenderer;
-    layerRenderer = LayerRendererChromium::create(this, context3d, textureUploader);
+    if (resourceProvider.get())
+        layerRenderer = LayerRendererChromium::create(this, resourceProvider.get(), textureUploader);
 
     // Since we now have a new context/layerRenderer, we cannot continue to use the old
     // resources (i.e. renderSurfaces and texture IDs).
@@ -720,8 +711,9 @@ bool CCLayerTreeHostImpl::initializeLayerRenderer(PassOwnPtr<CCGraphicsContext> 
     }
 
     m_layerRenderer = layerRenderer.release();
+    m_resourceProvider = resourceProvider.release();
     if (m_layerRenderer)
-        m_context = context;
+        m_context = contextRef.release();
 
     if (!m_visible && m_layerRenderer)
          m_layerRenderer->setVisible(m_visible);

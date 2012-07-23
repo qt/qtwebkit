@@ -283,7 +283,7 @@
         'cflags!': ['-g'],
       },
     }],
-    ['os_posix==1 and OS!="mac" and gcc_version==46', {
+    ['os_posix==1 and OS!="mac" and gcc_version>=46', {
       'target_defaults': {
         # Disable warnings about c++0x compatibility, as some names (such as nullptr) conflict
         # with upcoming c++0x types.
@@ -511,6 +511,17 @@
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
           ],
+          'conditions': [
+            ['OS=="win"', {
+              'variables': {
+                # Using cl instead of cygwin gcc cuts the processing time from
+                # 1m58s to 0m52s.
+                'preprocessor': '--preprocessor "cl.exe /nologo /EP /TP"',
+              },
+            }, {
+              'variables': { 'preprocessor': '', }
+            }],
+          ],
           'action': [
             'perl',
             '-w',
@@ -524,6 +535,7 @@
             '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
             '--idlAttributesFile',
             '../bindings/scripts/IDLAttributes.txt',
+            '<@(preprocessor)',
           ],
           'message': 'Resolving [Supplemental=XXX] dependencies in all IDL files',
         }
@@ -1429,7 +1441,7 @@
             ],
           },
         }],
-        ['OS != "android" and "WTF_USE_WEBAUDIO_FFMPEG=1" in feature_defines', {
+        ['"WTF_USE_WEBAUDIO_FFMPEG=1" in feature_defines', {
           # This directory needs to be on the include path for multiple sub-targets of webcore.
           'direct_dependent_settings': {
             'include_dirs': [

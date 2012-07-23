@@ -827,8 +827,8 @@ AC_MSG_RESULT([$enable_mathml])
 AC_MSG_CHECKING([whether to enable MHTML support])
 AC_ARG_ENABLE(mhtml,
               AC_HELP_STRING([--enable-mhtml],
-                             [enable support for MHTML [default=no]]),
-              [],[enable_mhtml="no"])
+                             [enable support for MHTML [default=yes]]),
+              [],[enable_mhtml="yes"])
 AC_MSG_RESULT([$enable_mhtml])
 
 # check whether to enable SVG support
@@ -1410,18 +1410,18 @@ AM_CONDITIONAL([ENABLE_UNSTABLE_FEATURES],[test "$enable_unstable_features" = "y
 AM_CONDITIONAL([ENABLE_WEBGL],[test "$enable_webgl" = "yes"])
 AM_CONDITIONAL([ENABLE_BLOB],[test "$enable_blob" = "yes"])
 AM_CONDITIONAL([ENABLE_LEGACY_WEBKIT_BLOB_BUILDER],[test "$enable_legacy_webkit_blob_builder" = "yes"])
-AM_CONDITIONAL([ENABLE_METER_TAG],[test "$enable_meter_tag" = "yes"])
+AM_CONDITIONAL([ENABLE_METER_ELEMENT],[test "$enable_meter_tag" = "yes"])
 AM_CONDITIONAL([ENABLE_MICRODATA],[test "$enable_microdata" = "yes"])
 AM_CONDITIONAL([ENABLE_PAGE_VISIBILITY_API],[test "$enable_page_visibility_api" = "yes"])
-AM_CONDITIONAL([ENABLE_PROGRESS_TAG],[test "$enable_progress_tag" = "yes"])
+AM_CONDITIONAL([ENABLE_PROGRESS_ELEMENT],[test "$enable_progress_tag" = "yes"])
 AM_CONDITIONAL([ENABLE_CHANNEL_MESSAGING],[test "$enable_channel_messaging" = "yes"])
 AM_CONDITIONAL([ENABLE_JAVASCRIPT_DEBUGGER],[test "$enable_javascript_debugger" = "yes"])
 AM_CONDITIONAL([ENABLE_GAMEPAD],[test "$enable_gamepad" = "yes"])
 AM_CONDITIONAL([ENABLE_DIRECTORY_UPLOAD],[test "$enable_directory_upload" = "yes"])
 AM_CONDITIONAL([ENABLE_DATA_TRANSFER_ITEMS],[test "$enable_data_transfer_items" = "yes"])
 AM_CONDITIONAL([ENABLE_SQL_DATABASE],[test "$enable_sql_database" = "yes"])
-AM_CONDITIONAL([ENABLE_DATALIST],[test "$enable_datalist" = "yes"])
-AM_CONDITIONAL([ENABLE_DETAILS],[test "$enable_details" = "yes"])
+AM_CONDITIONAL([ENABLE_DATALIST_ELEMENT],[test "$enable_datalist" = "yes"])
+AM_CONDITIONAL([ENABLE_DETAILS_ELEMENT],[test "$enable_details" = "yes"])
 AM_CONDITIONAL([ENABLE_FAST_MOBILE_SCROLLING],[test "$enable_fast_mobile_scrolling" = "yes"])
 AM_CONDITIONAL([ENABLE_FILE_SYSTEM],[test "$enable_file_system" = "yes"])
 AM_CONDITIONAL([ENABLE_STYLE_SCOPED],[test "$enable_style_scoped" = "yes"])

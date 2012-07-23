@@ -56,6 +56,7 @@
 #include "PageWidgetDelegate.h"
 #include "PlatformGestureCurveTarget.h"
 #include "UserMediaClientImpl.h"
+#include "WebViewBenchmarkSupportImpl.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -106,6 +107,7 @@ class WebFrameImpl;
 class WebGestureEvent;
 class WebPagePopupImpl;
 class WebPrerendererClient;
+class WebViewBenchmarkSupport;
 class WebImage;
 class WebKeyboardEvent;
 class WebMouseEvent;
@@ -159,6 +161,8 @@ public:
     virtual WebTextInputInfo textInputInfo();
     virtual WebTextInputType textInputType();
     virtual bool setEditableSelectionOffsets(int start, int end);
+    virtual bool isSelectionEditable() const;
+    virtual WebColor backgroundColor() const;
     virtual bool selectionBounds(WebRect& start, WebRect& end) const;
     virtual bool selectionTextDirection(WebTextDirection& start, WebTextDirection& end) const;
     virtual bool caretOrSelectionRange(size_t* location, size_t* length);
@@ -203,6 +207,7 @@ public:
     virtual void clearFocusedNode();
     virtual void scrollFocusedNodeIntoView();
     virtual void scrollFocusedNodeIntoRect(const WebRect&);
+    virtual void zoomToFindInPageRect(const WebRect&);
     virtual void advanceFocus(bool reverse);
     virtual double zoomLevel();
     virtual double setZoomLevel(bool textOnly, double zoomLevel);
@@ -276,6 +281,7 @@ public:
         const WebVector<int>& itemIDs,
         int separatorIndex);
     virtual void hidePopups();
+    virtual void selectAutofillSuggestionAtIndex(unsigned listIndex);
     virtual void setScrollbarColors(unsigned inactiveColor,
                                     unsigned activeColor,
                                     unsigned trackColor);
@@ -291,6 +297,7 @@ public:
 #endif
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&);
     virtual void renderingStats(WebRenderingStats&) const;
+    virtual WebViewBenchmarkSupport* benchmarkSupport();
 
     // WebLayerTreeViewClient
     virtual void willBeginFrame();
@@ -373,7 +380,7 @@ public:
     // Event related methods:
     void mouseContextMenu(const WebMouseEvent&);
     void mouseDoubleClick(const WebMouseEvent&);
-    void startPageScaleAnimation(const WebCore::IntPoint& targetPosition, bool useAnchor, float newScale, double durationSec);
+    void startPageScaleAnimation(const WebCore::IntPoint& targetPosition, bool useAnchor, float newScale, double durationInSeconds);
 
     void numberOfWheelEventHandlersChanged(unsigned);
     void numberOfTouchEventHandlersChanged(unsigned);
@@ -503,6 +510,7 @@ public:
         return m_currentInputEvent;
     }
 
+    WebCore::GraphicsLayer* rootGraphicsLayer();
 #if USE(ACCELERATED_COMPOSITING)
     bool allowsAcceleratedCompositing();
     void setRootGraphicsLayer(WebCore::GraphicsLayer*);
@@ -544,6 +552,7 @@ public:
 #if ENABLE(GESTURE_EVENTS)
     void computeScaleAndScrollForHitRect(const WebRect& hitRect, AutoZoomType, float& scale, WebPoint& scroll);
 #endif
+    void animateZoomAroundPoint(const WebCore::IntPoint&, AutoZoomType);
 
     void loseCompositorContext(int numTimes);
 
@@ -783,6 +792,8 @@ private:
     // If set, the WebView is in fullscreen mode for an element in this frame.
     RefPtr<WebCore::Frame> m_fullScreenFrame;
     bool m_isCancelingFullScreen;
+
+    WebViewBenchmarkSupportImpl m_benchmarkSupport;
 
 #if USE(ACCELERATED_COMPOSITING)
     WebCore::IntRect m_rootLayerScrollDamage;

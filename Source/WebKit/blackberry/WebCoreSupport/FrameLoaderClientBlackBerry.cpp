@@ -530,6 +530,9 @@ void FrameLoaderClientBlackBerry::dispatchDidCommitLoad()
             m_webPagePrivate->m_client->notifyLoadCommitted(
                 originalUrl.characters(), originalUrl.length(),
                     url.characters(), url.length(), token.characters(), token.length());
+            HistoryItem* currentItem = m_frame->loader()->history()->currentItem();
+            if (currentItem && currentItem->isInPageCache())
+                dispatchDidReceiveIcon();
         }
     }
 
@@ -1067,12 +1070,12 @@ void FrameLoaderClientBlackBerry::restoreViewState()
 
     m_webPagePrivate->m_shouldReflowBlock = viewState.shouldReflowBlock;
 
-    // Will restore updates to backingstore guaranteed!
-    if (!m_webPagePrivate->zoomAboutPoint(scale, m_frame->view()->scrollPosition(), true /* enforceScaleClamping */, true /*forceRendering*/, true /*isRestoringZoomLevel*/)) {
-        // If we're already at that scale, then we should still force rendering since
-        // our scroll position changed.
-        m_webPagePrivate->m_backingStore->d->renderVisibleContents();
+    bool didZoom = m_webPagePrivate->zoomAboutPoint(scale, m_frame->view()->scrollPosition(), true /* enforceScaleClamping */, true /*forceRendering*/, true /*isRestoringZoomLevel*/);
+    // If we're already at that scale, then we should still force rendering
+    // since our scroll position changed.
+    m_webPagePrivate->m_backingStore->d->resumeScreenAndBackingStoreUpdates(BackingStore::RenderAndBlit);
 
+    if (!didZoom) {
         // We need to notify the client of the scroll position and content size change(s) above even if we didn't scale.
         m_webPagePrivate->notifyTransformedContentsSizeChanged();
         m_webPagePrivate->notifyTransformedScrollChanged();

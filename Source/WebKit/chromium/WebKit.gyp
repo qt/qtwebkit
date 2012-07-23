@@ -279,6 +279,7 @@
                 'public/WebUserMediaClient.h',
                 'public/WebUserMediaRequest.h',
                 'public/WebView.h',
+                'public/WebViewBenchmarkSupport.h',
                 'public/WebViewClient.h',
                 'public/WebWidget.h',
                 'public/WebWidgetClient.h',
@@ -661,6 +662,8 @@
                 'src/WebTextFieldDecoratorClient.cpp',
                 'src/WebUserMediaRequest.cpp',
                 'src/WebVideoLayer.cpp',
+                'src/WebViewBenchmarkSupportImpl.cpp',
+                'src/WebViewBenchmarkSupportImpl.h',
                 'src/WebViewImpl.cpp',
                 'src/WebViewImpl.h',
                 'src/WebWorkerBase.cpp',
@@ -1048,7 +1051,7 @@
         },
     ], # targets
     'conditions': [
-        ['os_posix==1 and OS!="mac" and gcc_version==46', {
+        ['os_posix==1 and OS!="mac" and gcc_version>=46', {
             'target_defaults': {
                 # Disable warnings about c++0x compatibility, as some names (such
                 # as nullptr) conflict with upcoming c++0x types.

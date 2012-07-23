@@ -721,11 +721,13 @@ sub builtDylibPathForName
         return "$configurationProductDir/$libraryName/lib" . lc($libraryName) . $libraryExtension;
     }
     if (isQt()) {
+        my $isSearchingForWebCore = $libraryName =~ "WebCore";
         $libraryName = "QtWebKit";
+        my $result;
         if (isDarwin() and -d "$configurationProductDir/lib/$libraryName.framework") {
-            return "$configurationProductDir/lib/$libraryName.framework/$libraryName";
+            $result = "$configurationProductDir/lib/$libraryName.framework/$libraryName";
         } elsif (isDarwin() and -d "$configurationProductDir/lib") {
-            return "$configurationProductDir/lib/lib$libraryName.dylib";
+            $result = "$configurationProductDir/lib/lib$libraryName.dylib";
         } elsif (isWindows()) {
             if (configuration() eq "Debug") {
                 # On Windows, there is a "d" suffix to the library name. See <http://trac.webkit.org/changeset/53924/>.
@@ -738,10 +740,23 @@ sub builtDylibPathForName
             if (not $qtMajorVersion) {
                 $qtMajorVersion = "";
             }
-            return "$configurationProductDir/lib/$libraryName$qtMajorVersion.dll";
+
+            $result = "$configurationProductDir/lib/$libraryName$qtMajorVersion.dll";
         } else {
-            return "$configurationProductDir/lib/lib$libraryName.so";
+            $result = "$configurationProductDir/lib/lib$libraryName.so";
         }
+
+        if ($isSearchingForWebCore) {
+            # With CONFIG+=force_static_libs_as_shared we have a shared library for each subdir.
+            # For feature detection to work it is necessary to return the path of the WebCore library here.
+            my $replacedWithWebCore = $result;
+            $replacedWithWebCore =~ s/$libraryName/WebCore/g;
+            if (-e $replacedWithWebCore) {
+                return $replacedWithWebCore;
+            }
+        }
+
+        return $result;
     }
     if (isWx()) {
         return "$configurationProductDir/libwxwebkit.dylib";
@@ -2128,6 +2143,12 @@ sub jhbuildWrapperPrefixIfNeeded()
     return "";
 }
 
+sub removeCMakeCache()
+{
+    my $cacheFilePath = File::Spec->catdir(baseProductDir(), configuration(), "CMakeCache.txt");
+    unlink($cacheFilePath) if -e $cacheFilePath;
+}
+
 sub generateBuildSystemFromCMakeProject
 {
     my ($port, $prefixPath, @cmakeArgs, $additionalCMakeArgs) = @_;
@@ -2165,12 +2186,6 @@ sub generateBuildSystemFromCMakeProject
 
     if (isEfl()) {
         saveJhbuildMd5();
-    }
-
-    # Remove CMakeCache.txt to avoid using outdated build flags
-    if (isEfl()) {
-        my $cacheFilePath = File::Spec->catdir($buildPath, "CMakeCache.txt");
-        unlink($cacheFilePath) if -e $cacheFilePath;
     }
 
     # We call system("cmake @args") instead of system("cmake", @args) so that @args is

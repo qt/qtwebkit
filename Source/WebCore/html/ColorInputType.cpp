@@ -38,6 +38,8 @@
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
 #include "MouseEvent.h"
+#include "RenderObject.h"
+#include "RenderView.h"
 #include "ScriptController.h"
 #include "ShadowRoot.h"
 
@@ -117,7 +119,7 @@ void ColorInputType::createShadowSubtree()
     ExceptionCode ec = 0;
     wrapperElement->appendChild(colorSwatch.release(), ec);
     ASSERT(!ec);
-    element()->shadow()->oldestShadowRoot()->appendChild(wrapperElement.release(), ec);
+    element()->userAgentShadowRoot()->appendChild(wrapperElement.release(), ec);
     ASSERT(!ec);
     
     updateColorSwatch();
@@ -191,8 +193,15 @@ void ColorInputType::updateColorSwatch()
 
 HTMLElement* ColorInputType::shadowColorSwatch() const
 {
-    ShadowRoot* shadow = element()->shadow()->oldestShadowRoot();
+    ShadowRoot* shadow = element()->userAgentShadowRoot();
     return shadow ? toHTMLElement(shadow->firstChild()->firstChild()) : 0;
+}
+
+IntRect ColorInputType::elementRectRelativeToWindow() const
+{
+    RenderObject* renderer = element()->renderer();
+    ASSERT(renderer);
+    return pixelSnappedIntRect(renderer->view()->frameView()->contentsToWindow(renderer->absoluteBoundingBoxRect()));
 }
 
 } // namespace WebCore

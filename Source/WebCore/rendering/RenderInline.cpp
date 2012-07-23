@@ -302,7 +302,8 @@ void RenderInline::addChildIgnoringContinuation(RenderObject* newChild, RenderOb
     if (!beforeChild && isAfterContent(lastChild()))
         beforeChild = lastChild();
 
-    if (!newChild->isInline() && !newChild->isFloatingOrOutOfFlowPositioned()) {
+    // We don't split table parts as they will be wrapped in an anonymous inline table.
+    if (!newChild->isInline() && !newChild->isFloatingOrOutOfFlowPositioned() && !newChild->isTablePart()) {
         // We are placing a block inside an inline. We have to perform a split of this
         // inline into continuations.  This involves creating an anonymous block box to hold
         // |newChild|.  We then make that block box a continuation of this inline.  We take all of
@@ -1135,9 +1136,11 @@ void RenderInline::mapLocalToContainer(RenderBoxModelObject* repaintContainer, b
     if (!o)
         return;
 
-    if (applyContainerFlip && o->isBox() && o->style()->isFlippedBlocksWritingMode()) {
-        IntPoint centerPoint = roundedIntPoint(transformState.mappedPoint());
-        transformState.move(toRenderBox(o)->flipForWritingModeIncludingColumns(centerPoint) - centerPoint);
+    if (applyContainerFlip && o->isBox()) {
+        if (o->style()->isFlippedBlocksWritingMode()) {
+            IntPoint centerPoint = roundedIntPoint(transformState.mappedPoint());
+            transformState.move(toRenderBox(o)->flipForWritingModeIncludingColumns(centerPoint) - centerPoint);
+        }
         applyContainerFlip = DoNotApplyContainerFlip;
     }
 
@@ -1228,7 +1231,7 @@ void RenderInline::updateHitTestResult(HitTestResult& result, const LayoutPoint&
             
             // Get our containing block.
             RenderBox* block = containingBlock();
-            localPoint.move(block->x() - firstBlock->x(), block->y() - firstBlock->y());
+            localPoint.moveBy(block->location() - firstBlock->locationOffset());
         }
 
         result.setInnerNode(n);
@@ -1366,7 +1369,7 @@ void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& 
             if (curr->hasLayer()) 
                 pos = curr->localToAbsolute();
             else if (curr->isBox())
-                pos.move(toRenderBox(curr)->x(), toRenderBox(curr)->y());
+                pos.move(toRenderBox(curr)->locationOffset());
             curr->addFocusRingRects(rects, flooredIntPoint(pos));
         }
     }

@@ -75106,6 +75106,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\ExtensionView.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\FileContentView.js"
 					>
 				</File>
@@ -75203,10 +75207,6 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\IndexedDBViews.js"
-					>
-				</File>
-				<File
-					RelativePath="..\inspector\front-end\InjectedFakeWorker.js"
 					>
 				</File>
 				<File

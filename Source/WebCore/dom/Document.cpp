@@ -421,7 +421,7 @@ uint64_t Document::s_globalTreeVersion = 0;
 
 Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     : ContainerNode(0, CreateDocument)
-    , TreeScope(this)
+    , TreeScope(this, this)
     , m_guardRefCount(0)
     , m_contextFeatures(ContextFeatures::defaultSwitch())
     , m_compatibilityMode(NoQuirksMode)
@@ -493,7 +493,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_didDispatchViewportPropertiesChanged(false)
 #endif
 {
-    m_document = this;
+    setTreeScope(this);
 
     m_pageGroupUserSheetCacheValid = false;
 
@@ -585,6 +585,19 @@ static void histogramMutationEventUsage(const unsigned short& listenerTypes)
     HistogramSupport::histogramEnumeration("DOMAPI.PerDocumentMutationEventUsage.DOMCharacterDataModified", static_cast<bool>(listenerTypes & Document::DOMCHARACTERDATAMODIFIED_LISTENER), 2);
 }
 
+#if ENABLE(FULLSCREEN_API)
+static bool isAttributeOnAllOwners(const WebCore::QualifiedName& attribute, const HTMLFrameOwnerElement* owner)
+{
+    if (!owner)
+        return true;
+    do {
+        if (!owner->hasAttribute(attribute))
+            return false;
+    } while ((owner = owner->document()->ownerElement()));
+    return true;
+}
+#endif
+
 Document::~Document()
 {
     ASSERT(!renderer());
@@ -663,7 +676,7 @@ Document::~Document()
     for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_collections); i++)
         ASSERT(!m_collections[i]);
 
-    m_document = 0;
+    setTreeScope(0);
 
     InspectorCounters::decrementCounter(InspectorCounters::DocumentCounter);
 }
@@ -1337,13 +1350,14 @@ void Document::setContent(const String& content)
 
 String Document::suggestedMIMEType() const
 {
-    if (m_document->isXHTMLDocument())
+    Document* doc = document();
+    if (doc->isXHTMLDocument())
         return "application/xhtml+xml";
-    if (m_document->isSVGDocument())
+    if (doc->isSVGDocument())
         return "image/svg+xml";
-    if (m_document->xmlStandalone())
+    if (doc->xmlStandalone())
         return "text/xml";
-    if (m_document->isHTMLDocument())
+    if (doc->isHTMLDocument())
         return "text/html";
 
     if (DocumentLoader* documentLoader = loader())
@@ -3868,7 +3882,7 @@ void Document::setCSSTarget(Element* n)
 
 void Document::registerNodeListCache(DynamicNodeListCacheBase* list)
 {
-    if (list->type() != InvalidCollectionType)
+    if (list->type() != NodeListCollectionType)
         m_nodeListCounts[InvalidateOnIdNameAttrChange]++;
     m_nodeListCounts[list->invalidationType()]++;
     if (list->isRootedAtDocument())
@@ -3877,38 +3891,13 @@ void Document::registerNodeListCache(DynamicNodeListCacheBase* list)
 
 void Document::unregisterNodeListCache(DynamicNodeListCacheBase* list)
 {
-    if (list->type() != InvalidCollectionType)
+    if (list->type() != NodeListCollectionType)
         m_nodeListCounts[InvalidateOnIdNameAttrChange]--;
     m_nodeListCounts[list->invalidationType()]--;
     if (list->isRootedAtDocument()) {
         ASSERT(m_listsInvalidatedAtDocument.contains(list));
         m_listsInvalidatedAtDocument.remove(list);
     }
-}
-
-bool Document::shouldInvalidateNodeListCaches(const QualifiedName* attrName) const
-{
-    if (attrName) {
-        for (int type = DoNotInvalidateOnAttributeChanges + 1; type < numNodeListInvalidationTypes; type++) {
-            if (m_nodeListCounts[type] && DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(static_cast<NodeListInvalidationType>(type), *attrName))
-                return true;
-        }
-        return false;
-    }
-
-    for (int type = 0; type < numNodeListInvalidationTypes; type++) {
-        if (m_nodeListCounts[type])
-            return true;
-    }
-
-    return false;
-}
-
-void Document::invalidateNodeListCaches(const QualifiedName* attrName)
-{
-    HashSet<DynamicNodeListCacheBase*>::iterator end = m_listsInvalidatedAtDocument.end();
-    for (HashSet<DynamicNodeListCacheBase*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
-        (*it)->invalidateCache(attrName);
 }
 
 void Document::attachNodeIterator(NodeIterator* ni)
@@ -5365,15 +5354,7 @@ MediaCanStartListener* Document::takeAnyMediaCanStartListener()
 bool Document::fullScreenIsAllowedForElement(Element* element) const
 {
     ASSERT(element);
-    while (HTMLFrameOwnerElement* ownerElement = element->document()->ownerElement()) {
-        if (!ownerElement->isFrameElementBase())
-            continue;
-
-        if (!static_cast<HTMLFrameElementBase*>(ownerElement)->allowFullScreen())
-            return false;
-        element = ownerElement;
-    }
-    return true;
+    return isAttributeOnAllOwners(webkitallowfullscreenAttr, element->document()->ownerElement());
 }
 
 void Document::requestFullScreenForElement(Element* element, unsigned short flags, FullScreenCheckType checkType)
@@ -5582,19 +5563,7 @@ bool Document::webkitFullscreenEnabled() const
     // browsing context's documents have their fullscreen enabled flag set, or false otherwise.
 
     // Top-level browsing contexts are implied to have their allowFullScreen attribute set.
-    HTMLFrameOwnerElement* owner = ownerElement();
-    if (!owner)
-        return true;
-
-    do {
-        if (!owner->isFrameElementBase())
-            continue;
-
-        if (!static_cast<HTMLFrameElementBase*>(owner)->allowFullScreen())
-            return false;
-    } while ((owner = owner->document()->ownerElement()));
-
-    return true;        
+    return isAttributeOnAllOwners(webkitallowfullscreenAttr, ownerElement());
 }
 
 void Document::webkitWillEnterFullScreenForElement(Element* element)

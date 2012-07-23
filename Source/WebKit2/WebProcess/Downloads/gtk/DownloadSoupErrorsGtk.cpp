@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,80 +24,22 @@
  */
 
 #include "config.h"
-#include "WebInspectorProxy.h"
+#include "DownloadSoupErrors.h"
 
-#if ENABLE(INSPECTOR)
+#include <WebCore/ErrorsGtk.h>
 
-#include <WebCore/NotImplemented.h>
-#include <wtf/text/WTFString.h>
+using namespace WebCore;
 
 namespace WebKit {
 
-WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
+ResourceError platformDownloadNetworkError(int errorCode, const String& failingURL, const String& localizedDescription)
 {
-    notImplemented();
-    return 0;
+    return downloadNetworkError(ResourceError(errorDomainDownload, errorCode, failingURL, localizedDescription));
 }
 
-void WebInspectorProxy::platformOpen()
+ResourceError platformDownloadDestinationError(const ResourceResponse& response, const String& message)
 {
-    notImplemented();
-}
-
-void WebInspectorProxy::platformDidClose()
-{
-    notImplemented();
-}
-
-void WebInspectorProxy::platformBringToFront()
-{
-    notImplemented();
-}
-
-bool WebInspectorProxy::platformIsFront()
-{
-    notImplemented();
-    return false;
-}
-
-void WebInspectorProxy::platformInspectedURLChanged(const String&)
-{
-    notImplemented();
-}
-
-String WebInspectorProxy::inspectorPageURL() const
-{
-    notImplemented();
-    return String();
-}
-
-String WebInspectorProxy::inspectorBaseURL() const
-{
-    notImplemented();
-    return String();
-}
-
-unsigned WebInspectorProxy::platformInspectedWindowHeight()
-{
-    notImplemented();
-    return 0;
-}
-
-void WebInspectorProxy::platformAttach()
-{
-    notImplemented();
-}
-
-void WebInspectorProxy::platformDetach()
-{
-    notImplemented();
-}
-
-void WebInspectorProxy::platformSetAttachedWindowHeight(unsigned)
-{
-    notImplemented();
+    return downloadDestinationError(response, message);
 }
 
 } // namespace WebKit
-
-#endif // ENABLE(INSPECTOR)

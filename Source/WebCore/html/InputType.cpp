@@ -453,12 +453,10 @@ void InputType::createShadowSubtree()
 
 void InputType::destroyShadowSubtree()
 {
-    ElementShadow* shadow = element()->shadow();
-    if (!shadow)
+    ShadowRoot* root = element()->userAgentShadowRoot();
+    if (!root)
         return;
 
-    ShadowRoot* root = shadow->oldestShadowRoot();
-    ASSERT(root->type() == ShadowRoot::UserAgentShadowRoot);
     root->removeAllChildren();
 
     // It's ok to clear contents of all other ShadowRoots because they must have
@@ -896,6 +894,12 @@ String InputType::defaultToolTip() const
 {
     return String();
 }
+
+#if ENABLE(DATALIST_ELEMENT)
+void InputType::listAttributeTargetChanged()
+{
+}
+#endif
 
 bool InputType::supportsIndeterminateAppearance() const
 {

@@ -1,3 +1,592 @@
+2012-07-23  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_METER_TAG and ENABLE_PROGRESS_TAG to ENABLE_METER_ELEMENT and ENABLE_PROGRESS_ELEMENT respectively
+        https://bugs.webkit.org/show_bug.cgi?id=91941
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-22  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_DETAILS to ENABLE_DETAILS_ELEMENT
+        https://bugs.webkit.org/show_bug.cgi?id=91928
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-20  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_DATALIST to ENABLE_DATALIST_ELEMENT
+        https://bugs.webkit.org/show_bug.cgi?id=91846
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-20  Rafael Brandao  <rafael.lobo@openbossa.org>
+
+        QtNetworkAccessManager should not rely on signal sslErrors when QT_NO_SSL is defined
+        https://bugs.webkit.org/show_bug.cgi?id=91866
+
+        Reviewed by Noam Rosenthal.
+
+        * WebProcess/qt/QtNetworkAccessManager.cpp:
+        (WebKit::QtNetworkAccessManager::QtNetworkAccessManager): QNAM's signal is only defined when
+        that flag is undefined. Removed the connection when we have the flag set.
+        (WebKit::QtNetworkAccessManager::onSslErrors): When the flag is set, this slot becomes unused.
+
+2012-07-20  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Proxy configuration should honor the no_proxy environment variable
+        https://bugs.webkit.org/show_bug.cgi?id=91747
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Use the new custom proxy resolver from WebCore in
+        WebKit2-EFL so that it is possible for the client
+        to set proxy exceptions via the "no_proxy"
+        environment variable.
+
+        By default, the proxy set in the "http_proxy"
+        environment variable will not be used for requests
+        to localhost or 127.0.0.1.
+
+        * WebProcess/efl/WebProcessMainEfl.cpp:
+        (WebKit::WebProcessMainEfl):
+
+2012-06-01  Dinu Jacob  <dinu.jacob@nokia.com>
+
+        [Qt][WK2] Add support for multi-select list
+        https://bugs.webkit.org/show_bug.cgi?id=85527
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added support for multi-select list:
+        - Added multi-selection flag to PlatformPopupMenuData to indicate whether to accept multiple selections or not.
+        - Added selected state to WebPopupItem.
+        - Modified WebPopupMenuQt to support multiple selections.
+
+        * Shared/PlatformPopupMenuData.cpp:
+        (WebKit::PlatformPopupMenuData::PlatformPopupMenuData):
+        (WebKit::PlatformPopupMenuData::encode):
+        (WebKit::PlatformPopupMenuData::decode):
+        * Shared/PlatformPopupMenuData.h:
+        (PlatformPopupMenuData):
+        * Shared/WebPopupItem.cpp:
+        (WebKit::WebPopupItem::WebPopupItem):
+        (WebKit::WebPopupItem::encode):
+        (WebKit::WebPopupItem::decode):
+        * Shared/WebPopupItem.h:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_multiSelect.qml: Added.
+        * UIProcess/API/qt/tests/qmltests/common/multiselect.html: Added.
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/WebPopupMenuProxy.h:
+        (Client):
+        * UIProcess/qt/WebPageProxyQt.cpp:
+        (WebKit::WebPageProxy::changeSelectedIndex):
+        (WebKit):
+        (WebKit::WebPageProxy::closePopupMenu):
+        * UIProcess/qt/WebPopupMenuProxyQt.cpp:
+        (WebKit::PopupMenuItemModel::multiple):
+        (PopupMenuItemModel):
+        (WebKit::PopupMenuItemModel::Item::Item):
+        (ItemSelectorContextObject):
+        (WebKit::ItemSelectorContextObject::allowMultiSelect):
+        (WebKit::ItemSelectorContextObject::reject):
+        (WebKit::ItemSelectorContextObject::dismiss):
+        (WebKit::ItemSelectorContextObject::ItemSelectorContextObject):
+        (WebKit):
+        (WebKit::ItemSelectorContextObject::onIndexUpdate):
+        (WebKit::ItemSelectorContextObject::accept):
+        (WebKit::PopupMenuItemModel::PopupMenuItemModel):
+        (WebKit::PopupMenuItemModel::select):
+        (WebKit::PopupMenuItemModel::toggleItem):
+        (WebKit::PopupMenuItemModel::buildItems):
+        (WebKit::WebPopupMenuProxyQt::showPopupMenu):
+        (WebKit::WebPopupMenuProxyQt::hidePopupMenu):
+        (WebKit::WebPopupMenuProxyQt::selectIndex):
+        (WebKit::WebPopupMenuProxyQt::createItem):
+        * UIProcess/qt/WebPopupMenuProxyQt.h:
+        (WebPopupMenuProxyQt):
+        * WebProcess/WebCoreSupport/WebPopupMenu.cpp:
+        (WebKit::WebPopupMenu::didChangeSelectedIndex):
+        (WebKit::WebPopupMenu::populateItems):
+        * WebProcess/WebCoreSupport/WebPopupMenu.h:
+        (WebPopupMenu):
+        * WebProcess/WebCoreSupport/qt/WebPopupMenuQt.cpp:
+        (WebKit::WebPopupMenu::setUpPlatformData):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::didChangeSelectedIndexForActivePopupMenu):
+        (WebKit):
+        (WebKit::WebPage::changeSelectedIndex):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+        * WebProcess/WebPage/WebPage.messages.in:
+        * WebProcess/WebPage/qt/WebPageQt.cpp:
+        (WebKit::WebPage::selectedIndex):
+        (WebKit):
+        (WebKit::WebPage::hidePopupMenu):
+
+2012-07-20  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Unreviewed, rolling out r123085.
+        http://trac.webkit.org/changeset/123085
+        https://bugs.webkit.org/show_bug.cgi?id=91719
+
+        r123085 causes crashes on EFL layout test bot.
+
+        * UIProcess/efl/WebContextEfl.cpp:
+        (WebKit::WebContext::applicationCacheDirectory):
+
+2012-07-20  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Use "load,finished" signal in EWK2UnitTestBase::loadUrlSync() instead of "load,progress"
+        https://bugs.webkit.org/show_bug.cgi?id=91721
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The purpose of EWK2UnitTestBase::loadUrlSync() is to load
+        a URL in the view and wait synchronously for the load to finish.
+        The current implementation uses the "load,progress" signal to
+        detect when the load is finished, which is inefficient because
+        it gets emitted several times.
+
+        It is better to wait for the "load,finished" signal which gets
+        emitted only once when the load is complete.
+
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.cpp:
+        (EWK2UnitTest::onLoadFinished):
+        (EWK2UnitTest::EWK2UnitTestBase::EWK2UnitTestBase):
+        (EWK2UnitTest::EWK2UnitTestBase::loadUrlSync):
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.h:
+        (EWK2UnitTestBase):
+
+2012-07-19  MORITA Hajime  <morrita@google.com>
+
+        [Refactoring] Replace Node's Document pointer with a TreeScope pointer
+        https://bugs.webkit.org/show_bug.cgi?id=59816
+
+        Reviewed by Ryosuke Niwa.
+
+        * win/WebKit2.def: Added newly exported symbols.
+        * win/WebKit2CFLite.def: Ditto.
+
+2012-07-19  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [EFL] [WK2] Add methods to get/set a custom text encoding
+        https://bugs.webkit.org/show_bug.cgi?id=90604
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add methods to get/set custom character encoding.
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_del):
+        (ewk_view_setting_encoding_custom_get):
+        (ewk_view_setting_encoding_custom_set):
+        * UIProcess/API/efl/ewk_view.h:
+
+2012-07-19  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Unreviewed. Fix build break because of changing parameter type of
+        vibration virtual function on EFL port.
+
+        * WebProcess/WebCoreSupport/WebVibrationClient.cpp:
+        (WebKit::WebVibrationClient::vibrate):
+        * WebProcess/WebCoreSupport/WebVibrationClient.h:
+        (WebVibrationClient):
+
+2012-07-19  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [WK2] Add Vibration API integration to WebContext and WebPage
+        https://bugs.webkit.org/show_bug.cgi?id=91081
+
+        Reviewed by Anders Carlsson.
+
+        Integrate Vibration API to WebPage, WebContext and properly route
+        messages to the WebVibrationProxy.
+
+        * UIProcess/API/C/WKContext.cpp:
+        (WKContextGetVibration):
+        * UIProcess/API/C/WKContext.h:
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::WebContext):
+        (WebKit::WebContext::~WebContext):
+        (WebKit::WebContext::disconnectProcess):
+        (WebKit::WebContext::didReceiveMessage):
+        * UIProcess/WebContext.h:
+        (WebKit):
+        (WebContext):
+        (WebKit::WebContext::vibrationProxy):
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::didReceiveMessage):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::WebPage):
+
+2012-07-19  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        [Qt] Enable CSS shaders in Qt (software mode)
+        https://bugs.webkit.org/show_bug.cgi?id=85140
+
+        Reviewed by Simon Hausmann.
+
+        Add CSSCustomFilterEnabled to QWebPreferences. It's disabled by default.
+
+        * UIProcess/API/qt/qwebpreferences.cpp:
+        (QWebPreferencesPrivate::testAttribute):
+        (QWebPreferencesPrivate::setAttribute):
+        * UIProcess/API/qt/qwebpreferences_p_p.h:
+
+2012-07-19  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        [Qt] Enable CSS shaders in Qt (software mode)
+        https://bugs.webkit.org/show_bug.cgi?id=85140
+
+        Reviewed by Simon Hausmann.
+
+        Add CSSCustomFilterEnabled to QWebPreferences. It's disabled by default.
+
+        * UIProcess/API/qt/qwebpreferences.cpp:
+        (QWebPreferencesPrivate::testAttribute):
+        (QWebPreferencesPrivate::setAttribute):
+        * UIProcess/API/qt/qwebpreferences_p_p.h:
+
+2012-07-19  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt][WK2] Map the elementRect exposed in QML to the view for popup menu
+        https://bugs.webkit.org/show_bug.cgi?id=91645
+
+        Reviewed by Simon Hausmann.
+
+        This way the geometry of the QML item is still sensible even if we panned
+        and zoomed.
+
+        * UIProcess/qt/WebPopupMenuProxyQt.cpp:
+        (ItemSelectorContextObject):
+        (WebKit::ItemSelectorContextObject::elementRect):
+        (WebKit::ItemSelectorContextObject::ItemSelectorContextObject):
+        (WebKit::WebPopupMenuProxyQt::showPopupMenu):
+
+2012-07-19  Zoltan Nyul  <zoltan.nyul@intel.com>
+
+        [EFL][WK2] Using different cache directory for each WTR process
+        https://bugs.webkit.org/show_bug.cgi?id=91719
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make sure we return a valid application cache directory in
+        WebContextEfl.
+
+        * UIProcess/efl/WebContextEfl.cpp:
+        (WebKit::WebContext::applicationCacheDirectory):
+
+2012-07-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] EFL should use DownloadSoup instead of defining DownloadEfl
+        https://bugs.webkit.org/show_bug.cgi?id=91602
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Reuse WebProcess/Downloads/soup/DownloadSoup.cpp in EFL port
+        instead of redefining our own DownloadEfl.cpp. The EFL port
+        is also using libsoup so it is best to avoid code duplication.
+
+        * GNUmakefile.am:
+        * GNUmakefile.list.am:
+        * PlatformEfl.cmake:
+        * WebProcess/Downloads/Download.h:
+        (WebKit):
+        (Download):
+        * WebProcess/Downloads/efl/DownloadEfl.cpp: Removed.
+        * WebProcess/Downloads/efl/DownloadSoupErrorsEfl.cpp: Added.
+        (WebKit):
+        (WebKit::platformDownloadNetworkError):
+        (WebKit::platformDownloadDestinationError):
+        * WebProcess/Downloads/efl/FileDownloaderEfl.cpp: Removed.
+        * WebProcess/Downloads/efl/FileDownloaderEfl.h: Removed.
+        * WebProcess/Downloads/gtk/DownloadSoupErrorsGtk.cpp: Added.
+        (WebKit):
+        (WebKit::platformDownloadNetworkError):
+        (WebKit::platformDownloadDestinationError):
+        * WebProcess/Downloads/soup/DownloadSoup.cpp: Make the code
+        compile for other ports than GTK.
+        (WebKit::DownloadClient::didReceiveResponse):
+        (WebKit::DownloadClient::didReceiveData):
+        (WebKit::DownloadClient::didFail):
+        (WebKit::Download::continueWithoutCredential):
+        (WebKit):
+        (WebKit::Download::useCredential):
+        (WebKit::Download::cancelAuthenticationChallenge):
+        * WebProcess/Downloads/soup/DownloadSoupErrors.h: Added.
+        (WebKit):
+
+2012-07-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2] Add C API for Network Information API
+        https://bugs.webkit.org/show_bug.cgi?id=90762
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add C API for WKNetworkInfo and WKNetworkInfoManager
+        so that they can be used by the client.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * Target.pri:
+        * UIProcess/API/C/WKContext.cpp:
+        (WKContextGetNetworkInfoManager):
+        * UIProcess/API/C/WKContext.h:
+        * UIProcess/API/C/WKNetworkInfo.cpp: Copied from Source/WebKit2/UIProcess/API/C/WKNetworkInfoManager.cpp.
+        (WKNetworkInfoGetTypeID):
+        (WKNetworkInfoCreate):
+        * UIProcess/API/C/WKNetworkInfo.h: Copied from Source/WebKit2/UIProcess/API/C/WKNetworkInfoManager.cpp.
+        * UIProcess/API/C/WKNetworkInfoManager.cpp:
+        (WKNetworkInfoManagerSetProvider):
+        (WKNetworkInfoManagerProviderDidChangeNetworkInformation):
+        * UIProcess/API/C/WKNetworkInfoManager.h:
+
+2012-07-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] ewk_cookie_manager_persistent_storage_set is not exported
+        https://bugs.webkit.org/show_bug.cgi?id=91647
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Properly export ewk_cookie_manager_persistent_storage_set in
+        ewk_cookie_manager.h by using EAPI.
+
+        * UIProcess/API/efl/ewk_cookie_manager.h:
+
+2012-07-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Add central error management to EFL port
+        https://bugs.webkit.org/show_bug.cgi?id=91598
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make use of ErrorsEfl header from WebCore in
+        WebKit2, for Ewk_Web_Error and WebErrorsEfl.
+
+        * UIProcess/API/efl/ewk_web_error.cpp:
+        (ewk_web_error_type_get):
+        * UIProcess/API/efl/ewk_web_error.h:
+        * WebProcess/WebCoreSupport/efl/WebErrorsEfl.cpp:
+        (WebKit::cancelledError):
+        (WebKit::blockedError):
+        (WebKit::cannotShowURLError):
+        (WebKit::interruptedForPolicyChangeError):
+        (WebKit::cannotShowMIMETypeError):
+        (WebKit::fileDoesNotExistError):
+        (WebKit::pluginWillHandleLoadError):
+
+2012-07-18  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Set a theme for EFL WebKit2 unit test fixture
+        https://bugs.webkit.org/show_bug.cgi?id=91618
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The test fixture should load the theme generated by the build
+        instead of trying to load the system theme.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.cpp:
+        (EWK2UnitTest::EWK2UnitTestBase::SetUp):
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestEnvironment.cpp:
+        (EWK2UnitTest::EWK2UnitTestEnvironment::defaultTheme):
+        (EWK2UnitTest):
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestEnvironment.h:
+        (EWK2UnitTestEnvironment):
+
+2012-07-18  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] QQuickWebView shouldn't recieve mouse events while dialogs are active
+        https://bugs.webkit.org/show_bug.cgi?id=91634
+
+        Reviewed by Alexis Menard.
+
+        One side-effect of reimplementing childMouseEventFilter() in r122438 is that it can end up
+        bypassing the mouseArea mechanism used in QML dialogs and still forward some mouse events
+        over to the web process. We can rely on the same m_dialogActive mechanism already used for
+        touch events in there as well.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebView::childMouseEventFilter): ignore events and return early if a dialog is active.
+
+2012-07-18  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] Build fix for ENABLE_TOUCH_EVENTS=0
+
+        Rubber-stamped by No'am Rosenthal.
+
+        Add the appropriate ENABLE(TOUCH_EVENTS) where they're needed.
+
+        * UIProcess/API/qt/raw/qrawwebview.cpp:
+        * UIProcess/API/qt/raw/qrawwebview_p.h: include Platform.h so we can use the ENABLE macro.
+        * UIProcess/InspectorServer/qt/WebInspectorServerQt.cpp: Also add the missing QFile include.
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (WebKit::QtWebPageEventHandler::deactivateTapHighlight):
+
+2012-07-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Add Ewk class for cookie manager
+        https://bugs.webkit.org/show_bug.cgi?id=91053
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add new Ewk_Cookie_Manager class to allow the client
+        to set/get the cookie acceptance policy, support
+        persistent cookie storage and clear cookies.
+
+        The Ewk_Cookie_Manager instance can be retrieved
+        from the Ewk_Context API.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/EWebKit2.h:
+        * UIProcess/API/efl/ewk_context.cpp:
+        (_Ewk_Context):
+        (_Ewk_Context::_Ewk_Context):
+        (_Ewk_Context::~_Ewk_Context):
+        (ewk_context_cookie_manager_get):
+        * UIProcess/API/efl/ewk_context.h:
+        * UIProcess/API/efl/ewk_cookie_manager.cpp: Added.
+        (_Ewk_Cookie_Manager):
+        (_Ewk_Cookie_Manager::_Ewk_Cookie_Manager):
+        (ewk_cookie_manager_persistent_storage_set):
+        (ewk_cookie_manager_accept_policy_set):
+        (Get_Policy_Async_Data):
+        (getAcceptPolicyCallback):
+        (ewk_cookie_manager_async_accept_policy_get):
+        (Get_Hostnames_Async_Data):
+        (getHostnamesWithCookiesCallback):
+        (ewk_cookie_manager_async_hostnames_with_cookies_get):
+        (ewk_cookie_manager_hostname_cookies_clear):
+        (ewk_cookie_manager_cookies_clear):
+        (ewk_cookie_manager_free):
+        (ewk_cookie_manager_new):
+        * UIProcess/API/efl/ewk_cookie_manager.h: Added.
+        * UIProcess/API/efl/ewk_cookie_manager_private.h: Added.
+
+2012-07-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add WebKitWebView::submit-form signal to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=91605
+
+        Reviewed by Gustavo Noronha Silva.
+
+        The signal is emitted when a form is about to submitted, with a
+        form submission request that can be used to get the text fields
+        and to continue the form submission wheh done.
+
+        * GNUmakefile.list.am: Add new files to compilation.
+        * UIProcess/API/gtk/WebKitFormClient.cpp: Added.
+        (willSubmitForm): Create a WebKitFormSubmissionRequest and call
+        webkitWebViewSubmitFormRequest() with the request.
+        (attachFormClientToView): Add impementation for willSubmitForm
+        callback.
+        * UIProcess/API/gtk/WebKitFormClient.h: Added.
+        * UIProcess/API/gtk/WebKitFormSubmissionRequest.cpp: Added.
+        (webkit_form_submission_request_init):
+        (webkitFormSubmissionRequestFinalize):
+        (webkit_form_submission_request_class_init):
+        (webkitFormSubmissionRequestCreate): Create a new
+        WebKitFormSubmissionRequest for the given values dictionary and
+        submission listener.
+        (webkit_form_submission_request_get_text_fields): Create a
+        GHashTable with the text fields values and return it.
+        (webkit_form_submission_request_submit): Continue the form
+        submission.
+        * UIProcess/API/gtk/WebKitFormSubmissionRequest.h: Added.
+        * UIProcess/API/gtk/WebKitFormSubmissionRequestPrivate.h: Added.
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewConstructed): Attach web view to form client.
+        (webkit_web_view_class_init): Add WebKitWebView::submit-form
+        signal.
+        (webkitWebViewSubmitFormRequest): Emit WebKitWebView::submit-form
+        signal.
+        * UIProcess/API/gtk/WebKitWebView.h:
+        * UIProcess/API/gtk/WebKitWebViewPrivate.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-docs.sgml: Add new section for
+        WebKitFormSubmissionRequest.
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbols.
+        * UIProcess/API/gtk/tests/TestWebKitWebView.cpp:
+        (testWebViewSubmitForm):
+        (beforeAll):
+        * UIProcess/API/gtk/webkit2.h: Include
+        WebKitFormSubmissionRequest.h.
+
+2012-07-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] No main resource in WebView when page has been loaded from history cache
+        https://bugs.webkit.org/show_bug.cgi?id=91478
+
+        Reviewed by Gustavo Noronha Silva.
+
+        We are assuming that a resource loaded for the main frame that is
+        provisionally loading is the main resource of the web view. However
+        that's not true for pages loaded from history cache, so when you
+        go back/forward webkit_web_view_get_main_resource() always returns
+        NULL. We can assume that the first resource loaded for the main
+        frame is the main resource of the web view when
+        pageIsProvisionallyLoading is false.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewResourceLoadStarted): Make sure we always have a
+        main resource for the web view.
+        * UIProcess/API/gtk/tests/TestResources.cpp:
+        (testWebViewResourcesHistoryCache): Test we always have a main
+        resource even after going back/forward.
+        (beforeAll): Add new test case.
+
+2012-07-18  Seokju Kwon  <seokju.kwon@samsung.com>
+
+        [EFL] Rename WebInspectorEfl.cpp as WebInspectorProxyEfl.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=91585
+
+        Reviewed by Andreas Kling.
+
+        Rename WebInspectorEfl.cpp as WebInspectorProxyEfl.cpp
+        since it implements the platform specific methods of WebInspectorProxy.
+
+        * PlatformEfl.cmake:
+        * UIProcess/efl/WebInspectorProxyEfl.cpp: Renamed from Source/WebKit2/UIProcess/efl/WebInspectorEfl.cpp.
+        (WebKit):
+        (WebKit::WebInspectorProxy::platformCreateInspectorPage):
+        (WebKit::WebInspectorProxy::platformOpen):
+        (WebKit::WebInspectorProxy::platformDidClose):
+        (WebKit::WebInspectorProxy::platformBringToFront):
+        (WebKit::WebInspectorProxy::platformIsFront):
+        (WebKit::WebInspectorProxy::platformInspectedURLChanged):
+        (WebKit::WebInspectorProxy::inspectorPageURL):
+        (WebKit::WebInspectorProxy::inspectorBaseURL):
+        (WebKit::WebInspectorProxy::platformInspectedWindowHeight):
+        (WebKit::WebInspectorProxy::platformAttach):
+        (WebKit::WebInspectorProxy::platformDetach):
+        (WebKit::WebInspectorProxy::platformSetAttachedWindowHeight):
+
+2012-07-18  Zoltan Horvath  <zoltan@webkit.org>
+
+        [Qt] Modify the using of the QImage::Format enum to the appropriate functions from NativeImageQt
+        https://bugs.webkit.org/show_bug.cgi?id=91600
+
+        Reviewed by Andreas Kling.
+
+        Use NativeImageQt::defaultFormatForAlphaEnabledImages() and NativeImageQt::defaultFormatForOpaqueImages()
+        instead of the direct imagetypes at the appropriate places.
+
+        * Shared/qt/ShareableBitmapQt.cpp:
+        (WebKit::ShareableBitmap::createQImage):
+
 2012-07-18  Zeno Albisser  <zeno@webkit.org>
 
         [Qt][WK2] Caching of ShareableSurfaces breaks tiling.

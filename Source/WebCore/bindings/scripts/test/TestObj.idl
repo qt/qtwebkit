@@ -38,7 +38,7 @@ module test {
         readonly attribute long            readOnlyIntAttr;
         readonly attribute DOMString       readOnlyStringAttr;
         readonly attribute TestObj         readOnlyTestObjAttr;
-#if defined(TESTING_JS)
+#if defined(TESTING_JS) || defined(TESTING_V8)
         static readonly attribute long     staticReadOnlyIntAttr;
         static attribute DOMString         staticStringAttr;
 #endif
@@ -251,5 +251,7 @@ module test {
         const unsigned short CONST_VALUE_13 = 0X20;
         const unsigned short CONST_VALUE_14 = 0x1abc;
         [Reflect=CONST_IMPL] const unsigned short CONST_JAVASCRIPT = 15;
+
+        attribute [Replaceable] long replaceableAttribute;
     };
 }

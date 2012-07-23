@@ -1,3 +1,124 @@
+2012-07-22  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_METER_TAG and ENABLE_PROGRESS_TAG to ENABLE_METER_ELEMENT and ENABLE_PROGRESS_ELEMENT respectively
+        https://bugs.webkit.org/show_bug.cgi?id=91941
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * DefaultTheme/default.edc:
+
+2012-07-20  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Remove unused headers from ewk_security_origin
+        https://bugs.webkit.org/show_bug.cgi?id=91914
+
+        Reviewed by Noam Rosenthal.
+
+        There are some unused header in the ewk_security_origin.h/cpp
+        We need to remove them.
+
+        * ewk/ewk_security_origin.cpp:
+        * ewk/ewk_security_origin.h:
+
+2012-07-20  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Proxy configuration should honor the no_proxy environment variable
+        https://bugs.webkit.org/show_bug.cgi?id=91747
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Use the new custom proxy resolver from WebCore in
+        WebKit1-EFL's ewk_network_proxy_uri_set() / get(),
+        instead of the less flexible SOUP_SESSION_PROXY_URI
+        SoupSession property.
+
+        * ewk/ewk_network.cpp:
+        (ewk_network_proxy_uri_set):
+        (ewk_network_proxy_uri_get):
+
+2012-07-20  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Fix build when protocol handler and custom scheme is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=91840
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Fixed namespace closing bracket positioning.
+
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.cpp:
+        (WebCore):
+
+2012-07-20  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Check parameters of ewk APIs in ewk_security_origin
+        https://bugs.webkit.org/show_bug.cgi?id=91833
+
+        Reviewed by Kentaro Hara.
+
+        For preventing crash, check parameters of ewk APIs in the ewk_security_origin.cpp.
+
+        * ewk/ewk_security_origin.cpp:
+        (ewk_security_origin_port_get):
+        (ewk_security_origin_web_database_usage_get):
+        (ewk_security_origin_web_database_quota_get):
+        (ewk_security_origin_web_database_quota_set):
+        (ewk_security_origin_application_cache_quota_set):
+        (ewk_security_origin_application_cache_clear):
+        (ewk_security_origin_web_database_get_all):
+        (ewk_security_origin_free):
+        * ewk/ewk_security_origin.h:
+
+2012-07-19  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Enable interactive form validation
+        https://bugs.webkit.org/show_bug.cgi?id=91711
+
+        Reviewed by Ryosuke Niwa.
+
+        Enable interactive form validation on the Efl.
+        This makes we can validate data at form elements.
+        In addition, it is already enabled in the DRT.
+
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+
+2012-07-18  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Add central error management to EFL port
+        https://bugs.webkit.org/show_bug.cgi?id=91598
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make use of ErrorsEfl header from WebCore in
+        EFL's FrameLoaderClient now that we have
+        a central place for errors.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::cancelledError):
+        (WebCore::FrameLoaderClientEfl::blockedError):
+        (WebCore::FrameLoaderClientEfl::cannotShowURLError):
+        (WebCore::FrameLoaderClientEfl::interruptedForPolicyChangeError):
+        (WebCore::FrameLoaderClientEfl::cannotShowMIMETypeError):
+        (WebCore::FrameLoaderClientEfl::fileDoesNotExistError):
+        (WebCore::FrameLoaderClientEfl::pluginWillHandleLoadError):
+        (WebCore::FrameLoaderClientEfl::shouldFallBack):
+
+2012-07-18  Seokju Kwon  <seokju.kwon@samsung.com>
+
+        [EFL][DRT] Add support for Web Inspector in WebKit-EFL DRT
+        https://bugs.webkit.org/show_bug.cgi?id=87935
+
+        Reviewed by Andreas Kling.
+
+        Add implementation of DumpRenderTreeSupportEfl::evaluateInWebInspector().
+        Some scripts for test should be evaluated in frontend.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::evaluateInWebInspector):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
 2012-07-17  Christophe Dumez  <christophe.dumez@intel.com>
 
         [EFL] Replace 0 by NULL in public headers documentation

@@ -44,7 +44,7 @@
     ],
   },
   'conditions': [
-    ['os_posix == 1 and OS != "mac" and gcc_version==46', {
+    ['os_posix == 1 and OS != "mac" and gcc_version>=46', {
       'target_defaults': {
         # Disable warnings about c++0x compatibility, as some names (such as nullptr) conflict
         # with upcoming c++0x types.
@@ -154,7 +154,7 @@
         '<(chromium_src_dir)/third_party/icu/icu.gyp:icui18n',
         '<(chromium_src_dir)/third_party/icu/icu.gyp:icuuc',
       ],
-      'msvs_disabled_warnings': [4127, 4355, 4510, 4512, 4610, 4706],
+      'msvs_disabled_warnings': [4127, 4355, 4510, 4512, 4610, 4706, 4068],
       'conditions': [
         ['OS=="win"', {
           'sources/': [

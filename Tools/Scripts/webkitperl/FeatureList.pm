@@ -186,13 +186,13 @@ my @features = (
       define => "ENABLE_CUSTOM_SCHEME_HANDLER", default => (isBlackBerry() || isEfl()), value => \$customSchemeHandlerSupport },
 
     { option => "datalist", desc => "Toggle Datalist support",
-      define => "ENABLE_DATALIST", default => isEfl(), value => \$datalistSupport },
+      define => "ENABLE_DATALIST_ELEMENT", default => isEfl(), value => \$datalistSupport },
 
     { option => "data-transfer-items", desc => "Toggle Data Transfer Items support",
       define => "ENABLE_DATA_TRANSFER_ITEMS", default => 0, value => \$dataTransferItemsSupport },
 
     { option => "details", desc => "Toggle Details support",
-      define => "ENABLE_DETAILS", default => 1, value => \$detailsSupport },
+      define => "ENABLE_DETAILS_ELEMENT", default => 1, value => \$detailsSupport },
 
     { option => "device-orientation", desc => "Toggle Device Orientation support",
       define => "ENABLE_DEVICE_ORIENTATION", default => isBlackBerry(), value => \$deviceOrientationSupport },
@@ -291,10 +291,10 @@ my @features = (
       define => "ENABLE_MEDIA_STREAM", default => (isChromium() || isGtk() || isBlackBerry()), value => \$mediaStreamSupport },
 
     { option => "meter-tag", desc => "Toggle Meter Tag support",
-      define => "ENABLE_METER_TAG", default => !isAppleWinWebKit(), value => \$meterTagSupport },
+      define => "ENABLE_METER_ELEMENT", default => !isAppleWinWebKit(), value => \$meterTagSupport },
 
     { option => "mhtml", desc => "Toggle MHTML support",
-      define => "ENABLE_MHTML", default => 0, value => \$mhtmlSupport },
+      define => "ENABLE_MHTML", default => isGtk(), value => \$mhtmlSupport },
 
     { option => "microdata", desc => "Toggle Microdata support",
       define => "ENABLE_MICRODATA", default => (isEfl() || isBlackBerry()), value => \$microdataSupport },
@@ -318,7 +318,7 @@ my @features = (
       define => "ENABLE_PAGE_VISIBILITY_API", default => (isBlackBerry() || isEfl()), value => \$pageVisibilityAPISupport },
 
     { option => "progress-tag", desc => "Toggle Progress Tag support",
-      define => "ENABLE_PROGRESS_TAG", default => 1, value => \$progressTagSupport },
+      define => "ENABLE_PROGRESS_ELEMENT", default => 1, value => \$progressTagSupport },
 
     { option => "quota", desc => "Toggle Quota support",
       define => "ENABLE_QUOTA", default => 0, value => \$quotaSupport },

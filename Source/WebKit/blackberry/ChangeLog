@@ -1,3 +1,178 @@
+2012-07-22  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_METER_TAG and ENABLE_PROGRESS_TAG to ENABLE_METER_ELEMENT and ENABLE_PROGRESS_ELEMENT respectively
+        https://bugs.webkit.org/show_bug.cgi?id=91941
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * WebCoreSupport/AboutDataEnableFeatures.in:
+
+2012-07-20  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] clock_gettime() in BackingStore.cpp should use CLOCK_MONOTONIC
+        https://bugs.webkit.org/show_bug.cgi?id=91898
+
+        Reviewed by Yong Li.
+
+        PR: 181043
+        Use CLOCK_MONOTONIC when we do expect a monotonic timer.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::blitContents):
+
+2012-07-20  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry] Add Cancel button for Select popup
+        https://bugs.webkit.org/show_bug.cgi?id=91887
+
+        Reviewed by Yong Li.
+
+        PR 177706
+
+        * WebCoreSupport/SelectPopupClient.cpp:
+        (WebCore::SelectPopupClient::generateHTML):
+        (WebCore::SelectPopupClient::setValueAndClosePopup):
+
+2012-07-19  Mary Wu  <mary.wu@torchmobile.com.cn>
+
+        [BlackBerry] Make sure to send favicon when go back/forward
+        https://bugs.webkit.org/show_bug.cgi?id=91808
+
+        Reviewed by George Staikos.
+
+        When go back/forward, if the page was in page cache, it would have no chance
+        to send favicon. So we'll send it in commitLoad right after send the blank
+        icon.
+        RIM PR# 177495
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidCommitLoad):
+
+2012-07-19  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Suspend when there's no target buffer until an external compositor is set
+        https://bugs.webkit.org/show_bug.cgi?id=91686
+        RIM PR 174365
+
+        Reviewed by Antonio Gomes.
+
+        If we don't have a client window (i.e. rendering to
+        GL directly) and a WebPageCompositor is only set
+        after a rendering operation, then we'll try to render
+        to BackingStorePrivate::buffer() which doesn't exist
+        at this point. That's bad, and gets us various
+        assertions and possibly worse.
+
+        Fix it by starting in a screen-suspended state and only
+        resuming screen and backingstore once a compositor is
+        actually set.
+
+        So, in effect, with this patch applied, the sequence
+        of events will look like this:
+
+        1) WebPage & BackingStore are initialize, neither window
+           nor compositor exists, therefore buffer() returns 0.
+           createSurface() therefore suspends screen and
+           backingstore.
+        2) loadURL() or loadData() is called, web page is
+           fully loaded, however we don't try to render because
+           we're still suspended, still have no target buffer.
+        3) A WebPageCompositor is being set from outside.
+           At the beginning of WebPage::setCompositor() we still
+           don't have a buffer() so there's nothing to suspend,
+           however, after the sync call to setCompositorHelper()
+           the compositor is set so buffer() will return a
+           nonzero value, causing us to resume at this point.
+
+        Using the existence of a target buffer to determine
+        whether or not to enable rendering or keep it suspended
+        seems like a good idea, and the implementation (while
+        not quite perfect yet) is a step forward from before.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::createSurfaces):
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setCompositor):
+        (BlackBerry::WebKit::WebPagePrivate::setCompositorHelper):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+
+2012-07-19  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Allow nested suspend/resume screen & backingstore calls.
+        https://bugs.webkit.org/show_bug.cgi?id=91644
+        RIM PR 174365
+
+        Reviewed by Adam Treat and Antonio Gomes.
+
+        We expose suspendScreenAndBackingStoreUpdates() to the
+        outside API, but also use it internally when reacting
+        to a number of happenings, i.e. zooming, viewport resize,
+        resetting view state on Committed state or when restoring
+        it from previous pages, etc.
+
+        These two can clash. For instance, if we get a suspend
+        call from outside that suspends us for app inactivity,
+        or we are told to suspend because the main target surface
+        is not available at the time, and while being suspended
+        we try to rotate, finish loading a page, the we'll end up
+        resuming operations even though we shouldn't.
+
+        This patch changes the suspend flag to be a counter
+        instead, allowing nested suspend/resume calls and making
+        suspend/resume more robust this way. It also changes
+        several call sites to make sure suspend/resume calls are
+        paired up correctly.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::BackingStorePrivate):
+        (BlackBerry::WebKit::BackingStorePrivate::suspendScreenAndBackingStoreUpdates):
+        (BlackBerry::WebKit::BackingStorePrivate::resumeScreenAndBackingStoreUpdates):
+        * Api/BackingStore_p.h:
+        (BackingStorePrivate):
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::shouldZoomAboutPoint):
+        (BlackBerry::WebKit::WebPagePrivate::zoomAboutPointTimerFired):
+        (BlackBerry::WebKit::WebPagePrivate::blockZoomRectForNode):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::restoreViewState):
+
+2012-07-18  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Move about: URL handling out of WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=91541
+
+        Reviewed by Rob Buis.
+
+        Move about URL handling code to WebKit/blackberry. Now when WebPage is asked to load an about URL,
+        it directly calls loadString() with the generated source.
+
+        Also move AboutData.h/cpp from WebCoreSupport to WebKitSupport and change their namespace from WebCore
+        to BlackBerry::WebKit.
+
+        The change is very mechanical except "procss total memory usage" in about:memory now only accounts used
+        bytes and ignore free spaces in malloc.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::loadAbout):
+        (WebKit):
+        (BlackBerry::WebKit::WebPage::load):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebKitSupport/AboutData.cpp: Renamed from Source/WebKit/blackberry/WebCoreSupport/AboutData.cpp.
+        (WebKit):
+        (BlackBerry::WebKit::writeFeatures):
+        (BlackBerry::WebKit::numberToHTMLTr):
+        (BlackBerry::WebKit::bool):
+        (BlackBerry::WebKit::configPage):
+        (BlackBerry::WebKit::cacheTypeStatisticToHTMLTr):
+        (BlackBerry::WebKit::dumpJSCTypeCountSetToTableHTML):
+        (BlackBerry::WebKit::memoryPage):
+        * WebKitSupport/AboutData.h: Renamed from Source/WebKit/blackberry/WebCoreSupport/AboutData.h.
+        (WebKit):
+
 2012-07-17  Jakob Petsovits  <jpetsovits@rim.com>
 
         [BlackBerry] Remove unnecessary clearWindow() calls and the method itself

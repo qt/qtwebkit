@@ -35,7 +35,7 @@
 #include "cc/CCLayerSorter.h"
 #include "cc/CCMathUtil.h"
 #include "cc/CCProxy.h"
-#include "cc/CCQuadCuller.h"
+#include "cc/CCQuadSink.h"
 #include <wtf/text/WTFString.h>
 
 using WebKit::WebTransformationMatrix;
@@ -145,7 +145,7 @@ bool CCLayerImpl::descendantDrawsContent()
     return false;
 }
 
-PassOwnPtr<CCSharedQuadState> CCLayerImpl::createSharedQuadState() const
+PassOwnPtr<CCSharedQuadState> CCLayerImpl::createSharedQuadState(int id) const
 {
     WebTransformationMatrix quadTransformation = drawTransform();
     if (!contentBounds().isEmpty() && !bounds().isEmpty()) {
@@ -154,10 +154,10 @@ PassOwnPtr<CCSharedQuadState> CCLayerImpl::createSharedQuadState() const
         quadTransformation.translate(-contentBounds().width() / 2.0, -contentBounds().height() / 2.0);
     }
 
-    return CCSharedQuadState::create(quadTransformation, m_visibleContentRect, m_scissorRect, m_drawOpacity, m_opaque);
+    return CCSharedQuadState::create(id, quadTransformation, m_visibleContentRect, m_scissorRect, m_drawOpacity, m_opaque);
 }
 
-void CCLayerImpl::willDraw(CCRenderer*, CCGraphicsContext*)
+void CCLayerImpl::willDraw(CCResourceProvider*)
 {
 #ifndef NDEBUG
     // willDraw/didDraw must be matched.
@@ -166,7 +166,7 @@ void CCLayerImpl::willDraw(CCRenderer*, CCGraphicsContext*)
 #endif
 }
 
-void CCLayerImpl::didDraw()
+void CCLayerImpl::didDraw(CCResourceProvider*)
 {
 #ifndef NDEBUG
     ASSERT(m_betweenWillDrawAndDidDraw);
@@ -174,7 +174,7 @@ void CCLayerImpl::didDraw()
 #endif
 }
 
-void CCLayerImpl::appendDebugBorderQuad(CCQuadCuller& quadList, const CCSharedQuadState* sharedQuadState) const
+void CCLayerImpl::appendDebugBorderQuad(CCQuadSink& quadList, const CCSharedQuadState* sharedQuadState) const
 {
     if (!hasDebugBorders())
         return;
@@ -183,7 +183,7 @@ void CCLayerImpl::appendDebugBorderQuad(CCQuadCuller& quadList, const CCSharedQu
     quadList.append(CCDebugBorderDrawQuad::create(sharedQuadState, contentRect, debugBorderColor(), debugBorderWidth()));
 }
 
-unsigned CCLayerImpl::contentsTextureId() const
+CCResourceProvider::ResourceId CCLayerImpl::contentsResourceId() const
 {
     ASSERT_NOT_REACHED();
     return 0;

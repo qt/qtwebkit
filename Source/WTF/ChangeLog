@@ -1,3 +1,109 @@
+2012-07-20  Han Shen  <shenhan@google.com>
+
+        [Chromium] Compilation fails under gcc 4.7
+        https://bugs.webkit.org/show_bug.cgi?id=90227
+
+        Reviewed by Tony Chang.
+
+        Disable warnings about c++0x compatibility in gcc newer than 4.6.
+
+        * WTF.gyp/WTF.gyp:
+
+2012-07-19  Dan Bernstein  <mitz@apple.com>
+
+        The ATSUI-based complex text code is unused
+        https://bugs.webkit.org/show_bug.cgi?id=91816
+
+        Reviewed by Sam Weinig.
+
+        Removed definitions of WTF_USE_ATSUI and WTF_USE_CORE_TEXT.
+
+        * wtf/Platform.h:
+
+2012-07-19  Wei James  <james.wei@intel.com>
+
+        enable Web Audio for chromium android port
+        https://bugs.webkit.org/show_bug.cgi?id=89428
+
+        Reviewed by Kenneth Russell.
+
+        * wtf/MathExtras.h:
+        (log2):
+        (log2f):
+
+2012-07-19  Scott Graham  <scottmg@chromium.org>
+
+        [Chromium] disable warning on Windows from gcc-only pragma in Assertions.cpp"
+        https://bugs.webkit.org/show_bug.cgi?id=91776
+
+        Reviewed by Ryosuke Niwa.
+
+        Avoids:
+            ...\source\wtf\wtf\assertions.cpp(31) : warning C4068: unknown pragma
+
+        * WTF.gyp/WTF.gyp:
+
+2012-07-19  Robert Sesek  <rsesek@chromium.org>
+
+        [chromium][Mac] Switch the MACOSX_DEPLOYMENT_TARGET to 10.6
+        https://bugs.webkit.org/show_bug.cgi?id=91752
+
+        Reviewed by Eric Seidel.
+
+        When building CHROMIUM && DARWIN, do not enable ATSUI support.
+
+        * wtf/Platform.h:
+
+2012-07-18  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Implement currentTime() and monotonicallyIncreasingTime() for OS(QNX)
+        https://bugs.webkit.org/show_bug.cgi?id=91659
+
+        Reviewed by Rob Buis.
+
+        Implement currentTime() and monotonicallyIncreasingTime() for OS(QNX) with clock_gettime().
+
+        * wtf/CurrentTime.cpp:
+        (WTF):
+        (WTF::currentTime):
+        (WTF::monotonicallyIncreasingTime):
+
+2012-07-18  Tom Sepez  <tsepez@chromium.org>
+
+        OOB read of stack buffer below DoubleToStringConverter::CreateExponentialRepresentation() in debug builds
+        https://bugs.webkit.org/show_bug.cgi?id=91642
+
+        Reviewed by Abhishek Arya.
+
+        * wtf/dtoa/double-conversion.cc:
+        (DoubleToStringConverter::CreateExponentialRepresentation): NUL-terminate string buffer before passing it to StringBuilder::AddSubstring()
+        
+2012-07-18  Michael Saboff  <msaboff@apple.com>
+
+        Make TextCodecLatin1 handle 8 bit data without converting to UChar's
+        https://bugs.webkit.org/show_bug.cgi?id=90319
+
+        Reviewed by Oliver Hunt.
+
+        * wtf/text/StringImpl.h:
+        (StringImpl): Exported LChar variant of adopt().
+        * wtf/text/WTFString.h:
+        (WTF::String::createUninitialized): Exported LChar variant.
+
+2012-07-18  Rob Buis  <rbuis@rim.com>
+
+        Alignment crash in MIMESniffer
+        https://bugs.webkit.org/show_bug.cgi?id=89787
+
+        Reviewed by Yong Li.
+
+        PR 169064
+
+        Change isPointerTypeAlignmentOkay so calling it does not require ifdefs.
+
+        * wtf/StdLibExtras.h:
+        (isPointerTypeAlignmentOkay):
+
 2012-07-17  Gabor Ballabas  <gaborb@inf.u-szeged.hu>
 
         [Qt][V8] Remove the V8 related codepaths and configuration

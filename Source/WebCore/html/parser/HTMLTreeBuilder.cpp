@@ -346,11 +346,10 @@ private:
 };
 
 
-HTMLTreeBuilder::HTMLTreeBuilder(HTMLDocumentParser* parser, HTMLDocument* document, bool reportErrors, bool usePreHTML5ParserQuirks, unsigned maximumDOMTreeDepth)
+HTMLTreeBuilder::HTMLTreeBuilder(HTMLDocumentParser* parser, HTMLDocument* document, bool, bool usePreHTML5ParserQuirks, unsigned maximumDOMTreeDepth)
     : m_framesetOk(true)
     , m_document(document)
     , m_tree(document, maximumDOMTreeDepth)
-    , m_reportErrors(reportErrors)
     , m_insertionMode(InitialMode)
     , m_originalInsertionMode(InitialMode)
     , m_shouldSkipLeadingNewline(false)
@@ -367,7 +366,6 @@ HTMLTreeBuilder::HTMLTreeBuilder(HTMLDocumentParser* parser, DocumentFragment* f
     , m_fragmentContext(fragment, contextElement, scriptingPermission)
     , m_document(fragment->document())
     , m_tree(fragment, scriptingPermission, maximumDOMTreeDepth)
-    , m_reportErrors(false) // FIXME: Why not report errors in fragments?
     , m_insertionMode(InitialMode)
     , m_originalInsertionMode(InitialMode)
     , m_shouldSkipLeadingNewline(false)
@@ -729,7 +727,7 @@ void HTMLTreeBuilder::processStartTagForInBody(AtomicHTMLToken& token)
 {
     ASSERT(token.type() == HTMLTokenTypes::StartTag);
     if (token.name() == htmlTag) {
-        m_tree.insertHTMLHtmlStartTagInBody(token);
+        processHtmlStartTagForInBody(token);
         return;
     }
     if (token.name() == baseTag
@@ -1142,7 +1140,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case BeforeHeadMode:
         ASSERT(insertionMode() == BeforeHeadMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == headTag) {
@@ -1161,7 +1159,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case AfterHeadMode:
         ASSERT(insertionMode() == AfterHeadMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == bodyTag) {
@@ -1224,7 +1222,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case InColumnGroupMode:
         ASSERT(insertionMode() == InColumnGroupMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == colTag) {
@@ -1311,7 +1309,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case AfterAfterBodyMode:
         ASSERT(insertionMode() == AfterBodyMode || insertionMode() == AfterAfterBodyMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         setInsertionMode(InBodyMode);
@@ -1320,7 +1318,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case InHeadNoscriptMode:
         ASSERT(insertionMode() == InHeadNoscriptMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == basefontTag
@@ -1343,7 +1341,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case InFramesetMode:
         ASSERT(insertionMode() == InFramesetMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == framesetTag) {
@@ -1364,7 +1362,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case AfterAfterFramesetMode:
         ASSERT(insertionMode() == AfterFramesetMode || insertionMode() == AfterAfterFramesetMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == noframesTag) {
@@ -1390,7 +1388,7 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
     case InSelectMode:
         ASSERT(insertionMode() == InSelectMode || insertionMode() == InSelectInTableMode);
         if (token.name() == htmlTag) {
-            m_tree.insertHTMLHtmlStartTagInBody(token);
+            processHtmlStartTagForInBody(token);
             return;
         }
         if (token.name() == optionTag) {
@@ -1446,6 +1444,12 @@ void HTMLTreeBuilder::processStartTag(AtomicHTMLToken& token)
         ASSERT_NOT_REACHED();
         break;
     }
+}
+
+void HTMLTreeBuilder::processHtmlStartTagForInBody(AtomicHTMLToken& token)
+{
+    parseError(token);
+    m_tree.insertHTMLHtmlStartTagInBody(token);
 }
 
 bool HTMLTreeBuilder::processBodyEndTagForInBody(AtomicHTMLToken& token)
@@ -1964,6 +1968,7 @@ void HTMLTreeBuilder::processEndTagForInTable(AtomicHTMLToken& token)
         parseError(token);
         return;
     }
+    parseError(token);
     // Is this redirection necessary here?
     HTMLConstructionSite::RedirectToFosterParentGuard redirecter(m_tree);
     processEndTagForInBody(token);
@@ -2558,7 +2563,7 @@ bool HTMLTreeBuilder::processStartTagForInHead(AtomicHTMLToken& token)
 {
     ASSERT(token.type() == HTMLTokenTypes::StartTag);
     if (token.name() == htmlTag) {
-        m_tree.insertHTMLHtmlStartTagInBody(token);
+        processHtmlStartTagForInBody(token);
         return true;
     }
     if (token.name() == baseTag

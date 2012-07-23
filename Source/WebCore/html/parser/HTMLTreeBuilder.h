@@ -137,6 +137,7 @@ private:
     void processEndTagForInCell(AtomicHTMLToken&);
 
     void processIsindexStartTagForInBody(AtomicHTMLToken&);
+    void processHtmlStartTagForInBody(AtomicHTMLToken&);
     bool processBodyEndTagForInBody(AtomicHTMLToken&);
     bool processTableEndTagForInTable();
     bool processCaptionEndTagForInCaption();
@@ -212,8 +213,6 @@ private:
 
     Document* m_document;
     HTMLConstructionSite m_tree;
-
-    bool m_reportErrors;
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/parsing.html#insertion-mode
     InsertionMode m_insertionMode;

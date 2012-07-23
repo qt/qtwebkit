@@ -189,6 +189,15 @@ WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->geolocationManagerProxy());
 }
 
+WKNetworkInfoManagerRef WKContextGetNetworkInfoManager(WKContextRef contextRef)
+{
+#if ENABLE(NETWORK_INFO)
+    return toAPI(toImpl(contextRef)->networkInfoManagerProxy());
+#else
+    return 0;
+#endif
+}
+
 WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->iconDatabase());
@@ -217,6 +226,15 @@ WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contex
 WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->resourceCacheManagerProxy());
+}
+
+WKVibrationRef WKContextGetVibration(WKContextRef contextRef)
+{
+#if ENABLE(VIBRATION)
+    return toAPI(toImpl(contextRef)->vibrationProxy());
+#else
+    return 0;
+#endif
 }
 
 void WKContextStartMemorySampler(WKContextRef contextRef, WKDoubleRef interval)

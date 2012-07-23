@@ -1,3 +1,70 @@
+2012-07-23  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_METER_TAG and ENABLE_PROGRESS_TAG to ENABLE_METER_ELEMENT and ENABLE_PROGRESS_ELEMENT respectively
+        https://bugs.webkit.org/show_bug.cgi?id=91941
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-22  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_DETAILS to ENABLE_DETAILS_ELEMENT
+        https://bugs.webkit.org/show_bug.cgi?id=91928
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-20  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_DATALIST to ENABLE_DATALIST_ELEMENT
+        https://bugs.webkit.org/show_bug.cgi?id=91846
+
+        Reviewed by Kentaro Hara.
+
+        A flag name for an elmement should be ENABLE_*_ELEMENT.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-18  Benjamin Poulain  <bpoulain@apple.com>
+
+        [Mac] Make WebDataSourcePrivate lighter
+        https://bugs.webkit.org/show_bug.cgi?id=91511
+
+        Reviewed by Anders Carlsson.
+
+        Make WebDataSourcePrivate a simple C++ class and use smart pointers for memory management.
+
+        Since the "loader" attribute is only set on initialization, all the assertions spread in
+        various function are removed in favor of assertions on initialization.
+
+        * WebView/WebDataSource.h:
+        * WebView/WebDataSource.mm:
+        (WebDataSourcePrivate):
+        (WebDataSourcePrivate::WebDataSourcePrivate):
+        (WebDataSourcePrivate::~WebDataSourcePrivate):
+        Use a class instead of a Objective-C object for WebDataSourcePrivate.
+        Use smart pointers instead of ref counting manually.
+
+        (-[WebDataSource _setRepresentation:]):
+        (-[WebDataSource _addSubframeArchives:]):
+        (-[WebDataSource _transferApplicationCache:]):
+        (-[WebDataSource _setDeferMainResourceDataLoad:]):
+        (-[WebDataSource _documentFragmentWithArchive:]):
+        (-[WebDataSource _initWithDocumentLoader:]):
+
+        (+[WebDataSource initialize]):
+        (-[WebDataSource dealloc]):
+        (-[WebDataSource finalize]):
+        WebDataSource takes the special initialization and destruction that was done in WebDataSourcePrivate.
+
+        (-[WebDataSource representation]):
+
 2012-07-17  Vivek Galatage  <vivekgalatage@gmail.com>
 
         Web Inspector: refactor InspectorController::connectFrontend() to accept InspectorFrontendChannel.

@@ -138,6 +138,10 @@
 #include "IntentData.h"
 #endif
 
+#if ENABLE(VIBRATION)
+#include "WebVibrationClient.h"
+#endif
+
 #if PLATFORM(MAC)
 #include "BuiltInPDFView.h"
 #endif
@@ -287,6 +291,9 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #endif
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     WebCore::provideNotification(m_page.get(), new WebNotificationClient(this));
+#endif
+#if ENABLE(VIBRATION)
+    WebCore::provideVibrationTo(m_page.get(), new WebVibrationClient(this));
 #endif
 
     // Qt does not yet call setIsInWindow. Until it does, just leave
@@ -2394,11 +2401,16 @@ void WebPage::countStringMatches(const String& string, uint32_t options, uint32_
 
 void WebPage::didChangeSelectedIndexForActivePopupMenu(int32_t newIndex)
 {
+    changeSelectedIndex(newIndex);
+    m_activePopupMenu = 0;
+}
+
+void WebPage::changeSelectedIndex(int32_t index)
+{
     if (!m_activePopupMenu)
         return;
 
-    m_activePopupMenu->didChangeSelectedIndex(newIndex);
-    m_activePopupMenu = 0;
+    m_activePopupMenu->didChangeSelectedIndex(index);
 }
 
 void WebPage::didChooseFilesForOpenPanel(const Vector<String>& files)

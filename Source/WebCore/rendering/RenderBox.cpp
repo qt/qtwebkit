@@ -1604,19 +1604,16 @@ void RenderBox::computeRectForRepaint(RenderBoxModelObject* repaintContainer, La
     o->computeRectForRepaint(repaintContainer, rect, fixed);
 }
 
-void RenderBox::repaintDuringLayoutIfMoved(const LayoutRect& rect)
+void RenderBox::repaintDuringLayoutIfMoved(const LayoutRect& oldRect)
 {
-    LayoutUnit newX = x();
-    LayoutUnit newY = y();
-    LayoutUnit newWidth = width();
-    LayoutUnit newHeight = height();
-    if (rect.x() != newX || rect.y() != newY) {
+    if (oldRect.location() != m_frameRect.location()) {
+        LayoutRect newRect = m_frameRect;
         // The child moved.  Invalidate the object's old and new positions.  We have to do this
         // since the object may not have gotten a layout.
-        m_frameRect = rect;
+        m_frameRect = oldRect;
         repaint();
         repaintOverhangingFloats(true);
-        m_frameRect = LayoutRect(newX, newY, newWidth, newHeight);
+        m_frameRect = newRect;
         repaint();
         repaintOverhangingFloats(true);
     }
@@ -2126,12 +2123,11 @@ LayoutUnit RenderBox::computePercentageLogicalHeight(const Length& height)
             result = cb->overrideLogicalContentHeight();
             includeBorderPadding = true;
         }
-    }
-    // Otherwise we only use our percentage height if our containing block had a specified
-    // height.
-    else if (cbstyle->logicalHeight().isFixed())
-        result = cb->computeContentBoxLogicalHeight(cbstyle->logicalHeight().value());
-    else if (cbstyle->logicalHeight().isPercent() && !isOutOfFlowPositionedWithSpecifiedHeight) {
+    } else if (cbstyle->logicalHeight().isFixed()) {
+        // Otherwise we only use our percentage height if our containing block had a specified height.
+        LayoutUnit contentBoxHeightWithScrollbar = cb->computeContentBoxLogicalHeight(cbstyle->logicalHeight().value());
+        result = max<LayoutUnit>(0, contentBoxHeightWithScrollbar - cb->scrollbarLogicalHeight());
+    } else if (cbstyle->logicalHeight().isPercent() && !isOutOfFlowPositionedWithSpecifiedHeight) {
         // We need to recur and compute the percentage height for our containing block.
         result = cb->computePercentageLogicalHeight(cbstyle->logicalHeight());
         if (result != -1)
@@ -2268,7 +2264,10 @@ LayoutUnit RenderBox::computeReplacedLogicalHeightUsing(SizeType sizeType, Lengt
                     cb = cb->containingBlock();
                 }
             }
-            return computeContentBoxLogicalHeight(valueForLength(logicalHeight, availableHeight));
+            availableHeight = computeContentBoxLogicalHeight(valueForLength(logicalHeight, availableHeight));
+            if (cb->style()->logicalHeight().isFixed())
+                availableHeight = max<LayoutUnit>(0, availableHeight - toRenderBox(cb)->scrollbarLogicalHeight());
+            return availableHeight;
         }
         case ViewportPercentageWidth:
         case ViewportPercentageHeight:
@@ -2366,8 +2365,10 @@ LayoutUnit RenderBox::containingBlockLogicalWidthForPositioned(const RenderBoxMo
                 if (isWritingModeRoot()) {
                     LayoutUnit cbPageOffset = offsetFromLogicalTopOfFirstPage - logicalTop();
                     RenderRegion* cbRegion = cb->regionAtBlockOffset(cbPageOffset);
-                    cbRegion = cb->clampToStartAndEndRegions(cbRegion);
-                    boxInfo = cb->renderBoxRegionInfo(cbRegion, cbPageOffset);
+                    if (cbRegion) {
+                        cbRegion = cb->clampToStartAndEndRegions(cbRegion);
+                        boxInfo = cb->renderBoxRegionInfo(cbRegion, cbPageOffset);
+                    }
                 }
             } else if (region && enclosingRenderFlowThread()->isHorizontalWritingMode() == containingBlock->isHorizontalWritingMode()) {
                 RenderRegion* containingBlockRegion = cb->clampToStartAndEndRegions(region);
@@ -2629,11 +2630,13 @@ void RenderBox::computePositionedLogicalWidth(RenderRegion* region, LayoutUnit o
         const RenderBlock* cb = toRenderBlock(containerBlock);
         LayoutUnit cbPageOffset = offsetFromLogicalTopOfFirstPage - logicalTop();
         RenderRegion* cbRegion = cb->regionAtBlockOffset(cbPageOffset);
-        cbRegion = cb->clampToStartAndEndRegions(cbRegion);
-        RenderBoxRegionInfo* boxInfo = cb->renderBoxRegionInfo(cbRegion, cbPageOffset);
-        if (boxInfo) {
-            logicalLeftPos += boxInfo->logicalLeft();
-            setLogicalLeft(logicalLeftPos);
+        if (cbRegion) {
+            cbRegion = cb->clampToStartAndEndRegions(cbRegion);
+            RenderBoxRegionInfo* boxInfo = cb->renderBoxRegionInfo(cbRegion, cbPageOffset);
+            if (boxInfo) {
+                logicalLeftPos += boxInfo->logicalLeft();
+                setLogicalLeft(logicalLeftPos);
+            }
         }
     }
 }
@@ -2951,11 +2954,13 @@ void RenderBox::computePositionedLogicalHeight()
         const RenderBlock* cb = toRenderBlock(containerBlock);
         LayoutUnit cbPageOffset = cb->offsetFromLogicalTopOfFirstPage() - logicalLeft();
         RenderRegion* cbRegion = cb->regionAtBlockOffset(cbPageOffset);
-        cbRegion = cb->clampToStartAndEndRegions(cbRegion);
-        RenderBoxRegionInfo* boxInfo = cb->renderBoxRegionInfo(cbRegion, cbPageOffset);
-        if (boxInfo) {
-            logicalTopPos += boxInfo->logicalLeft();
-            setLogicalTop(logicalTopPos);
+        if (cbRegion) {
+            cbRegion = cb->clampToStartAndEndRegions(cbRegion);
+            RenderBoxRegionInfo* boxInfo = cb->renderBoxRegionInfo(cbRegion, cbPageOffset);
+            if (boxInfo) {
+                logicalTopPos += boxInfo->logicalLeft();
+                setLogicalTop(logicalTopPos);
+            }
         }
     }
 }
@@ -3412,7 +3417,7 @@ LayoutRect RenderBox::localCaretRect(InlineBox* box, int caretOffset, LayoutUnit
     // FIXME: Paint the carets inside empty blocks differently than the carets before/after elements.
 
     // FIXME: What about border and padding?
-    LayoutRect rect(x(), y(), caretWidth, height());
+    LayoutRect rect(location(), LayoutSize(caretWidth, height()));
     bool ltr = box ? box->isLeftToRightDirection() : style()->isLeftToRightDirection();
 
     if ((!caretOffset) ^ ltr)
@@ -3939,6 +3944,8 @@ LayoutSize RenderBox::topLeftLocationOffset() const
         return locationOffset();
     
     LayoutRect rect(frameRect());
+    if (containerBlock->style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
+        rect.move(containerBlock->verticalScrollbarWidth(), 0);
     containerBlock->flipForWritingMode(rect); // FIXME: This is wrong if we are an absolutely positioned object enclosed by a relative-positioned inline.
     return LayoutSize(rect.x(), rect.y());
 }
@@ -3961,9 +3968,11 @@ static void markBoxForRelayoutAfterSplit(RenderBox* box)
 {
     // FIXME: The table code should handle that automatically. If not,
     // we should fix it and remove the table part checks.
-    if (box->isTable())
-        toRenderTable(box)->setNeedsSectionRecalc();
-    else if (box->isTableSection())
+    if (box->isTable()) {
+        // Because we may have added some sections with already computed column structures, we need to
+        // sync the table structure with them now. This avoids crashes when adding new cells to the table.
+        toRenderTable(box)->forceSectionsRecalc();
+    } else if (box->isTableSection())
         toRenderTableSection(box)->setNeedsCellRecalc();
 
     box->setNeedsLayoutAndPrefWidthsRecalc();

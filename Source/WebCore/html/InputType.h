@@ -226,6 +226,7 @@ public:
 #if ENABLE(INPUT_SPEECH)
     virtual HTMLElement* speechButtonElement() const { return 0; }
 #endif
+    virtual HTMLElement* sliderThumbElement() const { return 0; }
     virtual HTMLElement* placeholderElement() const;
 
     // Miscellaneous functions
@@ -275,6 +276,9 @@ public:
     virtual void disabledAttributeChanged();
     virtual void readonlyAttributeChanged();
     virtual String defaultToolTip() const;
+#if ENABLE(DATALIST_ELEMENT)
+    virtual void listAttributeTargetChanged();
+#endif
 
     // Parses the specified string for the type, and return
     // the Decimal value for the parsing result if the parsing
