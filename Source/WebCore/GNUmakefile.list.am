@@ -405,6 +405,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSMessageEvent.h \
 	DerivedSources/WebCore/JSMessagePort.cpp \
 	DerivedSources/WebCore/JSMessagePort.h \
+	DerivedSources/WebCore/JSMicroDataItemValue.cpp \
+	DerivedSources/WebCore/JSMicroDataItemValue.h \
 	DerivedSources/WebCore/JSMouseEvent.cpp \
 	DerivedSources/WebCore/JSMouseEvent.h \
 	DerivedSources/WebCore/JSMutationCallback.cpp \
@@ -477,6 +479,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSProcessingInstruction.h \
 	DerivedSources/WebCore/JSProgressEvent.cpp \
 	DerivedSources/WebCore/JSProgressEvent.h \
+	DerivedSources/WebCore/JSPropertyNodeList.cpp \
+	DerivedSources/WebCore/JSPropertyNodeList.h \
 	DerivedSources/WebCore/JSRadioNodeList.cpp \
 	DerivedSources/WebCore/JSRadioNodeList.h \
 	DerivedSources/WebCore/JSRange.cpp \
@@ -795,6 +799,7 @@ dom_binding_idls += \
 	$(WebCore)/dom/PopStateEvent.idl \
 	$(WebCore)/dom/ProcessingInstruction.idl \
 	$(WebCore)/dom/ProgressEvent.idl \
+	$(WebCore)/dom/PropertyNodeList.idl \
 	$(WebCore)/dom/Range.idl \
 	$(WebCore)/dom/RangeException.idl \
 	$(WebCore)/dom/ShadowRoot.idl \
@@ -900,6 +905,7 @@ dom_binding_idls += \
 	$(WebCore)/html/MediaError.idl \
 	$(WebCore)/html/MediaKeyError.idl \
 	$(WebCore)/html/MediaKeyEvent.idl \
+	$(WebCore)/html/MicroDataItemValue.idl \
 	$(WebCore)/html/RadioNodeList.idl \
 	$(WebCore)/html/TextMetrics.idl \
 	$(WebCore)/html/TimeRanges.idl \
@@ -1317,6 +1323,8 @@ webcore_sources += \
 	Source/WebCore/accessibility/AccessibilityMenuListPopup.h \
 	Source/WebCore/accessibility/AccessibilityMockObject.cpp \
 	Source/WebCore/accessibility/AccessibilityMockObject.h \
+	Source/WebCore/accessibility/AccessibilityNodeObject.cpp \
+	Source/WebCore/accessibility/AccessibilityNodeObject.h \
 	Source/WebCore/accessibility/AccessibilityObject.cpp \
 	Source/WebCore/accessibility/AccessibilityObject.h \
 	Source/WebCore/accessibility/AccessibilityProgressIndicator.cpp \
@@ -1483,6 +1491,7 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSMessageEventCustom.cpp \
 	Source/WebCore/bindings/js/JSMessagePortCustom.cpp \
 	Source/WebCore/bindings/js/JSMessagePortCustom.h \
+	Source/WebCore/bindings/js/JSMicroDataItemValueCustom.cpp \
 	Source/WebCore/bindings/js/JSMutationCallbackCustom.cpp \
 	Source/WebCore/bindings/js/JSMutationObserverCustom.cpp \
 	Source/WebCore/bindings/js/JSNamedNodeMapCustom.cpp \
@@ -2014,6 +2023,8 @@ webcore_sources += \
 	Source/WebCore/dom/ProcessingInstruction.h \
 	Source/WebCore/dom/ProgressEvent.cpp \
 	Source/WebCore/dom/ProgressEvent.h \
+	Source/WebCore/dom/PropertyNodeList.cpp \
+	Source/WebCore/dom/PropertyNodeList.h \
 	Source/WebCore/dom/QualifiedName.cpp \
 	Source/WebCore/dom/QualifiedName.h \
 	Source/WebCore/dom/RangeBoundaryPoint.h \
@@ -3508,6 +3519,8 @@ webcore_sources += \
 	Source/WebCore/platform/image-decoders/webp/WEBPImageDecoder.h \
 	Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp \
 	Source/WebCore/platform/image-decoders/png/PNGImageDecoder.h \
+	Source/WebCore/platform/LayoutTestSupport.cpp \
+	Source/WebCore/platform/LayoutTestSupport.h \
 	Source/WebCore/platform/linux/GamepadDeviceLinux.cpp \
 	Source/WebCore/platform/linux/GamepadDeviceLinux.h \
 	Source/WebCore/platform/mediastream/DeprecatedPeerConnectionHandler.h \
@@ -4111,6 +4124,7 @@ webcore_sources += \
 	Source/WebCore/rendering/style/SVGRenderStyleDefs.cpp \
 	Source/WebCore/rendering/style/SVGRenderStyleDefs.h \
 	Source/WebCore/rendering/style/SVGRenderStyle.h \
+	Source/WebCore/rendering/style/WrapShapes.h \
 	Source/WebCore/rendering/svg/RenderSVGBlock.cpp \
 	Source/WebCore/rendering/svg/RenderSVGBlock.h \
 	Source/WebCore/rendering/svg/RenderSVGContainer.cpp \
@@ -5914,6 +5928,7 @@ webcore_built_sources += \
 
 webcore_sources += \
 	Source/ThirdParty/ANGLE/include/GLSLANG/ShaderLang.h \
+	Source/ThirdParty/ANGLE/src/common/angleutils.h \
 	Source/ThirdParty/ANGLE/src/compiler/BaseTypes.h \
 	Source/ThirdParty/ANGLE/src/compiler/BuiltInFunctionEmulator.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/BuiltInFunctionEmulator.h \
@@ -6007,6 +6022,7 @@ webcore_sources += \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Token.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Tokenizer.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/Tokenizer.h \
+	Source/ThirdParty/ANGLE/src/compiler/preprocessor/new/pp_utils.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/parser.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/preprocess.h \
 	Source/ThirdParty/ANGLE/src/compiler/preprocessor/scanner.c \
@@ -6265,4 +6281,3 @@ dom_binding_idls += \
 	$(WebCore)/Modules/quota/StorageInfoUsageCallback.idl
 
 endif  # END ENABLE_QUOTA
-

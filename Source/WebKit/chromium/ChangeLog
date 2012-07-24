@@ -1,3 +1,233 @@
+2012-07-24  Jochen Eisinger  <jochen@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-07-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123463.
+        http://trac.webkit.org/changeset/123463
+        https://bugs.webkit.org/show_bug.cgi?id=92110
+
+        Broke Android build (Requested by keishi on #webkit).
+
+        * src/WebPagePopupImpl.h:
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleMouseDown):
+
+2012-07-24  Keishi Hattori  <keishi@webkit.org>
+
+        [Chromium] Page popup should close on mouse down
+        https://bugs.webkit.org/show_bug.cgi?id=92092
+
+        Reviewed by Kent Tamura.
+
+        Page popup should close on mouse down because some elements(e.g. <input type=color>) don't have a blur event that
+        we can hook to hide the page popup when the user clicks on the page.
+
+        * src/WebPagePopupImpl.h:
+        (WebKit::WebPagePopupImpl::hasSamePopupClient): Returns true if the given WebPagePopupImpl have the same popup client.
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleMouseDown): Close all popups when the page is clicked. Checks if the
+        mouse down event opened the same popup we just closed.
+
+2012-07-24  Anthony Scian  <ascian@rim.com>
+
+        Web Inspector [JSC]: Enable initiator column in network panel.
+        https://bugs.webkit.org/show_bug.cgi?id=65533
+
+        Reviewed by Vsevolod Vlasov.
+
+        With 40118 fixed for webkit, Preferences.displayInitiator should be set to true.
+        Removed references to it since the optionality is no longer required.
+
+        Test: http/tests/inspector/network/network-initiator.html
+
+        * src/js/DevTools.js:
+
+2012-07-24  Peter Beverloo  <peter@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-07-23  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move layoutTestMode to WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=92010
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * src/PlatformSupport.cpp:
+        (WebCore):
+        * src/WebKit.cpp:
+        (WebKit::setLayoutTestMode):
+        (WebKit::layoutTestMode):
+
+2012-07-23  Dave Tu  <dtu@chromium.org>
+
+        [chromium] Add droppedFrameCount to renderingStats.
+        https://bugs.webkit.org/show_bug.cgi?id=91694
+
+        Reviewed by Adrienne Walker.
+
+        * src/WebLayerTreeView.cpp:
+        (WebKit::WebLayerTreeView::renderingStats):
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::CCLayerTreeHostTestScrollMultipleRedraw::drawLayersOnCCThread):
+
+2012-07-23  Brian Anderson  <brianderson@chromium.org>
+
+        [chromium] Use shallow flushes that don't glFlush
+        https://bugs.webkit.org/show_bug.cgi?id=90325
+
+        Reviewed by Kenneth Russell.
+
+        Changed CCTextureUpdaterTest to recognize shallowFlushCHROMIUM().
+
+        * tests/CCTextureUpdaterTest.cpp:
+
+2012-07-23  Adrienne Walker  <enne@google.com>
+
+        [chromium] Add more compositor unit tests for high DPI transforms
+        https://bugs.webkit.org/show_bug.cgi?id=91917
+
+        Reviewed by Kenneth Russell.
+
+        The current set of high DPI tests only deal with layers in a render
+        surface. Add some extra tests for non-surface layers. Also add a test
+        to make sure that an owning layer in a surface doesn't differ from a
+        non-owning layer in high DPI circumstances.
+
+        * tests/CCLayerTreeHostCommonTest.cpp:
+
+2012-07-23  Shawn Singh  <shawnsingh@chromium.org>
+
+        [chromium] Fix unit tests in debug mode after r123375
+        https://bugs.webkit.org/show_bug.cgi?id=92030
+
+        Reviewed by Adrienne Walker.
+
+        Fixed two unit tests that were causing debug assertions because
+        they gave calcDrawTransforms an empty sized root layer.
+
+        * tests/CCLayerTreeHostCommonTest.cpp:
+
+2012-07-23  Simon Fraser  <simon.fraser@apple.com>
+
+        Part 2 of: Implement sticky positioning
+        https://bugs.webkit.org/show_bug.cgi?id=90046
+
+        Reviewed by Ojan Vafai.
+
+        Turn on ENABLE_CSS_STICKY_POSITION.
+
+        * features.gypi:
+
+2012-07-23  Shawn Singh  <shawnsingh@chromium.org>
+
+        [chromium] Refactor CCLayerTreeHostCommon: clean up clipRect and drawableContentRect design
+        https://bugs.webkit.org/show_bug.cgi?id=80622
+
+        Reviewed by Adrienne Walker.
+
+        Many tests needed to be updated because the semantics of the layer tree have changed:
+          - a few tests that were no longer applicable were removed.
+          - many tests needed to have fixed initialization, properly
+            setting surface contentRect and rootLayer bounds.
+          - because clipRect and usesLayerClipping no longer exists, those places in code had to be removed/changed
+          - the scissorRect tests needed to have updated expectations
+            because after this patch, the rootLayer Surface now clips
+            to its contentBounds.
+          - the clipRect tests were changed to test the layer's new semantics for the drawableContentRect instead.
+
+        * tests/CCLayerImplTest.cpp:
+        (WebCore::TEST):
+        * tests/CCLayerIteratorTest.cpp:
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/CCLayerTreeHostTest.cpp:
+        * tests/CCOcclusionTrackerTest.cpp:
+        (WebKitTests::CCOcclusionTrackerTest::calcDrawEtc):
+        (WebKitTests::CCOcclusionTrackerTestAnimationOpacity1OnMainThread::runMyTest):
+        (WebKitTests::CCOcclusionTrackerTestAnimationOpacity0OnMainThread::runMyTest):
+        * tests/LayerChromiumTest.cpp:
+
+2012-07-23  Daniel Cheng  <dcheng@chromium.org>
+
+        [chromium] Fix build on Ubuntu Precise.
+        https://bugs.webkit.org/show_bug.cgi?id=92021
+
+        Reviewed by Adrienne Walker.
+
+        Remove an array that's written but never read.
+
+        * tests/CCResourceProviderTest.cpp:
+        (WebKit::TEST_F):
+
+2012-07-23  Nate Chapin  <japhet@chromium.org>
+
+        Add WebTextInputType enum values for text areas and
+        content-editable.
+        https://bugs.webkit.org/show_bug.cgi?id=91654
+
+        Reviewed by Adam Barth.
+
+        No new tests, no behavior change without corresponding chromium.org changes.
+
+        * public/WebTextInputType.h:
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::textInputType):
+
+2012-07-23  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        Unify numTouchEventHandlersChanged and needTouchEvents in the chrome client
+        https://bugs.webkit.org/show_bug.cgi?id=91006
+
+        Reviewed by Ryosuke Niwa.
+
+        Rename the functions to follow a more boolean logic.
+
+        * public/WebViewClient.h:
+        (WebKit::WebViewClient::hasTouchEventHandlers):
+        * src/ChromeClientImpl.cpp:
+        (WebKit):
+        (WebKit::ChromeClientImpl::needTouchEvents):
+        * src/ChromeClientImpl.h:
+        (ChromeClientImpl):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::hasTouchEventHandlers):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-07-23  Simon Fraser  <simon.fraser@apple.com>
+
+        Implement sticky positioning
+        https://bugs.webkit.org/show_bug.cgi?id=90046
+
+        Reviewed by Ojan Vafai.
+
+        Add ENABLE_CSS_STICKY_POSITION, defaulting to off initially.
+        
+        * features.gypi:
+
+2012-07-23  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Buildfix for fixing gclient on the Chromium Windows bot
+        https://bugs.webkit.org/show_bug.cgi?id=91977
+
+        Unreviewed build fix.
+
+        Add the tools/isolate directory to the Windows checkout as these files
+        currently are missing during gyp generation. maruel introduced the need
+        for these in this isolate refactoring, specifically this Chromium CL:
+        http://src.chromium.org/viewvc/chrome?view=rev&revision=147689
+
+        * DEPS:
+
 2012-07-22  Kent Tamura  <tkent@chromium.org>
 
         [Chromium-Mac] Fix a build error.

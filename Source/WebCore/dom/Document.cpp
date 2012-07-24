@@ -421,7 +421,7 @@ uint64_t Document::s_globalTreeVersion = 0;
 
 Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     : ContainerNode(0, CreateDocument)
-    , TreeScope(this, this)
+    , TreeScope(this)
     , m_guardRefCount(0)
     , m_contextFeatures(ContextFeatures::defaultSwitch())
     , m_compatibilityMode(NoQuirksMode)
@@ -481,7 +481,9 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_writeRecursionIsTooDeep(false)
     , m_writeRecursionDepth(0)
     , m_wheelEventHandlerCount(0)
+#if ENABLE(TOUCH_EVENTS)
     , m_touchEventHandlerCount(0)
+#endif
 #if ENABLE(UNDO_MANAGER)
     , m_undoManager(0)
 #endif
@@ -493,7 +495,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_didDispatchViewportPropertiesChanged(false)
 #endif
 {
-    setTreeScope(this);
+    m_document = this;
 
     m_pageGroupUserSheetCacheValid = false;
 
@@ -676,7 +678,7 @@ Document::~Document()
     for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_collections); i++)
         ASSERT(!m_collections[i]);
 
-    setTreeScope(0);
+    m_document = 0;
 
     InspectorCounters::decrementCounter(InspectorCounters::DocumentCounter);
 }
@@ -1350,14 +1352,13 @@ void Document::setContent(const String& content)
 
 String Document::suggestedMIMEType() const
 {
-    Document* doc = document();
-    if (doc->isXHTMLDocument())
+    if (m_document->isXHTMLDocument())
         return "application/xhtml+xml";
-    if (doc->isSVGDocument())
+    if (m_document->isSVGDocument())
         return "image/svg+xml";
-    if (doc->xmlStandalone())
+    if (m_document->xmlStandalone())
         return "text/xml";
-    if (doc->isHTMLDocument())
+    if (m_document->isHTMLDocument())
         return "text/html";
 
     if (DocumentLoader* documentLoader = loader())
@@ -5821,7 +5822,13 @@ void Document::webkitExitPointerLock()
 
 Element* Document::webkitPointerLockElement() const
 {
-    return page() ? page()->pointerLockController()->element() : 0;
+    if (!page())
+        return 0;
+    if (Element* element = page()->pointerLockController()->element()) {
+        if (element->document() == this)
+            return element;
+    }
+    return 0;
 }
 #endif
 
@@ -5926,19 +5933,33 @@ void Document::didRemoveWheelEventHandler()
 
 void Document::didAddTouchEventHandler()
 {
+#if ENABLE(TOUCH_EVENTS)
     ++m_touchEventHandlerCount;
-    Frame* mainFrame = page() ? page()->mainFrame() : 0;
-    if (mainFrame)
-        mainFrame->notifyChromeClientTouchEventHandlerCountChanged();
+    if (m_touchEventHandlerCount > 1)
+        return;
+    if (Page* page = this->page())
+        page->chrome()->client()->needTouchEvents(true);
+#endif
 }
 
 void Document::didRemoveTouchEventHandler()
 {
-    ASSERT(m_touchEventHandlerCount > 0);
+#if ENABLE(TOUCH_EVENTS)
+    ASSERT(m_touchEventHandlerCount);
     --m_touchEventHandlerCount;
-    Frame* mainFrame = page() ? page()->mainFrame() : 0;
-    if (mainFrame)
-        mainFrame->notifyChromeClientTouchEventHandlerCountChanged();
+    if (m_touchEventHandlerCount)
+        return;
+
+    m_listenerTypes &= ~TOUCH_LISTENER;
+    Page* page = this->page();
+    if (!page)
+        return;
+    for (const Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        if (frame->document() && frame->document()->touchEventHandlerCount())
+            return;
+    }
+    page->chrome()->client()->needTouchEvents(false);
+#endif
 }
 
 HTMLIFrameElement* Document::seamlessParentIFrame() const

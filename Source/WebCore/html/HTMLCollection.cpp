@@ -32,6 +32,7 @@
 
 #if ENABLE(MICRODATA)
 #include "HTMLPropertiesCollection.h"
+#include "PropertyNodeList.h"
 #endif
 
 #include <utility>
@@ -288,7 +289,7 @@ Node* DynamicNodeListCacheBase::itemBeforeOrAfter(Node* previous) const
     if (LIKELY(!!previous)) // Without this LIKELY, length() and item() can be 10% slower.
         current = nextNode<forward>(rootNode(), previous, shouldOnlyIncludeDirectChildren());
     else
-        current = firstNode(forward, rootNode(), previous);
+        current = firstNode(forward, rootNode(), shouldOnlyIncludeDirectChildren());
 
     if (type() == NodeListCollectionType && shouldOnlyIncludeDirectChildren()) // ChildNodeList
         return current;
@@ -368,6 +369,8 @@ Node* DynamicNodeListCacheBase::itemCommon(unsigned offset) const
 #if ENABLE(MICRODATA)
     if (type() == ItemProperties)
         static_cast<const HTMLPropertiesCollection*>(this)->updateRefElements();
+    if (type() == NodeListCollectionType && rootType() == NodeListIsRootedAtDocumentIfOwnerHasItemrefAttr)
+        static_cast<const PropertyNodeList*>(this)->updateRefElements();
 #endif
 
     if (isLengthCacheValid() && !overridesItemAfter() && isLastItemCloserThanLastOrCachedItem(offset)) {

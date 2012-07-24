@@ -1124,7 +1124,12 @@ public:
     void didAddWheelEventHandler();
     void didRemoveWheelEventHandler();
 
+#if ENABLE(TOUCH_EVENTS)
     unsigned touchEventHandlerCount() const { return m_touchEventHandlerCount; }
+#else
+    unsigned touchEventHandlerCount() const { return 0; }
+#endif
+
     void didAddTouchEventHandler();
     void didRemoveTouchEventHandler();
 
@@ -1504,7 +1509,9 @@ private:
     unsigned m_writeRecursionDepth;
     
     unsigned m_wheelEventHandlerCount;
+#if ENABLE(TOUCH_EVENTS)
     unsigned m_touchEventHandlerCount;
+#endif
     
 #if ENABLE(UNDO_MANAGER)
     RefPtr<UndoManager> m_undoManager;
@@ -1539,48 +1546,20 @@ private:
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
 
-inline TreeScope* Node::treeScope() const
-{
-    return m_treeScope == TreeScope::nullInstance() ? 0 : m_treeScope;
-}
-
-inline void Node::setTreeScope(TreeScope* scope)
-{
-    m_treeScope = scope ? scope : TreeScope::nullInstance();
-    setFlag(!m_treeScope->isDocumentScope(), InShadowTree);
-}
-
-inline Document* Node::documentInternal() const
-{
-    if (getFlag(InShadowTree))
-        return m_treeScope->rootDocument();
-    return static_cast<Document*>(m_treeScope);
-}
-
-inline Document* Node::document() const
-{
-    Document* document = documentInternal();
-    // FIXME: below ASSERT is useful, but prevents the use of document() in the constructor or destructor
-    // due to the virtual function call to nodeType().
-    ASSERT(document || (nodeType() == DOCUMENT_TYPE_NODE && !inDocument()));
-    return document;
-}
-
 inline bool Node::isDocumentNode() const
 {
-    return this == documentInternal();
+    return this == m_document;
 }
 
 inline Node::Node(Document* document, ConstructionType type)
     : m_nodeFlags(type)
-    , m_treeScope(0)
+    , m_document(document)
     , m_previous(0)
     , m_next(0)
     , m_renderer(0)
 {
     if (document)
         document->guardRef();
-    setTreeScope(document);
 #if !defined(NDEBUG) || (defined(DUMP_NODE_STATISTICS) && DUMP_NODE_STATISTICS)
     trackForDebugging();
 #endif

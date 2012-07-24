@@ -624,6 +624,12 @@ String Internals::markerDescriptionForNode(Node* node, const String& markerType,
     return marker->description();
 }
 
+void Internals::addTextMatchMarker(const Range* range, bool isActive)
+{
+    range->ownerDocument()->updateLayoutIgnorePendingStylesheets();
+    range->ownerDocument()->markers()->addTextMatchMarker(range, isActive);
+}
+
 void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionCode& ec)
 {
     if (!document || !document->view()) {
@@ -917,6 +923,17 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec
 
     return document->touchEventHandlerCount();
 }
+
+bool Internals::hasTouchEventListener(Document* document, ExceptionCode& ec)
+{
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return document->hasListenerType(Document::TOUCH_LISTENER);
+}
+
 
 PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int x, int y, unsigned topPadding, unsigned rightPadding,
     unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, ExceptionCode& ec) const

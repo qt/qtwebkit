@@ -1,20 +1,185 @@
-2012-06-13  Patrick Gansterer  <paroga@webkit.org>
+2012-07-23  Patrick Gansterer  <paroga@webkit.org>
 
-        [WIN] Remove dependency on pthread from MachineStackMarker
-        https://bugs.webkit.org/show_bug.cgi?id=68429
+        Move GregorianDateTime from JSC to WTF namespace
+        https://bugs.webkit.org/show_bug.cgi?id=91948
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Geoffrey Garen.
 
-        Implement pthread TLS functionality with native windows functions.
+        Moving GregorianDateTime into the WTF namespace allows us to us to
+        use it in WebCore too. The new class has the same behaviour as the
+        old struct. Only the unused timeZone member has been removed.
 
-        * heap/MachineStackMarker.cpp: Use the new functions instead of pthread directly.
-        * heap/MachineStackMarker.h:
-        * wtf/ThreadSpecific.h:
-        (WTF::ThreadSpecificKeyCreate): Added wrapper around pthread_key_create.
-        (WTF::ThreadSpecificKeyDelete): Added wrapper around pthread_key_delete.
-        (WTF::ThreadSpecificSet): Added wrapper around pthread_setspecific.
-        (WTF::ThreadSpecificGet): Added wrapper around pthread_getspecific.
-        * wtf/ThreadSpecificWin.cpp:
+        * runtime/DateConstructor.cpp:
+        * runtime/DateConversion.cpp:
+        * runtime/DateConversion.h:
+        * runtime/DateInstance.h:
+        * runtime/DatePrototype.cpp:
+        * runtime/JSDateMath.cpp:
+        * runtime/JSDateMath.h:
+
+2012-07-23  Filip Pizlo  <fpizlo@apple.com>
+
+        Property storage should grow in reverse address direction, to support butterflies
+        https://bugs.webkit.org/show_bug.cgi?id=91788
+
+        Reviewed by Geoffrey Garen.
+
+        Changes property storage to grow to the left, and changes the property storage pointer to point
+        one 8-byte word (i.e. JSValue) to the right of the first value in the storage.
+        
+        Also improved debug support somewhat, by adding a describe() function to the jsc command-line,
+        and a slow mode of object access in LLInt.
+
+        * assembler/ARMv7Assembler.h:
+        (JSC::ARMv7Assembler::repatchCompact):
+        * assembler/MacroAssemblerARMv7.h:
+        (MacroAssemblerARMv7):
+        (JSC::MacroAssemblerARMv7::isCompactPtrAlignedAddressOffset):
+        (JSC::MacroAssemblerARMv7::load32WithCompactAddressOffsetPatch):
+        * assembler/MacroAssemblerX86Common.h:
+        (JSC::MacroAssemblerX86Common::isCompactPtrAlignedAddressOffset):
+        (JSC::MacroAssemblerX86Common::repatchCompact):
+        * assembler/X86Assembler.h:
+        (JSC::X86Assembler::repatchCompact):
+        * bytecode/CodeBlock.cpp:
+        (JSC::dumpStructure):
+        * bytecode/GetByIdStatus.h:
+        (JSC::GetByIdStatus::GetByIdStatus):
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h:
+        * dfg/DFGRepatch.cpp:
+        (JSC::DFG::tryCacheGetByID):
+        (JSC::DFG::emitPutTransitionStub):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileAllocatePropertyStorage):
+        (JSC::DFG::SpeculativeJIT::compileReallocatePropertyStorage):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * heap/ConservativeRoots.cpp:
+        (JSC::ConservativeRoots::genericAddPointer):
+        * heap/CopiedSpace.h:
+        (CopiedSpace):
+        * heap/CopiedSpaceInlineMethods.h:
+        (JSC::CopiedSpace::pinIfNecessary):
+        (JSC):
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::compileGetDirectOffset):
+        * jit/JITPropertyAccess32_64.cpp:
+        (JSC::JIT::compileGetDirectOffset):
+        * jit/JITStubs.cpp:
+        (JSC::JITThunks::tryCacheGetByID):
+        * jsc.cpp:
+        (GlobalObject::finishCreation):
+        (functionDescribe):
+        * llint/LLIntCommon.h:
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::visitChildren):
+        (JSC::JSFinalObject::visitChildren):
+        (JSC::JSObject::growOutOfLineStorage):
+        * runtime/JSObject.h:
+        (JSC::JSObject::getDirectLocation):
+        (JSC::JSObject::offsetForLocation):
+        * runtime/JSValue.h:
+        (JSValue):
+        * runtime/PropertyOffset.h:
+        (JSC::offsetInOutOfLineStorage):
+
+2012-07-23  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG is too aggressive in performing the specific value optimization on loads
+        https://bugs.webkit.org/show_bug.cgi?id=92034
+
+        Reviewed by Mark Hahnenberg.
+
+        This ensures that we don't do optimizations based on a structure having a specific
+        value, if there is no way to detect that the value is despecified. This is the
+        case for dictionaries, since despecifying a value in a dictionary does not lead to
+        a transition and so cannot be caught by either structure checks or structure
+        transition watchpoints.
+
+        * bytecode/GetByIdStatus.cpp:
+        (JSC::GetByIdStatus::computeFromLLInt):
+        (JSC::GetByIdStatus::computeForChain):
+        (JSC::GetByIdStatus::computeFor):
+        * bytecode/ResolveGlobalStatus.cpp:
+        (JSC::computeForStructure):
+
+2012-07-23  Filip Pizlo  <fpizlo@apple.com>
+
+        REGRESSION(r123169): It made fast/js/dfg-inline-arguments-use-from-uninlined-code.html fail on 32 bit platforms
+        https://bugs.webkit.org/show_bug.cgi?id=92002
+
+        Reviewed by Mark Hahnenberg.
+        
+        In the process of changing the nature of local variable typing, I forgot to modify one of the places where
+        we glue the DFG's notion of variable prediction to the runtime's notion of variable tagging.
+
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-07-23  Simon Fraser  <simon.fraser@apple.com>
+
+        Part 2 of: Implement sticky positioning
+        https://bugs.webkit.org/show_bug.cgi?id=90046
+
+        Reviewed by Ojan Vafai.
+
+        Turn on ENABLE_CSS_STICKY_POSITION.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-23  Patrick Gansterer  <paroga@webkit.org>
+
+        Move JSC::parseDate() from DateConversion to JSDateMath
+        https://bugs.webkit.org/show_bug.cgi?id=91982
+
+        Reviewed by Geoffrey Garen.
+
+        Moveing this function into the other files removes the dependency
+        on JSC spcific classes in DateConversion.{cpp|h}.
+
+        * runtime/DateConversion.cpp:
+        * runtime/DateConversion.h:
+        (JSC):
+        * runtime/JSDateMath.cpp:
+        (JSC::parseDate):
+        (JSC):
+        * runtime/JSDateMath.h:
+        (JSC):
+
+2012-07-23  Simon Fraser  <simon.fraser@apple.com>
+
+        Part 1 of: Implement sticky positioning
+        https://bugs.webkit.org/show_bug.cgi?id=90046
+
+        Reviewed by Ojan Vafai.
+
+        Add ENABLE_CSS_STICKY_POSITION, defaulting to off initially.
+        
+        Sort the ENABLE_CSS lines in the file. Make sure all the flags
+        are in FEATURE_DEFINES.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-23  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Implement GCActivityCallback with platform timer
+        https://bugs.webkit.org/show_bug.cgi?id=90175
+
+        Reviewed by Rob Buis.
+
+        Use JSLock when performing GC to avoid assertions.
+
+        * runtime/GCActivityCallbackBlackBerry.cpp:
+        (JSC::DefaultGCActivityCallback::doWork):
 
 2012-07-23  Kent Tamura  <tkent@chromium.org>
 

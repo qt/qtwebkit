@@ -52,6 +52,7 @@ SOURCES += \
     accessibility/AccessibilityList.cpp \
     accessibility/AccessibilityListBox.cpp \
     accessibility/AccessibilityListBoxOption.cpp \
+    accessibility/AccessibilityNodeObject.cpp \
     accessibility/AccessibilityProgressIndicator.cpp \
     accessibility/AccessibilityRenderObject.cpp \
     accessibility/AccessibilityScrollbar.cpp \
@@ -166,6 +167,7 @@ SOURCES += \
      bindings/js/JSMessageEventCustom.cpp \
      bindings/js/JSMessagePortCustom.cpp \
      bindings/js/JSMessagePortCustom.h \
+     bindings/js/JSMicroDataItemValueCustom.cpp \
      bindings/js/JSMutationCallbackCustom.cpp \
      bindings/js/JSMutationObserverCustom.cpp \
      bindings/js/JSNamedNodeMapCustom.cpp \
@@ -439,6 +441,7 @@ SOURCES += \
     dom/PositionIterator.cpp \
     dom/ProcessingInstruction.cpp \
     dom/ProgressEvent.cpp \
+    dom/PropertyNodeList.cpp \
     dom/QualifiedName.cpp \
     dom/Range.cpp \
     dom/RangeException.cpp \
@@ -997,6 +1000,7 @@ SOURCES += \
     platform/KillRingNone.cpp \
     platform/KURL.cpp \
     platform/Language.cpp \
+    platform/LayoutTestSupport.cpp \
     platform/Length.cpp \
     platform/LengthBox.cpp \
     platform/text/LineEnding.cpp \
@@ -1561,6 +1565,7 @@ HEADERS += \
     dom/PositionIterator.h \
     dom/ProcessingInstruction.h \
     dom/ProgressEvent.h \
+    dom/PropertyNodeList.h \
     dom/QualifiedName.h \
     dom/Range.h \
     dom/RegisteredEventListener.h \

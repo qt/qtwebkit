@@ -28,21 +28,21 @@ import sys
 import re
 
 def exportForwardsForLibrary(library):
-    dumpBin = subprocess.Popen("dumpbin /directives " + library, stdout=subprocess.PIPE, universal_newlines=True);
+    dumpBin = subprocess.Popen("dumpbin /directives " + library, stdout=subprocess.PIPE, universal_newlines=True)
 
-    output, errors = dumpBin.communicate();
+    output = dumpBin.communicate()[0]
     return output
 
-libraries = sys.argv[1 : len(sys.argv) - 1]
-outputFileName = sys.argv[len(sys.argv) - 1]
+libraries = sys.argv[1 : -1]
+outputFileName = sys.argv[-1]
 
-exportedSymbolRegexp = re.compile("\s*(?P<symbol>/EXPORT:.+)");
+exportedSymbolRegexp = re.compile("\s*(?P<symbol>/EXPORT:.+)")
 symbols = set()
 
 for lib in libraries:
     for line in exportForwardsForLibrary(lib).splitlines():
         match = exportedSymbolRegexp.match(line)
-        if match != None:
+        if match:
             symbols.add(match.group("symbol"))
 
 print "Forwarding %s symbols from %s" % (len(symbols), " ".join(libraries))

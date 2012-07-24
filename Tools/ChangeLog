@@ -1,9 +1,9 @@
-2012-07-16  Simon Hausmann  <simon.hausmann@nokia.com>
+2012-07-24  Simon Hausmann  <simon.hausmann@nokia.com>
 
         [Qt] MSVC: unresolved external symbol __DllMainCRTStartup@12
         https://bugs.webkit.org/show_bug.cgi?id=91229
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Jocelyn Turcotte.
 
         In order to successfully link a DLL on Windows we need to have at least
         one object file (or compilation unit). The forward export header files were
@@ -27,6 +27,353 @@
         * Scripts/generate-win32-export-forwards: Support multiple input files, i.e.
         consider the last argument to be the output file and everything else input.
         * qmake/mkspecs/features/win32/default_post.prf:
+
+2012-07-24  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] Add quirks for running the web process in a profiler shell, like valgrind
+        https://bugs.webkit.org/show_bug.cgi?id=87672
+
+        Reviewed by Jocelyn Turcotte.
+
+        Add --no-timeout-at-all command line switch to not time out no matter how
+        long the web process does it's job. --no-timeout is not enough for profiling
+        purposes because it only affects the timeout when we are waiting for the end
+        of the test. We use another timeout to control how much we wait for the web
+        process to initialize before and reset after the test and it could also easily
+        expire when running under valgrind. We should keep the behavior of --no-timeout
+        to not disable this timout check because --no-timeout is used by performace tests
+        and those should not wait for the web process to initialize and reset more than
+        normal tests.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::TestController):
+        (WTR::TestController::initialize):
+        (WTR::TestController::runUntil):
+        * WebKitTestRunner/TestController.h:
+
+2012-07-24  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Fix a class/struct mismatch error in TestDelegate.h (showing up on clang)
+        https://bugs.webkit.org/show_bug.cgi?id=92097
+
+        Unreviewed build fix.
+
+        WebContextMenuData is declared as a struct in Source/WebKit/chromium/public/WebContextMenuData.h,
+        but TestDelegate.h forward declares it as a class.
+
+        * DumpRenderTree/chromium/TestRunner/TestDelegate.h:
+        (WebKit):
+
+2012-07-23  Oswald Buddenhagen  <oswald.buddenhagen@nokia.com>
+
+        [Qt] Fix compilation against namespaced Qt
+
+        Reviewed by Simon Hausmann.
+
+        * QtTestBrowser/launcherwindow.h:
+        * WebKitTestRunner/PlatformWebView.h:
+
+2012-07-24  Peter Beverloo  <peter@chromium.org>
+
+        Update a few Chromium Android contributors in committers.py
+        https://bugs.webkit.org/show_bug.cgi?id=92090
+
+        Reviewed by Kent Tamura.
+
+        Add Sami Kyostila, who has been doing significant work on Chromium's
+        compositor. Add IRC nicknames for John Mellor and Tien-Ren Chen, and
+        remove John Grabowski who changed projects, and add my webkit.org alias.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-07-24  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] Enable touch slider when touch events are enabled
+        https://bugs.webkit.org/show_bug.cgi?id=91013
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        TOUCH_SLIDER guards are used in WebCore, so we should really
+        be setting the corresponding ENABLE define in features.prf.
+
+        * qmake/mkspecs/features/features.prf:
+
+2012-07-24  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] EWebLauncher should not require config.h in the style check
+        https://bugs.webkit.org/show_bug.cgi?id=92070
+
+        Reviewed by Kentaro Hara.
+
+        * Scripts/webkitpy/style/checker.py:
+        Remove the include rules from the style-check for EWebLauncher because
+        EWebLauncher is simple EFL application.
+
+2012-07-24  Jochen Eisinger  <jochen@chromium.or>
+
+        [Chromium] EventSender shouldn't know about TestShell
+        https://bugs.webkit.org/show_bug.cgi?id=91449
+
+        Reviewed by Adam Barth.
+
+        Original patch by Adam Barth.
+
+        This patch removes the dependency from EventSender to TestShell.  Most
+        of EventSender works directly with a WebView, but there are a handful
+        of references to WebViewHost.  We don't want to re-use WebViewHost in
+        ContentShell because we want to use the multi-process embedding
+        environment for WebViews.
+
+        To avoid the dependency on WebViewHost, this patch introduces
+        TestDelegate, which is an abstract base class for WebViewHost.  In
+        ContentShell, we'll need another object to implement these functions.
+
+        * DumpRenderTree/chromium/EventSender.cpp:
+        (EventSender::EventSender):
+        (EventSender::keyDown):
+        (makeMenuItemStringsFor):
+        (EventSender::contextClick):
+        * DumpRenderTree/chromium/EventSender.h:
+        (EventSender):
+        (EventSender::setDelegate):
+        (EventSender::setWebView):
+        (EventSender::webview):
+        * DumpRenderTree/chromium/TestRunner/TestDelegate.h: Added.
+        (WebKit):
+        (TestDelegate):
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::initialize):
+        (TestShell::createMainWindow):
+        (TestShell::~TestShell):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::fillSpellingSuggestionList):
+        * DumpRenderTree/chromium/WebViewHost.h:
+        (WebViewHost):
+
+2012-07-24  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        Make WebIntents and WebIntentsTag a build option for the build-webkit script
+        https://bugs.webkit.org/show_bug.cgi?id=91841
+
+        Reviewed by Philippe Normand.
+
+        And it will also be disabled when building with --minimal.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-07-23  Dirk Pranke  <dpranke@chromium.org>
+
+        Unreviewed, rolling out r123360.
+        http://trac.webkit.org/changeset/123360
+        https://bugs.webkit.org/show_bug.cgi?id=91890
+
+        broke the chromium bots
+
+        * Scripts/webkitpy/layout_tests/port/chromium.py:
+        (ChromiumPort._static_build_path):
+        (ChromiumPort.default_results_directory):
+        (ChromiumPort._build_path):
+        (ChromiumPort._path_to_image_diff):
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort._build_path):
+        (ChromiumAndroidPort._path_to_driver):
+        (ChromiumAndroidPort._path_to_forwarder):
+        (ChromiumAndroidPort._push_executable):
+        (ChromiumAndroidPort._push_fonts):
+        * Scripts/webkitpy/layout_tests/port/chromium_linux.py:
+        (ChromiumLinuxPort._determine_driver_path_statically):
+        (ChromiumLinuxPort._modules_to_search_for_symbols):
+        (ChromiumLinuxPort._path_to_driver):
+        * Scripts/webkitpy/layout_tests/port/chromium_linux_unittest.py:
+        (ChromiumLinuxPortTest.test_build_path):
+        * Scripts/webkitpy/layout_tests/port/chromium_mac.py:
+        (ChromiumMacPort._modules_to_search_for_symbols):
+        (ChromiumMacPort._path_to_driver):
+        (ChromiumMacPort._path_to_helper):
+        * Scripts/webkitpy/layout_tests/port/chromium_mac_unittest.py:
+        (ChromiumMacPortTest.test_build_path):
+        * Scripts/webkitpy/layout_tests/port/chromium_win.py:
+        (ChromiumWinPort._path_to_driver):
+        (ChromiumWinPort._path_to_helper):
+        (ChromiumWinPort._path_to_image_diff):
+        * Scripts/webkitpy/layout_tests/port/chromium_win_unittest.py:
+        (ChromiumWinTest.test_build_path):
+
+2012-07-23  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] TestInterfaces should be responsible for owning and binding AccessibilityController and TextInputController
+        https://bugs.webkit.org/show_bug.cgi?id=91459
+
+        Reviewed by Ryosuke Niwa.
+
+        Rather than having TestShell own and bind each of these JavaScript APIs
+        individually, TestShell should delegate that work to TestInterfaces.
+        This patch moves AccessibilityController and TextInputController to be
+        the responsibility of TestInterfaces.
+
+        * DumpRenderTree/chromium/TestRunner/TestInterfaces.cpp:
+        (TestInterfaces::TestInterfaces):
+        (TestInterfaces::~TestInterfaces):
+        (TestInterfaces::setWebView):
+        (TestInterfaces::bindTo):
+        (TestInterfaces::resetAll):
+        * DumpRenderTree/chromium/TestRunner/TestInterfaces.h:
+        (WebKit):
+        (TestInterfaces):
+        (TestInterfaces::accessibilityController):
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::initialize):
+        (TestShell::createMainWindow):
+        (TestShell::~TestShell):
+        (TestShell::resetTestController):
+        (TestShell::bindJSObjectsToWindow):
+        * DumpRenderTree/chromium/TestShell.h:
+        (TestShell::accessibilityController):
+        (TestShell):
+
+2012-07-23  Balazs Kelemen  <kbalazs@webkit.org>
+
+        nrwt swallows early exceptions
+        https://bugs.webkit.org/show_bug.cgi?id=91884
+
+        Reviewed by Dirk Pranke.
+
+        Put everything in a try block so we won't miss any error.
+
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        (run):
+        (main):
+
+2012-07-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2] WebKitTestRunner needs to print information about Web intents
+        https://bugs.webkit.org/show_bug.cgi?id=90873
+
+        Reviewed by Anders Carlsson.
+
+        Print out information about new intents requests and intent
+        services registrations in WebKitTestRunner. This is expected
+        by tests under webintents/*.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::InjectedBundlePage):
+        (WTR::InjectedBundlePage::didReceiveIntentForFrame):
+        (WTR):
+        (WTR::InjectedBundlePage::registerIntentServiceForFrame):
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.h:
+        (InjectedBundlePage):
+
+2012-07-23  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: never finds binaries in the 'out' dir on chromium win
+        https://bugs.webkit.org/show_bug.cgi?id=91890
+
+        Reviewed by Tony Chang.
+
+        We were figuring out which directory look in for binaries by
+        testing for the base directory (the directory above
+        Debug/Release). In chromium-win's case, we look in src/build,
+        which always exists because there are checked-in files in it,
+        which means we'd always pick that directory over src/out. All of
+        the other ports' build_path() implementation was including
+        Debug/Release. If we matched that, we wouldn't have a problem,
+        so this change fixes that and updates all of the callers of the
+        chromium ports' implementation to not pass configuration as part
+        of the path to look up; we still need to pass configuration in
+        some cases (to test if the build is out of date between debug
+        and release) so the implementation gets slightly more
+        complicated.
+
+        * Scripts/webkitpy/layout_tests/port/chromium.py:
+        (ChromiumPort._static_build_path):
+        (ChromiumPort.default_results_directory):
+        (ChromiumPort._build_path):
+        (ChromiumPort._path_to_image_diff):
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort._build_path):
+        (ChromiumAndroidPort._path_to_driver):
+        (ChromiumAndroidPort._path_to_forwarder):
+        (ChromiumAndroidPort._push_executable):
+        (ChromiumAndroidPort._push_fonts):
+        * Scripts/webkitpy/layout_tests/port/chromium_linux.py:
+        (ChromiumLinuxPort._determine_driver_path_statically):
+        (ChromiumLinuxPort._modules_to_search_for_symbols):
+        (ChromiumLinuxPort._path_to_driver):
+        * Scripts/webkitpy/layout_tests/port/chromium_linux_unittest.py:
+        (ChromiumLinuxPortTest.test_build_path):
+        * Scripts/webkitpy/layout_tests/port/chromium_mac.py:
+        (ChromiumMacPort._modules_to_search_for_symbols):
+        (ChromiumMacPort._path_to_driver):
+        (ChromiumMacPort._path_to_helper):
+        * Scripts/webkitpy/layout_tests/port/chromium_mac_unittest.py:
+        (ChromiumMacPortTest.test_build_path):
+        * Scripts/webkitpy/layout_tests/port/chromium_win.py:
+        (ChromiumWinPort._path_to_driver):
+        (ChromiumWinPort._path_to_helper):
+        (ChromiumWinPort._path_to_image_diff):
+        * Scripts/webkitpy/layout_tests/port/chromium_win_unittest.py:
+        (ChromiumWinTest.test_build_path):
+
+2012-07-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123339.
+        http://trac.webkit.org/changeset/123339
+        https://bugs.webkit.org/show_bug.cgi?id=92006
+
+        massive media tests failure (Requested by philn on #webkit).
+
+        * Scripts/webkitdirs.pm:
+        (buildAutotoolsProject):
+        * gtk/jhbuild.modules:
+
+2012-07-23  Tommy Widenflycht  <tommyw@google.com>
+
+        [chromium] MediaStream API: Clean up the MockWebKitPlatformSupport object at shutdown
+        https://bugs.webkit.org/show_bug.cgi?id=91857
+
+        Reviewed by Adam Barth.
+
+        Made a few changes so that the destructor could be called at shutdown.
+
+        * DumpRenderTree/chromium/DumpRenderTree.cpp:
+        (WebKitSupportTestEnvironment::WebKitSupportTestEnvironment):
+        (WebKitSupportTestEnvironment):
+        * DumpRenderTree/chromium/MockWebKitPlatformSupport.cpp:
+        (MockWebKitPlatformSupport::create):
+        * DumpRenderTree/chromium/MockWebKitPlatformSupport.h:
+        (MockWebKitPlatformSupport):
+        (MockWebKitPlatformSupport::~MockWebKitPlatformSupport):
+
+2012-07-23  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK][jhbuild] Switch to GStreamer 0.11 build
+        https://bugs.webkit.org/show_bug.cgi?id=91727
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Switch build-webkit --gtk to GStreamer 0.11 support and build the
+        necessary GStreamer git modules from JHBuild.
+
+        * Scripts/webkitdirs.pm:
+        (buildAutotoolsProject): Build WebKit with GStreamer 0.11 support.
+        * gtk/jhbuild.modules: GStreamer build support.
+
+2012-07-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        WebKit2 needs layoutTestController.setAlwaysAcceptCookies
+        https://bugs.webkit.org/show_bug.cgi?id=42778
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add support for layoutTestController.setAlwaysAcceptCookies()
+        since it is required by some tests.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/LayoutTestController.idl:
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.cpp:
+        (WTR::LayoutTestController::setAlwaysAcceptCookies):
+        (WTR):
+        * WebKitTestRunner/InjectedBundle/LayoutTestController.h:
+        (LayoutTestController):
 
 2012-07-23  Kent Tamura  <tkent@chromium.org>
 

@@ -52,20 +52,12 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-TreeScope::TreeScope(ContainerNode* rootNode, Document* rootDocument)
+TreeScope::TreeScope(ContainerNode* rootNode)
     : m_rootNode(rootNode)
-    , m_rootDocument(rootDocument)
-    , m_parentTreeScope(rootNode == rootDocument ? 0 : rootDocument)
+    , m_parentTreeScope(0)
     , m_idTargetObserverRegistry(IdTargetObserverRegistry::create())
 {
     ASSERT(rootNode);
-}
-
-TreeScope::TreeScope()
-    : m_rootNode(0)
-    , m_rootDocument(0)
-    , m_parentTreeScope(0)
-{
 }
 
 TreeScope::~TreeScope()
@@ -90,7 +82,6 @@ void TreeScope::setParentTreeScope(TreeScope* newParentScope)
     ASSERT(newParentScope);
 
     m_parentTreeScope = newParentScope;
-    m_rootDocument = newParentScope->rootDocument();
 }
 
 Element* TreeScope::getElementById(const AtomicString& elementId) const
@@ -257,17 +248,12 @@ Node* TreeScope::focusedNode()
     return 0;
 }
 
-bool TreeScope::isDocumentScope() const
-{
-    return this == m_rootDocument;
-}
-
 static void listTreeScopes(Node* node, Vector<TreeScope*, 5>& treeScopes)
 {
     while (true) {
         treeScopes.append(node->treeScope());
-        Node* ancestor = node->shadowAncestorNode();
-        if (node == ancestor)
+        Element* ancestor = node->shadowHost();
+        if (!ancestor)
             break;
         node = ancestor;
     }
@@ -293,12 +279,6 @@ TreeScope* commonTreeScope(Node* nodeA, Node* nodeB)
     for (; indexA > 0 && indexB > 0 && treeScopesA[indexA - 1] == treeScopesB[indexB - 1]; --indexA, --indexB) { }
 
     return treeScopesA[indexA] == treeScopesB[indexB] ? treeScopesA[indexA] : 0;
-}
-
-TreeScope* TreeScope::nullInstance()
-{
-    DEFINE_STATIC_LOCAL(TreeScope, instance, ());
-    return &instance;
 }
 
 } // namespace WebCore

@@ -354,6 +354,7 @@ SET(WebCore_IDL_FILES
     dom/PopStateEvent.idl
     dom/ProcessingInstruction.idl
     dom/ProgressEvent.idl
+    dom/PropertyNodeList.idl
     dom/RangeException.idl
     dom/Range.idl
     dom/RequestAnimationFrameCallback.idl
@@ -464,6 +465,7 @@ SET(WebCore_IDL_FILES
     html/ImageData.idl
     html/MediaController.idl
     html/MediaError.idl
+    html/MicroDataItemValue.idl
     html/RadioNodeList.idl
     html/TextMetrics.idl
     html/TimeRanges.idl
@@ -935,6 +937,7 @@ SET(WebCore_SOURCES
     accessibility/AccessibilityMenuListOption.cpp
     accessibility/AccessibilityMenuListPopup.cpp
     accessibility/AccessibilityMockObject.cpp
+    accessibility/AccessibilityNodeObject.cpp
     accessibility/AccessibilityObject.cpp
     accessibility/AccessibilityProgressIndicator.cpp
     accessibility/AccessibilityRenderObject.cpp
@@ -1130,6 +1133,7 @@ SET(WebCore_SOURCES
     dom/PositionIterator.cpp
     dom/ProcessingInstruction.cpp
     dom/ProgressEvent.cpp
+    dom/PropertyNodeList.cpp
     dom/QualifiedName.cpp
     dom/Range.cpp
     dom/RangeException.cpp
@@ -1700,6 +1704,7 @@ SET(WebCore_SOURCES
     platform/KURL.cpp
     platform/KillRingNone.cpp
     platform/Language.cpp
+    platform/LayoutTestSupport.cpp
     platform/Length.cpp
     platform/LengthBox.cpp
     platform/LinkHash.cpp
@@ -1985,6 +1990,7 @@ SET(WebCore_SOURCES
     rendering/RenderLayer.cpp
     rendering/RenderLayerBacking.cpp
     rendering/RenderLayerCompositor.cpp
+    rendering/RenderLayerFilterInfo.cpp
     rendering/RenderLineBoxList.cpp
     rendering/RenderListBox.cpp
     rendering/RenderListItem.cpp

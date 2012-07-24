@@ -1,4 +1,5 @@
 LIST(APPEND WebKit2_LINK_FLAGS
+    ${CAIRO_LDFLAGS}
     ${ECORE_X_LDFLAGS}
     ${EDJE_LDFLAGS}
     ${EFLDEPS_LDFLAGS}
@@ -24,10 +25,11 @@ LIST(APPEND WebKit2_SOURCES
     Shared/efl/NativeWebKeyboardEventEfl.cpp
     Shared/efl/NativeWebWheelEventEfl.cpp
     Shared/efl/NativeWebMouseEventEfl.cpp
+    Shared/efl/ProcessExecutablePathEfl.cpp
     Shared/efl/WebEventFactory.cpp
-    Shared/efl/WebCoreArgumentCodersEfl.cpp
 
     Shared/soup/PlatformCertificateInfo.cpp
+    Shared/soup/WebCoreArgumentCodersSoup.cpp
 
     UIProcess/API/C/efl/WKView.cpp
 
@@ -37,12 +39,14 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/efl/BatteryProvider.cpp
     UIProcess/API/efl/PageClientImpl.cpp
     UIProcess/API/efl/ewk_context.cpp
+    UIProcess/API/efl/ewk_context_request_manager_client.cpp
     UIProcess/API/efl/ewk_cookie_manager.cpp
     UIProcess/API/efl/ewk_intent.cpp
     UIProcess/API/efl/ewk_intent_service.cpp
     UIProcess/API/efl/ewk_navigation_policy_decision.cpp
     UIProcess/API/efl/ewk_url_request.cpp
     UIProcess/API/efl/ewk_url_response.cpp
+    UIProcess/API/efl/ewk_url_scheme_request.cpp
     UIProcess/API/efl/ewk_view.cpp
     UIProcess/API/efl/ewk_view_loader_client.cpp
     UIProcess/API/efl/ewk_view_policy_client.cpp
@@ -179,6 +183,7 @@ SET (EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_navigation_policy_decision.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_response.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_scheme_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_view.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_web_error.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_web_resource.h"
@@ -194,9 +199,11 @@ SET(EWK2UnitTests_LIBRARIES
     ${JavaScriptCore_LIBRARY_NAME}
     ${WebCore_LIBRARY_NAME}
     ${WebKit2_LIBRARY_NAME}
+    ${CAIRO_LIBRARIES}
     ${ECORE_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${EVAS_LIBRARIES}
+    ${LIBSOUP24_LIBRARIES}
     gtest
 )
 
@@ -213,12 +220,16 @@ SET(TEST_RESOURCES_DIR ${WEBKIT2_EFL_TEST_DIR}/resources)
 ADD_DEFINITIONS(-DTEST_RESOURCES_DIR=\"${TEST_RESOURCES_DIR}\"
     -DTEST_THEME_DIR=\"${THEME_BINARY_DIR}\"
     -DGTEST_LINKED_AS_SHARED_LIBRARY=1
+    -DLIBEXECDIR=\"${CMAKE_INSTALL_PREFIX}/${EXEC_INSTALL_DIR}\"
+    -DWEBPROCESSNAME=\"${WebProcess_EXECUTABLE_NAME}\"
+    -DPLUGINPROCESSNAME=\"${PluginProcess_EXECUTABLE_NAME}\"
 )
 
 ADD_LIBRARY(ewk2UnitTestUtils
     ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestBase.cpp
     ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestEnvironment.cpp
     ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestMain.cpp
+    ${WEBKIT2_EFL_TEST_DIR}/UnitTestUtils/EWK2UnitTestServer.cpp
 )
 
 TARGET_LINK_LIBRARIES(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
@@ -226,6 +237,7 @@ TARGET_LINK_LIBRARIES(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
 # The "ewk" on the test name needs to be suffixed with "2", otherwise it
 # will clash with tests from the WebKit 1 test suite.
 SET(EWK2UnitTests_BINARIES
+    test_ewk2_cookie_manager
     test_ewk2_view
 )
 

@@ -615,8 +615,12 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueVisible || valueID == CSSValueNone || valueID == CSSValueAll || valueID == CSSValueAuto || (valueID >= CSSValueVisiblepainted && valueID <= CSSValueStroke))
             return true;
         break;
-    case CSSPropertyPosition: // static | relative | absolute | fixed | inherit
-        if (valueID == CSSValueStatic || valueID == CSSValueRelative || valueID == CSSValueAbsolute || valueID == CSSValueFixed)
+    case CSSPropertyPosition: // static | relative | absolute | fixed | sticky | inherit
+        if (valueID == CSSValueStatic || valueID == CSSValueRelative || valueID == CSSValueAbsolute || valueID == CSSValueFixed
+#if ENABLE(CSS_STICKY_POSITION)
+            || valueID == CSSValueWebkitSticky
+#endif
+            )
             return true;
         break;
     case CSSPropertyResize: // none | both | horizontal | vertical | auto
@@ -4465,7 +4469,12 @@ PassRefPtr<CSSWrapShape> CSSParser::parseExclusionShapeRectangle(CSSParserValueL
     unsigned argumentNumber = 0;
     CSSParserValue* argument = args->current();
     while (argument) {
-        if (!validUnit(argument, FLength | FPercent))
+        Units unitFlags = FLength | FPercent;
+        if (argumentNumber > 1) {
+            // Arguments width, height, rx, and ry cannot be negative.
+            unitFlags = unitFlags | FNonNeg;
+        }
+        if (!validUnit(argument, unitFlags))
             return 0;
 
         RefPtr<CSSPrimitiveValue> length = createPrimitiveNumericValue(argument);
@@ -4518,7 +4527,13 @@ PassRefPtr<CSSWrapShape> CSSParser::parseExclusionShapeCircle(CSSParserValueList
     unsigned argumentNumber = 0;
     CSSParserValue* argument = args->current();
     while (argument) {
-        if (!validUnit(argument, FLength | FPercent))
+        Units unitFlags = FLength | FPercent;
+        if (argumentNumber == 2) {
+            // Argument radius cannot be negative.
+            unitFlags = unitFlags | FNonNeg;
+        }
+
+        if (!validUnit(argument, unitFlags))
             return 0;
 
         RefPtr<CSSPrimitiveValue> length = createPrimitiveNumericValue(argument);
@@ -4561,7 +4576,12 @@ PassRefPtr<CSSWrapShape> CSSParser::parseExclusionShapeEllipse(CSSParserValueLis
     unsigned argumentNumber = 0;
     CSSParserValue* argument = args->current();
     while (argument) {
-        if (!validUnit(argument, FLength | FPercent))
+        Units unitFlags = FLength | FPercent;
+        if (argumentNumber > 1) {
+            // Arguments radiusX and radiusY cannot be negative.
+            unitFlags = unitFlags | FNonNeg;
+        }
+        if (!validUnit(argument, unitFlags))
             return 0;
 
         RefPtr<CSSPrimitiveValue> length = createPrimitiveNumericValue(argument);
@@ -6064,6 +6084,8 @@ bool CSSParser::parseBorderImageRepeat(RefPtr<CSSValue>& result)
     RefPtr<CSSPrimitiveValue> firstValue;
     RefPtr<CSSPrimitiveValue> secondValue;
     CSSParserValue* val = m_valueList->current();
+    if (!val)
+        return false;
     if (isBorderImageRepeatKeyword(val->id))
         firstValue = cssValuePool().createIdentifierValue(val->id);
     else

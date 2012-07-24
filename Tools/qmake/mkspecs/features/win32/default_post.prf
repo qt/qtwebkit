@@ -31,10 +31,7 @@ shared:contains(TEMPLATE, lib) {
 
 !isEmpty(LIBSWITHEXPORTS) {
     suffix =
-    CONFIG(debug, debug|release) {
-        win32: suffix = d
-        mac: suffix = _debug
-    }
+    CONFIG(debug, debug|release): suffix = d
     forwarded_exports.target = forwarded-exports$${suffix}.cpp
     forwarded_exports.commands = python $${ROOT_WEBKIT_DIR}$${QMAKE_DIR_SEP}Tools$${QMAKE_DIR_SEP}Scripts$${QMAKE_DIR_SEP}generate-win32-export-forwards $$LIBSWITHEXPORTS $$forwarded_exports.target
     forwarded_exports.depends = $$LIBSWITHEXPORTS

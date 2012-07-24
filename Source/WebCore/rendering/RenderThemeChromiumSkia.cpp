@@ -29,9 +29,9 @@
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
 #include "Image.h"
+#include "LayoutTestSupport.h"
 #include "MediaControlElements.h"
 #include "PaintInfo.h"
-#include "PlatformSupport.h"
 #include "PlatformContextSkia.h"
 #include "RenderBox.h"
 #include "RenderMediaControlsChromium.h"
@@ -160,7 +160,7 @@ double RenderThemeChromiumSkia::caretBlinkInterval() const
 {
     // Disable the blinking caret in layout test mode, as it introduces
     // a race condition for the pixel tests. http://b/1198440
-    if (PlatformSupport::layoutTestMode())
+    if (isRunningLayoutTest())
         return 0;
 
     return caretBlinkIntervalInternal();
@@ -281,10 +281,11 @@ IntRect RenderThemeChromiumSkia::convertToPaintingRect(RenderObject* inputRender
 bool RenderThemeChromiumSkia::paintSearchFieldCancelButton(RenderObject* cancelButtonObject, const PaintInfo& paintInfo, const IntRect& r)
 {
     // Get the renderer of <input> element.
-    Node* input = cancelButtonObject->node()->shadowAncestorNode();
-    if (!input->renderer()->isBox())
+    Node* input = cancelButtonObject->node()->shadowHost();
+    RenderObject* baseRenderer = input ? input->renderer() : cancelButtonObject;
+    if (!baseRenderer->isBox())
         return false;
-    RenderBox* inputRenderBox = toRenderBox(input->renderer());
+    RenderBox* inputRenderBox = toRenderBox(baseRenderer);
     LayoutRect inputContentBox = inputRenderBox->contentBoxRect();
 
     // Make sure the scaled button stays square and will fit in its parent's box.
@@ -324,10 +325,11 @@ void RenderThemeChromiumSkia::adjustSearchFieldResultsDecorationStyle(StyleResol
 bool RenderThemeChromiumSkia::paintSearchFieldResultsDecoration(RenderObject* magnifierObject, const PaintInfo& paintInfo, const IntRect& r)
 {
     // Get the renderer of <input> element.
-    Node* input = magnifierObject->node()->shadowAncestorNode();
-    if (!input->renderer()->isBox())
+    Node* input = magnifierObject->node()->shadowHost();
+    RenderObject* baseRenderer = input ? input->renderer() : magnifierObject;
+    if (!baseRenderer->isBox())
         return false;
-    RenderBox* inputRenderBox = toRenderBox(input->renderer());
+    RenderBox* inputRenderBox = toRenderBox(baseRenderer);
     LayoutRect inputContentBox = inputRenderBox->contentBoxRect();
 
     // Make sure the scaled decoration stays square and will fit in its parent's box.
@@ -359,10 +361,11 @@ void RenderThemeChromiumSkia::adjustSearchFieldResultsButtonStyle(StyleResolver*
 bool RenderThemeChromiumSkia::paintSearchFieldResultsButton(RenderObject* magnifierObject, const PaintInfo& paintInfo, const IntRect& r)
 {
     // Get the renderer of <input> element.
-    Node* input = magnifierObject->node()->shadowAncestorNode();
-    if (!input->renderer()->isBox())
+    Node* input = magnifierObject->node()->shadowHost();
+    RenderObject* baseRenderer = input ? input->renderer() : magnifierObject;
+    if (!baseRenderer->isBox())
         return false;
-    RenderBox* inputRenderBox = toRenderBox(input->renderer());
+    RenderBox* inputRenderBox = toRenderBox(baseRenderer);
     LayoutRect inputContentBox = inputRenderBox->contentBoxRect();
 
     // Make sure the scaled decoration will fit in its parent's box.

@@ -1,3 +1,460 @@
+2012-07-24  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix compilation after QtQuick API changes
+        https://bugs.webkit.org/show_bug.cgi?id=91822
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        QQuickCanvas is now QQuickWindow, QQuickItem::canvas() is window() and rootItem()
+        is contentItem(). Also QQuickWindow::grabFrameBuffer() is now grabWindow().
+
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::updateIcon):
+        * UIProcess/API/qt/tests/qquickwebview/tst_qquickwebview.cpp:
+        (tst_QQuickWebView::multipleWebViews):
+        (tst_QQuickWebView::basicRenderingSanity):
+        (tst_QQuickWebView::transparentWebViews):
+        * UIProcess/API/qt/tests/testwindow.h:
+        (TestWindow::TestWindow):
+        * UIProcess/qt/QtPageClient.cpp:
+        (WebKit::QtPageClient::isViewVisible):
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (WebKit::QtWebPageEventHandler::startDrag):
+
+2012-07-24  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] Add quirks for running the web process in a profiler shell, like valgrind
+        https://bugs.webkit.org/show_bug.cgi?id=87672
+
+        Reviewed by Jocelyn Turcotte.
+
+        If environment variables QT_WEBKIT_WEB_PROCESS_COMMAND_PREFIX
+        and/or QT_WEBKIT_PLUGIN_PROCESS_COMMAND_PREFIX are set, use their
+        values as the prefix of the command when launching the child process.
+        Example usage:
+            export QT_WEB_PROCESS_COMMAND_PREFIX="valgrind --smc-check=all"
+            ./MiniBrowser http://somepage.html
+            ./WebKitTestRunner --no-timeout-at-all some_layouttest.html
+
+        * UIProcess/Launcher/qt/ProcessLauncherQt.cpp:
+        (WebKit::ProcessLauncher::launchProcess):
+
+2012-07-23  Oswald Buddenhagen  <oswald.buddenhagen@nokia.com>
+
+        [Qt] Fix compilation against namespaced Qt
+
+        Reviewed by Simon Hausmann.
+
+        * Platform/CoreIPC/Connection.h:
+        * Platform/PlatformProcessIdentifier.h:
+        * Platform/WorkQueue.h:
+        * Shared/qt/QtNetworkRequestData.h:
+        * Shared/qt/WebEventFactoryQt.h:
+        * UIProcess/API/C/qt/WKNativeEvent.h:
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qwebnavigationhistory_p.h:
+        * UIProcess/API/qt/raw/qrawwebview_p.h:
+        * UIProcess/DrawingAreaProxy.h:
+        * UIProcess/Launcher/ThreadLauncher.h:
+        * UIProcess/LayerTreeCoordinatorProxy.h:
+        * UIProcess/qt/QtViewportHandler.h:
+        * UIProcess/qt/QtWebPageSGNode.h:
+        * UIProcess/qt/WebColorChooserProxyQt.h:
+        * UIProcess/qt/WebGeolocationProviderQt.h:
+        * UIProcess/qt/WebPopupMenuProxyQt.h:
+        * WebProcess/WebProcess.h:
+
+2012-07-24  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Remove unneeded WebURLRequestEfl and WebURLResponseEfl
+        https://bugs.webkit.org/show_bug.cgi?id=92087
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Remove WebURLRequestEfl and WebURLResponseEfl classes
+        and their corresponding C APIs since we don't need / use
+        them.
+
+        * Shared/API/c/efl/WKURLRequestEfl.cpp: Removed.
+        * Shared/API/c/efl/WKURLRequestEfl.h: Removed.
+        * Shared/API/c/efl/WKURLResponseEfl.cpp: Removed.
+        * Shared/API/c/efl/WKURLResponseEfl.h: Removed.
+        * Shared/efl/WebURLRequestEfl.cpp: Removed.
+        * Shared/efl/WebURLRequestEfl.h: Removed.
+        * Shared/efl/WebURLResponseEfl.cpp: Removed.
+        * Shared/efl/WebURLResponseEfl.h: Removed.
+        * UIProcess/API/efl/ewk_url_request.cpp:
+
+2012-07-24  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] Enable touch slider when touch events are enabled
+        https://bugs.webkit.org/show_bug.cgi?id=91013
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        TOUCH_SLIDER guards are used in WebCore, so we should really
+        be setting the corresponding ENABLE define in features.prf.
+
+        * Target.pri:
+
+2012-07-24  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Fix possible crash in didSendRequestForResource
+        https://bugs.webkit.org/show_bug.cgi?id=92077
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add NULL check for wkRedirectResponse in
+        didSendRequestForResource() before using it. The
+        argument may be NULL if there was no redirection.
+
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/API/efl/ewk_view_resource_load_client.cpp:
+        (didSendRequestForResource):
+
+2012-07-24  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][EFL][GTK] Share WebCoreArgumentCoders for soup-related types
+        https://bugs.webkit.org/show_bug.cgi?id=92073
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Move WebCoreArgumentCoders for soup-related types such as
+        ResourceRequest, ResourceResponse and ResourceError from
+        port specific file to Shared/soup/WebCoreArgumentCodersSoup.cpp.
+        This way, the different ports using libsoup can share
+        code and avoid duplication.
+
+        * GNUmakefile.list.am:
+        * PlatformEfl.cmake:
+        * Shared/efl/WebCoreArgumentCodersEfl.cpp: Removed.
+        * Shared/soup/WebCoreArgumentCodersSoup.cpp: Renamed from Source/WebKit2/Shared/gtk/WebCoreArgumentCodersGtk.cpp.
+        (CoreIPC):
+        (CoreIPC::::encode):
+        (CoreIPC::::decode):
+
+2012-07-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123184, r123195, and r123197.
+        http://trac.webkit.org/changeset/123184
+        http://trac.webkit.org/changeset/123195
+        http://trac.webkit.org/changeset/123197
+        https://bugs.webkit.org/show_bug.cgi?id=92049
+
+        pagecycler regression (Requested by morrita on #webkit).
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-07-23  Simon Fraser  <simon.fraser@apple.com>
+
+        Part 2 of: Implement sticky positioning
+        https://bugs.webkit.org/show_bug.cgi?id=90046
+
+        Reviewed by Ojan Vafai.
+
+        Turn on ENABLE_CSS_STICKY_POSITION.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2] WebKitTestRunner needs to print information about Web intents
+        https://bugs.webkit.org/show_bug.cgi?id=90873
+
+        Reviewed by Anders Carlsson.
+
+        Add Bundle API for Web Intents. This is needed by the WebKitTestRunner
+        to print information about the new intent requests and the intent
+        service registrations.
+
+        * CMakeLists.txt: Move WebIntentData and WebIntentServiceInfo from
+        UIProcess/ to Shared/.
+        * GNUmakefile.list.am: Move WebIntentData and WebIntentServiceInfo from
+        UIProcess/ to Shared/.
+        * Shared/APIClientTraits.h:
+        * Shared/WebIntentData.cpp: Renamed from Source/WebKit2/UIProcess/WebIntentData.cpp.
+        (WebKit):
+        (WebKit::WebIntentData::WebIntentData):
+        (WebKit::WebIntentData::data):
+        (WebKit::WebIntentData::suggestions):
+        (WebKit::WebIntentData::extra):
+        (WebKit::WebIntentData::extras):
+        * Shared/WebIntentData.h: Renamed from Source/WebKit2/UIProcess/WebIntentData.h.
+        (WebKit):
+        (WebIntentData):
+        (WebKit::WebIntentData::create):
+        (WebKit::WebIntentData::~WebIntentData):
+        (WebKit::WebIntentData::action):
+        (WebKit::WebIntentData::payloadType):
+        (WebKit::WebIntentData::service):
+        (WebKit::WebIntentData::store):
+        (WebKit::WebIntentData::type):
+        * Shared/WebIntentServiceInfo.cpp: Renamed from Source/WebKit2/UIProcess/WebIntentServiceInfo.cpp.
+        (WebKit):
+        (WebKit::WebIntentServiceInfo::WebIntentServiceInfo):
+        * Shared/WebIntentServiceInfo.h: Renamed from Source/WebKit2/UIProcess/WebIntentServiceInfo.h.
+        (WebKit):
+        (WebIntentServiceInfo):
+        (WebKit::WebIntentServiceInfo::create):
+        (WebKit::WebIntentServiceInfo::~WebIntentServiceInfo):
+        (WebKit::WebIntentServiceInfo::action):
+        (WebKit::WebIntentServiceInfo::payloadType):
+        (WebKit::WebIntentServiceInfo::href):
+        (WebKit::WebIntentServiceInfo::title):
+        (WebKit::WebIntentServiceInfo::disposition):
+        (WebKit::WebIntentServiceInfo::type):
+        * Target.pri: Move WebIntentData and WebIntentServiceInfo from
+        UIProcess/ to Shared/.
+        * UIProcess/API/C/WKPage.h:
+        * UIProcess/API/efl/ewk_view_loader_client.cpp:
+        (didReceiveIntentForFrame):
+        (registerIntentServiceForFrame):
+        * UIProcess/WebLoaderClient.cpp:
+        (WebKit::WebLoaderClient::didReceiveIntentForFrame):
+        (WebKit::WebLoaderClient::registerIntentServiceForFrame):
+        * UIProcess/WebLoaderClient.h:
+        (WebLoaderClient):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::registerIntentServiceForFrame):
+        (WebKit::WebPageProxy::didReceiveIntentForFrame):
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.messages.in:
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.cpp:
+        (WebKit):
+        (WebKit::InjectedBundlePageLoaderClient::didReceiveIntentForFrame):
+        (WebKit::InjectedBundlePageLoaderClient::registerIntentServiceForFrame):
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.h:
+        (WebKit):
+        (InjectedBundlePageLoaderClient):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::dispatchIntent):
+        (WebKit::WebFrameLoaderClient::registerIntentService):
+        * WebProcess/qt/QtBuiltinBundlePage.cpp:
+        (WebKit::QtBuiltinBundlePage::QtBuiltinBundlePage):
+
+2012-07-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Add unit tests for Ewk_Cookie_Manager
+        https://bugs.webkit.org/show_bug.cgi?id=91639
+
+        Reviewed by Antonio Gomes.
+
+        Add unit tests for Ewk_Cookie_Manager.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/ewk_cookie_manager.h: Fix "accept policy" documentation
+        to indicate that only cookies set by the main document are accepted by default.
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestServer.cpp: Added.
+        (EWK2UnitTestServer::EWK2UnitTestServer): Add HTTP server similar to the one
+        used by GTK port unit tests.
+        (EWK2UnitTestServer::~EWK2UnitTestServer):
+        (EWK2UnitTestServer::run):
+        (EWK2UnitTestServer::getURIForPath):
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestServer.h: Added.
+        (EWK2UnitTestServer):
+        (EWK2UnitTestServer::baseURI):
+        * UIProcess/API/efl/tests/test_ewk2_cookie_manager.cpp: Added.
+        (serverCallback):
+        (getAcceptPolicyCallback):
+        (getAcceptPolicy):
+        (getHostnamesWithCookiesCallback):
+        (getHostnamesWithCookies):
+        (freeHostNames):
+        (countHostnamesWithCookies):
+        (TEST_F):
+        (cleanUpCookieFiles):
+
+2012-07-23  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] Enable touch slider when touch events are enabled
+        https://bugs.webkit.org/show_bug.cgi?id=91013
+
+        Reviewed by Antonio Gomes.
+
+        Take advantage of the logic introduced in r122286.
+
+        * Target.pri:
+
+2012-07-23  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        Unify numTouchEventHandlersChanged and needTouchEvents in the chrome client
+        https://bugs.webkit.org/show_bug.cgi?id=91006
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove numTouchEventHandlersChanged stub.
+
+        * WebProcess/WebCoreSupport/WebChromeClient.h:
+        (WebChromeClient):
+
+2012-07-23  Simon Fraser  <simon.fraser@apple.com>
+
+        Part 1 of: Implement sticky positioning
+        https://bugs.webkit.org/show_bug.cgi?id=90046
+
+        Reviewed by Ojan Vafai.
+
+        Add ENABLE_CSS_STICKY_POSITION, defaulting to off initially.
+        
+        Sort the ENABLE_CSS lines in the file. Make sure all the flags
+        are in FEATURE_DEFINES.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Add request manager client
+        https://bugs.webkit.org/show_bug.cgi?id=91193
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add a URL request manager client and attach it
+        to the Ewk_Context.
+
+        The client application can now register a URL scheme
+        via the Ewk_Context API and provide a callback handler
+        that will get called whenever a URL request with this
+        scheme is made.
+
+        A new Ewk_Url_Scheme_Request type is introduced to
+        provide information about the request to the client
+        and to allow the client to finish it by setting its
+        contents.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/EWebKit2.h:
+        * UIProcess/API/efl/ewk_context.cpp:
+        (_Ewk_Url_Scheme_Handler):
+        (_Ewk_Url_Scheme_Handler::_Ewk_Url_Scheme_Handler):
+        (_Ewk_Context):
+        (_Ewk_Context::_Ewk_Context):
+        (ewk_context_request_manager_get):
+        (ewk_context_url_scheme_request_received):
+        (createDefaultEwkContext):
+        (ewk_context_uri_scheme_register):
+        * UIProcess/API/efl/ewk_context.h:
+        * UIProcess/API/efl/ewk_context_private.h:
+        * UIProcess/API/efl/ewk_context_request_manager_client.cpp: Added.
+        (toEwkContext):
+        (didReceiveURIRequest):
+        (ewk_context_request_manager_client_attach):
+        * UIProcess/API/efl/ewk_context_request_manager_client_private.h: Added.
+        * UIProcess/API/efl/ewk_url_scheme_request.cpp: Added.
+        (_Ewk_Url_Scheme_Request):
+        (_Ewk_Url_Scheme_Request::_Ewk_Url_Scheme_Request):
+        (_Ewk_Url_Scheme_Request::~_Ewk_Url_Scheme_Request):
+        (ewk_url_scheme_request_ref):
+        (ewk_url_scheme_request_unref):
+        (ewk_url_scheme_request_scheme_get):
+        (ewk_url_scheme_request_url_get):
+        (ewk_url_scheme_request_path_get):
+        (ewk_url_scheme_request_id_get):
+        (ewk_url_scheme_request_finish):
+        (ewk_url_scheme_request_new):
+        * UIProcess/API/efl/ewk_url_scheme_request.h: Added.
+        * UIProcess/API/efl/ewk_url_scheme_request_private.h: Added.
+
+2012-07-23  KwangYong Choi  <ky0.choi@samsung.com>
+
+        [EFL][WK2] ProcessExecutablePath is required
+        https://bugs.webkit.org/show_bug.cgi?id=89719
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added executablePathOfWebProcess and executablePathOfPluginProcess.
+        It's used for getting the location of WebProcess and PluginProcess.
+
+        * PlatformEfl.cmake: Added LIBEXECDIR definition
+        * Shared/efl/ProcessExecutablePathEfl.cpp: Added.
+        (WebKit):
+        (WebKit::findWebKitProcess):
+        (WebKit::executablePathOfWebProcess): Get the absolute path of WebProcess
+        (WebKit::executablePathOfPluginProcess): Get the absolute path of PluginProcess
+        * UIProcess/Launcher/efl/ProcessLauncherEfl.cpp:
+        (WebKit::ProcessLauncher::launchProcess): Modified to use above routines
+
+2012-07-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        WebKit2 needs layoutTestController.setAlwaysAcceptCookies
+        https://bugs.webkit.org/show_bug.cgi?id=42778
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add setAlwaysAcceptCookies() method to InjectedBundle
+        so that we can use it in LayoutTestController.
+        The method uses WebCookieManager::setHTTPCookieAcceptPolicy()
+        internally.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetAlwaysAcceptCookies):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setAlwaysAcceptCookies):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-07-23  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [WK2] SQL Database cannot be disabled at build time
+        https://bugs.webkit.org/show_bug.cgi?id=91837
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        WebKit2 had no #ifdefs for SQL Database. This patch adds these
+        statments and it can now be disabled at build time.
+
+        * Shared/OriginAndDatabases.cpp:
+        * Shared/OriginAndDatabases.h:
+        * Shared/WebCoreArgumentCoders.cpp:
+        (CoreIPC):
+        * UIProcess/API/C/WKContext.cpp:
+        (WKContextGetDatabaseManager):
+        * UIProcess/API/C/WKDatabaseManager.cpp:
+        (WKDatabaseManagerGetTypeID):
+        (WKDatabaseManagerGetOriginKey):
+        (WKDatabaseManagerGetOriginQuotaKey):
+        (WKDatabaseManagerGetOriginUsageKey):
+        (WKDatabaseManagerGetDatabaseDetailsKey):
+        (WKDatabaseManagerGetDatabaseDetailsNameKey):
+        (WKDatabaseManagerGetDatabaseDetailsDisplayNameKey):
+        (WKDatabaseManagerGetDatabaseDetailsExpectedUsageKey):
+        (WKDatabaseManagerGetDatabaseDetailsCurrentUsageKey):
+        (WKDatabaseManagerSetClient):
+        (WKDatabaseManagerGetDatabasesByOrigin):
+        (callGetDatabasesByOriginBlockAndDispose):
+        (WKDatabaseManagerGetDatabasesByOrigin_b):
+        (WKDatabaseManagerGetDatabaseOrigins):
+        (callGetDatabaseOriginsBlockBlockAndDispose):
+        (WKDatabaseManagerGetDatabaseOrigins_b):
+        (WKDatabaseManagerDeleteDatabasesWithNameForOrigin):
+        (WKDatabaseManagerDeleteDatabasesForOrigin):
+        (WKDatabaseManagerDeleteAllDatabases):
+        (WKDatabaseManagerSetQuotaForOrigin):
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::WebContext):
+        (WebKit::WebContext::~WebContext):
+        (WebKit::WebContext::shouldTerminate):
+        (WebKit::WebContext::disconnectProcess):
+        (WebKit::WebContext::didReceiveMessage):
+        * UIProcess/WebContext.h:
+        (WebContext):
+        * UIProcess/WebDatabaseManagerProxy.cpp:
+        * UIProcess/WebDatabaseManagerProxy.h:
+        * UIProcess/WebDatabaseManagerProxy.messages.in:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::clearAllDatabases):
+        (WebKit::InjectedBundle::setDatabaseQuota):
+        * WebProcess/WebCoreSupport/WebDatabaseManager.cpp:
+        * WebProcess/WebCoreSupport/WebDatabaseManager.h:
+        * WebProcess/WebCoreSupport/WebDatabaseManager.messages.in:
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::didReceiveMessage):
+
 2012-07-23  Kent Tamura  <tkent@chromium.org>
 
         Rename ENABLE_METER_TAG and ENABLE_PROGRESS_TAG to ENABLE_METER_ELEMENT and ENABLE_PROGRESS_ELEMENT respectively
