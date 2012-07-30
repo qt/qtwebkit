@@ -36,8 +36,6 @@ import time
 
 from webkitpy.common.system import path
 
-from webkitpy.layout_tests.port import server_process
-
 
 _log = logging.getLogger(__name__)
 
@@ -115,9 +113,6 @@ class Driver(object):
         self._worker_number = worker_number
         self._no_timeout = no_timeout
 
-        # overridable for testing.
-        self._server_process_constructor = server_process.ServerProcess
-
         self._driver_tempdir = None
         # WebKitTestRunner can report back subprocess crashes by printing
         # "#CRASHED - PROCESSNAME".  Since those can happen at any time
@@ -171,8 +166,8 @@ class Driver(object):
 
         crash_log = None
         if self.has_crashed():
-            crash_log = self._port._get_crash_log(self._crashed_process_name, self._crashed_pid, text, self.error_from_test,
-                                                  newer_than=start_time)
+            self.error_from_test, crash_log = self._port._get_crash_log(self._crashed_process_name,
+                self._crashed_pid, text, self.error_from_test, newer_than=start_time)
 
             # If we don't find a crash log use a placeholder error message instead.
             if not crash_log:
@@ -271,7 +266,7 @@ class Driver(object):
         environment['LOCAL_RESOURCE_ROOT'] = self._port.layout_tests_dir()
         self._crashed_process_name = None
         self._crashed_pid = None
-        self._server_process = self._server_process_constructor(self._port, server_name, self.cmd_line(pixel_tests, per_test_args), environment)
+        self._server_process = self._port._server_process_constructor(self._port, server_name, self.cmd_line(pixel_tests, per_test_args), environment)
         self._server_process.start()
 
     def stop(self):
@@ -298,7 +293,7 @@ class Driver(object):
 
         cmd.extend(self._port.get_option('additional_drt_flag', []))
 
-        if pixel_tests:
+        if pixel_tests and not self._port.supports_switching_pixel_tests_per_test():
             cmd.append('--pixel-tests')
         cmd.extend(per_test_args)
 
@@ -338,8 +333,14 @@ class Driver(object):
             if sys.platform == 'cygwin':
                 command = path.cygpath(command)
 
+        assert not driver_input.image_hash or driver_input.should_run_pixel_test
+
+        if driver_input.should_run_pixel_test:
+            if self._port.supports_switching_pixel_tests_per_test():
+                # We did not start the driver with --pixel-tests, instead we specify it per test.
+                # "'" is the separator of command fields.
+                command += "'" + '--pixel-test'
         if driver_input.image_hash:
-            # "'" is the separator of command fields.
             command += "'" + driver_input.image_hash
         return command + "\n"
 

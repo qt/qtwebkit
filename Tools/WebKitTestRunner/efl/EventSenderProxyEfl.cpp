@@ -37,6 +37,7 @@
 
 #include <Ecore.h>
 #include <Ecore_Evas.h>
+#include <unistd.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 #include <wtf/text/CString.h>
@@ -141,10 +142,16 @@ static void setEvasModifiers(Evas* evas, WKEventModifiers wkModifiers)
     }
 }
 
-static void dispatchMouseDownEvent(Evas* evas, unsigned button, WKEventModifiers wkModifiers)
+static void dispatchMouseDownEvent(Evas* evas, unsigned button, WKEventModifiers wkModifiers, int clickCount)
 {
+    Evas_Button_Flags buttonFlags = EVAS_BUTTON_NONE;
+    if (clickCount == 3)
+        buttonFlags = EVAS_BUTTON_TRIPLE_CLICK;
+    else if (clickCount == 2)
+        buttonFlags = EVAS_BUTTON_DOUBLE_CLICK;
+
     setEvasModifiers(evas, wkModifiers);
-    evas_event_feed_mouse_down(evas, button, EVAS_BUTTON_NONE, 0, 0);
+    evas_event_feed_mouse_down(evas, button, buttonFlags, 0, 0);
     setEvasModifiers(evas, 0);
 }
 
@@ -162,20 +169,11 @@ static void dispatchMouseMoveEvent(Evas* evas, int x, int y)
 
 static void dispatchMouseScrollByEvent(Evas* evas, int horizontal, int vertical)
 {
-    const int SCROLLLEFT = -10;
-    const int SCROLLRIGHT = 10;
-    const int SCROLLDOWN = -10;
-    const int SCROLLUP = 10;
+    if (horizontal)
+        evas_event_feed_mouse_wheel(evas, 1, horizontal, 0, 0);
 
-    if (horizontal > 0)
-        evas_event_feed_mouse_wheel(evas, 1, SCROLLLEFT, 0, 0);
-    else if (horizontal < 0)
-        evas_event_feed_mouse_wheel(evas, 1, SCROLLRIGHT, 0, 0);
-
-    if (vertical > 0)
-        evas_event_feed_mouse_wheel(evas, 0, SCROLLUP, 0, 0);
-    else if (vertical < 0)
-        evas_event_feed_mouse_wheel(evas, 0, SCROLLDOWN, 0, 0);
+    if (vertical)
+        evas_event_feed_mouse_wheel(evas, 0, vertical, 0, 0);
 }
 
 static const PassRefPtr<KeyEventInfo> keyPadName(WKStringRef keyRef)
@@ -233,6 +231,18 @@ static const PassRefPtr<KeyEventInfo> keyName(WKStringRef keyRef)
         return adoptRef(new KeyEventInfo("Print", ""));
     if (WKStringIsEqualToUTF8CString(keyRef, "menu"))
         return adoptRef(new KeyEventInfo("Menu", ""));
+    if (WKStringIsEqualToUTF8CString(keyRef, "leftControl"))
+        return adoptRef(new KeyEventInfo("Control_L", ""));
+    if (WKStringIsEqualToUTF8CString(keyRef, "rightControl"))
+        return adoptRef(new KeyEventInfo("Control_R", ""));
+    if (WKStringIsEqualToUTF8CString(keyRef, "leftShift"))
+        return adoptRef(new KeyEventInfo("Shift_L", ""));
+    if (WKStringIsEqualToUTF8CString(keyRef, "rightShift"))
+        return adoptRef(new KeyEventInfo("Shift_R", ""));
+    if (WKStringIsEqualToUTF8CString(keyRef, "leftAlt"))
+        return adoptRef(new KeyEventInfo("Alt_L", ""));
+    if (WKStringIsEqualToUTF8CString(keyRef, "rightAlt"))
+        return adoptRef(new KeyEventInfo("Alt_R", ""));
     if (WKStringIsEqualToUTF8CString(keyRef, "F1"))
         return adoptRef(new KeyEventInfo("F1", ""));
     if (WKStringIsEqualToUTF8CString(keyRef, "F2"))
@@ -303,7 +313,7 @@ void EventSenderProxy::updateClickCountForButton(int button)
 void EventSenderProxy::dispatchEvent(const WTREvent& event)
 {
     if (event.eventType == WTREventTypeMouseDown)
-        dispatchMouseDownEvent(ecore_evas_get(m_testController->mainWebView()->platformWindow()), event.button, event.modifiers);
+        dispatchMouseDownEvent(ecore_evas_get(m_testController->mainWebView()->platformWindow()), event.button, event.modifiers, m_clickCount);
     else if (event.eventType == WTREventTypeMouseUp)
         dispatchMouseUpEvent(ecore_evas_get(m_testController->mainWebView()->platformWindow()), event.button, event.modifiers);
     else if (event.eventType == WTREventTypeMouseMove)
@@ -367,8 +377,10 @@ void EventSenderProxy::mouseMoveTo(double x, double y)
 void EventSenderProxy::mouseScrollBy(int horizontal, int vertical)
 {
     WTREvent event(WTREventTypeMouseScrollBy, 0, 0, WTRMouseButtonNone);
-    event.horizontal = horizontal;
-    event.vertical = vertical;
+    // We need to invert scrolling values since in EFL negative z value means that
+    // canvas is scrolling down
+    event.horizontal = -horizontal;
+    event.vertical = -vertical;
     sendOrQueueEvent(event);
 }
 
@@ -388,6 +400,10 @@ void EventSenderProxy::keyDown(WKStringRef keyRef, WKEventModifiers wkModifiers,
 
     const char* keyName = keyEventInfo->keyName.data();
     const char* keyString = keyEventInfo->keyString.data();
+
+    // Enforce 'Shift' modifier for caps.
+    if ((strlen(keyName) == 1) && (keyName[0] >= 'A' && keyName[0] <= 'Z'))
+        wkModifiers |= kWKEventModifiersShiftKey;
 
     Evas* evas = ecore_evas_get(m_testController->mainWebView()->platformWindow());
     setEvasModifiers(evas, wkModifiers);

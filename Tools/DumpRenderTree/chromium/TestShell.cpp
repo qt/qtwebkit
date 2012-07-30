@@ -122,6 +122,11 @@ TestShell::TestShell()
     WebRuntimeFeatures::enableGeolocation(true);
     WebRuntimeFeatures::enablePointerLock(true);
     WebRuntimeFeatures::enableIndexedDatabase(true);
+    WebRuntimeFeatures::enableInputTypeDateTime(true);
+    WebRuntimeFeatures::enableInputTypeDateTimeLocal(true);
+    WebRuntimeFeatures::enableInputTypeMonth(true);
+    WebRuntimeFeatures::enableInputTypeTime(true);
+    WebRuntimeFeatures::enableInputTypeWeek(true);
     WebRuntimeFeatures::enableFileSystem(true);
     WebRuntimeFeatures::enableJavaScriptI18NAPI(true);
     WebRuntimeFeatures::enableMediaSource(true);
@@ -171,6 +176,7 @@ void TestShell::createMainWindow()
     m_drtDevToolsAgent = adoptPtr(new DRTDevToolsAgent);
     m_webViewHost = adoptPtr(createNewWindow(WebURL(), m_drtDevToolsAgent.get()));
     m_webView = m_webViewHost->webView();
+    m_testInterfaces->setDelegate(m_webViewHost.get());
     m_testInterfaces->setWebView(m_webView);
     m_eventSender->setDelegate(m_webViewHost.get());
     m_eventSender->setWebView(m_webView);
@@ -179,6 +185,7 @@ void TestShell::createMainWindow()
 
 TestShell::~TestShell()
 {
+    m_testInterfaces->setDelegate(0);
     m_testInterfaces->setWebView(0);
     m_eventSender->setDelegate(0);
     m_eventSender->setWebView(0);

@@ -162,6 +162,9 @@ private:
 
     virtual void setCursor(const WebCore::Cursor&) OVERRIDE;
     virtual void setCursorHiddenUntilMouseMoves(bool) OVERRIDE;
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
+    virtual void scheduleAnimation() OVERRIDE;
+#endif
 
     // Notification that the given form element has changed. This function
     // will be called frequently, so handling should be very fast.
@@ -218,6 +221,8 @@ private:
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const OVERRIDE;
     
     virtual void numWheelEventHandlersChanged(unsigned) OVERRIDE;
+
+    virtual void logDiagnosticMessage(const String& message, const String& description, const String& success) OVERRIDE;
 
     String m_cachedToolTip;
     mutable RefPtr<WebFrame> m_cachedFrameSetLargestFrame;

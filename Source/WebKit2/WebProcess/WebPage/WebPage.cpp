@@ -419,6 +419,11 @@ void WebPage::initializeInjectedBundleFullScreenClient(WKBundlePageFullScreenCli
 }
 #endif
 
+void WebPage::initializeInjectedBundleDiagnosticLoggingClient(WKBundlePageDiagnosticLoggingClient* client)
+{
+    m_logDiagnosticMessageClient.initialize(client);
+}
+
 PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* pluginElement, const Plugin::Parameters& parameters)
 {
     String pluginPath;
@@ -2086,6 +2091,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 
     settings->setShouldRespectImageOrientation(store.getBoolValueForKey(WebPreferencesKey::shouldRespectImageOrientationKey()));
 
+    settings->setDiagnosticLoggingEnabled(store.getBoolValueForKey(WebPreferencesKey::diagnosticLoggingEnabledKey()));
+
     platformPreferencesDidChange(store);
 
     if (m_drawingArea)
@@ -2144,6 +2151,10 @@ bool WebPage::handleEditingKeyboardEvent(KeyboardEvent* evt)
 
     if (command.execute(evt))
         return true;
+
+    // Don't allow text insertion for nodes that cannot edit.
+    if (!frame->editor()->canEdit())
+        return false;
 
     // Don't insert null or control characters as they can result in unexpected behaviour
     if (evt->charCode() < ' ')

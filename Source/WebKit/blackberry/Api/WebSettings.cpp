@@ -38,6 +38,7 @@ namespace BlackBerry {
 namespace WebKit {
 
 DEFINE_STATIC_LOCAL(String, BlackBerryAllowCrossSiteRequests, ("BlackBerryAllowCrossSiteRequests"));
+DEFINE_STATIC_LOCAL(String, BlackBerryAsynchronousSpellChecking, ("BlackBerryAsynchronousSpellChecking"));
 DEFINE_STATIC_LOCAL(String, BlackBerryBackgroundColor, ("BlackBerryBackgroundColor"));
 DEFINE_STATIC_LOCAL(String, BlackBerryCookiesEnabled, ("BlackBerryCookiesEnabled"));
 DEFINE_STATIC_LOCAL(String, BlackBerryDirectRenderingToWindowEnabled, ("BlackBerryDirectRenderingToWindowEnabled"));
@@ -177,6 +178,7 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setBoolean(BlackBerryFullScreenVideoCapable, false);
     settings->m_private->setBoolean(BlackBerryCredentialAutofillEnabled, false);
     settings->m_private->setBoolean(BlackBerryFormAutofillEnabled, false);
+    settings->m_private->setBoolean(BlackBerryAsynchronousSpellChecking, true);
 
     if (BlackBerry::Platform::DeviceInfo::instance()->isMobile()) {
         WebCore::FloatSize currentPPI = Platform::Graphics::Screen::primaryScreen()->pixelsPerInch(-1);
@@ -198,10 +200,10 @@ WebSettings* WebSettings::standardSettings()
     settings->m_private->setInteger(WebKitMinimumFontSize, 8);
     settings->m_private->setBoolean(WebKitWebSocketsEnabled, true);
 
-    settings->m_private->setString(WebKitFixedFontFamily, BlackBerry::Platform::fontFamily("-webkit-monospace", "").c_str());
-    settings->m_private->setString(WebKitSansSeriffFontFamily, BlackBerry::Platform::fontFamily("-webkit-sans-serif", "").c_str());
-    settings->m_private->setString(WebKitSeriffFontFamily, BlackBerry::Platform::fontFamily("-webkit-serif", "").c_str());
-    settings->m_private->setString(WebKitStandardFontFamily, BlackBerry::Platform::fontFamily("-webkit-standard", "").c_str());
+    settings->m_private->setString(WebKitFixedFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-monospace", "").c_str());
+    settings->m_private->setString(WebKitSansSeriffFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-sans-serif", "").c_str());
+    settings->m_private->setString(WebKitSeriffFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-serif", "").c_str());
+    settings->m_private->setString(WebKitStandardFontFamily, BlackBerry::Platform::FontInfo::instance()->fontFamily("-webkit-standard", "").c_str());
 
     return settings;
 }
@@ -805,6 +807,16 @@ bool WebSettings::isSpatialNavigationEnabled() const
 void WebSettings::setSpatialNavigationEnabled(bool enable)
 {
     m_private->setBoolean(SpatialNavigationEnabled, enable);
+}
+
+bool WebSettings::isAsynchronousSpellCheckingEnabled() const
+{
+    return m_private->getBoolean(BlackBerryAsynchronousSpellChecking);
+}
+
+void WebSettings::setAsynchronousSpellCheckingEnabled(bool enable) const
+{
+    return m_private->setBoolean(BlackBerryAsynchronousSpellChecking, enable);
 }
 
 bool WebSettings::fullScreenVideoCapable() const

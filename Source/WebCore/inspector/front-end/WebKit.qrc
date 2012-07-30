@@ -133,6 +133,7 @@
     <file>ResourceWebSocketFrameView.js</file>
     <file>ResourcesPanel.js</file>
     <file>RevisionHistoryView.js</file>
+    <file>SASSSourceMapping.js</file>
     <file>ScopeChainSidebarPane.js</file>
     <file>Script.js</file>
     <file>ScriptFormatter.js</file>
@@ -181,6 +182,7 @@
     <file>TopDownProfileDataGridTree.js</file>
     <file>treeoutline.js</file>
     <file>UISourceCode.js</file>
+    <file>UISourceCodeFrame.js</file>
     <file>UIUtils.js</file>
     <file>UserAgentSupport.js</file>
     <file>UserMetrics.js</file>

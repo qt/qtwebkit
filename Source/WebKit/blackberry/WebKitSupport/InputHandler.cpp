@@ -53,6 +53,8 @@
 #include "ScopePointer.h"
 #include "SelectPopupClient.h"
 #include "SelectionHandler.h"
+#include "SpellChecker.h"
+#include "TextCheckerClient.h"
 #include "TextIterator.h"
 #include "WebPageClient.h"
 #include "WebPage_p.h"
@@ -360,7 +362,8 @@ void InputHandler::focusedNodeChanged()
     Node* node = frame->document()->focusedNode();
 
     if (isActiveTextEdit() && m_currentFocusElement == node) {
-        notifyClientOfKeyboardVisibilityChange(true);
+        if (!processingChange())
+            notifyClientOfKeyboardVisibilityChange(true);
         return;
     }
 
@@ -432,7 +435,7 @@ static bool convertStringToWchar(const String& string, wchar_t* dest, int destCa
     // wchar_t strings sent to IMF are 32 bit so casting to UChar32 is safe.
     u_strToUTF32(reinterpret_cast<UChar32*>(dest), destCapacity, destLength, string.characters(), string.length(), &ec);
     if (ec) {
-        InputLog(LogLevelInfo, "InputHandler::convertStringToWchar Error converting string ec (%d).", ec);
+        logAlways(LogLevelCritical, "InputHandler::convertStringToWchar Error converting string ec (%d).", ec);
         destLength = 0;
         return false;
     }
@@ -448,7 +451,7 @@ static bool convertStringToWcharVector(const String& string, WTF::Vector<wchar_t
         return true;
 
     if (!wcharString.tryReserveCapacity(length + 1)) {
-        logAlways(LogLevelWarn, "InputHandler::convertStringToWcharVector Cannot allocate memory for string.\n");
+        logAlways(LogLevelCritical, "InputHandler::convertStringToWcharVector Cannot allocate memory for string.\n");
         return false;
     }
 
@@ -468,7 +471,7 @@ static String convertSpannableStringToString(spannable_string_t* src)
     WTF::Vector<UChar> dest;
     int destCapacity = (src->length * 2) + 1;
     if (!dest.tryReserveCapacity(destCapacity)) {
-        logAlways(LogLevelWarn, "InputHandler::convertSpannableStringToString Cannot allocate memory for string.\n");
+        logAlways(LogLevelCritical, "InputHandler::convertSpannableStringToString Cannot allocate memory for string.\n");
         return String();
     }
 
@@ -477,7 +480,7 @@ static String convertSpannableStringToString(spannable_string_t* src)
     // wchar_t strings sent from IMF are 32 bit so casting to UChar32 is safe.
     u_strFromUTF32(dest.data(), destCapacity, &destLength, reinterpret_cast<UChar32*>(src->str), src->length, &ec);
     if (ec) {
-        InputLog(LogLevelInfo, "InputHandler::convertSpannableStringToString Error converting string ec (%d).", ec);
+        logAlways(LogLevelCritical, "InputHandler::convertSpannableStringToString Error converting string ec (%d).", ec);
         return String();
     }
     dest.resize(destLength);
@@ -517,12 +520,127 @@ void InputHandler::learnText()
     sendLearnTextDetails(textInField);
 }
 
-
-void InputHandler::spellCheckingRequestProcessed(int32_t id, spannable_string_t* spannableString)
+void InputHandler::requestCheckingOfString(PassRefPtr<WebCore::TextCheckingRequest> textCheckingRequest)
 {
-    UNUSED_PARAM(id);
-    UNUSED_PARAM(spannableString);
-    // TODO implement.
+    RefPtr<WebCore::TextCheckingRequest> request = textCheckingRequest;
+
+    int32_t sequenceId = request->sequence();
+    int requestLength = request->text().length();
+    if (!requestLength /* || requestLength > maxSpellCheckStringLength */) {
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    wchar_t* checkingString = (wchar_t*)malloc(sizeof(wchar_t) * (requestLength + 1));
+    if (!checkingString) {
+        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "InputHandler::requestCheckingOfString Cannot allocate memory for string.");
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    int stringLength = 0;
+    if (!convertStringToWchar(request->text(), checkingString, requestLength + 1, &stringLength)) {
+        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "InputHandler::requestCheckingOfString Failed to convert String to wchar type.");
+        free(checkingString);
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    int32_t transactionId = m_webPage->m_client->checkSpellingOfStringAsync(checkingString, stringLength);
+    free(checkingString);
+
+    // If the call to the input service did not go through, then cancel the request so we don't block endlessly.
+    // This should still take transactionId as a parameter to maintain the same behavior as if InputMethodSupport
+    // were to cancel a request during processing.
+    if (transactionId == -1) { // Error before sending request to input service.
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    // map sequenceId to transactionId.
+    m_sequenceMap[transactionId] = sequenceId;
+}
+
+int32_t InputHandler::convertTransactionIdToSequenceId(int32_t transactionId)
+{
+    std::map<int32_t, int32_t>::iterator it = m_sequenceMap.find(transactionId);
+
+    if (it == m_sequenceMap.end())
+        return 0;
+
+    int32_t sequenceId = it->second;
+    // We only convert this value when we have received its response, so its safe to remove it from the map.
+    m_sequenceMap.erase(it);
+
+    return sequenceId;
+}
+
+void InputHandler::spellCheckingRequestProcessed(int32_t transactionId, spannable_string_t* spannableString)
+{
+    if (!spannableString) {
+        spellCheckingRequestCancelled(transactionId, false /* isSequenceId */);
+        return;
+    }
+
+    Vector<TextCheckingResult> results;
+
+    // Convert the spannableString to TextCheckingResult then append to results vector.
+    String replacement;
+    TextCheckingResult textCheckingResult;
+    textCheckingResult.type = TextCheckingTypeSpelling;
+    textCheckingResult.replacement = replacement;
+    textCheckingResult.location = 0;
+    textCheckingResult.length = 0;
+
+    span_t* span = spannableString->spans;
+    for (unsigned int i = 0; i < spannableString->spans_count; i++) {
+        if (!span)
+            break;
+        if (span->end < span->start) {
+            spellCheckingRequestCancelled(transactionId, false /* isSequenceId */);
+            return;
+        }
+        if (span->attributes_mask & MISSPELLED_WORD_ATTRIB) {
+            textCheckingResult.location = span->start;
+            // The end point includes the character that it is before. Ie, 0, 0
+            // applies to the first character as the end point includes the character
+            // at the position. This means the endPosition is always +1.
+            textCheckingResult.length = span->end - span->start + 1;
+            results.append(textCheckingResult);
+        }
+        span++;
+    }
+
+    // transactionId here is for use with the input service. We need to translate this to sequenceId used with SpellChecker.
+    int32_t sequenceId = convertTransactionIdToSequenceId(transactionId);
+
+    SpellChecker* sp = getSpellChecker();
+    if (!sp || !sequenceId) {
+        InputLog(LogLevelWarn, "InputHandler::spellCheckingRequestProcessed failed to process the request with sequenceId %d", sequenceId);
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+    sp->didCheckSucceeded(sequenceId, results);
+}
+
+void InputHandler::spellCheckingRequestCancelled(int32_t id, bool isSequenceId)
+{
+    int32_t sequenceId = isSequenceId ? id : convertTransactionIdToSequenceId(id);
+    SpellChecker* sp = getSpellChecker();
+    if (!sp) {
+        InputLog(LogLevelWarn, "InputHandler::spellCheckingRequestCancelled failed to cancel the request with sequenceId %d", sequenceId);
+        return;
+    }
+    sp->didCheckCanceled(sequenceId);
+}
+
+SpellChecker* InputHandler::getSpellChecker()
+{
+    if (Frame* frame = m_currentFocusElement->document()->frame())
+        if (Editor* editor = frame->editor())
+            return editor->spellChecker();
+
+    return 0;
 }
 
 void InputHandler::setElementUnfocused(bool refocusOccuring)
@@ -1167,6 +1285,11 @@ void InputHandler::paste()
     executeTextEditCommand("Paste");
 }
 
+void InputHandler::selectAll()
+{
+    executeTextEditCommand("SelectAll");
+}
+
 void InputHandler::addAttributedTextMarker(int start, int end, const AttributeTextStyle& style)
 {
     if ((end - start) < 1 || end > static_cast<int>(elementText().length()))
@@ -1463,21 +1586,20 @@ spannable_string_t* InputHandler::spannableTextInRange(int start, int end, int32
 
     WTF::String textString = elementText().substring(start, length);
 
-    spannable_string_t* pst = (spannable_string_t*)malloc(sizeof(spannable_string_t));
-    if (!pst) {
-        InputLog(LogLevelInfo, "InputHandler::spannableTextInRange error allocating spannable string.");
-        return 0;
-    }
+    spannable_string_t* pst = (spannable_string_t*)fastMalloc(sizeof(spannable_string_t));
 
+    // Don't use fastMalloc in case the string is unreasonably long. fastMalloc will
+    // crash immediately on failure.
     pst->str = (wchar_t*)malloc(sizeof(wchar_t) * (length + 1));
     if (!pst->str) {
-        InputLog(LogLevelInfo, "InputHandler::spannableTextInRange Cannot allocate memory for string.\n");
+        logAlways(LogLevelCritical, "InputHandler::spannableTextInRange Cannot allocate memory for string.\n");
         free(pst);
         return 0;
     }
 
     int stringLength = 0;
     if (!convertStringToWchar(textString, pst->str, length + 1, &stringLength)) {
+        logAlways(LogLevelCritical, "InputHandler::spannableTextInRange failed to convert string.\n");
         free(pst->str);
         free(pst);
         return 0;
@@ -1527,7 +1649,7 @@ extracted_text_t* InputHandler::extractedTextRequest(extracted_text_request_t* r
     if (!isActiveTextEdit())
         return 0;
 
-    extracted_text_t* extractedText = (extracted_text_t *)malloc(sizeof(extracted_text_t));
+    extracted_text_t* extractedText = (extracted_text_t *)fastMalloc(sizeof(extracted_text_t));
 
     // 'flags' indicates whether the text is being monitored. This is not currently used.
 
@@ -1784,7 +1906,7 @@ bool InputHandler::setTextAttributes(int insertionPoint, spannable_string_t* spa
         // used by IMF. When they add support for on the fly spell checking we can
         // use it to apply spelling markers and disable continuous spell checking.
 
-        InputLog(LogLevelInfo, "InputHandler::setTextAttributes adding marker %d to %d - %d", startPosition, endPosition, span->attributes_mask);
+        InputLog(LogLevelInfo, "InputHandler::setTextAttributes adding marker %d to %d - %llu", startPosition, endPosition, span->attributes_mask);
         addAttributedTextMarker(startPosition, endPosition, textStyleFromMask(span->attributes_mask));
 
         span++;

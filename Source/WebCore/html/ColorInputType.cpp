@@ -35,8 +35,10 @@
 #include "Chrome.h"
 #include "Color.h"
 #include "ElementShadow.h"
+#include "HTMLDataListElement.h"
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
+#include "HTMLOptionElement.h"
 #include "MouseEvent.h"
 #include "RenderObject.h"
 #include "RenderView.h"
@@ -49,6 +51,8 @@
 #if ENABLE(INPUT_TYPE_COLOR)
 
 namespace WebCore {
+
+using namespace HTMLNames;
 
 static bool isValidColorString(const String& value)
 {
@@ -162,6 +166,11 @@ bool ColorInputType::shouldRespectListAttribute()
     return InputType::themeSupportsDataListUI(this);
 }
 
+bool ColorInputType::typeMismatchFor(const String& value) const
+{
+    return isValidColorString(value);
+}
+
 void ColorInputType::didChooseColor(const Color& color)
 {
     if (element()->disabled() || element()->readOnly() || color == valueAsColor())
@@ -197,11 +206,41 @@ HTMLElement* ColorInputType::shadowColorSwatch() const
     return shadow ? toHTMLElement(shadow->firstChild()->firstChild()) : 0;
 }
 
-IntRect ColorInputType::elementRectRelativeToWindow() const
+IntRect ColorInputType::elementRectRelativeToRootView() const
 {
-    RenderObject* renderer = element()->renderer();
-    ASSERT(renderer);
-    return pixelSnappedIntRect(renderer->view()->frameView()->contentsToWindow(renderer->absoluteBoundingBoxRect()));
+    return element()->document()->view()->contentsToRootView(element()->getPixelSnappedRect());
+}
+
+Color ColorInputType::currentColor()
+{
+    return valueAsColor();
+}
+
+bool ColorInputType::shouldShowSuggestions() const
+{
+#if ENABLE(DATALIST_ELEMENT)
+    return element()->fastHasAttribute(listAttr);
+#endif
+}
+
+Vector<Color> ColorInputType::suggestions() const
+{
+    Vector<Color> suggestions;
+#if ENABLE(DATALIST_ELEMENT)
+    HTMLDataListElement* dataList = element()->dataList();
+    if (dataList) {
+        RefPtr<HTMLCollection> options = dataList->options();
+        for (unsigned i = 0; HTMLOptionElement* option = static_cast<HTMLOptionElement*>(options->item(i)); i++) {
+            if (!element()->isValidValue(option->value()))
+                continue;
+            Color color(option->value());
+            if (!color.isValid())
+                continue;
+            suggestions.append(color);
+        }
+    }
+#endif
+    return suggestions;
 }
 
 } // namespace WebCore

@@ -3,6 +3,7 @@ LIST(APPEND WebKit2_LINK_FLAGS
     ${ECORE_X_LDFLAGS}
     ${EDJE_LDFLAGS}
     ${EFLDEPS_LDFLAGS}
+    ${EFREET_LDFLAGS}
     ${EVAS_LDFLAGS}
     ${LIBSOUP24_LDFLAGS}
 )
@@ -19,9 +20,9 @@ LIST(APPEND WebKit2_SOURCES
 
     Shared/API/c/gtk/WKGraphicsContextGtk.cpp
 
-    Shared/cairo/LayerTreeContextCairo.cpp
     Shared/cairo/ShareableBitmapCairo.cpp
 
+    Shared/efl/LayerTreeContextEfl.cpp
     Shared/efl/NativeWebKeyboardEventEfl.cpp
     Shared/efl/NativeWebWheelEventEfl.cpp
     Shared/efl/NativeWebMouseEventEfl.cpp
@@ -37,17 +38,24 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/C/soup/WKSoupRequestManager.cpp
 
     UIProcess/API/efl/BatteryProvider.cpp
+    UIProcess/API/efl/NetworkInfoProvider.cpp
     UIProcess/API/efl/PageClientImpl.cpp
+    UIProcess/API/efl/VibrationProvider.cpp
     UIProcess/API/efl/ewk_context.cpp
+    UIProcess/API/efl/ewk_context_download_client.cpp
     UIProcess/API/efl/ewk_context_request_manager_client.cpp
     UIProcess/API/efl/ewk_cookie_manager.cpp
+    UIProcess/API/efl/ewk_download_job.cpp
+    UIProcess/API/efl/ewk_form_submission_request.cpp
     UIProcess/API/efl/ewk_intent.cpp
     UIProcess/API/efl/ewk_intent_service.cpp
+    UIProcess/API/efl/ewk_main.cpp
     UIProcess/API/efl/ewk_navigation_policy_decision.cpp
     UIProcess/API/efl/ewk_url_request.cpp
     UIProcess/API/efl/ewk_url_response.cpp
     UIProcess/API/efl/ewk_url_scheme_request.cpp
     UIProcess/API/efl/ewk_view.cpp
+    UIProcess/API/efl/ewk_view_form_client.cpp
     UIProcess/API/efl/ewk_view_loader_client.cpp
     UIProcess/API/efl/ewk_view_policy_client.cpp
     UIProcess/API/efl/ewk_view_resource_load_client.cpp
@@ -122,6 +130,7 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     ${ECORE_X_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
     ${EFLDEPS_INCLUDE_DIRS}
+    ${EFREET_INCLUDE_DIRS}
     ${EVAS_INCLUDE_DIRS}
     ${LIBXML2_INCLUDE_DIR}
     ${LIBXSLT_INCLUDE_DIRS}
@@ -135,6 +144,7 @@ LIST(APPEND WebKit2_LIBRARIES
     ${CAIRO_LIBRARIES}
     ${ECORE_X_LIBRARIES}
     ${EFLDEPS_LIBRARIES}
+    ${EFREET_LIBRARIES}
     ${Freetype_LIBRARIES}
     ${LIBXML2_LIBRARIES}
     ${SQLITE_LIBRARIES}
@@ -144,6 +154,13 @@ LIST(APPEND WebKit2_LIBRARIES
     ${CMAKE_DL_LIBS}
     ${Glib_LIBRARIES}
     ${LIBSOUP24_LIBRARIES}
+)
+
+LIST (APPEND WebKit2_FORWARDING_HEADERS_DIRECTORIES
+    Shared/API/c/efl
+    Shared/API/c/soup
+    UIProcess/API/C/efl
+    UIProcess/API/C/soup
 )
 
 LIST (APPEND WebProcess_SOURCES
@@ -163,23 +180,16 @@ LIST (APPEND WebProcess_LIBRARIES
 
 ADD_DEFINITIONS(-DDEFAULT_THEME_PATH=\"${CMAKE_INSTALL_PREFIX}/${DATA_INSTALL_DIR}/themes\")
 
-ADD_CUSTOM_TARGET(forwarding-headerEfl
-    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${DERIVED_SOURCES_WEBKIT2_DIR}/include efl
-)
-SET(ForwardingHeaders_NAME forwarding-headerEfl)
-
-ADD_CUSTOM_TARGET(forwarding-headerSoup
-    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${DERIVED_SOURCES_WEBKIT2_DIR}/include soup
-)
-SET(ForwardingNetworkHeaders_NAME forwarding-headerSoup)
-
 CONFIGURE_FILE(efl/ewebkit2.pc.in ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc @ONLY)
 SET (EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/EWebKit2.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_context.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_cookie_manager.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_download_job.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_form_submission_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent_service.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_main.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_navigation_policy_decision.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_response.h"
@@ -237,7 +247,9 @@ TARGET_LINK_LIBRARIES(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
 # The "ewk" on the test name needs to be suffixed with "2", otherwise it
 # will clash with tests from the WebKit 1 test suite.
 SET(EWK2UnitTests_BINARIES
+    test_ewk2_context
     test_ewk2_cookie_manager
+    test_ewk2_download_job
     test_ewk2_view
 )
 
@@ -248,4 +260,25 @@ IF (ENABLE_API_TESTS)
         SET_TESTS_PROPERTIES(${testName} PROPERTIES TIMEOUT 60)
         TARGET_LINK_LIBRARIES(${testName} ${EWK2UnitTests_LIBRARIES} ewk2UnitTestUtils)
     ENDFOREACH ()
+ENDIF ()
+
+IF (ENABLE_INSPECTOR)
+    SET(WK2_WEB_INSPECTOR_DIR ${CMAKE_BINARY_DIR}/WebKit2/efl/webinspector)
+    SET(WK2_WEB_INSPECTOR_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/${WebKit2_LIBRARY_NAME}-${PROJECT_VERSION_MAJOR})
+    ADD_DEFINITIONS(-DWK2_WEB_INSPECTOR_DIR="${WK2_WEB_INSPECTOR_DIR}")
+    ADD_DEFINITIONS(-DWK2_WEB_INSPECTOR_INSTALL_DIR="${WK2_WEB_INSPECTOR_INSTALL_DIR}/webinspector")
+    ADD_CUSTOM_TARGET(
+        wk2-web-inspector-resources ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${WEBCORE_DIR}/inspector/front-end ${WK2_WEB_INSPECTOR_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${WEBCORE_DIR}/English.lproj/localizedStrings.js ${WK2_WEB_INSPECTOR_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendCommands.js ${WK2_WEB_INSPECTOR_DIR}/InspectorBackendCommands.js
+        DEPENDS ${WebCore_LIBRARY_NAME}
+    )
+    INSTALL(DIRECTORY ${WK2_WEB_INSPECTOR_DIR}
+        DESTINATION ${WK2_WEB_INSPECTOR_INSTALL_DIR}
+        FILES_MATCHING PATTERN "*.js"
+                       PATTERN "*.html"
+                       PATTERN "*.css"
+                       PATTERN "*.gif"
+                       PATTERN "*.png")
 ENDIF ()

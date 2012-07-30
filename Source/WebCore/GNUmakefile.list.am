@@ -110,8 +110,6 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSDataView.h \
 	DerivedSources/WebCore/JSDedicatedWorkerContext.cpp \
 	DerivedSources/WebCore/JSDedicatedWorkerContext.h \
-	DerivedSources/WebCore/JSDeprecatedPeerConnection.cpp \
-	DerivedSources/WebCore/JSDeprecatedPeerConnection.h \
 	DerivedSources/WebCore/JSDeviceMotionEvent.cpp \
 	DerivedSources/WebCore/JSDeviceMotionEvent.h \
 	DerivedSources/WebCore/JSDeviceOrientationEvent.cpp \
@@ -142,6 +140,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSDOMPluginArray.h \
 	DerivedSources/WebCore/JSDOMPlugin.cpp \
 	DerivedSources/WebCore/JSDOMPlugin.h \
+	DerivedSources/WebCore/JSDOMSecurityPolicy.cpp \
+	DerivedSources/WebCore/JSDOMSecurityPolicy.h \
 	DerivedSources/WebCore/JSDOMSelection.cpp \
 	DerivedSources/WebCore/JSDOMSelection.h \
 	DerivedSources/WebCore/JSDOMSettableTokenList.cpp \
@@ -505,8 +505,10 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSSharedWorkerContext.h \
 	DerivedSources/WebCore/JSSharedWorker.cpp \
 	DerivedSources/WebCore/JSSharedWorker.h \
-	DerivedSources/WebCore/JSSignalingCallback.cpp \
-	DerivedSources/WebCore/JSSignalingCallback.h \
+	DerivedSources/WebCore/JSSourceBuffer.cpp \
+	DerivedSources/WebCore/JSSourceBuffer.h \
+	DerivedSources/WebCore/JSSourceBufferList.cpp \
+	DerivedSources/WebCore/JSSourceBufferList.h \
 	DerivedSources/WebCore/JSSpeechInputEvent.cpp \
 	DerivedSources/WebCore/JSSpeechInputEvent.h \
 	DerivedSources/WebCore/JSSpeechInputResult.cpp \
@@ -696,7 +698,8 @@ dom_binding_idls += \
 	$(WebCore)/Modules/geolocation/PositionCallback.idl \
 	$(WebCore)/Modules/geolocation/PositionError.idl \
 	$(WebCore)/Modules/geolocation/PositionErrorCallback.idl \
-	$(WebCore)/Modules/mediastream/DeprecatedPeerConnection.idl \
+	$(WebCore)/Modules/mediasource/SourceBuffer.idl \
+	$(WebCore)/Modules/mediasource/SourceBufferList.idl \
 	$(WebCore)/Modules/mediastream/DOMWindowMediaStream.idl \
 	$(WebCore)/Modules/mediastream/IceCallback.idl \
 	$(WebCore)/Modules/mediastream/IceCandidate.idl \
@@ -713,7 +716,6 @@ dom_binding_idls += \
 	$(WebCore)/Modules/mediastream/NavigatorUserMediaSuccessCallback.idl \
 	$(WebCore)/Modules/mediastream/PeerConnection00.idl \
 	$(WebCore)/Modules/mediastream/SessionDescription.idl \
-	$(WebCore)/Modules/mediastream/SignalingCallback.idl \
 	$(WebCore)/Modules/notifications/Notification.idl \
 	$(WebCore)/Modules/notifications/NotificationCenter.idl \
 	$(WebCore)/Modules/notifications/NotificationPermissionCallback.idl \
@@ -963,6 +965,7 @@ dom_binding_idls += \
 	$(WebCore)/page/Console.idl \
 	$(WebCore)/page/Coordinates.idl \
 	$(WebCore)/page/Crypto.idl \
+	$(WebCore)/page/DOMSecurityPolicy.idl \
 	$(WebCore)/page/DOMSelection.idl \
 	$(WebCore)/page/DOMWindow.idl \
 	$(WebCore)/page/EventSource.idl \
@@ -990,6 +993,7 @@ dom_binding_idls += \
 	$(WebCore)/plugins/DOMPluginArray.idl \
 	$(WebCore)/storage/Storage.idl \
 	$(WebCore)/storage/StorageEvent.idl \
+	$(WebCore)/testing/FastMallocStatistics.idl \
 	$(WebCore)/testing/Internals.idl \
 	$(WebCore)/testing/InternalSettings.idl \
 	$(WebCore)/workers/AbstractWorker.idl \
@@ -1165,8 +1169,10 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/indexeddb/PageGroupIndexedDatabase.h \
 	Source/WebCore/Modules/indexeddb/WorkerContextIndexedDatabase.cpp \
 	Source/WebCore/Modules/indexeddb/WorkerContextIndexedDatabase.h \
-	Source/WebCore/Modules/mediastream/DeprecatedPeerConnection.cpp \
-	Source/WebCore/Modules/mediastream/DeprecatedPeerConnection.h \
+	Source/WebCore/Modules/mediasource/SourceBuffer.cpp \
+	Source/WebCore/Modules/mediasource/SourceBuffer.h \
+	Source/WebCore/Modules/mediasource/SourceBufferList.cpp \
+	Source/WebCore/Modules/mediasource/SourceBufferList.h \
 	Source/WebCore/Modules/mediastream/IceCallback.h \
 	Source/WebCore/Modules/mediastream/IceCandidate.cpp \
 	Source/WebCore/Modules/mediastream/IceCandidate.h \
@@ -1195,7 +1201,6 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/mediastream/PeerConnection00.h \
 	Source/WebCore/Modules/mediastream/SessionDescription.cpp \
 	Source/WebCore/Modules/mediastream/SessionDescription.h \
-	Source/WebCore/Modules/mediastream/SignalingCallback.h \
 	Source/WebCore/Modules/mediastream/UserMediaClient.h \
 	Source/WebCore/Modules/mediastream/UserMediaController.h \
 	Source/WebCore/Modules/mediastream/UserMediaController.cpp \
@@ -1423,7 +1428,6 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSDOMWrapper.h \
 	Source/WebCore/bindings/js/JSDataViewCustom.cpp \
 	Source/WebCore/bindings/js/JSDedicatedWorkerContextCustom.cpp \
-	Source/WebCore/bindings/js/JSDeprecatedPeerConnectionCustom.cpp \
 	Source/WebCore/bindings/js/JSDeviceMotionEventCustom.cpp \
 	Source/WebCore/bindings/js/JSDeviceOrientationEventCustom.cpp \
 	Source/WebCore/bindings/js/JSDirectoryEntryCustom.cpp \
@@ -2573,6 +2577,7 @@ webcore_sources += \
 	Source/WebCore/html/parser/HTMLScriptRunnerHost.h \
 	Source/WebCore/html/parser/HTMLSourceTracker.cpp \
 	Source/WebCore/html/parser/HTMLSourceTracker.h \
+	Source/WebCore/html/parser/HTMLStackItem.h \
 	Source/WebCore/html/parser/HTMLToken.h \
 	Source/WebCore/html/parser/HTMLTokenizer.cpp \
 	Source/WebCore/html/parser/HTMLTokenizer.h \
@@ -3019,6 +3024,10 @@ webcore_sources += \
 	Source/WebCore/page/Coordinates.h \
 	Source/WebCore/page/Crypto.cpp \
 	Source/WebCore/page/Crypto.h \
+	Source/WebCore/page/DiagnosticLoggingKeys.cpp \
+	Source/WebCore/page/DiagnosticLoggingKeys.h \
+	Source/WebCore/page/DOMSecurityPolicy.cpp \
+	Source/WebCore/page/DOMSecurityPolicy.h \
 	Source/WebCore/page/DOMSelection.cpp \
 	Source/WebCore/page/DOMSelection.h \
 	Source/WebCore/page/DOMTimer.cpp \
@@ -3523,8 +3532,6 @@ webcore_sources += \
 	Source/WebCore/platform/LayoutTestSupport.h \
 	Source/WebCore/platform/linux/GamepadDeviceLinux.cpp \
 	Source/WebCore/platform/linux/GamepadDeviceLinux.h \
-	Source/WebCore/platform/mediastream/DeprecatedPeerConnectionHandler.h \
-	Source/WebCore/platform/mediastream/DeprecatedPeerConnectionHandlerClient.h \
 	Source/WebCore/platform/mediastream/IceCandidateDescriptor.cpp \
 	Source/WebCore/platform/mediastream/IceCandidateDescriptor.h \
 	Source/WebCore/platform/mediastream/IceOptions.cpp \
@@ -3535,6 +3542,7 @@ webcore_sources += \
 	Source/WebCore/platform/mediastream/MediaStreamCenter.h \
 	Source/WebCore/platform/mediastream/MediaStreamComponent.h \
 	Source/WebCore/platform/mediastream/MediaStreamDescriptor.h \
+	Source/WebCore/platform/mediastream/MediaStreamSource.cpp \
 	Source/WebCore/platform/mediastream/MediaStreamSource.h \
 	Source/WebCore/platform/mediastream/MediaStreamSourcesQueryClient.h \
 	Source/WebCore/platform/mediastream/PeerConnection00Handler.cpp \
@@ -3542,7 +3550,6 @@ webcore_sources += \
 	Source/WebCore/platform/mediastream/PeerConnection00HandlerClient.h \
 	Source/WebCore/platform/mediastream/SessionDescriptionDescriptor.cpp \
 	Source/WebCore/platform/mediastream/SessionDescriptionDescriptor.h \
-	Source/WebCore/platform/mediastream/gstreamer/DeprecatedPeerConnectionHandler.cpp \
 	Source/WebCore/platform/mediastream/gstreamer/MediaStreamCenterGStreamer.cpp \
 	Source/WebCore/platform/mediastream/gstreamer/MediaStreamCenterGStreamer.h \
 	Source/WebCore/platform/mock/DeviceMotionClientMock.cpp \
@@ -4124,6 +4131,7 @@ webcore_sources += \
 	Source/WebCore/rendering/style/SVGRenderStyleDefs.cpp \
 	Source/WebCore/rendering/style/SVGRenderStyleDefs.h \
 	Source/WebCore/rendering/style/SVGRenderStyle.h \
+	Source/WebCore/rendering/style/WrapShapes.cpp \
 	Source/WebCore/rendering/style/WrapShapes.h \
 	Source/WebCore/rendering/svg/RenderSVGBlock.cpp \
 	Source/WebCore/rendering/svg/RenderSVGBlock.h \
@@ -6281,3 +6289,13 @@ dom_binding_idls += \
 	$(WebCore)/Modules/quota/StorageInfoUsageCallback.idl
 
 endif  # END ENABLE_QUOTA
+
+# ----
+# Spell check support
+# ----
+if ENABLE_SPELLCHECK
+webcore_sources += \
+	Source/WebCore/platform/text/gtk/TextCheckerEnchant.h \
+	Source/WebCore/platform/text/gtk/TextCheckerEnchant.cpp
+endif # END ENABLE_SPELLCHECK
+

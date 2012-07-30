@@ -1,3 +1,446 @@
+2012-07-27  Eli Fidler  <efidler@rim.com>
+
+        [BlackBerry] Adapt to change in the FontInfo platform API.
+        https://bugs.webkit.org/show_bug.cgi?id=92547
+
+        Reviewed by Yong Li
+
+        RIM PR 161263
+
+        * Api/WebSettings.cpp:
+        (BlackBerry::WebKit::WebSettings::standardSettings):
+
+2012-07-27  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Should support onbeforeunload event and show confirmation dialog
+        https://bugs.webkit.org/show_bug.cgi?id=92510
+
+        Reviewed by Antonio Gomes.
+
+        RIM PR# 155878.
+        1. Export dispatchBeforeUnloadEvent() so client can call it before going to close the page.
+        2. Forward runBeforeUnloadConfirmPanel() call to client so it can show a dialog.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::dispatchBeforeUnloadEvent):
+        (WebKit):
+        * Api/WebPage.h:
+        * Api/WebPageClient.h:
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::canRunBeforeUnloadConfirmPanel):
+        (WebCore::ChromeClientBlackBerry::runBeforeUnloadConfirmPanel):
+
+2012-07-27  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Switch InputHandler malloc use to fastMalloc for cases that should never fail
+        https://bugs.webkit.org/show_bug.cgi?id=92508
+
+        Reviewed by Yong Li.
+
+        Replace common uses of malloc with fastMalloc rather
+        than trying to recover gracefully.  If we are truly
+        out of memory, crash before corruption occurs.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::spannableTextInRange):
+        (BlackBerry::WebKit::InputHandler::extractedTextRequest):
+
+2012-07-26  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        [BlackBerry] Remove synchronous spellchecking code
+        https://bugs.webkit.org/show_bug.cgi?id=92415
+
+        Removing synchronous spellchecking code path.
+
+        Reviewed by Rob Buis.
+
+        Internally reviewed by Mike Fenton.
+
+        * Api/WebPageClient.h:
+        * WebCoreSupport/EditorClientBlackBerry.cpp:
+        (WebCore::EditorClientBlackBerry::checkSpellingOfString):
+
+2012-07-26  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        [BlackBerry] Support async spellcheck for the blackberry port
+        https://bugs.webkit.org/show_bug.cgi?id=92160
+
+        PR124517
+        Implementing support for async spellcheck.
+
+        Reviewed by Rob Buis.
+
+        Internally reviewed by Mike Fenton.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::spellCheckingRequestCancelled):
+        (WebKit):
+        (BlackBerry::WebKit::WebPage::spellCheckingRequestProcessed):
+        (BlackBerry::WebKit::WebPagePrivate::didChangeSettings):
+        * Api/WebPage.h:
+        * Api/WebSettings.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebSettings::standardSettings):
+        (BlackBerry::WebKit::WebSettings::isAsynchronousSpellCheckingEnabled):
+        (BlackBerry::WebKit::WebSettings::setAsynchronousSpellCheckingEnabled):
+        * Api/WebSettings.h:
+        * WebCoreSupport/EditorClientBlackBerry.cpp:
+        (WebCore):
+        (WebCore::EditorClientBlackBerry::requestCheckingOfString):
+        (WebCore::EditorClientBlackBerry::checkTextOfParagraph):
+        * WebCoreSupport/EditorClientBlackBerry.h:
+        (EditorClientBlackBerry):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::requestCheckingOfString):
+        (BlackBerry::WebKit::InputHandler::convertTransactionIdToSequenceId):
+        (WebKit):
+        (BlackBerry::WebKit::InputHandler::spellCheckingRequestProcessed):
+        (BlackBerry::WebKit::InputHandler::spellCheckingRequestCancelled):
+        (BlackBerry::WebKit::InputHandler::getSpellChecker):
+        * WebKitSupport/InputHandler.h:
+        (WebCore):
+        (InputHandler):
+
+2012-07-26  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Improve the logs in Selection Handler.
+        https://bugs.webkit.org/show_bug.cgi?id=92405
+
+        Reviewed by Rob Buis.
+
+        Clean up selection logging, fix priority and style
+        of helper function.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::cancelSelection):
+        (BlackBerry::WebKit::SelectionHandler::shouldUpdateSelectionOrCaretForPoint):
+        (BlackBerry::WebKit::SelectionHandler::setCaretPosition):
+        (BlackBerry::WebKit::SelectionHandler::updateOrHandleInputSelection):
+        (BlackBerry::WebKit::SelectionHandler::setSelection):
+        (BlackBerry::WebKit::SelectionHandler::selectObject):
+        (BlackBerry::WebKit::SelectionHandler::selectionPositionChanged):
+        (BlackBerry::WebKit::SelectionHandler::caretPositionChanged):
+
+2012-07-26  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Add timing logs to SelectionHandler.
+        https://bugs.webkit.org/show_bug.cgi?id=92404
+
+        Reviewed by Rob Buis.
+
+        Add selection timing logs.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::setSelection):
+        (BlackBerry::WebKit::SelectionHandler::selectionPositionChanged):
+        * WebKitSupport/SelectionHandler.h:
+        (SelectionHandler):
+
+2012-07-26  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] InputHandler failure logs should be logAlways and critical.
+        https://bugs.webkit.org/show_bug.cgi?id=92403
+
+        Reviewed by Rob Buis.
+
+        Update Log level for failures and fix mask in log.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::convertStringToWchar):
+        (BlackBerry::WebKit::convertStringToWcharVector):
+        (BlackBerry::WebKit::convertSpannableStringToString):
+        (BlackBerry::WebKit::InputHandler::spannableTextInRange):
+        (BlackBerry::WebKit::InputHandler::setTextAttributes):
+
+2012-07-26  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Refactor BackingStorePrivate::BackingStorePrivate::clearAndUpdateTileOfNotRenderedRegion() to avoid touching tile frontbuffer
+        https://bugs.webkit.org/show_bug.cgi?id=92095
+
+        Reviewed by George Staikos.
+
+        PR: 141439
+        Specifically, we want to avoid changing the rendered region of the
+        front buffer without proper synchronization.
+
+        The method is trying to force checkerboard to appear on screen because
+        an area was invalidated but the render job was dropped, so the tile
+        contents are now invalid.
+
+        Unfortunately it did this in a way which is not thread safe. Fixed by
+        making it thread safe, in a way that minimizes memory bandwidth usage.
+
+        Instead of using the customary sequence of copy-back, modify and swap,
+        we send a synchronous message to the compositing thread to avoid the
+        copy-back step and save memory bandwidth. The trade-off is that the
+        WebKit thread might wait a little longer for the compositing thread
+        than it would from a waitForCurrentMessage() call.
+
+        The way we synchronize this is rather expensive for the WebKit thread,
+        and this method is called rather carelessly, so add various early
+        returns to avoid doing it redundantly.
+
+        Internally reviewed by Jakob Petsovits and Adam Treat.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::indexOfTile):
+        (BlackBerry::WebKit::BackingStorePrivate::clearAndUpdateTileOfNotRenderedRegion):
+        * Api/BackingStore_p.h:
+        (BackingStorePrivate):
+
+2012-07-26  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Refactor BackingStorePrivate::render() to avoid touching tile frontbuffer
+        https://bugs.webkit.org/show_bug.cgi?id=91989
+
+        Reviewed by George Staikos.
+
+        PR: 141439
+        Specifically, we want to avoid changing the rendered region of the
+        front buffer. The code only touched the front buffer rendered region
+        if the tile was not committed.
+
+        Instead of immediately marking the tile as committed, and clearing the
+        front buffer's rendered region to make it appear as checkerboard, we
+        leave the front buffer alone and only mark the tile as committed once
+        the front buffer has valid content. Un-committed tiles will also be
+        rendered as checkerboard, so leaving it uncommitted is equivalent to
+        clearing the front buffer rendered region here.
+
+        In addition to the main change, some related changes follow naturally.
+
+        The copyPreviousContentsToBackSurfaceOfTile() call only makes sense if
+        the tile is committed, and the front buffer has valid content.
+        Otherwise, clearing the back buffer is equivalent. The code has been
+        updated to this effect.
+
+        Since copyPreviousContentsToBackSurfaceOfTile() always sets the
+        rendered region to the union of the front and back buffer regions,
+        there is no point in the "backBufferIsValid" check. It has been turned
+        into an ASSERT instead, just to make sure.
+
+        Internally reviewed by Jakob Petsovits.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::render):
+
+2012-07-25  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
+
+        [BlackBerry] Support RTSP in browser
+        https://bugs.webkit.org/show_bug.cgi?id=92233
+
+        Reviewed by Rob Buis.
+
+        Handle URL scheme "rtsp://" before creating the DocumentLoader
+        and send the request to webkit. As we don't have any application
+        which can deal with rtsp invocation for now, we need to create
+        a media document to wrap the rtsp url within a video tag which
+        makes it load as a normal video clip.
+
+        RIM PR: 169669
+        Internally reviewed by Charles Wei <charles.wei@torchmobile.com.cn>.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::createDocumentLoader):
+
+2012-07-25  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Rephrase suspend/resume condition to guard against crashes
+        https://bugs.webkit.org/show_bug.cgi?id=92300
+        PR 182125
+
+        Reviewed by George Staikos.
+
+        When the compositor is removed from a WebPage, it might
+        already have unset its context, and issuing a call to
+        BackingStore::buffer() would therefore cause a crash.
+        Just guarding buffer() from this crash isn't fully
+        correct, because then we wouldn't suspend rendering
+        for a compositor that had been previously enabled.
+
+        Instead, change the condition to suspend/resume in
+        WebPagePrivate::setCompositor() to focus on the
+        object that delivers us the buffer. If we can't
+        listen to the context or buffer being set, better
+        just take the compositor object itself to determine
+        whether we have something valid or not... and hope
+        that they give us a valid context & buffer in all
+        situations when we can actually be rendering.
+
+        Also check compositor->context() in buffer() to be
+        non-zero before accessing the context's buffer,
+        because more defensive coding can't hurt here.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::buffer):
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setCompositor):
+
+2012-07-25  Joshua Netterfield  <jnetterfield@rim.com>
+
+        [BlackBerry] Update about:config lists
+        https://bugs.webkit.org/show_bug.cgi?id=92118
+
+        Reviewed by Rob Buis.
+
+        Remove features from list that have either been removed from WebKit
+        or that have been moved from one list to another.
+
+        * WebCoreSupport/AboutDataEnableFeatures.in:
+        * WebCoreSupport/AboutDataHaveFeatures.in:
+        * WebCoreSupport/AboutDataUseFeatures.in:
+
+2012-07-25  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] clock_gettime() in BackingStore.cpp should use CLOCK_MONOTONIC
+        https://bugs.webkit.org/show_bug.cgi?id=91898
+
+        Reviewed by Yong Li.
+
+        Let pthread condition variable in BackingStore.cpp use monotonic clock
+        to fix a regression caused by r123266.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::BackingStorePrivate):
+
+2012-07-25  Andy Chen  <andchen@rim.com>
+
+        [BlackBerry] Add "SelectAll" to WebPage
+        https://bugs.webkit.org/show_bug.cgi?id=92246
+
+        Reviewed by Antonio Gomes.
+
+        Add "Select All" editor command to WebPage.
+        Internally reviewed by Mike Fenton.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::selectAll):
+        (WebKit):
+        * Api/WebPage.h:
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::selectAll):
+        (WebKit):
+        * WebKitSupport/InputHandler.h:
+
+2012-07-25  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Don't touch a tile buffer while it's still on its way to the GPU
+        https://bugs.webkit.org/show_bug.cgi?id=91992
+
+        Reviewed by Adam Treat.
+
+        PR: 141439
+        The copyPreviousContentsToBackSurfaceOfTile() call will also modify
+        buffer contents, move it after the blit generation condvar to make sure
+        we've waited for the buffer to become available first.
+
+        This is done as part of some general BackingStorePrivate::render()
+        cleanup in PR 141439.
+
+        Internally reviewed by Jakob Petsovits.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::render):
+
+2012-07-25  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] notifyContentRendered() call missing in two spots
+        https://bugs.webkit.org/show_bug.cgi?id=92153
+        RIM PR 173340
+
+        Reviewed by Antonio Gomes.
+
+        In dispatchDidFirstVisualLayout() and repaint() in
+        immediate mode, we render but don't notify the
+        WebPageClient that the content was modified.
+
+        In the long run, we should probably keep track of
+        the modified reason from within render() itself
+        and use this to automatically notify the client
+        from within blitContents() and/or invalidateWindow(),
+        depending on the rendering path. That's somewhat of
+        a medium-size undertaking though; for now, adding
+        the call directly to the renderVisibleContents()
+        call sites will do.
+
+        This patch also adds a blitVisibleContents() to
+        dispatchDidFirstVisualLayout() where it was
+        inexplicably missing, probably on account of
+        old code that was never updated.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::repaint):
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::resumeBackingStore):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidFirstVisuallyNonEmptyLayout):
+
+2012-07-24  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Do not call settings setters twice on page construction
+        https://bugs.webkit.org/show_bug.cgi?id=92157
+
+        Reviewed by Yong Li.
+
+        The WebPagePrivate init method sets some settings value that were
+        already set in didChangeSettings. setUseHixie76WebSocketProtocol just
+        sets the default value, no need to set it again.
+        Also call didChangeSettings explicitly from init, before that we are
+        not calling it since the delegate is not set yet.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::init):
+
+2012-07-24  Mike Fenton  <mifenton@rim.com>
+
+        Throttle calls to request the virtual keyboard be shown.
+        https://bugs.webkit.org/show_bug.cgi?id=92138
+
+        Reviewed by Rob Buis.
+
+        PR 178465.
+
+        Do not request keyboard visibility change when
+        we are actively processing an input event.
+
+        Reviewed Internally by Gen Mak.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::focusedNodeChanged):
+
+2012-07-24  Joshua Netterfield  <jnetterfield@rim.com>
+
+        [BlackBerry] Update about:config lists
+        https://bugs.webkit.org/show_bug.cgi?id=92118
+
+        Reviewed by Rob Buis.
+
+        We want to have all flags which could be used / have been used by any platform. These lists were created by running:
+
+        * WebCoreSupport/AboutDataEnableFeatures.in: `git grep "ENABLE(" | cut -d "(" -f2 | cut -d ")" -f1 | sort -u`
+        * WebCoreSupport/AboutDataHaveFeatures.in: `git grep "HAVE(" | cut -d "(" -f2 | cut -d ")" -f1 | sort -u`
+        * WebCoreSupport/AboutDataUseFeatures.in: `git grep "USE(" | cut -d "(" -f2 | cut -d ")" -f1 | sort -u`
+
+2012-07-24  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Remove unused variable in BackingStore.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=91987
+
+        Reviewed by Antonio Gomes.
+
+        PR: 141439
+        This is done as part of some general BackingStorePrivate::render()
+        cleanup in PR 141439.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::render):
+
 2012-07-23  Yong Li  <yoli@rim.com>
 
         [BlackBerry] Move about: URL handling out of WebCore

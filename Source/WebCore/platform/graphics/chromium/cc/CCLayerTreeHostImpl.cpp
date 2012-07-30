@@ -35,7 +35,6 @@
 #include "cc/CCDelayBasedTimeSource.h"
 #include "cc/CCFontAtlas.h"
 #include "cc/CCFrameRateCounter.h"
-#include "cc/CCHeadsUpDisplay.h"
 #include "cc/CCLayerIterator.h"
 #include "cc/CCLayerTreeHost.h"
 #include "cc/CCLayerTreeHostCommon.h"
@@ -123,7 +122,6 @@ CCLayerTreeHostImpl::CCLayerTreeHostImpl(const CCLayerTreeSettings& settings, CC
     , m_visible(true)
     , m_contentsTexturesWerePurgedSinceLastCommit(false)
     , m_memoryAllocationLimitBytes(CCPrioritizedTextureManager::defaultMemoryAllocationLimit())
-    , m_headsUpDisplay(CCHeadsUpDisplay::create())
     , m_pageScale(1)
     , m_pageScaleDelta(1)
     , m_sentPageScaleDelta(1)
@@ -252,19 +250,9 @@ void CCLayerTreeHostImpl::calculateRenderSurfaceLayerList(CCLayerList& renderSur
     ASSERT(renderSurfaceLayerList.isEmpty());
     ASSERT(m_rootLayerImpl);
 
-    renderSurfaceLayerList.append(m_rootLayerImpl.get());
-
-    if (!m_rootLayerImpl->renderSurface())
-        m_rootLayerImpl->createRenderSurface();
-    m_rootLayerImpl->renderSurface()->clearLayerList();
-    m_rootLayerImpl->renderSurface()->setContentRect(IntRect(IntPoint(), deviceViewportSize()));
-
     {
         TRACE_EVENT0("cc", "CCLayerTreeHostImpl::calcDrawEtc");
-        WebTransformationMatrix identityMatrix;
-        WebTransformationMatrix deviceScaleTransform;
-        deviceScaleTransform.scale(m_deviceScaleFactor);
-        CCLayerTreeHostCommon::calculateDrawTransforms(m_rootLayerImpl.get(), m_rootLayerImpl.get(), deviceScaleTransform, identityMatrix, renderSurfaceLayerList, m_rootLayerImpl->renderSurface()->layerList(), &m_layerSorter, layerRendererCapabilities().maxTextureSize);
+        CCLayerTreeHostCommon::calculateDrawTransforms(m_rootLayerImpl.get(), deviceViewportSize(), m_deviceScaleFactor, &m_layerSorter, layerRendererCapabilities().maxTextureSize, renderSurfaceLayerList);
 
         trackDamageForAllSurfaces(m_rootLayerImpl.get(), renderSurfaceLayerList);
 
@@ -295,6 +283,9 @@ bool CCLayerTreeHostImpl::calculateRenderPasses(FrameData& frame)
 
         int renderPassId = renderSurfaceLayer->id();
         OwnPtr<CCRenderPass> pass = CCRenderPass::create(renderSurface, renderPassId);
+        pass->setFilters(renderSurfaceLayer->filters());
+        pass->setBackgroundFilters(renderSurfaceLayer->backgroundFilters());
+
         surfacePassMap.add(renderSurface, pass.get());
         frame.renderPasses.append(pass.get());
         frame.renderPassesById.add(renderPassId, pass.release());
@@ -551,15 +542,12 @@ void CCLayerTreeHostImpl::drawLayers(const FrameData& frame)
     // RenderWidget.
     m_fpsCounter->markBeginningOfFrame(currentTime());
 
-    m_layerRenderer->drawFrame(frame.renderPasses, m_rootScissorRect);
-    if (m_headsUpDisplay->enabled(settings()))
-        m_headsUpDisplay->draw(this);
-    m_layerRenderer->finishDrawingFrame();
+    m_layerRenderer->drawFrame(frame.renderPasses, frame.renderPassesById, m_rootScissorRect);
 
     for (unsigned int i = 0; i < frame.renderPasses.size(); i++)
         frame.renderPasses[i]->targetSurface()->damageTracker()->didDrawDamagedArea();
 
-    if (m_debugRectHistory->enabled(settings()))
+    if (m_settings.showDebugRects())
         m_debugRectHistory->saveDebugRectsForCurrentFrame(m_rootLayerImpl.get(), *frame.renderSurfaceLayerList, frame.occludingScreenSpaceRects, settings());
 
     // The next frame should start by assuming nothing has changed, and changes are noted as they occur.
@@ -1156,11 +1144,6 @@ String CCLayerTreeHostImpl::layerTreeAsText() const
         dumpRenderSurfaces(ts, 1, m_rootLayerImpl.get());
     }
     return ts.release();
-}
-
-void CCLayerTreeHostImpl::setFontAtlas(PassOwnPtr<CCFontAtlas> fontAtlas)
-{
-    m_headsUpDisplay->setFontAtlas(fontAtlas);
 }
 
 void CCLayerTreeHostImpl::dumpRenderSurfaces(TextStream& ts, int indent, const CCLayerImpl* layer) const

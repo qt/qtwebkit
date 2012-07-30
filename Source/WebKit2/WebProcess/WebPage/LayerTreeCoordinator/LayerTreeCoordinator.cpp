@@ -356,6 +356,10 @@ void LayerTreeCoordinator::performScheduledLayerFlush()
 {
     if (m_isSuspended || m_waitingForUIProcess)
         return;
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER) && !USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+    // Make sure that any previously registered animation callbacks are being executed before we flush the layers.
+    m_webPage->corePage()->mainFrame()->view()->serviceScriptedAnimations(convertSecondsToDOMTimeStamp(currentTime()));
+#endif
 
     m_webPage->layoutIfNeeded();
 
@@ -543,6 +547,13 @@ void LayerTreeCoordinator::setVisibleContentsRect(const IntRect& rect, float sca
     if (contentsRectDidChange)
         m_shouldSendScrollPositionUpdate = true;
 }
+
+#if USE(UI_SIDE_COMPOSITING)
+void LayerTreeCoordinator::scheduleAnimation()
+{
+    scheduleLayerFlush();
+}
+#endif
 
 void LayerTreeCoordinator::renderNextFrame()
 {

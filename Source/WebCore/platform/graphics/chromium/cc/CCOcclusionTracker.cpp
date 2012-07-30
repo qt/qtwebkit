@@ -235,9 +235,9 @@ void CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::leaveToRenderTarget(c
 
     const LayerType* oldTarget = m_stack[lastIndex].target;
     const RenderSurfaceType* oldSurface = oldTarget->renderSurface();
-    Region oldTargetOcclusionInNewTarget = transformSurfaceOpaqueRegion<RenderSurfaceType>(oldSurface, m_stack[lastIndex].occlusionInTarget, oldSurface->originTransform());
+    Region oldTargetOcclusionInNewTarget = transformSurfaceOpaqueRegion<RenderSurfaceType>(oldSurface, m_stack[lastIndex].occlusionInTarget, oldSurface->drawTransform());
     if (oldTarget->hasReplica() && !oldTarget->replicaHasMask())
-        oldTargetOcclusionInNewTarget.unite(transformSurfaceOpaqueRegion<RenderSurfaceType>(oldSurface, m_stack[lastIndex].occlusionInTarget, oldSurface->replicaOriginTransform()));
+        oldTargetOcclusionInNewTarget.unite(transformSurfaceOpaqueRegion<RenderSurfaceType>(oldSurface, m_stack[lastIndex].occlusionInTarget, oldSurface->replicaDrawTransform()));
 
     IntRect unoccludedSurfaceRect;
     IntRect unoccludedReplicaRect;
@@ -259,51 +259,10 @@ void CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::leaveToRenderTarget(c
     }
 
     if (oldTarget->backgroundFilters().hasFilterThatMovesPixels()) {
-        reduceOcclusionBelowSurface(oldTarget, unoccludedSurfaceRect, oldSurface->originTransform(), newTarget, m_stack.last().occlusionInTarget, m_stack.last().occlusionInScreen);
+        reduceOcclusionBelowSurface(oldTarget, unoccludedSurfaceRect, oldSurface->drawTransform(), newTarget, m_stack.last().occlusionInTarget, m_stack.last().occlusionInScreen);
         if (oldTarget->hasReplica())
-            reduceOcclusionBelowSurface(oldTarget, unoccludedReplicaRect, oldSurface->replicaOriginTransform(), newTarget, m_stack.last().occlusionInTarget, m_stack.last().occlusionInScreen);
+            reduceOcclusionBelowSurface(oldTarget, unoccludedReplicaRect, oldSurface->replicaDrawTransform(), newTarget, m_stack.last().occlusionInTarget, m_stack.last().occlusionInScreen);
     }
-}
-
-template<typename LayerType>
-static inline WebTransformationMatrix contentToScreenSpaceTransform(const LayerType* layer)
-{
-    ASSERT(layerTransformsToScreenKnown(layer));
-    IntSize boundsInLayerSpace = layer->bounds();
-    IntSize boundsInContentSpace = layer->contentBounds();
-
-    WebTransformationMatrix transform = layer->screenSpaceTransform();
-
-    if (boundsInContentSpace.isEmpty())
-        return transform;
-
-    // Scale from content space to layer space
-    transform.scaleNonUniform(boundsInLayerSpace.width() / static_cast<double>(boundsInContentSpace.width()),
-                              boundsInLayerSpace.height() / static_cast<double>(boundsInContentSpace.height()));
-
-    return transform;
-}
-
-template<typename LayerType>
-static inline WebTransformationMatrix contentToTargetSurfaceTransform(const LayerType* layer)
-{
-    ASSERT(layerTransformsToTargetKnown(layer));
-    IntSize boundsInLayerSpace = layer->bounds();
-    IntSize boundsInContentSpace = layer->contentBounds();
-
-    WebTransformationMatrix transform = layer->drawTransform();
-
-    if (boundsInContentSpace.isEmpty())
-        return transform;
-
-    // Scale from content space to layer space
-    transform.scaleNonUniform(boundsInLayerSpace.width() / static_cast<double>(boundsInContentSpace.width()),
-                              boundsInLayerSpace.height() / static_cast<double>(boundsInContentSpace.height()));
-
-    // The draw transform expects the origin to be in the middle of the layer.
-    transform.translate(-boundsInContentSpace.width() / 2.0, -boundsInContentSpace.height() / 2.0);
-
-    return transform;
 }
 
 // FIXME: Remove usePaintTracking when paint tracking is on for paint culling.
@@ -351,7 +310,7 @@ void CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::markOccludedBehindLay
 
     IntRect scissorInTarget = layerScissorRectInTargetSurface(layer);
     if (layerTransformsToTargetKnown(layer))
-        addOcclusionBehindLayer<LayerType>(m_stack.last().occlusionInTarget, layer, contentToTargetSurfaceTransform<LayerType>(layer), opaqueContents, scissorInTarget, m_minimumTrackingSize, 0);
+        addOcclusionBehindLayer<LayerType>(m_stack.last().occlusionInTarget, layer, layer->drawTransform(), opaqueContents, scissorInTarget, m_minimumTrackingSize, 0);
 
     // We must clip the occlusion within the layer's scissorInTarget within screen space as well. If the scissor rect can't be moved to screen space and
     // remain rectilinear, then we don't add any occlusion in screen space.
@@ -364,7 +323,7 @@ void CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::markOccludedBehindLay
         if (clipped || !scissorInScreenQuad.isRectilinear())
             return;
         IntRect scissorInScreenRect = intersection(m_scissorRectInScreenSpace, enclosedIntRect(scissorInScreenQuad.boundingBox()));
-        addOcclusionBehindLayer<LayerType>(m_stack.last().occlusionInScreen, layer, contentToScreenSpaceTransform<LayerType>(layer), opaqueContents, scissorInScreenRect, m_minimumTrackingSize, m_occludingScreenSpaceRects);
+        addOcclusionBehindLayer<LayerType>(m_stack.last().occlusionInScreen, layer, layer->screenSpaceTransform(), opaqueContents, scissorInScreenRect, m_minimumTrackingSize, m_occludingScreenSpaceRects);
     }
 }
 
@@ -390,10 +349,10 @@ bool CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::occluded(const LayerT
 
     ASSERT(layer->renderTarget() == m_stack.last().target);
 
-    if (layerTransformsToTargetKnown(layer) && testContentRectOccluded(contentRect, contentToTargetSurfaceTransform<LayerType>(layer), layerScissorRectInTargetSurface(layer), m_stack.last().occlusionInTarget))
+    if (layerTransformsToTargetKnown(layer) && testContentRectOccluded(contentRect, layer->drawTransform(), layerScissorRectInTargetSurface(layer), m_stack.last().occlusionInTarget))
         return true;
 
-    if (layerTransformsToScreenKnown(layer) && testContentRectOccluded(contentRect, contentToScreenSpaceTransform<LayerType>(layer), m_scissorRectInScreenSpace, m_stack.last().occlusionInScreen)) {
+    if (layerTransformsToScreenKnown(layer) && testContentRectOccluded(contentRect, layer->screenSpaceTransform(), m_scissorRectInScreenSpace, m_stack.last().occlusionInScreen)) {
         if (hasOcclusionFromOutsideTargetSurface)
             *hasOcclusionFromOutsideTargetSurface = true;
         return true;
@@ -440,11 +399,11 @@ IntRect CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::unoccludedContentR
 
     IntRect unoccludedInScreen = contentRect;
     if (layerTransformsToScreenKnown(layer))
-        unoccludedInScreen = computeUnoccludedContentRect(contentRect, contentToScreenSpaceTransform<LayerType>(layer), m_scissorRectInScreenSpace, m_stack.last().occlusionInScreen);
+        unoccludedInScreen = computeUnoccludedContentRect(contentRect, layer->screenSpaceTransform(), m_scissorRectInScreenSpace, m_stack.last().occlusionInScreen);
 
     IntRect unoccludedInTarget = contentRect;
     if (layerTransformsToTargetKnown(layer))
-        unoccludedInTarget = computeUnoccludedContentRect(contentRect, contentToTargetSurfaceTransform<LayerType>(layer), layerScissorRectInTargetSurface(layer), m_stack.last().occlusionInTarget);
+        unoccludedInTarget = computeUnoccludedContentRect(contentRect, layer->drawTransform(), layerScissorRectInTargetSurface(layer), m_stack.last().occlusionInTarget);
 
     if (hasOcclusionFromOutsideTargetSurface)
         *hasOcclusionFromOutsideTargetSurface = (intersection(unoccludedInScreen, unoccludedInTarget) != unoccludedInTarget);
@@ -481,7 +440,7 @@ IntRect CCOcclusionTrackerBase<LayerType, RenderSurfaceType>::unoccludedContribu
     bool hasOcclusion = m_stack.size() > 1;
 
     const WebTransformationMatrix& transformToScreen = forReplica ? surface->replicaScreenSpaceTransform() : surface->screenSpaceTransform();
-    const WebTransformationMatrix& transformToTarget = forReplica ? surface->replicaOriginTransform() : surface->originTransform();
+    const WebTransformationMatrix& transformToTarget = forReplica ? surface->replicaDrawTransform() : surface->drawTransform();
 
     IntRect unoccludedInScreen = contentRect;
     if (surfaceTransformsToScreenKnown(surface)) {

@@ -222,6 +222,10 @@
 #include "TextAutosizer.h"
 #endif
 
+#if ENABLE(CSP_NEXT)
+#include "DOMSecurityPolicy.h"
+#endif
+
 using namespace std;
 using namespace WTF;
 using namespace Unicode;
@@ -662,7 +666,7 @@ Document::~Document()
 
 #if ENABLE(UNDO_MANAGER)
     if (m_undoManager)
-        m_undoManager->undoScopeHostDestroyed();
+        m_undoManager->disconnect();
 #endif
 
     // We must call clearRareData() here since a Document class inherits TreeScope
@@ -1640,6 +1644,15 @@ bool Document::webkitHidden() const
 void Document::dispatchVisibilityStateChangeEvent()
 {
     dispatchEvent(Event::create(eventNames().webkitvisibilitychangeEvent, false, false));
+}
+#endif
+
+#if ENABLE(CSP_NEXT)
+DOMSecurityPolicy* Document::securityPolicy()
+{
+    if (!m_domSecurityPolicy)
+        m_domSecurityPolicy = DOMSecurityPolicy::create(this);
+    return m_domSecurityPolicy.get();
 }
 #endif
 
@@ -6075,6 +6088,7 @@ void Document::setContextFeatures(PassRefPtr<ContextFeatures> features)
 void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo<Document> info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    info.addInstrumentedMember(m_styleResolver);
     info.visitBaseClass<ContainerNode>(this);
     info.addVector(m_customFonts);
     info.addString(m_documentURI);

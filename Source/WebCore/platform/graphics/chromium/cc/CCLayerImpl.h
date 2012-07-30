@@ -187,9 +187,6 @@ public:
     const IntSize& contentBounds() const { return m_contentBounds; }
     void setContentBounds(const IntSize&);
 
-    void setContentsScale(float contentsScale) { m_contentsScale = contentsScale; }
-    float contentsScale() const { return m_contentsScale; }
-
     const IntPoint& scrollPosition() const { return m_scrollPosition; }
     void setScrollPosition(const IntPoint&);
 
@@ -230,9 +227,6 @@ public:
     bool doubleSided() const { return m_doubleSided; }
     void setDoubleSided(bool);
 
-    // Returns the rect containtaining this layer in the current view's coordinate system.
-    const IntRect getDrawRect() const;
-
     void setTransform(const WebKit::WebTransformationMatrix&);
     bool transformIsAnimating() const;
 
@@ -255,10 +249,12 @@ public:
 
     void setStackingOrderChanged(bool);
 
-    bool layerPropertyChanged() const { return m_layerPropertyChanged; }
+    bool layerPropertyChanged() const { return m_layerPropertyChanged || layerIsAlwaysDamaged(); }
     bool layerSurfacePropertyChanged() const;
 
     void resetAllChangeTrackingForSubtree();
+
+    virtual bool layerIsAlwaysDamaged() const { return false; }
 
     CCLayerAnimationController* layerAnimationController() { return m_layerAnimationController.get(); }
 
@@ -305,7 +301,6 @@ private:
     float m_anchorPointZ;
     IntSize m_bounds;
     IntSize m_contentBounds;
-    float m_contentsScale;
     IntPoint m_scrollPosition;
     bool m_scrollable;
     bool m_shouldScrollOnMainThread;

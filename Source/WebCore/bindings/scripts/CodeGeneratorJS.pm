@@ -260,8 +260,6 @@ sub AddIncludesForType
     } elsif ($type eq "DOMString[]") {
         # FIXME: Add proper support for T[], T[]?, sequence<T>
         $includesRef->{"JSDOMStringList.h"} = 1;
-    } elsif ($type eq "unsigned long[]") {
-        $includesRef->{"<wtf/Vector.h>"} = 1;
     } elsif ($type eq "SerializedScriptValue") {
         $includesRef->{"SerializedScriptValue.h"} = 1;
     } elsif ($isCallback) {
@@ -1277,7 +1275,7 @@ sub GenerateParametersCheckExpression
             # For Callbacks only checks if the value is null or object.
             push(@andExpression, "(${value}.isNull() || ${value}.isFunction())");
             $usedArguments{$parameterIndex} = 1;
-        } elsif (IsArrayType($type)) {
+        } elsif (IsArrayType($type) || $codeGenerator->GetSequenceType($type)) {
             # FIXME: Add proper support for T[], T[]?, sequence<T>
             if ($parameter->isNullable) {
                 push(@andExpression, "(${value}.isNull() || (${value}.isObject() && isJSArray(${value})))");
@@ -1766,13 +1764,13 @@ sub GenerateImplementation
                 my $attributeConditionalString = $codeGenerator->GenerateConditionalString($attribute->signature);
                 push(@implContent, "#if ${attributeConditionalString}\n") if $attributeConditionalString;
 
-                push(@implContent, "JSValue ${getFunctionName}(ExecState* exec, JSValue");
-                push(@implContent, " slotBase") if !$attribute->isStatic;
-                push(@implContent, ", PropertyName)\n");
+                push(@implContent, "JSValue ${getFunctionName}(ExecState* exec, JSValue slotBase, PropertyName)\n");
                 push(@implContent, "{\n");
 
-                if (!$attribute->isStatic) {
+                if (!$attribute->isStatic || $attribute->signature->type =~ /Constructor$/) {
                     push(@implContent, "    ${className}* castedThis = jsCast<$className*>(asObject(slotBase));\n");
+                } else {
+                    push(@implContent, "    UNUSED_PARAM(slotBase);\n");
                 }
 
                 if ($attribute->signature->extendedAttributes->{"CachedAttribute"}) {
@@ -2609,6 +2607,14 @@ sub GenerateParametersCheck
                 push(@$outputArray, "    }\n");
                 push(@$outputArray, "    RefPtr<$argType> $name = ${callbackClassName}::create(asObject(exec->argument($argsIndex)), castedThis->globalObject());\n");
             }
+        } elsif ($parameter->extendedAttributes->{"Clamp"}) {
+                my $nativeValue = "${name}NativeValue";
+                push(@$outputArray, "    $argType $name = 0;\n");
+                push(@$outputArray, "    double $nativeValue = exec->argument($argsIndex).toNumber(exec);\n");
+                push(@$outputArray, "    if (exec->hadException())\n");
+                push(@$outputArray, "        return JSValue::encode(jsUndefined());\n\n");
+                push(@$outputArray, "    if (!isnan(objArgsShortNativeValue))\n");
+                push(@$outputArray, "        $name = clampTo<$argType>($nativeValue);\n\n");
         } else {
             # If the "StrictTypeChecking" extended attribute is present, and the argument's type is an
             # interface type, then if the incoming value does not implement that interface, a TypeError
@@ -2924,8 +2930,7 @@ my %nativeType = (
     "long long" => "long long",
     "unsigned long long" => "unsigned long long",
     "MediaQueryListListener" => "RefPtr<MediaQueryListListener>",
-    "DOMTimeStamp" => "DOMTimeStamp",
-    "unsigned long[]" => "Vector<unsigned long>"
+    "DOMTimeStamp" => "DOMTimeStamp",    
 );
 
 sub GetNativeType
@@ -3072,11 +3077,6 @@ sub JSValueToNative
         return "toDOMStringList(exec, $value)";
     }
 
-    if ($type eq "unsigned long[]") {
-        AddToImplIncludes("JSDOMBinding.h", $conditional);
-        return "jsUnsignedLongArrayToVector(exec, $value)";
-    }
-
     AddToImplIncludes("HTMLOptionElement.h", $conditional) if $type eq "HTMLOptionElement";
     AddToImplIncludes("JSCustomVoidCallback.h", $conditional) if $type eq "VoidCallback";
     AddToImplIncludes("Event.h", $conditional) if $type eq "Event";
@@ -3187,8 +3187,6 @@ sub NativeToJSValue
     } elsif ($type eq "SerializedScriptValue" or $type eq "any") {
         AddToImplIncludes("SerializedScriptValue.h", $conditional);
         return "$value ? $value->deserialize(exec, castedThis->globalObject(), 0) : jsNull()";
-    } elsif ($type eq "unsigned long[]") {
-        AddToImplIncludes("<wrt/Vector.h>", $conditional);
     } elsif ($type eq "MessagePortArray") {
         AddToImplIncludes("MessagePort.h", $conditional);
         AddToImplIncludes("JSMessagePort.h", $conditional);

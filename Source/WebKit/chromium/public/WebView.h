@@ -63,7 +63,6 @@ struct WebActiveWheelFlingParameters;
 struct WebMediaPlayerAction;
 struct WebPluginAction;
 struct WebPoint;
-struct WebRenderingStats;
 
 class WebView : public WebWidget {
 public:
@@ -253,6 +252,14 @@ public:
 
     virtual float minimumPageScaleFactor() const = 0;
     virtual float maximumPageScaleFactor() const = 0;
+
+    // Save the WebView's current scroll and scale state. Each call to this function
+    // overwrites the previously saved scroll and scale state.
+    virtual void saveScrollAndScaleState() = 0;
+
+    // Restore the previously saved scroll and scale state. After restroing the
+    // state, this function deletes any saved scroll and scale state.
+    virtual void restoreScrollAndScaleState() = 0;
 
     // Prevent the web page from setting a maximum scale via the viewport meta
     // tag. This is an accessibility feature that lets folks zoom in to web
@@ -453,10 +460,6 @@ public:
     virtual bool setEditableSelectionOffsets(int start, int end) = 0;
 
     virtual bool isSelectionEditable() const = 0;
-
-    // Fills in a WebRenderingStats struct containing information about the state of the compositor.
-    // This call is relatively expensive in threaded mode as it blocks on the compositor thread.
-    virtual void renderingStats(WebRenderingStats&) const { }
 
     // Benchmarking support --------------------------------------------
 

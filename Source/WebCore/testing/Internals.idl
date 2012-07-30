@@ -155,6 +155,8 @@ module window {
         void suspendAnimations(in Document document) raises (DOMException);
         void resumeAnimations(in Document document) raises (DOMException);
 
+        void garbageCollectDocumentResources(in Document document) raises (DOMException);
+
         void allowRoundingHacks();
 
 #if defined(ENABLE_BATTERY_STATUS) && ENABLE_BATTERY_STATUS
@@ -170,6 +172,7 @@ module window {
         [Conditional=INSPECTOR] sequence<String> consoleMessageArgumentCounts(in Document document);
 
         DOMString counterValue(in Element element);
+        long pageNumber(in Element element, in [Optional] float pageWidth, in [Optional] float pageHeight);
         DOMString[] iconURLs(in Document document);
 
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
@@ -181,6 +184,8 @@ module window {
 
         void registerURLSchemeAsBypassingContentSecurityPolicy(in DOMString scheme);
         void removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(in DOMString scheme);
+
+        FastMallocStatistics fastMallocStatistics();
     };
 }
 

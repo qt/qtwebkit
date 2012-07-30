@@ -1,3 +1,201 @@
+2012-07-29  YoungTaeck Song  <youngtaeck.song@samsung.com>
+
+        [WK2][EFL] TILED_BACKING_STORE support on Efl WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=91582
+
+        Reviewed by Noam Rosenthal.
+
+        Add a dummy function for fixing building error when enabling TILED_BACKING_STORE.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore):
+        (WebCore::ChromeClientEfl::delegatedScrollRequested):
+        * WebCoreSupport/ChromeClientEfl.h:
+        (ChromeClientEfl):
+
+2012-07-27  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Regression(r123858): Default navigation policy decision was switched to "reject"
+        https://bugs.webkit.org/show_bug.cgi?id=92507
+
+        Reviewed by Kentaro Hara.
+
+        After r92466, the default navigation policy is to reject the request if the
+        client does not make a decision explicitly. The default policy should be
+        to accept. This broke ewk_view unit tests.
+
+        * ewk/ewk_view.cpp:
+        (ewk_view_navigation_policy_decision):
+
+2012-07-27  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Fix wrong return value in EWK_VIEW_XXX macro.
+        https://bugs.webkit.org/show_bug.cgi?id=92466
+
+        Reviewed by Simon Hausmann.
+
+        There are wrong return values in EWK_VIEW_XXX macros. The wrong return values
+        should be fixed. In addition, API description is also modified according to returned
+        value change.
+
+        * ewk/ewk_view.cpp:
+        (ewk_view_setting_minimum_timer_interval_get):
+        (ewk_view_navigation_policy_decision):
+        (ewk_view_page_rect_get):
+        (ewk_view_setting_enable_xss_auditor_get):
+        * ewk/ewk_view.h:
+
+2012-07-27  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Change prototype of run_open_panel
+        https://bugs.webkit.org/show_bug.cgi?id=91956
+
+        Reviewed by Kentaro Hara.
+
+        In order to support all of the file chooser attributes,
+        change the types of parameters in run_open_panel method.
+        i.e., change "Eina_Bool allows_multiple_files, Eina_List *accept_types"
+        to "Ewk_File_Chooser *file_chooser"
+        In addition, Efl can support the capture attribute for HTML media capture.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::runOpenPanel):
+        * ewk/ewk_view.cpp:
+        (ewk_view_run_open_panel):
+        * ewk/ewk_view.h:
+        * ewk/ewk_view_private.h:
+
+2012-07-26  Seokju Kwon  <seokju.kwon@samsung.com>
+
+        [EFL] Highlight the element under mouse on web inspector
+        https://bugs.webkit.org/show_bug.cgi?id=91592
+
+        Reviewed by Kentaro Hara.
+
+        Implement highlighting the nodes when using the web inspector.
+
+        * WebCoreSupport/InspectorClientEfl.cpp:
+        (WebCore::InspectorClientEfl::highlight):
+        (WebCore::InspectorClientEfl::hideHighlight):
+        (WebCore::InspectorClientEfl::invalidateView):
+        (WebCore):
+        * WebCoreSupport/InspectorClientEfl.h:
+        (InspectorClientEfl):
+        * ewk/ewk_paint_context.cpp:
+        (ewk_paint_context_paint_contents):
+
+2012-07-26  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Implement Network Information provider
+        https://bugs.webkit.org/show_bug.cgi?id=92343
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make NetworkInfoClientEfl use NetworkInfoProviderEfl
+        from WebCore to avoid code duplication with WebKit2.
+
+        * WebCoreSupport/NetworkInfoClientEfl.cpp:
+        (WebCore::NetworkInfoClientEfl::startUpdating):
+        (WebCore::NetworkInfoClientEfl::stopUpdating):
+        (WebCore::NetworkInfoClientEfl::bandwidth):
+        (WebCore::NetworkInfoClientEfl::metered):
+        (WebCore):
+        * WebCoreSupport/NetworkInfoClientEfl.h:
+        (WebCore):
+        (NetworkInfoClientEfl):
+
+2012-07-26  Zoltan Nyul  <zoltan.nyul@intel.com>
+
+        [EFL] EFL port should use XDG paths
+        https://bugs.webkit.org/show_bug.cgi?id=91719
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Using xdg paths instead of home/.webkit directory for application
+        cache, web-database and local-storage.
+
+        * ewk/ewk_main.cpp:
+        (_ewk_init_body):
+
+2012-07-26  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        [DRT] LTC:: pageNumberForElementById() could be moved to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=92091
+
+        Reviewed by Adam Barth.
+
+        Move the pageNumberForElementById from LayoutTestCotroller to Internals and
+        remove the old platform specific implementations as it exclusively tests WebCore functionality.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+
+2012-07-25  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Use eina_stringshare_add instead of strdup.
+        https://bugs.webkit.org/show_bug.cgi?id=92072
+
+        Reviewed by Kentaro Hara.
+
+        Eina of EFL libraries supports a string functionality that replaces strdup. So, EFL port needs
+        to replace strdup with eina_stringshare_add function.
+
+        In addition, some API descriptions need to be modified according to ewk APIs's parameter and
+        return type change.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::runJavaScriptPrompt):
+        * ewk/ewk_cookies.cpp:
+        (ewk_cookies_get_all):
+        (ewk_cookies_cookie_free):
+        * ewk/ewk_cookies.h:
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_script_execute):
+        (ewk_frame_selection_get):
+        (ewk_frame_resources_location_get):
+        (ewk_frame_plain_text_get):
+        * ewk/ewk_frame.h:
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_suggestions_get):
+        (ewk_intent_extra_get):
+        (ewk_intent_extra_names_get):
+        * ewk/ewk_intent.h:
+        * ewk/ewk_js.cpp:
+        (ewk_js_variant_to_npvariant):
+        (ewk_js_object_new):
+        * ewk/ewk_view.cpp:
+        (_ewk_view_smart_run_javascript_prompt):
+        (ewk_view_selection_get):
+        (ewk_view_run_javascript_prompt):
+        (ewk_view_run_open_panel):
+        * ewk/ewk_view.h:
+        * ewk/ewk_view_private.h:
+
+2012-07-25  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Add File Chooser API
+        https://bugs.webkit.org/show_bug.cgi?id=91957
+
+        Reviewed by Hajime Morita.
+
+        Add APIs for file chooser. These APIs allow an application(like a browser) queries informations
+        about multiple files allowed, directory upload allowed, accept mimetypes list,
+        accept file extentions list, selected files list and capture to support HTML media capture.
+
+        * ewk/EWebKit.h:
+        * ewk/ewk_file_chooser.cpp: Added.
+        (_Ewk_File_Chooser):
+        (ewk_file_chooser_allows_multiple_files_get):
+        (ewk_file_chooser_allows_directory_upload_get):
+        (ewk_file_chooser_accept_mimetypes_get):
+        (ewk_file_chooser_accept_file_extentions_get):
+        (ewk_file_chooser_selected_files_get):
+        (ewk_file_chooser_capture_get):
+        (ewk_file_chooser_new):
+        (ewk_file_chooser_free):
+        * ewk/ewk_file_chooser.h: Added.
+        * ewk/ewk_file_chooser_private.h: Added.
+        (WebCore):
+
 2012-07-23  Pierre Rossi  <pierre.rossi@gmail.com>
 
         Unify numTouchEventHandlersChanged and needTouchEvents in the chrome client

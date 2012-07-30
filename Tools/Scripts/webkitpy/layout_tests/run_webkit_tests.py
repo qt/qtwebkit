@@ -112,23 +112,7 @@ def run(port, options, args, regular_output=sys.stderr, buildbot_output=sys.stdo
         manager = Manager(port, options, printer)
         printer.print_config()
 
-        printer.write_update("Collecting tests ...")
-        try:
-            manager.collect_tests(args)
-        except IOError, e:
-            if e.errno == errno.ENOENT:
-                return -1
-            raise
-
-        printer.write_update("Checking build ...")
-        if not port.check_build(manager.needs_servers()):
-            _log.error("Build check failed")
-            return -1
-
-        printer.write_update("Parsing expectations ...")
-        manager.parse_expectations()
-
-        unexpected_result_count = manager.run()
+        unexpected_result_count = manager.run(args)
         _log.debug("Testing completed, Exit status: %d" % unexpected_result_count)
     except Exception:
         exception_type, exception_value, exception_traceback = sys.exc_info()
@@ -175,15 +159,28 @@ def _set_up_derived_options(port, options):
         warnings.append("--force/--skipped=%s overrides --no-http." % (options.skipped))
         options.http = True
 
-    if options.skip_pixel_test_if_no_baseline and not options.pixel_tests:
-        warnings.append("--skip-pixel-test-if-no-baseline is only supported with -p (--pixel-tests)")
-
     if options.ignore_metrics and (options.new_baseline or options.reset_results):
         warnings.append("--ignore-metrics has no effect with --new-baselines or with --reset-results")
 
     if options.new_baseline:
         options.reset_results = True
         options.add_platform_exceptions = True
+
+    if options.pixel_test_directories:
+        options.pixel_tests = True
+        varified_dirs = set()
+        pixel_test_directories = options.pixel_test_directories
+        for directory in pixel_test_directories:
+            # FIXME: we should support specifying the directories all the ways we support it for additional
+            # arguments specifying which tests and directories to run. We should also move the logic for that
+            # to Port.
+            filesystem = port.host.filesystem
+            if not filesystem.isdir(filesystem.join(port.layout_tests_dir(), directory)):
+                warnings.append("'%s' was passed to --pixel-test-directories, which doesn't seem to be a directory" % str(directory))
+            else:
+                varified_dirs.add(directory)
+
+        options.pixel_test_directories = list(varified_dirs)
 
     return warnings
 
@@ -246,10 +243,6 @@ def parse_args(args=None):
             action="store_true",
             default=False,
             help="Use hardware accelerated painting of composited pages"),
-        optparse.make_option("--enable-hardware-gpu",
-            action="store_true",
-            default=False,
-            help="Run graphics tests on real GPU hardware vs software"),
         optparse.make_option("--per-tile-painting",
             action="store_true",
             help="Use per-tile painting of composited pages"),
@@ -275,8 +268,9 @@ def parse_args(args=None):
             help="Run a concurrent JavaScript thread with each test"),
         optparse.make_option("--webkit-test-runner", "-2", action="store_true",
             help="Use WebKitTestRunner rather than DumpRenderTree."),
+        # FIXME: We should merge this w/ --build-directory and only have one flag.
         optparse.make_option("--root", action="store",
-            help="Path to a pre-built root of WebKit (for running tests using a nightly build of WebKit)"),
+            help="Path to a directory containing the executables needed to run tests."),
     ]))
 
     option_group_definitions.append(("ORWT Compatibility Options", [
@@ -312,9 +306,16 @@ def parse_args(args=None):
         optparse.make_option("--no-new-test-results", action="store_false",
             dest="new_test_results", default=True,
             help="Don't create new baselines when no expected results exist"),
-        optparse.make_option("--skip-pixel-test-if-no-baseline", action="store_true",
-            dest="skip_pixel_test_if_no_baseline", help="Do not generate and check pixel result in the case when "
-                 "no image baseline is available for the test."),
+
+        #FIXME: we should support a comma separated list with --pixel-test-directory as well.
+        optparse.make_option("--pixel-test-directory", action="append", default=[], dest="pixel_test_directories",
+            help="A directory where it is allowed to execute tests as pixel tests. "
+                 "Specify multiple times to add multiple directories. "
+                 "This option implies --pixel-tests. If specified, only those tests "
+                 "will be executed as pixel tests that are located in one of the "
+                 "directories enumerated with the option. Some ports may ignore this "
+                 "option while others can have a default value that can be overridden here."),
+
         optparse.make_option("--skip-failing-tests", action="store_true",
             default=False, help="Skip tests that are expected to fail. "
                  "Note: When using this option, you might miss new crashes "

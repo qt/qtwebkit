@@ -1,20 +1,315 @@
-2012-06-13  Patrick Gansterer  <paroga@webkit.org>
+2012-07-29  Filip Pizlo  <fpizlo@apple.com>
 
-        [WIN] Remove dependency on pthread from MachineStackMarker
-        https://bugs.webkit.org/show_bug.cgi?id=68429
+        PropertyNameArray::m_shouldCache is only assigned and never used
+        https://bugs.webkit.org/show_bug.cgi?id=92598
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Dan Bernstein.
 
-        Implement pthread TLS functionality with native windows functions.
+        * runtime/PropertyNameArray.h:
+        (JSC::PropertyNameArray::PropertyNameArray):
+        (PropertyNameArray):
 
-        * heap/MachineStackMarker.cpp: Use the new functions instead of pthread directly.
-        * heap/MachineStackMarker.h:
-        * wtf/ThreadSpecific.h:
-        (WTF::ThreadSpecificKeyCreate): Added wrapper around pthread_key_create.
-        (WTF::ThreadSpecificKeyDelete): Added wrapper around pthread_key_delete.
-        (WTF::ThreadSpecificSet): Added wrapper around pthread_setspecific.
-        (WTF::ThreadSpecificGet): Added wrapper around pthread_getspecific.
-        * wtf/ThreadSpecificWin.cpp:
+2012-07-29  Rik Cabanier  <cabanier@adobe.com>
+
+        Add ENABLE_CSS_COMPOSITING flag
+        https://bugs.webkit.org/show_bug.cgi?id=92553
+
+        Reviewed by Dirk Schulze.
+
+        Adds compiler flag CSS_COMPOSITING to build systems to enable CSS blending and compositing. See spec https://dvcs.w3.org/hg/FXTF/rawfile/tip/compositing/index.html
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-27  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Split functionality of MarkedAllocator::m_currentBlock
+        https://bugs.webkit.org/show_bug.cgi?id=92550
+
+        Reviewed by Filip Pizlo.
+
+        MarkedAllocator::m_currentBlock serves two purposes right now; it indicates the block that is currently 
+        being used for allocation and the beginning of the list of blocks that need to be swept. We should split 
+        these two functionalities into two separate fields.
+
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper): Use m_blocksToSweep instead of m_currentBlock as the 
+        initializer/reference of the loop. Only change m_currentBlock when we know what the result will be.
+        (JSC::MarkedAllocator::addBlock): When we add a new block we know that both m_blocksToSweep and 
+        m_currentBlock are null. In order to preserve the invariant that m_currentBlock <= m_blocksToSweep, 
+        we assign both of them to point to the new block.
+        (JSC::MarkedAllocator::removeBlock): We need a separate check to see if the block we're removing is 
+        m_blocksToSweep and if so, advance it to the next block in the list.
+        * heap/MarkedAllocator.h:
+        (MarkedAllocator): Initialize m_blocksToSweep.
+        (JSC::MarkedAllocator::MarkedAllocator):
+        (JSC::MarkedAllocator::reset): We set m_blocksToSweep to be the head of our list. This function is called
+        at the end of a collection, so all of the blocks in our allocator need to be swept. We need to sweep a 
+        block before we can start allocating, so m_currentBlock is set to null. We also set the freeList to 
+        the empty FreeList to emphasize the fact that we can't start allocating until we do some sweeping.
+
+2012-07-27  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Increase inline storage for JSFinalObjects by one
+        https://bugs.webkit.org/show_bug.cgi?id=92526
+
+        Reviewed by Geoffrey Garen.
+
+        Now that we've removed the inheritorID from objects, we can increase our inline storage for JSFinalObjects on 
+        64-bit platforms by 1.
+
+        * llint/LowLevelInterpreter.asm: Change the constant.
+        * runtime/PropertyOffset.h: Change the constant.
+        (JSC):
+
+2012-07-27  Jer Noble  <jer.noble@apple.com>
+
+        Support a rational time class for use by media elements.
+        https://bugs.webkit.org/show_bug.cgi?id=88787
+
+        Re-export WTF::MediaTime from JavaScriptCore.
+
+        Reviewed by Eric Carlson.
+
+        * JavaScriptCore.order:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-07-26  Filip Pizlo  <fpizlo@apple.com>
+
+        JSObject::reallocateStorageIfNecessary is neither used nor defined
+        https://bugs.webkit.org/show_bug.cgi?id=92417
+
+        Reviewed by Mark Rowe.
+
+        * runtime/JSObject.h:
+        (JSObject):
+
+2012-07-26  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Allocate Structures in a separate part of the Heap
+        https://bugs.webkit.org/show_bug.cgi?id=92420
+
+        Reviewed by Filip Pizlo.
+
+        To fix our issue with destruction/finalization of Structures before their objects, we can move Structures to a separate 
+        part of the Heap that will be swept after all other objects. This first patch will just be separating Structures 
+        out into their own separate MarkedAllocator. Everything else will behave identically.
+
+        * heap/Heap.h: New function to allocate Structures in the Heap.
+        (Heap):
+        (JSC):
+        (JSC::Heap::allocateStructure):
+        * heap/MarkedAllocator.cpp: Pass whether or not we're allocated Structures to the MarkedBlock.
+        (JSC::MarkedAllocator::allocateBlock):
+        * heap/MarkedAllocator.h: Add tracking for whether or not we're allocating only Structures.
+        (JSC::MarkedAllocator::onlyContainsStructures):
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::MarkedAllocator):
+        (JSC::MarkedAllocator::init):
+        * heap/MarkedBlock.cpp: Add tracking for whether or not we're allocating only Structures. We need this to be able to 
+        distinguish the various MarkedBlock types in MarkedSpace::allocatorFor(MarkedBlock*).
+        (JSC::MarkedBlock::create):
+        (JSC::MarkedBlock::MarkedBlock):
+        * heap/MarkedBlock.h:
+        (MarkedBlock):
+        (JSC::MarkedBlock::onlyContainsStructures):
+        (JSC):
+        * heap/MarkedSpace.cpp: Include the new Structure allocator in all the places that all the other allocators are used/modified.
+        (JSC::MarkedSpace::MarkedSpace):
+        (JSC::MarkedSpace::resetAllocators):
+        (JSC::MarkedSpace::canonicalizeCellLivenessData):
+        (JSC::MarkedSpace::isPagedOut):
+        * heap/MarkedSpace.h: Add new MarkedAllocator just for Structures.
+        (MarkedSpace):
+        (JSC::MarkedSpace::allocatorFor):
+        (JSC::MarkedSpace::allocateStructure):
+        (JSC):
+        (JSC::MarkedSpace::forEachBlock):
+        * runtime/Structure.h: Move all of the functions that call allocateCell<Structure> down below the explicit template specialization
+        for allocateCell<Structure>. The new inline specialization for allocateCell directly calls the allocateStructure() function in the
+        Heap.
+        (Structure):
+        (JSC::Structure):
+        (JSC):
+        (JSC::Structure::create):
+        (JSC::Structure::createStructure):
+
+2012-07-26  Filip Pizlo  <fpizlo@apple.com>
+
+        JSArray has methods that are neither used nor defined
+        https://bugs.webkit.org/show_bug.cgi?id=92416
+
+        Reviewed by Simon Fraser.
+
+        * runtime/JSArray.h:
+        (JSArray):
+
+2012-07-26  Zoltan Herczeg  <zherczeg@webkit.org>
+
+        [Qt][ARM]ARMAssembler needs buildfix afert r123417
+        https://bugs.webkit.org/show_bug.cgi?id=92086
+
+        Reviewed by Csaba Osztrogonác.
+
+        The ARM implementation of this should be optimized code path
+        is covered by a non-optimized code path. This patch fixes this,
+        and adds a new function which returns with the offset range.
+
+        * assembler/ARMAssembler.h:
+        (JSC::ARMAssembler::readPointer):
+        (ARMAssembler):
+        (JSC::ARMAssembler::repatchInt32):
+        (JSC::ARMAssembler::repatchCompact):
+        * assembler/MacroAssemblerARM.h:
+        (MacroAssemblerARM):
+        (JSC::MacroAssemblerARM::isCompactPtrAlignedAddressOffset):
+        (JSC::MacroAssemblerARM::load32WithCompactAddressOffsetPatch):
+
+2012-07-25  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Build fix for 32-bit after r123682
+
+        * runtime/JSObject.h: Need to pad out JSObjects on 32-bit so that they're the correct size since
+        we only removed one 4-byte word and we need to be 8-byte aligned.
+        (JSObject):
+
+2012-07-25  Filip Pizlo  <fpizlo@apple.com>
+
+        JSC GC object copying APIs should allow for greater flexibility
+        https://bugs.webkit.org/show_bug.cgi?id=92316
+
+        Reviewed by Mark Hahnenberg.
+
+        It's now the case that visitChildren() methods can directly pin and allocate in new space during copying.
+        They can also do the copying and marking themselves. This new API is only used for JSObjects for now.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * heap/MarkStack.cpp:
+        (JSC::SlotVisitor::allocateNewSpaceSlow):
+        (JSC::SlotVisitor::allocateNewSpaceOrPin):
+        (JSC):
+        (JSC::SlotVisitor::copyAndAppend):
+        * heap/MarkStack.h:
+        (MarkStack):
+        (JSC::MarkStack::appendUnbarrieredValue):
+        (JSC):
+        * heap/SlotVisitor.h:
+        * heap/SlotVisitorInlineMethods.h: Added.
+        (JSC):
+        (JSC::SlotVisitor::checkIfShouldCopyAndPinOtherwise):
+        (JSC::SlotVisitor::allocateNewSpace):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::visitOutOfLineStorage):
+        (JSC):
+        (JSC::JSObject::visitChildren):
+        (JSC::JSFinalObject::visitChildren):
+        * runtime/JSObject.h:
+        (JSObject):
+
+2012-07-25  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Remove JSObject::m_inheritorID
+        https://bugs.webkit.org/show_bug.cgi?id=88378
+
+        Reviewed by Filip Pizlo.
+
+        This is rarely used, and not performance critical (the commonly accessed copy is cached on JSFunction),
+        and most objects don't need an inheritorID (this value is only used if the object is used as a prototype).
+        Instead use a private named value in the object's property storage.
+
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::emitAllocateBasicJSObject): No need m_inheritorID to initialize!
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateBasicJSObject): No need m_inheritorID to initialize!
+        * llint/LowLevelInterpreter.asm: No need m_inheritorID to initialize!
+        * runtime/JSGlobalData.h:
+        (JSGlobalData): Added private name 'm_inheritorIDKey'.
+        * runtime/JSGlobalThis.cpp:
+        (JSC::JSGlobalThis::setUnwrappedObject): resetInheritorID is now passed a JSGlobalData&.
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::visitChildren): No m_inheritorID to be marked.
+        (JSC::JSFinalObject::visitChildren): No m_inheritorID to be marked.
+        (JSC::JSObject::createInheritorID): Store the newly created inheritorID in the property map. Make sure 
+        it's got the DontEnum attribute!!
+        * runtime/JSObject.h:
+        (JSObject):
+        (JSC::JSObject::resetInheritorID): Remove the inheritorID from property storage.
+        (JSC):
+        (JSC::JSObject::inheritorID): Read the inheritorID from property storage.
+
+2012-07-25  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Create a specialized pair for use in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=92137
+
+        Reviewed by Ryosuke Niwa.
+
+        Update a couple of sites that relied on the fact that "contents" of iterators were
+        std::pairs.
+
+        * profiler/Profile.cpp:
+        (JSC): This code kept a vector of the pairs that were the "contents" of the iterators. This
+        is changed to use a KeyValuePair. We make use HashCount's ValueType (which represents only
+        the key) to get the proper key parameter for KeyValuePair.
+        * tools/ProfileTreeNode.h:
+        (ProfileTreeNode): Use HashMap::ValueType to declare the type of the contents of the hash
+        instead of declaring it manually. This will make use of the new KeyValuePair.
+
+2012-07-25  Patrick Gansterer  <paroga@webkit.org>
+
+        REGRESSION(r123505): Date.getYear() returns the same as Date.getFullYear()
+        https://bugs.webkit.org/show_bug.cgi?id=92218
+
+        Reviewed by Csaba Osztrogonác.
+
+        * runtime/DatePrototype.cpp:
+        (JSC::dateProtoFuncGetYear): Added the missing offset of 1900 to the return value.
+
+2012-07-24  Filip Pizlo  <fpizlo@apple.com>
+
+        REGRESSION(r123417): It made tests assert/crash on 32 bit
+        https://bugs.webkit.org/show_bug.cgi?id=92088
+
+        Reviewed by Mark Hahnenberg.
+
+        The pointer arithmetic was wrong, because negative numbers are hard to think about.
+
+        * dfg/DFGRepatch.cpp:
+        (JSC::DFG::emitPutTransitionStub):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileReallocatePropertyStorage):
+
+2012-07-24  Patrick Gansterer  <paroga@webkit.org>
+
+        Store the full year in GregorianDateTime
+        https://bugs.webkit.org/show_bug.cgi?id=92067
+
+        Reviewed by Geoffrey Garen.
+
+        Use the full year instead of the offset from year 1900
+        for the year member variable of GregorianDateTime.
+
+        * runtime/DateConstructor.cpp:
+        (JSC::constructDate):
+        (JSC::dateUTC):
+        * runtime/DateConversion.cpp:
+        (JSC::formatDate):
+        (JSC::formatDateUTCVariant):
+        * runtime/DatePrototype.cpp:
+        (JSC::formatLocaleDate):
+        (JSC::fillStructuresUsingDateArgs):
+        (JSC::dateProtoFuncToISOString):
+        (JSC::dateProtoFuncGetFullYear):
+        (JSC::dateProtoFuncGetUTCFullYear):
+        (JSC::dateProtoFuncSetYear):
+        * runtime/JSDateMath.cpp:
+        (JSC::gregorianDateTimeToMS):
+        (JSC::msToGregorianDateTime):
+
+2012-07-24  Patrick Gansterer  <paroga@webkit.org>
+
+        [WIN] Build fix after r123417.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
 
 2012-07-23  Patrick Gansterer  <paroga@webkit.org>
 

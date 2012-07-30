@@ -44,14 +44,6 @@ struct HTMLConstructionSiteTask {
     {
     }
 
-    void take(HTMLConstructionSiteTask& other)
-    {
-        parent = other.parent.release();
-        nextChild = other.nextChild.release();
-        child = other.child.release();
-        selfClosing = other.selfClosing;
-    }
-
     RefPtr<ContainerNode> parent;
     RefPtr<Node> nextChild;
     RefPtr<Node> child;
@@ -121,6 +113,7 @@ public:
     HTMLElementStack::ElementRecord* currentElementRecord() const { return m_openElements.topRecord(); }
     Element* currentElement() const { return m_openElements.top(); }
     ContainerNode* currentNode() const { return m_openElements.topNode(); }
+    HTMLStackItem* currentStackItem() const { return m_openElements.topStackItem(); }
     Element* oneBelowTop() const { return m_openElements.oneBelowTop(); }
 
     HTMLElementStack* openElements() const { return &m_openElements; }

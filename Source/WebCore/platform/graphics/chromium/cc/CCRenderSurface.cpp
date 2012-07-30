@@ -75,11 +75,9 @@ CCRenderSurface::~CCRenderSurface()
 
 FloatRect CCRenderSurface::drawableContentRect() const
 {
-    FloatRect localContentRect(-0.5 * m_contentRect.width(), -0.5 * m_contentRect.height(),
-                               m_contentRect.width(), m_contentRect.height());
-    FloatRect drawableContentRect = CCMathUtil::mapClippedRect(m_drawTransform, localContentRect);
+    FloatRect drawableContentRect = CCMathUtil::mapClippedRect(m_drawTransform, m_contentRect);
     if (m_owningLayer->hasReplica())
-        drawableContentRect.unite(CCMathUtil::mapClippedRect(m_replicaDrawTransform, localContentRect));
+        drawableContentRect.unite(CCMathUtil::mapClippedRect(m_replicaDrawTransform, m_contentRect));
 
     return drawableContentRect;
 }
@@ -166,13 +164,13 @@ bool CCRenderSurface::surfacePropertyChangedOnlyFromDescendant() const
 PassOwnPtr<CCSharedQuadState> CCRenderSurface::createSharedQuadState(int id) const
 {
     bool isOpaque = false;
-    return CCSharedQuadState::create(id, m_originTransform, m_contentRect, m_scissorRect, m_drawOpacity, isOpaque);
+    return CCSharedQuadState::create(id, m_drawTransform, m_contentRect, m_scissorRect, m_drawOpacity, isOpaque);
 }
 
 PassOwnPtr<CCSharedQuadState> CCRenderSurface::createReplicaSharedQuadState(int id) const
 {
     bool isOpaque = false;
-    return CCSharedQuadState::create(id, m_replicaOriginTransform, m_contentRect, m_scissorRect, m_drawOpacity, isOpaque);
+    return CCSharedQuadState::create(id, m_replicaDrawTransform, m_contentRect, m_scissorRect, m_drawOpacity, isOpaque);
 }
 
 FloatRect CCRenderSurface::computeRootScissorRectInCurrentSurface(const FloatRect& rootScissorRect) const
@@ -210,13 +208,9 @@ void CCRenderSurface::appendQuads(CCQuadSink& quadList, CCSharedQuadState* share
     }
 
     CCResourceProvider::ResourceId maskResourceId = maskLayer ? maskLayer->contentsResourceId() : 0;
-    WebTransformationMatrix drawTransform = forReplica ? m_replicaDrawTransform : m_drawTransform;
     IntRect contentsChangedSinceLastFrame = contentsChanged() ? m_contentRect : IntRect();
 
-    const WebKit::WebFilterOperations& filters = m_owningLayer->filters();
-    const WebKit::WebFilterOperations& backgroundFilters = m_owningLayer->backgroundFilters();
-
-    quadList.append(CCRenderPassDrawQuad::create(sharedQuadState, contentRect(), renderPassId, forReplica, drawTransform, filters, backgroundFilters, maskResourceId, contentsChangedSinceLastFrame));
+    quadList.append(CCRenderPassDrawQuad::create(sharedQuadState, contentRect(), renderPassId, forReplica, maskResourceId, contentsChangedSinceLastFrame));
 }
 
 }

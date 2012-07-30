@@ -197,6 +197,8 @@ static const float doubleTapZoomContentDefaultMargin = 5;
 static const float doubleTapZoomContentMinimumMargin = 2;
 static const double doubleTabZoomAnimationDurationInSeconds = 0.25;
 
+// Constants for zooming in on a focused text field.
+static const double scrollAndScaleAnimationDurationInSeconds = 0.2;
 
 namespace WebKit {
 
@@ -392,6 +394,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_maximumPageScaleFactor(maxPageScaleFactor)
     , m_ignoreViewportTagMaximumScale(false)
     , m_pageScaleFactorIsSet(false)
+    , m_savedPageScaleFactor(0)
     , m_contextMenuAllowed(false)
     , m_doingDragAndDrop(false)
     , m_ignoreInputEvents(false)
@@ -522,14 +525,23 @@ void WebViewImpl::handleMouseLeave(Frame& mainFrame, const WebMouseEvent& event)
 
 void WebViewImpl::handleMouseDown(Frame& mainFrame, const WebMouseEvent& event)
 {
-    // If there is a select popup open, close it as the user is clicking on
-    // the page (outside of the popup).  We also save it so we can prevent a
-    // click on the select element from immediately reopening the popup.
+    // If there is a popup open, close it as the user is clicking on the page (outside of the
+    // popup). We also save it so we can prevent a click on an element from immediately
+    // reopening the same popup.
     RefPtr<WebCore::PopupContainer> selectPopup;
+#if ENABLE(PAGE_POPUP)
+    RefPtr<WebPagePopupImpl> pagePopup;
+#endif
     if (event.button == WebMouseEvent::ButtonLeft) {
         selectPopup = m_selectPopup;
-        hideSelectPopup();
+#if ENABLE(PAGE_POPUP)
+        pagePopup = m_pagePopup;
+#endif
+        hidePopups();
         ASSERT(!m_selectPopup);
+#if ENABLE(PAGE_POPUP)
+        ASSERT(!m_pagePopup);
+#endif
     }
 
     m_lastMouseDownPoint = WebPoint(event.x, event.y);
@@ -554,6 +566,14 @@ void WebViewImpl::handleMouseDown(Frame& mainFrame, const WebMouseEvent& event)
         // immediately reopened the select popup.  It needs to be closed.
         hideSelectPopup();
     }
+
+#if ENABLE(PAGE_POPUP)
+    if (m_pagePopup && pagePopup && m_pagePopup->hasSamePopupClient(pagePopup.get())) {
+        // That click triggered a page popup that is the same as the one we just closed.
+        // It needs to be closed.
+        closePagePopup(m_pagePopup.get());
+    }
+#endif
 
     // Dispatch the contextmenu event regardless of if the click was swallowed.
     // On Windows, we handle it on mouse up, not down.
@@ -2713,6 +2733,33 @@ float WebViewImpl::maximumPageScaleFactor() const
     return m_maximumPageScaleFactor;
 }
 
+void WebViewImpl::saveScrollAndScaleState()
+{
+    m_savedPageScaleFactor = pageScaleFactor();
+    m_savedScrollOffset = mainFrame()->scrollOffset();
+}
+
+void WebViewImpl::restoreScrollAndScaleState()
+{
+    if (!m_savedPageScaleFactor)
+        return;
+
+#if ENABLE(GESTURE_EVENTS)
+    startPageScaleAnimation(IntPoint(m_savedScrollOffset), false, m_savedPageScaleFactor, scrollAndScaleAnimationDurationInSeconds);
+#else
+    setPageScaleFactor(m_savedPageScaleFactor, WebPoint());
+    mainFrame()->setScrollOffset(m_savedScrollOffset);
+#endif
+
+    resetSavedScrollAndScaleState();
+}
+
+void WebViewImpl::resetSavedScrollAndScaleState()
+{
+    m_savedPageScaleFactor = 0;
+    m_savedScrollOffset = IntSize();
+}
+
 WebSize WebViewImpl::fixedLayoutSize() const
 {
     if (!page())
@@ -3246,6 +3293,7 @@ void WebViewImpl::didCommitLoad(bool* isNewNavigation, bool isNavigationWithinPa
         m_pageScaleFactorIsSet = false;
 
     m_gestureAnimation.clear();
+    resetSavedScrollAndScaleState();
 }
 
 void WebViewImpl::layoutUpdated(WebFrameImpl* webframe)

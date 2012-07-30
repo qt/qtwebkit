@@ -57,6 +57,7 @@ my (
     $cssImageResolutionSupport,
     $cssRegionsSupport,
     $cssShadersSupport,
+    $cssCompositingSupport,
     $cssVariablesSupport,
     $customSchemeHandlerSupport,
     $dataTransferItemsSupport,
@@ -92,6 +93,7 @@ my (
     $linkPrefetchSupport,
     $linkPrerenderSupport,
     $mathmlSupport,
+    $mediaCaptureSupport,
     $mediaSourceSupport,
     $mediaStatisticsSupport,
     $mediaStreamSupport,
@@ -180,6 +182,9 @@ my @features = (
 
     { option => "css-shaders", desc => "Toggle CSS Shaders support",
       define => "ENABLE_CSS_SHADERS", default => isAppleMacWebKit(), value => \$cssShadersSupport },
+
+    { option => "css-compositing", desc => "Toggle CSS Compositing support",
+      define => "ENABLE_CSS_COMPOSITING", default => 0, value => \$cssCompositingSupport },
 
     { option => "css-variables", desc => "Toggle CSS Variable support",
       define => "ENABLE_CSS_VARIABLES", default => isEfl(), value => \$cssVariablesSupport },
@@ -282,6 +287,9 @@ my @features = (
 
     { option => "mathml", desc => "Toggle MathML support",
       define => "ENABLE_MATHML", default => 1, value => \$mathmlSupport },
+
+    { option => "media-capture", desc => "Toggle Media Capture support",
+      define => "ENABLE_MEDIA_CAPTURE", default => isEfl(), value => \$mediaCaptureSupport },
 
     { option => "media-source", desc => "Toggle Media Source support",
       define => "ENABLE_MEDIA_SOURCE", default => 0, value => \$mediaSourceSupport },

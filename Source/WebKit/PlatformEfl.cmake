@@ -2,6 +2,7 @@ LIST(APPEND WebKit_LINK_FLAGS
     ${ECORE_X_LDFLAGS}
     ${EDJE_LDFLAGS}
     ${EFLDEPS_LDFLAGS}
+    ${EFREET_LDFLAGS}
     ${EVAS_LDFLAGS}
 )
 
@@ -18,6 +19,7 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     ${ECORE_X_INCLUDE_DIRS}
     ${EDJE_INCLUDE_DIRS}
     ${EFLDEPS_INCLUDE_DIRS}
+    ${EFREET_INCLUDE_DIRS}
     ${EVAS_INCLUDE_DIRS}
     ${EUKIT_INCLUDE_DIRS}
     ${EDBUS_INCLUDE_DIRS}
@@ -65,19 +67,6 @@ IF (WTF_USE_PANGO)
   )
   LIST(APPEND WebKit_LIBRARIES
     ${Pango_LIBRARIES}
-  )
-ENDIF ()
-
-IF (ENABLE_NETWORK_INFO)
-  LIST(APPEND WebKit_LINK_FLAGS
-    ${EEZE_LDFLAGS}
-  )
-  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
-    "${WEBCORE_DIR}/Modules/networkinfo"
-     ${EEZE_INCLUDE_DIRS}
-  )
-  LIST(APPEND WebKit_LIBRARIES
-    ${EEZE_LIBRARIES}
   )
 ENDIF ()
 
@@ -132,6 +121,7 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_contextmenu.cpp
     efl/ewk/ewk_cookies.cpp
     efl/ewk/ewk_custom_handler.cpp
+    efl/ewk/ewk_file_chooser.cpp
     efl/ewk/ewk_frame.cpp
     efl/ewk/ewk_history.cpp
     efl/ewk/ewk_intent.cpp
@@ -158,6 +148,7 @@ LIST(APPEND WebKit_LIBRARIES
     ${CAIRO_LIBRARIES}
     ${ECORE_X_LIBRARIES}
     ${EFLDEPS_LIBRARIES}
+    ${EFREET_LIBRARIES}
     ${EUKIT_LIBRARIES}
     ${EDBUS_LIBRARIES}
     ${FREETYPE_LIBRARIES}
@@ -274,6 +265,7 @@ SET(EWebKit_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_auth.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_contextmenu.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_cookies.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_file_chooser.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_frame.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_history.h
     ${CMAKE_CURRENT_SOURCE_DIR}/efl/ewk/ewk_intent.h
@@ -359,6 +351,7 @@ IF (ENABLE_API_TESTS)
     FOREACH (testName ${EWKUnitTests_BINARIES})
         ADD_EXECUTABLE(${testName} ${WEBKIT_EFL_TEST_DIR}/${testName}.cpp ${WEBKIT_EFL_TEST_DIR}/test_runner.cpp)
         ADD_TEST(${testName} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${testName})
+        SET_TESTS_PROPERTIES(${testName} PROPERTIES TIMEOUT 60)
         TARGET_LINK_LIBRARIES(${testName} ${EWKUnitTests_LIBRARIES} ewkTestUtils)
         ADD_TARGET_PROPERTIES(${testName} LINK_FLAGS "${EWKUnitTests_LINK_FLAGS}")
         SET_TARGET_PROPERTIES(${testName} PROPERTIES FOLDER "WebKit")

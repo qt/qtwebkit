@@ -74,16 +74,10 @@ public:
 
     virtual void viewportChanged() { }
 
-    const WebKit::WebTransformationMatrix& projectionMatrix() const { return m_projectionMatrix; }
-    const WebKit::WebTransformationMatrix& windowMatrix() const { return m_windowMatrix; }
-
     virtual void decideRenderPassAllocationsForFrame(const CCRenderPassList&) { }
     virtual bool haveCachedResourcesForRenderPassId(int) const { return false; }
 
-    virtual void drawFrame(const CCRenderPassList&, const FloatRect& rootScissorRect) = 0;
-    virtual void finishDrawingFrame() { }
-
-    virtual void drawHeadsUpDisplay(const CCScopedTexture*, const IntSize& hudSize) = 0;
+    virtual void drawFrame(const CCRenderPassList&, const CCRenderPassIdHashMap&, const FloatRect& rootScissorRect) = 0;
 
     // waits for rendering to finish
     virtual void finish() = 0;
@@ -108,8 +102,6 @@ protected:
     }
 
     CCRendererClient* m_client;
-    WebKit::WebTransformationMatrix m_projectionMatrix;
-    WebKit::WebTransformationMatrix m_windowMatrix;
 };
 
 }

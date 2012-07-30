@@ -1160,9 +1160,9 @@ public:
     int paintContentsCount() { return m_paintContentsCount; }
     void resetPaintContentsCount() { m_paintContentsCount = 0; }
 
-    virtual void update(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion) OVERRIDE
+    virtual void update(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion, CCRenderingStats& stats) OVERRIDE
     {
-        ContentLayerChromium::update(updater, occlusion);
+        ContentLayerChromium::update(updater, occlusion, stats);
         m_paintContentsCount++;
     }
 
@@ -1301,7 +1301,6 @@ public:
         // The root layer is scaled by 2x.
         WebTransformationMatrix rootScreenSpaceTransform = scaleTransform;
         WebTransformationMatrix rootDrawTransform = scaleTransform;
-        rootDrawTransform.translate(root->bounds().width() * 0.5, root->bounds().height() * 0.5);
 
         EXPECT_EQ(rootDrawTransform, root->drawTransform());
         EXPECT_EQ(rootScreenSpaceTransform, root->screenSpaceTransform());
@@ -1311,7 +1310,6 @@ public:
         childScreenSpaceTransform.translate(2, 2);
         WebTransformationMatrix childDrawTransform = scaleTransform;
         childDrawTransform.translate(2, 2);
-        childDrawTransform.translate(child->bounds().width() * 0.5, child->bounds().height() * 0.5);
 
         EXPECT_EQ(childDrawTransform, child->drawTransform());
         EXPECT_EQ(childScreenSpaceTransform, child->screenSpaceTransform());
@@ -1576,7 +1574,7 @@ class TestLayerChromium : public LayerChromium {
 public:
     static PassRefPtr<TestLayerChromium> create() { return adoptRef(new TestLayerChromium()); }
 
-    virtual void update(CCTextureUpdater&, const CCOcclusionTracker* occlusion) OVERRIDE
+    virtual void update(CCTextureUpdater&, const CCOcclusionTracker* occlusion, CCRenderingStats&) OVERRIDE
     {
         // Gain access to internals of the CCOcclusionTracker.
         const TestCCOcclusionTracker* testOcclusion = static_cast<const TestCCOcclusionTracker*>(occlusion);

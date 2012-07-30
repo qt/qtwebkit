@@ -440,7 +440,7 @@ void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) con
     if (frame->page()->mainFrame() != frame)
         return;
 
-#if PLATFORM(QT)
+#if PLATFORM(QT) || (PLATFORM(EFL) && USE(TILED_BACKING_STORE))
     if (m_page->useFixedLayout()) {
         // The below method updates the size().
         m_page->resizeToContentsIfNeeded();
@@ -483,7 +483,7 @@ bool WebChromeClient::shouldUnavailablePluginMessageBeButton(RenderEmbeddedObjec
     
 void WebChromeClient::unavailablePluginButtonClicked(Element* element, RenderEmbeddedObject::PluginUnavailabilityReason pluginUnavailabilityReason) const
 {
-    ASSERT(element->hasTagName(objectTag) || element->hasTagName(embedTag));
+    ASSERT(element->hasTagName(objectTag) || element->hasTagName(embedTag) || element->hasTagName(appletTag));
     ASSERT(pluginUnavailabilityReason == RenderEmbeddedObject::PluginMissing || pluginUnavailabilityReason == RenderEmbeddedObject::InsecurePluginVersion);
 
     HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(element);
@@ -635,6 +635,15 @@ void WebChromeClient::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
     m_page->send(Messages::WebPageProxy::SetCursorHiddenUntilMouseMoves(hiddenUntilMouseMoves));
 }
 
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
+void WebChromeClient::scheduleAnimation()
+{
+#if USE(UI_SIDE_COMPOSITING)
+    m_page->drawingArea()->layerTreeHost()->scheduleAnimation();
+#endif
+}
+#endif
+
 void WebChromeClient::formStateDidChange(const Node*)
 {
     notImplemented();
@@ -771,6 +780,14 @@ bool WebChromeClient::shouldRubberBandInDirection(WebCore::ScrollDirection direc
 void WebChromeClient::numWheelEventHandlersChanged(unsigned count)
 {
     m_page->numWheelEventHandlersChanged(count);
+}
+
+void WebChromeClient::logDiagnosticMessage(const String& message, const String& description, const String& success)
+{
+    if (!m_page->corePage()->settings()->diagnosticLoggingEnabled())
+        return;
+
+    m_page->injectedBundleDiagnosticLoggingClient().logDiagnosticMessage(m_page, message, description, success);
 }
 
 } // namespace WebKit

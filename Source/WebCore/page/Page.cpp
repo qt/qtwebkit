@@ -167,6 +167,8 @@ Page::Page(PageClients& pageClients)
     , m_alternativeTextClient(pageClients.alternativeTextClient)
     , m_scriptedAnimationsSuspended(false)
 {
+    ASSERT(m_editorClient);
+
     if (!allPages) {
         allPages = new HashSet<Page*>;
         
@@ -1154,6 +1156,26 @@ void Page::resumeActiveDOMObjectsAndAnimations()
 {
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
         frame->resumeActiveDOMObjectsAndAnimations();
+}
+
+bool Page::hasSeenAnyPlugin() const
+{
+    return !m_seenPlugins.isEmpty();
+}
+
+bool Page::hasSeenPlugin(const String& serviceType) const
+{
+    return m_seenPlugins.contains(serviceType);
+}
+
+void Page::sawPlugin(const String& serviceType)
+{
+    m_seenPlugins.add(serviceType);
+}
+
+void Page::resetSeenPlugins()
+{
+    m_seenPlugins.clear();
 }
 
 Page::PageClients::PageClients()

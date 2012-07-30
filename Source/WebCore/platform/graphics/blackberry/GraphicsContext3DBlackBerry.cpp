@@ -54,6 +54,7 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attrs, HostWi
     : m_currentWidth(0)
     , m_currentHeight(0)
     , m_context(BlackBerry::Platform::Graphics::createWebGLContext())
+    , m_compiler(SH_ESSL_OUTPUT)
     , m_extensions(adoptPtr(new Extensions3DOpenGLES(this)))
     , m_attrs(attrs)
     , m_texture(0)
@@ -173,7 +174,11 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
         sampleCount = std::min(8, maxSampleCount);
     }
 
-    ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_boundFBO);
+    bool mustRestoreFBO = false;
+    if (m_boundFBO != m_fbo) {
+        mustRestoreFBO = true;
+        ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_fbo);
+    }
 
     ::glBindTexture(GL_TEXTURE_2D, m_texture);
     ::glTexImage2D(GL_TEXTURE_2D, 0, internalColorFormat, fboWidth, fboHeight, 0, colorFormat, GL_UNSIGNED_BYTE, 0);
@@ -211,7 +216,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
 
     logFrameBufferStatus(__LINE__);
 
-    return true;
+    return mustRestoreFBO;
 }
 
 void GraphicsContext3D::logFrameBufferStatus(int line)
@@ -355,29 +360,16 @@ PlatformLayer* GraphicsContext3D::platformLayer() const
 #endif
 
 void GraphicsContext3D::paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight, int canvasWidth, int canvasHeight,
-       GraphicsContext* context, bool flipY)
+       GraphicsContext* context)
 {
-    // Reorder pixels into BGRA format.
     unsigned char* tempPixels = new unsigned char[imageWidth * imageHeight * 4];
 
-    if (flipY) {
-        for (int y = 0; y < imageHeight; y++) {
-            const unsigned char *srcRow = imagePixels + (imageWidth * 4 * y);
-            unsigned char *destRow = tempPixels + (imageWidth * 4 * (imageHeight - y - 1));
-            for (int i = 0; i < imageWidth * 4; i += 4) {
-                destRow[i + 0] = srcRow[i + 2];
-                destRow[i + 1] = srcRow[i + 1];
-                destRow[i + 2] = srcRow[i + 0];
-                destRow[i + 3] = srcRow[i + 3];
-            }
-        }
-    } else {
-        for (int i = 0; i < imageWidth * imageHeight * 4; i += 4) {
-            tempPixels[i + 0] = imagePixels[i + 2];
-            tempPixels[i + 1] = imagePixels[i + 1];
-            tempPixels[i + 2] = imagePixels[i + 0];
-            tempPixels[i + 3] = imagePixels[i + 3];
-        }
+    // 3D images have already been converted to BGRA. Don't do it twice!!
+    for (int y = 0; y < imageHeight; y++) {
+        const unsigned char *srcRow = imagePixels + (imageWidth * 4 * y);
+        unsigned char *destRow = tempPixels + (imageWidth * 4 * (imageHeight - y - 1));
+        for (int i = 0; i < imageWidth * 4; i += 4)
+            memcpy(destRow + i, srcRow + i, 4);
     }
 
     SkBitmap canvasBitmap;

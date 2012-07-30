@@ -38,6 +38,7 @@
 #include "Element.h"
 #include "ElementShadow.h"
 #include "ExceptionCode.h"
+#include "FastMallocStatistics.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "HTMLContentElement.h"
@@ -55,6 +56,7 @@
 #include "Language.h"
 #include "NodeRenderingContext.h"
 #include "Page.h"
+#include "PrintContext.h"
 #include "Range.h"
 #include "RenderObject.h"
 #include "RenderTreeAsText.h"
@@ -1094,6 +1096,19 @@ void Internals::resumeAnimations(Document* document, ExceptionCode& ec) const
     controller->resumeAnimations();
 }
 
+void Internals::garbageCollectDocumentResources(Document* document, ExceptionCode& ec) const
+{
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    CachedResourceLoader* cachedResourceLoader = document->cachedResourceLoader();
+    if (!cachedResourceLoader)
+        return;
+    cachedResourceLoader->garbageCollectDocumentResources();
+}
+
 void Internals::allowRoundingHacks() const
 {
     settings()->allowRoundingHacks();
@@ -1105,6 +1120,14 @@ String Internals::counterValue(Element* element)
         return String();
 
     return counterValueForElement(element);
+}
+
+int Internals::pageNumber(Element* element, float pageWidth, float pageHeight)
+{
+    if (!element)
+        return 0;
+
+    return PrintContext::pageNumberForElement(element, FloatSize(pageWidth, pageHeight));
 }
 
 PassRefPtr<DOMStringList> Internals::iconURLs(Document* document) const
@@ -1157,6 +1180,11 @@ void Internals::registerURLSchemeAsBypassingContentSecurityPolicy(const String& 
 void Internals::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const String& scheme)
 {
     SchemeRegistry::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(scheme);
+}
+
+PassRefPtr<FastMallocStatistics> Internals::fastMallocStatistics() const
+{
+    return FastMallocStatistics::create();
 }
 
 }

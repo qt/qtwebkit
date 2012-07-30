@@ -22,13 +22,17 @@
 #include "ewk_context.h"
 
 #include "BatteryProvider.h"
+#include "VibrationProvider.h"
 #include "WKAPICast.h"
 #include "WKContextSoup.h"
 #include "WKRetainPtr.h"
 #include "WKString.h"
+#include "ewk_context_download_client_private.h"
 #include "ewk_context_private.h"
 #include "ewk_context_request_manager_client_private.h"
 #include "ewk_cookie_manager_private.h"
+#include "ewk_download_job.h"
+#include "ewk_download_job_private.h"
 #include <wtf/HashMap.h>
 #include <wtf/text/WTFString.h>
 
@@ -58,6 +62,10 @@ struct _Ewk_Context {
 #if ENABLE(BATTERY_STATUS)
     RefPtr<BatteryProvider> batteryProvider;
 #endif
+#if ENABLE(VIBRATION)
+    RefPtr<VibrationProvider> vibrationProvider;
+#endif
+    HashMap<uint64_t, Ewk_Download_Job*> downloadJobs;
 
     WKRetainPtr<WKSoupRequestManagerRef> requestManager;
     URLSchemeHandlerMap urlSchemeHandlers;
@@ -72,13 +80,24 @@ struct _Ewk_Context {
         batteryProvider = BatteryProvider::create(wkBatteryManager);
 #endif
 
+#if ENABLE(VIBRATION)
+        WKVibrationRef wkVibrationRef = WKContextGetVibration(contextRef);
+        vibrationProvider = VibrationProvider::create(wkVibrationRef);
+#endif
+
         ewk_context_request_manager_client_attach(this);
+        ewk_context_download_client_attach(this);
     }
 
     ~_Ewk_Context()
     {
         if (cookieManager)
             ewk_cookie_manager_free(cookieManager);
+
+        HashMap<uint64_t, Ewk_Download_Job*>::iterator it = downloadJobs.begin();
+        HashMap<uint64_t, Ewk_Download_Job*>::iterator end = downloadJobs.end();
+        for ( ; it != end; ++it)
+            ewk_download_job_unref(it->second);
     }
 };
 
@@ -99,6 +118,47 @@ WKContextRef ewk_context_WKContext_get(const Ewk_Context* ewkContext)
 
 /**
  * @internal
+ * Registers that a new download has been requested.
+ */
+void ewk_context_download_job_add(Ewk_Context* ewkContext, Ewk_Download_Job* ewkDownload)
+{
+    EINA_SAFETY_ON_NULL_RETURN(ewkContext);
+    EINA_SAFETY_ON_NULL_RETURN(ewkDownload);
+
+    uint64_t downloadId = ewk_download_job_id_get(ewkDownload);
+    if (ewkContext->downloadJobs.contains(downloadId))
+        return;
+
+    ewk_download_job_ref(ewkDownload);
+    ewkContext->downloadJobs.add(downloadId, ewkDownload);
+}
+
+/**
+ * @internal
+ * Returns the #Ewk_Download_Job with the given @a downloadId, or
+ * @c 0 in case of failure.
+ */
+Ewk_Download_Job* ewk_context_download_job_get(const Ewk_Context* ewkContext, uint64_t downloadId)
+{
+    EINA_SAFETY_ON_NULL_RETURN_VAL(ewkContext, 0);
+
+    return ewkContext->downloadJobs.get(downloadId);
+}
+
+/**
+ * @internal
+ * Removes the #Ewk_Download_Job with the given @a downloadId from the internal
+ * HashMap.
+ */
+void ewk_context_download_job_remove(Ewk_Context* ewkContext, uint64_t downloadId)
+{
+    EINA_SAFETY_ON_NULL_RETURN(ewkContext);
+    Ewk_Download_Job* download = ewkContext->downloadJobs.take(downloadId);
+    if (download)
+        ewk_download_job_unref(download);
+}
+
+/**
  * Retrieve the request manager for @a ewkContext.
  *
  * @param ewkContext a #Ewk_Context object.
@@ -150,4 +210,13 @@ Eina_Bool ewk_context_uri_scheme_register(Ewk_Context* ewkContext, const char* s
     WKSoupRequestManagerRegisterURIScheme(ewkContext->requestManager.get(), wkScheme.get());
 
     return true;
+}
+
+void ewk_context_vibration_client_callbacks_set(Ewk_Context* ewkContext, Ewk_Vibration_Client_Vibrate_Cb vibrate, Ewk_Vibration_Client_Vibration_Cancel_Cb cancel, void* data)
+{
+    EINA_SAFETY_ON_NULL_RETURN(ewkContext);
+
+#if ENABLE(VIBRATION)
+    ewkContext->vibrationProvider->setVibrationClientCallbacks(vibrate, cancel, data);
+#endif
 }

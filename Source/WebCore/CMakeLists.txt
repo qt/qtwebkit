@@ -48,6 +48,8 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics"
     "${WEBCORE_DIR}/platform/graphics/filters"
     "${WEBCORE_DIR}/platform/graphics/filters/arm"
+    "${WEBCORE_DIR}/platform/graphics/harfbuzz"
+    "${WEBCORE_DIR}/platform/graphics/harfbuzz/ng"
     "${WEBCORE_DIR}/platform/graphics/transforms"
     "${WEBCORE_DIR}/platform/image-decoders"
     "${WEBCORE_DIR}/platform/image-decoders/bmp"
@@ -189,7 +191,6 @@ SET(WebCore_IDL_FILES
     Modules/intents/IntentResultCallback.idl
     Modules/intents/NavigatorIntents.idl
 
-    Modules/mediastream/DeprecatedPeerConnection.idl
     Modules/mediastream/DOMWindowMediaStream.idl
     Modules/mediastream/IceCallback.idl
     Modules/mediastream/IceCandidate.idl
@@ -206,7 +207,6 @@ SET(WebCore_IDL_FILES
     Modules/mediastream/NavigatorUserMediaSuccessCallback.idl
     Modules/mediastream/PeerConnection00.idl
     Modules/mediastream/SessionDescription.idl
-    Modules/mediastream/SignalingCallback.idl
 
     Modules/networkinfo/NavigatorNetworkInfoConnection.idl
     Modules/networkinfo/NetworkInfoConnection.idl
@@ -532,6 +532,7 @@ SET(WebCore_IDL_FILES
     page/Console.idl
     page/Coordinates.idl
     page/Crypto.idl
+    page/DOMSecurityPolicy.idl
     page/DOMSelection.idl
     page/DOMWindow.idl
     page/EventSource.idl
@@ -813,7 +814,6 @@ SET(WebCore_SOURCES
     Modules/intents/IntentRequest.cpp
     Modules/intents/NavigatorIntents.cpp
 
-    Modules/mediastream/DeprecatedPeerConnection.cpp
     Modules/mediastream/IceCandidate.cpp
     Modules/mediastream/LocalMediaStream.cpp
     Modules/mediastream/MediaStream.cpp
@@ -1624,6 +1624,8 @@ SET(WebCore_SOURCES
     page/ContentSecurityPolicy.cpp
     page/ContextMenuController.cpp
     page/Crypto.cpp
+    page/DiagnosticLoggingKeys.cpp
+    page/DOMSecurityPolicy.cpp
     page/DOMSelection.cpp
     page/DOMTimer.cpp
     page/DOMWindow.cpp
@@ -1792,6 +1794,8 @@ SET(WebCore_SOURCES
     platform/graphics/Gradient.cpp
     platform/graphics/GraphicsContext.cpp
     platform/graphics/GraphicsLayer.cpp
+    platform/graphics/GraphicsLayerAnimation.cpp
+    platform/graphics/GraphicsLayerTransform.cpp
     platform/graphics/GraphicsTypes.cpp
     platform/graphics/Image.cpp
     platform/graphics/ImageBuffer.cpp
@@ -1810,6 +1814,7 @@ SET(WebCore_SOURCES
     platform/graphics/SurrogatePairAwareTextIterator.cpp
     platform/graphics/SVGGlyph.cpp
     platform/graphics/TextRun.cpp
+    platform/graphics/TiledBackingStore.cpp
     platform/graphics/WidthIterator.cpp
 
     platform/graphics/filters/CustomFilterGlobalContext.cpp
@@ -1850,6 +1855,11 @@ SET(WebCore_SOURCES
     platform/graphics/filters/arm/FEGaussianBlurNEON.h
     platform/graphics/filters/arm/FELightingNEON.cpp
     platform/graphics/filters/arm/FELightingNEON.h
+
+    platform/graphics/texmap/TextureMapper.cpp
+    platform/graphics/texmap/TextureMapperBackingStore.cpp
+    platform/graphics/texmap/TextureMapperImageBuffer.cpp
+    platform/graphics/texmap/TextureMapperLayer.cpp
 
     platform/graphics/transforms/AffineTransform.cpp
     platform/graphics/transforms/Matrix3DTransformOperation.cpp
@@ -2081,6 +2091,7 @@ SET(WebCore_SOURCES
     rendering/style/StyleVisualData.cpp
     rendering/style/SVGRenderStyle.cpp
     rendering/style/SVGRenderStyleDefs.cpp
+    rendering/style/WrapShapes.cpp
 
     rendering/svg/RenderSVGBlock.cpp
     rendering/svg/RenderSVGContainer.cpp
@@ -2627,6 +2638,7 @@ SET(WebCoreTestSupport_IDL_INCLUDES
 )
 
 SET(WebCoreTestSupport_IDL_FILES
+    testing/FastMallocStatistics.idl
     testing/Internals.idl
     testing/InternalSettings.idl
 )
@@ -2635,6 +2647,20 @@ SET(WebCoreTestSupport_SOURCES
     testing/Internals.cpp
     testing/InternalSettings.cpp
 )
+
+IF (ENABLE_MEDIA_SOURCE)
+    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${WEBCORE_DIR}/Modules/mediasource
+    )
+    LIST(APPEND WebCore_IDL_FILES
+        Modules/mediasource/SourceBuffer.idl
+        Modules/mediasource/SourceBufferList.idl
+    )
+    LIST(APPEND WebCore_SOURCES
+        Modules/mediasource/SourceBuffer.cpp
+        Modules/mediasource/SourceBufferList.cpp
+    )
+ENDIF()
 
 # Modules that the bindings generator scripts may use
 SET(SCRIPTS_RESOLVE_SUPPLEMENTAL

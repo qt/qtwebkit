@@ -1,3 +1,74 @@
+2012-07-29  Rik Cabanier  <cabanier@adobe.com>
+
+        Add ENABLE_CSS_COMPOSITING flag
+        https://bugs.webkit.org/show_bug.cgi?id=92553
+
+        Reviewed by Dirk Schulze.
+
+        Adds compiler flag CSS_COMPOSITING to build systems to enable CSS blending and compositing. See spec https://dvcs.w3.org/hg/FXTF/rawfile/tip/compositing/index.html
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-07-27  Anders Carlsson  <andersca@apple.com>
+
+        Show the unavailable plug-in indicator for Java applets as well
+        https://bugs.webkit.org/show_bug.cgi?id=92521
+
+        Reviewed by Sam Weinig.
+
+        Check if the Java plug-in is blocked before trying to instantiate it.
+
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+
+2012-07-25  Jer Noble  <jer.noble@apple.com>
+
+        Add setting to enable and disable diagnostic logging.
+        https://bugs.webkit.org/show_bug.cgi?id=92337
+
+        Reviewed by Anders Carlsson.
+
+        Add a WebKit WebPreferences API to set set the WebCore diagnosticLoggingEnabled setting.
+
+        * WebView/WebPreferenceKeysPrivate.h:
+        * WebView/WebPreferences.mm:
+        (+[WebPreferences initialize]): Register the default value to false.
+        (-[WebPreferences diagnosticLoggingEnabled]): Simple userDefaults accessor.
+        (-[WebPreferences setDiagnosticLoggingEnabled:]): Ditto.
+        * WebView/WebPreferencesPrivate.h:
+        * WebView/WebView.mm:
+        (-[WebView _preferencesChanged:]): Ensure this preference is propagated to Settings
+            whenever the preferences change.
+
+2012-07-25  Pratik Solanki  <psolanki@apple.com>
+
+        Remove catchesDelegateExceptions from WebViewData and related accessor methods
+        https://bugs.webkit.org/show_bug.cgi?id=90898
+
+        Reviewed by Darin Adler.
+
+        Remove catchesDelegateException ivar from WebViewData and all its accesor methods from
+        WebView. All uses of this flag in WebKit set it to YES and no one calls
+        _setCatchesDelegateExceptions with NO.
+
+        * WebCoreSupport/WebDragClient.mm:
+        (WebDragClient::startDrag):
+        * WebView/WebDelegateImplementationCaching.mm:
+        (CallDelegate):
+        (CallDelegateReturningFloat):
+        (CallDelegateReturningBoolean):
+        (CallResourceLoadDelegateReturningBoolean):
+        (CallFormDelegate):
+        (CallFormDelegateReturningBoolean):
+        * WebView/WebView.mm:
+        (-[WebView _commonInitializationWithFrameName:groupName:]):
+        (-[WebView _policyDelegateForwarder]):
+        (-[WebView _UIDelegateForwarder]):
+        (-[WebView _editingDelegateForwarder]):
+        (-[_WebSafeForwarder initWithTarget:defaultTarget:]):
+        (-[_WebSafeForwarder forwardInvocation:]):
+        * WebView/WebViewData.h:
+        * WebView/WebViewPrivate.h:
+
 2012-07-23  Simon Fraser  <simon.fraser@apple.com>
 
         Part 2 of: Implement sticky positioning

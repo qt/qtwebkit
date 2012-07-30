@@ -36,6 +36,7 @@
 #include "cc/CCOcclusionTracker.h"
 #include "cc/CCPrioritizedTextureManager.h"
 #include "cc/CCProxy.h"
+#include "cc/CCRenderingStats.h"
 
 
 #include <limits>
@@ -53,7 +54,6 @@ class CCLayerTreeHostImplClient;
 class CCTextureUpdater;
 class Region;
 class CCPrioritizedTextureManager;
-struct CCRenderingStats;
 struct CCScrollAndScaleSet;
 
 class CCLayerTreeHostClient {
@@ -112,6 +112,9 @@ struct CCLayerTreeSettings {
     IntSize defaultTileSize;
     IntSize maxUntiledLayerSize;
     IntSize minimumOcclusionTrackingSize;
+
+    bool showDebugInfo() const { return showPlatformLayerTree || showFPSCounter || showDebugRects(); }
+    bool showDebugRects() const { return showPaintRects || showPropertyChangedRects || showSurfaceDamageRects || showScreenSpaceRects || showReplicaScreenSpaceRects || showOccludingRects; }
 };
 
 // Provides information on an Impl's rendering capabilities back to the CCLayerTreeHost
@@ -168,6 +171,7 @@ public:
     void layout();
     void beginCommitOnImplThread(CCLayerTreeHostImpl*);
     void finishCommitOnImplThread(CCLayerTreeHostImpl*);
+    void willCommit();
     void commitComplete();
     PassOwnPtr<CCGraphicsContext> createContext();
     virtual PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHostImpl(CCLayerTreeHostImplClient*);
@@ -178,7 +182,6 @@ public:
         RecreateFailedAndGaveUp,
     };
     RecreateResult recreateContext();
-    void willCommit() { m_client->willCommit(); }
     void didCommitAndDrawFrame() { m_client->didCommitAndDrawFrame(); }
     void didCompleteSwapBuffers() { m_client->didCompleteSwapBuffers(); }
     void deleteContentsTexturesOnImplThread(CCResourceProvider*);
@@ -201,8 +204,6 @@ public:
     bool compositeAndReadback(void *pixels, const IntRect&);
 
     void finishAllRendering();
-
-    int animationFrameNumber() const { return m_animationFrameNumber; }
 
     int commitNumber() const { return m_commitNumber; }
 
@@ -278,7 +279,7 @@ private:
 
     void initializeLayerRenderer();
 
-    static void update(LayerChromium*, CCTextureUpdater&, const CCOcclusionTracker*);
+    void update(LayerChromium*, CCTextureUpdater&, const CCOcclusionTracker*);
     bool paintLayerContents(const LayerList&, CCTextureUpdater&);
     bool paintMasksForRenderSurface(LayerChromium*, CCTextureUpdater&);
 
@@ -300,8 +301,8 @@ private:
 
     CCLayerTreeHostClient* m_client;
 
-    int m_animationFrameNumber;
     int m_commitNumber;
+    CCRenderingStats m_renderingStats;
 
     OwnPtr<CCProxy> m_proxy;
     bool m_layerRendererInitialized;
@@ -310,6 +311,7 @@ private:
     int m_numFailedRecreateAttempts;
 
     RefPtr<LayerChromium> m_rootLayer;
+    RefPtr<LayerChromium> m_hudLayer;
     OwnPtr<CCPrioritizedTextureManager> m_contentsTextureManager;
     OwnPtr<CCPrioritizedTexture> m_surfaceMemoryPlaceholder;
 

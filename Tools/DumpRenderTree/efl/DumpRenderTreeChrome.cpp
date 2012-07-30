@@ -207,17 +207,6 @@ bool DumpRenderTreeChrome::initialize()
 
     m_mainFrame = ewk_view_frame_main_get(m_mainView);
 
-    char* drtTemp = getenv("DUMPRENDERTREE_TEMP");
-    if (drtTemp) {
-        char path[2048];
-        eina_str_join(path, sizeof(path), '/', drtTemp, "LocalStorage");
-        ewk_settings_local_storage_path_set(path);
-        eina_str_join(path, sizeof(path), '/', drtTemp, "Databases");
-        ewk_settings_web_database_path_set(path);
-        eina_str_join(path, sizeof(path), '/', drtTemp, "Applications");
-        ewk_settings_application_cache_path_set(path);
-    }
-
     return true;
 }
 
@@ -446,7 +435,7 @@ void DumpRenderTreeChrome::onWindowObjectCleared(void* userData, Evas_Object*, v
                         makeEventSender(objectClearedInfo->context, !DumpRenderTreeSupportEfl::frameParent(objectClearedInfo->frame)),
                         kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete, 0);
 
-    JSRetainPtr<JSStringRef> textInputControllerName(JSStringCreateWithUTF8CString("textInputController"));
+    JSRetainPtr<JSStringRef> textInputControllerName(Adopt, JSStringCreateWithUTF8CString("textInputController"));
     JSObjectSetProperty(objectClearedInfo->context, objectClearedInfo->windowObject,
                         textInputControllerName.get(),
                         makeTextInputController(objectClearedInfo->context),
@@ -856,19 +845,20 @@ void DumpRenderTreeChrome::onFrameIntentNew(void*, Evas_Object*, void* eventInfo
     void* data = 0;
     Eina_List* extraNames = ewk_intent_extra_names_get(intent);
     EINA_LIST_FREE(extraNames, data) {
-        char* name = static_cast<char*>(data);
-        char* value = ewk_intent_extra_get(intent, name);
+        const char* name = static_cast<char*>(data);
+        const char* value = ewk_intent_extra_get(intent, name);
         if (value) {
             printf("Extras[%s] = %s\n", name, value);
-            free(value);
+            eina_stringshare_del(value);
         }
-        free(name);
+        eina_stringshare_del(name);
     }
 
     Eina_List* suggestions = ewk_intent_suggestions_get(intent);
     EINA_LIST_FREE(suggestions, data) {
-        printf("Have suggestion %s\n", static_cast<char*>(data));
-        free(data);
+        const char* suggestion = static_cast<char*>(data);
+        printf("Have suggestion %s\n", suggestion);
+        eina_stringshare_del(suggestion);
     }
 }
 

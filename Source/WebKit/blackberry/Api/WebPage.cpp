@@ -547,8 +547,9 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     // so that we only get one didChangeSettings() callback when we set the page group name. This causes us
     // to make a copy of the WebSettings since some WebSettings method make use of the page group name.
     // Instead, we shouldn't be storing the page group name in WebSettings.
-    m_webSettings->setDelegate(this);
     m_webSettings->setPageGroupName(pageGroupName);
+    m_webSettings->setDelegate(this);
+    didChangeSettings(m_webSettings);
 
     RefPtr<Frame> newFrame = Frame::create(m_page, /* HTMLFrameOwnerElement* */ 0, frameLoaderClient);
 
@@ -564,22 +565,16 @@ void WebPagePrivate::init(const WebString& pageGroupName)
     m_page->settings()->setCanvasUsesAcceleratedDrawing(true);
     m_page->settings()->setAccelerated2dCanvasEnabled(true);
 #endif
-#if ENABLE(VIEWPORT_REFLOW)
-    m_page->settings()->setTextReflowEnabled(m_webSettings->textReflowMode() == WebSettings::TextReflowEnabled);
-#endif
 
     m_page->settings()->setInteractiveFormValidationEnabled(true);
     m_page->settings()->setAllowUniversalAccessFromFileURLs(false);
     m_page->settings()->setAllowFileAccessFromFileURLs(false);
-    m_page->settings()->setShouldUseCrossOriginProtocolCheck(!m_webSettings->allowCrossSiteRequests());
-    m_page->settings()->setWebSecurityEnabled(!m_webSettings->allowCrossSiteRequests());
 
     m_backingStoreClient = BackingStoreClient::create(m_mainFrame, /* parent frame */ 0, m_webPage);
     // The direct access to BackingStore is left here for convenience since it
     // is owned by BackingStoreClient and then deleted by its destructor.
     m_backingStore = m_backingStoreClient->backingStore();
 
-    m_page->settings()->setSpatialNavigationEnabled(m_webSettings->isSpatialNavigationEnabled());
     blockClickRadius = int(roundf(0.35 * Platform::Graphics::Screen::primaryScreen()->pixelsPerInch(0).width())); // The clicked rectangle area should be a fixed unit of measurement.
 
     m_page->settings()->setDelegateSelectionPaint(true);
@@ -977,6 +972,11 @@ void WebPagePrivate::prepareToDestroy()
 void WebPage::prepareToDestroy()
 {
     d->prepareToDestroy();
+}
+
+bool WebPage::dispatchBeforeUnloadEvent()
+{
+    return d->m_page->mainFrame()->loader()->shouldClose();
 }
 
 static void enableCrossSiteXHRRecursively(Frame* frame)
@@ -3653,12 +3653,14 @@ void WebPagePrivate::resumeBackingStore()
         m_backingStore->d->orientationChanged(); // Updates tile geometry and creates visible tile buffer.
         m_backingStore->d->resetTiles(true /* resetBackground */);
         m_backingStore->d->updateTiles(false /* updateVisible */, false /* immediate */);
+
         // This value may have changed, so we need to update it.
         directRendering = m_backingStore->d->shouldDirectRenderingToWindow();
-        if (m_backingStore->d->renderVisibleContents() && !m_backingStore->d->isSuspended() && !directRendering)
-            m_backingStore->d->blitVisibleContents();
-
-        m_client->notifyContentRendered(m_backingStore->d->visibleContentsRect());
+        if (m_backingStore->d->renderVisibleContents()) {
+            if (!m_backingStore->d->isSuspended() && !directRendering)
+                m_backingStore->d->blitVisibleContents();
+            m_client->notifyContentRendered(m_backingStore->d->visibleContentsRect());
+        }
     } else {
         if (m_backingStore->d->isOpenGLCompositing())
            setCompositorDrawsRootLayer(false);
@@ -4596,9 +4598,14 @@ void WebPage::setSpellCheckingEnabled(bool enabled)
     static_cast<EditorClientBlackBerry*>(d->m_page->editorClient())->enableSpellChecking(enabled);
 }
 
-void WebPage::spellCheckingRequestProcessed(int32_t id, spannable_string_t* spannableString)
+void WebPage::spellCheckingRequestCancelled(int32_t transactionId)
 {
-    d->m_inputHandler->spellCheckingRequestProcessed(id, spannableString);
+    d->m_inputHandler->spellCheckingRequestCancelled(transactionId);
+}
+
+void WebPage::spellCheckingRequestProcessed(int32_t transactionId, spannable_string_t* spannableString)
+{
+    d->m_inputHandler->spellCheckingRequestProcessed(transactionId, spannableString);
 }
 
 class DeferredTaskSelectionCancelled: public DeferredTask<&WebPagePrivate::m_wouldCancelSelection> {
@@ -4680,6 +4687,13 @@ void WebPage::paste()
     if (d->m_page->defersLoading())
         return;
     d->m_inputHandler->paste();
+}
+
+void WebPage::selectAll()
+{
+    if (d->m_page->defersLoading())
+        return;
+    d->m_inputHandler->selectAll();
 }
 
 void WebPage::setSelection(const Platform::IntPoint& startPoint, const Platform::IntPoint& endPoint)
@@ -5873,7 +5887,7 @@ void WebPagePrivate::setCompositor(PassRefPtr<WebPageCompositorPrivate> composit
     // That seems extremely likely to be the case, but let's assert just to make sure.
     ASSERT(webKitThreadMessageClient()->isCurrentThread());
 
-    if (m_backingStore->d->buffer())
+    if (m_compositor || m_client->window())
         m_backingStore->d->suspendScreenAndBackingStoreUpdates();
 
     // This method call always round-trips on the WebKit thread (see WebPageCompositor::WebPageCompositor() and ~WebPageCompositor()),
@@ -5885,7 +5899,7 @@ void WebPagePrivate::setCompositor(PassRefPtr<WebPageCompositorPrivate> composit
     // safe access to m_compositor and its refcount.
     userInterfaceThreadMessageClient()->dispatchSyncMessage(createMethodCallMessage(&WebPagePrivate::setCompositorHelper, this, compositor, compositingContext));
 
-    if (m_backingStore->d->buffer()) // the new compositor, if one was set
+    if (m_compositor || m_client->window()) // the new compositor, if one was set
         m_backingStore->d->resumeScreenAndBackingStoreUpdates(BackingStore::RenderAndBlit);
 }
 
@@ -6400,6 +6414,7 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
     coreSettings->setDefaultTextEncodingName(webSettings->defaultTextEncodingName().impl());
     coreSettings->setDownloadableBinaryFontsEnabled(webSettings->downloadableBinaryFontsEnabled());
     coreSettings->setSpatialNavigationEnabled(m_webSettings->isSpatialNavigationEnabled());
+    coreSettings->setAsynchronousSpellCheckingEnabled(m_webSettings->isAsynchronousSpellCheckingEnabled());
 
     WebString stylesheetURL = webSettings->userStyleSheetString();
     if (stylesheetURL.isEmpty())

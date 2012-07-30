@@ -1669,12 +1669,8 @@ void RenderBlock::addOverflowFromPositionedObjects()
         positionedObject = *it;
         
         // Fixed positioned elements don't contribute to layout overflow, since they don't scroll with the content.
-        if (positionedObject->style()->position() != FixedPosition) {
-            int x = positionedObject->x();
-            if (style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-                x -= verticalScrollbarWidth();
-            addOverflowFromChild(positionedObject, IntSize(x, positionedObject->y()));
-        }
+        if (positionedObject->style()->position() != FixedPosition)
+            addOverflowFromChild(positionedObject, IntSize(positionedObject->x(), positionedObject->y()));
     }
 }
 
@@ -2208,8 +2204,6 @@ LayoutUnit RenderBlock::computeStartPositionDeltaForChildAvoidingFloats(const Re
 void RenderBlock::determineLogicalLeftPositionForChild(RenderBox* child)
 {
     LayoutUnit startPosition = borderStart() + paddingStart();
-    if (style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-        startPosition -= verticalScrollbarWidth();
     LayoutUnit totalAvailableLogicalWidth = borderAndPaddingLogicalWidth() + availableLogicalWidth();
 
     // Add in our start margin.
@@ -2866,61 +2860,69 @@ void RenderBlock::paintContents(PaintInfo& paintInfo, const LayoutPoint& paintOf
 
     if (childrenInline())
         m_lineBoxes.paint(this, paintInfo, paintOffset);
-    else
-        paintChildren(paintInfo, paintOffset);
-}
+    else {
+        PaintPhase newPhase = (paintInfo.phase == PaintPhaseChildOutlines) ? PaintPhaseOutline : paintInfo.phase;
+        newPhase = (newPhase == PaintPhaseChildBlockBackgrounds) ? PaintPhaseChildBlockBackground : newPhase;
 
-void RenderBlock::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
-{
-    PaintPhase newPhase = (paintInfo.phase == PaintPhaseChildOutlines) ? PaintPhaseOutline : paintInfo.phase;
-    newPhase = (newPhase == PaintPhaseChildBlockBackgrounds) ? PaintPhaseChildBlockBackground : newPhase;
-    
-    // We don't paint our own background, but we do let the kids paint their backgrounds.
-    PaintInfo info(paintInfo);
-    info.phase = newPhase;
-    info.updatePaintingRootForChildren(this);
-    
-    // FIXME: Paint-time pagination is obsolete and is now only used by embedded WebViews inside AppKit
-    // NSViews.  Do not add any more code for this.
-    RenderView* renderView = view();
-    bool usePrintRect = !renderView->printRect().isEmpty();
-    
-    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {        
-        // Check for page-break-before: always, and if it's set, break and bail.
-        bool checkBeforeAlways = !childrenInline() && (usePrintRect && child->style()->pageBreakBefore() == PBALWAYS);
-        LayoutUnit absoluteChildY = paintOffset.y() + child->y();
-        if (checkBeforeAlways
-            && absoluteChildY > paintInfo.rect.y()
-            && absoluteChildY < paintInfo.rect.maxY()) {
-            view()->setBestTruncatedAt(absoluteChildY, this, true);
-            return;
-        }
+        // We don't paint our own background, but we do let the kids paint their backgrounds.
+        PaintInfo paintInfoForChild(paintInfo);
+        paintInfoForChild.phase = newPhase;
+        paintInfoForChild.updatePaintingRootForChildren(this);
 
-        if (!child->isFloating() && child->isReplaced() && usePrintRect && child->height() <= renderView->printRect().height()) {
-            // Paginate block-level replaced elements.
-            if (absoluteChildY + child->height() > renderView->printRect().maxY()) {
-                if (absoluteChildY < renderView->truncatedAt())
-                    renderView->setBestTruncatedAt(absoluteChildY, child);
-                // If we were able to truncate, don't paint.
-                if (absoluteChildY >= renderView->truncatedAt())
-                    break;
-            }
-        }
-
-        LayoutPoint childPoint = flipForWritingModeForChild(child, paintOffset);
-        if (!child->hasSelfPaintingLayer() && !child->isFloating())
-            child->paint(info, childPoint);
-
-        // Check for page-break-after: always, and if it's set, break and bail.
-        bool checkAfterAlways = !childrenInline() && (usePrintRect && child->style()->pageBreakAfter() == PBALWAYS);
-        if (checkAfterAlways
-            && (absoluteChildY + child->height()) > paintInfo.rect.y()
-            && (absoluteChildY + child->height()) < paintInfo.rect.maxY()) {
-            view()->setBestTruncatedAt(absoluteChildY + child->height() + max(ZERO_LAYOUT_UNIT, child->collapsedMarginAfter()), this, true);
-            return;
-        }
+        // FIXME: Paint-time pagination is obsolete and is now only used by embedded WebViews inside AppKit
+        // NSViews. Do not add any more code for this.
+        bool usePrintRect = !view()->printRect().isEmpty();
+        paintChildren(paintInfo, paintOffset, paintInfoForChild, usePrintRect);
     }
 }
+
+void RenderBlock::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset, PaintInfo& paintInfoForChild, bool usePrintRect)
+{
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
+        if (!paintChild(child, paintInfo, paintOffset, paintInfoForChild, usePrintRect))
+            return;
+    }
+}
+
+bool RenderBlock::paintChild(RenderBox* child, PaintInfo& paintInfo, const LayoutPoint& paintOffset, PaintInfo& paintInfoForChild, bool usePrintRect)
+{
+    // Check for page-break-before: always, and if it's set, break and bail.
+    bool checkBeforeAlways = !childrenInline() && (usePrintRect && child->style()->pageBreakBefore() == PBALWAYS);
+    LayoutUnit absoluteChildY = paintOffset.y() + child->y();
+    if (checkBeforeAlways
+        && absoluteChildY > paintInfo.rect.y()
+        && absoluteChildY < paintInfo.rect.maxY()) {
+        view()->setBestTruncatedAt(absoluteChildY, this, true);
+        return false;
+    }
+
+    RenderView* renderView = view();
+    if (!child->isFloating() && child->isReplaced() && usePrintRect && child->height() <= renderView->printRect().height()) {
+        // Paginate block-level replaced elements.
+        if (absoluteChildY + child->height() > renderView->printRect().maxY()) {
+            if (absoluteChildY < renderView->truncatedAt())
+                renderView->setBestTruncatedAt(absoluteChildY, child);
+            // If we were able to truncate, don't paint.
+            if (absoluteChildY >= renderView->truncatedAt())
+                return false;
+        }
+    }
+
+    LayoutPoint childPoint = flipForWritingModeForChild(child, paintOffset);
+    if (!child->hasSelfPaintingLayer() && !child->isFloating())
+        child->paint(paintInfoForChild, childPoint);
+
+    // Check for page-break-after: always, and if it's set, break and bail.
+    bool checkAfterAlways = !childrenInline() && (usePrintRect && child->style()->pageBreakAfter() == PBALWAYS);
+    if (checkAfterAlways
+        && (absoluteChildY + child->height()) > paintInfo.rect.y()
+        && (absoluteChildY + child->height()) < paintInfo.rect.maxY()) {
+        view()->setBestTruncatedAt(absoluteChildY + child->height() + max(ZERO_LAYOUT_UNIT, child->collapsedMarginAfter()), this, true);
+        return false;
+    }
+    return true;
+}
+
 
 void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffset, CaretType type)
 {
@@ -4670,7 +4672,7 @@ bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
     // If we have clipping, then we can't have any spillout.
     bool useOverflowClip = hasOverflowClip() && !hasSelfPaintingLayer();
     bool useClip = (hasControlClip() || useOverflowClip);
-    bool checkChildren = !useClip || (hasControlClip() ? pointInContainer.intersects(controlClipRect(adjustedLocation)) : pointInContainer.intersects(overflowClipRect(adjustedLocation, result.region(), IncludeOverlayScrollbarSize)));
+    bool checkChildren = !useClip || (hasControlClip() ? pointInContainer.intersects(controlClipRect(adjustedLocation)) : pointInContainer.intersects(overflowClipRect(adjustedLocation, pointInContainer.region(), IncludeOverlayScrollbarSize)));
     if (checkChildren) {
         // Hit test descendants first.
         LayoutSize scrolledOffset(localOffset);
@@ -4914,6 +4916,9 @@ VisiblePosition RenderBlock::positionForPointWithInlineChildren(const LayoutPoin
     if (!firstRootBox())
         return createVisiblePosition(0, DOWNSTREAM);
 
+    bool linesAreFlipped = style()->isFlippedLinesWritingMode();
+    bool blocksAreFlipped = style()->isFlippedBlocksWritingMode();
+
     // look for the closest line box in the root box which is at the passed-in y coordinate
     InlineBox* closestBox = 0;
     RootInlineBox* firstRootBoxWithChildren = 0;
@@ -4923,10 +4928,24 @@ VisiblePosition RenderBlock::positionForPointWithInlineChildren(const LayoutPoin
             continue;
         if (!firstRootBoxWithChildren)
             firstRootBoxWithChildren = root;
+
+        if (!linesAreFlipped && root->isFirstAfterPageBreak() && (pointInLogicalContents.y() < root->lineTopWithLeading()
+            || (blocksAreFlipped && pointInLogicalContents.y() == root->lineTopWithLeading())))
+            break;
+
         lastRootBoxWithChildren = root;
 
         // check if this root line box is located at this y coordinate
-        if (pointInLogicalContents.y() < root->selectionBottom()) {
+        if (pointInLogicalContents.y() < root->selectionBottom() || (blocksAreFlipped && pointInLogicalContents.y() == root->selectionBottom())) {
+            if (linesAreFlipped) {
+                RootInlineBox* nextRootBoxWithChildren = root->nextRootBox();
+                while (nextRootBoxWithChildren && !nextRootBoxWithChildren->firstLeafChild())
+                    nextRootBoxWithChildren = nextRootBoxWithChildren->nextRootBox();
+
+                if (nextRootBoxWithChildren && nextRootBoxWithChildren->isFirstAfterPageBreak() && (pointInLogicalContents.y() > nextRootBoxWithChildren->lineTopWithLeading()
+                    || (!blocksAreFlipped && pointInLogicalContents.y() == nextRootBoxWithChildren->lineTopWithLeading())))
+                    continue;
+            }
             closestBox = root->closestLeafChildForLogicalLeftPosition(pointInLogicalContents.x());
             if (closestBox)
                 break;
@@ -4941,19 +4960,22 @@ VisiblePosition RenderBlock::positionForPointWithInlineChildren(const LayoutPoin
     }
 
     if (closestBox) {
-        if (moveCaretToBoundary && pointInLogicalContents.y() < firstRootBoxWithChildren->selectionTop()
-            && pointInLogicalContents.y() < firstRootBoxWithChildren->logicalTop()) {
-            InlineBox* box = firstRootBoxWithChildren->firstLeafChild();
-            if (box->isLineBreak()) {
-                if (InlineBox* newBox = box->nextLeafChildIgnoringLineBreak())
-                    box = newBox;
+        if (moveCaretToBoundary) {
+            LayoutUnit firstRootBoxWithChildrenTop = min<LayoutUnit>(firstRootBoxWithChildren->selectionTop(), firstRootBoxWithChildren->logicalTop());
+            if (pointInLogicalContents.y() < firstRootBoxWithChildrenTop
+                || (blocksAreFlipped && pointInLogicalContents.y() == firstRootBoxWithChildrenTop)) {
+                InlineBox* box = firstRootBoxWithChildren->firstLeafChild();
+                if (box->isLineBreak()) {
+                    if (InlineBox* newBox = box->nextLeafChildIgnoringLineBreak())
+                        box = newBox;
+                }
+                // y coordinate is above first root line box, so return the start of the first
+                return VisiblePosition(positionForBox(box, true), DOWNSTREAM);
             }
-            // y coordinate is above first root line box, so return the start of the first
-            return VisiblePosition(positionForBox(box, true), DOWNSTREAM);
         }
 
         // pass the box a top position that is inside it
-        LayoutPoint point(pointInLogicalContents.x(), max(closestBox->root()->lineTop(), closestBox->root()->selectionTop()));
+        LayoutPoint point(pointInLogicalContents.x(), closestBox->root()->blockDirectionPointInLine());
         if (!isHorizontalWritingMode())
             point = point.transposedPoint();
         if (closestBox->renderer()->isReplaced())
@@ -5009,13 +5031,19 @@ VisiblePosition RenderBlock::positionForPoint(const LayoutPoint& point)
     while (lastCandidateBox && !isChildHitTestCandidate(lastCandidateBox))
         lastCandidateBox = lastCandidateBox->previousSiblingBox();
 
+    bool blocksAreFlipped = style()->isFlippedBlocksWritingMode();
     if (lastCandidateBox) {
-        if (pointInContents.y() > lastCandidateBox->logicalTop())
+        if (pointInLogicalContents.y() > logicalTopForChild(lastCandidateBox)
+            || (!blocksAreFlipped && pointInLogicalContents.y() == logicalTopForChild(lastCandidateBox)))
             return positionForPointRespectingEditingBoundaries(this, lastCandidateBox, pointInContents);
 
         for (RenderBox* childBox = firstChildBox(); childBox; childBox = childBox->nextSiblingBox()) {
+            if (!isChildHitTestCandidate(childBox))
+                continue;
+            LayoutUnit childLogicalBottom = logicalTopForChild(childBox) + logicalHeightForChild(childBox);
             // We hit child if our click is above the bottom of its padding box (like IE6/7 and FF3).
-            if (isChildHitTestCandidate(childBox) && pointInContents.y() < childBox->logicalBottom())
+            if (isChildHitTestCandidate(childBox) && (pointInLogicalContents.y() < childLogicalBottom
+                || (blocksAreFlipped && pointInLogicalContents.y() == childLogicalBottom)))
                 return positionForPointRespectingEditingBoundaries(this, childBox, pointInContents);
         }
     }
@@ -5026,11 +5054,15 @@ VisiblePosition RenderBlock::positionForPoint(const LayoutPoint& point)
 
 void RenderBlock::offsetForContents(LayoutPoint& offset) const
 {
+    offset = flipForWritingMode(offset);
+
     if (hasOverflowClip())
         offset += scrolledContentOffset();
 
     if (hasColumns())
         adjustPointToColumnContents(offset);
+
+    offset = flipForWritingMode(offset);
 }
 
 LayoutUnit RenderBlock::availableLogicalWidth() const
@@ -5245,51 +5277,65 @@ void RenderBlock::adjustPointToColumnContents(LayoutPoint& point) const
         if (isHorizontalWritingMode() == (colInfo->progressionAxis() == ColumnInfo::InlineAxis)) {
             LayoutRect gapAndColumnRect(colRect.x() - halfColGap, colRect.y(), colRect.width() + colGap, colRect.height());
             if (point.x() >= gapAndColumnRect.x() && point.x() < gapAndColumnRect.maxX()) {
-                // FIXME: The clamping that follows is not completely right for right-to-left
-                // content.
-                // Clamp everything above the column to its top left.
-                if (point.y() < gapAndColumnRect.y())
-                    point = gapAndColumnRect.location();
-                // Clamp everything below the column to the next column's top left. If there is
-                // no next column, this still maps to just after this column.
-                else if (point.y() >= gapAndColumnRect.maxY()) {
-                    point = gapAndColumnRect.location();
-                    point.move(0, gapAndColumnRect.height());
+                if (colInfo->progressionAxis() == ColumnInfo::InlineAxis) {
+                    // FIXME: The clamping that follows is not completely right for right-to-left
+                    // content.
+                    // Clamp everything above the column to its top left.
+                    if (point.y() < gapAndColumnRect.y())
+                        point = gapAndColumnRect.location();
+                    // Clamp everything below the column to the next column's top left. If there is
+                    // no next column, this still maps to just after this column.
+                    else if (point.y() >= gapAndColumnRect.maxY()) {
+                        point = gapAndColumnRect.location();
+                        point.move(0, gapAndColumnRect.height());
+                    }
+                } else {
+                    if (point.x() < colRect.x())
+                        point.setX(colRect.x());
+                    else if (point.x() >= colRect.maxX())
+                        point.setX(colRect.maxX() - 1);
                 }
 
                 // We're inside the column.  Translate the x and y into our column coordinate space.
                 if (colInfo->progressionAxis() == ColumnInfo::InlineAxis)
-                    point.move(columnPoint.x() - colRect.x(), logicalOffset);
+                    point.move(columnPoint.x() - colRect.x(), (!style()->isFlippedBlocksWritingMode() ? logicalOffset : -logicalOffset));
                 else
                     point.move((!style()->isFlippedBlocksWritingMode() ? logicalOffset : -logicalOffset) - colRect.x() + borderLeft() + paddingLeft(), 0);
                 return;
             }
-            
+
             // Move to the next position.
             logicalOffset += colInfo->progressionAxis() == ColumnInfo::InlineAxis ? colRect.height() : colRect.width();
         } else {
             LayoutRect gapAndColumnRect(colRect.x(), colRect.y() - halfColGap, colRect.width(), colRect.height() + colGap);
             if (point.y() >= gapAndColumnRect.y() && point.y() < gapAndColumnRect.maxY()) {
-                // FIXME: The clamping that follows is not completely right for right-to-left
-                // content.
-                // Clamp everything above the column to its top left.
-                if (point.x() < gapAndColumnRect.x())
-                    point = gapAndColumnRect.location();
-                // Clamp everything below the column to the next column's top left. If there is
-                // no next column, this still maps to just after this column.
-                else if (point.x() >= gapAndColumnRect.maxX()) {
-                    point = gapAndColumnRect.location();
-                    point.move(gapAndColumnRect.width(), 0);
+                if (colInfo->progressionAxis() == ColumnInfo::InlineAxis) {
+                    // FIXME: The clamping that follows is not completely right for right-to-left
+                    // content.
+                    // Clamp everything above the column to its top left.
+                    if (point.x() < gapAndColumnRect.x())
+                        point = gapAndColumnRect.location();
+                    // Clamp everything below the column to the next column's top left. If there is
+                    // no next column, this still maps to just after this column.
+                    else if (point.x() >= gapAndColumnRect.maxX()) {
+                        point = gapAndColumnRect.location();
+                        point.move(gapAndColumnRect.width(), 0);
+                    }
+                } else {
+                    if (point.y() < colRect.y())
+                        point.setY(colRect.y());
+                    else if (point.y() >= colRect.maxY())
+                        point.setY(colRect.maxY() - 1);
                 }
 
                 // We're inside the column.  Translate the x and y into our column coordinate space.
                 if (colInfo->progressionAxis() == ColumnInfo::InlineAxis)
-                    point.move(logicalOffset, columnPoint.y() - colRect.y());
+                    point.move((!style()->isFlippedBlocksWritingMode() ? logicalOffset : -logicalOffset), columnPoint.y() - colRect.y());
                 else
                     point.move(0, (!style()->isFlippedBlocksWritingMode() ? logicalOffset : -logicalOffset) - colRect.y() + borderTop() + paddingTop());
                 return;
             }
-            
+
             // Move to the next position.
             logicalOffset += colInfo->progressionAxis() == ColumnInfo::InlineAxis ? colRect.width() : colRect.height();
         }
@@ -5591,7 +5637,7 @@ static inline void stripTrailingSpace(float& inlineMax, float& inlineMin,
 
 static inline void updatePreferredWidth(LayoutUnit& preferredWidth, float& result)
 {
-    LayoutUnit snappedResult = LayoutUnit::fromFloatCeil(result);
+    LayoutUnit snappedResult = ceiledLayoutUnit(result);
     preferredWidth = max(snappedResult, preferredWidth);
 }
 
@@ -6941,6 +6987,7 @@ void RenderBlock::adjustLinePositionForPagination(RootInlineBox* lineBox, Layout
         layoutState->m_columnInfo->updateMinimumColumnHeight(lineHeight);
     logicalOffset += delta;
     lineBox->setPaginationStrut(0);
+    lineBox->setIsFirstAfterPageBreak(false);
     LayoutUnit pageLogicalHeight = pageLogicalHeightForOffset(logicalOffset);
     bool hasUniformPageLogicalHeight = !inRenderFlowThread() || enclosingRenderFlowThread()->regionsHaveUniformLogicalHeight();
     // If lineHeight is greater than pageLogicalHeight, but logicalVisualOverflow.height() still fits, we are
@@ -6964,8 +7011,10 @@ void RenderBlock::adjustLinePositionForPagination(RootInlineBox* lineBox, Layout
         else {
             delta += remainingLogicalHeight;
             lineBox->setPaginationStrut(remainingLogicalHeight);
+            lineBox->setIsFirstAfterPageBreak(true);
         }
-    }
+    } else if (remainingLogicalHeight == pageLogicalHeight && lineBox != firstRootBox())
+        lineBox->setIsFirstAfterPageBreak(true);
 }
 
 LayoutUnit RenderBlock::adjustBlockChildForPagination(LayoutUnit logicalTopAfterClear, LayoutUnit estimateWithoutPagination, RenderBox* child, bool atBeforeSideOfBlock)

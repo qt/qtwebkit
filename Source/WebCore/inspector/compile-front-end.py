@@ -87,6 +87,7 @@ modules = [
             "Linkifier.js",
             "NetworkLog.js",
             "Placard.js",
+            "SASSSourceMapping.js",
             "Script.js",
             "ScriptFormatter.js",
             "ScriptSnippetModel.js",
@@ -171,6 +172,7 @@ modules = [
             "PropertiesSidebarPane.js",
             "SourceFrame.js",
             "TimelineGrid.js",
+            "UISourceCodeFrame.js",
         ]
     },
     {

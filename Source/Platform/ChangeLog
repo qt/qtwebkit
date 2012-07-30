@@ -1,3 +1,82 @@
+2012-07-25  Min Qin  <qinmin@chromium.org>
+
+        Upstream declaration of WebGraphicsContext3D::createStreamTextureCHROMIUM() for android
+        https://bugs.webkit.org/show_bug.cgi?id=92308
+
+        Reviewed by Adam Barth.
+
+        For android, we need 2 calls to create and destroy the stream texture.
+        This change adds the interface for these 2 calls.
+        The actual implementation will be in webgraphicscontext3d_in_process_impl and webgraphicscontext3d_command_buffer_impl.
+
+        * chromium/public/WebGraphicsContext3D.h:
+        (WebGraphicsContext3D):
+        (WebKit::WebGraphicsContext3D::createStreamTextureCHROMIUM):
+        (WebKit::WebGraphicsContext3D::destroyStreamTextureCHROMIUM):
+
+2012-07-25  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Update MediaStreamTrack to match the specification
+        https://bugs.webkit.org/show_bug.cgi?id=90180
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebMediaStreamDescriptor.h:
+        (WebMediaStreamDescriptor):
+        * chromium/public/WebMediaStreamSource.h:
+        (WebMediaStreamSource):
+
+2012-07-24  Dave Tu  <dtu@chromium.org>
+
+        [chromium] Add time spent painting to GPU benchmarking renderingStats() API.
+        https://bugs.webkit.org/show_bug.cgi?id=90019
+
+        Reviewed by Adrienne Walker.
+
+        * chromium/public/WebRenderingStats.h:
+        (WebRenderingStats):
+        (WebKit::WebRenderingStats::WebRenderingStats):
+
+2012-07-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123499.
+        http://trac.webkit.org/changeset/123499
+        https://bugs.webkit.org/show_bug.cgi?id=92161
+
+        Android fails to compile (Requested by zhenyao on #webkit).
+
+        * chromium/public/WebMediaStreamDescriptor.h:
+        (WebMediaStreamDescriptor):
+        * chromium/public/WebMediaStreamSource.h:
+        (WebMediaStreamSource):
+
+2012-07-24  Leandro Gracia Gil  <leandrogracia@chromium.org>
+
+        [Chromium] Enable conversion between WebFloatRect and gfx::RectF.
+        https://bugs.webkit.org/show_bug.cgi?id=92117
+
+        Reviewed by Adam Barth.
+
+        Introduce WebFloatRect <--> gfx::RectF conversion as we already do with WebRect <--> gfx::Rect.
+
+        * chromium/public/WebFloatRect.h:
+        (WebKit::WebFloatRect::WebFloatRect):
+        (WebFloatRect):
+        (WebKit::WebFloatRect::operator=):
+        (WebKit::WebFloatRect::operator gfx::RectF):
+
+2012-07-24  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Update MediaStreamTrack to match the specification
+        https://bugs.webkit.org/show_bug.cgi?id=90180
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebMediaStreamDescriptor.h:
+        (WebMediaStreamDescriptor):
+        * chromium/public/WebMediaStreamSource.h:
+        (WebMediaStreamSource):
+
 2012-07-23  Dave Tu  <dtu@chromium.org>
 
         [chromium] Add droppedFrameCount to renderingStats.

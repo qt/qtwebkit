@@ -26,6 +26,7 @@
 
 #include "cc/CCLayerTreeHost.h"
 
+#include "HeadsUpDisplayLayerChromium.h"
 #include "LayerChromium.h"
 #include "Region.h"
 #include "TraceEvent.h"
@@ -38,7 +39,6 @@
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCOcclusionTracker.h"
 #include "cc/CCOverdrawMetrics.h"
-#include "cc/CCRenderingStats.h"
 #include "cc/CCSettings.h"
 #include "cc/CCSingleThreadProxy.h"
 #include "cc/CCThreadProxy.h"
@@ -72,8 +72,8 @@ CCLayerTreeHost::CCLayerTreeHost(CCLayerTreeHostClient* client, const CCLayerTre
     , m_animating(false)
     , m_needsAnimateLayers(false)
     , m_client(client)
-    , m_animationFrameNumber(0)
     , m_commitNumber(0)
+    , m_renderingStats()
     , m_layerRendererInitialized(false)
     , m_contextLost(false)
     , m_numTimesRecreateShouldFail(0)
@@ -105,14 +105,6 @@ bool CCLayerTreeHost::initialize()
 
     if (!m_proxy->initializeContext())
         return false;
-
-    // Only allocate the font atlas if we have reason to use the heads-up display.
-    if (m_settings.showFPSCounter || m_settings.showPlatformLayerTree) {
-        TRACE_EVENT0("cc", "CCLayerTreeHost::initialize::initializeFontAtlas");
-        OwnPtr<CCFontAtlas> fontAtlas(CCFontAtlas::create());
-        fontAtlas->initialize();
-        m_proxy->setFontAtlas(fontAtlas.release());
-    }
 
     m_compositorIdentifier = m_proxy->compositorIdentifier();
     return true;
@@ -217,7 +209,7 @@ void CCLayerTreeHost::updateAnimations(double monotonicFrameBeginTime)
     animateLayers(monotonicFrameBeginTime);
     m_animating = false;
 
-    m_animationFrameNumber++;
+    m_renderingStats.numAnimationFrames++;
 }
 
 void CCLayerTreeHost::layout()
@@ -259,8 +251,20 @@ void CCLayerTreeHost::finishCommitOnImplThread(CCLayerTreeHostImpl* hostImpl)
     m_commitNumber++;
 }
 
+void CCLayerTreeHost::willCommit()
+{
+    m_client->willCommit();
+    if (m_rootLayer && m_settings.showDebugInfo()) {
+        if (!m_hudLayer)
+            m_hudLayer = HeadsUpDisplayLayerChromium::create(m_settings, layerRendererCapabilities().maxTextureSize);
+        m_rootLayer->addChild(m_hudLayer);
+    }
+}
+
 void CCLayerTreeHost::commitComplete()
 {
+    if (m_hudLayer)
+        m_hudLayer->removeFromParent();
     m_deleteTextureAfterCommitList.clear();
     m_client->didCommit();
 }
@@ -303,8 +307,8 @@ void CCLayerTreeHost::finishAllRendering()
 
 void CCLayerTreeHost::renderingStats(CCRenderingStats& stats) const
 {
+    stats = m_renderingStats;
     m_proxy->implSideRenderingStats(stats);
-    stats.numAnimationFrames = animationFrameNumber();
 }
 
 const LayerRendererCapabilities& CCLayerTreeHost::layerRendererCapabilities() const
@@ -463,24 +467,13 @@ void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer, CCTextureUpdater& u
 {
     TRACE_EVENT0("cc", "CCLayerTreeHost::updateLayers");
 
-    if (!rootLayer->renderSurface())
-        rootLayer->createRenderSurface();
-    rootLayer->renderSurface()->setContentRect(IntRect(IntPoint(0, 0), deviceViewportSize()));
-
     LayerList updateList;
-    updateList.append(rootLayer);
-
-    RenderSurfaceChromium* rootRenderSurface = rootLayer->renderSurface();
-    rootRenderSurface->clearLayerList();
 
     {
         TRACE_EVENT0("cc", "CCLayerTreeHost::updateLayers::calcDrawEtc");
-        WebTransformationMatrix identityMatrix;
-        WebTransformationMatrix deviceScaleTransform;
-        deviceScaleTransform.scale(m_deviceScaleFactor);
-        CCLayerTreeHostCommon::calculateDrawTransforms(rootLayer, rootLayer, deviceScaleTransform, identityMatrix, updateList, rootRenderSurface->layerList(), layerRendererCapabilities().maxTextureSize);
+        CCLayerTreeHostCommon::calculateDrawTransforms(rootLayer, deviceViewportSize(), m_deviceScaleFactor, layerRendererCapabilities().maxTextureSize, updateList);
 
-        FloatRect rootScissorRect(FloatPoint(0, 0), viewportSize());
+        FloatRect rootScissorRect(FloatPoint(0, 0), deviceViewportSize());
         CCLayerTreeHostCommon::calculateVisibleAndScissorRects(updateList, rootScissorRect);
     }
 
@@ -572,13 +565,13 @@ bool CCLayerTreeHost::paintMasksForRenderSurface(LayerChromium* renderSurfaceLay
     bool needMoreUpdates = false;
     LayerChromium* maskLayer = renderSurfaceLayer->maskLayer();
     if (maskLayer) {
-        maskLayer->update(updater, 0);
+        maskLayer->update(updater, 0, m_renderingStats);
         needMoreUpdates |= maskLayer->needMoreUpdates();
     }
 
     LayerChromium* replicaMaskLayer = renderSurfaceLayer->replicaLayer() ? renderSurfaceLayer->replicaLayer()->maskLayer() : 0;
     if (replicaMaskLayer) {
-        replicaMaskLayer->update(updater, 0);
+        replicaMaskLayer->update(updater, 0, m_renderingStats);
         needMoreUpdates |= replicaMaskLayer->needMoreUpdates();
     }
     return needMoreUpdates;
@@ -605,7 +598,7 @@ bool CCLayerTreeHost::paintLayerContents(const LayerList& renderSurfaceLayerList
             needMoreUpdates |= paintMasksForRenderSurface(*it, updater);
         } else if (it.representsItself()) {
             ASSERT(!it->bounds().isEmpty());
-            it->update(updater, &occlusionTracker);
+            it->update(updater, &occlusionTracker, m_renderingStats);
             needMoreUpdates |= it->needMoreUpdates();
         }
 

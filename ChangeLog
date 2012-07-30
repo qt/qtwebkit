@@ -1,3 +1,128 @@
+2012-07-29  Vsevolod Vlasov  <vsevik@chromium.org>
+
+        Web Inspector: Resource agent's reference to cached resources should be weak.
+        https://bugs.webkit.org/show_bug.cgi?id=92108
+
+        Reviewed by Pavel Feldman.
+
+        * Source/autotools/symbols.filter:
+
+2012-07-29  Rik Cabanier  <cabanier@adobe.com>
+
+        Add ENABLE_CSS_COMPOSITING flag
+        https://bugs.webkit.org/show_bug.cgi?id=92553
+
+        Reviewed by Dirk Schulze.
+
+        Adds compiler flag CSS_COMPOSITING to build systems to enable CSS blending and compositing. See spec https://dvcs.w3.org/hg/FXTF/rawfile/tip/compositing/index.html
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+        * configure.ac:
+
+2012-07-27  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Support for HTML media capture
+        https://bugs.webkit.org/show_bug.cgi?id=91842
+
+        Reviewed by Ryosuke Niwa.
+
+        Add HTML media capture feature, and enable that on the Efl port.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2012-07-27  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed perf-o-matic build fix for dashboard image generation.
+        Also, only show Parser/html5-full-render on the dashboard by default
+        so that it won't take forever to load it.
+
+        * Websites/webkit-perf.appspot.com/controller.py:
+        (schedule_runs_update):
+        (RunsChartHandler.post):
+        * Websites/webkit-perf.appspot.com/models.py:
+        (Runs.chart_params):
+        (DashboardImage.get_image):
+        * Websites/webkit-perf.appspot.com/models_unittest.py:
+        (RunsTest.test_chart_params_with_value):
+
+2012-07-27  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        [Cairo] Add complex font drawing using HarfbuzzNG
+        https://bugs.webkit.org/show_bug.cgi?id=91864
+
+        Reviewed by Simon Hausmann and Martin Robinson.
+
+        Configuring Freetype backend to use HarfBuzz by default.
+
+        * Source/cmake/FindHarfBuzz.cmake: Added pkgconfig based discovery of HarfBuzz.
+        * Source/cmake/OptionsEfl.cmake: Adding Harfbuzz configuration.
+
+2012-07-26  Dan Bernstein  <mitz@apple.com>
+
+        When Safari 6 is launched via the WebKit Xcode workspace, it does not link against the built frameworks
+        https://bugs.webkit.org/show_bug.cgi?id=92331
+
+        Reviewed by Mark Rowe.
+
+        Changed references to the Safari executable to the SafariForWebKitDevelopment binary.
+
+        * WebKit.xcworkspace/xcshareddata/xcschemes/All Source (target WebProcess).xcscheme:
+        * WebKit.xcworkspace/xcshareddata/xcschemes/All Source.xcscheme:
+
+2012-07-26  Keishi Hattori  <keishi@webkit.org>
+
+        Implement ColorSuggestionPicker page popup
+        https://bugs.webkit.org/show_bug.cgi?id=92109
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/forms/color-suggestion-picker.html: Added. Tests colorSuggestionPicker.{js,css}
+
+2012-07-26  Zoltan Nyul  <zoltan.nyul@intel.com>
+
+        [EFL] EFL port should use XDG paths
+        https://bugs.webkit.org/show_bug.cgi?id=91719
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Efreet library added.
+
+        * Source/cmake/FindEFL.cmake:
+
+2012-07-26  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        [DRT] LTC:: pageNumberForElementById() could be moved to Internals.
+        https://bugs.webkit.org/show_bug.cgi?id=92091
+
+        Reviewed by Adam Barth.
+
+        Exporting Internals::pageNumber symbols for the Gtk build.
+
+        * Source/autotools/symbols.filter:
+
+2012-07-25  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123606.
+        http://trac.webkit.org/changeset/123606
+        https://bugs.webkit.org/show_bug.cgi?id=92247
+
+        broke Windows build of Chromium (Requested by tomhudson on
+        #webkit).
+
+        * ManualTests/forms/color-suggestion-picker.html: Removed.
+
+2012-07-25  Keishi Hattori  <keishi@webkit.org>
+
+        Implement ColorSuggestionPicker page popup
+        https://bugs.webkit.org/show_bug.cgi?id=92109
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/forms/color-suggestion-picker.html: Added. Tests colorSuggestionPicker.{js,css}
+
 2012-07-23  Kent Tamura  <tkent@chromium.org>
 
         [GTK] Remove unnecessary trailing space in the previous commit.

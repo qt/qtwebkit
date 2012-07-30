@@ -1,3 +1,561 @@
+2012-07-29  Lu Guanqun  <guanqun.lu@intel.com>
+
+        [chromium] pass acceleratePainting info to settings
+        https://bugs.webkit.org/show_bug.cgi?id=92467
+
+        Reviewed by Eric Seidel.
+
+        The acceleratePainting info is not passed into settings correctly so
+        that GPU composition would not use the code path of accelerated painting.
+
+        * src/WebLayerTreeView.cpp:
+        (WebKit::WebLayerTreeView::Settings::operator CCLayerTreeSettings):
+
+2012-07-29  Rik Cabanier  <cabanier@adobe.com>
+
+        Add ENABLE_CSS_COMPOSITING flag
+        https://bugs.webkit.org/show_bug.cgi?id=92553
+
+        Reviewed by Dirk Schulze.
+
+        Adds compiler flag CSS_COMPOSITING to build systems to enable CSS blending and compositing. See spec https://dvcs.w3.org/hg/FXTF/rawfile/tip/compositing/index.html
+
+        * features.gypi:
+
+2012-07-28  Peter Kasting  <pkasting@google.com>
+
+        Sigh.  Just disable all the AutoResize tests after the first three.
+        https://bugs.webkit.org/show_bug.cgi?id=92318 
+
+        Unreviewed, making bots happier.
+
+        * tests/WebViewTest.cpp:
+
+2012-07-28  Peter Kasting  <pkasting@google.com>
+
+        Try disabling different test in hopes of tracking down the real problem.
+        https://bugs.webkit.org/show_bug.cgi?id=92318 
+
+        Unreviewed, making bots happier.
+
+        * tests/WebViewTest.cpp:
+
+2012-07-27  Peter Kasting  <pkasting@google.com>
+
+        Disable failing test.
+        https://bugs.webkit.org/show_bug.cgi?id=92318 
+
+        Unreviewed, making bots happier.
+
+        * tests/WebViewTest.cpp:
+
+2012-07-27  Scott Graham  <scottmg@chromium.org>
+
+        Change navigator.webkitGamepads[] to navigator.webkitGetGamepads()
+        https://bugs.webkit.org/show_bug.cgi?id=92533
+
+        Reviewed by Adam Barth.
+
+        Renames for updated access point.
+
+        * src/WebRuntimeFeatures.cpp:
+        (WebKit::WebRuntimeFeatures::enableGamepad):
+        (WebKit::WebRuntimeFeatures::isGamepadEnabled):
+
+2012-07-27  Kevin Ellis  <kevers@chromium.org>
+
+        [chromium] Calendar for input type=date should be larger on devices that support touch input.
+        https://bugs.webkit.org/show_bug.cgi?id=92424
+
+        Reviewed by Kent Tamura.
+
+        Plumbs the deviceSupportsTouch setting through to the popup page so
+        that the Calendar popup can be enlarged on screens that support touch
+        input.
+
+        * src/WebPagePopupImpl.cpp:
+        (WebKit::WebPagePopupImpl::initPage):
+
+2012-07-27  Peter Beverloo  <peter@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-07-27  Oli Lan  <olilan@chromium.org>
+
+        [chromium] Fix issues in visiblePositionForWindowPoint (offscreen points / iframes).
+        https://bugs.webkit.org/show_bug.cgi?id=79117
+
+        Fix two issues in WebFrameImpl::visiblePositionForWindowPoint.
+
+        1) If the point is off-screen, the visiblePosition is clipped to the screen.
+           - The fix is to add HitTestRequest::IgnoreClipping.
+
+        2) The result is incorrect if the point is within an iframe.
+           - This is because we are calling convertFromContainingWindow twice: once in windowToContents,
+             and then explicitly as well.
+           - This patch removes the explicit call to convertFromContainingWindow. 
+
+        Reviewed by Adam Barth.
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::visiblePositionForWindowPoint):
+
+2012-07-27  Peter Beverloo  <peter@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-07-27  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: inject index keys on cursor/objectstore/index get success handlers
+        https://bugs.webkit.org/show_bug.cgi?id=91123
+
+        Reviewed by Tony Chang.
+
+        Remove method no longer used.
+
+        * tests/IDBFakeBackingStore.h:
+
+2012-07-26  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [Forms] Introduce runtime feature flags for input type datetime, datetimelocal, month, time, week
+        https://bugs.webkit.org/show_bug.cgi?id=92339
+
+        Reviewed by Kent Tamura.
+
+        To detect compilation errors and test failure earlier, I would like
+        build and run tests for input type datetime, datetime-local, month,
+        time and week with runtime feature flags to avoid behavior changes
+        on chromium browser.
+
+        This patch adds query and change functions for runtime features of
+        input type datetime, datetime-local, month, time and week to WebRuntimeFeatures
+        class for exposing DRT and chromium browser expermental flags.
+
+        * features.gypi: Turn on ENABLE_INPUT_TYPE_DATETIME, ENABLE_INPUT_TYPE_DATETIMELOCAL,
+        ENABLE_INPUT_TYPE_MONTH, ENABLE_INPUT_TYPE_TIME, and ENABLE_INPUT_TYPE_WEEK for all OS.
+        * public/WebRuntimeFeatures.h:
+        (WebRuntimeFeatures):
+        * src/WebRuntimeFeatures.cpp:
+        (WebKit::WebRuntimeFeatures::enableInputTypeDateTime): Added.
+        (WebKit::WebRuntimeFeatures::isInputTypeDateTimeEnabled): Added.
+        (WebKit::WebRuntimeFeatures::enableInputTypeDateTimeLocal): Added.
+        (WebKit::WebRuntimeFeatures::isInputTypeDateTimeLocalEnabled): Added.
+        (WebKit::WebRuntimeFeatures::enableInputTypeMonth): Added.
+        (WebKit::WebRuntimeFeatures::isInputTypeMonthEnabled): Added.
+        (WebKit::WebRuntimeFeatures::enableInputTypeTime): Added.
+        (WebKit::WebRuntimeFeatures::isInputTypeTimeEnabled): Added.
+        (WebKit::WebRuntimeFeatures::enableInputTypeWeek): Added.
+        (WebKit::WebRuntimeFeatures::isInputTypeWeekEnabled): Added.
+
+2012-07-26  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123799.
+        http://trac.webkit.org/changeset/123799
+        https://bugs.webkit.org/show_bug.cgi?id=92431
+
+        broke the Apple Mac build (Requested by bweinstein on
+        #webkit).
+
+        * src/WebInputEventConversion.cpp:
+        (WebKit):
+        * src/WebInputEventConversion.h:
+        (WebKit):
+        * src/WebPluginContainerImpl.cpp:
+        (WebKit::WebPluginContainerImpl::handleEvent):
+        * src/WebPluginContainerImpl.h:
+        (WebPluginContainerImpl):
+
+2012-07-26  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        Propagate gesture events to plugins.
+        https://bugs.webkit.org/show_bug.cgi?id=92281
+
+        Reviewed by Adam Barth.
+
+        Propagate gesture events to plugins.
+
+        * src/WebInputEventConversion.cpp:
+        (WebKit):
+        (WebKit::WebGestureEventBuilder::WebGestureEventBuilder):
+        * src/WebInputEventConversion.h:
+        (WebCore):
+        (WebKit):
+        (WebGestureEventBuilder):
+        * src/WebPluginContainerImpl.cpp:
+        (WebKit::WebPluginContainerImpl::handleEvent):
+        * src/WebPluginContainerImpl.h:
+        (WebCore):
+        (WebPluginContainerImpl):
+
+2012-07-26  Adrienne Walker  <enne@google.com>
+
+        [chromium] Remove redundant surface origin transforms
+        https://bugs.webkit.org/show_bug.cgi?id=91815
+
+        Reviewed by Stephen White.
+
+        Clean up use of origin transforms in tests. Where possible, test
+        against the equivalent draw transform.
+
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/CCRenderSurfaceTest.cpp:
+
+2012-07-25  David Grogan  <dgrogan@chromium.org>
+
+        IndexedDB: WebKit API interfaces for "upgradeneeded" methods and events
+        https://bugs.webkit.org/show_bug.cgi?id=92203
+
+        Reviewed by Adam Barth.
+
+        This is the beginning of our typical three-sided-patch process.
+
+        * public/WebIDBCallbacks.h:
+        (WebKit::WebIDBCallbacks::onBlocked):
+        (WebKit::WebIDBCallbacks::onUpgradeNeeded):
+        * public/WebIDBDatabaseCallbacks.h:
+        (WebKit::WebIDBDatabaseCallbacks::onVersionChange):
+        * public/WebIDBFactory.h:
+        (WebIDBFactory):
+        (WebKit::WebIDBFactory::open):
+        * src/WebIDBFactoryImpl.cpp:
+        (WebKit::WebIDBFactoryImpl::open):
+        (WebKit):
+        * src/WebIDBFactoryImpl.h:
+        (WebIDBFactoryImpl):
+
+2012-07-19  Adrienne Walker  <enne@google.com>
+
+        [chromium] Make all compositor screen space transforms operate on content rects
+        https://bugs.webkit.org/show_bug.cgi?id=91807
+
+        Reviewed by Kenneth Russell.
+
+        Update tests that deal with screen space transforms to reflect this change.
+
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/TiledLayerChromiumTest.cpp:
+
+2012-07-25  Andrew Wilson  <atwilson@chromium.org>
+
+        Unreviewed chromium change to disable failing WebViewTest.AutoResizeInBetweenSizes.
+        https://bugs.webkit.org/show_bug.cgi?id=92318
+
+        * tests/WebViewTest.cpp:
+
+2012-07-25  Scott Graham  <scottmg@chromium.org>
+
+        [Chromium] fix double->float warnings in CCLayerTreeHostCommonTest.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=92271
+
+        Reviewed by Adrienne Walker.
+
+        Fix compile warnings on Windows.
+
+        * tests/CCLayerTreeHostCommonTest.cpp:
+
+2012-07-25  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Move WebFilterOperations from RenderPassDrawQuad to RenderPass
+        https://bugs.webkit.org/show_bug.cgi?id=91885
+
+        Reviewed by Adrienne Walker.
+
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/LayerRendererChromiumTest.cpp:
+        (FakeCCRendererClient::FakeCCRendererClient):
+        (FakeCCRendererClient::rootRenderPass):
+        (FakeCCRendererClient::renderPassesInDrawOrder):
+        (FakeCCRendererClient::renderPasses):
+        (FakeCCRendererClient):
+        (TEST_F):
+        (TEST):
+
+2012-07-24  Shawn Singh  <shawnsingh@chromium.org>
+
+        [chromium] Refactor CCLayerTreeHostCommon: move root layer special case initialization into internal code.
+        https://bugs.webkit.org/show_bug.cgi?id=88953
+
+        Reviewed by Adrienne Walker.
+
+        Unit tests updated to account for the new less-special root layer setup.
+          - most test cases just needed to remove root->renderSurface()->setContentBounds(), createRenderSurface(), and renderSurfaceLayerList.append().
+          - some test cases originally relied on setting some awkward unconventional bounds of the rootLayer that were different than the rootLayer's renderSurface. these tests are updated.
+          - a few minor cleanups otherwise.
+
+        * tests/CCDamageTrackerTest.cpp:
+        (WebKitTests::executeCalculateDrawTransformsAndVisibility):
+        * tests/CCLayerIteratorTest.cpp:
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/CCOcclusionTrackerTest.cpp:
+        (WebKitTests::CCOcclusionTrackerTest::calcDrawEtc):
+
+2012-07-25  Taiju Tsuiki  <tzik@chromium.org>
+
+        FileSystem should provide a way to delete filesystem.
+        https://bugs.webkit.org/show_bug.cgi?id=91861
+
+        Reviewed by Adam Barth.
+
+        * public/WebFrameClient.h:
+        (WebFrameClient):
+        (WebKit::WebFrameClient::deleteFileSystem):
+        * src/LocalFileSystemChromium.cpp: Add deleteFileSystem
+        (WebCore::deleteFileSystemNotAllowed):
+        (WebCore):
+        (WebCore::LocalFileSystem::deleteFileSystem):
+
+2012-07-25  Alok Priyadarshi  <alokp@chromium.org>
+
+        [chromium] WebViewBenchmarkSupport::paint API does not work with recording canvas
+        https://bugs.webkit.org/show_bug.cgi?id=92008
+
+        Reviewed by Darin Fisher.
+
+        Moved the ownership of canvas to WebViewBenchmarkSupport::PaintClient.
+
+        * public/WebViewBenchmarkSupport.h:
+        (PaintClient):
+        (WebKit::WebViewBenchmarkSupport::PaintClient::willPaint):
+        (WebKit::WebViewBenchmarkSupport::PaintClient::didPaint):
+        * src/WebViewBenchmarkSupportImpl.cpp:
+        (WebKit::WebViewBenchmarkSupportImpl::paintLayer):
+        (WebKit::WebViewBenchmarkSupportImpl::softwarePaint):
+
+2012-07-24  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Turn the debug HUD into a layer so that it can be drawn as a WebCompositorQuad
+        https://bugs.webkit.org/show_bug.cgi?id=92182
+
+        Reviewed by Adrienne Walker.
+
+        * tests/LayerRendererChromiumTest.cpp:
+        (TEST):
+
+2012-07-25  Adrienne Walker  <enne@google.com>
+
+        [chromium] Unify compositor quadTransform/drawTransform/originTransform
+        https://bugs.webkit.org/show_bug.cgi?id=91417
+
+        Reviewed by Kenneth Russell.
+
+        Clean up tests to refer to the new draw transform semantics.
+
+        * tests/CCDamageTrackerTest.cpp:
+        (WebKitTests::createTestTreeWithOneSurface):
+        (WebKitTests::createTestTreeWithTwoSurfaces):
+        (WebKitTests::TEST_F):
+        * tests/CCLayerSorterTest.cpp:
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::CCLayerTreeHostTestDeviceScaleFactorScalesViewportAndLayers::commitCompleteOnCCThread):
+        * tests/CCQuadCullerTest.cpp:
+        * tests/TiledLayerChromiumTest.cpp:
+
+2012-07-25  Kevin Ellis  <kevers@chromium.org>
+
+        [chromium] Calendar picker popup displays at wrong scale when deviceScaleFactor != 1.
+        https://bugs.webkit.org/show_bug.cgi?id=92177
+
+        Manually tested at deviceScaleFactor = 1 and 2.
+
+        Reviewed by Kent Tamura.
+
+        The device scale factor was not being set for the calendar popup. 
+        As a result, the popup was rendered too small on hidpi displays.
+        This patch sets the device scale factor for any page popup.
+
+        * src/WebPagePopupImpl.cpp:
+        (WebKit::WebPagePopupImpl::initPage):
+
+2012-07-25  MORITA Hajime <morrita@google.com>
+
+        Another unreviewed win build fix against r123569.
+
+        * tests/IDBAbortOnCorruptTest.cpp:
+
+2012-07-25  MORITA Hajime  <morrita@google.com>
+
+        Unreviewed win build fix against r123569.
+
+        * tests/IDBAbortOnCorruptTest.cpp:
+        * tests/IDBDatabaseBackendTest.cpp:
+
+2012-07-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-07-24  Dave Tu  <dtu@chromium.org>
+
+        [chromium] Move renderingStats from WebView to WebWidget.
+        https://bugs.webkit.org/show_bug.cgi?id=92184
+
+        Reviewed by Adam Barth.
+
+        We are going to add some rendering stats that work in non-composited mode, so the renderingStats() method should be moved from WebView to WebWidget.
+
+        * public/WebView.h:
+        (WebKit):
+        (WebView):
+        * public/WebWidget.h:
+        (WebKit):
+        (WebWidget):
+        (WebKit::WebWidget::renderingStats):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-07-24  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: fix #include dependencies so IDBRequest isn't an include root
+        https://bugs.webkit.org/show_bug.cgi?id=92167
+
+        Reviewed by Tony Chang.
+
+        Remove implicit dependencies due to using IDBRequest.h, and fix all 
+        places that break as a result.
+
+        * src/IDBCallbacksProxy.cpp:
+        * src/WebIDBDatabaseImpl.cpp:
+        * src/WebIDBTransactionImpl.cpp:
+
+2012-07-24  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] Support scrolling and zooming to focused input elements
+        https://bugs.webkit.org/show_bug.cgi?id=91661
+
+        Reviewed by Darin Fisher.
+
+        This patch introduces saveScrollAndScaleState and
+        restoreScrollAndScaleState, which can be used to save and restore the
+        scroll and scale state of the WebView, respectively.  These functions
+        will be used by Chromium on Android to save the scale and scrolls state
+        before zoom into a text field so that we can "undo" the zoom if the
+        user didn't mean to zoom into the text field.
+
+        I wanted to write unit tests for these functions, but it wasn't clear
+        to me how to write the test because startPageScaleAnimation appears to
+        complete asynchronously.
+
+        * public/WebView.h:
+        (WebView):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+        (WebKit::WebViewImpl::saveScrollAndScaleState):
+        (WebKit):
+        (WebKit::WebViewImpl::restoreScrollAndScaleState):
+        (WebKit::WebViewImpl::resetSavedScrollAndScaleState):
+        (WebKit::WebViewImpl::didCommitLoad):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-07-24  Dave Tu  <dtu@chromium.org>
+
+        [chromium] Add time spent painting to GPU benchmarking renderingStats() API.
+        https://bugs.webkit.org/show_bug.cgi?id=90019
+
+        Reviewed by Adrienne Walker.
+
+        * src/WebLayerTreeView.cpp:
+        (WebKit::WebLayerTreeView::renderingStats):
+        * tests/CCLayerTreeHostTest.cpp:
+        * tests/CCTiledLayerTestCommon.cpp:
+        (WebKitTests::FakeLayerTextureUpdater::Texture::prepareRect):
+        (WebKitTests::FakeTiledLayerChromium::update):
+        * tests/CCTiledLayerTestCommon.h:
+        (Texture):
+        (FakeTiledLayerChromium):
+        * tests/Canvas2DLayerBridgeTest.cpp:
+        * tests/ContentLayerChromiumTest.cpp:
+        (WebKit::TEST):
+        * tests/TiledLayerChromiumTest.cpp:
+
+2012-07-24  Jian Li  <jianli@chromium.org>
+
+        Add per-context setting for html notifications
+        https://bugs.webkit.org/show_bug.cgi?id=91295
+
+        Reviewed by Adam Barth.
+
+        Add new per-context feature for chromium port.
+
+        * public/WebPermissionClient.h:
+        (WebPermissionClient):
+        (WebKit::WebPermissionClient::allowHTMLNotifications):
+        * src/ContextFeaturesClientImpl.cpp:
+        (WebKit::ContextFeaturesClientImpl::askIfIsEnabled):
+
+2012-07-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123499.
+        http://trac.webkit.org/changeset/123499
+        https://bugs.webkit.org/show_bug.cgi?id=92161
+
+        Android fails to compile (Requested by zhenyao on #webkit).
+
+        * src/AssertMatchingEnums.cpp:
+
+2012-07-24  Terry Anderson  <tdanderson@chromium.org>
+
+        [chromium] Add a bounding box member in WebGestureEvent
+        https://bugs.webkit.org/show_bug.cgi?id=92144
+
+        Reviewed by Adam Barth.
+
+        The new |boundingBox| member will be used to store the touch region for a WebGestureEvent.
+        This will be useful for gesture target fuzzing across multiple different gesture types
+        (tap, long press, scroll, etc.)
+
+        * public/WebInputEvent.h:
+        (WebGestureEvent):
+        * src/WebInputEvent.cpp:
+        (SameSizeAsWebGestureEvent):
+
+2012-07-24  Nico Weber  <thakis@chromium.org>
+
+        [chromium/mac] Add cursor resource pngs to the pak file.
+        https://bugs.webkit.org/show_bug.cgi?id=92148
+
+        Reviewed by Tony Chang.
+
+        Once https://chromiumcodereview.appspot.com/10817031/ has landed, they can be
+        removed from WebCore.gyp's mac_bundle_resources. Part of http://crbug.com/137588
+
+        * WebKit.grd:
+
+2012-07-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123472.
+        http://trac.webkit.org/changeset/123472
+        https://bugs.webkit.org/show_bug.cgi?id=92134
+
+        Revert roll to v8 version that crashes sporadically (Requested
+        by atwilson on #webkit).
+
+        * DEPS:
+
+2012-07-24  Keishi Hattori  <keishi@webkit.org>
+
+        [Chromium] Page popup should close on mouse down
+        https://bugs.webkit.org/show_bug.cgi?id=92092
+
+        Reviewed by Kent Tamura.
+
+        Page popup should close on mouse down because some elements(e.g. <input type=color>) don't have a blur event that
+        we can hook to hide the page popup when the user clicks on the page.
+
+        * src/WebPagePopupImpl.h:
+        (WebKit::WebPagePopupImpl::hasSamePopupClient): Returns true if the given WebPagePopupImpl have the same popup client.
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleMouseDown): Close all popups when the page is clicked. Checks if the
+        mouse down event opened the same popup we just closed.
+
 2012-07-24  Jochen Eisinger  <jochen@chromium.org>
 
         Unreviewed.  Rolled DEPS.

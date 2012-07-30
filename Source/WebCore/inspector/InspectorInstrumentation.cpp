@@ -80,6 +80,10 @@ static const char* const setTimerEventName = "setTimer";
 static const char* const clearTimerEventName = "clearTimer";
 static const char* const timerFiredEventName = "timerFired";
 
+namespace {
+static HashSet<InstrumentingAgents*>* instrumentingAgentsSet = 0;
+}
+
 int InspectorInstrumentation::s_frontendCounter = 0;
 
 static bool eventHasListeners(const AtomicString& eventType, DOMWindow* window, Node* node, const Vector<EventContext>& ancestors)
@@ -844,6 +848,18 @@ void InspectorInstrumentation::loaderDetachedFromFrameImpl(InstrumentingAgents* 
         inspectorPageAgent->loaderDetachedFromFrame(loader);
 }
 
+void InspectorInstrumentation::willDestroyCachedResourceImpl(CachedResource* cachedResource)
+{
+    if (!instrumentingAgentsSet)
+        return;
+    HashSet<InstrumentingAgents*>::iterator end = instrumentingAgentsSet->end();
+    for (HashSet<InstrumentingAgents*>::iterator it = instrumentingAgentsSet->begin(); it != end; ++it) {
+        InstrumentingAgents* instrumentingAgents = *it;
+        if (InspectorResourceAgent* inspectorResourceAgent = instrumentingAgents->inspectorResourceAgent())
+            inspectorResourceAgent->willDestroyCachedResource(cachedResource);
+    }
+}
+
 InspectorInstrumentationCookie InspectorInstrumentation::willWriteHTMLImpl(InstrumentingAgents* instrumentingAgents, unsigned int length, unsigned int startLine, Frame* frame)
 {
     int timelineAgentId = 0;
@@ -1141,6 +1157,22 @@ WTF::ThreadSpecific<InspectorTimelineAgent*>& InspectorInstrumentation::threadSp
     return *instance;
 }
 
+void InspectorInstrumentation::registerInstrumentingAgents(InstrumentingAgents* instrumentingAgents)
+{
+    if (!instrumentingAgentsSet)
+        instrumentingAgentsSet = new HashSet<InstrumentingAgents*>();
+    instrumentingAgentsSet->add(instrumentingAgents);
+}
+
+void InspectorInstrumentation::unregisterInstrumentingAgents(InstrumentingAgents* instrumentingAgents)
+{
+    if (!instrumentingAgentsSet)
+        return;
+    instrumentingAgentsSet->remove(instrumentingAgents);
+    if (!instrumentingAgentsSet->size())
+        delete instrumentingAgentsSet;
+}
+
 InspectorTimelineAgent* InspectorInstrumentation::retrieveTimelineAgent(const InspectorInstrumentationCookie& cookie)
 {
     if (!cookie.first)
@@ -1171,6 +1203,15 @@ InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForNonDocument
     if (context->isWorkerContext())
         return instrumentationForWorkerContext(static_cast<WorkerContext*>(context));
     return 0;
+}
+#endif
+
+#if ENABLE(GEOLOCATION)
+GeolocationPosition* InspectorInstrumentation::overrideGeolocationPositionImpl(InstrumentingAgents* instrumentingAgents, GeolocationPosition* position)
+{
+    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent())
+        position = pageAgent->overrideGeolocationPosition(position);
+    return position;
 }
 #endif
 

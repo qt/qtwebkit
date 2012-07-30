@@ -49,6 +49,7 @@ class Range;
 class ScriptExecutionContext;
 class ShadowRoot;
 class WebKitPoint;
+class FastMallocStatistics;
 
 typedef int ExceptionCode;
 
@@ -146,7 +147,7 @@ public:
 
     int lastSpellCheckRequestSequence(Document*, ExceptionCode&);
     int lastSpellCheckProcessedSequence(Document*, ExceptionCode&);
-    
+
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
 
@@ -182,6 +183,8 @@ public:
     void suspendAnimations(Document*, ExceptionCode&) const;
     void resumeAnimations(Document*, ExceptionCode&) const;
 
+    void garbageCollectDocumentResources(Document*, ExceptionCode&) const;
+
     void allowRoundingHacks() const;
 
 #if ENABLE(INSPECTOR)
@@ -191,6 +194,8 @@ public:
 #endif
 
     String counterValue(Element*);
+
+    int pageNumber(Element*, float pageWidth = 800, float pageHeight = 600);
     PassRefPtr<DOMStringList> iconURLs(Document*) const;
 
 #if ENABLE(FULLSCREEN_API)
@@ -202,6 +207,8 @@ public:
 
     void registerURLSchemeAsBypassingContentSecurityPolicy(const String& scheme);
     void removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const String& scheme);
+
+    PassRefPtr<FastMallocStatistics> fastMallocStatistics() const;
 
 private:
     explicit Internals(Document*);

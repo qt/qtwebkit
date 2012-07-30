@@ -50,6 +50,9 @@ WebInspector.UISourceCode = function(url, resource, contentProvider, sourceMappi
      * @type Array.<function(?string,boolean,string)>
      */
     this._requestContentCallbacks = [];
+    /**
+     * @type Array.<WebInspector.LiveLocation>
+     */
     this._liveLocations = [];
     /**
      * @type {Array.<WebInspector.PresentationConsoleMessage>}
@@ -61,6 +64,10 @@ WebInspector.UISourceCode = function(url, resource, contentProvider, sourceMappi
      */
     this.history = [];
     this._restoreRevisionHistory();
+    this._formatterMapping = new WebInspector.IdentityFormatterSourceMapping();
+
+    // FIXME: postpone formattedChanged call to after the mapping has been established.
+    setTimeout(this.formattedChanged.bind(this), 0);
 }
 
 WebInspector.UISourceCode.Events = {
@@ -134,7 +141,7 @@ WebInspector.UISourceCode.prototype = {
         }
         this._requestContentCallbacks.push(callback);
         if (this._requestContentCallbacks.length === 1)
-            this._contentProvider.requestContent(this.fireContentAvailable.bind(this));
+            this._contentProvider.requestContent(this._fireContentAvailable.bind(this));
     },
 
     /**
@@ -348,7 +355,7 @@ WebInspector.UISourceCode.prototype = {
      * @param {boolean} contentEncoded
      * @param {string} mimeType
      */
-    fireContentAvailable: function(content, contentEncoded, mimeType)
+    _fireContentAvailable: function(content, contentEncoded, mimeType)
     {
         this._contentLoaded = true;
         this._mimeType = mimeType;
@@ -358,6 +365,11 @@ WebInspector.UISourceCode.prototype = {
         this._requestContentCallbacks = [];
         for (var i = 0; i < callbacks.length; ++i)
             callbacks[i](content, contentEncoded, mimeType);
+
+        if (this._formatOnLoad) {
+            delete this._formatOnLoad;
+            this.setFormatted(true);
+        }
     },
 
     /**
@@ -375,11 +387,12 @@ WebInspector.UISourceCode.prototype = {
      */
     uiLocationToRawLocation: function(lineNumber, columnNumber)
     {
-        return this._sourceMapping.uiLocationToRawLocation(this, lineNumber, columnNumber);
+        var location = this._formatterMapping.formattedToOriginal(lineNumber, columnNumber);
+        return this._sourceMapping.uiLocationToRawLocation(this, location[0], location[1]);
     },
 
     /**
-     * @param {WebInspector.Script.Location} liveLocation
+     * @param {WebInspector.LiveLocation} liveLocation
      */
     addLiveLocation: function(liveLocation)
     {
@@ -387,7 +400,7 @@ WebInspector.UISourceCode.prototype = {
     },
 
     /**
-     * @param {WebInspector.Script.Location} liveLocation
+     * @param {WebInspector.LiveLocation} liveLocation
      */
     removeLiveLocation: function(liveLocation)
     {
@@ -403,10 +416,12 @@ WebInspector.UISourceCode.prototype = {
 
     /**
      * @param {WebInspector.UILocation} uiLocation
-     * @return {WebInspector.UILocation}
      */
     overrideLocation: function(uiLocation)
     {
+        var location = this._formatterMapping.originalToFormatted(uiLocation.lineNumber, uiLocation.columnNumber);
+        uiLocation.lineNumber = location[0];
+        uiLocation.columnNumber = location[1];
         return uiLocation;
     },
 
@@ -443,13 +458,90 @@ WebInspector.UISourceCode.prototype = {
     },
 
     /**
+     * @return {boolean}
+     */
+    togglingFormatter: function()
+    {
+        return this._togglingFormatter;
+    },
+
+    /**
+     * @return {boolean}
+     */
+    formatted: function()
+    {
+        return this._formatted;
+    },
+
+    /**
      * @param {boolean} formatted
      * @param {function()=} callback
      */
     setFormatted: function(formatted, callback)
     {
-        if (callback)
+        callback = callback || function() {};
+        if (!this.contentLoaded()) {
+            this._formatOnLoad = formatted;
             callback();
+            return;
+        }
+
+        if (this._formatted === formatted) {
+            callback();
+            return;
+        }
+
+        this._formatted = formatted;
+
+        // Re-request content
+        this._contentLoaded = false;
+        this._content = false;
+        WebInspector.UISourceCode.prototype.requestContent.call(this, didGetContent.bind(this));
+  
+        /**
+         * @this {WebInspector.UISourceCode}
+         * @param {?string} content
+         * @param {boolean} contentEncoded
+         * @param {string} mimeType
+         */
+        function didGetContent(content, contentEncoded, mimeType)
+        {
+            var formatter;
+            if (!formatted)
+                formatter = new WebInspector.IdentityFormatter();
+            else
+                formatter = WebInspector.Formatter.createFormatter(this.contentType());
+            formatter.formatContent(mimeType, content || "", formattedChanged.bind(this));
+  
+            /**
+             * @this {WebInspector.UISourceCode}
+             * @param {string} content
+             * @param {WebInspector.FormatterSourceMapping} formatterMapping
+             */
+            function formattedChanged(content, formatterMapping)
+            {
+                this._togglingFormatter = true;
+                this.contentChanged(content, mimeType);
+                delete this._togglingFormatter;
+                this._formatterMapping = formatterMapping;
+                this.updateLiveLocations();
+                this.formattedChanged();
+                callback();
+            }
+        }
+    },
+
+    /**
+     * @return {WebInspector.Formatter} formatter
+     */
+    createFormatter: function()
+    {
+        // overridden by subclasses.
+        return null;
+    },
+
+    formattedChanged: function()
+    {
     }
 }
 
@@ -509,6 +601,14 @@ WebInspector.UILocation.prototype = {
     uiLocationToRawLocation: function()
     {
         return this.uiSourceCode.uiLocationToRawLocation(this.lineNumber, this.columnNumber);
+    },
+
+    /**
+     * @return {?string}
+     */
+    url: function()
+    {
+        return this.uiSourceCode.contentURL();
     }
 }
 
@@ -517,6 +617,58 @@ WebInspector.UILocation.prototype = {
  */
 WebInspector.RawLocation = function()
 {
+}
+
+/**
+ * @constructor
+ * @param {WebInspector.RawLocation} rawLocation
+ * @param {function(WebInspector.UILocation):(boolean|undefined)} updateDelegate
+ */
+WebInspector.LiveLocation = function(rawLocation, updateDelegate)
+{
+    this._rawLocation = rawLocation;
+    this._updateDelegate = updateDelegate;
+    this._uiSourceCodes = [];
+}
+
+WebInspector.LiveLocation.prototype = {
+    update: function()
+    {
+        var uiLocation = this.uiLocation();
+        if (uiLocation) {
+            var uiSourceCode = uiLocation.uiSourceCode;
+            if (this._uiSourceCodes.indexOf(uiSourceCode) === -1) {
+                uiSourceCode.addLiveLocation(this);
+                this._uiSourceCodes.push(uiSourceCode);
+            }
+            var oneTime = this._updateDelegate(uiLocation);
+            if (oneTime)
+                this.dispose();
+        }
+    },
+
+    /**
+     * @return {WebInspector.RawLocation}
+     */
+    rawLocation: function()
+    {
+        return this._rawLocation;
+    },
+
+    /**
+     * @return {WebInspector.UILocation}
+     */
+    uiLocation: function()
+    {
+        // Should be overridden by subclasses.
+    },
+
+    dispose: function()
+    {
+        for (var i = 0; i < this._uiSourceCodes.length; ++i)
+            this._uiSourceCodes[i].removeLiveLocation(this);
+        this._uiSourceCodes = [];
+    }
 }
 
 /**
